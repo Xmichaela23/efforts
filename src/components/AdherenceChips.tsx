@@ -159,14 +159,25 @@ export default function AdherenceChips({
       );
     };
 
-    /** "22 of 35 min" — whole minutes, from the seconds the server measured. */
-    const easyValue = (() => {
-      if (easyUnderS == null || easyTotalS == null || easyTotalS <= 0) {
-        // No minutes shipped (a session analysed before they existed) — the percentage is still true.
-        return intensityAdherence != null ? `${intensityAdherence}%` : null;
-      }
-      return `${Math.round(easyUnderS / 60)} of ${Math.round(easyTotalS / 60)} min`;
-    })();
+    /** "22 of 35 min" — whole minutes, from the seconds the server measured.
+     *
+     * ⛔ NO FALLBACK TO THE PERCENTAGE (2026-08-02, Michael: *"is this a good fallback?"* — it was not).
+     * The first version rendered `49%` when the seconds were absent, justified as a bridge for sessions
+     * analysed before they existed. Two things were wrong with it. It was SILENT: one run reading
+     * "22 of 35 min" and the next reading "49%", with nothing on screen saying why. And the reason
+     * given for tolerating it — "it will age out" — was false, because nothing ages it out; there is no
+     * backfill, only a person tapping recompute.
+     *
+     * ⚠️ The window it covered turned out to be about two sessions: a run analysed BEFORE this morning
+     * has no percentage either, so it shows no Easy chip at all and never reached this branch. Paying
+     * for a permanent second shape to cover two runs is the wrong trade — and the backfill that would
+     * have retired it rewrites `heart_rate_summary`, which is State's durability substrate. Not worth
+     * moving State to tidy two chips.
+     *
+     * So: no measurement, no chip. The session shows Execution and Duration until it is recomputed. */
+    const easyValue = (easyUnderS != null && easyTotalS != null && easyTotalS > 0)
+      ? `${Math.round(easyUnderS / 60)} of ${Math.round(easyTotalS / 60)} min`
+      : null;
     const easySubtitle = easyCeilingBpm != null
       ? `under ${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim()
       : 'held easy';
