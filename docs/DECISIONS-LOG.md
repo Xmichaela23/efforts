@@ -2664,6 +2664,146 @@ is provenance) — the RULE is what is shared, not the items. ⚠️ **The empty
 *"no baseline set · accept your FTP to anchor"* is actionable, and hiding an actionable gap behind a tap
 is how a missing dot starts reading as a bug.
 
+## D-363 — THE SESSION SCREEN IS NOT THE STATE SCREEN (2026-08-02, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+Michael, on the ride Performance tab: *"this is too dense — see how running handles it, works there."*
+A run's Performance tab renders **one** analysis row and a sentence:
+
+> `Conditions · Rolling (33 ft gain) · 82°F (mild heat stress)` + *"Warm at 82°F — both add a little
+> load, and you carried it."*
+
+The ride rendered **nine**. "Cycling parity rows" had been added so the bike would not feel empty, and
+overshot into a data table. Cut to running's shape: **Insights, Terrain, Efficiency**.
+
+| cut | why |
+|---|---|
+| Power | said "141W (80% of threshold)" one row under an Insights line already reading "141 W normalized at 0.8 intensity" |
+| Heart rate | "Avg 144 · Max 166" is already on the DETAILS tab — a bare avg/max belongs with raw readouts |
+| Power zones | a seven-band distribution is a data table wearing a sentence; running shows none either |
+| Climbing (VAM) | a specialist's metric; Terrain already states the gain. `formatCyclingClimbingRow` KEPT (tested) |
+
+**And three rules came out of it that generalise beyond the bike:**
+
+1. ⛔ **FATIGUE BELONGS TO STATE.** *"Accumulated fatigue is elevated (6 training days without rest…)"*
+   is a cross-discipline, multi-day judgement that renders **identically on every session opened that
+   week**. State owns the athlete's condition; a session page owns what happened in the session. Two
+   screens asserting one verdict is the divergence the spine exists to prevent, and the session page is
+   the one with no context to qualify it. Filtered by **category**, not message text, in BOTH doors (the
+   Flag row and the narrative fallback that appended the first flag to Insights).
+2. ⛔ **DO NOT SHOW A READING THE ENGINE THREW AWAY.** Michael: *"why would you say 146 is heart rate at
+   easy power?"* Because on a hard ride it is not. In-band time on a threshold ride is incidental —
+   warmup, descents, the sag between efforts — and HR there is dragged up by the work around it. The
+   STATE trend has excluded such rides since D-275-bike (`bikeEfficiencyRideEligible`). **The session
+   card did not know**, so it printed the number under a label claiming it was measured at easy power
+   AND told the athlete it fed a read that had already discarded it. The analyzer now decides with the
+   same gate and ships `counts_toward_trend`; the card renders only when true. **The client does not
+   re-derive eligibility** — that is how the two drift apart.
+3. **NAME THE ZONE THE ATHLETE ACTUALLY RODE IN.** `classified_type: threshold` had been computed all
+   along and never printed. Insights now leads with *"Ridden at threshold — …"*, read from the
+   classification, never re-derived from IF (that would be a second opinion on a settled question).
+   ⚠️ It matters most when it **contradicts the prescription**: prescribed "easy, all conversational",
+   ridden at threshold, 14% held under the easy ceiling — one coherent story instead of three numbers
+   that never met.
+
+**Also:** `at Z2 power · 99–132 W` was the SAMPLING WINDOW, not a verdict — on a threshold ride the
+most prominent label said "Z2", the opposite of the truth. Now *"measured in your 99–132 W range"*.
+**And the two tabs disagreed about elevation** — 958 ft on Details, 942 ft on Performance, because
+Details read the provider total and Performance derived its own. One number now (`providerElevationGainM`).
+
+## D-362 — SCORE WHAT WAS PRESCRIBED (2026-08-02, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+A ride prescribed *"~108 min easy, all conversational"* scored **0%**. The chain of reasons is the
+entry; the rule is the title.
+
+### 1. The planned duration was not where cycling looked
+
+`analyze-running-workout` reads `plannedWorkout.computed.total_duration_seconds`
+(`lib/adherence/granular-pace.ts`). `analyze-cycling-workout` summed the STEPS and nothing else. An
+unstructured session has no steps, so it resolved to 0 planned seconds → 0%. **A run in the same shape
+scores fine** (a real one: duration 53, execution 72). Not a missing feature — one of two readers
+looking in one place.
+→ `_shared/planned-duration.ts`: steps → `computed.total_duration_seconds` → the column → `duration`
+(minutes). **`auto-attach-planned` reads the same resolver** ([D-361]); it had the identical hole,
+which is how one session managed to be both unattachable AND unscoreable.
+⚠️ **And the analyzer's query never SELECTED `duration`** — the resolver had nothing to resolve. Third
+time one missing column caused this in a night.
+
+### 2. It graded power that was never prescribed
+
+70/30 power/duration assumes power targets exist. With none, a rider who did 59% of the prescribed time
+scored `0.7×0 + 0.3×59 = 18%` — **wrong, not lenient**: graded against a prescription never given.
+With no graded power interval, `power_adherence` is **NULL, not 0** ("not measured" ≠ "you scored
+zero", and the chips hide when everything is 0).
+
+### 3. ⛔ AN EASY PRESCRIPTION IS GOVERNED BY HEART RATE
+
+Michael: *"I went too hard — heart rate should probably be the governor. It was prescribed as easy."*
+The field's rule: power is what the bike sees, heart rate is what the body did to produce it. For an
+easy ride the target is physiological → HR leads; for intervals the target is external → power leads.
+Decide in advance which governs (TrainingPeaks/Friel practice). Execution = **50/50 intensity+duration**,
+mirroring running's 50/50 pace+duration.
+
+- ⛔ **TIME UNDER THE CEILING, NEVER THE AVERAGE.** The ride climbed 958 ft; an average punishes terrain
+  and reads a hilly easy ride as indiscipline. A test pins exactly this (average says "not easy", the
+  honest answer is two thirds held).
+- ⛔ **THE CEILING IS NOT `ride_easy_hr`.** That learned 130 bpm is a **median of past easy rides** — as
+  a gate it fails half the athlete's own easy rides by construction. Anchor: threshold-first (Friel
+  cycling Z2, 89% of LTHR), **75% of max** as bootstrap — NOT the run's 80%, because cycling HR sits
+  5–10 bpm below running at the same effort and this app's own ride learner already uses a 65–75% band.
+  `_shared/easy-hr.ts` says outright: do not unify them.
+- **`ride_easy_hr` was written by `learn-fitness-profile` and read by NOTHING.** Another built-and-
+  starved capability, now consumed.
+
+### 4. A large deviation is not a reason to stop scoring
+
+`assessed_against` flips to `'actual'` in two unrelated cases (`fact-packet/build.ts:848`): no planned
+workout at all, **or** distance deviated ≥30% ("intentional"). `AdherenceChips` treated them the same
+and returned null for both. Case 2 is backwards: there IS a plan, the comparison DID run, and pace 90 /
+duration 78 / execution 84 sat in the contract unrendered — while the same screen printed *"36 of 46 min
+planned (78%)"* and a 90% interval row two lines above. Michael: *"if it attached it should adhere to
+something."* Only the display guard moved; `assessed_against` still drives stimulus criteria and the
+LLM note.
+
+**Grounding for the numbers, checked not recalled:** a 20-min TT repeats at CV ~2.9% in a lab (IJSPP
+2019); 220−age has no scientific merit (Robergs & Landwehr 2002, error 7–11 bpm) and Tanaka
+(208 − 0.7×age, n=18,712) still puts this athlete 7 bpm under a heart rate he has actually ridden at.
+**Measurement beats prediction — which is the argument for a threshold test, and why the Easy chip now
+prints "est. from your max HR" until one exists.**
+
+## D-361 — A SESSION MUST BE ABLE TO ATTACH, AND THE ANALYZER MUST FOLLOW IT (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+Michael: *"bike is kind of a mess — didn't attach to planned workout."* Three defects in one chain, all
+found with the row in hand.
+
+**1. The planned Long Ride was found and refused.** Right date, type `ride`, status `planned`, nothing
+claiming it — and: `computed: null · intervals: [] · total_duration_seconds: null · duration: 108`.
+`sumPlanned` read only `computed.steps` / `intervals`, so it saw no duration and the caller declined.
+⛔ **Every UNSTRUCTURED endurance session in the app was unattachable** — base miles, most of an
+endurance week, not an edge case. (The ride was 64 min of 108 = ratio 0.59, well inside the 0.50–1.50
+window. It should have attached.)
+
+**2. The refusal lied.** `ratio == null` returned `duration_out_of_range`, which reads as *"the athlete
+rode too short"* — it cost an hour of debugging and sent two hypotheses the wrong way. Now
+`planned_has_no_duration` / `completed_has_no_duration`, carrying both seconds.
+
+**3. A session pushed to Garmin was invisible.** `send-workout-to-garmin` sets
+`workout_status: 'sent_to_garmin'` (`index.ts:175`) and **nothing in the codebase ever sets it back** —
+the string appears in exactly two places. The candidate query listed only `planned`/`in_progress`/
+`completed`, so the sessions an athlete deliberately pushed to their head unit — the ones most likely to
+be ridden and come back — were the only ones that could never auto-attach. The inverse of the intent.
+
+**4. And attaching did not re-score anything but runs.** All three attach paths ended in
+`if (finalSport === 'run')`. Adherence and execution are the only outputs needing a planned session, so
+a **ride or swim that attached after its analysis had run never got them, permanently** — on screen, a
+Performance tab with every plan-free number present and the execution chips simply absent, which reads
+as a deleted feature. All three now route through `resolveAnalyzeEdgeFn(w.type)`.
+
+⛔ **That helper moved to `_shared/analyze-routing.ts`.** Its old header said it was kept local *"so it
+bundles only here — no cross-function deploy trap"*. **That trade cost more than it saved:** attach
+needed the same routing, could not import it, and grew a second table that was a one-line `if` with a
+silent hole. `CLAUDE.md` names three hand-maintained routing tables as a standing hazard; this pays down
+one. `orchestrator-lib` re-exports it, so its callers and 19 tests are untouched.
+
 ## D-360 — CYCLING FTP: THE ATHLETE CHOOSES, AND THEIR CHOICE WINS (2026-08-01, Michael — **PUSHED + DEPLOYED + VERIFIED ON DEVICE**)
 
 **Closes [Q-240].** Bike was the only baseline where the app decided and the athlete could not answer

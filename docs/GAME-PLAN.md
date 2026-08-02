@@ -4,6 +4,15 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-02 — THE SESSION SCREEN, BOTH SPORTS AT ONCE.**
+> A night of reading the live screen turned up one disease in four forms: each sport had grown its own
+> private answer to a question both were asking. Attach, execution scoring, screen density and trend
+> eligibility all fixed for bike ([D-361], [D-362], [D-363]) — **and swim and strength were never
+> checked for the same thing.**
+>
+> ⛔ **NEXT: `docs/WORKORDER-session-screen-continuity-2026-08-02.md`.** One session, both sports, audit
+> before rows. Michael's framing: *"a wide continuity."*
+
 > **2026-08-01 (late) — THE BIKE ROW IS FINISHED, AND THE NEXT JOB IS UPSTREAM OF THE SCREEN.**
 > Gate + floor + three reads ([D-359]) and the FTP choice ([D-360], closes Q-240) all shipped and
 > deployed. The bike row now refuses to assert a direction it cannot support, and names WHY when it

@@ -23,64 +23,51 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-01 late — **the bike is finished: gated, floored, and it says what it can read. Your job is the ATTACH FAILURE.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-02 morning — **the session screen is the job, and it is BOTH sports at once. Read `docs/WORKORDER-session-screen-continuity-2026-08-02.md` first.**)
 
-### YOUR JOB — WHY TONIGHT'S RIDE DID NOT ATTACH TO THE PLANNED LONG RIDE
+### YOUR JOB — ONE VOCABULARY, FOUR SPORTS
 
-Michael, on the ride detail for **Evening Ride, Sat 2026-08-01 19:54** (Strava, via Edge 1040): *"bike
-is kind of a mess — didn't attach to planned workout."* The screen shows an **Attach** button, meaning
-`auto-attach-planned` did not claim it, and `Sat 8/1 Long Ride` was on the plan (the State NEXT line
-names it).
+**The work order is written and it is the entry point, not this banner:**
+`docs/WORKORDER-session-screen-continuity-2026-08-02.md`. It names the disease, the rules already
+settled, the target row shape, and the three known bike gaps.
 
-⛔ **This is the loop breaking, not a display bug.** An unattached ride has no planned-vs-executed
-comparison and drops out of adherence — so the week reads as missed work that was actually done.
+⛔ **ONE SESSION HOLDS BOTH BIKE AND RUN.** Michael's call: *"should a fresh chat tackle both
+simultaneously to ensure visual continuity, a wide continuity?"* — yes, and splitting them is precisely
+how they drifted apart. The deliverable is that they AGREE.
 
-**Start at** `ingest-activity/index.ts:~1430-1580` (the fan-out; `auto-attach-planned` is the one call
-deliberately AWAITED) and then `auto-attach-planned` itself. **Do not assume it is absent** — it is
-wired and awaited, so this is a matching failure, not a missing feature: the date, the discipline, the
-window, or a Strava-path field the Garmin path supplies. ⚠️ **Michael's account only — do not query
-prod without asking.**
+**Start with the audit, not the rows.** Each sport grew a private answer to a question both were
+asking — planned duration, which analyzer runs, which read leads, does this session count. Four such
+were found and fixed on 2026-08-01. **Swim and strength have never been checked for the same disease.**
 
-### THEN, IN ORDER
+### WHAT SHIPPED — do NOT re-litigate ([D-361], [D-362], [D-363])
 
-1. **`Workload 86` reads as TSS** on the ride screen (Garmin showed TSS 66.3 alongside). Different unit
-   entirely, sitting in a grid of power numbers where a cyclist will read it as TSS. Label problem.
-2. **Swim and strength probably have the bike's old disease** — reporting an absence instead of naming
-   a reason ([D-359] §3). Michael has NOT ruled on this; ask before building.
-3. **BASE-WEEK COMMUNICATION** — ⚠️ still not specified anywhere in this repo. He named it 2026-08-01
-   morning and the substance was never captured. **Get it from him. Do not infer it from the code.**
+**ATTACH IS FIXED, three ways.** Unstructured sessions ("~108 min easy", no steps) were **unattachable
+app-wide** — the matcher only summed steps and the row's `duration: 108` was never even selected. A
+session pushed to a Garmin was **invisible** to the matcher (`sent_to_garmin` is set by
+`send-workout-to-garmin` and never unset). And attaching only re-ran the analyzer **for runs**, so a
+ride or swim attaching late never got a plan comparison at all.
 
-### WHAT SHIPPED TODAY — do NOT re-litigate
+**RIDE EXECUTION SCORES WHAT WAS PRESCRIBED.** Watts prescribed → power. "Easy" prescribed → **heart
+rate governs**, 50/50 with duration. Time UNDER the ceiling, never the average (958 ft of climbing must
+not read as indiscipline). ⛔ The ceiling is NOT the learned `ride_easy_hr` — that is a MEDIAN and would
+fail half his own easy rides; it is threshold-first, 75%-of-max bootstrap.
 
-**THE BIKE ROW IS DONE ([D-359], [D-360]).** Direction gated against its own scatter (bike was the only
-discipline without it), an 8-ride floor that is DERIVED not felt (the derivation is in D-359 §2 — read
-it before touching the number), and three reads that name the reason instead of reporting an absence:
-threshold / aerobic / building. **The bike now carries WORDS on its aerobic read — that reverses part
-of [D-356]**, and the reasoning is in D-359 §4: the noise guard, not a confidence interval, is the bar.
+**THE SESSION SCREEN IS NOT THE STATE SCREEN.** Nine rows cut to three (running's shape). Fatigue moved
+to State. A ride the trend DISCARDS no longer prints its contaminated HR reading — the card now reads
+`counts_toward_trend` from the analyzer instead of not knowing.
 
-**FTP is a CHOICE now ([D-360], closes Q-240)** — two pills, `ftp_source`, honoured by the one resolver.
-⛔ **Absent a choice it is byte-identical to before, deliberately** — that resolver feeds the coach, the
-analyzers, the plan generators and every power zone. Do not "simplify" it. The FTP field also could not
-be edited at all (it rendered the learned value); fixed.
-
-**[Q-241] named the wrong file and [D-359] explains how.** It pointed at `bike.ts`; the STATE row reads
-`bike-fitness.ts`. Fixing only the filed line would have left the screen wrong and the ticket closed.
-
-**The strength logger is device-verified** (2026-08-01, Michael: "it works") — [D-352], and the LOGGER
-half of [D-351]. **The PERFORMANCE half of D-351 is still unseen.**
+**CHIPS RENDER ON A BIG DEVIATION NOW.** `assessed_against: 'actual'` meant two unrelated things; a
+37%-short run had pace 90 / duration 78 / execution 84 sitting unrendered.
 
 ### STILL UNVERIFIED — what would settle it
 
-- **Only the BUILDING bike state has been seen** (`6 rides in 8 weeks`, which is the floor working —
-  he has 6 easy rides and no hard efforts). **The AEROBIC and THRESHOLD states have never rendered**
-  for anyone. Settled by: 2 more qualifying easy rides (aerobic), or any threshold/sweet-spot/tempo/
-  climbing ride (threshold).
-- **Performance's renamed per-ride block** ("Heart rate at easy power") — deployed, unseen.
-- **Our power numbers are ~1.5% under Garmin's** on the same ride: avg 113 vs 115 W, NP 141 vs 143 W.
-  Max power matches exactly (424 W), so it is the same file read slightly differently — likely
-  start-of-ride or zero-sample handling. **Filed here, not investigated.**
-- **176 vs 181 W is NOT an error** — ours is 95% of the athlete's best 20 min, Garmin's is its own
-  estimate. Two estimators, not a truth and a bug.
+- **Everything from 2026-08-02 is device-verified EXCEPT the last three pushes** (chip layout, the
+  deviation guard, the easy-power block copy). Michael was reading the screen live for all of it, so the
+  bar here is higher than usual — but those three landed after his last screenshot.
+- **The AEROBIC and THRESHOLD bike states have still never rendered** — he has 6 easy rides (needs 8)
+  and no qualifying hard rides. Only BUILDING has been seen.
+- **~1.5% power delta vs Garmin** (avg 113 vs 115 W, NP 141 vs 143) while MAX matches exactly at 424 W.
+  Filed, not investigated.
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 

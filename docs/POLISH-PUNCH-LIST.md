@@ -59,6 +59,35 @@ Claude-written — "seen and accepted", not a line-by-line copy review.
 
 ---
 
+## ✅ VERIFIED ON DEVICE — THE SESSION SCREEN PASS (2026-08-02, Michael reading it live)
+
+Michael watched each of these land on his own screen through the night. **Higher confidence than usual
+— but the last three pushes came after his final screenshot** (see AWAITING below).
+
+- [x] The 2026-08-01 ride **attaches** to its planned Long Ride ("Ride — Long Ride", Unattach shown).
+- [x] Execution chips on the ride: **37% Execution · 14% Easy · 59% Duration**, easy ceiling 131 bpm.
+- [x] Insights leads with **"Ridden at threshold"** — the zone he actually rode, contradicting the
+      "easy, all conversational" prescription, which is the point.
+- [x] The ride tab is **four rows, not nine**; fatigue is gone from it.
+- [x] **958 ft on BOTH tabs** (was 958 on Details, 942 on Performance).
+- [x] The **heart-rate-at-easy-power card no longer renders on this ride** — the trend discards
+      threshold rides, so the card must not print the number ([D-363] §2).
+
+## ⏳ AWAITING MICHAEL — THE LAST THREE PUSHES (2026-08-02)
+
+Landed after his final screenshot; a reload is needed for all three.
+
+- [ ] **Easy chip is ONE line:** `131 bpm · est. from your max HR` (was two lines, which is what knocked
+      the chip row out of alignment).
+- [ ] **Chip row is flush** — 14% level with 37% and 59%.
+- [ ] **Recompute analysis sits at the right end of the stat line** (`15.7 mi · 1:04:00 · 81°F`), not on
+      a row of its own.
+- [ ] **The 28 Jul run shows chips** — 84% Execution / 78% Duration. It was hidden because a ≥30%
+      distance deviation flipped `assessed_against` to 'actual'. ⚠️ **If it still shows nothing, that is
+      a real bug** and the guard is not the only thing suppressing it.
+- [ ] **The easy-power card reads three lines**, ending *"Lower over time means fitter — this feeds your
+      bike read on State"*, with no "easy ceiling" line (two different "easy"s collided).
+
 ## ✅ VERIFIED ON DEVICE — THE FTP CHOICE (2026-08-01 late, Michael)
 
 - [x] **Two pills under the FTP field** — *Use my rides 176 W* / *Use my number 181 W* ([D-360], closes
