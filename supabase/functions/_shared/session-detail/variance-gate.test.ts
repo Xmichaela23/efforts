@@ -147,3 +147,55 @@ Deno.test('Bug B: getOverallGapSecPerMi returns null when avg_gap_s_per_mi is mi
   assertEquals(getOverallGapSecPerMi({}), null);
   assertEquals(getOverallGapSecPerMi({ computed: { overall: { avg_gap_s_per_mi: 462 } } }), 462);
 });
+
+// ─── One work step is not an interval (2026-08-02) ──────────────────────────
+// ⛔ THE BUG THIS PINS. Michael, reading an easy run: *"do we need 'interval'?"* — the row on a
+// single-block easy run said "Interval 1" with "11:15-11:43/mi" under it. An interval is a REPEAT.
+// The screen knew the plan prescribed exactly one continuous block and still named it with track
+// vocabulary, because "work step number 1" was the only word the humanizer had.
+
+Deno.test('a lone work step is Steady, not "Interval 1"', () => {
+  assertEquals(
+    humanizePlannedSegmentLabel('work', 'work', { intervalNumber: 1, workStepCount: 1 }),
+    'Steady',
+  );
+  assertEquals(
+    humanizePlannedSegmentLabel('', 'work', { intervalNumber: 1, workStepCount: 1 }),
+    'Steady',
+  );
+  // The pace-range-only form takes the same path.
+  assertEquals(
+    humanizePlannedSegmentLabel('11:15-11:43/mi', 'work', { intervalNumber: 1, workStepCount: 1 }),
+    'Steady',
+  );
+});
+
+Deno.test('a real interval session keeps its numbers', () => {
+  assertEquals(
+    humanizePlannedSegmentLabel('work', 'work', { intervalNumber: 1, workStepCount: 6 }),
+    'Interval 1',
+  );
+  assertEquals(
+    humanizePlannedSegmentLabel('', 'work', { intervalNumber: 4, workStepCount: 6 }),
+    'Interval 4',
+  );
+});
+
+Deno.test('an absent count changes nothing — old rows keep their existing label', () => {
+  // Defence-in-depth: session_detail is rebuilt on read, but a caller that does not pass the count
+  // must not silently start renaming interval rows.
+  assertEquals(humanizePlannedSegmentLabel('work', 'work', { intervalNumber: 1 }), 'Interval 1');
+  assertEquals(humanizePlannedSegmentLabel('work', 'work'), 'Work');
+});
+
+Deno.test('a named step is never overwritten, however many work steps there are', () => {
+  assertEquals(
+    humanizePlannedSegmentLabel('Tempo 5K @ 7:30/mi', 'work', { intervalNumber: 1, workStepCount: 1 }),
+    'Tempo 5K @ 7:30/mi',
+  );
+  // Warmup and cooldown are not work steps and are untouched by the rule.
+  assertEquals(
+    humanizePlannedSegmentLabel('', 'warmup', { workStepCount: 1 }),
+    'Warmup',
+  );
+});

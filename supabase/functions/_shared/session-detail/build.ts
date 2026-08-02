@@ -87,11 +87,18 @@ function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]
 export function humanizePlannedSegmentLabel(
   raw: string,
   intervalType?: string,
-  numbers?: { intervalNumber?: number | null; recoveryNumber?: number | null },
+  numbers?: { intervalNumber?: number | null; recoveryNumber?: number | null; workStepCount?: number | null },
 ): string {
   const s = String(raw || '').trim();
   const it = String(intervalType || '').toLowerCase();
   const low = s.toLowerCase();
+  // ⛔ ONE WORK STEP IS NOT AN INTERVAL (2026-08-02, Michael, reading an easy run: *"do we need
+  // 'interval'?"*). An interval is a REPEAT. A session with a single continuous work block — every
+  // easy run, every long run, most tempo blocks — was labelled "Interval 1" for the only reason that
+  // it was work step number one. The screen was plan-aware enough to know the prescription was one
+  // block at 11:15-11:43/mi, and then named it with the vocabulary of a track session.
+  // "Steady" is the word this file already uses for a continuous effort; one vocabulary, not two.
+  const soloWorkStep = it === 'work' && Number(numbers?.workStepCount) === 1;
   // Defense-in-depth: stale workout_analysis rows from before the analyzer fix
   // may carry the legacy 'Overall session' literal. Collapse to 'Overall' so
   // the table renders consistently without backfill.
@@ -112,7 +119,7 @@ export function humanizePlannedSegmentLabel(
     if (it === 'warmup') return 'Warmup';
     if (it === 'cooldown') return 'Cooldown';
     if (it === 'recovery') return hasRecN ? `Recovery ${recN}` : 'Recovery';
-    if (it === 'work' && hasIvN) return `Interval ${ivN}`;
+    if (it === 'work' && hasIvN) return soloWorkStep ? 'Steady' : `Interval ${ivN}`;
     // 'work' without an interval number, or no interval type → generic.
     // 'Steady' fits any continuous-effort segment without prescribing intent;
     // better than echoing the pace-range string back into the label cell.
@@ -125,12 +132,12 @@ export function humanizePlannedSegmentLabel(
     if (it === 'warmup') return 'Warmup';
     if (it === 'cooldown') return 'Cooldown';
     if (it === 'recovery') return hasRecN ? `Recovery ${recN}` : 'Recovery';
-    if (it === 'work') return hasIvN ? `Interval ${ivN}` : 'Work';
+    if (it === 'work') return soloWorkStep ? 'Steady' : (hasIvN ? `Interval ${ivN}` : 'Work');
     // Unknown kind + no label: best we can do.
     if (low === 'recovery') return hasRecN ? `Recovery ${recN}` : 'Recovery';
     if (low === 'warmup') return 'Warmup';
     if (low === 'cooldown') return 'Cooldown';
-    if (low === 'work') return hasIvN ? `Interval ${ivN}` : 'Work';
+    if (low === 'work') return soloWorkStep ? 'Steady' : (hasIvN ? `Interval ${ivN}` : 'Work');
   }
   return s;
 }
@@ -398,6 +405,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const intervals: IntervalRow[] = [];
   const ibList: any[] = Array.isArray(ib?.intervals) ? ib.intervals : [];
   // Use any non-empty breakdown intervals (some pipelines set available:false while still emitting rows).
+  // How many WORK steps the plan actually prescribed. One = a continuous effort, not an interval
+  // session; the label humanizer needs this to stop calling a single easy block "Interval 1".
+  const ibWorkStepCount = ibList.filter((iv: any) => normIntervalType(iv?.interval_type || iv?.kind) === 'work').length;
   if (ibList.length > 0) {
     for (const iv of ibList) {
       const lower = iv.planned_pace_range_lower ?? iv.planned_pace_range?.lower;
@@ -435,6 +445,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           {
             intervalNumber: typeof iv?.interval_number === 'number' ? iv.interval_number : null,
             recoveryNumber: typeof iv?.recovery_number === 'number' ? iv.recovery_number : null,
+            workStepCount: ibWorkStepCount,
           },
         ),
         planned_duration_s: fin(iv?.planned_duration_s),
@@ -478,6 +489,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // "Interval N" / "Recovery N" when the analyzer didn't ship a label.
     let workCursor = 0;
     let recoveryCursor = 0;
+    const rowsWorkStepCount = dataRows.filter((r: any) => normIntervalType(r?.kind) === 'work').length;
     for (let i = 0; i < dataRows.length; i++) {
       const r = dataRows[i];
       const ex = r?.executed || {};
@@ -495,6 +507,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         planned_label: humanizePlannedSegmentLabel(String(r.planned_label ?? ''), rowKind, {
           intervalNumber: ivN,
           recoveryNumber: recN,
+          workStepCount: rowsWorkStepCount,
         }),
         planned_duration_s: null,
         planned_pace_display: typeof r.planned_pace_display === 'string' ? r.planned_pace_display : null,
