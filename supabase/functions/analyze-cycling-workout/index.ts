@@ -1591,7 +1591,13 @@ Deno.serve(async (req) => {
       // columns only AND capture + check `plannedError`.
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, total_duration_seconds')
+        // ⛔ `duration` IS IN THIS LIST FOR A REASON (2026-08-01). It is the ONLY place an unstructured
+        // session states its length — "~108 min easy" carries computed: null, intervals: [],
+        // total_duration_seconds: null, duration: 108. Without the column selected,
+        // resolvePlannedDurationSeconds has nothing to resolve and the ride scores 0% executed.
+        // Third time one missing column caused this: the attach matcher's candidate query had the same
+        // hole, and so did its post-materialize re-read.
+        .select('id, type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, total_duration_seconds, duration')
         .eq('id', workout.planned_id)
         .eq('user_id', workout.user_id)
         .single();
