@@ -242,10 +242,17 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
     // ⛔ NOT TWICE IN ONE PARAGRAPH. When the prescription clause has already named the zone (because it
     // contradicted what was asked), this clause drops the label and states only the numbers — otherwise
     // the reader gets "Prescribed easy, ridden at threshold. Ridden at threshold — 141 W…".
-    if (power && np != null && iff != null && tss != null) {
+    // ⛔ TSS REMOVED FROM THE SENTENCE (2026-08-02). The ride carried TWO load numbers — "69 TSS" here
+    // and "Workload 86" on the Details readouts — and they disagree by a quarter because Workload takes
+    // its intensity from a banded ladder while TSS uses the exact ratio. Two answers to "what did this
+    // cost", different scales, and only ONE sport had the second one: a run has no TSS at all.
+    //
+    // Workload is the load number now, on both sports, in one place. Normalized power and intensity
+    // stay — they are facts about the ride, not a second answer to the same question.
+    if (power && np != null && iff != null) {
       parts.push(led
-        ? `${np} W normalized at ${r2(iff)} intensity, ${tss} TSS.`
-        : `${rideZoneLabel(inp.type)} — ${np} W normalized at ${r2(iff)} intensity, ${tss} TSS.`);
+        ? `${np} W normalized at ${r2(iff)} intensity.`
+        : `${rideZoneLabel(inp.type)} — ${np} W normalized at ${r2(iff)} intensity.`);
     }
     // HR-only caveat ONLY when there's a work-story to caveat — never as standalone padding (silence otherwise).
     else if (!inp.hasPower && hasReps) parts.push('Read from heart rate — no power meter, so the effort is graded by zone.');

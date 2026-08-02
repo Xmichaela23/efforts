@@ -812,8 +812,52 @@ async function runSessionDetailPipelineAndPersist(
       console.warn('[workout-detail] core_verdicts read failed (non-fatal):', cvErr instanceof Error ? cvErr.message : cvErr);
     }
 
+    // ⛔ "86" CANNOT BE HIGH OR LOW WITHOUT A COMPARISON (2026-08-02, Michael: *"is there a graph or
+    // something to cue if its high or low?"*).
+    //
+    // Strava shows Relative Effort against the athlete's own recent range; Garmin bands Training Load
+    // the same way. Neither calls a session good or bad — they show where it SITS among yours. That is
+    // the version that invents nothing: we do not decide 86 is high, we show that this athlete's rides
+    // run 40-90 and this one sat near the top.
+    //
+    // ⚠️ SAME SPORT, 90 DAYS, COMPLETED ONLY. Comparing a ride to a run makes the range meaningless.
+    // ⚠️ AND IT IS THE MIDDLE HALF, NOT MIN-MAX. One four-hour ride would stretch a min-max band until
+    // every ordinary session looked tiny. The 25th-75th percentile is a standard descriptive summary,
+    // not a tuned threshold — nothing here is fitted to an athlete.
+    let loadContext: { workload: number | null; typical_low: number | null; typical_high: number | null; sample_count: number } | null = null;
+    try {
+      const thisLoad = Number((row as any)?.workload_actual);
+      const since = new Date(new Date(workoutDate + 'T12:00:00Z').getTime() - 90 * 86400000)
+        .toISOString().slice(0, 10);
+      const { data: loadRows } = await supabase
+        .from('workouts')
+        .select('workload_actual')
+        .eq('user_id', userId)
+        .eq('type', row?.type ?? '')
+        .eq('workout_status', 'completed')
+        .gte('date', since)
+        .lte('date', workoutDate);
+      const vals = ((loadRows ?? []) as any[])
+        .map((r) => Number(r?.workload_actual))
+        .filter((v) => Number.isFinite(v) && v > 0)
+        .sort((a2, b2) => a2 - b2);
+      // A band drawn from a handful of sessions is a line through noise. Below this the chip shows the
+      // number and no range, and says nothing about where it sits.
+      const MIN_SESSIONS_FOR_RANGE = 5;
+      const pct = (q: number) => vals[Math.min(vals.length - 1, Math.floor(q * (vals.length - 1)))];
+      loadContext = {
+        workload: Number.isFinite(thisLoad) && thisLoad > 0 ? Math.round(thisLoad) : null,
+        typical_low: vals.length >= MIN_SESSIONS_FOR_RANGE ? Math.round(pct(0.25)) : null,
+        typical_high: vals.length >= MIN_SESSIONS_FOR_RANGE ? Math.round(pct(0.75)) : null,
+        sample_count: vals.length,
+      };
+    } catch (e) {
+      console.warn('[session_detail_v1] load context failed (non-fatal):', e instanceof Error ? e.message : e);
+    }
+
     sessionDetailV1 = buildSessionDetailV1({
       coreVerdicts,
+      loadContext,
       workoutId: id,
       workoutDate,
       workoutType: row?.type ?? 'other',

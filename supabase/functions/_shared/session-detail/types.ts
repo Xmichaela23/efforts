@@ -267,6 +267,23 @@ export type SessionDetailV1 = {
   /** Ride-start temperature from workouts.weather_data (temperature_start_f ??
    *  temperature). null when no weather data. Used by the cycling Performance
    *  stat line and the TERRAIN row. */
+  /** ⛔ WHAT THE SESSION COST, WITH SOMETHING TO READ IT AGAINST (2026-08-02).
+   *
+   *  `workload` is `workouts.workload_actual` — hours x intensity^2 x 100, the TSS formula, with the
+   *  intensity taken from whatever signal the sport has (power vs FTP, HR vs threshold HR, swim pace,
+   *  else the prescribed intensity). That is why it works on every sport where TSS needs a power meter
+   *  or a threshold pace. Same anchor as TSS: 100 = one hour at threshold.
+   *
+   *  `typical_low` / `typical_high` are the athlete's OWN 25th-75th percentile over 90 days of the same
+   *  sport — the middle half, so a single four-hour ride cannot stretch the band. Null below five
+   *  sessions: a range drawn from a handful is a line through noise, and the chip then shows the
+   *  number with no claim about where it sits. */
+  load?: {
+    workload: number | null;
+    typical_low: number | null;
+    typical_high: number | null;
+    sample_count: number;
+  } | null;
   weather: {
     temperature_f: number | null;
     /** What the screen shows: "74 → 78°F" when it moved, "76°F" when it did not. Composed ONCE by

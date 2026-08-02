@@ -164,3 +164,19 @@ Deno.test('no RPE logged → the clause simply omits it, never a guess', () => {
   })!;
   assertEquals(out.includes('RPE'), false);
 });
+
+// ── One load number, in one place (2026-08-02) ──────────────────────────────
+// ⛔ The ride carried TWO: "69 TSS" in this sentence and "Workload 86" on the Details readouts. Same
+// question, different scales — Workload takes intensity from a banded ladder, TSS from the exact
+// ratio — and only rides had the second one. A run has no TSS at all. Workload is the number now.
+
+Deno.test('⛔ the ride sentence no longer carries a second load number', () => {
+  const out = composeBikeInsight({
+    ...LONG_RIDE,
+    prescription: { easy: true, underMin: 9, totalMin: 64, ceilingBpm: 131 },
+  })!;
+  assertEquals(/TSS/i.test(out), false, 'TSS belongs to Workload now, in one place');
+  // The ride FACTS stay — they are not a second answer to "what did this cost".
+  assertStringIncludes(out, '141 W normalized');
+  assertStringIncludes(out, '0.8 intensity');
+});

@@ -244,6 +244,9 @@ export type SessionDetailInput = {
   /** Ride-start temperature °F from workouts.weather_data (temperature_start_f
    *  ?? temperature), resolved in workout-detail. The contract had no weather
    *  field — added for the cycling Performance stat line + TERRAIN row. */
+  /** This session's load and the athlete's own recent range for the same sport. Read-only context —
+   *  the builder places it in the contract, it does not compute the band. */
+  loadContext?: { workload: number | null; typical_low: number | null; typical_high: number | null; sample_count: number } | null;
   weatherTempF?: number | null;
   /** Session start/end temperature (°F) from `workouts.weather_data`. Feeds `formatSessionTemp` so the
    *  RIDE Terrain row speaks the same temperature vocabulary the run does — see the note on that row. */
@@ -361,6 +364,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedComputed,
     completedSwimScalars,
     completedRunScalars,
+    loadContext,
     weatherTempF,
     weatherTempStartF,
     weatherTempEndF,
@@ -998,6 +1002,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       : null,
 
     analysis_details: { rows: analysisDetailRows },
+    load: loadContext ?? null,
 
     adherence: {
       technical_insights: techInsights,

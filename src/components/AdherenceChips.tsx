@@ -43,6 +43,12 @@ interface AdherenceChipsProps {
       is_pool_swim?: boolean;
       is_easy_like?: boolean;
     };
+    load?: {
+      workload?: number | null;
+      typical_low?: number | null;
+      typical_high?: number | null;
+      sample_count?: number | null;
+    } | null;
     session_interpretation?: SessionInterpretationV1;
   } | null;
   hasSessionDetail: boolean;
@@ -207,6 +213,29 @@ export default function AdherenceChips({
       ? `under ${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim()
       : 'held easy';
 
+    /**
+     * ⛔ WORKLOAD REPLACES EXECUTION (2026-08-02, Michael: *"omfg what the fuck are all these score"*).
+     *
+     * The row carried Execution, Duration and Easy, and Execution was the other two averaged — it could
+     * not say anything they did not already say, and its weighting was a number nobody chose. Three
+     * questions, three numbers, no blends:
+     *   · Duration — did you do the amount asked
+     *   · Easy / Power — did you do it at the intensity asked
+     *   · Workload — what it cost you
+     *
+     * ⚠️ THE RANGE IS THE POINT. "86" cannot be high or low on its own. This shows the athlete's OWN
+     * middle-half band for the same sport, the way Strava frames Relative Effort and Garmin bands
+     * Training Load — where it SITS among theirs, never a verdict. Below five sessions there is no
+     * band and the chip makes no claim.
+     */
+    const loadValue = sd.load?.workload != null ? String(sd.load.workload) : null;
+    const loadSubtitle = (() => {
+      const lo = sd.load?.typical_low;
+      const hi = sd.load?.typical_high;
+      if (lo == null || hi == null) return 'What it cost';
+      return lo === hi ? `you typically ${lo}` : `you typically ${lo}–${hi}`;
+    })();
+
     const fmtDeltaTime = (s: number) => {
       const sign = s >= 0 ? '+' : '−';
       const v = Math.abs(Math.round(s));
@@ -249,7 +278,7 @@ export default function AdherenceChips({
           {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
             <div className="flex items-start gap-3">
-              {chip('Execution', executionScore, 'Overall adherence')}
+              {chipText('Workload', loadValue, loadSubtitle)}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
               {chipText('Duration', durationValue, 'Moving time vs plan')}
             </div>
@@ -265,7 +294,7 @@ export default function AdherenceChips({
           {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
             <div className="flex items-start gap-3">
-              {chip('Execution', executionScore, 'Overall adherence')}
+              {chipText('Workload', loadValue, loadSubtitle)}
               {/* Power when watts were prescribed; Easy when the prescription was an intensity. Never
                   both — a session asked one of those two questions, not both. */}
               {powerAdherence != null
@@ -291,8 +320,7 @@ export default function AdherenceChips({
         {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
         <div className="flex items-center justify-center gap-6 text-center mb-3">
           <div className="flex items-start gap-3">
-            {chip('Execution', executionScore,
-              performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence')}
+            {chipText('Workload', loadValue, loadSubtitle)}
             {chipText('Duration', durationValue, 'Moving time vs plan')}
             {/* An easy run had the Pace chip hidden and NOTHING put in its place — the athlete was
                 told the session was not judged on pace, and then shown no read at all on whether they
