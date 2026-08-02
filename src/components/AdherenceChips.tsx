@@ -12,6 +12,8 @@ interface AdherenceChipsProps {
       pace_adherence?: number | null;
       power_adherence?: number | null;
       duration_adherence?: number | null;
+      intensity_adherence?: number | null;
+      easy_ceiling_bpm?: number | null;
       performance_assessment?: string | null;
       assessed_against?: string | null;
       status_label?: string | null;
@@ -63,15 +65,20 @@ export default function AdherenceChips({
     const paceAdherence = ex?.pace_adherence ?? null;
     const powerAdherence = ex?.power_adherence ?? null;
     const durationAdherence = ex?.duration_adherence ?? null;
+    // The EASY governor (rides prescribed without watts): share of time at or under the athlete's easy
+    // ceiling. It takes the Power chip's slot, because it is the same question — "did you ride it as
+    // prescribed" — asked of a session that prescribed an intensity instead of a number.
+    const intensityAdherence = ex?.intensity_adherence ?? null;
+    const easyCeilingBpm = ex?.easy_ceiling_bpm ?? null;
     const isGapAdjusted = !!ex?.gap_adjusted;
     const performanceAssessment = ex?.performance_assessment ?? null;
     const isStructured = !!sd.classification?.is_structured_interval;
 
     const allZero = (executionScore ?? 0) === 0 && (paceAdherence ?? 0) === 0 &&
-      (powerAdherence ?? 0) === 0 && (durationAdherence ?? 0) === 0;
+      (powerAdherence ?? 0) === 0 && (durationAdherence ?? 0) === 0 && (intensityAdherence ?? 0) === 0;
     if (allZero) return null;
     const anyVal = executionScore != null || paceAdherence != null ||
-      powerAdherence != null || durationAdherence != null;
+      powerAdherence != null || durationAdherence != null || intensityAdherence != null;
     if (!anyVal) return null;
 
     const weekLabel = sd.plan_context?.week_label ?? null;
@@ -155,7 +162,11 @@ export default function AdherenceChips({
           <div className="flex items-center justify-center gap-6 text-center mb-3">
             <div className="flex items-end gap-3">
               {chip('Execution', executionScore, 'Overall adherence')}
-              {chip('Power', powerAdherence, 'Time in range')}
+              {/* Power when watts were prescribed; Easy when the prescription was an intensity. Never
+                  both — a session asked one of those two questions, not both. */}
+              {powerAdherence != null
+                ? chip('Power', powerAdherence, 'Time in range')
+                : chip('Easy', intensityAdherence, easyCeilingBpm != null ? `At or under ${easyCeilingBpm} bpm` : 'Time held easy')}
               {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
             </div>
           </div>

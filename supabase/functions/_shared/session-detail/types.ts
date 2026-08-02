@@ -159,6 +159,12 @@ export type SessionDetailV1 = {
     pace_adherence: number | null;
     power_adherence: number | null;
     duration_adherence: number | null;
+    /** Share of ride time at or under the athlete's easy HR ceiling. The governor for a session
+     *  prescribed as EASY, where no watts were given — heart rate is what "conversational" means.
+     *  Null on any session that prescribed power, and on runs/swims. See `_shared/ride-easy-hr.ts`. */
+    intensity_adherence?: number | null;
+    /** The ceiling it was judged against, so the screen can state the bar rather than a bare %. */
+    easy_ceiling_bpm?: number | null;
     performance_assessment: string | null;
     assessed_against: 'plan' | 'actual' | null;
     status_label: string | null;

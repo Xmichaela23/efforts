@@ -847,6 +847,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       pace_adherence: paceAdherence != null ? Math.round(paceAdherence) : null,
       power_adherence: powerAdherence != null ? Math.round(powerAdherence) : null,
       duration_adherence: durationAdherence != null ? Math.round(durationAdherence) : null,
+      // The easy-ride governor, passed through from the cycling analyzer. Rendered as its own chip;
+      // it is NOT folded into power_adherence, because "you held it easy" and "you hit your watts" are
+      // different questions and only one of them was asked of this session.
+      intensity_adherence: fin(perf?.intensity_adherence),
+      easy_ceiling_bpm: fin(perf?.easy_ceiling_bpm),
       performance_assessment: granular?.performance_assessment ?? null,
       assessed_against: assessedAgainst,
       status_label: sessionState?.glance?.status_label ?? null,

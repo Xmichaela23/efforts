@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
+import { resolveRideEasyCeiling, timeUnderCeilingPct } from '../_shared/ride-easy-hr.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
@@ -1831,9 +1832,28 @@ Deno.serve(async (req) => {
     // scored zero", and build.ts hides the chips when every number is 0).
     const hasGradedPower = Array.isArray(intervalBreakdown)
       && intervalBreakdown.some((iv: any) => iv?.power_adherence_percent != null);
+
+    // ⛔ AN EASY PRESCRIPTION IS GOVERNED BY HEART RATE (2026-08-01, Michael: "it was prescribed as
+    // easy"). With no watts prescribed, duration alone says "you rode 59% of it" and says NOTHING about
+    // riding it at tempo — which is the more important miss, because the session's whole purpose was to
+    // stay aerobic. Heart rate is the internal load; it is what "conversational" actually means.
+    // Time UNDER the ceiling, never the average: this ride climbed 958 ft, and an average would score
+    // the hills as indiscipline. See `_shared/ride-easy-hr.ts` for the anchor and why the ceiling is not
+    // the learned `ride_easy_hr` median.
+    const easyCeiling = resolveRideEasyCeiling(fullBaselines?.learned_fitness);
+    const intensityAdherence = hasGradedPower
+      ? null
+      : timeUnderCeilingPct(sensorData.map((sample: any) => sample?.heart_rate), easyCeiling.ceiling);
+
+    // Weighting mirrors running's 50/50 pace+duration: the two halves of "did you do the session" are
+    // how long, and how hard. Power's 70/30 stays where power was actually prescribed.
+    // No ceiling resolvable (no threshold HR, no max HR) → duration alone, and the row says so rather
+    // than inventing a gate.
     const executionAdherence = hasGradedPower
       ? Math.round((powerAdherence * 0.7) + (durationAdherenceValue * 0.3))
-      : durationAdherenceValue;
+      : (intensityAdherence != null
+        ? Math.round((intensityAdherence * 0.5) + (durationAdherenceValue * 0.5))
+        : durationAdherenceValue);
     
     // D-035: Unlinked-ride null-override. Without a plan, "adherence" is
     // meaningless — there's nothing to be measured against. power_variability
@@ -1851,6 +1871,11 @@ Deno.serve(async (req) => {
       // NULL, not 0, when no power was prescribed — see the comment above.
       power_adherence: hasGradedPower ? powerAdherence : null,
       duration_adherence: durationAdherenceValue,
+      /** Share of ride time at or under the easy ceiling. The governor for an easy prescription. */
+      intensity_adherence: intensityAdherence,
+      /** The ceiling itself + how it was anchored, so the screen can state the bar it judged against. */
+      easy_ceiling_bpm: hasGradedPower ? null : easyCeiling.ceiling,
+      easy_ceiling_anchor: hasGradedPower ? null : easyCeiling.anchor,
       // An unstructured session is ONE step, and completing it is completing it. Reporting
       // "0 of 1 steps" for a ride that happened is the step-counter describing a session that was
       // never made of steps. Mirrors running, which scores the whole session as its single step.
@@ -1861,6 +1886,9 @@ Deno.serve(async (req) => {
       execution_score: null,
       power_adherence: null,
       duration_adherence: null,
+      intensity_adherence: null,
+      easy_ceiling_bpm: null,
+      easy_ceiling_anchor: null,
       completed_steps: null,
       total_steps: null,
     };
