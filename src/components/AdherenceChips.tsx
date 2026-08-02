@@ -93,10 +93,16 @@ export default function AdherenceChips({
     // "At or under 131 bpm" over "Est. from your max HR" was two lines saying one thing, and the extra
     // line made this chip taller than its neighbours — which is what knocked the row out of alignment.
     // "131 bpm · est. from your max HR" carries the bar AND its provenance in the space of one.
+    // ⛔ AND IT STILL WRAPPED TO TWO LINES (2026-08-02). "134 bpm · from your threshold HR" is 30
+    // characters in a third of the screen width, so it wrapped anyway and the chip stood taller than
+    // its neighbours — the exact misalignment the line above was written to fix. The provenance is
+    // now one word: `measured` when a real threshold test anchors the bar, `est.` when it is derived
+    // from max HR. That distinction is the whole argument for doing a threshold test, and it survives
+    // the shortening — what is lost is only the sentence around it.
     const easyCeilingNote = ex?.easy_ceiling_anchor === 'threshold'
-      ? '· from your threshold HR'
+      ? '· measured'
       : ex?.easy_ceiling_anchor === 'max_hr'
-        ? '· est. from your max HR'
+        ? '· est.'
         : null;
     const isGapAdjusted = !!ex?.gap_adjusted;
     const performanceAssessment = ex?.performance_assessment ?? null;

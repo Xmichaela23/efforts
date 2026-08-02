@@ -1560,12 +1560,11 @@ Deno.serve(async (req) => {
         // threshold anchor `lthr`. Translate at the boundary rather than teaching the client a second
         // word for one thing (the ride already emits `threshold`).
         performance.easy_ceiling_anchor = runEasyBand.anchor === 'lthr' ? 'threshold' : runEasyBand.anchor;
-        if (Number.isFinite(performance.duration_adherence)) {
-          performance.execution_adherence = Math.round(
-            (intensityAdherence * 0.5) + (Number(performance.duration_adherence) * 0.5),
-          );
-        }
-        console.log(`🫀 [EASY GOVERNOR] ${intensityAdherence}% of time at or under ${runEasyBand.ceiling} bpm (${runEasyBand.anchor}) → execution ${performance.execution_adherence}%`);
+        // ⚠️ THE SCORE IS NOT SET HERE. Four later blocks in this function recompute
+        // `execution_adherence` from (pace + duration) / 2, so anything written at this point is
+        // silently overwritten before the analysis is saved. See applyEasyGovernorToExecution() at
+        // the serialization boundary — that is the last word.
+        console.log(`🫀 [EASY GOVERNOR] ${intensityAdherence}% of time at or under ${runEasyBand.ceiling} bpm (${runEasyBand.anchor})`);
       }
     }
 
@@ -1964,6 +1963,33 @@ Deno.serve(async (req) => {
     // NOTE: analysis (with series) is NOT included — it's owned by compute-workout-analysis
     // and preserved by the JSONB || merge operator in merge_computed RPC.
     
+    // ⛔ THE EASY GOVERNOR GETS THE LAST WORD ON THE SCORE (2026-08-02).
+    // Michael, on a run he executed exactly as written: pace 100%, Easy 49%, Execution 88%.
+    // 88 is (100 pace + 76 duration) / 2 — the pace number the same screen refuses to show him.
+    //
+    // The first version of this change set the score next to the measurement, ~400 lines up. It was
+    // overwritten every time: FOUR later blocks in this function recompute execution_adherence from
+    // (pace + duration) / 2, the last of them after the interval breakdown is rebuilt. A green suite
+    // and a rendering chip both said it worked. It did not. So the override moved HERE — the
+    // serialization boundary, after every recalculation, with nothing downstream of it.
+    //
+    // ⚠️ THIS IS WHY THE SCREEN CONTRADICTED ITSELF. Pace adherence stays in the payload (it is a
+    // true fact and the coach reads it), it simply stops deciding the score on a session that was
+    // never asked to hit a pace ([D-362]).
+    if (
+      Number.isFinite((performance as any).intensity_adherence) &&
+      Number.isFinite(performance.duration_adherence)
+    ) {
+      const governed = Math.round(
+        (Number((performance as any).intensity_adherence) * 0.5) +
+        (Number(performance.duration_adherence) * 0.5),
+      );
+      console.log(`🫀 [EASY GOVERNOR] execution ${performance.execution_adherence}% → ${governed}% (intensity ${(performance as any).intensity_adherence}% + duration ${performance.duration_adherence}%) / 2`);
+      performance.execution_adherence = governed;
+      // Keep the narrative copy in step — breakdown text reads this one.
+      if (enhancedAnalysis?.performance) enhancedAnalysis.performance.execution_adherence = governed;
+    }
+
     // Create analysis_v2 with version metadata
     const analysisV2 = {
       _meta: {
