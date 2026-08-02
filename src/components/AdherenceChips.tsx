@@ -13,6 +13,8 @@ interface AdherenceChipsProps {
       power_adherence?: number | null;
       duration_adherence?: number | null;
       intensity_adherence?: number | null;
+      easy_under_s?: number | null;
+      easy_total_s?: number | null;
       easy_ceiling_bpm?: number | null;
       easy_ceiling_anchor?: string | null;
       performance_assessment?: string | null;
@@ -84,6 +86,8 @@ export default function AdherenceChips({
     // ceiling. It takes the Power chip's slot, because it is the same question — "did you ride it as
     // prescribed" — asked of a session that prescribed an intensity instead of a number.
     const intensityAdherence = ex?.intensity_adherence ?? null;
+    const easyUnderS = ex?.easy_under_s ?? null;
+    const easyTotalS = ex?.easy_total_s ?? null;
     const easyCeilingBpm = ex?.easy_ceiling_bpm ?? null;
     // ⛔ SAY WHERE THE BAR CAME FROM (2026-08-01, Michael). "At or under 131 bpm" reads as a fact
     // handed down; it is an ESTIMATE off the highest heart rate we have observed, and the athlete
@@ -136,6 +140,36 @@ export default function AdherenceChips({
         </div>
       );
     };
+
+    // ⛔ EASY IS A READOUT, NOT A MARK (2026-08-02, Michael's call).
+    // Every other chip here answers "how close to plan, out of 100". Easy does not, and it never
+    // could: it is time spent under a heart-rate ceiling on a session whose whole purpose is aerobic
+    // work at low cost. Printing it as 49% put a failing grade on a run executed exactly as
+    // prescribed, on a warm hilly morning at RPE 2. None of the three apps we measure against score
+    // an easy session — Strava shows the zone bar, Garmin shows time in zone, TrainingPeaks grades
+    // duration and distance and nothing else. So the number stays, stated as the fact it is.
+    const chipText = (label: string, value: string | null, text: string) => {
+      if (!value) return null;
+      return (
+        <div className="flex flex-col items-center px-2">
+          <div className="text-sm font-semibold text-gray-100">{value}</div>
+          <div className="text-[12px] text-gray-300">{label}</div>
+          <div className="text-[12px] text-gray-400">{text}</div>
+        </div>
+      );
+    };
+
+    /** "22 of 35 min" — whole minutes, from the seconds the server measured. */
+    const easyValue = (() => {
+      if (easyUnderS == null || easyTotalS == null || easyTotalS <= 0) {
+        // No minutes shipped (a session analysed before they existed) — the percentage is still true.
+        return intensityAdherence != null ? `${intensityAdherence}%` : null;
+      }
+      return `${Math.round(easyUnderS / 60)} of ${Math.round(easyTotalS / 60)} min`;
+    })();
+    const easySubtitle = easyCeilingBpm != null
+      ? `under ${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim()
+      : 'held easy';
 
     const fmtDeltaTime = (s: number) => {
       const sign = s >= 0 ? '+' : '−';
@@ -200,7 +234,7 @@ export default function AdherenceChips({
                   both — a session asked one of those two questions, not both. */}
               {powerAdherence != null
                 ? chip('Power', powerAdherence, 'Time in range')
-                : chip('Easy', intensityAdherence, easyCeilingBpm != null ? `${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim() : 'Time held easy')}
+                : chipText('Easy', easyValue, easySubtitle)}
               {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
             </div>
           </div>
@@ -234,7 +268,7 @@ export default function AdherenceChips({
                 presence IS the verdict — the client does not re-derive it from `is_easy_like` (which
                 is a separate, looser display flag and would drift the moment the rule changes). */}
             {intensityAdherence != null
-              ? chip('Easy', intensityAdherence, easyCeilingBpm != null ? `${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim() : 'Time held easy')
+              ? chipText('Easy', easyValue, easySubtitle)
               : (showPaceChip && chip(paceChipLabel, paceAdherence, paceChipSubtitle))}
           </div>
         </div>

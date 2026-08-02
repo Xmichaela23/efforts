@@ -27,14 +27,27 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+export type TimeUnderCeiling = {
+  /** Share of sampled time at or under the ceiling, 0-100. */
+  pct: number;
+  /** Seconds at or under the ceiling. Samples are 1 Hz, so a sample IS a second. */
+  under_s: number;
+  /** Seconds of usable heart rate — NOT the session duration. Dropped samples are not counted. */
+  total_s: number;
+};
+
 /**
- * Share of sampled time at or under the ceiling, 0-100. Null when there is no ceiling or no HR.
- * Samples are treated as equal slices of time — true for the 1 Hz streams these analyzers read.
+ * The measurement. Null when there is no ceiling or no usable heart rate — we abstain rather than
+ * report a zero we did not observe.
+ *
+ * ⚠️ `total_s` IS THE HEART-RATE COVERAGE, NOT THE SESSION LENGTH. A strap that drops for ten minutes
+ * yields a smaller total, and saying "22 of 35 min" off the session length would then be a claim about
+ * time nobody measured. The surface renders these two numbers, so they must be the same population.
  */
-export function timeUnderCeilingPct(
+export function timeUnderCeiling(
   hrSamples: Array<number | null | undefined>,
   ceiling: number | null,
-): number | null {
+): TimeUnderCeiling | null {
   if (!ceiling || !Array.isArray(hrSamples)) return null;
   let total = 0, under = 0;
   for (const raw of hrSamples) {
@@ -44,5 +57,13 @@ export function timeUnderCeilingPct(
     if (hr <= ceiling) under++;
   }
   if (total === 0) return null;
-  return Math.round((under / total) * 100);
+  return { pct: Math.round((under / total) * 100), under_s: under, total_s: total };
+}
+
+/** Share of sampled time at or under the ceiling, 0-100. Thin wrapper over the measurement above. */
+export function timeUnderCeilingPct(
+  hrSamples: Array<number | null | undefined>,
+  ceiling: number | null,
+): number | null {
+  return timeUnderCeiling(hrSamples, ceiling)?.pct ?? null;
 }

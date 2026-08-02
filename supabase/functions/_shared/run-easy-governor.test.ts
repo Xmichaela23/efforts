@@ -1,6 +1,6 @@
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { isEasyPrescribedRun } from './easy-hr.ts';
-import { timeUnderCeilingPct } from './time-under-ceiling.ts';
+import { timeUnderCeiling, timeUnderCeilingPct } from './time-under-ceiling.ts';
 
 /**
  * THE EASY GOVERNOR FOR RUNS (2026-08-02) — an easy run is scored on heart rate, not on pace.
@@ -66,4 +66,27 @@ Deno.test('execution on an easy run is 50/50 intensity and duration, mirroring t
   assertEquals(execution(67, 100), 84);
   assertEquals(execution(100, 100), 100);
   assertEquals(execution(0, 90), 45);
+});
+
+// ── THE READOUT ─────────────────────────────────────────────────────────────
+// Easy is rendered as "22 of 35 min under 134 bpm", not as a percentage, so the minutes must come
+// from the server and must be the SAME population as each other.
+
+Deno.test('the minutes are measured, not back-converted from the percentage', () => {
+  const r = timeUnderCeiling([128, 130, 132, 155, 158, 137], 141)!;
+  assertEquals(r.under_s, 4);
+  assertEquals(r.total_s, 6);
+  assertEquals(r.pct, 67);
+});
+
+Deno.test('⛔ total is HR COVERAGE, not session length — a dropped strap must not invent time', () => {
+  // Six samples, two unusable. Saying "3 of 6" would claim two seconds nobody measured.
+  const r = timeUnderCeiling([130, 135, null, 0, 138, 150], 141)!;
+  assertEquals(r.total_s, 4);
+  assertEquals(r.under_s, 3);
+});
+
+Deno.test('no usable heart rate abstains — the chip renders nothing rather than "0 of 0"', () => {
+  assertEquals(timeUnderCeiling([null, undefined], 141), null);
+  assertEquals(timeUnderCeiling([130, 135], null), null);
 });

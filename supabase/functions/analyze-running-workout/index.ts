@@ -37,7 +37,7 @@ import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveRunEasyHrBand, isEasyPrescribedRun, easyCeilingBpm, zone3FloorBpm } from '../_shared/easy-hr.ts';
-import { timeUnderCeilingPct } from '../_shared/time-under-ceiling.ts';
+import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 // =============================================================================
@@ -1549,12 +1549,18 @@ Deno.serve(async (req) => {
     // bpm above cycling at the same effort; both files say do not unify them.
     const runEasyBand = resolveRunEasyHrBand(learnedFitness, (baselines as any)?.threshold_heart_rate);
     if (isEasyPrescribedRun(classifiedTypeKey) && runEasyBand.ceiling != null) {
-      const intensityAdherence = timeUnderCeilingPct(
+      const easyRead = timeUnderCeiling(
         sensorData.map((sample: any) => sample?.heart_rate),
         runEasyBand.ceiling,
       );
+      const intensityAdherence = easyRead?.pct ?? null;
       if (intensityAdherence != null) {
         performance.intensity_adherence = intensityAdherence;
+        // The surface shows MINUTES ("22 of 35 min under 134 bpm"), not a percentage, so both sides of
+        // that sentence travel with the number. Back-converting from the pct against session duration
+        // would claim time the strap never measured.
+        performance.easy_under_s = easyRead!.under_s;
+        performance.easy_total_s = easyRead!.total_s;
         performance.easy_ceiling_bpm = runEasyBand.ceiling;
         // The session contract's vocabulary is `threshold | max_hr | none`; the run band calls its
         // threshold anchor `lthr`. Translate at the boundary rather than teaching the client a second
@@ -1584,6 +1590,8 @@ Deno.serve(async (req) => {
       // The easy governor is an adherence read like any other — "you held it easy" only means
       // something against a prescription that said easy. No plan, no chip.
       performance.intensity_adherence = null;
+      performance.easy_under_s = null;
+      performance.easy_total_s = null;
       performance.easy_ceiling_bpm = null;
       performance.easy_ceiling_anchor = null;
       performance.completed_steps = null;

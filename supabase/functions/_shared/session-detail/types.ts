@@ -163,6 +163,11 @@ export type SessionDetailV1 = {
      *  prescribed as EASY, where no watts were given — heart rate is what "conversational" means.
      *  Null on any session that prescribed power, and on runs/swims. See `_shared/ride-easy-hr.ts`. */
     intensity_adherence?: number | null;
+    /** Seconds at or under the easy ceiling, and the seconds of USABLE heart rate they are out of.
+     *  `easy_total_s` is HR coverage, not session duration — the surface prints "X of Y min", so the
+     *  two numbers must come from the same population. */
+    easy_under_s?: number | null;
+    easy_total_s?: number | null;
     /** The ceiling it was judged against, so the screen can state the bar rather than a bare %. */
     easy_ceiling_bpm?: number | null;
     /** WHERE that ceiling came from — 'threshold' (measured) or 'max_hr' (estimated off observed max).

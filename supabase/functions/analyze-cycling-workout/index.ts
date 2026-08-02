@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
-import { timeUnderCeilingPct } from '../_shared/time-under-ceiling.ts';
+import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
@@ -1842,9 +1842,10 @@ Deno.serve(async (req) => {
     // the hills as indiscipline. See `_shared/ride-easy-hr.ts` for the anchor and why the ceiling is not
     // the learned `ride_easy_hr` median.
     const easyCeiling = resolveRideEasyCeiling(fullBaselines?.learned_fitness);
-    const intensityAdherence = hasGradedPower
+    const easyRead = hasGradedPower
       ? null
-      : timeUnderCeilingPct(sensorData.map((sample: any) => sample?.heart_rate), easyCeiling.ceiling);
+      : timeUnderCeiling(sensorData.map((sample: any) => sample?.heart_rate), easyCeiling.ceiling);
+    const intensityAdherence = easyRead?.pct ?? null;
 
     // Weighting mirrors running's 50/50 pace+duration: the two halves of "did you do the session" are
     // how long, and how hard. Power's 70/30 stays where power was actually prescribed.
@@ -1874,6 +1875,9 @@ Deno.serve(async (req) => {
       duration_adherence: durationAdherenceValue,
       /** Share of ride time at or under the easy ceiling. The governor for an easy prescription. */
       intensity_adherence: intensityAdherence,
+      // Minutes travel with the percentage — the chip renders "22 of 35 min under 131 bpm".
+      easy_under_s: easyRead?.under_s ?? null,
+      easy_total_s: easyRead?.total_s ?? null,
       /** The ceiling itself + how it was anchored, so the screen can state the bar it judged against. */
       easy_ceiling_bpm: hasGradedPower ? null : easyCeiling.ceiling,
       easy_ceiling_anchor: hasGradedPower ? null : easyCeiling.anchor,
@@ -1888,6 +1892,8 @@ Deno.serve(async (req) => {
       power_adherence: null,
       duration_adherence: null,
       intensity_adherence: null,
+      easy_under_s: null,
+      easy_total_s: null,
       easy_ceiling_bpm: null,
       easy_ceiling_anchor: null,
       completed_steps: null,
