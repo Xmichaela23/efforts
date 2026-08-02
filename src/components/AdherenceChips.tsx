@@ -75,10 +75,14 @@ export default function AdherenceChips({
     // handed down; it is an ESTIMATE off the highest heart rate we have observed, and the athlete
     // deserves to know that before it costs them a score. When a measured threshold anchors it
     // instead, the line says so — and that difference is the whole argument for doing a threshold test.
+    // ⛔ ONE LINE, NOT TWO (2026-08-02, Michael: "at or under should be removed, just leave est").
+    // "At or under 131 bpm" over "Est. from your max HR" was two lines saying one thing, and the extra
+    // line made this chip taller than its neighbours — which is what knocked the row out of alignment.
+    // "131 bpm · est. from your max HR" carries the bar AND its provenance in the space of one.
     const easyCeilingNote = ex?.easy_ceiling_anchor === 'threshold'
-      ? 'From your threshold HR'
+      ? '· from your threshold HR'
       : ex?.easy_ceiling_anchor === 'max_hr'
-        ? 'Est. from your max HR'
+        ? '· est. from your max HR'
         : null;
     const isGapAdjusted = !!ex?.gap_adjusted;
     const performanceAssessment = ex?.performance_assessment ?? null;
@@ -102,15 +106,13 @@ export default function AdherenceChips({
     const durationDelta = (completedDurS != null && plannedDurS != null && plannedDurS > 0)
       ? completedDurS - plannedDurS : null;
 
-    const chip = (label: string, pct: number | null, text: string, note?: string | null) => {
+    const chip = (label: string, pct: number | null, text: string) => {
       if (pct == null) return null;
       return (
         <div className="flex flex-col items-center px-2">
           <div className="text-sm font-semibold text-gray-100">{pct}%</div>
           <div className="text-[12px] text-gray-300">{label}</div>
           <div className="text-[12px] text-gray-400">{text}</div>
-          {/* Provenance line — only the Easy chip uses it today: its bar is an estimate and must say so. */}
-          {note && <div className="text-[11px] text-gray-500">{note}</div>}
         </div>
       );
     };
@@ -156,7 +158,7 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="flex items-end gap-3">
+            <div className="flex items-start gap-3">
               {chip('Execution', executionScore, 'Overall adherence')}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
               {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
@@ -172,13 +174,13 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="flex items-end gap-3">
+            <div className="flex items-start gap-3">
               {chip('Execution', executionScore, 'Overall adherence')}
               {/* Power when watts were prescribed; Easy when the prescription was an intensity. Never
                   both — a session asked one of those two questions, not both. */}
               {powerAdherence != null
                 ? chip('Power', powerAdherence, 'Time in range')
-                : chip('Easy', intensityAdherence, easyCeilingBpm != null ? `At or under ${easyCeilingBpm} bpm` : 'Time held easy', easyCeilingNote)}
+                : chip('Easy', intensityAdherence, easyCeilingBpm != null ? `${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim() : 'Time held easy')}
               {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
             </div>
           </div>
@@ -198,7 +200,7 @@ export default function AdherenceChips({
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
         <div className="flex items-center justify-center gap-6 text-center mb-3">
-          <div className="flex items-end gap-3">
+          <div className="flex items-start gap-3">
             {chip('Execution', executionScore,
               performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence')}
             {chip('Duration', durationAdherence, 'Time adherence')}

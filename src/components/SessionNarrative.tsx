@@ -282,21 +282,11 @@ export default function SessionNarrative({
           {planLinkNote ?? 'No planned session to compare.'}
         </div>
       )}
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs text-gray-500">
-          {recomputeError ? (
-            <span className="text-red-300">{recomputeError}</span>
-          ) : null}
-        </div>
-        <button
-          onClick={onRecompute}
-          disabled={recomputing || recomputeDisabled}
-          className="text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
-          title="Re-run analysis for this workout"
-        >
-          {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-        </button>
-      </div>
+      {/* ⛔ RECOMPUTE RIDES ON THE STAT LINE (2026-08-02, Michael: "can recompute be on the top right so
+          it doesn't interfere with layout"). It used to own a full-width row of its own between the
+          adherence chips and the first real content, which pushed everything down and read as a section
+          heading. It is a maintenance control, not content: it belongs at the edge, sharing a line. */}
+      {recomputeError && <div className="text-xs text-red-300 mb-1">{recomputeError}</div>}
       {(() => {
         // Stat line above INSIGHTS: distance · duration · temperature.
         // distance/duration from session_detail_v1.completed_totals; temperature
@@ -316,9 +306,25 @@ export default function SessionNarrative({
             : `${m}:${String(s).padStart(2, '0')}`);
         }
         if (typeof tF === 'number' && Number.isFinite(tF)) parts.push(`${Math.round(tF)}°F`);
+        const recomputeBtn = (
+          <button
+            onClick={onRecompute}
+            disabled={recomputing || recomputeDisabled}
+            className="shrink-0 text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
+            title="Re-run analysis for this workout"
+          >
+            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+          </button>
+        );
         return parts.length > 0
-          ? <div className="text-sm font-medium text-gray-300">{parts.join(' · ')}</div>
-          : null;
+          ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-medium text-gray-300">{parts.join(' · ')}</div>
+              {recomputeBtn}
+            </div>
+          )
+          // No stat line to share with (thin session) — the control still needs a home, right-aligned.
+          : <div className="flex justify-end">{recomputeBtn}</div>;
       })()}
       {hasRaceDebrief && (
         <div className="space-y-4">
