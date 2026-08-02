@@ -1522,7 +1522,7 @@ Deno.serve(async (req) => {
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
         planned_id, user_id, date, moving_time, duration, distance, elevation_gain, workout_status, workload_actual, workload_planned,
-        achievements
+        achievements, weather_data
       `)
       .eq('id', workout_id)
       .single();
@@ -2027,6 +2027,29 @@ Deno.serve(async (req) => {
     // can use vs_similar_v1 / achievements_v1 / np_trend_v1 / limiter_v1 (mirrors
     // analyze-running-workout, whose fact packet carries comparisons before the
     // summary runs). Generating here (the old position) produced a context-blind
+    // ⛔ POWER FADE ACROSS THE HALVES — the bike's answer to running's split (2026-08-02).
+    //
+    // `formatCyclingPacingRow` needs structured work intervals, so an UNSTRUCTURED ride got no Pacing
+    // row at all — and most rides are unstructured. Running always has a split to report because it
+    // always has splits; the bike has the same story available in watts and was not telling it.
+    //
+    // ⚠️ MEAN OF PEDALLING SAMPLES PER HALF, NOT NORMALIZED POWER. NP is a whole-ride construct with a
+    // 30-second rolling average baked in; halving it would misreport the boundary. Zero-power samples
+    // (coasting, descending) are excluded from both halves alike — otherwise a descent-heavy second
+    // half reads as a fade that never happened.
+    try {
+      const pw = (powerSamples as number[]).filter((w) => Number.isFinite(w) && w > 0);
+      if (pw.length >= 120) {                       // ~2 min of pedalling per half at 1 Hz, or say nothing
+        const mid = Math.floor(pw.length / 2);
+        const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+        const first = Math.round(mean(pw.slice(0, mid)));
+        const second = Math.round(mean(pw.slice(mid)));
+        if (first > 0 && second > 0 && (cyclingFactPacketV1 as any)?.derived) {
+          (cyclingFactPacketV1 as any).derived.power_halves = { first_w: first, second_w: second };
+        }
+      }
+    } catch { /* a missing pacing row is not worth failing an analysis over */ }
+
     // template-grade paragraph because none of that data existed yet.
     let ai_summary: string | null = null;
     let ai_summary_generated_at: string | null = null;
@@ -2641,10 +2664,47 @@ Deno.serve(async (req) => {
         heldTarget: _bikeIntv.held_target ?? _bikeIntv.on_target ?? null,
         consistent: _bikeIntv.consistent ?? null,
       } : null;
+      // ⛔ CONDITIONS: the composer has accepted these since 2026-07-19 and the mapper passed null, so
+      // the clause has never once fired. Michael's 81°F / 958 ft Long Ride read as though it happened
+      // in a lab. `weather_data` was not even in this function's SELECT — added with this change.
+      const _wxRaw = (workout as any)?.weather_data;
+      const _wx = _wxRaw
+        ? (typeof _wxRaw === 'string' ? (() => { try { return JSON.parse(_wxRaw); } catch { return null; } })() : _wxRaw)
+        : null;
+      const _num = (v: unknown): number | null => {
+        if (v == null || v === '') return null;   // Number(null) === 0, and 0°F is not a measurement
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+      const _elevM = _num((workout as any)?.elevation_gain);
+      // ⛔ RPE IS DELIBERATELY NOT PASSED YET. `workouts.rpe` is also absent from the SELECT above, and
+      // adding it would feed the cross-domain carryover gauge (`thisRpe`, ~line 2700) which has
+      // therefore NEVER RUN — switching a dormant card on inside a verification batch would make it
+      // impossible to tell which change moved the screen. Filed, not done.
+      const _bikePrescription = (!hasGradedPower && easyRead && easyCeiling.ceiling != null)
+        ? {
+            easy: true,
+            underMin: easyRead.under_s / 60,
+            totalMin: easyRead.total_s / 60,
+            ceilingBpm: easyCeiling.ceiling,
+          }
+        : null;
       ai_summary = composeBikeInsight(buildBikeInsightInputFromPacket(cyclingFactPacketV1, {
         tss: (fitnessV1 as any)?.tss_today ?? null,
         decouplingPct: typeof cyclingHrDriftPct === 'number' ? cyclingHrDriftPct : null,
         intervals: _bikeIntervals,
+        conditions: _wx || _elevM != null ? {
+          tempF: _num(_wx?.temperature),
+          tempStartF: _num(_wx?.temperature_start_f),
+          tempEndF: _num(_wx?.temperature_end_f),
+          heatStress: (() => {
+            // Reuse the packet's own heat verdict when it has one; never invent a second scale.
+            const hs = String((cyclingFactPacketV1 as any)?.facts?.weather?.heat_stress_level || '').toLowerCase();
+            return (hs === 'mild' || hs === 'moderate' || hs === 'high') ? hs : null;
+          })(),
+          elevationGainFt: _elevM != null ? _elevM * 3.28084 : null,
+        } : null,
+        prescription: _bikePrescription,
       }));
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       void generateCyclingAISummaryV1; void cyclingFlagsV1; void cyclingVsSimilar; void cyclingPRs; void npTrendV1; void pwr20TrendV1; void spineBikeTrend; void bike_spine_verdict; void cyclingLimiter; void _varGateRide; void plannedWorkout; void aiSummaryDebug; // dead LLM-path refs, retained for the cleanup sweep

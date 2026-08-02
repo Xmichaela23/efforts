@@ -244,6 +244,10 @@ export type SessionDetailInput = {
    *  ?? temperature), resolved in workout-detail. The contract had no weather
    *  field — added for the cycling Performance stat line + TERRAIN row. */
   weatherTempF?: number | null;
+  /** Session start/end temperature (°F) from `workouts.weather_data`. Feeds `formatSessionTemp` so the
+   *  RIDE Terrain row speaks the same temperature vocabulary the run does — see the note on that row. */
+  weatherTempStartF?: number | null;
+  weatherTempEndF?: number | null;
   /** ⛔ THE PROVIDER'S OWN ELEVATION TOTAL (metres) — `workouts.elevation_gain`, the number Strava or
    *  Garmin reports and the number the DETAILS tab renders (`useWorkoutData.elevation_gain_m`).
    *  Added 2026-08-01 because Performance was deriving its own from `computed.overall` / the first lap
@@ -357,6 +361,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedSwimScalars,
     completedRunScalars,
     weatherTempF,
+    weatherTempStartF,
+    weatherTempEndF,
     providerElevationGainM,
     completedRefinedType,
     nextSession,
@@ -1345,16 +1351,40 @@ export function formatCyclingVsSimilarRow(
  */
 export function formatCyclingPacingRow(
   intervals: Array<{ interval_type?: string; executed?: { power_watts?: number | null } }> | null | undefined,
+  /** `derived.power_halves` — mean pedalling watts per half, for rides with no structured work. */
+  halves?: { first_w?: number | null; second_w?: number | null } | null,
 ): { label: string; value: string } | null {
-  if (!Array.isArray(intervals)) return null;
-  const work = intervals
-    .filter((iv) => String(iv?.interval_type) === 'work')
-    .map((iv) => Number(iv?.executed?.power_watts))
-    .filter((w) => Number.isFinite(w) && w > 0);
-  if (work.length < 2) return null;
+  const work = Array.isArray(intervals)
+    ? intervals
+        .filter((iv) => String(iv?.interval_type) === 'work')
+        .map((iv) => Number(iv?.executed?.power_watts))
+        .filter((w) => Number.isFinite(w) && w > 0)
+    : [];
+  if (work.length >= 2) {
+    return {
+      label: 'Pacing',
+      value: `Work intervals: ${Math.round(work[0])}W → ${Math.round(work[work.length - 1])}W`,
+    };
+  }
+  // ⛔ AN UNSTRUCTURED RIDE USED TO GET NO PACING ROW AT ALL (2026-08-02). Running always reports a
+  // split because it always has splits; the bike had the same story sitting in watts and stayed silent
+  // on every ride without prescribed intervals — which is most of them.
+  //
+  // ⚠️ IT IS A POWER COMPARISON AND IT SAYS SO. Running's split is grade-adjusted pace; copying its
+  // wording would imply a like-for-like that does not exist.
+  const f = Number(halves?.first_w);
+  const sec = Number(halves?.second_w);
+  if (!Number.isFinite(f) || !Number.isFinite(sec) || f <= 0 || sec <= 0) return null;
+  const deltaPct = ((sec - f) / f) * 100;
+  // 5% is the boundary the ride classifier already treats as meaningful drift; below it, two halves of
+  // an ordinary ride differ for reasons that are not fade, and calling that a fade would be noise.
+  if (Math.abs(deltaPct) < 5) {
+    return { label: 'Pacing', value: `Power held across the halves (${Math.round(f)}W → ${Math.round(sec)}W)` };
+  }
+  const dir = deltaPct < 0 ? 'faded' : 'rose';
   return {
     label: 'Pacing',
-    value: `Work intervals: ${Math.round(work[0])}W → ${Math.round(work[work.length - 1])}W`,
+    value: `Power ${dir} ${Math.abs(Math.round(deltaPct))}% in the second half (${Math.round(f)}W → ${Math.round(sec)}W)`,
   };
 }
 
@@ -1386,7 +1416,12 @@ export function formatCyclingEfficiencyRow(
   // is already kept jargon-clean by `summaryHasJargon` (SESSION-CONTEXT §7
   // 3-guard-stack footgun) but the dashboard rows still leaked the abbreviations.
   // Athletes recognize "watts per heartbeat" and "HR drift" more readily.
-  return { label: 'EFFICIENCY', value: `Watts per heartbeat ${ef} · HR drift ${dec}%` };
+  // ⛔ DRIFT MOVED OUT (2026-08-02). It rode along here as "· HR drift 0.4%" while the RUN gave the
+  // same idea a row of its own — so one sport buried its durability read inside an efficiency figure
+  // and the other headlined it. `dec` is still required above as an eligibility signal (a ride without
+  // it is not a readable aerobic effort), it is simply no longer PRINTED here. See the Heart rate row.
+  void dec;
+  return { label: 'EFFICIENCY', value: `Watts per heartbeat ${ef}` };
 }
 
 /**
@@ -1570,8 +1605,35 @@ export function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
-  // Efficiency (cycling): HR-at-power EF + Friel aerobic decoupling from
-  // computed.analysis.efficiency. Placed after Heart rate per spec.
+  // Heart rate (cycling): the run's row, on the bike's instrument. Drift as a PERCENTAGE with a plain
+  // sentence around it — the same shape the run row now uses, so a rider and a runner read one idea.
+  //
+  // ⛔ AND IT CARRIES THE TRUST GATE THE BIKE NEVER HAD (2026-08-02). Michael's Long Ride printed
+  // "HR drift 0.4%" on a ride the engine had classified THRESHOLD. Decoupling is a STEADY-AEROBIC
+  // measurement — it answers "did the aerobic system hold" — and on a threshold effort it answers
+  // nothing; the number was real and the question was not asked. The run has always gated its
+  // percentage (terrain-neutral basis, not heat-confounded) and fallen back to a plain description.
+  // The bike gates on the ride actually being an aerobic effort, read off `classified_type` — the same
+  // classification the zone label and the power trend use. NEVER a second opinion about the zone.
+  //
+  // ⚠️ SILENCE, NOT A SUBSTITUTE. On a hard ride this row does not appear. It does not swap in a
+  // different number wearing the same label — that is the fault this whole day has been closing.
+  try {
+    if (sport === 'ride') {
+      const ct = String((factPacket?.facts as any)?.classified_type || '').toLowerCase();
+      const isAerobicRide = /endurance|recovery|long|aerobic|base|z2|easy/.test(ct);
+      const dec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
+      if (isAerobicRide && Number.isFinite(dec)) {
+        const d = Math.round(dec * 10) / 10;
+        const desc = d < 5 ? 'Held steady with the power'
+          : d <= 10 ? 'Moderate drift over the ride'
+          : 'Notable drift late in the ride';
+        rows.push({ label: 'Heart rate', value: `${desc} (drift ${d}%)` });
+      }
+    }
+  } catch { /* */ }
+
+  // Efficiency (cycling): HR-at-power EF from computed.analysis.efficiency.
   try {
     if (sport === 'ride') {
       const row = formatCyclingEfficiencyRow(comp?.analysis?.efficiency);
@@ -1633,13 +1695,21 @@ export function buildAnalysisDetailRows(
   // cycling analogue of running's Pacing row. See formatCyclingPacingRow.
   try {
     if (sport === 'ride') {
-      const row = formatCyclingPacingRow(intervals);
+      const row = formatCyclingPacingRow(intervals, (factPacket?.derived as any)?.power_halves ?? null);
       if (row) rows.push(row);
     }
   } catch { /* */ }
 
-  // Terrain (cycling): elevation gain from completed computed (temp is not persisted
-  // for rides — omitted). Labelled "Conditions" so the client relabels it TERRAIN.
+  // Terrain (cycling): elevation gain + temperature. Labelled "Conditions" so the client relabels it
+  // TERRAIN.
+  //
+  // ⛔ THE COMMENT THAT WAS HERE SAID "temp is not persisted for rides — omitted". THAT WAS FALSE —
+  // the ride screen prints it, and has been.
+  //
+  // ⛔ AND THIS ROW SPOKE A DIFFERENT TEMPERATURE VOCABULARY FROM THE RUN'S (2026-08-02). The morning's
+  // fix gave the run `74 → 78°F` through `formatSessionTemp` and left the ride on a single number
+  // (`81°F`) — a divergence opened by the change that existed to close exactly that. Same formatter
+  // now, so a rider and a runner read one screen family in one language.
   try {
     if (sport === 'ride') {
       // computed.overall.elevation_gain_m is frequently null for rides; the value
@@ -1656,9 +1726,12 @@ export function buildAnalysisDetailRows(
           lap0?.total_elevation_gain,
       );
       if (Number.isFinite(elevM) && elevM > 15) {
-        const tempSuffix = (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
-          ? ` · ${Math.round(weatherTempF)}°F`
-          : '';
+        const tempStr = formatSessionTemp({
+          temperature_f: weatherTempF,
+          temp_start_f: weatherTempStartF,
+          temp_end_f: weatherTempEndF,
+        });
+        const tempSuffix = tempStr ? ` · ${tempStr}` : '';
         rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain${tempSuffix}` });
       }
     }
@@ -1708,11 +1781,19 @@ export function buildAnalysisDetailRows(
       // PER-RUN FACT, not a base verdict. "Aerobic base needs work / is sound" is a LONGITUDINAL claim
       // about fitness — it belongs to the TREND (State, confound-excluded, personal + posture-aware), which
       // OWNS it (Law 1). A single run only states how HR held vs pace THIS run; the base verdict is State's.
+      // ⛔ ONE ROW NAME, AND THE SENTENCE LEADS (2026-08-02, Michael approved: *"drift as a percentage
+      // on both sports, with a plain sentence around it"*).
+      //
+      // This row used to be labelled "Aerobic decoupling" and read "4% — HR held steady with pace",
+      // while the same question on the same screen wore the label "Heart rate" whenever the percentage
+      // could not be trusted. Two names for one question, and the technical one appeared exactly when
+      // there was most to say. The label is now stable; the plain sentence leads and the number is the
+      // receipt behind it.
       const p = decoupling!.pct as number;
-      const desc = p < 5 ? 'HR held steady with pace'
-        : p <= 10 ? 'moderate HR drift over the run'
-        : 'notable HR drift late in the run';
-      rows.push({ label: 'Aerobic decoupling', value: `${p}% — ${desc}` });
+      const desc = p < 5 ? 'Held steady with pace'
+        : p <= 10 ? 'Moderate drift over the run'
+        : 'Notable drift late in the run';
+      rows.push({ label: 'Heart rate', value: `${desc} (drift ${p}%)` });
     }
 
     if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {

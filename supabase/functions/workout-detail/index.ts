@@ -869,13 +869,23 @@ async function runSessionDetailPipelineAndPersist(
         const v = Number((detail as any)?.elevation_gain ?? (detail as any)?.metrics?.elevation_gain);
         return Number.isFinite(v) && v > 0 ? v : null;
       })(),
-      weatherTempF: (() => {
+      ...(() => {
+        // One parse, three fields. `weatherTempF` stays the single-number fallback; start/end let
+        // `formatSessionTemp` render "74 → 78°F" on the ride Terrain row exactly as it does on the run's.
         const raw = (row as any)?.weather_data;
         const wd = raw
           ? (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : raw)
           : null;
-        const t = Number(wd?.temperature_start_f ?? wd?.temperature);
-        return Number.isFinite(t) ? Math.round(t) : null;
+        const num = (v: unknown): number | null => {
+          if (v == null || v === '') return null;            // Number(null) === 0 — 0°F is not a fact
+          const n = Number(v);
+          return Number.isFinite(n) ? Math.round(n) : null;
+        };
+        return {
+          weatherTempF: num(wd?.temperature_start_f ?? wd?.temperature),
+          weatherTempStartF: num(wd?.temperature_start_f),
+          weatherTempEndF: num(wd?.temperature_end_f),
+        };
       })(),
       disciplineTrend,
     });

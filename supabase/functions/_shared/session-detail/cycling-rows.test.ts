@@ -11,17 +11,22 @@ import { formatCyclingClimbingRow, formatCyclingEfficiencyRow } from './build.ts
 
 // ── EFFICIENCY ──────────────────────────────────────────────────────────────
 
-// D-062 / Q-010: the EFFICIENCY row is plain-language ("Watts per heartbeat … · HR drift …%"), NOT the
-// old jargon ("EF … · …% HR decoupling"). This test drifted from that shipped change; realigned 2026-07-12.
-Deno.test('efficiency: both values finite → "Watts per heartbeat {ef} · HR drift {dec}%"', () => {
+// D-062 / Q-010: the EFFICIENCY row is plain-language ("Watts per heartbeat …"), NOT the old jargon
+// ("EF … · …% HR decoupling"). This test drifted from that shipped change; realigned 2026-07-12.
+//
+// ⛔ DRIFT LEFT THIS ROW 2026-08-02. It used to ride along as "· HR drift 4.3%" — the bike burying its
+// durability read inside an efficiency figure while the RUN gave the same idea a row of its own. It now
+// has its own "Heart rate" row on both sports. `aerobic_decoupling_pct` is STILL REQUIRED here as an
+// eligibility signal (a ride without it is not a readable aerobic effort); it is simply not printed.
+Deno.test('efficiency: both values finite → "Watts per heartbeat {ef}", drift NOT printed here', () => {
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62 · HR drift 4.3%' },
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62' },
   );
-  // 0% decoupling is finite → still renders
+  // 0% decoupling is finite → still renders (Number(null) trap: 0 is a value, absent is not)
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.7, aerobic_decoupling_pct: 0 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.7 · HR drift 0%' },
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.7' },
   );
 });
 

@@ -44,15 +44,21 @@ Deno.test('Q-158 (1): GAP decoupling renders the run FACT (not a base verdict) a
   const rows = buildAnalysisDetailRows(
     factPacketWithDrift(6), [], false, null, false, [], 'run', null, null, GAP_GOOD,
   );
-  const dec = find(rows, 'Aerobic decoupling');
-  assertEquals(!!dec, true, 'Aerobic decoupling row must render on a GAP-basis read');
+  // ⛔ THE ROW IS NAMED "Heart rate" NOW, ON BOTH BRANCHES (2026-08-02). It used to be labelled
+  // "Aerobic decoupling" when the percentage was trustworthy and "Heart rate" when it was not — two
+  // names for one question, with the technical one appearing exactly when there was most to say.
+  // The suppression rule this test exists to protect is UNCHANGED; it is now asserted by COUNTING the
+  // row rather than by the old label's absence, which would be vacuous.
+  const dec = find(rows, 'Heart rate');
+  assertEquals(!!dec, true, 'the heart-rate row must render on a GAP-basis read');
   assertStringIncludes(dec!.value, '4.2%');
   // audit 2026-07-17: the per-run row states a RUN FACT, not a base verdict. "aerobic base needs work / is
   // sound" is a LONGITUDINAL claim owned by the State trend (confound-excluded, personal). ≤5% → held steady.
-  assertStringIncludes(dec!.value, 'HR held steady with pace');
+  assertStringIncludes(dec!.value, 'Held steady with pace');
   assertEquals(dec!.value.includes('aerobic base'), false, 'per-run row must NOT issue the base verdict');
-  // Exactly one HR-behaviour read: the descriptive bpm "Heart rate" line is gone.
-  assertEquals(labels(rows).includes('Heart rate'), false, 'bpm line must be suppressed when % shown');
+  // Exactly ONE HR-behaviour read — never the % verdict and the descriptive bpm line together.
+  assertEquals(labels(rows).filter((l) => l === 'Heart rate').length, 1, 'exactly one HR row');
+  assertEquals(dec!.value.includes('bpm'), false, 'the bpm description must be suppressed when % shown');
 });
 
 Deno.test('audit 2026-07-17: a CONFOUNDED run stamps NO verdict — it falls through to the measured line', () => {
@@ -62,16 +68,22 @@ Deno.test('audit 2026-07-17: a CONFOUNDED run stamps NO verdict — it falls thr
   const rows = buildAnalysisDetailRows(
     factPacketWithDrift(9), [], false, null, false, [], 'run', null, null, CONFOUNDED,
   );
-  assertEquals(labels(rows).includes('Aerobic decoupling'), false, 'confounded run must NOT stamp a decoupling verdict');
-  assertEquals(!!find(rows, 'Heart rate'), true, 'the measured bpm line renders instead');
+  // The row name is shared now, so "no verdict" is asserted on the VALUE: a confounded run gets the
+  // measured bpm description and no percentage.
+  const hr = find(rows, 'Heart rate');
+  assertEquals(!!hr, true, 'the measured bpm line renders instead');
+  assertStringIncludes(hr!.value, 'bpm');
+  assertEquals(/drift \d/.test(hr!.value), false, 'confounded run must NOT stamp a decoupling percentage');
 });
 
 Deno.test('Q-158 (1b): high decoupling still suppresses the bpm line (no competing verdict)', () => {
   const rows = buildAnalysisDetailRows(
     factPacketWithDrift(14), [], false, null, false, [], 'run', null, null, GAP_HIGH,
   );
-  assertStringIncludes(find(rows, 'Aerobic decoupling')!.value, '9.1%');
-  assertEquals(labels(rows).includes('Heart rate'), false);
+  const hr = find(rows, 'Heart rate');
+  assertStringIncludes(hr!.value, '9.1%');
+  assertEquals(labels(rows).filter((l) => l === 'Heart rate').length, 1, 'still exactly one HR row');
+  assertEquals(hr!.value.includes('bpm'), false, 'no competing bpm line');
 });
 
 Deno.test('Q-158 (2): no GAP % → bpm line renders and NEVER says "normal for N min"', () => {
