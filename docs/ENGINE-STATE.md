@@ -23,51 +23,79 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-02 morning — **the session screen is the job, and it is BOTH sports at once. Read `docs/WORKORDER-session-screen-continuity-2026-08-02.md` first.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-02 evening — **the session screen is DONE and device-verified on both endurance sports. The next job is SWIM + STRENGTH, and one live State bug.**)
 
-### YOUR JOB — ONE VOCABULARY, FOUR SPORTS
+### WHAT THIS SESSION DID, IN ONE LINE
 
-**The work order is written and it is the entry point, not this banner:**
-`docs/WORKORDER-session-screen-continuity-2026-08-02.md`. It names the disease, the rules already
-settled, the target row shape, and the three known bike gaps.
+Run and ride now answer the same questions with the same words, every number on the Performance screen
+answers a **distinct** question, and Michael verified all of it on a device. Nineteen commits, six
+decisions ([D-364] … [D-369]), six new questions ([Q-242] … [Q-247]).
 
-⛔ **ONE SESSION HOLDS BOTH BIKE AND RUN.** Michael's call: *"should a fresh chat tackle both
-simultaneously to ensure visual continuity, a wide continuity?"* — yes, and splitting them is precisely
-how they drifted apart. The deliverable is that they AGREE.
+### ⛔ YOUR JOB
 
-**Start with the audit, not the rows.** Each sport grew a private answer to a question both were
-asking — planned duration, which analyzer runs, which read leads, does this session count. Four such
-were found and fixed on 2026-08-01. **Swim and strength have never been checked for the same disease.**
+**1. SWIM AND STRENGTH HAVE STILL NEVER BEEN AUDITED FOR ANY OF THIS.** That was the first task in the
+morning's work order and it is still untouched. The four shared questions that split run and ride apart
+(planned duration, which analyzer runs, which read leads, does this session count) have never been asked
+of the other two sports. **Start with the audit, not the rows.**
 
-### WHAT SHIPPED — do NOT re-litigate ([D-361], [D-362], [D-363])
+**2. [Q-245] IS A LIVE BUG, AND IT IS CHEAP.** State's run and bike trends cannot see a deload week —
+those series build `{date, value}` with no `meta`, so `isDeloadWeek` returns false on every point. A
+deliberately light week can read as **"sliding"** on both rows. Strength was fixed by D-338; these two
+were never wired. `run.ts:50/86/273`, `bike.ts:37`.
 
-**ATTACH IS FIXED, three ways.** Unstructured sessions ("~108 min easy", no steps) were **unattachable
-app-wide** — the matcher only summed steps and the row's `duration: 108` was never even selected. A
-session pushed to a Garmin was **invisible** to the matcher (`sent_to_garmin` is set by
-`send-workout-to-garmin` and never unset). And attaching only re-ran the analyzer **for runs**, so a
-ride or swim attaching late never got a plan comparison at all.
+**3. [Q-246] — delete the dead paths, keep their reasoning.** Sixteen computed-then-discarded blocks
+across the ride path, plus two dead client blocks. Every dated comment saying WHY a row is off is worth
+keeping; move it to a `D-NNN`. The code is a trap for whoever finds "already built" rows.
 
-**RIDE EXECUTION SCORES WHAT WAS PRESCRIBED.** Watts prescribed → power. "Easy" prescribed → **heart
-rate governs**, 50/50 with duration. Time UNDER the ceiling, never the average (958 ft of climbing must
-not read as indiscipline). ⛔ The ceiling is NOT the learned `ride_easy_hr` — that is a MEDIAN and would
-fail half his own easy rides; it is threshold-first, 75%-of-max bootstrap.
+### THE THREE FACTS YOU NEED BEFORE YOU TOUCH ANYTHING
 
-**THE SESSION SCREEN IS NOT THE STATE SCREEN.** Nine rows cut to three (running's shape). Fatigue moved
-to State. A ride the trend DISCARDS no longer prints its contaminated HR reading — the card now reads
-`counts_toward_trend` from the analyzer instead of not knowing.
+- **The endurance Insights paragraphs contain NO LLM.** `_shared/insights/run-insights.ts` and
+  `bike-insights.ts` are deterministic composers, wired at `analyze-running-workout` and
+  `analyze-cycling-workout:8`. The old model paths are imported and dead. **Strength insights and the
+  coach narrative DO still call Claude** — those are the only two output-LLMs left on a session/State
+  surface.
+- **The reference set is THREE APPS: TrainingPeaks, Garmin, Strava** (Michael, 2026-08-02: *"we dont
+  need to get in the weeds after that"*). If all three agree, that is the answer — stop researching.
+  Do not reach for intervals.icu / Runalyze / Stryd to settle an endurance call.
+- **Performance = how the session went. State = how the body is adapting over time.** Michael's own
+  split, and it is TrainingPeaks' and Garmin's. It decides where a number belongs: anything that only
+  means something as a trend is State's.
 
-**CHIPS RENDER ON A BIG DEVIATION NOW.** `assessed_against: 'actual'` meant two unrelated things; a
-37%-short run had pace 90 / duration 78 / execution 84 sitting unrendered.
+### WHAT SHIPPED — DEVICE-VERIFIED, DO NOT RE-LITIGATE
 
-### STILL UNVERIFIED — what would settle it
+The Performance row is **three numbers, no blends**: `Workload · Duration · Easy/Power` ([D-369]).
+Execution is gone (it was the other two averaged). TSS is gone from the ride (two load numbers
+disagreeing by a quarter; a run has none). Workload carries the athlete's **own** band —
+`typically 68–117` — never a verdict, and no band under five sessions.
 
-- **Everything from 2026-08-02 is device-verified EXCEPT the last three pushes** (chip layout, the
-  deviation guard, the easy-power block copy). Michael was reading the screen live for all of it, so the
-  bar here is higher than usual — but those three landed after his last screenshot.
-- **The AEROBIC and THRESHOLD bike states have still never rendered** — he has 6 easy rides (needs 8)
-  and no qualifying hard rides. Only BUILDING has been seen.
-- **~1.5% power delta vs Garmin** (avg 113 vs 115 W, NP 141 vs 143) while MAX matches exactly at 424 W.
-  Filed, not investigated.
+An easy session is judged on **heart rate, as time under a ceiling**, gated on PLAN INTENT ([D-364]).
+One verdict per session — the pace badge comes off when the easy governor judged it, and stays on tempo
+/ threshold / intervals / hills ([D-365]). Easy and Duration are **readouts, not marks**; one
+temperature per screen, stated as a range when it moved ([D-366]). The bike mirrors the run, including
+the sentence neither sport had — *"Prescribed easy, ridden at threshold"* ([D-367]). The coach reports
+the two grades separately and **no longer diagnoses fatigue from them** ([D-368]).
+
+### ⚠️ THE TWO MISTAKES THIS SESSION MADE, BECAUSE THEY WILL REPEAT
+
+**1. A number picked at the keyboard with a justification written beside it that sounded sourced and was
+not.** Twice in one day: `gain >= 500 ft` credited to a classifier that actually uses 40 ft/mi density,
+and a 5% "fade" threshold credited to a drift boundary that is really Friel's decoupling line. Michael
+caught both by asking *"are you tuning this to me?"* — **the wrong number is recoverable; the false
+citation is what survives review.**
+
+**2. A silent `catch` hiding a broken reference, not missing data.** The ride's TERRAIN row vanished off
+the screen for an hour because two arguments were added to one function's params and used inside a
+DIFFERENT function that takes positional args. The reference threw, the row's own `try/catch` swallowed
+it, the suite stayed green. ⚠️ **`deno check` had it the whole time** — 15 errors → 13 with the fix. Run
+it on the file you changed, not just the small ones.
+
+### STILL UNVERIFIED
+
+- **Everything after Michael's last screenshot**: the chip-wrapping fix (`5eb0b0ce`) is client-only and
+  unseen.
+- **[Q-244]** — Workload 86 vs TSS 69 on the same ride. Known, tolerated while only one is on screen.
+  **Check the banding before putting any scale or infographic in front of the athlete.**
+- **[Q-247]** — three living docs are over the archive cap; the decisions log is 3× over.
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 

@@ -31,7 +31,13 @@
 
 **1. The "as of" date drifts, and it always drifts optimistic.** The server stores an *age in days* relative to when the snapshot was computed (`classify.ts:56`). The client renders it as `today − age` (`StatePerformanceSection.tsx:49-54`). So if the snapshot is N days old, every "as of" on the screen is N days too fresh. **Live receipt:** on 2026-07-13 the screen read *"as of Jun 27"* while the newest qualifying run was **Jun 28**. Off by one, in the flattering direction. **Fix: ship the newest data DATE, not its age.** A date cannot rot; an age computed against the wrong clock always does.
 
-**2. The deload exclusion has never once fired.** `isDeloadWeek` reads `point.meta.name` (`deload.ts:15`) and **no adapter in the trend layer ever sets `meta`** (verified: zero non-test matches). Every `{ exclude: isDeloadWeek }` evaluates `/deload/i.test('')` → false, always. The file's own comment describes behaviour that does not happen. **Consequence, and it is the exact failure the file says it prevents: a deliberately light deload week can read as "sliding".**
+**2. The deload exclusion has never once fired.** ⚠️ **HALF STALE — corrected 2026-08-02 (Q-245).** It
+fires for **strength** now: D-338 wired `meta.phase` per date (`assemble.ts:210`, `strength.ts:65`).
+It still **never fires for run or bike** — those series build `{date, value}` with no `meta` at all
+(`run.ts:50/86/273`, `bike.ts:37`), so a deliberately light week can still read as "sliding" on both
+rows. Naming which series matters: read as written, the next session either re-fixes strength or trusts
+run and bike. *Everything below is the original finding.*
+ `isDeloadWeek` reads `point.meta.name` (`deload.ts:15`) and **no adapter in the trend layer ever sets `meta`** (verified: zero non-test matches). Every `{ exclude: isDeloadWeek }` evaluates `/deload/i.test('')` → false, always. The file's own comment describes behaviour that does not happen. **Consequence, and it is the exact failure the file says it prevents: a deliberately light deload week can read as "sliding".**
 
 **3. The whole run column is built on the routes table.** ✅ **FIXED 2026-07-21 — this finding is HISTORY, not current state (corrected 2026-07-31).** `compute-snapshot:686` now seeds the run substrate from `workouts.workout_analysis`, so a treadmill or no-GPS run is no longer invisible to State. *The original finding, kept because it is the reasoning: Familiar Routes is a courtesy feature and was acting as a gate on fitness; a run failing the route write (no GPS distance, under 1 km, treadmill — `route-intelligence.ts:133`) did not exist for State even though `workout_facts` held a good decoupling number for it.*
 

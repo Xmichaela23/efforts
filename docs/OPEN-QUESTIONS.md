@@ -2724,3 +2724,84 @@ exactly the "sounds more certain than it is" failure this whole day was spent re
 
 ⚠️ **Do NOT reach for a CI for bike to match run efficiency.** Bike efficiency is not the same shape of
 computation, and the noise guard is the bar its siblings already meet.
+
+---
+
+## Q-242 — The carryover RPE gauge has never run, and is now gated OFF (2026-08-02) — **deferred, deliberate**
+
+`analyze-cycling-workout`'s cross-domain carryover has a two-way RPE gauge (this ride's RPE vs the
+athlete's own baseline for comparable-IF rides). `workouts.rpe` was **not in that function's SELECT**, so
+`thisRpe` was `Number(undefined)` and every branch below it has been dead since it was written.
+
+RPE was added to the SELECT on 2026-08-02 for the Insights conditions clause ([D-367]). Feeding the gauge
+as a side effect would have switched a dormant card on mid-verification — the athlete meeting a reading
+nobody has ever seen the output of. It is behind `CARRYOVER_RPE_GAUGE_ENABLED = false`.
+
+**To close:** review what the gauge actually emits on real rides, then flip the one constant.
+
+---
+
+## Q-243 — `avg_temperature` heat gate: starved AND wrong units (2026-08-02) — **filed, not fixed**
+
+Same function, same block: `const tempF = Number(workout.avg_temperature); const heatConfound = tempF >= 82`.
+
+Two faults stacked. `avg_temperature` is **not in the SELECT**, so it is always `NaN` and the gate never
+fires. And `avg_temperature` is **CELSIUS** (the run analyzer converts it: `avgC * 9/5 + 32`), compared
+here against 82 as if Fahrenheit — so even when fed, 82°C would never occur.
+
+Not fixed with Q-242 for the same reason: it changes what the carryover card does.
+
+---
+
+## Q-244 — Workload and TSS disagree by a quarter on the same ride (2026-08-02) — **known, tolerated**
+
+The 2026-08-01 Long Ride: **Workload 86**, **TSS 69**. Same formula (`hours × IF² × 100`) — the gap is
+the intensity source. TSS uses the exact NP/FTP ratio; Workload uses a **banded ladder**
+(`inferIntensityFromPerformance`, `_shared/workload.ts`), which rounds 0.64 up to a 0.70 band.
+
+Tolerable now that only ONE of them is on screen ([D-369]). It matters if a scale or an infographic is
+ever put in front of the athlete: **Workload is coarser than it looks.** Check the banding before
+publishing any interpretation of the number.
+
+---
+
+## Q-245 — State's run and bike trends still cannot see a deload week (2026-08-02) — **VERIFIED IN CODE, live**
+
+`isDeloadWeek` (`state-trend/deload.ts:26-29`) reads `meta.phase`, falling back to `meta.name`. D-338
+wired `meta.phase` for **strength** (`assemble.ts:210`, `strength.ts:65`).
+
+**Run and bike series carry no `meta` at all** — `run.ts:50`, `run.ts:86`, `run.ts:273`, `bike.ts:37` all
+build `{date, value}`. So `{ exclude: isDeloadWeek }` evaluates false on every run and bike point, every
+time. **A deliberately light week can still read as "sliding" on those two rows** — the exact failure
+D-338 fixed for strength.
+
+⚠️ `STATE-SOURCE-MAP.md` finding #2 says this exclusion "has never once fired". That is now **half
+stale** — it fires for strength. The doc must say WHICH series, or the next session will either re-fix
+strength or trust run and bike.
+
+---
+
+## Q-246 — Session-screen dead code that still runs (2026-08-02) — **filed, cheap, not done**
+
+Four blocks in the ride path compute fully and are then `void`ed (`session-detail/build.ts` — normalized
+power row, avg/max HR row, seven-band power zones, VAM climbing). Twelve more in
+`analyze-cycling-workout:2733` ("dead LLM-path refs, retained for the cleanup sweep"). Plus
+`getAdvancedMetrics` (`CompletedTab.tsx:1034`) — assigned at `:1136`, never read, and containing
+`const isRun = workoutData.swim_data`, identical to the `isSwim` line below it, which makes the swim
+branch unreachable. And `AppleHealthSwimEnrichment`, imported at `MobileSummary.tsx:11` and never
+rendered.
+
+**Each dated comment explaining WHY a row is off is good and should move to a `D-NNN`. The code is a
+trap:** a future session finds four "already built" rows and switches them on without reading why they
+were switched off.
+
+---
+
+## Q-247 — Three living docs are over the cap, and one has doubled (2026-08-02) — **measured**
+
+`DECISIONS-LOG.md` **452K**, `OPEN-QUESTIONS.md` **316K**, `ENGINE-STATE.md` **196K**. `CLAUDE.md` sets
+the archive trigger at ~150K. All three are past it; the decisions log is 3× over.
+
+The split is mechanical (move closed/superseded entries to `-ARCHIVE.md`, leave a pointer) and nothing is
+deleted. It is skipped every session because it is never the urgent thing — which is precisely how they
+got here.

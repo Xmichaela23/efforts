@@ -1,5 +1,17 @@
 # WORK ORDER — ONE VOCABULARY, FOUR SPORTS (2026-08-02)
 
+> ⛔ **STATUS, 2026-08-02 EVENING: PART 1 IS DONE AND DEVICE-VERIFIED. ONLY THE SWIM + STRENGTH AUDIT
+> REMAINS.**
+>
+> All five bike gaps shipped ([D-367]), plus four decisions the audit did not anticipate: the easy
+> governor ([D-364]), one verdict per session ([D-365]), readouts instead of marks ([D-366]), the two
+> grades and the coach's fatigue path ([D-368]), and the three-number row ([D-369]). Run and ride are
+> verified on a device.
+>
+> **What is left of this document is PART 3 — swim and strength, never audited for any of it.** Read
+> Part 1 for the shape the bike ended up with; read Part 2 for the continuity findings, several of which
+> are now filed as [Q-242] … [Q-247]. **Everything in Part 0's "what shipped" table is history.**
+
 **Rewritten 2026-08-02 midday**, read-only, while Michael was out running. The morning half of this
 file described work that has since SHIPPED; leaving it standing would have sent the next session to
 re-fix it. What follows is: what is true now, the bike spec, and an audit of run ↔ ride ↔ State

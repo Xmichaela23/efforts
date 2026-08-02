@@ -8,6 +8,37 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE LAST PUSH OF 2026-08-02 (client only, unseen)
+
+- [ ] **Chip subtitles must not break through a value** (`5eb0b0ce`). "typically 68–117" was wrapping
+      with "117" alone on the last line. The value line is now nowrap and the numbers inside subtitles
+      are joined by non-breaking spaces, so words wrap around them and figures cannot be cut in half.
+      ⚠️ Client only — no function deploy. Just needs a look.
+
+---
+
+## ✅ VERIFIED ON DEVICE — THE SESSION SCREEN, BOTH ENDURANCE SPORTS (2026-08-02, Michael reading it live)
+
+Michael confirmed all of this on a device across the afternoon. Kept as the record of what was checked.
+
+- [x] **Three numbers, no blends:** `Workload · Duration · Easy/Power`. Execution gone (it was the other
+      two averaged); TSS gone from the ride (a run has none, and the two disagreed by a quarter).
+- [x] **Workload carries the athlete's own band** — "typically 68–117". Never a verdict. No band under
+      five sessions.
+- [x] **An easy session is judged on heart rate**, as time under a ceiling, gated on plan intent. A
+      tempo run is no longer graded against the easy ceiling.
+- [x] **One verdict per session** — the green pace badge comes off an easy row; the prescription and the
+      executed pace both still render.
+- [x] **"Steady", not "Interval 1"**, on a single-block session.
+- [x] **One temperature per screen** — `79 → 84°F` in the header, Insights and Terrain together.
+- [x] **The bike mirrors the run** — *"Prescribed easy, ridden at threshold — 9 of 64 minutes stayed
+      under your 131 bpm ceiling"*, conditions as load with RPE, a Pacing row on an unstructured ride,
+      heart rate as its own row and **absent** on a hard ride.
+- [x] **A confounded run makes no heart-rate claim** — the paragraph states the shape and lets the heat
+      carry the cause.
+
+---
+
 ## ⏸ PARKED — POLISH, NOT NOW (2026-08-02, Michael: *"thats a polish once things are working"*)
 
 - [ ] **Should the app notice "I keep failing to hit my intervals" and say so?**

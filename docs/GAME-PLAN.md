@@ -4,7 +4,20 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
-> **2026-08-02 — THE SESSION SCREEN, BOTH SPORTS AT ONCE.**
+> **2026-08-02 (evening) — THE SESSION SCREEN IS DONE, AND DEVICE-VERIFIED ON BOTH ENDURANCE SPORTS.**
+> Run and ride answer the same questions with the same words. The Performance row is **three numbers,
+> no blends** — `Workload · Duration · Easy/Power` — and every one answers a distinct question
+> ([D-364] … [D-369]). Execution and TSS are gone; both were second answers to questions already asked.
+>
+> ⛔ **NEXT: SWIM AND STRENGTH.** They have still never been audited for the four shared questions that
+> split run and ride apart. That was the first task in the morning's work order and it is the only part
+> of it left. **Audit before rows** — `docs/WORKORDER-session-screen-continuity-2026-08-02.md`.
+>
+> ⛔ **AND ONE LIVE BUG, CHEAP: [Q-245].** State's run and bike trends cannot see a deload week, so a
+> deliberately light week can read as "sliding". Strength was fixed by D-338; those two were never
+> wired.
+
+> **2026-08-02 (morning) — SUPERSEDED BY THE ENTRY ABOVE. The session screen, both sports at once.**
 > A night of reading the live screen turned up one disease in four forms: each sport had grown its own
 > private answer to a question both were asking. Attach, execution scoring, screen density and trend
 > eligibility all fixed for bike ([D-361], [D-362], [D-363]) — **and swim and strength were never

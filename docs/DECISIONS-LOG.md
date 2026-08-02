@@ -2666,6 +2666,15 @@ is how a missing dot starts reading as a bug.
 
 ## D-363 — THE SESSION SCREEN IS NOT THE STATE SCREEN (2026-08-02, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
+> ⚠️ **THE SAME LAW APPLIED ONE FLOOR UP, 2026-08-02 — see [D-368].** This entry moved a
+> cross-discipline fatigue judgement off the session screen. The COACH was doing the identical thing:
+> reading a per-session adherence average and returning readiness `'fatigued'` *"regardless of ACWR"*,
+> plus a caution telling the athlete to dial back intensity because *"your execution suggests you're not
+> absorbing the work"*. Both paths are now **deleted**. Fatigue is State's, from trends over time.
+>
+> ⚠️ Its row-shape half was also superseded: the ride's **Efficiency** row lost the drift figure to its
+> own **Heart rate** row, and the **prescribed-versus-ridden** sentence was added — see [D-367].
+>
 Michael, on the ride Performance tab: *"this is too dense — see how running handles it, works there."*
 A run's Performance tab renders **one** analysis row and a sentence:
 
@@ -2712,6 +2721,14 @@ Details read the provider total and Performance derived its own. One number now 
 
 ## D-362 — SCORE WHAT WAS PRESCRIBED (2026-08-02, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
+> ⚠️ **EXTENDED TO RUNNING 2026-08-02 — see [D-364].** This entry made the RIDE score what was
+> prescribed. The run had the same idea in prose only, off AVERAGE heart rate, while this one used time
+> under the ceiling — so an easy run showed two chips and an easy ride three. The measurement now lives
+> in `_shared/time-under-ceiling.ts` and both sports call it. ⛔ **The gate is the load-bearing part:**
+> do NOT gate on `mapClassifiedTypeToHrWorkoutType()`, which returns `steady_state` for everything but
+> intervals and hills — a TEMPO run took the easy branch and was graded against a prescription it was
+> never given.
+>
 A ride prescribed *"~108 min easy, all conversational"* scored **0%**. The chain of reasons is the
 entry; the rule is the title.
 
@@ -2772,6 +2789,15 @@ prints "est. from your max HR" until one exists.**
 
 ## D-361 — A SESSION MUST BE ABLE TO ATTACH, AND THE ANALYZER MUST FOLLOW IT (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
+> ⚠️ **EXTENDED 2026-08-02 — THERE WAS A FOURTH READER, AND IT WAS MISSED.** This entry fixed three
+> surfaces that each answered "how long was this planned" in one place. `buildPlannedTotals`
+> (`_shared/session-detail/build.ts`) was never wired to `resolvePlannedDurationSeconds` and is the same
+> bug's fourth face: the cycling analyzer resolved 59% duration adherence correctly THROUGH the shared
+> resolver while the session contract's `planned_totals.duration_s` came back null from its own private
+> lookup — one fact, two answers, in the same request. ⛔ **And the fix was itself starved for an hour:**
+> `workout-detail` selects `total_duration_seconds` and NOT `duration`, in three places, so the resolver
+> ran and found nothing. See [D-366].
+>
 Michael: *"bike is kind of a mess — didn't attach to planned workout."* Three defects in one chain, all
 found with the row in hand.
 
@@ -3883,3 +3909,213 @@ to the SECOND off a pace stamped `confidence: high` from three runs. Michael: *"
 featre unless it robust."* ⛔ The floor is the app's OWN — `runDirectionMinRuns` = 8, the same bar State
 already requires to assert a direction — **not a new number picked for this.** A TYPED target never
 qualifies at all: projecting race times off an aspiration is a fabricated number in measured clothes.
+
+---
+
+## D-364 — AN EASY SESSION IS JUDGED ON HEART RATE, AS TIME UNDER A CEILING (2026-08-02, Michael — **VERIFIED ON DEVICE**)
+
+The app already knew this and said it in the wrong place. The run's Insights paragraph dropped the pace
+verdict on a steady run and spoke to the easy band instead; the client already hid the Pace chip. But the
+read was **prose only, off AVERAGE heart rate**, while the ride had shipped the same idea a day earlier
+as a scored chip off **time under the ceiling** ([D-362]). An easy run showed two chips, an easy ride
+three, and the run's score was still half-built from a pace number the same screen refused to display.
+
+**Three things, the ride's three, applied to running:**
+
+1. **TIME under the ceiling, never the average.** A hilly run averages under the bar while a third of it
+   was over — the average calls that clean. `_shared/time-under-ceiling.ts`, shared by both sports.
+2. **Its own chip, naming the ceiling and its provenance** — `measured` when a threshold test anchors
+   it, `est.` off max HR. That distinction is the whole argument for doing a threshold test.
+3. **The score is built from what was prescribed**, not from pace.
+
+**THE GATE IS PLAN INTENT, AND THIS IS THE LOAD-BEARING PART.** `isEasyPrescribedRun`
+(`_shared/easy-hr.ts`) reads `classifiedTypeKey` — easy / recovery / long_run. ⛔ **Do NOT gate on
+`mapClassifiedTypeToHrWorkoutType()`**: it returns `steady_state` for everything except intervals and
+hills, so a TEMPO run took the easy branch and was told it "ran 22 bpm over your easy ceiling" — graded
+against a prescription it was never given. Fixed and pinned.
+
+⚠️ **LONG RUNS ARE IN, SCORED STRAIGHT** (Michael: *"straight — that's the whole point"*). They drift, so
+a well-executed long run will not read 100. No shipped app corrects for this: they report time-in-zone
+straight and report decoupling separately, which the HR row already does. Correcting here would invent
+a number nobody measured.
+
+⚠️ **THE CEILING IS PER-SPORT AND STAYS THAT WAY.** Running HR sits 5–10 bpm above cycling at the same
+effort. `easy-hr.ts` and `ride-easy-hr.ts` both say do not unify them.
+
+⛔ **THE SCORE MUST BE WRITTEN LAST.** The first version set it beside the measurement, ~400 lines early;
+**four** later blocks in `analyze-running-workout` recompute `execution_adherence` from
+`(pace + duration) / 2` and overwrote it every time. The chip rendered, the suite was green, and the
+number on screen was the old one. The override now sits at the serialization boundary.
+
+---
+
+## D-365 — ONE VERDICT PER SESSION, AND THE INTENT DECIDES WHICH (2026-08-02, Michael — **VERIFIED ON DEVICE**)
+
+The screen printed two answers to "did you do this session right" and they disagreed by 51 points: the
+Easy chip read 49% while the row below showed a green **100%** pace badge. Michael had run 11:28/mi
+inside a prescribed 11:15–11:43 — on a 76°F rolling morning at RPE 2, which is exactly why heart rate sat
+above the easy ceiling. He did what was asked.
+
+**All three reference apps agree, and none would print both.** TrainingPeaks does not grade pace at all
+(compliance is duration and distance); Garmin gives a step ONE target, pace or heart rate, never both;
+Strava shows time in heart-rate zones and never scores a session against a plan.
+
+So on a session judged by the easy governor, the per-row pace percentage and its colour come off. **The
+prescription and the executed pace both still render** — the row still reads `11:15-11:43/mi` and
+`11:28/mi`. Nothing is hidden; it stops being a mark.
+
+⚠️ **INTENT-GATED, NOT A BLANKET RULE.** The signal is the presence of `intensity_adherence`, which the
+analyzer emits only for an easy prescription. Tempo, threshold, intervals and hills were GIVEN a pace and
+are still graded on it, badge and all — a different paradigm for a different intent, which is the point.
+The client does not re-derive the rule.
+
+---
+
+## D-366 — READOUTS, NOT MARKS: EASY, DURATION, AND ONE TEMPERATURE (2026-08-02, Michael — **VERIFIED ON DEVICE**)
+
+**Easy stopped being a score.** Every other chip answers "how close to plan, out of 100". Easy never
+could: it is time under a heart-rate ceiling on a session whose purpose is aerobic work at the lowest
+cost. Printed as 49%, it put a failing grade on a run executed exactly as prescribed. None of the three
+reference apps score an easy session — Strava shows the zone bar, Garmin time in zone, TrainingPeaks
+grades duration and distance and nothing else. It reads `17 of 35 min · under 134 bpm · measured`.
+
+⚠️ **THE MINUTES ARE MEASURED, NOT BACK-CONVERTED.** `easy_total_s` is HEART-RATE COVERAGE, not session
+length. Deriving "17 of 35" from a percentage against moving time would claim minutes the strap never
+recorded.
+
+**Duration stopped being a score, and the old one could not answer its own question.**
+`duration_adherence` is distance-from-100 via `Math.abs()`, so against a 46-minute plan a 35-minute and a
+57-minute session **both read 76%**. `volume_ratio_pct` is the plain ratio; the chip reads
+`64 of 108 min · Moving time vs plan`. ⚠️ Moving minutes, said out loud — a session with long stops reads
+short for that reason alone.
+
+**One temperature per screen, and it says when it moved.** The header read the START (74°F) and the
+Terrain row the AVERAGE (76°F) on the same run. `formatSessionTemp` is called by both: `74 → 78°F` when
+the reading moved, one number when it did not. ⛔ **No threshold** — any "only show the range if it moved
+more than N degrees" invents an N.
+
+⚠️ **A 2026-07-03 comment in `analyze-running-workout` already described this fix as done** ("the
+header-76 vs terrain-78 disagreement") — it had pointed two call sites of three at the same field. A
+shared formatter is the version that cannot be half-applied.
+
+---
+
+## D-367 — THE BIKE MIRRORS THE RUN (2026-08-02, Michael — **VERIFIED ON DEVICE**)
+
+⛔ **THE DETERMINISTIC BIKE COMPOSER ALREADY EXISTED AND WAS ALREADY WIRED** (`_shared/insights/
+bike-insights.ts`, called from `analyze-cycling-workout:8`). There is **no LLM in either endurance
+Insights path**. This was a clause-set job, not a build — run's composer emits ~16 clauses, bike's ~11,
+and almost none fired on a ride without structured intervals, which is most rides.
+
+**Five gaps, one screen:**
+
+1. **Terrain speaks one temperature vocabulary** — the ride was left on a single number by the morning's
+   own fix. Both call `formatSessionTemp` now.
+2. **Heart rate is its own row, as a percentage, on both sports** (Michael: *"drift as a percentage on
+   both sports, with a plain sentence around it"*). The bike buried drift inside the Efficiency figure;
+   the run split the same question across two DIFFERENT row names — "Aerobic decoupling" when the number
+   was trustworthy, "Heart rate" when it was not, so the jargon appeared exactly when there was most to
+   say. One name, sentence first, number as receipt.
+   ⛔ **And the bike gained the trust gate it never had.** It printed "HR drift 0.4%" on a ride the
+   engine had classified THRESHOLD. Decoupling is a steady-aerobic measurement; on a threshold effort
+   the number is real and the question was never asked. Gated on `classified_type` — the same field the
+   zone label reads. On a hard ride the row is **absent**, never substituted.
+3. **Prescribed versus ridden — the sentence neither sport had.** The 2026-08-01 Long Ride was prescribed
+   easy and ridden at threshold; the screen held both facts three lines apart and never joined them.
+   It leads the paragraph, is silent when they agree, and names no consequence — the cost is State's.
+4. **Conditions as load** — a clause the composer has accepted since 2026-07-19 while the mapper
+   hardcoded `conditions: null`, so it could never once have fired. An 81°F ride with 958 ft of climbing
+   read as though it happened in a lab. **Starved, not absent.**
+5. **Unstructured rides get a Pacing row** — mean pedalling watts per half. ⚠️ NOT halved NP (a 30-second
+   rolling average is baked into it), and zero-power samples excluded from both halves so a
+   descent-heavy second half is not a fade that never happened.
+
+⛔ **TWO INVENTED NUMBERS, CORRECTED THE SAME DAY** (Michael: *"ensuring you are not tuning any of this
+to me or this ride"*). The climbing gate shipped as `gain >= 500 ft` with a comment claiming 500 was the
+classifier's own bar. **It was not** — the classifier uses elevation DENSITY, ≥ 40 ft/mi
+(`cycling-v1/build.ts:113`) — and an absolute foot count is also the wrong SHAPE: 600 ft over 60 miles is
+flat and passed; 450 ft over 8 miles is steep and failed. And the Pacing row called a ≥5% drop a "fade",
+citing 5% as a drift boundary — that is Friel's aerobic-DECOUPLING line, a different idea, and no
+reference app publishes a power-fade bar. The row now states the watts and grades nothing.
+
+> **THE LESSON, AND IT IS THE EXPENSIVE ONE:** both misses had the same shape — a number picked at the
+> keyboard with a justification written beside it that *sounded sourced and was not*. The wrong number is
+> recoverable. **The false citation is what survives review**, including mine.
+
+---
+
+## D-368 — TWO GRADES, AND THE COACH STOPS DIAGNOSING FROM THEM (2026-08-02, Michael — **PUSHED + DEPLOYED**)
+
+Michael: *"duration is one grade, time in prescribed anything is another grade"* — and, on fatigue,
+*"we have addressed all this in state"*.
+
+Execution was those two averaged, and the weighting was a number nobody chose: the ride's comment said it
+mirrors running's 50/50, running's cites nothing. **Three files pointing at each other with no ground
+under any of them** — and there is no field answer to reach for, because none of the three reference apps
+produces a single execution score at all.
+
+**So they are reported separately and never merged:** `avg_intensity_adherence` (time at the prescribed
+effort) and `avg_volume_ratio` (moving time as a ratio of planned). Both readiness-driver tones are
+**neutral** — a driver row states a fact; the readiness verdict is reached elsewhere, from body signals.
+
+⛔ **AND THE EXECUTION-DRIVES-FATIGUE PATH IS DELETED, NOT GATED.** Two places read a per-session
+adherence average and concluded about the athlete's BODY: `execution_low` → readiness `'fatigued'`
+explicitly *"regardless of ACWR"*, and a caution verdict telling him to *"dial back intensity for
+24-48h"* because *"your execution suggests you're not absorbing the work"*. That is a cross-session
+verdict and **State owns it** — [D-363] moved exactly this off the session screen the night before; both
+were the same violation one floor up. The input could not support the claim either: a warm 35-minute run
+in place of 46, effort held exactly right, dragged the average down and came out as "you look fatigued".
+
+⚠️ **NOT REPLACED BY A SPLIT-GRADE VERSION.** The thresholds (65/70/75 per methodology) were fitted to
+the blended number; carrying them across to an intensity-only grade would reuse a bar that no longer
+measures what it was set against. `min_execution_score_ok` is now **unread**.
+
+⚠️ **The app never changed training from this** — `adapt-plan` does not read it. It coloured a card,
+shifted wording toward "fatigued", and offered a suggestion gated on body signals agreeing. Claimed
+otherwise from a code comment before tracing it; corrected.
+
+---
+
+## D-369 — THREE NUMBERS ON A SESSION, AND LOAD HAS SOMETHING TO BE READ AGAINST (2026-08-02, Michael — **VERIFIED ON DEVICE**)
+
+Michael, at seven numbers on one screen: *"omfg what the fuck are all these score"*. He was right, and
+the fault was handing him one decision at a time instead of proposing a set.
+
+**Three questions, three numbers, no blends:**
+
+| chip | answers |
+|---|---|
+| **Workload** | what it cost you |
+| **Duration** | did you do the amount asked |
+| **Easy / Power** | did you do it at the intensity asked |
+
+**Execution came off** — the other two averaged. **TSS came out of the ride's Insights** — the ride
+carried two load numbers, "69 TSS" there and "Workload 86" on Details, disagreeing by a quarter because
+Workload takes intensity from a banded ladder and TSS from the exact ratio. Two answers to one question,
+and only rides had the second: **a run has no TSS at all.**
+
+⛔ **WORKLOAD IS NOT A HOUSE INVENTION — IT IS THE TSS FORMULA.** `hours × IF² × 100`, the same anchor
+TrainingPeaks uses (100 = one hour at threshold). The only difference is where intensity comes from:
+TrainingPeaks needs power-vs-FTP or pace-vs-threshold-pace; ours takes the best signal each sport HAS —
+power, HR vs threshold HR, swim pace, else the prescribed intensity. That is why it works on every sport,
+and why **rTSS was rejected**: it needs a learned threshold pace, so a new athlete would get load on rides
+and nothing on runs for weeks.
+
+⚠️ **Having a house load unit is field-normal, not a compromise.** TrainingPeaks calls it TSS, Garmin
+Training Load, Strava Relative Effort. Different names, different scales, none interchangeable.
+
+**AND IT NOW HAS A COMPARISON.** "86" cannot be high or low alone. The chip shows the athlete's OWN band
+for the same sport — `typically 68–117` — which is how Strava frames Relative Effort and Garmin bands
+Training Load: **where it sits among yours, never a verdict.**
+
+⚠️ Same sport, 90 days, completed only. ⚠️ The **middle half** (25th–75th), not min–max — one four-hour
+ride would stretch a min-max band until every ordinary session looked tiny. ⚠️ **Under five sessions
+there is no band** and the chip makes no claim.
+
+⛔ **NO TRAFFIC LIGHT, ASKED AND DECLINED** (Michael: *"do we want to color code it green yellow red?"*).
+A high workload is not bad — a long ride SHOULD be the biggest number of the week, and red on a
+correctly-executed long run tells the athlete off for following the plan. There is no "right" workload
+for a session; it depends what the session was for. Garmin does colour load, but on a **seven-day
+rolling** total against an optimal range, where too little and too much are both genuinely suboptimal.
+One session is not that question. If scannability needs more, the honest answer is a **position marker**
+in the band, not a colour that judges.
