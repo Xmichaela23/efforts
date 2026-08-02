@@ -60,7 +60,21 @@ export default function AdherenceChips({
     if (hideTopAdherence) return null;
 
     const ex = sd.execution;
-    if (sd.execution?.assessed_against === 'actual') return null;
+    // ⛔ A BIG DEVIATION IS NOT A REASON TO STOP SCORING (2026-08-02, Michael: "if it attached it should
+    // adhere to something").
+    // `assessed_against` flips to 'actual' in TWO unrelated situations (`fact-packet/build.ts:848`):
+    //   1. there is no planned workout at all — nothing to compare against, chips are meaningless.
+    //   2. the distance deviated >=30% from plan, which the packet calls an "intentional" change.
+    // This guard treated them the same and hid the chips for both. Case 2 is exactly BACKWARDS: there IS
+    // a plan, the comparison DID run, and pace 90 / duration 78 / execution 84 are all sitting in the
+    // contract. A 37%-short session is precisely when an athlete should see those numbers — and the
+    // same screen was already printing "36 of 46 min planned (78%)" and a 90% interval row two lines
+    // above, so the screen contradicted itself.
+    // Case 1 is still handled, by `noPlannedCompare` above and by the analyzer nulling every adherence
+    // field on an unlinked workout (D-035) — so nothing renders for a genuinely unplanned session.
+    // ⚠️ `assessed_against` itself is UNCHANGED: the fact packet still uses it to pick stimulus criteria
+    // and to tell the LLM not to compare against a prescription that does not exist. Only this display
+    // guard moved.
 
     const executionScore = ex?.execution_score ?? null;
     const paceAdherence = ex?.pace_adherence ?? null;
