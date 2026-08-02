@@ -1,4 +1,4 @@
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeRunInsight, type RunInsightInput } from './run-insights.ts';
 
 // The real 80-min out-and-back (2026-07-19): even effort, HR held (decoupling 4.4%), rolling +249ft,
@@ -56,4 +56,50 @@ Deno.test('fartlek: mixed by design, NEVER graded as a fade', () => {
 Deno.test('nothing worth saying → silence (null), not padding', () => {
   const s = composeRunInsight({ type: 'other', pacing: null, decoupling: null });
   assertEquals(s, null);
+});
+
+// ── A confounded percentage makes no claim, in either direction (2026-08-02) ─
+// ⛔ THE CONTRADICTION THIS PINS, verified on the 2026-08-02 Long Run: decoupling 8.7%, basis gap,
+// assessment needs_work, confounded TRUE (79 → 84°F). The session-detail HR row correctly showed
+// NOTHING — a confounded percentage is unreliable and State excludes the run from its durability
+// verdict. This paragraph did not know the flag existed and said "The second half slowed as your
+// heart rate climbed — the effort drifted up": a fade verdict off the number the row had just
+// discarded, three lines above the sentence explaining it was 84°F.
+
+Deno.test('⛔ a confounded run gets the pacing SHAPE without a heart-rate verdict', () => {
+  const s = composeRunInsight({
+    type: 'steady',
+    pacing: { pattern: 'positive_split', hrHeld: false },
+    decoupling: { pct: 8.7, assessment: 'needs_work', confounded: true },
+  })!;
+  assertStringIncludes(s, 'positive split');
+  assertEquals(/heart rate climbed|effort drifted up/i.test(s), false);
+  assertEquals(s.includes('8.7%'), false, 'a confounded number is never quoted');
+});
+
+Deno.test('an UNconfounded fade is still named honestly — the guard is not a mute button', () => {
+  const s = composeRunInsight({
+    type: 'steady',
+    pacing: { pattern: 'positive_split', hrHeld: false },
+    decoupling: { pct: 9.5, assessment: 'high', confounded: false },
+  })!;
+  assertStringIncludes(s, 'heart rate climbed');
+});
+
+Deno.test('confounding withdraws the GOOD reading too, not just the bad one', () => {
+  // Heat inflates decoupling, so a confounded number cannot confirm "HR held" either. Both directions
+  // are withdrawn together — otherwise the guard would only ever flatter the athlete.
+  //
+  // ⚠️ Null is a legal answer here and the assertion is written for it. Silence is legal in this
+  // composer, and with the only usable read withdrawn there may be nothing true left to say — which is
+  // the correct outcome, not a gap. (The mapper cannot even produce `even_effort` on a confounded run:
+  // it passes a null percentage to `pacingVerdict`, and that pattern is derived from HR holding.)
+  const s = composeRunInsight({
+    type: 'steady',
+    pacing: { pattern: null, hrHeld: true },
+    decoupling: { pct: 3.0, assessment: 'excellent', confounded: true },
+  });
+  const out = s ?? '';
+  assertEquals(out.includes('3%'), false);
+  assertEquals(/heart rate held/i.test(out), false);
 });

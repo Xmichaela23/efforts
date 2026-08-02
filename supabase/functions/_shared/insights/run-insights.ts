@@ -39,8 +39,18 @@ export interface RunInsightInput {
     hrHeld: boolean;
     outAndBack?: boolean | null; // net-symmetric elevation — pace tracked the hills both ways
   } | null;
-  /** Aerobic durability — SAME decoupling the State durability row uses. */
-  decoupling?: { pct: number | null; assessment: DecouplingAssessment } | null;
+  /** Aerobic durability — SAME decoupling the State durability row uses.
+   *
+   *  ⛔ `confounded` ADDED 2026-08-02, AND IT IS THE POINT. The session-detail HR row has honoured this
+   *  flag since 2026-07-17 — a heat- or effort-confounded percentage is unreliable, State EXCLUDES the
+   *  run from its durability verdict, and the row refuses to stamp one either. THIS PARAGRAPH NEVER
+   *  KNEW THE FLAG EXISTED, so it kept asserting from the same number the row had just discarded.
+   *
+   *  Michael's 2026-08-02 Long Run, verified in the row: decoupling 8.7%, basis gap, assessment
+   *  needs_work, confounded TRUE. The row correctly showed nothing. The paragraph said "The second
+   *  half slowed as your heart rate climbed — the effort drifted up" — a fade verdict, off a number
+   *  the app itself had flagged as unreliable, three lines above the sentence explaining it was 84°F. */
+  decoupling?: { pct: number | null; assessment: DecouplingAssessment; confounded?: boolean } | null;
   terrain?: { gainFt?: number | null; rolling?: boolean } | null;
   conditions?: {
     tempF?: number | null;
@@ -106,8 +116,14 @@ export function composeRunInsight(inp: RunInsightInput): string | null {
   if (!inp) return null;
   const parts: (string | null)[] = [];
 
-  const hrHeld = inp.pacing?.hrHeld === true;
-  const dcp = inp.decoupling?.pct;
+  // ⛔ A CONFOUNDED PERCENTAGE MAKES NO CLAIM — IN EITHER DIRECTION. Heat and hard efforts inflate
+  // decoupling, so a confounded number can neither confirm "HR held" nor convict "the effort drifted".
+  // Both readings are withdrawn together; the conditions clause below still names the heat, which is
+  // the honest cause, and the pacing shape is still stated without an attached verdict.
+  const dcpConfounded = inp.decoupling?.confounded === true;
+  const hrHeld = !dcpConfounded && inp.pacing?.hrHeld === true;
+  const hrDrifted = !dcpConfounded && inp.pacing?.hrHeld === false && inp.decoupling?.pct != null;
+  const dcp = dcpConfounded ? null : inp.decoupling?.pct;
   const dcpTxt = typeof dcp === 'number' ? `${Math.round(dcp * 10) / 10}%` : null;
   const rolling = inp.terrain?.rolling === true || (inp.terrain?.gainFt ?? 0) >= 150;
   const gain = inp.terrain?.gainFt;
@@ -134,9 +150,13 @@ export function composeRunInsight(inp: RunInsightInput): string | null {
     } else if (inp.pacing?.pattern === 'negative_split') {
       parts.push('You ran the back half faster — a negative split.');
       if (hrHeld && dcpTxt) parts.push(`Heart rate held (drift ${dcpTxt}); controlled, not a surge you paid for.`);
-    } else if (inp.pacing?.pattern === 'positive_split' && !hrHeld) {
+    } else if (inp.pacing?.pattern === 'positive_split' && hrDrifted) {
       // a REAL fade — HR drifted up as pace fell. Named honestly (the honesty guard's job, here in prose).
       parts.push('The second half slowed as your heart rate climbed — the effort drifted up, a positive split.');
+    } else if (inp.pacing?.pattern === 'positive_split') {
+      // Positive split with no USABLE heart-rate read (confounded, or none measured). State the shape and
+      // stop — the cause is not ours to assign, and on a hot run the conditions clause below names it.
+      parts.push('You ran a positive split — the second half was slower.');
     } else if (hrHeld && dcpTxt) {
       parts.push(`Heart rate held across the run (drift ${dcpTxt}) — the aerobic system carried it.`);
     }
@@ -225,12 +245,20 @@ export function buildRunInsightInputFromPacket(
   fp: any,
   splitsMi: any[] | null | undefined,
   intervals?: { hit?: number | null; total?: number | null; consistent?: boolean | null } | null,
+  /** `heart_rate_summary.decouplingConfounded` — the authoritative flag, passed by the caller because
+   *  it lives on the analysis, not in the fact packet. Without it this paragraph asserts from numbers
+   *  the session-detail HR row has already discarded. */
+  decouplingConfounded?: boolean | null,
 ): RunInsightInput {
   const facts = fp?.facts ?? {};
   const derived = fp?.derived ?? {};
   const dcp = typeof derived.cardiac_decoupling_pct === 'number' ? derived.cardiac_decoupling_pct : null;
+  // The SAME flag the session-detail HR row reads (`heart_rate_summary.decouplingConfounded`).
+  const dcpConfounded = decouplingConfounded === true;
   const type = toRunType(facts.workout_type);
-  const pv = pacingVerdict(splitsMi, dcp, true);
+  // ⚠️ A confounded percentage may not decide `hrHeld` either — that flag is what turns a pace swing
+  // into "terrain, not fatigue", and it must not rest on a number the app flagged unreliable.
+  const pv = pacingVerdict(splitsMi, dcpConfounded ? null : dcp, true);
   const gainFt = typeof facts.elevation_gain_ft === 'number' ? facts.elevation_gain_ft : null;
   const terrainType = String(facts.terrain_type || '').toLowerCase();
   const wk = String(facts.plan?.week_intent || '').toLowerCase();
@@ -241,7 +269,7 @@ export function buildRunInsightInputFromPacket(
     distanceMi: typeof facts.total_distance_mi === 'number' ? Math.round(facts.total_distance_mi * 10) / 10 : null,
     durationMin: typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null,
     pacing: pv ? { pattern: pv.pattern, hrHeld: pv.hrHeld, outAndBack: null } : null,
-    decoupling: { pct: dcp, assessment: null },
+    decoupling: { pct: dcp, assessment: null, confounded: dcpConfounded },
     terrain: { gainFt, rolling: terrainType.includes('rolling') || terrainType.includes('hill') || (gainFt ?? 0) >= 150 },
     conditions: {
       tempF: typeof facts.weather?.temperature_f === 'number' ? facts.weather.temperature_f : null,

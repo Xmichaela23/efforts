@@ -2370,7 +2370,16 @@ Deno.serve(async (req) => {
         // the SAME sources the PACING/TERRAIN rows use — one story across Performance and (later) State.
         const _ib = (detailedAnalysis as any)?.interval_breakdown;
         const _intervals = _ib ? { hit: _ib.completed ?? _ib.hit ?? null, total: _ib.total ?? _ib.count ?? null, consistent: _ib.consistent ?? null } : null;
-        ai_summary = composeRunInsight(buildRunInsightInputFromPacket(fact_packet_v1, _ehSplitsMi, _intervals));
+        // The confound flag travels with the number (2026-08-02). The session-detail HR row has excluded
+        // heat/effort-confounded decoupling since 2026-07-17; this paragraph was still asserting from it.
+        ai_summary = composeRunInsight(buildRunInsightInputFromPacket(
+          fact_packet_v1, _ehSplitsMi, _intervals,
+          // ⚠️ Derived from the SAME two facts `decouplingConfounded` is built from further down
+          // (`_heatConfound` + `_hasDecoupling`) rather than referencing that const — it is declared
+          // ~800 lines below this call and reading it here is a temporal dead zone, i.e. a throw.
+          ((hrAnalysisResult as any)?.drift?.weather?.factor === 'hot')
+            && ((hrAnalysisResult as any)?.summary?.decouplingPct != null),
+        ));
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
         void generateAISummaryV1; void arc_narrative_for_summary; void _varGate; void isLinkedPlanSession; void arc_run_easy_pace_at_hr_trend; void run_spine_verdict; void _executionHonesty; void _ehPaceVariedPct; // dead LLM-path refs, retained for cleanup
 
