@@ -14,6 +14,25 @@ export type BikeType = 'endurance' | 'recovery' | 'long' | 'tempo' | 'sweetspot'
 // INTERVAL (tempo/sweetspot/threshold/vo2/anaerobic/sprint/over_under) = the work story; MIXED (group) =
 // surges by design, never graded for steadiness.
 type BikeFamily = 'aerobic' | 'interval' | 'mixed';
+// ⛔ NAME THE ZONE THE ATHLETE ACTUALLY RODE IN (2026-08-02, Michael). The engine has always
+// classified the ride — `classified_type`, the same field the terrain bins and the power trend read —
+// and the session screen never said it out loud. It matters most when it CONTRADICTS the prescription:
+// a session prescribed "easy, all conversational" and executed at threshold is the single most useful
+// sentence that screen can carry, and it was the one thing missing.
+// Reads the classification; never re-derives a zone from IF, which would be a second opinion.
+function rideZoneLabel(t: BikeType): string {
+  switch (t) {
+    case 'tempo': return 'Ridden at tempo';
+    case 'sweetspot': return 'Ridden at sweet spot';
+    case 'threshold': return 'Ridden at threshold';
+    case 'vo2': return 'Ridden at VO2';
+    case 'anaerobic': return 'Ridden anaerobic';
+    case 'sprint': return 'Sprint work';
+    case 'over_under': return 'Over-unders';
+    default: return 'Ridden hard';
+  }
+}
+
 function familyOf(t: BikeType): BikeFamily {
   if (t === 'endurance' || t === 'recovery' || t === 'long') return 'aerobic';
   if (t === 'group') return 'mixed';
@@ -91,7 +110,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
       else if (inp.intervals?.consistent === true) parts.push('The reps held even across the set.');
       else if (inp.intervals?.consistent === false) parts.push('The reps drifted — the later ones came in lower.');
     }
-    if (power && np != null && iff != null && tss != null) parts.push(`${np} W normalized at ${r2(iff)} intensity — ${tss} TSS.`);
+    if (power && np != null && iff != null && tss != null) parts.push(`${rideZoneLabel(inp.type)} — ${np} W normalized at ${r2(iff)} intensity, ${tss} TSS.`);
     // HR-only caveat ONLY when there's a work-story to caveat — never as standalone padding (silence otherwise).
     else if (!inp.hasPower && hasReps) parts.push('Read from heart rate — no power meter, so the effort is graded by zone.');
     return clean(parts);

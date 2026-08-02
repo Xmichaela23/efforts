@@ -308,8 +308,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             </div>
             <div className="flex flex-col items-center">
               <div className="text-sm font-semibold text-gray-100">{bf.hr_at_band} bpm</div>
+              {/* ⛔ "at Z2 power" READ AS A VERDICT ON THE RIDE (2026-08-02, Michael: "it should say the
+                  zone the user was in — it says at zone 2"). It never meant that. It is the SAMPLING
+                  WINDOW: this heart rate is measured only across the portions of the ride spent in the
+                  aerobic power band. On a ride the engine classified THRESHOLD, a screen whose most
+                  prominent label says "Z2" is telling the athlete the opposite of the truth. The band
+                  stays — it is what makes the number comparable ride to ride — but it now reads as a
+                  window, and the ride's real zone is named in Insights. */}
               <div className="text-[11px] text-gray-400 mt-0.5">
-                at Z2 power{band ? ` · ${band}` : ''}{src ? ` · ${src}` : ''}
+                measured{band ? ` in your ${band} range` : ' in your aerobic range'}{src ? ` · ${src}` : ''}
               </div>
               {/* ⛔ SAY WHAT THE NUMBER MEANS, NOT JUST WHAT IT IS (2026-08-02, Michael: "should say
                   what zone"). "146 bpm" is inert on its own — the reader has to remember their own
