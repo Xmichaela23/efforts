@@ -393,10 +393,14 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
               (`FitnessAnchor.value`) so the FTP shown and the FTP behind the verdict are the same
               number by construction. Resolving it client-side would give one that is *probably* the
               same — which is what the FTP-fracture work existed to remove. */}
-          {/* ⛔ THRESHOLD READ ONLY. On an aerobic row this sat under a read it has nothing to do with —
-              "Your estimated FTP is 176 W" beneath a heart-rate verdict invites the rider to think the
-              FTP is what moved. */}
-          {src && leadIsPower && (() => {
+          {/* ⛔ THE SENTENCE CHANGES WITH THE READ — and the FTP is NOT dropped on the aerobic row.
+              It was, briefly, on the reasoning that FTP "has nothing to do with" a heart-rate verdict.
+              That was wrong: the aerobic band IS 56-75% of FTP (`bikeRideIntensityAerobic`), so the FTP
+              is precisely what "easy power" MEANS. Removing it left the rider unable to see what band
+              their read was taken in, or that confirming their FTP would move it.
+              What was true in the complaint is that it must not read as the verdict's own number —
+              hence "Easy power is set from…", which states the basis and claims nothing about the trend. */}
+          {src && (() => {
             // ⚠️ NO METRIC-STRING GUARD. The first cut gated on `anchor.metric === 'ftp'` — a string
             // that comes from the `fitness_baselines` row and was never verified to be that exact
             // word. It silently rendered nothing. This branch is already inside `src`, which is
@@ -416,6 +420,13 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             // ⚠️ So the sentence states the FTP ON RECORD and says the basis is an estimate. Both are
             // true independently. Naming the number the measurement used would need that number
             // carried through per ride — a real question, not a copy fix.
+            if (!leadIsPower) {
+              // AEROBIC read: the FTP is the band's definition, not the measurement.
+              if (src === 'est (FTP)') {
+                return <span>{ftp != null ? `Easy power is set from your estimated FTP of ${ftp} W` : 'Easy power is set from an estimated FTP'} — not one you confirmed.</span>;
+              }
+              return <span>{ftp != null ? `Easy power is set from your tested FTP of ${ftp} W.` : 'Easy power is set from your own tested FTP.'}</span>;
+            }
             if (src === 'est (FTP)') {
               return <span>{ftp != null ? `Your estimated FTP is ${ftp} W` : 'Your FTP is an estimate'} — not one you confirmed.</span>;
             }
