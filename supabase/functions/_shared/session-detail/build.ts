@@ -398,6 +398,30 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const volumeDev = computeStrengthVolumeDeviation(type, plannedRowRaw, completedStrengthExercises);
   const strengthVolume = buildStrengthVolume(type, plannedRowRaw, completedStrengthExercises, bodyweightLb);
 
+  // ⛔ ONE VERDICT PER SESSION (2026-08-02, Michael: *"heart rate is the read — if session intent is
+  // that; hills, intervals etc need different paradigm"*).
+  //
+  // The screen was printing TWO answers to "did you do this session right", and they disagreed by 51
+  // points: the Easy chip said 49% while the row below it showed a green 100% pace badge. Michael had
+  // run 11:28/mi inside a prescribed 11:15-11:43 — on a 76F rolling morning at RPE 2, which is why
+  // heart rate sat above the easy ceiling. He did exactly what was asked. Two scores, one of them
+  // wrong, and no way for a rider to know which.
+  //
+  // THE FIELD, and all three agree: TrainingPeaks does not grade pace at all (compliance is duration
+  // and distance); Garmin gives a step ONE target, pace or heart rate, never both; Strava shows time
+  // in heart-rate zones and never scores a session against a plan. None of them would print both.
+  //
+  // ⚠️ SCOPE — THIS IS INTENT-GATED, NOT A BLANKET RULE. `intensity_adherence` is emitted ONLY when
+  // the analyzer judged the session against an EASY prescription (`isEasyPrescribedRun`: easy /
+  // recovery / long run). Tempo, threshold, intervals and hills were GIVEN a pace and are still
+  // graded on it, badge and all — a different paradigm for a different intent. Its presence is the
+  // signal; the client does not re-derive the rule.
+  //
+  // The prescription and the executed pace both still RENDER — the row keeps saying "11:15-11:43/mi"
+  // and "11:28/mi". Only the percentage, and the green that goes with it, come off. Nothing is
+  // hidden; it just stops being a mark.
+  const judgedOnIntensity = Number.isFinite(perf?.intensity_adherence);
+
   // ── Interval rows (pre-resolved) ──────────────────────────────────────────
   const intervalDisplay = sessionState?.details?.interval_display || {};
   const sessionRows: any[] = Array.isArray(sessionState?.details?.interval_rows) ? sessionState.details.interval_rows : [];
@@ -472,6 +496,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         // (cycling recovery rows). Short-circuit before the sr.adherence_pct
         // fallback — that fallback would still produce a spurious badge.
         pace_adherence_pct: (() => {
+          if (judgedOnIntensity) return null;
           if (iv && iv.pace_adherence_percent === null) return null;
           if (iv && iv.power_adherence_percent === null) return null;
           const fromIv = fin(iv?.pace_adherence_percent) ?? fin(iv?.power_adherence_percent);
@@ -520,7 +545,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           actual_gap_sec_per_mi: null,
           power_watts: fin(ex.power_watts) ?? null,
         },
-        pace_adherence_pct: fin(r.adherence_pct),
+        pace_adherence_pct: judgedOnIntensity ? null : fin(r.adherence_pct),
         duration_adherence_pct: null,
       });
     }
