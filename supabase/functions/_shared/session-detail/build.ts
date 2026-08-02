@@ -798,8 +798,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         : 'Power came in uneven as a result of surging.');
     }
     if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`Avg HR ${Math.round(avgHr)} bpm.`);
+    // Same exclusion as the Flag row below: the fatigue verdict belongs to State, and appending it to
+    // the ride's narrative would put it back on this screen through the other door.
     const flag = Array.isArray(flagsV1)
-      ? flagsV1.find((x: any) => x && typeof x.message === 'string' && x.message.trim())
+      ? flagsV1.find((x: any) => x && typeof x.message === 'string' && x.message.trim()
+          && String(x.category || '').toLowerCase() !== 'fatigue')
       : null;
     if (flag) parts.push(String(flag.message).trim());
     return parts.length ? parts.join(' ') : null;
@@ -1703,7 +1706,16 @@ export function buildAnalysisDetailRows(
   } catch { /* */ }
 
   try {
+    // ⛔ FATIGUE IS NOT THIS SCREEN'S JOB (2026-08-01, Michael: "it's State's").
+    // "Accumulated fatigue is elevated (6 training days without rest...)" is a CROSS-DISCIPLINE,
+    // MULTI-DAY judgement — it is not about this ride, it is about the block, and it is identical on
+    // every session page you open that week. The State screen owns the athlete's condition; a session
+    // page owns what happened in the session. Two screens asserting the same verdict is exactly the
+    // divergence the spine exists to prevent, and the session page is the one with no context to
+    // qualify it. Filtered by CATEGORY (`_shared/cycling-v1/flags.ts` sets category 'Fatigue'), not by
+    // message text, so rewording the flag cannot smuggle it back in.
     const concerns = flagsV1
+      .filter((f: any) => String(f?.category || '').toLowerCase() !== 'fatigue')
       .filter((f: any) => f && f.type === 'concern' && typeof f.message === 'string' && f.message.length > 0 && Number(f.priority || 99) <= 2)
       .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 2);
