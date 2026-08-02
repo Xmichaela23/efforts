@@ -297,13 +297,22 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           ? `${Math.round(bf.band_lo)}–${Math.round(bf.band_hi)} W` : null;
         return (
           <div className="w-full pt-1 pb-3">
+            {/* ⛔ SAME WORDS AS THE STATE BIKE ROW (2026-08-01). State's aerobic read says "138 bpm at
+                easy power" and this is the single ride that feeds it — when the two screens named the
+                same number differently ("Aerobic efficiency" here, "efficiency" there), a rider had no
+                way to know they were looking at one measurement seen twice. The heading is now the
+                plain sentence State uses; the band and its source stay, because THIS screen is where
+                the per-ride provenance belongs. */}
             <div className="mb-1 text-center text-xs text-gray-400 uppercase tracking-widest">
-              Aerobic efficiency
+              Heart rate at easy power
             </div>
             <div className="flex flex-col items-center">
               <div className="text-sm font-semibold text-gray-100">{bf.hr_at_band} bpm</div>
               <div className="text-[11px] text-gray-400 mt-0.5">
                 at Z2 power{band ? ` · ${band}` : ''}{src ? ` · ${src}` : ''}
+              </div>
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                Counts toward your bike read on State
               </div>
             </div>
           </div>

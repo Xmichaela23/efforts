@@ -99,6 +99,33 @@ export const STATE_TREND_WINDOWS = {
   // steady runs/wk over the 6wk window — enough that the early/recent 2-run endpoint averages aren't the
   // whole series. Judgment call; calibrate with real data, don't tune to one athlete.
   runDirectionMinRuns: 8,
+  // The bike half of the same rule (2026-08-01, Michael: "we can just say that when someone drops a
+  // discipline, as long as the engine is right for when they pick back up"). Below this many qualifying
+  // rides IN THE WINDOW the bike direction is 'withheld' — the row says "too few to read" instead of
+  // stepping straight from silence to a confident arrow, which is what it did before.
+  //
+  // ⛔ 8 IS DERIVED, NOT FELT. The literature, and the arithmetic it forces (Q-241, D-359):
+  //   · A 20-min cycling TT re-tested a week apart has a CV of ~2.9% in trained, familiarised cyclists
+  //     (Nimmerichter/Sparks-type protocols, IJSPP 2019 n=8: TEM 4.6 W, ICC 0.99; a second n=25 study:
+  //     CV 2.9%, ICC 0.97). Our substrate is NOT that: it is the best 20-min inside an ordinary ride,
+  //     so pacing, motivation, drafting, heat and terrain all sit ON TOP of that number. ~3% is the
+  //     OPTIMISTIC typical error here, not the expected one.
+  //   · Hopkins: the typical error of a MEAN falls with √n. The verdict compares the mean of the 2
+  //     oldest points to the mean of the 2 newest, so the error on that comparison is TE × √(2/n) per end.
+  //   · At TE 3%: n=2 per end → ±3.0% on the comparison, which is WIDER THAN THE ENTIRE ±2.0% verdict
+  //     band. n=3 → ±2.45%. n=4 → ±2.12%, the first point where a band-clearing move is at least the
+  //     size of its own measurement error. 4 per end × 2 ends = 8.
+  //   · It lands on run's 8 from a completely different direction, which is a check, not a coincidence.
+  //   · Coaching practice agrees at the other end: FTP is re-tested every 4-8 weeks because a threshold
+  //     change needs a BLOCK to appear. 8 rides across the 56d window ≈ 1/wk in that bin — the minimum
+  //     training density at which a coach would entertain "your threshold moved" at all.
+  // What the field does NOT give us is a published count: Strava and TrainingPeaks draw a curve and never
+  // assert a direction (nothing to gate), and Garmin gates on RECENCY and qualifying activity — 1-2 weeks
+  // of history with ~2 qualifying sessions a week, else "No Status". We already have Garmin's half (the
+  // 21d staleness decay). The count is ours because the CLAIM is ours.
+  // ⚠️ The number that is still soft is the ±2.0% band itself, not this floor — it sits at or below the
+  // measurement error of the substrate. That is now the honest next question, and it is filed, not fixed.
+  bikeDirectionMinRides: 8,
 };
 
 // Pure asOf-relative window boundary (mirrors classify.ts's isoMinusDays; kept local to avoid a cycle).
@@ -275,16 +302,25 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // efficiency" trend reads ride-type MIX as fitness (the fabricated -5.5% "improving" — Q-117 #2).
     .filter((r) => bikeEfficiencyRideEligible(r.classified_type, r.in_band_s, r.w20, r.band_hi))
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
-  const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike);
+  const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike, STATE_TREND_WINDOWS.bikeDirectionMinRides);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
   // 12-week POWER chart series — the w20 points of the winning terrain bin (the one the verdict reads), so
   // chart and word agree. Mirrors run efficiency / strength e1RM. Empty when power has no verdict (needs_data
   // → basis null → the bike row shows the efficiency read and no power chart). Uses the bike verdict window.
   bikeFitness.power.series = bikePowerChartSeries(binRides, asOf, bikeFitness.power.basis);
-  const bikeLead = bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power : bikeFitness.efficiency;
-  // State v3 DOT — the lead metric's position in the 12wk range. Power is higher-is-better (more watts =
-  // fitter); HR-at-power efficiency is lower-is-better (less HR for the same power = fitter).
-  const bikeLeadIsPower = bikeFitness.power.verdict !== 'needs_data';
+  // LEAD SELECTION — power leads UNLESS it cannot make a claim and efficiency can (Q-241, 2026-08-01).
+  // Before the ride floor there was only one way for power to be silent (`needs_data`); now there are
+  // two, and a `withheld` power read left un-handled here would have hidden a perfectly good efficiency
+  // read behind "too few to read". Both signals still render their own state either way — this only
+  // decides which one the dot and the summary are built from.
+  // `computeBikeFitness` already decided this and put it on the payload as `lead` — read it, never
+  // re-derive it. 'none' keeps power as the shape the dot/summary are built from, exactly as before.
+  const bikeLeadIsPower = bikeFitness.lead !== 'efficiency';
+  const bikeLead = bikeLeadIsPower ? bikeFitness.power : bikeFitness.efficiency;
+  // State v3 DOT — the lead metric's position in the 12wk range, built from whichever signal led above
+  // (one variable now, so the dot's series and the summary's verdict can never come from different
+  // metrics). Power is higher-is-better (more watts = fitter); HR-at-power efficiency is lower-is-better
+  // (less HR for the same power = fitter).
   const bikeBandSeries = bikeLeadIsPower
     ? binRides.map((r) => ({ date: r.date, value: Number(r.w20) })).filter((p) => Number.isFinite(p.value) && p.value > 0)
     : hrPts;
@@ -624,7 +660,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const strengthPrimaries = strength.lifts.filter((l) => l.isPrimary && l.trend.verdict !== 'needs_data');
   const provisionalByDisc: Record<string, boolean> = {
     strength: strengthPrimaries.length > 0 && (strengthPrimaries.length < 2 || strengthPrimaries.some((l) => isProvisionalTrend(l.trend))),
-    bike: bikeFitness.power.verdict !== 'needs_data' ? bikeFitness.power.provisional : bikeFitness.efficiency.provisional,
+    // Follows the SAME lead as the verdict and the dot (`bikeLeadIsPower`) — a provisional flag read off
+    // power while the row renders efficiency is how a row ends up hedging the wrong number.
+    bike: bikeLeadIsPower ? bikeFitness.power.provisional : bikeFitness.efficiency.provisional,
     run: isProvisionalTrend(runState.trend),
     swim: isProvisionalTrend(swimState.trend),
   };
@@ -967,6 +1005,12 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       power: { ...r.bikeFitness.power },
       efficiency: { ...r.bikeFitness.efficiency },
       basis: r.bikeFitness.efficiency.basis,
+      // Carried here as well as on `display` so a consumer reading the flat `bike` block (the coach,
+      // anything asking "what does the bike say") gets the same lead and the same reason the screen
+      // shows. A second consumer re-deriving "is power leading" is how the two would drift apart.
+      lead: r.bikeFitness.lead,
+      power_silent: r.bikeFitness.powerSilent ?? null,
+      hard_ride_count: r.bikeFitness.hardRideCount ?? null,
     },
   };
 }

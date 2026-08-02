@@ -157,6 +157,38 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
   return word ? `${where} · ${word}` : where;
 }
 
+// ── THE AEROBIC READ'S OWN WORDS (2026-08-01) ───────────────────────────────────────────────────
+// A SEPARATE MAP, for the same reason `RUN_EFF_WORDS` is separate: `NUMERIC` is the POWER read's
+// vocabulary and stays wordless. These words are plain-language — heart rate at a given power is
+// "how hard your body is working to hold the same pace on the bike", so that is what they say. They
+// are earned by the noise gate (Q-241), which is the same bar run durability and strength clear;
+// a confidence interval was never the requirement, beating your own scatter was.
+const BIKE_AEROBIC_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
+  improving: { word: 'Easier at the same power', cls: 'text-emerald-400', arr: '↑' },
+  holding: { word: 'Holding steady', cls: 'text-white/70', arr: '→' },
+  // Neutral, never amber: heat, a hard block or a poor night all do this, and none of them is a fault.
+  sliding: { word: 'Harder at the same power', cls: 'text-white/70', arr: '↓' },
+  needs_data: { word: 'Need a few more rides', cls: 'text-white/60', arr: '' },
+  withheld: { word: 'Too few rides to read', cls: 'text-white/60', arr: '' },
+};
+
+// THE AEROBIC LEAD — the row for the athlete who never does a hard effort. Leads with the NUMBER in
+// its own unit (heart rate at their easy power), because a bare direction is unreadable to someone
+// who has no idea what it is a direction OF.
+function AerobicSignal({ sig }: { sig: BikeSignal }) {
+  const v = BIKE_AEROBIC_WORDS[sig.verdict];
+  const asserts = sig.verdict !== 'needs_data' && sig.verdict !== 'withheld';
+  return (
+    <span className="inline-flex items-baseline gap-1.5 flex-wrap">
+      {sig.recentValue != null && <span className="text-white/85">{sig.recentValue} bpm at easy power</span>}
+      <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
+        {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
+      </span>
+      {asserts && sig.pctChange != null && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
+    </span>
+  );
+}
+
 // One labelled signal ("Power: improving +2%") for the bike dual read.
 function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
   const v = NUMERIC[sig.verdict];   // bike: arrow + number, no word
@@ -166,7 +198,8 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
       <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
         {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
       </span>
-      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
+      {/* `withheld` prints no number — see FitnessDotBlock: the percent would BE the claim we just declined to make. */}
+      {sig.pctChange != null && sig.verdict !== 'needs_data' && sig.verdict !== 'withheld' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
       {sig.provisional && <span className="text-white/50 text-[12px]">prov</span>}
     </span>
   );
@@ -221,11 +254,46 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // (power leads; efficiency when power has no verdict). Power and efficiency do NOT always rest on
   // the same rides — power counts w20>0, efficiency counts clean HR-at-band (D-237: corrupt-HR rides
   // are excluded from efficiency, not power). So when efficiency's own sample count differs, surface it.
-  const lead = fitness.power.verdict !== 'needs_data' ? fitness.power : fitness.efficiency;
+  // ⛔ THE SERVER PICKS THE LEAD (`fitness.lead`) — this used to be re-derived here as
+  // `power.verdict !== 'needs_data'`, a second copy of a rule that changed under it the moment the
+  // ride floor introduced `withheld`. The fallback keeps old cached payloads rendering.
+  const leadIsPower = fitness.lead != null ? fitness.lead !== 'efficiency' : fitness.power.verdict !== 'needs_data';
+  const lead = leadIsPower ? fitness.power : fitness.efficiency;
   const tail = (lead.sampleCount != null && lead.windowDays != null)
     ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike' })
     : null;
-  const leadIsPower = fitness.power.verdict !== 'needs_data';
+  // ── THE THREE READS, AND WHY THIS ROW HAS THEM (2026-08-01, Michael) ─────────────────────────────
+  //
+  // "A user focusing on strength may never hit that 20 minutes — so a user may joy ride. FTP is the
+  // north star for serious riders; they don't care about heart rate like runners. But those zone 2
+  // rides?" Two different athletes read the same row, and only one of them will ever produce a
+  // threshold effort. Before this, the second one got "too few to read" forever — the app reporting
+  // its own failure at an athlete who was training perfectly well, just not hard.
+  //
+  // So the row NAMES THE REASON instead of reporting an absence. Three states, everyone lands in one:
+  //   · THRESHOLD — hard efforts exist and clear the floor: watts, direction. Unchanged.
+  //   · AEROBIC — no hard efforts (or too few): lead with heart rate at the same power, which is what
+  //     the endurance world reads on this athlete anyway (Friel's decoupling / efficiency factor:
+  //     the ordinary zone 2 ride IS the test, no testing required), and say why there is no FTP read.
+  //   · BUILDING — not enough of either yet: say what is there and what it will become.
+  //
+  // ⛔ "No hard efforts yet" is a FACT ABOUT HOW THEY RIDE. "Too few to read" is the app failing.
+  // Same data, and only one of them is true. Do not collapse these back into one string.
+  const powerSilent = fitness.powerSilent ?? null;
+  // Which of the three the athlete is in — READ, not re-derived. `lead === 'none'` is the server saying
+  // neither signal can assert; computing that here from the two verdicts would be a second copy of the
+  // rule, which is exactly what went wrong with `leadIsPower` above. The fallback covers cached payloads
+  // written before `lead` existed.
+  const assertsLead = fitness.lead != null
+    ? fitness.lead !== 'none'
+    : (lead.verdict !== 'needs_data' && lead.verdict !== 'withheld');
+  const aerobicLead = assertsLead && !leadIsPower;
+  const building = !assertsLead;
+  // Qualifying rides we can see — the larger of the two pools (they count different things: power
+  // counts hard rides in the winning terrain bin, efficiency counts clean easy rides). Stated as
+  // "rides we can read from", never as their total ride count, which we do not have here.
+  const rideCount = Math.max(fitness.power.sampleCount ?? 0, fitness.efficiency.sampleCount ?? 0);
+  const ftpNow = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : fallbackFtp;
   const range = (fitness as any).range as { positionPct: number; confident: boolean } | null | undefined;
   const anchored = mode === 'anchored';
   // SLICE 1: a dot only when ANCHORED — bike is anchored only once the athlete ACCEPTS its FTP estimate
@@ -235,12 +303,25 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // hard efforts and 20–120 min rides. Coggan's field protocol — the same arithmetic as a 20-minute
   // test, taken from 20 minutes the athlete already rode hard rather than asking them to test.
   const ftpMethod = src === 'est (FTP)' ? ' FTP is estimated from your hard rides — 95% of your best 20 minutes.' : '';
-  const showDot = anchored && range != null && lead.verdict !== 'needs_data';
-  const trendOnly = !anchored && lead.verdict !== 'needs_data';
+  // The dot and the "accept your FTP" tag belong to a REAL read; a withheld or absent one gets neither.
+  const showDot = anchored && range != null && assertsLead && leadIsPower;
+  const trendOnly = !anchored && assertsLead && leadIsPower;
   return (
     <Row label="bike">
-      {showDot ? (
-        <FitnessDotBlock label={leadIsPower ? 'power' : 'efficiency'} range={range!} verdict={lead.verdict} pctChange={lead.pctChange} wordMap={NUMERIC} showAxis={showAxis} explain={leadIsPower
+      {building ? (
+        // BUILDING — say what is there and what it becomes. Never a bare "needs data": the athlete
+        // cannot tell whether that means "ride more" or "the app is broken".
+        <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
+          <span className="text-white/85">{rideCount === 0 ? 'No rides yet' : `${rideCount} ${rideCount === 1 ? 'ride' : 'rides'} in 8 weeks`}</span>
+          <span>{rideCount === 0 ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
+        </span>
+      ) : aerobicLead ? (
+        <AerobicSignal sig={fitness.efficiency} />
+      ) : showDot ? (
+        // The headline names the NUMBER, not the metric's category: "212 W threshold" is what a rider
+        // wants off a glance, and it is `anchor.value` — the same FTP the verdict was computed against
+        // (D-358), never a second client-side resolve.
+        <FitnessDotBlock label={ftpNow != null ? `${ftpNow} W threshold` : 'power'} range={range!} verdict={lead.verdict} pctChange={lead.pctChange} wordMap={NUMERIC} showAxis={showAxis} explain={leadIsPower
           // ⛔ THE ⓘ DEFINES THE METRIC AND STOPS (2026-08-01, Michael: "anything specific to where the
           // user is needs to go to more; ⓘ simply shows what the metric is"). Both strings used to end
           // with "the dot is where it sits versus your baseline; the arrow is the direction" — that is a
@@ -254,7 +335,23 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           ? `Power = how much power you are producing on rides, measured against your FTP.${ftpMethod}`
           : `Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter.${ftpMethod}`} />
       ) : (
-        <Signal label={leadIsPower ? 'Power' : 'Efficiency'} sig={lead} />
+        <Signal label={ftpNow != null ? `${ftpNow} W threshold` : 'Power'} sig={lead} />
+      )}
+      {/* ⛔ THE REASON LINE — the whole point of the rebuild. An athlete with no threshold read is told
+          WHY in a sentence about their riding, not about the app's data. It sits under the read it
+          explains, and it is not tap-gated: a rider who never sees it would never learn that hard
+          efforts are what unlock the FTP read. */}
+      {powerSilent && !building && (
+        <span className="basis-full text-white/45 text-[12px]">
+          {powerSilent === 'no_hard_efforts'
+            ? 'No hard efforts yet, so there is no threshold read'
+            : 'Not enough hard rides yet for a threshold read'}
+        </span>
+      )}
+      {aerobicLead && (
+        <span className="basis-full text-white/45 text-[12px]">
+          Your heart rate at the same power{(fitness.efficiency.sampleCount ?? 0) > 0 ? `, from ${fitness.efficiency.sampleCount} easy ${fitness.efficiency.sampleCount === 1 ? 'ride' : 'rides'}` : ''}
+        </span>
       )}
       {/* The one receipt that stays: window · rides · recency. The "more" cue rides with it. */}
       {(tail || src || asOf(lead.newestAgeDays) || (showDot && anchor?.label)) && (
@@ -286,7 +383,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             // word. It silently rendered nothing. This branch is already inside `src`, which is
             // derived from `efficiency.basis === 'coggan_ftp'`, so the bike anchor here IS the FTP;
             // the value alone is the honest gate.
-            const ftp = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : fallbackFtp;
+            const ftp = ftpNow; // one resolve for the row — the headline and this line cannot disagree
             // ⛔ STATES THE BASELINE, DOES NOT CLAIM WHAT THE MEASUREMENT USED (2026-08-01).
             //
             // The first version read "Measured against an estimated FTP of 212 W" — and that was a
@@ -557,7 +654,12 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
           <span className="text-white/55 text-[13px]">{label}</span>
         )}
         {verdict !== 'needs_data' && (
-          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
+          // ⛔ `withheld` PRINTS NO NUMBER. "Too few to read −0.4%" reads as a result with a caveat
+          // attached, and the number is the part people take away — so the row would say the opposite
+          // of what the engine decided. Withheld means we are not making a claim; the percent IS the
+          // claim. (Only the bike lead passes `pctChange` here today — the card caller at :1035 omits
+          // it — so this changes the bike row and nothing else.)
+          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && verdict !== 'withheld' && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
