@@ -414,8 +414,16 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
               named. An IN-SLOT swap carries note:null and renders NOTHING (nothing was missed, so it is
               not news, and narrating it would make the app a nag). Only an OUT-OF-SLOT swap speaks, and
               that sentence is DETERMINISTIC — computed server-side from `primaryRef`, never LLM prose. */}
+          {/* ⛔ THIS IS THE ONE SENTENCE ON THE SCREEN THAT TELLS THE ATHLETE SOMETHING THEY DID NOT
+              ALREADY KNOW, and it shipped at 12px/55% — the size of a disclaimer (2026-08-02,
+              Michael: *"need this copy bigger and brighter"*). Every other line on this screen
+              reports a number the athlete watched themselves produce. This one names a trade they
+              made without noticing: a push where the plan had a pull.
+              ⚠️ It is DETERMINISTIC — `buildSubstitutionNote` compares the two exercises' movement
+              patterns from the config table. No model, no prompt, checkable by hand. Brightening it
+              is not promoting a guess. */}
           {execSubstitutionNotes.map((note, i) => (
-            <p key={i} className="text-xs text-white/55 mt-1 leading-snug">{note}</p>
+            <p key={i} className="text-sm text-white/80 mt-1.5 leading-snug">{note}</p>
           ))}
         </div>
       )}
