@@ -4,6 +4,8 @@ import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthComp
 // on. Imported rather than re-implemented so this screen cannot disagree with them about what a
 // lift is called (audit F5: five separate name-matchers, and counting is not the place to add one).
 import { canonicalize } from '@/lib/canonicalize';
+// D-370: the one rule for "is this planned row an assistance slot", shared with the server matcher.
+import { isAssistanceSlot } from '@/lib/assistance-slot';
 
 interface StrengthPerformanceSummaryProps {
   planned: any | null;
@@ -26,12 +28,20 @@ const extractExercisesFromComputed = (workout: any) => {
       const s = st.strength;
       const name = String(s?.name || 'Exercise');
       const sets = Number(s?.sets || s?.setsCount || 0);
+      const rawReps = s?.reps ?? s?.repCount;
       const reps = (() => {
-        const r = s?.reps || s?.repCount;
+        const r = rawReps;
         if (typeof r === 'string') return parseInt(r, 10) || 0;
         if (typeof r === 'number') return Math.max(1, Math.round(r));
         return 0;
       })();
+      // ⛔ ASKED THROUGH THE SHARED RULE, NOT INLINE. `isAssistanceSlot` answers on the composer's
+      // marker OR — for plans materialized in the four-day window before that marker was plumbed
+      // into `computed.steps` — on the composer's own authored shape. Michael's block is in that
+      // window, which is why the flag-only version of this shipped, deployed, and changed nothing on
+      // his screen. The full history is in that file; the SERVER matcher gates Tier 3 on the same
+      // call, so the two sides cannot disagree about what an assistance slot is.
+      const looksLikeAssistance = isAssistanceSlot({ sets: s?.sets, reps: rawReps, load_prescribed: s?.load_prescribed });
       const weight = Number(s?.weight || s?.load || 0);
       const target_rir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
       // ⛔ THE RAMP, CARRIED (D-338). 5/3/1 is three sets at THREE weights — 170/180/190 — and
@@ -68,7 +78,7 @@ const extractExercisesFromComputed = (workout: any) => {
       // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader that
       // treats absent as assistance turns every main lift into one.
       return { name, sets, reps, weight, target_rir, ...(setPlan?.length ? { setPlan } : {}),
-        ...(s?.load_prescribed === false ? { load_prescribed: false } : {}) };
+        ...(s?.load_prescribed === false || looksLikeAssistance ? { load_prescribed: false } : {}) };
     });
   } catch (e) {
     return [];
@@ -130,11 +140,11 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           weightNum = Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length);
         }
         const target_rir = typeof ex.target_rir === 'number' ? ex.target_rir : undefined;
-        // Same marker as the `computed.steps` path above — a plan read from `strength_exercises`
-        // directly must reach the table saying the same thing, or the two routes disagree about
-        // whether a chin-up was prescribed.
+        // Same question as the `computed.steps` path above, asked the same way — a plan read from
+        // `strength_exercises` directly must reach the table saying the same thing, or the two
+        // routes disagree about whether a chin-up was prescribed.
         const result: any = { name: ex.name, sets: setsNum, weight: weightNum, target_rir,
-          ...(ex?.load_prescribed === false ? { load_prescribed: false } : {}) };
+          ...(isAssistanceSlot(ex) ? { load_prescribed: false } : {}) };
         if (weightDisplay) result.weight_display = weightDisplay;
         if (durationNum > 0) {
           result.duration_seconds = durationNum;

@@ -351,3 +351,28 @@ Deno.test('D-370: an assistance slot with NOTHING logged anywhere is still a ski
   assertEquals(m[0].matched, false);
   assertEquals(m[0].substituted, undefined);
 });
+
+Deno.test('D-370: a plan from the FLAG-LESS WINDOW is still recognised by its shape', () => {
+  // ⛔ THE BUG THAT SHIPPED. Plans materialized 2026-07-26..07-29 carry the assistance SHAPE
+  // (`sets: undefined` / `reps: "25 total"`) and NO `load_prescribed` — materialize read the flag
+  // and dropped it before writing `computed.steps`. The flag-only gate deployed and changed nothing
+  // on Michael's live screen. Nothing re-materializes plan history, so this case is permanent.
+  const flagless = { name: 'Band Face Pulls', sets: undefined, reps: '25 total', weight: 'By feel' };
+  const m = matchExercises([flagless], [ex('Dips')]);
+  assertEquals(m.length, 1);
+  assertEquals(m[0].matched, true);
+  assertEquals(m[0].substituted_with, 'Dips');
+  assertEquals(m[0].inferred, true);
+});
+
+Deno.test('D-370: a missing set count ALONE does not make a row assistance', () => {
+  // Both halves of the shape are required. A malformed planned row with no set count must NOT
+  // become an inferable slot — a false positive here credits a skipped MAIN LIFT.
+  // ⚠️ The logged name must not CONTAIN the planned one, or the legacy Tier 2 fuzzy `includes()`
+  // matches them before this gate is ever consulted and the test proves nothing. The first draft
+  // used "Dumbbell Bench Press" against "Bench Press" and passed through Tier 2.
+  const malformed = { name: 'Bench Press', sets: undefined, reps: 5, weight: 185 };
+  const m = matchExercises([malformed], [ex('Leg Press')]);
+  assertEquals(m.find((x) => x.name === 'Bench Press')!.matched, false);
+  assertEquals(m.find((x) => x.name === 'Leg Press')!.planned, null);
+});

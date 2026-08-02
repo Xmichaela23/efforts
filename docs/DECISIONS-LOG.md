@@ -4214,3 +4214,31 @@ reading its single call site (`auto-attach-planned/index.ts:477`).
   bench already pressed, so crediting Dips there looked like it needed its own exception. It does
   not: Dips are `horizontal_push`, Face Pulls are `horizontal_pull`, so the pattern comparison
   already catches it and says something truer than a bench-specific rule would.
+
+### ⚠️ FOLLOW-UP, SAME DAY — THE FLAG-ONLY GATE SHIPPED, DEPLOYED, AND CHANGED NOTHING
+
+First cut gated everything on `load_prescribed === false`. Pushed, both functions deployed, Michael
+recomputed — **the screen was identical.** The `vs plan` line WAS gone, which proved the bundle was
+fresh and the fault was the data, not the deploy. (That one line was the whole diagnostic: it is the
+only change in the set that depends on no data at all.)
+
+**A four-day hole in the plumbing.** The composer has written `load_prescribed: false` since
+2026-07-25 (`eb7db0df`) and the `sets: undefined` / `reps: "25 total"` shape since 2026-07-26
+(`57d7d447`) — but `materialize-plan` did not CARRY the flag into `computed.steps` until 2026-07-30
+(`739df704`); until then it read the flag, used it to stop deriving a weight, and dropped it, because
+the object it builds is a whitelist. **A plan materialized 07-26..07-29 has the assistance shape and
+no assistance flag.** Michael's block is one. Nothing re-materializes plan history, so those sessions
+keep that shape permanently.
+
+**The fix is `src/lib/assistance-slot.ts` — flag first, then the composer's authored shape.** The
+shape is not a heuristic: `reps: "N total"` with no set count is what the composer deliberately
+writes so that no surface can render a set count that was never prescribed. Both halves are required
+— a missing set count alone would let a malformed row credit a skipped main lift, which is pinned by
+its own test.
+
+⛔ **It is SHARED, and that is the point.** The server matcher's Tier 3 gate and the session screen's
+planned-row extractor now call the same function. This exact question — "is this an assistance slot"
+— decides whether work gets credited on one side and whether the rep total gets printed on the
+other; two private copies would drift into "the app credited it but won't say what it was for."
+
+⛔ **Do not delete the shape branch** when new plans all carry the flag. The old sessions do not heal.

@@ -65,6 +65,7 @@
 
 import { sharesMovementFamily } from '../../../../src/lib/exercise-config.ts';
 import { isMain531Lift } from '../../../../src/lib/exercise-role.ts';
+import { isAssistanceSlot } from '../../../../src/lib/assistance-slot.ts';
 
 export interface MatchableExercise {
   name?: string;
@@ -193,12 +194,14 @@ export function matchExercises(
   // Runs LAST, on leftovers only: every declared swap and every name match above has already taken
   // what it was owed, so this can never steal a row from a stronger signal.
   //
-  // ⛔ THE GATE IS `load_prescribed === false`, AND IT IS THE WHOLE SAFETY ARGUMENT. That flag is
-  // stamped by the Get Stronger composer on assistance rows ONLY — the four main lifts never carry
-  // it. `!== false` (not `=== true`) because absent means "not stated", and a reader that treats
-  // absent as assistance turns every main lift into one. A plan from any other generator carries the
-  // flag nowhere, so this tier is inert on it and those plans behave exactly as they did before.
-  const isAssistanceSlot = (p: any) => p?.load_prescribed === false;
+  // ⛔ THE GATE IS `isAssistanceSlot`, AND IT IS THE WHOLE SAFETY ARGUMENT. It answers on the
+  // composer's marker (`load_prescribed: false`) or, for plans materialized before that marker was
+  // plumbed through, on the composer's own authored shape. The four main lifts satisfy neither.
+  //
+  // ⛔ IT IS SHARED WITH THE CLIENT ON PURPOSE (`src/lib/assistance-slot.ts`). This gate decides
+  // whether work the athlete did gets credited; the session screen decides whether to print the
+  // slot's rep total. Two private copies of that question would drift, and the drift would read as
+  // "the app credited it but won't say what it was for."
   // ⚠️ A MAIN LIFT MAY NEVER FILL AN ASSISTANCE SLOT. Logging a heavy squat does not discharge the
   // single-leg slot, and crediting it there would hide a skipped accessory behind the day's big
   // lift. `isMain531Lift` misses to FALSE on an unmapped name, which is the permissive direction —
