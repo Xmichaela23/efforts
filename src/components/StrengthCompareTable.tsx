@@ -543,8 +543,16 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     caption rather than as the prescription, which is the same fault the intake copy
                     was corrected for on 2026-07-27. Still subordinate to the name, deliberately:
                     it is what was ASKED, and the name is what the row IS. */}
+                {/* ⛔ IT SAYS "PLANNED", BECAUSE NOTHING ELSE ON THIS ROW DOES (2026-08-02, Michael:
+                    *"25 total by feel should have planned"*). Dropping the Planned COLUMN from
+                    assistance rows was right — there is no per-set plan to put in it — but it also
+                    removed the only word telling the athlete that this number is a prescription
+                    rather than a result. Every other row on the screen has that label sitting over
+                    its middle column. This is the label, moved to where the prescription now lives. */}
                 {r.assistanceTotalReps != null && (
-                  <span className="text-xs text-white/65">{r.assistanceTotalReps} total · by feel</span>
+                  <span className="text-sm text-white/80">
+                    <span className="text-white/50">Planned </span>{r.assistanceTotalReps} total · by feel
+                  </span>
                 )}
               </div>
               {/* THE THREE WORDS — how the top set felt. 5/3/1 dictates the weight, so there is
@@ -727,13 +735,21 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                           )
                         ) : r.hasPrevious ? (
                           <>
+                            {/* ⛔ PLANNED READS AT THE SAME LEVEL AS COMPLETED (2026-08-02, Michael:
+                                *"planned should be same lumosity"*). They are the two halves of the
+                                row — what the block prescribed, and what happened — and the
+                                prescription was rendered a third dimmer than the result, so the
+                                number the athlete was TOLD to hit looked like the subordinate one.
+                                ⚠️ PREVIOUS stays lower on purpose. It is context from another
+                                session, not a fact about this one; levelling all three would make
+                                the row read as three equal prescriptions. */}
                             <div className="col-span-3 text-white/50">{fmt(pair.previous, r.isBodyweight, true)}</div>
-                            <div className="col-span-3 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
+                            <div className="col-span-3 text-white/90">{fmt(p, r.isBodyweight, true)}</div>
                             <div className="col-span-3 text-white/90">{fmt(c, false, true)}</div>
                           </>
                         ) : (
                           <>
-                            <div className="col-span-5 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
+                            <div className="col-span-5 text-white/90">{fmt(p, r.isBodyweight, true)}</div>
                             <div className="col-span-4 text-white/90">{fmt(c, false, true)}</div>
                           </>
                         )}
@@ -765,13 +781,17 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 the header says what was asked, this says how much of it got done — and they were
                 rendered in three different values between them (65% on the header; 80% on the count
                 and 50% on its label here). Three weights across one sentence makes the eye read a
-                hierarchy that is not there. Matched to the header at 65%, INCLUDING the count: this
-                is a tally, not a headline, and emphasising the number would re-introduce exactly the
-                "score" reading D-338 spent a session removing from this screen.
+                hierarchy that is not there. Both lines now sit at 14px/80% — raised together, on a
+                second pass the same afternoon (*"25 of 25 larger and brighter"*), so the pair keeps
+                moving as one.
+                ⚠️ THE COUNT IS NOT EMPHASISED ABOVE ITS OWN LABEL, and that is the part to preserve
+                if these values change again: this is a tally, not a headline, and making the number
+                pop re-introduces exactly the "score" reading D-338 spent a session removing from
+                this screen.
                 ⚠️ A JSX comment may NOT sit between `(` and its element inside `{cond && ( … )}` —
                 that is a syntax error, not a comment. Second time today. It goes ABOVE the guard. */}
             {r.assistanceTotalReps != null && (
-              <div className="text-xs text-white/65 border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
+              <div className="text-sm text-white/80 border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
                 <span>{r.cRepsTotal.toLocaleString()}</span>
                 <span>of {r.assistanceTotalReps.toLocaleString()} reps</span>
               </div>
