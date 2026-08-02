@@ -31,7 +31,16 @@ function sportSubtype(s: string | null | undefined): { sport: string; subtype: s
 
 function isSameDayLocal(dateIsoA: string, dateIsoB: string): boolean { return String(dateIsoA).slice(0,10) === String(dateIsoB).slice(0,10); }
 
-function sumPlanned(planned: any): { seconds: number | null; meters: number | null } {
+// ⛔ THE PLANNED DURATION IS NOT ONLY IN THE STEPS (2026-08-01, traced from a real miss).
+// A ride on 2026-08-01 did not attach to its planned "Long Ride". The planned row was found — right
+// date, right sport, status 'planned', nothing claiming it — and it was refused anyway, because:
+//     computed: null · intervals: [] · total_duration_seconds: null · duration: 108
+// The session is "~108 min easy, all conversational" — real, prescribed, and completely UNSTRUCTURED.
+// This function only ever read `computed.steps` / `intervals`, so it saw no duration and returned
+// nulls, and the caller then refused the match. The 108 was sitting in the row the whole time.
+// ⛔ SO: every unstructured endurance session in the app was unattachable. Not the rare case — the
+// DEFAULT case for base miles, which is most of an endurance athlete's week.
+export function sumPlanned(planned: any): { seconds: number | null; meters: number | null } {
   let sec = 0; let m = 0; let any=false;
   const steps = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals)? planned.intervals : []);
   for (const st of steps) {
@@ -47,7 +56,20 @@ function sumPlanned(planned: any): { seconds: number | null; meters: number | nu
       else if (ou==='m') { m += ov; any=true; }
     }
   }
-  return { seconds: any? sec||null : null, meters: any? m||null : null };
+  if (any) return { seconds: sec || null, meters: m || null };
+
+  // FALLBACK, in the order of how directly each states the whole session's length. Only reached when
+  // the steps carry nothing — a structured session's steps stay authoritative, since they are what the
+  // athlete was actually told to do.
+  const totalSec = Number(planned?.total_duration_seconds);
+  if (Number.isFinite(totalSec) && totalSec > 0) return { seconds: Math.round(totalSec), meters: null };
+
+  // The `duration` column is MINUTES (verified: 108 on a "~108 min easy" ride). The >=1000 guard is the
+  // same heuristic the caller already uses on `workouts.moving_time`, for legacy rows storing seconds.
+  const dur = Number(planned?.duration);
+  if (Number.isFinite(dur) && dur > 0) return { seconds: Math.round(dur < 1000 ? dur * 60 : dur), meters: null };
+
+  return { seconds: null, meters: null };
 }
 
 Deno.serve(async (req) => {
@@ -393,7 +415,9 @@ Deno.serve(async (req) => {
     const day = String(w.date || '').slice(0,10);
     const { data: plannedList } = await supabase
       .from('planned_workouts')
-      .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises')
+      // `duration` + `total_duration_seconds` are the unstructured session's ONLY statement of length —
+      // without them selected, sumPlanned's fallback has nothing to read.
+      .select('id,user_id,type,date,name,computed,intervals,duration,total_duration_seconds,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises')
       .eq('user_id', w.user_id)
       .eq('type', finalSport)
       .eq('date', day)
@@ -588,7 +612,7 @@ Deno.serve(async (req) => {
           // Re-read this row to pick up computed totals
           const { data: pRow } = await supabase
             .from('planned_workouts')
-            .select('id,computed,total_duration_seconds,date,type')
+            .select('id,computed,total_duration_seconds,duration,date,type')
             .eq('id', p.id)
             .maybeSingle();
           if (pRow) Object.assign(p, pRow);
@@ -642,8 +666,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     const ratio = (bestTotals.seconds && wSec>0) ? (wSec / (bestTotals.seconds as number)) : null;
-    if (!(ratio!=null && ratio >= 0.50 && ratio <= 1.50)) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    if (ratio == null) {
+      // ⛔ THIS USED TO REPORT 'duration_out_of_range' WITH ratio: null — which reads as "the athlete
+      // rode too short" when the truth is "the planned session never told us how long it was, or the
+      // completed one didn't". Two different problems, and the wrong label sent tonight's debugging
+      // down the wrong path for an hour. Say which side is missing.
+      return new Response(JSON.stringify({
+        success: true, attached: false,
+        reason: !(wSec > 0) ? 'completed_has_no_duration' : 'planned_has_no_duration',
+        planned_id: best?.id, planned_seconds: bestTotals.seconds, completed_seconds: wSec || null,
+      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    if (!(ratio >= 0.50 && ratio <= 1.50)) {
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio, planned_seconds: bestTotals.seconds, completed_seconds: wSec }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     // Ambiguity gate: if there's more than one plausible match, do not guess.
