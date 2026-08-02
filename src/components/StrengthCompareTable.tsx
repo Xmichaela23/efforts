@@ -323,7 +323,15 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     // ⚠️ Reads `slotFor`, so an INFERRED pairing gets the same "→ Dips" label a declared one does.
     // The row must name the trade either way — a row silently retitled to an exercise the plan never
     // asked for is the worst of the three options.
-    const swappedWith = c?.name && keyOf(slotFor(c)) === k && keyOf(c.name) !== k ? String(c.name) : null;
+    //
+    // ⛔ AND IT MUST NOT NAME THE ROW AFTER ITSELF. When the server's slot name cannot be re-homed
+    // onto a planned row this screen actually draws, the completed exercise ends up keyed under its
+    // own slot with NO PLANNED PARTNER — the row is then titled from `c.name` and this line rendered
+    // "Dips → Dips · NOT IN THE PLAN" on Michael's screen. A swap label reports a PAIRING; with
+    // nothing to pair to, there is nothing to say.
+    // ⚠️ The guard is `!!p`, not a comparison against `displayName` — that is declared a few lines
+    // below and reading it here is a temporal-dead-zone crash, not a subtle bug.
+    const swappedWith = !!p && c?.name && keyOf(slotFor(c)) === k && keyOf(c.name) !== k ? String(c.name) : null;
     // ⚠️ The row's DISPLAY name, and the legacy key derived from it. `k` is now a canonical slug
     // ("chin_up"), so anything that used to read the key as prose — the bodyweight regex below, and
     // the two lookups further down whose maps are still built with `normalizeName` — has to go

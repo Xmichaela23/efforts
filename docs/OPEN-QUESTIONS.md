@@ -2852,3 +2852,39 @@ missing is what the app then does with the number.
 (ii) also feeds the e1RM trend under its own key, or (iii) marks the week as travel and suspends the
 progression rather than failing it. Field check first — this is exactly the case commercial 5/3/1
 apps handle badly and it is worth seeing how before ruling.
+
+---
+
+## Q-249 — ONE PLANNED ROW, TWO NAMES: the analyzer and the session screen read different sources (2026-08-02) — **VERIFIED ON DEVICE, worked around at the surface**
+
+**The receipt.** Michael's 2026-08-02 bench day, after [D-370] shipped. The server correctly inferred
+the swap and said so — *"Dips filled the Face Pull slot"* — while the table two inches below drew
+**"Dips → Dips · NOT IN THE PLAN"** next to a separate **"Band Face Pulls · NOT LOGGED"** row, and the
+count read 3 of 4. One session, both answers, on the same screen.
+
+**The cause is two sources for one name.**
+- `analyze-strength-workout` reads planned exercises from **`planned_workouts.strength_exercises`** —
+  the AUTHORED name, `Face Pull`.
+- `StrengthPerformanceSummary` reads them from **`computed.steps[].strength.name`** — the
+  MATERIALIZED name, `Band Face Pulls`, after `materialize-plan` prefixed the equipment.
+
+`canonicalize` keeps them apart: `face_pull` vs `band_face_pulls`. **It does not even fold
+`face_pull` and `face_pulls`** — three keys for one movement. So every lookup that crossed the two
+sources missed, silently, and rendered as "no swap" rather than as an error.
+
+**What shipped is a WORKAROUND, and it is at the surface on purpose.** The screen re-homes the
+server's slot name onto the planned row it actually draws: exact canonical match first, then a
+single unambiguous containment match (the same `includes()` tolerance the matcher has used as its
+Tier 2 since [Q-181]), and **nothing at all when two rows are both plausible** — a wrong pairing is
+worse than the row as it renders today.
+
+**Why the real fix was not attempted here.** The honest fix is upstream and it is a fork in the road:
+either materialize stops renaming (and the equipment lives in a field rather than in the name), or
+the analyzer reads the materialized names, or `canonicalize` grows equipment-prefix and plural
+folding. **The third is the tempting one and the most dangerous** — `canonicalize` is THE grouping key
+for `exercise_log` and the State strength trend, so widening it silently re-groups an athlete's
+history. Not a thing to do as a follow-on to a display fix.
+
+**To close:** rule on which of the three, then delete the containment fallback in
+`StrengthPerformanceSummary` and the note above it. ⚠️ Until then, assume ANY cross-source exercise
+lookup in the app is exposed to this — the swap pairing is simply where it became visible.

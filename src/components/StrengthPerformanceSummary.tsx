@@ -267,8 +267,41 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   // recomputed from the live lists cannot outlive the thing it describes.
   // D-370: the server's swap pairings, read by BOTH the count below and the table further down.
   // ⚠️ Declared here, above its first use — `const` is not hoisted, and the count reads it.
-  const execSubstitutions: Array<{ planned?: string; executed?: string }> =
-    Array.isArray(sessionDetail?.execution?.substitutions) ? sessionDetail!.execution!.substitutions as any : [];
+  //
+  // ⛔ THE SLOT NAME IS RE-HOMED ONTO THE ROW THE SCREEN ACTUALLY DRAWS, BECAUSE ONE PLANNED ROW
+  // HAS TWO NAMES (2026-08-02, found on Michael's screen — the swap fired and the rows did not
+  // collapse, so the same session read "Dips → Dips · NOT IN THE PLAN" beside a "Face Pull" it had
+  // just credited).
+  //
+  // The analyzer reads planned names from `planned_workouts.strength_exercises` — the AUTHORED name,
+  // "Face Pull". This screen reads them from `computed.steps[].strength.name` — the MATERIALIZED
+  // name, "Band Face Pulls", after materialize prefixed the equipment. `canonicalize` keeps them
+  // apart (`face_pull` vs `band_face_pulls`; it does not even fold `face_pull`/`face_pulls`), so
+  // every lookup between the two sources missed. Filed as [Q-249] — the divergence is upstream and
+  // fixing it here would be fixing the symptom, but the screen may not stay wrong while it waits.
+  //
+  // ⚠️ THE TOLERANCE IS CONTAINMENT ON CANONICAL KEYS, AND IT IS NOT A NEW VOCABULARY — it is the
+  // same `includes()` fallback the server matcher has used as its Tier 2 since Q-181. It is bounded
+  // three ways: exact match wins outright; containment is consulted only when exact fails; and an
+  // AMBIGUOUS containment (two planned rows both plausible) resolves to nothing rather than to a
+  // guess, which leaves the row exactly as it renders today.
+  const execSubstitutions: Array<{ planned?: string; executed?: string }> = (() => {
+    const raw: Array<{ planned?: string; executed?: string }> =
+      Array.isArray(sessionDetail?.execution?.substitutions) ? sessionDetail!.execution!.substitutions as any : [];
+    if (!raw.length) return [];
+    const key = (n: unknown) => canonicalize(String(n || ''));
+    return raw.map((s) => {
+      const want = key(s?.planned);
+      if (!want) return s;
+      const exact = plannedExercises.find((p: any) => key(p?.name) === want);
+      if (exact) return { ...s, planned: String(exact.name) };
+      const loose = plannedExercises.filter((p: any) => {
+        const k = key(p?.name);
+        return !!k && (k.includes(want) || want.includes(k));
+      });
+      return loose.length === 1 ? { ...s, planned: String(loose[0].name) } : s;
+    });
+  })();
 
   const completedOfPlanned = (() => {
     const key = (n: unknown) => canonicalize(String(n || ''));
