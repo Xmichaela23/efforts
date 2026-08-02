@@ -231,6 +231,10 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // SLICE 1: a dot only when ANCHORED — bike is anchored only once the athlete ACCEPTS its FTP estimate
   // (basis flips to 'personal'). On est(FTP) it's TREND-ONLY: the arrow + "no baseline set · accept your
   // FTP", never a dot on an estimate the athlete never confirmed.
+  // Traced from `learn-fitness-profile` (STEP 4): tier 1 is best 20-min power × 0.95, gated on
+  // hard efforts and 20–120 min rides. Coggan's field protocol — the same arithmetic as a 20-minute
+  // test, taken from 20 minutes the athlete already rode hard rather than asking them to test.
+  const ftpMethod = src === 'est (FTP)' ? ' FTP is estimated from your hard rides — 95% of your best 20 minutes.' : '';
   const showDot = anchored && range != null && lead.verdict !== 'needs_data';
   const trendOnly = !anchored && lead.verdict !== 'needs_data';
   return (
@@ -241,8 +245,14 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           // user is needs to go to more; ⓘ simply shows what the metric is"). Both strings used to end
           // with "the dot is where it sits versus your baseline; the arrow is the direction" — that is a
           // legend for THIS athlete's position, not a definition of the measure. Moved to "more".
-          ? "Power = how much power you are producing on rides, measured against your FTP."
-          : "Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter."} />
+          // ⚠️ THE FTP METHOD LINE IS CONDITIONAL, and it has to be. "Estimated from your hard rides"
+          // is false for an athlete who tested and entered their own FTP — appending it
+          // unconditionally would tell a confirmed rider their number was guessed. Only when the
+          // basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
+          // It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
+          // not where this athlete sits.
+          ? `Power = how much power you are producing on rides, measured against your FTP.${ftpMethod}`
+          : `Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter.${ftpMethod}`} />
       ) : (
         <Signal label={leadIsPower ? 'Power' : 'Efficiency'} sig={lead} />
       )}
