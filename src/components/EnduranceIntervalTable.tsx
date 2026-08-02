@@ -108,17 +108,20 @@ export default function EnduranceIntervalTable({
   const isEasyLike = !!sd?.classification?.is_easy_like;
   const isGoalRace = !!sd?.race?.is_goal_race;
   const race = sd?.race;
-  // D-040 Fix C + D-041 Fix C: detect single-segment steady-state sessions.
-  // The label/subtitle override uses workout_type (label-only signal,
-  // D-035 carryover: descriptive only, never a target) instead of
-  // is_mixed_effort. The variance gate is for downstream effort interpretation;
-  // the table-row label decision should key on whether this is a long_run /
-  // easy_run with one segment — those genuinely render as 'Steady' regardless
-  // of pace CV (which can be elevated on rolling terrain even on easy efforts).
-  const workoutType = String(sd?.classification?.workout_type ?? '').toLowerCase();
-  const singleSegmentSteady =
-    Array.isArray(sd?.intervals) && sd.intervals.length === 1 &&
-    (workoutType === 'long_run' || workoutType === 'easy_run');
+  // ⛔ THE CLIENT'S OWN 'Steady' RULE IS GONE (2026-08-02). It fired on one segment plus an
+  // easy/long type and FORCED the word "Steady", running after the server's label and winning — so a
+  // step the plan had actually named ("Long run main set") was thrown away and overwritten. Two rules
+  // for one label, keyed on different fields, and the phone's copy won.
+  //
+  // The server owns it now: a lone WORK step is not an interval, so it is labelled "Steady" there
+  // (`humanizePlannedSegmentLabel`, work-step count), and a named step keeps its name. Nothing to
+  // re-derive here.
+  //
+  // ⚠️ ITS SECOND JOB IS ALSO DELIBERATELY GONE. This flag suppressed the planned-range subtitle,
+  // reasoning that "the session wasn't prescribed a range". It was — the row reads
+  // "11:15-11:43/mi" — and now that the pace PERCENTAGE has come off an easy row, that range is the
+  // only thing left saying what was asked. Hiding it would leave the row stating what he ran with
+  // nothing to read it against.
   const displayMode = sd?.intervals_display?.mode ?? 'none';
   const displayReason = sd?.intervals_display?.reason ?? null;
   const allIntervals: IntervalRow[] = Array.isArray(sd?.intervals) ? sd!.intervals as IntervalRow[] : [];
@@ -325,7 +328,6 @@ export default function EnduranceIntervalTable({
               // D-040 Fix C: single-segment steady → no subtitle (the pace
               // column already shows the actual pace; the planned range is
               // redundant on a session that wasn't prescribed a range).
-              if (singleSegmentSteady) return false;
               if (useProj || useGoalTarget) return !!subtitlePace;
               if (idx === 0) return true;
               const prev = visibleIntervals[idx - 1];
@@ -346,7 +348,7 @@ export default function EnduranceIntervalTable({
                 <td className="px-2 py-1.5">
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                      <span className="text-[13px] font-medium truncate pr-2">{singleSegmentSteady ? 'Steady' : String(iv.planned_label ?? '')}</span>
+                      <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
                       {pct != null && !isGoalRace && hasPlanned && (
                         <div className="flex items-center gap-1">
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>

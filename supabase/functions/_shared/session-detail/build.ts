@@ -792,6 +792,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     (String(completedRefinedType || '').toLowerCase() !== 'open_water_swim')
   );
 
+  // ⛔ NEVER SHIP A NAMELESS ROW (2026-08-02). The client used to force the word "Steady" onto a
+  // single-segment easy session; that override is deleted (it also overwrote labels the plan had
+  // genuinely named). But it was quietly rescuing one case: a lone row whose planned label is empty
+  // AND whose kind the analyzer never set, which `humanizePlannedSegmentLabel` returns as ''. With
+  // the client's safety net gone that renders as an empty cell — worse than the wrong word.
+  // A single continuous row is a steady effort by definition, so the server says so. Named rows and
+  // multi-row sessions are untouched.
+  if (intervals.length === 1 && !String(intervals[0].planned_label ?? '').trim()) {
+    intervals[0].planned_label = 'Steady';
+  }
+
   // ── Splits ─────────────────────────────────────────────────────────────────
   const rawSplitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi)
     ? comp.analysis.events.splits.mi : [];
