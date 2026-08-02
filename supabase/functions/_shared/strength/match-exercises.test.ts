@@ -3,14 +3,34 @@ import { matchExercises, normalizeExerciseName, strengthSessionsShareTheWork } f
 
 const ex = (name: string, extra: Record<string, unknown> = {}) => ({ name, sets: [], ...extra });
 const plan = (name: string, sets = 3, reps = 10) => ({ name, sets, reps, weight: 100 });
+/**
+ * D-370: an ASSISTANCE slot, as the Get Stronger composer authors one — no set count, a rep TOTAL,
+ * no load, and `load_prescribed: false`. That last flag is the ONLY thing that opens Tier 3.
+ */
+const assistance = (name: string, totalReps = 25) =>
+  ({ name, sets: undefined, reps: `${totalReps} total`, weight: 'By feel', load_prescribed: false });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 // ⛔ THE GUARD. Written FIRST, before matchExercises was changed, and it must NEVER go green by
-// accident. An exercise that simply DIDN'T HAPPEN is still a SKIP.
+// accident. A PRESCRIBED LIFT that simply DIDN'T HAPPEN is still a SKIP.
 //
 // Forgiving a real skip would be a score that lies in the athlete's FAVOUR — the exact failure mode
 // CANON-arc-inference-model.md exists to prevent, and a far worse bug than the double-dock Q-181 fixes.
-// If this test ever fails, STOP. Do not "fix" it by relaxing the rule.
+// If one of these fails, STOP. Do not "fix" it by relaxing the rule.
+//
+// ⚠️ NARROWED 2026-08-02 (D-370), AND THE WORDING ABOVE CHANGED WITH IT — read this before assuming
+// a green run means what it used to. The guard once covered EVERY planned row; it now covers every
+// planned row EXCEPT an assistance slot (`load_prescribed: false`), which may be filled by
+// undeclared work. Two reasons the narrowing is not a relaxation:
+//   · the score it protected is GONE (D-338 deleted the strength execution percentage), so there is
+//     nothing left for a forgiven skip to inflate; and
+//   · an assistance slot is prescribed as a CATEGORY WITH A MENU, not as a movement — Wendler
+//     writes it as "Lats, Upper Back, Triceps — 5 sets of 10-20 (DB rows, Chins, Face Pulls…)" —
+//     so filling it off the menu IS the prescription.
+// A MAIN LIFT is prescribed by name at a percentage of a training max and none of that applies.
+// The four tests below pin exactly where the line now sits; the D-370 block at the bottom pins the
+// other side of it. ⛔ IF YOU ARE HERE BECAUSE A TEST WENT RED, THE ANSWER IS ALMOST CERTAINLY THAT
+// `load_prescribed` LEAKED ONTO A ROW THAT IS NOT ASSISTANCE — check that before touching the rule.
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('GUARD: an UNDECLARED miss is STILL a skip (D-208 intact)', () => {
@@ -21,18 +41,36 @@ Deno.test('GUARD: an UNDECLARED miss is STILL a skip (D-208 intact)', () => {
   assertEquals(m[0].substituted, undefined);
 });
 
-Deno.test('GUARD: logging a DIFFERENT exercise with NO declaration is a skip PLUS an unplanned extra — never a swap', () => {
-  // The athlete did a hip thrust and never said it replaced anything. That is not a substitution.
-  // (Law 2: ask, don't guess.)
-  const m = matchExercises([plan('Bulgarian Split Squat')], [ex('Hip Thrust')]);
-  const bss = m.find((x) => x.name === 'Bulgarian Split Squat')!;
-  const ht = m.find((x) => x.name === 'Hip Thrust')!;
+Deno.test('GUARD: on a MAIN LIFT, logging something else with NO declaration is still a skip PLUS an unplanned extra', () => {
+  // ⛔ THIS IS THE HALF OF THE OLD GUARD THAT SURVIVES D-370 UNCHANGED, and it is the important half.
+  // A main lift is prescribed BY NAME at a percentage of a training max. Doing a leg press instead
+  // of the prescribed squat did not discharge the squat, and no inference may say it did.
+  const m = matchExercises([plan('Back Squat')], [ex('Leg Press')]);
+  const sq = m.find((x) => x.name === 'Back Squat')!;
+  const lp = m.find((x) => x.name === 'Leg Press')!;
 
-  assertEquals(bss.matched, false);   // still a skip
-  assertEquals(bss.executed, null);
-  assertEquals(ht.planned, null);     // still an unplanned extra
-  assertEquals(ht.matched, false);
-  assertEquals(bss.substituted, undefined);
+  assertEquals(sq.matched, false);   // still a skip
+  assertEquals(sq.executed, null);
+  assertEquals(lp.planned, null);    // still an unplanned extra
+  assertEquals(lp.matched, false);
+  assertEquals(sq.substituted, undefined);
+});
+
+Deno.test('GUARD: a planned row with NO assistance marker is never inferred into — absent ≠ assistance', () => {
+  // `load_prescribed` is only ever `false` or ABSENT. A plan from any other generator carries it
+  // nowhere, so Tier 3 must be inert on it. Reading absent as assistance would turn every planned
+  // row in the app into an inferable slot at once.
+  const m = matchExercises([plan('Barbell Row')], [ex('Dumbbell Row')]);
+  assertEquals(m.find((x) => x.name === 'Barbell Row')!.matched, false);
+  assertEquals(m.find((x) => x.name === 'Dumbbell Row')!.planned, null);
+});
+
+Deno.test('GUARD: a MAIN LIFT may not fill an assistance slot', () => {
+  // Logging a heavy squat does not discharge the single-leg slot. Crediting it there would hide a
+  // skipped accessory behind the day's big lift.
+  const m = matchExercises([assistance('Single Leg Hip Thrust')], [ex('Back Squat')]);
+  assertEquals(m.find((x) => x.name === 'Single Leg Hip Thrust')!.matched, false);
+  assertEquals(m.find((x) => x.name === 'Back Squat')!.planned, null);
 });
 
 Deno.test('GUARD: a partially-completed session still marks the untouched exercise as a skip', () => {
@@ -247,4 +285,69 @@ Deno.test('⛔ GATE: an UNDECLARED different main lift still does NOT share', ()
     [{ name: 'Trap Bar Deadlift', sets: [{ reps: 5, weight: 225, completed: true }] }],
   );
   assertEquals(r.share, false);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// D-370 — AN UNDECLARED SWAP INTO AN ASSISTANCE SLOT IS CREDITED, AND FLAGGED WHEN THE PATTERN
+// DIFFERS. Supersedes the "we never INFER a substitution" half of Q-181 for assistance ONLY.
+//
+// The old law's stated fear was "a score that lies in the athlete's FAVOUR". D-338 deleted the
+// strength execution score, so there is no score left to lie. What remains is a count and a label,
+// and both were UNDER-reporting: work that happened read as a skip plus an orphan.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('D-370: an assistance slot with nothing logged is filled by unplanned work — credited, marked inferred', () => {
+  // THE MICHAEL CASE, 2026-08-02. The plan asked for Band Face Pulls in the push slot; he did Dips
+  // and never tapped Swap. Before this: Face Pulls "NOT LOGGED" + Dips "NOT IN THE PLAN".
+  const m = matchExercises([assistance('Band Face Pulls')], [ex('Dips')]);
+
+  assertEquals(m.length, 1);                       // ONE row, not a skip plus an orphan
+  assertEquals(m[0].name, 'Band Face Pulls');      // it answers to the SLOT
+  assertEquals(m[0].matched, true);                // the slot was filled -> no dock
+  assertEquals(m[0].substituted, true);
+  assertEquals(m[0].substituted_with, 'Dips');
+  assertEquals(m[0].inferred, true);               // the app decided this; he did not say it
+});
+
+Deno.test('D-370: a DECLARED swap is NOT marked inferred — the distinction survives', () => {
+  // `substituted && !inferred` has to keep meaning "they told us", or the receipt says "swapped"
+  // on a pairing the athlete never made.
+  const m = matchExercises(
+    [assistance('Band Face Pulls')],
+    [ex('Dips', { substituted_for: 'Band Face Pulls' })],
+  );
+  assertEquals(m[0].matched, true);
+  assertEquals(m[0].substituted, true);
+  assertEquals(m[0].inferred, undefined);
+});
+
+Deno.test('D-370: same-family work claims its slot BEFORE a different-family candidate can take it', () => {
+  // Two open slots, two unplanned exercises. Pass A pairs by movement family first, so the pull
+  // slot gets the pull and the single-leg slot gets the single-leg movement — not whichever the
+  // loop reached first. Getting this wrong flags two clean swaps as mismatches.
+  const m = matchExercises(
+    [assistance('Pull Up'), assistance('Reverse Lunge')],
+    [ex('Bulgarian Split Squat'), ex('Chin Up')],
+  );
+  assertEquals(m.find((x) => x.name === 'Pull Up')!.substituted_with, 'Chin Up');
+  assertEquals(m.find((x) => x.name === 'Reverse Lunge')!.substituted_with, 'Bulgarian Split Squat');
+});
+
+Deno.test('D-370: an assistance slot that was actually LOGGED is untouched — no inference runs', () => {
+  // Tier 3 sees leftovers only. A slot the athlete filled by name must never be re-paired.
+  const m = matchExercises(
+    [assistance('Chin Up'), assistance('Dips')],
+    [ex('Chin Up'), ex('Dips')],
+  );
+  assertEquals(m.length, 2);
+  assertEquals(m.every((x) => x.matched), true);
+  assertEquals(m.every((x) => x.substituted === undefined), true);
+});
+
+Deno.test('D-370: an assistance slot with NOTHING logged anywhere is still a skip', () => {
+  // There is nothing to credit it with. The slot reads as missed, exactly as before.
+  const m = matchExercises([assistance('Band Face Pulls')], []);
+  assertEquals(m.length, 1);
+  assertEquals(m[0].matched, false);
+  assertEquals(m[0].substituted, undefined);
 });

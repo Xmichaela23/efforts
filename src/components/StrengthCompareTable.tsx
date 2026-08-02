@@ -30,6 +30,9 @@ export interface StrengthExercise {
   /** Q-181: stamped by the Swap action, naming the PLANNED exercise this one stands in for. The slot
    *  is the unit of adherence, so a declared swap pairs to the slot it replaced, not to its own name. */
   substituted_for?: string;
+  /** ASSISTANCE. `false` means the plan deliberately prescribed no load — see `assistanceTotalReps`
+   *  below for what that changes about the row. Never `true`; absent means "not stated". */
+  load_prescribed?: boolean;
 }
 
 /**
@@ -115,6 +118,17 @@ interface StrengthCompareTableProps {
   workoutId?: string | null;
   /** `session_detail_v1.strength_volume`. Absent → the lb column is omitted, never re-derived. */
   strengthVolume?: StrengthVolumePayload | null;
+  /**
+   * D-370: the server's swap pairings — `session_detail_v1.execution.substitutions`. Each entry
+   * names the PLANNED slot and the exercise that filled it.
+   *
+   * ⛔ THIS IS READ, NEVER RE-DERIVED. The matcher (`_shared/strength/match-exercises.ts`) is the one
+   * place allowed to decide which logged exercise answers to which planned slot — "do not write a
+   * second matcher" is written at the top of that file, and this table pairing rows on its own
+   * inference is exactly what a second matcher would be. A DECLARED swap still arrives the other
+   * way, stamped on the logged set as `substituted_for`; an INFERRED one exists only here.
+   */
+  substitutions?: Array<{ planned?: string; executed?: string }> | null;
   onAdjustmentSaved?: () => void;
 }
 
@@ -129,7 +143,7 @@ function formatPrevDate(dateStr: string | null | undefined): string | null {
   return month ? `${month} ${parseInt(m[3], 10)}` : null;
 }
 
-export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, strengthVolume, onAdjustmentSaved }: StrengthCompareTableProps){
+export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, strengthVolume, substitutions, onAdjustmentSaved }: StrengthCompareTableProps){
   // editingSet: { exerciseName, setIndex } — which completed set is being edited inline
   const [editingSet, setEditingSet] = useState<{ exerciseName: string; setIndex: number } | null>(null);
   const [editFields, setEditFields] = useState<{ reps: string; weight: string; rir: string }>({ reps: '', weight: '', rir: '' });
@@ -248,11 +262,27 @@ export default function StrengthCompareTable({ planned, completed, completedWork
   const keyOf = (n: unknown) => canonicalize(String(n || ''));
   const plannedMap = new Map<string, StrengthExercise>();
   planned.forEach(p => plannedMap.set(keyOf(p.name), p));
+
+  // ⛔ ONE ANSWER TO "WHICH SLOT DOES THIS EXERCISE ANSWER TO", USED BY ALL THREE READERS BELOW —
+  // the row pairing, the swap label, and the volume re-home (D-370). They each used to read
+  // `substituted_for` directly, which was fine while a declaration was the only kind of swap; now
+  // that the matcher can INFER one, three copies of the question would answer it three ways the
+  // moment any of them was touched.
+  //
+  // ORDER IS THE PRECEDENCE, and it matches the matcher's own tiers: what the athlete DECLARED
+  // outranks what the server inferred, which outranks the exercise's own name.
+  const inferredSlotByExercise = new Map<string, string>();
+  (substitutions ?? []).forEach((s) => {
+    const performed = keyOf(s?.executed);
+    const slot = String(s?.planned ?? '').trim();
+    if (performed && slot) inferredSlotByExercise.set(performed, slot);
+  });
+  const slotFor = (c: any): string =>
+    String(c?.substituted_for || inferredSlotByExercise.get(keyOf(c?.name)) || c?.name || '');
+
   const completedMap = new Map<string, StrengthExercise>();
   completed.forEach(c => {
-    // The slot it was declared against wins; otherwise the exercise answers to its own name.
-    const declaredFor = c?.substituted_for;
-    completedMap.set(keyOf(declaredFor || c.name), c);
+    completedMap.set(keyOf(slotFor(c)), c);
   });
 
   // Is there a prescription to compare against at all? Everything that grades, labels or totals
@@ -276,10 +306,10 @@ export default function StrengthCompareTable({ planned, completed, completedWork
   // exercise the athlete actually did; the table draws that work under the PLANNED slot. Without
   // this re-home the row is drawn and its volume is filed under a key nothing renders.
   completed.forEach(c => {
-    const declaredFor = c?.substituted_for;
-    if (!declaredFor) return;
+    const filledSlot = slotFor(c);
+    if (!filledSlot || keyOf(filledSlot) === keyOf(c.name)) return;
     const vol = completedVolByKey.get(keyOf(c.name));
-    if (vol != null) completedVolByKey.set(keyOf(declaredFor), vol);
+    if (vol != null) completedVolByKey.set(keyOf(filledSlot), vol);
   });
   const hasServerVolume = strengthVolume != null;
 
@@ -290,7 +320,10 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const c = completedMap.get(k);
     // What the athlete ACTUALLY did, when it differs from what was asked. Drives the swap receipt
     // on the row — never a dock, just the trade named.
-    const swappedWith = c?.substituted_for && c?.name && keyOf(c.name) !== k ? String(c.name) : null;
+    // ⚠️ Reads `slotFor`, so an INFERRED pairing gets the same "→ Dips" label a declared one does.
+    // The row must name the trade either way — a row silently retitled to an exercise the plan never
+    // asked for is the worst of the three options.
+    const swappedWith = c?.name && keyOf(slotFor(c)) === k && keyOf(c.name) !== k ? String(c.name) : null;
     // ⚠️ The row's DISPLAY name, and the legacy key derived from it. `k` is now a canonical slug
     // ("chin_up"), so anything that used to read the key as prose — the bodyweight regex below, and
     // the two lookups further down whose maps are still built with `normalizeName` — has to go
@@ -318,6 +351,11 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       : [];
     const cSets = Array.isArray(cSetsArr) ? cSetsArr.length : 0;
     const cRepsAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.reps||0)) : 0;
+    // The SUM, not the average — on an assistance row the total is the prescription, so the total
+    // is what the work has to be read against (Michael, 2026-08-02: *"we should see the planned
+    // number the completed work off of"*). `cRepsAvg` above answers a different question and is used
+    // by the main-lift rows; both are kept, and this comment is why there are two.
+    const cRepsTotal = Array.isArray(cSetsArr) ? cSetsArr.reduce((s, st) => s + (Number(st?.reps) || 0), 0) : 0;
     const cWAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.weight||0)) : 0;
     // D-349: priced by the server's one set rule. 0 when the payload has no entry for this row.
     const cVol = completedVolByKey.get(k) ?? 0;
@@ -360,6 +398,30 @@ export default function StrengthCompareTable({ planned, completed, completedWork
           if (typeof targetRir === 'number') set.rir = targetRir;
           return set;
         });
+    // ⛔ AN ASSISTANCE ROW IS PRESCRIBED AS A TOTAL, AND THE TOTAL IS THE WHOLE PRESCRIPTION
+    // (2026-08-02, Michael: *"25 are planned, how they are executed is up to user — so they
+    // shouldn't get lost"*).
+    //
+    // Wendler prescribes assistance as a rep TOTAL and never as sets, and never with a load:
+    // dips *"50 total reps… 100 total reps if you're just using your bodyweight"*, chins *"no less
+    // than 100 per week"*, the bodyweight template *"no less than 75 reps per exercise for each
+    // workout"* — and immediately after: *"These numbers are just recommendations, so you can do
+    // more or less depending on your strength level."* On load he is blunter still: *"Let the big
+    // lifts stress the joints and mind; let the small lifts stress the muscles… It's best to use
+    // the lightest weight possible so you don't wreck your joints."* The only assistance he ever
+    // puts a percentage on is ONE big loadable lift per day (close-grip bench, front squat, incline,
+    // stiff-leg deadlift), each off its own tested max — and he names face pulls and dumbbell
+    // benches specifically as NOT qualifying. Nothing in this app authors that category.
+    //
+    // So `pSets` is 0 on these rows BY DESIGN, `plannedSets` is therefore empty, and every Planned
+    // cell rendered "—" on a lift the plan had plainly asked 25 reps of. A row that was never
+    // logged at all (`Band Face Pulls`) drew a column header over nothing.
+    //
+    // ⚠️ THE FIX IS NOT TO SYNTHESISE SET ROWS. Splitting 25 into "5 × 5" states a prescription
+    // that was never made — the same lie `sets: 1` told when it rendered "1×25" (Michael: *"25 chin
+    // ups? lol i can do 5"*). The total goes on the row HEADER, where it cannot be lost and cannot
+    // be mistaken for a per-set target, and the sets below it are simply what was done.
+    const assistanceTotalReps = p?.load_prescribed === false && pReps > 0 ? pReps : null;
     const completedSets: StrengthSet[] = cSetsArr;
     // D-095: PREVIOUS column — last session's actual per-set data for this exercise.
     // ⚠️ Keyed by `canonicalize`, matching how `workout-detail` builds the map.
@@ -395,10 +457,13 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       return max > 0 ? weights.lastIndexOf(max) : -1;
     })();
     const difficulty = topCompletedIdx >= 0 ? (cSetsArr[topCompletedIdx] as any)?.difficulty ?? null : null;
-    return { name: displayName, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty } as any;
+    return { name: displayName, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cRepsTotal, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty, assistanceTotalReps } as any;
   });
 
-  const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
+  // ⛔ THE `totals` REDUCER IS DELETED, NOT ORPHANED. It fed the "vs plan" row at the bottom of this
+  // file and nothing else; leaving it computed-then-discarded is the exact trap Q-246 catalogues —
+  // a future session finds a working total sitting right there and switches a row back on without
+  // reading why it came off. The reasoning is at the delete site.
 
   // Prefer server verdict when available; fall back to local heuristic
   const isRirConcerning = (targetRir?: number, actualRir?: number, verdict?: string | null) => {
@@ -450,6 +515,16 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 {r.status === 'swapped' && hasPlan && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">not in the plan</span>
                 )}
+                {/* THE PRESCRIPTION, ON THE ROW IT BELONGS TO. This is the ONLY thing the plan said
+                    about this movement — a rep total, no sets, no load — and until now the screen
+                    dropped it entirely. It rides beside the name so it survives a row with no sets
+                    logged, which is exactly the row that most needs to show what was asked for.
+                    ⚠️ "by feel" is not decoration: it is the prescription. `load_prescribed: false`
+                    means the plan declined to name a weight, and the athlete should read that as an
+                    instruction rather than as a missing number. */}
+                {r.assistanceTotalReps != null && (
+                  <span className="text-[11px] text-white/45">{r.assistanceTotalReps} total · by feel</span>
+                )}
               </div>
               {/* THE THREE WORDS — how the top set felt. 5/3/1 dictates the weight, so there is
                   nothing for reps-in-reserve to decide; this is what replaced it (D-338). Shown as
@@ -482,9 +557,28 @@ export default function StrengthCompareTable({ planned, completed, completedWork
             {/* D-095: PREVIOUS column added when prior-session data exists for this
                 exercise. 12-col grid rebalances Set/Planned/Completed when present;
                 falls back to the original 2/5/5 layout when absent. */}
+            {/* ⛔ NO ROWS, NO COLUMN HEADERS. A lift that was never logged used to draw
+                "Set · Planned · Completed" over empty space — a table promising three facts and
+                delivering none. The prescription now lives on the name line above, which is the
+                whole point: a skipped lift still says what was asked for. */}
+            {r.pairs.length > 0 && (
             <div className="grid grid-cols-12 text-xs font-medium text-white/50 border-b border-white/20 pb-1">
               <div className="col-span-2">Set</div>
-              {r.hasPrevious ? (
+              {/* ⛔ AN ASSISTANCE ROW HAS NO PLANNED COLUMN, because there is no per-set plan to put
+                  in it (see `assistanceTotalReps`). Keeping the column and filling it with dashes
+                  reads as data the app failed to load; the prescription is on the header line. */}
+              {r.assistanceTotalReps != null ? (
+                r.hasPrevious ? (
+                  <>
+                    <div className="col-span-4" title={r.previousDate ? `${r.previousDate}${r.previousDaysAgo != null ? ` · ${r.previousDaysAgo} days ago` : ''}` : undefined}>
+                      Previous{formatPrevDate(r.previousDate) ? <span className="text-white/30 font-normal"> · {formatPrevDate(r.previousDate)}</span> : (r.previousDaysAgo != null ? <span className="text-white/30 font-normal"> · {r.previousDaysAgo}d</span> : null)}
+                    </div>
+                    <div className="col-span-5">Completed</div>
+                  </>
+                ) : (
+                  <div className="col-span-9">Completed</div>
+                )
+              ) : r.hasPrevious ? (
                 <>
                   <div className="col-span-3" title={r.previousDate ? `${r.previousDate}${r.previousDaysAgo != null ? ` · ${r.previousDaysAgo} days ago` : ''}` : undefined}>
                     Previous{formatPrevDate(r.previousDate) ? <span className="text-white/30 font-normal"> · {formatPrevDate(r.previousDate)}</span> : (r.previousDaysAgo != null ? <span className="text-white/30 font-normal"> · {r.previousDaysAgo}d</span> : null)}
@@ -499,6 +593,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 </>
               )}
             </div>
+            )}
             <div className="space-y-1">
               {r.pairs.map((pair: any, idx: number) => {
                 const p = pair.planned as StrengthSet | undefined;
@@ -594,7 +689,18 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     ) : (
                       <div className="grid grid-cols-12 text-sm group">
                         <div className="col-span-2 text-white/60">{idx+1}</div>
-                        {r.hasPrevious ? (
+                        {/* Column spans mirror the header above exactly — an assistance row drops
+                            Planned and gives the space to what was actually done. */}
+                        {r.assistanceTotalReps != null ? (
+                          r.hasPrevious ? (
+                            <>
+                              <div className="col-span-4 text-white/50">{fmt(pair.previous, r.isBodyweight, true)}</div>
+                              <div className="col-span-5 text-white/90">{fmt(c, false, true)}</div>
+                            </>
+                          ) : (
+                            <div className="col-span-9 text-white/90">{fmt(c, false, true)}</div>
+                          )
+                        ) : r.hasPrevious ? (
                           <>
                             <div className="col-span-3 text-white/50">{fmt(pair.previous, r.isBodyweight, true)}</div>
                             <div className="col-span-3 text-white/60">{fmt(p, r.isBodyweight, true)}</div>
@@ -621,6 +727,20 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 );
               })}
             </div>
+            {/* ⛔ THE ONE COMPARISON AN ASSISTANCE ROW CAN HONESTLY MAKE: reps against the total.
+                Not sets, not load — the plan named neither. This is the counterpart to the header
+                line: the header says what was asked, this says how much of it got done, and between
+                them the prescription is never lost even on a row with nothing logged (`0 of 25`).
+                ⚠️ It is a COUNT, not a grade — no colour, no percentage, no verdict. Wendler on
+                these totals: *"These numbers are just recommendations, so you can do more or less
+                depending on your strength level."* Going over is not an overshoot and going under is
+                not a miss, so nothing here is allowed to render as either. */}
+            {r.assistanceTotalReps != null && (
+              <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
+                <span className="text-white/80">{r.cRepsTotal.toLocaleString()}</span>
+                <span className="text-white/50">of {r.assistanceTotalReps.toLocaleString()} reps</span>
+              </div>
+            )}
             {/* Only show volume line when planned has volume to compare against */}
             {/* ⛔ A ROW THE PLAN NEVER PRICED STILL DID REAL WORK (D-349 follow-up, 2026-08-01).
                 This gate was `r.pVol > 0` — volume renders only if the PRESCRIPTION had a number.
@@ -654,26 +774,34 @@ export default function StrengthCompareTable({ planned, completed, completedWork
           </div>
         );
       })}
-      {/* Only show totals when there's planned volume to compare */}
-      {/* Same rule as the per-row line: a session made entirely of rows the plan never priced still
-          has a total. The DELTA needs a prescription to be a delta, so it only appears when there was
-          one; otherwise the honest line is the work done. */}
-      {(totals.pVol > 0 || totals.cVol > 0) && (
-        <div className="grid grid-cols-12 text-sm font-semibold border-t border-white/20 pt-2 text-white">
-          {/* ⛔ NOT "Totals" (Michael, 2026-07-31, on sight of his own screen). This row is a DELTA —
-              completed minus planned — and it sat directly above the real session total
-              ("Volume (lbs) 11,165") wearing the word that belongs to that number. He read "+7,640 lb"
-              as his volume, and said any lifter would. The label now names the comparison, so the two
-              numbers can't be confused for each other. */}
-          <div className="col-span-7">vs plan</div>
-          <div className="col-span-5 text-right text-white/80">
-            {totals.pVol > 0
-              ? `${totals.cVol - totals.pVol >= 0 ? '+' : ''}${(totals.cVol - totals.pVol).toLocaleString()} lb`
-              : `${totals.cVol.toLocaleString()} lb`}
-          </div>
-        </div>
-      )}
-      
+      {/* ⛔ "vs plan" IS DELETED (2026-08-02) — IT IS NOT A 5/3/1 MEASUREMENT, AND IT COULD NOT BE
+          COMPUTED HONESTLY IF IT WERE.
+
+          The label was already fixed once: it used to say "Totals" and Michael read "+7,640 lb" as
+          his volume (2026-07-31). Naming it "vs plan" made it an honest label on a number that
+          should not exist.
+
+          TWO REASONS, EITHER SUFFICIENT.
+
+          1. THE ARITHMETIC IS BETWEEN TWO DIFFERENT SESSIONS. The plan prices ONLY the main lift —
+             assistance is authored with no load by design — while the completed side prices every
+             row, bodyweight included (D-348/D-349). On the 2026-08-02 bench day that is 1,575 lb of
+             prescription against 13,215 lb of work, printed as "+11,640 lb". It reads as a massive
+             overshoot; it is a category error. Any Get Stronger session with assistance on it
+             produces the same fake surplus, and the more assistance the athlete does the "better"
+             the number gets.
+
+          2. WENDLER DOES NOT COUNT IT. Tonnage appears nowhere in 5/3/1. His own training log (2nd
+             ed., pp. 123-130) has four columns — one per main lift — carrying Actual Max, Training
+             Max, the three prescribed sets, a blank weight column, and a REP RECORDS table.
+             Assistance has no row on that sheet at all. The measurement 5/3/1 tracks is reps on the
+             last set, and this screen already carries it ("Your best at this weight is 8").
+
+          ⚠️ DO NOT REINSTATE IT AS A "session volume" total either. That number already exists,
+          once, further down the Performance screen (`completed_total_lb`, D-349) — putting a second
+          one here is how the first version of this row got misread. The per-row `Vol:` lines stay:
+          they are per-exercise facts, not a verdict against a plan that never priced them. */}
+
     </div>
   );
 }

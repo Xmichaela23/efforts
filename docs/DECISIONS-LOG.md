@@ -4119,3 +4119,98 @@ for a session; it depends what the session was for. Garmin does colour load, but
 rolling** total against an optimal range, where too little and too much are both genuinely suboptimal.
 One session is not that question. If scannability needs more, the honest answer is a **position marker**
 in the band, not a colour that judges.
+
+---
+
+## D-370 — AN UNDECLARED SWAP INTO AN ASSISTANCE SLOT IS CREDITED, AND FLAGGED WHEN THE PATTERN DIFFERS (2026-08-02, Michael) — **NOT YET VERIFIED ON DEVICE**
+
+**Supersedes the "we never INFER a substitution" half of [Q-181].** That clause is still law for main
+lifts and for every planned row that is not an assistance slot. Read the back-annotation on Q-181.
+
+### THE SCREEN THAT CAUSED IT
+
+Michael's 2026-08-02 bench day. Plan: Bench Press + three assistance slots — Band Face Pulls (push
+slot), Chin Up (pull), Single Leg Hip Thrust (single-leg). He did the chin-ups and the hip thrusts,
+skipped the face pulls, and did **Dips** instead without tapping Swap.
+
+The screen read: `Band Face Pulls — NOT LOGGED` and `Dips — NOT IN THE PLAN`, three rows apart, with
+the count saying 3 of 4. **He was docked for a slot he filled and unpaid for the work that filled
+it** — the exact double-fault Q-181 was written to end, surviving in the one case Q-181 declined to
+cover.
+
+### WHY THE OLD LAW COULD BE REVERSED, AND WHY IT COULD NOT HAVE BEEN BEFORE
+
+Q-181's stated reason for refusing inference was *"a score that lies in the athlete's FAVOUR"* — a
+forgiven skip inflating the strength execution percentage. **[D-338] deleted that percentage.** No
+strength surface grades a session any more; what remains is a count and a row label, and both were
+under-reporting. The thing the law protected no longer exists.
+
+### WHY ASSISTANCE IS NOT A MAIN LIFT
+
+A main lift is prescribed BY NAME at a percentage of a training max. An assistance slot is
+prescribed as a **category with a menu** — Wendler writes it as *"Lats, Upper Back, Triceps — 5 sets
+of 10-20 reps (DB rows, Bent Over Rows, Chins, T-bar Rows, Lat Pulldowns, Face Pulls, Shrugs)"*
+(2nd ed. p50-51). Filling that slot off the menu **is** the prescription. The gate in code is
+`load_prescribed === false`, stamped by the Get Stronger composer on assistance rows only —
+`!== false` rather than `=== true`, because absent means "not stated" and a reader that treats
+absent as assistance turns every main lift into one.
+
+### FIELD STANDARD (re-checked 2026-08-02)
+
+Every app credits the swap; **none of them flag a bad one.** Boostcamp carries the working weights
+and rep targets straight over to the substitute. Hevy, TrainHeroic and Juggernaut all
+replace-and-continue. TrainHeroic's own writeup names the gap — athletes improvising *"sometimes
+choose movements that don't match the original training goal"* — and answers it with
+coach-preselected alternatives, **not** with a warning. Crediting is the field. The flag is the part
+the field does not do.
+
+### WHAT SHIPPED
+
+**Tier 3 in `_shared/strength/match-exercises.ts`.** Runs last, on leftovers only, so it can never
+take a row from a declared swap or a name match. Two passes: same movement family first (a pull for
+a pull is the field's own definition of a valid substitute), then anything else still unpaired. A
+main lift may never fill an assistance slot (`isMain531Lift`). The match carries `inferred: true`.
+
+**The flag was already built and starved.** `buildSubstitutionNote` has compared MOVEMENT PATTERN
+and written the honest sentence since Q-181 slice 3 — it had simply never been reached, because
+nothing ever produced an undeclared swap for it to describe. Tier 3 feeds it. ⛔ Do not write a
+second pattern comparison.
+
+**The verb changes on an inferred pairing.** *"Swapped X → Y"* reports something the athlete did; on
+an inferred pairing they did no such thing. It now reads **"Dips filled the Band Face Pulls slot.
+Pushing instead of pulling — same session, different stimulus."** An in-slot fill stays silent,
+exactly as a declared one does.
+
+### THE VERNACULAR CALL
+
+⛔ **Movement-pattern words decide; plain words speak.** The big apps label by MUSCLE GROUP — Hevy
+takes one primary and several secondary muscles; Strong and Fitbod the same. Movement pattern
+(horizontal push / vertical pull) is coach vocabulary; Trainerize users have been asking for a
+movement-pattern filter for years and do not have one. Printing `horizontal_push` on a strength row
+would break the bro-friendly rule for no gain. The sentence teaches the idea without the taxonomy.
+
+### GUARDS
+
+`match-exercises.test.ts` — the old blanket guard is **narrowed, not relaxed**, and its header says
+so: a main lift with something else logged is still a skip, a planned row with no assistance marker
+is never inferred into, and a main lift may not fill an assistance slot. Six new tests pin the other
+side. 31 pass. `substitution-note.test.ts` pins the inferred wording (12 pass).
+
+### RIPPLE
+
+`analyze-strength-workout` and `auto-attach-planned` both import the changed file and both must be
+redeployed (the `_shared` deploy trap). **`auto-attach-planned` uses only
+`strengthSessionsShareTheWork`, which was NOT touched** — attach behaviour is unchanged, verified by
+reading its single call site (`auto-attach-planned/index.ts:477`).
+
+### WHAT WAS REJECTED
+
+- **Inferring on main lifts too.** A skipped bench is a skipped bench. Q-181's guard survives intact
+  there and its test is unchanged.
+- **Client-side inference.** "Do not write a second matcher" is written at the top of the matcher.
+  `StrengthCompareTable` now READS the server's pairing (`session_detail_v1.execution.substitutions`)
+  and re-homes the row off it; it decides nothing.
+- **A special rule for the day's main lift.** The push slot was balanced to Face Pulls *because*
+  bench already pressed, so crediting Dips there looked like it needed its own exception. It does
+  not: Dips are `horizontal_push`, Face Pulls are `horizontal_pull`, so the pattern comparison
+  already catches it and says something truer than a bench-specific rule would.

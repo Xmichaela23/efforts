@@ -44,7 +44,21 @@ export interface SubstitutionNote {
   note: string | null;
 }
 
-export function buildSubstitutionNote(plannedName: string, executedName: string): SubstitutionNote {
+export function buildSubstitutionNote(
+  plannedName: string,
+  executedName: string,
+  /**
+   * D-370: the pairing was INFERRED (an assistance slot with nothing logged, filled by work that
+   * answered to nothing planned) rather than declared by the Swap action.
+   *
+   * ⛔ IT CHANGES THE VERB, AND THAT IS NOT COSMETIC. *"Swapped X → Y"* reports something the
+   * athlete DID; on an inferred pairing they did no such thing — the app decided it. Saying
+   * "swapped" would put words in their mouth and, worse, make a decision the app made look like a
+   * record of their intent. *"Y filled the X slot"* is what actually happened, and it reads as the
+   * app's reasoning, which is what it is.
+   */
+  inferred = false,
+): SubstitutionNote {
   const planned = String(plannedName || '').trim();
   const executed = String(executedName || '').trim();
 
@@ -80,7 +94,9 @@ export function buildSubstitutionNote(plannedName: string, executedName: string)
     planned,
     executed,
     same_pattern: false,
-    note: `Swapped ${planned} → ${executed}. ${capitalize(eWord)} instead of ${pWord} — same session, different stimulus.`,
+    note: inferred
+      ? `${executed} filled the ${planned} slot. ${capitalize(eWord)} instead of ${pWord} — same session, different stimulus.`
+      : `Swapped ${planned} → ${executed}. ${capitalize(eWord)} instead of ${pWord} — same session, different stimulus.`,
   };
 }
 

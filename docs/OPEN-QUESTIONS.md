@@ -812,6 +812,23 @@ I first wrote this up as *"4 of 5 Hyrox stations are unloggable"*. **Wrong.** Th
 
 ## Q-181 — A SWAP IS NOT A SKIP: the app docks the athlete TWICE for an honest exercise substitution (PRODUCT + ENGINE, 2026-07-13 — RAISED BY MICHAEL)
 
+> **⛔ ITS "WE NEVER INFER A SUBSTITUTION" LAW IS SUPERSEDED FOR ASSISTANCE SLOTS ([D-370], 2026-08-02).**
+> This entry says, and the matcher's own header said: *"if the athlete just logs a different exercise
+> with no declaration, that is an unplanned exercise PLUS a skip, and it must read that way."*
+> **That is still true for main lifts and for every planned row that is not an assistance slot. It is
+> no longer true for an assistance slot** (`load_prescribed: false`), which the matcher now fills
+> from undeclared work — credited, marked `inferred`, and flagged by the existing pattern comparison
+> when the movement differs.
+>
+> Two reasons the reversal is not a relaxation: the **execution score this law protected was deleted
+> by [D-338]**, so there is nothing left for a forgiven skip to inflate; and an assistance slot is
+> prescribed as a *category with a menu*, so filling it off the menu IS the prescription. Entry
+> point: `_shared/strength/match-exercises.ts` Tier 3. The guard test is narrowed, not removed —
+> read its header before assuming a green run means what it used to.
+>
+> **Everything below is history on that point.** The rest of Q-181 — the slot is the unit of
+> adherence, the declared-swap tiers, the out-of-slot receipt — is UNCHANGED and still law.
+
 > **↪ Its "the swap CLEARS the weight" resolution is SUPERSEDED TWICE (D-322, 2026-07-24).** D-315 first replaced
 > clearing with a seeded weight, computed by rescaling the old lift's load. **That rescale was wrong** — it multiplied
 > plate-rounding error and ignored per-hand halving (45/hand against a prescribed 20). D-322 replaced it with a
@@ -2805,3 +2822,33 @@ the archive trigger at ~150K. All three are past it; the decisions log is 3× ov
 The split is mechanical (move closed/superseded entries to `-ARCHIVE.md`, leave a pointer) and nothing is
 deleted. It is skipped every session because it is never the urgent thing — which is precisely how they
 got here.
+
+---
+
+## Q-248 — A MAIN LIFT HAS NO SUBSTITUTE PATH, AND TRAVEL IS THE CASE THAT NEEDS ONE (2026-08-02, Michael) — **deliberate for now, named as future work**
+
+Michael, closing the D-370 build: *"you either did or you didn't — we will build work around for
+travel and hotel gyms but for now lets get the basics working."*
+
+**Today, and by design:** the four main lifts are binary. [D-370] credits an undeclared swap into an
+**assistance** slot only; a planned Bench Press with no bench logged reads as a skip, full stop
+(`match-exercises.ts` — the guard test pins it three ways). A main lift is prescribed by name at a
+percentage of a training max, so nothing else discharges it.
+
+**The case that breaks it:** a hotel gym with no barbell. The athlete does the closest thing
+available — dumbbell bench for the bench, goblet or leg press for the squat — and the app reads the
+whole session as a skipped main lift. That is not a scoring problem any more ([D-338] deleted the
+strength score), but it is a **continuity** problem: the lift drops out of the e1RM trend and the
+block's progression has a hole in it that the athlete did not actually leave.
+
+**Why it is NOT just "extend Tier 3 to main lifts".** A main lift carries a prescribed LOAD off the
+training max, and a substitute has no training max of its own. Crediting a dumbbell bench into the
+bench slot would either (a) grade it against a barbell prescription it was never given, or (b) fill
+the slot while contributing nothing to the trend the slot exists to move. Both are worse than the
+honest skip. The declared-swap path ([Q-181] Tier 0) already handles the athlete SAYING so — what is
+missing is what the app then does with the number.
+
+**To close, in order:** decide whether a declared main-lift substitute (i) counts for adherence only,
+(ii) also feeds the e1RM trend under its own key, or (iii) marks the week as travel and suspends the
+progression rather than failing it. Field check first — this is exactly the case commercial 5/3/1
+apps handle badly and it is worth seeing how before ruling.

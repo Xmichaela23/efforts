@@ -75,3 +75,32 @@ Deno.test('the sentence NAMES the trade and never predicts its cost', () => {
     assertEquals(note.toLowerCase().includes(banned), false, `note must not claim consequence: "${banned}"`);
   }
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// D-370 — AN INFERRED PAIRING DOES NOT SAY "SWAPPED"
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('D-370: an INFERRED pairing says the slot was FILLED, never that the athlete swapped', () => {
+  // ⛔ THE VERB IS THE WHOLE TEST. On an inferred pairing the athlete performed no swap action —
+  // the matcher decided the Dips answered for the Face Pulls. "Swapped X → Y" would report a
+  // decision the APP made as something the ATHLETE did.
+  const n = buildSubstitutionNote('Band Face Pulls', 'Dips', true);
+  assertEquals(n.same_pattern, false);
+  assertEquals(n.note?.startsWith('Dips filled the Band Face Pulls slot.'), true);
+  assertEquals(n.note?.includes('Swapped'), false);
+  // …and it still names the trade in plain words, with no claim about what the trade costs.
+  assertEquals(n.note?.includes('instead of'), true);
+});
+
+Deno.test('D-370: an inferred pairing that is IN-SLOT stays silent, exactly like a declared one', () => {
+  // The row header already shows "Pull Up → Chin Up". A like-for-like fill is not news, and the
+  // inference does not earn it a sentence it would not have got from a declaration.
+  const n = buildSubstitutionNote('Pull Up', 'Chin Up', true);
+  assertEquals(n.same_pattern, true);
+  assertEquals(n.note, null);
+});
+
+Deno.test('D-370: the default is DECLARED — omitting the flag keeps the original wording', () => {
+  const n = buildSubstitutionNote('Band Face Pulls', 'Dips');
+  assertEquals(n.note?.startsWith('Swapped Band Face Pulls → Dips.'), true);
+});

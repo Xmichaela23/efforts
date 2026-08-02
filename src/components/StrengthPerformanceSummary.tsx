@@ -50,7 +50,25 @@ const extractExercisesFromComputed = (workout: any) => {
             .filter((p: any) => p.weight > 0 || p.reps > 0)
         : undefined;
 
-      return { name, sets, reps, weight, target_rir, ...(setPlan?.length ? { setPlan } : {}) };
+      // ⛔ CARRY THE ASSISTANCE MARKER, OR THE PRESCRIPTION IS LOST ON THIS SCREEN (2026-08-02).
+      // `load_prescribed: false` is stamped by the Get Stronger composer on every assistance slot
+      // and carried all the way through materialize (`materialize-plan/index.ts:2156`) — and then
+      // died HERE, because this object is a whitelist and the flag was not on it.
+      //
+      // Assistance in 5/3/1 is prescribed as a REP TOTAL and nothing else — Wendler, on the exact
+      // movements in this athlete's block: *"50 total reps for weighted dips. 100 total reps if
+      // you're just using your bodyweight"*, chins *"no less than 100 per week"*, bodyweight
+      // template *"no less than 75 reps per exercise for each workout"*. So the composer writes
+      // `sets: undefined` / `reps: "25 total"` / `weight: "By feel"` — correctly.
+      //
+      // But `sets` is what the compare table builds its planned rows FROM. No set count, no rows,
+      // and every Planned cell on a chin-up rendered "—" while the plan sat there plainly saying
+      // 25. The prescription existed; the table had nowhere to put it. Without this flag the client
+      // cannot tell "the plan asked for nothing" from "the plan asked for a total".
+      // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader that
+      // treats absent as assistance turns every main lift into one.
+      return { name, sets, reps, weight, target_rir, ...(setPlan?.length ? { setPlan } : {}),
+        ...(s?.load_prescribed === false ? { load_prescribed: false } : {}) };
     });
   } catch (e) {
     return [];
@@ -112,7 +130,11 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           weightNum = Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length);
         }
         const target_rir = typeof ex.target_rir === 'number' ? ex.target_rir : undefined;
-        const result: any = { name: ex.name, sets: setsNum, weight: weightNum, target_rir };
+        // Same marker as the `computed.steps` path above — a plan read from `strength_exercises`
+        // directly must reach the table saying the same thing, or the two routes disagree about
+        // whether a chin-up was prescribed.
+        const result: any = { name: ex.name, sets: setsNum, weight: weightNum, target_rir,
+          ...(ex?.load_prescribed === false ? { load_prescribed: false } : {}) };
         if (weightDisplay) result.weight_display = weightDisplay;
         if (durationNum > 0) {
           result.duration_seconds = durationNum;
@@ -233,6 +255,11 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   // ⚠️ RECOMPUTED FROM WHAT IS ON SCREEN, never read from the stored analysis. That analysis is
   // exactly what went stale and produced 117% on a session with no plan attached — a number
   // recomputed from the live lists cannot outlive the thing it describes.
+  // D-370: the server's swap pairings, read by BOTH the count below and the table further down.
+  // ⚠️ Declared here, above its first use — `const` is not hoisted, and the count reads it.
+  const execSubstitutions: Array<{ planned?: string; executed?: string }> =
+    Array.isArray(sessionDetail?.execution?.substitutions) ? sessionDetail!.execution!.substitutions as any : [];
+
   const completedOfPlanned = (() => {
     const key = (n: unknown) => canonicalize(String(n || ''));
     // A slot counts as filled by an exercise that was actually performed…
@@ -246,6 +273,15 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
       const raw = completedRaw.find((r: any) => key(r?.name) === key(c?.name));
       const sub = raw?.substituted_for;
       if (sub) filled.add(key(sub));
+    }
+    // …or by one the SERVER paired into an assistance slot (D-370). Without this the count keeps
+    // reading "3 of 4" on a session where the table below it now draws four filled rows — the two
+    // numbers on one screen disagreeing, which is the fault this whole area exists to prevent.
+    // ⚠️ Still recomputed from what is on screen: this reads the server's PAIRING and re-checks the
+    // exercise was actually performed, rather than trusting a stored completion count.
+    for (const s of execSubstitutions) {
+      const slot = String(s?.planned ?? '').trim();
+      if (slot && filled.has(key(s?.executed))) filled.add(key(slot));
     }
     return plannedExercises.filter((p: any) => filled.has(key(p.name))).length;
   })();
@@ -436,6 +472,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         previousByExercise={previousByExercise}
         workoutId={workoutId}
         strengthVolume={strengthVolume}
+        substitutions={execSubstitutions}
         onAdjustmentSaved={() => {
           window.dispatchEvent(new CustomEvent('plan:adjusted'));
           onRecompute?.();

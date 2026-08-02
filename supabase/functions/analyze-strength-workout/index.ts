@@ -1280,7 +1280,7 @@ function calculateExecutionSummary(
     // and gets ONE honest sentence naming what changed. It names the trade; it never predicts its cost.
     substitutions: matchedExercises
       .filter((ex: any) => ex.substituted && ex.substituted_with)
-      .map((ex: any) => buildSubstitutionNote(String(ex.name ?? ''), String(ex.substituted_with ?? ''))),
+      .map((ex: any) => buildSubstitutionNote(String(ex.name ?? ''), String(ex.substituted_with ?? ''), ex.substitution_inferred === true)),
   };
 }
 
@@ -1421,7 +1421,11 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
       // UN-ANCHORED for load/RIR: the executed exercise has no prescription of its own, and grading
       // a hip thrust against a Bulgarian split squat's target is nonsense.
       substituted: (match as any).substituted === true,
-      substituted_with: (match as any).substituted_with
+      substituted_with: (match as any).substituted_with,
+      // D-370: was this pairing DECLARED by the athlete or INFERRED by the matcher? Carried so the
+      // receipt below says "filled the slot" rather than "swapped" — the app must not report its own
+      // inference as something the athlete told it.
+      substitution_inferred: (match as any).inferred === true
     };
   });
   
