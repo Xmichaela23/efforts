@@ -12,17 +12,10 @@ export function mondayOf(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Same routing as MobileSummary; default matches mobility / unknown types. */
-export function resolveAnalyzeEdgeFn(workoutType: string | null | undefined): string {
-  const t = (workoutType ?? '').toLowerCase();
-  if (t === 'run' || t === 'running') return 'analyze-running-workout';
-  // Provider mappers normalize cycling activities to type='ride' upstream;
-  // 'cycling' and 'bike' synonyms previously listed here never fired in production data.
-  if (t === 'ride') return 'analyze-cycling-workout';
-  if (t === 'strength' || t === 'strength_training') return 'analyze-strength-workout';
-  if (t === 'swim' || t === 'swimming') return 'analyze-swim-workout';
-  return 'analyze-running-workout';
-}
+// MOVED to `_shared/analyze-routing.ts` (2026-08-01) and re-exported here so this function's callers
+// and its existing tests are unchanged. It left because `auto-attach-planned` needed the same routing
+// and could not import it, so it grew a second, broken copy — see that file's header.
+export { resolveAnalyzeEdgeFn } from '../_shared/analyze-routing.ts';
 
 /** Constant-time string compare — the service-role door must not leak the key via timing. */
 export function timingSafeEqual(a: string, b: string): boolean {

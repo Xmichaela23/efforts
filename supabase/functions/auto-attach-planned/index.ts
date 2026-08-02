@@ -6,6 +6,9 @@ import { resolveUser } from '../_shared/require-user.ts';
 // The attach GATE (not a matcher — see the header on that function). Strength used to attach on
 // date + type alone. docs/AUDIT-performance-state-2026-07-29.md F1.
 import { strengthSessionsShareTheWork } from '../_shared/strength/match-exercises.ts';
+// One routing table for "which analyzer owns this sport", shared — see _shared/analyze-routing.ts
+// for why it moved out of recompute-workout (this file's private `if run` copy was the bug).
+import { resolveAnalyzeEdgeFn } from '../_shared/analyze-routing.ts';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -308,19 +311,19 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ workout_id: w.id }),
         });
 
-        if (finalSport === 'run') {
-          triggerSummary
-            .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
-            .catch((e) => {
-              // Don't block run analysis on compute-workout-analysis; it's additive.
-              console.error('[auto-attach-planned] compute-workout-analysis trigger error:', e);
-              return null;
-            })
-            .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
-            .catch((e) => console.error('[auto-attach-planned] Run analysis trigger error:', e));
-        } else {
-          triggerSummary.catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error:', e));
-        }
+        // ⛔ THE ANALYZER MUST MATCH THE SPORT — this used to fire the RUN analyzer or nothing.
+        // A ride or swim attaching AFTER its analysis had run never got a plan comparison: adherence
+        // and execution score are the only outputs that need a planned session, and nothing came back
+        // for them. On screen: every plan-free number present, the execution chips simply absent.
+        const analyzeFn = resolveAnalyzeEdgeFn(w.type);
+        triggerSummary
+          .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+          .catch((e) => {
+            console.error('[auto-attach-planned] compute-workout-analysis trigger error:', e);
+            return null;
+          })
+          .then(() => fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+          .catch((e) => console.error(`[auto-attach-planned] ${analyzeFn} trigger error:`, e));
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
         console.error('[auto-attach-planned] Explicit attach error:', explicitError);
@@ -388,18 +391,19 @@ Deno.serve(async (req) => {
             headers,
             body: JSON.stringify({ workout_id: w.id }),
           });
-          if (finalSport === 'run') {
-            triggerSummary
-              .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
-              .catch((e) => {
-                console.error('[auto-attach-planned] compute-workout-analysis trigger error (sync_existing_link):', e);
-                return null;
-              })
-              .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
-              .catch((e) => console.error('[auto-attach-planned] Run analysis trigger error (sync_existing_link):', e));
-          } else {
-            triggerSummary.catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error (sync_existing_link):', e));
-          }
+          // ⛔ THE ANALYZER MUST MATCH THE SPORT — this used to fire the RUN analyzer or nothing.
+          // A ride or swim attaching AFTER its analysis had run never got a plan comparison: adherence
+          // and execution score are the only outputs that need a planned session, and nothing came back
+          // for them. On screen: every plan-free number present, the execution chips simply absent.
+          const analyzeFn = resolveAnalyzeEdgeFn(w.type);
+          triggerSummary
+            .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+            .catch((e) => {
+              console.error('[auto-attach-planned] compute-workout-analysis trigger error (sync_existing_link):', e);
+              return null;
+            })
+            .then(() => fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+            .catch((e) => console.error(`[auto-attach-planned] ${analyzeFn} trigger error (sync_existing_link):`, e));
         } catch (e) {
           console.error('[auto-attach-planned] Trigger error (sync_existing_link):', e);
         }
@@ -798,18 +802,19 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ workout_id: w.id }),
       });
 
-      if (finalSport === 'run') {
-        triggerSummary
-          .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
-          .catch((e) => {
-            console.error('[auto-attach-planned] compute-workout-analysis trigger error (heuristic):', e);
-            return null;
-          })
-          .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
-          .catch((e) => console.error('[auto-attach-planned] Run analysis trigger error (heuristic):', e));
-      } else {
-        triggerSummary.catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error (heuristic):', e));
-      }
+      // ⛔ THE ANALYZER MUST MATCH THE SPORT — this used to fire the RUN analyzer or nothing.
+      // A ride or swim attaching AFTER its analysis had run never got a plan comparison: adherence
+      // and execution score are the only outputs that need a planned session, and nothing came back
+      // for them. On screen: every plan-free number present, the execution chips simply absent.
+      const analyzeFn = resolveAnalyzeEdgeFn(w.type);
+      triggerSummary
+        .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+        .catch((e) => {
+          console.error('[auto-attach-planned] compute-workout-analysis trigger error (heuristic):', e);
+          return null;
+        })
+        .then(() => fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+        .catch((e) => console.error(`[auto-attach-planned] ${analyzeFn} trigger error (heuristic):`, e));
     } catch (e) {
       console.error('[auto-attach-planned] trigger error (heuristic):', e);
     }
