@@ -14,6 +14,7 @@ interface AdherenceChipsProps {
       duration_adherence?: number | null;
       intensity_adherence?: number | null;
       easy_ceiling_bpm?: number | null;
+      easy_ceiling_anchor?: string | null;
       performance_assessment?: string | null;
       assessed_against?: string | null;
       status_label?: string | null;
@@ -70,6 +71,15 @@ export default function AdherenceChips({
     // prescribed" — asked of a session that prescribed an intensity instead of a number.
     const intensityAdherence = ex?.intensity_adherence ?? null;
     const easyCeilingBpm = ex?.easy_ceiling_bpm ?? null;
+    // ⛔ SAY WHERE THE BAR CAME FROM (2026-08-01, Michael). "At or under 131 bpm" reads as a fact
+    // handed down; it is an ESTIMATE off the highest heart rate we have observed, and the athlete
+    // deserves to know that before it costs them a score. When a measured threshold anchors it
+    // instead, the line says so — and that difference is the whole argument for doing a threshold test.
+    const easyCeilingNote = ex?.easy_ceiling_anchor === 'threshold'
+      ? 'From your threshold HR'
+      : ex?.easy_ceiling_anchor === 'max_hr'
+        ? 'Est. from your max HR'
+        : null;
     const isGapAdjusted = !!ex?.gap_adjusted;
     const performanceAssessment = ex?.performance_assessment ?? null;
     const isStructured = !!sd.classification?.is_structured_interval;
@@ -92,13 +102,15 @@ export default function AdherenceChips({
     const durationDelta = (completedDurS != null && plannedDurS != null && plannedDurS > 0)
       ? completedDurS - plannedDurS : null;
 
-    const chip = (label: string, pct: number | null, text: string) => {
+    const chip = (label: string, pct: number | null, text: string, note?: string | null) => {
       if (pct == null) return null;
       return (
         <div className="flex flex-col items-center px-2">
           <div className="text-sm font-semibold text-gray-100">{pct}%</div>
           <div className="text-[12px] text-gray-300">{label}</div>
           <div className="text-[12px] text-gray-400">{text}</div>
+          {/* Provenance line — only the Easy chip uses it today: its bar is an estimate and must say so. */}
+          {note && <div className="text-[11px] text-gray-500">{note}</div>}
         </div>
       );
     };
@@ -166,7 +178,7 @@ export default function AdherenceChips({
                   both — a session asked one of those two questions, not both. */}
               {powerAdherence != null
                 ? chip('Power', powerAdherence, 'Time in range')
-                : chip('Easy', intensityAdherence, easyCeilingBpm != null ? `At or under ${easyCeilingBpm} bpm` : 'Time held easy')}
+                : chip('Easy', intensityAdherence, easyCeilingBpm != null ? `At or under ${easyCeilingBpm} bpm` : 'Time held easy', easyCeilingNote)}
               {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
             </div>
           </div>

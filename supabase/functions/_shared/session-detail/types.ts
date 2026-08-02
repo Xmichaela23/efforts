@@ -165,6 +165,9 @@ export type SessionDetailV1 = {
     intensity_adherence?: number | null;
     /** The ceiling it was judged against, so the screen can state the bar rather than a bare %. */
     easy_ceiling_bpm?: number | null;
+    /** WHERE that ceiling came from — 'threshold' (measured) or 'max_hr' (estimated off observed max).
+     *  The screen says which, because a bar built on an observed peak deserves the word "estimated". */
+    easy_ceiling_anchor?: 'threshold' | 'max_hr' | 'none' | null;
     performance_assessment: string | null;
     assessed_against: 'plan' | 'actual' | null;
     status_label: string | null;
