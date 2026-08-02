@@ -10,6 +10,7 @@ import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor } from '@/lib/context-utils';
@@ -184,6 +185,29 @@ function asOf(ageDays: number | null | undefined): string | null {
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
 function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
+  // ⛔ THE FTP ON RECORD, SERVER-FIRST WITH A CLIENT FALLBACK (2026-08-01).
+  //
+  // `anchor.value` is the authority — but `fitnessAnchors` is assembled by compute-snapshot and only
+  // rewritten on an INGEST, so every athlete carries the previous shape until their next workout
+  // syncs. A field that lands "sometime after your next ride" reads as broken.
+  //
+  // ⚠️ THE FALLBACK IS ONLY HONEST BECAUSE THE SENTENCE CHANGED. It used to claim the number was what
+  // the measurement was computed against — which a client-side read cannot promise. It now reports
+  // the FTP ON RECORD, and that is exactly what `resolveCurrentFtp` returns. Same resolver the coach
+  // and the analyzers use (D-... FTP fracture #2), never a second read of the raw column.
+  const { loadUserBaselines } = useAppContext();
+  const [fallbackFtp, setFallbackFtp] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (anchor?.value != null) return;            // server already told us; don't ask twice
+    let cancelled = false;
+    void loadUserBaselines?.().then((b: any) => {
+      if (cancelled || !b) return;
+      const r = resolveCurrentFtp({ learned_fitness: b.learned_fitness, performance_numbers: b.performanceNumbers });
+      if (r?.value != null) setFallbackFtp(Math.round(r.value));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [anchor?.value, loadUserBaselines]);
+
   const [powerInfoOpen, setPowerInfoOpen] = React.useState(false);
   // ⛔ SAME RULE AS THE RUN ROW (2026-08-01, Michael): the headline and ONE receipt line stay
   // visible; everything else goes behind "more". The CONTENTS differ because the rows have
@@ -252,7 +276,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             // word. It silently rendered nothing. This branch is already inside `src`, which is
             // derived from `efficiency.basis === 'coggan_ftp'`, so the bike anchor here IS the FTP;
             // the value alone is the honest gate.
-            const ftp = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : null;
+            const ftp = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : fallbackFtp;
             // ⛔ STATES THE BASELINE, DOES NOT CLAIM WHAT THE MEASUREMENT USED (2026-08-01).
             //
             // The first version read "Measured against an estimated FTP of 212 W" — and that was a
