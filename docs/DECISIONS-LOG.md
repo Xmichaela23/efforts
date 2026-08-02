@@ -2664,6 +2664,67 @@ is provenance) — the RULE is what is shared, not the items. ⚠️ **The empty
 *"no baseline set · accept your FTP to anchor"* is actionable, and hiding an actionable gap behind a tap
 is how a missing dot starts reading as a bug.
 
+## D-358 — THE BIKE ROW NAMES ITS FTP, AND SAYS ONLY WHAT IT CAN PROVE (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
+
+The bike row said `est (FTP)` and never said *which* FTP. It now reads:
+
+> Your estimated FTP is 176 W — not one you confirmed.
+
+…and the ⓘ adds how that number is made: **"FTP is estimated from your hard rides — 95% of your best
+20 minutes."** ⚠️ Conditional — appended only when the basis IS an estimate, because telling an athlete
+who tested and typed their own FTP that it was guessed is a confident falsehood.
+
+**The method, traced from `learn-fitness-profile` STEP 4 rather than described from memory:** best
+20-min power × 0.95, hard efforts only, rides 20–120 min, ≥2 efforts (≥3 for high confidence). Coggan's
+field protocol — the same arithmetic as a 20-minute test, taken from 20 minutes the athlete already
+rode hard instead of asking them to go and test.
+
+### Why the number was missing: nobody hid it, nothing asked for it
+
+`FitnessAnchor` exists to answer ONE question — *where does the tick sit on the band*. Run's anchor
+metric IS the band metric, so it places. Bike's is FTP (watts) against a watts-per-heartbeat band — a
+metric mismatch, explicitly deferred at `assemble.ts:588`. So bike got `tickPct: null` and the value —
+which the placement is computed FROM — was carried in and dropped one line later. **Third instance of
+this shape today**, after HRV and resting HR: not absent, not rejected, just never routed anywhere.
+`FitnessAnchor` now carries `value` + `metric` for run, bike and swim — including rows that render
+neither, because the ask was continuity, not one row.
+
+### ⛔ THE CORRECTION, and it is the part worth keeping
+
+I shipped *"Measured against an estimated FTP of 176 W"* and told Michael that number was **"provably
+the one behind the −0.4%."** **I had not checked, and it is not.** `anchor.value` is the
+`fitness_baselines` record; the per-ride power BAND is `workout_analysis.bike_fitness_v1.band_source`,
+written by `analyze-cycling-workout` at ANALYSIS time from whatever FTP resolved then. Two separately
+derived numbers — probably equal, not verified equal, and rides analysed weeks apart need not agree
+with each other, in which case **there is no single number to name.**
+
+**So the sentence was rewritten to state the FTP ON RECORD and the fact that the basis is an estimate**
+— two claims that are each true independently. ⚠️ **This matters more than the wording:** the whole
+point of the row's rework was removing numbers that sound more certain than they are, and a specific,
+confident sentence gets believed *because* it is specific. **The fix is invisible in the diff.** Nothing
+in the current code shows that a stronger sentence existed, was wrong, and why — which is exactly how
+someone re-adds it later thinking it is an improvement.
+
+*(Incidentally: Michael's typed and learned FTP are both 176 W, so no discrepancy was live on his
+screen. The rule stands regardless — it was luck, not correctness.)*
+
+### The client fallback, and why it only became honest afterwards
+
+`fitnessAnchors` is written by `compute-snapshot` and only rewritten on an **ingest**; the coach
+FORWARDS it. So the value lands after the athlete's next sync, and a field that appears "sometime after
+your next ride" reads as broken. The row now prefers `anchor.value` and falls back to
+`resolveCurrentFtp` on the client.
+
+⛔ **I argued AGAINST exactly this an hour earlier, and was right to.** A client-resolved FTP cannot
+promise it is the number the measurement used — but the copy no longer claims that. It reports the FTP
+**on record**, which is precisely what `resolveCurrentFtp` returns. **The objection died with the copy
+that caused it.** Uses the one resolver (FTP fracture #2), never a second read of the raw column, and
+only fires when the server has not supplied a value — so it disappears on its own as snapshots catch up.
+
+**Also cleaned up:** `cappedSignalColor` (the STEP 1 stopgap from [D-353]) is deleted. It forced the
+BODY heart-rate row grey while the server fix deployed; the server fix landed and then the row itself
+was deleted ([D-354]), so it was guarding something that no longer exists.
+
 ## D-357 — TWO CUES, TWO ANSWERS: ⓘ is the definition, "more" is the read (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
 **On a fitness row, ⓘ and the read were one blob behind the metric word.** An athlete who wanted *"what

@@ -70,36 +70,6 @@ function trendColor(dir: string, tone?: string): string {
   return 'text-white/55';
 }
 
-// ── THE SEVERITY CAP, ENFORCED AT THE EDGE (STEP 1 — TEMPORARY, 2026-08-01) ──────────────────────
-//
-// THE RULE (Michael): *a rollup row's severity may never exceed the maximum severity of its
-// contributors.* A rollup may be LESS severe than what it summarises — that is legitimate
-// aggregation — never MORE. If every contributor renders neutral, the rollup renders neutral.
-//
-// THE BUG IT CLOSES. "Heart-rate response" is a pure rollup: its contributors ARE `run.efficiency`
-// and `bike.efficiency` (`_shared/state-trend/assemble.ts:837-843`), the same two verdicts the RUN
-// and BIKE rows render below it. Those rows now render a decline NEUTRALLY. The rollup was still
-// amber, because the server pins its tone with a literal that encodes an assumption about another
-// row's colour — `coach/index.ts:2574`, comment: *"WARNING, NOT DANGER — the RUN row renders the
-// same movement in amber."* That row is no longer amber, so the rollup was manufacturing a severity
-// its own evidence does not support.
-//
-// ⛔ THIS IS A STOPGAP AND IT IS MEANT TO BE DELETED. Capping at the render edge fixes the SCREEN
-// today; it does not fix the MECHANISM, because the server still composes the over-severe tone and
-// anything else reading `trend_tone` still sees `warning`. STEP 2 moves the cap into the composer
-// (coach v156) where it applies to every rollup, present and future — and then this function and its
-// call site come out. Do not build on it.
-// ⚠️ THE CAP HAS TO TAKE THE DIRECTION TOO, NOT JUST THE TONE. `trendColor` falls THROUGH a neutral
-// tone to `dir === 'declining' → amber`, so clamping the tone alone left the row exactly as amber as
-// it started. Both inputs are capped here, together, or the clamp is decorative.
-const ROLLUP_SIGNALS = new Set(['Heart-rate response']);
-function cappedSignalColor(label: string, dir: string, tone?: string): string {
-  if (!ROLLUP_SIGNALS.has(label)) return trendColor(dir, tone);
-  // Every contributor currently renders neutral-or-better, so a rollup of them cannot exceed neutral.
-  // A POSITIVE rollup is still allowed through — the cap is a ceiling on severity, not a flattener.
-  if (tone === 'positive' || dir === 'improving') return trendColor(dir, tone);
-  return 'text-white/55';
-}
 
 function verdictToneToColor(tone: string): string {
   if (tone === 'action')   return 'text-amber-400/90';
@@ -1602,19 +1572,7 @@ export default function StateTab({
                   >
                     <span className="text-[13px] text-white/70 shrink-0 w-[104px]">{s.label}</span>
                     <div className="flex-1 flex items-start gap-2 min-w-0">
-                      {/* ⛔ A ROLLUP SHOWS ITS DIRECTION, NOT A WORD FOR IT (2026-08-01, Michael).
-                          The standing decision — no verdict word on the fitness reads — named
-                          run/bike/BODY. This row kept a word ("Easing off") because its `detail` is
-                          composed server-side; the ARROW was already on the wire (`trend_icon`,
-                          coach/index.ts:2586) and simply had no client type to arrive through.
-                          ⚠️ NO NUMBER IS POSSIBLE HERE, and that is not an oversight. The row rolls up
-                          run efficiency and bike efficiency — different metrics, different units. There
-                          is no honest way to combine −15.2% and −0.4% into one figure, so the arrow is
-                          the whole claim. See Q-238: the arrow is a directional assertion its own two
-                          contributors do not currently agree on. */}
-                      <span className={`flex-1 text-[13px] text-left leading-snug ${cappedSignalColor(s.label, s.trend, s.trend_tone)}`}>
-                        {ROLLUP_SIGNALS.has(s.label) ? (s.trend_icon ?? s.detail) : s.detail}
-                      </span>
+                      <span className={`flex-1 text-[13px] text-left leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
                       {s.provenance && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
                     </div>
                   </button>

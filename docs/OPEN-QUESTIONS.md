@@ -2631,3 +2631,35 @@ clause was right, and it removed that corrective. The ages now live one tap down
 **⛔ IF THE ROW IS DELETED (the queued "C" call), this does not resolve itself** — the per-discipline
 ages belong back on the RUN and BIKE rows, where each is accurate for exactly one metric. They are
 **not** replaced by anything at the rollup level, because there is nothing true to put there.
+
+---
+
+## Q-240 — Cycling FTP has a DELETE button where running has a CHOICE (2026-08-01, Michael, FILED — parked deliberately; wider blast radius than it looks)
+
+**Michael, comparing the two Baselines screens:** running's easy pace offers *"Use my runs 12:35/mi"*
+vs *"Use my number 11:30/mi"*. Cycling's FTP offers **"Clear entry"**.
+
+**They are not the same control.** Run stores an explicit preference — `easy_pace_source`
+(`learned` | `manual`) — and its own code comment states the principle: *"when both exist, they pick,
+and the pick is honoured over even a high-confidence learned pace. An assertion beats an inference
+(Law 2); Garmin and TrainingPeaks both respect a value you set."*
+(`TrainingBaselines.tsx:1318-1332`)
+
+**Cycling has no preference at all.** `resolveCurrentFtp` decides — learned-first, confidence-gated —
+and the athlete's only lever is **deleting their own number** to fall back
+(`TrainingBaselines.tsx:1460-1478`). They cannot say *"keep mine and use it."* So the principle the run
+control is built on is simply not applied to bike.
+
+⛔ **WHY IT IS PARKED AND NOT A QUICK PARITY FIX.** Giving bike the same control means adding an
+`ftp_source` preference **and teaching `resolveCurrentFtp` to respect it**. That resolver is read by the
+coach, the analyzers, the plan generators and the power-zone maths. **Changing what it returns changes
+what every one of those computes** — that is a resolver behaviour change with a wide blast radius, not
+a button. It was deliberately not attempted at the end of a long session on a screen that had not been
+traced that day.
+
+⚠️ **Not urgent for the current athlete:** Michael's typed and learned FTP are both 176 W, so nothing
+is being overridden today. The gap is structural, not live.
+
+**Where it would be fixed:** `src/lib/resolve-current-ftp.ts` (the one resolver — do NOT add a second
+read), the `performance_numbers` shape, and the FTP block in `TrainingBaselines.tsx`. Mirror the
+`easy_pace_source` pattern rather than inventing a second one.

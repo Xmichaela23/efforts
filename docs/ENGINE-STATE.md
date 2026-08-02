@@ -69,6 +69,14 @@ the row that got deleted. **Do not clean it up as dead code**; it is a rule wait
 uncertainty, no exceptions.** ⚠️ It partly reverses the morning's "arrow + number, no word" call,
 which had never been written down — D-356 records both.
 
+**The bike row names its FTP ([D-358]).** `FitnessAnchor` now carries `value` + `metric` for run,
+bike and swim — the number was always computed and dropped, the third "not absent, just never routed"
+finding of the day. ⛔ **Read the correction in D-358 before touching that sentence:** a stronger
+version ("measured against an estimated FTP of X") shipped, was wrong, and was walked back — and
+nothing in the code shows that, which is how it gets re-added as an improvement.
+**[Q-240] filed:** cycling FTP has a delete button where running has a choice; fixing it means
+changing `resolveCurrentFtp`, which the coach, analyzers, plan generators and zone maths all read.
+
 ### STILL UNVERIFIED — what would settle it
 
 - **⛔ NOTHING FROM TODAY HAS BEEN SEEN ON A DEVICE.** Every string in the new BODY row was written by
