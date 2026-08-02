@@ -263,7 +263,13 @@ export type SessionDetailV1 = {
   /** Ride-start temperature from workouts.weather_data (temperature_start_f ??
    *  temperature). null when no weather data. Used by the cycling Performance
    *  stat line and the TERRAIN row. */
-  weather: { temperature_f: number | null } | null;
+  weather: {
+    temperature_f: number | null;
+    /** What the screen shows: "74 → 78°F" when it moved, "76°F" when it did not. Composed ONCE by
+     *  `formatSessionTemp` — the header and the Terrain row render this same string, so they cannot
+     *  disagree the way they did on 2026-08-02 (header 74, terrain 76, same run). */
+    display?: string | null;
+  } | null;
 
   // ── Analysis details (SessionNarrative "Analysis Details" panel) ──────────
   /** Display-ready insight rows. Server picks + formats from fact_packet, flags, adherence_summary. */

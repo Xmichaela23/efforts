@@ -42,7 +42,15 @@ export interface RunInsightInput {
   /** Aerobic durability — SAME decoupling the State durability row uses. */
   decoupling?: { pct: number | null; assessment: DecouplingAssessment } | null;
   terrain?: { gainFt?: number | null; rolling?: boolean } | null;
-  conditions?: { tempF?: number | null; heatStress?: 'mild' | 'moderate' | 'high' | null } | null;
+  conditions?: {
+    tempF?: number | null;
+    /** Start and end of the session. When they differ, the paragraph says the run WARMED rather than
+     *  quoting a single average — on a run whose second half drifted, that is the difference between
+     *  "it got hot" and "you pushed". */
+    tempStartF?: number | null;
+    tempEndF?: number | null;
+    heatStress?: 'mild' | 'moderate' | 'high' | null;
+  } | null;
   execution?: { rpe?: number | null; hitIntent?: boolean | null } | null;
   intervals?: { hit?: number | null; total?: number | null; consistent?: boolean | null } | null;
   /** Optional longitudinal read (the "4-week" pattern users prize). */
@@ -136,7 +144,16 @@ export function composeRunInsight(inp: RunInsightInput): string | null {
     // 2. CONDITIONS as load (only when material — otherwise silent).
     if (heat && typeof tempF === 'number') {
       const gainClause = typeof gain === 'number' && gain >= 150 ? ` and ${round(gain)} ft of climbing` : '';
-      parts.push(`Warm at ${round(tempF)}°F${gainClause} — ${heat === 'mild' ? 'both add a little load' : 'that adds real load'}, and you carried it${typeof rpe === 'number' ? ` at RPE ${rpe}` : ''}.`);
+      // ⛔ ONE TEMPERATURE PER SCREEN (2026-08-02). This quoted the AVERAGE while the Terrain row three
+      // lines down quoted the start — 76 here, 74 there, same run. When the reading moved, saying so is
+      // both consistent and more useful: it is the sentence that claims the heat added load, so it
+      // should be the sentence that says the heat was rising.
+      const ts = inp.conditions?.tempStartF;
+      const te = inp.conditions?.tempEndF;
+      const tempPhrase = (typeof ts === 'number' && typeof te === 'number' && round(ts) !== round(te))
+        ? `Warming from ${round(ts)} to ${round(te)}°F`
+        : `Warm at ${round(tempF)}°F`;
+      parts.push(`${tempPhrase}${gainClause} — ${heat === 'mild' ? 'both add a little load' : 'that adds real load'}, and you carried it${typeof rpe === 'number' ? ` at RPE ${rpe}` : ''}.`);
     } else if (typeof gain === 'number' && gain >= 250) {
       parts.push(`${round(gain)} ft of climbing added the load${typeof rpe === 'number' ? `, carried at RPE ${rpe}` : ''}.`);
     }
@@ -226,7 +243,12 @@ export function buildRunInsightInputFromPacket(
     pacing: pv ? { pattern: pv.pattern, hrHeld: pv.hrHeld, outAndBack: null } : null,
     decoupling: { pct: dcp, assessment: null },
     terrain: { gainFt, rolling: terrainType.includes('rolling') || terrainType.includes('hill') || (gainFt ?? 0) >= 150 },
-    conditions: { tempF: typeof facts.weather?.temperature_f === 'number' ? facts.weather.temperature_f : null, heatStress: toHeat(facts.weather?.heat_stress_level) },
+    conditions: {
+      tempF: typeof facts.weather?.temperature_f === 'number' ? facts.weather.temperature_f : null,
+      tempStartF: typeof (facts.weather as any)?.temp_start_f === 'number' ? (facts.weather as any).temp_start_f : null,
+      tempEndF: typeof (facts.weather as any)?.temp_end_f === 'number' ? (facts.weather as any).temp_end_f : null,
+      heatStress: toHeat(facts.weather?.heat_stress_level),
+    },
     execution: { rpe: typeof facts.athlete_reported?.rpe === 'number' ? facts.athlete_reported.rpe : null, hitIntent: null },
     intervals: intervals ?? null,
   };

@@ -142,6 +142,47 @@ export function humanizePlannedSegmentLabel(
   return s;
 }
 
+/**
+ * THE SESSION'S TEMPERATURE, SAID ONCE (2026-08-02, Michael: *"starting and ending confirm — we need
+ * clarity there"*).
+ *
+ * ⛔ THE SCREEN WAS PRINTING TWO. The header read the START (74°F) and the Terrain row read the
+ * AVERAGE (76°F) — on the same run, three lines apart. Neither was wrong; nobody had ever chosen.
+ * There is a July 3rd fix in `analyze-running-workout` that names the identical fault ("header 76 vs
+ * terrain 78") and pointed two call sites at the same field; a third call site was never in it.
+ * A shared formatter is the version of that fix that cannot be half-applied.
+ *
+ * ⚠️ AND THE RANGE WAS ALREADY THERE. `fact-packet` has carried `temp_start_f` / `temp_end_f` /
+ * `temp_peak_f` all along, computed and stored and read by nothing. This does not add a measurement;
+ * it spends one already being paid for.
+ *
+ * WHY A RANGE AT ALL: a lone "76°F" cannot tell you whether it was warm throughout or warmed up on
+ * you — and on a run whose second half drifted, that is the difference between "it got hot" and "you
+ * pushed". TrainingPeaks shows min/avg/max for this reason. Start → end is the version of that which
+ * fits one line.
+ *
+ * ⚠️ NO THRESHOLD, DELIBERATELY. Any "only show the range if it moved more than N degrees" invents an
+ * N. If the two readings differ, they differ, and the screen says so; if they are equal it is one
+ * number. Nothing is hand-picked.
+ */
+export function formatSessionTemp(
+  wx: { temperature_f?: number | null; temp_start_f?: number | null; temp_end_f?: number | null } | null | undefined,
+): string | null {
+  // ⛔ `Number(null) === 0`, and 0°F is a plausible-looking temperature. A missing end reading would
+  // have rendered "74 → 0°F" and a missing everything would have rendered "0°F" — a number nobody
+  // measured, on the screen, in the shape of a fact. Guard the null before the coercion.
+  const n = (v: unknown): number | null => {
+    if (v == null || v === '') return null;
+    const x = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(x) ? Math.round(x) : null;
+  };
+  const start = n(wx?.temp_start_f);
+  const end = n(wx?.temp_end_f);
+  if (start != null && end != null && start !== end) return `${start} → ${end}°F`;
+  const single = start ?? end ?? n(wx?.temperature_f);
+  return single != null ? `${single}°F` : null;
+}
+
 function normType(t: string | null | undefined): string {
   const s = String(t || '').toLowerCase().trim();
   if (s.startsWith('run') || s === 'running') return 'run';
@@ -940,8 +981,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     completed_totals: completedTotals,
     planned_totals: plannedTotals,
+    // ⛔ THE HEADER AND THE TERRAIN ROW READ ONE STRING. `temperature_f` stays for older clients;
+    // `display` is what the screen shows, and it is the SAME call the Conditions row makes.
     weather: (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
-      ? { temperature_f: Math.round(weatherTempF) }
+      ? { temperature_f: Math.round(weatherTempF), display: formatSessionTemp(factPacket?.facts?.weather) ?? `${Math.round(weatherTempF)}°F` }
       : null,
 
     analysis_details: { rows: analysisDetailRows },
@@ -1735,7 +1778,7 @@ export function buildAnalysisDetailRows(
     const terrainType = typeof facts?.terrain_type === 'string' && facts.terrain_type !== 'flat'
       ? facts.terrain_type : null;
     const elevFt = typeof facts?.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
-    const tempF = typeof wx?.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
+    const tempStr = formatSessionTemp(wx);
     const humidity = typeof wx?.humidity_pct === 'number' ? Math.round(wx.humidity_pct) : null;
     const heatLevel = typeof wx?.heat_stress_level === 'string' && wx.heat_stress_level !== 'none'
       ? wx.heat_stress_level : null;
@@ -1746,8 +1789,8 @@ export function buildAnalysisDetailRows(
     } else if (elevFt != null && elevFt > 50) {
       parts.push(`${elevFt} ft elevation gain`);
     }
-    if (tempF != null) {
-      let wxStr = `${tempF}°F`;
+    if (tempStr != null) {
+      let wxStr = tempStr;
       if (humidity != null && humidity >= 50) wxStr += `, ${humidity}% humidity`;
       if (heatLevel) wxStr += ` (${heatLevel} heat stress)`;
       parts.push(wxStr);

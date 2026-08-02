@@ -75,7 +75,7 @@ interface SessionNarrativeProps {
     } | null;
     summary?: { title?: string; bullets?: string[] };
     completed_totals?: { duration_s?: number | null; distance_m?: number | null };
-    weather?: { temperature_f?: number | null } | null;
+    weather?: { temperature_f?: number | null; display?: string | null } | null;
     analysis_details?: { rows?: Array<{ label: string; value: string }> };
     adherence?: {
       technical_insights?: Array<{ label: string; value: string }>;
@@ -294,7 +294,10 @@ export default function SessionNarrative({
         // the Details tab).
         const distM = sd?.completed_totals?.distance_m;
         const durS = sd?.completed_totals?.duration_s;
-        const tF = sd?.weather?.temperature_f;
+        // The server composes the temperature string (start → end when it moved). `temperature_f` is
+        // the fallback for a session built before `display` existed.
+        const tDisplay = sd?.weather?.display
+          ?? (typeof sd?.weather?.temperature_f === 'number' ? `${sd.weather.temperature_f}°F` : null);
         const parts: string[] = [];
         if (typeof distM === 'number' && distM > 0) parts.push(`${(distM / 1609.34).toFixed(1)} mi`);
         if (typeof durS === 'number' && durS > 0) {
@@ -305,7 +308,7 @@ export default function SessionNarrative({
             ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
             : `${m}:${String(s).padStart(2, '0')}`);
         }
-        if (typeof tF === 'number' && Number.isFinite(tF)) parts.push(`${Math.round(tF)}°F`);
+        if (tDisplay) parts.push(tDisplay);
         const recomputeBtn = (
           <button
             onClick={onRecompute}
