@@ -2039,7 +2039,18 @@ Deno.serve(async (req) => {
     // half reads as a fade that never happened.
     try {
       const pw = (powerSamples as number[]).filter((w) => Number.isFinite(w) && w > 0);
-      if (pw.length >= 120) {                       // ~2 min of pedalling per half at 1 Hz, or say nothing
+      // ⛔ THE FLOOR IS THE REPO'S OWN, AND THE FIRST ONE'S ARITHMETIC WAS WRONG (corrected 2026-08-02).
+      //
+      // It read `>= 120` with the comment "~2 min of pedalling per half at 1 Hz". 120 samples split in
+      // two is 60 per half — ONE minute, not two. So the number was invented AND its stated
+      // justification did not describe it.
+      //
+      // `MIN_PEDALLING_S` is 600 to match `MIN_EASY_PACE_IN_BAND_S` (`_shared/easy-hr.ts`) and the
+      // bike's own `MIN_EFFICIENCY_IN_BAND_S` (D-275-bike) — this codebase's existing answer to "a
+      // fragment is not a measurement", already argued once. Five minutes of pedalling per half is
+      // enough for a mean to mean something, and it is not a fresh opinion.
+      const MIN_PEDALLING_S = 600;
+      if (pw.length >= MIN_PEDALLING_S) {
         const mid = Math.floor(pw.length / 2);
         const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
         const first = Math.round(mean(pw.slice(0, mid)));
