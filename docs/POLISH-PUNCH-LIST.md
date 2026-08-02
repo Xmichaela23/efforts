@@ -39,24 +39,32 @@ accepted" is the meaningful state, not "deployed".
 
 ---
 
+## ✅ VERIFIED ON DEVICE — THE STRENGTH LOGGER (2026-08-01 evening, Michael: "it works")
+
+**Michael walked these in a real Get Stronger session on 2026-08-01 and accepted them** ([D-351]
+logger half, [D-352]). Kept as the record of what was checked. As with the State pass, the copy is
+Claude-written — "seen and accepted", not a line-by-line copy review.
+
+- [x] A **main lift** set card shows a bar-speed line under the "last:" anchor. Sets 1–2 read
+      "Every rep at the same speed as the first"; the top set reads **"Grind it out. Stop before
+      failure."** ⚠️ It should be legible, not grey-on-grey — that was the first complaint.
+- [x] The open set reads **"AMRAP"**, not "all out" — placeholder and the "· 5 minimum" label.
+- [x] **A Box Jump shows NO bar-speed cue**, no bar, no plate calculator, no weight box. Reps only.
+- [x] **One** "Split these into as many sets as you need…" line sits **above** the accessory block —
+      not inside a card, not repeated per exercise, and the exercise NAME is visible.
+- [x] A chin-up's band control is a numeric **Assist (lb)** box, not Light/Moderate/Heavy.
+- [x] **Single Leg Hip Thrust**: plain weight box, no 45 lb bar, no plate calculator.
+- [x] Type reps into a set, do NOT tap Done, hit save → a prompt names that set and offers
+      "Mark them done" / "Save without them".
+
+---
+
 ## ⏳ AWAITING MICHAEL — DEPLOYED + ON THE PHONE, NOT YET SEEN (2026-08-01)
 
 **Everything below is pushed, deployed and synced to iOS. None of it has been seen on a device.**
-A green suite proves the code is right, not that it is doing the right thing on a screen. Tick these
-off in one pass through a strength session.
-
-**In the LOGGER (open a Get Stronger session):**
-- [ ] A **main lift** set card shows a bar-speed line under the "last:" anchor. Sets 1–2 read
-      "Every rep at the same speed as the first"; the top set reads **"Grind it out. Stop before
-      failure."** ⚠️ It should be legible, not grey-on-grey — that was the first complaint.
-- [ ] The open set reads **"AMRAP"**, not "all out" — placeholder and the "· 5 minimum" label.
-- [ ] **A Box Jump shows NO bar-speed cue**, no bar, no plate calculator, no weight box. Reps only.
-- [ ] **One** "Split these into as many sets as you need…" line sits **above** the accessory block —
-      not inside a card, not repeated per exercise, and the exercise NAME is visible.
-- [ ] A chin-up's band control is a numeric **Assist (lb)** box, not Light/Moderate/Heavy.
-- [ ] **Single Leg Hip Thrust**: plain weight box, no 45 lb bar, no plate calculator.
-- [ ] Type reps into a set, do NOT tap Done, hit save → a prompt names that set and offers
-      "Mark them done" / "Save without them".
+A green suite proves the code is right, not that it is doing the right thing on a screen. ⚠️ **The
+LOGGER half of this block was verified on 2026-08-01 and has moved above — what is left is the
+PERFORMANCE side, which that pass did not cover.**
 
 **In PERFORMANCE (open a completed strength session):**
 - [ ] Chin-ups and dips show **pounds**, not blanks.

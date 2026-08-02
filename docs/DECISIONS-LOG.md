@@ -3010,7 +3010,13 @@ the implementation. Both are the D-353 argument applied where D-353 did not reac
   (`coach/index.ts:2486` gates on `contributors.length > 0`), so the branch is defensive only — but
   the guard lives in the CALLER, not the RULE, and the rule is meant to be general.
 
-## D-352 — THE IN-SESSION CUES: SURFACED, NARROWED, AND THE AMRAP RULE REVERSED (2026-08-01, **PUSHED, client-only, not device-verified**)
+## D-352 — THE IN-SESSION CUES: SURFACED, NARROWED, AND THE AMRAP RULE REVERSED (2026-08-01, **PUSHED + VERIFIED ON DEVICE 2026-08-01, Michael**)
+
+> ✅ **VERIFIED ON A DEVICE, 2026-08-01 (Michael): "it works."** The logger checks in
+> `POLISH-PUNCH-LIST.md` were walked in a real session — the bar-speed lines render and are legible,
+> the open set reads AMRAP, a Box Jump carries no bar-speed cue, and the accessory line sits above the
+> block with the exercise name visible. The verification is *seen and accepted*, not line-by-line copy
+> review.
 
 **⛔ THE BAR-SPEED DOCTRINE HAD NO `D-NNN` UNTIL NOW.** It was written on 2026-07-25, argued in a
 long comment at the top of `src/lib/strength-focus-copy.ts`, pinned by `bar-speed-copy.test.ts`, and
@@ -3094,7 +3100,14 @@ starved, not built.*
 
 ---
 
-## D-351 — THE BAND CARRIES A NUMBER THE ATHLETE ENTERED, AND TYPED REPS STOP VANISHING (2026-08-01, **PUSHED + DEPLOYED, not device-verified**)
+## D-351 — THE BAND CARRIES A NUMBER THE ATHLETE ENTERED, AND TYPED REPS STOP VANISHING (2026-08-01, **PUSHED + DEPLOYED; the LOGGER half VERIFIED ON DEVICE 2026-08-01, Michael**)
+
+> ✅ **THE LOGGER HALF IS DEVICE-VERIFIED, 2026-08-01 (Michael): "it works."** The Assist (lb) box, the
+> plain weight box on the Single Leg Hip Thrust, and the save prompt for typed-but-unticked reps were
+> seen in a real session.
+> ⚠️ **The PERFORMANCE half was NOT part of that pass** — chin-ups/dips showing pounds, the assisted
+> set pricing below bodyweight and the loaded set pricing above it are still unseen. They stay in the
+> punch list's awaiting block.
 
 **Context.** The screens were made honest first (D-347 / D-349 / D-350). What remained was upstream:
 the logger's *record* of what happened was lossy in two ways, and everything downstream — volume,

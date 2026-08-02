@@ -96,6 +96,11 @@ carrying words. Gate first, language second.
   row were seen and accepted; the punch-list block is moved to VERIFIED. ⚠️ The copy was still all
   Claude-written and one invented verdict word shipped earlier that day, so "seen and accepted" is the
   claim — not "reviewed line by line".
+- ✅ **THE STRENGTH LOGGER IS ALSO DEVICE-VERIFIED (2026-08-01, Michael: "it works")** — bar-speed
+  lines, AMRAP wording, the bare Box Jump, the Assist (lb) box, the Single Leg Hip Thrust weight box
+  and the typed-but-unticked reps prompt ([D-351] logger half, [D-352]). ⚠️ **The PERFORMANCE side of
+  [D-351] was NOT in that pass** — chin-ups/dips in pounds, and assisted pricing below / loaded above
+  a bodyweight set, are still unseen and stay in the punch-list awaiting block.
 - **The persistence line has almost certainly never fired.** It needs 4 of 6 sessions above his own
   normal plus a 5-entry baseline. Settled by: checking `resolveCurrentSoreness`'s `diag` on real data,
   or waiting for a sore block.
