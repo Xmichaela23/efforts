@@ -253,10 +253,23 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             // derived from `efficiency.basis === 'coggan_ftp'`, so the bike anchor here IS the FTP;
             // the value alone is the honest gate.
             const ftp = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : null;
+            // ⛔ STATES THE BASELINE, DOES NOT CLAIM WHAT THE MEASUREMENT USED (2026-08-01).
+            //
+            // The first version read "Measured against an estimated FTP of 212 W" — and that was a
+            // claim I could not back. `anchor.value` is the `fitness_baselines` record. The per-ride
+            // power BAND is `workout_analysis.bike_fitness_v1.band_source` (read at
+            // compute-snapshot:715), computed by analyze-cycling-workout at ANALYSIS time from
+            // whatever FTP resolved then. Two separately derived numbers — probably equal, not
+            // verified equal, and rides analysed at different times need not even agree with each
+            // other.
+            //
+            // ⚠️ So the sentence states the FTP ON RECORD and says the basis is an estimate. Both are
+            // true independently. Naming the number the measurement used would need that number
+            // carried through per ride — a real question, not a copy fix.
             if (src === 'est (FTP)') {
-              return <span>Measured against an estimated FTP{ftp != null ? ` of ${ftp} W` : ''} — not one you confirmed.</span>;
+              return <span>{ftp != null ? `Your estimated FTP is ${ftp} W` : 'Your FTP is an estimate'} — not one you confirmed.</span>;
             }
-            return <span>Measured against your own tested FTP{ftp != null ? ` of ${ftp} W` : ''}.</span>;
+            return <span>{ftp != null ? `Your tested FTP is ${ftp} W.` : 'Measured against your own tested FTP.'}</span>;
           })()}
           {asOf(lead.newestAgeDays) && <span>Newest qualifying ride {asOf(lead.newestAgeDays)}.</span>}
           {showDot && anchor?.label && <span>{anchor.label}</span>}
