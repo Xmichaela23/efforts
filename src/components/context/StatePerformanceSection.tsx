@@ -84,6 +84,13 @@ const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: stri
   withheld: { word: 'Too soon to tell', cls: 'text-white/60', arr: '' },
 };
 
+// "newest today" / "newest 3d ago" — the ONE fact a count-and-window line cannot carry: whether the
+// ride you just finished is in there yet. Distinct from `asOf()`, which prints a calendar date.
+function recencyOf(ageDays: number | null | undefined): string | null {
+  if (ageDays == null || ageDays < 0) return null;
+  return ageDays <= 0 ? 'newest today' : `newest ${Math.round(ageDays)}d ago`;
+}
+
 // `wordMap` selects the vocabulary: VERDICT keeps the words (swim, rest), NUMERIC drops them
 // (bike), RUN_EFF_WORDS spells them out (run efficiency). The recentlyFlat SPLIT survives all three —
 // it is the arrow that carries it, and on the run row it gets its own phrase.
@@ -290,11 +297,15 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // says "from N easy rides", and the same number twice on consecutive lines reads as two facts. Window
   // and recency stay: nothing else on the row states them. The threshold read keeps the count, because
   // there it IS the only place the count appears.
-  // ⛔ NO RECEIPT IN THE BUILDING STATE. `lead` falls back to POWER when neither signal can assert, so
-  // the tail cited power's pool — and for a rider with six easy rides and no hard ones that rendered
-  // "over 8wk · 0 rides" directly under "6 rides in 8 weeks". Two counts, one row, flatly contradicting
-  // each other, and the 0 was the more authoritative-looking of the two. The building headline already
-  // states the count and the window, so there is nothing left for a receipt to add.
+  // ⛔ THE BUILDING STATE KEEPS RECENCY AND DROPS THE COUNT. `lead` falls back to POWER when neither
+  // signal can assert, so the full tail cited power's pool — for a rider with six easy rides and no hard
+  // ones that rendered "over 8wk · 0 rides" directly under "6 rides in 8 weeks": two counts on one row,
+  // contradicting each other, with the 0 looking the more official.
+  // But dropping the WHOLE tail was an over-correction, and the screen proved it in one question:
+  // "does this include today?" — which the row could no longer answer. Recency is the one thing a
+  // count-and-window headline cannot say, and on a building row it is the most useful fact there is,
+  // because it tells the athlete whether the ride they just did has landed yet.
+  const buildingRecency = building ? recencyOf(fitness.efficiency.newestAgeDays ?? fitness.power.newestAgeDays) : null;
   const tail = (!building && lead.sampleCount != null && lead.windowDays != null)
     ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike', omitCount: aerobicLead })
     : null;
@@ -322,7 +333,8 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
         // cannot tell whether that means "ride more" or "the app is broken".
         <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
           <span className="text-white/85">{rideCount === 0 ? 'No rides yet' : `${rideCount} ${rideCount === 1 ? 'ride' : 'rides'} in 8 weeks`}</span>
-          <span>{rideCount === 0 ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
+          {buildingRecency && <span className="text-white/45">{buildingRecency}</span>}
+          <span className="basis-full">{rideCount === 0 ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
         </span>
       ) : aerobicLead ? (
         <AerobicSignal sig={fitness.efficiency} />
