@@ -9,7 +9,7 @@ import { spineVerdictFor } from '../_shared/narrative-core/index.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
 // Step 2 (spine): first server consumer of the relocated deterministic core. The narrative
 // DESCRIBES the spine's bike verdict (terrain-matched + staleness-gated), never infers direction.
-import { computeBikeState, pwr20ToSeries, resolveZoneBand } from '../_shared/state-trend/index.ts';
+import { computeBikeState, pwr20ToSeries, resolveZoneBand, bikeEfficiencyRideEligible } from '../_shared/state-trend/index.ts';
 import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
 import { detectClimbSegments, parseStravaSegmentEfforts } from '../_shared/cycling-v1/segments.ts';
 import { computeCtlAtl } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -2595,11 +2595,27 @@ Deno.serve(async (req) => {
         inBandS = hrs.length; // ≈ seconds (1 Hz)
         if (hrs.length >= 120) hrAtBand = Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length);
       }
+      // ⛔ DOES THIS RIDE ACTUALLY COUNT (2026-08-02, Michael: "why would you say 146 is heart rate at
+      // easy power?"). Because on a HARD ride it is not. The in-band time on a threshold ride is
+      // incidental — warmup, descents, the sag between efforts — and the heart rate there is dragged up
+      // by the work around it (cardiac lag). That is the exact contamination `bikeEfficiencyRideEligible`
+      // was written to reject, and the STATE trend has always rejected it. The session screen did not
+      // know, so it printed the number anyway, under a label claiming it was measured at easy power, and
+      // told the athlete it fed a read that had in fact discarded it.
+      // Decided HERE, with the same gate the trend uses, and shipped as a field — the client must not
+      // re-derive "does this count" or the two will disagree.
+      const countsTowardTrend = bikeEfficiencyRideEligible(
+        cyclingFactPacketV1?.facts?.classified_type,
+        inBandS,
+        Number.isFinite(w20) && w20 > 0 ? w20 : null,
+        band.hi,
+      );
       bikeFitnessV1 = {
         w20: Number.isFinite(w20) && w20 > 0 ? Math.round(w20) : null,
         hr_at_band: hrAtBand,
         band_lo: band.lo, band_hi: band.hi, band_source: band.source,
         in_band_s: inBandS,
+        counts_toward_trend: countsTowardTrend,
       };
     } catch (e: any) {
       console.log('⚠️ bike_fitness_v1 failed (non-fatal):', e?.message || e);

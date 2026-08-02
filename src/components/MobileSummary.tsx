@@ -291,6 +291,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { wa = null; } }
         const bf = wa?.bike_fitness_v1;
         if (!bf || !(Number(bf.hr_at_band) > 0)) return null;
+        // ⛔ DO NOT SHOW A READING THE ENGINE THREW AWAY (2026-08-02, Michael: "why would you say 146 is
+        // heart rate at easy power?"). On a hard ride it ISN'T. The in-band time is incidental — warmup,
+        // descents, the sag between efforts — and heart rate there is dragged up by the work around it.
+        // The STATE trend has always excluded such rides (`bikeEfficiencyRideEligible`); this card did
+        // not know, so it printed the number under a label claiming it was measured at easy power AND
+        // told the athlete it fed a read that had discarded it. Two lies in three lines.
+        // The server decides (`counts_toward_trend`); undefined = a row analysed before the field
+        // existed, and those keep rendering rather than vanishing from old sessions.
+        if (bf.counts_toward_trend === false) return null;
         const src = bf.band_source === 'personal' ? 'personal'
           : bf.band_source === 'coggan_ftp' ? 'est (FTP)' : null;
         const band = (Number(bf.band_lo) > 0 && Number(bf.band_hi) > 0)
