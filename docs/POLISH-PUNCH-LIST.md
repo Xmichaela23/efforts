@@ -8,6 +8,21 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏸ PARKED — POLISH, NOT NOW (2026-08-02, Michael: *"thats a polish once things are working"*)
+
+- [ ] **Should the app notice "I keep failing to hit my intervals" and say so?**
+      The old coach rule that did something like this was **deleted** 2026-08-02 — it read a blended
+      duration+intensity average and returned "dial back intensity for 24-48h", a verdict about the
+      BODY that State owns (same violation D-363 closed on the session screen). Nothing is broken by
+      its absence; the concern it half-served is a **new feature**, not a repair.
+      ⚠️ If it ever returns: it belongs in **State**, not the coach's weekly read, and it needs a
+      **fresh threshold**. The old bars (65 / 70 / 75, per methodology in
+      `coach/methodologies/*.ts`) were fitted to the blended number and no longer measure what they
+      were set against. `min_execution_score_ok` is now **unread** — leave it or remove it in the
+      cleanup sweep; it is part of a published config shape.
+
+---
+
 ## ✅ VERIFIED ON DEVICE — THE BODY + STATE REBUILD (2026-08-01 evening, Michael)
 
 **Michael confirmed these on a device 2026-08-01.** Kept as the record of what was checked — the copy
