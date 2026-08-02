@@ -341,13 +341,25 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           WHY in a sentence about their riding, not about the app's data. It sits under the read it
           explains, and it is not tap-gated: a rider who never sees it would never learn that hard
           efforts are what unlock the FTP read. */}
-      {powerSilent && !building && (
-        <span className="basis-full text-white/45 text-[12px]">
-          {powerSilent === 'no_hard_efforts'
-            ? 'No hard efforts yet, so there is no threshold read'
-            : 'Not enough hard rides yet for a threshold read'}
-        </span>
-      )}
+      {powerSilent && !building && (powerSilent === 'no_hard_efforts' ? (
+        // Tappable ONLY for the joy rider, because only they have something to unlock. A rider who
+        // already does hard efforts and just has too few does not need "here is what a hard effort is".
+        // ⛔ This replaced a separate "power trend ⓘ" button that sat at the bottom of the row saying the
+        // same thing in different words. One question, one place to tap.
+        <>
+          <button type="button" onClick={() => setPowerInfoOpen((o) => !o)} className="basis-full inline-flex items-baseline gap-1 text-left text-white/45 text-[12px]">
+            No hard efforts yet, so there is no threshold read
+            <span className="text-white/40 text-[11px]">{powerInfoOpen ? '▾' : 'ⓘ'}</span>
+          </button>
+          {powerInfoOpen && (
+            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
+              A threshold, sweet-spot, tempo or climbing ride records a 20-minute power max, and that is what an FTP read is built from. Easy rides carry no max to read, so the bike is read on heart rate at the same power until one is logged.
+            </p>
+          )}
+        </>
+      ) : (
+        <span className="basis-full text-white/45 text-[12px]">Not enough hard rides yet for a threshold read</span>
+      ))}
       {aerobicLead && (
         <span className="basis-full text-white/45 text-[12px]">
           Your heart rate at the same power{(fitness.efficiency.sampleCount ?? 0) > 0 ? `, from ${fitness.efficiency.sampleCount} easy ${fitness.efficiency.sampleCount === 1 ? 'ride' : 'rides'}` : ''}
@@ -377,7 +389,10 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
               (`FitnessAnchor.value`) so the FTP shown and the FTP behind the verdict are the same
               number by construction. Resolving it client-side would give one that is *probably* the
               same — which is what the FTP-fracture work existed to remove. */}
-          {src && (() => {
+          {/* ⛔ THRESHOLD READ ONLY. On an aerobic row this sat under a read it has nothing to do with —
+              "Your estimated FTP is 176 W" beneath a heart-rate verdict invites the rider to think the
+              FTP is what moved. */}
+          {src && leadIsPower && (() => {
             // ⚠️ NO METRIC-STRING GUARD. The first cut gated on `anchor.metric === 'ftp'` — a string
             // that comes from the `fitness_baselines` row and was never verified to be that exact
             // word. It silently rendered nothing. This branch is already inside `src`, which is
@@ -418,20 +433,6 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           minSpanFraction={0.15}
           recentLabel="recent 8 wks in color"
         />
-      )}
-      {/* No power to chart yet (all-aerobic riding) — a tap-ⓘ that NAMES what unlocks the power trend, rather
-          than silently omitting it. Fact-first + conditional, no imperative (copy voice). 2026-07-23. */}
-      {!leadIsPower && detailOpen && (
-        <>
-          <button type="button" onClick={() => setPowerInfoOpen((o) => !o)} className="basis-full inline-flex items-baseline gap-1 text-white/45 text-[12px]">
-            power trend <span className="text-white/40 text-[11px]">{powerInfoOpen ? '▾' : 'ⓘ'}</span>
-          </button>
-          {powerInfoOpen && (
-            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
-              A 12-week power trend appears here once a hard 20-min effort is logged — a threshold, sweet-spot, tempo, or climbing ride records a 20-min power max. Recent rides are all aerobic, so there’s no max to plot yet; the bike is read on efficiency until then.
-            </p>
-          )}
-        </>
       )}
     </Row>
   );
