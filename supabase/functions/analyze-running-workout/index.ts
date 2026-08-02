@@ -36,7 +36,8 @@ import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveRunEasyHrBand, isEasyHr, easyCeilingBpm, zone3FloorBpm } from '../_shared/easy-hr.ts';
+import { resolveRunEasyHrBand, isEasyPrescribedRun, easyCeilingBpm, zone3FloorBpm } from '../_shared/easy-hr.ts';
+import { timeUnderCeilingPct } from '../_shared/time-under-ceiling.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 // =============================================================================
@@ -1528,6 +1529,47 @@ Deno.serve(async (req) => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // THE EASY GOVERNOR — an easy run is scored on heart rate, not on pace
+    // ─────────────────────────────────────────────────────────────────────────
+    // The app has ALWAYS known this: the Insights paragraph below already drops the pace verdict on a
+    // steady run and speaks to the easy band instead, and the client already hides the Pace chip
+    // (`is_easy_like`). What was missing is that the read was PROSE ONLY — a sentence, off AVERAGE HR
+    // — while the ride shipped the same idea as a scored chip off TIME UNDER THE CEILING ([D-362]).
+    // So an easy run showed two chips, an easy ride three, and the run's Execution score was still
+    // half-built from a pace number the same screen had decided not to show.
+    //
+    // Three things change, and they are the ride's three, applied to running:
+    //   1. TIME under the ceiling, never the average — a hilly run averages over and reads as
+    //      indiscipline when 90% of it was correctly easy (`_shared/time-under-ceiling.ts`).
+    //   2. Its own chip, naming the ceiling AND where the ceiling came from — an estimate off max HR
+    //      is not a measured threshold and the athlete deserves to know before it costs them a score.
+    //   3. Execution = 50/50 intensity + duration, so the score is built from what was prescribed.
+    //
+    // ⚠️ THE CEILING IS THE RUN'S OWN (`resolveRunEasyHrBand`), not the ride's. Running HR sits 5-10
+    // bpm above cycling at the same effort; both files say do not unify them.
+    const runEasyBand = resolveRunEasyHrBand(learnedFitness, (baselines as any)?.threshold_heart_rate);
+    if (isEasyPrescribedRun(classifiedTypeKey) && runEasyBand.ceiling != null) {
+      const intensityAdherence = timeUnderCeilingPct(
+        sensorData.map((sample: any) => sample?.heart_rate),
+        runEasyBand.ceiling,
+      );
+      if (intensityAdherence != null) {
+        performance.intensity_adherence = intensityAdherence;
+        performance.easy_ceiling_bpm = runEasyBand.ceiling;
+        // The session contract's vocabulary is `threshold | max_hr | none`; the run band calls its
+        // threshold anchor `lthr`. Translate at the boundary rather than teaching the client a second
+        // word for one thing (the ride already emits `threshold`).
+        performance.easy_ceiling_anchor = runEasyBand.anchor === 'lthr' ? 'threshold' : runEasyBand.anchor;
+        if (Number.isFinite(performance.duration_adherence)) {
+          performance.execution_adherence = Math.round(
+            (intensityAdherence * 0.5) + (Number(performance.duration_adherence) * 0.5),
+          );
+        }
+        console.log(`🫀 [EASY GOVERNOR] ${intensityAdherence}% of time at or under ${runEasyBand.ceiling} bpm (${runEasyBand.anchor}) → execution ${performance.execution_adherence}%`);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // D-035: Unlinked-workout null-override
     // ─────────────────────────────────────────────────────────────────────────
     // Adherence means "vs what was prescribed." Without a plan link, there is
@@ -1540,6 +1582,11 @@ Deno.serve(async (req) => {
       performance.execution_adherence = null;
       performance.pace_adherence = null;
       performance.duration_adherence = null;
+      // The easy governor is an adherence read like any other — "you held it easy" only means
+      // something against a prescription that said easy. No plan, no chip.
+      performance.intensity_adherence = null;
+      performance.easy_ceiling_bpm = null;
+      performance.easy_ceiling_anchor = null;
       performance.completed_steps = null;
       performance.total_steps = null;
       performance.gap_adjusted = false;
@@ -2584,7 +2631,12 @@ Deno.serve(async (req) => {
         // SO: steady_state (easy / long / recovery) is judged on the HR BAND. Pace becomes a RECEIPT, not a
         // verdict. Every other type (intervals / tempo / progressive / hills / fartlek) KEEPS the pace verdict
         // — those sessions were GIVEN a pace target and asked to hit it. Judge what the athlete was trying to do.
-        const isSteadyEasyRun = String(classifiedHrWorkoutType) === 'steady_state';
+        // ⛔ WAS `classifiedHrWorkoutType === 'steady_state'` (fixed 2026-08-02). That helper returns
+        // `steady_state` for EVERYTHING except intervals and hills, so a TEMPO run took this branch and
+        // was told it "ran 22 bpm over your easy ceiling" — a session that was supposed to be hard,
+        // graded against a prescription it was never given ([D-362]). One gate now, shared with the
+        // Easy chip, reading plan intent: `isEasyPrescribedRun`.
+        const isSteadyEasyRun = isEasyPrescribedRun(classifiedTypeKey);
         const easyHrBand = resolveRunEasyHrBand(learnedFitness, (baselines as any)?.threshold_heart_rate);
         const runAvgHr = Number((hrAnalysisResult as any)?.summary?.avgHr);
         const ranHot = (hrAnalysisResult as any)?.drift?.weather?.factor === 'hot';
@@ -2598,15 +2650,16 @@ Deno.serve(async (req) => {
 
         if (hrJudgeable) {
           const ceiling = easyHrBand.ceiling as number;
-          const hr = Math.round(runAvgHr);
-          if (isEasyHr(runAvgHr, easyHrBand) === true) {
-            bullets.push(`Held your easy band — ${hr} bpm, at or under your ${ceiling} bpm ceiling${paceReceipt}.`);
-          } else if (runAvgHr > ceiling) {
-            const over = Math.round(runAvgHr - ceiling);
+          // ⛔ THE SENTENCE AND THE CHIP READ THE SAME NUMBER (2026-08-02). This used to speak off
+          // AVERAGE heart rate — "Held your easy band — 134 bpm" — while the Easy chip above it scores
+          // TIME under the ceiling. On a hilly run those two disagree by construction: the average can
+          // sit under the ceiling while a third of the run was over it, so the paragraph would confirm
+          // a session the chip had just marked 68%. One measurement, stated once (Constitution Law 1).
+          const underPct = Number(performance?.intensity_adherence);
+          if (Number.isFinite(underPct)) {
             bullets.push(
-              `Ran ${over} bpm over your easy ceiling (${hr} vs ${ceiling} bpm)`
-              + (ranHot ? ' — heat will do that' : '')
-              + `${paceReceipt}.`,
+              `${underPct}% of the run at or under your ${ceiling} bpm easy ceiling${paceReceipt}.`
+              + (ranHot && underPct < 100 ? ' Heat lifts heart rate at the same effort.' : ''),
             );
           }
           // Below the FLOOR (a walk / stopped strap) is not a verdict worth speaking. Silence.

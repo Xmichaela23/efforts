@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
-import { resolveRideEasyCeiling, timeUnderCeilingPct } from '../_shared/ride-easy-hr.ts';
+import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
+import { timeUnderCeilingPct } from '../_shared/time-under-ceiling.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';

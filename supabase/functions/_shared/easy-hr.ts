@@ -207,3 +207,32 @@ export function runEasyPaceEligible(
   if (!(Number(inBandSeconds) >= MIN_EASY_PACE_IN_BAND_S)) return false;   // a fragment is not a measurement
   return true;
 }
+
+/**
+ * WAS THIS RUN PRESCRIBED EASY — the gate for the heart-rate governor on the session screen.
+ *
+ * The band above answers "is this HEARTBEAT easy". This answers "was this SESSION supposed to be",
+ * and they are different questions: a tempo run at 165 bpm is not a failed easy run, it is a tempo
+ * run. Kept in this file because both are the one definition of easy for running, and a second copy
+ * of either is how the app ends up disagreeing with itself.
+ *
+ * ⛔ DO NOT GATE THIS ON `mapClassifiedTypeToHrWorkoutType()` (analyze-running-workout). That helper
+ * returns `steady_state` for EVERYTHING except intervals and hills — so a TEMPO run reads as steady,
+ * and the Insights paragraph gated on it spent months able to tell a correctly-executed tempo session
+ * it "ran 22 bpm over your easy ceiling". Graded against a prescription the athlete was never given,
+ * which is exactly the fault [D-362] closed on the ride side.
+ *
+ * The input is `classifiedTypeKey` (`resolveClassifiedTypeKey`), which is PLAN INTENT first — what the
+ * session was FOR, not what the heart rate happened to do. Easy / recovery / long runs prescribe an
+ * INTENSITY, so heart rate governs. Tempo / threshold / intervals / hills prescribe a PACE, so pace
+ * keeps its verdict.
+ *
+ * ⚠️ LONG RUNS ARE IN, DELIBERATELY (ruled by Michael 2026-08-02: *"straight — that's the whole
+ * point"*). They drift, so a well-executed long run will not score 100 against a fixed ceiling. The
+ * field reports time-in-zone straight and reports decoupling separately — see the reasoning in
+ * `_shared/time-under-ceiling.ts` — and the HR row on the same screen already tells the drift story.
+ */
+export const EASY_PRESCRIBED_RUN_TYPES = new Set(['easy', 'recovery', 'long_run']);
+export function isEasyPrescribedRun(classifiedTypeKey: unknown): boolean {
+  return EASY_PRESCRIBED_RUN_TYPES.has(String(classifiedTypeKey ?? '').toLowerCase().trim());
+}

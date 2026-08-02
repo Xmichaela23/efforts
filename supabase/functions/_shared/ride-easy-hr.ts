@@ -62,18 +62,8 @@ export function resolveRideEasyCeiling(learnedFitness: any): RideEasyCeiling {
 }
 
 /**
- * Share of sampled ride time at or under the ceiling, 0-100. Null when there is no ceiling or no HR.
- * Samples are treated as equal slices of time — true for the 1 Hz streams these analyzers read.
+ * `timeUnderCeilingPct` MOVED 2026-08-02 → `_shared/time-under-ceiling.ts`, and every importer was
+ * updated (no shim left behind). The measurement is sport-neutral (samples + a ceiling) and the RUN
+ * now uses it too; leaving it in a ride-named file is how the next session ends up writing a second
+ * copy for running. The CEILING stays here, because that part really is per-sport.
  */
-export function timeUnderCeilingPct(hrSamples: Array<number | null | undefined>, ceiling: number | null): number | null {
-  if (!ceiling || !Array.isArray(hrSamples)) return null;
-  let total = 0, under = 0;
-  for (const raw of hrSamples) {
-    const hr = num(raw);
-    if (hr == null || hr > 240) continue; // strap artefacts are not evidence of anything
-    total++;
-    if (hr <= ceiling) under++;
-  }
-  if (total === 0) return null;
-  return Math.round((under / total) * 100);
-}

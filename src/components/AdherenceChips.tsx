@@ -208,7 +208,7 @@ export default function AdherenceChips({
       ? (isGapAdjusted ? 'Blended interval GAP' : 'Blended interval pace')
       : (isGapAdjusted ? 'Grade-adjusted pace' : 'Pace adherence');
 
-    const showPaceChip = !(sd as any)?.classification?.is_easy_like;
+    const showPaceChip = !sd.classification?.is_easy_like;
 
     return (
       <div className="w-full pt-1 pb-2">
@@ -218,7 +218,18 @@ export default function AdherenceChips({
             {chip('Execution', executionScore,
               performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence')}
             {chip('Duration', durationAdherence, 'Time adherence')}
-            {showPaceChip && chip(paceChipLabel, paceAdherence, paceChipSubtitle)}
+            {/* An easy run had the Pace chip hidden and NOTHING put in its place — the athlete was
+                told the session was not judged on pace, and then shown no read at all on whether they
+                held it easy. The ride solved this on 2026-08-01; this is the same chip, the run's own
+                ceiling, in the slot the pace chip vacated. Never both: a session prescribed a pace or
+                prescribed an intensity, and only one of those questions was asked of it. */}
+            {/* ⚠️ THE SERVER DECIDES WHICH QUESTION THIS SESSION WAS ASKED. `intensity_adherence` is
+                only emitted when the analyzer judged the run against an easy prescription, so its
+                presence IS the verdict — the client does not re-derive it from `is_easy_like` (which
+                is a separate, looser display flag and would drift the moment the rule changes). */}
+            {intensityAdherence != null
+              ? chip('Easy', intensityAdherence, easyCeilingBpm != null ? `${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim() : 'Time held easy')
+              : (showPaceChip && chip(paceChipLabel, paceAdherence, paceChipSubtitle))}
           </div>
         </div>
       </div>

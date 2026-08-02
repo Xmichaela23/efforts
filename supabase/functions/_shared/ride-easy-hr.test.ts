@@ -1,7 +1,8 @@
 // The heart-rate governor for an easy ride (2026-08-01, Michael: "it was prescribed as easy").
 // Run: deno test --no-check ride-easy-hr.test.ts
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { resolveRideEasyCeiling, timeUnderCeilingPct } from './ride-easy-hr.ts';
+import { resolveRideEasyCeiling } from './ride-easy-hr.ts';
+import { timeUnderCeilingPct } from './time-under-ceiling.ts';
 
 const lf = (o: Record<string, unknown>) => o;
 
