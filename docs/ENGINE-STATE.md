@@ -25,21 +25,31 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 ---
 ## 🧭 NEXT SESSION — START HERE (2026-08-01 evening — **BODY is rebuilt and the cache trap that hid three deploys is fixed. Your job is the ENDURANCE STEER.**)
 
-### YOUR JOB
+### YOUR JOB — BIKE CLEANUP + BASE-WEEK COMMUNICATION
 
-**Build the endurance steer in the Adjust tab: "ease or push each discipline's load."** It is the one
-thing standing between a shipped soreness flag and a flag that can do something.
+**Not the endurance steer.** That was the previous banner's call and Michael has re-ordered it — the
+steer stays filed (see below), it is simply not next.
 
-Three facts to start from, traced today:
-- **`adapt-plan` cannot reduce endurance volume.** Its suggestion types are `strength_progression`,
-  `strength_deload`, `strength_relayout`, `endurance_pace_update`, `rematerialize`. Paces, yes; volume,
-  no. (`supabase/functions/adapt-plan/index.ts`)
-- **`StateAdjustLens.tsx` is a v0 scaffold** and says so: *"Nothing here changes your plan yet — no dead
-  buttons that pretend to work."* Strength steers work but live in the logger. The endurance section is
-  one sentence: *"Ease or push each discipline's load — coming next."*
-- ⚠️ **THIS WOULD BE THE FIFTH PLAN-MUTATION PATH,** and Q-225 explicitly held the line at four
-  (*"wait for the general surface"*). **Route it through the existing rematerialize path rather than
-  inventing another one** — that is the decision to make before writing code, not after.
+**1. BIKE CLEANUP.** Two items are already traced and filed; anything Michael saw on the device on
+2026-08-01 evening belongs with them:
+- **[Q-241] — the gate, and it comes FIRST.** Bike is the only discipline whose direction is not checked
+  against its own scatter (`bike.ts:78` has no `noiseGuardStdev`, while `run.ts:299` and
+  `strength.ts:191` both do). ⛔ **Gate first, language second** — words on an ungated direction are the
+  "sounds more certain than it is" failure the whole 2026-08-01 pass existed to remove. One option flag,
+  but it is a COMPUTATION change: some bike arrows become `holding`, fixtures move, payload bumps.
+- **[Q-240]** — cycling FTP offers a DELETE button where running offers a CHOICE. Fixing it means
+  teaching `resolveCurrentFtp` to respect a preference, and the coach, analyzers, plan generators and
+  zone maths all read that resolver.
+
+**2. BASE-WEEK COMMUNICATION.** ⚠️ **NOT SPECIFIED IN THE DOCS YET — get it from Michael before
+building.** He named it as the next job on 2026-08-01 evening; the substance was not captured, and
+nothing in this repo records what the base-week display should say or why. **Do not infer it from the
+code.** A [Q-NNN] is owed as soon as he states it.
+
+⚠️ **ALSO OWED AND NOT CAPTURED: a DEADLIFT NUMBER DISCREPANCY** Michael observed the same evening.
+Number, screen and expectation were not recorded. **Ask before hunting** — the strength surfaces have
+several places a lift number is rendered, and guessing which one he meant is how a session burns a day
+on the wrong row.
 
 ### WHAT SHIPPED TODAY — do NOT re-litigate
 
@@ -84,9 +94,10 @@ carrying words. Gate first, language second.
 
 ### STILL UNVERIFIED — what would settle it
 
-- **⛔ NOTHING FROM TODAY HAS BEEN SEEN ON A DEVICE.** Every string in the new BODY row was written by
-  Claude, not Michael, and one copy misstep already happened today (a verdict word was invented and
-  shipped). **Treat all of it as draft.** Settled by: Michael opening State and reading the row.
+- ✅ **THE STATE WORK IS DEVICE-VERIFIED (2026-08-01 evening, Michael).** BODY, the run row and the bike
+  row were seen and accepted; the punch-list block is moved to VERIFIED. ⚠️ The copy was still all
+  Claude-written and one invented verdict word shipped earlier that day, so "seen and accepted" is the
+  claim — not "reviewed line by line".
 - **The persistence line has almost certainly never fired.** It needs 4 of 6 sessions above his own
   normal plus a 5-entry baseline. Settled by: checking `resolveCurrentSoreness`'s `diag` on real data,
   or waiting for a sore block.

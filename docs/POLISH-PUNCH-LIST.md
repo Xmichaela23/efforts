@@ -8,31 +8,32 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE BODY REBUILD (2026-08-01 evening, DEPLOYED, **none of it seen**)
+## ✅ VERIFIED ON DEVICE — THE BODY + STATE REBUILD (2026-08-01 evening, Michael)
 
-**Open State. This is one pass, and the copy is the part I need eyes on** — every string below was
-written by Claude, and a verdict word was invented and shipped earlier today, so treat it as draft.
+**Michael confirmed these on a device 2026-08-01.** Kept as the record of what was checked — the copy
+was all Claude-written and one invented verdict word had already shipped that day, so "seen and
+accepted" is the meaningful state, not "deployed".
 
-- [ ] **BODY is ONE row.** No "Heart-rate response". No "Cross-training". Just **What you've logged**.
-- [ ] It reads roughly: *"Effort about as usual: 3.6 of 10 avg vs 3.8 typical. Soreness normal for you:
+- [x] **BODY is ONE row.** No "Heart-rate response". No "Cross-training". Just **What you've logged**.
+- [x] It reads roughly: *"Effort about as usual: 3.6 of 10 avg vs 3.8 typical. Soreness normal for you:
       2.1 of 7. Logged on 4 sessions."* ⚠️ **Both numbers should carry their scale** (of 10, of 7).
-- [ ] **If soreness has fewer than 5 logged entries** it should SAY so — *"Soreness needs 5 logged
+- [x] **If soreness has fewer than 5 logged entries** it should SAY so — *"Soreness needs 5 logged
       sessions to read a normal; N so far"* — not silently vanish.
-- [ ] **The persistence line probably will NOT show**, and that is correct: it needs 4 of your last 6
+- [x] **The persistence line probably will NOT show**, and that is correct: it needs 4 of your last 6
       sessions above your own normal. If it does show, it reads *"Soreness above your normal on 4 of
       your last 6 sessions. Adjust ›"* and tapping opens the **Adjust** tab.
-- [ ] **RUN row now reads in plain language** ([D-356]): *"↓ Slower at the same effort −15%"* — a
+- [x] **RUN row now reads in plain language** ([D-356]): *"↓ Slower at the same effort −15%"* — a
       phrase, and a WHOLE percent (no tenths). `pace ~12:49/mi at 134 bpm` still there; heart rate
       stays with run.
-- [ ] **Tap the ⓘ on the run row** → *"About 15% less speed per heartbeat over 13 weeks (range −24%
+- [x] **Tap the ⓘ on the run row** → *"About 15% less speed per heartbeat over 13 weeks (range −24%
       to −6%). Heat, fatigue, or a base block can all cause this."* ⚠️ **The range is the thing to
       check** — it should appear on EVERY state that shows a number, including the flat-arrow
       "Slower, now holding" one. If a number ever appears without a range, that is the bug.
-- [ ] **BIKE row is deliberately unchanged** — still wordless (arrow + number), because it has no
+- [x] **BIKE row is deliberately unchanged** — still wordless (arrow + number), because it has no
       confidence interval yet. Not an oversight.
 
 **MEASURED, NOT SEEN:**
-- [ ] The first open after this deploy may take one extra beat while the cached payload refreshes.
+- [x] The first open after this deploy may take one extra beat while the cached payload refreshes.
       ⚠️ **If BODY still shows a heart-rate row after that, tell me** — that is the [D-355] cache trap
       recurring and it is not a copy problem.
 
