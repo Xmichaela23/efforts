@@ -155,13 +155,18 @@ export default function AdherenceChips({
     // prescribed, on a warm hilly morning at RPE 2. None of the three apps we measure against score
     // an easy session — Strava shows the zone bar, Garmin shows time in zone, TrainingPeaks grades
     // duration and distance and nothing else. So the number stays, stated as the fact it is.
+    // ⛔ THE SUBTITLE MUST NOT BREAK MID-FACT (2026-08-02, Michael: *"ctenr them better?"*).
+    // "you typically 68–117" wrapped with "117" alone on the last line — the range split across two
+    // rows, which reads as a different number. Three chips share a phone width, so wrapping is normal
+    // and fine; wrapping THROUGH a value is not. `text-center` centres what does wrap, and the value
+    // line is nowrap so a range, a bpm figure or a "64 of 108 min" can never be cut in half.
     const chipText = (label: string, value: string | null, text: string) => {
       if (!value) return null;
       return (
-        <div className="flex flex-col items-center px-2">
-          <div className="text-sm font-semibold text-gray-100">{value}</div>
-          <div className="text-[12px] text-gray-300">{label}</div>
-          <div className="text-[12px] text-gray-400">{text}</div>
+        <div className="flex flex-col items-center px-2 min-w-0">
+          <div className="text-sm font-semibold text-gray-100 whitespace-nowrap">{value}</div>
+          <div className="text-[12px] text-gray-300 text-center">{label}</div>
+          <div className="text-[12px] text-gray-400 text-center leading-snug">{text}</div>
         </div>
       );
     };
@@ -210,7 +215,7 @@ export default function AdherenceChips({
       ? `${Math.round(easyUnderS / 60)} of ${Math.round(easyTotalS / 60)} min`
       : null;
     const easySubtitle = easyCeilingBpm != null
-      ? `under ${easyCeilingBpm} bpm ${easyCeilingNote ?? ''}`.trim()
+      ? `under\u00a0${easyCeilingBpm}\u00a0bpm ${easyCeilingNote ?? ''}`.trim()
       : 'held easy';
 
     /**
@@ -233,7 +238,8 @@ export default function AdherenceChips({
       const lo = sd.load?.typical_low;
       const hi = sd.load?.typical_high;
       if (lo == null || hi == null) return 'What it cost';
-      return lo === hi ? `you typically ${lo}` : `you typically ${lo}–${hi}`;
+      // Non-breaking space before the range so "typically" can wrap but "68–117" never splits.
+      return lo === hi ? `typically\u00a0${lo}` : `typically\u00a0${lo}–${hi}`;
     })();
 
     const fmtDeltaTime = (s: number) => {
