@@ -2663,3 +2663,45 @@ is being overridden today. The gap is structural, not live.
 **Where it would be fixed:** `src/lib/resolve-current-ftp.ts` (the one resolver — do NOT add a second
 read), the `performance_numbers` shape, and the FTP block in `TrainingBaselines.tsx`. Mirror the
 `easy_pace_source` pattern rather than inventing a second one.
+
+---
+
+## Q-241 — BIKE is the only discipline whose direction is NOT checked against its own noise — and that is what blocks it earning words (2026-08-01, Michael, FILED — code-verified, the smallest unlock on the board)
+
+**Michael:** *"bike should have FTP gains and losses language if the data is there."* Correct — and the
+data is not currently gated well enough to say.
+
+### The gap, verified
+
+| discipline | noise gate |
+|---|---|
+| run durability | `noiseGuardStdev: 1.0` — `run.ts:299` |
+| strength | same gate — `strength.ts:191` |
+| **bike** | ⛔ **none** — `bike.ts:78`: `classifyTrend(series, resolveThresholds('bike', …), asOf, { exclude: isDeloadWeek })` |
+
+Bike's verdict clears only a fixed holding band. **It never has to beat its own ride-to-ride scatter.**
+Every other directional read in the app does. So a bike arrow can be riding wobble and nothing in the
+pipeline knows — the live screen shows `→ −0.4%`, and there is currently no way to say whether that
+is a real hold or an ungated coin-flip that happened to land inside the band.
+
+### Why this is the thing to fix, not a confidence interval
+
+⚠️ **I told Michael earlier that bike needed a CI before it could carry words. That was wrong** — or
+rather, it named the wrong bar. Run EFFICIENCY has a CI (`routeTrend`) because it is a regression; run
+DURABILITY and STRENGTH have no CI and **do** carry words, because they clear the noise guard instead.
+**The honest bar for a directional word is "the move beats the metric's own scatter", and there are two
+ways to meet it.** Bike meets neither.
+
+### The fix, and its real cost
+
+Pass `noiseGuardStdev: 1.0` at `bike.ts:78`. One option flag — **but it is a COMPUTATION change, not a
+display one.** Some current bike arrows will become `holding`, which is the point: those were the
+ungated ones. Expect verdict values to move, fixtures to need updating, and the payload to need a bump
+so cached rows re-source.
+
+**Then bike has earned words** — the same treatment run got in [D-356], on the same evidence footing as
+strength. That is the sequence: **gate first, language second.** Language on an ungated direction is
+exactly the "sounds more certain than it is" failure this whole day was spent removing.
+
+⚠️ **Do NOT reach for a CI for bike to match run efficiency.** Bike efficiency is not the same shape of
+computation, and the noise guard is the bar its siblings already meet.

@@ -77,6 +77,11 @@ nothing in the code shows that, which is how it gets re-added as an improvement.
 **[Q-240] filed:** cycling FTP has a delete button where running has a choice; fixing it means
 changing `resolveCurrentFtp`, which the coach, analyzers, plan generators and zone maths all read.
 
+**[Q-241] — the smallest unlock on the board.** BIKE is the ONLY discipline whose direction is not
+checked against its own scatter (`bike.ts:78` — no `noiseGuardStdev`, while `run.ts:299` and
+`strength.ts:191` both have it). That, not a missing confidence interval, is what stops the bike row
+carrying words. Gate first, language second.
+
 ### STILL UNVERIFIED — what would settle it
 
 - **⛔ NOTHING FROM TODAY HAS BEEN SEEN ON A DEVICE.** Every string in the new BODY row was written by
