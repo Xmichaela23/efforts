@@ -196,6 +196,12 @@ export type SessionDetailInput = {
    *  ?? temperature), resolved in workout-detail. The contract had no weather
    *  field — added for the cycling Performance stat line + TERRAIN row. */
   weatherTempF?: number | null;
+  /** ⛔ THE PROVIDER'S OWN ELEVATION TOTAL (metres) — `workouts.elevation_gain`, the number Strava or
+   *  Garmin reports and the number the DETAILS tab renders (`useWorkoutData.elevation_gain_m`).
+   *  Added 2026-08-01 because Performance was deriving its own from `computed.overall` / the first lap
+   *  and the two tabs printed DIFFERENT numbers for one fact — 958 ft on Details, 942 ft on Performance.
+   *  Neither was wrong; there were simply two. Performance now reads this first. */
+  providerElevationGainM?: number | null;
   /** Step 4b — this session's discipline spine verdict, pre-read from
    *  athlete_snapshot.state_trends_v1 in workout-detail. The builder only passes it through
    *  (no re-derivation); null when no cache is available. */
@@ -303,6 +309,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedSwimScalars,
     completedRunScalars,
     weatherTempF,
+    providerElevationGainM,
     completedRefinedType,
     nextSession,
     readinessSnapshot,
@@ -702,6 +709,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         (wa as any)?.vs_similar_v1 ?? null,
         (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF)) ? Math.round(weatherTempF) : null,
         decouplingV1,
+        providerElevationGainM ?? null,
       );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -1304,6 +1312,9 @@ export function buildAnalysisDetailRows(
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
   weatherTempF: number | null = null,
   decoupling: { pct: number | null; basis: 'gap' | 'raw' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean } | null = null,
+  /** The provider's own elevation total (metres) — the number the DETAILS tab renders. See the TERRAIN
+   *  row below: without this, the two tabs derived elevation separately and printed different numbers. */
+  providerElevationGainM: number | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1425,7 +1436,10 @@ export function buildAnalysisDetailRows(
       const ei = (factPacket as any)?.derived?.executed_intensity;
       const effortDescriptor = (typeof ei === 'string' && ei !== 'unknown') ? `${ei} effort` : null;
       const suffix = effortDescriptor ? ` — ${effortDescriptor}` : '';
-      rows.push({ label: 'Power', value: `Normalized power ${np}W (${pctThreshold}% of threshold)${suffix}` });
+      // ⛔ NOT EMITTED (2026-08-01). This said "Normalized power 141W (80% of threshold) — hard effort"
+      // directly under an Insights line that already read "141 W normalized at 0.8 intensity — 69 TSS."
+      // The same number twice, one row apart. Insights keeps it; this row does not.
+      void np; void pctThreshold; void suffix;
     }
   } catch { /* */ }
 
@@ -1447,7 +1461,9 @@ export function buildAnalysisDetailRows(
       const parts: string[] = [];
       if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`Avg ${Math.round(avgHr)} bpm`);
       if (Number.isFinite(maxHr) && maxHr > 0) parts.push(`Max ${Math.round(maxHr)} bpm`);
-      if (parts.length > 0) rows.push({ label: 'Heart rate', value: parts.join(' · ') });
+      // ⛔ NOT EMITTED (2026-08-01): "Avg 144 bpm · Max 166 bpm" is already on the DETAILS tab readouts.
+      // Performance is where a number is INTERPRETED; a bare avg/max belongs with the raw readouts.
+      void parts;
     }
   } catch { /* */ }
 
@@ -1501,7 +1517,11 @@ export function buildAnalysisDetailRows(
         const otherMin = smallRemainder + unbinned;
         const segs = shown.map((s) => `${s.name} ${s.min}m`);
         if (otherMin > 0) segs.push(`+${otherMin}m other`);
-        if (segs.length > 0) rows.push({ label: 'Power zones', value: segs.join(' · ') });
+        // ⛔ NOT EMITTED (2026-08-01, Michael: "this is too dense — see how running handles it").
+        // A seven-band time-in-zone distribution is a data table wearing a sentence. Running shows no
+        // zone breakdown on Performance either. The bins remain in the fact packet, so nothing is lost
+        // and a future zone CHART can read them.
+        void segs;
       }
     }
   } catch { /* */ }
@@ -1522,9 +1542,13 @@ export function buildAnalysisDetailRows(
       // computed.overall.elevation_gain_m is frequently null for rides; the value
       // actually lives on the activity lap (computed.analysis.events.laps[0]
       // .total_elevation_gain, metres). Prefer overall when present, else the lap.
+      // ⛔ THE PROVIDER'S TOTAL FIRST — same field the DETAILS tab prints, so the two tabs cannot
+      // disagree about one fact. The computed/lap values stay as the fallback for rows that predate
+      // the column or arrived without it.
       const lap0 = comp?.analysis?.events?.laps?.[0];
       const elevM = Number(
-        comp?.overall?.elevation_gain_m ??
+        providerElevationGainM ??
+          comp?.overall?.elevation_gain_m ??
           comp?.overall?.elevation_gain ??
           lap0?.total_elevation_gain,
       );
@@ -1541,8 +1565,10 @@ export function buildAnalysisDetailRows(
   // after Terrain (the Conditions row above) per spec.
   try {
     if (sport === 'ride') {
-      const row = formatCyclingClimbingRow(comp?.analysis?.climbing);
-      if (row) rows.push(row);
+      // ⛔ NOT EMITTED (2026-08-01). VAM is a climber's specialist metric; on a rolling ride it is a
+      // number without a question. The Terrain row above already states the gain. `formatCyclingClimbingRow`
+      // is KEPT (tested, and the right thing to render if a climbing view is ever built).
+      void formatCyclingClimbingRow;
     }
   } catch { /* */ }
 

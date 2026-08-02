@@ -864,6 +864,11 @@ async function runSessionDetailPipelineAndPersist(
       // Ride-start temperature from workouts.weather_data (same source the
       // Details tab uses) → session_detail_v1.weather for the cycling
       // Performance stat line + TERRAIN row. temperature_start_f ?? temperature.
+      // One elevation for the whole screen: the provider total the DETAILS readouts already render.
+      providerElevationGainM: (() => {
+        const v = Number((detail as any)?.elevation_gain ?? (detail as any)?.metrics?.elevation_gain);
+        return Number.isFinite(v) && v > 0 ? v : null;
+      })(),
       weatherTempF: (() => {
         const raw = (row as any)?.weather_data;
         const wd = raw
