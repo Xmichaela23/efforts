@@ -318,28 +318,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
               <div className="text-[11px] text-gray-400 mt-0.5">
                 measured{band ? ` in your ${band} range` : ' in your aerobic range'}{src ? ` · ${src}` : ''}
               </div>
-              {/* ⛔ SAY WHAT THE NUMBER MEANS, NOT JUST WHAT IT IS (2026-08-02, Michael: "should say
-                  what zone"). "146 bpm" is inert on its own — the reader has to remember their own
-                  ceiling to know whether it is good news. Placed against the SAME ceiling the Easy chip
-                  scored the ride on, so the two cannot tell different stories.
-                  ⚠️ It states the RELATION, not a zone NUMBER. Naming "Z3"/"Z4" would need bike HR
-                  zones anchored on a threshold this athlete has not tested — one hard ride, low
-                  confidence. A zone label is a claim about physiology; "above your easy ceiling" is a
-                  claim about arithmetic, and only one of them is currently true. */}
-              {(() => {
-                const ceiling = (sd as any)?.execution?.easy_ceiling_bpm ?? null;
-                const hr = Number(bf.hr_at_band);
-                if (!(Number(ceiling) > 0) || !(hr > 0)) return null;
-                return (
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    {hr <= Number(ceiling)
-                      ? `Inside your easy range — at or under ${ceiling} bpm`
-                      : `Above your easy ceiling of ${ceiling} bpm`}
-                  </div>
-                );
-              })()}
+              {/* ⛔ ONE IDEA PER LINE, AND NO SECOND "EASY" (2026-08-02, Michael: "this is confusing").
+                  This block briefly carried "Above your easy ceiling of 131 bpm" as well — and "easy
+                  POWER" (a watts band) sitting two lines from "easy CEILING" (a heart-rate limit) is the
+                  same word meaning two different things on one card. The ceiling belongs to the Easy
+                  CHIP, which is where the ride is judged; this block is not a judgement at all. It is one
+                  reading, tracked over time: the heart rate it costs you to ride the same watts. Lower
+                  is fitter. Say that, and stop. */}
               <div className="text-[11px] text-gray-500 mt-0.5">
-                Counts toward your bike read on State
+                Lower over time means fitter — this feeds your bike read on State
               </div>
             </div>
           </div>
