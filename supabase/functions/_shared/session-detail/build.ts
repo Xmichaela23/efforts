@@ -795,6 +795,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF)) ? Math.round(weatherTempF) : null,
         decouplingV1,
         providerElevationGainM ?? null,
+        weatherTempStartF ?? null,
+        weatherTempEndF ?? null,
       );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -1459,6 +1461,18 @@ export function buildAnalysisDetailRows(
   /** The provider's own elevation total (metres) — the number the DETAILS tab renders. See the TERRAIN
    *  row below: without this, the two tabs derived elevation separately and printed different numbers. */
   providerElevationGainM: number | null = null,
+  /** ⛔ SESSION START/END TEMPERATURE — AND THE BUG THAT ADDING THEM CAUSED (2026-08-02).
+   *
+   *  The ride TERRAIN row was pointed at `formatSessionTemp` using `weatherTempStartF` /
+   *  `weatherTempEndF`. Those were added as fields on `buildSessionDetailV1`'s params — a DIFFERENT
+   *  function. This one takes POSITIONAL arguments, and they were never added here or passed in, so
+   *  inside this function they were undefined identifiers. The reference threw, the row's `try/catch`
+   *  swallowed it, and the ride's TERRAIN row VANISHED from the screen with no error anywhere.
+   *
+   *  ⚠️ The catch is what made it invisible. A row that cannot be built is meant to be absent, so a
+   *  silent `catch` is right for missing DATA — and it hides a broken REFERENCE just as quietly. */
+  weatherTempStartF: number | null = null,
+  weatherTempEndF: number | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
