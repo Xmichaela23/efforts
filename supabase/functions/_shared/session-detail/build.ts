@@ -1834,6 +1834,27 @@ export function buildAnalysisDetailRows(
     if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {
       // Decoupling % owns it (above), OR swims get no land HR-drift row (terrain/grade/pace
       // framing is land-only), OR interval/variable-pace runs where "HR rose" is meaningless.
+      //
+      // ⛔ NAME THE REASON, NEVER REPORT AN ABSENCE ([D-359] §3, applied here 2026-08-02).
+      //
+      // Michael's 2026-08-02 Long Run showed "Drifted +5 bpm" and then, after a recompute populated
+      // its per-mile segments, showed NOTHING — the pace-spread suppression started firing and the
+      // whole heart-rate read silently left the screen. The suppression is RIGHT: the run slowed
+      // 86 s/mi, and a raw "HR rose 5 bpm" across a pace swing that size is not a durability signal.
+      // Vanishing is what was wrong.
+      //
+      // ⚠️ THIS IS A FACT ABOUT THE RUN, NOT THE APP APOLOGISING. "The pace varied too much for a
+      // drift number to mean anything" describes what the athlete did; "too few samples to read"
+      // would be the app announcing its own failure, which is the thing D-359 §3 forbids. And it only
+      // speaks when there IS a measurement being withheld — no drift data, no row, no padding.
+      const withheldForPaceSpread = !decouplingShown && sport !== 'swim'
+        && signal != null && Math.abs(signal) >= 3;
+      if (withheldForPaceSpread) {
+        rows.push({
+          label: 'Heart rate',
+          value: 'Not read on this session — the pace varied too much across it for a drift number to mean anything',
+        });
+      }
     } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {
       rows.push({
         label: 'Heart rate',

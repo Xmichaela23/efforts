@@ -434,7 +434,7 @@ async function runSessionDetailPipelineAndPersist(
     const [plannedRes, weekWorkoutsRes, , arcCtx, snapRes] = await Promise.all([
       supabase
         .from('planned_workouts')
-        .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id')
+        .select('id,date,type,name,description,rendered_description,duration,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id')
         .eq('user_id', userId)
         .gte('date', weekStartDate)
         .lte('date', weekEndDate),
@@ -551,7 +551,7 @@ async function runSessionDetailPipelineAndPersist(
         const { data: pr } = await supabase
           .from('planned_workouts')
           .select(
-            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id',
+            'id,date,type,name,description,rendered_description,duration,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id',
           )
           .eq('user_id', userId)
           .eq('id', effectivePlannedId)
@@ -590,7 +590,7 @@ async function runSessionDetailPipelineAndPersist(
         const { data: pr } = await supabase
           .from('planned_workouts')
           .select(
-            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id',
+            'id,date,type,name,description,rendered_description,duration,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id',
           )
           .eq('user_id', userId)
           .eq('id', plannedId)

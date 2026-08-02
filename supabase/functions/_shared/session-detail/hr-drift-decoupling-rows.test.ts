@@ -125,3 +125,51 @@ Deno.test('Q-158 (3): all-dropout late window → invalid drift, never a garbage
   assertEquals(result.driftBpm, 0, 'dropout half must yield invalid drift (0), never a garbage value');
   assertStringIncludes(result.scopeDescription, 'Insufficient valid HR', 'the empty-window guard is what fired');
 });
+
+// ── The suppressed read names its reason (2026-08-02) ───────────────────────
+// ⛔ THE REGRESSION THIS PINS. Michael's 2026-08-02 Long Run showed "Drifted +5 bpm", then after a
+// recompute populated its per-mile segments it showed NOTHING — the pace-spread suppression started
+// firing and the heart-rate read left the screen with no explanation. The suppression is correct
+// (the run slowed 86 s/mi; a raw bpm rise across that is not a durability signal). The silence was not.
+
+const VARIABLE_PACE_PACKET = (driftBpm: number) => {
+  const p = factPacketWithDrift(driftBpm);
+  // Five mile segments spanning >= 75 s/mi — the shipped suppression trigger.
+  (p as any).facts = {
+    ...((p as any).facts ?? {}),
+    segments: [
+      { pace_sec_per_mi: 620 }, { pace_sec_per_mi: 650 }, { pace_sec_per_mi: 680 },
+      { pace_sec_per_mi: 700 }, { pace_sec_per_mi: 710 },
+    ],
+  };
+  return p;
+};
+
+Deno.test('⛔ a suppressed heart-rate read says WHY, instead of vanishing', () => {
+  const rows = buildAnalysisDetailRows(
+    VARIABLE_PACE_PACKET(5), [], false, null, false, [], 'run', null, null, RAW,
+  );
+  const hr = rows.find((r) => r.label === 'Heart rate');
+  assertEquals(!!hr, true, 'the row must still render');
+  assertStringIncludes(hr!.value, 'pace varied too much');
+  // It states a fact about the RUN, never the app apologising for itself (D-359 §3).
+  assertEquals(/too few|not enough|insufficient|unavailable/i.test(hr!.value), false);
+  // And it does not smuggle the number it just declined to interpret.
+  assertEquals(/\d+ bpm/.test(hr!.value), false);
+});
+
+Deno.test('no drift measured at all → no row, not an apology', () => {
+  const rows = buildAnalysisDetailRows(
+    VARIABLE_PACE_PACKET(0), [], false, null, false, [], 'run', null, null, RAW,
+  );
+  assertEquals(rows.find((r) => r.label === 'Heart rate'), undefined);
+});
+
+Deno.test('a trustworthy percentage still wins — the reason line never competes with it', () => {
+  const rows = buildAnalysisDetailRows(
+    VARIABLE_PACE_PACKET(5), [], false, null, false, [], 'run', null, null, GAP_GOOD,
+  );
+  const hr = rows.find((r) => r.label === 'Heart rate');
+  assertStringIncludes(hr!.value, '4.2%');
+  assertEquals(rows.filter((r) => r.label === 'Heart rate').length, 1);
+});
