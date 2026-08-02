@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
@@ -871,9 +872,16 @@ function calculatePrescribedRangeAdherenceGranular(
  */
 function calculateDurationAdherence(workout: any, plannedWorkout: any, intervals: any[]): any {
   try {
-    // Get planned duration from intervals
-    const plannedDurationSeconds = intervals.reduce((sum, segment) => 
-      sum + (segment.duration || segment.duration_s || 0), 0);
+    // ⛔ THE PLANNED DURATION IS NOT ONLY IN THE STEPS (2026-08-01, Michael: "look at running").
+    // This summed `intervals` and nothing else, so an UNSTRUCTURED ride — "~108 min easy", no steps —
+    // resolved to 0 planned seconds and scored 0% executed. `analyze-running-workout` never had this
+    // problem because it reads `computed.total_duration_seconds` instead
+    // (`lib/adherence/granular-pace.ts`). Same question, two answers; now one, shared with the attach
+    // matcher, which had the identical hole.
+    const plannedDurationSeconds = intervals.reduce((sum, segment) =>
+      sum + (segment.duration || segment.duration_s || 0), 0)
+      || resolvePlannedDurationSeconds(plannedWorkout)
+      || 0;
     
     // Get actual duration from computed data
     const actualDurationSeconds = workout?.computed?.overall?.duration_s_moving || 0;
@@ -1805,9 +1813,21 @@ Deno.serve(async (req) => {
       ? Math.round(durationAdherence.adherence_percentage) 
       : 0;
     
-    // Execution adherence: For cycling, power is primary metric (70% weight)
-    // Duration matters less than hitting your power targets
-    const executionAdherence = Math.round((powerAdherence * 0.7) + (durationAdherenceValue * 0.3));
+    // ⛔ SCORE WHAT WAS PRESCRIBED (2026-08-01, Michael: "look at running").
+    // The 70/30 power/duration split assumes power TARGETS exist. On an unstructured ride — "~108 min
+    // easy", no steps, no watts prescribed — there is nothing to grade power against, so
+    // `powerAdherence` stays 0 and a rider who did 59% of the prescribed time scored
+    // 0.7*0 + 0.3*59 = 18%. That is not a lenient score, it is a WRONG one: it grades them against a
+    // prescription they were never given.
+    // `analyze-running-workout` already handles this shape — when there are no pace ranges to grade it
+    // falls back to duration alone. Same rule here: with no graded power interval, execution IS
+    // duration adherence, and power_adherence is NULL (not 0 — "we did not measure" is not "you
+    // scored zero", and build.ts hides the chips when every number is 0).
+    const hasGradedPower = Array.isArray(intervalBreakdown)
+      && intervalBreakdown.some((iv: any) => iv?.power_adherence_percent != null);
+    const executionAdherence = hasGradedPower
+      ? Math.round((powerAdherence * 0.7) + (durationAdherenceValue * 0.3))
+      : durationAdherenceValue;
     
     // D-035: Unlinked-ride null-override. Without a plan, "adherence" is
     // meaningless — there's nothing to be measured against. power_variability
@@ -1822,10 +1842,14 @@ Deno.serve(async (req) => {
       // type-debt errors filed in MAINTENANCE-DEBT.md (analyze-cycling-workout's
       // local performance type was narrower than what runtime constructs/reads).
       execution_score: executionAdherence,
-      power_adherence: powerAdherence,
+      // NULL, not 0, when no power was prescribed — see the comment above.
+      power_adherence: hasGradedPower ? powerAdherence : null,
       duration_adherence: durationAdherenceValue,
-      completed_steps: workIntervals.length,
-      total_steps: intervals.length
+      // An unstructured session is ONE step, and completing it is completing it. Reporting
+      // "0 of 1 steps" for a ride that happened is the step-counter describing a session that was
+      // never made of steps. Mirrors running, which scores the whole session as its single step.
+      completed_steps: intervals.length > 0 ? workIntervals.length : (durationAdherenceValue > 0 ? 1 : 0),
+      total_steps: intervals.length > 0 ? intervals.length : 1,
     } : {
       execution_adherence: null,
       execution_score: null,

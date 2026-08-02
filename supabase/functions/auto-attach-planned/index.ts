@@ -9,6 +9,7 @@ import { strengthSessionsShareTheWork } from '../_shared/strength/match-exercise
 // One routing table for "which analyzer owns this sport", shared — see _shared/analyze-routing.ts
 // for why it moved out of recompute-workout (this file's private `if run` copy was the bug).
 import { resolveAnalyzeEdgeFn } from '../_shared/analyze-routing.ts';
+import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -61,18 +62,10 @@ export function sumPlanned(planned: any): { seconds: number | null; meters: numb
   }
   if (any) return { seconds: sec || null, meters: m || null };
 
-  // FALLBACK, in the order of how directly each states the whole session's length. Only reached when
-  // the steps carry nothing — a structured session's steps stay authoritative, since they are what the
-  // athlete was actually told to do.
-  const totalSec = Number(planned?.total_duration_seconds);
-  if (Number.isFinite(totalSec) && totalSec > 0) return { seconds: Math.round(totalSec), meters: null };
-
-  // The `duration` column is MINUTES (verified: 108 on a "~108 min easy" ride). The >=1000 guard is the
-  // same heuristic the caller already uses on `workouts.moving_time`, for legacy rows storing seconds.
-  const dur = Number(planned?.duration);
-  if (Number.isFinite(dur) && dur > 0) return { seconds: Math.round(dur < 1000 ? dur * 60 : dur), meters: null };
-
-  return { seconds: null, meters: null };
+  // No steps → the shared resolver answers "how long was this planned to be" the SAME way the cycling
+  // analyzer now does. Two readers of one fact must not have two answers; that is exactly how an
+  // unstructured session came to be both unattachable AND unscoreable.
+  return { seconds: resolvePlannedDurationSeconds(planned), meters: null };
 }
 
 Deno.serve(async (req) => {
