@@ -37,8 +37,13 @@ export function trendEvidence(args: {
   sampleCount: number;
   newestAgeDays: number | null | undefined;
   discipline: Discipline;
+  /** Drop the count when the line ABOVE already states it (the bike aerobic read says "from 6 easy
+   *  rides", so the receipt repeating "6 rides" is the same fact twice on consecutive lines). Window
+   *  and recency still belong here — they are not stated anywhere else. */
+  omitCount?: boolean;
 }): string {
-  const parts = [`over ${windowLabel(args.windowDays)}`, unitLabel(args.discipline, args.sampleCount)];
+  const parts = [`over ${windowLabel(args.windowDays)}`];
+  if (!args.omitCount) parts.push(unitLabel(args.discipline, args.sampleCount));
   const rec = recencyLabel(args.newestAgeDays);
   if (rec) parts.push(rec);
   return parts.join(' · ');

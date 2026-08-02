@@ -259,9 +259,6 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // ride floor introduced `withheld`. The fallback keeps old cached payloads rendering.
   const leadIsPower = fitness.lead != null ? fitness.lead !== 'efficiency' : fitness.power.verdict !== 'needs_data';
   const lead = leadIsPower ? fitness.power : fitness.efficiency;
-  const tail = (lead.sampleCount != null && lead.windowDays != null)
-    ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike' })
-    : null;
   // ── THE THREE READS, AND WHY THIS ROW HAS THEM (2026-08-01, Michael) ─────────────────────────────
   //
   // "A user focusing on strength may never hit that 20 minutes — so a user may joy ride. FTP is the
@@ -289,6 +286,13 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
     : (lead.verdict !== 'needs_data' && lead.verdict !== 'withheld');
   const aerobicLead = assertsLead && !leadIsPower;
   const building = !assertsLead;
+  // The shared evidence tail. ⛔ THE COUNT IS DROPPED ON THE AEROBIC READ — its own line above already
+  // says "from N easy rides", and the same number twice on consecutive lines reads as two facts. Window
+  // and recency stay: nothing else on the row states them. The threshold read keeps the count, because
+  // there it IS the only place the count appears.
+  const tail = (lead.sampleCount != null && lead.windowDays != null)
+    ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike', omitCount: aerobicLead })
+    : null;
   // Qualifying rides we can see — the larger of the two pools (they count different things: power
   // counts hard rides in the winning terrain bin, efficiency counts clean easy rides). Stated as
   // "rides we can read from", never as their total ride count, which we do not have here.
