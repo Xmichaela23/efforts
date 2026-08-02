@@ -1415,15 +1415,33 @@ return (
                                       id="ftp-input"
                                       ref={ftpInputRef}
                                       type="number"
-                                      value={manualFtp || learnedFtp || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: {
-                                          ...prev.performanceNumbers,
-                                          ftp: parseInt(e.target.value) || undefined
+                                      // ⛔ THE FIELD EDITS YOUR TYPED NUMBER ONLY. It used to fall back to the
+                                      // LEARNED value (`manualFtp || learnedFtp || ''`), which made it
+                                      // impossible to change: clearing the box parsed to NaN -> ftp removed ->
+                                      // the value prop immediately re-rendered the learned 176, so every attempt
+                                      // to backspace and retype snapped straight back. The learned number is a
+                                      // PLACEHOLDER now — visible, clearly not yours, and it cannot fight you
+                                      // for the field.
+                                      value={manualFtp ?? ''}
+                                      onChange={(e) => setData(prev => {
+                                        const typed = parseInt(e.target.value);
+                                        const next: any = { ...prev.performanceNumbers };
+                                        if (Number.isFinite(typed) && typed > 0) {
+                                          next.ftp = typed;
+                                          // ⛔ TYPING IS CHOOSING (Q-240). An athlete who enters a number has
+                                          // asserted it; making them also tap a pill to be believed is the
+                                          // same "the app decided" complaint one step later. Reversible: the
+                                          // pills stay, and "Use my rides" hands it straight back.
+                                          next.ftp_source = 'manual';
+                                        } else {
+                                          delete next.ftp;
+                                          // No typed number left to prefer — drop the preference with it
+                                          // rather than leaving a pointer to a value that is gone.
+                                          if (next.ftp_source === 'manual') delete next.ftp_source;
                                         }
-                                      }))}
-                                      placeholder="250"
+                                        return { ...prev, performanceNumbers: next };
+                                      })}
+                                      placeholder={learnedFtp ? String(Math.round(Number(learnedFtp))) : '250'}
                                       className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
                                       style={{ fontFamily: 'Inter, sans-serif' }}
                                     />
