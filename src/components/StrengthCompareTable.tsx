@@ -511,8 +511,16 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     Performance screen: "the whole thing is a mess". */}
                 {/* A DECLARED swap is never a dock — the slot was filled. It gets the trade named,
                     on one row, instead of the miss-plus-unplanned pair it used to draw. */}
+                {/* ⛔ THE SUBSTITUTE IS TITLE TEXT, NOT AN ANNOTATION (2026-08-02, Michael: *"Dips…
+                    should be the same size as the one its replacing"*). It shipped at 11px/45% —
+                    a footnote hanging off the name — and the exercise he ACTUALLY DID read as
+                    smaller and dimmer than the one he didn't. On a ledger the work performed is
+                    never the subordinate half of the pair. Matches the name's own classes exactly;
+                    the arrow stays quiet because the arrow is punctuation, not information. */}
                 {r.swappedWith && (
-                  <span className="text-[11px] text-white/45">→ {r.swappedWith}</span>
+                  <span className="text-sm font-medium text-white">
+                    <span className="text-white/40">→ </span>{r.swappedWith}
+                  </span>
                 )}
                 {r.status === 'skipped' && !r.swappedWith && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">not logged</span>
@@ -530,8 +538,13 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     ⚠️ "by feel" is not decoration: it is the prescription. `load_prescribed: false`
                     means the plan declined to name a weight, and the athlete should read that as an
                     instruction rather than as a missing number. */}
+                {/* Brightened one notch with the swap label above (2026-08-02). This is the ONLY
+                    thing the plan said about the movement — at 11px/45% it read as a disabled
+                    caption rather than as the prescription, which is the same fault the intake copy
+                    was corrected for on 2026-07-27. Still subordinate to the name, deliberately:
+                    it is what was ASKED, and the name is what the row IS. */}
                 {r.assistanceTotalReps != null && (
-                  <span className="text-[11px] text-white/45">{r.assistanceTotalReps} total · by feel</span>
+                  <span className="text-xs text-white/65">{r.assistanceTotalReps} total · by feel</span>
                 )}
               </div>
               {/* THE THREE WORDS — how the top set felt. 5/3/1 dictates the weight, so there is
@@ -569,8 +582,12 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 "Set · Planned · Completed" over empty space — a table promising three facts and
                 delivering none. The prescription now lives on the name line above, which is the
                 whole point: a skipped lift still says what was asked for. */}
+            {/* ⛔ 50% WHITE ON BLACK READS AS DISABLED (2026-08-02, Michael: *"set completed isnt
+                bright enough"*). These are the column headers that tell you which number is which;
+                they are not decoration, and they were dimmer than the data they label. Same
+                correction, same reason, as the intake prose on 2026-07-27. */}
             {r.pairs.length > 0 && (
-            <div className="grid grid-cols-12 text-xs font-medium text-white/50 border-b border-white/20 pb-1">
+            <div className="grid grid-cols-12 text-xs font-medium text-white/70 border-b border-white/20 pb-1">
               <div className="col-span-2">Set</div>
               {/* ⛔ AN ASSISTANCE ROW HAS NO PLANNED COLUMN, because there is no per-set plan to put
                   in it (see `assistanceTotalReps`). Keeping the column and filling it with dashes
