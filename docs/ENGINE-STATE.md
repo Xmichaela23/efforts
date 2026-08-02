@@ -46,19 +46,8 @@ building.** He named it as the next job on 2026-08-01 evening; the substance was
 nothing in this repo records what the base-week display should say or why. **Do not infer it from the
 code.** A [Q-NNN] is owed as soon as he states it.
 
-⚠️ **ALSO OWED: a DEADLIFT NUMBER DISCREPANCY.** Michael named it as an item to file on 2026-08-01.
-**That is the entire extent of what is known.** No number, no screen, no expected-vs-actual, and no
-statement of where or when he saw it — the substance was never given, and the session that wrote this
-line had not seen it.
-
-⛔ **ASK. DO NOT HUNT, AND DO NOT INFER IT FROM THE CODE.** A lift number renders on the State strength
-row, the Performance strength table, the compare table and the logger, and they do not all derive it
-the same way. Picking one and investigating is how a session spends a day on the wrong surface and
-then reports a finding about a row Michael was not looking at.
-
-*(An earlier version of this line said he "observed" it "the same evening" — invented detail, corrected
-2026-08-01. Noted because a fabricated provenance reads exactly like a recorded one to the next
-session, and this doc's whole value is that it does not.)*
+*(A deadlift number discrepancy was briefly listed here as owed. **Raised in error and withdrawn
+2026-08-01 — there is no finding.** Noted only so it is not re-raised from the git history.)*
 
 ### WHAT SHIPPED TODAY — do NOT re-litigate
 
