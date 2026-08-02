@@ -760,10 +760,20 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 these totals: *"These numbers are just recommendations, so you can do more or less
                 depending on your strength level."* Going over is not an overshoot and going under is
                 not a miss, so nothing here is allowed to render as either. */}
+            {/* ⛔ ONE LUMINOSITY ACROSS THE PAIR (2026-08-02, Michael: *"25 total by feel / of 25
+                reps should be the same luminosity"*). These two lines are halves of ONE statement —
+                the header says what was asked, this says how much of it got done — and they were
+                rendered in three different values between them (65% on the header; 80% on the count
+                and 50% on its label here). Three weights across one sentence makes the eye read a
+                hierarchy that is not there. Matched to the header at 65%, INCLUDING the count: this
+                is a tally, not a headline, and emphasising the number would re-introduce exactly the
+                "score" reading D-338 spent a session removing from this screen.
+                ⚠️ A JSX comment may NOT sit between `(` and its element inside `{cond && ( … )}` —
+                that is a syntax error, not a comment. Second time today. It goes ABOVE the guard. */}
             {r.assistanceTotalReps != null && (
-              <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
-                <span className="text-white/80">{r.cRepsTotal.toLocaleString()}</span>
-                <span className="text-white/50">of {r.assistanceTotalReps.toLocaleString()} reps</span>
+              <div className="text-xs text-white/65 border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
+                <span>{r.cRepsTotal.toLocaleString()}</span>
+                <span>of {r.assistanceTotalReps.toLocaleString()} reps</span>
               </div>
             )}
             {/* Only show volume line when planned has volume to compare against */}
