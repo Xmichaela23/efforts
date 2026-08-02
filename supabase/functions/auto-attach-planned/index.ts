@@ -421,7 +421,14 @@ Deno.serve(async (req) => {
       .eq('user_id', w.user_id)
       .eq('type', finalSport)
       .eq('date', day)
-      .in('workout_status', ['planned','in_progress','completed']);
+      // ⛔ 'sent_to_garmin' IS IN THIS LIST, AND LEAVING IT OUT WAS THE INVERSE OF THE INTENT.
+      // `send-workout-to-garmin` sets that status when a planned session is pushed to the head unit
+      // (`send-workout-to-garmin/index.ts:175`), and NOTHING in the codebase ever sets it back — the
+      // string appears in exactly one other place, that write. So every session an athlete pushed to
+      // their Garmin became invisible to the matcher: the sessions MOST likely to be executed, and to
+      // come back as a completed activity, were the only ones that could not be attached to.
+      // (Not the cause of the 2026-08-01 miss — that row was still 'planned' — found while tracing it.)
+      .in('workout_status', ['planned','in_progress','completed','sent_to_garmin']);
 
     let candidates = Array.isArray(plannedList) ? plannedList : [];
     console.log('[auto-attach-planned] Found candidates:', candidates.length, 'for sport:', finalSport, 'day:', day);
