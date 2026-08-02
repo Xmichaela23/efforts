@@ -13,6 +13,7 @@ interface AdherenceChipsProps {
       power_adherence?: number | null;
       duration_adherence?: number | null;
       intensity_adherence?: number | null;
+      volume_ratio_pct?: number | null;
       easy_under_s?: number | null;
       easy_total_s?: number | null;
       easy_ceiling_bpm?: number | null;
@@ -159,6 +160,30 @@ export default function AdherenceChips({
       );
     };
 
+    /**
+     * ⛔ DURATION IS A READOUT TOO (2026-08-02, Michael: *"duration is one grade, time in prescribed
+     * anything is another grade"*).
+     *
+     * The percentage could not answer the question he actually asks of it — "did you cut it short or
+     * go long". It is distance-from-100 computed with Math.abs(), so a 35-minute run and a 57-minute
+     * run against a 46-minute plan BOTH read 76%. "35 of 46 min" answers it at a glance and grades
+     * nothing, exactly as the Easy chip now does.
+     *
+     * ⚠️ THESE ARE MOVING MINUTES. Both analyzers resolve actual duration from
+     * `computed.overall.duration_s_moving`, so the sports agree with each other — but a session with
+     * long stops reads short here for that reason alone, not for anything the athlete did.
+     */
+    const durationValue = (() => {
+      const done = sd.completed_totals?.duration_s ?? null;
+      const plan = sd.planned_totals?.duration_s ?? null;
+      if (done == null || plan == null || plan <= 0) {
+        // No plan to compare against — the percentage is the only honest thing left, and if that is
+        // absent too the chip does not render at all.
+        return durationAdherence != null ? `${durationAdherence}%` : null;
+      }
+      return `${Math.round(done / 60)} of ${Math.round(plan / 60)} min`;
+    })();
+
     /** "22 of 35 min" — whole minutes, from the seconds the server measured.
      *
      * ⛔ NO FALLBACK TO THE PERCENTAGE (2026-08-02, Michael: *"is this a good fallback?"* — it was not).
@@ -226,7 +251,7 @@ export default function AdherenceChips({
             <div className="flex items-start gap-3">
               {chip('Execution', executionScore, 'Overall adherence')}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
-              {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
+              {chipText('Duration', durationValue, 'Moving time vs plan')}
             </div>
           </div>
         </div>
@@ -246,7 +271,7 @@ export default function AdherenceChips({
               {powerAdherence != null
                 ? chip('Power', powerAdherence, 'Time in range')
                 : chipText('Easy', easyValue, easySubtitle)}
-              {chip('Duration', durationAdherence, completedDurS != null ? fmtDurAbs(completedDurS) : '—')}
+              {chipText('Duration', durationValue, 'Moving time vs plan')}
             </div>
           </div>
         </div>
@@ -268,7 +293,7 @@ export default function AdherenceChips({
           <div className="flex items-start gap-3">
             {chip('Execution', executionScore,
               performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence')}
-            {chip('Duration', durationAdherence, 'Time adherence')}
+            {chipText('Duration', durationValue, 'Moving time vs plan')}
             {/* An easy run had the Pace chip hidden and NOTHING put in its place — the athlete was
                 told the session was not judged on pace, and then shown no read at all on whether they
                 held it easy. The ride solved this on 2026-08-01; this is the same chip, the run's own

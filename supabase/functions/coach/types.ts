@@ -251,6 +251,13 @@ export type CoachWeekContextResponseV1 = {
       explain: string;
     };
     avg_execution_score: number | null; // 0..100 (from computed.overall.execution_score where available)
+    /** THE TWO GRADES, KEPT APART (2026-08-02). `avg_execution_score` is how long and how hard
+     *  averaged together — it can fall because a session ran short and rise because one ran long, and
+     *  cannot say which. These two answer the questions separately:
+     *   · `avg_intensity_adherence` — time spent at the prescribed effort (HR ceiling / power range).
+     *   · `avg_volume_ratio` — moving time as a ratio of planned: under 100 short, over 100 long. */
+    avg_intensity_adherence: number | null;
+    avg_volume_ratio: number | null;
     execution_sample_size: number; // count of sessions contributing to avg_execution_score
     // Aerobic response (primarily running): cardiac drift and internal load markers
     hr_drift_avg_bpm: number | null;

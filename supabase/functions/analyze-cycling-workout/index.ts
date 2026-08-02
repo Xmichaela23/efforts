@@ -1875,6 +1875,13 @@ Deno.serve(async (req) => {
       duration_adherence: durationAdherenceValue,
       /** Share of ride time at or under the easy ceiling. The governor for an easy prescription. */
       intensity_adherence: intensityAdherence,
+      volume_ratio_pct: (() => {
+        const pd = Number(durationAdherence?.planned_duration_s);
+        const ad = Number(durationAdherence?.actual_duration_s);
+        return (Number.isFinite(pd) && pd > 0 && Number.isFinite(ad) && ad > 0)
+          ? Math.round((ad / pd) * 100)
+          : null;
+      })(),
       // Minutes travel with the percentage — the chip renders "22 of 35 min under 131 bpm".
       easy_under_s: easyRead?.under_s ?? null,
       easy_total_s: easyRead?.total_s ?? null,
@@ -1892,6 +1899,7 @@ Deno.serve(async (req) => {
       power_adherence: null,
       duration_adherence: null,
       intensity_adherence: null,
+      volume_ratio_pct: null,
       easy_under_s: null,
       easy_total_s: null,
       easy_ceiling_bpm: null,

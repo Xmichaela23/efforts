@@ -950,6 +950,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // it is NOT folded into power_adherence, because "you held it easy" and "you hit your watts" are
       // different questions and only one of them was asked of this session.
       intensity_adherence: fin(perf?.intensity_adherence),
+      volume_ratio_pct: fin(perf?.volume_ratio_pct),
       easy_under_s: fin(perf?.easy_under_s),
       easy_total_s: fin(perf?.easy_total_s),
       easy_ceiling_bpm: fin(perf?.easy_ceiling_bpm),

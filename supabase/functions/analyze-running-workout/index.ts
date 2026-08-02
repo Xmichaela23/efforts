@@ -1486,6 +1486,25 @@ Deno.serve(async (req) => {
       
       performance.pace_adherence = granularPaceAdherence;
       performance.duration_adherence = granularDurationAdherence;
+      // ⛔ SHORT OR LONG — THE PERCENTAGE CANNOT SAY (2026-08-02, Michael: *"did you cut it short or
+      // go long"*). `adherence_percentage` is distance-from-100 computed with Math.abs(), so 76% means
+      // "24%% off" and a 35-minute run and a 57-minute run against a 46-minute plan both come out 76.
+      // The signed delta has always been computed and then dropped before anything could read it.
+      //
+      // `volume_ratio_pct` is the plain ratio: under 100 is short, over 100 is long. Nothing is graded
+      // here — it is the raw relationship, for the screen to read out and the coach to trend.
+      //
+      // ⚠️ IT IS MOVING TIME AGAINST PLANNED TIME (Michael: *"dont confuse duration with moving time"*).
+      // Both analyzers resolve the actual from `computed.overall.duration_s_moving`, so the two sports
+      // agree — but a session with long stops has a moving time well under its elapsed time, and this
+      // ratio will read short for that reason alone. Surfaces that say "min" must mean moving minutes.
+      {
+        const pd = Number(enhancedAnalysis.duration_adherence?.planned_duration_s);
+        const ad = Number(enhancedAnalysis.duration_adherence?.actual_duration_s);
+        performance.volume_ratio_pct = (Number.isFinite(pd) && pd > 0 && Number.isFinite(ad) && ad > 0)
+          ? Math.round((ad / pd) * 100)
+          : null;
+      }
       performance.gap_adjusted = !!(analysis as any).gap_adjusted;
       
       // Execution adherence = combination of pace + duration (equal weight: 50% pace, 50% duration)
@@ -1590,6 +1609,7 @@ Deno.serve(async (req) => {
       // The easy governor is an adherence read like any other — "you held it easy" only means
       // something against a prescription that said easy. No plan, no chip.
       performance.intensity_adherence = null;
+      performance.volume_ratio_pct = null;
       performance.easy_under_s = null;
       performance.easy_total_s = null;
       performance.easy_ceiling_bpm = null;

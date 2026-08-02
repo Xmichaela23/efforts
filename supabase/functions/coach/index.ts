@@ -787,26 +787,29 @@ function buildVerdict(
     };
   }
 
-  // Execution quality: if key sessions are being executed poorly, bias toward reducing intensity even if ACWR is okay.
-  if (
-    t.min_execution_score_ok != null &&
-    reaction.avg_execution_score != null &&
-    reaction.execution_sample_size >= 2 &&
-    reaction.avg_execution_score < t.min_execution_score_ok
-  ) {
-    reason_codes.push('execution_low');
-    return {
-      code: 'caution_ramping_fast',
-      label: 'Caution',
-      confidence: 0.72,
-      reason_codes,
-      next: {
-        code: 'swap_quality_for_easy',
-        title: 'Dial back intensity for 24–48h',
-        details: 'Your execution suggests you’re not absorbing the work. Keep it easy, then re-attempt the next key session.',
-      },
-    };
-  }
+  // ⛔ DELETED 2026-08-02 — the execution-quality caution gate.
+  //
+  // It read a per-session adherence average against a methodology threshold (65 / 70 / 75) and, on its
+  // own, returned a "Caution" verdict telling the athlete to "dial back intensity for 24-48h" because
+  // "your execution suggests you're not absorbing the work".
+  //
+  // Two things were wrong with it, and Michael named the second:
+  //
+  //  1. THE INPUT COULD NOT SUPPORT THE CLAIM. `avg_execution_score` is how LONG and how HARD averaged
+  //     together, so it falls when a session runs short and rises when one runs long, and cannot say
+  //     which happened. A warm 35-minute run in place of 46 — effort held exactly right — pushed it
+  //     down and came out as "you are not absorbing the work".
+  //  2. IT IS STATE'S JUDGEMENT, NOT THIS ONE'S. "Are you absorbing the work" is a cross-session
+  //     verdict about the body over time. D-363 moved exactly that off the session screen the night
+  //     before; this was the same violation one floor up.
+  //
+  // ⚠️ NOT REPLACED BY A SPLIT-GRADE VERSION. The thresholds were fitted to the blended number, so
+  // carrying 65/70/75 across to an intensity-only grade would be reusing a bar that no longer measures
+  // what it was set against. If this ever returns it needs a fresh bar and its own decision entry.
+  //
+  // The two grades still REPORT (the readiness-driver rows). They no longer conclude.
+  // `min_execution_score_ok` remains in the methodology configs, now unread — flagged for the cleanup
+  // sweep rather than removed here, since it is part of a published config shape.
 
   if (acwr >= warn && !isPlanWeek1) {
     reason_codes.push('acwr_elevated');
@@ -904,6 +907,8 @@ function buildRaceReadinessDrivers(args: {
     avg_session_rpe_7d: number | null;
     rpe_sample_size_7d: number;
     avg_execution_score: number | null;
+    avg_intensity_adherence: number | null;
+    avg_volume_ratio: number | null;
     execution_sample_size: number;
   };
   norms28d: {
@@ -947,12 +952,27 @@ function buildRaceReadinessDrivers(args: {
     });
   }
 
-  if (reaction.avg_execution_score != null && norms28d.execution_score_avg != null && reaction.execution_sample_size >= 2) {
-    const execDelta = reaction.avg_execution_score - norms28d.execution_score_avg;
+  // ⛔ TWO GRADES, REPORTED SEPARATELY (2026-08-02). "Execution 63%" was how long and how hard averaged
+  // together — a number that can fall because the athlete ran short, rose because they ran long, and
+  // says nothing about which. Michael: *"duration is one grade, time in prescribed anything is
+  // another grade"*. They are reported side by side and never merged.
+  //
+  // ⚠️ TONE IS NEUTRAL ON BOTH. A driver row states a fact; the readiness VERDICT is reached elsewhere,
+  // from body signals, and these two must stop leaning on it. Warning tones here were how a short week
+  // read as a body problem.
+  if (reaction.avg_intensity_adherence != null && reaction.execution_sample_size >= 2) {
     readinessDrivers.push({
-      label: 'Execution',
-      value: `${Math.round(reaction.avg_execution_score)}%`,
-      tone: execDelta >= 3 ? 'positive' : execDelta <= -5 ? 'warning' : 'neutral',
+      label: 'Time at prescribed effort',
+      value: `${Math.round(reaction.avg_intensity_adherence)}%`,
+      tone: 'neutral',
+    });
+  }
+  if (reaction.avg_volume_ratio != null && reaction.execution_sample_size >= 2) {
+    const v = Math.round(reaction.avg_volume_ratio);
+    readinessDrivers.push({
+      label: 'Session length vs plan',
+      value: v === 100 ? 'as planned' : `${v}% — ${v < 100 ? 'short' : 'long'}`,
+      tone: 'neutral',
     });
   }
 
@@ -1362,6 +1382,9 @@ Deno.serve(async (req) => {
       }
     };
     const executionScores: number[] = [];
+    // The two grades, collected separately and never averaged into each other (2026-08-02).
+    const intensityAdherences: number[] = [];
+    const volumeRatios: number[] = [];
     const driftBpms: number[] = [];
     const driftDates: string[] = []; // newest-session-date tracking for the BODY hr_drift "as of" stamp
     for (const w of Array.isArray(weekWorkouts) ? weekWorkouts : []) {
@@ -1370,6 +1393,19 @@ Deno.serve(async (req) => {
       if (pid && plannedIds.has(pid)) {
         const s = executionScoreFromWorkout(w as any);
         if (s != null) executionScores.push(s);
+        {
+          // Read straight off the analyzer's performance block — the same two fields the session
+          // screen renders, so the coach and the screen cannot describe the week differently.
+          const perf = (() => {
+            let wa: any = (w as any)?.workout_analysis;
+            if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { wa = null; } }
+            return wa?.performance ?? null;
+          })();
+          const ia = Number(perf?.intensity_adherence);
+          if (Number.isFinite(ia)) intensityAdherences.push(ia);
+          const vr = Number(perf?.volume_ratio_pct);
+          if (Number.isFinite(vr) && vr > 0) volumeRatios.push(vr);
+        }
         // Aerobic response: HR drift for steady aerobic runs only (avoid intervals/fartlek noise)
         if (String((w as any)?.type || '').toLowerCase() === 'run') {
           if (hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
@@ -1392,6 +1428,9 @@ Deno.serve(async (req) => {
     }
     const avgExecutionScore =
       executionScores.length > 0 ? Math.round(executionScores.reduce((a, b) => a + b, 0) / executionScores.length) : null;
+    const mean = (a: number[]) => (a.length > 0 ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null);
+    const avgIntensityAdherence = mean(intensityAdherences);
+    const avgVolumeRatio = mean(volumeRatios);
 
     // Subjective + structural response windows (last 7 days)
     const rpeStart = addDaysISO(asOfDate, -6);
@@ -1763,6 +1802,8 @@ Deno.serve(async (req) => {
       extra_sessions_details: extraSessionsDetails.slice(0, 10),
       linking_confidence: linkingConfidence,
       avg_execution_score: avgExecutionScore,
+      avg_intensity_adherence: avgIntensityAdherence,
+      avg_volume_ratio: avgVolumeRatio,
       execution_sample_size: executionScores.length,
       hr_drift_avg_bpm: hrDriftAvg,
       hr_drift_sample_size: driftBpms.length,
@@ -2923,8 +2964,20 @@ Deno.serve(async (req) => {
         rm.assessment.signals_concerning === 0 &&
         rm.assessment.label === 'responding';
 
-      // Execution degraded with enough samples — trust that regardless of ACWR
-      if (v.reason_codes.includes('execution_low')) return 'fatigued';
+      // ⛔ EXECUTION NO LONGER DIAGNOSES THE ATHLETE (2026-08-02, Michael: *"we have addressed all this
+      // in state"*).
+      //
+      // This read a per-session adherence average and returned 'fatigued' — a multi-day judgement about
+      // the BODY — "regardless of ACWR", i.e. regardless of whether any body signal agreed. It is the
+      // same violation D-363 closed on the session screen the night before, one floor up: fatigue is a
+      // cross-session verdict and STATE owns it, from trends over time, confound-excluded.
+      //
+      // ⚠️ AND THE INPUT COULD NOT SUPPORT IT. The score it read was duration and intensity averaged
+      // together, so a warm 35-minute run in place of a 46-minute one — effort held exactly right —
+      // dragged the average down and came out the other side as "you look fatigued". Splitting the two
+      // grades removes the blend; removing this line removes the diagnosis.
+      //
+      // Execution still REPORTS (the readiness-driver rows below). It no longer concludes.
 
       // ACWR elevated AND body signals confirm it — genuinely fatigued
       if (isAcwrFatiguedSignal(metrics.acwr, isPlanTransitionPeriod, weekIntent as any) && bodySignalsConcerning) return 'fatigued';

@@ -163,6 +163,10 @@ export type SessionDetailV1 = {
      *  prescribed as EASY, where no watts were given — heart rate is what "conversational" means.
      *  Null on any session that prescribed power, and on runs/swims. See `_shared/ride-easy-hr.ts`. */
     intensity_adherence?: number | null;
+    /** Moving time as a plain ratio of planned time: under 100 short, over 100 long. NOT a grade — the
+     *  `duration_adherence` percentage above is distance-from-100 via Math.abs(), so it cannot say
+     *  WHICH side of plan the session fell on. This can. */
+    volume_ratio_pct?: number | null;
     /** Seconds at or under the easy ceiling, and the seconds of USABLE heart rate they are out of.
      *  `easy_total_s` is HR coverage, not session duration — the surface prints "X of Y min", so the
      *  two numbers must come from the same population. */
