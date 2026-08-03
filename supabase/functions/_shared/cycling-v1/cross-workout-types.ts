@@ -87,10 +87,13 @@ export type CyclingPoolIntensityFilter = {
  * (`matched` / `current_much_harder` / `current_much_easier`), gated by
  * the same 10% boundary as the run's POOL_INTENSITY_MATCH_PCT.
  *
- * The POOL INTENSITY CONTEXT prompt rule in
- * `_shared/cycling-v1/ai-summary.ts` keys off `intensity_match` to suppress
- * false fatigue / fitness-loss framing when the pool was structurally
- * easier or harder than this ride.
+ * ⚠️ [D-372] — THIS TYPE NOW HAS NO READER. Its only consumer was the POOL
+ * INTENSITY CONTEXT prompt rule in `_shared/cycling-v1/ai-summary.ts`, which
+ * keyed off `intensity_match` to suppress false fatigue / fitness-loss framing
+ * when the pool was structurally easier or harder than this ride. That module
+ * went with the LLM output path. The field is still COMPUTED and still carries
+ * a real signal — deciding whether the deterministic bike row should use it, or
+ * whether the computation should go too, is open work, not settled.
  */
 export type CyclingPoolPowerContext = {
   current_if: number;

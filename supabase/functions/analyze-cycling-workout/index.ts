@@ -4,7 +4,6 @@ import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
 import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
-import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { composeBikeInsight, buildBikeInsightInputFromPacket } from '../_shared/insights/bike-insights.ts';
 import { spineVerdictFor } from '../_shared/narrative-core/index.ts';
 import { detectCrossDomainCarryover, buildCarryoverClause, classifyStrengthFocus, resolveCarriedInSoreness, CARRYOVER_WINDOW_DAYS, type SorenessEntry } from '../_shared/cross-domain-carryover.ts';
@@ -2105,8 +2104,9 @@ Deno.serve(async (req) => {
     // Build granular analysis (matches running structure for client compatibility)
     // D-089: wrap intervalBreakdown as { available, intervals } — the run-aligned
     // shape every consumer expects (session_detail/build.ts:234, workout-detail/
-    // index.ts:1238, _shared/cycling-v1/ai-summary.ts:259, generate-training-
-    // context/index.ts:1669). Bare array silently missed all of them.
+    // index.ts:1238, generate-training-context/index.ts:1669). Bare array silently
+    // missed all of them. (A fourth consumer, `_shared/cycling-v1/ai-summary.ts`,
+    // was deleted with the LLM path — [D-372].)
     const wrappedIntervalBreakdown = {
       available: Array.isArray(intervalBreakdown) && intervalBreakdown.length > 0,
       intervals: Array.isArray(intervalBreakdown) ? intervalBreakdown : [],
@@ -2674,8 +2674,9 @@ Deno.serve(async (req) => {
     try {
       // DETERMINISTIC INSIGHTS (2026-07-19) — the LLM cycling ai_summary is REPLACED by the bike composer.
       // Same verdicts (NP/IF/VI/TSS from the packet, power-at-HR decoupling, work-interval hits), power-vs-HR
-      // aware, no model, no wild card. generateCyclingAISummaryV1 is now dead for the main path (cleanup with
-      // the run LLM layer once bike is verified). Reads the SAME cycling packet the rows/State bike read use.
+      // aware, no model, no wild card. generateCyclingAISummaryV1 was DELETED on 2026-08-03 ([D-372]) — this
+      // composer is the only producer of `ai_summary` for rides now. Reads the SAME cycling packet the
+      // rows/State bike read use.
       const _bikeIntv = (detailedAnalysis as any)?.interval_breakdown;
       const _bikeIntervals = _bikeIntv ? {
         hit: _bikeIntv.completed ?? _bikeIntv.hit ?? null,
@@ -2730,7 +2731,7 @@ Deno.serve(async (req) => {
         rpe: _num((workout as any)?.rpe),
       }));
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
-      void generateCyclingAISummaryV1; void cyclingFlagsV1; void cyclingVsSimilar; void cyclingPRs; void npTrendV1; void pwr20TrendV1; void spineBikeTrend; void bike_spine_verdict; void cyclingLimiter; void _varGateRide; void plannedWorkout; void aiSummaryDebug; // dead LLM-path refs, retained for the cleanup sweep
+      void cyclingFlagsV1; void cyclingVsSimilar; void cyclingPRs; void npTrendV1; void pwr20TrendV1; void spineBikeTrend; void bike_spine_verdict; void cyclingLimiter; void _varGateRide; void plannedWorkout; void aiSummaryDebug; // dead LLM-path refs, retained for the cleanup sweep ([Q-246])
 
       // Axis 1 — cross-domain carryover (BIKE card). Discipline-correct signal: power-at-HR decoupling
       // (cyclingHrDriftPct — HR rising relative to power = engine straining to hold watts). For cycling,
@@ -2914,8 +2915,8 @@ Deno.serve(async (req) => {
       console.log('[analyze-cycling-workout] LLM produced no new ai_summary AND force_regenerate set — leaving null (stale preservation suppressed)');
     }
 
-    // _varGateRide is hoisted above generateCyclingAISummaryV1 so it can gate
-    // the LLM input shape. The same values feed glance below.
+    // _varGateRide was hoisted above the (now-deleted) LLM summary call so it could gate
+    // the LLM input shape — [D-372]. It survives because the same values feed glance below.
 
     const sessionStateV1 = {
       version: 1,

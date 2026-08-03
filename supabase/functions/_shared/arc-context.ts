@@ -1163,9 +1163,11 @@ export async function getArcContext(
 
   // Derive cycling fitness/fatigue/form from the snapshot CTL/ATL/TSB columns
   // (design Build Order #9). select('*') already pulls these once the migration
-  // is applied + compute-snapshot writes them; null until then. Same TSB band
-  // as the ai_summary narrative slice (cyclingCrossWorkoutDisplay) for
-  // cross-surface consistency.
+  // is applied + compute-snapshot writes them; null until then. The TSB band
+  // below used to be mirrored by an ai_summary narrative slice
+  // (`cyclingCrossWorkoutDisplay`); that slice went with the LLM path ([D-372]),
+  // so THIS is now the only bike form band. The CTL/ATL/TSB substrate it reads
+  // is unaffected — it lives in `_shared/cycling-v1/ride-physiology.ts`.
   let cycling_fitness: ArcContext['cycling_fitness'] = null;
   if (latest_snapshot) {
     const ctl = Number((latest_snapshot as any).ctl);
