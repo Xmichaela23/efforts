@@ -34,6 +34,29 @@ strength LLM deletion (*"looks good"* — nothing changed on screen, which was t
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE STRENGTH ROWS AFTER [D-373] + [D-374] (2026-08-02 night, deployed + pushed)
+
+Server side is **verified in the payload** (Hip Thrust and Barbell Row returned empty verdicts, the
+four main lifts unchanged). The **client filter is pushed but not seen on a device** — Netlify has to
+build, and the last screenshot of the night was still the old payload.
+
+- [ ] **Open State → the strength row → "from your logged sets".** It should now list **main lifts
+      only** — Squat, Deadlift, Bench Press, Overhead Press — and the count beside the header should
+      drop (it read `· 5 lifts` with accessories in it). ⛔ **No red "back off weight" anywhere**, on
+      any row.
+- [ ] **Check the count reads sensibly** when fewer than four main lifts have enough sessions — the
+      section hides entirely at zero rather than rendering an empty box.
+- [ ] ⚠️ **Hip Thrust and Barbell Row are now simply absent from that section.** That is [D-374] and it
+      is deliberate — the column is *"Working ~X vs your Y baseline"* and there is no tested max for
+      them. **If their absence feels wrong, that is [Q-253], not a regression** — the answer is a
+      different frame for accessories (their own history), not putting them back in this one.
+
+**Also unverified on a device tonight:** the State performance section itself was restored by hand
+after [Q-252] blanked it. It came back with all four cards in the payload — **worth one look that run,
+ride, swim and strength are all actually on screen.**
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE LAST PUSH OF 2026-08-02 (client only, unseen)
 
 - [ ] **Chip subtitles must not break through a value** (`5eb0b0ce`). "typically 68–117" was wrapping

@@ -4,6 +4,29 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-02 (night, third pass) — STRENGTH SAYS LESS AND MEANS MORE, AND THE REAL WORK IS NAMED.**
+> **[D-373]** — coaching language is main-lifts-only. A hard accessory (Hip Thrust, Barbell Row) no
+> longer prints a red *"back off weight"*; the gate is `isMain531Lift`, whose unknown-default is
+> silence. Deployed, coach **v161**, verified live in the payload. **[D-374]** — "from your logged
+> sets" drops accessories entirely: every row there is *"Working ~120 vs your 150 baseline"*, and you
+> do not test a max on a hip thrust. Filtered at the display, not the source, because `per_lift` feeds
+> the coach's own reasoning.
+>
+> ⛔ **NEXT IS A PRODUCT CALL, NOT A BUILD — [Q-254], THE AMRAP.** Michael: *"we need to make state
+> screen read amrap as the north star for stregnth focus."* The app already writes `amrap_reps` +
+> `measured` on every strength exercise (`compute-facts:1442`) and then reasons from something else at
+> three layers: the State e1RM is built from `bestWeight`/`bestReps` (an aggregate — and
+> `cycle-verdicts.ts` already documents why that is wrong), the per-lift verdict reads RIR (how it
+> FELT), and [Q-223] means the AMRAP advance only fires on a rebuild. **Decide rep-record vs e1RM
+> first; everything else follows.**
+>
+> ⚠️ **[Q-252] HAS A DEADLINE — it recurs this Sunday at 17:00 Pacific.** The State performance section
+> blanks because `compute-snapshot:670` gates the trend build on a UTC week. Restored by hand tonight;
+> that is a patch. **Do not open by shifting the timezone** — Michael: *"this section is rolling too"*.
+>
+> Also filed: **[Q-251]** (planned load counts three-fifths of a strength session as zero) and
+> **[Q-253]** (accessories now have no home on State — a gap, not a resolution).
+
 > **2026-08-02 (night, second session) — THE LLM MACHINERY IS OUT OF THE TREE, NOT JUST BYPASSED.**
 > [D-372] deleted the three dead prompt builders (3,532 lines) — `prompt-builders.ts` (852, zero
 > references repo-wide), `_shared/fact-packet/ai-summary.ts` (1,261) and
