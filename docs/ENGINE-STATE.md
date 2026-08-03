@@ -23,7 +23,50 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-02 night, SECOND session — **[Q-252] recurs THIS SUNDAY. Read it before you pick anything.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-03 — strength language SHIPPED; next is Q-254 AMRAP + two fresh bugs)
+
+### YOUR JOB
+The **strength language is done** ([D-375], see below) — do NOT re-open it. The next strength work is
+**[Q-254], the AMRAP currency job**, and it now carries three concrete pieces (all in `OPEN-QUESTIONS-2.md`
+under Q-254's 2026-08-03 addendum): (1) rebuild the State "from your logged sets" rows on the **AMRAP top
+set + learned e1RM** instead of working-weight-vs-a-stale-typed-baseline; (2) **drop RIR for AMRAP** as the
+strength-currency signal (Michael: *"rir arent valid anymore — 5-3-1 uses amrap"*); (3) roll **trap-bar
+deadlift into the deadlift slot** (`PRIMARY_LIFTS`/`computeE1rmBand` — variant aggregates, don't add a 5th
+max). See `GAME-PLAN.md`.
+
+### ⛔ TWO FRESH BUGS FROM DEVICE ACCEPTANCE (both filed under Known-broken below, neither fixed)
+1. **OHP logging gap.** The Jul 28 overhead-press session stored `estimated_1rm = 0` — `compute-facts:1434`
+   only computes an e1RM when `bestWeight > 0 && bestReps > 0`, so a set logged without a valid weight+reps
+   pair never updates the learned max (left it stale at Jul 23, value 105). VERIFIED via read: the Jul 28
+   row has e1RM 0 and null RIR. **Open question, one read to settle:** was the weight missing (a logger
+   capture bug) or the reps (UX)? Pull that session's stored sets.
+2. **Add-picker catalog gap.** The strength logger's add-exercise search (draws from `exercise-config.ts`)
+   is missing **band-named moves, sled, and dead hang** — confirmed on device ("ban" and "sled" return
+   nothing; "fa" DOES return Face Pulls / Farmer's Carry / TRX Fallout, so it's spotty, NOT a whole
+   category). Pre-existing (the add catalog never grew with the type table). **This blocks verification of
+   the 5 changed logger movements** (sled push/pull, dead hang, wall angel, foot doming) — they can't be
+   added by hand. Job: reconcile `exercise-config.ts` against the full vocabulary, each with correct
+   display config (perHand / band / duration). A terminal reconciliation task was drafted but not run.
+
+### ⛔ STILL LIVE AND UNFIXED — [Q-252], THE SUNDAY BLACKOUT (carried forward, NOT touched this session)
+The entire State performance section blanks every Sunday ~17:00 Pacific: `compute-snapshot/index.ts:670`
+gates the trend build on `targetWeek === mondayOfToday()`, which resolves in **UTC**. It is a rolling
+7-day read and Michael's objection stands — *"this section is rolling too"* — so the fix is a product call
+(does the week gate belong at all), and there's no athlete timezone on the snapshot path. **It recurs every
+Sunday.** Restored by hand each time is a patch, not a fix. Read Q-252 before touching it.
+
+### WHAT SHIPPED THIS SESSION — DO NOT RE-LITIGATE
+- **[D-375]** — the whole strength-language collapse: one role axis + one type axis (8 types incl. band),
+  read by the card, logger, swapping, and load. Fixed a real band-assist pricing bug (200-vs-700, was
+  corrupting stored `total_volume_lbs`; history checked clean). The fitness-section name sets are **three
+  questions, not one** (coach ~16 / tracked-max 4 / dot 5) — a Front Squat coached-but-not-charted is
+  CORRECT. PUSHED (`dd703ef5`) + DEPLOYED (29 fns) + card VERIFIED on device.
+- **Cap fix** — `StateTab.tsx` logged-sets list filtered to main lifts BEFORE the `.slice(0,5)` cap, so
+  overhead press (6th) is no longer cut. Client-only, pushed, VERIFIED (OHP back on the card).
+- ⚠️ **NOT verified:** the 5 changed logger movements (blocked by the catalog gap above). Bands only
+  partially (band-assisted Chin Up seen; band-add row and Dead Hang not).
+
+### 🗄️ HISTORY (2026-08-02 night, SECOND session) — superseded by the banner above; kept for the Q-249 / Q-246 / grep-the-exports notes still relevant below
 
 ### WHAT THIS SESSION DID
 

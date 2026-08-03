@@ -1,9 +1,13 @@
 # SPEC — one strength language across the app (5/3/1 base)
 
-**Status:** LOCKED 2026-08-01 (Michael). **Axis 1 (Role) SHIPPED as D-373** (2026-08-02) — accessory
-commands silenced, gated on `isMain531Lift`. **Axis 2 (Type) + the classifier collapse REMAIN — and are
-UNBLOCKED:** Q-240/Q-241 (bike cleanup) both closed 2026-08-01, so the old "queued after bike" note is
-**stale.** The build order is at the bottom of this file (`## BUILD ORDER`).
+**Status:** ⛔ **FULLY SHIPPED 2026-08-03 as [D-375]** (Axis 1 was [D-373]; Axis 2 + the classifier
+collapse shipped in 7 steps — see the BUILD ORDER review blocks below). **This file is retained ONLY for
+the unbuilt remainder**, and should be DELETED once that lands (per the SPEC lifecycle in `CLAUDE.md`).
+**Unbuilt remainder:** (1) plain-name recognition ("Dips"/"Chin Up"/bare "Bench"/"Deadlift" fall to
+`primary`); (2) Bench-as-main-lift name gap; (3) core-circuit label (cosmetic — Michael: leave); (4)
+`bandMeansAssistance` in `canonicalize.ts` is dead-in-prod, left labelled reference-only (Michael's call);
+(5) the add-picker catalog gap (band/sled/dead-hang not addable — now tracked in ENGINE-STATE Known-broken).
+The AMRAP/e1RM currency rebuild is NOT here — it lives in [Q-254].
 **Lifecycle:** this is a build contract. When it ships, fold its substance into a new `D-NNN` in
 `DECISIONS-LOG.md` and **delete this file** (per the SPEC lifecycle in `CLAUDE.md`).
 

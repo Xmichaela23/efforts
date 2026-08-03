@@ -92,3 +92,54 @@ which rows belong in **one section**, made with the **same shared classifier the
 [Q-253]: the honest frame for by-feel work is the athlete's own history (reps at a weight, volume over
 weeks), never a tested max — which is also Michael's direction on [Q-251]. Do not "fix" Q-253 by
 putting accessories back into the baseline section.
+
+### D-375 — ONE strength language: Axis 2 (Type) + the classifier collapse (2026-08-03, **PUSHED + DEPLOYED (29 fns) + PARTIALLY VERIFIED**)
+
+Completes `SPEC-strength-language.md`. [D-373] shipped Axis 1 (Role); this is **Axis 2 (Type)** plus
+the collapse of the 6→8 overlapping classifiers onto **one role axis + one type axis**. Built as 7
+ordered steps (build the new table → migrate readers one at a time → delete duplicates last), each
+proven by fixture with no behavior change except deliberate corrections.
+
+**What shipped:**
+- **The Type table** (`src/lib/exercise-role.ts`): 8 rows — barbell-main, barbell/DB-accessory,
+  bodyweight, plyo, isometric/hold, mobility, carry, **band** — each carrying has-weight / has-1RM /
+  coached / logged-as. The four main lifts read `MAIN_531_LIFTS` directly so "coached type" can't drift
+  from `isMain531Lift`. Unknown move = counts as load, says nothing (same safe default as D-373).
+- **Band is an 8th type that POINTS at existing machinery**, not reinvented pricing: `bandMeansAssistance`
+  (add-vs-assist) + the flat-token path in `workload.ts`.
+- **The card, logger, swapping, load all read the shared axes.** Notable sub-decisions: equipment-draw
+  rules were **transcribed byte-for-byte** into the shared module (Step 3), NOT re-derived — re-deriving
+  would have re-opened Q-180 (Farmers Carry priced as one bar). Swapping's `isMainLift` became a
+  **union** (curated family OR shared classifier) so it can't disagree about "main lift" (Step 4).
+- **A real pricing bug fixed along the way** (`src/lib/band-assistance.ts`, Step 5): the logger and the
+  pricer used different gates for "is the band assistance," so "Band Assisted Pull Up" priced 40 lb of
+  HELP as 40 lb of LOAD — **200 vs the correct 700**, and it was corrupting stored `total_volume_lbs`
+  in 5 call sites, not just the load score. One shared gate now. **History checked read-only: clean —
+  Michael only ever logged the plain base names, which were always priced right.**
+- **The fitness-section name sets are THREE questions, not one** (`src/lib/tracked-max-lifts.ts`, Step 7):
+  "may we coach it?" (~16, includes Front Squat) ≠ "do we chart a tracked max?" (exactly 4) ≠ "does it
+  move the dot?" (`PRIMARY_LIFTS`, 5). A Front Squat coached-but-not-charted is **correct** (it fills the
+  squat slot, doesn't earn a 5th max) — pinned in a fixture. The real bug fixed: `BIG_4` existed
+  byte-identical in two files (server emitter + client renderer) with only a comment claiming they
+  matched — the D-346 fault waiting to happen; now one imported list.
+- **Cap fix** (`StateTab.tsx` logged-sets list): the list was `.slice(0,5)` **before** the main-lift
+  filter, so `overhead_press` (6th in key order) was cut before it was checked — the "missing OHP"
+  symptom. Now filter to main lifts FIRST, then cap (redundant at max 4). Client-only.
+
+**Deploy:** commit `dd703ef5` + the cap-fix push; 29 edge functions redeployed (the union widened from
+11 → 29 because `state-trend/assemble.ts` is the snapshot spine). Coach payload version NOT bumped, so
+no client-floor / Q-252 trap. Blocked once by an upstream esm.sh 404 (`@supabase/supabase-js@2` →
+2.112.0 auth-js missing); self-healed within hours, no version pinning needed.
+
+**VERIFIED on device:** strength card shows main lifts only, no red "back off weight," OHP restored
+after the cap fix, band-assisted Chin Up renders Assist(lb)+Added correctly. **NOT verified:** the 5
+changed logger movements (sled push/pull, dead hang, wall angel, foot doming) — blocked because they
+aren't in the add-picker (see the catalog gap in ENGINE-STATE Known-broken).
+
+**Deferred (NOT this decision):** → [Q-254] now carries the real strength-currency work (rebuild the
+logged-sets rows on AMRAP + learned e1RM, drop RIR for AMRAP, roll trap-bar into the deadlift slot).
+Two fresh bugs from acceptance filed in ENGINE-STATE. [Q-253] (accessory home), plain-name recognition,
+core-circuit label, and `bandMeansAssistance`-in-canonicalize (dead, left labelled) remain.
+
+> **Back-annotates [D-373]:** Axis 1 shipped there; the strength-language SPEC is now fully built as of
+> this entry. `SPEC-strength-language.md` retained only for the unbuilt remainder above.

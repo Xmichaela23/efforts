@@ -4,6 +4,20 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-03 — THE STRENGTH LANGUAGE IS SHIPPED. ONE VOCABULARY, ACROSS THE WHOLE APP.**
+> **[D-375]** completed `SPEC-strength-language.md`: the 6→8 overlapping classifiers collapsed onto one
+> role axis + one type axis (8 types incl. band), read by the card, logger, swapping and load. Built as 7
+> ordered steps, PUSHED + DEPLOYED (29 fns) + card VERIFIED on device. The fitness-section name sets are
+> **three questions, not one** (coach 16 / tracked-max 4 / dot 5). A band-assist pricing bug (200-vs-700,
+> corrupting stored `total_volume_lbs`) fixed; history checked clean. Cap fix restored OHP to the card.
+>
+> ⛔ **NEXT: [Q-254], THE AMRAP CURRENCY JOB — this is the real strength north star.** Three named pieces
+> (Q-254's 2026-08-03 addendum): rebuild the logged-sets rows on AMRAP + learned e1RM (they currently read
+> working-weight vs a stale typed baseline), drop RIR for AMRAP, roll trap-bar into the deadlift slot.
+> **Plus two fresh acceptance bugs** (ENGINE-STATE Known-broken): the OHP logging gap (Jul 28 e1RM=0) and
+> the add-picker catalog gap (band/sled/dead-hang not addable, blocking logger verification). And **[Q-252]
+> is STILL LIVE** — the Sunday blackout, untouched this session.
+
 > **2026-08-02 (night, third pass) — STRENGTH SAYS LESS AND MEANS MORE, AND THE REAL WORK IS NAMED.**
 > **[D-373]** — coaching language is main-lifts-only. A hard accessory (Hip Thrust, Barbell Row) no
 > longer prints a red *"back off weight"*; the gate is `isMain531Lift`, whose unknown-default is

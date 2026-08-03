@@ -266,6 +266,34 @@ still talking about feel; fixing the verdict without Q-223 leaves the plan still
 **To close:** rule on (3) first — rep record or e1RM. Everything else follows. Related: [Q-223],
 [D-338], [D-370], [D-373], [D-374], [Q-251].
 
+### Added 2026-08-03 — three findings from the strength-language ship, all landing in this Q
+
+Surfaced during Michael's device acceptance of the strength-language work. All three are the same job:
+**reason from the AMRAP / learned max, not from the wrong number.**
+
+1. **The "from your logged sets" section reads working-weight vs a STALE TYPED baseline.** Live (Michael's
+   screen, 2026-08-03): Deadlift reads *"Working ~120 vs your 150 baseline"* while his logged e1RM is
+   already ~225 — the section compares to `performance_numbers.deadlift` (typed, old) and ignores the
+   learned max. So it measures effort against a number he's blown past, and in a light 5/3/1 week it just
+   says "you're going light." **Rebuild each row on the AMRAP top set + the learned/climbing e1RM**
+   ("top set hit X reps, max is climbing/holding") — the real "am I getting stronger" read.
+   `StateTab.tsx` logged-sets list (~1233-1247) + its baseline source.
+
+2. **RIR is deprecated in favor of AMRAP as the strength-currency signal (Michael, 2026-08-03):** *"rir
+   arent valid anymore — 5-3-1 uses amrap."* D-118's RIR-based exclusion (`avg_rir ≥ 5` → fallback
+   bucket) is the wrong lens for a 5/3/1 block where the top set is AMRAP at a fixed %. Currency/verdict
+   should read AMRAP reps, not RIR deviation. (This is Gap 2 of this Q, now with an explicit ruling.)
+
+3. **Trap-bar deadlift double-counts the strength dot — RULED (Michael, 2026-08-03):** a **variant
+   aggregates into its slot** — trap-bar deadlift is a deadlift OPTION, contributes to the deadlift max,
+   never a 5th tracked lift (same as Front Squat → squat slot). Fix `PRIMARY_LIFTS` / `computeE1rmBand`
+   to roll variants into the four slots (do NOT delete the name — an athlete who only trap-bars must
+   still get a deadlift signal). Measured today: squat+deadlift dot 0.750 → 0.833 from logging the variant.
+
+⚠️ **Separate, NOT this Q — a logger/compute-facts bug found the same day:** the Jul 28 OHP session stored
+`estimated_1rm = 0` (no valid weight+reps pair, `compute-facts:1434`), so it never updated the learned max
+and left `last_logged` at Jul 23. A logging-capture gap, not an AMRAP-reasoning problem — track separately.
+
 ## Q-255 — ⛔ THE BIKE ROW GOES SILENT WHILE A GOOD CYCLING FITNESS NUMBER SITS ONE FIELD AWAY (2026-08-02, Michael) — **CTL/ATL/TSB are computed, populated, and unread by State**
 
 Michael, looking at the row the night after it was "finished": *"i thought we fixed this"* … *"isnt there
