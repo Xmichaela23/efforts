@@ -15,6 +15,10 @@
 // input reads, so the two cannot answer differently for the same movement. See the module header
 // for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
 import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
+// ⛔ THE OTHER HALF OF THE BAND QUESTION: does a band here ADD load rather than cancel it? Asked of
+// the shared TYPE axis so it answers for `clamshell` and `lateral band walk`, which carry no "band"
+// in the name. Same import path precedent as `_shared/response-model/weekly.ts`.
+import { typeForExercise } from '../../../src/lib/exercise-role.ts';
 
 // ---------------------------------------------------------------------------
 // Intensity factor tables
@@ -309,6 +313,22 @@ export type StrengthVolumeOpts = {
    * cannot disagree. (Was `bandMeansAssistance(canonical)`; that split on "Band Assisted Pull Up".)
    */
   bandIsAssistance?: boolean;
+  /**
+   * ⛔ IS THE BAND THE LOAD ON THIS MOVEMENT? `typeForExercise(name) === 'band'` — the shared type
+   * axis, not a name test, so it answers for `band pull apart`, `band row`, `clamshell` and
+   * `lateral band walk` alike (the last two carry no "band" in the word at all).
+   *
+   * ⚠️ THE COMPANION TO `bandIsAssistance`, AND THE OTHER HALF OF THE SAME QUESTION. That flag says
+   * "a band here CANCELS load"; this one says "a band here IS the load". They are mutually
+   * exclusive by construction — `bandMeansAssistance` is exactly {pullup, chinup, dip}, and none of
+   * those is typed `band` — and both are asked of the EXERCISE once, never of the set.
+   *
+   * ⛔ IT EXISTS BECAUSE A BLANK BAND BOX WAS PRICED AS BODY WEIGHT. With no logged weight and no
+   * band value, the final fall-through returned `bodyweight × reps` — correct for a push-up and
+   * badly wrong for a band pull-apart, which put ~4,000 lb on a set of face pulls. The pricer was
+   * never told what the movement was; it only ever saw the set.
+   */
+  bandIsLoad?: boolean;
 };
 
 /**
@@ -435,6 +455,23 @@ export function strengthSetVolume(
 
   if (banded) return bandLb != null ? bandLb * reps : BAND_SET_VOLUME_TOKEN;
 
+  // ⛔ A BAND MOVEMENT WITH AN EMPTY BOX IS NOT A BODYWEIGHT MOVEMENT (2026-08-03).
+  //
+  // Below this line is the bodyweight fall-through, and until now EVERY set that reached it with no
+  // weight and no band value was priced `bodyweight × reps`. On a band face pull that is ~170 × 25 =
+  // ~4,250 lb for a set of face pulls — more than the day's bench work, on a movement where the band
+  // is the entire load and the athlete's body is not moving anywhere.
+  //
+  // ⚠️ AND A BLANK BOX IS LEGAL, WHICH IS WHY THIS IS NOT A DATA PROBLEM. The keypad hint says
+  // "Leave blank if you don't know it", and D-351 prices a blank ADD-band at the flat token
+  // deliberately. The bug was that a blank band never reached that token — `banded` is false when
+  // `resistance_level` is empty, so it fell straight past rule 4 into the bodyweight rule.
+  //
+  // ⛔ ONLY THE BLANK CASE MOVES. If the athlete typed a poundage, `banded` is true and rule 4 above
+  // already priced it `bandLb × reps` — untouched, and it must stay that way: a recorded band is a
+  // real number and the token would throw it away.
+  if (opts.bandIsLoad) return BAND_SET_VOLUME_TOKEN;
+
   return bw > 0 ? bw * reps : 0;
 }
 
@@ -446,9 +483,10 @@ export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number,
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       // Asked once per EXERCISE, not per set — a band means the same thing on every set of a row.
       const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
+      const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
       ex.sets.forEach((set: any) => {
         if (set.completed !== false) {
-          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance });
+          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance, bandIsLoad });
         }
       });
     }
@@ -512,9 +550,15 @@ export function calculatePlannedStrengthWorkload(
       // resolves to "no weight, no band" and gets priced as full bodyweight, against a token on the
       // completed side — the mismatch this function was written to end, re-created one layer down.
       const plannedIsBand = /band/i.test(String(ex.weight ?? ''));
+      // ⚠️ AND THE TYPE AXIS CATCHES WHAT THE WORD MISSES. `plannedIsBand` only fires when the
+      // prescription literally says "band" in the weight slot; a Band Face Pull prescribed
+      // "By feel" (every assistance row in a Get Stronger block) says nothing of the kind, so it
+      // fell to the bodyweight rule on the PLANNED side while the completed side took the token —
+      // the exact planned-vs-actual mismatch this function exists to prevent, one layer down.
+      const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
       totalVolume += sets * strengthSetVolume(
         { weight: ex.weight, reps, resistance_level: plannedIsBand ? 'band' : null },
-        { ...opts, bandIsAssistance },
+        { ...opts, bandIsAssistance, bandIsLoad },
       );
     }
     if (typeof ex.target_rir === 'number' && ex.target_rir >= 0) intensities.push(rirToStrengthIntensity(ex.target_rir));

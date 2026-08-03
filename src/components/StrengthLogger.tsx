@@ -33,6 +33,9 @@ import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
 import { equipmentForExercise, isDurationLogged } from '@/lib/strength-logging-mode';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
+// Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
+// asked of the shared classifier rather than a private regex.
+import { calculateRestTime, isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
@@ -162,18 +165,13 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 
 
 // Check if exercise is a main compound lift
-const isMainCompound = (exerciseName: string): boolean => {
-  const name = exerciseName.toLowerCase();
-  // Main compounds: squat, deadlift, bench, overhead press
-  return /squat|deadlift|bench|overhead|ohp/.test(name) && 
-         !/goblet|bulgarian|split|romanian|sumo|stiff|jump/.test(name);
-};
-
-// Check if exercise is a plyometric/explosive movement
-const isPlyometric = (exerciseName: string): boolean => {
-  const name = exerciseName.toLowerCase();
-  return /jump|bound|hop|box jump|bench jump|broad jump|depth jump|squat jump|tuck jump|split jump|plyo|explosive/.test(name);
-};
+// ⛔ `isMainCompound` AND `isPlyometric` LIVED HERE AND ARE GONE (2026-08-03).
+// `isMainCompound` was the SEVENTH private exercise classifier in the app and it disagreed with
+// `MAIN_531_LIFTS`: Push Press and Military Press matched none of its words, so two main lifts
+// rested like accessories. Rest length now comes from `src/lib/strength-rest-timer.ts`, which asks
+// the shared classifier — and which can be unit-run, unlike a function inside this file.
+// `isPlyometric` moved to the same module unchanged, so the rest timer and the render gates below
+// read ONE copy instead of two.
 
 // Normalize an exercise name for cross-session matching: lowercase, strip
 // (Left)/(Right) suffixes, collapse whitespace, drop a trailing plural 's' (Q-197).
@@ -267,37 +265,7 @@ async function cancelRestNotification(key: string): Promise<void> {
   try { await LocalNotifications.cancel({ notifications: [{ id: restNotifId(key) }] }); } catch { /* no-op */ }
 }
 
-// Calculate rest time based on exercise type and reps
-const calculateRestTime = (exerciseName: string, reps: number | undefined): number => {
-  if (!reps || reps === 0) return 90; // Default 90 seconds
-  
-  // Plyometrics need full recovery between sets (2-3 min)
-  if (isPlyometric(exerciseName)) {
-    return 150; // 2:30 for neural recovery
-  }
-  
-  const isCompound = isMainCompound(exerciseName);
-  
-  if (isCompound) {
-    // Main Compounds:
-    // 3-5 reps: 150 sec (2:30)
-    // 6-8 reps: 120 sec (2:00)
-    if (reps >= 3 && reps <= 5) return 150;
-    if (reps >= 6 && reps <= 8) return 120;
-    // Default for compounds outside range
-    return 120;
-  } else {
-    // Accessories:
-    // 6-10 reps: 90 sec (1:30)
-    // 10-15 reps: 75 sec (1:15)
-    // 15+ reps or time-based: 60 sec (1:00)
-    if (reps >= 6 && reps < 10) return 90;
-    if (reps >= 10 && reps < 15) return 75;
-    if (reps >= 15) return 60;
-    // Default for accessories outside range
-    return 90;
-  }
-};
+// Rest length: `src/lib/strength-rest-timer.ts` (extracted 2026-08-03 so it can be fixtured).
 
 // Readiness Check Banner Component
 interface ReadinessCheckBannerProps {

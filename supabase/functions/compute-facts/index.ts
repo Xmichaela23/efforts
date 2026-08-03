@@ -36,6 +36,9 @@ import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
 // [Step 5] One shared gate for band-as-assistance; see src/lib/band-assistance.ts.
 import { isBandAssistedMovement } from "../../../src/lib/band-assistance.ts";
+// ⛔ The OTHER half of the band question — does a band here ADD load rather than cancel it. Asked of
+// the shared TYPE axis so it also answers for `clamshell` / `lateral band walk` (no "band" in name).
+import { typeForExercise } from "../../../src/lib/exercise-role.ts";
 // THE SAME top-set rule the logger stamps the difficulty tap with — heaviest set, ties to the last.
 // Imported, not re-derived: if the two ever disagree the word lands on a different set than the one
 // the athlete answered about. (`strength-focus-copy.ts` documents that both runtimes import it.)
@@ -1414,10 +1417,14 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null, bodyweigh
     // It used to be asked of `canon`, and `canonicalize` drops "Band Assisted Pull Up" onto its own
     // key — so the assist the athlete typed was priced as added band load. See `band-assistance.ts`.
     const bandIsAssistance = isBandAssistedMovement(rawName);
+    // ⛔ The band is the LOAD here, not help — so a blank band box prices at the flat token rather
+    // than falling through to `bodyweight x reps` (2026-08-03). Asked of the shared type axis, which
+    // also answers for `clamshell` and `lateral band walk` (no "band" in either name).
+    const bandIsLoad = typeForExercise(rawName) === 'band';
     for (const s of completedSets) {
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;
-      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance });
+      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad });
       if (w > bestWeight) { bestWeight = w; bestReps = r; }
       if (w === bestWeight && r > bestReps) { bestReps = r; }
       // D-203/provenance: exclude auto-filled RIR (the suggested target echoed back by

@@ -23,6 +23,7 @@ import { strengthSetVolume } from '../workload.ts';
 // [Step 5] The ONE gate for "does a band mean help here" — the same function the logger's assist
 // input reads, so the two cannot answer differently for the same movement. See the module header
 // for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
+import { typeForExercise } from '../../../../src/lib/exercise-role.ts';
 import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
 
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
@@ -2213,9 +2214,12 @@ function buildStrengthVolume(
 
   const completed = compExs.map((ex: any) => {
     const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
+    // ⛔ The band is the LOAD on these, not help and not the body — asked of the shared type axis so
+    // a blank band box prices at the token rather than bodyweight x reps (2026-08-03).
+    const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
     const setsArr = Array.isArray(ex?.sets) ? ex.sets : (Array.isArray(ex?.setsArray) ? ex.setsArray : []);
     const volume_lb = setsArr.filter(isPerformedSet).reduce(
-      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance }),
+      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad }),
       0,
     );
     return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };
@@ -2223,6 +2227,10 @@ function buildStrengthVolume(
 
   const planned = plannedExs.map((ex: any) => {
     const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
+    // ⚠️ The word-test below only fires when the prescription literally says "band"; an assistance
+    // row prescribed "By feel" does not, so the type axis is what keeps the PLANNED column pricing
+    // a band the same way the completed column does.
+    const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
     // ⚠️ A PRESCRIPTION PUTS A WORD WHERE THE NUMBER GOES (D-094: "Bodyweight", "Band", "Heavy
     // barbell"). `strengthSetVolume` reads a band off `resistance_level`, which only a LOGGED set
     // has — so the prescribed dialect is translated into the logged one here, exactly as
@@ -2240,7 +2248,7 @@ function buildStrengthVolume(
       for (const ap of setPlan) {
         volume_lb += strengthSetVolume(
           { weight: ap?.weight ?? ex?.weight, reps: ap?.reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad },
         );
       }
     } else {
@@ -2249,7 +2257,7 @@ function buildStrengthVolume(
       if (sets > 0 && Number.isFinite(reps) && reps > 0) {
         volume_lb = sets * strengthSetVolume(
           { weight: ex?.weight, reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad },
         );
       }
     }
