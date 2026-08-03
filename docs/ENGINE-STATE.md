@@ -23,79 +23,89 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-02 evening — **the session screen is DONE and device-verified on both endurance sports. The next job is SWIM + STRENGTH, and one live State bug.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-02 night — **YOUR JOB IS AN AUDIT, NOT A FIX. Michael asked for a fresh session to audit everything before touching the queue.**)
 
 ### WHAT THIS SESSION DID, IN ONE LINE
 
-Run and ride now answer the same questions with the same words, every number on the Performance screen
-answers a **distinct** question, and Michael verified all of it on a device. Nineteen commits, six
-decisions ([D-364] … [D-369]), six new questions ([Q-242] … [Q-247]).
+The strength session screen became a real ledger — the plan's assistance totals are printed, an
+undeclared swap is credited and flagged, and **the strength narrative LLM is deleted** (845 lines).
+Ten commits, two decisions ([D-370], [D-371]), two questions ([Q-248], [Q-249]).
 
 ### ⛔ YOUR JOB
 
-**1. SWIM AND STRENGTH HAVE STILL NEVER BEEN AUDITED FOR ANY OF THIS.** That was the first task in the
-morning's work order and it is still untouched. The four shared questions that split run and ride apart
-(planned duration, which analyzer runs, which read leads, does this session count) have never been asked
-of the other two sports. **Start with the audit, not the rows.**
+**AUDIT FIRST. Michael's words: *"maybe a new chat audits everything and then tackles this."*** The
+queue below is real and mostly verified, but he wants a fresh read of the code rather than a fresh
+read of the last session's summary. **Do not open with a fix.**
 
-**2. [Q-245] IS A LIVE BUG, AND IT IS CHEAP.** State's run and bike trends cannot see a deload week —
-those series build `{date, value}` with no `meta`, so `isDeloadWeek` returns false on every point. A
-deliberately light week can read as **"sliding"** on both rows. Strength was fixed by D-338; these two
-were never wired. `run.ts:50/86/273`, `bike.ts:37`.
+Then, in confidence order — **the LLM deletes are the highest-confidence work on the board and they
+finish what today started:**
 
-**3. [Q-246] — delete the dead paths, keep their reasoning.** Sixteen computed-then-discarded blocks
-across the ride path, plus two dead client blocks. Every dated comment saying WHY a row is off is worth
-keeping; move it to a `D-NNN`. The code is a trap for whoever finds "already built" rows.
+**1. THREE DEAD LLM FILES. Verified today by reference count, not assumed.**
+- `analyze-running-workout/lib/narrative/prompt-builders.ts` — holds `callLLMInsights`. **ZERO
+  references anywhere in the repo.** Deleting it cannot break anything. Not in any note before today.
+- `_shared/fact-packet/ai-summary.ts` — one importer, `analyze-running-workout/index.ts:18`, and that
+  import is **voided at `:2384`**.
+- `_shared/cycling-v1/ai-summary.ts` — one importer, `analyze-cycling-workout/index.ts:7`, voided at
+  `:2733`.
+- Plus the swim LLM block, `analyze-swim-workout` ~396-720, already gated off by the never-set
+  `SWIM_INSIGHTS_LLM` env var.
+All four are on the **"DELETE (dead after the composers)" list further down this file** and have been
+since the composers shipped. ⚠️ The 12 voided refs on `analyze-cycling-workout:2733` are the fiddly
+part: deleting the `void` is trivial, deleting the VARIABLES means tracing each (`plannedWorkout` is
+certainly used elsewhere).
 
-### THE THREE FACTS YOU NEED BEFORE YOU TOUCH ANYTHING
+**2. [Q-246] — the non-LLM dead code.** Five computed-then-discarded ride rows in
+`session-detail/build.ts` (`:1451`, `:1620`, `:1644`, `:1729`, `:1787` — normalized power, avg/max HR,
+seven-band power zones, VAM climbing), plus `getAdvancedMetrics` (`CompletedTab.tsx:1034`) and
+`AppleHealthSwimEnrichment` (`MobileSummary.tsx:11`). **Safe to delete — they render nothing — but each
+carries a dated comment saying WHY the row is off, and that reasoning must move to a `D-NNN` first.**
 
-- **The endurance Insights paragraphs contain NO LLM.** `_shared/insights/run-insights.ts` and
-  `bike-insights.ts` are deterministic composers, wired at `analyze-running-workout` and
-  `analyze-cycling-workout:8`. The old model paths are imported and dead. **Strength insights and the
-  coach narrative DO still call Claude** — those are the only two output-LLMs left on a session/State
-  surface.
-- **The reference set is THREE APPS: TrainingPeaks, Garmin, Strava** (Michael, 2026-08-02: *"we dont
-  need to get in the weeds after that"*). If all three agree, that is the answer — stop researching.
-  Do not reach for intervals.icu / Runalyze / Stryd to settle an endurance call.
-- **Performance = how the session went. State = how the body is adapting over time.** Michael's own
-  split, and it is TrainingPeaks' and Garmin's. It decides where a number belongs: anything that only
-  means something as a trend is State's.
+**3. THE SWIM + STRENGTH AUDIT.** Still the standing work-order job
+(`WORKORDER-session-screen-continuity-2026-08-02.md` Part 3). **Smaller than it was this morning** —
+strength got a real pass today. Michael on swim: *"swim is very straight forward, not a lot there
+intentionally, we just dont get reliable metrics."*
 
-### WHAT SHIPPED — DEVICE-VERIFIED, DO NOT RE-LITIGATE
+### ⛔ [Q-249] IS NOT YOURS TO PICK. IT NEEDS MICHAEL.
 
-The Performance row is **three numbers, no blends**: `Workload · Duration · Easy/Power` ([D-369]).
-Execution is gone (it was the other two averaged). TSS is gone from the ride (two load numbers
-disagreeing by a quarter; a run has none). Workload carries the athlete's **own** band —
-`typically 68–117` — never a verdict, and no band under five sessions.
+One exercise has TWO NAMES — the analyzer reads `Face Pull` from `planned_workouts.strength_exercises`,
+the screen reads `Band Face Pulls` from `computed.steps[].strength.name`. Three fixes are possible and
+**one of them widens `canonicalize`, which is the grouping key for `exercise_log` and the State strength
+trend — it would silently re-group the athlete's lifting history.** A patch is live at the surface. He
+called it *"a huge fix on the docket"* and parked it. **Do not pick one.**
 
-An easy session is judged on **heart rate, as time under a ceiling**, gated on PLAN INTENT ([D-364]).
-One verdict per session — the pace badge comes off when the easy governor judged it, and stays on tempo
-/ threshold / intervals / hills ([D-365]). Easy and Duration are **readouts, not marks**; one
-temperature per screen, stated as a range when it moved ([D-366]). The bike mirrors the run, including
-the sentence neither sport had — *"Prescribed easy, ridden at threshold"* ([D-367]). The coach reports
-the two grades separately and **no longer diagnoses fatigue from them** ([D-368]).
+### THE FACTS YOU NEED BEFORE YOU TOUCH ANYTHING
 
-### ⚠️ THE TWO MISTAKES THIS SESSION MADE, BECAUSE THEY WILL REPEAT
+- **NO SESSION SCREEN HAS AN OUTPUT LLM ANY MORE — run, ride, and now strength.** Swim's is behind an
+  off env flag. **The coach and the race-readiness line are the last two live output-LLMs.** Michael:
+  *"we may keep it in race builder so dont get rid of all of it"* — `_shared/llm.ts`, `coach`,
+  `course-strategy`, `arc-setup-chat`, `extract-races` all STAY.
+- **The reference set is THREE APPS: TrainingPeaks, Garmin, Strava** for endurance. For STRENGTH it is
+  **Wendler's 5/3/1 book itself** (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`) plus Hevy / Strong /
+  Boostcamp. Today's decisions are sourced to page numbers; keep it that way.
+- **A strength session is a LEDGER.** It has no score ([D-338]), no narrative ([D-371]), and no tonnage
+  verdict ([D-370]) — Wendler's own log tracks the main lifts' rep records and nothing else.
 
-**1. A number picked at the keyboard with a justification written beside it that sounded sourced and was
-not.** Twice in one day: `gain >= 500 ft` credited to a classifier that actually uses 40 ft/mi density,
-and a 5% "fade" threshold credited to a drift boundary that is really Friel's decoupling line. Michael
-caught both by asking *"are you tuning this to me?"* — **the wrong number is recoverable; the false
-citation is what survives review.**
+### WHAT SHIPPED — DO NOT RE-LITIGATE
 
-**2. A silent `catch` hiding a broken reference, not missing data.** The ride's TERRAIN row vanished off
-the screen for an hour because two arguments were added to one function's params and used inside a
-DIFFERENT function that takes positional args. The reference threw, the row's own `try/catch` swallowed
-it, the suite stayed green. ⚠️ **`deno check` had it the whole time** — 15 errors → 13 with the fix. Run
-it on the file you changed, not just the small ones.
+**[D-370]** — assistance is prescribed as a REP TOTAL and printed as one (`Planned 25 total · by feel`);
+the Planned COLUMN is dropped from those rows because there is no per-set plan; `24 of 25 reps` under
+the sets; **`vs plan +11,640 lb` deleted** (it priced one lift against four, and tonnage is not a 5/3/1
+measure). An **undeclared swap into an assistance slot is credited and flagged** when the movement
+pattern differs — reversing the "never INFER a substitution" half of [Q-181], which is safe now only
+because [D-338] deleted the score that law protected. **A main lift stays binary.** Michael: *"you
+either did or you didn't."*
+
+**[D-371]** — the strength narrative LLM and everything feeding it: the Arc fetch, the spine verdict,
+the `spine_direction` tagging, an 8-week history query, seven imports. **Two DB round-trips per analysis
+removed on top of the model call.** `deno check` on that file: 2 errors → 0.
 
 ### STILL UNVERIFIED
 
-- **Everything after Michael's last screenshot**: the chip-wrapping fix (`5eb0b0ce`) is client-only and
-  unseen.
-- **[Q-244]** — Workload 86 vs TSS 69 on the same ride. Known, tolerated while only one is on screen.
-  **Check the banding before putting any scale or infographic in front of the athlete.**
-- **[Q-247]** — three living docs are over the archive cap; the decisions log is 3× over.
+- **The last two copy pushes** (`8483f083`, `ac536a99`) landed AFTER Michael's final screenshot: the
+  Planned column at Completed's luminosity, the `Planned` label on assistance rows, and the swap
+  sentence at 14px/80%. Deployed, unseen. See `POLISH-PUNCH-LIST.md`.
+- **[Q-244]** — Workload 86 vs TSS 69 on the same ride. Tolerated while only one is on screen.
+- **[Q-247]** — three living docs over the archive cap; the decisions log is 3× over.
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 

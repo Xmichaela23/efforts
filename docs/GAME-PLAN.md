@@ -4,6 +4,23 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-02 (night) — STRENGTH IS A LEDGER NOW, AND THE SESSION SCREENS HAVE NO LLM LEFT.**
+> The assistance prescription is printed (`Planned 25 total · by feel`), an undeclared swap into an
+> assistance slot is credited and flagged by movement pattern, `vs plan` tonnage is gone, and the
+> **strength narrative LLM is deleted** — 845 lines, plus two DB round-trips per analysis ([D-370],
+> [D-371]). Run and ride were already deterministic; swim's LLM is behind an off env flag. **The coach
+> and the race-readiness line are the last two live output-LLMs, and both STAY** (Michael: *"we may
+> keep it in race builder so dont get rid of all of it"*).
+>
+> ⛔ **NEXT: AN AUDIT, NOT A FIX.** Michael: *"maybe a new chat audits everything and then tackles
+> this."* Read the code before opening the queue. The queue, in confidence order, is in the
+> ENGINE-STATE banner: three verifiably-dead LLM files → [Q-246]'s non-LLM dead code → the swim +
+> strength audit.
+>
+> ⛔ **[Q-249] IS PARKED AND IS NOT A FREE PICK.** One exercise carries two names across two sources;
+> one of the three fixes widens `canonicalize` and would silently re-group the athlete's lifting
+> history. Michael called it *"a huge fix on the docket"*. A surface patch is live. **Wait for him.**
+
 > **2026-08-02 (evening) — THE SESSION SCREEN IS DONE, AND DEVICE-VERIFIED ON BOTH ENDURANCE SPORTS.**
 > Run and ride answer the same questions with the same words. The Performance row is **three numbers,
 > no blends** — `Workload · Duration · Easy/Power` — and every one answers a distinct question

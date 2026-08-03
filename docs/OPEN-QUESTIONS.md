@@ -2800,6 +2800,26 @@ strength or trust run and bike.
 
 ## Q-246 — Session-screen dead code that still runs (2026-08-02) — **filed, cheap, not done**
 
+> **↪ RE-VERIFIED AND WIDENED 2026-08-02 night. The line numbers below were confirmed against code,
+> and the LLM half of this is bigger than the entry said.**
+>
+> **The `void` sites in `_shared/session-detail/build.ts` are FIVE, not four:** `:1451` (`dec`),
+> `:1620` (`np`, `pctThreshold`, `suffix`), `:1644` (`parts`), `:1729` (`segs`), `:1787`
+> (`formatCyclingClimbingRow`).
+>
+> **THREE WHOLE FILES ARE DEAD, not just refs**, and they are already on the "DELETE (dead after the
+> composers)" list in `ENGINE-STATE.md`:
+> `_shared/fact-packet/ai-summary.ts` (one importer, `analyze-running-workout:18`, voided at `:2384`),
+> `_shared/cycling-v1/ai-summary.ts` (one importer, `analyze-cycling-workout:7`, voided at `:2733`),
+> and `analyze-running-workout/lib/narrative/prompt-builders.ts` — which holds `callLLMInsights` and
+> has **ZERO references anywhere in the repo**. That third one was in no note before tonight.
+>
+> ⚠️ **Split the job.** The three files + the swim LLM block are the LLM half and are
+> mechanically verifiable (grep the importer, check the void, `deno check`). The five ride rows and
+> the two client blocks are the tidy half, and each ride row's dated "why this is off" comment must
+> move to a `D-NNN` BEFORE the code goes — that is judgment, not mechanics, and losing the reasoning
+> is the only real risk in the whole ticket.
+
 Four blocks in the ride path compute fully and are then `void`ed (`session-detail/build.ts` — normalized
 power row, avg/max HR row, seven-band power zones, VAM climbing). Twelve more in
 `analyze-cycling-workout:2733` ("dead LLM-path refs, retained for the cleanup sweep"). Plus
