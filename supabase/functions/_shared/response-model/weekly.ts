@@ -31,10 +31,13 @@ import {
 } from './types.ts';
 import { computeCrossDomain } from './cross-domain.ts';
 import { VERDICT_DEVIATION } from '../strength-profiles.ts';
-// [D-373] The role gate for coaching language. Same classifier the logger's bar-speed cue uses, so
-// the two cannot drift apart. Path precedent: `_shared/strength/match-exercises.ts` imports it the
-// same way — Supabase bundles `src/lib/` into each edge function at deploy time.
-import { isMain531Lift } from '../../../../src/lib/exercise-role.ts';
+// [D-373 → Step 2] The gate for coaching language, now asked as a CAPABILITY rather than as a
+// boolean about one protocol's four lifts. `capabilitiesForExercise(x).coached` is true on exactly
+// one type row (`barbell_main`), and that row is built FROM `MAIN_531_LIFTS` — so this is the same
+// answer `isMain531Lift` gave, from the axis that also knows what to render instead.
+// Path precedent: `_shared/strength/match-exercises.ts` imports it the same way — Supabase bundles
+// `src/lib/` into each edge function at deploy time.
+import { capabilitiesForExercise } from '../../../../src/lib/exercise-role.ts';
 
 function trend(delta: number | null, worseDirection: 'positive' | 'negative', threshold: number): TrendDirection {
   if (delta == null) return 'stable';
@@ -156,15 +159,22 @@ export function computeLiftVerdict(
   // to build a sentence from and dumped the raw command. It is WORSE on lighter programs, where
   // almost everything is an accessory.
   //
-  // ⚠️ THE GATE IS `isMain531Lift`, NOT `roleForExercise`, AND THAT IS DELIBERATE. Both classifiers
+  // ⚠️ THE GATE IS THE TYPE AXIS, NOT `roleForExercise`, AND THAT IS DELIBERATE. Both classifiers
   // exist and they have OPPOSITE defaults on an unknown movement: `roleForExercise` → 'primary'
-  // (the load system's safe direction — count it), `isMain531Lift` → false (the language system's
-  // safe direction — say nothing). Gating language on `roleForExercise` would coach every unknown
-  // move and re-create this exact bug one layer down. Silence is the safe failure here.
+  // (the load system's safe direction — count it), the type axis → `loaded_accessory`, which is
+  // `coached: false` (the language system's safe direction — say nothing). Gating language on
+  // `roleForExercise` would coach every unknown move and re-create this exact bug one layer down.
+  // Silence is the safe failure here.
+  //
+  // ⛔ ONE READER OF "MAY WE COACH THIS" (Step 2). `coached` is true on exactly one type row and
+  // that row reads `MAIN_531_LIFTS` directly, so this returns what `isMain531Lift` returned — but
+  // the CLIENT now asks the same table what to render INSTEAD of a command, rather than inferring
+  // it from the empty string this returns. A sentinel that two sides interpret separately is how a
+  // second vocabulary starts.
   //
   // Field basis: Strong and Hevy show numbers only per exercise — heaviest weight, e1RM, volume,
   // PRs — and issue NO commands. "Back off weight" is not app language.
-  if (!isMain531Lift(_canonical)) {
+  if (!capabilitiesForExercise(_canonical).coached) {
     return { label: '', tone: 'neutral' };
   }
 

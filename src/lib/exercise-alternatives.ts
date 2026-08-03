@@ -45,6 +45,10 @@
 import { EXERCISE_CONFIG, getExerciseConfig, type ExerciseConfig } from './exercise-config.ts';
 // The assistance framework owns its own peer list — see `assistancePeersFor`.
 import { assistancePeersFor } from './assistance-menu.ts';
+// [Step 4] The ONE answer to "is this one of the four main lifts" — the same classifier the State
+// row and the logger's bar-speed cue gate on. Unioned with this file's curated families, never
+// substituted for them; see `isMainLift` for the measurement behind that.
+import { isMain531Lift } from './exercise-role.ts';
 
 // DIRECT-SWAP FAMILIES — a small curated map of "the same movement, programmed differently," the way a
 // strength app groups substitutes. Members of the same family are DIRECT swaps for each other (Leg Press
@@ -96,10 +100,42 @@ const DIRECT_FAMILIES: Array<Set<string>> = [
  * exclusion has to earn itself: across all 110 uncurated slots, excluding main lifts empties **2**
  * lists — and both are the `pullup`/`pullups` alias gap below, not a real absence. Every other
  * accessory keeps a full list of same-pattern accessories.
+ *
+ * ── [Step 4] THE SHARED CLASSIFIER IS NOW AUTHORITATIVE, AS A UNION — NOT AS A REPLACEMENT ──────
+ *
+ * ⛔ REPOINTING THIS AT `isMain531Lift` OUTRIGHT WOULD HAVE UNDONE THE FIX ABOVE. Measured across
+ * the 143 config names, the two answers disagree on **27**, and 26 of those run the same way: a
+ * Goblet Squat, Leg Press, RDL, Barbell Row, Dumbbell Row, Pull Up, Chin Up and Lat Pulldown are all
+ * in a curated family and are all `isMain531Lift === false`. Dropping the family test would let every
+ * one of them back into an accessory's swap list — i.e. exactly the Face Pull → "Barbell Row" and
+ * Lateral Raise → "Shoulder Press" offers this function was written to stop.
+ *
+ * ⚠️ THE TWO QUESTIONS ARE GENUINELY DIFFERENT, WHICH IS WHY IT IS A UNION AND NOT A CHOICE.
+ * `isMain531Lift` asks "is this one of Wendler's four" — a narrow, protocol question. This asks "is
+ * this too heavy a compound to offer in an accessory slot" — a relative one, and a Leg Press is
+ * exactly that without being anybody's main lift.
+ *
+ * ⚠️ AND THE UNION CHANGES NOTHING ON SCREEN TODAY — MEASURED, NOT ASSUMED. The swap lists are
+ * byte-identical with and without it. Only two names the shared classifier calls main lifts sit in
+ * no family: `press`, which is not a config key at all, and `standing barbell overhead press`, which
+ * is already suppressed by the CONFIG-IDENTITY DEDUP below (~:279) — its config is byte-identical to
+ * `overhead press`, which is iterated first and added to `seen` before this gate drops it.
+ *
+ * ⛔ SO THIS IS A GUARD, NOT A FIX, AND IT SHOULD BE READ THAT WAY. It becomes load-bearing the
+ * moment those two configs diverge (one gains a `note`, or a different `confidence`) — the dedup
+ * stops firing and the name would otherwise leak into every vertical-push accessory's list. What it
+ * buys unconditionally is that no name list in this file can disagree with the rest of the app about
+ * what a main lift is, which is the "answered in one place" this step is for.
+ * `exercise-alternatives.shared-role.test.ts` pins the divergence check that announces the change.
+ *
+ * ⛔ STILL NOT A ROLE FILTER, and the header's warning stands: `roleForExercise` says `barbell row`
+ * is primary and `bent over row` is accessory — the same movement — so filtering on it produced
+ * EMPTY lists. That data bug is filed, not papered over here.
  */
 function isMainLift(name: string): boolean {
   const n = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-  return directFamilyOf(n) != null;
+  // Curated family membership OR the shared classifier — either makes it too big for an accessory slot.
+  return directFamilyOf(n) != null || isMain531Lift(name);
 }
 
 /** The family a lift belongs to (by normalized name, singular-tolerant), or null if uncurated. */

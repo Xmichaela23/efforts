@@ -33,7 +33,9 @@ import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausib
 // ⛔ ONE FORMULA FOR THE WHOLE APP (D-339). The client's baseline test imports this same module, so
 // the number that SETS the working weights and the number that JUDGES the work now agree.
 import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts";
-import { canonicalize, muscleGroup, bigFourLift, bandMeansAssistance } from "../_shared/canonicalize.ts";
+import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
+// [Step 5] One shared gate for band-as-assistance; see src/lib/band-assistance.ts.
+import { isBandAssistedMovement } from "../../../src/lib/band-assistance.ts";
 // THE SAME top-set rule the logger stamps the difficulty tap with — heaviest set, ties to the last.
 // Imported, not re-derived: if the two ever disagree the word lands on a different set than the one
 // the athlete answered about. (`strength-focus-copy.ts` documents that both runtimes import it.)
@@ -1408,7 +1410,10 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null, bodyweigh
     // drawn from — carried the identical bodyweight blindness as the load score. Fixing one and not
     // the other would have put two numbers about the same session on the same screen disagreeing.
     // Priced by `strengthSetVolume`, so there is one rule and it lives in one file.
-    const bandIsAssistance = bandMeansAssistance(canon);
+    // [Step 5] Asked of the RAW name, via the one shared gate both the logger and the pricer read.
+    // It used to be asked of `canon`, and `canonicalize` drops "Band Assisted Pull Up" onto its own
+    // key — so the assist the athlete typed was priced as added band load. See `band-assistance.ts`.
+    const bandIsAssistance = isBandAssistedMovement(rawName);
     for (const s of completedSets) {
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;

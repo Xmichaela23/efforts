@@ -35,6 +35,31 @@ export interface StrengthState {
  * Primary lifts that drive the overall verdict. Accessory anchors (hip_thrust,
  * barbell_row) are still tracked + shown per-lift but don't move the discipline verdict.
  * Swap this set — or replace `rollUp` — for a richer roll-up without touching `classifyTrend`.
+ *
+ * ── [Step 7] THIS IS THE THIRD OF THREE DIFFERENT QUESTIONS, AND THE ONLY ONE STILL UNSETTLED ────
+ *   1. "may we coach it?"      → `capabilitiesForExercise().coached`, ~16 names (four lifts + the
+ *                                 variants that fill their slots). Wide on purpose.
+ *   2. "do we chart a max?"    → `src/lib/tracked-max-lifts.ts`, exactly 4. In 5/3/1 you hold a
+ *                                 training max on four lifts — one per slot.
+ *   3. "does it move the dot?" → THIS SET, currently 5.
+ *
+ * ⚠️ Differences 1-vs-2 are INTENTIONAL and are now documented as such: a Front Squat is coached
+ * (it IS the squat slot this cycle) and carries no fifth tracked max. Do not force them equal.
+ *
+ * ⛔ BUT THIS SET'S FIFTH MEMBER IS A PRODUCT CALL THAT HAS NOT BEEN MADE, AND IT IS MEASURABLE.
+ * `trap_bar_deadlift` sits here but not in the tracked-max four, and `buildStrengthBaselines` gives
+ * it the SAME baseline as `deadlift` (both from `perf.deadlift`). So an athlete who logs both a
+ * conventional and a trap-bar deadlift has the DEADLIFT SLOT COUNTED TWICE in `computeE1rmBand`,
+ * which averages one ratio per canonical. Measured on a synthetic athlete with identical strength:
+ * squat + deadlift → dot **0.750**; squat + deadlift + trap bar → dot **0.833**. The dot moved eight
+ * points because a variant was logged, not because anything got stronger.
+ *
+ * ⚠️ NOT FIXED HERE, DELIBERATELY. The fix is a design choice, not a cleanup: either the four SLOTS
+ * aggregate their variants (one ratio per slot, whichever movement filled it) or a variant carries
+ * its own max. That is the same question as "should a Front Squat carry its own tracked max", and it
+ * changes a number on screen for any athlete who rotates variants. Surfaced for Michael; see the
+ * Step 7 review block in `SPEC-strength-language.md`. Do NOT widen or narrow this set to make the
+ * three lists match — that would ship the product call by accident.
  */
 export const PRIMARY_LIFTS = new Set([
   'squat',

@@ -11,7 +11,10 @@
 // THE app's exercise vocabulary. Pricing a set has to know whether a band on the row is the LOAD or
 // is HELP, and only the exercise says which — so this asks the one vocabulary rather than matching
 // names again (audit F5: five name-matchers already).
-import { canonicalize, bandMeansAssistance } from './canonicalize.ts';
+// [Step 5] The ONE gate for "does a band mean help here" — the same function the logger's assist
+// input reads, so the two cannot answer differently for the same movement. See the module header
+// for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
+import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
 
 // ---------------------------------------------------------------------------
 // Intensity factor tables
@@ -300,7 +303,11 @@ export type StrengthVolumeOpts = {
    * does not fill a gap with a confident number.
    */
   bodyweightLb?: number | null;
-  /** `bandMeansAssistance(canonical)` for the exercise this set belongs to. */
+  /**
+   * `isBandAssistedMovement(name)` for the exercise this set belongs to — `src/lib/band-assistance.ts`,
+   * the ONE gate the logger's assist input reads too, so the box offered and the number computed
+   * cannot disagree. (Was `bandMeansAssistance(canonical)`; that split on "Band Assisted Pull Up".)
+   */
   bandIsAssistance?: boolean;
 };
 
@@ -438,7 +445,7 @@ export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number,
   exercises.forEach(ex => {
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       // Asked once per EXERCISE, not per set — a band means the same thing on every set of a row.
-      const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+      const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
       ex.sets.forEach((set: any) => {
         if (set.completed !== false) {
           totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance });
@@ -497,7 +504,7 @@ export function calculatePlannedStrengthWorkload(
     // pins prescribed == performed, so it fails the moment one side moves alone. One rule, priced
     // per set here exactly as it is priced per set there.
     if (sets > 0 && Number.isFinite(reps) && reps > 0) {
-      const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+      const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
       // ⚠️ THE TWO SIDES SPEAK DIFFERENT DIALECTS ABOUT A BAND, and this is where they are made to
       // agree. A logged set names the band in `resistance_level`; a PRESCRIPTION has no such field —
       // it puts a word where the number goes ("Band", "Bodyweight", "Heavy barbell", D-094). So a

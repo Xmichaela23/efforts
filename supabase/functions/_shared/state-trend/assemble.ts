@@ -13,6 +13,10 @@ import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeStat
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
+// [Step 7] The ONE list of lifts that carry a tracked max — shared with the client renderer so the
+// emitted series and the drawn sparkline cannot disagree about which four. Path precedent:
+// `_shared/response-model/weekly.ts` imports `src/lib/` the same way (bundled at deploy time).
+import { isTrackedMaxLift } from '../../../../src/lib/tracked-max-lifts.ts';
 import { CROWN_MIN_DECOUPLING } from './baseline-derive.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
@@ -559,10 +563,14 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // SAME 84d window + recent-flag convention as run efficiency (recent = inside the 42d verdict window, so the
   // colored tail IS the slice the verdict judges). Values rounded to lb. Reuses _chartStart/_verdictStart above
   // (strength windowDays === run's 42d). Fills as the athlete logs — <2 points renders no line, only a note.
-  const BIG_4_LIFTS = new Set(['squat', 'bench_press', 'deadlift', 'overhead_press']);
+  // [Step 7] The four-name list used to live here AND in `StatePerformanceSection.tsx`, byte-identical,
+  // with a comment on the client saying "Matches BIG_4_LIFTS in assemble.ts". A comment is not a
+  // constraint: whichever copy gained a name first would emit a series nothing drew, or draw a slot
+  // nothing filled. One list now, read by the emitter here and the renderer there — see
+  // `src/lib/tracked-max-lifts.ts` for why this is four and the coaching gate is sixteen.
   const strengthChartByCanonical = new Map(
     liftSeries
-      .filter((s) => BIG_4_LIFTS.has(s.canonical))
+      .filter((s) => isTrackedMaxLift(s.canonical))
       .map((s) => [s.canonical, s.points
         .filter((p) => p.date > _chartStart && p.date <= asOf)
         .sort((a, b) => a.date.localeCompare(b.date))

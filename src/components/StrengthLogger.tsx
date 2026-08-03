@@ -27,6 +27,12 @@ import {
 } from '@/lib/strength-focus-copy';
 // D-208's role table — the app's one answer to "is this a main lift or assistance work".
 import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
+// [Step 3] The logger's two private classifiers, moved out of this file and beside the shared type
+// table. `isDurationLogged` reads the table (`loggedAs`); `equipmentForExercise` is the transcribed
+// EQUIPMENT axis the table does not carry — see the module header for why it is not derived.
+import { equipmentForExercise, isDurationLogged } from '@/lib/strength-logging-mode';
+// [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
+import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
@@ -134,68 +140,10 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
     }, 0);
 };
 
-// Smart exercise type detection from name
-// Q-180: normalize before ANY substring match. The plan writes "Farmers Carry"; the exercise library
-// and the athlete write "Farmer's Carry". `"farmer's carry".includes('farmers carry')` is FALSE, so the
-// apostrophe alone dropped the exercise through every dbPattern and it defaulted to BARBELL — the
-// logger offered a plate calculator and a 45 lb bar for a dumbbell carry. Strip punctuation, collapse
-// whitespace, then match. (Screenshot, 2026-07-14.)
-const normalizeExerciseNameForMatch = (name: string): string =>
-  String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+// [Step 3] `normalizeExerciseNameForMatch` moved to `src/lib/strength-logging-mode.ts` with the
+// classifier that was its only caller. Its Q-180 lesson (the apostrophe in "Farmer's Carry") moved
+// with it — deleted here rather than left behind, per the repo's replace-means-delete rule.
 
-const getExerciseType = (exerciseName: string): 'barbell' | 'dumbbell' | 'band' | 'bodyweight' | 'goblet' | 'plyo' => {
-  const name = normalizeExerciseNameForMatch(exerciseName);
-
-  // ⛔ PLYOMETRICS ARE REPS AND NOTHING ELSE (2026-08-01, Michael: a Box Jump was being shown a bar,
-  // a plate calculator AND a bar-speed cue). A jump has no external load to record, no bar to load,
-  // and no bar-speed conversation — the intent is maximal every rep by definition, so a cue telling
-  // the athlete to keep the reps at one speed is describing a different kind of exercise.
-  // ⚠️ CHECKED FIRST, ABOVE EVERY OTHER PATTERN. "Jump Squat" contains "squat" and "Box Jump" fell
-  // through every rule below to the `barbell` DEFAULT — the third time that default has been the bug
-  // (Q-180 the dumbbell carry, then the single-leg hip thrust). Order is the fix.
-  if (/\b(jump|hop|bound|plyo|skater)\w*/.test(name)) return 'plyo';
-
-  // Bodyweight / core exercises (no equipment needed)
-  if (name.includes('core circuit') || name.includes('core work') || name.includes('calf raise')) return 'bodyweight';
-  
-  // Band exercises (including those that commonly use bands)
-  if (name.includes('band') || name.includes('banded') || name.includes('clamshell')) return 'band';
-  
-  // Goblet hold exercises (single weight, not per-hand)
-  // ⛔ A SINGLE-LEG HIP THRUST IS NOT A BARBELL LIFT (Michael, screenshot 2026-07-31). It matched no
-  // pattern below and fell through to the `barbell` default, so the logger drew a 45 lb bar and a
-  // plate calculator over a movement loaded with one dumbbell or plate on the hip — the same class of
-  // miss as the Farmers Carry above, and the second time the default has been the bug.
-  // ⚠️ `goblet`, NOT `dumbbell`: the load is ONE implement on the hip, so the per-hand label a
-  // dumbbell row prints ("lb/hand") would be wrong in the other direction. Goblet is this app's
-  // "single weight, no bar, no plate math" shape.
-  // ⚠️ SINGLE-LEG ONLY. A bilateral barbell hip thrust genuinely is a barbell lift and keeps the bar
-  // and the plate calculator — which is why this tests for the single-leg qualifier and not for
-  // "hip thrust".
-  if (name.includes('lateral lunge') || name.includes('goblet squat')) return 'goblet';
-  if (/(single leg|singleleg|one leg|1 leg|unilateral)/.test(name) && name.includes('thrust')) return 'goblet';
-  
-  // Dumbbell exercises
-  if (name.includes('dumbbell') || name.includes('db ')) return 'dumbbell';
-  
-  // Common dumbbell exercise patterns (two weights, per-hand)
-  const dbPatterns = [
-    'bicep curl', 'biceps curl', 'hammer curl', 'concentration curl',
-    'lateral raise', 'front raise', 'chest fly', 'chest flye',
-    'arnold press', 'bulgarian split squat',
-    // Q-180: the plan calls it "Farmers Carry" (strength-primary-plan HYROX_ROTATION), and only
-    // 'farmer walk' was listed — so a Farmers Carry fell through to 'barbell' and would have been
-    // labelled as a single total load instead of per-hand. Carries are two implements, one per hand.
-    'farmer walk', 'farmer walks', 'farmers carry', 'farmer carry', 'farmers walk', 'suitcase carry',
-    'walking lunge', 'reverse lunge', 'forward lunge', 'lunge',
-    'single leg rdl', 'single leg rdl',  // Single-leg RDLs are typically dumbbell; regular RDL is barbell
-    'step up', 'step up'
-  ];
-  if (dbPatterns.some(p => name.includes(p))) return 'dumbbell';
-  
-  // Default: barbell
-  return 'barbell';
-};
 
 // Check if exercise is a main compound lift
 const isMainCompound = (exerciseName: string): boolean => {
@@ -968,12 +916,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    * ⚠️ Deliberately narrower than `isBodyweightMove`. A push-up or a plank has no standard assisted
    * form, so it stays blank; these three do, and a blank row loses the only thing that moves.
    */
-  const isAssistCapableMove = (raw?: string): boolean => {
-    try {
-      const n = String(raw || '').toLowerCase().replace(/[\s-]/g, '');
-      return /dip|chinup|pullup/.test(n);
-    } catch { return false; }
-  };
+  // ⛔ [Step 5] NOW THE SHARED GATE. This rule and the pricer's used to be two different questions
+  // about the same set: this one matched a substring, the pricer looked up an exact canonical key,
+  // and on "Band Assisted Pull Up" they split — the athlete typed 40 lb of assistance here and the
+  // server priced it as 40 lb of added band load (200 instead of 700). Both sides now call one
+  // function, so the box the athlete is offered and the number the server computes cannot disagree.
+  // ⚠️ If a fourth movement ever earns an assist box, it gains a stem in `band-assistance.ts` — not
+  // a rule here, or the split comes straight back.
+  const isAssistCapableMove = (raw?: string): boolean => isBandAssistedMovement(raw ?? '');
 
   // Helper: detect duration-based exercises by name (planks, holds, carries)
   // Q-180: a LOADED duration exercise — duration-based, but the LOAD IS THE EXERCISE.
@@ -998,10 +948,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return /carry|carries|farmer|suitcase|sled|sandbag|yoke|rack hold|front rack hold|overhead hold|waiter/.test(n);
   };
 
-  const isDurationBasedExercise = (name: string): boolean => {
-    const n = String(name || '').toLowerCase();
-    return /plank|hold|carry|farmer|suitcase|wall sit|iso|isometric|time|seconds?|sec|core circuit|core work|circuit/.test(n);
-  };
   
   // Helper: detect if this is a Core Work exercise that should use CoreTimer
   const isCoreWorkExercise = (name: string, reps?: string | number): boolean => {
@@ -1671,7 +1617,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // MISSES TO FALSE, so an unmapped lift gets no cue rather than the wrong one. Accessories get
     // the section note above the block; plyos get nothing.
     if (!isMain531Lift(exercise?.name || '')) return null;
-    if (getExerciseType(exercise?.name || '') === 'plyo') return null;
+    if (equipmentForExercise(exercise?.name || '') === 'plyo') return null;
     if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
     return barSpeedLineFor({
       isWarmup: set?.setType === 'warmup',
@@ -1992,7 +1938,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
-        const exerciseType = getExerciseType(name);
+        const exerciseType = equipmentForExercise(name);
         const resistanceLevel = exerciseType === 'band' ? extractResistance(notes) : undefined;
         
         // Check if this is a duration-based exercise
@@ -2001,7 +1947,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const isDurationExercise = durationSeconds !== undefined && durationSeconds > 0;
         // Also check by name if no explicit duration_seconds but has reps (for legacy data)
         // Convert if it's a duration-based exercise name and has reps (e.g., "Planks 3×60" where 60 is seconds)
-        const shouldConvertToDuration = !isDurationExercise && isDurationBasedExercise(name) && reps > 0 && !isAmrap;
+        const shouldConvertToDuration = !isDurationExercise && isDurationLogged(name) && reps > 0 && !isAmrap;
         
         if (!byName[name]) {
           // Extract notes separately - ensure they don't end up in the name
@@ -2609,7 +2555,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // Duration-based exercises (planks, holds, carries)
             if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
               baseSet.duration_seconds = exercise.duration_seconds;
-            } else if (isDurationBasedExercise(exercise.name) && numericReps) {
+            } else if (isDurationLogged(exercise.name) && numericReps) {
               // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
               baseSet.duration_seconds = numericReps;
             } else if (numericReps) {
@@ -2752,7 +2698,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     // Check for duration-based exercises
                     if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
                       baseSet.duration_seconds = exercise.duration_seconds;
-                    } else if (isDurationBasedExercise(exercise.name) && numericReps) {
+                    } else if (isDurationLogged(exercise.name) && numericReps) {
                       baseSet.duration_seconds = numericReps;
                     } else if (numericReps) {
                       baseSet.reps = numericReps;
@@ -2861,7 +2807,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 // Duration-based exercises (planks, holds, carries)
                 if (exercise.duration_seconds !== undefined && exercise.duration_seconds > 0) {
                   baseSet.duration_seconds = exercise.duration_seconds;
-                } else if (isDurationBasedExercise(exercise.name) && numericReps) {
+                } else if (isDurationLogged(exercise.name) && numericReps) {
                   baseSet.duration_seconds = numericReps;
                 } else if (numericReps) {
                   baseSet.reps = numericReps;
@@ -3313,7 +3259,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // the materializer prefills them." Exactly right. The shape logic existed and fired on ONE path.
     //
     // `addSet` already clones duration_seconds from the previous set, so fixing the FIRST set is enough.
-    const isDurationExercise = isDurationBasedExercise(nameToAdd);
+    const isDurationExercise = isDurationLogged(nameToAdd);
     const firstSet: LoggedSet = isDurationExercise
       ? {
           // The timer's own fallback is 60s (`set.duration_seconds || 60`) — match it, and let the
@@ -3534,7 +3480,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     setExercises(exercises.map(exercise => {
       if (exercise.id === exerciseId) {
         const lastSet = exercise.sets[exercise.sets.length - 1];
-        const exerciseType = getExerciseType(exercise.name);
+        const exerciseType = equipmentForExercise(exercise.name);
         const newSet: LoggedSet = {
           reps: lastSet?.reps ?? undefined, // Preserve undefined for "until" patterns
           duration_seconds: lastSet?.duration_seconds, // Copy duration for duration-based exercises
@@ -3672,7 +3618,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Same shape as the two skips above (mobility, AMRAP/rep-max) — a set type whose measurement is
     // not reps does not get asked for reps-in-reserve. AND we persist the duration on Done, so the
     // work is actually recorded rather than just flagged.
-    if (isDurationBasedExercise(exercise.name)) {
+    if (isDurationLogged(exercise.name)) {
       // Persist a duration DEFENSIVELY. Both set-creation paths are supposed to stamp
       // duration_seconds from the prescription — and yet the live Jul-13 carry saved with NO
       // duration at all (the row rendered "0 reps (RIR 3)"; the compare table's formatter DOES
@@ -4926,7 +4872,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                   // Weight steppers apply to loaded barbell/dumbbell/goblet lifts only
                   // (not band/bodyweight/duration).
-                  const exType = getExerciseType(exercise.name);
+                  const exType = equipmentForExercise(exercise.name);
                   const showStepper = !isDurationBased && !isBodyweightMove(exercise.name)
                     && ['barbell', 'dumbbell', 'goblet'].includes(exType);
 
@@ -5254,7 +5200,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           return null;
                         }
                         
-                        const exerciseType = getExerciseType(exercise.name);
+                        const exerciseType = equipmentForExercise(exercise.name);
                         
                         // ⛔ A PLYO HAS NO LOAD COLUMN AT ALL (2026-08-01). A box jump is reps; there is
                         // no bar, no plate, no band and no belt to record. Checked before every other
@@ -5481,7 +5427,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           only when its field applies; the whole strip is hidden if none do. */}
                       {(() => {
                         const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-                        const exType = getExerciseType(exercise.name);
+                        const exType = equipmentForExercise(exercise.name);
                         // A 1RM/baseline TEST has no RIR (the AMRAP protocol is the signal) — hide the rir ±1 nudges too. (Q-097/Q-102)
                         const isTestWorkout = isBaselineTestWorkout(scheduledWorkout || {});
                         const showReps = !isDurationBased && set.reps !== undefined;
@@ -5579,7 +5525,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       if (isBodyweightMove(exercise.name)) {
                         return null;
                       }
-                      const exerciseType = getExerciseType(exercise.name);
+                      const exerciseType = equipmentForExercise(exercise.name);
                       // A plyo has no equipment to choose — no bar, no plates, no band.
                       if (exerciseType === 'plyo') return null;
                       // D-351: the equipment strip's band control, in pounds — the same field and the
@@ -5659,7 +5605,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       if (isBodyweightMove(exercise.name)) {
                         return null;
                       }
-                      const exerciseType = getExerciseType(exercise.name);
+                      const exerciseType = equipmentForExercise(exercise.name);
                       // Only show PlateMath for barbell exercises
                       if (exerciseType === 'barbell' && expandedPlates[`${exercise.id}-${setIndex}`]) {
                         return (

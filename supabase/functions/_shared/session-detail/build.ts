@@ -20,7 +20,10 @@ import { frielBand, decouplingBandDisplay } from '../state-trend/run.ts';
 // D-349: the ONE set rule (D-348). Imported, never re-implemented — the whole point of this field is
 // that the lb on this screen and the lb in the load score come out of the same function.
 import { strengthSetVolume } from '../workload.ts';
-import { canonicalize, bandMeansAssistance } from '../canonicalize.ts';
+// [Step 5] The ONE gate for "does a band mean help here" — the same function the logger's assist
+// input reads, so the two cannot answer differently for the same movement. See the module header
+// for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
+import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
 
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
 // headline the client renders VERBATIM — no client-side re-derivation. Heat is parked; this is the
@@ -2209,7 +2212,7 @@ function buildStrengthVolume(
   const bw = typeof bodyweightLb === 'number' && bodyweightLb > 0 ? bodyweightLb : null;
 
   const completed = compExs.map((ex: any) => {
-    const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+    const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
     const setsArr = Array.isArray(ex?.sets) ? ex.sets : (Array.isArray(ex?.setsArray) ? ex.setsArray : []);
     const volume_lb = setsArr.filter(isPerformedSet).reduce(
       (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance }),
@@ -2219,7 +2222,7 @@ function buildStrengthVolume(
   });
 
   const planned = plannedExs.map((ex: any) => {
-    const bandIsAssistance = bandMeansAssistance(canonicalize(String(ex?.name ?? '')));
+    const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
     // ⚠️ A PRESCRIPTION PUTS A WORD WHERE THE NUMBER GOES (D-094: "Bodyweight", "Band", "Heavy
     // barbell"). `strengthSetVolume` reads a band off `resistance_level`, which only a LOGGED set
     // has — so the prescribed dialect is translated into the logged one here, exactly as

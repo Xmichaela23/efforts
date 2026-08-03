@@ -14,6 +14,8 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor } from '@/lib/context-utils';
+// [Step 7] Shared with the server emitter — see tracked-max-lifts.ts.
+import { isTrackedMaxLift } from '@/lib/tracked-max-lifts';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
@@ -496,9 +498,11 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // noise guard it relied on is still on the spine and still correct; the data underneath it is simply
 // one reading per cycle, which is too sparse for any direction claim, guarded or not. `planWeek` is
 // back as a real input — it now carries the block position this row renders.
-// The big-4 lifts that get a 12-week e1RM sparkline (Michael 2026-07-23). Matches BIG_4_LIFTS in
-// assemble.ts — only these canonicals carry a `series` from the server.
-const BIG_4_CHART_LIFTS = new Set(['squat', 'bench_press', 'deadlift', 'overhead_press']);
+// [Step 7] The big-4 lifts that get a 12-week e1RM sparkline (Michael 2026-07-23). This used to be a
+// second copy of the server's list with a comment claiming they matched; it now IS the server's list
+// (`src/lib/tracked-max-lifts.ts`), which is also what gates the series being emitted at all. One
+// membership test, both ends — so a name can never be drawn without being filled, or filled without
+// being drawn. See that module for why this is four while the coaching gate is sixteen.
 function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: StrengthFitness; fatigue?: boolean; planWeek?: number | null; block?: BlockCard | null }) {
   // Main lifts with a real e1RM number; primaries lead (squat/bench/deadlift/press — the field's "main lifts").
   const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
@@ -562,7 +566,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                 </span>
                 {/* THE LONG VIEW per lift — 12-week e1RM sparkline (big-4 only, Michael 2026-07-23). Same
                     component as the run row; server sends the recent-6wk slice in the strength color. */}
-                {BIG_4_CHART_LIFTS.has(l.canonical) && (
+                {isTrackedMaxLift(l.canonical) && (
                   <TrendSparkline
                     series={l.series}
                     color={getDisciplineColor('strength')}

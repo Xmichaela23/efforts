@@ -8,9 +8,13 @@ import type {
   FitnessVerdictDivergence,
 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
-// [D-374] The SAME main-lift classifier the server gates coaching language on ([D-373]), so the row
-// that renders and the verdict that fills it can never disagree about what a main lift is.
-import { isMain531Lift } from '@/lib/exercise-role';
+// [D-374 → Step 2] The SAME axis the server gates coaching language on, so the row that renders and
+// the verdict that fills it can never disagree about what a main lift is. `coached` is true on
+// exactly one type row and that row is built from `MAIN_531_LIFTS`, so this is the same answer
+// `isMain531Lift` gave — asked as a capability, from the table that also says what to render
+// instead. See SPEC-strength-language, Step 2.
+import { capabilitiesForExercise } from '@/lib/exercise-role';
+import { composePerLiftRowText } from '@/lib/strength-row-text';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
@@ -1241,7 +1245,7 @@ export default function StateTab({
   // direction on [Q-251], by-feel work should be read against the athlete's OWN history (reps at a
   // weight, volume over weeks), never against a tested max. That row is unbuilt. See [Q-253].
   const perLiftMain = perLift.filter((l: { canonical_name?: string | null }) =>
-    isMain531Lift(String(l?.canonical_name ?? '')));
+    capabilitiesForExercise(String(l?.canonical_name ?? '')).coached);
   // Still use liftTrends only for pre-filling the adjustment modal (best_weight)
   const liftWeightMap = new Map(liftTrends.map(lt => [lt.canonical, lt.entries[lt.entries.length - 1]?.best_weight ?? 0]));
 
@@ -1321,48 +1325,28 @@ export default function StateTab({
         <span className="text-white/45 normal-case tracking-normal">· {perLiftMain.length} {perLiftMain.length === 1 ? 'lift' : 'lifts'}</span>
       </button>
       {strengthDetailOpen && perLiftMain.map((lt: any) => {
-        // ⚠️ `?? '—'` only covers a MISSING field (older cached rows). An empty string is meaningful
-        // and must survive: [D-373] uses '' to mean "not a main lift, do not coach it".
+        // ⛔ [Step 2] THE ROW TEXT IS COMPOSED IN ONE PLACE, `strength-row-text.ts`, AND THE HARNESS
+        // READS THE SAME FUNCTION. It was inline here, which is why nothing could print this screen
+        // for a synthetic athlete — GAME-PLAN's method note, and the D-259 precedent.
+        //
+        // ⛔ AND IT DECIDES "IS THIS COACHED" FROM THE TYPE TABLE, NOT FROM AN EMPTY LABEL. The old
+        // line asked the server's sentinel (`verdict_label !== ''`). `coach_cache` renders the last
+        // good contract, so a row cached before [D-373] still carries a command on an accessory and
+        // the sentinel test would render it. The type axis cannot be stale.
+        const row = composePerLiftRowText(lt, liftWeightMap.get(lt.canonical_name) ?? null);
         const verdictLabel: string = lt.verdict_label ?? '—';
-        const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
+        const verdictColor = verdictToneToColor(row.tone);
         const suggestedWeight: number | null = lt.suggested_weight ?? null;
         const bestWeight: number | null = lt.best_weight ?? liftWeightMap.get(lt.canonical_name) ?? null;
-        const hasWeightSuggestion = suggestedWeight != null && bestWeight != null && bestWeight > 0;
+        const hasWeightSuggestion = row.tappable;
         const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
           ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
           : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
           ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
           : null;
-        // D-231 / Q-107 H1: self-explanatory row (My Record pattern) — what we measured, versus the
-        // typed baseline anchor, and the action. Only when a typed anchor (anchor_1rm) exists;
-        // accessories / gap-fill lifts (no anchor) keep the legacy "best → suggested" pair.
-        const anchor1rm: number | null = lt.anchor_1rm ?? null;
-        const tone: string = lt.verdict_tone ?? 'neutral';
-        const actionText: string = hasWeightSuggestion
-          ? (verdictLabel === 'add weight' ? `add to ${suggestedWeight} next session`
-             : verdictLabel === 'back off weight' ? (tone === 'caution' ? `ease to ${suggestedWeight} this week` : `suggest ${suggestedWeight} this week`)
-             : `to ${suggestedWeight}`)
-          : verdictLabel;
-        // ⛔ [D-373] AN EMPTY verdict_label IS THE SERVER SAYING "THIS MOVEMENT IS NOT COACHED".
-        // `computeLiftVerdict` returns '' for anything that is not one of the four main lifts, so an
-        // accessory reaches this row with no command — by design (SPEC-strength-language, Axis 1).
-        // It must then show NUMBERS OR NOTHING, never a command: the fact of what was moved, matching
-        // how Strong and Hevy render a per-exercise row. Do NOT fall back to a dash here — a dash in
-        // the action slot reads as "we had nothing to say about your lift", which is the opposite of
-        // the truth (we deliberately say nothing about accessories).
-        const isCoachedLift = verdictLabel !== '';
-        const rowText: string = !isCoachedLift
-          ? (bestWeight != null && bestWeight > 0 ? `Working ~${bestWeight}` : '')
-          : (anchor1rm != null && bestWeight != null && bestWeight > 0)
-          // Q-111 (fact-only): with a typed anchor, state the fact; append an action ONLY when there's
-          // a suggestion (progression). A decline drops the suggestion server-side, so this renders
-          // "Working ~125 vs your 150 baseline." — no prescription.
-          ? (hasWeightSuggestion
-              ? `Working ~${bestWeight} vs your ${anchor1rm} baseline — ${actionText}`
-              : `Working ~${bestWeight} vs your ${anchor1rm} baseline`)
-          : hasWeightSuggestion
-            ? `${bestWeight} → ${suggestedWeight} lbs`
-            : verdictLabel;
+        // The composed text and every rule behind it — D-231 / Q-107 H1's "My Record" shape, the
+        // anchor clause, the fact-only decline — now live in `composePerLiftRowText`.
+        const rowText: string = row.text;
         return (
           <div key={lt.canonical_name} className="space-y-1">
             <div className="flex items-start justify-between gap-3">
