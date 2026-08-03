@@ -14,7 +14,9 @@ Deno.test('the rep record LEADS and the estimate follows', () => {
   }, 'Jul 28');
   assertEquals(t?.set_line, 'All-out set 225 lb × 6 · Jul 28');
   assertEquals(t?.record_line, 'Rep record at this weight — your best was 5.');
-  assertEquals(t?.estimate_line, 'Estimated max 270 lb · rough — over 5 reps no formula holds up');
+  // ⚠️ REWRITTEN 2026-08-03 — the old hedge ("rough — over 5 reps no formula holds up") described
+  // the arithmetic instead of the lift and was not understood on sight. It now uses HIS rep count.
+  assertEquals(t?.estimate_line, 'Estimated max 270 lb — a guess from 6 reps. Estimates hold to about 5.');
 });
 
 Deno.test('⛔ a null prior says so plainly — it never implies a first-time PR', () => {

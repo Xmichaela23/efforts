@@ -37,6 +37,22 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
 
+/**
+ * The hint under the Band (lb) keypad. ⛔ ONE CONSTANT, TWO CALL SITES — the band box is rendered in
+ * two places (the compact set row and the expanded one) and the sentence was duplicated in both.
+ * One fact, one string, or they drift the way every other doubled sentence in this app has.
+ *
+ * ⚠️ "ENTER THE MIDDLE" IS THERE BECAUSE BANDS ARE SOLD AS A RANGE. A band is rated "20-35 lb", not
+ * "27 lb" — so an athlete looking at the packet has no single number to type and the box invites a
+ * guess or a blank. Blank is legal and prices at the flat token (D-351), but it throws away the one
+ * thing that changes across a block when the band IS the load. The midpoint is the convention the
+ * band manufacturers' own charts use for a nominal rating.
+ * ⚠️ NOT ADDED to the Assist (lb) box: that one covers a band OR an assisted-pull-up MACHINE, and a
+ * machine has a pin and a stack, not a range. See the report.
+ */
+const BAND_LB_HINT =
+  "The band's resistance in pounds. Rated as a range? Enter the middle. Leave blank if you don't know it.";
+
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
   duration_seconds?: number;  // Optional - used for duration-based exercises (planks, holds, carries)
@@ -5289,7 +5305,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
                                   initialValue: bandNum == null ? '' : String(bandNum),
                                   allowDecimal: true,
-                                  hint: 'The band\'s resistance in pounds. Leave blank if you don\'t know it.',
+                                  hint: BAND_LB_HINT,
                                 })}
                                 className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
@@ -5608,7 +5624,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
                                 initialValue: bandNum == null ? '' : String(bandNum),
                                 allowDecimal: true,
-                                hint: 'The band\'s resistance in pounds. Leave blank if you don\'t know it.',
+                                hint: BAND_LB_HINT,
                               })}
                               className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 tabular-nums"
                             >

@@ -495,11 +495,17 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
               </div>
               {/* The estimate, second. ⚠️ Above the rep ceiling it is labelled rather than hidden or
                   capped — a capped rep count would report a 15-rep set as a 10-rep one (D-339). */}
+              {/* ⛔ THE HEDGE REWRITTEN (2026-08-03). Was `rough — over N reps no formula holds up`,
+                  which Michael read and did not understand: it described OUR ARITHMETIC rather than
+                  his lift, and quoted the generic ceiling instead of his own rep count. See
+                  `composeAllOutRowText` in `src/lib/strength-row-text.ts` for the full reasoning —
+                  ⚠️ THAT FUNCTION COMPOSES THE SAME SENTENCE FOR THE STATE SCREEN. The two must be
+                  changed together or one reading gets two wordings on two screens. */}
               <div className="text-[12px] text-white/50 mt-1 tabular-nums">
                 Estimated max {a.estimated_1rm} lb
                 {!a.estimate_trusted && (
                   <span className="text-white/40">
-                    {' '}· rough — over {a.estimate_trusted_max_reps} reps no formula holds up
+                    {' '}— a guess from {a.reps} reps. Estimates hold to about {a.estimate_trusted_max_reps}.
                   </span>
                 )}
               </div>

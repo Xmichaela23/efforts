@@ -181,9 +181,20 @@ export function composeAllOutRowText(
 
   const est = Number(allOut?.estimated_1rm) || 0;
   const trustedMax = Number(allOut?.estimate_trusted_max_reps) || 0;
+  // ⛔ THE HEDGE REWRITTEN (2026-08-03, Michael: *"what does over 8 reps no formula hold up mean?
+  // cause i didnt know what it mean"*). The old line was `rough — over N reps no formula holds up`,
+  // which described OUR ARITHMETIC instead of his lift and broke two rules of COPY-VOICE.md: it was
+  // abstract where a plain word exists (rule 9 — an athlete does not care that a formula exists),
+  // and it quoted the generic ceiling instead of HIS rep count (rule 5 — quantify).
+  //
+  // ⚠️ IT SAYS "UNRELIABLE", NOT "TOO HIGH", AND THAT RESTRAINT IS DELIBERATE. The obvious rewrite is
+  // "so it reads high" — and that is a claim this app cannot source. `estimate-1rm.ts` records that
+  // the direction of error flips by equation and by lift, and that LeSuer et al. (1997) found every
+  // tested equation UNDERestimates a deadlift 1RM. What IS sourced is the ceiling itself
+  // (`trustedMaxRepsFor`, 8 reps and 5 on deadlift). So the copy states the ceiling and stops.
   const estimate_line = est > 0
     ? (allOut?.estimate_trusted === false && trustedMax > 0
-        ? `Estimated max ${est} lb · rough — over ${trustedMax} reps no formula holds up`
+        ? `Estimated max ${est} lb — a guess from ${reps} reps. Estimates hold to about ${trustedMax}.`
         : `Estimated max ${est} lb`)
     : '';
 
