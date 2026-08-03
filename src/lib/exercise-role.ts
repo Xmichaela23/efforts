@@ -353,6 +353,13 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'shoulder press': 'loaded_accessory',
   'db shoulder press': 'loaded_accessory',
   'dumbbell shoulder press': 'loaded_accessory',
+  // ⚠️ ADDED 2026-08-03 with the config reconciliation. These three sat in the add-picker list with
+  // no config entry and no type row — visible to the athlete, invisible to both tables. They earn a
+  // type here because the coverage test below demands one for every config key, which is exactly the
+  // drift guard working: adding the config forced the classification instead of letting it default.
+  'dumbbell press': 'loaded_accessory',
+  'kettlebell press': 'loaded_accessory',
+  'single arm row': 'loaded_accessory',
   'db push press': 'loaded_accessory',
   'lateral raise': 'loaded_accessory',
   'dumbbell lateral raise': 'loaded_accessory',

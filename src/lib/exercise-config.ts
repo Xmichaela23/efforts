@@ -688,15 +688,25 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   
   // Reverse Fly: Very light, posterior delt isolation
+  // ⛔ PATTERN CORRECTED vertical_push → horizontal_pull (2026-08-03). A reverse fly IS a rear delt
+  // fly — the same movement under a second name — and `rear delt fly` / `rear delt flye` have always
+  // been `horizontal_pull`. One movement in two swap pools: which substitutes the app offered
+  // depended purely on which of the two names the plan happened to write.
+  //
+  // ⚠️ THE SAME DEFECT CLASS AS `ytw raise` (fixed in the same pass) AND `squat jump` below. All
+  // three were found by the swap audit — docs/AUDIT-accessory-swaps-2026-08-03.md — and all three are
+  // "one movement, two names, two patterns". Shoulder/rear-delt work is scapular PULLING; there is
+  // no press in it, and the whole family (face pull, band face pull, cable face pull, rear delt fly,
+  // band pull apart, ytw raise) now sits together.
   'reverse fly': {
-    pattern: 'vertical_push',
+    pattern: 'horizontal_pull',
     primaryRef: 'overhead',
     ratio: 0.20,
     displayFormat: 'perHand',
     isUnilateral: false
   },
   'reverse flye': {
-    pattern: 'vertical_push',
+    pattern: 'horizontal_pull',
     primaryRef: 'overhead',
     ratio: 0.20,
     displayFormat: 'perHand',
@@ -704,8 +714,26 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   
   // YTW Raises: Prehab, very light
+  // ⛔ PATTERN CORRECTED vertical_push → horizontal_pull (2026-08-03). A prone Y-T-W raise is
+  // SCAPULAR RETRACTION AND UPWARD ROTATION — lower and mid traps, rhomboids, posterior delts. There
+  // is no press in it. `pattern` is the SWAP SLOT, so at `vertical_push` this movement was offered
+  // overhead presses as substitutes, and was itself offered as a substitute for one.
+  //
+  // ⚠️ NOT AN ANATOMY OPINION — THE FILE'S OWN FAMILY SAYS SO. Every other movement of this class
+  // already sits at `horizontal_pull`: `face pull`, `band face pull`, `cable face pull`,
+  // `rear delt fly`, `rear delt flye`, `band pull apart`. This entry was the outlier, and the
+  // vocabulary has no dedicated scapular bucket to put it in instead.
+  //
+  // ⚠️ THIS RESOLVES A SPLIT RATHER THAN CREATING ONE. `prone y t w raise` (the same movement spelled
+  // out) and `external rotation` were added on 2026-08-03 at `horizontal_pull`, which put one Y-T-W
+  // in the pull pool and the other in the push pool. Moving THIS entry — rather than the two new ones
+  // — is what makes all three agree, and it is the one that was wrong.
+  //
+  // ⚠️ `primaryRef` STAYS `overhead`, and that is not a contradiction: primaryRef is the LOADING
+  // reference and pattern is the SLOT. `barbell row` is primaryRef 'bench' at pattern horizontal_pull
+  // for the same reason. See MovementPattern's docblock.
   'ytw raises': {
-    pattern: 'vertical_push',
+    pattern: 'horizontal_pull',
     primaryRef: 'overhead',
     ratio: 0.15,
     displayFormat: 'perHand',
@@ -713,7 +741,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     notes: 'Light dumbbells or plates for scapular health.'
   },
   'ytw raise': {
-    pattern: 'vertical_push',
+    pattern: 'horizontal_pull',
     primaryRef: 'overhead',
     ratio: 0.15,
     displayFormat: 'perHand',
@@ -1265,15 +1293,26 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // SQUAT VARIANTS (Bodyweight explosives)
   // ============================================================================
   
+  // ⛔ PATTERN CORRECTED knee_dominant → plyometric (2026-08-03). A squat jump IS a jump squat — the
+  // same movement, written the other way round — and `jump squat` / `jump squats` have always been
+  // `plyometric`. This entry sat in the knee-dominant pool, so the app offered a Bulgarian Split
+  // Squat, a Reverse Lunge, a Step Up and a Leg Extension as substitutes for a jump.
+  //
+  // ⚠️ AND IT WAS THE PATTERN, NOT THE TIER GATE, THAT STRANDED IT. With the intensity gate in place
+  // this movement is `power` tier, and there were no other power movements in the knee-dominant pool
+  // — so it went from six unsound options to none. Filing it where its own twin already lives gives
+  // it back the RIGHT ones: box jump, broad jump, bounding, skater hop.
+  // ⚠️ `equipmentForExercise` already read this correctly ("Jump Squat" contains "squat", and rule
+  // order is what keeps it a jump) — only the config's pattern disagreed.
   'squat jump': {
-    pattern: 'knee_dominant',
+    pattern: 'plyometric',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
   'squat jumps': {
-    pattern: 'knee_dominant',
+    pattern: 'plyometric',
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
@@ -1307,6 +1346,577 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
+
+  // ══════════════════════════════════════════════════════════════════════════════════════════════
+  // RECONCILIATION WITH THE TYPE TABLE (2026-08-03). Purely additive — no existing entry is edited.
+  //
+  // ⛔ WHY THESE WERE MISSING AND WHY IT WAS NOT VISIBLE. Every name below already carries a declared
+  // type in `exercise-role.ts`'s TYPE_TABLE — the app knows exactly what kind of movement it is — and
+  // had NO entry here. That is not inert. `getExerciseConfig` ends in a LONGEST-SUBSTRING FUZZY
+  // FALLBACK, so an unconfigured name does not return null; it lands on whichever neighbouring key
+  // overlaps most, and then renders that neighbour's prescription.
+  //
+  // ⛔ THE WORST ONE, AND THE REASON THIS SECTION EXISTS: **`press`** — one of the app's own
+  // MAIN_531_LIFTS, 5/3/1's name for the overhead press — matched `leg press` and was priced at
+  // **ratio 1.5 of the SQUAT**. `military press` and `push press` are also main lifts and also had no
+  // entry. Two more of the same class: `single leg squat` (a bodyweight pistol) matched `squat` and
+  // was priced at 100% of the barbell back squat, and `band overhead press` matched `overhead press`
+  // and was priced at 100% of the OHP max instead of being drawn as a band.
+  //
+  // ⛔ EVERY RATIO BELOW IS INHERITED FROM AN EXISTING SIBLING ENTRY IN THIS FILE, NOT CHOSEN.
+  // A first pass at this section picked its own numbers (a DB row at 0.4, a step up at 0.15) and that
+  // is exactly the guessing the file's header warns against — these ratios are load prescriptions.
+  // The rule used instead: find the movement this one is a VARIANT of, take its ratio unchanged, and
+  // change only what the equipment demands (perHand vs total vs band). Where no sibling exists, the
+  // ratio is 0 — this file's existing way of saying "there is no number to derive" — and the
+  // athlete's own logged weight drives the row instead of a fabricated prescription.
+  //
+  //     bodyweight / plyo / isometric / mobility → primaryRef null, ratio 0, displayFormat 'bodyweight'
+  //                                                (precedent: `plank`, `box jump`, `bird dog`, `core circuit`)
+  //     band                                     → primaryRef null, ratio 0, displayFormat 'band'
+  //                                                (precedent: `band pull apart`, `clamshell`, `lateral band walk`)
+  //     loaded_accessory                         → its sibling's ref + ratio, its own equipment's format
+  //     barbell_main                             → the lift's own 1RM, ratio 1.0
+  //
+  // ⚠️ `ratioIsTotal` IS CARRIED WITH THE RATIO WHEN THE SIBLING HAS IT. On `dumbbell bench press` the
+  // ratio is the TOTAL load and the display halves it per hand. Copying the ratio without the flag
+  // would have doubled every one of those prescriptions.
+  //
+  // ⚠️ THE LOGGING MODE IS NOT SET HERE AND NEVER WAS. What the row asks for (weight × reps / reps /
+  // time / distance) comes from the type table via `strength-logging-mode.ts`. A dead hang and a sled
+  // push already logged as time/distance before this section existed. These entries fix the WEIGHT
+  // PRESCRIPTION and the DISPLAY, not the mode.
+  // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+  // ── MAIN LIFTS THAT HAD NO ENTRY (the `press` → `leg press` class) ───────────────────────────
+  // Sibling: `overhead press` (overhead × 1.0, total) / `bench press` (bench × 1.0, total).
+  press: {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high',
+    notes: "5/3/1's name for the overhead press. Without this key it fuzzy-matched `leg press` at 1.5x squat.",
+  },
+  'military press': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high',
+  },
+  'push press': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    // ⚠️ Leg drive lets a push press move MORE than a strict press. The sibling's 1.0 is kept rather
+    // than invented upward — erring low is this file's stated direction for a prescription.
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'medium',
+  },
+  'barbell bench press': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high',
+  },
+
+  // ── PRESS VARIANTS that the new `press` key would otherwise have captured ────────────────────
+  // ⚠️ THESE TWO ARE HERE BECAUSE OF THE KEY ABOVE. Both resolved to nothing before; adding `press`
+  // made them fuzzy-match it and inherit a BARBELL total. They are dumbbell/kettlebell movements, so
+  // they get the `dumbbell shoulder press` sibling (overhead × 0.7 total, shown per hand) instead.
+  'dumbbell press': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 0.7,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+    confidence: 'medium',
+  },
+  'kettlebell press': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 0.7,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+    confidence: 'low',
+  },
+
+  // ── SERVER-KEYING + SHORTHAND ALIASES. Sibling: `dumbbell row` (bench × 0.45, perHand) ───────
+  // ⚠️ `canonicalize()` on the server emits `db_row`, and the protocols write "DB Row". These
+  // resolved by fuzzy luck or not at all; an exact key is not a new opinion, it is the same
+  // prescription reached deterministically.
+  'db row': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    confidence: 'medium',
+  },
+  'light db row': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    // ⚠️ SAME RATIO AS `dumbbell row`, DELIBERATELY. "Light" is a prescription cue in the protocol
+    // text, and this file has no precedent for a light-modifier ratio. Inventing one (0.3?) would be
+    // exactly the guess this section avoids. The athlete's logged weight carries the difference.
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    confidence: 'low',
+  },
+  'single arm row': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    confidence: 'medium',
+    notes: 'In the add-picker list with no entry. Explicit so the new bare `row` key cannot capture it as a two-handed total.',
+  },
+  // Sibling: `barbell row` (bench × 0.8, total) — a machine/cable row is one stack, one total load.
+  row: {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.8,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'medium',
+    notes: 'Bare "Row" — the same slot it already fuzzy-matched (`barbell row`), now reached exactly.',
+  },
+  'cable row': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.8,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'medium',
+  },
+  // Sibling: `lat pulldown` (bench × 0.65, total) — the same movement, spelled with a space.
+  'lat pull down': {
+    pattern: 'vertical_pull',
+    primaryRef: 'bench',
+    ratio: 0.65,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'medium',
+  },
+  'explosive lat pull down': {
+    pattern: 'vertical_pull',
+    primaryRef: 'bench',
+    // Same sibling ratio. "Explosive" is a speed cue, not a different load basis.
+    ratio: 0.65,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'low',
+  },
+  // Sibling: `dumbbell bench press` (bench × 0.8 TOTAL, shown per hand).
+  'db floor press': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.8,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+    confidence: 'medium',
+  },
+  // Sibling: `dumbbell shoulder press` (overhead × 0.7 TOTAL, shown per hand).
+  'db push press': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 0.7,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+    confidence: 'medium',
+  },
+  // Sibling: `romanian deadlift` (deadlift × 0.75). Dumbbells → per hand, so the ratio is the TOTAL
+  // and the display halves it — the same shape `walking lunge` and `dumbbell bench press` use.
+  'db romanian deadlift': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.75,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+    confidence: 'medium',
+  },
+  // Sibling: the existing `kb/db swings` (deadlift × 0.25, total). ONE bell, TWO hands.
+  'db swing': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'low',
+    notes: 'One bell, two hands — a total load, not per hand.',
+  },
+  'kb swing': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'low',
+  },
+  'kb db swing': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'low',
+  },
+  // Sibling: `rear delt flyes` — ratio 0, per hand. Copied exactly, including the absent ratio.
+  'rear delt flye': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+
+  // ── LOADED ACCESSORIES with no entry ─────────────────────────────────────────────────────────
+  // Sibling: `hip thrust` (deadlift × 0.9, total). The bilateral barbell version IS that slot.
+  'barbell hip thrust': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.9,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high',
+  },
+  // Sibling: `walking lunge` (squat × 0.5 TOTAL, shown per hand). The barbell version puts the same
+  // load on the back as ONE implement, so only the format changes.
+  'barbell walking lunge': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.5,
+    displayFormat: 'total',
+    isUnilateral: true,
+    confidence: 'medium',
+  },
+  'dumbbell walking lunge': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.5,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    ratioIsTotal: true,
+    confidence: 'medium',
+  },
+  'sandbag lunge': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.5,
+    displayFormat: 'total',
+    isUnilateral: true,
+    confidence: 'low',
+    notes: 'One implement, carried — a total load. Same ratio as the walking lunge sibling.',
+  },
+  // Sibling: `step up` (squat × 0.4, per hand). "Explosive" is a speed cue, not a load basis.
+  'explosive step up': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.4,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    confidence: 'low',
+  },
+  // Sibling: `ytw raise` (overhead × 0.15, per hand) — the nearest configured rear-delt/cuff work.
+  // ⛔ A CABLE face pull carries real external load. Without this key it matched `face pull`, which
+  // is configured `band`, so a stack-loaded movement was drawn as a band. One stack → total.
+  'cable face pull': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'overhead',
+    ratio: 0.15,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'low',
+  },
+  'external rotation': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'overhead',
+    ratio: 0.15,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    confidence: 'low',
+  },
+  // This IS a Y-T-W raise, spelled out. Copied from `ytw raise` exactly.
+  'prone y t w raise': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'overhead',
+    ratio: 0.15,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    confidence: 'low',
+  },
+  // ⛔ WEIGHTED — without this key it matched `single leg calf raise`, which is `bodyweight`, so the
+  // added load had nowhere to go. ⚠️ RATIO 0 AND THAT IS THE HONEST ANSWER: this file has no
+  // configured loaded calf raise to inherit from, and a calf-raise load is not a fraction of any
+  // barbell max. The format is fixed so the weight has somewhere to go; the number stays the
+  // athlete's own.
+  'weighted single leg calf raise': {
+    pattern: 'calf',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+  },
+
+  // ── BAND: the band IS the load. `_shared/workload.ts` prices it; a ratio is meaningless here ──
+  'band row': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
+  'resistance band row': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
+  'band pull down': {
+    pattern: 'vertical_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
+  'band overhead press': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+    notes: 'Without this key it matched `overhead press` and was priced at 100% of the barbell OHP max.',
+  },
+  'band lateral raise': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+    notes: 'Without this key it matched `lateral raise` and was drawn as a per-hand dumbbell.',
+  },
+  'band lateral walk': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+    notes: 'The movement the existing `lateral band walk` covers, written the other way round.',
+  },
+
+  // ── BODYWEIGHT with no entry ─────────────────────────────────────────────────────────────────
+  'band assisted pull up': {
+    pattern: 'vertical_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'The BAND IS ASSISTANCE here, not load — `bandMeansAssistance` is the authority and the body is what moved. Typed `bodyweight`, never `band`.',
+  },
+  'inverted ring row': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  // ⛔ THE SERVER'S KEY FOR A CHIN-UP, AND IT WAS THE ONLY ONE MISSING. `canonicalize()` emits
+  // `chinup`; `pullup` has had an entry all along and `chinup` did not, so the same lookup that
+  // priced a pull-up correctly returned NULL for a chin-up. Copied from `chin up` exactly — this is
+  // the same movement reached by the other of the app's two keyings, not a new opinion.
+  chinup: {
+    pattern: 'vertical_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'nordic hamstring curl': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'back extension': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'soleus raise': {
+    pattern: 'calf',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'tibialis raise': {
+    pattern: 'calf',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'single leg squat': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+    notes: 'Without this key it matched `squat` — a bodyweight pistol priced at 100% of the barbell back squat.',
+  },
+
+  // ── PLYO ─────────────────────────────────────────────────────────────────────────────────────
+  'bench jump': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+  // ── ISOMETRIC / MOBILITY: held, not repped. Time comes from the type table, not from here ─────
+  // ⛔ `pattern` IS DELIBERATELY NULL ON `dead hang`, `wall sit`, `wall angel` AND `foot doming`, AND
+  // THIS IS THE ONE THING IN THIS SECTION I COULD NOT DERIVE. `pattern` is the SWAP SLOT:
+  // `getInSlotAlternatives` offers every config entry sharing a pattern as a substitute. Typing a
+  // wall sit `knee_dominant` would offer it as a substitute for a Back Squat, and a dead hang
+  // `vertical_pull` would offer it for Pull Ups — neither substitutes for anything. `MovementPattern`
+  // has no `hold` or `carry` member, so there is no honest bucket. Null means "no slot": the entry
+  // offers no alternatives and is offered as none (the loop compares patterns, and null never equals
+  // a real one). Zero ripple, and it leaves the taxonomy question open rather than answering it
+  // wrongly. Precedent for a null pattern already exists (`kb/db swings`).
+  'plank hold': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'plank with shoulder tap': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'side plank abduction': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+  'dead hang': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Held, not repped. Pattern null on purpose — a dead hang substitutes for nothing.',
+  },
+  'wall sit': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Held, not repped. Pattern null on purpose — a wall sit is not a substitute for a squat.',
+  },
+  'wall angel': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Mobility — done or timed, unloaded, and not a substitute for a loaded movement.',
+  },
+  'foot doming': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+    notes: 'Mobility — done or timed, unloaded.',
+  },
+
+  // ── CARRY: loaded, but measured in distance or time ──────────────────────────────────────────
+  // ⛔ THE TYPE TABLE HAS A `carry` ROW AND THIS FILE HAD **ZERO** CARRY ENTRIES — every carry in the
+  // vocabulary resolved to null or by fuzzy luck. The per-hand/total split below is NOT a new
+  // opinion: it is transcribed from `equipmentForExercise` in `strength-logging-mode.ts`, which
+  // already answers `dumbbell` (per hand) for farmer and suitcase carries and leaves the sled on the
+  // default. Q-180 is the precedent AND the warning — a Farmers Carry drawn as one loaded barbell.
+  // ⚠️ RATIO 0 THROUGHOUT: a carry load is not a fraction of any barbell max. `pattern` null for the
+  // reason given above — a carry substitutes for nothing and the taxonomy has no slot for it.
+  'farmers carry': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    notes: 'Two implements, one per hand (Q-180).',
+  },
+  'farmer carry': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'farmer walk': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'suitcase carry': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    notes: 'One implement, one side — unilateral, and the per-hand label is still the honest one.',
+  },
+  'backpack carry': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'One implement on the back — a single total load, not per hand.',
+  },
+  'sled push': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'One implement. Sled load is not a fraction of any barbell max — friction and surface dominate.',
+  },
+  'sled pull': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+
 };
 
 /**

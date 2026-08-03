@@ -116,8 +116,17 @@ Deno.test('THE MICHAEL CASE II: Leg Press is a DIRECT squat swap; a curated fami
   assertEquals(tierOf(alts, 'Leg Press'), 'direct');     // loads 1.5× squat, same family
   assertEquals(tierOf(alts, 'Front Squat'), 'direct');
   assertEquals(tierOf(alts, 'Goblet Squat'), 'direct');
-  // NOT direct: unilateral / machine-isolation / plyo in the same pattern
-  assertEquals(tierOf(alts, 'Squat Jump'), 'lighter');   // bodyweight plyo, not a loaded swap
+  // NOT direct: unilateral / machine-isolation in the same pattern
+  assertEquals(tierOf(alts, 'Bulgarian Split Squat'), 'lighter');
+  assertEquals(tierOf(alts, 'Leg Extension'), 'lighter');
+  // ⚠️ THIS LINE USED TO ASSERT `Squat Jump` → 'lighter', AND IT CHANGED ON 2026-08-03. `squat jump`
+  // carried `pattern: 'knee_dominant'` while `jump squat` — the same movement, written the other way
+  // round — carried `plyometric`, so the two names behaved differently in this very list: Squat Jump
+  // was offered here and Jump Squat never was. The config was corrected so both are `plyometric`,
+  // and neither is offered for a Back Squat now. That is the CONSISTENT answer, and it is also the
+  // right one: a maximal-intent jump is not a substitute for a heavy squat.
+  assertEquals(tierOf(alts, 'Squat Jump'), null);
+  assertEquals(tierOf(alts, 'Jump Squat'), null);
 });
 
 Deno.test('⛔ Hip Thrust is an ALTERNATIVE for a deadlift, NOT a direct swap (Michael flagged it)', () => {

@@ -44,9 +44,29 @@ Deno.test('this axis is NOT MovementGroup — the pair that proves they are orth
 });
 
 Deno.test('an absent pattern is not evidence of a clash (§0h)', () => {
-  assertEquals(getMovementFamily('Nonexistent Widget Press'), null);
-  assertEquals(sharesMovementFamily('Nonexistent Widget Press', 'Bench Press'), false);
-  assertEquals(sharesMovementFamily('Nonexistent Widget Press', 'Another Nonexistent Thing'), false);
+  // ⚠️ THE JUNK NAME CHANGED ON 2026-08-03 AND THE REASON MATTERS. It used to be "Nonexistent Widget
+  // Press", which stopped being a junk name the moment `press` became a config key — the fuzzy
+  // fallback matches on substrings, so anything ending in "Press" now resolves. The rule under test
+  // is unchanged ("a name the table has never heard of yields no family"); only the example had to
+  // stop containing a real lift word. See the case below, which pins the new behaviour explicitly
+  // rather than letting this rename hide it.
+  assertEquals(getMovementFamily('Nonexistent Widget Contraption'), null);
+  assertEquals(sharesMovementFamily('Nonexistent Widget Contraption', 'Bench Press'), false);
+  assertEquals(sharesMovementFamily('Nonexistent Widget Contraption', 'Another Nonexistent Thing'), false);
+});
+
+Deno.test('⚠️ THE COST OF THE BARE `press` KEY, RECORDED RATHER THAN HIDDEN (2026-08-03)', () => {
+  // ⛔ ADDING A SHORT KEY WIDENS THE FUZZY NET. `press` was added because without it, 5/3/1's own
+  // name for the overhead press resolved to `leg press` at 1.5x SQUAT — a badly wrong prescription
+  // on a main lift. The price is that an UNKNOWN "...Press" movement now resolves to `press`
+  // (vertical push, overhead x 1.0) instead of to null, wherever no longer key matches.
+  //
+  // ⚠️ THIS IS A TRADE, NOT A FIX, AND IT IS MICHAEL'S CALL WHETHER IT IS THE RIGHT ONE. Recorded
+  // here so the next session sees the behaviour instead of rediscovering it. Longer keys still win:
+  // `bench press`, `leg press` and `overhead press` are all unaffected.
+  assertEquals(getMovementFamily('Nonexistent Widget Press'), 'push');
+  assertEquals(getMovementFamily('Bench Press'), 'push');
+  assertEquals(getMovementFamily('Leg Press'), 'knee');
 });
 
 // ── Q-212 step 3: the balance pool ────────────────────────────────────────────

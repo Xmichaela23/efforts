@@ -21,12 +21,27 @@
  * transcribed from that file's own section headers, which have carried the taxonomy as comments all
  * along.
  *
- * ⛔ AND WE DO NOT FILTER ON ROLE. Two reasons. (1) THE FIELD DOESN'T: Trainerize's filters are "Same
- * muscle group / Same Equipment / Same movement"; Fitbod matches "same muscles at equivalent
- * intensity". Neither filters on load tier — that was MY judgment, not the field's. (2) `roleForExercise`
- * is too noisy to filter on anyway: `barbell row` is 'primary' while `bent over row` is 'accessory' —
- * THE SAME MOVEMENT. Filtering on it produced EMPTY lists. (That inconsistency is a real data bug in
- * exercise-role.ts; it is filed, not papered over here.)
+ * ⛔ WE DO NOT FILTER ON ROLE — BUT WE DO NOW FILTER ON INTENSITY TIER. ⚠️ THIS PARAGRAPH USED TO SAY
+ * THE OPPOSITE, and the correction is worth keeping in full because the original reasoning was half
+ * right. It read: *"THE FIELD DOESN'T: … Neither filters on load tier — that was MY judgment, not the
+ * field's."*
+ *
+ *   • **On role, it still stands.** `roleForExercise` is too noisy to filter on: `barbell row` is
+ *     'primary' while `bent over row` is 'accessory' — THE SAME MOVEMENT. Filtering on it produced
+ *     EMPTY lists. (That inconsistency is a real data bug in exercise-role.ts; filed, not papered over.)
+ *   • **On tier, it was wrong, and the gate below is the fix.** Fitbod's own rule is "same muscles at
+ *     *equivalent intensity*" — that IS a tier filter. The main-lift gate further down this same file
+ *     already said so in terms (*"Trainerize and Fitbod substitute within muscle group AND equivalent
+ *     intensity, never across load tiers"*) and then applied it to exactly one case. Without the
+ *     general rule the engine offered a **Barbell Hip Thrust for a Clamshell** and a **DB Lateral
+ *     Raise for a Band Lateral Raise**. Measured over the library: 97 of 764 offers were wrong on
+ *     tier alone (docs/AUDIT-accessory-swaps-2026-08-03.md). Tier is derived in
+ *     `strength-intensity-tier.ts` from the TYPE axis, never from role.
+ *
+ * ⚠️ AND THE MUSCLE AXIS STAYS LOOSE ON PURPOSE. The same audit flagged 253 offers whose target muscle
+ * differs (Single Leg RDL → Hip Thrust: hamstrings vs glutes). Those are NOT gated — Michael's ruling
+ * and Wendler's: posterior-chain assistance is interchangeable, `pattern` remains the muscle proxy,
+ * and a same-muscle gate would empty half these lists.
  *
  * ⚠️ THERE IS A DEAD SECOND TAXONOMY IN THE REPO — `src/services/ExerciseLibrary.ts` (primaryMuscles,
  * equipment, categories). Its header claims it is "Used by PlanEngine, ManualPlanBuilder, and Logging
@@ -49,6 +64,9 @@ import { assistancePeersFor } from './assistance-menu.ts';
 // row and the logger's bar-speed cue gate on. Unioned with this file's curated families, never
 // substituted for them; see `isMainLift` for the measurement behind that.
 import { isMain531Lift } from './exercise-role.ts';
+// The INTENSITY-TIER gate (2026-08-03). Generalizes the main-lift exclusion below from "never offer a
+// main lift for an accessory" to "never offer across load tiers at all".
+import { intensityTierForExercise } from './strength-intensity-tier.ts';
 
 // DIRECT-SWAP FAMILIES — a small curated map of "the same movement, programmed differently," the way a
 // strength app groups substitutes. Members of the same family are DIRECT swaps for each other (Leg Press
@@ -254,6 +272,25 @@ export function getInSlotAlternatives(
   const norm = (n: string) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 
   const selfNorm = norm(plannedName);
+  // The slot's own tier, resolved once. ⚠️ Off `plannedName`, not off `selfNorm` — the tier reader
+  // resolves through `getExerciseConfig`, which does its own folding.
+  const slotTier = intensityTierForExercise(plannedName);
+  // ⛔ THE TIER GATE IS FOR ACCESSORY SLOTS ONLY, AND THAT IS THE EXISTING ONE-DIRECTIONAL RULE, NOT
+  // A NEW CARVE-OUT. The main-lift exclusion below already says it in terms: *"ONE-DIRECTIONAL. A
+  // main-lift slot still offers everything it offered before, accessories included — swapping DOWN
+  // from a squat to a lunge is a legitimate call the athlete may need."*
+  // ⚠️ A FIRST CUT GATED EVERY SLOT AND BROKE THAT. It dropped Squat Jump from a Back Squat's list
+  // (`exercise-alternatives.test.ts` pins it as a 'lighter' alternative), which is the app deciding
+  // an athlete may not swap down out of a heavy squat — a decision nobody asked for. The audit's
+  // finding was about ACCESSORIES offering each other across tiers; main lifts were never in it.
+  //
+  // ⛔ AND THE EXEMPTION IS `isMain531Lift`, NOT THIS FILE'S `isMainLift`. They answer different
+  // questions and only one fits here. `isMainLift` is a UNION — the shared classifier OR membership
+  // of any curated family — built to ask *"is this candidate too big to offer INTO an accessory
+  // slot"*, so it calls a Romanian Deadlift, a Barbell Row, a Goblet Squat and a Leg Press main
+  // lifts. Using it to exempt SLOTS let `barbell row → ytw raise` and `romanian deadlift → clamshell`
+  // straight back through. The swap-down allowance belongs to the four lifts the block is built on.
+  const slotIsMainLift = isMain531Lift(plannedName);
   // DIRECT = same curated family (Leg Press IS a direct swap for a Back Squat); a same-pattern lift NOT
   // in the family is an ALTERNATIVE (Hip Thrust). If the slot isn't in any family, fall back to a
   // loadable-compound heuristic (a barbell/dumbbell compound is direct; band/bodyweight is lighter).
@@ -305,6 +342,19 @@ export function getInSlotAlternatives(
     // ⚠️ ONE-DIRECTIONAL. A main-lift slot still offers everything it offered before, accessories
     // included — swapping DOWN from a squat to a lunge is a legitimate call the athlete may need.
     if (!slotFamily && isMainLift(key)) continue;
+
+    // ⛔ THE INTENSITY-TIER GATE (2026-08-03). The generalization of the rule directly above: that one
+    // stops a MAIN LIFT reaching an accessory slot, which caught the loudest case and left every other
+    // crossing open. A Clamshell is not a main lift, and neither is a Barbell Hip Thrust — so the old
+    // gate passed them both and the engine offered one for the other.
+    //
+    // ⚠️ EXACT MATCH IN BOTH DIRECTIONS. Not "one tier lighter is acceptable": offering a band movement
+    // for a barbell lift under-loads a session the plan sized, and offering the barbell lift for the
+    // band movement turns a prehab slot into a heavy one nobody programmed. Tiers are `light` (band,
+    // isometric, mobility, bodyweight core work), `loaded` (implements, and bodyweight compounds like
+    // pull-ups and dips) and `power` (plyometrics) — see `strength-intensity-tier.ts` for why the third
+    // exists and why this reads the TYPE axis rather than `role`.
+    if (!slotIsMainLift && intensityTierForExercise(key) !== slotTier) continue;
 
     // DIRECT = same curated family; else same-pattern is an ALTERNATIVE. Ranked heaviest-first per tier.
     const ratio = typeof c.ratio === 'number' ? c.ratio : 0;

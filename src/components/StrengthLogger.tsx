@@ -1695,7 +1695,71 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Russian Twist', 'Cable Woodchopper', 'Landmine Twist', 'Pallof Press',
     "Farmer's Carry", 'Suitcase Carry', 'Overhead Carry',
     'Superman Hold', 'Back Extension', 'Hip Extension', 'Glute Bridge March', 'Reverse Hyperextension',
-    'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit Up', 'GHD Sit Up'
+    'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit Up', 'GHD Sit Up',
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════
+    // RECONCILED AGAINST THE TYPE TABLE (2026-08-03). Purely additive.
+    //
+    // ⛔ THIS LIST — NOT `exercise-config.ts` — IS WHAT THE ADD-EXERCISE SEARCH READS. That matters
+    // because the gap was reported as a config gap and it is not one: `getFilteredExercises` filters
+    // THIS array and nothing else. Confirmed against the device report exactly — typing "ban"
+    // returned nothing, "sled" returned nothing, and "fa" returned Face Pulls / Farmer's Carry /
+    // TRX Fallout, which is precisely what this array does and does not contain. Adding entries to
+    // the config would not have put a single one of them in the picker.
+    //
+    // ⛔ SO THE FIX IS TWO-SIDED AND BOTH SIDES ARE NEEDED: a movement has to be FINDABLE (here) and
+    // CORRECTLY PRICED (`exercise-config.ts`). Every name below is one the app already classifies in
+    // `exercise-role.ts`'s TYPE_TABLE — the engine knew what each of these was and the athlete could
+    // not type it in.
+    //
+    // ⚠️ WHY THE OMISSION LOOKED RANDOM: this array is hand-curated and grew by whoever hit a miss.
+    // Face Pulls and Farmer's Carry were added at some point; Band Pull Apart and Sled Push never
+    // were. There is nothing systematic to fix in the search itself — the list was just short.
+    // ⚠️ AND IT IS ONE OF THREE COPIES (`StrengthPlansView.tsx`, `StrengthExerciseBuilder.tsx` each
+    // hold their own `commonExercises`). Only the logger's is reconciled here; see the report.
+
+    // Bands — the whole category was absent, which is the "ban returns nothing" report.
+    'Band Pull Apart', 'Band Face Pull', 'Band Row', 'Band Pull Down', 'Band Overhead Press',
+    'Band Lateral Raise', 'Lateral Band Walk', 'Band Assisted Pull up', 'Resistance Band Row',
+    'Clamshell',
+
+    // Carries and sleds. ⚠️ Farmer's Carry / Suitcase Carry / Overhead Carry were already above —
+    // this is the rest of the carry row, and the sled, which is why "sled" returned nothing.
+    'Sled Push', 'Sled Pull', 'Farmers Carry', 'Farmer Walk', 'Backpack Carry',
+
+    // Holds and mobility — logged against the clock. Dead Hang is the reported miss.
+    'Dead Hang', 'Wall Sit', 'Wall Angel', 'Foot Doming', 'Plank Hold', 'Side Plank Abduction',
+
+    // Bodyweight the table classifies and the list never offered.
+    'Air Squat', 'Bodyweight Squat', 'Bird Dog', 'Dead Bug', 'Inverted Row', 'Inverted Ring Row',
+    'Nordic Hamstring Curl', 'Single Leg Squat', 'Single Leg Glute Bridge', 'Single Leg Calf Raise',
+    'Soleus Raise', 'Tibialis Raise', 'Archer Push up', 'Diamond Push up', 'Decline Push up',
+
+    // Plyometrics — reps only, never a loaded bar (the Box Jump lesson).
+    'Box Jump', 'Broad Jump', 'Bench Jump', 'Bounding', 'Skater Hop', 'Jump Lunge', 'Squat Jump',
+
+    // Loaded accessories with a config entry the picker could not reach.
+    'Barbell Hip Thrust', 'Goblet Squat', 'Chest Supported Row', 'Box Step Up', 'Walking Lunge',
+    'Dumbbell Walking Lunge', 'Barbell Walking Lunge', 'Sandbag Lunge', 'Explosive Step Up',
+    'Cable Face Pull', 'External Rotation', 'Prone Y T W Raise', 'Rear Delt Fly',
+    'Lat Pull Down', 'Weighted Single Leg Calf Raise', 'DB Row', 'DB Floor Press',
+    'DB Push Press', 'DB Romanian Deadlift', 'KB Swing',
+
+    // Main lifts the picker was missing. ⛔ "Press" and "Military Press" are 5/3/1's own names for
+    // the overhead press and neither could be typed in — while "Press" also resolved to a LEG PRESS
+    // prescription in the config. Both halves of that are fixed.
+    'Press', 'Military Press', 'Push Press', 'Barbell Bench Press',
+
+    // Second pass — movements with a config entry whose full name still returned nothing.
+    // ⚠️ WHAT IS DELIBERATELY NOT HERE: `pushup` / `pullup` / `chinup` (server `canonicalize()` keys,
+    // never what a human types — "push up" already finds "Push ups"), `core circuit` / `core work`
+    // (internal session names the type table documents as never shown to an athlete), and the
+    // `db …` / `kb …` abbreviations whose spelled-out form is in the list.
+    'Front Raise', 'Reverse Fly', 'YTW Raise', 'Single Leg Romanian Deadlift',
+    'Dumbbell Bench Press', 'Dumbbell Incline Press', 'Dumbbell Lateral Raise',
+    'Dumbbell Shoulder Press', 'Dumbbell Swing', 'Light DB Row', 'Explosive Lat Pull Down',
+    'Farmer Carry', 'Band Lateral Walk', 'Conventional Deadlift', 'Barbell Back Squat',
+    'Standing Barbell Overhead Press',
   ];
 
 

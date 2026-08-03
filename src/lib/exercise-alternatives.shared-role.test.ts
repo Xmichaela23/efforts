@@ -69,21 +69,19 @@ Deno.test('⛔ NO MAIN LIFT IS EVER OFFERED IN AN UNCURATED SLOT — the shared 
   assertEquals(leaks, [], `a main lift was offered in an uncurated slot:\n  ${leaks.join('\n  ')}`);
 });
 
-Deno.test('⚠️ THE UNION IS BEHAVIOUR-NEUTRAL TODAY, AND THIS RECORDS THE REASON IT IS', () => {
-  // ⛔ DO NOT READ STEP 4 AS "IT FIXED A LEAK". It did not. Measured: the swap list is byte-identical
-  // with and without the union. `standing barbell overhead press` and `press` are the only two names
-  // the shared classifier calls main lifts that sit in NO curated family — and neither can reach an
-  // accessory's list anyway:
+Deno.test('⛔ THE UNION IS NOW LOAD-BEARING — `press` became a config key on 2026-08-03', () => {
+  // ⛔ THIS TEST CHANGED, AND THE CHANGE IS THE FINDING. It used to assert the union was
+  // BEHAVIOUR-NEUTRAL, and it said so on the strength of one fact: *"`press` is not a config key at
+  // all, so it is never iterated."* Its own closing line was the trigger — *"If this assertion
+  // fails, the union has just become load-bearing."*
   //
-  //   • `press` is not a config key at all, so it is never iterated.
-  //   • `standing barbell overhead press` IS a key, and is suppressed by the CONFIG-IDENTITY DEDUP
-  //     (`exercise-alternatives.ts` ~:279) — its config is byte-identical to `overhead press`, which
-  //     is iterated first, added to `seen`, and only then dropped by the main-lift gate.
+  // It failed, on purpose. The 2026-08-03 config reconciliation ADDED `press`, because as a
+  // non-key it was falling through `getExerciseConfig`'s fuzzy fallback onto `leg press` and being
+  // priced at 1.5x the SQUAT — 5/3/1's own name for the overhead press, prescribed as a leg press.
   //
-  // ⚠️ SO THE UNION IS A GUARD, NOT A FIX — and this test exists to tell the next session when that
-  // stops being true. The moment either config gains a `note` or a different `confidence`, the dedup
-  // stops firing and the name WOULD leak into every vertical-push accessory's list. The union is
-  // what catches it then. If this assertion fails, the union has just become load-bearing.
+  // ⚠️ SO THE GUARD IS NOW DOING REAL WORK. `press` IS iterated, it IS a vertical_push, and the
+  // main-lift union is the only thing keeping it off every vertical-push accessory's swap list. The
+  // two assertions below are no longer bookkeeping — they are the leak test.
   const cfg = EXERCISE_CONFIG as Record<string, unknown>;
   assertEquals(
     JSON.stringify(cfg['standing barbell overhead press']),
@@ -91,14 +89,21 @@ Deno.test('⚠️ THE UNION IS BEHAVIOUR-NEUTRAL TODAY, AND THIS RECORDS THE REA
     'the configs diverged — the dedup no longer hides this name, and the union is now the only thing excluding it',
   );
   assert(isMain531Lift('standing barbell overhead press'), 'the shared classifier still claims it as a main lift');
-  assertEquals(Object.prototype.hasOwnProperty.call(cfg, 'press'), false, '`press` is still not a config key');
+  assert(Object.prototype.hasOwnProperty.call(cfg, 'press'), '`press` is a config key as of 2026-08-03');
+  assert(isMain531Lift('press'), 'and the shared classifier calls it a main lift');
 
-  // Either way — dedup or union — it must not be on an accessory's list.
+  // ⛔ NEITHER MAIN LIFT MAY REACH AN ACCESSORY'S LIST. `press` is the new one under test.
   for (const slot of ['Lateral Raise', 'Front Raise', 'Face Pull']) {
+    const offered = names(getInSlotAlternatives(slot, FULL_GYM));
     assertEquals(
-      names(getInSlotAlternatives(slot, FULL_GYM)).includes('standing barbell overhead press'),
+      offered.includes('standing barbell overhead press'),
       false,
       `${slot} must not be offered a Standing Barbell Overhead Press`,
+    );
+    assertEquals(
+      offered.includes('press'),
+      false,
+      `${slot} must not be offered a bare "press" — it is a main lift, and only the union excludes it now`,
     );
   }
 });
