@@ -295,6 +295,13 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
         ? null
         : computeSuggestedWeight(verdict.label, best_weight, l.canonical_name, anchor_1rm),
       anchor_1rm,
+      // ⛔ Q-254 SLICE 1 — CARRIED, NOT CONSULTED. The all-out set is the measurement 5/3/1 is built
+      // on, and this function has never seen it: `computeLiftVerdict` above still decides on RIR
+      // deviation (how the sets FELT) while the number that actually moves the training max is the
+      // rep count on the top set. Slice 1 puts the measurement ON the contract so State can render
+      // it beside the verdict. Slice 2 changes what the verdict READS — deliberately not here, so
+      // the rendering can be seen on a device before the reasoning moves under it.
+      all_out: l.last_all_out ?? null,
     };
   });
 

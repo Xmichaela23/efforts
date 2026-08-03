@@ -24,9 +24,16 @@ import { canonicalize } from '../_shared/canonicalize.ts';
 // D-349: unit-aware, human-bounded body-weight resolver — the same one the load score and the
 // backfill use, so a session's lb column and its load score are priced off an identical number.
 import { resolveBodyweightLb } from '../_shared/workload.ts';
-// The app's one 1RM formula (D-339, Wendler's own) + the rep ceiling above which it stops holding.
-import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
-import { trustedMaxRepsFor } from '../shared/strength-system/loading/wendler-531.ts';
+// The all-out set: the rep record, Wendler's own 1RM formula (D-339) and the rep ceiling above which
+// it stops holding. Shared with `coach` (Q-254 slice 1) so State and Performance read one function.
+import {
+  accumulateBestRepsAtWeight,
+  allOutEmptyReason,
+  type BestRepsAtWeight,
+  readAllOutSets,
+  REP_RECORD_WINDOW_SESSIONS,
+  toAllOutPayload,
+} from '../_shared/strength/all-out-set.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 import { generateRaceNarrative } from '../_shared/race-narrative.ts';
@@ -963,15 +970,10 @@ async function runSessionDetailPipelineAndPersist(
             .filter((s: string) => s.length > 0),
         );
         if (currentNames.size > 0) {
-          // ⚠️ WIDENED 10 → 40 (2026-07-30) FOR THE REP RECORD, and the Previous column is unaffected
-          // because it keeps only the most recent hit per exercise either way.
-          //
-          // 10 strength sessions is ~2.5 weeks on a four-day block — long enough to answer "what did I
-          // lift last time", far too short to answer "is this my best at this weight". 40 covers ~10
-          // weeks, which spans the anchor cycles a rep record actually lives across.
-          // ⛔ The number is OURS. It is a window, not a claim about all-time — see `rep_record_window_sessions`
-          // on the payload, and do not let a surface narrate it as a lifetime PR.
-          const REP_RECORD_WINDOW_SESSIONS = 40;
+          // ⚠️ THE WINDOW (40 sessions) AND THE ALL-OUT READ NOW LIVE IN `_shared/strength/all-out-set.ts`
+          // (Q-254 slice 1). They were inline here; State needed the identical read for its "from your
+          // logged sets" rows, and the only alternatives were a sixth private copy in `coach` or this
+          // extraction. Nothing about the Performance payload changed — the same functions produce it.
           const { data: priorRows } = await supabase
             .from('workouts')
             .select('id,date,strength_exercises')
@@ -982,7 +984,7 @@ async function runSessionDetailPipelineAndPersist(
             .order('date', { ascending: false })
             .limit(REP_RECORD_WINDOW_SESSIONS);
           /** Per exercise: the most reps ever done at each weight, inside the window. */
-          const bestRepsAtWeight: Record<string, Record<number, number>> = {};
+          const bestRepsAtWeight: BestRepsAtWeight = {};
           const previousByName: Record<string, { date: string; days_ago: number; sets: any[] }> = {};
           const todayMs = new Date(workoutDate + 'T00:00:00Z').getTime();
           for (const pr of (priorRows ?? [])) {
@@ -996,19 +998,14 @@ async function runSessionDetailPipelineAndPersist(
               exercises = [];
             }
             if (!Array.isArray(exercises)) continue;
+            // The rep-record scan runs over EVERY prior session, not just the most recent one, so it
+            // must run before the `previousByName` early-out below — hence its own pass here rather
+            // than a branch inside the loop that keeps only the newest hit per exercise.
+            accumulateBestRepsAtWeight(bestRepsAtWeight, exercises, currentNames);
             for (const ex of exercises) {
               const normName = normalizeExerciseName(ex?.name || '');
               if (!normName || !currentNames.has(normName)) continue;
               const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
-              // The rep-record scan runs over EVERY prior session, not just the most recent one, so
-              // it must come before the `previousByName` early-out below.
-              for (const st of setsArr) {
-                const w = Number(st?.weight) || 0;
-                const r = Number(st?.reps) || 0;
-                if (!(w > 0) || !(r > 0)) continue;
-                const byW = (bestRepsAtWeight[normName] ??= {});
-                if (!(byW[w] > r)) byW[w] = r;
-              }
               if (setsArr.length === 0) continue;  // skip rows with no per-set data
               if (previousByName[normName]) continue;  // earlier (= more recent) row already won
               const priorMs = new Date(prDate + 'T00:00:00Z').getTime();
@@ -1044,78 +1041,26 @@ async function runSessionDetailPipelineAndPersist(
           // given weight AND an e1RM curve off top sets continuously, flagging PRs as they happen.
           // Being the only 5/3/1 app that hides the number three weeks in four is an outlier position
           // taken on instinct. Every anchor week it is.
-          // The planned rows, for the set_plan fallback below.
+          //
+          // ⛔ THE READ ITSELF MOVED TO `_shared/strength/all-out-set.ts` (Q-254 slice 1). It is the
+          // same code — same flag-then-plan resolution, same rep record, same trust ceiling — and it
+          // is shared because STATE now renders the same finding on its "from your logged sets" rows.
+          // Two screens, one function: they cannot disagree about whether a set was a record.
+          // The planned rows, for the set_plan fallback.
           const plannedExercisesForAllOut: any[] | null = Array.isArray(plannedRowRaw?.strength_exercises)
             ? plannedRowRaw.strength_exercises
             : null;
-          const allOut: Array<Record<string, unknown>> = [];
-          for (const ex of compStrengthArr) {
-            const normName = normalizeExerciseName(ex?.name || '');
-            const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
-            // `amrap` is stamped on the set from the plan's `set_plan`; the athlete types the reps.
-            // ⛔ THE PLAN DEFINES WHICH SET IS THE READING — the logged flag is only a convenience.
-            //
-            // First choice: the logger stamped `amrap: true` on the set it copied from the plan.
-            // But that flag only lands when the row was BUILT from a planned session, so a session
-            // logged from a stale bundle, edited by hand, or added on the day carries the right work
-            // and no marker — and the panel would silently show nothing on a set the plan clearly
-            // called all-out. Falling back to the PLAN is not a guess: `set_plan[].amrap` is the
-            // prescription that made it an all-out set in the first place.
-            let amrapSet = setsArr.find((st: any) => st?.amrap === true && (Number(st?.reps) || 0) > 0);
-            if (!amrapSet && normName && Array.isArray(plannedExercisesForAllOut)) {
-              const pEx = plannedExercisesForAllOut.find(
-                (pe: any) => normalizeExerciseName(pe?.name || '') === normName,
-              );
-              const plan = Array.isArray(pEx?.set_plan) ? pEx.set_plan : null;
-              const idx = plan ? plan.findIndex((sp: any) => sp?.amrap === true) : -1;
-              if (idx >= 0) {
-                const candidate = setsArr[idx];
-                if (candidate && (Number(candidate?.reps) || 0) > 0) amrapSet = candidate;
-              }
-            }
-            if (!amrapSet || !normName) continue;
-            const weight = Number(amrapSet.weight) || 0;
-            const reps = Number(amrapSet.reps) || 0;
-            if (!(weight > 0) || !(reps > 0)) continue;
-
-            const priorBest = bestRepsAtWeight[normName]?.[weight] ?? null;
-            const trustedMax = trustedMaxRepsFor(ex?.name);
-            allOut.push({
-              name: String(ex?.name || ''),
-              weight,
-              reps,
-              /** The most reps done at THIS weight inside the window. Null = never lifted it here before. */
-              prior_best_reps_at_weight: priorBest,
-              /** ⚠️ Null prior is NOT a record. Nothing to beat yet is not the same as beating something. */
-              is_rep_record: priorBest != null && reps > priorBest,
-              rep_record_window_sessions: REP_RECORD_WINDOW_SESSIONS,
-              estimated_1rm: estimate1RMRounded(weight, reps),
-              /**
-               * ⛔ IS THE ESTIMATE WORTH SHOWING AS A NUMBER? Above 8 reps (5 on deadlift) no equation
-               * holds up [LeSuer et al. 1997], and the all-out set is exactly where reps run long. The
-               * value is still computed honestly — it is LABELLED, never capped, because capping the
-               * rep count would report a 15-rep set as a 10-rep one (D-339).
-               */
-              estimate_trusted: reps <= trustedMax,
-              estimate_trusted_max_reps: trustedMax,
-            });
-          }
+          const allOut = toAllOutPayload(readAllOutSets({
+            exercises: compStrengthArr,
+            plannedExercises: plannedExercisesForAllOut,
+            bestRepsAtWeight,
+          }));
           (sessionDetailV1 as any).strength_all_out = allOut;
-          // ⛔ AN EMPTY PANEL MUST SAY WHY (2026-07-30). This shipped three times showing NOTHING —
-          // once because a cache served the old copy, once because the block card resolved null, once
-          // because the plan link was missing — and each time the screen looked identical to "this
-          // session had no all-out set". An invisible failure is indistinguishable from a correct
-          // absence, which is what made it cost four round trips to find.
           if (allOut.length === 0) {
-            const anyAmrapFlag = compStrengthArr.some((ex: any) =>
-              (Array.isArray(ex?.sets) ? ex.sets : []).some((st: any) => st?.amrap === true));
-            const anyPlannedAmrap = Array.isArray(plannedExercisesForAllOut)
-              && plannedExercisesForAllOut.some((pe: any) =>
-                (Array.isArray(pe?.set_plan) ? pe.set_plan : []).some((sp: any) => sp?.amrap === true));
-            (sessionDetailV1 as any).strength_all_out_reason =
-              !plannedExercisesForAllOut ? 'no_planned_rows'
-              : anyAmrapFlag || anyPlannedAmrap ? 'no_reps_on_all_out_set'
-              : 'session_had_no_all_out_set';
+            (sessionDetailV1 as any).strength_all_out_reason = allOutEmptyReason({
+              exercises: compStrengthArr,
+              plannedExercises: plannedExercisesForAllOut,
+            });
           }
         }
       } catch (e) {

@@ -81,6 +81,10 @@ export type LiftTrend = {
   suggested_weight: number | null;
   /** D-231 typed 1RM anchor (150) this verdict was judged against; null = accessory/gap-fill (baseline-blind, legacy). Client renders the self-explanatory "vs your {anchor} baseline" row. */
   anchor_1rm: number | null;
+  /** Q-254 slice 1: the last all-out (AMRAP) top set for this lift, carried through verbatim from the
+   *  snapshot. ⚠️ Slice 1 RENDERS it and does not judge on it — `verdict_label` still reads RIR.
+   *  Making the verdict read this is slice 2, and it is a separate decision (Q-254 Gap 2). */
+  all_out: LiftAllOut | null;
 };
 
 export type StrengthResponse = {
@@ -360,6 +364,36 @@ export type StrengthLiftSnapshot = {
    *  the coach's vocab. When present it WINS as `e1rm_trend` — the per-lift verdict reads it instead of
    *  re-deriving one from `previous_e1rm` (which was always null → dead, Q-107 H2). Null → fall back. */
   spine_e1rm_direction?: 'improving' | 'declining' | 'stable' | null;
+  /** Q-254 slice 1: the last all-out (AMRAP) top set for this lift, read by `_shared/strength/all-out-set.ts`
+   *  — the SAME function the Performance screen's ALL-OUT SET card calls. Null = none in the window,
+   *  which is common and honest (a leader cycle prescribes none). ⛔ Never synthesized from
+   *  `best_weight`/`best_reps` — see the file header for why that pair lies. */
+  last_all_out?: LiftAllOut | null;
+};
+
+/**
+ * ⛔ THE MEASUREMENT, AS STATE RENDERS IT (Q-254 slice 1). Structurally identical to one element of
+ * `session_detail_v1.strength_all_out` plus the DATE it was measured, because both surfaces are
+ * showing the same reading and must show the same numbers.
+ *
+ * ⛔ THE REP RECORD LEADS AND THE ESTIMATE IS THE HEDGED SECONDARY. That is the shipped Performance
+ * model and it is Wendler's own order (p10) — reps at a fixed weight are EXACT, the estimated max is
+ * an equation's guess about a number nobody measured. Above `estimate_trusted_max_reps` the estimate
+ * is LABELLED, never hidden and never capped (D-339).
+ */
+export type LiftAllOut = {
+  /** The movement as the athlete logged it — may be a variant of the slot's name. */
+  name: string;
+  /** YYYY-MM-DD. ⛔ Not optional: this reading is often from an earlier week and must say so. */
+  date: string;
+  weight: number;
+  reps: number;
+  prior_best_reps_at_weight: number | null;
+  is_rep_record: boolean;
+  rep_record_window_sessions: number;
+  estimated_1rm: number;
+  estimate_trusted: boolean;
+  estimate_trusted_max_reps: number;
 };
 
 export type CrossDomainPair = {

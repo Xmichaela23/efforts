@@ -14,7 +14,7 @@ import { useExerciseLog } from '@/hooks/useExerciseLog';
 // `isMain531Lift` gave — asked as a capability, from the table that also says what to render
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
-import { composePerLiftRowText } from '@/lib/strength-row-text';
+import { composeAllOutRowText, composePerLiftRowText, type AllOutRowInput } from '@/lib/strength-row-text';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
@@ -1045,7 +1045,10 @@ export default function StateTab({
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<{ label: string; category?: string; trend: string; trend_icon?: string; trend_tone: string; detail: string; samples: number; provenance?: string | null; soreness_flag?: string | null }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
-    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
+    // ⚠️ `all_out` (Q-254 slice 1) is OPTIONAL on purpose: `coach_cache` serves the last good payload,
+    // so any row written before COACH_PAYLOAD_VERSION 162 simply has no all-out lines. Absent renders
+    // nothing — it must never fall back to the working weight.
+    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null; all_out?: AllOutRowInput | null }> };
     endurance: unknown;
     assessment: { label: string; signals_concerning: number };
   } | undefined;
@@ -1357,6 +1360,25 @@ export default function StateTab({
         // good contract, so a row cached before [D-373] still carries a command on an accessory and
         // the sentinel test would render it. The type axis cannot be stale.
         const row = composePerLiftRowText(lt, liftWeightMap.get(lt.canonical_name) ?? null);
+        // ── THE ALL-OUT SET (Q-254 slice 1) ─────────────────────────────────────────────────────
+        //
+        // ⛔ THE MEASUREMENT THE SCREEN WAS MISSING. Every line above this reads the WORKING weight
+        // against a TYPED baseline — so Deadlift said "Working ~120 vs your 150 baseline" on a light
+        // 5/3/1 week while the logged e1RM was already ~225. In 5/3/1 the working weight is the
+        // PRESCRIPTION; the AMRAP top set is the measurement, and this is it.
+        //
+        // ⛔ SERVER-COMPUTED, RENDERED VERBATIM — and it is the SAME object, from the SAME function,
+        // that the Performance screen's ALL-OUT SET card renders. Neither screen re-derives, so they
+        // cannot report different numbers or a different record for one session (Law 4).
+        //
+        // ⚠️ ABSENT IS COMMON AND HONEST: a leader cycle and every deload week prescribe no all-out
+        // set. When there is none in the window these lines simply do not render. There is NO
+        // fallback to the working weight or to `best_reps` — see `composeAllOutRowText`.
+        const allOut: AllOutRowInput | null = (lt as { all_out?: AllOutRowInput | null }).all_out ?? null;
+        const allOutDateLabel = allOut?.date
+          ? new Date(String(allOut.date) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : '';
+        const allOutText = composeAllOutRowText(allOut, allOutDateLabel);
         const verdictLabel: string = lt.verdict_label ?? '—';
         const verdictColor = verdictToneToColor(row.tone);
         const suggestedWeight: number | null = lt.suggested_weight ?? null;
@@ -1401,6 +1423,21 @@ export default function StateTab({
             </div>
             {lt.last_session_date && (
               <div className="text-[12px] text-white/45">as of {new Date(lt.last_session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            )}
+            {/* ⛔ THE RECORD LEADS, THE ESTIMATE FOLLOWS AND SITS QUIETER — the shipped Performance
+                hierarchy, kept identical here so one reading does not get two orders of importance
+                on two screens. The set line carries its own date because this is frequently a
+                measurement from an earlier week (no all-out set on a leader cycle or a deload). */}
+            {allOutText && (
+              <div className="mt-1 space-y-0.5">
+                <div className="text-[12px] text-white/70 tabular-nums">{allOutText.set_line}</div>
+                <div className={`text-[12px] ${allOut?.is_rep_record === true ? 'text-emerald-300' : 'text-white/50'}`}>
+                  {allOutText.record_line}
+                </div>
+                {allOutText.estimate_line && (
+                  <div className="text-[12px] text-white/45 tabular-nums">{allOutText.estimate_line}</div>
+                )}
+              </div>
             )}
             {e1rmPct != null && (
               <div className="h-[3px] w-full rounded-full bg-white/[0.06]">

@@ -16,7 +16,7 @@
  */
 import { computeStrength } from '../../supabase/functions/_shared/response-model/weekly.ts';
 import type { StrengthLiftSnapshot } from '../../supabase/functions/_shared/response-model/types.ts';
-import { composePerLiftRowText, containsCommand } from './strength-row-text.ts';
+import { composeAllOutRowText, composePerLiftRowText, containsCommand } from './strength-row-text.ts';
 import { typeForExercise } from './exercise-role.ts';
 
 /** One movement in a synthetic athlete's week. Defaults are a healthy, on-target main lift. */
@@ -172,6 +172,37 @@ export const ATHLETES: SyntheticAthlete[] = [
       lift('zercher_good_morning_complex', { current_avg_rir: 0, target_rir: 2, best_weight: 95 }),
     ],
   },
+  {
+    // ⛔ THE MICHAEL CASE, Q-254. His real screen on 2026-08-03: Deadlift read "Working ~120 vs your
+    // 150 baseline" — a light 5/3/1 week measured against a typed number he had blown past — while
+    // the AMRAP said 225 × 6 and beat his record at that weight. The working weight is the
+    // PRESCRIPTION; the all-out set is the MEASUREMENT. Both now sit on the row, in that order.
+    name: 'A13 · ⛔ THE AMRAP — a light working week over a rep record (Q-254)',
+    question: 'does the measurement render, does it carry its date, and does it out-rank nothing?',
+    weekIntent: 'base',
+    lifts: [
+      lift('deadlift', {
+        anchor_1rm: 150, best_weight: 120, current_avg_rir: 2, target_rir: 2,
+        last_all_out: {
+          name: 'Deadlift', date: '2026-07-28', weight: 225, reps: 6,
+          prior_best_reps_at_weight: 5, is_rep_record: true, rep_record_window_sessions: 40,
+          estimated_1rm: 270, estimate_trusted: false, estimate_trusted_max_reps: 5,
+        },
+      }),
+      // Measured, no record yet — the honest middle case.
+      lift('bench_press', {
+        anchor_1rm: 150, best_weight: 135,
+        last_all_out: {
+          name: 'Bench Press', date: '2026-07-30', weight: 165, reps: 4,
+          prior_best_reps_at_weight: 7, is_rep_record: false, rep_record_window_sessions: 40,
+          estimated_1rm: 190, estimate_trusted: true, estimate_trusted_max_reps: 8,
+        },
+      }),
+      // ⛔ NOT MEASURED — a leader cycle prescribes no all-out set. The row must simply say less,
+      // never reach for the working weight to fill the space.
+      lift('overhead_press', { anchor_1rm: 100, best_weight: 85 }),
+    ],
+  },
 ];
 
 /**
@@ -197,6 +228,20 @@ export function renderAthlete(a: SyntheticAthlete) {
   return rows;
 }
 
+/**
+ * The all-out (AMRAP) lines under one row, if the lift carries a measurement — Q-254 slice 1.
+ *
+ * ⛔ IT IS HERE FOR THE SAME REASON THE ROW TEXT IS: the assembled screen is where these bugs live.
+ * A fixture proves the sentence is correct in isolation; only this shows it sitting under the
+ * verdict, where a rep record and a "back off weight" could end up on the same lift and nobody
+ * would notice until it reached a device.
+ */
+export function renderAllOut(lift: { all_out?: Parameters<typeof composeAllOutRowText>[0] }) {
+  const a = lift?.all_out ?? null;
+  const dateLabel = a?.date ? String(a.date).slice(5) : '';
+  return composeAllOutRowText(a, dateLabel);
+}
+
 function pad(s: string, n: number) {
   return s.length >= n ? s : s + ' '.repeat(n - s.length);
 }
@@ -218,6 +263,12 @@ export function printAll(): void {
         '   ' + pad(name, 22) + pad(typeForExercise(String((l as { canonical_name?: string }).canonical_name ?? '')), 19) +
           pad(row.coached ? 'yes' : 'no', 9) + text + (row.tappable ? '   [tap → adjust]' : '') + flag,
       );
+      const allOut = renderAllOut(l as { all_out?: Parameters<typeof composeAllOutRowText>[0] });
+      if (allOut) {
+        console.log('   ' + ' '.repeat(50) + allOut.set_line);
+        console.log('   ' + ' '.repeat(50) + allOut.record_line);
+        if (allOut.estimate_line) console.log('   ' + ' '.repeat(50) + allOut.estimate_line);
+      }
     }
   }
   console.log('\n' + '─'.repeat(96));

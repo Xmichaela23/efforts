@@ -23,6 +23,21 @@ export interface PerLiftRowInput {
   suggested_weight?: number | null;
   best_weight?: number | null;
   anchor_1rm?: number | null;
+  /** Q-254 slice 1: the last all-out (AMRAP) top set. Absent on any row cached before v162. */
+  all_out?: AllOutRowInput | null;
+}
+
+/** One element of `per_lift[].all_out`, as `_shared/strength/all-out-set.ts` computed it. */
+export interface AllOutRowInput {
+  name?: string | null;
+  date?: string | null;
+  weight?: number | null;
+  reps?: number | null;
+  prior_best_reps_at_weight?: number | null;
+  is_rep_record?: boolean | null;
+  estimated_1rm?: number | null;
+  estimate_trusted?: boolean | null;
+  estimate_trusted_max_reps?: number | null;
 }
 
 export interface PerLiftRowText {
@@ -110,6 +125,73 @@ export function composePerLiftRowText(
       : verdictLabel;
 
   return { text, coached: true, type, tappable: hasWeightSuggestion, tone };
+}
+
+/** The three lines of the all-out read, in the order Wendler puts them. Null = nothing to say. */
+export interface AllOutRowText {
+  /** "All-out set 225 lb x 6 · Jul 28" — the measurement and WHEN it was measured. */
+  set_line: string;
+  /** The rep record against this lift's own history. Leads, because it is exact. */
+  record_line: string;
+  /** The estimate, quieter, carrying its own hedge when the reps run past the trust ceiling. */
+  estimate_line: string;
+}
+
+/**
+ * Compose the all-out (AMRAP) lines for one State row — Q-254 slice 1.
+ *
+ * ⛔ THIS MIRRORS THE PERFORMANCE ALL-OUT CARD BECAUSE IT IS THE SAME READING. The server hands both
+ * screens the identical object (`_shared/strength/all-out-set.ts`), so the only thing that could
+ * still make them disagree is the wording, and that is what this function removes. If you change a
+ * sentence here, change `StrengthPerformanceSummary.tsx` in the same breath.
+ *
+ * ⛔ THE REP RECORD LEADS; THE ESTIMATE IS THE HEDGED SECONDARY. Wendler p10 — the rep count at a
+ * fixed weight is EXACT and is what "stronger" means here. The estimated max is an equation's guess
+ * about a number nobody measured, and above the trust ceiling it says so in its own line rather than
+ * being hidden or capped (D-339).
+ *
+ * ⚠️ THE DATE IS NOT DECORATION. Not every week prescribes an all-out set — a leader cycle and every
+ * deload week carry none — so this reading is very often from an earlier week. Without the date it
+ * silently reads as "this week", which is the whole reason Q-254 rules that the carried value must
+ * travel with the date it was measured on.
+ *
+ * @param dateLabel the already-localised date (the caller owns locale formatting).
+ */
+export function composeAllOutRowText(
+  allOut: AllOutRowInput | null | undefined,
+  dateLabel: string,
+): AllOutRowText | null {
+  const weight = Number(allOut?.weight) || 0;
+  const reps = Number(allOut?.reps) || 0;
+  // ⛔ THE GATE IS THE PRESENCE OF A REAL ALL-OUT SET, AND NOTHING ELSE. There is deliberately no
+  // fallback here: a row with no measurement in the window renders no all-out lines at all. The one
+  // thing it must never do is reach for `best_weight` / `best_reps` — that pair is the heaviest set
+  // and the most reps at that weight, so a heavy single after the AMRAP reports 1 rep on a session
+  // that went well (Q-254 Gap 1). The server does not send that number here and this must not invent it.
+  if (!(weight > 0) || !(reps > 0)) return null;
+
+  const prior = allOut?.prior_best_reps_at_weight;
+  const hasPrior = typeof prior === 'number' && Number.isFinite(prior);
+  const record_line = allOut?.is_rep_record === true && hasPrior
+    // ⚠️ A null prior is NOT a record — nothing to beat is not the same as beating something.
+    ? `Rep record at this weight — your best was ${prior}.`
+    : hasPrior
+      ? `Your best at this weight is ${prior}.`
+      : 'First time at this weight.';
+
+  const est = Number(allOut?.estimated_1rm) || 0;
+  const trustedMax = Number(allOut?.estimate_trusted_max_reps) || 0;
+  const estimate_line = est > 0
+    ? (allOut?.estimate_trusted === false && trustedMax > 0
+        ? `Estimated max ${est} lb · rough — over ${trustedMax} reps no formula holds up`
+        : `Estimated max ${est} lb`)
+    : '';
+
+  const set_line = dateLabel
+    ? `All-out set ${weight} lb × ${reps} · ${dateLabel}`
+    : `All-out set ${weight} lb × ${reps}`;
+
+  return { set_line, record_line, estimate_line };
 }
 
 /**
