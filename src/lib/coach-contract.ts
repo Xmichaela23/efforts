@@ -25,4 +25,11 @@
 // user id, so the verification itself could not disturb a real athlete's cached payload. That check
 // is the whole procedure: the 2026-08-02 damage was not the bump, it was bumping on the assumption
 // the deploy had landed.
-export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 162;
+//
+// 163 (Q-254 slice 2, 2026-08-03): same procedure, same order — `coach` and
+// `generate-overall-context` deployed first, prod confirmed serving 163 against the all-zeros id,
+// and only then this line. ⛔ THIS BUMP IS LOAD-BEARING, unlike 162's: slice 2 is a COMPUTATION
+// change (`per_lift[].verdict_label` and `.verdict_tone` move), so a cached row does not merely
+// lack a field — it carries the OLD command. Without the floor, a main lift keeps showing
+// "back off weight" computed from accessory RIR for another 24h.
+export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 163;
