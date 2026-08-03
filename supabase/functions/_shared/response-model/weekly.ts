@@ -22,6 +22,7 @@ import {
   type TrendDirection,
   type ConfidenceLevel,
   type LiftTrend,
+  type LiftAllOut,
   type VisibleSignal,
   type ContextPrompt,
   type GoalSummary,
@@ -31,6 +32,10 @@ import {
 } from './types.ts';
 import { computeCrossDomain } from './cross-domain.ts';
 import { VERDICT_DEVIATION } from '../strength-profiles.ts';
+// Q-254 slice 2b — the BOOK'S rule for what an all-out set means, already written and fixtured.
+// ⛔ Imported rather than re-derived: a second answer to "did the top set pass" is how the working
+// number and the words on screen start disagreeing about one session.
+import { verdictFrom95Set } from '../../shared/strength-system/loading/wendler-531.ts';
 // [D-373 → Step 2] The gate for coaching language, now asked as a CAPABILITY rather than as a
 // boolean about one protocol's four lifts. `capabilitiesForExercise(x).coached` is true on exactly
 // one type row (`barbell_main`), and that row is built FROM `MAIN_531_LIFTS` — so this is the same
@@ -143,6 +148,32 @@ import { isLowerBodyLift } from '../strength-profiles.ts';
 // back-off there is normal sub-max training, not overreach, so we keep the label but drop the alarm tone.
 const ANCHOR_HEADROOM_FRAC = 0.90;
 
+/**
+ * ⛔ Q-254 SLICE 2b — THE STATUS WORDS THE ALL-OUT SET EARNS, AND NOTHING MORE.
+ *
+ * Read-only by design. `verdictFrom95Set` answers what happens to the WORKING NUMBER; this maps that
+ * answer to something an athlete reads. It deliberately does NOT return a label
+ * `computeSuggestedWeight` acts on ('add weight' / 'back off weight'), so no weight suggestion can
+ * be attached and the row cannot become tappable — the plan-adjustment path stays closed.
+ *
+ * ⚠️ `advance_untrusted` READS THE SAME AS `advance`, and that is the book's position, not a
+ * shortcut. `wendler-531.ts:448-452`: a 12-rep set at 95% means the athlete is genuinely stronger
+ * than the training max says, and withholding the advance would punish them for it. What is untrusted
+ * is the e1RM off that set, which the ALL-OUT card already hedges separately.
+ *
+ * ⛔ AND NOTHING HERE RECOMPUTES THE WORKING NUMBER. Wendler keeps the +5/+10 increment and treats
+ * reps as feedback (`wendler-531.ts:206-208`: *"Do NOT recompute this from an AMRAP result… the
+ * increment stays +5/+10 and the reps are feedback, not an input"*). Letting the AMRAP drive the bar
+ * is Q-223 and is out of scope.
+ */
+function labelFromAllOut(reps: number, canonical: string): { label: string; tone: LiftVerdictTone } | null {
+  const verdict = verdictFrom95Set(reps, canonical);
+  // `hold` = no evidence. Fall through to the existing trend words rather than inventing a status.
+  if (verdict === 'hold') return null;
+  if (verdict === 'reset') return { label: 'top set missed', tone: 'caution' };
+  return { label: 'top set met', tone: 'positive' };
+}
+
 export function computeLiftVerdict(
   rir: number | null,
   targetRir: number | null,
@@ -151,6 +182,8 @@ export function computeLiftVerdict(
   _canonical: string,
   anchor: number | null = null,
   bestWeight: number | null = null,
+  /** Q-254 slice 2b: the last all-out (AMRAP) top set. Optional so every existing caller is unchanged. */
+  allOut: LiftAllOut | null = null,
 ): { label: string; tone: LiftVerdictTone } {
   // ⛔ [D-373] COACHING LANGUAGE IS FOR MAIN LIFTS ONLY. This gate is the whole fix for the
   // "back off weight" bug (SPEC-strength-language, Axis 1): this function ran EVERY movement
@@ -188,6 +221,24 @@ export function computeLiftVerdict(
       return { label: 'add weight', tone: 'action' };
     }
     return { label: 'hold weight', tone: 'neutral' };
+  }
+
+  // ⛔ THE ALL-OUT SET OUTRANKS RIR, WHICH IS THE WHOLE OF Q-254 GAP 2. In 5/3/1 the progression
+  // signal is reps on the top set at a known percentage — Wendler's own log tracks rep records and
+  // nothing else. RIR is a self-reported proxy for how the sets FELT, and on `strength_primary` it
+  // is not even collected (`usesRir: false`), so the number that decided growth and the words on the
+  // screen were reading different signals.
+  //
+  // ⚠️ PLACED AFTER THE PLAN-STATE BRANCHES ON PURPOSE. Recovery, taper and peak are statements about
+  // the WEEK, and a stale all-out set from an earlier week must not overwrite them — a deload week
+  // says "lighter this week" even if the last measured top set went well.
+  // ⚠️ AND IT IS SAFE ON ANY WEEK OF THE CYCLE, not only the 95% one. `verdictFrom95Set` resets at
+  // ZERO reps (`VALIDITY_CHECK_MIN_REPS = 1`), so an 85% x 5+ or 90% x 3+ week cannot be read as a
+  // miss for falling short of a bar it was never set. The narrower "which week counts" question
+  // belongs to `verdictForCycle`, which selects by `weekInCycle` and drives the working number.
+  if (allOut != null && Number.isFinite(allOut.reps)) {
+    const fromAllOut = labelFromAllOut(Number(allOut.reps), _canonical);
+    if (fromAllOut) return fromAllOut;
   }
 
   // Base / build — deviation from target RIR
@@ -268,7 +319,7 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
 
     const anchor_1rm = l.anchor_1rm ?? null;
     const best_weight = l.best_weight ?? null;
-    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name, anchor_1rm, best_weight);
+    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name, anchor_1rm, best_weight, l.last_all_out ?? null);
 
     return {
       canonical_name: l.canonical_name,
