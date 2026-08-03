@@ -86,6 +86,12 @@ const PRE_EXISTING_TYPE_CONFIG_DISAGREEMENTS = new Set([
   'face pull',
   'pallof press',
   'dip',
+  // ⚠️ `tricep dip` IS THE SAME MOVEMENT AS `dip`, NOT A FIFTH CASE. It joined this list on
+  // 2026-08-03 only because it gained a key that day — before that it fuzzy-matched `dips` and
+  // carried the identical contradiction unmeasured. The ledger tracks MOVEMENTS; a second spelling
+  // of one already on it is not a new bug, and typing it differently from `dip` to dodge this would
+  // have created exactly the one-movement-two-answers defect the same pass was fixing.
+  'tricep dip',
   'glute bridge',
 ]);
 

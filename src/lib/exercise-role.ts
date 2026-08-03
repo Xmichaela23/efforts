@@ -202,7 +202,19 @@ const MAIN_531_LIFTS = new Set<string>([
   'bench press', 'barbell bench press', 'close grip bench press',
   'deadlift', 'conventional deadlift', 'trap bar deadlift', 'sumo deadlift',
   'overhead press', 'standing barbell overhead press', 'press', 'military press', 'push press',
+  'ohp',
 ]);
+// ⛔ `ohp` JOINED THIS SET ON 2026-08-03, BECAUSE THE SERVER ALREADY PUT IT HERE.
+// `canonicalize('ohp')` returns `overhead_press`, so the strength trend, the learned max and
+// `per_lift` have been folding Michael's logged "ohp" sessions into the overhead press all along —
+// while this set did not, so one session was a main lift to one reader and an unmapped accessory to
+// the other. That is the "one movement, two vocabularies, two answers" defect this file exists to
+// prevent. Found by reconciling against his REAL logs, not the library.
+// ⚠️ CONSEQUENCE, STATED: sessions logged as "ohp" now get main-lift treatment — coaching language
+// and an AMRAP/e1RM read — which is what the trend already gave them.
+// ⚠️ AND THE COMMENT LIVES OUT HERE ON PURPOSE. `exercise-role.type.test.ts` reads this set by
+// splitting the source on `MAIN_531_LIFTS` and regexing quoted strings out of it, so prose with
+// apostrophes INSIDE the literal is parsed as though it were exercise names.
 
 export function isMain531Lift(name: string): boolean {
   return MAIN_531_LIFTS.has(canonical(name));
@@ -381,6 +393,14 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'good morning': 'loaded_accessory',
   'hip thrust': 'loaded_accessory',
   'barbell hip thrust': 'loaded_accessory',
+  // ⚠️ ADDED 2026-08-03 (second reconciliation, against the athlete's REAL plans and logs rather
+  // than the library). Every one of these is a movement he has actually planned or logged that
+  // neither table had heard of — `single leg hip thrust` was inheriting the BILATERAL hip thrust's
+  // 0.9x deadlift prescription, and `db thruster` / `nordic curls` resolved to nothing at all.
+  'single leg hip thrust': 'loaded_accessory',
+  'db thruster': 'loaded_accessory',
+  'nordic curl': 'bodyweight',
+  'tricep dip': 'bodyweight',
   'goblet squat': 'loaded_accessory',
   'bulgarian split squat': 'loaded_accessory',
   'walking lunge': 'loaded_accessory',

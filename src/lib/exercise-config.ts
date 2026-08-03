@@ -1917,6 +1917,114 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
   },
 
+  // ══════════════════════════════════════════════════════════════════════════════════════════════
+  // RECONCILED AGAINST THE ATHLETE'S ACTUAL PLANS AND LOGS (2026-08-03, second pass). Additive.
+  //
+  // ⛔ THE FIRST RECONCILIATION USED THE LIBRARY AND THAT WAS THE WRONG CORPUS. It diffed
+  // `exercise-config.ts` against the exercise LIBRARY (TYPE_TABLE, ROLE_TABLE, the protocol
+  // vocabulary) and closed every gap it found — while the moves actually sitting in the athlete's
+  // `planned_workouts` and `workouts` went unchecked. Read-only pull of the 68 distinct strength
+  // names he has really planned or logged: 15 had no exact key, and SIX of those were real.
+  //
+  // ⚠️ THE OTHER NINE ARE FINE AND ARE DELIBERATELY NOT ADDED — plurals and case variants that the
+  // folding pass already lands on the right entry (`Goblet Squats` → `goblet squat`,
+  // `Bulgarian Split Squats`, `Cable Face Pulls`, `Farmer Walks`, `Leg Curls`, `chinups`,
+  // `Calf Raises (Bilateral)`, `Core Work (5 min - your choice)`,
+  // `Weighted Single-Leg Calf Raises`). Adding keys for those would be noise.
+  // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+  // ⛔ THE ONE MICHAEL NAMED. `Single Leg Hip Thrust` is in his plans AND his logs and had no entry,
+  // so it fuzzy-matched the BILATERAL `hip thrust`: deadlift × 0.9, `displayFormat: 'total'`
+  // (a loaded barbell) and `isUnilateral: false`. `assistance-menu.ts`'s header has flagged this in
+  // writing the whole time — *"Two of them are known-wrong (`Single Leg Hip Thrust` carries the
+  // two-legged 0.9× deadlift ratio)"* — and `strength-logging-mode.ts` carries the other half of the
+  // same bug from a screenshot: *"A SINGLE-LEG HIP THRUST IS NOT A BARBELL LIFT … the logger drew a
+  // 45 lb bar and a plate calculator over a movement loaded with one dumbbell or plate on the hip."*
+  //
+  // ⚠️ RATIO INHERITED FROM `single leg romanian deadlift` (deadlift × 0.25), which is this file's
+  // own single-leg hip-dominant precedent and a structural twin: same reference lift, same pattern,
+  // same `displayFormat: 'total'`, same `isUnilateral: true`. Halving 0.9 would have been a guess.
+  // ⚠️ `displayFormat: 'total'` AND NOT `perHand`, on purpose: the load is ONE implement resting on
+  // the hip, which is exactly why `equipmentForExercise` routes this movement to `goblet` rather than
+  // `dumbbell`. A "lb/hand" label would be wrong in the other direction.
+  // ⚠️ PATTERN IS `hip_dominant` — a hip thrust is hip extension, single-legged or not. That is also
+  // what it already resolved to, so no swap list moves; this fixes the PRESCRIPTION and the DISPLAY.
+  'single leg hip thrust': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.25,
+    displayFormat: 'total',
+    isUnilateral: true,
+    confidence: 'low',
+  },
+
+  // ⛔ `Planks` RESOLVED TO A COPENHAGEN PLANK. Both are core holds so nothing caught it, but the
+  // fuzzy fallback scores by LENGTH: `copenhagen planks` CONTAINS "planks" (score 6) and beats
+  // `plank`, which is only a substring of it (score 5). The practical cost today is one field —
+  // `isUnilateral: true` on a bilateral hold — and the real cost is that the day Copenhagen Plank
+  // gains a ratio, every "Planks" in the athlete's log inherits it. He has this in plans AND logs.
+  // Copied from `plank` exactly.
+  planks: {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+  // ⛔ `Nordic Curls` RESOLVED TO NOTHING AT ALL. `nordic hamstring curl` exists, but neither name is
+  // a substring of the other, so the fuzzy pass returns null and the movement falls through to the
+  // legacy weight path — the D-322 "Pull Up @ 110 lb" class. In his plans AND logs.
+  // ⚠️ The SERVER keys it `nordic_curls`, separately from `nordic_hamstring_curl`, so the two names
+  // are already tracked apart upstream; this entry only makes the client resolve the same movement.
+  'nordic curls': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+  // `Tricep Dips` had no key and landed on `dips` by luck of overlap. Same movement, so the values
+  // were right — pinning it means they stay right rather than depending on the fuzzy scoring.
+  'tricep dips': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.9,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'Total load (bodyweight + added), same as `dips`.',
+  },
+
+  // ⛔ `DB Thruster` RESOLVED TO NOTHING. A thruster is a front squat into an overhead press, and the
+  // PRESS is the limiting half — so it takes the vertical-push slot and `db push press`'s ratio
+  // (overhead × 0.7 TOTAL, shown per hand). ⚠️ `ratioIsTotal` travels with that ratio; without it the
+  // prescription would double.
+  'db thruster': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 0.7,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+    confidence: 'low',
+  },
+
+  // ⛔ `ohp` — HIS OWN SHORTHAND, LOGGED, AND IT RESOLVED TO NOTHING. Copied from `overhead press`.
+  // ⚠️ THE SERVER ALREADY AGREES: `canonicalize('ohp')` returns `overhead_press`, so the strength
+  // trend and the learned max have been folding it into the press all along while this lookup
+  // returned null. Two vocabularies disagreeing about one logged session — the same defect class as
+  // the Y-T-W / reverse-fly / squat-jump collisions. See the note on MAIN_531_LIFTS in
+  // `exercise-role.ts`, which is the other half of closing it.
+  ohp: {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high',
+  },
+
 };
 
 /**
