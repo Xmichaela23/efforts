@@ -23,13 +23,39 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-02 night, SECOND session of the day — **the LLM deletes are DONE and VERIFIED. Your job is the swim + strength audit.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-02 night, SECOND session — **[Q-252] recurs THIS SUNDAY. Read it before you pick anything.**)
 
-### WHAT THIS SESSION DID, IN ONE LINE
+### WHAT THIS SESSION DID
 
-**The three dead LLM prompt builders are deleted** — 3,532 lines out, 45 in ([D-372]) — pushed
-(`4424d459`), deployed, and **verified on device with database write-timestamps checked, not just a
-screenshot**. One commit, one decision, one new question ([Q-250]).
+Three things shipped, all pushed and deployed and verified on device:
+
+- **[D-372]** — the three dead LLM prompt builders deleted, 3,532 lines out, 45 in (`4424d459`).
+  Verified by **database write-timestamps**, not a screenshot: three workouts recomputed 2–9 minutes
+  apart, paragraphs byte-identical.
+- **[D-373]** — **accessories stop issuing commands.** `computeLiftVerdict` ran every movement through
+  the same RIR logic and never consulted role, so a hard Hip Thrust or Barbell Row printed a red *"back
+  off weight"*. Now gated on `isMain531Lift`; verified live — Hip Thrust and Barbell Row return an
+  empty verdict, the four main lifts unchanged. Coach payload **v161**, client floor raised **after**
+  the server was confirmed serving it.
+- **The docs were re-based.** `DECISIONS-LOG` frozen at D-372 → `DECISIONS-LOG-2.md` (D-373 →);
+  `OPEN-QUESTIONS` frozen at Q-250 → `OPEN-QUESTIONS-2.md` (Q-251 →). ENGINE-STATE 197K → 92K.
+  ⛔ **`CLAUDE.md`'s rule changed: freeze by number, judge nothing.** "Archive the closed ones" was
+  tested and fails — it flagged Q-247 while it was live and Q-246 when half of it was open.
+
+Two questions filed: **[Q-251]** (planned load counts three-fifths of a strength session as zero) and
+**[Q-252]** below.
+
+### ⛔ THE MISTAKE THAT COST THE MOST TONIGHT — DO NOT REPEAT IT
+
+**`COACH_CLIENT_MIN_PAYLOAD_VERSION` was raised while the server still served the old version.** The
+client rejected its own cached payload, forced a coach regeneration, and that regeneration hit [Q-252]
+and **wrote null over the good cached copy** — blanking the entire State performance section, run,
+ride, swim and strength at once. Reverting the floor did NOT undo it; the good copy was gone.
+
+⛔ **That floor moves only in the same breath as deploying `coach`, and only after the server is
+verified serving the new version.** `coach-contract.ts` now carries the warning. And a caution about
+this whole session: an hour went into a `catch` block marked "(non-fatal)" that was never the problem.
+**Before diagnosing a null, first prove the code that writes it actually RAN.**
 
 ### ⛔ READ THIS FIRST — [Q-252] IS LIVE AND IT RECURS EVERY SUNDAY
 
@@ -44,15 +70,34 @@ and the build is **skipped**. Nothing throws; the `catch` two lines down says "(
 Michael's objection outranks the timezone question: *the section is a rolling 7-day read and should
 probably not be gated on a calendar week at all.*
 
-### ⛔ YOUR JOB — THE SWIM + STRENGTH AUDIT
+### ⛔ YOUR JOB — ASK MICHAEL FIRST, BECAUSE [Q-252] IS A PRODUCT CALL, NOT A BUG FIX
 
-The standing work-order job (`WORKORDER-session-screen-continuity-2026-08-02.md` Part 3). **It is
-smaller than it was 24 hours ago** — strength got a real pass ([D-370], [D-371]) and the LLM sweep is
-off the board. Michael on swim: *"swim is very straight forward, not a lot there intentionally, we
-just dont get reliable metrics."*
+**[Q-252] is the only thing with a deadline** — it fires again this Sunday at 17:00 Pacific. But do
+NOT open by shifting the timezone. Michael's objection outranks it: *"this section is rolling too"* —
+it is a **rolling 7-day read**, so the calendar-week gate may not belong there at all. Moving the gate
+three time zones leaves a rolling window keyed to a boundary it does not use.
 
-**Then, if you want a second thing:** [Q-246]'s **tidy half** (below) or [Q-250] (a real design call,
-not cleanup).
+⚠️ **And the small fix is not small:** there is **no athlete timezone on the snapshot path today**, so
+even the narrow version needs one plumbed through. Ask him which he wants before writing anything.
+
+**The build queue he set, in his order:**
+1. **Strength language, the rest of it.** [D-373] shipped Axis 1 (role). `SPEC-strength-language.md`
+   is still locked and still holds **Axis 2 (Type)** plus the collapse of six overlapping classifiers.
+   ⛔ **It is NOT blocked** — the spec says "queued after bike cleanup (Q-240/Q-241)" and **both closed
+   on 2026-08-01**. Delete that line when you pick it up.
+2. **Deload.** Michael named it and it is genuinely separate: `computeLiftVerdict` knows `recovery`,
+   `taper`, `peak`, base/build and has **never heard of deload** — which lives on its own in
+   `strength-profiles.ts` as a progression threshold. Two vocabularies for one idea.
+3. **Race builder.** He is modifying it; scope is his.
+4. **The swim LLM delete** — ~320 lines, `analyze-swim-workout` ~396-720, gated off by the never-set
+   `SWIM_INSIGHTS_LLM`. **The last output-LLM left in the tree.** Mechanical, same method as [D-372].
+   ⚠️ Also uncovered tonight and on nobody's list: `analyze-cycling-workout` holds
+   **`generateAINarrativeInsights` (~1294-1476, ~180 lines) with ZERO callers** — another dead LLM
+   generator no doc has ever named.
+
+⚠️ **The swim + strength "audit" in the old banner was overstated.** It came from
+`WORKORDER-session-screen-continuity-2026-08-02.md` **Part 3, whose title is "WHAT I DID NOT CHECK"** —
+a gap list, not a work item. Strength has since had a real pass ([D-370], [D-371], [D-373]).
 
 ### ⛔ WHAT NOT TO DO, AND BOTH OF THESE WILL LOOK OBVIOUS TO YOU
 
