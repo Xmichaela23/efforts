@@ -108,3 +108,67 @@ Rule on (3) first — what earns an adherence statement for by-feel work. Then d
 side should price accessories at all, or whether planned-vs-actual should simply **stop being shown**
 for them (it is already dropped from the session screen's Planned COLUMN per [D-370] — State did not
 get the memo). See also [Q-233] (deliberate bodyweight imprecisions) and [D-351].
+
+## Q-252 — ⛔ THE STATE TRENDS VANISH EVERY SUNDAY AT 5PM PACIFIC. A UTC WEEK BOUNDARY DECIDES THE ATHLETE'S WEEK IS HISTORY (2026-08-02) — **ROOT-CAUSED, REPRODUCED, NOT FIXED**
+
+**Symptom:** the entire State performance section — run, ride, swim AND strength cards — disappears.
+No error on screen, no error in the app. `StatePerformanceSection` returns `null` and the screen
+simply ends. Michael, live: *"we lost all the perfmace metrics!!! run ride swim and strgnth gone!!!"*
+
+### The cause, in one line
+
+`compute-snapshot/index.ts:670` — **`if (targetWeek === mondayOfToday())`**.
+
+The trend build only runs for what the SERVER thinks is the current week. `mondayOfToday()`
+(`_shared/parse-local-date.ts`) resolves against the runtime clock, and **edge functions run in UTC.**
+At **17:00 Pacific on Sunday**, UTC ticks into Monday. From that moment `mondayOfToday()` returns the
+NEXT week, the athlete's actual current week fails the equality check, and the whole block is
+**skipped** — `state_trends_v1` stays `null`.
+
+⛔ **NOTHING THROWS. NOTHING IS LOGGED.** The block's own `catch` writes *"(non-fatal)"* and was the
+obvious suspect for an hour of this session — it is a red herring. **The code never runs at all.**
+
+**Proved on 2026-08-02 at 04:20 UTC** (21:20 Sunday Pacific): `compute-snapshot` for `2026-07-27`
+returned `success: true` with `state_trends_v1: null`; the identical call for `2026-08-03` returned a
+full contract — `run`, `bike`, `swim`, `strength`, `display`, 4 cards. **The assembler is fine. The
+gate is the bug.**
+
+### Why it looked intermittent, and why it hid for so long
+
+`coach_cache` holds the last good contract and the client renders that. So after the Sunday rollover
+the screen keeps showing a copy built earlier in the day — **the cache masks it completely** until
+something forces a coach regeneration. That is why Michael watched his run move the bar earlier the
+same day and then saw it gone. It also explains the ragged history: `athlete_snapshot` week `2026-07-20`
+carries a contract, `2026-07-14` and `2026-07-27` do not — whichever weeks happened to be last written
+after a rollover are empty.
+
+⚠️ **HOW IT SURFACED, recorded because it is not the athlete's fault and not the bug's doing.** A
+session raised `COACH_CLIENT_MIN_PAYLOAD_VERSION` to 161 while the server still served 160. The client
+rejected its cached payload (`useCoachWeekContext.ts:699`), forced a coach regeneration, and the
+regeneration hit this gate and **wrote null over the good cached copy.** The floor was reverted; the
+damage was not undoable, because the good copy was gone. See the warning now on `coach-contract.ts`.
+
+### ⛔ THE DEEPER OBJECTION — MICHAEL'S, AND IT OUTRANKS THE TIMEZONE FIX
+
+> *"this section is rolling too, so there s that"*
+
+**The section is a ROLLING 7-DAY read. It has no business being gated on a calendar week at all.**
+Fixing the gate to resolve the athlete's local Monday would stop the Sunday-night blackout, but it
+would leave a rolling window keyed to a calendar boundary it does not use. The honest fix is to ask
+why the gate exists, not to move it three time zones.
+
+### To close — in this order
+
+1. **Decide whether the gate should exist.** A rolling window arguably needs no week equality test at
+   all; the comment above it ("the verdict is 'as of now'; historical snapshots leave it null, unread")
+   is about not wasting work on backfilled weeks, which is a different problem than the one it causes.
+2. If it survives, it must resolve **the athlete's** week, not the server's. There is no user timezone
+   on the snapshot path today — that is the real cost of this fix and the reason it is not a one-liner.
+3. **A skipped build must not be silent.** Whatever replaces this, the null case needs a reason
+   attached, or the next person spends an hour on the innocent `catch` the way this session did.
+4. ⚠️ Check every other `mondayOfToday()` / `todayISO()` caller for the same assumption — `todayISO()`
+   is `new Date().toISOString()`, i.e. UTC, and is used as `asOf` throughout the trend code.
+
+**Live state (2026-08-02):** restored by hand — `compute-snapshot` run for `2026-08-03` and
+`coach_cache` invalidated, which put all four cards back. **That is a patch on a Sunday night, not a
+fix, and it will recur next Sunday.**

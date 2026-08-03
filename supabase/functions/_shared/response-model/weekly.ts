@@ -31,6 +31,10 @@ import {
 } from './types.ts';
 import { computeCrossDomain } from './cross-domain.ts';
 import { VERDICT_DEVIATION } from '../strength-profiles.ts';
+// [D-373] The role gate for coaching language. Same classifier the logger's bar-speed cue uses, so
+// the two cannot drift apart. Path precedent: `_shared/strength/match-exercises.ts` imports it the
+// same way — Supabase bundles `src/lib/` into each edge function at deploy time.
+import { isMain531Lift } from '../../../../src/lib/exercise-role.ts';
 
 function trend(delta: number | null, worseDirection: 'positive' | 'negative', threshold: number): TrendDirection {
   if (delta == null) return 'stable';
@@ -145,6 +149,25 @@ export function computeLiftVerdict(
   anchor: number | null = null,
   bestWeight: number | null = null,
 ): { label: string; tone: LiftVerdictTone } {
+  // ⛔ [D-373] COACHING LANGUAGE IS FOR MAIN LIFTS ONLY. This gate is the whole fix for the
+  // "back off weight" bug (SPEC-strength-language, Axis 1): this function ran EVERY movement
+  // through identical RIR-deviation logic and never consulted role, so a hard-feeling Hip Thrust
+  // or Barbell Row printed a red command. Accessories have no anchor, so the State row had nothing
+  // to build a sentence from and dumped the raw command. It is WORSE on lighter programs, where
+  // almost everything is an accessory.
+  //
+  // ⚠️ THE GATE IS `isMain531Lift`, NOT `roleForExercise`, AND THAT IS DELIBERATE. Both classifiers
+  // exist and they have OPPOSITE defaults on an unknown movement: `roleForExercise` → 'primary'
+  // (the load system's safe direction — count it), `isMain531Lift` → false (the language system's
+  // safe direction — say nothing). Gating language on `roleForExercise` would coach every unknown
+  // move and re-create this exact bug one layer down. Silence is the safe failure here.
+  //
+  // Field basis: Strong and Hevy show numbers only per exercise — heaviest weight, e1RM, volume,
+  // PRs — and issue NO commands. "Back off weight" is not app language.
+  if (!isMain531Lift(_canonical)) {
+    return { label: '', tone: 'neutral' };
+  }
+
   if (weekIntent === 'recovery') return { label: 'lighter this week', tone: 'muted' };
   if (weekIntent === 'taper') return { label: 'maintain', tone: 'neutral' };
 

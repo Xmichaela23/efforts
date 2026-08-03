@@ -31,6 +31,19 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 (`4424d459`), deployed, and **verified on device with database write-timestamps checked, not just a
 screenshot**. One commit, one decision, one new question ([Q-250]).
 
+### ⛔ READ THIS FIRST — [Q-252] IS LIVE AND IT RECURS EVERY SUNDAY
+
+**The whole State performance section — run, ride, swim, strength — disappears every Sunday at 17:00
+Pacific.** `compute-snapshot/index.ts:670` gates the trend build on `targetWeek === mondayOfToday()`,
+which resolves in **UTC**. When UTC rolls into Monday, the athlete's real current week fails the test
+and the build is **skipped**. Nothing throws; the `catch` two lines down says "(non-fatal)" and is a
+**red herring** that cost an hour on 2026-08-02.
+
+**It was restored by hand on 2026-08-02** (ran `compute-snapshot` for `2026-08-03`, invalidated
+`coach_cache` → all four cards returned). ⚠️ **That is a patch, not a fix. It will happen again.**
+Michael's objection outranks the timezone question: *the section is a rolling 7-day read and should
+probably not be gated on a calendar week at all.*
+
 ### ⛔ YOUR JOB — THE SWIM + STRENGTH AUDIT
 
 The standing work-order job (`WORKORDER-session-screen-continuity-2026-08-02.md` Part 3). **It is

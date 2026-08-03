@@ -1303,6 +1303,8 @@ export default function StateTab({
         <span className="text-white/45 normal-case tracking-normal">· {perLift.length} {perLift.length === 1 ? 'lift' : 'lifts'}</span>
       </button>
       {strengthDetailOpen && perLift.map((lt: any) => {
+        // ⚠️ `?? '—'` only covers a MISSING field (older cached rows). An empty string is meaningful
+        // and must survive: [D-373] uses '' to mean "not a main lift, do not coach it".
         const verdictLabel: string = lt.verdict_label ?? '—';
         const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
         const suggestedWeight: number | null = lt.suggested_weight ?? null;
@@ -1323,7 +1325,17 @@ export default function StateTab({
              : verdictLabel === 'back off weight' ? (tone === 'caution' ? `ease to ${suggestedWeight} this week` : `suggest ${suggestedWeight} this week`)
              : `to ${suggestedWeight}`)
           : verdictLabel;
-        const rowText: string = (anchor1rm != null && bestWeight != null && bestWeight > 0)
+        // ⛔ [D-373] AN EMPTY verdict_label IS THE SERVER SAYING "THIS MOVEMENT IS NOT COACHED".
+        // `computeLiftVerdict` returns '' for anything that is not one of the four main lifts, so an
+        // accessory reaches this row with no command — by design (SPEC-strength-language, Axis 1).
+        // It must then show NUMBERS OR NOTHING, never a command: the fact of what was moved, matching
+        // how Strong and Hevy render a per-exercise row. Do NOT fall back to a dash here — a dash in
+        // the action slot reads as "we had nothing to say about your lift", which is the opposite of
+        // the truth (we deliberately say nothing about accessories).
+        const isCoachedLift = verdictLabel !== '';
+        const rowText: string = !isCoachedLift
+          ? (bestWeight != null && bestWeight > 0 ? `Working ~${bestWeight}` : '')
+          : (anchor1rm != null && bestWeight != null && bestWeight > 0)
           // Q-111 (fact-only): with a typed anchor, state the fact; append an action ONLY when there's
           // a suggestion (progression). A decline drops the suggestion server-side, so this renders
           // "Working ~125 vs your 150 baseline." — no prescription.

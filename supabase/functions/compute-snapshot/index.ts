@@ -667,6 +667,17 @@ serve(async (req: Request) => {
     // Non-fatal: a failure here must never break the snapshot write.
     // -----------------------------------------------------------------------
     let stateTrendsV1: StateTrendsV1 | null = null;
+    // ⛔ [Q-252] THIS LINE BLANKS THE ENTIRE STATE PERFORMANCE SECTION EVERY SUNDAY AT 17:00 PACIFIC.
+    // `mondayOfToday()` resolves against the RUNTIME clock and edge functions run in UTC, so once UTC
+    // ticks into Monday the athlete's actual current week fails this equality and the whole block is
+    // SKIPPED — `state_trends_v1` stays null, and run/ride/swim/strength all vanish from State.
+    // ⚠️ Nothing throws and nothing is logged. The `catch` below says "(non-fatal)" and is a RED
+    // HERRING — the code never runs at all. An hour was lost to that catch on 2026-08-02.
+    // Proved that night: this call for `2026-07-27` returned null; the same call for `2026-08-03`
+    // returned a full contract with all four cards. The assembler is fine; the gate is the bug.
+    // ⛔ AND THE DEEPER OBJECTION (Michael): the section is a ROLLING 7-DAY read — it should probably
+    // not be gated on a calendar week at all. Do not "fix" this by shifting the timezone until that
+    // question is answered. See Q-252.
     if (targetWeek === mondayOfToday()) {
       try {
         const asOf = todayISO();

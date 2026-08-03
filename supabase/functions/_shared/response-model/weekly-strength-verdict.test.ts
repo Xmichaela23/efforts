@@ -44,20 +44,69 @@ Deno.test('REPRO[125→115]: RIR-only back-off, suggested = best×0.9, no anchor
   assertEquals(bench.anchor_1rm ?? null, null); // baseline-blind: the typed 150 never entered
 });
 
-// ── FIXED — accessory / gap-fill (no typed anchor) keeps CURRENT behavior exactly ─────────────────
-Deno.test('accessory (no anchor): behavior unchanged — still RIR back-off to 115, anchor null', () => {
+// ── [D-373] AN ACCESSORY IS NOT COACHED AT ALL. This test was REVERSED on 2026-08-02. ─────────────
+//
+// ⛔ It used to assert the OPPOSITE — that a Hip Thrust receives "back off weight" — under the title
+// "behavior unchanged". It passed, and it was pinning the live bug: `computeLiftVerdict` ran EVERY
+// movement through the same RIR-deviation logic and never consulted role, so a hard-feeling accessory
+// printed a red command it has no business printing. Accessories carry no anchor, so the State row had
+// nothing to build a sentence from and dumped the raw command on screen.
+//
+// The rule now (SPEC-strength-language Axis 1, grounded in Strong / Hevy): coaching language —
+// commands, e1RM direction, AMRAP targets — appears ONLY on the four main lifts. Everything else shows
+// numbers or nothing. **An empty label is the contract**, and the client reads it as "not coached".
+Deno.test('D-373: an accessory gets NO verdict command, however hard the RIR says it was', () => {
   const hipThrust: StrengthLiftSnapshot = {
     canonical_name: 'hip_thrust', display_name: 'Hip Thrust',
     current_e1rm: 225, previous_e1rm: null,
+    // Same numbers as the old repro: deviation = 1 − 3 = −2, deep into BACK_OFF territory.
     current_avg_rir: 1, baseline_avg_rir: 3, target_rir: 3,
     sessions_in_window: 4, best_weight: 225, anchor_1rm: null,
   } as StrengthLiftSnapshot;
   const res = computeStrength([hipThrust], 'build');
   const l = res.per_lift[0];
-  assertEquals(l.verdict_label, 'back off weight');
-  assertEquals(l.verdict_tone, 'caution');
-  assertEquals(l.suggested_weight, null); // Q-111 fact-only: back-off drops the lighter prescription
+  assertEquals(l.verdict_label, '');            // no command — this is the fix
+  assertEquals(l.suggested_weight, null);        // and therefore nothing to prescribe
+  assertEquals(l.best_weight, 225);              // the NUMBER survives — the row still says what moved
   assertEquals(l.anchor_1rm ?? null, null);
+});
+
+// The bug was worst on light programs, where nearly every movement is an accessory — so the gate has
+// to hold on a barbell accessory too, not just obviously-bodyweight ones.
+Deno.test('D-373: a barbell ACCESSORY (Barbell Row) is still not coached — the gate is role, not equipment', () => {
+  const row: StrengthLiftSnapshot = {
+    canonical_name: 'barbell_row', display_name: 'Barbell Row',
+    current_e1rm: 185, previous_e1rm: null,
+    current_avg_rir: 1, baseline_avg_rir: 3, target_rir: 3,
+    sessions_in_window: 4, best_weight: 185, anchor_1rm: null,
+  } as StrengthLiftSnapshot;
+  assertEquals(computeStrength([row], 'build').per_lift[0].verdict_label, '');
+});
+
+// ⛔ THE DEFAULT DIRECTION MATTERS. `roleForExercise` defaults an UNKNOWN move to 'primary'; the
+// language gate uses `isMain531Lift`, which defaults to false. Silence is the safe failure — gating on
+// the other classifier would coach every unrecognised movement and rebuild this bug one layer down.
+Deno.test('D-373: an UNKNOWN movement is not coached — the language gate fails to silence', () => {
+  const mystery: StrengthLiftSnapshot = {
+    canonical_name: 'landmine_thruster_xyz', display_name: 'Landmine Thruster',
+    current_e1rm: 95, previous_e1rm: null,
+    current_avg_rir: 1, baseline_avg_rir: 3, target_rir: 3,
+    sessions_in_window: 4, best_weight: 95, anchor_1rm: null,
+  } as StrengthLiftSnapshot;
+  assertEquals(computeStrength([mystery], 'build').per_lift[0].verdict_label, '');
+});
+
+// And the other half of the contract: a MAIN LIFT still gets everything it got before.
+Deno.test('D-373: main lifts are UNCHANGED — squat still earns a progression command + suggestion', () => {
+  const squat: StrengthLiftSnapshot = {
+    canonical_name: 'squat', display_name: 'Squat',
+    current_e1rm: 200, previous_e1rm: null,
+    current_avg_rir: 4, baseline_avg_rir: 2, target_rir: 2,
+    sessions_in_window: 4, best_weight: 180, anchor_1rm: null,
+  } as StrengthLiftSnapshot;
+  const l = computeStrength([squat], 'build').per_lift[0];
+  assertEquals(l.verdict_label, 'add weight');
+  assert(l.suggested_weight != null, 'a main lift must still carry its progression suggestion');
 });
 
 // ── FIXED — typed anchor 150 present: de-alarmed tone + anchor carried; NO lighter prescription ────
