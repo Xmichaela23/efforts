@@ -198,3 +198,70 @@ problem, not the filter.
 **To close:** decide whether accessories earn their own row, and on what frame — reps-at-weight,
 volume trend, or nothing at all until [Q-251]'s adherence question is answered. This is a product
 call. Related: [Q-251], [D-373], [D-374].
+
+## Q-254 — ⛔ THE AMRAP IS THE MEASUREMENT IN 5/3/1, AND STATE DOES NOT READ IT (2026-08-02, Michael) — **THE NORTH STAR FOR STRENGTH FOCUS. Three gaps, one shape.**
+
+Michael: *"we need to be using amraps for this plan to really set the growth"* → *"we need to make
+state screen read amrap as the north star for stregnth focus right?"*
+
+**He is right, and the app already captures everything needed.** `compute-facts/index.ts:1442-1464`
+writes **`amrap_reps`** (the set stamped `amrap: true` from the plan's `set_plan`) and **`measured`**
+(true when a real all-out set happened) onto every strength exercise. The evidence is there. Three
+separate places then fail to use it.
+
+### Gap 1 — the e1RM on State is built from the WRONG SET
+
+`compute-facts/index.ts:1429`:
+
+```
+const est1rm = bestWeight > 0 && bestReps > 0 ? estimated1RM(bestWeight, bestReps, avgRir ?? 0) : 0;
+```
+
+`bestReps` is **"the most reps at the heaviest weight"** — an aggregate, not the AMRAP. `amrap_reps`
+is computed thirteen lines later and never reaches this.
+
+⛔ **THE CODEBASE ALREADY DOCUMENTS WHY THIS IS WRONG**, at the top of
+`shared/strength-system/loading/cycle-verdicts.ts`: that module **refuses to read `exercise_log`**
+because *"best_weight / best_reps ... is the heaviest set, and the most reps at that weight — NOT the
+AMRAP. In 5/3/1 those usually [diverge] ... single afterwards: `best_reps` becomes 1, and 1 < 5 reads
+as a MISS on a session that went well."* **The verdict engine avoids this trap. The State e1RM walks
+straight into it.**
+
+### Gap 2 — the per-lift verdict reads RIR, not the AMRAP
+
+`computeLiftVerdict` (`_shared/response-model/weekly.ts`) decides on **RIR deviation** — how hard the
+sets *felt*. That is a self-reported proxy, collected on the top set only. In 5/3/1 the progression
+signal is **reps on the top set at a known percentage**; Wendler's own log tracks rep records and
+nothing else. So the number that decides growth and the words on the screen read different signals.
+([D-373] narrowed this to main lifts; it did not change what it reads.)
+
+### Gap 3 — the AMRAP-driven advance only runs on a rebuild ([Q-223], already filed)
+
+`verdictForCycle` / `amrapRepsForLift` are correct and wired — but only into
+`create-goal-and-materialize-plan` and `rematerialize-strength-block`. `strength-primary-plan.ts`
+authors all twelve weeks **before a single set is performed**, so a running block climbs on the
+calendar, not on evidence. Q-223 records that this **falsified a sentence in the partner-facing
+protocol** claiming week 3's AMRAP decides what comes next.
+
+### Why this is one job and not three tickets
+
+All three are the same omission at different layers: **the app collects the one measurement 5/3/1 is
+built on and then reasons from something else.** Fixing the e1RM without the verdict leaves the screen
+still talking about feel; fixing the verdict without Q-223 leaves the plan still climbing on schedule.
+
+### ⚠️ What has to be decided, not just coded
+
+1. **Weeks with no AMRAP.** Not every week prescribes one. What does the row say then — carry the last
+   measured value with its date, or go quiet? ⛔ It must not silently fall back to the `bestReps`
+   aggregate, or Gap 1 returns wearing a different hat.
+2. **`measured` is already the honest flag** for "a real all-out set happened" ([D-338]). Use it as the
+   gate rather than inventing a second one.
+3. **Rep records vs e1RM.** Wendler tracks *reps at a weight*, not an estimated max. An e1RM from 35
+   reps is arithmetic, not a measurement — the app already hedges this on screen (*"rough — over 5 reps
+   no formula holds up"*). Decide whether the north star is the **rep record** or a formula built on it.
+4. ⚠️ **Do not re-price history without checking.** Changing the e1RM basis moves every trend that
+   reads it (State strength dot, [D-270] per-lift direction, the coach's strength maxes). Same class of
+   change as [D-348], which shipped a backfill *with* it for exactly this reason.
+
+**To close:** rule on (3) first — rep record or e1RM. Everything else follows. Related: [Q-223],
+[D-338], [D-370], [D-373], [D-374], [Q-251].

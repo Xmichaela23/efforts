@@ -80,6 +80,24 @@ three time zones leaves a rolling window keyed to a boundary it does not use.
 ⚠️ **And the small fix is not small:** there is **no athlete timezone on the snapshot path today**, so
 even the narrow version needs one plumbed through. Ask him which he wants before writing anything.
 
+### ⛔ AND THE BIGGEST THING HE FOUND TONIGHT — [Q-254], THE AMRAP
+
+Michael: *"we need to make state screen read amrap as the north star for stregnth focus right?"*
+**He is right and the app already captures it.** `compute-facts:1442` writes `amrap_reps` + a
+`measured` flag on every strength exercise. Then three layers ignore it:
+
+- **The State e1RM is built from the wrong set** — `compute-facts:1429` uses `bestWeight`/`bestReps`
+  ("most reps at the heaviest weight"), an aggregate. ⛔ `cycle-verdicts.ts` **already documents why
+  that is wrong** and refuses to read it: do a heavy single after your AMRAP and `bestReps` becomes 1,
+  *"and 1 < 5 reads as a MISS on a session that went well."* The verdict engine dodges this trap; the
+  State e1RM walks into it.
+- **The per-lift verdict reads RIR** — how sets *felt* — not reps on the top set.
+- **[Q-223]** — the AMRAP-driven advance only runs on a REBUILD, so a live block climbs on the
+  calendar.
+
+⚠️ **Read Q-254 before touching any of the three — they are one omission at three layers**, and the
+first decision is a product one (rep record vs e1RM), not a code one.
+
 **The build queue he set, in his order:**
 1. **Strength language, the rest of it.** [D-373] shipped Axis 1 (role). `SPEC-strength-language.md`
    is still locked and still holds **Axis 2 (Type)** plus the collapse of six overlapping classifiers.
