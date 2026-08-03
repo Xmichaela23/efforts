@@ -4242,3 +4242,70 @@ planned-row extractor now call the same function. This exact question — "is th
 other; two private copies would drift into "the app credited it but won't say what it was for."
 
 ⛔ **Do not delete the shape branch** when new plans all carry the flag. The old sessions do not heal.
+
+---
+
+## D-371 — THE STRENGTH NARRATIVE LLM IS DELETED; THE SCREEN IS A LEDGER (2026-08-02, Michael) — **VERIFIED ON DEVICE**
+
+Michael: *"we are stripping all the ai out of the app... i heard strength uses it for the synopsis it
+doesnt even show, we dont need it, it should be a ledger."*
+
+### WHAT WAS DELETED
+
+`generateEnhancedStrengthInsights` and everything that fed it — **845 lines out of
+`analyze-strength-workout`**. The function was a Claude call (`model: 'sonnet'`, 300 tokens) with a
+system prompt, an e1RM block, a novel-movement block, an unplanned block, a register block, a
+**2-attempt validator loop** and `capNarrative` to trim the result to four sentences. It ran on every
+strength analysis and **every recompute**, twice whenever the first draft broke a reasoning rule.
+
+### THE FINDING: IT HAD REACHED NOBODY SINCE 2026-07-30
+
+The client stopped rendering the strength narrative that day ([D-338] + the deletion note in
+`MobileSummary.tsx`). The paragraph kept being generated for a month, billing on every recompute,
+written into `session_state_v1.narrative.text` / `summary.bullets` / `ai_summary` — all read by
+nothing on a strength surface.
+
+⚠️ **This is the third form of the codebase's standing disease.** Not *starved* (built, never fed) and
+not *doubled* (built twice) — **orphaned**: still running, still costing, output arriving nowhere. The
+tell was cheap and nobody looked: grep the field it writes for a reader.
+
+### WHAT WENT WITH IT, AND WHY THAT MATTERS MORE THAN THE MODEL CALL
+
+- The **Temporal Arc fetch** (`getArcContext`) and `strength_spine_verdict`.
+- The **`spine_direction` tagging** of `e1rmTrend` rows — whose only consumer in the entire codebase is
+  `_shared/narrative-core/adapters/strength.ts`, the reasoning scaffold the prompt was built from.
+- **`novelFact`** — an **8-week history query per analysis**, existing solely to hand the validator a
+  list of movement names the prose was obliged to mention (Q-111 §2 rule 9).
+- `isUnplannedSession`, the flag for prompt rule 8.
+- **Seven imports**, each verified dead by reference count before removal, not assumed.
+
+**Two database round-trips removed from every strength analysis and every recompute**, on top of the
+model call. `deno check` on the file: **2 errors before, 0 after** — one was real and had been hiding
+behind the arc import chain.
+
+⛔ **`getE1rmTrend` STAYS.** `buildStrengthTestResult` reads it and the e1RM numbers are the receipt
+behind the all-out set. Only the spine TAGGING of its rows was for the paragraph.
+
+### THE EMPTY STATE IS THE OLD FAILURE STATE
+
+`insights` is now always `[]`, so `narrative.text` → null (`source: 'none'`), `summary.bullets` → `[]`,
+`ai_summary` → null. **Those were already the values whenever the LLM call failed or returned empty**,
+so no consumer meets a shape it has not always handled. Verified on device: nothing changed on screen.
+
+### SCOPE — THIS IS NOT A BAN ON LLMs
+
+Michael, in the same message: *"we may keep it in race builder so dont get rid of all of it."*
+`_shared/llm.ts` and every other caller stand — the **coach**, the **race-readiness** line,
+`course-strategy`, `arc-setup-chat`, `extract-races`. What died is **the output-LLM on the strength
+session screen**. Run and ride were already deterministic; swim's is behind an env flag and off.
+
+### WHAT SAYS THINGS ON THIS SCREEN NOW
+
+The set rows, the all-out set with its rep record, the assistance totals ([D-370]) — and the swap
+receipt, which is **deterministic prose** (`_shared/strength/substitution-note.ts`) computed from the
+movement-pattern table and checkable by hand.
+
+⛔ **That is the model for anything this screen ever says again.** Do not restore a paragraph by wiring
+a deterministic composer into `insights` without first deciding the screen wants prose at all — the run
+and ride composers exist because those sports have a story about pacing and drift. **A strength ledger
+does not.**
