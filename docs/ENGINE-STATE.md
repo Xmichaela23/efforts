@@ -23,62 +23,62 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-02 night — **YOUR JOB IS AN AUDIT, NOT A FIX. Michael asked for a fresh session to audit everything before touching the queue.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-02 night, SECOND session of the day — **the LLM deletes are DONE and VERIFIED. Your job is the swim + strength audit.**)
 
 ### WHAT THIS SESSION DID, IN ONE LINE
 
-The strength session screen became a real ledger — the plan's assistance totals are printed, an
-undeclared swap is credited and flagged, and **the strength narrative LLM is deleted** (845 lines).
-Ten commits, two decisions ([D-370], [D-371]), two questions ([Q-248], [Q-249]).
+**The three dead LLM prompt builders are deleted** — 3,532 lines out, 45 in ([D-372]) — pushed
+(`4424d459`), deployed, and **verified on device with database write-timestamps checked, not just a
+screenshot**. One commit, one decision, one new question ([Q-250]).
 
-### ⛔ YOUR JOB
+### ⛔ YOUR JOB — THE SWIM + STRENGTH AUDIT
 
-**AUDIT FIRST. Michael's words: *"maybe a new chat audits everything and then tackles this."*** The
-queue below is real and mostly verified, but he wants a fresh read of the code rather than a fresh
-read of the last session's summary. **Do not open with a fix.**
+The standing work-order job (`WORKORDER-session-screen-continuity-2026-08-02.md` Part 3). **It is
+smaller than it was 24 hours ago** — strength got a real pass ([D-370], [D-371]) and the LLM sweep is
+off the board. Michael on swim: *"swim is very straight forward, not a lot there intentionally, we
+just dont get reliable metrics."*
 
-Then, in confidence order — **the LLM deletes are the highest-confidence work on the board and they
-finish what today started:**
+**Then, if you want a second thing:** [Q-246]'s **tidy half** (below) or [Q-250] (a real design call,
+not cleanup).
 
-**1. THREE DEAD LLM FILES. Verified today by reference count, not assumed.**
-- `analyze-running-workout/lib/narrative/prompt-builders.ts` — holds `callLLMInsights`. **ZERO
-  references anywhere in the repo.** Deleting it cannot break anything. Not in any note before today.
-- `_shared/fact-packet/ai-summary.ts` — one importer, `analyze-running-workout/index.ts:18`, and that
-  import is **voided at `:2384`**.
-- `_shared/cycling-v1/ai-summary.ts` — one importer, `analyze-cycling-workout/index.ts:7`, voided at
-  `:2733`.
-- Plus the swim LLM block, `analyze-swim-workout` ~396-720, already gated off by the never-set
-  `SWIM_INSIGHTS_LLM` env var.
-All four are on the **"DELETE (dead after the composers)" list further down this file** and have been
-since the composers shipped. ⚠️ The 12 voided refs on `analyze-cycling-workout:2733` are the fiddly
-part: deleting the `void` is trivial, deleting the VARIABLES means tracing each (`plannedWorkout` is
-certainly used elsewhere).
+### ⛔ WHAT NOT TO DO, AND BOTH OF THESE WILL LOOK OBVIOUS TO YOU
 
-**2. [Q-246] — the non-LLM dead code.** Five computed-then-discarded ride rows in
-`session-detail/build.ts` (`:1451`, `:1620`, `:1644`, `:1729`, `:1787` — normalized power, avg/max HR,
-seven-band power zones, VAM climbing), plus `getAdvancedMetrics` (`CompletedTab.tsx:1034`) and
-`AppleHealthSwimEnrichment` (`MobileSummary.tsx:11`). **Safe to delete — they render nothing — but each
-carries a dated comment saying WHY the row is off, and that reasoning must move to a `D-NNN` first.**
+**1. [Q-249] IS NOT YOURS TO PICK. IT NEEDS MICHAEL.** One exercise has TWO NAMES — the analyzer reads
+`Face Pull` from `planned_workouts.strength_exercises`, the screen reads `Band Face Pulls` from
+`computed.steps[].strength.name`. **It is now plainly visible in one glance** on Tue Jul 28's session:
+the row header says `Band Face Pulls → Chin Up` and the sentence three inches above says "the Face
+Pull slot." Three fixes exist and **one widens `canonicalize`, the grouping key for `exercise_log` and
+the State strength trend — it would silently re-group the athlete's lifting history.** He called it
+*"a huge fix on the docket"* and parked it. A surface patch is live. **Do not pick one.**
 
-**3. THE SWIM + STRENGTH AUDIT.** Still the standing work-order job
-(`WORKORDER-session-screen-continuity-2026-08-02.md` Part 3). **Smaller than it was this morning** —
-strength got a real pass today. Michael on swim: *"swim is very straight forward, not a lot there
-intentionally, we just dont get reliable metrics."*
+**2. DO NOT FINISH [Q-246] AS A SWEEP.** Its LLM half is closed. What is left is the **tidy half**:
+five `void` sites in `session-detail/build.ts`, eleven surviving refs on
+`analyze-cycling-workout:2733`, seven on `analyze-running-workout:2384` (both lines now carry a
+`[Q-246]` pointer in code), plus `getAdvancedMetrics` and `AppleHealthSwimEnrichment`. ⛔
+**`plannedWorkout` on the cycling line is genuinely used elsewhere — that line cannot be deleted
+wholesale**, and each dead ride row's dated "why this is off" comment must move to a `D-NNN` before
+the code goes. That is judgment, not mechanics.
 
-### ⛔ [Q-249] IS NOT YOURS TO PICK. IT NEEDS MICHAEL.
+### THE ONE METHOD LESSON FROM TONIGHT — IT COST THE MOST TIME
 
-One exercise has TWO NAMES — the analyzer reads `Face Pull` from `planned_workouts.strength_exercises`,
-the screen reads `Band Face Pulls` from `computed.steps[].strength.name`. Three fixes are possible and
-**one of them widens `canonicalize`, which is the grouping key for `exercise_log` and the State strength
-trend — it would silently re-group the athlete's lifting history.** A patch is live at the surface. He
-called it *"a huge fix on the docket"* and parked it. **Do not pick one.**
+**The previous banner said each `ai-summary` file had "exactly one importer." That was true of
+`index.ts` and FALSE OF THE REPO** — three TEST files imported them too, and two of those tests were
+guarding rules (D-035, D-036) that had since been **rebuilt on the deterministic spine**, while two
+others (D-037, D-038 Piece 3) were guarding the wording of a "pace vs similar" line **that no screen
+renders**. A per-FILE grep found one caller. A per-EXPORT grep found the rest.
+
+⛔ **Grep the exports, not the filename.** And when a test's subject has moved, **re-point it — do not
+delete it with the old code.** `decoupling.test.ts` survived exactly because of this: half of it
+covers `enrichSamplesWithGAP` / `calculateEfficiency` / `analyzeHeartRate`, including the 2026-07-14
+regression where a mixed-effort run vanished from the State durability trend for 16 days.
 
 ### THE FACTS YOU NEED BEFORE YOU TOUCH ANYTHING
 
-- **NO SESSION SCREEN HAS AN OUTPUT LLM ANY MORE — run, ride, and now strength.** Swim's is behind an
-  off env flag. **The coach and the race-readiness line are the last two live output-LLMs.** Michael:
-  *"we may keep it in race builder so dont get rid of all of it"* — `_shared/llm.ts`, `coach`,
-  `course-strategy`, `arc-setup-chat`, `extract-races` all STAY.
+- **NO SESSION SCREEN HAS AN OUTPUT LLM ANY MORE — run, ride, and now strength — AND AS OF [D-372]
+  THE MACHINERY IS GONE FROM THE TREE, not just bypassed.** Swim's is behind an off env flag and is
+  the last one still present in code. **The coach and the race-readiness line are the last two live
+  output-LLMs.** Michael: *"we may keep it in race builder so dont get rid of all of it"* —
+  `_shared/llm.ts`, `coach`, `course-strategy`, `arc-setup-chat`, `extract-races` all STAY.
 - **The reference set is THREE APPS: TrainingPeaks, Garmin, Strava** for endurance. For STRENGTH it is
   **Wendler's 5/3/1 book itself** (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`) plus Hevy / Strong /
   Boostcamp. Today's decisions are sourced to page numbers; keep it that way.
@@ -99,13 +99,49 @@ either did or you didn't."*
 the `spine_direction` tagging, an 8-week history query, seven imports. **Two DB round-trips per analysis
 removed on top of the model call.** `deno check` on that file: 2 errors → 0.
 
+### WHAT [D-372] SHIPPED, AND HOW IT WAS VERIFIED (the method matters more than the result)
+
+Deleted `prompt-builders.ts` (852), `_shared/fact-packet/ai-summary.ts` (1,261),
+`_shared/cycling-v1/ai-summary.ts` (644), plus `unplanned-workout.test.ts`,
+`cycling-v1/ai-summary.test.ts` and the display-packet half of `decoupling.test.ts`.
+
+`deno check`: run analyzer 65 → 61 errors (the four that went were inside the deleted file), cycling
+10 → 10, `_shared` suite **1533 passed / 0 failed**. Then the part that actually settled it —
+**recompute on device, and the DATABASE checked for `ai_summary_generated_at`** rather than trusting
+the screen: Jul 27 run, Aug 2 run and Aug 1 ride all stamped 2–9 minutes old, in click order, after
+the deploy, with the paragraphs byte-identical. Both strength rows correctly carried no summary
+([D-371]).
+
+⛔ **That DB check is the pattern to copy.** A screen showing text proves the READ path works; it does
+not prove the deployed code WROTE it. The write timestamp does.
+
 ### STILL UNVERIFIED
 
-- **The last two copy pushes** (`8483f083`, `ac536a99`) landed AFTER Michael's final screenshot: the
-  Planned column at Completed's luminosity, the `Planned` label on assistance rows, and the swap
-  sentence at 14px/80%. Deployed, unseen. See `POLISH-PUNCH-LIST.md`.
+- ~~**The last two copy pushes** (`8483f083`, `ac536a99`)~~ — **CONFIRMED 2026-08-02 night.** Planned
+  now reads at Completed's luminosity with Previous still dim (checked on a three-set Box Jump row
+  where all three levels appear at once); assistance rows say `Planned 25 total · by feel`; the swap
+  sentence renders full size under "3 of 4" on Tue Jul 28 — *"Chin Up filled the Face Pull slot.
+  Vertical pulling instead of horizontal pulling — same session, different stimulus."*
 - **[Q-244]** — Workload 86 vs TSS 69 on the same ride. Tolerated while only one is on screen.
-- **[Q-247]** — three living docs over the archive cap; the decisions log is 3× over.
+
+### 📁 THE NUMBERED LOGS WERE FROZEN TONIGHT — YOU ARE PROBABLY READING THE WRONG FILE
+
+**[Q-247] closed for both numbered logs.** `DECISIONS-LOG.md` (D-240→D-372) and `OPEN-QUESTIONS.md`
+(Q-130→Q-250) are **frozen**. New entries go in **`DECISIONS-LOG-2.md` (D-373 →)** and
+**`OPEN-QUESTIONS-2.md` (Q-251 →)**. Numbering never restarts, no text was moved, and **the frozen
+files are still fully authoritative.** Grep with a glob:
+
+```bash
+grep -rn "Q-183" docs/OPEN-QUESTIONS*.md docs/archive/OPEN-QUESTIONS-archive-*.md
+```
+
+⛔ **Do not "archive the closed entries" — that rule is dead and `CLAUDE.md` now says why.** It was
+tested: it flagged Q-247 while it was live and Q-246 when only half was closed. **Freeze by number,
+judge nothing.**
+
+⚠️ **THIS FILE is the exception and is STILL OVER (~199K).** It must stay one file — it is the first
+thing you read. Its fix is trimming **Solid** entries older than a few weeks into
+`archive/ENGINE-STATE-archive.md`. **Not done. It is the last piece of Q-247.**
 
 ## WHAT SHIPPED LAST NIGHT — client only, uncommitted, do NOT re-litigate
 
@@ -388,7 +424,7 @@ exists.** A knowingly-taken debt; a test asserts the line is present to keep it 
 > ## READ `docs/GAME-PLAN.md`, `START-HERE.md`, `LIFECYCLE.md`. **The product decision this session: LOSE THE LLM from all output narration.** Michael's call, after a year of proving the deterministic spine — the insight was always the engine's VERDICT, the LLM only phrased it (and drifted: "pace held steady" on a run whose pace ran 13:07→15:50). Research backs it (users hate AI-narrative fluff; DIS-2026 paper "Who Gets to Interpret the Workout"). Positioning: "the app that doesn't make anything up." **Keep the LLM ONLY for INPUT PARSING** (onboarding goal-parse `llm-arc-setup.ts`, `extract-races`) — unstructured→structured is the one thing it's good at, and the user confirms the parse. Never structured→prose again.
 >
 > ### ⛔ YOUR JOB #1 — THE CLEANUP SWEEP. Run + bike composers shipped and VERIFIED on device; the LLM per-workout generators are now DEAD but still in the tree (bypassed, `void`'d). Delete them.
-> **DELETE (dead after the composers):** `_shared/fact-packet/ai-summary.ts` (generateAISummaryV1 + its whole validator suite incl. the pacing/HR guards), `_shared/cycling-v1/ai-summary.ts` (generateCyclingAISummaryV1), the honesty-guard plumbing + `void`'d dead refs in `analyze-running-workout` and `analyze-cycling-workout`, AND the swim LLM block in `analyze-swim-workout` (~lines 396-720, now gated off by the never-set `SWIM_INSIGHTS_LLM` env var → the deterministic facts fallback renders). ⚠ SWIM: it had its OWN per-workout LLM narrative that the first pass MISSED — now disabled (facts only, no composer, per D-304). Confirm it's gone (recompute a swim → INSIGHTS should be just "Average pace … / N intervals").
+> **DELETE (dead after the composers):** ⛔ **MOSTLY DONE — [D-372], 2026-08-02 night. Everything below except SWIM is deleted, deployed and verified on device.** `_shared/fact-packet/ai-summary.ts` and `_shared/cycling-v1/ai-summary.ts` are **gone**, along with `analyze-running-workout/lib/narrative/prompt-builders.ts` (852 lines, zero references, which this list never named). Both `void` lines lost their LLM symbol. **What remains of this bullet is (a) the SWIM block and (b) the non-LLM `void`'d refs, which are [Q-246]'s tidy half and must NOT be swept — `plannedWorkout` on the cycling line is live.** ⚠ SWIM: it had its OWN per-workout LLM narrative that the first pass MISSED — now disabled (facts only, no composer, per D-304), still in the tree. Confirm it's gone (recompute a swim → INSIGHTS should be just "Average pace … / N intervals").
 > **⛔ KEEP — do NOT delete (a cold chat WILL get this wrong):**
 > - `_shared/insights/run-insights.ts` + `bike-insights.ts` — the composers (the whole point).
 > - `pacingVerdict` — lives in `run-insights.ts`, imported by `session-detail/build.ts` (the PACING row single-sources off it). Load-bearing.

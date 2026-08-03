@@ -8,23 +8,26 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE LAST TWO COPY PUSHES OF 2026-08-02 NIGHT (client only, deployed, unseen)
+## ✅ CLOSED 2026-08-02 NIGHT — THE LAST TWO COPY PUSHES (confirmed on screen)
 
-Both landed AFTER his final screenshot of the strength ledger, so nobody has looked at them.
+All three checked on the running app. Nothing outstanding here.
 
-- [ ] **Planned reads at Completed's luminosity** (`8483f083`). The two columns are the halves of the
-      row and the prescription was rendering a third dimmer than the result. Both at 90%; **Previous
-      deliberately stays at 50%** — it is context from another session, and levelling all three would
-      make the row read as three equal prescriptions. ⚠️ Look at a BENCH row (three sets, a Previous
-      column) — that is where all three levels appear at once.
-- [ ] **Assistance rows say the word "Planned"** (`8483f083`) — `Planned 25 total · by feel`. Dropping
-      the Planned COLUMN from those rows was right, but it removed the only word saying that number is
-      a prescription and not a result.
-- [ ] **The swap sentence at 14px/80%** (`ac536a99`) — *"Dips filled the Face Pull slot. Horizontal
-      pushing instead of horizontal pulling — same session, different stimulus."* It shipped at
-      12px/55%, the size of a disclaimer, and it is the only line on that screen telling him something
-      he did not already know. ⚠️ It is DETERMINISTIC (`_shared/strength/substitution-note.ts`), not
-      prose from a model — brightening it is not promoting a guess.
+- [x] **Planned reads at Completed's luminosity** (`8483f083`) — confirmed 2026-08-02 on a three-set
+      **Box Jump** row (Sat Aug 1), where all three levels appear at once: Planned and Completed sit
+      at the same brightness, Previous stays clearly dimmer. Reads as two halves of one row with
+      context behind them, which was the intent. **Previous deliberately stays at 50%** — levelling
+      all three would make the row read as three equal prescriptions.
+- [x] **Assistance rows say the word "Planned"** (`8483f083`) — confirmed. `Dips  Planned 25 total ·
+      by feel`, no Planned column, `25 of 25 reps` under the sets.
+- [x] **The swap sentence at 14px/80%** (`ac536a99`) — confirmed on **Tue Jul 28** (Overhead Press
+      day), sitting directly under `COMPLETED 3 of 4` at full readable size: *"Chin Up filled the Face
+      Pull slot. Vertical pulling instead of horizontal pulling — same session, different stimulus."*
+      ⚠️ The punch-list draft said *"Dips filled the Face Pull slot"* — that was a different session's
+      swap. The sentence is generated per session, so the exercise name changes; the line itself is
+      the same one. It is DETERMINISTIC (`_shared/strength/substitution-note.ts`), not model prose.
+      ⛔ **This screen is also where [Q-249] is now visible in a single glance** — the row header says
+      `Band Face Pulls → Chin Up` while the sentence above says "the Face Pull slot." Parked, needs
+      Michael, do not fix.
 
 **Already confirmed by him tonight:** the assistance totals, the collapsed swap row, `4 of 4`, and the
 strength LLM deletion (*"looks good"* — nothing changed on screen, which was the pass condition).

@@ -4,6 +4,24 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-02 (night, second session) — THE LLM MACHINERY IS OUT OF THE TREE, NOT JUST BYPASSED.**
+> [D-372] deleted the three dead prompt builders (3,532 lines) — `prompt-builders.ts` (852, zero
+> references repo-wide), `_shared/fact-packet/ai-summary.ts` (1,261) and
+> `_shared/cycling-v1/ai-summary.ts` (644) — plus the tests that guarded wording no screen renders.
+> Pushed `4424d459`, both analyzers deployed, and **verified by DB write-timestamp, not by screenshot**:
+> run and ride paragraphs came back byte-identical from a live recompute. The three copy items from
+> the earlier session are **confirmed on screen** and closed in `POLISH-PUNCH-LIST.md`.
+>
+> ⛔ **NEXT: THE SWIM + STRENGTH AUDIT** (`WORKORDER-session-screen-continuity-2026-08-02.md` Part 3) —
+> smaller than it was, since strength got a real pass and the LLM sweep is off the board. **[Q-246] is
+> half-closed**: its tidy half survives and must NOT be swept (`plannedWorkout` is live; each dead ride
+> row's reasoning must land in a `D-NNN` first). **[Q-250]** is new and is a design call, not cleanup:
+> the pool-intensity signal is still computed and now has no reader at all.
+>
+> ⛔ **[Q-249] STILL PARKED AND STILL NOT A FREE PICK** — and it is now visible in one glance on Tue
+> Jul 28 (`Band Face Pulls → Chin Up` above a sentence saying "the Face Pull slot"). One of its three
+> fixes widens `canonicalize` and would silently re-group the athlete's lifting history. **Wait for him.**
+
 > **2026-08-02 (night) — STRENGTH IS A LEDGER NOW, AND THE SESSION SCREENS HAVE NO LLM LEFT.**
 > The assistance prescription is printed (`Planned 25 total · by feel`), an undeclared swap into an
 > assistance slot is credited and flagged by movement pattern, `vs plan` tonnage is gone, and the

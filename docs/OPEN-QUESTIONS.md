@@ -1,4 +1,18 @@
-# Open Questions
+# Open Questions — Part 1 (Q-130 → Q-250)
+
+## ⛔ FROZEN 2026-08-02 AT Q-250. NEW ENTRIES GO IN [`OPEN-QUESTIONS-2.md`](OPEN-QUESTIONS-2.md) STARTING AT Q-251.
+
+**Frozen does NOT mean answered — this file is mostly LIVE questions, and that was measured.** Of its
+120 entries, roughly **10–15** are genuinely finished. The rest are open, half-open, or tagged
+*intentional* — and the intentional ones are the whole reason this doc exists. **Always grep both
+parts** (`docs/OPEN-QUESTIONS*.md`) plus `docs/archive/OPEN-QUESTIONS-archive-Q001-Q129.md`.
+
+⚠️ It was closed at 329KB by **number**, not by judgment. An earlier plan to archive "the closed ones"
+was tested and rejected: the check flagged **Q-247 while it was being actively worked on**, and
+**Q-246 when only half of it was closed** — the live half being the one that says `plannedWorkout`
+must not be deleted.
+
+---
 
 Behaviors that look like bugs but might be intentional, or are deferred for a deliberate reason. The point of this doc is to **prevent re-litigation**: when a future session notices one of these and starts to "fix" it, this doc explains why someone already considered it and chose to leave it.
 
@@ -2798,7 +2812,27 @@ strength or trust run and bike.
 
 ---
 
-## Q-246 — Session-screen dead code that still runs (2026-08-02) — **filed, cheap, not done**
+## Q-246 — Session-screen dead code that still runs (2026-08-02) — **HALF CLOSED; the tidy half is open**
+
+> **↪ THE LLM HALF IS DONE — [D-372], 2026-08-02 night, pushed `4424d459`, deployed, verified on
+> device.** All three files below are deleted (3,532 lines), both `void` lines lost their LLM symbol,
+> and the run + ride paragraphs were confirmed byte-identical on recompute with DB write-timestamps
+> checked. **Do not re-file the file deletions.**
+>
+> ⚠️ **WHAT IS STILL OPEN IS THE TIDY HALF, AND IT IS THE HARDER ONE:** the five `void` sites in
+> `_shared/session-detail/build.ts`, the eleven surviving refs on `analyze-cycling-workout:2733`, the
+> seven on `analyze-running-workout:2384` (both lines now carry a `[Q-246]` pointer in code),
+> `getAdvancedMetrics` and `AppleHealthSwimEnrichment`. ⛔ `plannedWorkout` on the cycling line **is
+> genuinely used elsewhere** — that line cannot be deleted wholesale. And each dead ride row's dated
+> "why this is off" comment must land in a `D-NNN` BEFORE the code goes. **Judgment, not mechanics.**
+>
+> ⚠️ The swim LLM block (`analyze-swim-workout` ~396-720, gated off by the never-set
+> `SWIM_INSIGHTS_LLM`) was NOT touched and is still on the list.
+>
+> **AND THE LESSON THAT COST THE MOST TIME:** this entry said each `ai-summary` file had "exactly one
+> importer." That was true of `index.ts` and **false of the repo** — three TEST files imported them
+> too, and two of those tests turned out to be guarding rules that had been rebuilt elsewhere.
+> **Grep the EXPORTS, not the filename.**
 
 > **↪ RE-VERIFIED AND WIDENED 2026-08-02 night. The line numbers below were confirmed against code,
 > and the LLM half of this is bigger than the entry said.**
@@ -2834,7 +2868,28 @@ were switched off.
 
 ---
 
-## Q-247 — Three living docs are over the cap, and one has doubled (2026-08-02) — **measured**
+## Q-247 — Three living docs are over the cap, and one has doubled (2026-08-02) — **CLOSED for the two numbered logs; ENGINE-STATE still open**
+
+> **↪ CLOSED 2026-08-02 night for `DECISIONS-LOG` and `OPEN-QUESTIONS` — and the FIX WAS NOT THE ONE
+> THIS ENTRY PROPOSED.** Both are now **frozen by number** with successors:
+> `DECISIONS-LOG-2.md` (D-373 →) and `OPEN-QUESTIONS-2.md` (Q-251 →). No text was moved.
+> `CLAUDE.md`'s rule was rewritten to match.
+>
+> ⛔ **The "move the closed entries to an archive" plan below was tested and REJECTED**, for two
+> reasons worth keeping:
+> 1. **A decision never closes**, so the trigger could never fire on `DECISIONS-LOG` at all. It grew
+>    to 3× the cap while the rule sat there looking followed.
+> 2. **Detecting "closed" does not work.** Run over this very file, the check flagged **Q-247 —
+>    itself, while it was the live question being worked on** — and **Q-246, when only half of it was
+>    closed.** Burying Q-246 would have hidden the note that `plannedWorkout` is still in use, which
+>    is the one thing standing between the next session and a broken ride analyzer.
+>
+> **And archiving would have bought almost nothing:** of this file's 120 entries, only **10–15** are
+> genuinely finished. It is big because it is mostly LIVE.
+>
+> ⚠️ **STILL OPEN: `ENGINE-STATE.md` (~199K).** It is the exception — it must stay ONE file, since it
+> is the first thing a session reads. Its fix is different: trim **Solid** entries older than a few
+> weeks into `archive/ENGINE-STATE-archive.md`. Not done.
 
 `DECISIONS-LOG.md` **452K**, `OPEN-QUESTIONS.md` **316K**, `ENGINE-STATE.md` **196K**. `CLAUDE.md` sets
 the archive trigger at ~150K. All three are past it; the decisions log is 3× over.
@@ -2908,3 +2963,33 @@ history. Not a thing to do as a follow-on to a display fix.
 **To close:** rule on which of the three, then delete the containment fallback in
 `StrengthPerformanceSummary` and the note above it. ⚠️ Until then, assume ANY cross-source exercise
 lookup in the app is exposed to this — the swap pairing is simply where it became visible.
+
+---
+
+## Q-250 — `CyclingPoolIntensityFilter` is computed and now has NO reader (2026-08-02 night) — **filed, opened by [D-372], not a bug**
+
+`_shared/cycling-v1/cross-workout-types.ts` still defines and the packet still **computes**
+`CyclingPoolIntensityFilter` / `CyclingPoolPowerContext` — `intensity_match` on a
+`matched` / `current_much_harder` / `current_much_easier` trichotomy, gated at the same 10% boundary as
+the run's `POOL_INTENSITY_MATCH_PCT`.
+
+**Its only consumer was the POOL INTENSITY CONTEXT prompt rule in `_shared/cycling-v1/ai-summary.ts`
+(D-073, the mirror of the run's D-038 Piece 3), which [D-372] deleted.** The computation survived the
+deletion; the reader did not. A note to this effect is on the type itself.
+
+⚠️ **This is NOT "dead code, delete it" — that is exactly the reflex to resist here.** The signal is
+real and it answers a question the deterministic ride row cannot currently answer: *were the rides I
+am being compared against structurally easier than this one?* Without it, an HR delta against an
+easier comparison pool reads as fatigue or fitness loss when it is just a harder ride. That is the
+"score that lies" failure mode.
+
+**Two honest options, and the call has not been made:**
+1. **Wire it into the deterministic bike row** — the signal earns its keep and the ride comparison
+   stops mis-attributing intensity to fatigue. Costs a copy decision (it must not print `delta_pct`;
+   the old rule was explicit that it be spoken in words, never numbers).
+2. **Delete the computation too** — if the ride row is never going to make a cross-session HR claim,
+   the whole context is unearned work on every ingest.
+
+**To close:** decide which. ⚠️ Check the RUN analog first — `pool_intensity_filter` in
+`_shared/fact-packet/types.ts:98` is the same shape and lost its reader in the same commit, so
+whatever is decided here should be decided for both or the two disciplines diverge again.

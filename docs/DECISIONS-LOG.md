@@ -1,4 +1,16 @@
-# Decisions Log
+# Decisions Log — Part 1 (D-240 → D-372)
+
+## ⛔ FROZEN 2026-08-02 AT D-372. NEW ENTRIES GO IN [`DECISIONS-LOG-2.md`](DECISIONS-LOG-2.md) STARTING AT D-373.
+
+**Frozen does NOT mean superseded.** Every entry below is as binding as anything in Part 2. This file
+was closed at 484KB — about 120k tokens, most of a context window — because past that size it stops
+being read at all. **Grep all three parts before reversing anything:**
+`docs/DECISIONS-LOG*.md` + `docs/archive/DECISIONS-LOG-archive-D001-D239.md` (D-001 → D-239).
+
+⛔ **Back-annotating still applies to this file.** If you supersede something below, come back and mark
+it here.
+
+---
 
 Append-only record of architecture / design decisions worth preserving across sessions. Each entry captures **why** the call was made, what was rejected, and what tradeoff is being lived with — so the next session doesn't re-debate (or worse, undo) settled choices.
 
@@ -4309,3 +4321,66 @@ movement-pattern table and checkable by hand.
 a deterministic composer into `insights` without first deciding the screen wants prose at all — the run
 and ride composers exist because those sports have a story about pacing and drift. **A strength ledger
 does not.**
+
+---
+
+### D-372 — The three dead LLM prompt builders are deleted, and the tests that guarded their wording go with them (2026-08-02 night, PUSHED `4424d459` + DEPLOYED `analyze-running-workout` / `analyze-cycling-workout` + VERIFIED on device)
+
+3,532 lines out, 45 in. The run and ride session paragraphs have been written by the **deterministic
+composers** since 2026-07-19 ([D-304] lineage); the prompt builders they replaced were left in place
+"for the cleanup pass" and had sat there ever since. This is that pass. It finishes what [D-371]
+started on strength the same night — **no session screen has an output LLM any more.**
+
+**DELETED, in the confidence order they were verified:**
+
+| file | lines | why it was safe |
+|---|---|---|
+| `analyze-running-workout/lib/narrative/prompt-builders.ts` | 852 | **ZERO references repo-wide**, verified per-EXPORT not per-file. The one near-match is `course-strategy`'s own local `buildPrompt` (`index.ts:99`), defined in that file, unrelated. |
+| `_shared/fact-packet/ai-summary.ts` | 1,261 | the run prompt builder; its only live importer void'd the symbol at `index.ts:2384`, and `composeRunInsight` was already the sole producer of `ai_summary`. |
+| `_shared/cycling-v1/ai-summary.ts` | 644 | the ride equivalent, same shape, void'd at `index.ts:2733`, `composeBikeInsight` producing the real text. |
+
+⛔ **THE HANDOFF BANNER WAS WRONG ABOUT THE IMPORTERS, AND THAT IS THE PART WORTH REMEMBERING.** It
+said each `ai-summary` file had "exactly one importer." True of `index.ts`; **false of the repo** —
+three TEST files also imported them. A per-file grep found one caller; a **per-export** grep found the
+rest. *Grep the exports, not the filename.*
+
+**THE TESTS, AND THE QUESTION THAT ACTUALLY MATTERED.** Those tests pinned four decisions
+(D-035, D-036, D-037, D-038 Piece 3). A test whose subject was rebuilt elsewhere should be
+**re-pointed, not deleted** — so each was traced before anything was cut:
+
+- **D-035 (unplanned) and D-036 (decoupling) WERE rebuilt and are live** on the deterministic spine —
+  `session-detail/types.ts:351`, `build.ts:1038`, `build.ts:766/1041/1809`, plus four client
+  components. Their display-packet tests were a **second, dead copy**. ⛔ Do not "restore" them.
+- **D-037 and D-038 Piece 3 pin the wording of a "pace vs similar" line, and NO SCREEN RENDERS ONE.**
+  Verified absent from `session-detail/build.ts` and every client component. They were guarding text
+  that does not exist.
+
+So `unplanned-workout.test.ts` and `cycling-v1/ai-summary.test.ts` are deleted whole.
+**`decoupling.test.ts` is NOT** — it also covers `enrichSamplesWithGAP`, `calculateEfficiency` and
+`analyzeHeartRate`, **including the 2026-07-14 regression where a mixed-effort run was dropped from
+the State durability trend for 16 days.** Only its display-packet half was cut; 14 live tests remain.
+
+**WHAT WAS DELIBERATELY NOT SWEPT.** The other eleven void'd refs on `analyze-cycling-workout:2733`
+stay — `plannedWorkout` among them is genuinely used elsewhere — as do the seven on
+`analyze-running-workout:2384`. Both lines now carry a `[Q-246]` pointer. That is Q-246's **tidy
+half**, and each dead ride row's dated "why this is off" comment must move to a `D-NNN` before the
+code goes. Judgment, not mechanics.
+
+**VERIFICATION — the method, since "it compiles" proves nothing here.**
+`deno check analyze-running-workout` 65 → 61 errors (the four that vanished were inside the deleted
+file); `analyze-cycling-workout` 10 → 10; full `_shared` suite **1533 passed / 0 failed**. Then the
+real one: recompute on device, and **the database checked for write timestamps** rather than trusting
+the screen — Jul 27 run, Aug 2 run and Aug 1 ride all carried `ai_summary_generated_at` stamped
+2–9 minutes old, in click order, after the deploy. **Paragraphs came back byte-identical.** Both
+strength rows correctly carried no summary at all ([D-371]).
+
+**WHAT STAYS, AND IT IS NOT NEGOTIABLE FROM A CLEANUP PASS.** `_shared/llm.ts`, `coach`,
+`course-strategy`, `arc-setup-chat`, `extract-races`. Michael: *"we may keep it in race builder so
+dont get rid of all of it."* The coach and the race-readiness line are the last two live output-LLMs.
+
+**WHY THIS IS WORTH DOING AT ALL**, since nothing on screen changes: the dominant failure mode in this
+codebase is a session finding something that looks alive and either rebuilding it or wiring to the
+wrong copy — four plan generators exist because of it. A 1,261-line file named `ai-summary.ts` sitting
+beside a working composer **is** that trap: it reads as a description of what the app does, and it
+described what the app used to do. The return is not performance. It is that the next session is not
+lied to.

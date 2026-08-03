@@ -163,7 +163,13 @@ Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) o
 
 **The 6 living docs** (updated ~every session; everything else in `docs/` is reference, often stale — verify before trusting): `ENGINE-STATE.md`, `GAME-PLAN.md`, `DECISIONS-LOG.md`, `OPEN-QUESTIONS.md`, `POLISH-PUNCH-LIST.md`, `CAPABILITY-MAP.md`.
 
-**⛔ AND THEY ARE CAPPED.** `DECISIONS-LOG`, `OPEN-QUESTIONS` and `ENGINE-STATE` are **append-heavy and they WILL rot back.** They hit **812KB / 416KB / 380KB** and had to be split by hand. **When a living doc passes ~150KB, move the closed and superseded entries to its `-ARCHIVE.md` and leave a pointer.** Nothing is deleted; it stops being loaded. *The 2026-07 split was a rescue, not a rule. This is the rule.*
+**⛔ AND THEY ARE CAPPED — ~150KB.** `DECISIONS-LOG`, `OPEN-QUESTIONS` and `ENGINE-STATE` are **append-heavy and they WILL rot back.** They hit **812KB / 416KB / 380KB** once already. The cap exists because a 484KB doc is ~120k tokens — most of a context window — and past that size it stops being read at all. **A doc nobody can load is worse than no doc.**
+
+**THE RULE, for the two NUMBERED logs (`DECISIONS-LOG`, `OPEN-QUESTIONS`): when one passes ~150KB, FREEZE IT AT ITS CURRENT NUMBER AND START THE NEXT PART.** `DECISIONS-LOG-2.md` at D-373, `OPEN-QUESTIONS-2.md` at Q-251 (done 2026-08-02). **Numbering never restarts**, so a `D-NNN`/`Q-NNN` still exists exactly once anywhere. Put a range table at the top of the new file and a forward pointer on the frozen one. **Move no text.** Grep with a glob: `docs/OPEN-QUESTIONS*.md`.
+
+⛔ **DO NOT "ARCHIVE THE CLOSED ONES" — that rule was tried, measured, and is dangerous.** Two reasons, both verified 2026-08-02: (1) **a decision never closes**, so the trigger could never fire on `DECISIONS-LOG` and it grew to 3× the cap while looking compliant; (2) automated "is this closed?" detection over `OPEN-QUESTIONS` flagged **Q-247 while it was the question being actively worked**, and **Q-246 when only half of it was closed** — and burying Q-246 would have hidden the warning that `plannedWorkout` is still live, costing a broken ride analyzer. **Judging entries is where the danger is. Freeze by number and judge nothing.** Also: only ~10–15 of that file's 120 entries were genuinely finished, so archiving bought almost nothing anyway.
+
+⚠️ **`ENGINE-STATE` is the EXCEPTION — do not split it.** It is the first file a session reads and it must stay one file. Keep it under the cap by trimming **Solid** entries older than a few weeks into `archive/ENGINE-STATE-archive.md` (still authoritative — grep it). *(It is ~199KB and over; that trim is outstanding.)*
 
 ### ⛔ THE SPEC LIFECYCLE — a SPEC is scaffolding, and scaffolding comes down
 
