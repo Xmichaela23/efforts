@@ -92,6 +92,8 @@ const PRE_EXISTING_TYPE_CONFIG_DISAGREEMENTS = new Set([
   // of one already on it is not a new bug, and typing it differently from `dip` to dodge this would
   // have created exactly the one-movement-two-answers defect the same pass was fixing.
   'tricep dip',
+  // ⚠️ `ring dip` — same movement again, third spelling. Added 2026-08-03 when it gained a key.
+  'ring dip',
   'glute bridge',
 ]);
 

@@ -122,9 +122,16 @@ Deno.test('⛔ THE FIVE MOVEMENTS THE OLD REGEX MISSED — and only those five',
   for (const n of await knownVocabulary()) {
     if (legacyIsDurationBased(n) !== isDurationLogged(n)) changed.push(n);
   }
+  // ⚠️ THE REVIEWED SET GREW FROM FIVE TO EIGHT ON 2026-08-03, and the three additions are the same
+  // fix, not a regression. `l sit` / `l sits` / `stir the pot` entered the vocabulary in that day's
+  // pass (the vocabulary guard's backlog) and are typed `isometric` — they are HELD, exactly like a
+  // plank or a dead hang. The legacy regex matched `plank|hold|carry|farmer|…` and none of those
+  // words appear in "L Sit" or "Stir the Pot", which is the identical blind spot that made it miss
+  // a sled push and a dead hang. Every one still changes TOWARD being timed, which the loop below
+  // asserts — the direction is what makes it a fix rather than a drift.
   assertEquals(
     changed.sort(),
-    ['dead hang', 'foot doming', 'sled pull', 'sled push', 'wall angel'],
+    ['dead hang', 'foot doming', 'l sit', 'l sits', 'sled pull', 'sled push', 'stir the pot', 'wall angel'],
     'the set of movements whose logging mode changed is not the reviewed set',
   );
   // …and every one of them changed toward being timed, never away from it.

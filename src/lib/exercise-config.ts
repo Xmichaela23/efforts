@@ -2025,6 +2025,688 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     confidence: 'high',
   },
 
+
+  // ══════════════════════════════════════════════════════════════════════════════════════════════
+  // THE VOCABULARY GUARD'S BACKLOG, CLOSED (2026-08-03, third pass). Additive.
+  //
+  // ⛔ EVERY ENTRY BELOW WAS FOUND BY A TEST, NOT BY A SCREENSHOT. `exercise-config.vocabulary-guard`
+  // walks the config, the type/role tables, the assistance menu, the add-picker and a snapshot of
+  // what the athlete has actually planned and logged, and fails on anything resolving through the
+  // fuzzy fallback. It found 65. Each one was a movement borrowing a neighbour's prescription — or
+  // resolving to nothing at all and dropping onto the legacy weight path.
+  //
+  // ⛔ NO NUMBER BELOW WAS CHOSEN. Every entry copies a structural sibling already in this file and
+  // changes only what the equipment or the laterality demands. Where no sibling with a real ratio
+  // exists — arm isolation, cable core, carries — the ratio is 0, which is this file's existing way
+  // of saying "there is no number to derive" (`rear delt fly` is the precedent) and lets the
+  // athlete's own logged weight drive the row instead of a fabricated prescription.
+  // ══════════════════════════════════════════════════════════════════════════════════════════════
+
+
+  // ── PLURALS AND SPELLINGS: an exact copy of the entry they already meant ──────────────────
+  'bulgarian split squats': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.5,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    ratioIsTotal: true,
+  },
+  'cable face pulls': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'overhead',
+    ratio: 0.15,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'calf raises (bilateral)': {
+    pattern: 'calf',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'chest flyes': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.35,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  chinups: {
+    pattern: 'vertical_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'core work (5 min - your choice)': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'dumbbell flyes': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.35,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'farmer walks': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'goblet squats': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.45,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'leg curls': {
+    pattern: 'hip_dominant',
+    primaryRef: 'deadlift',
+    ratio: 0.3,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'leg extensions': {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.35,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'nordic curl': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'plank with shoulder taps': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'ring dips': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.9,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'side plank with hip dip': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+  squats: {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'tricep dip': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.9,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'weighted single-leg calf raises': {
+    pattern: 'calf',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+  },
+  'decline bench press': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+
+  // ── ⛔ CORRECTIONS: these MOVE a resolution. The review shortlist. ─────────────────────────
+  // was borrowing `squat` at 100% of the barbell back squat
+  'pistol squats': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+  // was borrowing `push ups` — a horizontal push for a vertical one
+  'handstand push ups': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  // was borrowing `rows` at 0.85 TOTAL; one bell is per hand
+  'kettlebell rows': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+  },
+  // was borrowing `glute bridge` at 0.4x deadlift; a march is unloaded
+  'glute bridge march': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+  // bare 'Lunges' — see the flagged calls
+  lunges: {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.5,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    ratioIsTotal: true,
+  },
+
+  // ── LOADED ISOLATION: an implement, but no derivable percentage ───────────────────────────────
+  // ⛔ SIBLING IS `rear delt fly` — ref null, ratio 0, a loaded display. This file has no configured
+  // arm-isolation or cable-core movement carrying a real ratio, so there is nothing to inherit a
+  // number FROM. Ratio 0 is the honest answer and the established one; the format is set so the
+  // weight the athlete logs has somewhere to go.
+  'barbell curl': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'dumbbell curls': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'hammer curls': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'cable curls': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'tricep extensions': {
+    pattern: 'horizontal_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'tricep pushdown': {
+    pattern: 'horizontal_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'cable crossover': {
+    pattern: 'horizontal_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'cable crunch': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'ab machine crunch': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'cable woodchopper': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'landmine twist': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'kettlebell snatches': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'turkish get ups': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: true,
+  },
+
+  // ── CARRIES ───────────────────────────────────────────────────────────────────────────────
+  'overhead carry': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+
+  // ── POSTERIOR-CHAIN BODYWEIGHT ────────────────────────────────────────────────────────────
+  'hip extension': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'reverse hyperextension': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+  // ── BODYWEIGHT CORE: reps or time, no load. Sibling `plank` / `hanging leg raise` (identical) ──
+  crunch: {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'reverse crunch': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'cross body crunch': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'bicycle crunch': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'sit up': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'ghd sit up': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'roman chair sit up': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'v up': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'flutter kicks': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'scissor kicks': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'toe touches': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'russian twist': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'l sits': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'superman hold': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'stir the pot': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'stability ball rollout': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'ab wheel rollout': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'trx fallout': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'hanging knee raise': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'toes to bar': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'hanging windshield wipers': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  "captain's chair knee raise": {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+  // ── ⚠️ CONDITIONING: THE TWO I COULD NOT GROUND IN A SIBLING ──────────────────────────────────
+  // A burpee and a mountain climber are full-body conditioning. This file has no conditioning
+  // family: the nearest shapes are `plank` (core, unloaded) and `box jump` (plyometric, unloaded),
+  // and neither is the same thing. What IS certain is that they carry no external load and no
+  // percentage, so ratio 0 / bodyweight is safe in every direction. `pattern: null` because putting
+  // them in a real bucket would offer them as substitutes for loaded work in that bucket — the same
+  // reasoning already applied to the holds and carries. ⛔ THIS IS THE ONE JUDGEMENT CALL IN THE PASS.
+  burpees: {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'mountain climbers': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+
+  // ── THE SINGULAR / `canonical()` FORMS OF THE ENTRIES ABOVE ───────────────────────────────────
+  // ⛔ TWO NORMALIZERS, AND THEY DISAGREE ABOUT PLURALS. `exercise-role.ts`'s `canonical()`
+  // DEPLURALIZES ("Flutter Kicks" → `flutter kick`) and strips punctuation; this file's
+  // `foldExerciseName` does neither. So a type-table row keyed on the singular could not find a
+  // config keyed on the plural, and the vocabulary guard — correctly — reported every one of them as
+  // borrowing. Each is a byte-copy of its plural above; the two spellings are one movement.
+  // ⚠️ `toe touche` / `kettlebell snatche` look wrong and are RIGHT: `canonical()` strips one
+  // trailing 's', so that is genuinely the key the type axis asks for.
+  burpee: {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'cable curl': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'captain s chair knee raise': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'chest flye': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.35,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'dumbbell curl': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'dumbbell flye': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.35,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'flutter kick': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'hammer curl': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'handstand push up': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'hanging windshield wiper': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'kettlebell row': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'bench',
+    ratio: 0.45,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+  },
+  'kettlebell snatche': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'l sit': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  lunge: {
+    pattern: 'knee_dominant',
+    primaryRef: 'squat',
+    ratio: 0.5,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    ratioIsTotal: true,
+  },
+  'mountain climber': {
+    pattern: null,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'pistol squat': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+  'ring dip': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.9,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'scissor kick': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'toe touche': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'tricep extension': {
+    pattern: 'horizontal_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'turkish get up': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: true,
+  },
+
+
+  // ── SERVER-KEYING FORMS. `canonicalize()` emits shapes this file's fold does not produce —
+  // `turkish_getup` from "Turkish Get ups", `ab_rollout` from "Ab Wheel Rollout", and the
+  // parenthetical stripped out of "Core Work (5 min - your choice)". Those keys reach
+  // `per_lift.canonical_name` and the State row, so they must resolve here too. Byte-copies.
+  'core work 5 min your choice': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'turkish getup': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: true,
+  },
+  'ab rollout': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
 };
 
 /**
@@ -2047,6 +2729,18 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
 function foldExerciseName(raw: string): string {
   return String(raw ?? '')
     .toLowerCase()
+    // ⛔ THE APOSTROPHE IS DROPPED, AND Q-180 IS WHY. `"farmer's carry".includes('farmers carry')` is
+    // FALSE, so the athlete's spelling and the plan's spelling of the SAME movement never met: the
+    // plan writes "Farmers Carry", the exercise library and the athlete write "Farmer's Carry", and
+    // this fold resolved the second to NOTHING — dropping it onto the legacy weight path.
+    // `strength-logging-mode.ts` already learned this exact lesson (*"Strip punctuation, collapse
+    // whitespace, then match"*) and fixed it for the EQUIPMENT question; the config lookup was still
+    // carrying the bug for the PRESCRIPTION question. Same trap, two functions, found by the
+    // vocabulary guard rather than by another screenshot.
+    // ⚠️ Only apostrophes are added here. Hyphens and underscores were already folded; anything
+    // wider (dropping every non-alphanumeric) would collapse `kb/db swings` onto `kbdb swings` and
+    // is a bigger change than this fixes.
+    .replace(/['’]/g, '')
     .replace(/[-_]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -2062,15 +2756,46 @@ const FOLDED_CONFIG_INDEX: Record<string, ExerciseConfig> = (() => {
   return idx;
 })();
 
+/** Folded key → the CONFIG KEY that answered, so a resolution can name its source. Same order. */
+const FOLDED_KEY_INDEX: Record<string, string> = (() => {
+  const idx: Record<string, string> = {};
+  for (const key of Object.keys(EXERCISE_CONFIG)) {
+    const folded = foldExerciseName(key);
+    if (!(folded in idx)) idx[folded] = key;
+  }
+  return idx;
+})();
+
 /**
- * Look up exercise configuration, with fuzzy matching fallback
+ * HOW a name resolved — the seam the vocabulary guard and the tripwire both read.
+ *
+ * ⛔ `via: 'fuzzy'` MEANS THE MOVEMENT IS BORROWING A NEIGHBOUR'S PRESCRIPTION. That is not a
+ * theoretical worry; it is how `Single Leg Hip Thrust` came to be priced at 0.9x the deadlift as a
+ * two-legged barbell lift, how `Planks` came to resolve to a Copenhagen Plank, and how `press` — the
+ * app's own name for the overhead press — came to be priced as a LEG PRESS at 1.5x squat. Every one
+ * of those was found by hand, months apart, from a screenshot. The point of exposing this is that
+ * the next one is found by a test instead.
  */
-export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
+export type ConfigResolutionVia = 'exact' | 'folded' | 'fuzzy' | 'none';
+export interface ConfigResolution {
+  config: ExerciseConfig | null;
+  via: ConfigResolutionVia;
+  /** The config key that answered. Null when nothing did. */
+  matchedKey: string | null;
+}
+
+/**
+ * Resolve an exercise to its config AND report how.
+ *
+ * ⚠️ `exact` and `folded` are both trustworthy — folded is just punctuation/spacing-insensitive
+ * ("Pull Up" → `pull-up`), a spelling difference, not a different movement. Only `fuzzy` is a guess.
+ */
+export function resolveExerciseConfig(exerciseName: string): ConfigResolution {
   const normalized = String(exerciseName ?? '').toLowerCase().trim();
 
   // Exact match first
   if (EXERCISE_CONFIG[normalized]) {
-    return EXERCISE_CONFIG[normalized];
+    return { config: EXERCISE_CONFIG[normalized], via: 'exact', matchedKey: normalized };
   }
 
   // Punctuation-insensitive exact match: "Pull Up" → `pull-up`. Runs BEFORE the fuzzy
@@ -2078,12 +2803,13 @@ export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
   // happens to overlap most.
   const folded = foldExerciseName(exerciseName);
   if (FOLDED_CONFIG_INDEX[folded]) {
-    return FOLDED_CONFIG_INDEX[folded];
+    return { config: FOLDED_CONFIG_INDEX[folded], via: 'folded', matchedKey: FOLDED_KEY_INDEX[folded] ?? null };
   }
 
   // Longest-key fuzzy match so "squat" hits primary `squat`, not "bulgarian split squat".
   // Compared on the FOLDED forms too, so "Barbell Pull Up" still reaches `pull-up`.
   let best: ExerciseConfig | null = null;
+  let bestKey: string | null = null;
   let bestScore = -1;
   for (const [key, config] of Object.entries(EXERCISE_CONFIG)) {
     const fkey = foldExerciseName(key);
@@ -2093,9 +2819,43 @@ export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
     if (score > bestScore) {
       bestScore = score;
       best = config;
+      bestKey = key;
     }
   }
-  return bestScore > 0 ? best : null;
+  return bestScore > 0
+    ? { config: best, via: 'fuzzy', matchedKey: bestKey }
+    : { config: null, via: 'none', matchedKey: null };
+}
+
+/** Names already warned about, so the tripwire fires once per name rather than once per render. */
+const warnedFuzzyNames = new Set<string>();
+
+/**
+ * Look up exercise configuration, with fuzzy matching fallback.
+ *
+ * ⛔ THE FUZZY FALLBACK IS NOW LOUD. It used to be silent, and that silence is the single most
+ * expensive thing in this file's history: an unconfigured name does not return null, it returns
+ * whichever neighbouring key overlaps most, and then the app renders that neighbour's prescription
+ * with complete confidence. Three shipped bugs from it, each found by eye from a screenshot weeks or
+ * months later. It warns ONCE PER NAME, naming what it guessed from, so the next gap announces
+ * itself the first time it is rendered.
+ * ⚠️ Modelled on `typeForExercise`'s tripwire in `exercise-role.ts` — same shape, same reasoning,
+ * and its docblock's rule applies here too: never make the default quiet.
+ */
+export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
+  const r = resolveExerciseConfig(exerciseName);
+  if (r.via === 'fuzzy') {
+    const key = foldExerciseName(exerciseName);
+    if (!warnedFuzzyNames.has(key)) {
+      warnedFuzzyNames.add(key);
+      console.warn(
+        `[exercise-config] FUZZY MATCH: "${exerciseName}" has no entry — borrowing '${r.matchedKey}' ` +
+          `(ratio ${r.config?.ratio}, ${r.config?.displayFormat}). Its prescription and display are ` +
+          `that other movement's. Add a key to EXERCISE_CONFIG in src/lib/exercise-config.ts.`,
+      );
+    }
+  }
+  return r.config;
 }
 
 /** The broad training group of an exercise, from its movement pattern. Used by "add an exercise" to

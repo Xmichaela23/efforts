@@ -397,6 +397,69 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   // than the library). Every one of these is a movement he has actually planned or logged that
   // neither table had heard of — `single leg hip thrust` was inheriting the BILATERAL hip thrust's
   // 0.9x deadlift prescription, and `db thruster` / `nordic curls` resolved to nothing at all.
+  // ⚠️ ADDED 2026-08-03 (third pass) — the type rows the vocabulary guard's backlog demanded. Each
+  // one is a movement that now carries a config entry, so the coverage test below requires it to
+  // declare a type rather than fall to the default. The type follows the config: a `bodyweight`
+  // displayFormat is `bodyweight`, an implement is `loaded_accessory`, a hold is `isometric`.
+  // ⚠️ KEYS ARE THE DEPLURALIZED `canonical()` FORM — that function strips the trailing 's' and the
+  // parentheticals, so "Flutter Kicks" arrives here as `flutter kick`.
+  'chest flye': 'loaded_accessory',
+  'dumbbell flye': 'loaded_accessory',
+  'ring dip': 'bodyweight',
+  'side plank with hip dip': 'isometric',
+  'decline bench press': 'loaded_accessory',
+  'pistol squat': 'bodyweight',
+  'handstand push up': 'bodyweight',
+  'kettlebell row': 'loaded_accessory',
+  'glute bridge march': 'bodyweight',
+  'lunge': 'loaded_accessory',
+  'barbell curl': 'loaded_accessory',
+  'dumbbell curl': 'loaded_accessory',
+  'hammer curl': 'loaded_accessory',
+  'cable curl': 'loaded_accessory',
+  'tricep extension': 'loaded_accessory',
+  'tricep pushdown': 'loaded_accessory',
+  'cable crossover': 'loaded_accessory',
+  'cable crunch': 'loaded_accessory',
+  'ab machine crunch': 'loaded_accessory',
+  'cable woodchopper': 'loaded_accessory',
+  'landmine twist': 'loaded_accessory',
+  'kettlebell snatche': 'loaded_accessory',
+  'turkish get up': 'loaded_accessory',
+  'overhead carry': 'carry',
+  'hip extension': 'bodyweight',
+  'reverse hyperextension': 'bodyweight',
+  'crunch': 'bodyweight',
+  'reverse crunch': 'bodyweight',
+  'cross body crunch': 'bodyweight',
+  'bicycle crunch': 'bodyweight',
+  'sit up': 'bodyweight',
+  'ghd sit up': 'bodyweight',
+  'roman chair sit up': 'bodyweight',
+  'v up': 'bodyweight',
+  'flutter kick': 'bodyweight',
+  'scissor kick': 'bodyweight',
+  'toe touche': 'bodyweight',
+  'russian twist': 'bodyweight',
+  'l sit': 'isometric',
+  'superman hold': 'isometric',
+  'stir the pot': 'isometric',
+  'stability ball rollout': 'bodyweight',
+  'ab wheel rollout': 'bodyweight',
+  'trx fallout': 'bodyweight',
+  'hanging knee raise': 'bodyweight',
+  'toes to bar': 'bodyweight',
+  'hanging windshield wiper': 'bodyweight',
+  'captain s chair knee raise': 'bodyweight',
+  'burpee': 'bodyweight',
+  'mountain climber': 'bodyweight',
+  // ⚠️ SERVER-KEYING FORMS. `canonicalize()` (the SERVER's normalizer, `_shared/canonicalize.ts`)
+  // emits its own shapes — it strips parentheticals differently and collapses "Get ups" to `getup`.
+  // These are the keys that reach `per_lift.canonical_name` and the State row, so the type axis has
+  // to resolve them too, not only the display spellings.
+  'core work 5 min your choice': 'mobility',
+  'turkish getup': 'loaded_accessory',
+  'ab rollout': 'bodyweight',
   'single leg hip thrust': 'loaded_accessory',
   'db thruster': 'loaded_accessory',
   'nordic curl': 'bodyweight',

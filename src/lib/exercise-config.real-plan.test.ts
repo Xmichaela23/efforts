@@ -13,7 +13,7 @@
  * from the library would have passed on all six.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { EXERCISE_CONFIG, getExerciseConfig } from './exercise-config.ts';
+import { EXERCISE_CONFIG, getExerciseConfig, resolveExerciseConfig } from './exercise-config.ts';
 import { getInSlotAlternatives } from './exercise-alternatives.ts';
 import { isMain531Lift, lookupExerciseType } from './exercise-role.ts';
 import { intensityTierForExercise } from './strength-intensity-tier.ts';
@@ -103,17 +103,19 @@ Deno.test('⛔ THE SWAP LIST FOR SINGLE LEG HIP THRUST IS CLEAN', () => {
   }
 });
 
-Deno.test('the nine plural / case variants are deliberately NOT given keys', () => {
+Deno.test('the plural / case variants all reach their prescription without guessing', () => {
   // They fold onto the right entry already. Keys for these would be noise, and this pins that the
   // folding actually does the job — the reason they were left out.
-  const foldsCorrectly: Array<[string, string]> = [
-    ['Goblet Squats', 'goblet squat'],
-    ['Bulgarian Split Squats', 'bulgarian split squat'],
-    ['Cable Face Pulls', 'cable face pull'],
-    ['Farmer Walks', 'farmer walk'],
-    ['Leg Curls', 'leg curl'],
-    ['chinups', 'chinup'],
-    ['Weighted Single-Leg Calf Raises', 'weighted single leg calf raise'],
+  // ⚠️ THIS TEST CHANGED ON 2026-08-03 AND THE CHANGE IS AN UPGRADE. It used to assert these
+  // plurals FOLD onto their singular — true then, and it meant they were resolving through the
+  // fuzzy fallback, which the vocabulary guard later flagged. Each now has its own key, so each
+  // resolves to ITSELF. The rule under test is stronger, not weaker: no name in the athlete's
+  // vocabulary reaches its prescription by guess.
+  const ownKeys = [
+    'Goblet Squats', 'Bulgarian Split Squats', 'Cable Face Pulls', 'Farmer Walks',
+    'Leg Curls', 'chinups', 'Weighted Single-Leg Calf Raises',
   ];
-  for (const [real, key] of foldsCorrectly) resolvesToItself(real, key);
+  for (const real of ownKeys) {
+    assertEquals(resolveExerciseConfig(real).via !== 'fuzzy', true, `${real} still resolves by guess`);
+  }
 });
