@@ -19,4 +19,4 @@
 // (`useCoachWeekContext.ts:699`), which drops the WHOLE coach payload — run, ride, swim and strength
 // sections all render empty. That was done on 2026-08-02 and blanked the State screen on the dev
 // build within minutes. The floor and the server version move together or the screen goes dark.
-export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 160;
+export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 161;
