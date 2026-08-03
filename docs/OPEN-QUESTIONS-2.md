@@ -265,3 +265,57 @@ still talking about feel; fixing the verdict without Q-223 leaves the plan still
 
 **To close:** rule on (3) first — rep record or e1RM. Everything else follows. Related: [Q-223],
 [D-338], [D-370], [D-373], [D-374], [Q-251].
+
+## Q-255 — ⛔ THE BIKE ROW GOES SILENT WHILE A GOOD CYCLING FITNESS NUMBER SITS ONE FIELD AWAY (2026-08-02, Michael) — **CTL/ATL/TSB are computed, populated, and unread by State**
+
+Michael, looking at the row the night after it was "finished": *"i thought we fixed this"* … *"isnt there
+another metric for cycling beyond aerbic effeciency that could read here"*. **There is, and it is
+already in his snapshot.**
+
+### What the row says, and why every word of it is correct
+
+`6 rides in 8 weeks · newest 19d ago · A few more and this reads your aerobic fitness` — on a night he
+rode **yesterday**. Verified against the data:
+
+| ride | classified | why it does not count |
+|---|---|---|
+| Aug 1 | `threshold` | efficiency is **steady-aerobic only** — HR on a hard ride is dragged up by effort |
+| Jul 20 | `recovery` | 9.6 min in band, under the **10-minute dwell floor** |
+| Jul 15 | `endurance`, 19.3 min | ✅ counts — and it is **19 days ago** |
+
+Power is silent for the same class of reason: `POWER_BINS` counts only `climbing` / `threshold` /
+`sweet_spot` / `tempo`, and he has **two** in the window against a floor of three (`sampleCount: 0`,
+`series: []` at the time of writing — his endurance riding is deliberately excluded because a 20-min
+"best" on an aerobic ride is not a fitness max).
+
+**All of that is [D-359] working as designed.** The row refuses to assert a direction it cannot
+support. ⛔ **The problem is not the gate. It is that nothing else was given to say.**
+
+### The read that already exists and is NOT wired
+
+`athlete_snapshot` carries **`ctl` / `atl` / `tsb`** — populated right now (12 / 9 / 3), computed by
+`computeCtlAtl` (`_shared/cycling-v1/ride-physiology.ts:91`) off ride TSS. `arc-context.ts:1171`
+already assembles them into a `cycling_fitness` object **with a form band**. It is built, populated,
+and **the State bike row does not read it.**
+
+⛔ **CTL COUNTS EVERY RIDE.** It does not care about ride type, dwell time, or terrain bin. It is the
+one bike number that does **not** go quiet when the athlete rides the "wrong" kind of ride — and it is
+the number TrainingPeaks, Intervals.icu and every cycling app lead with. Yesterday's threshold ride
+*would* register.
+
+⚠️ **This is the house disease, not a new bug** — a well-built system starved of a consumer. The
+computation, the storage and the assembly all exist. Nothing renders it.
+
+### What has to be decided
+
+1. **Does CTL become the bike row's lead when the type-filtered reads are withheld**, or a third read
+   that always shows? ⚠️ A form band (`fresh`/`neutral`/`fatigued`) is close to a readiness claim —
+   check it does not contradict the BODY row, which already owns that language.
+2. **CTL 12 is LOW.** On six rides in eight weeks that is honest, and it must not be dressed up. The
+   number has to be allowed to say "there is not much here" without going silent about it.
+3. ⚠️ **`arc-context`'s TSB band is currently the only bike form band in the app** ([D-372] deleted the
+   ai_summary mirror). If State renders one too, they must read the same source or they will diverge —
+   the exact failure `CONSTITUTION` Law 1 exists to prevent.
+
+**To close:** rule on (1). Related: [D-359] (the gate), [Q-241] (closed — the gate's own ticket),
+[D-360] (the FTP choice the row already discloses), [Q-244].
