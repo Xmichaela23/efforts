@@ -1230,7 +1230,24 @@ export default function StateTab({
   const visibleSignals = (rm?.visible_signals ?? []).filter((s: any) => s.category === 'endurance');
 
   // ── STRENGTH row — server-computed per_lift from response_model ──────────
-  const perLift = (rm?.strength?.per_lift ?? []).filter((l: any) => l.sufficient).slice(0, 5);
+  // ⛔ THE CAP MUST NOT RUN BEFORE THE MAIN-LIFT FILTER — that is what hid the Overhead Press.
+  //
+  // `per_lift` arrives in `Object.entries(learned_fitness.strength_1rms)` order, and the coach
+  // builds it for SEVEN lifts (the four, plus hip_thrust / trap_bar_deadlift / barbell_row). With
+  // `.slice(0, 5)` applied first, positions 6-7 were cut BEFORE anything asked whether they were
+  // main lifts — so an athlete whose press sorted sixth simply lost the row, with 6 logged sessions
+  // and a typed baseline both present. Reproduced exactly: seven in, the cap keeps squat /
+  // bench_press / deadlift / hip_thrust / trap_bar_deadlift, and the [D-374] filter then strips the
+  // two accessories, leaving three rows and no press.
+  //
+  // ⚠️ IT WAS LATENT BEFORE [D-374] AND THAT IS WHY NOBODY SAW IT. The section used to render all
+  // five sliced rows including accessories, so it looked full while the press was already missing.
+  // Filtering after the cap didn't create the bug; it made it visible by dropping the row count.
+  //
+  // `perLift` KEEPS the old shape (sufficient + first 5) because `StateAdjustLens` reads it below
+  // and this is not a change to that surface — only the card's own list is re-derived.
+  const perLiftSufficient = (rm?.strength?.per_lift ?? []).filter((l: any) => l.sufficient);
+  const perLift = perLiftSufficient.slice(0, 5);
   // ⛔ [D-374] "FROM YOUR LOGGED SETS" IS A MAIN-LIFT SECTION. Every row in it reads
   // `Working ~120 vs your 150 baseline` — a comparison against a TESTED 1RM. You test a max on the
   // four barbell lifts; you do not test one on a Hip Thrust. So an accessory can never fill that
@@ -1244,8 +1261,14 @@ export default function StateTab({
   // ⛔ Accessories are not being hidden as unimportant — they have no home YET. Per Michael's
   // direction on [Q-251], by-feel work should be read against the athlete's OWN history (reps at a
   // weight, volume over weeks), never against a tested max. That row is unbuilt. See [Q-253].
-  const perLiftMain = perLift.filter((l: { canonical_name?: string | null }) =>
-    capabilitiesForExercise(String(l?.canonical_name ?? '')).coached);
+  // FILTER FIRST, THEN CAP — off the uncapped list, so a main lift can never be cut by an accessory
+  // that happened to sort ahead of it. The cap is kept at the same 5 as a display bound; after the
+  // filter it has nothing to cut in practice (5/3/1 has four slots, and only a variant like a
+  // trap-bar deadlift adds a fifth main-class row).
+  const perLiftMain = perLiftSufficient
+    .filter((l: { canonical_name?: string | null }) =>
+      capabilitiesForExercise(String(l?.canonical_name ?? '')).coached)
+    .slice(0, 5);
   // Still use liftTrends only for pre-filling the adjustment modal (best_weight)
   const liftWeightMap = new Map(liftTrends.map(lt => [lt.canonical, lt.entries[lt.entries.length - 1]?.best_weight ?? 0]));
 
