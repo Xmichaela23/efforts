@@ -172,3 +172,29 @@ why the gate exists, not to move it three time zones.
 **Live state (2026-08-02):** restored by hand — `compute-snapshot` run for `2026-08-03` and
 `coach_cache` invalidated, which put all four cards back. **That is a patch on a Sunday night, not a
 fix, and it will recur next Sunday.**
+
+## Q-253 — Accessories now have NO home on State, and that is a gap, not a resolution (2026-08-02) — **opened by [D-374]**
+
+[D-373] stopped accessories issuing commands. [D-374] removed them from **"from your logged sets"**
+entirely, because every row in that section reads `Working ~120 vs your 150 baseline` — a comparison
+against a **tested 1RM**, which exists for the four barbell lifts and does not exist for a Hip Thrust.
+An accessory could never fill that column; before D-373 it fell through and printed a red command
+instead.
+
+⚠️ **So the section is now honest and accessories are now invisible.** Michael did the work. Nothing
+on State reflects it.
+
+**What the field does:** Strong and Hevy show every exercise, but framed against **the athlete's own
+history** — heaviest set, best reps at a weight, volume over time — never against a tested max. That
+is the frame accessories can actually participate in.
+
+**And it is already the direction Michael set on [Q-251]:** *"we should be able to accept what user
+enters for the vibed out accessory work and track it as they go and look for their own reporting of
+soreness or not making the numbers and use that."*
+
+⛔ **Do NOT solve this by putting accessories back into the baseline section.** The column is the
+problem, not the filter.
+
+**To close:** decide whether accessories earn their own row, and on what frame — reps-at-weight,
+volume trend, or nothing at all until [Q-251]'s adherence question is answered. This is a product
+call. Related: [Q-251], [D-373], [D-374].

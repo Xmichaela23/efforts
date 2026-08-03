@@ -8,6 +8,9 @@ import type {
   FitnessVerdictDivergence,
 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
+// [D-374] The SAME main-lift classifier the server gates coaching language on ([D-373]), so the row
+// that renders and the verdict that fills it can never disagree about what a main lift is.
+import { isMain531Lift } from '@/lib/exercise-role';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
@@ -1224,6 +1227,21 @@ export default function StateTab({
 
   // ── STRENGTH row — server-computed per_lift from response_model ──────────
   const perLift = (rm?.strength?.per_lift ?? []).filter((l: any) => l.sufficient).slice(0, 5);
+  // ⛔ [D-374] "FROM YOUR LOGGED SETS" IS A MAIN-LIFT SECTION. Every row in it reads
+  // `Working ~120 vs your 150 baseline` — a comparison against a TESTED 1RM. You test a max on the
+  // four barbell lifts; you do not test one on a Hip Thrust. So an accessory can never fill that
+  // column, and before [D-373] it fell through to the raw verdict and printed a red "back off
+  // weight" instead. D-373 silenced the command; this removes the row that had nothing to say.
+  // ⚠️ FILTERED HERE, NOT SERVER-SIDE, ON PURPOSE. `per_lift` is a shared contract — the coach reads
+  // it for strength maxes (`coach/index.ts:3557`) and the block model iterates it (`block.ts:322`).
+  // Narrowing it at the source would quietly change that reasoning. This is a DISPLAY choice about
+  // which rows belong in one section, made with the same shared classifier the server gates on, so
+  // the two cannot drift. `perLift` itself is left intact for the adjust lens below.
+  // ⛔ Accessories are not being hidden as unimportant — they have no home YET. Per Michael's
+  // direction on [Q-251], by-feel work should be read against the athlete's OWN history (reps at a
+  // weight, volume over weeks), never against a tested max. That row is unbuilt. See [Q-253].
+  const perLiftMain = perLift.filter((l: { canonical_name?: string | null }) =>
+    isMain531Lift(String(l?.canonical_name ?? '')));
   // Still use liftTrends only for pre-filling the adjustment modal (best_weight)
   const liftWeightMap = new Map(liftTrends.map(lt => [lt.canonical, lt.entries[lt.entries.length - 1]?.best_weight ?? 0]));
 
@@ -1289,7 +1307,7 @@ export default function StateTab({
   // StatePerformanceSection (below), framed "from your logged sets" as provisional detail — so a
   // confident per-lift line can't read as a second, competing "STRENGTH" top-line when the spine
   // trend says needs-data. All state/handlers stay here; only the rendered node is passed down.
-  const strengthPerLiftDetail: React.ReactNode = perLift.length > 0 ? (
+  const strengthPerLiftDetail: React.ReactNode = perLiftMain.length > 0 ? (
     <div className="mt-1.5 ml-[84px] pl-3 border-l border-white/[0.07] space-y-2">
       {/* Collapsed by default — the e1RM dot above is the read; this list is drill-down. */}
       <button
@@ -1300,9 +1318,9 @@ export default function StateTab({
       >
         <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
         from your logged sets
-        <span className="text-white/45 normal-case tracking-normal">· {perLift.length} {perLift.length === 1 ? 'lift' : 'lifts'}</span>
+        <span className="text-white/45 normal-case tracking-normal">· {perLiftMain.length} {perLiftMain.length === 1 ? 'lift' : 'lifts'}</span>
       </button>
-      {strengthDetailOpen && perLift.map((lt: any) => {
+      {strengthDetailOpen && perLiftMain.map((lt: any) => {
         // ⚠️ `?? '—'` only covers a MISSING field (older cached rows). An empty string is meaningful
         // and must survive: [D-373] uses '' to mean "not a main lift, do not coach it".
         const verdictLabel: string = lt.verdict_label ?? '—';

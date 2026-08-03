@@ -36,3 +36,59 @@ the back-annotation as a `>` blockquote at the TOP of the old entry: what change
 > is still in use. **So: no judgment, no moving text. Freeze at a number, start the next file.**
 
 ---
+
+### D-373 — Coaching language is for MAIN LIFTS ONLY (2026-08-02, **PUSHED `b1b4c13f` + DEPLOYED coach v161 + VERIFIED live**)
+
+`computeLiftVerdict` (`_shared/response-model/weekly.ts`) ran **every** movement through the same
+RIR-deviation logic and **never consulted role**, so a hard-feeling **accessory** — Hip Thrust,
+Barbell Row — printed a red **"back off weight"**. Accessories carry no anchor, so the State row had
+nothing to build a sentence from and dumped the raw command on screen. It is *worse* on lighter
+programs, where almost everything is an accessory. Root-caused in `SPEC-strength-language.md` (locked
+2026-08-01) and unbuilt until now; this is **Axis 1 (Role)** of that spec. Axis 2 (Type) and the
+collapse of the six overlapping classifiers remain.
+
+**The gate returns an EMPTY label for anything that is not one of the four main lifts.** The client
+reads `''` as "not coached" and renders the number instead (`Working ~110`).
+
+⛔ **THE GATE IS `isMain531Lift`, NOT `roleForExercise`, AND THE DEFAULTS ARE WHY.** Both classifiers
+exist and they disagree on an unknown movement: `roleForExercise` → `'primary'`, `isMain531Lift` →
+`false`. That opposition is correct — the LOAD system should count an unknown move, the LANGUAGE
+system should say nothing about it. **Gating language on `roleForExercise` would coach every
+unrecognised movement and rebuild this exact bug one layer down.** Silence is the safe failure.
+
+**Field basis:** Strong and Hevy render per-exercise numbers only — heaviest weight, e1RM, volume, PRs
+— and issue **no commands**. "Back off weight" is not app language.
+
+**A test was REVERSED, not deleted.** `weekly-strength-verdict.test.ts` asserted that Hip Thrust
+*should* receive "back off weight", under the title *"behavior unchanged"*. It passed, and it pinned
+the bug. Same lesson as [D-372] the same night: when a test's subject moves, re-point it.
+
+**Verified live, not by screenshot:** after deploy, the coach payload returned Hip Thrust `""` and
+Barbell Row `""`, with Squat / Deadlift / Bench / Overhead Press still coached.
+
+⚠️ **THE DEPLOY ORDER IS PART OF THIS DECISION.** `COACH_CLIENT_MIN_PAYLOAD_VERSION` was raised to 161
+*before* the server served it, which made the client reject its own cache, forced a coach
+regeneration, and the regeneration hit [Q-252] and wrote null over the good cached copy — **blanking
+the entire State performance section.** The floor now moves only after the server is verified serving
+the new version. See the warning on `coach-contract.ts`.
+
+### D-374 — "From your logged sets" is a MAIN-LIFT section (2026-08-02, Michael — **PUSHED, client-only**)
+
+Michael, looking at the section: *"what does this section actually communicate? should it be for
+accessories?"* → *"so we should lose the acceroies and just have main lifts"*.
+
+**Every row reads `Working ~120 vs your 150 baseline` — a comparison against a TESTED 1RM.** You test
+a max on the four barbell lifts. You do not test one on a Hip Thrust. So an accessory can never fill
+that column; [D-373] silenced the command it used to fall through to, and this removes the row that
+had nothing left to say.
+
+⚠️ **FILTERED AT THE DISPLAY, NOT AT THE SOURCE, DELIBERATELY.** `per_lift` is a shared contract — the
+coach reads it for strength maxes (`coach/index.ts:3557`) and the block model iterates it
+(`block.ts:322`). Narrowing it server-side would quietly change that reasoning. This is a choice about
+which rows belong in **one section**, made with the **same shared classifier the server gates on**
+(`isMain531Lift`) so the two cannot drift. `perLift` is left intact for the adjust lens.
+
+⛔ **This does not mean accessory work does not count — it means it has no home YET.** Filed as
+[Q-253]: the honest frame for by-feel work is the athlete's own history (reps at a weight, volume over
+weeks), never a tested max — which is also Michael's direction on [Q-251]. Do not "fix" Q-253 by
+putting accessories back into the baseline section.
