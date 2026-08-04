@@ -5,7 +5,7 @@ import React from 'react';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 
 export function StepLayout({
-  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false,
+  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false,
 }: {
   step: number; totalSteps: number; title: string; subtitle?: string;
   onBack?: () => void; children: React.ReactNode;
@@ -14,10 +14,16 @@ export function StepLayout({
    *  button to do. Rendering a dead control below the only thing on the screen reads as a missing
    *  step rather than a finished one. */
   hideContinue?: boolean;
+  /** ⛔ FOR THE STEP WHERE THE FLOW LENGTH IS NOT YET KNOWN — a goal picker whose cards lead to
+   *  flows of different lengths. Printing "1 of 6" and then jumping to "2 of 8" is a number the
+   *  screen cannot stand behind, and this wizard has shipped that bug once already. A bar with
+   *  nothing to measure is better absent than wrong. */
+  hideProgress?: boolean;
 }) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Progress */}
+      {!hideProgress && (
       <div className="shrink-0 px-4 pt-3 pb-2">
         <div className="flex gap-1">
           {Array.from({ length: totalSteps }).map((_, i) => (
@@ -29,6 +35,7 @@ export function StepLayout({
         </div>
         <p className="mt-1.5 text-[11px] text-white/35 text-right">{step} of {totalSteps}</p>
       </div>
+      )}
 
       {/* Back */}
       {onBack && (

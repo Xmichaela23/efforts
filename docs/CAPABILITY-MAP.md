@@ -50,8 +50,11 @@
 12. **Strava token refresh.** `strava-refresh/` is a complete, **DEAD** standalone function with the obvious name. The live logic is `_shared/strava-access-token.ts`. Someone told "add token refresh" will find the corpse first.
 13. **A plan "baker".** `src/services/plans/tools/plan_bake_and_compute.ts:948` (`augmentPlan`) exists, works offline (`npm run bake`), and is **commented out in the app** (`PlanSelect.tsx:910-930`, "BAKER IS CRASHING SUPABASE"). Disabled, not missing.
 14. **A plan-token expander.** TWO exist: the live one inline in `materialize-plan/index.ts:1840` (`expandTokensForRow`; `expandRunToken:1279`, `expandBikeToken:1676`) ⟨A31⟩, and `_shared/token-parser.ts` (which serves the **analysis** path, not plans). CLAUDE.md points at the wrong one.
-15. **Race finish projection.** `_shared/race-projections.ts` (17 importers) is the answer. Six other modules orbit it (`riegel.ts`, `goal-finish-from-workouts.ts`, `resolve-server-predicted-finish.ts`, `resolve-goal-target-time.ts`, and two `race-finish-seconds.ts`).
-16. **Backfills.** Six DEAD backfill functions already exist plus two empty dirs. Check the DEAD list before writing a seventh.
+15. **A marathon race-entry screen.** `GoalsScreen.tsx:2433` (`renderEventForm`) already takes name, date, distance, fitness, strength protocol + frequency and plan start date, and builds a plan. Marathon is in `DISTANCE_OPTIONS:115`. Do not build a second race form — the missing pieces are `extract-races` wiring and the hold cards, not the screen. ⟨2026-08-03⟩
+16. **5s PRO / a low-fatigue 5/3/1 variant.** It is the `leader` cycle and it already ships: `wendler-531.ts:52` `setsForWeek('leader', …)` returns 5/5/5 with **no AMRAP**, and the training max is already **85%** of 1RM (`:88`). What does NOT exist is an all-leader block — `leaderCount:291` always leaves the last cycle an anchor. ⟨2026-08-03⟩
+17. **An accessory "light vs loaded" dose axis.** `src/lib/strength-intensity-tier.ts` (`intensityTierForExercise`, D-376) already classifies every movement light / loaded / power. Do not add a second field for "is this a heavy accessory". ⟨2026-08-03⟩
+18. **Race finish projection.** `_shared/race-projections.ts` (17 importers) is the answer. Six other modules orbit it (`riegel.ts`, `goal-finish-from-workouts.ts`, `resolve-server-predicted-finish.ts`, `resolve-goal-target-time.ts`, and two `race-finish-seconds.ts`).
+19. **Backfills.** Six DEAD backfill functions already exist plus two empty dirs. Check the DEAD list before writing a seventh.
 
 ---
 
@@ -139,7 +142,8 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 |---|---|---|---|
 | **THE wrapper** — create a goal, build + activate a plan | `create-goal-and-materialize-plan/index.ts:2105` (`Deno.serve`) | BUILT | ⟨A31⟩ every plan path goes through here except `PlanWizard` |
 | Season / combined (multi-sport) | `generate-combined-plan/index.ts:60` | BUILT | the most active engine; the only one wired to `week-optimizer` |
-| Run race plan | `generate-run-plan/index.ts:232` | BUILT | only `sustainable` + `performance_build` are switched on |
+| Run race plan | `generate-run-plan/index.ts:47` (`Deno.serve`); approach switch `:232` | BUILT | only `sustainable` + `performance_build` are switched on. ⛔ **This — not `generate-combined-plan` — is what a SINGLE marathon goal actually builds** (`create-goal…:3489`). Its own phase structure (`generators/base-generator.ts:274`), own recovery weeks (`:411`, −30% volume `:640`), and it does NOT route through `week-optimizer` (audited 2026-08-03) |
+| `generate-plan` (the 4th generator) | `generate-plan/index.ts` | ⛔ **DEAD** | validation-only; generates nothing. Listed here so it stops being mistaken for a generator |
 | Run non-race (capacity, retest head) | `create-goal…:2458` | BUILT | |
 | **Get Stronger (strength-primary)** | `generate-strength-plan/index.ts:25` → `shared/strength-system/strength-primary-plan.ts` | PARTIAL | ⚠️ **No equipment gate — deliberately removed 2026-07-25** (`create-goal…:2440-2452`, "Do not reinstate an equipment gate"). Entry is gated on having all FOUR main-lift 1RMs, with a message. Still true: **no plan pin** (`generate-strength-plan` never calls `buildAthleteSnapshot`). ⟨A31⟩ |
 | **The WEEK SOLVER** — which day each lift goes on | `_shared/week-solver.ts` (`solve()`); spec `docs/SPEC-week-solver.md` | **BUILT — SHIPPED** | Exhaustive recursion over 7 days per lift, pruned by hard law, scored lexicographically. **Four fates incl. REFUSAL — it never silently drops a session (§5.2b).** ⛔ Its `notes[]` are athlete-facing copy printed VERBATIM downstream; at-the-floor notes group on (anchor, distance, side) — D-331 |
@@ -162,7 +166,30 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 | Drag-reschedule | `validate-reschedule/` + `WorkoutCalendar.tsx:397` | PARTIAL | athlete IS asked — but confirm also **silently deletes same-type conflicting planned rows** (`:431`), which the popup never mentions |
 | Auto-attach a completed workout to its planned row | `auto-attach-planned/index.ts` | BUILT | |
 | Sweep a week (materialize missing + attach) | `sweep-week/index.ts:22` | BUILT | fires on calendar load |
-| Extract races from free text | `extract-races/index.ts` | BUILT | Claude + web search |
+| Extract races from free text | `extract-races/index.ts:14` | BUILT | Claude + web search; returns MULTIPLE races sorted with A/B priority; `marathon` is in its distance enum. ⚠️ **Only caller is `ArcSetupWizard.tsx:836`** (+ `:1099` prior-finish). The call is a plain `functions.invoke` — the picker UI is inline in the wizard, not a component |
+
+### RACE / MARATHON ENTRY — audited 2026-08-03 (`SPEC-race-builder-marathon.md`)
+
+| capability | entry point | status | note |
+|---|---|---|---|
+| **Race goal entry in the Goals flow** | `GoalsScreen.tsx:2433` (`renderEventForm`) → `handleSaveEvent:1335` | **BUILT** | ⛔ **A marathon goal + plan can be created TODAY from Goals.** Marathon is in `DISTANCE_OPTIONS:115`. What it does NOT have: `extract-races` (the race is typed by hand), the hold cards, and it routes to `generate-run-plan` |
+| Static week floors | `create-goal…:226` `MIN_WEEKS` (marathon 14/10/8 by fitness); tri twin `:219` `TRI_MIN_WEEKS` | **PARTIAL — bypassed** | `floorWeeks` is computed at `:3137` and only used as the fallback inside the DISABLED branch |
+| `fitness` (drives every floor) | server `create-goal…:2364`; seeded client-side `GoalsScreen.tsx:540` (vDOT ≥45/≥33, else weekly miles ≥30/≥12, else `'intermediate'`), override at `:2533` | PARTIAL | data-seeded when baselines exist, **self-claimed otherwise, always overridable** |
+| **Adaptive marathon decision** | `_shared/athlete-memory.ts:351` `resolveAdaptiveMarathonDecisionFromMemory` ← called `create-goal…:3221` | BUILT | `readiness_state` from `modeFromWeeksOut:343` (≤2 race_support, ≤6 bridge_peak, ≤10 compressed_build, else full_build); `recommended_mode:401`; `risk_tier:425`; `minimum_feasible_weeks:394` |
+| ⛔ **No-history claimed-advanced hole** | fallbacks `athlete-memory.ts:381` — advanced **3**, intermediate 4, beginner 6 weeks | ⛔ **GAP** | With no `athlete_memory`, a self-claimed "advanced" athlete gets `minimum_feasible_weeks: 3`. `MIN_WEEKS.marathon.advanced = 8` never applies |
+| ⛔ **The "race too close" refusal is dead code** | `create-goal…:3276` | ⛔ **GAP** | Gated on `!ADAPTIVE_MARATHON_DECISIONS_ENABLED`, and the flag **defaults ON** (`:232`). Nothing refuses a too-close marathon today |
+| `race_support` / `bridge_peak` build lengths | `create-goal…:3285-3293` | BUILT | race_support caps the plan at 2 weeks, bridge_peak at 6, else `max(floor, min(weeksOut, 20))`. Legacy race-week variant at `:3258` |
+| Taper width | `generate-combined-plan/science.ts:903` `taperWeeks` (distance × priority) | BUILT | |
+| Deload / loading pattern | `phase-structure.ts:587` `applyLoadingPattern` (3:1 / 2:1 / 1:1), chosen `:630` | BUILT | |
+| Phase timeline (combined) | `phase-structure.ts:84` `buildPhaseTimeline`; single race `:337` | BUILT | |
+| **5/3/1 on a RACE plan** | routing gate `create-goal…:2432` | ⛔ **GAP — UNREACHABLE** | The gate needs strength `develop` AND **no endurance developing**, so a race goal can never reach `wendler-531.ts`. Race strength comes from `session-factory.ts:2577` `runStrength` / `:2393` `triathlonStrength` off the 8-protocol registry (`protocols/selector.ts:18`) — Wendler is not in it |
+| Race-plan strength frequency | `week-builder.ts:110` `strFreqForPhase` | BUILT | base 2 / build 1 (2 if performance) / taper **1** — i.e. lifting continues into race week per `STRENGTH-PROTOCOL.md §3.7` "Taper Priming" |
+| Race-plan protocol selection | `create-goal…:765` from `strength_focus` (power → `neural_speed`, else `durability`); athlete pick `GoalsScreen.tsx:1370` | BUILT | |
+| **Hold-card DOSE fields never reach a race generator** | written `NonRaceBuilder.tsx:405/409/412`; read only by `generate-strength-plan` | ⛔ **GAP** | `target_weekly_ride_hours`, `ride_days`, `swim_days`, `target_weekly_miles`, `run_days`, `assistance_picks`, `lifting_days` — all strength-path only |
+| Hold-card POSTURE field DOES reach combined | `per_discipline_posture` → `phase-structure.ts:353`, `week-builder.ts:2239`, `validator.ts:325`; zero-sum redistribution `science.ts:795` (D-210) | BUILT | ⚠️ `generate-run-plan` only reads a derived `endurance_posture` to cap strength frequency (`types.ts:31`) |
+| ⛔ **The frequency matrix is triathlon-only** | `src/lib/session-frequency-defaults.ts:262` (`sport` defaults `'triathlon'`); `running`/`cycling`/`hybrid` **throw** at `:266` | ⛔ **GAP** | No caller passes `sport` — `ArcSetupWizard.tsx:657`, `:2022`, `reconcile-athlete-state-week-optimizer.ts:128`. A run-only goal is issued swim/bike counts, taken as a floor at `reconcile…:167`, placed, then dropped at `week-builder.ts:2239` |
+| Season gate (≥2 event goals) | `arc-setup-persistence.ts:465` (`combine = eventGoals.length >= 2`); server force at `create-goal…:2208` | BUILT | ⚠️ **one marathon → `combine:false` → `generate-run-plan`.** Non-race goals are force-combined, so the Focus flow already uses the combined engine and a single race does not |
+
 
 ### What can CHANGE a plan after it's built — and is the athlete asked?
 

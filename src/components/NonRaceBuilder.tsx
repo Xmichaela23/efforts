@@ -14,6 +14,9 @@ import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY } from '@/lib/st
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
+// ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
+// week against the SAME numbers the engine builds from, or it is guessing at the athlete.
+import { validateWeeklyMiles } from '@/lib/run-volume-tables';
 import WeekGrid from '@/components/WeekGrid';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
@@ -61,7 +64,53 @@ const DISCIPLINE_ICONS: Record<Discipline, React.ComponentType<{ className?: str
 //
 // (Michael also ruled Maintain should never be a card at all: it is the state between blocks, not
 // something an athlete chooses. The app drops into it when a block ends. See BUILD-ORDER.)
-const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger'];
+// ⛔ SECOND CARD ADDED 2026-08-04 — Marathon. It is not a new builder; it is this builder with a
+// race step in front and two extra fields on the payload. The run steps it walks (`days`,
+// `commitment`, `run`, `bike`, `swim`) were ALL already built and were dark only because this array
+// had one entry. See the slice report for what was ungated vs what was already live.
+const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger', 'marathon'];
+
+/** Race distances this card offers. One for now — the rest come behind the same machinery. */
+const RACE_DISTANCES = ['Marathon'] as const;
+
+/**
+ * Label → the key the ENGINE uses. The payload carries the label because that is what
+ * `DISTANCE_TO_API` (`create-goal…:195`) expects; the volume tables are keyed by the api value.
+ * Mapping in one place so the two never drift apart inside this file.
+ */
+const RACE_DISTANCE_API: Record<string, string> = { Marathon: 'marathon' };
+
+/**
+ * Level, and it is the most load-bearing answer on the race path — it picks the weekly-volume table
+ * (`generate-run-plan/types.ts:380`), the long-run arc, and the fallback paces. Same three tiers and
+ * the same wording as the existing race form (`GoalsScreen.tsx:2519`) so the two cannot drift.
+ *
+ * ⚠️ NOT SEEDED FROM DATA HERE. The race form pre-fills this from vDOT or weekly miles when the
+ * athlete has baselines; this card asks outright and starts blank. Seeding it is the blank-user
+ * slice, not this one — and a blank default was the thing that made the old form quietly pick
+ * `intermediate` for someone with no numbers at all.
+ */
+const FITNESS_TIERS: Array<{ id: 'beginner' | 'intermediate' | 'advanced'; label: string; blurb: string }> = [
+  { id: 'beginner', label: 'Beginner', blurb: 'New to the distance, or coming back to it' },
+  { id: 'intermediate', label: 'Intermediate', blurb: 'Running regularly, some distance behind you' },
+  { id: 'advanced', label: 'Advanced', blurb: 'High mileage, races often' },
+];
+
+/**
+ * Whole weeks from today to the race, the way the SERVER counts them
+ * (`create-goal…:243` `weeksUntilRace` — ceil, from today, not from plan start).
+ *
+ * ⚠️ DISPLAY ONLY, AND IT IS AN APPROXIMATION. The server takes
+ * `max(floor, min(weeksOut, 20))` and can cap far lower in its race-support / bridge-peak modes,
+ * which this cannot predict. Every place it is shown says "about".
+ */
+function weeksUntilRaceApprox(raceISO: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raceISO)) return null;
+  const ms = new Date(`${raceISO}T12:00:00`).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  const w = Math.ceil(ms / (7 * 24 * 60 * 60 * 1000));
+  return w > 0 ? Math.min(20, w) : null;
+}
 const DAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_SHORT: Record<DayName, string> = {
   monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
@@ -211,10 +260,23 @@ type NonRaceState = {
    *  did not, so the composer had a total with nothing to divide it by. */
   rideDays: number;
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
+  /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
+   *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
+  raceDate: string;
+  /** Race distance as the SERVER's label vocabulary expects it (`DISTANCE_TO_API`, `create-goal…:195`
+   *  — 'Marathon' → 'marathon'). Sending the lowercase api key here would not resolve. */
+  raceDistance: string;
+  /** Self-reported level. Race path only; blank until answered — see FITNESS_TIERS. */
+  fitness: 'beginner' | 'intermediate' | 'advanced' | '';
 };
 
 type StepKey =
-  | 'goal' | 'posture' | 'commitment' | 'length'
+  | 'goal'
+  // ⛔ THE RACE ITSELF — distance, date, level. Its own card, immediately after the goal, because
+  // every screen after it is shaped by the answers: the date owns the block length (so the `length`
+  // step drops out), and the level picks the volume table the plan is built from.
+  | 'race'
+  | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
   | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
   // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
@@ -250,7 +312,7 @@ type StepKey =
 // sees a bike screen. The unit is the DISCIPLINE, not the question: run holds its day and its volume
 // together, because deciding one without seeing the other is deciding half of it.
 // This is grouping, not new logic: every control here was already gated on posture.
-function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean): StepKey[] {
+function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal = false): StepKey[] {
   const kept = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
   const strengthDevelop = state.posture?.strength === 'develop';
   const out: StepKey[] = [];
@@ -271,7 +333,14 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean): StepKey[]
     if (kept('bike')) out.push('bike');
   }
   // Swim sits last — booked, not coached. It is the slot we merely hold, so it follows the work.
-  if (strengthDevelop && state.posture?.swim === 'maintain') out.push('swim');
+  // ⛔ UNGATED FOR A RACE GOAL (2026-08-04). The condition was `strengthDevelop && swim === 'maintain'`,
+  // so on a marathon block the athlete could opt the swim IN on the posture card and then never be
+  // asked how many — `swim_days` went out unset and the engine guessed. The swim hold card is the
+  // same mechanic whichever goal is leading; what gates it is whether the swim is KEPT, not which
+  // discipline develops. Strength-path behaviour is unchanged (`maintain` is the only non-out state
+  // that path seeds for swim).
+  const swimKept = state.posture?.swim != null && state.posture?.swim !== 'out';
+  if ((strengthDevelop || isRaceGoal) && swimKept) out.push('swim');
   return out;
 }
 
@@ -287,15 +356,25 @@ function getSteps(state: NonRaceState): StepKey[] {
   // goal offered, the flow it produces is knowable before it is picked. Count that.
   const effective = state.goal ?? (GOAL_ORDER.length === 1 ? GOAL_ORDER[0] : null);
   const isStrengthFocus = effective === 'get_stronger';
+  const isRaceGoal = effective === 'marathon';
   // ⛔ AND NO LENGTH SLIDER on this path. Twelve weeks is not a preference — Wendler's ratios are
   // 2:1, 3:2 and 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor
   // as designed. The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10
   // silently became 8 and 14 became 12: the athlete picked a number the engine never built. 8 ships
   // later as the short, off-ratio option, labelled as such.
+  // ⛔ AND NO LENGTH SLIDER ON A RACE EITHER, FOR A DIFFERENT REASON (2026-08-04). Strength Focus
+  // skips it because 12 is the protocol; a race skips it because THE DATE ALREADY DECIDED. The
+  // server computes `durationWeeks = max(floor, min(weeksOut, 20))` from the race date
+  // (`create-goal…:3293`) and never reads `target_weeks` on the event path. Showing a slider that
+  // moves a number the engine discards is the exact failure this file has produced twice before —
+  // "Days Per Week: 5" and "Weekly Hours Available: 6" printed as constraints the athlete never set.
+  // The confirm screen states the derived length instead.
   const head: StepKey[] = isStrengthFocus
     ? ['goal', 'posture']
-    : ['goal', 'posture', 'commitment', 'length'];
-  return [...head, ...scheduleSteps(state, isStrengthFocus), 'confirm'];
+    : isRaceGoal
+      ? ['goal', 'race', 'posture', 'commitment']
+      : ['goal', 'posture', 'commitment', 'length'];
+  return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'confirm'];
 }
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -326,20 +405,47 @@ function planWeekStartISO(): string {
 function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeeklyMiles?: number): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
+  /**
+   * ⛔ THE RACE FORK, AND IT IS THE ONLY ONE IN THIS FUNCTION. A race date present means this goal
+   * is an `event` row: `goal_type` flips, the date and distance stop being null, and `target_weeks`
+   * is omitted because the server anchors the length on the date instead (`create-goal…:3293`).
+   *
+   * ⚠️ `goal_type` HERE IS THE **ROW** TYPE, and `training_prefs.goal_type` below is a DIFFERENT
+   * FIELD with the same name — 'complete' | 'speed', which picks the generator's approach
+   * (`create-goal…:3411`). They are not interchangeable and the server reads both.
+   *
+   * ⚠️ ONE GOAL, SO `combine` STAYS FALSE (`arc-setup-persistence.ts:465` = "two or more races").
+   * A single marathon therefore builds on `generate-run-plan`, exactly as the existing race form
+   * already does. This slice deliberately does not change that routing.
+   */
+  const isRace = !!state.raceDate;
   return {
-    summary: `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
+    summary: isRace
+      ? `${GOAL_LABELS[goal]} — ${state.raceDate}`
+      : `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
     goals: [
       {
         name: GOAL_LABELS[goal],
-        goal_type: shape.goal_type,
-        target_date: null,
-        target_weeks: state.targetWeeks,
+        goal_type: isRace ? 'event' : shape.goal_type,
+        target_date: isRace ? state.raceDate : null,
+        ...(isRace ? {} : { target_weeks: state.targetWeeks }),
         sport: shape.sport,
-        distance: null,
+        distance: isRace ? state.raceDistance : null,
         priority: 'A',
         training_prefs: {
           training_intent: 'completion',
-          fitness: 'intermediate',
+          // ⛔ LEVEL. It was hardcoded `'intermediate'` here for every goal, which is fine on the
+          // non-race path (nothing downstream keys off it) and is NOT fine on a race, where it
+          // picks the weekly-volume table, the long-run arc and the fallback paces. The race card
+          // asks; every other goal keeps the old constant so their payloads are byte-identical.
+          fitness: isRace && state.fitness ? state.fitness : 'intermediate',
+          // ⛔ THE **OTHER** `goal_type` (see the note above): 'complete' → the `sustainable`,
+          // effort-based generator; 'speed' → `performance_build`, which is gated on a real pace
+          // benchmark and refuses an athlete who has none. This card does not ask the
+          // complete-vs-speed question yet, so it sends 'complete' — the branch that builds without
+          // numbers on file. Asking it is the blank-user slice, and it needs the calibration modal
+          // to land in the same change or a no-numbers athlete hits a dead-end refusal.
+          ...(isRace ? { goal_type: 'complete' } : {}),
           // ⛔ WHAT THE ATHLETE IS ACTUALLY CHASING, PERSISTED (Q-230 Part B).
           //
           // The goal id was the FIRST thing this screen knew and the only thing it never saved.
@@ -439,7 +545,18 @@ type PreviewPlan = {
 
 export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {}) {
   const navigate = useNavigate();
-  const { complete, preview, saving, previewError } = useArcSetupComplete();
+  // ⛔ `error` WAS NOT READ, AND THE BUILD BUTTON FAILED SILENTLY (2026-08-04).
+  //
+  // The hook has always returned it and `ArcSetupWizard.tsx:2791` has always rendered it; this
+  // builder destructured four of the eight fields and left it behind. So when `complete()` was
+  // refused server-side, the spinner stopped and **nothing appeared** — the athlete tapped "Build
+  // plan" and the screen sat there. Pre-existing, and it swallowed every build error, not just the
+  // new one.
+  //
+  // ⚠️ IT BECOMES LOAD-BEARING WITH THE TIMELINE WALL. A refusal the athlete cannot see is worse
+  // than no refusal: without the message they cannot tell "too close" from "broken", and the only
+  // action left is to tap it again.
+  const { complete, preview, saving, previewError, error: buildError } = useArcSetupComplete();
   // ⛔ THE WEEK, BEFORE IT IS ACCEPTED. Nothing here writes: `preview()` calls the composer with the
   // goal inline and persists neither a goal nor a plan.
   const [previewWeek, setPreviewWeek] = React.useState<PreviewSession[] | null>(null);
@@ -491,16 +608,24 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     // Wendler's own, and it is the only shape where every lift is trained first and every top set is
     // a clean measurement. The card states that rather than hiding it behind an empty control.
     daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
+    // silent `intermediate` all over again, one screen further in.
+    raceDate: '', raceDistance: RACE_DISTANCES[0], fitness: '',
   });
   const [stepIdx, setStepIdx] = useState(0);
 
   // ⚠️ The schedule screens are built from the POSTURE, which is only seeded when the goal is tapped
   // — so on step 1 the flow would count itself with no disciplines kept ("1 of 3") and then jump.
   // With one goal offered, the posture it seeds is knowable in advance. Count off that.
+  // ⛔ THIS USED TO BE GATED ON `GOAL_ORDER.length === 1` AND THAT BROKE THE MOMENT A SECOND CARD
+  // WAS ADDED (2026-08-04). With two goals the memo returned `{}`, so on step 1 `getSteps` saw no
+  // disciplines kept, counted a short flow, and the progress bar jumped the instant a card was
+  // tapped — the exact bug the original comment above was written to fix, reintroduced by the fix's
+  // own precondition. Every card's seed is knowable before it is picked; when they disagree on step
+  // count there is nothing honest to show, so fall back to the FIRST card's seed only while the
+  // counts agree, and otherwise show the flow the athlete is actually in once they have chosen.
   const seededPosture = useMemo(
-    () => (GOAL_ORDER.length === 1
-      ? seedFromGoal(GOAL_ORDER[0], undefined, athleteDisciplines, equipmentTier).per_discipline_posture
-      : {}),
+    () => seedFromGoal(GOAL_ORDER[0], undefined, athleteDisciplines, equipmentTier).per_discipline_posture,
     [athleteDisciplines, equipmentTier],
   );
   const steps = getSteps(state.goal ? state : { ...state, posture: seededPosture });
@@ -555,6 +680,54 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // `posture.strength === 'develop'`. An assumed answer that never reaches the payload is the same
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
+  const isRaceGoal = state.goal === 'marathon';
+  const raceWeeks = state.raceDate ? weeksUntilRaceApprox(state.raceDate) : null;
+  // The race card cannot continue on a date alone: level picks the volume table the whole plan is
+  // built from, and a blank one would fall to the silent `intermediate` this card exists to replace.
+  const raceCanContinue = !!state.raceDate && !!state.fitness && raceWeeks !== null;
+
+  /**
+   * ⛔ THE TYPED MILEAGE, JUDGED AGAINST THE ENGINE'S OWN TABLES (`src/lib/run-volume-tables.ts`).
+   *
+   * ⚠️ CANONICALISE BEFORE VALIDATING. The tables are in MILES; the field is in the athlete's
+   * display unit. Validating a kilometre figure against a mile table would tell a 32 km/wk runner
+   * they are under a 27-mile floor — the same unit slip the bike card's "hours, not miles" note was
+   * written to catch, in the other direction.
+   */
+  const typedMilesCanonical = typeof state.targetMiles === 'number' && state.targetMiles > 0
+    ? (unit === 'km' ? state.targetMiles / 1.609344 : state.targetMiles)
+    : null;
+  const milesVerdict = isRaceGoal && state.fitness
+    ? validateWeeklyMiles(RACE_DISTANCE_API[state.raceDistance] ?? '', state.fitness, typedMilesCanonical)
+    : null;
+  /** Floor + week-1 long run back in the athlete's unit, for the copy. Miles in, display unit out. */
+  const toDisplayMi = (mi: number) => Math.round(unit === 'km' ? mi * 1.609344 : mi);
+  const milesFloorDisplay = milesVerdict ? Math.ceil(unit === 'km' ? milesVerdict.requiredMi * 1.609344 : milesVerdict.requiredMi) : null;
+  const longRunDisplay = milesVerdict ? toDisplayMi(milesVerdict.longRunWeek1Mi) : null;
+
+  /**
+   * ⛔ THE MILEAGE FLOOR IS ADVISORY. IT WARNS AND IT DOES NOT REFUSE. Michael's call, 2026-08-04:
+   * *"warn, no wall."*
+   *
+   * ⛔ THIS LINE IS DELIBERATELY A CONSTANT, AND DELETING IT WOULD LOSE THE DECISION. It shipped
+   * for one day as `!isRaceGoal || milesVerdict?.ok === true` — a wall — and the wall was WRONG
+   * for the reason the file already documents in three other places: **§5.2b, breach states cost
+   * and never refuses**, and *"None is a real answer with a stated cost."* A beginner running 20
+   * miles a week is making a decision about their own body with the consequence in front of them;
+   * the app's job is to put the consequence there, not to take the decision.
+   *
+   * ⚠️ THE ARGUMENT FOR THE WALL, WRITTEN DOWN SO IT IS NOT RE-MADE FROM SCRATCH: the cost of
+   * being wrong here is an injury rather than a worse plan, and the engine clamps the number
+   * upward anyway (`resolveEffectiveStartVolume`), so an athlete who proceeds under the floor gets
+   * a week bigger than the one they typed. **That second half is why the WARNING has to name the
+   * clamp** — see the `engine_clamp` branch of the copy. It is not why they should be stopped.
+   *
+   * ⚠️ THE ONE HARD REFUSAL ON THIS PATH IS THE TIMELINE, NOT THE VOLUME — `raceCanContinue`
+   * above (a race in the past cannot be planned) and the server's weeks-to-race floor. Those are a
+   * different kind of claim: a date that does not work is arithmetic, a body that is not ready is
+   * a judgement about a person.
+   */
+  const runCanContinue = true;
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
 
   /**
@@ -638,8 +811,24 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
    * clearance it could not honour and nothing rendered them, so the week arrived silently short a
    * ride and silently short a rest day. Those sentences are the honest half of the preview.
    */
+  /**
+   * ⛔ THE PREVIEW IS OFF ON A RACE GOAL, AND IT IS NOT A STYLE CHOICE — IT WOULD WRITE (2026-08-04).
+   *
+   * `preview()` calls `create-goal-and-materialize-plan` with `mode: 'create'` + `preview: true`
+   * (`useArcSetupComplete.ts:125`). On the NON-RACE branch that is safe: the goal insert is guarded
+   * (`create-goal…:2396` — `mode === 'create' && !bodyPreview`), which is the leak that hook's own
+   * comment says was closed. **The EVENT branch has a second, unguarded insert**
+   * (`create-goal…:3307`, plain `if (mode === 'create')`), so previewing a race goal would create a
+   * real goal row and build a real plan — every time the athlete reached the confirm screen.
+   *
+   * ⚠️ FOUND BY TRACE, NOT SEEN ON A DEVICE. Filing it rather than fixing it: the fix is on the
+   * event path and belongs with the routing work, not inside an intake slice. Until then the race
+   * card simply does not offer a week preview, and says so.
+   */
+  const previewSupported = !state.raceDate;
+
   const runPreview = async () => {
-    if (!state.goal || previewing) return;
+    if (!state.goal || previewing || !previewSupported) return;
     setPreviewing(true);
     const plan = (await preview(payloadNow())) as PreviewPlan | null;
     const wk1 = plan?.sessions_by_week?.['1'];
@@ -691,6 +880,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
    */
   React.useEffect(() => {
     if (currentStep !== 'confirm') return;
+    if (!previewSupported) return;   // race goals: previewing would WRITE — see `previewSupported`
     if (previewWeek !== null || previewing || previewFailed) return;
     void runPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -706,9 +896,12 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'goal' && (
         <StepLayout
           step={stepNo('goal')} totalSteps={steps.length} title="What's the goal?"
-          subtitle="Every plan carries strength. This one puts it in front."
+          subtitle="Every plan carries strength. A race puts the race in front; Strength Focus puts the lifting in front."
           onBack={back} onContinue={next} canContinue={goalCanContinue}
           hideContinue
+          // ⛔ The two cards lead to flows of different lengths, so there is no honest count to
+          // print here until one is tapped. See `hideProgress` in StepLayout.
+          hideProgress
         >
           <div className="space-y-2">
             {GOAL_ORDER.map((g) => (
@@ -724,6 +917,17 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     now carries it, so the card, the goal name, the block summary and the duration
                     copy all read from one place instead of the card disagreeing with the plan. */}
                 <span className="block">{GOAL_LABELS[g]}</span>
+                {/* Same job as the Strength Focus card's copy: state what the block IS and what it
+                    needs, at the door. What this one deliberately does NOT claim is a time goal —
+                    the block is built to get the athlete to the start line, and the pace work it
+                    can do depends on numbers we may not have yet. */}
+                {g === 'marathon' && (
+                  <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
+                    A build to a marathon date. Running leads; the bike, the swim and the lifting are
+                    held at a maintenance dose and are yours to switch on next screen. The block runs
+                    from the week you start to race day, so the date sets the length.
+                  </span>
+                )}
                 {g === 'get_stronger' && (
                   <>
                     {/* The card states what it NEEDS and who it is FOR. The app cannot tell a
@@ -765,6 +969,96 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               ))}
             </div>
           )}
+        </StepLayout>
+      )}
+
+      {/* ── THE RACE ─────────────────────────────────────────────────────────────────────────────
+          Distance, date, level — the three fields the existing race form (`GoalsScreen.tsx:2433`)
+          collects that this builder never had. Everything else that form asks (name, priority,
+          strength protocol + frequency) is either answered elsewhere in this flow or defaulted.
+
+          ⛔ NO RACE PICKER HERE YET. The date is typed. `extract-races` exists and works
+          (web search, official name, A/B priority) and wiring it is the next slice — it changes what
+          this card LOOKS like, not what it produces, so the payload below is already final.
+
+          ⛔ AND NO "just finish vs get faster" QUESTION. That answer picks the generator
+          (`create-goal…:3411`), and the faster branch is gated on a real pace benchmark — an athlete
+          with no numbers on file is refused outright. Asking it before the calibration prompt exists
+          would build a door with a wall behind it. Until then this sends 'complete'. */}
+      {currentStep === 'race' && (
+        <StepLayout
+          step={stepNo('race')} totalSteps={steps.length} title="Which race?"
+          subtitle="The date sets the length of the block — training runs from the week you start to race day."
+          onBack={back} onContinue={next} canContinue={raceCanContinue}
+        >
+          <div className="space-y-5">
+            <div>
+              <p className="text-white/85 text-sm mb-2">Distance</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {RACE_DISTANCES.map((d) => (
+                  <button
+                    key={d} type="button"
+                    onClick={() => setState((s) => ({ ...s, raceDistance: d }))}
+                    className={`py-2 rounded-lg text-sm ${state.raceDistance === d ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                  >{d}</button>
+                ))}
+              </div>
+              {/* Say why there is one option, so it reads as scope and not as a broken control. */}
+              <p className="text-white/50 text-xs mt-1.5">
+                Marathon first. The other distances come on the same machinery.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-white/85 text-sm mb-2">Race day</p>
+              <input
+                type="date"
+                value={state.raceDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setState((s) => ({ ...s, raceDate: e.target.value }))}
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
+                style={{ fontSize: '16px' }}
+              />
+              {/* ⚠️ "About", and it means it — the server can shorten this a long way on a close
+                  race (its race-support and bridge-peak modes cap at 2 and 6 weeks). Stating a
+                  number this screen cannot guarantee as though it were fixed is the failure this
+                  file keeps having; the hedge is the honest half. */}
+              {raceWeeks !== null && (
+                <p className="text-white/70 text-sm mt-1.5">
+                  About {raceWeeks} week{raceWeeks === 1 ? '' : 's'} of training
+                  {raceWeeks === 20 ? ' — the longest block we build to a single race.' : '.'}
+                </p>
+              )}
+              {state.raceDate && raceWeeks === null && (
+                <p className="text-amber-400/70 text-sm mt-1.5">That date has already passed.</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-white/85 text-sm mb-2">Where are you now?</p>
+              <div className="space-y-2">
+                {FITNESS_TIERS.map((t) => (
+                  <button
+                    key={t.id} type="button"
+                    onClick={() => setState((s) => ({ ...s, fitness: t.id }))}
+                    className={optBtn(state.fitness === t.id)}
+                  >
+                    <span className="font-medium">{t.label}</span>
+                    <span className="block text-white/55 text-sm mt-0.5">{t.blurb}</span>
+                  </button>
+                ))}
+              </div>
+              {/* ⛔ SAY WHAT THIS ANSWER DOES. It is not a label — it picks the starting weekly
+                  mileage, the long-run progression and the pace estimates the first weeks are
+                  written from. An athlete who guesses high gets a week they cannot carry, and
+                  nothing on the old form told them that. */}
+              <p className="text-white/50 text-xs mt-2 leading-relaxed">
+                This sets your starting mileage and how fast the long run grows. Pick the one that
+                matches what you are doing now, not what you are aiming at — the plan adjusts as you
+                log.
+              </p>
+            </div>
+          </div>
         </StepLayout>
       )}
 
@@ -1411,8 +1705,13 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'run' && (
         <StepLayout
           step={stepNo('run')} totalSteps={steps.length} title="Running"
-          subtitle="All of it conversational — strength leads this block."
-          onBack={back} onContinue={next} canContinue
+          // ⛔ THE SUBTITLE WAS WRITTEN FOR THE STRENGTH BLOCK AND SAYS SO — "strength leads this
+          // block" is false on a race, where running leads and the lifting is the thing being held.
+          // The card is shared; the sentence describing what leads cannot be.
+          subtitle={isRaceGoal
+            ? 'The one day the plan builds around, and the week it sits in.'
+            : 'All of it conversational — strength leads this block.'}
+          onBack={back} onContinue={next} canContinue={runCanContinue}
         >
           <div className="space-y-5">
             {/* ⛔ THE DAY PICKER SITS ABOVE THE NUMBERS. A numeric input pushes everything below it
@@ -1433,9 +1732,107 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   stay clear of it by two days.
                 </p>
               )}
+              {/* Without this the race path shows a bare day picker and no reason for it — the
+                  strength-block explanation above is gated off, and nothing replaced it. */}
+              {isRaceGoal && (
+                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                  Whichever day you actually run long. It grows through the block and is the last
+                  thing to come down before the race.
+                </p>
+              )}
             </div>
+
+            {/* ── WEEKLY MILEAGE, RACE PATH ────────────────────────────────────────────────────
+                ⛔ UNGATED FOR A RACE (2026-08-04). The mileage questions below are wrapped in
+                `posture.strength === 'develop'`, so a marathon goal was never asked what it runs —
+                and on the event path the engine took `current_weekly_miles` from SNAPSHOTS only
+                (`create-goal…:3417`). A brand-new athlete has no snapshots, so week one was built
+                off the level tick alone.
+
+                ⛔ ONE FIELD HERE, NOT THE STRENGTH PATH'S TWO. That path asks "what do you
+                normally run" and derives a HOLD dose from it (two-thirds, Hickson) because running
+                is being maintained under a lifting block. On a race the running IS the block —
+                there is no hold to derive, the number typed is the starting volume itself. Reusing
+                the two-field mechanic would have asked a question with no second half. */}
+            {isRaceGoal && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">What do you run now?</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="decimal" min={0}
+                    value={state.targetMiles === '' ? '' : state.targetMiles}
+                    onChange={(e) => setState((st) => ({
+                      ...st,
+                      targetMiles: e.target.value === '' ? '' : Number(e.target.value),
+                      targetTouched: true,
+                    }))}
+                    placeholder="e.g. 30"
+                    className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <span className="text-white/75 text-sm">{unit}/wk</span>
+                </div>
+                {/* ⛔ NO "NOT SURE" BUTTON HERE, AND IT IS A DEPARTURE. The strength card offers one
+                    on purpose — *"making someone compute a historical baseline before a screen
+                    unlocks is a data-entry exam"* — and that is right when the cost of guessing is a
+                    few easy miles. On a marathon this number sets week one's volume and decides
+                    whether the block is safe to build at all, so there is nothing honest to put
+                    behind an "I don't know". */}
+                {milesVerdict === null && (
+                  <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                    Your current average, not what you are aiming at. Week one starts from this.
+                  </p>
+                )}
+                {milesVerdict?.ok === true && (
+                  <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                    Week one starts near this, with a {longRunDisplay}-{unit} long run — about{' '}
+                    {milesVerdict.sharePct}% of the week.
+                  </p>
+                )}
+                {/* ⛔ THE BASE-BUILD NOTICE — AND IT IS A NOTICE, NOT A REFUSAL (Michael, "warn, no
+                    wall"). Continue stays live underneath it; `runCanContinue` is a constant.
+
+                    ⛔ FACT, THEN CONSEQUENCE, NEVER AN INSTRUCTION (COPY-VOICE rule 7). The first
+                    draft ended *"Build to about N a week first, then come back"* — an imperative,
+                    and one the athlete has already implicitly declined by typing what they typed.
+                    It now states what the block will do and what that is associated with, and
+                    leaves the decision where it belongs.
+
+                    ⛔ THE THREE REASONS ARE DIFFERENT AND THE COPY MUST NOT BLUR THEM: too little
+                    base for the DISTANCE, a number the ENGINE will silently raise, or a week too
+                    small to carry the LONG RUN it prescribes. Each names its own consequence.
+
+                    ⚠️ THE RISK LINE IS DELIBERATELY GENERAL. Ramp rate and weekly volume are the
+                    exposures the injury literature actually associates with running injury; the
+                    line says "raises injury risk", not a percentage, because we have no number for
+                    THIS athlete and a fabricated one would be the score that lies. */}
+                {milesVerdict?.ok === false && (
+                  <div className="mt-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-3">
+                    <p className="text-white/90 text-sm leading-relaxed">
+                      {milesVerdict.bound === 'long_run_share'
+                        ? `A ${state.raceDistance.toLowerCase()} block for this level opens with a ${longRunDisplay}-${unit} long run. At ${state.targetMiles} ${unit} a week, that is most of your running in one session.`
+                        : milesVerdict.bound === 'engine_clamp'
+                          ? `The plan starts near ${milesFloorDisplay} ${unit} a week whatever is entered below that, so the first weeks would be bigger than the week you described.`
+                          : `A ${state.raceDistance.toLowerCase()} block usually sits on about ${milesFloorDisplay} ${unit} a week. You are starting under that.`}
+                    </p>
+                    <p className="text-white/60 text-sm mt-1.5 leading-relaxed">
+                      Building on less base than a block asks for means a faster ramp, and a faster
+                      ramp raises injury risk. Athletes who reach about {milesFloorDisplay} {unit} a
+                      week before the block starts carry it more comfortably.
+                    </p>
+                    <p className="text-white/45 text-xs mt-2 leading-relaxed">
+                      You can carry on — this is a note, not a stop.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* The volume questions belong to the STRENGTH path — elsewhere the mileage comes from
-                the commitment tier, so asking here would be asking twice. */}
+                the commitment tier, so asking here would be asking twice.
+                ⚠️ "Elsewhere" no longer means "everywhere else": the race path above asks its own,
+                once, because on a race the mileage is not a hold dose derived from a usual week —
+                it IS the week. The two blocks are mutually exclusive by construction. */}
             {state.posture?.strength === 'develop' && (
               <>
             <div>
@@ -1713,7 +2110,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           // "an 12-week" — the article was hardcoded for a number that varies. 8, 12 and 16 all take "a".
           // ⛔ THE PROTOCOL NAME MOVED HERE when the posture card came out — it was the one fact on
           // that card the week grid cannot show, and dropping it silently would have lost it.
-          subtitle={`${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks${isStrengthFocus ? ' of Wendler 5/3/1' : ''}.`}
+          subtitle={isRaceGoal
+            ? `${state.raceDistance} — ${state.raceDate}${raceWeeks !== null ? `, about ${raceWeeks} weeks` : ''}.`
+            : `${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks${isStrengthFocus ? ' of Wendler 5/3/1' : ''}.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
@@ -1723,6 +2122,18 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               same thing in days they recognise, and says it specifically. The one fact it carried
               that the grid cannot — the protocol — moved to the subtitle. */}
           <div className="space-y-3">
+            {/* ⛔ THE REFUSAL, WHERE THE ATHLETE TAPPED. `complete()` can be turned down by the
+                server — the timeline wall (`race_too_close` / `race_too_close_personalized`) is the
+                one that fires on this card, and the message it carries already names the weeks
+                needed, the weeks available, and the two ways out. Rendering it verbatim rather than
+                re-wording it client-side keeps one sentence in one place.
+                ⚠️ Sits ABOVE the start-date field on purpose: it is the reason the tap did nothing,
+                and a reason below the fold is a reason nobody reads. */}
+            {buildError && (
+              <div className="rounded-xl border border-red-400/25 bg-red-400/[0.07] p-3">
+                <p className="text-white/90 text-sm leading-relaxed">{buildError}</p>
+              </div>
+            )}
             <div>
               <p className="text-white/70 text-sm mb-2">Start the week of</p>
               <input
@@ -1739,9 +2150,16 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               </p>
             </div>
 
-            {/* ⛔ THE WEEK, BEFORE COMMITTING. Building it here writes nothing — no goal, no plan. */}
+            {/* ⛔ THE WEEK, BEFORE COMMITTING. Building it here writes nothing — no goal, no plan.
+                ⚠️ …ON THIS PATH. On a race goal it WOULD write (see `previewSupported`), so the
+                panel is replaced by a line that says the week comes after building rather than
+                offering a button that quietly creates a plan. */}
             <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3">
-              {previewWeek === null ? (
+              {!previewSupported ? (
+                <p className="text-white/70 text-sm leading-relaxed">
+                  Your week is laid out once the plan is built — you can move anything after that.
+                </p>
+              ) : previewWeek === null ? (
                 <button
                   type="button" onClick={() => { void runPreview(); }} disabled={previewing}
                   className="w-full min-h-[44px] rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
@@ -1786,7 +2204,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   nothing, is the shape of bug this file keeps producing.
                 Also fixed the article: "An 12-week" read wrong for every length that is not 8. */}
             <p className="text-white/75 text-sm">
-              {isStrengthFocus ? (
+              {isRaceGoal ? (
+                /* ⛔ NO "ending in a retest" HERE — a race block ends in the race, and the terminal
+                    phase is a taper, not a retest (`phase-structure.ts:401`). And no promised week
+                    count: the number is the server's, computed from today, and it can be cut hard
+                    on a close race. "About" is doing real work in this sentence. */
+                <>Running leads to {state.raceDistance.toLowerCase()} day, about {raceWeeks ?? '—'} weeks
+                out, with a taper into the race. Everything you kept is held underneath it.</>
+              ) : isStrengthFocus ? (
                 /* ⛔ "every third week" was false — the open set exists ONLY in the anchor cycle
                    (`wendler-531.ts:61`: amrap = anchor && !deload && last set), so weeks 9-11 of
                    twelve. Weeks 1-8 are plain fives with nothing to measure. Same correction as

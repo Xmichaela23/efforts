@@ -19,75 +19,11 @@ import { formatPace } from '../effort-score.ts';
 // Long run progression by fitness level (in miles)
 // SMOOTH progression: max +1 mile per week, recovery weeks reduce by ~30%
 // Post-recovery: resume at pre-recovery level (not beyond)
-const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
-  'marathon': {
-    'beginner': [
-      // Weeks 1-4: Build 6→8, recovery drops to 6
-      6, 7, 8, 6,
-      // Weeks 5-8: Resume 8→11, recovery drops to 8  
-      8, 9, 10, 8,
-      // Weeks 9-12: Resume 10→13, recovery drops to 10
-      10, 11, 12, 10,
-      // Weeks 13-16: Peak at 18, recovery drops to 13
-      14, 16, 18, 13,
-      // Weeks 17-20: Final build and taper
-      15, 17, 12, 8    // Week 17 resume, 18 peak, 19 taper, 20 race week
-    ],
-    'intermediate': [
-      8, 9, 10, 8,      // Weeks 1-4
-      10, 11, 12, 10,   // Weeks 5-8
-      12, 14, 16, 12,   // Weeks 9-12
-      16, 18, 20, 14,   // Weeks 13-16
-      16, 18, 14, 10   // Weeks 17-20: Final build and taper
-    ],
-    'advanced': [
-      10, 11, 12, 10,   // Weeks 1-4
-      12, 14, 16, 12,   // Weeks 5-8
-      16, 18, 20, 14,   // Weeks 9-12
-      18, 20, 20, 16,   // Weeks 13-16
-      18, 20, 16, 12    // Weeks 17-20: Final build and taper
-    ]
-  },
-  'half': {
-    'beginner': [5, 6, 7, 5, 7, 8, 9, 7, 9, 10, 11, 8],
-    'intermediate': [6, 7, 8, 6, 8, 9, 10, 8, 10, 11, 12, 8],
-    'advanced': [8, 9, 10, 8, 10, 11, 12, 10, 12, 13, 14, 10]
-  },
-  '10k': {
-    'beginner': [4, 5, 6, 4, 5, 6, 7, 5, 7, 8, 8, 6],
-    'intermediate': [5, 6, 7, 5, 7, 8, 9, 7, 9, 10, 10, 7],
-    'advanced': [7, 8, 9, 7, 9, 10, 11, 8, 10, 11, 12, 8]
-  },
-  '5k': {
-    'beginner': [3, 4, 4, 3, 4, 5, 5, 4, 5, 6, 6, 4],
-    'intermediate': [4, 5, 5, 4, 5, 6, 6, 5, 6, 7, 7, 5],
-    'advanced': [5, 6, 7, 5, 7, 8, 8, 6, 8, 9, 9, 7]
-  }
-};
+// ⛔ MOVED TO `src/lib/run-volume-tables.ts` (2026-08-04). The intake validates a typed weekly
+// mileage against week 1 of this arc, so the numbers had to become shareable. One copy, imported.
+// See that file's header for the deploy consequence.
+import { LONG_RUN_PROGRESSION, WEEKLY_MILEAGE } from '../../../../src/lib/run-volume-tables.ts';
 
-// Weekly mileage targets (conservative for completion)
-const WEEKLY_MILEAGE: Record<string, Record<string, { start: number; peak: number }>> = {
-  'marathon': {
-    'beginner': { start: 20, peak: 40 },
-    'intermediate': { start: 30, peak: 50 },
-    'advanced': { start: 40, peak: 60 }
-  },
-  'half': {
-    'beginner': { start: 15, peak: 30 },
-    'intermediate': { start: 25, peak: 40 },
-    'advanced': { start: 35, peak: 50 }
-  },
-  '10k': {
-    'beginner': { start: 12, peak: 25 },
-    'intermediate': { start: 20, peak: 35 },
-    'advanced': { start: 30, peak: 45 }
-  },
-  '5k': {
-    'beginner': { start: 10, peak: 20 },
-    'intermediate': { start: 15, peak: 28 },
-    'advanced': { start: 25, peak: 40 }
-  }
-};
 
 export class SustainableGenerator extends BaseGenerator {
   generatePlan(): TrainingPlan {

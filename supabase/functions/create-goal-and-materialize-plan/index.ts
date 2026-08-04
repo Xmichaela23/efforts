@@ -51,7 +51,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError, resolveMarathonFloorWeeks, marathonTimelineRefusal } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -3189,6 +3189,8 @@ Deno.serve(async (req: Request) => {
     }
 
     let personalizedFloorWeeks = floorWeeks;
+    /** True only when the marathon floor came from measured history rather than a fitness fallback. */
+    let marathonFloorIsMeasured = false;
     if (distanceApi === 'marathon') {
       // Recompute memory immediately so marathon gating reads fresh longitudinal state.
       await invokeFunction(functionsBaseUrl, serviceKey, 'recompute-athlete-memory', { user_id });
@@ -3236,7 +3238,39 @@ Deno.serve(async (req: Request) => {
       });
 
       if (ADAPTIVE_MARATHON_DECISIONS_ENABLED) {
-        personalizedFloorWeeks = Math.max(1, adaptive.minimum_feasible_weeks);
+        // ⛔ THE PERSONALISED FLOOR IS ONLY PERSONAL WHEN IT WAS MEASURED (2026-08-04).
+        //
+        // `resolveAdaptiveMarathonDecisionFromMemory` returns a `minimum_feasible_weeks` whether or
+        // not it had any evidence: with no `athlete_memory` row it falls through to
+        // `fallbackMinByFitness` (`_shared/athlete-memory.ts:381`) — **advanced 3, intermediate 4,
+        // beginner 6 weeks** — and hands that back in the same shape as a measured answer. This
+        // line then took it as gospel, so a brand-new account ticking "advanced" got a floor of
+        // THREE WEEKS for a marathon, and the static `MIN_WEEKS` table (advanced 8) never applied.
+        //
+        // ⛔ THE FIX IS NOT TO RAISE THE FALLBACK. The fallback is fine as an *estimate*; the bug is
+        // treating an estimate as a personalisation. When the rule reports `insufficient_data` there
+        // is nothing personal about the number, so the **level-scaled `MIN_WEEKS` table is the
+        // floor** — which is exactly what it is for, and what it was doing before the adaptive
+        // engine landed on top of it.
+        //
+        // ⚠️ `low_confidence` COUNTS AS MEASURED. It means a real value from real history that we
+        // are hedging, not an absence — `getRuleOrInsufficient` returns the value in that case.
+        // Treating a hedge as no-evidence would push experienced athletes back onto the static
+        // table and make the adaptive engine pointless for exactly the people it was built for.
+        const resolvedFloor = resolveMarathonFloorWeeks({
+          staticFloorWeeks: floorWeeks,
+          adaptiveMinWeeks: adaptive.minimum_feasible_weeks,
+          minWeeksRuleStatus: (adaptive.decision_source?.rule_statuses ?? {})['run.minimum_feasible_weeks'],
+        });
+        personalizedFloorWeeks = resolvedFloor.floorWeeks;
+        marathonFloorIsMeasured = resolvedFloor.measured;
+        console.log('[adaptive-marathon-floor]', {
+          user_id, weeksOut,
+          measured: resolvedFloor.measured,
+          adaptive_min: adaptive.minimum_feasible_weeks,
+          static_min: floorWeeks,
+          applied: personalizedFloorWeeks,
+        });
       } else {
         const resolved = resolveMarathonMinWeeksFromMemory(latestMemory, fitness, floorWeeks);
         const confidence = resolved.confidence;
@@ -3273,19 +3307,55 @@ Deno.serve(async (req: Request) => {
       allowRaceWeekSupportMode = hasActiveRunContext;
     }
 
-    if (!ADAPTIVE_MARATHON_DECISIONS_ENABLED && !allowRaceWeekSupportMode && weeksOut < personalizedFloorWeeks) {
-      const msg = distanceApi === 'marathon'
-        ? `Based on your recent training history, this marathon needs about ${personalizedFloorWeeks}+ weeks. Your selected race is ${weeksOut} weeks out. Choose Replace with a later date or pick a shorter race.`
-        : `Your race is ${weeksOut} weeks away. ${distanceApi} needs at least ${personalizedFloorWeeks} weeks.`;
-      throw new AppError(
-        distanceApi === 'marathon' ? 'race_too_close_personalized' : 'race_too_close',
-        msg,
-      );
-    }
+    // ⛔ MOVED ABOVE THE REFUSAL (2026-08-04). These were computed after it, which was fine while the
+    // refusal was dead code and is not fine now: the gate has to know whether a legitimate
+    // short-block mode is in play before it decides to refuse.
     const adaptiveMode = adaptiveMarathonDecision?.recommended_mode as string | undefined;
     const adaptiveSupportMode = distanceApi === 'marathon' && ADAPTIVE_MARATHON_DECISIONS_ENABLED
       ? adaptiveMode === 'race_support' || adaptiveMode === 'bridge_peak'
       : false;
+
+    /**
+     * ⛔ THE TIMELINE REFUSAL — RE-ENABLED. THIS IS THE ONE HARD WALL ON THIS PATH.
+     *
+     * ⛔ IT WAS DEAD. The condition opened with `!ADAPTIVE_MARATHON_DECISIONS_ENABLED`, and that
+     * flag defaults to **on** (`:232`), so the whole block was unreachable in every real request.
+     * `MIN_WEEKS` was computed at `:3137` and thrown away. Combined with the fallback floor above,
+     * a brand-new account claiming "advanced" could build a THREE-WEEK marathon plan. Nothing
+     * anywhere refused it.
+     *
+     * ⛔ WHY THIS ONE STOPS WHEN THE MILEAGE FLOOR ONLY WARNS. Michael drew the line and it holds
+     * up: *timeline, unlike mileage, is where we stop.* A weekly mileage below the floor is a
+     * judgement about a person's body, and they own that — §5.2b, breach states cost and never
+     * refuses. A race that is closer than the shortest block we know how to build is **arithmetic**:
+     * there is no plan to hand them, so "state the cost and continue" would mean shipping a
+     * fabricated one.
+     *
+     * ⛔ AND THE SUPPORT MODES SURVIVE, BECAUSE THE DISCRIMINATOR IS EVIDENCE, NOT WEEKS.
+     * `race_support` (≤2 weeks) and `bridge_peak` (≤6) exist for a real athlete mid-build whose
+     * race is imminent — and by construction those windows sit BELOW any sane floor, so a naive
+     * `weeksOut < floor` gate would have deleted both. They are exempted when, and only when, there
+     * is evidence the athlete has a build underneath them:
+     *   • `allowRaceWeekSupportMode` — an ACTIVE RUN PLAN on file (the pre-existing test, `:3258`)
+     *   • `marathonFloorIsMeasured` — real `athlete_memory`, so the short block is the engine's
+     *     considered answer about this athlete rather than a fitness-tier default
+     * A brand-new account has neither, which is precisely the case that was slipping through.
+     */
+    const timelineRefusal = marathonTimelineRefusal({
+      distanceApi,
+      weeksOut,
+      floorWeeks: personalizedFloorWeeks,
+      floorIsMeasured: marathonFloorIsMeasured,
+      allowRaceWeekSupportMode,
+      adaptiveSupportMode,
+    });
+    if (timelineRefusal) {
+      console.log('[race-too-close]', {
+        user_id, distanceApi, fitness, weeksOut,
+        floor: personalizedFloorWeeks, measured: marathonFloorIsMeasured,
+      });
+      throw new AppError(timelineRefusal.code, timelineRefusal.message);
+    }
     const durationWeeks = adaptiveSupportMode
       ? Math.max(1, Math.min(weeksOut, adaptiveMode === 'race_support' ? 2 : 6))
       : allowRaceWeekSupportMode
@@ -3304,7 +3374,28 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (mode === 'create') {
+    // ⛔ A PREVIEW MUST NOT WRITE — THE EVENT PATH'S COPY OF THE SAME BUG (2026-08-04).
+    //
+    // The non-race branch fixed this at `:2396` and its comment says "the plan side was already
+    // correct… only the goal leaked." **That was true of the non-race branch and false of the
+    // repo.** This is a SECOND `mode === 'create'` insert, on the run-event path, and it had no
+    // `bodyPreview` guard at all — so previewing a race goal created a real `status: 'active'` goal,
+    // built a real plan, linked it, activated it, and retired whatever plan the athlete was on.
+    // Worse than the leak it mirrors: that one left a stray row, this one changed the training.
+    //
+    // Found by tracing the marathon intake before wiring its confirm screen to `preview()`; the
+    // preview was never fired on this path, so nothing had ever exercised it.
+    //
+    // ⚠️ THE GUARD ALONE IS NOT THE FIX. With no goal row, `createdGoalId` is null and the code
+    // below would still call `generate-run-plan` for real, persist a plan, and then link it to
+    // nothing. The preview must ALSO reach the generator's own no-persist mode and return before
+    // the link/activate/retire block — see the two changes further down, and the (b)-run branch at
+    // `:2721`/`:2774`, which is the shape being copied.
+    //
+    // ⚠️ THE TRIATHLON EVENT PATH AT `:2842` STILL HAS THIS HOLE. Same `if (mode === 'create')`,
+    // same missing guard, and it is unreachable from the marathon intake so it is left for the
+    // slice that owns the tri path. Do not assume it was fixed here.
+    if (mode === 'create' && !bodyPreview) {
       const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
       const { data: createdGoal, error: goalInsertErr } = await supabase
         .from('goals')
@@ -3414,13 +3505,36 @@ Deno.serve(async (req: Request) => {
         : '4-5',
       race_date: resolvedGoal?.target_date,
       race_name: resolvedGoal?.name,
-      current_weekly_miles: weeklyMiles,
+      // ⛔ THE ATHLETE'S TYPED WEEK BEATS THE SNAPSHOT, AND UNTIL NOW IT WAS NOT READ AT ALL.
+      //
+      // This line was `current_weekly_miles: weeklyMiles` — snapshot-derived only
+      // (`planning-context.ts:366`). So the marathon intake could collect a weekly mileage and it
+      // went nowhere: the one input that sets week one's volume was discarded on the event path,
+      // and a brand-new athlete (no snapshots at all) had week one chosen by their level tick.
+      //
+      // ⚠️ PRECEDENCE, STATED: the typed number wins because it is the ANSWER TO A QUESTION WE
+      // ASKED, and the snapshot is an inference. The snapshot stays as the fallback for every
+      // caller that does not ask — the existing race form does not, so it is unchanged.
+      // The engine still clamps whatever arrives (`resolveEffectiveStartVolume`), and the intake
+      // now refuses to send a number that clamp would silently overwrite.
+      //
+      // ⚠️ MILES. `assemblePayload` canonicalises from the athlete's display unit before it leaves
+      // the client (`NonRaceBuilder.tsx` `payloadNow`), so no conversion belongs here.
+      current_weekly_miles: (() => {
+        const typed = Number((resolvedGoal?.training_prefs as Record<string, unknown> | undefined)?.target_weekly_miles);
+        return Number.isFinite(typed) && typed > 0 ? typed : weeklyMiles;
+      })(),
       ...(recent_long_run_miles != null ? { recent_long_run_miles } : {}),
       ...(weeks_since_peak_long_run != null ? { weeks_since_peak_long_run } : {}),
       ...(current_acwr != null ? { current_acwr } : {}),
       ...(volume_trend ? { volume_trend } : {}),
       transition_mode: trainingTransition.mode,
       ...(plan_start_date ? { start_date: plan_start_date } : {}),
+      // ⛔ THE GENERATOR'S OWN NO-PERSIST MODE (`generate-run-plan/index.ts:404`) — it composes the
+      // plan and returns it with `plan_id: null`, inserting no `plans` row and writing no baseline.
+      // Without this the guarded goal insert above would just move the damage: no goal row, but a
+      // real plan still built and persisted. Same flag the (b)-run branch passes at `:2721`.
+      ...(bodyPreview ? { preview: true } : {}),
     };
     if (allowRaceWeekSupportMode || adaptiveSupportMode) {
       generateBody.race_week_mode = true;
@@ -3487,6 +3601,26 @@ Deno.serve(async (req: Request) => {
     }
 
     const generated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', generateBody);
+
+    // ⛔ RETURN BEFORE ANYTHING PERSISTS OR MUTATES. Everything below this point writes: the plan is
+    // linked to a goal, activated, and — the destructive one — `retireCompetingActivePlans` ENDS the
+    // athlete's current plan. A preview that reached it would swap someone's training for a plan
+    // they were only looking at.
+    //
+    // ⚠️ IT ALSO HAS TO SIT ABOVE THE `plan_id` CHECK, not below it. In preview mode the generator
+    // deliberately returns `plan_id: null` (`generate-run-plan:406`), so the guard three lines down
+    // would throw `plan_generation_failed` on a preview that worked perfectly.
+    //
+    // Response shape mirrors the (b)-run preview at `:2774` so the client reads one contract:
+    // `goal_id` is null here because no row was created, and that is the point.
+    if (bodyPreview) {
+      return new Response(JSON.stringify({
+        success: true, mode, goal_id: null, preview: true,
+        sport: 'run', combined: false,
+        run_preview: generated?.preview ?? null, plan: generated?.plan ?? null,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const generatedPlanId = generated?.plan_id;
     if (!generatedPlanId) throw new AppError('plan_generation_failed', generated?.error || 'Plan generation returned no plan_id');
     createdPlanId = generatedPlanId;

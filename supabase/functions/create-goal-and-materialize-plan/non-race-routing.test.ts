@@ -1,6 +1,6 @@
 // D-214 — prove selectGoalsForCombined's EVENT path is byte-identical to the original inline logic,
 // and that the non-race path lets a lone goal through. Run: ~/.deno/bin/deno test --no-check <this>
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError } from './non-race-routing.ts';
 
 // Q-088 / D-220 — strength-focus mode producer (lane selection + freq-4 derivation).
@@ -160,4 +160,145 @@ Deno.test('buildExistingGuardError — event/non-race eligibility, distance + st
   assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'completed' }, { checkStatus: true })?.code, 'goal_not_active');
   assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'completed' }), null); // no checkStatus → ignored
   assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'active' }, { checkStatus: true }), null);
+});
+
+// ── THE MARATHON TIMELINE GATE (2026-08-04) ──────────────────────────────────
+// ⛔ THIS GATE WAS DEAD FOR MONTHS AND NO TEST COULD HAVE CAUGHT IT — it lived inline behind a
+// feature flag that defaults to the value that disables it. The point of these is that the
+// decision is now executable.
+import { resolveMarathonFloorWeeks, marathonTimelineRefusal } from './non-race-routing.ts';
+import { resolveAdaptiveMarathonDecisionFromMemory } from '../_shared/athlete-memory.ts';
+
+/** MIN_WEEKS.marathon, mirrored from `index.ts:226` — the level-scaled static table. */
+const MIN_WEEKS_MARATHON = { beginner: 14, intermediate: 10, advanced: 8 };
+
+Deno.test('⛔ THE BUG: a no-history "advanced" runner cannot build a 3-week marathon', () => {
+  // Step 1 — the adaptive engine, with NO athlete_memory, really does answer "3 weeks".
+  const adaptive = resolveAdaptiveMarathonDecisionFromMemory(null, {
+    weeksOut: 3, spacingWeeks: null, fitness: 'advanced',
+  });
+  assertEquals(adaptive.minimum_feasible_weeks, 3, 'the fallback floor moved — re-check this whole gate');
+  assertEquals(adaptive.decision_source.rule_statuses['run.minimum_feasible_weeks'], 'insufficient_data');
+  // and it recommends a short block off that fallback, which is what used to be honoured
+  assertEquals(adaptive.recommended_mode, 'race_support');
+
+  // Step 2 — the floor resolver refuses to treat that as personal, and defers to the static table.
+  const floor = resolveMarathonFloorWeeks({
+    staticFloorWeeks: MIN_WEEKS_MARATHON.advanced,
+    adaptiveMinWeeks: adaptive.minimum_feasible_weeks,
+    minWeeksRuleStatus: adaptive.decision_source.rule_statuses['run.minimum_feasible_weeks'],
+  });
+  assertEquals(floor, { floorWeeks: 8, measured: false });
+
+  // Step 3 — the gate refuses. This is the assertion the slice exists for.
+  const refusal = marathonTimelineRefusal({
+    distanceApi: 'marathon', weeksOut: 3,
+    floorWeeks: floor.floorWeeks, floorIsMeasured: floor.measured,
+    allowRaceWeekSupportMode: false,          // brand-new account: no active run plan
+    adaptiveSupportMode: true,                // the engine DID ask for race_support…
+  });
+  assert(refusal, 'a 3-week marathon from a no-history "advanced" account was allowed through');
+  assertEquals(refusal!.code, 'race_too_close');
+  assert(refusal!.message.includes('8 weeks'), 'the message must name the weeks NEEDED');
+  assert(refusal!.message.includes('3 weeks out'), 'the message must name the weeks AVAILABLE');
+  assert(/later date/.test(refusal!.message) && /shorter race/.test(refusal!.message),
+    'the message must offer both ways out');
+  // ⚠️ And it must NOT claim to have read history it does not have.
+  assert(!refusal!.message.includes('recent training history'),
+    'the no-evidence message must not cite training history the athlete has none of');
+});
+
+Deno.test('every level is held to its own static floor when there is no history', () => {
+  for (const [fitness, floorWeeks] of Object.entries(MIN_WEEKS_MARATHON)) {
+    const tooClose = marathonTimelineRefusal({
+      distanceApi: 'marathon', weeksOut: floorWeeks - 1,
+      floorWeeks, floorIsMeasured: false,
+      allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
+    });
+    assert(tooClose, `${fitness}: ${floorWeeks - 1} weeks out slipped past a ${floorWeeks}-week floor`);
+    // exactly at the floor is fine — the gate is "closer than", not "at or closer than"
+    assertEquals(
+      marathonTimelineRefusal({
+        distanceApi: 'marathon', weeksOut: floorWeeks,
+        floorWeeks, floorIsMeasured: false,
+        allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
+      }),
+      null,
+      `${fitness}: a race exactly at the floor was refused`,
+    );
+  }
+});
+
+Deno.test('⛔ the support modes SURVIVE — the discriminator is evidence, not weeks', () => {
+  // An athlete mid-build with an active run plan, race in 2 weeks. This is what race_support is FOR
+  // and a naive `weeksOut < floor` gate would have deleted it.
+  assertEquals(
+    marathonTimelineRefusal({
+      distanceApi: 'marathon', weeksOut: 2, floorWeeks: 8, floorIsMeasured: false,
+      allowRaceWeekSupportMode: true, adaptiveSupportMode: false,
+    }),
+    null,
+    'an athlete with an active run plan was refused race-week support',
+  );
+
+  // An athlete with REAL memory whose engine-computed floor is 6 and whose race is 5 weeks out.
+  assertEquals(
+    marathonTimelineRefusal({
+      distanceApi: 'marathon', weeksOut: 5, floorWeeks: 6, floorIsMeasured: true,
+      allowRaceWeekSupportMode: false, adaptiveSupportMode: true,
+    }),
+    null,
+    'a measured short block (bridge_peak) was refused',
+  );
+
+  // ⚠️ THE PAIR THAT MATTERS: same weeks, same mode, different evidence → different answer.
+  const unmeasured = marathonTimelineRefusal({
+    distanceApi: 'marathon', weeksOut: 5, floorWeeks: 10, floorIsMeasured: false,
+    allowRaceWeekSupportMode: false, adaptiveSupportMode: true,
+  });
+  assert(unmeasured, 'an UNMEASURED short block slipped through on the adaptive mode alone');
+});
+
+Deno.test('a measured floor stays personal, and says so', () => {
+  const refusal = marathonTimelineRefusal({
+    distanceApi: 'marathon', weeksOut: 4, floorWeeks: 12, floorIsMeasured: true,
+    allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
+  });
+  assert(refusal);
+  assertEquals(refusal!.code, 'race_too_close_personalized');
+  assert(refusal!.message.includes('recent training history'));
+});
+
+Deno.test('a measured floor is honoured over the static table — the engine still earns its keep', () => {
+  // An experienced athlete whose own history says 6 weeks is enough should NOT be held to 10.
+  const floor = resolveMarathonFloorWeeks({
+    staticFloorWeeks: MIN_WEEKS_MARATHON.intermediate,
+    adaptiveMinWeeks: 6,
+    minWeeksRuleStatus: 'ok',
+  });
+  assertEquals(floor, { floorWeeks: 6, measured: true });
+  assertEquals(
+    marathonTimelineRefusal({
+      distanceApi: 'marathon', weeksOut: 7,
+      floorWeeks: floor.floorWeeks, floorIsMeasured: true,
+      allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
+    }),
+    null,
+    'a 7-week race was refused against a measured 6-week floor',
+  );
+  // low_confidence is still MEASURED — a hedged real value, not an absence.
+  assertEquals(
+    resolveMarathonFloorWeeks({ staticFloorWeeks: 10, adaptiveMinWeeks: 6, minWeeksRuleStatus: 'low_confidence' }),
+    { floorWeeks: 6, measured: true },
+  );
+});
+
+Deno.test('non-marathon distances keep their own message and code', () => {
+  const r = marathonTimelineRefusal({
+    distanceApi: 'half', weeksOut: 2, floorWeeks: 4, floorIsMeasured: false,
+    allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
+  });
+  assert(r);
+  assertEquals(r!.code, 'race_too_close');
+  assert(r!.message.includes('half'));
 });

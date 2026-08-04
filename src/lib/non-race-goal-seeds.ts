@@ -9,7 +9,18 @@
 export type Discipline = 'swim' | 'bike' | 'run' | 'strength';
 export type Posture = 'develop' | 'maintain' | 'out';
 export type NonRaceGoalId =
-  | 'build_endurance' | 'build_speed' | 'get_stronger' | 'build_muscle' | 'maintain' | 'starting_over';
+  | 'build_endurance' | 'build_speed' | 'get_stronger' | 'build_muscle' | 'maintain' | 'starting_over'
+  // ⛔ `marathon` IS A RACE GOAL LIVING IN THE NON-RACE UNION, AND THAT IS DELIBERATE (2026-08-04).
+  //
+  // The Focus builder is the flow; a race is a Focus goal that additionally carries a date and a
+  // distance. Giving it its own union would have meant a second seed table, a second step machine
+  // and a second payload assembler — which is how this codebase grew four plan generators. It rides
+  // the existing machinery and diverges at exactly two points: `getSteps` inserts a `race` step, and
+  // `assemblePayload` sends `goal_type: 'event'` + `target_date` + `distance` instead of nulls.
+  //
+  // ⚠️ The TYPE NAME is now wrong for this member. Renaming it touches ~12 files and every goal
+  // stored as `goal_focus`; left alone on purpose until a slice needs the rename for its own sake.
+  | 'marathon';
 
 export type GoalSeed = {
   goal_type: 'capacity' | 'maintenance';
@@ -33,6 +44,7 @@ export const GOAL_LABELS: Record<NonRaceGoalId, string> = {
   build_muscle: 'Build muscle + train',
   maintain: 'Maintain',
   starting_over: 'Starting over',
+  marathon: 'Marathon',
 };
 
 // Only these 3 need a "which discipline develops?" sub-choice; the other 3 are fully determined.
@@ -49,6 +61,12 @@ export const LENGTH_FLOOR_WEEKS: Record<NonRaceGoalId, number> = {
   build_muscle: 12,   // hypertrophy is structural/slower (~8-12wk, Schoenfeld)
   maintain: 4,        // minimal coherent maintenance block
   starting_over: 6,   // re-adaptation is faster than from scratch
+  // ⛔ NOT THE MARATHON FLOOR, AND NOTHING READS IT ON THE RACE PATH. A race block's length is the
+  // distance from today to race day (`create-goal…:3293`), so the length step is skipped and this
+  // number never reaches a slider. The real level-scaled floor is `MIN_WEEKS` on the server
+  // (`create-goal…:226`), which is currently unreachable — see the CAPABILITY-MAP race section. This
+  // value exists only because the record is keyed by the full goal union.
+  marathon: 10,
 };
 export function floorForGoal(goal: NonRaceGoalId | null): number {
   return goal ? LENGTH_FLOOR_WEEKS[goal] : 4;
@@ -304,6 +322,16 @@ export function seedFromGoal(
       strength = 'maintain';
       break;
     }
+    // ⛔ RUN-ONLY IS THE CLEAN DEFAULT, AND IT IGNORES `have` ON PURPOSE. Every other goal
+    // intersects with the athlete's declared disciplines so nothing is prescribed that they do not
+    // do. A marathon goal is the athlete SAYING they run, so run develops whether or not
+    // `user_baselines.disciplines` has caught up — and a blank account has no disciplines at all.
+    // Bike and swim start OUT, not maintain: the race is the boss, and cross-training is opt-in on
+    // the posture step (the à la carte hold cards) rather than something to switch off.
+    case 'marathon':
+      for (const d of ENDURANCE) posture[d] = d === 'run' ? 'develop' : 'out';
+      strength = 'maintain';
+      break;
   }
   posture.strength = strength;
   const { goal_type, sport, strength_protocol } = derivePlanShape(posture, undefined, equipmentTier);

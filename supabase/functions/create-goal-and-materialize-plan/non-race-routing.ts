@@ -176,3 +176,91 @@ export function selectGoalsForCombined<T extends { id: string }>(
   const all = !primary ? rawEventGoals.slice(0, 2) : (partner ? [primary, partner] : [primary]);
   return all.length < 2 ? null : all;
 }
+
+// ── THE MARATHON TIMELINE GATE (2026-08-04) ──────────────────────────────────
+//
+// ⛔ EXTRACTED SO IT CAN BE TESTED, NOT JUST TRACED. The decision lived inline in a 3,600-line
+// handler and was DEAD for months without anyone noticing — its condition opened with a feature
+// flag that defaults to the value that disables it. Nothing could have caught that, because
+// nothing could run it. These two functions are pure, and `preview-no-write` aside, they are the
+// first part of this gate that a test can actually execute.
+//
+// Same home and same shape as `buildExistingGuardError` above: return `{code, message}` to throw,
+// or `null` when the request is allowed.
+
+/**
+ * Which floor applies, and whether it was MEASURED or defaulted.
+ *
+ * ⛔ THE DISTINCTION IS THE WHOLE FIX. `resolveAdaptiveMarathonDecisionFromMemory` always returns a
+ * `minimum_feasible_weeks` — with no `athlete_memory` row it falls through to a per-level constant
+ * (`_shared/athlete-memory.ts:381`: advanced 3, intermediate 4, beginner 6) and hands it back in
+ * the same shape as a value derived from real training. Read as a personalisation, that let a
+ * brand-new account claiming "advanced" past a 3-week floor for a marathon.
+ *
+ * So: a measured floor is the athlete's own; an unmeasured one is a guess, and the level-scaled
+ * `MIN_WEEKS` table is what a guess should defer to.
+ *
+ * ⚠️ `low_confidence` IS MEASURED. `getRuleOrInsufficient` returns a real value with a hedge on it;
+ * only `insufficient_data` means "no evidence". Treating a hedge as an absence would push
+ * experienced athletes back onto the static table — the opposite of what the engine is for.
+ */
+export function resolveMarathonFloorWeeks(input: {
+  /** `MIN_WEEKS[distance][fitness]` — the level-scaled table. */
+  staticFloorWeeks: number;
+  /** `adaptive.minimum_feasible_weeks`. */
+  adaptiveMinWeeks: number;
+  /** `decision_source.rule_statuses['run.minimum_feasible_weeks']`. */
+  minWeeksRuleStatus: string | undefined | null;
+}): { floorWeeks: number; measured: boolean } {
+  const measured = String(input.minWeeksRuleStatus ?? 'insufficient_data') !== 'insufficient_data';
+  return {
+    measured,
+    floorWeeks: measured ? Math.max(1, input.adaptiveMinWeeks) : input.staticFloorWeeks,
+  };
+}
+
+/**
+ * The one hard refusal on the race path: a race closer than the shortest block we know how to build.
+ *
+ * ⛔ WHY THIS REFUSES WHEN THE MILEAGE FLOOR ONLY WARNS. Michael's line, 2026-08-04: *timeline,
+ * unlike mileage, is where we stop.* A weekly volume under the floor is a judgement about someone's
+ * body and they own it (§5.2b — breach states cost, never refuses). A race inside the floor is
+ * arithmetic: there is no plan to hand them, so continuing would mean shipping a fabricated one.
+ *
+ * ⛔ THE SUPPORT MODES ARE EXEMPT ON EVIDENCE, NOT ON WEEKS. `race_support` (≤2 weeks) and
+ * `bridge_peak` (≤6) sit BELOW every sane floor by construction, so a naive `weeksOut < floor`
+ * would have deleted both. They pass only with proof of a build underneath: an active run plan, or
+ * a floor that came from real memory.
+ */
+export function marathonTimelineRefusal(input: {
+  /** `distanceToApiValue(goal.distance)` — 'marathon', 'half', '10k', '5k'. */
+  distanceApi: string;
+  weeksOut: number;
+  /** The APPLIED floor, from `resolveMarathonFloorWeeks`. */
+  floorWeeks: number;
+  floorIsMeasured: boolean;
+  /** An active run plan is on file (the pre-existing race-week test). */
+  allowRaceWeekSupportMode: boolean;
+  /** The adaptive engine chose `race_support` or `bridge_peak`. */
+  adaptiveSupportMode: boolean;
+}): { code: string; message: string } | null {
+  const legitimateShortBlock =
+    input.allowRaceWeekSupportMode || (input.floorIsMeasured && input.adaptiveSupportMode);
+  if (legitimateShortBlock) return null;
+  if (!(input.weeksOut < input.floorWeeks)) return null;
+
+  const isMarathon = input.distanceApi === 'marathon';
+  // ⚠️ TWO MESSAGES, BECAUSE ONE OF THEM WOULD BE A LIE. The original opened "Based on your recent
+  // training history…" — untrue for the athlete this now catches most often, who has none. Telling
+  // them to go fix history they never had is worse than saying nothing.
+  const message = isMarathon
+    ? (input.floorIsMeasured
+      ? `Based on your recent training history, this marathon needs about ${input.floorWeeks} weeks. Your race is ${input.weeksOut} weeks out. Pick a later date, or a shorter race.`
+      : `A marathon build at this level takes about ${input.floorWeeks} weeks. Your race is ${input.weeksOut} weeks out. Pick a later date, or a shorter race — and once you have training on file we can judge this on your own history instead of your level.`)
+    : `Your race is ${input.weeksOut} weeks away. ${input.distanceApi} needs at least ${input.floorWeeks} weeks.`;
+
+  return {
+    code: isMarathon && input.floorIsMeasured ? 'race_too_close_personalized' : 'race_too_close',
+    message,
+  };
+}
