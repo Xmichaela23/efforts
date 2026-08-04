@@ -4,6 +4,21 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-03 (night) — STRENGTH IS FUNCTIONALLY DONE. The AMRAP is the measurement, end to end.**
+> A full day past the language: swap intensity-tier gate ([D-376]), the 65-exercise catalog + a permanent
+> vocabulary GUARD ([D-377], kills "borrow a neighbor" prescriptions by name at build time), Q-254 slice 1
+> (State reads the AMRAP all-out set, [D-378]) + slice 2 (the verdict reads the AMRAP not RIR, killing a
+> live tappable-weight bug, [D-379]), the timer ([D-380]) and band pricing ([D-381]). All pushed + deployed
+> + device-verified where noted.
+>
+> ⛔ **AND THE PROGRESSION FINALE WAS ALREADY BUILT** (deployed 2026-07-31). Do NOT rebuild it — Wendler's
+> +5/+10 is automatic; the AMRAP only withholds it on a miss. See the ENGINE-STATE banner + [Q-223].
+>
+> ⛔ **NEXT: [Q-256], the ceiling fix** — the TM ceiling reads a stale signup 1RM, stalling squat/OHP after
+> one cycle (~Aug 24). Feed it the learned/AMRAP max instead. Michael rules on the approach first. THEN
+> **[Q-252]** (the Sunday blackout, still live with a deadline). Small polish: [Q-254] slice 3 (trap-bar),
+> the dot/PR hedge, the DB/incline-bench rest call.
+
 > **2026-08-03 — THE STRENGTH LANGUAGE IS SHIPPED. ONE VOCABULARY, ACROSS THE WHOLE APP.**
 > **[D-375]** completed `SPEC-strength-language.md`: the 6→8 overlapping classifiers collapsed onto one
 > role axis + one type axis (8 types incl. band), read by the card, logger, swapping and load. Built as 7

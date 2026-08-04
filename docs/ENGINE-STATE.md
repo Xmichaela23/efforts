@@ -23,48 +23,64 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-03 — strength language SHIPPED; next is Q-254 AMRAP + two fresh bugs)
+## 🧭 NEXT SESSION — START HERE (2026-08-03 night — STRENGTH is functionally DONE; next is the ceiling fix, then Q-252)
 
 ### YOUR JOB
-The **strength language is done** ([D-375], see below) — do NOT re-open it. The next strength work is
-**[Q-254], the AMRAP currency job**, and it now carries three concrete pieces (all in `OPEN-QUESTIONS-2.md`
-under Q-254's 2026-08-03 addendum): (1) rebuild the State "from your logged sets" rows on the **AMRAP top
-set + learned e1RM** instead of working-weight-vs-a-stale-typed-baseline; (2) **drop RIR for AMRAP** as the
-strength-currency signal (Michael: *"rir arent valid anymore — 5-3-1 uses amrap"*); (3) roll **trap-bar
-deadlift into the deadlift slot** (`PRIMARY_LIFTS`/`computeE1rmBand` — variant aggregates, don't add a 5th
-max). See `GAME-PLAN.md`.
+**Strength is functionally done.** A huge day shipped (11 commits, `dd703ef5` → `905b6879`) — all pushed,
+deployed, and device-verified where noted (list below). **Do NOT re-open it.** Two things remain:
 
-### ⛔ TWO FRESH BUGS FROM DEVICE ACCEPTANCE (both filed under Known-broken below, neither fixed)
-1. **OHP logging gap.** The Jul 28 overhead-press session stored `estimated_1rm = 0` — `compute-facts:1434`
-   only computes an e1RM when `bestWeight > 0 && bestReps > 0`, so a set logged without a valid weight+reps
-   pair never updates the learned max (left it stale at Jul 23, value 105). VERIFIED via read: the Jul 28
-   row has e1RM 0 and null RIR. **Open question, one read to settle:** was the weight missing (a logger
-   capture bug) or the reps (UX)? Pull that session's stored sets.
-2. **Add-picker catalog gap.** The strength logger's add-exercise search (draws from `exercise-config.ts`)
-   is missing **band-named moves, sled, and dead hang** — confirmed on device ("ban" and "sled" return
-   nothing; "fa" DOES return Face Pulls / Farmer's Carry / TRX Fallout, so it's spotty, NOT a whole
-   category). Pre-existing (the add catalog never grew with the type table). **This blocks verification of
-   the 5 changed logger movements** (sled push/pull, dead hang, wall angel, foot doming) — they can't be
-   added by hand. Job: reconcile `exercise-config.ts` against the full vocabulary, each with correct
-   display config (perHand / band / duration). A terminal reconciliation task was drafted but not run.
+1. **THE ONE REAL STRENGTH ITEM — the 5/3/1 training-max CEILING reads a STALE signup 1RM.** `tmCeilingLb`
+   (`wendler-531.ts:197`) caps the training max at 90% of `one_rep_maxes_at_build` — a **signup number that
+   never updates.** On a perfect block, **squat (TM 90→95) and OHP (85→90) STALL after ONE cycle (~Aug 24)**
+   while bench/deadlift keep climbing. Michael's bench AMRAP already implies ~160 against a stored 150.
+   **Fix: feed the ceiling from the LEARNED / AMRAP-implied max, not the frozen signup.** The +5/+10
+   increment stays (that's Wendler); only the *ceiling reference* changes. Filed as **[Q-256]**. ⚠️ Michael
+   must rule on the approach BEFORE it's built — it changes safety logic. Not urgent: first stall is ~Aug 24.
+2. **[Q-252] — the Sunday State blackout — STILL LIVE, with a deadline.** Recurs every Sunday 17:00 Pacific,
+   blanks the whole State performance section. Top non-strength item. See its own entry below + Q-252.
 
-### ⛔ STILL LIVE AND UNFIXED — [Q-252], THE SUNDAY BLACKOUT (carried forward, NOT touched this session)
-The entire State performance section blanks every Sunday ~17:00 Pacific: `compute-snapshot/index.ts:670`
-gates the trend build on `targetWeek === mondayOfToday()`, which resolves in **UTC**. It is a rolling
-7-day read and Michael's objection stands — *"this section is rolling too"* — so the fix is a product call
-(does the week gate belong at all), and there's no athlete timezone on the snapshot path. **It recurs every
-Sunday.** Restored by hand each time is a patch, not a fix. Read Q-252 before touching it.
+### ⛔ THE 5/3/1 PROGRESSION "FINALE" IS ALREADY BUILT — DO NOT REBUILD IT (audited 2026-08-03)
+The suggested-weight progression (advance/reset off the AMRAP, a consent sheet, rematerialize) is **already
+built, deployed 2026-07-31, and current** — verified against every transitive dep. `applyVerdict` /
+`workingNumberForCycles` (`wendler-531.ts`); the consent sheet in `StrengthLogger.tsx:6014` ("Your next
+cycle changed", Apply → rematerialize); `rematerialize-strength-block:180` scoped to weeks not yet started.
+**It has never fired for two reasons:** (a) Michael is in **week 2** — first possible trigger is ~**Aug 24**;
+(b) THE SURPRISE — **Wendler's +5/+10 is automatic; the AMRAP can only WITHHOLD it (a MISS → reset), never
+earn extra.** There is no "reward bump" to build; the sheet is a **miss-notice**, and a good cycle produces
+nothing because the plan already forecast the climb. Integration tests added (`q223-block-advance.test.ts`,
+uncommitted) pin the never-run chain before its first live run. See **[Q-223]**.
 
-### WHAT SHIPPED THIS SESSION — DO NOT RE-LITIGATE
-- **[D-375]** — the whole strength-language collapse: one role axis + one type axis (8 types incl. band),
-  read by the card, logger, swapping, and load. Fixed a real band-assist pricing bug (200-vs-700, was
-  corrupting stored `total_volume_lbs`; history checked clean). The fitness-section name sets are **three
-  questions, not one** (coach ~16 / tracked-max 4 / dot 5) — a Front Squat coached-but-not-charted is
-  CORRECT. PUSHED (`dd703ef5`) + DEPLOYED (29 fns) + card VERIFIED on device.
-- **Cap fix** — `StateTab.tsx` logged-sets list filtered to main lifts BEFORE the `.slice(0,5)` cap, so
-  overhead press (6th) is no longer cut. Client-only, pushed, VERIFIED (OHP back on the card).
-- ⚠️ **NOT verified:** the 5 changed logger movements (blocked by the catalog gap above). Bands only
-  partially (band-assisted Chin Up seen; band-add row and Dead Hang not).
+### WHAT SHIPPED TODAY — DO NOT RE-LITIGATE (all pushed + deployed; device-verified where noted)
+- **[D-375]** — one strength language (role + type axes, 8 types incl. band). *(from the morning; 29 fns.)*
+- **Cap fix** — OHP no longer cut from the logged-sets card. **VERIFIED.**
+- **[D-376]** — swap engine **intensity-tier gate**: accessories only swap within their heaviness tier
+  (light-prehab vs loaded), killing 97 unsound offers (Clamshell → Barbell Hip Thrust, etc.). Muscle axis
+  left loose (Wendler). **VERIFIED on device.**
+- **[D-377]** — the **65-exercise catalog reconciliation + a permanent vocabulary GUARD**: every classified
+  exercise now has a config entry; the fuzzy fallback went LOUD; a test fails any future exercise that
+  "borrows a neighbor." Killed a live mis-prescription (plain "Press" → Leg Press weight). Fixed Single Leg
+  Hip Thrust (was two-legged-deadlift priced) + 5 real-plan names. **VERIFIED.**
+- **[D-378]** — **Q-254 slice 1**: State's strength rows read the **AMRAP all-out set** (rep record +
+  hedged e1RM), matching the Performance screen. **VERIFIED** (Deadlift State ≡ Performance).
+- **[D-379]** — **Q-254 slice 2**: the verdict reads the **AMRAP the Wendler way** (`verdictFrom95Set`),
+  NOT RIR. Killed a live bug: a main lift inheriting accessory RIR could print a tappable "back off weight"
+  that moved real weights. Now consent-safe (no tap on this path). **VERIFIED** (green "top set met").
+- **[D-380]** — timer: rest reads the **shared** main-lift list (Push Press / Military Press now rest as
+  main lifts, not 90s); heavy main-lift rest bumped 150s → **180s** (standard). ⚠️ Side effect: DB / incline
+  / decline bench now rest 90s (they're assistance, not main lifts) — Michael to confirm.
+- **[D-381]** — band pricing: a band move with a blank box no longer prices as bodyweight (returns the flat
+  token). **LATENT** — Michael's logged band sets all carry a value, so zero sessions changed (backfill empty).
+- **Estimated-max copy rewritten** ("guess from N reps, estimates hold to about N") in both renderers.
+
+### STILL OPEN (none blocking; Michael's calls)
+- **[Q-256]** the ceiling stall (the one real strength item — see YOUR JOB above).
+- **[Q-254] slice 3** — roll trap-bar into the deadlift slot. NOT done (small).
+- **The dot/PR confidence hedge** — the Deadlift dot shows "PR ~225" off a 35-rep set the detail calls
+  "rough"; the tone/PR doesn't carry the hedge. NOT done (small, Q-254-adjacent).
+- **DB/incline/decline bench rest** — now 90s (correct per classifier); Michael to confirm keep or bump.
+- **OHP Jul 28 logging gap** — a session stored `estimated_1rm = 0` (no valid weight+reps). Explained by
+  Michael (missed the AMRAP first week); worth confirming next week's OHP logs cleanly. Not a live bug.
+- The 5 changed logger movements (sled/dead hang) are addable now (catalog fixed) but not device-verified.
 
 ### 🗄️ HISTORY (2026-08-02 night, SECOND session) — superseded by the banner above; kept for the Q-249 / Q-246 / grep-the-exports notes still relevant below
 

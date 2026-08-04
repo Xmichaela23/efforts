@@ -2118,6 +2118,16 @@ The gap is not rounding. Our working number **starts** at `WORKING_NUMBER_PCT_OF
 > ✅ **CLOSED 2026-07-30 by [D-341].** The working number no longer advances on the calendar — a
 > cycle with no logged evidence resolves to `hold`, pinned by fixture. Everything below is history.
 
+> **⚠️ RE-AUDITED 2026-08-03 — the mechanism is more built than this reads, and the mental model here is off.**
+> The advance/reset chain (`applyVerdict` / `workingNumberForCycles`, the consent sheet at
+> `StrengthLogger.tsx:6014` → `rematerialize-strength-block`) is **fully built and deployed (2026-07-31)**,
+> not rebuild-only. It has never fired for Michael only because he's in week 2 (first trigger ~Aug 24). ⛔
+> **The key correction: Wendler's +5/+10 is AUTOMATIC — the AMRAP can only WITHHOLD it (a miss → reset),
+> never earn extra.** So a *good* cycle produces no sheet (the plan already forecast the climb); the sheet
+> is a **miss-notice.** There is no "reward bump" to build. Integration tests added
+> (`q223-block-advance.test.ts`) pin the never-run chain. The real remaining issue is a *different* one —
+> the stale-signup-1RM ceiling, filed as **[Q-256]**. Everything below is the original (partly-superseded) note.
+
 ## Q-223 — The earned advance only runs on a rebuild, so a first block climbs on the calendar (2026-07-29, KNOWN — now DISCLOSED in the partner doc rather than fixed)
 
 `strength-primary-plan.ts` authors all twelve weeks **before a single set is performed**, so no logged evidence can exist for a fresh block. It passes `unknownMeans: 'advance'`, and every cycle resolves to a calendar step.

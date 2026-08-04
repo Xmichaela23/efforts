@@ -143,3 +143,76 @@ core-circuit label, and `bandMeansAssistance`-in-canonicalize (dead, left labell
 
 > **Back-annotates [D-373]:** Axis 1 shipped there; the strength-language SPEC is now fully built as of
 > this entry. `SPEC-strength-language.md` retained only for the unbuilt remainder above.
+
+### D-376 — Swap engine: an intensity-tier gate for accessories (2026-08-03, **PUSHED + DEPLOYED + VERIFIED**)
+
+The swap engine (`getInSlotAlternatives`, `exercise-alternatives.ts`) filtered on movement pattern and
+excluded main lifts, but was **blind to intensity tier** — so it offered a loaded Barbell Hip Thrust as a
+swap for a light-band Clamshell, ranked heaviest-first. Grounded in the field standard (Wendler push/pull/
+single-leg-core; Fitbod "same muscle, equivalent intensity, change only equipment"; RP "same muscle, similar
+rep range"), a sound accessory swap must share **category + intensity tier + muscle**. Added
+`src/lib/strength-intensity-tier.ts` (light / loaded / power) and gated swaps to same-tier only. Killed 97
+tier-only-unsound offers. **Muscle axis left LOOSE deliberately** — Wendler treats posterior-chain accessories
+as interchangeable, so pattern stays the muscle proxy (a fixture pins muscle-loose so a future change can't
+quietly tighten it). Gate is accessories-only (a main lift may still swap DOWN). Also fixed 3 "same movement,
+two names, two pools" pattern defects (Y-T-W, reverse-fly, squat-jump). Client-only engine; the pattern
+config touches 7 edge functions. Audit: `docs/AUDIT-accessory-swaps-2026-08-03.md`.
+
+### D-377 — The exercise-config catalog reconciled + a permanent VOCABULARY GUARD (2026-08-03, **PUSHED + DEPLOYED + VERIFIED**)
+
+`getExerciseConfig` ends in a "longest overlapping key wins" fuzzy fallback, so any exercise without an
+exact config key silently **inherits a neighbor's prescription** — the same disease as D-375's classifiers,
+one layer down. Live example killed: plain **"Press"** (5/3/1's own word for OHP) resolved to **"Leg Press"
+→ 1.5× your SQUAT**. Fixes: (1) added config entries for all 65 offenders (type table + baked plans + a
+read-only snapshot of Michael's real logged/planned names), every ratio **inherited from a structural
+sibling, never guessed**; (2) the fuzzy fallback now emits a **loud dev warning** naming what it borrowed;
+(3) **`exercise-config.vocabulary-guard.test.ts`** — a permanent test that fails the build, by name, for any
+exercise that resolves fuzzy/none. Empty `ACCEPTED_FUZZY` ledger — nothing pre-forgiven. Only 5 prescriptions
+actually moved (Squats-priced-as-jump, Pistol-Squats-off-barbell-max, Kettlebell-Rows-per-hand, Glute-Bridge-
+March-unloaded, Handstand-Push-ups-vertical); the rest were byte-copies or bodyweight. Also fixed the
+apostrophe trap (`foldExerciseName` now strips `'` — "Farmer's Carry" resolved to nothing) and Single Leg Hip
+Thrust (was priced as a two-legged barbell deadlift). **This turns "find bad prescriptions by screenshot"
+into an automatic, permanent check.**
+
+### D-378 — Q-254 slice 1: State reads the AMRAP all-out set (2026-08-03, **PUSHED + DEPLOYED + VERIFIED**)
+
+State's "from your logged sets" showed working-weight vs a stale typed baseline while the **Performance**
+screen already showed the real all-out set — the doubled disease. The all-out read (rep record + hedged
+e1RM + the "estimates hold to about N" caveat) lived in `workout-detail`, not `session-detail/build.ts`;
+extracted to `_shared/strength/all-out-set.ts` and made State read the same source over the last 40 sessions
+(the old 28-day window went blank on measured lifts during light weeks). Additive — no verdict/weight/trend
+moved. Coach payload 161 → 162. **VERIFIED: Deadlift State ≡ Performance (105×35, est 225 "rough").**
+
+### D-379 — Q-254 slice 2: the verdict reads the AMRAP, not RIR (2026-08-03, **PUSHED + DEPLOYED + VERIFIED**)
+
+`computeLiftVerdict` decided "back off / add weight" on **RIR deviation** — how sets *felt* — which is not
+5/3/1's signal. Worse, a live bug: `getTargetRir` never returned null for `usesRir:false`, so a main lift
+with no RIR of its own **inherited the accessory RIR average**, cleared the ±1.0 band, and printed a
+**tappable** command that moved real weights on one tap. Fix (2a): `getTargetRir` gated via the existing
+`protocolUsesRir(profile)` seam (NOT a signature change — its docblock forbids that; a forgotten null-check
+reads 0 = grind-to-failure) → a 5/3/1 main lift lands in the trend-words branch, no command, **not tappable**.
+Fix (2b): the verdict now reads the AMRAP through the **existing `verdictFrom95Set`** (`wendler-531.ts:454`,
+book-grounded: 0→reset, 1+→advance, big→advance-untrusted, none→hold) as **read-only status** ("top set met /
+missed"), no weight suggestion attached. ⛔ Deliberately **did NOT** surface "advancing/reset" wording — the
+working number does not move from this path (that's [Q-223], already built). Coach payload 162 → 163.
+**VERIFIED: green "top set met" replaced the old command; not tappable.**
+
+### D-380 — Strength rest timer reads the shared main-lift list; heavy rest 150s → 180s (2026-08-03, **PUSHED + DEPLOYED**)
+
+`calculateRestTime` split main-vs-accessory via its OWN private regex (a 7th private classifier) that missed
+Push Press / Military Press → they rested 90s after a heavy triple. Repointed at the shared
+`isMain531Lift` / `MAIN_531_LIFTS`. Heavy main-lift rest (3-5 rep case) bumped 150s → **180s** (the strength
+standard). ⚠️ Side effect, pinned in a fixture: DB / incline / decline bench now rest 90s — they're
+*assistance* in 5/3/1, not main lifts, so the shared classifier is correct, but Michael will feel it (his
+call to keep or bump). The backgrounding fix (Q-TIMER, wall-clock deadline + notification) was audited and
+is **solid** — no work needed there.
+
+### D-381 — Band-load pricing: a blank band box is not bodyweight (2026-08-03, **PUSHED + DEPLOYED, LATENT**)
+
+`strengthSetVolume`, for a band move with no logged band value, fell through to **bodyweight × reps** —
+correct for a push-up, wrong for a band pull. Added a `bandIsLoad` opt (`typeForExercise === 'band'`) that
+returns the flat `BAND_SET_VOLUME_TOKEN` instead. Also closed the matching planned-side hole ("By feel"
+didn't trip `plannedIsBand`). ⚠️ **LATENT**: read-only check of all 96 strength sessions found **zero**
+affected — every band set Michael has logged already carries a value, so no `total_volume_lbs` / ACWR moves.
+Backfill empty. *(This corrects the false premise that his screen's "4,000 lb" band face pull was live — it
+was a stale build; his real data prices at 1,000.)*

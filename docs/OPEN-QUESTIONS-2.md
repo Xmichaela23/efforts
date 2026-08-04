@@ -347,3 +347,27 @@ computation, the storage and the assembly all exist. Nothing renders it.
 
 **To close:** rule on (1). Related: [D-359] (the gate), [Q-241] (closed — the gate's own ticket),
 [D-360] (the FTP choice the row already discloses), [Q-244].
+
+## Q-256 — ⛔ THE 5/3/1 TRAINING-MAX CEILING READS A STALE SIGNUP 1RM, so lifts stall after one cycle (2026-08-03, Michael) — **THE ONE REAL STRENGTH ITEM LEFT. Not urgent (first stall ~Aug 24), but real.**
+
+Found while auditing the progression finale ([Q-223]). The 5/3/1 training max advances +5/+10 per cycle
+(Wendler, correct), but `tmCeilingLb` (`wendler-531.ts:197`) caps the TM at **90% of `one_rep_maxes_at_build`**
+— the athlete's **signup 1RM, which never updates.** So on a perfect block:
+
+- Squat TM 90 → 95 → **stops** (1RM 110 on file → ceiling ~99)
+- Overhead Press 85 → 90 → **stops** (1RM 100 → ceiling 90)
+- Bench and Deadlift have room.
+
+**Two of four lifts park after a single advance**, on a number nobody has verified since signup. Michael's
+bench AMRAP already implies ~160 against the stored 150. The code half-knows this — its own comment: *"a
+guard on a number nobody verified is a guard with a hypothesis inside it."*
+
+⛔ **The ceiling is the RIGHT kind of safety** (stop the TM running past a real 1RM). The bug is only that
+it reads a **frozen reference.** The fix: feed the ceiling from the **learned / AMRAP-implied max** (the app
+already computes it — "Estimated max 160") instead of the signup number. **The +5/+10 increment stays
+untouched — that's Wendler.** Over-performance is exactly the evidence the stored max is too low, and today
+it's ignored.
+
+⚠️ **Michael must rule on the approach before it's built — it changes safety logic.** Options: (a) ceiling
+reads the confirmed/learned max with a confidence gate; (b) a periodic TM recalibration (Wendler's own
+7th-week / reset protocol). **To close:** rule on (a) vs (b). Related: [Q-223], [Q-254], [D-338].
