@@ -81,6 +81,13 @@ const RACE_DISTANCES = ['Marathon'] as const;
 const RACE_DISTANCE_API: Record<string, string> = { Marathon: 'marathon' };
 
 /**
+ * Which discipline a race distance develops. Keyed by distance rather than hardcoded to `run`,
+ * because the tri distances arrive behind the same machinery and a 70.3 develops three things —
+ * the day that lands, this map is where it is said, not an `if` somewhere in the posture card.
+ */
+const RACE_DISCIPLINE: Record<string, Discipline> = { Marathon: 'run' };
+
+/**
  * Level, and it is the most load-bearing answer on the race path — it picks the weekly-volume table
  * (`generate-run-plan/types.ts:380`), the long-run arc, and the fallback paces. Same three tiers and
  * the same wording as the existing race form (`GoalsScreen.tsx:2519`) so the two cannot drift.
@@ -681,6 +688,8 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
   const isRaceGoal = state.goal === 'marathon';
+  /** The discipline the race develops. Everything else is held or parked (Michael, 2026-08-04). */
+  const raceDiscipline: Discipline = RACE_DISCIPLINE[state.raceDistance] ?? 'run';
   const raceWeeks = state.raceDate ? weeksUntilRaceApprox(state.raceDate) : null;
   // The race card cannot continue on a date alone: level picks the volume table the whole plan is
   // built from, and a blank one would fall to the silent `intermediate` this card exists to replace.
@@ -1124,7 +1133,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       {currentStep === 'posture' && !isStrengthFocus && (
         <StepLayout
           step={stepNo('posture')} totalSteps={steps.length} title="Per-discipline focus"
-          subtitle="Seeded from your goal — adjust as you like. At most 2 disciplines develop at once."
+          subtitle={isRaceGoal
+            ? `Everything else is held or parked while the ${DISCIPLINE_LABEL[raceDiscipline].toLowerCase()} builds. Keep what you want to keep.`
+            : 'Seeded from your goal — adjust as you like. At most 2 disciplines develop at once.'}
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
           <div className="space-y-3">
@@ -1140,7 +1151,33 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
                     {(['develop', 'maintain', 'out'] as Posture[]).map((p) => {
-                      const disabled = p === 'develop' && !canSetDevelop(state.posture, d);
+                      /**
+                       * ⛔ ON A RACE, EXACTLY ONE DISCIPLINE DEVELOPS — THE RACE'S. Michael,
+                       * 2026-08-04: *"no develop — maintain for now or opt out."*
+                       *
+                       * ⛔ THE APP ALREADY SAID THIS AND THEN OFFERED THE OPPOSITE. The goal card
+                       * two screens back reads *"a race build holds it at maintenance, this one
+                       * develops it"* — the rule, stated in prose, next to a control that broke it.
+                       *
+                       * ⛔ AND STRENGTH-DEVELOP HERE WAS SILENTLY WRONG, not merely unwise. It does
+                       * NOT produce a 5/3/1 block: `create-goal…:2432` routes to the strength engine
+                       * only when strength develops AND no endurance does, so with the run
+                       * developing it fell through to the race path carrying
+                       * `strength_frequency: 4` (`assemblePayload`) — **four heavy lifting days
+                       * under a marathon build**, with nothing on screen saying so.
+                       *
+                       * ⚠️ DISABLED, NOT HIDDEN. Same treatment the two-develop ceiling already
+                       * gets on this card: the option stays visible and the reason is printed
+                       * below. Hiding it removes the word; greying it teaches the rule.
+                       */
+                      const raceLead = isRaceGoal && d === raceDiscipline;
+                      const raceHeld = isRaceGoal && d !== raceDiscipline;
+                      const disabled =
+                        // the race's own discipline cannot be anything BUT develop
+                        (raceLead && p !== 'develop')
+                        // and nothing else may develop beside it
+                        || (raceHeld && p === 'develop')
+                        || (p === 'develop' && !canSetDevelop(state.posture, d));
                       const active = cur === p;
                       return (
                         <button
@@ -1172,7 +1209,18 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 </div>
               );
             })}
-            {developCount(state.posture) >= TWO_BUILD_CEILING && (
+            {/* ⛔ SAY WHY THE GREYED BUTTONS ARE GREY (§0f — a cost computed and never said is not
+                a cost, it is a mystery). On a race this line replaces the ceiling note: the ceiling
+                is two, but a race allows one, so printing the ceiling would explain the wrong rule.
+                ⚠️ FACT AND CONSEQUENCE, NOT AN INSTRUCTION — it says what the block does, not what
+                the athlete should do. */}
+            {isRaceGoal ? (
+              <p className="text-white/60 text-xs leading-relaxed">
+                The {DISCIPLINE_LABEL[raceDiscipline].toLowerCase()} is what this block develops — it
+                is the one with a date on it. The rest can be held at a maintenance dose or parked;
+                building two things at once costs the race.
+              </p>
+            ) : developCount(state.posture) >= TWO_BUILD_CEILING && (
               <p className="text-white/60 text-xs">
                 At most 2 disciplines develop together — the interference ceiling. Set one to maintain to develop another.
               </p>
