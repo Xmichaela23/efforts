@@ -15,7 +15,7 @@ Full record, incl. everything that shipped: [`STATE-race-builder-2026-08-05.md`]
 
 | # | Item | Size |
 |---|---|---|
-| 1 | **The intake screen has grown by accretion.** Four questions on "Your week"; the strength picker may break the *default-then-adjust-later* pattern. Michael: *"ok this is a mess."* ⚠️ **The call is unanswered — ask, do not guess.** | design first |
+| ~~1~~ | ~~**The intake screen has grown by accretion.**~~ ✅ **CLOSED 2026-08-05 — Michael: *"keep as is."*** Reviewed on device and kept: strength picker stays on "Your week", club-intensity stays under the club picker. ⛔ **Not a backlog item — a decision. Do not "tidy" it later.** | — |
 | 2 | **The solver collapse** — `week-solver.ts` still has not taken the run generators (`SPEC-week-solver` §7). `assign-days.ts` is a narrow stopgap that overrode a written "do not patch this". | large |
 | 3 | **Two doors to a marathon plan** — route `run` out of `renderEventForm` (`GoalsScreen.tsx:2433`); the form keeps ride/swim/tri. | small |
 | 4 | **Bike/swim cannot be opted into a marathon plan** — the hold cards move *after* the preview, and no post-preview surface exists. | medium |

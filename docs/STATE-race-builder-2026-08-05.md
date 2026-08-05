@@ -86,11 +86,17 @@ the call being made. It was built because the alternative on the table was worse
 appearing in the plan with **nothing** having asked), but "not silent" and "asked here" are not the
 same requirement, and only the first was actually established.
 
-**The open call:** does strength ship on its default with the picker moving to an adjust-later
+**The open call was:** does strength ship on its default with the picker moving to an adjust-later
 surface, and does the club-intensity pair move with it?
 
-⚠️ **Not started. Michael was asked which mess he meant and the question was withdrawn — the answer
-is not on record.** Do not guess it from this doc.
+✅ **ANSWERED 2026-08-05 — Michael: "keep as is."** The strength picker stays on "Your week", the
+club-intensity pair stays under the club picker, and nothing moves to an adjust-later surface. The
+screen keeps its four questions.
+
+⛔ **SO THIS IS NOW A DECISION, NOT A BACKLOG ITEM — do not "tidy" it later.** A future session
+reading §2.1's account of accretion will see an obvious refactor and reach for it. It was considered
+and declined. The accretion account stays because the *method* it describes is still worth avoiding
+(see §4); the *outcome* was reviewed on device and kept.
 
 ### 2.2 ⛔ THE SOLVER COLLAPSE IS STILL OWED — and this work made the debt bigger
 
