@@ -887,8 +887,21 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
    * Intent card. A time goal needs the time AND a pace to write it against — the calibration is
    * offered inline, so this is a completable state, not a wall.
    */
+  /**
+   * ⛔ THE TARGET TIME IS OPTIONAL (2026-08-05). Michael: plenty of people want to race hard
+   * without a number in mind. It used to block Continue, which made "A time" mean "a time you have
+   * already decided on" — a different and much narrower question.
+   *
+   * ⚠️ THE CALIBRATION IS STILL REQUIRED, and that asymmetry is deliberate: the time is what we
+   * MEASURE you against, the paces are what the sessions are WRITTEN FROM. Only the second one is
+   * load-bearing, and without it the server refuses the build.
+   *
+   * ⚠️ A HALF-TYPED TIME STILL BLOCKS — "3:" is not the same as leaving it blank. Empty is an
+   * answer; unparseable is an unfinished one.
+   */
+  const targetTimeUsable = !state.targetTime.trim() || !!parseTargetTime(state.targetTime);
   const intentCanContinue = !!state.raceIntent
-    && (state.raceIntent === 'complete' || (!!parseTargetTime(state.targetTime) && !speedNeedsCalibration));
+    && (state.raceIntent === 'complete' || (targetTimeUsable && !speedNeedsCalibration));
 
   /**
    * ⛔ THE TYPED MILEAGE, JUDGED AGAINST THE ENGINE'S OWN TABLES (`src/lib/run-volume-tables.ts`).
@@ -1032,20 +1045,22 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
    * ride and silently short a rest day. Those sentences are the honest half of the preview.
    */
   /**
-   * ⛔ THE PREVIEW IS OFF ON A RACE GOAL, AND IT IS NOT A STYLE CHOICE — IT WOULD WRITE (2026-08-04).
+   * ⛔ THE PREVIEW IS BACK ON FOR RACE GOALS (2026-08-05) — THE REASON IT WAS OFF IS FIXED.
    *
-   * `preview()` calls `create-goal-and-materialize-plan` with `mode: 'create'` + `preview: true`
-   * (`useArcSetupComplete.ts:125`). On the NON-RACE branch that is safe: the goal insert is guarded
-   * (`create-goal…:2396` — `mode === 'create' && !bodyPreview`), which is the leak that hook's own
-   * comment says was closed. **The EVENT branch has a second, unguarded insert**
-   * (`create-goal…:3307`, plain `if (mode === 'create')`), so previewing a race goal would create a
-   * real goal row and build a real plan — every time the athlete reached the confirm screen.
+   * It was disabled because `preview()` calls `create-goal-and-materialize-plan` with
+   * `mode: 'create'` + `preview: true`, and the EVENT branch had a second, unguarded goal insert
+   * (`create-goal…:3307`). Previewing a race therefore created a live goal, built a plan, activated
+   * it, and called `retireCompetingActivePlans` — ending whatever the athlete was training on.
    *
-   * ⚠️ FOUND BY TRACE, NOT SEEN ON A DEVICE. Filing it rather than fixing it: the fix is on the
-   * event path and belongs with the routing work, not inside an intake slice. Until then the race
-   * card simply does not offer a week preview, and says so.
+   * That is fixed and deployed: the insert is guarded, the generator gets its no-persist flag, and
+   * the handler returns before anything links, activates or retires. So the client guard is dead
+   * weight, and keeping it would mean an athlete building the biggest block in the app is the one
+   * person who never sees the week before committing.
+   *
+   * ⚠️ LEFT AS A NAMED CONSTANT rather than deleted, so the next person to read `runPreview` finds
+   * the history instead of wondering whether previewing writes.
    */
-  const previewSupported = !state.raceDate;
+  const previewSupported = true;
 
   const runPreview = async () => {
     if (!state.goal || previewing || !previewSupported) return;
@@ -1390,11 +1405,24 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     {mismatchNote} The plan builds from what you entered.
                   </p>
                 )}
+                {/* ⛔ SAY WHERE THE PLAN WILL ACTUALLY START. Michael: *"we should offer with
+                    minimum as the floor."* The engine ALREADY overrides a too-low number —
+                    `resolveEffectiveStartVolume` floors week one and never says so — and a silent
+                    override is the worst of both: the athlete's answer is discarded AND they think
+                    it was used. Naming the number the block opens at is the whole fix.
+                    ⚠️ Still not a wall. They continue either way; §5.2b, breach states cost. */}
                 {milesVerdict?.ok === false && (
-                  <p className="text-amber-400/70 text-xs leading-relaxed">
-                    A marathon block usually sits on about {milesFloorDisplay} {unit} a week. Building on
-                    less means a faster ramp, and a faster ramp raises injury risk.
-                  </p>
+                  <div className="rounded-lg border border-amber-400/25 bg-amber-400/[0.06] p-2.5">
+                    <p className="text-white/85 text-xs leading-relaxed">
+                      A {state.raceDistance.toLowerCase()} block usually sits on about{' '}
+                      {milesFloorDisplay} {unit} a week. Building on less means a faster ramp, and a
+                      faster ramp raises injury risk.
+                    </p>
+                    <p className="text-white/60 text-xs mt-1.5 leading-relaxed">
+                      The plan will open near {milesFloorDisplay} {unit} either way — that is its
+                      floor for this level.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -1445,7 +1473,18 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {state.raceIntent === 'speed' && (
               <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
                 <div>
-                  <p className="text-white/85 text-sm mb-2">Target finish</p>
+                  <p className="text-white/85 text-sm mb-2">
+                    Target finish <span className="text-white/45">Optional</span>
+                  </p>
+                  {/* ⛔ SAY WHICH NUMBER DOES WHAT, because without this the field reads as the one
+                      the plan trains you at — which is the dangerous version and NOT what happens.
+                      `effort_paces` comes from current fitness only; `target_time` never reaches the
+                      generator. It goes to the coach, the race-day pacing and the readiness
+                      projection: the thing you are measured against, not trained at. */}
+                  <p className="text-white/60 text-sm mb-2 leading-relaxed">
+                    Sessions are built from your current paces either way. This is what we measure
+                    you against.
+                  </p>
                   <div className="flex items-center gap-2">
                     <input
                       type="text" inputMode="numeric" placeholder="3:45"
@@ -1679,16 +1718,84 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
           honour. Michael, 2026-07-25: *"how many days is redundant."* */}
       {currentStep === 'days' && (
         <StepLayout
-          step={stepNo('days')} totalSteps={steps.length} title="How many days can you train?"
-          onBack={back} onContinue={next} canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7}
+          step={stepNo('days')} totalSteps={steps.length} title="Your week"
+          subtitle={isRaceGoal ? 'How many days, which one is long, and anything you cannot move.' : undefined}
+          onBack={back} onContinue={next}
+          canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7 && (!isRaceGoal || !!state.longRunDay)}
         >
-          <div className="grid grid-cols-4 gap-1.5">
-            {[4, 5, 6, 7].map((n) => (
-              <button
-                key={n} type="button" onClick={() => setState((s) => ({ ...s, daysPerWeek: n }))}
-                className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
-              >{n}</button>
-            ))}
+          <div className="space-y-5">
+            <div>
+              <p className="text-white/85 text-sm mb-2">Days a week</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[4, 5, 6, 7].map((n) => (
+                  <button
+                    key={n} type="button" onClick={() => setState((s) => ({ ...s, daysPerWeek: n }))}
+                    className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                  >{n}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* ⛔ THE LONG RUN DAY — RESTORED TO THIS CARD (2026-08-05). Michael's instruction when
+                the five screens were agreed: *"Long-run day stays — it's the solver's anchor and
+                it's not derivable from anything else. Keep it on screen 2 next to days-per-week."*
+                The restructure dropped the card it used to live on and never moved the question, so
+                the solver was placing the long run with no input from the athlete at all. It is
+                REQUIRED on a race — everything else in the week is placed around it. */}
+            {isRaceGoal && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Which day is the long run?</p>
+                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
+                <p className="text-white/60 text-sm mt-1.5 leading-relaxed">
+                  It grows through the block and is the last thing to come down before the race.
+                  Everything else is placed around it.
+                </p>
+              </div>
+            )}
+
+            {/* ⛔ THE HARD DAY YOU ALREADY OWN — AND IT USES THE MECHANISM THAT ALREADY EXISTS.
+                Michael, 2026-08-05: *"the anchor exists in both original marathon and it should be
+                in strength focus."* He is right and my first pass was wrong twice over: I invented
+                a new `fixedDays` concept, then grepped for "fixed"/"locked", found nothing, and
+                declared the club anchor unwired.
+
+                ⛔ IT WAS WIRED THE WHOLE TIME, UNDER A DIFFERENT NAME. `qualityDays` — the strength
+                flow's *"the hard day you already own — a club run, a track night, a chaingang"* —
+                maps through `buildPreferredDays` to `preferred_days.quality_run`, which
+                `reconcile-athlete-state-week-optimizer.ts:190` hands the solver, and which the
+                optimizer actively places around (it penalises easy runs adjacent to it). A new
+                field would have been a second vocabulary beside a working one.
+
+                ⚠️ RUN ONLY ON THIS PATH. The strength flow offers run OR bike because the block
+                carries exactly one hard aerobic day across disciplines. A race build's hard day is
+                in the race's own discipline by definition.
+                ⚠️ Optional — declining is a real answer. `buildPreferredDays` omits the key
+                entirely when no day is set, and the solver then places quality itself. */}
+            {isRaceGoal && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">
+                  Run club or a standing hard day? <span className="text-white/45">Optional</span>
+                </p>
+                <DayPicker
+                  value={(state.qualityDays.run as DayName | undefined) ?? ''}
+                  onChange={(d) => setState((s) => ({
+                    ...s,
+                    // Tapping the day already chosen clears it — declining has to stay reachable
+                    // once a day is picked, or "optional" is only true before the first tap.
+                    qualityDays: s.qualityDays.run === d ? {} : { run: d },
+                  }))}
+                />
+                {/* ⛔ NAME THE RUN CLUB EXPLICITLY. Michael, 2026-08-05. "A hard day you already
+                    run" is abstract — an athlete has to translate it. "Run club" is the concrete
+                    thing most people are actually protecting, and naming it is what makes them
+                    realise the question applies to them. Track night and chaingang follow as the
+                    other shapes of the same commitment. */}
+                <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                  Run club, track night, a standing group session. The plan puts its hard running
+                  there and keeps easy days clear of it. Tap again to clear.
+                </p>
+              </div>
+            )}
           </div>
         </StepLayout>
       )}
@@ -2604,11 +2711,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                 panel is replaced by a line that says the week comes after building rather than
                 offering a button that quietly creates a plan. */}
             <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3">
-              {!previewSupported ? (
-                <p className="text-white/70 text-sm leading-relaxed">
-                  Your week is laid out once the plan is built — you can move anything after that.
-                </p>
-              ) : previewWeek === null ? (
+              {previewWeek === null ? (
                 <button
                   type="button" onClick={() => { void runPreview(); }} disabled={previewing}
                   className="w-full min-h-[44px] rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
