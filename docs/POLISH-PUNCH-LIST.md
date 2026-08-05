@@ -8,6 +8,26 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## 🏁 RACE BUILDER — OPEN ITEMS (2026-08-05)
+
+Full record, incl. everything that shipped: [`STATE-race-builder-2026-08-05.md`](STATE-race-builder-2026-08-05.md).
+**Check it before building any of these** — most of this subsystem is already built and starved, not absent.
+
+| # | Item | Size |
+|---|---|---|
+| 1 | **The intake screen has grown by accretion.** Four questions on "Your week"; the strength picker may break the *default-then-adjust-later* pattern. Michael: *"ok this is a mess."* ⚠️ **The call is unanswered — ask, do not guess.** | design first |
+| 2 | **The solver collapse** — `week-solver.ts` still has not taken the run generators (`SPEC-week-solver` §7). `assign-days.ts` is a narrow stopgap that overrode a written "do not patch this". | large |
+| 3 | **Two doors to a marathon plan** — route `run` out of `renderEventForm` (`GoalsScreen.tsx:2433`); the form keeps ride/swim/tri. | small |
+| 4 | **Bike/swim cannot be opted into a marathon plan** — the hold cards move *after* the preview, and no post-preview surface exists. | medium |
+| 5 | **"Marathon" → "Run race"** (half/10k/5k). Engine is already multi-distance; needs per-distance `TIER_SEEDS` + distance-neutral tier copy first. | medium |
+| 6 | **Mark redundancies for deletion** — Michael asked for this explicitly. Six named in §2.6 of the state doc, incl. two duplicates that are numerically identical *today* only. | small |
+| 7 | **The tri event path has the same unguarded-insert hole** the race path had (`create-goal…:2842`) — preview still writes. | small |
+| 8 | **Delete the stray `Efforts_Summer` Supabase secret.** | trivial |
+
+⚠️ **Nothing from 2026-08-05 is device-verified.** Code, tests and typecheck only.
+
+---
+
 ## 🅿️ PARKED 2026-08-04 — REPLACE THE RACE-READINESS PARAGRAPH WITH CHARTS
 
 **Michael's call, parked as a to-do — not started.** *"cant we use graphs or visuals instead?"*

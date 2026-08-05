@@ -669,7 +669,26 @@ function assemblePayload(
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
           // and `create-goal` writes the real ones back once the plan exists.
           ...(buildStrengthDefaultSlots(state.posture) ? { strength_optimizer_slots: buildStrengthDefaultSlots(state.posture)! } : {}),
-          ...(shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {}),
+          // ⛔ THE RACE PATH'S HEAVY OPTION OVERRIDES THE MAINTAIN DEFAULT — DELIBERATELY, AND ONLY
+          // HERE. `derivePlanShape` honours an explicit protocol ONLY when strength is `develop`
+          // (`strengthProtocolFor` hardcodes maintain → 'durability'), which is right everywhere
+          // else: maintain means "hold it", and holding it is durability work.
+          //
+          // A marathon build is the exception the rule did not anticipate. Michael, 2026-08-05:
+          // *"are we using a 5/3/1 for strength? should give more discretion."* Two sessions of
+          // heavy low-volume lifting is not a develop block — `strength_frequency` stays 2, there is
+          // no progression arc, running is still the goal — but it is not durability work either.
+          // Rønnestad's running-economy protocol is what `neural_speed` implements, and it is the
+          // field's answer for a runner who lifts. Widening `derivePlanShape` to honour a protocol at
+          // maintain would change every other caller's behaviour to reach one card; this does not.
+          //
+          // ⚠️ THE EQUIPMENT GATE IS THE SERVER'S AND IT IS SILENT — `generate-run-plan` honours a
+          // protocol only at `strength_tier === 'strength_power'`, which needs barbell capability, so
+          // a bodyweight athlete choosing this would get durability back with nothing said (§0h). The
+          // card states the requirement rather than letting the downgrade happen unannounced.
+          ...(isRace && state.posture?.strength === 'maintain' && state.strengthProtocol === 'neural_speed'
+            ? { strength_protocol: 'neural_speed', strength_intent: 'performance' }
+            : (shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {})),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
           ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days
           // Strength Focus: the three assistance picks. The composer validates each name against the
@@ -919,6 +938,17 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
    * ⚠️ SAME DAY IS A SEPARATE, LOUDER CASE — it is not two hard days, it is one day asked to be two
    * sessions, and the athlete almost certainly meant something else.
    */
+  /**
+   * The strength card's three-way answer, read back out of the two fields it writes.
+   * ⚠️ Derived rather than stored so it cannot disagree with the payload: `posture.strength` and
+   * `strengthProtocol` are what actually travel, and a third state variable beside them is a second
+   * source of truth waiting to drift.
+   */
+  const raceStrengthChoice: 'durability' | 'heavy' | 'none' =
+    (state.posture.strength ?? 'maintain') === 'out'
+      ? 'none'
+      : state.strengthProtocol === 'neural_speed' ? 'heavy' : 'durability';
+
   const clubCollision = (() => {
     if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;
     const club = state.qualityDays.run;
@@ -1913,29 +1943,43 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
             {isRaceGoal && (
               <div>
                 <p className="text-white/85 text-sm mb-2">Strength work</p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="space-y-2">
                   {([
-                    ['maintain', 'Keep it', 'Two short sessions'],
-                    ['out', 'None', 'Running only'],
+                    ['durability', 'Keep me together',
+                      'Two short sessions — posture, single-leg, tendon work. It is not lifting to get stronger; it is what keeps the mileage from finding a weak link.'],
+                    ['heavy', 'Keep lifting heavy',
+                      'Two sessions of low-rep barbell work. Improves running economy without adding bulk — the volume is deliberately too low for that. Needs a barbell.'],
+                    ['none', 'None', 'Running only.'],
                   ] as const).map(([k, title, sub]) => (
                     <button
                       key={k} type="button"
-                      onClick={() => setState((st) => ({ ...st, posture: { ...st.posture, strength: k } }))}
-                      className={`px-3 py-2.5 rounded-xl border text-left ${
-                        (state.posture.strength ?? 'maintain') === k
+                      onClick={() => setState((st) => ({
+                        ...st,
+                        posture: { ...st.posture, strength: k === 'none' ? 'out' : 'maintain' },
+                        strengthProtocol: k === 'heavy' ? 'neural_speed' : undefined,
+                      }))}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border ${
+                        raceStrengthChoice === k
                           ? 'border-teal-400/70 bg-teal-400/[0.07]'
                           : 'border-white/12 bg-white/[0.03]'
                       }`}
                     >
                       <span className="block text-sm text-white/90">{title}</span>
-                      <span className="block text-[13px] text-white/55 mt-0.5">{sub}</span>
+                      <span className="block text-[13px] text-white/55 mt-0.5 leading-relaxed">{sub}</span>
                     </button>
                   ))}
                 </div>
-                <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                  Posture and single-leg durability work, placed on easy days. It is not lifting to
-                  get stronger — it is what keeps the mileage from finding a weak link.
-                </p>
+                {/* ⛔ §0h — THE DOWNGRADE IS SAID OUT LOUD OR IT DOES NOT HAPPEN. `generate-run-plan`
+                    honours a chosen protocol only at `strength_tier === 'strength_power'`, which
+                    needs barbell capability on file. Without it the heavy pick silently becomes
+                    durability — the athlete picks one thing, gets another, and nothing tells them. */}
+                {raceStrengthChoice === 'heavy' && equipmentTier === 'bodyweight_bands' && (
+                  <p className="text-amber-300/85 text-xs mt-2 leading-relaxed">
+                    Your equipment on file is bodyweight and bands. Heavy loading needs a barbell, so
+                    this would build the durability sessions instead. Adding your gear in settings
+                    changes it.
+                  </p>
+                )}
               </div>
             )}
           </div>

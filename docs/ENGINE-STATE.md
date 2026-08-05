@@ -23,7 +23,27 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-03 night — STRENGTH is functionally DONE; next is the ceiling fix, then Q-252)
+## 🧭 NEXT SESSION — START HERE (2026-08-05 — RACE BUILDER: every input now reaches the engine; what is left is SHAPE)
+
+**The run of work on 2026-08-04/05 has its own dated record: [`STATE-race-builder-2026-08-05.md`](STATE-race-builder-2026-08-05.md).**
+Read it before touching the marathon/race intake. Twelve changes shipped (pushed + deployed); the two
+that mattered were invisible from the outside:
+
+- **The intent card was decorative.** A hardcoded `training_intent: 'completion'` shadowed the
+  athlete's answer, so **every race build was `sustainable`** — no tempo, no intervals, any distance,
+  any athlete. A 17-week "A time" plan opened with four easy runs.
+- **The pinned days were never read.** `base-generator` hardcoded the grid for six generators; the
+  long-run day and club night were collected, stored, and ignored.
+
+⛔ **Two things that doc records and this banner will not repeat:** the **solver collapse is still
+owed** (`SPEC-week-solver` §7 — `assign-days.ts` is a narrow stopgap that overrode a written
+"do not patch this" and says so), and the intake screen has **grown by accretion** to four questions
+with a strength picker that may not belong there at all. Michael, 2026-08-05: *"ok this is a mess."*
+**That call is unanswered — do not guess it.**
+
+---
+
+## 🧭 PREVIOUS (2026-08-03 night — STRENGTH is functionally DONE; next is the ceiling fix, then Q-252)
 
 ### YOUR JOB
 **Strength is functionally done.** A huge day shipped (11 commits, `dd703ef5` → `905b6879`) — all pushed,

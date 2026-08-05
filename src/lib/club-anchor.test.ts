@@ -86,14 +86,46 @@ Deno.test('⛔ the screen no longer promises hard running on a day it may not pl
   );
 });
 
-Deno.test('the strength choice is offered rather than assumed', () => {
+Deno.test('the strength choice is offered rather than assumed, with three real answers', () => {
   // `non-race-goal-seeds` seeds a marathon with strength: 'maintain', which put two lifting days in
-  // the preview with nothing having asked. Michael, 2026-08-05: "we need to add strength as an option."
+  // the preview with nothing having asked. Michael, 2026-08-05: "we need to add strength as an
+  // option" — then, seeing two options: "are we using a 5/3/1? should give more discretion."
   assert(
-    /posture: \{ \.\.\.st\.posture, strength: k \}/.test(SRC),
+    /strength: k === 'none' \? 'out' : 'maintain'/.test(SRC),
     'the strength control no longer writes posture.strength — the default is unaskable again',
   );
+  assert(/Keep me together/.test(SRC), 'the durability option is gone');
+  assert(/Keep lifting heavy/.test(SRC), 'the heavy option is gone — the card is back to two answers');
   assert(/Running only/.test(SRC), 'the "None" option is gone; strength is mandatory again');
+});
+
+Deno.test('⛔ heavy sends neural_speed WITHOUT turning strength into a develop block', () => {
+  // `derivePlanShape` hardcodes maintain → durability, so the race path overrides it directly.
+  // The override must NOT reach for posture 'develop': that pulls strength_frequency to 4
+  // (`strength_frequency: state.posture?.strength === 'develop' ? 4 : 2`), putting a four-day
+  // strength block underneath a marathon. Two heavy sessions is the Rønnestad protocol; four is a
+  // different sport.
+  assert(
+    /strength_protocol: 'neural_speed', strength_intent: 'performance'/.test(SRC),
+    'the heavy pick no longer sends neural_speed — it will fall back to durability silently',
+  );
+  assert(
+    /state\.posture\?\.strength === 'maintain' && state\.strengthProtocol === 'neural_speed'/.test(SRC),
+    'the heavy override is no longer gated on maintain — check it has not become a develop block',
+  );
+  assert(
+    /strength_frequency: state\.posture\?\.strength === 'develop' \? 4 : 2/.test(SRC),
+    'strength_frequency changed shape — confirm the heavy pick still sends 2, not 4',
+  );
+});
+
+Deno.test('⛔ §0h — the silent equipment downgrade is stated', () => {
+  // generate-run-plan honours a protocol only at strength_tier 'strength_power' (barbell on file).
+  // Without it the heavy pick becomes durability and nothing says so.
+  assert(
+    /equipmentTier === 'bodyweight_bands'/.test(SRC),
+    'the equipment warning is gone — a bodyweight athlete picks heavy and silently gets durability',
+  );
 });
 
 // ── the intent card actually reaches the engine ──────────────────────────────────────────────────

@@ -168,7 +168,20 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 | Sweep a week (materialize missing + attach) | `sweep-week/index.ts:22` | BUILT | fires on calendar load |
 | Extract races from free text | `extract-races/index.ts:14` | BUILT | Claude + web search; returns MULTIPLE races sorted with A/B priority; `marathon` is in its distance enum. ⚠️ **Only caller is `ArcSetupWizard.tsx:836`** (+ `:1099` prior-finish). The call is a plain `functions.invoke` — the picker UI is inline in the wizard, not a component |
 
-### RACE / MARATHON ENTRY — audited 2026-08-03 (`SPEC-race-builder-marathon.md`)
+### RACE / MARATHON ENTRY — audited 2026-08-03, **materially changed 2026-08-04/05**
+
+⛔ **READ [`STATE-race-builder-2026-08-05.md`](STATE-race-builder-2026-08-05.md) BEFORE USING THE TABLE
+BELOW.** Twelve changes shipped after this table was written, and three of its rows are now wrong in
+the direction that causes rebuilds — the capability exists and is now *fed*, where the table says
+bypassed or unread. Corrected rows are marked ✅ 08-05 inline. The state doc also carries what is
+still open, including the intake's shape and the owed solver collapse.
+
+| capability | entry point | status | note |
+|---|---|---|---|
+| **Day placement reads the athlete's pins** ✅ 08-05 | `generate-run-plan/generators/assign-days.ts` ← `base-generator.assignDaysToSessions` (six generators) | **BUILT 2026-08-05** | ⛔ Was a hardcoded grid (long run Sunday, quality Tue/Thu, Saturday shut) that no input could change, so `preferred_days.long_run` / `.quality_run` were collected and never read. Rest day is now DERIVED as the day before the long run — its old comment shows Saturday always meant that. ⚠️ **Narrow stopgap, not the solver** (`SPEC-week-solver` §7 still owed) |
+| **Training intent reaches the approach** ✅ 08-05 | `NonRaceBuilder` payload `training_intent` → `create-goal…:2366` | **FIXED 2026-08-05** | ⛔ `training_intent` was a hardcoded `'completion'` and is read FIRST, returning before `goal_type` — so **every race built `sustainable`**, no tempo or intervals, whatever the athlete picked |
+| **Strength on a race build** ✅ 08-05 | `NonRaceBuilder` "Your week" → `strength_protocol` / `strength_intent` | **BUILT 2026-08-05** | Three options; heavy = `neural_speed` (Rønnestad, 85–90% 1RM, freq stays 2). ⚠️ Server honours a protocol only at `strength_tier === 'strength_power'` (barbell on file) — the downgrade is now stated, not silent |
+| Static week floors | `create-goal…:226` `MIN_WEEKS` (marathon 14/10/8 by fitness); tri twin `:219` `TRI_MIN_WEEKS` | ~~PARTIAL — bypassed~~ **LIVE 2026-08-04** | ⚠️ The refusal was re-enabled — see `non-race-routing.ts` `resolveMarathonFloorWeeks` / `marathonTimelineRefusal`. It is the ONE hard wall on this path |
 
 | capability | entry point | status | note |
 |---|---|---|---|
