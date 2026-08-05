@@ -4,7 +4,7 @@ import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Tar
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
-import { getDisciplineColor } from '@/lib/context-utils';
+import { getDisciplineColor, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 // ONE band, shared with the composer — what the athlete is told while typing and what the plan
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
 import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
@@ -95,7 +95,7 @@ const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: Reac
   // Colours mirror the Goals door exactly (`GoalsScreen`) — same three cards, so the same palette.
   // Build carries none: it has no discipline until the athlete writes one.
   train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Activity, color: getDisciplineColor('mobility') },
-  race: { label: 'Race', blurb: 'Train for any race', Icon: Flag, color: getDisciplineColor('run') },
+  race: { label: 'Race', blurb: 'Train for any race', Icon: Flag, color: FOCUS_RACE_COLOR },
   build: { label: 'Build', blurb: 'Write your own, the engine does the math', Icon: Plus, color: null },
 };
 /**

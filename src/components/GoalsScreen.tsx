@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus } from 'lucide-react';
 // The one discipline palette (`SPORT_COLORS`). Never hand-pick a hex for a discipline.
-import { getDisciplineColor } from '@/lib/context-utils';
+import { getDisciplineColor, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
@@ -2330,6 +2330,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 )}
               </div>
             )}
+            {/* ⛔ "Strength Focus" APPEARS TWICE ON THIS SCREEN AND IT IS NOT A DUPLICATE. Michael,
+                2026-08-05: *"why does strength focus have the current plan? if its meant to it
+                should be clear thats what it is, but might be redundnt."* The card below is his
+                RUNNING BLOCK (Anchor, week 2 of 12); the identically-named card behind Train is the
+                door to START one. Same name, two different things, and nothing said which was
+                which. Labelled rather than renamed — the block genuinely IS a Strength Focus, so
+                renaming either one would make the app call the same thing two names. */}
+            {activeGoals.length > 0 && (
+              <div className="flex items-center gap-3 pb-3">
+                <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Current</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+            )}
             {activeGoals.map(renderGoalCard)}
 
             {activeUnlinkedPlans.length > 0 && (
@@ -2352,6 +2365,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Bottom actions */}
       <div className="shrink-0 px-4 pb-4 pt-2 space-y-2">
+        {/* The other half of the "Current" label above — these three START something, they are not
+            what is running. Without the pair, the door read as a second copy of the live block. */}
+        <div className="flex items-center gap-3 pb-1">
+          <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Start something new</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
         {/* ── THE FRONT DOOR (SPEC §B) — replaces "Add a goal" ────────────────────────────────────
             Train · Race · Build. Train drills down to the discipline picker inside the builder;
             Race goes straight into the race flow. Build is a CREATE action, not a pick, so it gets
@@ -2362,14 +2381,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             discipline colors"*). `SPORT_COLORS` in `context-utils.ts` is the single source — do not
             hand-pick a hex here. Train has no ONE discipline (it holds all four), so it takes the
             palette's unclaimed colour rather than borrowing run's or strength's and implying a
-            default. Race is run-gold because every race behind it today is a run. Build is neutral:
+            default. Race takes `FOCUS_RACE_COLOR` — deliberately OUTSIDE the discipline palette,
+            because it is not a discipline and will hold tri and du (it was run-gold, which both
+            claimed a discipline and made Race and Run Focus the same colour). Build is neutral:
             it has no discipline until the athlete writes one.
 
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
         {([
           { id: 'train' as const, Icon: Activity, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true, color: getDisciplineColor('mobility') },
-          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true, color: getDisciplineColor('run') },
+          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true, color: FOCUS_RACE_COLOR },
           { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false, color: null },
         ]).map(({ id, Icon, label, blurb, live, color }) => (
           <button

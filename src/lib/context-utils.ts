@@ -41,6 +41,19 @@ export const SPORT_COLORS = {
 } as const;
 
 /**
+ * ⛔ NOT A DISCIPLINE — the Focus door's Race card (2026-08-05).
+ *
+ * Race was run-gold, which was wrong twice over: it claimed one discipline for a card that will hold
+ * tri and du, and it made "Race" and "Run Focus" the same colour on adjacent screens. Michael:
+ * *"make race something different, something we haven't used for disciplines."*
+ *
+ * This hue is deliberately OUTSIDE `SPORT_COLORS` and outside the teal used for selection, so it can
+ * never read as a discipline or as "this card is chosen". It lives here rather than inline in a
+ * component so the two doors that draw the card cannot drift apart.
+ */
+export const FOCUS_RACE_COLOR = '#FF5A5F';
+
+/**
  * Mapping from discipline type to Tailwind color name
  * This maps to the color in SPORT_COLORS above.
  * Update both SPORT_COLORS and this mapping when changing colors.
