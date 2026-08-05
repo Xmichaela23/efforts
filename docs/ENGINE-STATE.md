@@ -23,23 +23,65 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-05 — RACE BUILDER: every input now reaches the engine; what is left is SHAPE)
+## 🧭 NEXT SESSION — START HERE (2026-08-05 — THE FOCUS FRONT DOOR SHIPPED; THE STRENGTH FIX BEHIND IT HAS NOT)
 
-**The run of work on 2026-08-04/05 has its own dated record: [`STATE-race-builder-2026-08-05.md`](STATE-race-builder-2026-08-05.md).**
-Read it before touching the marathon/race intake. Twelve changes shipped (pushed + deployed); the two
-that mattered were invisible from the outside:
+### YOUR JOB
 
-- **The intent card was decorative.** A hardcoded `training_intent: 'completion'` shadowed the
-  athlete's answer, so **every race build was `sustainable`** — no tempo, no intervals, any distance,
-  any athlete. A 17-week "A time" plan opened with four easy runs.
-- **The pinned days were never read.** `base-generator` hardcoded the grid for six generators; the
-  long-run day and club night were collected, stored, and ignored.
+**`docs/SPEC-assistance-fix.md` §0–§7 — the accessory rework.** It is a build contract, decided by
+Michael 2026-08-05, and **no code has been written for it.** Read the spec before anything else. Four
+defects, all confirmed in code this session (not suspicions — the line numbers are real):
 
-⛔ **Two things that doc records and this banner will not repeat:** the **solver collapse is still
-owed** (`SPEC-week-solver` §7 — `assign-days.ts` is a narrow stopgap that overrode a written
-"do not patch this" and says so), and the intake screen has **grown by accretion** to four questions
-with a strength picker that may not belong there at all. Michael, 2026-08-05: *"ok this is a mess."*
-**That call is unanswered — do not guess it.**
+1. **A press day structurally cannot show a push.** `BALANCE_POOL.push` (`src/lib/assistance-menu.ts:224`)
+   holds four movements and **all four are pulls** — Face Pull, Band Pull Apart, Rear Delt Fly, Chest
+   Supported Row. Bench and OHP days get two pulls and zero push, every time, by design.
+2. **Lower-body work lands on upper days** (`single_leg_core` is only rewritten on hinge days).
+3. **The same leg pattern repeats day to day.**
+4. **The rep floor is 25** (`assistance-menu.ts:90`); Wendler's own minimum anywhere is **50**.
+
+⛔ **ONE NUMBER IS STILL MICHAEL'S TO CALL** — the accessory rep **ceiling**: keep 50, or raise to 75
+(spec §10). The floor of 50 is the book's and is taken as read. **Ask before building §5.**
+
+### WHAT SHIPPED TODAY — DO NOT RE-LITIGATE (8 commits, `5634b4f3` → `8a0efcd7`)
+
+**The whole front door, and it is UI only — no edge function was touched, so there is no Supabase
+deploy in any of it.** [D-382] the door (Focus → Train · Race · Build, Train drills down to Run /
+Ride / Strength / Athletic Focus); [D-383] Strength opens Strong / Heavy / Definition; [D-384] the
+eye mark, the discipline palette, sizing and copy. **All PUSHED + CLIENT-DEPLOYED via Netlify.**
+
+**The three things most likely to be re-broken:**
+
+- ⛔ **`GOAL_ORDER` IS A GOAL LIST, NOT NAVIGATION.** `train`/`race`/`build` live in `ENTRY_ORDER`.
+  Feeding an entry-card id to `seedFromGoal` (`NonRaceBuilder.tsx:816`) falls through to a default and
+  **reintroduces the 2026-08-04 progress-bar jump.** The comment above that line is the warning.
+- ⛔ **`GoalsScreen.tsx` IS NOT DELETED and must not be.** It still holds `renderEventForm()` — the
+  **ride / swim / tri / du race form, which has no other door.** Race routes marathon only.
+- ⛔ **STRONG IS A PASS-THROUGH.** Picking it changes nothing and sends no field. Heavy and Definition
+  are dark *because* §0–§7 is what separates them.
+
+### WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
+
+⚠️ **NOTHING from today is device-verified** — [Q-258], and the checklist is in the AWAITING MICHAEL
+block at the top of `POLISH-PUNCH-LIST.md`. Michael's screenshots during the build were mid-iteration
+and several show states that have since changed. **The one with real consequence is the Race path:**
+`reseed('marathon')` now fires from a **mount effect on a deep link** rather than from a tap, and the
+goal is seeded in the initial state so the right screen renders on the first frame. It typechecks and
+builds; **nobody has watched a marathon plan get built through the new door.** That is a hypothesis
+that it works, not a finding.
+
+⚠️ **[Q-257] — the Strength Focus preconditions are now UNSAID.** The paragraph naming what the block
+needs (barbell, rack, bench, four maxes on file) was removed at Michael's request — it made one card
+three times its neighbours' height. The 2026-07-25 rule it came from still stands: state requirements at
+the door. Its natural home is the tier screen. **Not built, deliberately not guessed at — ask.**
+
+### STILL OPEN FROM BEFORE — none of it was touched today
+
+- **[Q-256] the 5/3/1 training-max CEILING reads a stale signup 1RM.** `tmCeilingLb`
+  (`shared/strength-system/loading/wendler-531.ts:197`) caps at 90% of `one_rep_maxes_at_build` — a
+  signup number that never updates. **Squat and OHP stall after one cycle (~Aug 24)** while
+  bench/deadlift keep climbing. ⚠️ Michael rules on the approach BEFORE it is built; it changes safety
+  logic. **This has a date on it.**
+- **[Q-252] the Sunday State blackout** — still live, recurs every Sunday 17:00 Pacific.
+- The race-builder items in `STATE-race-builder-2026-08-05.md` (the solver collapse is still owed).
 
 ---
 

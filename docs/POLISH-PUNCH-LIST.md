@@ -8,6 +8,29 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE FOCUS FRONT DOOR (2026-08-05, pushed + client-deployed, **NOT SEEN ON A DEVICE**)
+
+Eight commits (`5634b4f3` → `8a0efcd7`), [D-382] / [D-383] / [D-384]. **Client only — no edge function
+was touched, so there is no Supabase deploy in any of it.** Netlify builds off the push. See [Q-258].
+
+- [ ] **Open Focus** (the tab is renamed from Goals, with an eye). Three cards: **Train · Race ·
+      Build**, above them a "Start something new" label, and your running block under a **"Current"**
+      label. Build is dashed and dark.
+- [ ] **Tap Train.** Run / Ride / Strength / Athletic Focus, each in its discipline colour. ⛔ **Try to
+      tap Run, Ride and Athletic — they should do nothing at all.** They are `disabled`, not just
+      handler-less.
+- [ ] **Tap Strength Focus →** Strong / Heavy / Definition. Heavy and Definition are dark. **Tap
+      Strong** — it should drop you into the block exactly as it was, nothing changed.
+- [ ] **Back out one screen at a time** — Strong → Strength → Train → the door → closes. It should
+      never dump you straight out.
+- [ ] ⚠️ **THE ONE THAT MATTERS — build a marathon through Race.** That path now seeds the goal on
+      mount rather than on a tap. Confirm the race card is the first thing you see (no flash of the
+      wrong screen) and that a plan actually builds. **Nobody has watched this work.**
+- [ ] **"Plan a season"** is no longer on the Focus screen — it is at the foot of the race card. Confirm
+      it still opens the season builder.
+
+---
+
 ## 🏁 RACE BUILDER — OPEN ITEMS (2026-08-05)
 
 Full record, incl. everything that shipped: [`STATE-race-builder-2026-08-05.md`](STATE-race-builder-2026-08-05.md).

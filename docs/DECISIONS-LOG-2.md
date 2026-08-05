@@ -216,3 +216,127 @@ didn't trip `plannedIsBand`). ⚠️ **LATENT**: read-only check of all 96 stren
 affected — every band set Michael has logged already carries a value, so no `total_volume_lbs` / ACWR moves.
 Backfill empty. *(This corrects the false premise that his screen's "4,000 lb" band face pull was live — it
 was a stale build; his real data prices at 1,000.)*
+
+---
+
+### D-382 — The Focus front door: Train / Race / Build, with a Train drill-down (2026-08-05, **PUSHED + CLIENT-DEPLOYED, NOT DEVICE-VERIFIED**)
+
+**Supersedes `SPEC-assistance-fix.md` §B, which dies with this entry.**
+
+The Goals screen opened to a list of active plans and one **"Add a goal"** button; the builder behind
+it opened to *"What's the goal?"* with two cards (Strength Focus, Marathon). It is now:
+
+- **Goals → Focus** (tab label, screen title, and the eye mark — see D-384), showing **Train · Race ·
+  Build** where "Add a goal" was.
+- **Train** drills down to **Run Focus · Ride Focus · Strength Focus · Athletic Focus**.
+- **Strength Focus** opens the three tiers (D-383), then today's block unchanged.
+- **Race** routes into the existing marathon flow, untouched.
+
+**Locked calls, with their reasoning:**
+
+1. **The entry cards are NAVIGATION, not goals.** `GOAL_ORDER` stays a goal list and keeps feeding
+   `seedFromGoal`; `train`/`race`/`build` live in `ENTRY_ORDER`, and the goal id is set one screen
+   later (Strength → `get_stronger`, Race → `marathon`). ⛔ Putting an entry id in `GOAL_ORDER` falls
+   through the seed switch to a default and **reintroduces the 2026-08-04 progress-bar jump**.
+2. **The door lives on the Goals screen, not as the builder's first step.** Built the wrong way round
+   first — three cards one level down behind "Add a goal", so the screen looked identical. Michael:
+   *"nothing there" … "should replace add a goal."* `GoalsScreen` renders the door and deep-links the
+   builder to the tapped card (`entry` prop); the builder's own door survives for the standalone
+   route and for Back to land on.
+3. **Not-yet cards are `disabled`, dimmed, and carry NO "Soon" tag.** Run / Ride / Athletic / Build
+   have no flow. Inert to pointer, keyboard and screen reader alike — "it isn't ready" has to be true
+   for everyone. No badge: it would promise a date that does not exist.
+4. **"Athletic", never "Multi"** — *"Multi" reads as triathlon-only, which is the read we are
+   avoiding.* The name alone does not carry multi-discipline, so **the subtitle does**; never render
+   one of these cards without its blurb.
+5. **"Plan a season" moved inside Race**, at the foot of the race screen (*"Racing more than once
+   this year?"*), placed after the fields so one race stays the primary path. Route unchanged
+   (`/arc-setup`); the handler is passed DOWN from `GoalsScreen` because closing Goals is that
+   screen's job, not the builder's.
+6. **`GoalsScreen.tsx` is NOT deleted.** "Replaces the Goals screen" means the entry the athlete
+   lands on. That file still holds `renderEventForm()` — the ride / swim / tri / du race form, which
+   **has no other door** and is not absorbed by Race in this slice (Race routes marathon only; see
+   punch-list #3). Both doors coexist.
+7. **The "Which discipline?" sub-picker is deleted, not moved.** It served `build_endurance` /
+   `build_speed` / `starting_over`, none of which were offered; the Train card names the discipline,
+   so the question cannot arise. `GOALS_NEEDING_DISCIPLINE` still governs any goal reached otherwise.
+
+> ⛔ **THIS REVERSES THE 2026-07-25 PLACEHOLDER RULE — and the rule's reasoning is kept.** That call
+> (*"let's clear out all the placeholders"*) rested on *a front door offering five things that do not
+> work is worse than a door offering one that does*, which is still true. The difference: the door now
+> has **two levels**, the entry screen offers only cards that OPEN, and the unbuilt disciplines sit one
+> level down **saying they are unbuilt**. A card that admits it is not ready was never what that rule
+> was aimed at. `NonRaceBuilder.tsx:60` rewritten accordingly.
+
+**Files:** `src/components/GoalsScreen.tsx`, `src/components/NonRaceBuilder.tsx`,
+`src/components/wizard/StepLayout.tsx` (`title` widened to `ReactNode`), `src/components/AppLayout.tsx`,
+`src/index.css`, `src/lib/context-utils.ts`. Commits `5634b4f3`, `c3990967`, `7f61ff4e`.
+
+---
+
+### D-383 — Strength opens three tiers, and Strong is a PASS-THROUGH (2026-08-05, **PUSHED + CLIENT-DEPLOYED, NOT DEVICE-VERIFIED**)
+
+Strength Focus no longer drops straight into the block. It opens **Strong / Heavy / Definition**
+(`SPEC-assistance-fix.md` §A), worded by Michael: *"Stronger, not bigger." · "Build muscle." · "Shape
+where you choose."*
+
+⛔ **STRONG IS TODAY'S BLOCK AND PICKING IT CHANGES NOTHING.** Michael: *"strong is our current
+strength focus plan."* The step routes into the existing `get_stronger` flow untouched and **sends no
+new field**. It exists so the tier is a visible choice the day the other two are real.
+
+⛔ **HEAVY AND DEFINITION SHIP DARK, ON PURPOSE.** What separates the three is *accessory volume and
+character* — which is exactly what `SPEC-assistance-fix.md` §0–§7 is about to rewrite. Offering them
+before that lands would ship **three names for one block**.
+
+⛔ **AND NO TIER FIELD REACHES THE PAYLOAD, BECAUSE THE SPEC'S FIELD NAME IS ALREADY TAKEN.** §B
+resolved that the tier travels as its own `strength_tier`. That key already exists on the plan config
+holding the **EQUIPMENT** tier (`generate-strength-plan/index.ts`, `strength_tier: 'barbell'`). Two
+meanings on one key is the "second vocabulary beside the first" trap `CLAUDE.md` opens with. Nothing
+is blocked — Strong is a no-op — so the name gets picked when Heavy or Definition actually needs it
+(`strength_intent` is the candidate). Recorded in the spec, not just here.
+
+**Scope:** the tier step is on the Train→Strength path only. A `get_stronger` goal reached any other
+way (standalone route, stored goal) walks the flow it always did. Commit `cea6b173`, spec note `841647e6`.
+
+---
+
+### D-384 — The eye, and one discipline palette on the front door (2026-08-05, **PUSHED + CLIENT-DEPLOYED, NOT DEVICE-VERIFIED**)
+
+**"Goals" → "Focus", with an eye.** Tab label, screen title, and the mark. The screen behind that tab
+is the front door and *focus* is the word it uses throughout (Choose your focus, Run Focus, Strength
+Focus) — a tab called Goals opening a screen that never says "goal" was one name too many. The
+internal `showGoals` state keeps its name; only what the athlete reads changed.
+
+⛔ **THE EYE IS DRAWN IN CSS, NOT DROPPED IN AS AN ICON COMPONENT.** The tab bar's whole language is
+abstract sigils built from gradients (`home`, `context`, `plans`); one real glyph among them reads as
+a mistake. **One definition, two sizes:** `.eye-mark` carries the paint, `.tab-sigil` supplies the
+16×10 box + active glow, `.eye-mark.eye-heading` is the 22×14 version beside the three door titles.
+Painting it twice is how the two would drift.
+
+⛔ **EVERY COLOUR READS `getDisciplineColor` (`SPORT_COLORS`) — not one hex is hand-picked.** Michael:
+*"everything should use discipline colors."* Run gold, Ride green, Strength orange. Two cards have no
+single discipline (Train, Athletic) and take the palette's unclaimed colour rather than borrowing one
+of the four and implying a default.
+
+⛔ **RACE IS NOT A DISCIPLINE, SO IT STOPS WEARING ONE.** It was run-gold, wrong twice: it claimed one
+discipline for a card that will hold tri and du, and made Race and Run Focus the same colour on
+adjacent screens. **`FOCUS_RACE_COLOR`** lives in `context-utils.ts` beside `SPORT_COLORS`,
+deliberately outside it *and* outside the teal that means "selected", so it can never read as a
+discipline or as a chosen state. One constant, both doors.
+
+⚠️ **The colour survives the dimming, at 40%.** A not-yet card should still say which discipline it
+is; going flat grey throws that away to signal something the text already says.
+
+**Sizing + copy, from device reads:** cards `px-4 py-3` → `p-5`, icons 20 → 24px, labels `text-base`
+(*"make the 3 cards bigger easier to read"*). Cards are **"Run Focus"**, not "Run" — a discipline is
+what you do on Tuesday, a Focus is what the block is aimed at. Strength's line is Michael's: *"Get
+stronger, bigger, more defined while holding aerobic base"* — it names the trade the block makes.
+
+**A "Current" / "Start something new" divider pair** was added because *"Strength Focus"* appears
+twice on the Focus screen and read as a duplicate: the top card is the block he is **running** (Anchor,
+week 2 of 12), the one behind Train is the door to **start** one. Labelled rather than renamed — the
+running block genuinely IS a Strength Focus, and a second name for it would make the app call one
+thing two things. ⚠️ Not redundant, then, but *"it reads as a duplicate"* is a real defect even when
+the data is right.
+
+Commits `9baa35fb`, `d4eda969`, `dca84dda`, `8a0efcd7`.

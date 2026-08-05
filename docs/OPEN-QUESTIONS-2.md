@@ -371,3 +371,40 @@ it's ignored.
 ⚠️ **Michael must rule on the approach before it's built — it changes safety logic.** Options: (a) ceiling
 reads the confirmed/learned max with a confidence gate; (b) a periodic TM recalibration (Wendler's own
 7th-week / reset protocol). **To close:** rule on (a) vs (b). Related: [Q-223], [Q-254], [D-338].
+
+---
+
+## Q-257 — The Strength Focus preconditions are now unsaid (2026-08-05, **deferred, needs a design call**)
+
+**Tag: deferred — the rule it came from still stands.**
+
+The Strength Focus card on the Train screen carried a paragraph naming what the block **needs**:
+*12 weeks of Wendler's 5/3/1, four lifting days. Needs a barbell, a rack and a bench — and your squat,
+bench, deadlift and overhead press maxes on file.* Michael, 2026-08-05: **"lose this."** It made one
+card three times the height of its three neighbours, which a picker screen cannot afford.
+
+⚠️ **The reason it existed has not gone away.** The 2026-07-25 rule was to state a block's
+requirements **at the door**, because finding out on step three that you need four 1RMs on file is
+worse than knowing before you start. That requirement is **now unsaid on this path.**
+
+**The obvious home is the tier screen** — the next tap, still before any work, and currently a very
+short screen with room. Not built: it is a design call, and guessing it is how screens grow by
+accretion. **Ask before placing it.**
+
+---
+
+## Q-258 — Nothing from 2026-08-05's front-door work is device-verified (2026-08-05, **verification debt**)
+
+Eight commits shipped the Focus front door (D-382 / D-383 / D-384), all **pushed and
+client-deployed via Netlify**. No edge function was touched, so there is no Supabase deploy in any of
+it. **None of it has been confirmed on a device** beyond Michael's screenshots during the build, and
+those were taken mid-iteration — several were of states that have since changed.
+
+**What would settle it** (see the AWAITING MICHAEL block in `POLISH-PUNCH-LIST.md`): open Focus, tap
+each of the three cards, confirm Run / Ride / Athletic / Build genuinely do not respond, walk
+Train → Strength → Strong into the existing block, and Back out one screen at a time.
+
+⚠️ **The one with real consequence is the Race path.** `reseed('marathon')` now fires from a mount
+effect on a deep link rather than from a tap, and the goal is seeded in the initial state so the
+right screen renders on the first frame. It typechecks and builds; **nobody has watched a marathon
+plan get built through the new door.**

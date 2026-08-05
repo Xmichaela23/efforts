@@ -4,6 +4,25 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-05 — THE FOCUS FRONT DOOR IS BUILT. THE STRENGTH FIX BEHIND IT IS NOT.**
+> Goals is now **Focus**, opening to **Train · Race · Build**; Train drills down to Run / Ride /
+> Strength / Athletic Focus; Strength opens **Strong / Heavy / Definition**. [D-382] / [D-383] /
+> [D-384], 8 commits, **pushed + client-deployed, NOT device-verified** ([Q-258], checklist at the top
+> of `POLISH-PUNCH-LIST.md`). Client only — no edge function touched.
+>
+> ⛔ **STRONG IS A PASS-THROUGH — it is today's block and picking it sends no new field.** Heavy and
+> Definition ship DARK because what separates the three is the accessory work that
+> `SPEC-assistance-fix.md` §0–§7 is about to rewrite. Shipping them first would be three names for one
+> block.
+>
+> ⛔ **NEXT: `SPEC-assistance-fix.md` §0–§7 — the accessory rework.** Four defects confirmed in code:
+> a press day **structurally cannot show a push** (`assistance-menu.ts:224` — all four "push"
+> replacements are pulls), legs land on upper days, the same leg pattern repeats, and the rep floor is
+> **25 against the book's 50**. ⚠️ **One number is Michael's before §5 is built: the ceiling, 50 or 75.**
+>
+> Untouched today and still queued: **[Q-256]** the training-max ceiling stall (has a date — ~Aug 24)
+> and **[Q-252]** the Sunday blackout.
+
 > **2026-08-03 (night) — STRENGTH IS FUNCTIONALLY DONE. The AMRAP is the measurement, end to end.**
 > A full day past the language: swap intensity-tier gate ([D-376]), the 65-exercise catalog + a permanent
 > vocabulary GUARD ([D-377], kills "borrow a neighbor" prescriptions by name at build time), Q-254 slice 1

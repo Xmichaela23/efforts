@@ -1,11 +1,13 @@
 # SPEC — Focus Front Door + Strength Intent Tiers + Assistance Rework (Wendler spine)
 
-**Status:** BUILD CONTRACT — not built. Scaffolding; folds into a D-NNN and gets deleted on ship.
+**Status:** BUILD CONTRACT — **§B SHIPPED** (folded into D-382 / D-384); **§A partly** (the tier
+picker ships, Strong only, as a pass-through — D-383); **§0–§7 NOT BUILT.** Scaffolding: what remains
+folds into a D-NNN and this file gets deleted when §0–§7 lands.
 **Decided by:** Michael, 2026-08-05.
 **Supersedes:** Q-212 (antagonist-balance — *partial*, see §8) and the "25 IS THE FLOOR AND IT STAYS" call of 2026-07-28 (see §8).
 **Source of truth for "by the book":** Wendler, *5/3/1* 2nd ed. (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`), assistance chapter pp.46–54, concurrent chapter p.86.
 
-**Three things this spec does:** (1) fixes the four accessory-selection defects (§0–§7), (2) wraps them in **three selectable strength tiers** on one Wendler spine (§A), and (3) reshapes the **front door** so the tiers have somewhere to be picked (§B). The tier changes the **strength work only** — accessory volume and character (plus a focus area for Definition). **Endurance is untouched** — the existing engine (quality days, hills, speed, run/ride choice, interference management) already handles it well; nothing here changes it. The 5/3/1 main-lift engine (TM, percentages, deload, the "+" set) is identical in all three.
+**What is LEFT of this spec:** the four accessory-selection defects (§0–§7), and the engine behind the two dark tiers (§A). The front door (§B) and the tier picker itself have shipped — see D-382 / D-383 / D-384. The tier changes the **strength work only** — accessory volume and character (plus a focus area for Definition). **Endurance is untouched** — the existing engine (quality days, hills, speed, run/ride choice, interference management) already handles it well; nothing here changes it. The 5/3/1 main-lift engine (TM, percentages, deload, the "+" set) is identical in all three.
 
 **Source of truth is the Wendler book (above).** The strength side matches it; nothing here invents strength science. *(An earlier draft added an endurance-interference layer with external citations — Schumann/Van Hooren/Wilson. Removed 2026-08-05: endurance is out of scope, the existing engine already handles it. Strength matches Wendler, full stop.)*
 
@@ -40,110 +42,19 @@ One-liner: **Strong = get stronger without getting bigger · Heavy = get bigger 
 
 ---
 
-## B. The front door — three entry cards (Train / Race / Build), Train drills down
+## B. The front door — ✅ SHIPPED 2026-08-05, folded into **[D-382]** / **[D-384]**
 
-**Decided by Michael, 2026-08-05**, after the trace below. The tiers in §A need a place to be chosen,
-and the goal step is currently a two-card screen. This section is the door only — it becomes a
-**three-card entry (Train / Race / Build)** with drill-downs. The only *flows* that change: Strength
-gains the tier step (§A), and Build is new (its work order). Race is a move, the placeholder
-disciplines are stubs; nothing else is touched.
+**This section is gone. Its substance is `DECISIONS-LOG-2.md` D-382 (the door, the drill-down, the
+seven locked calls) and D-384 (the eye, the palette, the sizing and copy).** Read those, not a copy
+here — a spec section that outlives its build is how `docs/` rotted.
 
-### Structure — three entry cards, Train drills down
+**What shipped:** Focus opens to Train · Race · Build; Train drills down to Run / Ride / Strength /
+Athletic Focus; Strength opens the tiers (§A) then today's block; Race routes into the existing
+marathon flow; Run / Ride / Athletic / Build are dimmed and inert. "Plan a season" moved inside Race.
+Pushed + client-deployed, **not device-verified — see [Q-258]**.
 
-**Decided by Michael, 2026-08-05.** NOT one screen of six. The entry is **three cards — Train · Race · Build** — and all three work. The disciplines live one tap under Train.
-
-**Entry screen (3 cards):**
-
-| Card | Treatment | Subtitle | Opens |
-|---|---|---|---|
-| **Train** | live (accent edge) | Run, ride, strength, or a mix | the four discipline cards ↓ |
-| **Race** | live (accent edge) | Train for any race | the race list ↓ |
-| **Build** | dashed ("create", set apart) | Write your own, the engine does the math | the build flow ↓ |
-
-**Under Train (4 discipline cards):**
-
-| Card | State | Subtitle | Opens |
-|---|---|---|---|
-| **Strength** | **LIVE** | Get stronger, bigger, or defined | the tier step (§A) → Strong / Heavy / Definition → today's flow |
-| **Run** | PLACEHOLDER | Base, VO2 max, distance | nothing yet — greyed, non-tappable |
-| **Ride** | PLACEHOLDER | FTP and endurance | nothing yet — greyed, non-tappable |
-| **Athletic** | PLACEHOLDER | Several disciplines, balanced | nothing yet — greyed, non-tappable |
-
-### Why drill-down beats bands (the change from the earlier draft)
-
-The earlier draft put six cards in three bands on **one** screen. Drill-down is better for a reason the band version missed: **the three not-yet disciplines move off the front screen.** The first thing anyone sees is three choices that all work; the greyed ones only appear *once you've committed to Train.* Costs one extra tap on Strength — worth it. (`Athletic` = the ongoing, interference-managed multi-discipline plan; its subtitle must always show, since "Athletic" alone doesn't signal multi-discipline.)
-
-### ⛔ Honesty rule — the door must not write a cheque the flow can't cash
-
-Same trap as the July placeholders, one level down. Two entry subtitles promise more than exists today:
-
-- **Race — "Train for any race."** Only the **marathon** flow is live; everything else behind Race is nothing yet.
-- **Build — "Write your own…"** Spec'd for run/ride/strength, but only **strength** is in the work order.
-
-Both are fine ONLY IF the drill-down scopes honestly: the **Race** screen shows marathon live and the rest greyed/not-yet; the **Build** screen shows strength live and run/ride not-yet — same greyed, non-tappable treatment as the disciplines under Train. **Entry subtitles may be broad; the screen behind each one must be honest about what is actually there.** Build is not a strength feature (author-your-own spans disciplines, `WORKORDER-build-your-own-strength-2026-08-04.md`); it just *opens* with strength.
-
-### Locked calls
-
-1. **Race Focus is a MOVE, not a build.** The `marathon` card comes off the top level and sits behind
-   Race Focus. The race intake, the payload, the generator — **none of it is touched.** Michael,
-   2026-08-05: *"we arent touching marathon."* Race is an **entry card**; the race list lives *under*
-   it — **all races consolidate there, scoped to what's live (marathon today); no per-race top-level
-   cards.** half / 10k / tri arrive inside the Race drill-down as they're built.
-2. **Strength Focus keeps its whole current flow, and that flow IS the Strong tier.** Michael:
-   *"we well use current stregnth fous for strong but it needs to be fixed based on the doc."* So
-   Strong is not new work beyond §0–§7 — it is the block that exists, with the accessory defects
-   fixed. Heavy and Definition are the two new dial settings on top of it.
-3. **Placeholders live UNDER Train, greyed and non-tappable — never on the entry screen.** The three
-   entry cards (Train / Race / Build) all work. The not-yet disciplines (Run / Ride / Athletic) appear
-   only *after* tapping Train — greyed, no navigation, **no "Soon" tag.** ⛔ **Do not wire them to
-   `build_endurance` / `build_speed` / `starting_over`** — those seed ids still exist in
-   `non-race-goal-seeds.ts` and pointing a card at one would open exactly the unfinished flow this rule
-   exists to keep shut. **Build is a live entry card** (SPEC'D, work order) — it opens with strength;
-   run/ride *inside* it are the greyed ones (the honesty rule above).
-
-> ⛔ **THIS REVERSES A STANDING CALL — BACK-ANNOTATE IT AT SHIP.** `NonRaceBuilder.tsx:60-70` carries
-> Michael's 2026-07-25 instruction: *"let's clear out all the placeholders — let's just have Strength
-> Focus now,"* with the reasoning *"a front door offering five things that do not work is worse than
-> a door offering one that does."* **That reasoning is not wrong and it is not being discarded** — the
-> difference is that these placeholders do not pretend to work. Rewrite that comment block when the
-> cards land; do not leave it standing as a rule the code now breaks.
-
-### Where it lives in code (traced 2026-08-05 — edit, do not rebuild)
-
-- **The card list:** `GOAL_ORDER` (`src/components/NonRaceBuilder.tsx:77`) — today `['get_stronger', 'marathon']`.
-- **The card render + the auto-advance on tap:** `NonRaceBuilder.tsx:1229-1260`, inside the `goal` step
-  (`currentStep === 'goal'`, `:1218`). The per-card blurbs are inline here, gated on the goal id.
-- **The labels:** `GOAL_LABELS` (`src/lib/non-race-goal-seeds.ts:34`) — one place, deliberately. The
-  card, the goal name, the block summary and the duration copy all read it. **Add new labels here,
-  not in the component** (a special case in the component is the exact bug that was fixed to create
-  this rule).
-- **The step machine:** `scheduleSteps()` / `getSteps` — the entry `goal` step now shows **three cards
-  (Train / Race / Build)**; **Train adds a discipline-picker step**, and Strength adds the **tier step**
-  (§A) after it. So the strength path is `goal → Train → Strength → tier → flow`. `stepNo()` /
-  `hideProgress` already handle branches of unequal length (`:1222-1226`).
-- **Placeholders need a fourth state.** `optBtn` (`:1211`) has active and inactive only. A
-  not-yet-available style is new — keep it inside `optBtn` rather than a second style helper.
-
-### Resolved on this section (Michael, 2026-08-05)
-
-> ⛔ **`strength_tier` IS ALREADY TAKEN — DO NOT USE THAT NAME (found in code 2026-08-05, while
-> building the tier step).** The plan config already writes `strength_tier: 'barbell'`
-> (`generate-strength-plan/index.ts`) and it means the **EQUIPMENT** tier — barbell / dumbbell /
-> bodyweight. Two meanings on one key is the "second vocabulary beside the first" trap `CLAUDE.md`
-> opens with, and every reader would have to guess which it had. **Pick a different name when the
-> field is actually needed** (`strength_intent` is the obvious candidate — it is the word §A already
-> uses). Nothing is blocked today: the tier UI ships with Strong only, Strong is a pass-through to
-> today's block, and **no tier field reaches the payload at all.** The decision below stands on its
-> reasoning; only the name is wrong.
-
-- **Tier reaches the plan as its own field (NOT the name below — see the warning above), NOT overloaded onto `strength_protocol`.**
-  The tier carries three things (accessory volume, endurance trim, area bias); a protocol name carries
-  one. Derive the protocol from the tier; do not cram the tier into it. `assemblePayload` (`:523-700`)
-  gains `strength_tier` alongside the existing `strength_protocol`. Tier is **plan-scoped in v1** (see
-  §A block-scoped note).
-- **Placeholder card copy** — see the subtitle columns in the structure tables above. Stated as what
-  each will be, not "coming soon." Placeholder disciplines render greyed and non-tappable **under
-  Train** per Locked call #3.
+⛔ **THE ONE THING TO CARRY FORWARD:** the tier's payload field name is **not** `strength_tier` — that
+key already means the EQUIPMENT tier. See the warning in §10 and D-383.
 
 ---
 
