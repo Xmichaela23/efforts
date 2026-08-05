@@ -1,27 +1,27 @@
-# SPEC — Strength Intent Tiers + Assistance Rework (Wendler spine)
+# SPEC — Focus Front Door + Strength Intent Tiers + Assistance Rework (Wendler spine)
 
 **Status:** BUILD CONTRACT — not built. Scaffolding; folds into a D-NNN and gets deleted on ship.
 **Decided by:** Michael, 2026-08-05.
 **Supersedes:** Q-212 (antagonist-balance — *partial*, see §8) and the "25 IS THE FLOOR AND IT STAYS" call of 2026-07-28 (see §8).
 **Source of truth for "by the book":** Wendler, *5/3/1* 2nd ed. (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`), assistance chapter pp.46–54, concurrent chapter p.86.
 
-**Two things this spec does:** (1) fixes the four accessory-selection defects (§0–§7), and (2) wraps them in **three selectable intent tiers** on one Wendler spine (§A). The tier chooses accessory *volume*, accessory *character*, and how hard *endurance* is trimmed. The 5/3/1 main-lift engine (TM, percentages, deload, the "+" set) is identical in all three.
+**Three things this spec does:** (1) fixes the four accessory-selection defects (§0–§7), (2) wraps them in **three selectable strength tiers** on one Wendler spine (§A), and (3) reshapes the **front door** so the tiers have somewhere to be picked (§B). The tier changes the **strength work only** — accessory volume and character (plus a focus area for Definition). **Endurance is untouched** — the existing engine (quality days, hills, speed, run/ride choice, interference management) already handles it well; nothing here changes it. The 5/3/1 main-lift engine (TM, percentages, deload, the "+" set) is identical in all three.
 
-**⛔ Citation rule (Michael, 2026-08-05):** every figure cites the *paper*, verified against the source — **never** the repo doc. Our own docs were found to carry at least one fabricated-looking effect size (see §A endurance note). Verified so far: Schumann 2023, Van Hooren 2024. Direction-only (numbers unverified): Wilson 2012. Not yet checked: Doma 2017, Coffey & Hawley 2017, Sabag 2018, Eddens 2018 — verify before they enter copy.
+**Source of truth is the Wendler book (above).** The strength side matches it; nothing here invents strength science. *(An earlier draft added an endurance-interference layer with external citations — Schumann/Van Hooren/Wilson. Removed 2026-08-05: endurance is out of scope, the existing engine already handles it. Strength matches Wendler, full stop.)*
 
 ---
 
 ## A. The three tiers (Strong / Heavy / Definition)
 
-One Wendler spine, three intents. Same main lifts and 5/3/1 loading; the tier moves three dials — accessory **volume**, accessory **character**, and **endurance trim**.
+One Wendler spine, three intents. Same main lifts and 5/3/1 loading; the tier moves the **strength work only** — accessory **volume** and **character** (plus a **focus area** for Definition). **Endurance is not a dial here** — the existing engine handles quality days, hills, speed, run/ride, and interference exactly as it does today.
 
 ### What each gets the user
 
-| Tier | The user gets | In the plan they'd see | Endurance | Who it's for |
-|---|---|---|---|---|
-| **Strong** *(default)* | **Stronger without getting bigger.** Neural / max-strength. | Minimal accessories — floor volume, ~2 movements, kept fresh; plyos for power. | **Kept high** — low lifting fatigue leaves room. | Performance-focused triathlete mid-season; anyone who doesn't want added mass. |
-| **Heavy** | **Bigger — visible muscle.** Hypertrophy. | Most accessory tonnage — 3 full slots at high reps + "Boring But Big" 5×10 size work. | **Trimmed to maintenance floor** — fewer/shorter easy sessions. | Off-season / base block; wants to add muscle and accepts carrying it. |
-| **Definition** | **Bigger where you choose.** Targeted hypertrophy + a focus area. | Area-biased block (glutes / arms / posterior / balanced) + some conditioning kept on purpose. | **Middle** — keeps some conditioning deliberately. | Wants shape in specific places; lift builds the shape, food reveals it. |
+| Tier | The user gets | In the plan they'd see | Who it's for |
+|---|---|---|---|
+| **Strong** *(default)* | **Stronger without getting bigger.** Neural / max-strength. | Minimal accessories — floor volume, ~2 movements, kept fresh; plyos for power. | Performance-focused athlete mid-season; anyone who doesn't want added mass. |
+| **Heavy** | **Bigger — visible muscle.** Hypertrophy. | Most accessory tonnage — 3 full slots at high reps + "Boring But Big" 5×10 size work. | Off-season / base block; wants to add muscle and accepts carrying it. |
+| **Definition** | **Bigger where you choose.** Targeted hypertrophy + a focus area. | Area-biased block (glutes / arms / posterior / balanced). | Wants shape in specific places; lift builds the shape, food reveals it. |
 
 One-liner: **Strong = get stronger without getting bigger · Heavy = get bigger · Definition = get bigger where you choose.**
 
@@ -31,24 +31,109 @@ One-liner: **Strong = get stronger without getting bigger · Heavy = get bigger 
 
 > "Toning" isn't its own thing — it's muscle underneath plus low enough body fat to see it. The lifting below builds the shape (especially the glutes). Whether it shows is mostly food (enough protein, not a big surplus) plus a little conditioning. So: lift for the shape, eat for the reveal. *(Not diet or medical advice — the engine programs the lifting only.)*
 
-### The endurance dial — the one net-new, non-Wendler layer
-
-Wendler's book barely addresses endurance; this coupling is **ours**, labeled as ours, and it rests on verified sources (§ citation rule):
-
-- **Core principle — cutting endurance is a fatigue/time budget, almost never gain-protection.** Concurrent training *preserves* maximal strength and hypertrophy; only power/explosive is meaningfully blunted.
-  > **Schumann et al. 2023**, *Sports Medicine*, DOI 10.1007/s40279-023-01943-9 — 43 studies: max strength SMD **−0.06**, hypertrophy **−0.01** (trivial); explosive **−0.28** within-session. **Verified against source.**
-- **Strong keeps endurance** — max strength is the concurrent-tolerant adaptation (Schumann 2023) and low accessory volume = low total fatigue. ⚠️ Holds **only while "neural" means max strength.** If it ever means power/explosive, endurance must be capped *harder* (power is the sensitive adaptation, Schumann's −0.28; Wilson 2012 same direction).
-- **Heavy trims endurance** — *not* to protect the muscle (hypertrophy survives concurrent, Schumann 2023) but to keep total weekly load recoverable. Avoid unwanted mass/fatigue: **Van Hooren et al. 2024**, *Sports Medicine*, DOI 10.1007/s40279-024-02110-4 — heavy loads >85–90%, stop one rep shy of failure to avoid hypertrophy the endurance athlete didn't ask for; add 1–2 plyometrics for RFD. **Verified against source.**
-- **Definition keeps some conditioning** — hypertrophy survives concurrent (Schumann 2023) so conditioning doesn't threaten the shape; the reveal is food (framing above), not something we cite or prescribe.
-- **Modality split (runner vs cyclist lower-body volume):** running interferes with lower-body strength/hypertrophy more than cycling — **Wilson et al. 2012**, *J Strength Cond Res* 26(8):2293–2307, PMID 22002517. ⚠️ **Direction only** — the specific effect sizes our repo doc quoted (0.94 / 0.32) do **not** match the abstract and are treated as unverified until pulled from full text. Dissenting signal: **Sabag 2018** (verify) found the reverse in one HIIT analysis. So: stay **conservative** (runner trims lower-body), don't claim it's settled.
-
 ### Where each dial hangs in existing code (trace 2026-08-05 — extend, don't rebuild)
 
 - **Volume switch (Strong↔Heavy):** the two-lane pattern already exists — `strength-focus-split.ts` (`build` vs `power` lanes), plus the `RepProfile = strength|hypertrophy|maintenance|neural` vocab in `protocols/intent-taxonomy.ts`. **Missing piece:** a working `hypertrophy` rep-profile emitter (the base-phase ramp is deferred; `performance-neural.ts:162` emits an invalid `LOWER_HYPERTROPHY`).
 - **Definition area bias:** the accessory-bias picker **shipped then was pulled to an "Adjust tab" (D-323)**. The mechanism survives — `single_leg_core` slot replacement in `assistance-menu.ts` + glute/hyrox fallbacks in `materialize-plan/index.ts:1169` + role tags in `exercise-role.ts:119`. Definition **re-lights that axis where D-323 sent it** (respects the prior decision, doesn't reverse it).
-- **Endurance trim:** *not built.* Extension point is `MAINTENANCE_FLOORS` + the posture clamp in `generate-combined-plan/science.ts:795-827`. The coupling "strength intent → cardio cap" is exactly what `docs/SCIENCE-concurrent-training-interference.md:37,85` asks for and does not yet exist.
 - **5/3/1 numbers:** single source `loading/wendler-531.ts` (`PCT_BY_WEEK`, `ANCHOR_REPS`; TM = **85%** of 1RM at `WORKING_NUMBER_PCT_OF_1RM`, 90% is the ceiling invariant). **Parameterize, do not copy.**
 - **⛔ One structural decision first (from `docs/BUILD-ORDER-strength-spine.md`):** protocol + posture are currently **PLAN-scoped**. If tiers ever shift block-to-block, they must become **BLOCK-scoped**. For v1 (pick one tier per plan) plan-scoped is fine — decide before building if cross-block emphasis shifts are in scope.
+
+---
+
+## B. The front door — three entry cards (Train / Race / Build), Train drills down
+
+**Decided by Michael, 2026-08-05**, after the trace below. The tiers in §A need a place to be chosen,
+and the goal step is currently a two-card screen. This section is the door only — it becomes a
+**three-card entry (Train / Race / Build)** with drill-downs. The only *flows* that change: Strength
+gains the tier step (§A), and Build is new (its work order). Race is a move, the placeholder
+disciplines are stubs; nothing else is touched.
+
+### Structure — three entry cards, Train drills down
+
+**Decided by Michael, 2026-08-05.** NOT one screen of six. The entry is **three cards — Train · Race · Build** — and all three work. The disciplines live one tap under Train.
+
+**Entry screen (3 cards):**
+
+| Card | Treatment | Subtitle | Opens |
+|---|---|---|---|
+| **Train** | live (accent edge) | Run, ride, strength, or a mix | the four discipline cards ↓ |
+| **Race** | live (accent edge) | Train for any race | the race list ↓ |
+| **Build** | dashed ("create", set apart) | Write your own, the engine does the math | the build flow ↓ |
+
+**Under Train (4 discipline cards):**
+
+| Card | State | Subtitle | Opens |
+|---|---|---|---|
+| **Strength** | **LIVE** | Get stronger, bigger, or defined | the tier step (§A) → Strong / Heavy / Definition → today's flow |
+| **Run** | PLACEHOLDER | Base, VO2 max, distance | nothing yet — greyed, non-tappable |
+| **Ride** | PLACEHOLDER | FTP and endurance | nothing yet — greyed, non-tappable |
+| **Athletic** | PLACEHOLDER | Several disciplines, balanced | nothing yet — greyed, non-tappable |
+
+### Why drill-down beats bands (the change from the earlier draft)
+
+The earlier draft put six cards in three bands on **one** screen. Drill-down is better for a reason the band version missed: **the three not-yet disciplines move off the front screen.** The first thing anyone sees is three choices that all work; the greyed ones only appear *once you've committed to Train.* Costs one extra tap on Strength — worth it. (`Athletic` = the ongoing, interference-managed multi-discipline plan; its subtitle must always show, since "Athletic" alone doesn't signal multi-discipline.)
+
+### ⛔ Honesty rule — the door must not write a cheque the flow can't cash
+
+Same trap as the July placeholders, one level down. Two entry subtitles promise more than exists today:
+
+- **Race — "Train for any race."** Only the **marathon** flow is live; everything else behind Race is nothing yet.
+- **Build — "Write your own…"** Spec'd for run/ride/strength, but only **strength** is in the work order.
+
+Both are fine ONLY IF the drill-down scopes honestly: the **Race** screen shows marathon live and the rest greyed/not-yet; the **Build** screen shows strength live and run/ride not-yet — same greyed, non-tappable treatment as the disciplines under Train. **Entry subtitles may be broad; the screen behind each one must be honest about what is actually there.** Build is not a strength feature (author-your-own spans disciplines, `WORKORDER-build-your-own-strength-2026-08-04.md`); it just *opens* with strength.
+
+### Locked calls
+
+1. **Race Focus is a MOVE, not a build.** The `marathon` card comes off the top level and sits behind
+   Race Focus. The race intake, the payload, the generator — **none of it is touched.** Michael,
+   2026-08-05: *"we arent touching marathon."* Race is an **entry card**; the race list lives *under*
+   it — **all races consolidate there, scoped to what's live (marathon today); no per-race top-level
+   cards.** half / 10k / tri arrive inside the Race drill-down as they're built.
+2. **Strength Focus keeps its whole current flow, and that flow IS the Strong tier.** Michael:
+   *"we well use current stregnth fous for strong but it needs to be fixed based on the doc."* So
+   Strong is not new work beyond §0–§7 — it is the block that exists, with the accessory defects
+   fixed. Heavy and Definition are the two new dial settings on top of it.
+3. **Placeholders live UNDER Train, greyed and non-tappable — never on the entry screen.** The three
+   entry cards (Train / Race / Build) all work. The not-yet disciplines (Run / Ride / Athletic) appear
+   only *after* tapping Train — greyed, no navigation, **no "Soon" tag.** ⛔ **Do not wire them to
+   `build_endurance` / `build_speed` / `starting_over`** — those seed ids still exist in
+   `non-race-goal-seeds.ts` and pointing a card at one would open exactly the unfinished flow this rule
+   exists to keep shut. **Build is a live entry card** (SPEC'D, work order) — it opens with strength;
+   run/ride *inside* it are the greyed ones (the honesty rule above).
+
+> ⛔ **THIS REVERSES A STANDING CALL — BACK-ANNOTATE IT AT SHIP.** `NonRaceBuilder.tsx:60-70` carries
+> Michael's 2026-07-25 instruction: *"let's clear out all the placeholders — let's just have Strength
+> Focus now,"* with the reasoning *"a front door offering five things that do not work is worse than
+> a door offering one that does."* **That reasoning is not wrong and it is not being discarded** — the
+> difference is that these placeholders do not pretend to work. Rewrite that comment block when the
+> cards land; do not leave it standing as a rule the code now breaks.
+
+### Where it lives in code (traced 2026-08-05 — edit, do not rebuild)
+
+- **The card list:** `GOAL_ORDER` (`src/components/NonRaceBuilder.tsx:77`) — today `['get_stronger', 'marathon']`.
+- **The card render + the auto-advance on tap:** `NonRaceBuilder.tsx:1229-1260`, inside the `goal` step
+  (`currentStep === 'goal'`, `:1218`). The per-card blurbs are inline here, gated on the goal id.
+- **The labels:** `GOAL_LABELS` (`src/lib/non-race-goal-seeds.ts:34`) — one place, deliberately. The
+  card, the goal name, the block summary and the duration copy all read it. **Add new labels here,
+  not in the component** (a special case in the component is the exact bug that was fixed to create
+  this rule).
+- **The step machine:** `scheduleSteps()` / `getSteps` — the entry `goal` step now shows **three cards
+  (Train / Race / Build)**; **Train adds a discipline-picker step**, and Strength adds the **tier step**
+  (§A) after it. So the strength path is `goal → Train → Strength → tier → flow`. `stepNo()` /
+  `hideProgress` already handle branches of unequal length (`:1222-1226`).
+- **Placeholders need a fourth state.** `optBtn` (`:1211`) has active and inactive only. A
+  not-yet-available style is new — keep it inside `optBtn` rather than a second style helper.
+
+### Resolved on this section (Michael, 2026-08-05)
+
+- **Tier reaches the plan as its own field `strength_tier`, NOT overloaded onto `strength_protocol`.**
+  The tier carries three things (accessory volume, endurance trim, area bias); a protocol name carries
+  one. Derive the protocol from the tier; do not cram the tier into it. `assemblePayload` (`:523-700`)
+  gains `strength_tier` alongside the existing `strength_protocol`. Tier is **plan-scoped in v1** (see
+  §A block-scoped note).
+- **Placeholder card copy** — see the subtitle columns in the structure tables above. Stated as what
+  each will be, not "coming soon." Placeholder disciplines render greyed and non-tappable **under
+  Train** per Locked call #3.
 
 ---
 
@@ -59,7 +144,7 @@ All live in `src/lib/assistance-menu.ts`, surfaced by `strength-primary-plan.ts`
 1. **Press days structurally cannot show a push.** `resolveAssistance` swaps any accessory that shares the main lift's movement *family*. A press day's main lift is always a press, so the `push` slot always collides, and it resolves through `BALANCE_POOL.push` — a list that contains **only pulls** (`Face Pull` first). Result: bench/OHP days get two pulls and zero push, every time, by design. Wendler never does this (§2).
 2. **Lower-body work dumped on upper days.** The `single_leg_core` slot only gets rewritten on hinge days. On bench/OHP nothing collides with it, so `Single Leg Hip Thrust` passes straight through onto press days. Wendler's press-day third slot is abs, never legs (§2).
 3. **Same lower-body pattern repeats day-to-day.** Hip Thrust on Squat day, Reverse Lunge on Deadlift day, Hip Thrust again on upper days — glute/ham load stacked across consecutive days and competing with the run legs.
-4. **Reps floored at 25 — half the book's floor.** `ASSISTANCE_TOTAL_REPS_FLOOR = 25`. Every Wendler template floors at 50+ (§2). The floor is also flat across disciplines, ignoring that running interferes with lower-body strength ~3× more than cycling (Wilson 2012).
+4. **Reps floored at 25 — half the book's floor.** `ASSISTANCE_TOTAL_REPS_FLOOR = 25`. Every Wendler template floors at 50+ (§2). Fix: floor 50, ceiling 75, flat (§5).
 
 ---
 
@@ -127,19 +212,16 @@ New collision-note copy (`assistanceSubstitutionNote`, `335-354`) must read as *
 
 ---
 
-## 5. Volume model — 50 floor, modality-aware
+## 5. Volume model — 50 floor, 75 ceiling (flat, Wendler)
 
 Rewrite `assistanceTotalReps` (`assistance-menu.ts:109-139`) and `ASSISTANCE_TOTAL_REPS_FLOOR` (`90`).
 
-- **Floor: 50** (Wendler's real minimum), replacing 25. Ceiling stays modest for a concurrent athlete — **proposed 75** (was 50); confirm.
-- **Upper-body accessory:** floor 50 for both disciplines. The existing pull-slot scaling off `pullupMaxReps` stays as an *additional* earn toward the ceiling.
-- **Lower-body accessory — modality-aware:**
-  - **Run-primary athlete:** hold lower-body accessory at/near the floor (conservative — running already loads those tissues, Wilson 2012).
-  - **Ride-primary athlete:** lower-body accessory earns headroom toward the ceiling.
-  - Discipline read from the athlete's per-discipline posture / sport (`goals.training_prefs`, same source the plan already uses). Duathlete/triathlete with both: treat as run-primary for the lower-body slot (the more-interfering modality governs).
+- **Floor: 50** (Wendler's real minimum), replacing 25. **Ceiling: 75** (Michael, 2026-08-05 — was 50). The band opens up so the §A tiers have room: at ceiling 50 floor=ceiling and Strong/Heavy would be identical on volume. 75 gives Strong the floor, Heavy the top, under Wendler's own 75–100.
+- **Same for everyone — Wendler does not split accessory reps by sport.** Floor 50 / ceiling 75 regardless of run or ride.
+- The existing pull-slot scaling off `pullupMaxReps` stays as an *additional* earn toward the ceiling.
 - **Anchor cycles still hold the floor** (existing rule, `line 115` — keep). The "insurance, not a target" framing and `assistanceBasisNote` copy stay.
 
-> Exact coefficients (floor 50, ceiling 75, the runner/cyclist lower-body split points) are proposed anchors, not hand-tuned to any one athlete. Settle them during build against the book + interference science, and confirm on Michael's acceptance run (§9). **Do not tune to Michael's numbers.**
+> ⛔ **DO NOT add a runner/cyclist rep split here — that behavior is ALREADY BUILT elsewhere.** The app is already modality-aware where it belongs: the per-discipline `MAINTENANCE_FLOORS` in `generate-combined-plan/science.ts:822-827` back cardio off differently for runners (0.15) vs cyclists (0.12). Interference/modality is the existing engine's job; accessory reps stay Wendler-flat. *(An earlier draft re-specced this as a lower-body rep split — removed 2026-08-05, it duplicated built behavior. This is the exact "don't rebuild what exists" trap.)*
 
 ---
 
@@ -156,9 +238,9 @@ Rewrite `assistanceTotalReps` (`assistance-menu.ts:109-139`) and `ASSISTANCE_TOT
 
 | File | What changes |
 |---|---|
-| `src/lib/assistance-menu.ts` | `resolveAssistance` (266-324): day-type slot roles (§3), push-stays-push (§4), upper-day core slot, lower-day variation. `BALANCE_POOL` (222-231): drop Face-Pull-as-push. `assistanceTotalReps` + FLOOR/CEILING (90-139): 50 floor, modality-aware lower-body (§5). `ASSISTANCE_MENU` (150-191): add Incline/Ab Wheel/Front-Split-Squat. `assistanceSubstitutionNote` (335-354): variation copy. `ASSISTANCE_DEFAULTS` (194-198): reset. |
+| `src/lib/assistance-menu.ts` | `resolveAssistance` (266-324): day-type slot roles (§3), push-stays-push (§4), upper-day core slot, lower-day variation. `BALANCE_POOL` (222-231): drop Face-Pull-as-push. `assistanceTotalReps` + FLOOR/CEILING (90-139): 50 floor / 75 ceiling, flat (§5) — no sport split. `ASSISTANCE_MENU` (150-191): add Incline/Ab Wheel/Front-Split-Squat. `assistanceSubstitutionNote` (335-354): variation copy. `ASSISTANCE_DEFAULTS` (194-198): reset. |
 | `src/lib/exercise-config.ts` | Classification stays (`MovementFamily`, `COMPLEMENT`, `sharesMovementFamily`). May add patterns for new menu exercises. |
-| `supabase/functions/_shared/strength-system/strength-primary-plan.ts` | `assistanceRows` (289-323) + call site (1339-1346): pass day-type; thread modality/sport for §5. |
+| `supabase/functions/_shared/strength-system/strength-primary-plan.ts` | `assistanceRows` (289-323) + call site (1339-1346): pass day-type. (No modality threading — reps are flat; interference lives in the existing `science.ts` floors.) |
 | `supabase/functions/_shared/strength-system/assistance-collision.test.ts` | **Rewrite the pinned invariants** (§8) — Bench push slot must now assert a push, not Face Pull. |
 | `src/components/NonRaceBuilder.tsx` | Seed-only; add the per-day override surface (§6) — likely a separate plan-side component, not the wizard. |
 | `materialize-plan/index.ts` (~1109/1384) | Equipment substitution unaffected except Face-Pull-as-push is gone. |
@@ -184,16 +266,18 @@ Per house method — deno fixtures, not prod; bug-case fixtures become permanent
    - OHP day emits a push + a pull + core; no Face-Pull-as-push.
    - No lower-body movement on any upper day; third slot is core/abs.
    - Squat-day and Deadlift-day single-leg/quad patterns differ.
-   - Floor = 50; run-primary lower-body accessory ≤ ride-primary at equal inputs.
+   - Reps floor = 50, ceiling 75, flat across sports (no runner/cyclist rep split).
 2. **Selection invariants:** rewrite `assistance-collision.test.ts` to the §4 rules.
-3. **Recompute stability:** the plan generator has an LLM narration layer — verify any generated-plan change with **≥3 back-to-back recomputes, all clean**, never one.
+3. **Deterministic — no recompute-for-variance needed.** The accessory/plan path has **no LLM** (verified 2026-08-05: no model calls in `strength-system` or `assistance-menu.ts`). Same input → same output, so a fixture asserting the exact resolved accessories per day is definitive on one run. (The ≥3-recompute rule is for stochastic/LLM generators; it does not apply here.)
 4. **One Michael-driven acceptance run** at the end: regenerate a Strength Focus block, eyeball a press day (has a push), a lower day (varied legs), and the rep floors. Confirm the coefficient anchors (§5) read right on a real block — without tuning them to his numbers.
 
 ---
 
 ## 10. Open items to confirm before/at build
 
-- Ceiling: 75 vs keep 50. (Proposed 75.)
-- Runner/cyclist lower-body split points — the actual floor/ceiling each discipline lands on.
+- ~~Ceiling 75 vs 50~~ **CLOSED — 75 (Michael, 2026-08-05).** See §5.
+- ~~Tier payload field vs `strength_protocol`~~ **CLOSED — own field `strength_tier` (§B).**
+- ~~Placeholder card copy~~ **CLOSED — subtitles in the §B table.**
+- ~~Runner/cyclist lower-body split points~~ **DROPPED — reps are flat Wendler (§5); modality is the existing `science.ts` floors, already built.**
 - Per-day override storage shape + re-materialize survival (§6).
 - Exact default exercises per slot (§3) — roles are locked, exercises are tuning.

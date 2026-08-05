@@ -58,23 +58,76 @@ const DISCIPLINE_LABEL: Record<Discipline, string> = { swim: 'Swim', bike: 'Bike
 const DISCIPLINE_ICONS: Record<Discipline, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   run: Activity, bike: Bike, swim: Waves, strength: Dumbbell,
 };
-// ⛔ ONE CARD, AND THE REST WERE PLACEHOLDERS. Michael, 2026-07-25: *"let's clear out all the
-// placeholders — let's just have Strength Focus now."*
+// ⛔ THE JULY RULE, AND WHY IT NO LONGER READS THE WAY IT DID (rewritten 2026-08-05, SPEC §B).
 //
-// Build endurance / Build speed / Build muscle + train / Maintain / Starting over were all pickable
-// and none of them had been built to the standard Strength Focus now sets. A front door offering
-// five things that do not work is worse than a door offering one that does.
+// Michael, 2026-07-25: *"let's clear out all the placeholders — let's just have Strength Focus now,"*
+// on the reasoning that *a front door offering five things that do not work is worse than a door
+// offering one that does.* Build endurance / Build speed / Build muscle / Maintain / Starting over
+// were all pickable and none of them worked.
 //
-// The goal IDs still exist in `non-race-goal-seeds.ts` and existing goals built on them keep
-// working — this list is only what the picker OFFERS. Add one back the day it is real.
+// ⚠️ **That reasoning still stands and is NOT discarded.** What changed is that the door now has two
+// levels: the entry screen offers only things that OPEN (Train, Race), and the not-yet disciplines
+// live one level down, rendered dimmed and NON-TAPPABLE. A card that says it isn't ready is not the
+// thing that rule was written against — a card that opens a half-built flow is. Michael, 2026-08-05:
+// *"the run focus ride focus etc are just place holders."*
 //
-// (Michael also ruled Maintain should never be a card at all: it is the state between blocks, not
-// something an athlete chooses. The app drops into it when a block ends. See BUILD-ORDER.)
-// ⛔ SECOND CARD ADDED 2026-08-04 — Marathon. It is not a new builder; it is this builder with a
-// race step in front and two extra fields on the payload. The run steps it walks (`days`,
-// `commitment`, `run`, `bike`, `swim`) were ALL already built and were dark only because this array
-// had one entry. See the slice report for what was ungated vs what was already live.
+// (Maintain is still never a card: it is the state between blocks, not something an athlete chooses.
+// The app drops into it when a block ends. See BUILD-ORDER.)
+//
+// ⛔ THIS LIST IS GOALS, NOT NAVIGATION — DO NOT PUT `train` / `race` / `build` IN IT. It feeds
+// `seedFromGoal` (`:816`), which switches on the goal id; an entry-card id falls through to a default
+// and reintroduces the 2026-08-04 progress-bar jump. The entry cards are `ENTRY_ORDER` below, and the
+// goal id is set one screen later — Strength → `get_stronger`, Race → `marathon`.
 const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger', 'marathon'];
+
+/**
+ * ⛔ THE FRONT DOOR — three cards, and it REPLACES "What's the goal?" (SPEC §B, 2026-08-05).
+ *
+ * Train / Race / Build. These are NAVIGATION, not goals — see the warning on `GOAL_ORDER`. Train
+ * drills down to a discipline picker (`TRAIN_ORDER`); Race and Build route straight into their flows.
+ *
+ * ⚠️ THE HONESTY RULE: the subtitles here are deliberately BROAD ("Train for any race"), and the
+ * screen behind each card shows only what is live. Never a card that opens nothing.
+ */
+type EntryCardId = 'train' | 'race' | 'build';
+const ENTRY_ORDER: EntryCardId[] = ['train', 'race', 'build'];
+const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string }> = {
+  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix' },
+  race: { label: 'Race', blurb: 'Train for any race' },
+  build: { label: 'Build', blurb: 'Write your own, the engine does the math' },
+};
+/**
+ * Build is a CREATE action, not a pick — every catalog app separates the two, so it gets a distinct
+ * (dashed) treatment and sits apart. ⚠️ It is NOT live: the flow is spec'd only
+ * (`WORKORDER-build-your-own-strength-2026-08-04.md`, Stage 0 not started), so it renders as not-yet
+ * rather than opening a door to nothing. Flip this the day the build flow lands.
+ */
+const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, build: false };
+
+/**
+ * ⛔ THE TRAIN DRILL-DOWN — the four ongoing-focus disciplines. Strength is the only one built.
+ *
+ * "Athletic", never "Multi" (Michael, 2026-08-05): *"Multi" reads as triathlon-only, which is the
+ * read we are avoiding.* The card name alone does not signal multi-discipline, so the SUBTITLE
+ * carries it — never render one of these without its blurb.
+ *
+ * ⛔ Run / Ride / Athletic are DIMMED AND NON-TAPPABLE, and they must NOT be wired to the
+ * `build_endurance` / `build_speed` / `starting_over` seeds. Those ids still exist in
+ * `non-race-goal-seeds.ts` and still work for goals already built on them — pointing a card at one
+ * would open exactly the unfinished flow the July rule exists to keep shut.
+ */
+type TrainCardId = 'run' | 'ride' | 'strength' | 'athletic';
+const TRAIN_ORDER: TrainCardId[] = ['run', 'ride', 'strength', 'athletic'];
+const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string }> = {
+  run: { label: 'Run', blurb: 'Base, VO2 max, distance' },
+  ride: { label: 'Ride', blurb: 'FTP and endurance' },
+  strength: { label: 'Strength', blurb: 'Get stronger, bigger, or defined' },
+  athletic: { label: 'Athletic', blurb: 'Several disciplines, balanced' },
+};
+/** The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate. */
+const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
+  run: null, ride: null, strength: 'get_stronger', athletic: null,
+};
 
 /** Race distances this card offers. One for now — the rest come behind the same machinery. */
 const RACE_DISTANCES = ['Marathon'] as const;
@@ -244,6 +297,12 @@ function equipmentTierFromArc(arc: unknown): 'full_barbell' | 'dumbbell_based' |
 }
 
 type NonRaceState = {
+  /**
+   * Which front-door card was tapped (SPEC §B). NAVIGATION ONLY — it never reaches the payload and
+   * nothing derives a plan from it; it exists so the step machine knows whether the Train drill-down
+   * belongs in the flow, and so Back walks entry ← train instead of jumping to the door.
+   */
+  entry: EntryCardId | null;
   goal: NonRaceGoalId | null;
   discipline: Discipline | undefined;
   posture: Partial<Record<Discipline, Posture>>;
@@ -338,7 +397,15 @@ type NonRaceState = {
 };
 
 type StepKey =
+  // ⛔ `goal` IS NOW THE ENTRY SCREEN — Train / Race / Build (SPEC §B, 2026-08-05). The key keeps its
+  // name because every `stepNo`/`steps.indexOf` caller and the back-to-close behaviour at `:830` key
+  // off it; renaming it is a bigger diff than it is worth for a screen whose job did not change (it
+  // is still "the first card, and the one Back closes the builder from").
   | 'goal'
+  // ⛔ THE TRAIN DRILL-DOWN — Run / Ride / Strength / Athletic. Only reachable from the Train entry
+  // card, and only Strength opens anything today. It sits between `goal` and the picked goal's own
+  // flow, so the Strength path is: entry → train → posture → … → confirm.
+  | 'train'
   // ⛔ THE RACE ITSELF — distance, date, level. Its own card, immediately after the goal, because
   // every screen after it is shaped by the answers: the date owns the block length (so the `length`
   // step drops out), and the level picks the volume table the plan is built from.
@@ -426,7 +493,12 @@ function getSteps(state: NonRaceState): StepKey[] {
   // ⚠️ On step 1 no goal has been chosen yet, so this returned the FULL six-step flow and the
   // progress bar read "1 of 6" — then jumped to "2 of 4" the moment the athlete tapped. With one
   // goal offered, the flow it produces is knowable before it is picked. Count that.
-  const effective = state.goal ?? (GOAL_ORDER.length === 1 ? GOAL_ORDER[0] : null);
+  // ⚠️ THE `GOAL_ORDER.length === 1` FALLBACK IS GONE (2026-08-05). It existed to make the progress
+  // bar countable on step 1 before a goal was picked, and it was already wrong with two cards. The
+  // entry and train screens now both `hideProgress` — there is no honest count until a discipline is
+  // chosen, so there is nothing left to guess a goal for. See `seededPosture` (`:816`), which still
+  // passes a REAL goal id and must keep doing so.
+  const effective = state.goal;
   const isStrengthFocus = effective === 'get_stronger';
   const isRaceGoal = effective === 'marathon';
   // ⛔ AND NO LENGTH SLIDER on this path. Twelve weeks is not a preference — Wendler's ratios are
@@ -455,11 +527,16 @@ function getSteps(state: NonRaceState): StepKey[] {
   //     disciplines outside the plan's primary, and it belongs after the athlete has seen the
   //     plan. It now lives on the confirm card, under the preview.
   //   • `length` — already skipped on a race; the date owns it.
+  // ⛔ RACE SKIPS THE TRAIN PICKER. It is reached from the entry card directly — racing is an intent
+  // that spans disciplines, not one of the four ongoing focuses (SPEC §B).
   if (isRaceGoal) return ['goal', 'race', 'days', 'level', 'intent', 'confirm'];
 
+  // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
+  // picked so Back walks entry ← train ← flow instead of jumping to the door.
+  const door: StepKey[] = state.entry === 'train' ? ['goal', 'train'] : ['goal'];
   const head: StepKey[] = isStrengthFocus
-    ? ['goal', 'posture']
-    : ['goal', 'posture', 'commitment', 'length'];
+    ? [...door, 'posture']
+    : [...door, 'posture', 'commitment', 'length'];
   return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'confirm'];
 }
 
@@ -773,6 +850,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
   const [state, setState] = useState<NonRaceState>({
+    entry: null,
     goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
     // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
     // arrival instead of an empty box. Michael: *"no prefill let them chose."* A long run is
@@ -856,11 +934,10 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   };
 
   const needsDiscipline = state.goal != null && GOALS_NEEDING_DISCIPLINE.includes(state.goal);
-  // Don't gate disciplines: everyone is offered all of them (people come in exclusive but switch
-  // gears). The athlete picks develop/maintain/out per discipline — the engine never decides what
-  // they're "allowed" to train. Missing baselines for a developed discipline are handled downstream
-  // (calibration prompt), not by hiding the option.
-  const enduranceChoices = DISCIPLINE_ORDER.filter((d) => d !== 'strength');
+  // ⚠️ `enduranceChoices` DELETED 2026-08-05 — it fed the "Which discipline?" sub-picker on the old
+  // goal screen, and the front door's Train card names the discipline instead (SPEC §B). The rule it
+  // carried is unchanged and still holds on the posture screen: don't gate disciplines, everyone is
+  // offered all of them, and missing baselines are handled downstream, not by hiding the option.
   const goalCanContinue = state.goal != null && (!needsDiscipline || state.discipline != null);
   const postureCanContinue = Object.values(state.posture).some((p) => p !== 'out');
   const rows = DISCIPLINE_ORDER; // ungated — always show all four disciplines (don't gate)
@@ -1208,89 +1285,120 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
-  const optBtn = (active: boolean) =>
-    `w-full text-left px-4 py-3 rounded-xl border ${active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'} text-white`;
+  // ⛔ A THIRD STATE (2026-08-05, SPEC §B): `notYet`. The front door shows disciplines that are not
+  // built, and they have to READ as not built — dimmed, no accent, and (at the call site) no click
+  // handler. The honesty rule is the whole point: a card that says it isn't ready is fine; a card
+  // that opens a half-built flow is the thing the July rule was written against.
+  //
+  // ⚠️ NO "Soon" TAG (Michael's call). The dimming carries it; a badge promises a date we don't have.
+  const optBtn = (active: boolean, notYet = false) =>
+    `w-full text-left px-4 py-3 rounded-xl border text-white ${
+      notYet
+        ? 'border-white/8 bg-white/[0.015] text-white/40 cursor-default'
+        : active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'
+    }`;
+  // Build is a CREATE action, not a pick — dashed edge, set apart from the two that route to a plan.
+  const createBtn = (notYet: boolean) =>
+    `w-full text-left px-4 py-3 rounded-xl border border-dashed ${
+      notYet ? 'border-white/12 bg-transparent text-white/40 cursor-default' : 'border-white/25 bg-white/[0.02] text-white'
+    }`;
 
   return (
     // h-full (not 100dvh) so it fills GoalsScreen's content area and keeps the app nav/banner when
     // embedded; standalone route still fills its container.
     <div className="h-full bg-zinc-950 text-white flex flex-col">
+      {/* ── THE FRONT DOOR ───────────────────────────────────────────────────────────────────────
+          Three cards, and it REPLACES "What's the goal?" (SPEC §B, 2026-08-05). Train drills down;
+          Race and Build route straight in.
+
+          ⛔ THE SUB-PICKER IS GONE, NOT MOVED. The old screen carried a "Which discipline?" list for
+          `build_endurance` / `build_speed` / `starting_over` — goals that were never offered. The
+          Train card NAMES the discipline, so the question it asked cannot arise here; when Run and
+          Ride land, the card they are tapped from is the answer. `GOALS_NEEDING_DISCIPLINE` still
+          governs any goal reached another way — this is the picker leaving, not the rule. */}
       {currentStep === 'goal' && (
         <StepLayout
-          step={stepNo('goal')} totalSteps={steps.length} title="What's the goal?"
-          subtitle="Every plan carries strength. A race puts the race in front; Strength Focus puts the lifting in front."
+          step={stepNo('goal')} totalSteps={steps.length} title="Choose your focus"
+          subtitle="Change it whenever you want."
           onBack={back} onContinue={next} canContinue={goalCanContinue}
           hideContinue
-          // ⛔ The two cards lead to flows of different lengths, so there is no honest count to
-          // print here until one is tapped. See `hideProgress` in StepLayout.
+          // ⛔ The cards lead to flows of different lengths, so there is no honest count to print
+          // here until one is tapped. See `hideProgress` in StepLayout.
           hideProgress
         >
           <div className="space-y-2">
-            {GOAL_ORDER.map((g) => (
-              <button
-                key={g} type="button" className={optBtn(state.goal === g)}
-                // Picking IS the answer — no second tap to confirm it. The card is the only thing on
-                // the screen and Continue was pure ceremony. Goals that still need a discipline pick
-                // (build_endurance / build_speed / starting_over) stay on the step so that question
-                // can be asked; none of them are offered today, but auto-advancing them would skip it.
-                onClick={() => { reseed(g, undefined); if (!GOALS_NEEDING_DISCIPLINE.includes(g)) next(); }}
-              >
-                {/* The special case that used to force "Strength Focus" here is gone — GOAL_LABELS
-                    now carries it, so the card, the goal name, the block summary and the duration
-                    copy all read from one place instead of the card disagreeing with the plan. */}
-                <span className="block">{GOAL_LABELS[g]}</span>
-                {/* Same job as the Strength Focus card's copy: state what the block IS and what it
-                    needs, at the door. What this one deliberately does NOT claim is a time goal —
-                    the block is built to get the athlete to the start line, and the pace work it
-                    can do depends on numbers we may not have yet. */}
-                {g === 'marathon' && (
-                  <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
-                    A build to a marathon date. Running leads; the bike, the swim and the lifting are
-                    held at a maintenance dose and are yours to switch on next screen. The block runs
-                    from the week you start to race day, so the date sets the length.
-                  </span>
-                )}
-                {g === 'get_stronger' && (
-                  <>
-                    {/* The card states what it NEEDS and who it is FOR. The app cannot tell a
-                        beginner from an experienced lifter, and the scope cut governs what we build,
-                        not who gets in (SPEC §4). */}
-                    <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
-                      12 weeks of Wendler's 5/3/1, four lifting days. For someone who already lifts and
-                      is months from a race. Needs a barbell, a rack and a bench — and your squat,
-                      bench, deadlift and overhead press maxes on file.
-                      {' '}
-                      {/* ⛔ THE PRECONDITION, SAID AT THE DOOR. The block holds an aerobic base at
-                          two-thirds of normal — so it assumes there IS a normal, and that the athlete
-                          knows what it is. The intake asks for it outright ("what do you normally
-                          run?") and the whole volume verdict is computed off that answer. Someone
-                          who cannot name their usual week is being asked a question they cannot
-                          answer, and finding that out on step three is worse than knowing at the
-                          door. Michael, 2026-07-25. */}
-                      Your usual weekly volume helps, but is not required — it starts light and adapts
-                      if you don't know it.
-                    </span>
-                  </>
-                )}
-              </button>
-            ))}
+            {ENTRY_ORDER.map((e) => {
+              const live = ENTRY_LIVE[e];
+              const isCreate = e === 'build';
+              return (
+                <button
+                  key={e} type="button"
+                  className={isCreate ? createBtn(!live) : optBtn(state.entry === e, !live)}
+                  // ⛔ NOT-YET CARDS DO NOT NAVIGATE. `disabled` (not just a missing handler) so the
+                  // card is inert to keyboard and screen readers too — "it isn't ready" has to be
+                  // true for everyone, not only for a mouse.
+                  disabled={!live}
+                  // Picking IS the answer — no second tap to confirm. Train opens the drill-down;
+                  // Race is a goal in its own right and seeds it here.
+                  onClick={() => {
+                    if (!live) return;
+                    if (e === 'race') { setState((s) => ({ ...s, entry: e })); reseed('marathon', undefined); }
+                    else setState((s) => ({ ...s, entry: e, goal: null }));
+                    next();
+                  }}
+                >
+                  <span className="block">{ENTRY_COPY[e].label}</span>
+                  <span className="block text-white/70 text-sm mt-1 leading-relaxed">{ENTRY_COPY[e].blurb}</span>
+                </button>
+              );
+            })}
           </div>
           {/* Strength is not a mode you switch into — it is in every plan, and only the dose changes.
-              Saying so here is what makes ONE strength card make sense rather than look like a gap. */}
+              Saying so here is what makes the Train list read as a focus, not as a menu of apps. */}
           <p className="text-white/75 text-sm mt-5 leading-relaxed">
             Every plan has a strength component built on the same 5/3/1 principle. The load adjusts to
-            the goal — a race build holds it at maintenance, this one develops it.
+            the focus — a race build holds it at maintenance, a strength block develops it.
           </p>
-          {needsDiscipline && (
-            <div className="mt-4 space-y-2">
-              <p className="text-white/70 text-sm">Which discipline?</p>
-              {enduranceChoices.map((d) => (
-                <button key={d} type="button" className={optBtn(state.discipline === d)} onClick={() => reseed(state.goal!, d)}>
-                  {DISCIPLINE_LABEL[d]}
+        </StepLayout>
+      )}
+
+      {/* ── THE TRAIN DRILL-DOWN ─────────────────────────────────────────────────────────────────
+          Run / Ride / Strength / Athletic. Only Strength opens anything today; the other three are
+          dimmed and inert. This is the screen the July placeholder rule was rewritten for — see the
+          comment above `GOAL_ORDER`. */}
+      {currentStep === 'train' && (
+        <StepLayout
+          step={stepNo('train')} totalSteps={steps.length} title="Train"
+          subtitle="What you're building. The rest keeps ticking over underneath."
+          onBack={back} onContinue={next} canContinue={state.goal != null}
+          hideContinue hideProgress
+        >
+          <div className="space-y-2">
+            {TRAIN_ORDER.map((t) => {
+              const goal = TRAIN_GOAL[t];
+              return (
+                <button
+                  key={t} type="button"
+                  className={optBtn(goal != null && state.goal === goal, goal == null)}
+                  disabled={goal == null}
+                  onClick={() => { if (!goal) return; reseed(goal, undefined); next(); }}
+                >
+                  <span className="block">{TRAIN_COPY[t].label}</span>
+                  <span className="block text-white/70 text-sm mt-1 leading-relaxed">{TRAIN_COPY[t].blurb}</span>
+                  {/* The Strength card keeps the preconditions that used to sit on the goal screen —
+                      what the block NEEDS and who it is FOR, said at the door rather than discovered
+                      on step three (Michael, 2026-07-25). */}
+                  {t === 'strength' && (
+                    <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
+                      12 weeks of Wendler's 5/3/1, four lifting days. Needs a barbell, a rack and a
+                      bench — and your squat, bench, deadlift and overhead press maxes on file. Your
+                      usual weekly volume helps, but is not required.
+                    </span>
+                  )}
                 </button>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </StepLayout>
       )}
 
