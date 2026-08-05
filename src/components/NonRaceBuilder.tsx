@@ -1495,16 +1495,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
                         {TRAIN_COPY[t].blurb}
                       </span>
-                      {/* The Strength card keeps the preconditions that used to sit on the goal
-                          screen — what the block NEEDS and who it is FOR, said at the door rather
-                          than discovered on step three (Michael, 2026-07-25). */}
-                      {t === 'strength' && (
-                        <span className="block text-white/85 text-sm mt-2 leading-relaxed">
-                          12 weeks of Wendler's 5/3/1, four lifting days. Needs a barbell, a rack and a
-                          bench — and your squat, bench, deadlift and overhead press maxes on file. Your
-                          usual weekly volume helps, but is not required.
-                        </span>
-                      )}
+                      {/* ⛔ THE PRECONDITION PARAGRAPH IS GONE (Michael, 2026-08-05: *"lose this"*).
+                          It listed what the block needs — barbell, rack, bench, four maxes on file —
+                          and it made one card three times the height of its three neighbours, which
+                          is what a picker screen cannot afford.
+
+                          ⚠️ IT WAS THERE FOR A REASON AND THAT REASON HAS NOT GONE AWAY: the
+                          2026-07-25 rule was to state a block's requirements AT THE DOOR, because
+                          finding out on step three that you need four 1RMs on file is worse than
+                          knowing before you start. The requirement is now UNSAID on this path. The
+                          natural home is the tier screen (the next tap, still before any work) —
+                          not built, deliberately not guessed at. */}
                     </span>
                   </span>
                 </button>
