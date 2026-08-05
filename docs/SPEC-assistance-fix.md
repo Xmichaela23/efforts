@@ -126,7 +126,17 @@ Both are fine ONLY IF the drill-down scopes honestly: the **Race** screen shows 
 
 ### Resolved on this section (Michael, 2026-08-05)
 
-- **Tier reaches the plan as its own field `strength_tier`, NOT overloaded onto `strength_protocol`.**
+> ⛔ **`strength_tier` IS ALREADY TAKEN — DO NOT USE THAT NAME (found in code 2026-08-05, while
+> building the tier step).** The plan config already writes `strength_tier: 'barbell'`
+> (`generate-strength-plan/index.ts`) and it means the **EQUIPMENT** tier — barbell / dumbbell /
+> bodyweight. Two meanings on one key is the "second vocabulary beside the first" trap `CLAUDE.md`
+> opens with, and every reader would have to guess which it had. **Pick a different name when the
+> field is actually needed** (`strength_intent` is the obvious candidate — it is the word §A already
+> uses). Nothing is blocked today: the tier UI ships with Strong only, Strong is a pass-through to
+> today's block, and **no tier field reaches the payload at all.** The decision below stands on its
+> reasoning; only the name is wrong.
+
+- **Tier reaches the plan as its own field (NOT the name below — see the warning above), NOT overloaded onto `strength_protocol`.**
   The tier carries three things (accessory volume, endurance trim, area bias); a protocol name carries
   one. Derive the protocol from the tier; do not cram the tier into it. `assemblePayload` (`:523-700`)
   gains `strength_tier` alongside the existing `strength_protocol`. Tier is **plan-scoped in v1** (see
