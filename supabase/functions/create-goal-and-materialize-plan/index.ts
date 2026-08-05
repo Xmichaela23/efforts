@@ -2719,6 +2719,8 @@ Deno.serve(async (req: Request) => {
           run_lean: 1.0, // run-only single-sport path → all endurance to run; the fader supplies the split when bike develops
           ...(plan_start_date ? { start_date: plan_start_date } : {}),
           ...(bodyPreview ? { preview: true } : {}),
+          // The pinned long-run day / club night — same channel, same reason as the event path above.
+          ...(tp.preferred_days ? { preferred_days: tp.preferred_days } : {}),
         };
 
         // Q-093 Lock 1: thread strength_tier/strength_intent/equipment so generate-run-plan's tier
@@ -3525,6 +3527,14 @@ Deno.serve(async (req: Request) => {
         : '4-5',
       race_date: resolvedGoal?.target_date,
       race_name: resolvedGoal?.name,
+      // ⛔ THE PINNED DAYS, AND UNTIL NOW THEY STOPPED HERE. The intake asks which day the long run
+      // is and which night the club meets, `buildPreferredDays` writes both to
+      // `training_prefs.preferred_days`, and the run generator hardcoded Sunday/Tuesday/Thursday
+      // with no input that could change it (`assign-days.ts` has the full account). Collected,
+      // stored, never read — and the screen promised *"the plan puts its hard running there."*
+      ...(resolvedGoal?.training_prefs?.preferred_days
+        ? { preferred_days: resolvedGoal.training_prefs.preferred_days }
+        : {}),
       // ⛔ THE ATHLETE'S TYPED WEEK BEATS THE SNAPSHOT, AND UNTIL NOW IT WAS NOT READ AT ALL.
       //
       // This line was `current_weekly_miles: weeklyMiles` — snapshot-derived only

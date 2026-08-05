@@ -228,6 +228,9 @@ Deno.serve(async (req: Request) => {
       effort_score: effortScore,
       effort_paces: effortPaces,
       units: request.units ?? 'imperial',
+      // The athlete's pinned long-run day and club night. Straight through — `assign-days.ts` is
+      // the only reader and it normalises. Undefined when nothing was pinned.
+      preferred_days: request.preferred_days,
     };
 
     let plan: TrainingPlan;

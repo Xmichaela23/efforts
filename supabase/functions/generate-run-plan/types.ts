@@ -54,6 +54,17 @@ export interface GeneratePlanRequest {
   no_doubles?: boolean; // If true, cannot stack strength on same day as quality runs (default: false, allows doubles)
   race_date?: string;
   race_name?: string;
+  /**
+   * ⛔ THE ATHLETE'S PINNED DAYS — long-run day and club night, forwarded to the generator and read
+   * by `assign-days.ts`. Full lowercase weekday names, straight from
+   * `goals.training_prefs.preferred_days` as `buildPreferredDays` wrote them. Absent means unpinned,
+   * and unpinned means the engine picks: an omitted key is a real answer, never a zero.
+   */
+  preferred_days?: {
+    long_run?: string | null;
+    quality_run?: string | null;
+    easy_run?: string | null;
+  };
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
   // Athlete current state — derived from recent snapshots & workout facts
@@ -123,6 +134,12 @@ export interface GeneratorParams {
   race_date?: string;   // ISO date string (YYYY-MM-DD) - race day
   terminalShape?: 'taper' | 'retest'; // (b)-run: non-race retest head vs race taper head (default taper)
   race_name?: string;   // Optional race name (e.g., "Boston Marathon")
+  /** The athlete's pinned days, forwarded verbatim to the generator. See `GeneratorParams`. */
+  preferred_days?: {
+    long_run?: string | null;
+    quality_run?: string | null;
+    easy_run?: string | null;
+  };
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
   // Athlete current state — from recent snapshots
@@ -260,6 +277,13 @@ export interface PlanContractV1 {
     include_disciplines: string[];
     weights?: Record<string, number>;
   };
+  /**
+   * ⚠️ DECLARED, NEVER POPULATED, AND TOO NARROW TO HOLD THE ANSWER. `long_run_day?: 'sat' | 'sun'`
+   * cannot express the Wednesday long run a shift worker actually runs, and no caller has ever set
+   * this object for a run plan (`generate-triathlon-plan:290` is the only writer, on its own path).
+   * The live channel is `preferred_days` below, which carries all seven days and is what the intake
+   * fills. Left in place because the triathlon path's types lean on the shape; do not add readers.
+   */
   schedule_preferences?: {
     long_run_day?: 'sat' | 'sun';
     long_ride_day?: 'sat' | 'sun';

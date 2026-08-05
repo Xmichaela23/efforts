@@ -104,6 +104,17 @@ export type ScheduleInput = {
    *  single `anchorDiscipline` + `anchorDay` was the narrower shape and forced a choice the data
    *  model never required. Both forms are accepted; this one wins where they overlap. */
   qualityDays?: Partial<Record<'run' | 'bike', string>>;
+  /**
+   * ⛔ THE SAME STANDING SESSION, DECLARED EASY — AND IT IS A DIFFERENT PIN, NOT A WEAKER ONE.
+   * `ArcSetupWizard.tsx:1743` has asked this since it shipped: *"Easy / social long run —
+   * conversational pace. Counts as aerobic. The planner adds a separate quality session."* A club
+   * night is not automatically a hard night, and filing a social run under `quality_run` tells the
+   * engine to put its intervals on the one evening the athlete is jogging and talking.
+   *
+   * ⚠️ Michael, 2026-08-05: *"we need to juggle whether run club is quality day."* The marathon
+   * intake assumed hard. This is the slot the honest answer goes in.
+   */
+  easyDays?: Partial<Record<'run' | 'bike', string>>;
   anchorDiscipline?: 'run' | 'bike' | null;
   anchorDay?: string;
 };
@@ -140,6 +151,14 @@ export function buildPreferredDays(
   for (const d of ['run', 'bike'] as const) {
     const day = sched.qualityDays?.[d];
     if (day && present(d)) out[`quality_${d}`] = day;
+  }
+  // The kept session declared EASY. Same posture gate, same "omit when unset" rule — an unpinned
+  // easy day is the planner's to choose, and writing one anyway would invent a preference.
+  // ⚠️ `quality_*` wins on a collision: the two cannot both describe one day, and the hard reading
+  // is the constraining one. The intake only ever sets one of them.
+  for (const d of ['run', 'bike'] as const) {
+    const day = sched.easyDays?.[d];
+    if (day && present(d) && !out[`quality_${d}`]) out[`easy_${d}`] = day;
   }
   // ⛔ THE `develop` SEED WAS DELETED 2026-07-27. It set Mon/Tue/Thu/Fri "to match the engine grid so
   // the intake header doesn't contradict the plan" — and that WAS the grid, back when `MAIN_LIFTS`

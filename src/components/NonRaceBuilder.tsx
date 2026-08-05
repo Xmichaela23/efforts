@@ -316,6 +316,8 @@ type NonRaceState = {
    * built on real pace targets (`create-goal…:3411`). Blank until answered.
    */
   raceIntent: 'complete' | 'speed' | '';
+  /** Is the standing session hard or easy? Mirrors `ArcSetupWizard`'s `groupRunIntensity`. */
+  runClubIntensity: 'quality' | 'easy';
   /** Calibration fields, shown only when `speed` is picked with no pace on file. */
   calEasy: string;
   calFiveK: string;
@@ -559,7 +561,25 @@ function assemblePayload(
           ? { target_time: parseTargetTime(state.targetTime) } : {}),
         priority: 'A',
         training_prefs: {
-          training_intent: 'completion',
+          // ⛔ THIS FIELD SHADOWED THE ATHLETE'S ANSWER, AND IT WAS HARDCODED (fixed 2026-08-05).
+          //
+          // Michael, 2026-08-05, on a 17-week "A time" build that came back with four easy runs and
+          // nothing else: *"no speed work showing up."*
+          //
+          // ⛔ THE INTENT QUESTION WAS BEING ASKED AND THROWN AWAY. `create-goal…:2366` resolves the
+          // build's approach like this:
+          //     if (training_intent is set) return trainingIntentToPrefsGoalType(training_intent);
+          //     return tPrefs.goal_type || 'complete';
+          // `training_intent` is consulted FIRST and returns before `goal_type` is ever read. So a
+          // constant `'completion'` here meant `goal_type: state.raceIntent` fifteen lines below —
+          // the whole point of the intent card — could never reach the decision. Every race built
+          // `sustainable`: no tempo, no intervals, at any distance, for any athlete, whatever they
+          // picked. The one hard session `sustainable` offers is optional strides from week 3, which
+          // is why week 1 was four easy runs and a long run.
+          //
+          // ⚠️ TWO FIELDS SAYING ONE THING IS THE HAZARD — they are kept in agreement here, derived
+          // from the same answer, rather than one being trusted to shadow the other correctly.
+          training_intent: isRace && state.raceIntent === 'speed' ? 'performance' : 'completion',
           // ⛔ LEVEL. It was hardcoded `'intermediate'` here for every goal, which is fine on the
           // non-race path (nothing downstream keys off it) and is NOT fine on a race, where it
           // picks the weekly-volume table, the long-run arc and the fallback paces. The race card
@@ -636,9 +656,14 @@ function assemblePayload(
           // 3, so an untouched flow is byte-identical to yesterday's.
           ...(state.liftingDays === 3 ? { lifting_days: 3 } : {}),
           per_discipline_posture: state.posture,
+          // ⛔ THE CLUB NIGHT GOES IN THE SLOT ITS INTENSITY NAMES. A social club run filed as
+          // `quality_run` tells the engine to put the week's intervals on the one evening the
+          // athlete is jogging and chatting. `runClubIntensity` decides which key it lands in;
+          // `buildPreferredDays` omits both when no day is picked.
           preferred_days: buildPreferredDays(state.posture, {
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
-            qualityDays: state.qualityDays,
+            qualityDays: state.runClubIntensity === 'quality' ? state.qualityDays : {},
+            easyDays: state.runClubIntensity === 'easy' ? state.qualityDays : {},
           }),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -754,7 +779,7 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
-    raceIntent: '', calEasy: '', calFiveK: '',
+    raceIntent: '', calEasy: '', calFiveK: '', runClubIntensity: 'quality',
     longRunMiles: '', targetTime: '', fixedDays: [],
   });
   const [stepIdx, setStepIdx] = useState(0);
@@ -880,6 +905,38 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
    * input, not a requirement. Someone who knows nothing but which race and when gets a plan.
    */
   const raceCanContinue = !!state.raceName.trim() && !!state.raceDate && raceWeeks !== null;
+
+  /**
+   * ⛔ TWO HARD DAYS BACK TO BACK — STATED, NEVER BLOCKED (§5.2b).
+   *
+   * The long run is a hard day. So is a track night. Putting them on consecutive days is the one
+   * placement problem the engine cannot solve, because both days belong to the athlete: the club
+   * meets when it meets, and the long run is the block's anchor. 48–72h between hard efforts is the
+   * standard recovery window, and adjacent days give roughly 24.
+   *
+   * ⚠️ ONLY WHEN THE CLUB NIGHT IS HARD. A social club run beside the long run is two aerobic days
+   * in a row, which is ordinary training and not worth a word.
+   * ⚠️ SAME DAY IS A SEPARATE, LOUDER CASE — it is not two hard days, it is one day asked to be two
+   * sessions, and the athlete almost certainly meant something else.
+   */
+  const clubCollision = (() => {
+    if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;
+    const club = state.qualityDays.run;
+    const long = state.longRunDay;
+    if (!club || !long) return null;
+    const order = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const i = order.indexOf(club), j = order.indexOf(long);
+    if (i < 0 || j < 0) return null;
+    if (i === j) {
+      return 'That is your long run day. The plan will keep the long run there and place its hard '
+        + 'session elsewhere in the week.';
+    }
+    const gap = Math.min(Math.abs(i - j), order.length - Math.abs(i - j));
+    if (gap > 1) return null;
+    return 'That sits next to your long run — two hard days back to back, with about 24 hours '
+      + 'between them instead of the 48 to 72 most plans leave. It is kept as you set it. Moving '
+      + 'the long run, if it is the one that can move, opens the gap.';
+  })();
   /** Level card: a tier, and two numbers that survived editing. */
   const levelCanContinue = !!state.fitness
     && Number(state.targetMiles) > 0 && Number(state.longRunMiles) > 0;
@@ -1791,8 +1848,93 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
                     realise the question applies to them. Track night and chaingang follow as the
                     other shapes of the same commitment. */}
                 <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                  Run club, track night, a standing group session. The plan puts its hard running
-                  there and keeps easy days clear of it. Tap again to clear.
+                  Run club, track night, a standing group session. Tap again to clear.
+                </p>
+
+                {/* ⛔ HARD OR EASY — AND THE APP HAS ASKED THIS SINCE `ArcSetupWizard` SHIPPED.
+                    Michael, 2026-08-05: *"we need to juggle whether run club is quality day."* He is
+                    right, and `ArcSetupWizard.tsx:1736` already carries the two-way question with
+                    the wording below. The marathon intake assumed every club night was a hard night,
+                    so a Sunday-social-run athlete would have had the week's intervals pinned to the
+                    one session they run at conversation pace.
+
+                    ⚠️ WORDING LIFTED, NOT REWRITTEN. Two screens asking one question in two
+                    vocabularies is how an athlete learns the answers mean different things. */}
+                {!!state.qualityDays.run && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-white/50 text-xs">What kind of session?</p>
+                    {([
+                      ['quality', 'Track / tempo / intervals', 'Hard effort. Counts as your quality run for the week.'],
+                      ['easy', 'Easy / social run', 'Conversational pace. Counts as aerobic. The plan adds a separate quality session.'],
+                    ] as const).map(([k, title, sub]) => (
+                      <button
+                        key={k} type="button"
+                        onClick={() => setState((st) => ({ ...st, runClubIntensity: k }))}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl border ${
+                          state.runClubIntensity === k
+                            ? 'border-teal-400/70 bg-teal-400/[0.07]'
+                            : 'border-white/12 bg-white/[0.03]'
+                        }`}
+                      >
+                        <span className="block text-sm text-white/90">{title}</span>
+                        <span className="block text-[13px] text-white/55 mt-0.5">{sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* ⛔ HARD DAYS WANT 48–72 HOURS, AND THE LONG RUN IS A HARD DAY. Pinning the club
+                    night next to the long run stacks two hard days back to back — the one placement
+                    fact the athlete can see and the engine cannot fix, because both days are theirs.
+
+                    ⚠️ §5.2b — IT STATES THE COST AND NEVER REFUSES. The club night is a fact about
+                    their week, not a preference to be overruled; `assign-days.ts` honours the pin
+                    even when it lands on the rest day. This says what it costs and leaves it. */}
+                {clubCollision && (
+                  <p className="text-amber-300/85 text-xs mt-3 leading-relaxed">
+                    {clubCollision}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ⛔ STRENGTH WAS IN THE PLAN AND NOTHING ASKED. Michael, 2026-08-05: *"we need to add
+                strength as an option."* `non-race-goal-seeds.ts` seeds a marathon goal with
+                `strength = 'maintain'`, so two lifting days — Upper Body: Posture and Lower Body:
+                Durability — arrived in the preview as the athlete's plan without the athlete ever
+                being asked. A default is fine; a default presented as a choice already made is not.
+
+                ⚠️ TWO OPTIONS, NOT THREE, AND THE MISSING ONE IS DELIBERATE. Heavy/progressive
+                lifting (`develop`) is not offered under a race build: `canSetDevelop` would allow it
+                (two develops are within the ceiling) and it would pull `strength_frequency` to 4
+                (`assemblePayload`), putting a four-day strength block underneath a marathon. Running
+                is the goal here; strength holds the athlete together while it happens. The full
+                developer picker stays where it belongs, on Get Stronger. */}
+            {isRaceGoal && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Strength work</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([
+                    ['maintain', 'Keep it', 'Two short sessions'],
+                    ['out', 'None', 'Running only'],
+                  ] as const).map(([k, title, sub]) => (
+                    <button
+                      key={k} type="button"
+                      onClick={() => setState((st) => ({ ...st, posture: { ...st.posture, strength: k } }))}
+                      className={`px-3 py-2.5 rounded-xl border text-left ${
+                        (state.posture.strength ?? 'maintain') === k
+                          ? 'border-teal-400/70 bg-teal-400/[0.07]'
+                          : 'border-white/12 bg-white/[0.03]'
+                      }`}
+                    >
+                      <span className="block text-sm text-white/90">{title}</span>
+                      <span className="block text-[13px] text-white/55 mt-0.5">{sub}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                  Posture and single-leg durability work, placed on easy days. It is not lifting to
+                  get stronger — it is what keeps the mileage from finding a weak link.
                 </p>
               </div>
             )}

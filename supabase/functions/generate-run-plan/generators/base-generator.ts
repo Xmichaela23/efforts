@@ -11,6 +11,7 @@ import {
   FITNESS_TO_VOLUME,
   TOKEN_PATTERNS
 } from '../types.ts';
+import { assignDays } from './assign-days.ts';
 
 export abstract class BaseGenerator {
   protected params: GeneratorParams;
@@ -685,82 +686,16 @@ export abstract class BaseGenerator {
   }
 
   /**
-   * Assign days to sessions based on workout type
-   * Prioritizes: Long run → Quality → Easy
-   * 
-   * Rest day strategy:
-   * - Saturday is ALWAYS a rest day (prep for Sunday long run)
-   * - Friday becomes rest if running 5 or fewer days
-   * - Quality days (hard workouts) on Tuesday and Thursday
-   * - Easy runs fill Monday, Wednesday, and optionally Friday
+   * Assign days to sessions — the athlete's pinned days lead, the engine's defaults follow.
+   *
+   * ⛔ THE GRID THAT USED TO LIVE HERE IS GONE (2026-08-05). It hardcoded the long run to Sunday,
+   * quality to Tuesday/Thursday, easy to Monday/Wednesday/Friday and Saturday shut, with no input
+   * that could change any of it — so `preferred_days.long_run` and `preferred_days.quality_run`
+   * were collected from the athlete, stored, and never read by the six generators behind this
+   * method. See `assign-days.ts` for the reasoning and for what deliberately did NOT change.
    */
   protected assignDaysToSessions(sessions: Session[], _numDays: number): Session[] {
-    // Days available for running (Saturday always OFF for long run prep)
-    const easyDayOrder = ['Monday', 'Wednesday', 'Friday'];
-    const qualityDays = ['Tuesday', 'Thursday'];
-    
-    // Separate by type
-    const longRuns = sessions.filter(s => s.tags.includes('long_run'));
-    const hardSessions = sessions.filter(s => 
-      s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
-    );
-    const easySessions = sessions.filter(s => 
-      !s.tags.includes('long_run') && 
-      !s.tags.some(t => ['hard_run', 'intervals', 'tempo', 'threshold'].includes(t))
-    );
-
-    const assignedSessions: Session[] = [];
-    const usedDays = new Set<string>();
-    
-    // Saturday is always a rest day (don't add it to usedDays, just never use it)
-    const restDays = new Set(['Saturday']);
-
-    // First pass: respect sessions that already have a day assigned (e.g., recovery week sessions)
-    for (const session of sessions) {
-      if (session.day && !restDays.has(session.day)) {
-        usedDays.add(session.day);
-        assignedSessions.push(session);
-      }
-    }
-
-    // Long run on Sunday (only if not already assigned)
-    for (const longRun of longRuns) {
-      if (assignedSessions.includes(longRun)) continue; // Already assigned
-      const preferredDay = 'Sunday';
-      if (!usedDays.has(preferredDay) && !restDays.has(preferredDay)) {
-        longRun.day = preferredDay;
-        usedDays.add(preferredDay);
-        assignedSessions.push(longRun);
-      }
-    }
-
-    // Hard sessions on Tuesday and Thursday (2Q system) - only if not already assigned
-    for (const hardSession of hardSessions) {
-      if (assignedSessions.includes(hardSession)) continue; // Already assigned
-      for (const day of qualityDays) {
-        if (!usedDays.has(day) && !restDays.has(day)) {
-          hardSession.day = day;
-          usedDays.add(day);
-          assignedSessions.push(hardSession);
-          break;
-        }
-      }
-    }
-
-    // Easy sessions on Monday, Wednesday, Friday (in that order) - only if not already assigned
-    for (const easySession of easySessions) {
-      if (assignedSessions.includes(easySession)) continue; // Already assigned
-      for (const day of easyDayOrder) {
-        if (!usedDays.has(day) && !restDays.has(day)) {
-          easySession.day = day;
-          usedDays.add(day);
-          assignedSessions.push(easySession);
-          break;
-        }
-      }
-    }
-
-    return assignedSessions;
+    return assignDays(sessions, this.params.preferred_days);
   }
 
   /**
