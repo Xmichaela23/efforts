@@ -1931,7 +1931,21 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               }
       : null;
 
-  if (showBuilder) return <div className="h-full"><NonRaceBuilder entry={showBuilder} onClose={() => setShowBuilder(null)} /></div>;
+  // `onPlanSeason` is the exact handler the old top-level "Plan a season" button carried — it closes
+  // the Goals screen and routes to the season builder. It is passed DOWN rather than reimplemented
+  // in the builder, because closing Goals is this screen's job, not the builder's (the builder's own
+  // `onClose` only unmounts the embedded view and would leave Goals sitting on top of the route).
+  if (showBuilder) {
+    return (
+      <div className="h-full">
+        <NonRaceBuilder
+          entry={showBuilder}
+          onClose={() => setShowBuilder(null)}
+          onPlanSeason={() => { onClose(); navigate('/arc-setup'); }}
+        />
+      </div>
+    );
+  }
   if (showEventForm) return renderEventForm();
   if (showCapacityForm) return renderCapacityForm();
   if (showMaintenanceForm) return renderMaintenanceForm();
@@ -2364,20 +2378,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             </div>
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => {
-            onClose();
-            navigate('/arc-setup');
-          }}
-          className="w-full flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.10] transition-all"
-        >
-          <CalendarRange className="h-5 w-5 shrink-0 mt-0.5 text-white/70" />
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-white/90">Plan a season</div>
-            <div className="mt-0.5 text-xs text-white/50">Build a plan for an upcoming race, or a full season of them.</div>
-          </div>
-        </button>
+        {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
+            season should be in race"*). It now lives inside the Race flow, under the race fields,
+            as the way out for an athlete racing more than once — see the `race` step in
+            `NonRaceBuilder`. The handler moved with it (`onPlanSeason`, passed down at the builder
+            mount above); the route it opens (`/arc-setup`) is unchanged. */}
         {inactiveGoals.length > 0 && (
           <button
             className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-xs text-white/55 hover:text-white/80 transition-colors"

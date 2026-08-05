@@ -819,7 +819,7 @@ type PreviewPlan = {
  * with no props, and Back from step 1 needs somewhere to land that isn't a closed builder. Passing
  * no `entry` gives you the full flow, door included.
  */
-export default function NonRaceBuilder({ onClose, entry: initialEntry }: { onClose?: () => void; entry?: EntryCardId } = {}) {
+export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSeason }: { onClose?: () => void; entry?: EntryCardId; onPlanSeason?: () => void } = {}) {
   const navigate = useNavigate();
   // ⛔ `error` WAS NOT READ, AND THE BUILD BUTTON FAILED SILENTLY (2026-08-04).
   //
@@ -1543,6 +1543,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry }: { onClo
                 for mile-by-mile pacing — any time from the goal once the plan exists.
               </p>
             </div>
+
+            {/* ⛔ "PLAN A SEASON" LIVES BEHIND RACE (Michael, 2026-08-05: *"plan a season should be
+                in race"*). It was a top-level button on the Goals screen, beside the front door,
+                which put a racing decision outside the racing card. It routes to `/arc-setup` — a
+                different builder entirely, for several races across a season rather than one block
+                to one date.
+
+                ⚠️ SECONDARY, NOT A THIRD CARD. One race is the common case and keeps the whole
+                screen; this is the way out for the athlete who wants more, placed after the fields
+                so it cannot be mistaken for the primary action. */}
+            {onPlanSeason && (
+              <div className="pt-1 border-t border-white/8">
+                <button
+                  type="button"
+                  onClick={onPlanSeason}
+                  className="w-full text-left pt-4"
+                >
+                  <span className="block text-white/85 text-sm">Racing more than once this year?</span>
+                  <span className="block text-white/50 text-xs mt-1 leading-relaxed">
+                    Plan a season instead — several races in order, with the build and the recovery
+                    between them worked out together.
+                  </span>
+                </button>
+              </div>
+            )}
 
           </div>
         </StepLayout>
