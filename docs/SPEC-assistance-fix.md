@@ -1,19 +1,42 @@
-# SPEC — Focus Front Door + Strength Intent Tiers + Assistance Rework (Wendler spine)
+# SPEC — Strength Assistance Rework (Wendler spine)
 
-**Status:** BUILD CONTRACT — **§B SHIPPED** (folded into D-382 / D-384); **§A partly** (the tier
-picker ships, Strong only, as a pass-through — D-383); **§0–§7 NOT BUILT.** Scaffolding: what remains
-folds into a D-NNN and this file gets deleted when §0–§7 lands.
+> # ✅ THE ENTRY WORK IS DONE. THIS FILE IS NOW ONLY THE ACCESSORY REWORK.
+>
+> **Shipped 2026-08-05 — do NOT rebuild any of it, and do not read this file for it:**
+>
+> | What | Where it is recorded now |
+> |---|---|
+> | The **Focus front door** — Goals → Focus, Train · Race · Build, the Train drill-down to Run / Ride / Strength / Athletic Focus, "Plan a season" moved inside Race | **[D-382]** |
+> | The **tier picker** — Strength opens Strong / Heavy / Definition; Strong is a pass-through to today's block | **[D-383]** |
+> | The **eye mark, the discipline palette, sizing and copy**, the Current / Start-something-new labels | **[D-384]** |
+>
+> 8 commits, `5634b4f3` → `8a0efcd7`. **Pushed + client-deployed** (client only — no edge function was
+> touched). **Not device-verified — [Q-258].** The old §B is deleted; §B below is a stub pointing here.
+>
+> ⛔ **WHAT IS LEFT IS §0–§7: the four accessory-selection defects. NO CODE HAS BEEN WRITTEN FOR THEM.**
+> Plus the engine behind the two dark tiers (§A) — the picker exists, the two protocols do not.
+
+**Status:** BUILD CONTRACT for **§0–§7 only** (not built) + the §A engine (not built). The entry work
+above is SHIPPED and folded into its D-entries. This file gets deleted when §0–§7 lands.
 **Decided by:** Michael, 2026-08-05.
 **Supersedes:** Q-212 (antagonist-balance — *partial*, see §8) and the "25 IS THE FLOOR AND IT STAYS" call of 2026-07-28 (see §8).
 **Source of truth for "by the book":** Wendler, *5/3/1* 2nd ed. (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`), assistance chapter pp.46–54, concurrent chapter p.86.
 
-**What is LEFT of this spec:** the four accessory-selection defects (§0–§7), and the engine behind the two dark tiers (§A). The front door (§B) and the tier picker itself have shipped — see D-382 / D-383 / D-384. The tier changes the **strength work only** — accessory volume and character (plus a focus area for Definition). **Endurance is untouched** — the existing engine (quality days, hills, speed, run/ride choice, interference management) already handles it well; nothing here changes it. The 5/3/1 main-lift engine (TM, percentages, deload, the "+" set) is identical in all three.
+**What the remaining work does:** fixes the four accessory-selection defects (§0–§7), and builds the
+engine behind the tiers (§A). The tier changes the **strength work only** — accessory volume and
+character (plus a focus area for Definition). **Endurance is untouched** — the existing engine (quality
+days, hills, speed, run/ride choice, interference management) already handles it well; nothing here
+changes it. The 5/3/1 main-lift engine (TM, percentages, deload, the "+" set) is identical in all three.
 
 **Source of truth is the Wendler book (above).** The strength side matches it; nothing here invents strength science. *(An earlier draft added an endurance-interference layer with external citations — Schumann/Van Hooren/Wilson. Removed 2026-08-05: endurance is out of scope, the existing engine already handles it. Strength matches Wendler, full stop.)*
 
 ---
 
-## A. The three tiers (Strong / Heavy / Definition)
+## A. The three tiers (Strong / Heavy / Definition) — ⚠️ PICKER SHIPPED, ENGINE NOT
+
+**The screen exists ([D-383]): Strength opens Strong / Heavy / Definition. Strong is LIVE and is a
+pass-through to today's block; Heavy and Definition are dark because what separates them is §0–§7.
+What is left here is the ENGINE behind those two.**
 
 One Wendler spine, three intents. Same main lifts and 5/3/1 loading; the tier moves the **strength work only** — accessory **volume** and **character** (plus a **focus area** for Definition). **Endurance is not a dial here** — the existing engine handles quality days, hills, speed, run/ride, and interference exactly as it does today.
 
