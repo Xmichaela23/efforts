@@ -91,10 +91,12 @@ const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger', 'marathon'];
  */
 type EntryCardId = 'train' | 'race' | 'build';
 const ENTRY_ORDER: EntryCardId[] = ['train', 'race', 'build'];
-const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Activity },
-  race: { label: 'Race', blurb: 'Train for any race', Icon: Flag },
-  build: { label: 'Build', blurb: 'Write your own, the engine does the math', Icon: Plus },
+const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string | null }> = {
+  // Colours mirror the Goals door exactly (`GoalsScreen`) — same three cards, so the same palette.
+  // Build carries none: it has no discipline until the athlete writes one.
+  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Activity, color: getDisciplineColor('mobility') },
+  race: { label: 'Race', blurb: 'Train for any race', Icon: Flag, color: getDisciplineColor('run') },
+  build: { label: 'Build', blurb: 'Write your own, the engine does the math', Icon: Plus, color: null },
 };
 /**
  * Build is a CREATE action, not a pick — every catalog app separates the two, so it gets a distinct
@@ -118,12 +120,29 @@ const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, buil
  */
 type TrainCardId = 'run' | 'ride' | 'strength' | 'athletic';
 const TRAIN_ORDER: TrainCardId[] = ['run', 'ride', 'strength', 'athletic'];
-type CardIcon = React.ComponentType<{ className?: string }>;
-const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: CardIcon }> = {
-  run: { label: 'Run', blurb: 'Base, VO2 max, distance', Icon: Footprints },
-  ride: { label: 'Ride', blurb: 'FTP and endurance', Icon: Bike },
-  strength: { label: 'Strength', blurb: 'Get stronger, bigger, or defined', Icon: Dumbbell },
-  athletic: { label: 'Athletic', blurb: 'Several disciplines, balanced', Icon: Shuffle },
+type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+/**
+ * ⛔ THEY ARE "<DISCIPLINE> FOCUS", NOT THE BARE DISCIPLINE (Michael, 2026-08-05). "Run" is a thing
+ * you do on Tuesday; "Run Focus" is what the block is aimed at, and it is the word the tab, the
+ * screen title and the copy all use. One name for one idea.
+ *
+ * ⛔ COLOURS COME FROM `SPORT_COLORS` (`context-utils.ts`) — the app's one discipline palette. Do not
+ * hand-pick a hex. Athletic has no single discipline, so it takes the palette's unclaimed colour
+ * rather than borrowing one of the four and implying a default.
+ */
+const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: CardIcon; color: string }> = {
+  run: { label: 'Run Focus', blurb: 'Base, VO2 max, distance', Icon: Footprints, color: getDisciplineColor('run') },
+  ride: { label: 'Ride Focus', blurb: 'FTP and endurance', Icon: Bike, color: getDisciplineColor('ride') },
+  strength: {
+    label: 'Strength Focus',
+    // Michael's wording. It names the trade the block actually makes: the lifting leads, and the
+    // aerobic base is HELD rather than dropped — which is the whole reason this is a hybrid block
+    // and not a powerlifting programme.
+    blurb: 'Get stronger, bigger, more defined while holding aerobic base',
+    Icon: Dumbbell,
+    color: getDisciplineColor('strength'),
+  },
+  athletic: { label: 'Athletic Focus', blurb: 'Several disciplines, balanced', Icon: Shuffle, color: getDisciplineColor('mobility') },
 };
 /** The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate. */
 const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
@@ -1358,15 +1377,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // that opens a half-built flow is the thing the July rule was written against.
   //
   // ⚠️ NO "Soon" TAG (Michael's call). The dimming carries it; a badge promises a date we don't have.
+  // ⚠️ Sized up a step 2026-08-05 — Michael read the first build on a phone: *"make the 3 cards
+  // bigger easier to read."* `px-4 py-3` → `p-5`, labels to `text-base`, blurbs to `text-sm`.
   const optBtn = (active: boolean, notYet = false) =>
-    `w-full text-left px-4 py-3 rounded-xl border text-white ${
+    `w-full text-left p-5 rounded-xl border text-white ${
       notYet
         ? 'border-white/8 bg-white/[0.015] text-white/40 cursor-default'
         : active ? 'border-teal-400 bg-teal-500/10' : 'border-white/12 bg-white/[0.03]'
     }`;
   // Build is a CREATE action, not a pick — dashed edge, set apart from the two that route to a plan.
   const createBtn = (notYet: boolean) =>
-    `w-full text-left px-4 py-3 rounded-xl border border-dashed ${
+    `w-full text-left p-5 rounded-xl border border-dashed ${
       notYet ? 'border-white/12 bg-transparent text-white/40 cursor-default' : 'border-white/25 bg-white/[0.02] text-white'
     }`;
 
@@ -1414,13 +1435,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     next();
                   }}
                 >
-                  <span className="flex items-start gap-3">
+                  <span className="flex items-start gap-3.5">
                     {React.createElement(ENTRY_COPY[e].Icon, {
-                      className: `h-5 w-5 shrink-0 mt-0.5 ${live ? 'text-white/70' : 'text-white/25'}`,
+                      className: 'h-6 w-6 shrink-0 mt-0.5',
+                      style: {
+                        color: ENTRY_COPY[e].color ?? (live ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)'),
+                        opacity: ENTRY_COPY[e].color && !live ? 0.4 : 1,
+                      },
                     })}
                     <span className="min-w-0 block">
-                      <span className="block">{ENTRY_COPY[e].label}</span>
-                      <span className="block text-white/70 text-sm mt-1 leading-relaxed">{ENTRY_COPY[e].blurb}</span>
+                      <span className="block text-base">{ENTRY_COPY[e].label}</span>
+                      <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
+                        {ENTRY_COPY[e].blurb}
+                      </span>
                     </span>
                   </span>
                 </button>
@@ -1450,24 +1477,29 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <div className="space-y-2">
             {TRAIN_ORDER.map((t) => {
               const goal = TRAIN_GOAL[t];
-              const { Icon } = TRAIN_COPY[t];
+              const { Icon, color } = TRAIN_COPY[t];
+              const live = goal != null;
               return (
                 <button
                   key={t} type="button"
-                  className={optBtn(goal != null && state.goal === goal, goal == null)}
-                  disabled={goal == null}
+                  className={optBtn(live && state.goal === goal, !live)}
+                  disabled={!live}
                   onClick={() => { if (!goal) return; reseed(goal, undefined); next(); }}
                 >
-                  <span className="flex items-start gap-3">
-                    <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${goal == null ? 'text-white/25' : 'text-white/70'}`} />
+                  <span className="flex items-start gap-3.5">
+                    {/* Discipline colour survives the dimming, at lower opacity — a not-yet card
+                        should still say which discipline it is. */}
+                    <Icon className="h-6 w-6 shrink-0 mt-0.5" style={{ color, opacity: live ? 1 : 0.4 }} />
                     <span className="min-w-0 block">
-                      <span className="block">{TRAIN_COPY[t].label}</span>
-                      <span className="block text-white/70 text-sm mt-1 leading-relaxed">{TRAIN_COPY[t].blurb}</span>
+                      <span className="block text-base">{TRAIN_COPY[t].label}</span>
+                      <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
+                        {TRAIN_COPY[t].blurb}
+                      </span>
                       {/* The Strength card keeps the preconditions that used to sit on the goal
                           screen — what the block NEEDS and who it is FOR, said at the door rather
                           than discovered on step three (Michael, 2026-07-25). */}
                       {t === 'strength' && (
-                        <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
+                        <span className="block text-white/85 text-sm mt-2 leading-relaxed">
                           12 weeks of Wendler's 5/3/1, four lifting days. Needs a barbell, a rack and a
                           bench — and your squat, bench, deadlift and overhead press maxes on file. Your
                           usual weekly volume helps, but is not required.
@@ -1504,11 +1536,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   disabled={!live}
                   onClick={() => { if (!live) return; setState((s) => ({ ...s, strengthTier: t })); next(); }}
                 >
-                  <span className="flex items-start gap-3">
-                    <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${live ? 'text-white/70' : 'text-white/25'}`} />
+                  <span className="flex items-start gap-3.5">
+                    {/* All three are strength blocks, so all three carry the strength colour — what
+                        differs between them is the work around the lifts, not the discipline. */}
+                    <Icon
+                      className="h-6 w-6 shrink-0 mt-0.5"
+                      style={{ color: getDisciplineColor('strength'), opacity: live ? 1 : 0.4 }}
+                    />
                     <span className="min-w-0 block">
-                      <span className="block">{label}</span>
-                      <span className="block text-white/70 text-sm mt-1 leading-relaxed">{blurb}</span>
+                      <span className="block text-base">{label}</span>
+                      <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
+                        {blurb}
+                      </span>
                     </span>
                   </span>
                 </button>

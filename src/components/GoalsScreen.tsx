@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus } from 'lucide-react';
+// The one discipline palette (`SPORT_COLORS`). Never hand-pick a hex for a discipline.
+import { getDisciplineColor } from '@/lib/context-utils';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
@@ -2126,7 +2128,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
-        <h2 className="text-2xl font-semibold text-white/90">Goals</h2>
+        {/* Matches the tab that opens it (AppLayout) and the word the whole flow uses. */}
+        <h2 className="text-2xl font-semibold text-white/90">Focus</h2>
         <button onClick={onClose} className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white/80 transition-all">
           <X className="h-5 w-5" />
         </button>
@@ -2355,26 +2358,43 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             the dashed treatment and sits apart — and it is DARK, because the flow behind it is
             spec'd and not built (`WORKORDER-build-your-own-strength-2026-08-04.md`). The honesty
             rule: never a card that opens nothing. */}
+        {/* ⛔ DISCIPLINE COLOURS, FROM THE ONE PALETTE (Michael, 2026-08-05: *"everything should use
+            discipline colors"*). `SPORT_COLORS` in `context-utils.ts` is the single source — do not
+            hand-pick a hex here. Train has no ONE discipline (it holds all four), so it takes the
+            palette's unclaimed colour rather than borrowing run's or strength's and implying a
+            default. Race is run-gold because every race behind it today is a run. Build is neutral:
+            it has no discipline until the athlete writes one.
+
+            ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
+            the first build on a phone and the labels were too small. */}
         {([
-          { id: 'train' as const, Icon: Activity, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true },
-          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true },
-          { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false },
-        ]).map(({ id, Icon, label, blurb, live }) => (
+          { id: 'train' as const, Icon: Activity, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true, color: getDisciplineColor('mobility') },
+          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true, color: getDisciplineColor('run') },
+          { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false, color: null },
+        ]).map(({ id, Icon, label, blurb, live, color }) => (
           <button
             key={id}
             type="button"
             disabled={!live}
             onClick={() => { if (live) setShowBuilder(id); }}
-            className={`w-full flex items-start gap-3 rounded-2xl p-4 text-left transition-all ${
+            className={`w-full flex items-start gap-3.5 rounded-2xl p-5 text-left transition-all ${
               id === 'build'
                 ? `border border-dashed ${live ? 'border-white/25 bg-transparent hover:bg-white/[0.04]' : 'border-white/12 bg-transparent cursor-default'}`
                 : 'border border-white/10 bg-white/[0.06] hover:bg-white/[0.10]'
             }`}
           >
-            <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${live ? 'text-white/70' : 'text-white/30'}`} />
+            {/* The colour stays on a dimmed card, at lower opacity — "not yet" without losing which
+                discipline it belongs to. No colour (Build) falls back to the neutral white. */}
+            <Icon
+              className="h-6 w-6 shrink-0 mt-0.5"
+              style={{
+                color: color ?? (live ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)'),
+                opacity: color && !live ? 0.4 : 1,
+              }}
+            />
             <div className="min-w-0">
-              <div className={`text-sm font-medium ${live ? 'text-white/90' : 'text-white/40'}`}>{label}</div>
-              <div className={`mt-0.5 text-xs ${live ? 'text-white/50' : 'text-white/30'}`}>{blurb}</div>
+              <div className={`text-base font-medium ${live ? 'text-white/90' : 'text-white/40'}`}>{label}</div>
+              <div className={`mt-1 text-sm leading-relaxed ${live ? 'text-white/60' : 'text-white/30'}`}>{blurb}</div>
             </div>
           </button>
         ))}

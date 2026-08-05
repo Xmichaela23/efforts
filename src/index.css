@@ -794,6 +794,15 @@
       linear-gradient(to right, rgba(255,255,255,0.9) 0 100%) center center/6px 2px no-repeat,
       linear-gradient(to right, rgba(255,255,255,0.9) 0 100%) right 1px center/3px 2px no-repeat;
   }
+  /* The eye — the Focus tab (2026-08-05). Drawn in CSS like its three neighbours rather than dropped
+     in as an icon component: the tab bar's whole language is abstract sigils, and one real glyph
+     among them reads as a mistake. A lens (wide ellipse) with a pupil. */
+  .tab-sigil.focus {
+    box-sizing: border-box;
+    border: 1.5px solid rgba(255,255,255,0.9);
+    border-radius: 50% / 60%;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.9) 0 1.7px, transparent 1.8px);
+  }
 
   .tabbar-label {
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
