@@ -2356,7 +2356,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             spec'd and not built (`WORKORDER-build-your-own-strength-2026-08-04.md`). The honesty
             rule: never a card that opens nothing. */}
         {([
-          { id: 'train' as const, Icon: Crosshair, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true },
+          { id: 'train' as const, Icon: Activity, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true },
           { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true },
           { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false },
         ]).map(({ id, Icon, label, blurb, live }) => (

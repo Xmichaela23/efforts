@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bike, Waves, Dumbbell, Info } from 'lucide-react';
+import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
@@ -91,10 +91,10 @@ const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger', 'marathon'];
  */
 type EntryCardId = 'train' | 'race' | 'build';
 const ENTRY_ORDER: EntryCardId[] = ['train', 'race', 'build'];
-const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string }> = {
-  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix' },
-  race: { label: 'Race', blurb: 'Train for any race' },
-  build: { label: 'Build', blurb: 'Write your own, the engine does the math' },
+const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: React.ComponentType<{ className?: string }> }> = {
+  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Activity },
+  race: { label: 'Race', blurb: 'Train for any race', Icon: Flag },
+  build: { label: 'Build', blurb: 'Write your own, the engine does the math', Icon: Plus },
 };
 /**
  * Build is a CREATE action, not a pick — every catalog app separates the two, so it gets a distinct
@@ -118,15 +118,41 @@ const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, buil
  */
 type TrainCardId = 'run' | 'ride' | 'strength' | 'athletic';
 const TRAIN_ORDER: TrainCardId[] = ['run', 'ride', 'strength', 'athletic'];
-const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string }> = {
-  run: { label: 'Run', blurb: 'Base, VO2 max, distance' },
-  ride: { label: 'Ride', blurb: 'FTP and endurance' },
-  strength: { label: 'Strength', blurb: 'Get stronger, bigger, or defined' },
-  athletic: { label: 'Athletic', blurb: 'Several disciplines, balanced' },
+type CardIcon = React.ComponentType<{ className?: string }>;
+const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: CardIcon }> = {
+  run: { label: 'Run', blurb: 'Base, VO2 max, distance', Icon: Footprints },
+  ride: { label: 'Ride', blurb: 'FTP and endurance', Icon: Bike },
+  strength: { label: 'Strength', blurb: 'Get stronger, bigger, or defined', Icon: Dumbbell },
+  athletic: { label: 'Athletic', blurb: 'Several disciplines, balanced', Icon: Shuffle },
 };
 /** The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate. */
 const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
   run: null, ride: null, strength: 'get_stronger', athletic: null,
+};
+
+/**
+ * ⛔ THE THREE STRENGTH TIERS (SPEC §A). One Wendler spine, three intents — the tier moves accessory
+ * VOLUME and CHARACTER (plus a focus area for Definition). The main-lift engine (training max,
+ * percentages, deload, the "+" set) is identical in all three.
+ *
+ * ⛔ STRONG IS TODAY'S PLAN, NOT A NEW ONE. Michael, 2026-08-05: *"strong is our current strength
+ * focus plan."* So picking it changes NOTHING about what gets built — it routes into the existing
+ * `get_stronger` flow untouched, and sends no new field. Heavy and Definition are dark until the
+ * assistance rework lands (`SPEC-assistance-fix.md` §0–§7), because the accessory selection they
+ * differ ON is the thing being fixed. Offering them now would ship three names for one block.
+ *
+ * ⚠️ NOTHING HERE REACHES THE PAYLOAD YET, DELIBERATELY. The spec's resolved call is that the tier
+ * travels as its own `strength_tier` field — but that key is ALREADY TAKEN on the plan config by the
+ * EQUIPMENT tier (`generate-strength-plan/index.ts`, `strength_tier: 'barbell'`). Two meanings, one
+ * key, and the readers would not know which they had. Pick the name when the field is actually
+ * needed (when Heavy or Definition ships), not now while Strong is a no-op.
+ */
+type StrengthTierId = 'strong' | 'heavy' | 'definition';
+const TIER_ORDER: StrengthTierId[] = ['strong', 'heavy', 'definition'];
+const TIER_COPY: Record<StrengthTierId, { label: string; blurb: string; Icon: CardIcon; live: boolean }> = {
+  strong: { label: 'Strong', blurb: 'Stronger, not bigger.', Icon: Dumbbell, live: true },
+  heavy: { label: 'Heavy', blurb: 'Build muscle.', Icon: Weight, live: false },
+  definition: { label: 'Definition', blurb: 'Shape where you choose.', Icon: Target, live: false },
 };
 
 /** Race distances this card offers. One for now — the rest come behind the same machinery. */
@@ -303,6 +329,11 @@ type NonRaceState = {
    * belongs in the flow, and so Back walks entry ← train instead of jumping to the door.
    */
   entry: EntryCardId | null;
+  /**
+   * Which strength tier was picked (SPEC §A). Only `strong` is selectable today and it is a no-op —
+   * see `TIER_COPY`. Held in state so the card reads as chosen and Back returns to it.
+   */
+  strengthTier: StrengthTierId | null;
   goal: NonRaceGoalId | null;
   discipline: Discipline | undefined;
   posture: Partial<Record<Discipline, Posture>>;
@@ -404,8 +435,11 @@ type StepKey =
   | 'goal'
   // ⛔ THE TRAIN DRILL-DOWN — Run / Ride / Strength / Athletic. Only reachable from the Train entry
   // card, and only Strength opens anything today. It sits between `goal` and the picked goal's own
-  // flow, so the Strength path is: entry → train → posture → … → confirm.
+  // flow, so the Strength path is: entry → train → tier → posture → … → confirm.
   | 'train'
+  // ⛔ THE STRENGTH TIER — Strong / Heavy / Definition (SPEC §A). Only on the Strength path, and only
+  // Strong is live: it is today's block, so the step is a pass-through that sends nothing new.
+  | 'tier'
   // ⛔ THE RACE ITSELF — distance, date, level. Its own card, immediately after the goal, because
   // every screen after it is shaped by the answers: the date owns the block length (so the `length`
   // step drops out), and the level picks the volume table the plan is built from.
@@ -534,8 +568,11 @@ function getSteps(state: NonRaceState): StepKey[] {
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
   const door: StepKey[] = state.entry === 'train' ? ['goal', 'train'] : ['goal'];
+  // The tier sits between the discipline and the block's own questions — it is WHICH strength block,
+  // so it has to be answered before anything shaped by it. Only on the Train→Strength path; a goal
+  // reached another way (standalone route, a stored goal) keeps the old flow.
   const head: StepKey[] = isStrengthFocus
-    ? [...door, 'posture']
+    ? [...door, ...(state.entry === 'train' ? ['tier' as StepKey] : []), 'posture']
     : [...door, 'posture', 'commitment', 'length'];
   return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'confirm'];
 }
@@ -868,6 +905,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // `equipmentTier` reads the arc, which may not have loaded on the first render, and the race
     // screen reads no posture.
     entry: initialEntry ?? null,
+    strengthTier: null,
     goal: initialEntry === 'race' ? 'marathon' : null,
     discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
     // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
@@ -1376,8 +1414,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     next();
                   }}
                 >
-                  <span className="block">{ENTRY_COPY[e].label}</span>
-                  <span className="block text-white/70 text-sm mt-1 leading-relaxed">{ENTRY_COPY[e].blurb}</span>
+                  <span className="flex items-start gap-3">
+                    {React.createElement(ENTRY_COPY[e].Icon, {
+                      className: `h-5 w-5 shrink-0 mt-0.5 ${live ? 'text-white/70' : 'text-white/25'}`,
+                    })}
+                    <span className="min-w-0 block">
+                      <span className="block">{ENTRY_COPY[e].label}</span>
+                      <span className="block text-white/70 text-sm mt-1 leading-relaxed">{ENTRY_COPY[e].blurb}</span>
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -1405,6 +1450,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <div className="space-y-2">
             {TRAIN_ORDER.map((t) => {
               const goal = TRAIN_GOAL[t];
+              const { Icon } = TRAIN_COPY[t];
               return (
                 <button
                   key={t} type="button"
@@ -1412,18 +1458,59 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   disabled={goal == null}
                   onClick={() => { if (!goal) return; reseed(goal, undefined); next(); }}
                 >
-                  <span className="block">{TRAIN_COPY[t].label}</span>
-                  <span className="block text-white/70 text-sm mt-1 leading-relaxed">{TRAIN_COPY[t].blurb}</span>
-                  {/* The Strength card keeps the preconditions that used to sit on the goal screen —
-                      what the block NEEDS and who it is FOR, said at the door rather than discovered
-                      on step three (Michael, 2026-07-25). */}
-                  {t === 'strength' && (
-                    <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
-                      12 weeks of Wendler's 5/3/1, four lifting days. Needs a barbell, a rack and a
-                      bench — and your squat, bench, deadlift and overhead press maxes on file. Your
-                      usual weekly volume helps, but is not required.
+                  <span className="flex items-start gap-3">
+                    <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${goal == null ? 'text-white/25' : 'text-white/70'}`} />
+                    <span className="min-w-0 block">
+                      <span className="block">{TRAIN_COPY[t].label}</span>
+                      <span className="block text-white/70 text-sm mt-1 leading-relaxed">{TRAIN_COPY[t].blurb}</span>
+                      {/* The Strength card keeps the preconditions that used to sit on the goal
+                          screen — what the block NEEDS and who it is FOR, said at the door rather
+                          than discovered on step three (Michael, 2026-07-25). */}
+                      {t === 'strength' && (
+                        <span className="block text-white/85 text-sm mt-1.5 leading-relaxed">
+                          12 weeks of Wendler's 5/3/1, four lifting days. Needs a barbell, a rack and a
+                          bench — and your squat, bench, deadlift and overhead press maxes on file. Your
+                          usual weekly volume helps, but is not required.
+                        </span>
+                      )}
                     </span>
-                  )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ── THE STRENGTH TIER ────────────────────────────────────────────────────────────────────
+          Strong / Heavy / Definition (SPEC §A). Strong is the block that exists today, so picking it
+          is a pass-through — nothing new goes to the engine. Heavy and Definition are dark until the
+          assistance rework lands, because the accessory selection they differ ON is exactly what is
+          being fixed; shipping them now would be three names for one block. */}
+      {currentStep === 'tier' && (
+        <StepLayout
+          step={stepNo('tier')} totalSteps={steps.length} title="Strength"
+          subtitle="Same lifts, same 5/3/1 loading. What changes is the work around them."
+          onBack={back} onContinue={next} canContinue={state.strengthTier != null}
+          hideContinue hideProgress
+        >
+          <div className="space-y-2">
+            {TIER_ORDER.map((t) => {
+              const { label, blurb, Icon, live } = TIER_COPY[t];
+              return (
+                <button
+                  key={t} type="button"
+                  className={optBtn(state.strengthTier === t, !live)}
+                  disabled={!live}
+                  onClick={() => { if (!live) return; setState((s) => ({ ...s, strengthTier: t })); next(); }}
+                >
+                  <span className="flex items-start gap-3">
+                    <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${live ? 'text-white/70' : 'text-white/25'}`} />
+                    <span className="min-w-0 block">
+                      <span className="block">{label}</span>
+                      <span className="block text-white/70 text-sm mt-1 leading-relaxed">{blurb}</span>
+                    </span>
+                  </span>
                 </button>
               );
             })}
