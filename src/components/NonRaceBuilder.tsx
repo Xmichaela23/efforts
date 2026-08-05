@@ -16,7 +16,13 @@ import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY } from '@/lib/st
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
 // ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
 // week against the SAME numbers the engine builds from, or it is guessing at the athlete.
-import { validateWeeklyMiles } from '@/lib/run-volume-tables';
+import { validateWeeklyMiles, TIER_SEEDS, tierMismatchNote, type IntakeTier } from '@/lib/run-volume-tables';
+// ⛔ ONE CALIBRATION, shared with the race form's. Also the ONLY vDOT engine — `effort-score.ts`.
+import {
+  hasPaceBenchmark, calibrationFromPaces, saveCalibration, formatPaceInput,
+  type PaceBenchmarkRow,
+} from '@/lib/run-pace-calibration';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
@@ -97,11 +103,29 @@ const RACE_DISCIPLINE: Record<string, Discipline> = { Marathon: 'run' };
  * slice, not this one — and a blank default was the thing that made the old form quietly pick
  * `intermediate` for someone with no numbers at all.
  */
-const FITNESS_TIERS: Array<{ id: 'beginner' | 'intermediate' | 'advanced'; label: string; blurb: string }> = [
-  { id: 'beginner', label: 'Beginner', blurb: 'New to the distance, or coming back to it' },
-  { id: 'intermediate', label: 'Intermediate', blurb: 'Running regularly, some distance behind you' },
-  { id: 'advanced', label: 'Advanced', blurb: 'High mileage, races often' },
+const FITNESS_TIERS: Array<{ id: IntakeTier; label: string; blurb: string }> = [
+  // ⛔ HISTORY WITH THE DISTANCE, NOT AN ADJECTIVE. Higdon's own framing, and the field's: the
+  // button names where you are with the marathon, the line under it describes the week that
+  // implies. "Beginner / Intermediate / Advanced" as button text asks the athlete to grade
+  // themselves, which is a different and harder question than the one we need answered.
+  //
+  // ⚠️ THE COPY SAYS THE RANGE, THE FIELD GETS THE NUMBER (`TIER_SEEDS`). "40+ miles a week" reads
+  // as a description; 40 is what lands in the box, editable.
+  { id: 'beginner', label: "Haven't run one", blurb: 'Or coming back after time off. Long run around 6 miles.' },
+  { id: 'intermediate', label: 'Finished one before', blurb: 'Running consistently. Long run in double figures.' },
+  { id: 'advanced', label: 'Chasing a number', blurb: '40+ miles a week, comfortable with quality work.' },
 ];
+
+/**
+ * `h:mm` or `h:mm:ss` → seconds. Bounded to the range `parseClientPredictedFinishSeconds` accepts
+ * server-side (10 minutes to 24 hours) so a typo cannot become a stored target.
+ */
+function parseTargetTime(raw: string): number | null {
+  const m = raw.trim().match(/^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/);
+  if (!m) return null;
+  const sec = parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + (m[3] ? parseInt(m[3], 10) : 0);
+  return sec >= 600 && sec <= 86400 ? sec : null;
+}
 
 /**
  * Whole weeks from today to the race, the way the SERVER counts them
@@ -273,8 +297,42 @@ type NonRaceState = {
   /** Race distance as the SERVER's label vocabulary expects it (`DISTANCE_TO_API`, `create-goal…:195`
    *  — 'Marathon' → 'marathon'). Sending the lowercase api key here would not resolve. */
   raceDistance: string;
+  /**
+   * ⛔ THE RACE'S OWN NAME. Without it every marathon goal was literally called "Marathon" —
+   * `assemblePayload` fell back to `GOAL_LABELS[goal]`. The name reaches the plan title, the goal
+   * card, and the coach, so a real one is worth one field.
+   */
+  raceName: string;
+  /**
+   * Total climb, in the athlete's display unit. OPTIONAL — never gates the build.
+   * Empty is a legitimate answer and the plan is built without any terrain claim at all.
+   */
+  raceElevation: number | '';
   /** Self-reported level. Race path only; blank until answered — see FITNESS_TIERS. */
   fitness: 'beginner' | 'intermediate' | 'advanced' | '';
+  /**
+   * ⛔ WHAT THE ATHLETE IS AFTER, AND IT PICKS THE GENERATOR — not a label.
+   * `complete` → `sustainable` (effort-based, needs no numbers); `speed` → `performance_build`,
+   * built on real pace targets (`create-goal…:3411`). Blank until answered.
+   */
+  raceIntent: 'complete' | 'speed' | '';
+  /** Calibration fields, shown only when `speed` is picked with no pace on file. */
+  calEasy: string;
+  calFiveK: string;
+  /**
+   * ⛔ THE ATHLETE'S CURRENT LONG RUN — seeded by the level tier, editable, and it is NOT
+   * decoration. It travels as `recent_long_run_miles`, which `getProgressionOffset`
+   * (`generators/base-generator.ts:133`) uses to decide how far into the long-run arc the plan
+   * starts. With it absent the arc always enters at week 1 regardless of the athlete.
+   */
+  longRunMiles: number | '';
+  /** Target finish, `h:mm` or `h:mm:ss`. Only asked when the intent is a time. */
+  targetTime: string;
+  /**
+   * Days the athlete cannot move — a club night, a track session, a standing group run. The solver
+   * takes them as fixed anchors. Cheap version of the run-club model: a locked slot, no type yet.
+   */
+  fixedDays: DayName[];
 };
 
 type StepKey =
@@ -283,6 +341,11 @@ type StepKey =
   // every screen after it is shaped by the answers: the date owns the block length (so the `length`
   // step drops out), and the level picks the volume table the plan is built from.
   | 'race'
+  // ⛔ SPLIT OUT OF `race` (2026-08-04). One question per card: the race card asks WHICH RACE, the
+  // level card asks WHERE THEY ARE, the intent card asks WHAT IT IS FOR. They were stacked on one
+  // scrolling card and the level question — the one that seeds every number in the plan — sat
+  // below the fold.
+  | 'level' | 'intent'
   | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
   | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
@@ -376,11 +439,25 @@ function getSteps(state: NonRaceState): StepKey[] {
   // moves a number the engine discards is the exact failure this file has produced twice before —
   // "Days Per Week: 5" and "Weekly Hours Available: 6" printed as constraints the athlete never set.
   // The confirm screen states the derived length instead.
+  // ⛔ THE RACE FLOW IS DECLARED WHOLE, NOT ASSEMBLED (2026-08-04). Michael's five screens:
+  // race+date, days (with the long-run day), level, intent, preview. It does NOT go through
+  // `scheduleSteps` — that builds a per-discipline flow from posture, which is the strength path's
+  // shape and produced three cards a race build does not want.
+  //
+  // ⛔ WHAT CAME OUT, AND WHY:
+  //   • `commitment` (the hours tier) — CUT. Screen 3 now carries volume as miles and a long run,
+  //     and `days` carries frequency. Asking hours after that is a THIRD estimate of the same
+  //     quantity, and it is the one athletes are worst at. `weekly_hours_available` is derived
+  //     from the miles instead (see `assemblePayload`).
+  //   • `posture` (the hold cards) — MOVED, not cut. Bike/swim maintenance is a decision about
+  //     disciplines outside the plan's primary, and it belongs after the athlete has seen the
+  //     plan. It now lives on the confirm card, under the preview.
+  //   • `length` — already skipped on a race; the date owns it.
+  if (isRaceGoal) return ['goal', 'race', 'days', 'level', 'intent', 'confirm'];
+
   const head: StepKey[] = isStrengthFocus
     ? ['goal', 'posture']
-    : isRaceGoal
-      ? ['goal', 'race', 'posture', 'commitment']
-      : ['goal', 'posture', 'commitment', 'length'];
+    : ['goal', 'posture', 'commitment', 'length'];
   return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'confirm'];
 }
 
@@ -409,7 +486,20 @@ function planWeekStartISO(): string {
   return `${y}-${m}-${dd}`;
 }
 
-function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeeklyMiles?: number): ArcSetupPayload {
+/**
+ * ⚠️ EVERY DISTANCE ARRIVES IN MILES. The athlete's display unit lives in the component; this
+ * function is unit-blind on purpose, so a km figure can never reach the engine's mile tables.
+ * `payloadNow()` does the conversion at the one call site.
+ */
+function assemblePayload(
+  state: NonRaceState,
+  equipmentTier?: string,
+  targetWeeklyMiles?: number,
+  canonLongRunMi?: number,
+  easyPaceMinPerMile?: number,
+  /** Race climb in METRES. Converted at the call site — this function is unit-blind. */
+  canonElevationM?: number,
+): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
   /**
@@ -432,12 +522,41 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
       : `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
     goals: [
       {
-        name: GOAL_LABELS[goal],
+        // ⛔ THE RACE'S OWN NAME WHEN THERE IS ONE. Every marathon goal used to be called
+        // "Marathon" because this fell through to the card's label.
+        name: isRace && state.raceName.trim() ? state.raceName.trim() : GOAL_LABELS[goal],
         goal_type: isRace ? 'event' : shape.goal_type,
         target_date: isRace ? state.raceDate : null,
         ...(isRace ? {} : { target_weeks: state.targetWeeks }),
         sport: shape.sport,
         distance: isRace ? state.raceDistance : null,
+        /**
+         * ⛔ THE TERRAIN CLAIM, AND IT IS STAMPED AS A CLAIM (2026-08-04).
+         *
+         * `goals.course_profile` already has a reader with an honesty rule built in:
+         * `race-readiness-llm` refuses to mention race terrain at all unless this field is present,
+         * and explicitly forbids using today's route as a stand-in for race day. Writing an
+         * athlete-typed number here turns that rule on — so the number had better be labelled for
+         * what it is.
+         *
+         * ⚠️ `source: 'athlete'` IS THE LOAD-BEARING PART. A measured profile from a GPX
+         * (`course-upload` → `race_courses`) and a number somebody typed from memory are not the
+         * same evidence, and anything reasoning over this must be able to tell them apart. Stored
+         * in METRES — one unit in the database, the display unit stays on the screen.
+         *
+         * ⚠️ OMITTED ENTIRELY WHEN BLANK, never `{}` or a zero. An empty object would satisfy the
+         * "is course_profile present" check and switch on terrain talk with nothing behind it —
+         * the absence has to stay a real absence.
+         */
+        ...(isRace && typeof canonElevationM === 'number' && canonElevationM > 0
+          ? { course_profile: { elevation_gain_m: Math.round(canonElevationM), source: 'athlete' } }
+          : {}),
+        // ⛔ THE TARGET FINISH, IN SECONDS, ON THE GOAL ROW. `goals.target_time` is already read by
+        // `resolveGoalTargetTimeSeconds` → the coach, course-strategy, course-detail and the finish
+        // projection. It has simply never been WRITTEN by any intake — another reader with no
+        // producer. Only sent when a time was actually asked for and parsed.
+        ...(isRace && state.raceIntent === 'speed' && parseTargetTime(state.targetTime)
+          ? { target_time: parseTargetTime(state.targetTime) } : {}),
         priority: 'A',
         training_prefs: {
           training_intent: 'completion',
@@ -447,12 +566,29 @@ function assemblePayload(state: NonRaceState, equipmentTier?: string, targetWeek
           // asks; every other goal keeps the old constant so their payloads are byte-identical.
           fitness: isRace && state.fitness ? state.fitness : 'intermediate',
           // ⛔ THE **OTHER** `goal_type` (see the note above): 'complete' → the `sustainable`,
-          // effort-based generator; 'speed' → `performance_build`, which is gated on a real pace
-          // benchmark and refuses an athlete who has none. This card does not ask the
-          // complete-vs-speed question yet, so it sends 'complete' — the branch that builds without
-          // numbers on file. Asking it is the blank-user slice, and it needs the calibration modal
-          // to land in the same change or a no-numbers athlete hits a dead-end refusal.
-          ...(isRace ? { goal_type: 'complete' } : {}),
+          // effort-based generator; 'speed' → `performance_build`, built on real pace targets and
+          // refused server-side without a pace benchmark (`create-goal…:3295`).
+          //
+          // ⚠️ IT SHIPPED HARDCODED TO 'complete' FOR ONE DAY, because asking the question without
+          // an in-flow way to supply a pace would dead-end a no-numbers athlete at the Build
+          // button. The race card now asks it AND carries the calibration, so the answer travels.
+          // Falls back to 'complete' only if the field is somehow unset — the safe branch, the one
+          // that builds with nothing on file.
+          ...(isRace ? { goal_type: state.raceIntent || 'complete' } : {}),
+          // ⛔ THE LONG RUN THE ATHLETE ACTUALLY HAS. `getProgressionOffset` uses it to enter the
+          // long-run arc at the right point; without it the arc always opens at week 1 and a
+          // sub-20-week plan never reaches the table's taper tail. Miles, canonicalised.
+          ...(isRace && typeof canonLongRunMi === 'number' && canonLongRunMi > 0
+            ? { recent_long_run_miles: Math.round(canonLongRunMi) } : {}),
+          // ⛔ DERIVED, NOT ASKED (2026-08-04). The hours tier came out of the flow — it was a
+          // third estimate of a quantity the athlete had already given twice, and the one they are
+          // worst at guessing. Downstream still wants a number (`scaledWeeklyTSS`), so it is
+          // computed from the miles at the easy pace this athlete actually has, plus a fifth for
+          // warmups, strides and the fact that not every mile is easy.
+          ...(isRace && typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0
+            ? { weekly_hours_available: Math.max(3, Math.round(
+                (targetWeeklyMiles * (easyPaceMinPerMile ?? 10) * 1.2) / 60)) }
+            : {}),
           // ⛔ WHAT THE ATHLETE IS ACTUALLY CHASING, PERSISTED (Q-230 Part B).
           //
           // The goal id was the FIRST thing this screen knew and the only thing it never saved.
@@ -617,7 +753,9 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
-    raceDate: '', raceDistance: RACE_DISTANCES[0], fitness: '',
+    raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
+    raceIntent: '', calEasy: '', calFiveK: '',
+    longRunMiles: '', targetTime: '', fixedDays: [],
   });
   const [stepIdx, setStepIdx] = useState(0);
 
@@ -693,7 +831,64 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const raceWeeks = state.raceDate ? weeksUntilRaceApprox(state.raceDate) : null;
   // The race card cannot continue on a date alone: level picks the volume table the whole plan is
   // built from, and a blank one would fall to the silent `intermediate` this card exists to replace.
-  const raceCanContinue = !!state.raceDate && !!state.fitness && raceWeeks !== null;
+  /**
+   * ⛔ DO WE ALREADY HAVE A PACE TO BUILD ON? Read once, with the SAME predicate the server uses
+   * (`hasPaceBenchmark`). `null` = not looked up yet, so the card stays quiet rather than asking
+   * for a calibration the athlete may not need.
+   *
+   * ⚠️ A SEPARATE READ FROM THE ARC, DELIBERATELY. The Arc gives this builder an easy pace and
+   * nothing else about running; the server's gate accepts four different signals. Judging on the
+   * one field the Arc happens to expose would ask experienced athletes to re-enter numbers they
+   * already have on file.
+   */
+  const [paceRow, setPaceRow] = React.useState<PaceBenchmarkRow | null>(null);
+  const [paceChecked, setPaceChecked] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const uid = getStoredUserId();
+      if (!uid) { if (!cancelled) setPaceChecked(true); return; }
+      const { data } = await supabase
+        .from('user_baselines')
+        .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness')
+        .eq('user_id', uid).maybeSingle();
+      if (cancelled) return;
+      setPaceRow(data as PaceBenchmarkRow);
+      setPaceChecked(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const paceOnFile = paceChecked && hasPaceBenchmark(paceRow);
+  /** The typed calibration, if it is coherent. Drives the preview and the save. */
+  const calResult = calibrationFromPaces({
+    easyPace: state.calEasy, fiveKPace: state.calFiveK, isMetric: unit === 'km',
+  });
+  const [calSaving, setCalSaving] = React.useState(false);
+  const [calSaved, setCalSaved] = React.useState(false);
+  /** Speed needs numbers. Either they are on file, or they were just entered here. */
+  const speedNeedsCalibration = state.raceIntent === 'speed' && paceChecked && !paceOnFile && !calSaved;
+
+  /**
+   * ⛔ THE INTENT IS REQUIRED, AND SO IS A PACE IF THEY PICKED SPEED. Without the second half the
+   * athlete answers "get faster", walks five more screens, and is refused at the Build button by
+   * `missing_pace_benchmark` — the dead end this card exists to close.
+   */
+  /**
+   * ⛔ NAME AND DATE. THAT IS THE WHOLE GATE. Michael, 2026-08-04: *"name and date is all we need."*
+   *
+   * Distance is given by the card being Marathon, and elevation is deliberately NOT here — it is an
+   * input, not a requirement. Someone who knows nothing but which race and when gets a plan.
+   */
+  const raceCanContinue = !!state.raceName.trim() && !!state.raceDate && raceWeeks !== null;
+  /** Level card: a tier, and two numbers that survived editing. */
+  const levelCanContinue = !!state.fitness
+    && Number(state.targetMiles) > 0 && Number(state.longRunMiles) > 0;
+  /**
+   * Intent card. A time goal needs the time AND a pace to write it against — the calibration is
+   * offered inline, so this is a completable state, not a wall.
+   */
+  const intentCanContinue = !!state.raceIntent
+    && (state.raceIntent === 'complete' || (!!parseTargetTime(state.targetTime) && !speedNeedsCalibration));
 
   /**
    * ⛔ THE TYPED MILEAGE, JUDGED AGAINST THE ENGINE'S OWN TABLES (`src/lib/run-volume-tables.ts`).
@@ -713,6 +908,15 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   const toDisplayMi = (mi: number) => Math.round(unit === 'km' ? mi * 1.609344 : mi);
   const milesFloorDisplay = milesVerdict ? Math.ceil(unit === 'km' ? milesVerdict.requiredMi * 1.609344 : milesVerdict.requiredMi) : null;
   const longRunDisplay = milesVerdict ? toDisplayMi(milesVerdict.longRunWeek1Mi) : null;
+  /** The soft signal — what they entered vs what the tier assumes. Null when they agree. */
+  const mismatchNote = state.fitness
+    ? tierMismatchNote(state.fitness as IntakeTier, {
+        weeklyMi: typedMilesCanonical,
+        longRunMi: typeof state.longRunMiles === 'number' && state.longRunMiles > 0
+          ? (unit === 'km' ? state.longRunMiles / 1.609344 : state.longRunMiles)
+          : null,
+      })
+    : null;
 
   /**
    * ⛔ THE MILEAGE FLOOR IS ADVISORY. IT WARNS AND IT DOES NOT REFUSE. Michael's call, 2026-08-04:
@@ -801,7 +1005,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     const canonMiles = typeof state.targetMiles === 'number' && state.targetMiles > 0
       ? (unit === 'km' ? Math.round(state.targetMiles / 1.609344) : state.targetMiles)
       : undefined;
-    return assemblePayload(state, equipmentTier, canonMiles);
+    const canonLongRun = typeof state.longRunMiles === 'number' && state.longRunMiles > 0
+      ? (unit === 'km' ? state.longRunMiles / 1.609344 : state.longRunMiles)
+      : undefined;
+    // Feet on screen when imperial, metres in the database. One unit stored, always.
+    const canonElevM = typeof state.raceElevation === 'number' && state.raceElevation > 0
+      ? (unit === 'km' ? state.raceElevation : state.raceElevation * 0.3048)
+      : undefined;
+    return assemblePayload(state, equipmentTier, canonMiles, canonLongRun, paceMinPerMile, canonElevM);
   };
 
   const handleConfirm = () => {
@@ -1002,6 +1213,20 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
         >
           <div className="space-y-5">
             <div>
+              <p className="text-white/85 text-sm mb-2">Which race?</p>
+              <input
+                type="text"
+                value={state.raceName}
+                onChange={(e) => setState((s) => ({ ...s, raceName: e.target.value }))}
+                placeholder="e.g. Humboldt Redwoods Marathon"
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 placeholder:text-white/25 focus:outline-none focus:border-teal-500/50"
+                style={{ fontSize: '16px' }}
+              />
+              {/* ⛔ THE NAME IS NOT DECORATION. It becomes the goal's name and the plan's title, and
+                  the coach reads it. Without this field every marathon goal was called "Marathon". */}
+            </div>
+
+            <div>
               <p className="text-white/85 text-sm mb-2">Distance</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {RACE_DISTANCES.map((d) => (
@@ -1043,30 +1268,206 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
               )}
             </div>
 
+            {/* ── CLIMB — AN INPUT, NOT A GATE ────────────────────────────────────────────────
+                ⛔ OPTIONAL, AND THE COPY SAYS SO. Michael, 2026-08-04: *"ask for it in the front
+                but say you can add both later."* Blank is a real answer — the block builds without
+                any terrain claim at all, and nothing downstream invents one.
+
+                ⛔ AND NOTHING GUESSES IT. There is no queryable database of race courses, so an
+                automatic lookup would be right for some races and quietly wrong for others — and
+                silently wrong terrain is worse than none, because the plan would prescribe hill
+                work for a flat course or miss a real climb. The athlete knows or they don't.
+
+                ⚠️ A NUMBER IS THE COARSE CALL ONLY — does this block need hill work. The per-mile
+                strategy needs real geometry, which is what the GPX upload on the goal card
+                produces (`course-upload` → segments → `course-strategy`). Both are deterministic;
+                neither needs a model to read the terrain. */}
             <div>
-              <p className="text-white/85 text-sm mb-2">Where are you now?</p>
-              <div className="space-y-2">
-                {FITNESS_TIERS.map((t) => (
-                  <button
-                    key={t.id} type="button"
-                    onClick={() => setState((s) => ({ ...s, fitness: t.id }))}
-                    className={optBtn(state.fitness === t.id)}
-                  >
-                    <span className="font-medium">{t.label}</span>
-                    <span className="block text-white/55 text-sm mt-0.5">{t.blurb}</span>
-                  </button>
-                ))}
+              <p className="text-white/85 text-sm mb-2">
+                How much climbing? <span className="text-white/45">Optional</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" inputMode="numeric" min={0}
+                  value={state.raceElevation === '' ? '' : state.raceElevation}
+                  onChange={(e) => setState((s) => ({
+                    ...s, raceElevation: e.target.value === '' ? '' : Number(e.target.value),
+                  }))}
+                  placeholder={unit === 'km' ? 'e.g. 340' : 'e.g. 1100'}
+                  className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                  style={{ fontSize: '16px' }}
+                />
+                <span className="text-white/75 text-sm">{unit === 'km' ? 'm' : 'ft'} of gain</span>
               </div>
-              {/* ⛔ SAY WHAT THIS ANSWER DOES. It is not a label — it picks the starting weekly
-                  mileage, the long-run progression and the pace estimates the first weeks are
-                  written from. An athlete who guesses high gets a week they cannot carry, and
-                  nothing on the old form told them that. */}
-              <p className="text-white/50 text-xs mt-2 leading-relaxed">
-                This sets your starting mileage and how fast the long run grows. Pick the one that
-                matches what you are doing now, not what you are aiming at — the plan adjusts as you
-                log.
+              <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                Shapes whether the block builds in hill work. You can add this — or the course file,
+                for mile-by-mile pacing — any time from the goal once the plan exists.
               </p>
             </div>
+
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ── WHERE ARE YOU WITH THE MARATHON ─────────────────────────────────────────────────
+          ⛔ THE TIER SEEDS, IT DOES NOT DECIDE. Tapping a tier drops two numbers into two fields
+          and the athlete edits from there — Runna's shape, and the field's: label on the button,
+          editable numbers behind it. The tier itself still drives the plan's volume table and
+          long-run arc; these two numbers say where the athlete is TODAY.
+
+          ⛔ SUGGEST, DO NOT GATE. Books gate (Pfitzinger's prerequisite, Higdon's "about a year of
+          running"); apps do not. Nobody is blocked here. When the numbers and the tier contradict
+          each other the card says so and moves on — the same move as Runna's implausible-time
+          warning and Garmin's confidence ring: let them in, then tell the truth. */}
+      {currentStep === 'level' && (
+        <StepLayout
+          step={stepNo('level')} totalSteps={steps.length} title="Where are you with the marathon?"
+          subtitle="This sets where the plan starts. Adjust the numbers if they are not yours."
+          onBack={back} onContinue={next} canContinue={levelCanContinue}
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {FITNESS_TIERS.map((t) => (
+                <button
+                  key={t.id} type="button"
+                  onClick={() => setState((st) => ({
+                    ...st,
+                    fitness: t.id,
+                    // ⛔ RESEED ON EVERY TAP, INCLUDING A RE-TAP. Someone who edits, changes their
+                    // mind about the tier, and comes back expects the new tier's numbers — not
+                    // their edits to the old one silently kept under a different heading.
+                    targetMiles: TIER_SEEDS[t.id].weeklyMi,
+                    longRunMiles: TIER_SEEDS[t.id].longRunMi,
+                    targetTouched: true,
+                  }))}
+                  className={optBtn(state.fitness === t.id)}
+                >
+                  <span className="font-medium">{t.label}</span>
+                  <span className="block text-white/55 text-sm mt-0.5">{t.blurb}</span>
+                </button>
+              ))}
+            </div>
+
+            {state.fitness && (
+              <div className="space-y-4 rounded-xl border border-white/12 bg-white/[0.03] p-3">
+                <div>
+                  <p className="text-white/85 text-sm mb-2">Weekly {unit === 'km' ? 'kilometres' : 'miles'} now</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" inputMode="decimal" min={0}
+                      value={state.targetMiles === '' ? '' : state.targetMiles}
+                      onChange={(e) => setState((st) => ({
+                        ...st, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true,
+                      }))}
+                      className="w-24 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                      style={{ fontSize: '16px' }}
+                    />
+                    <span className="text-white/75 text-sm">{unit}/wk</span>
+                  </div>
+                </div>
+                <div>
+                  {/* ⛔ THIS ONE DOES REAL WORK. It travels as `recent_long_run_miles`, and
+                      `getProgressionOffset` uses it to pick where in the long-run arc the plan
+                      starts. Absent, the arc always opens at week 1 no matter who the athlete is. */}
+                  <p className="text-white/85 text-sm mb-2">Longest run in the last month</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" inputMode="decimal" min={0}
+                      value={state.longRunMiles === '' ? '' : state.longRunMiles}
+                      onChange={(e) => setState((st) => ({
+                        ...st, longRunMiles: e.target.value === '' ? '' : Number(e.target.value),
+                      }))}
+                      className="w-24 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                      style={{ fontSize: '16px' }}
+                    />
+                    <span className="text-white/75 text-sm">{unit}</span>
+                  </div>
+                </div>
+
+                {/* The soft signal. Rare by construction — 25% under the seed before it speaks. */}
+                {mismatchNote && (
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    {mismatchNote} The plan builds from what you entered.
+                  </p>
+                )}
+                {milesVerdict?.ok === false && (
+                  <p className="text-amber-400/70 text-xs leading-relaxed">
+                    A marathon block usually sits on about {milesFloorDisplay} {unit} a week. Building on
+                    less means a faster ramp, and a faster ramp raises injury risk.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ── WHAT IS THIS FOR ─────────────────────────────────────────────────────────────────
+          ⛔ SHOWN TO EVERYONE, INCLUDING A FIRST-TIMER. An earlier draft hid this from beginners;
+          no app in the reference set does that. Drills are gated on the tier — that IS field
+          standard — but the QUESTION is not. Someone running their first marathon is allowed to
+          want a time.
+
+          ⛔ THE ANSWER PICKS THE GENERATOR: `complete` → `sustainable` (distance and effort, no
+          pace targets); `speed` → `performance_build` (tempo, cruise intervals, reps, MP runs). */}
+      {currentStep === 'intent' && (
+        <StepLayout
+          step={stepNo('intent')} totalSteps={steps.length} title="What's this block for?"
+          subtitle="Sessions come by distance and effort. Where we have your paces or heart rate, they carry those too."
+          onBack={back} onContinue={next} canContinue={intentCanContinue}
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setState((st) => ({ ...st, raceIntent: 'complete' }))}
+                className={optBtn(state.raceIntent === 'complete')}
+              >
+                <span className="font-medium">Getting to the finish</span>
+                <span className="block text-white/55 text-sm mt-0.5">
+                  Easy running and long runs. No pace targets to hit.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setState((st) => ({ ...st, raceIntent: 'speed' }))}
+                className={optBtn(state.raceIntent === 'speed')}
+              >
+                <span className="font-medium">A time</span>
+                <span className="block text-white/55 text-sm mt-0.5">
+                  Adds tempo work and intervals, written against your paces.
+                </span>
+              </button>
+            </div>
+
+            {/* ⛔ ONE FIELD, REVEALED. `goals.target_time` is already read by the coach, the course
+                strategy and the finish projection — it has simply never been written by this path. */}
+            {state.raceIntent === 'speed' && (
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
+                <div>
+                  <p className="text-white/85 text-sm mb-2">Target finish</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text" inputMode="numeric" placeholder="3:45"
+                      value={state.targetTime}
+                      onChange={(e) => setState((st) => ({ ...st, targetTime: e.target.value }))}
+                      className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm text-center"
+                      style={{ fontSize: '16px' }}
+                    />
+                    <span className="text-white/60 text-sm">h:mm</span>
+                  </div>
+                  {state.targetTime && !parseTargetTime(state.targetTime) && (
+                    <p className="text-amber-400/70 text-xs mt-1.5">Enter it as h:mm, like 3:45.</p>
+                  )}
+                </div>
+                {speedNeedsCalibration && (
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    A time goal is written against your paces, and there are none on file yet. Two
+                    numbers below and the plan can write real targets.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </StepLayout>
       )}

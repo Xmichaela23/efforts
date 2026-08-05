@@ -3409,7 +3409,27 @@ Deno.serve(async (req: Request) => {
           target_weeks: (resolvedGoal as any)?.target_weeks ?? null,
           sport,
           distance: resolvedGoal?.distance || null,
-          course_profile: {},
+          /**
+           * ⛔ THESE TWO WERE HARDCODED AWAY, AND THE INTAKE HAD ALREADY STARTED SENDING THEM
+           * (2026-08-04). `course_profile: {}` and a missing `target_time` meant the race card
+           * could collect a climb figure and a target finish, put both on the goal it posted, and
+           * have the server silently drop them on the floor — inputs with no pipe behind them.
+           *
+           * Both have real readers already: `plan-context.ts:58` reads `course_profile` and
+           * `race-readiness-llm` gates ALL race-terrain talk on its presence;
+           * `resolveGoalTargetTimeSeconds` reads `target_time` for the coach, course-strategy and
+           * the finish projection.
+           *
+           * ⚠️ `{}` IS NOT A SAFE DEFAULT FOR `course_profile` — an empty object still satisfies
+           * the "is it present" check and would switch on terrain commentary with nothing behind
+           * it. Absent must stay absent, so an empty/missing value writes `null`.
+           */
+          course_profile: (() => {
+            const cp = (resolvedGoal as any)?.course_profile;
+            return cp && typeof cp === 'object' && Object.keys(cp).length > 0 ? cp : null;
+          })(),
+          ...(Number((resolvedGoal as any)?.target_time) > 0
+            ? { target_time: Math.round(Number((resolvedGoal as any).target_time)) } : {}),
           target_metric: null,
           target_value: null,
           current_value: null,

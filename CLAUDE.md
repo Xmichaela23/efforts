@@ -209,7 +209,13 @@ This is the institutional-memory backbone. The next session reads what this sess
 - Invalidate `block_adaptation_cache` and `coach_cache`
 - Route to `analyze-{running,cycling,strength,swim}-workout` (NOT `analyze-swimming-workout`) — fire-and-forget
 - **`adapt-plan` action=auto** — fire-and-forget
-- `post-import-athlete-pipeline` — awaited, but **Garmin-only and milestone-gated**
+- `post-import-athlete-pipeline` — awaited. ⚠️ **"Garmin-only and milestone-gated" was WRONG and cost a wrong answer on 2026-08-04.** The `provider === 'garmin'` test at `ingest-activity:1545` is not an exclusion, it is **de-duplication** — the comment directly above it says Strava runs its own chain. **BOTH providers learn.** The pipeline itself (`_shared/post-import-athlete-pipeline.ts`, 51 lines) has **no throttle at all**: it fires `learn-fitness-profile` → `autoCompleteGoalsFromWorkouts` → `recompute-athlete-memory` → `compute-snapshot`, every call. The gating lives entirely in the callers, and they disagree:
+  - **Garmin** (`ingest-activity:1562-1567`) — workouts 1/2/5/10, then **weekly** off `athlete_identity.inferred_at`.
+  - **Strava webhook** (`strava-webhook:214`) — **every activity create, unthrottled.** Four edge functions per activity.
+  - **Strava bulk import** (`import-strava-history:888`) — once at the end of an import.
+  - **Post-race** (`_shared/race-feedback.ts:279`) — full re-learn including the race.
+
+  ⛔ **This is the file's own "a behaviour description here is a CACHE of the code" warning firing again** (see `adapt-plan` below, which went stale twice). The one-line version read as "Strava athletes never learn", which is the opposite of true — and it is load-bearing, because `learn-fitness-profile` is what feeds `learned_fitness.run_easy_pace_sec_per_km` and unstarves the D-033 pace reconciler (Q-169). **Trace the callers before repeating any cadence claim on this line.**
 
 ⚠️ **`adapt-plan` action=auto DOES NOT CHANGE STRENGTH WEIGHTS. Corrected 2026-07-29 — this paragraph has now been wrong in BOTH directions.**
 

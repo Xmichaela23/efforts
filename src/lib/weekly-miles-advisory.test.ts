@@ -61,12 +61,19 @@ Deno.test('the notice is still rendered — warn-no-wall is not the same as drop
 Deno.test('⛔ the TIMELINE gate stays hard — it is a different kind of claim', () => {
   // Michael kept exactly one refusal on this path. A date in the past is arithmetic; a body that is
   // not ready is a judgement about a person. Only the first may refuse.
+  // ⚠️ RE-POINTED 2026-08-04, NOT RELAXED. The five-screen restructure split one card into three,
+  // so the level requirement moved from `raceCanContinue` to `levelCanContinue`. Both halves are
+  // still hard gates; this test now checks each where it actually lives. The mileage assertion
+  // above is what proves the split did not quietly turn the ADVISORY into a gate too.
   const decl = SRC.match(/const raceCanContinue = ([^;]+);/);
   assert(decl, 'raceCanContinue has gone — the timeline gate was the one hard refusal and it stays');
   const expr = decl[1];
   assert(/raceWeeks !== null/.test(expr), 'the race gate no longer rejects a date that has passed');
-  assert(/state\.raceDate/.test(expr) && /state\.fitness/.test(expr),
-    'the race gate no longer requires both a date and a level');
+  assert(/state\.raceDate/.test(expr), 'the race gate no longer requires a date');
+
+  const level = SRC.match(/const levelCanContinue = ([^;]+);/);
+  assert(level, 'levelCanContinue has gone — the level card must still require a tier');
+  assert(/state\.fitness/.test(level[1]), 'the level card no longer requires a tier to be picked');
 });
 
 Deno.test('the verdict itself is unchanged — still reports, still refuses to guess', () => {

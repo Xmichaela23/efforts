@@ -41,8 +41,23 @@ Rules:
 - Use the full official event name when known.
 - Return exactly one object in "races". Omit date only if you cannot verify from sources after search.`;
 
+/**
+ * ⛔ THE 2026 VARIANT, AND THE UPGRADE IS THE POINT — NOT HOUSEKEEPING (2026-08-04).
+ *
+ * `web_search_20250305` is the BASIC variant, documented as the one for models OLDER than
+ * Sonnet 4.6 — this function was calling it on 4.6. `_20260209` adds **dynamic filtering**: Claude
+ * writes and runs code to filter search results before they reach the context window.
+ *
+ * That is squarely this function's problem. Finding one official race date means sifting a lot of
+ * near-miss listings — aggregator pages, last year's edition, a different race with the same city
+ * in its name — and filtering them BEFORE they land in context is both cheaper and more accurate
+ * than asking the model to ignore them after the fact.
+ *
+ * ⚠️ DO NOT ALSO DECLARE `code_execution` IN `tools`. The filtering runs code under the hood; a
+ * second execution environment confuses the model. This one tool is the whole feature.
+ */
 const WEB_SEARCH_TOOL = {
-  type: 'web_search_20250305',
+  type: 'web_search_20260209',
   name: 'web_search',
   max_uses: 5,
 };
@@ -58,12 +73,29 @@ function extractText(content: unknown): string {
     .trim();
 }
 
+/**
+ * ⛔ IT RETURNS A REASON, NOT A BARE `null` (2026-08-04).
+ *
+ * Two completely different failures — the API rejecting the request, and the model returning text
+ * that will not parse — both used to collapse into `null`, and the wizard rendered both as
+ * *"Couldn't find those races."* So a 400 from a stale model pin and a genuinely unfindable race
+ * looked identical on screen, and the only way to tell them apart was to go read the function logs
+ * in the dashboard. That cost real time on 2026-08-04.
+ *
+ * ⚠️ `reason` IS FOR US, NOT FOR THE ATHLETE. It rides in the response next to the empty array so
+ * the failure names itself; the wizard still shows its own plain sentence. §0h: an absence is not a
+ * result, and the caller must be able to tell which kind of absence it got.
+ */
+type SearchOutcome =
+  | { ok: true; text: string }
+  | { ok: false; reason: string };
+
 async function callWithWebSearch(
   apiKey: string,
   userText: string,
   today: string,
   systemPrompt: string,
-): Promise<string | null> {
+): Promise<SearchOutcome> {
   let messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
     { role: 'user', content: `Today is ${today}.\n\n${userText}` },
   ];
@@ -80,14 +112,35 @@ async function callWithWebSearch(
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31',
+        // ⛔ THE `prompt-caching-2024-07-31` BETA HEADER IS GONE. Prompt caching went GA, so the
+        // header did nothing — and neither did the `cache_control` block it was there to enable:
+        // this system prompt is a few hundred tokens, far under the minimum cacheable prefix, so
+        // it could never have produced a cache entry. Both removed rather than left as decoration.
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+        // ⛔ THE MODEL PIN. Was `claude-sonnet-4-6` — still a live model, so this was never
+        // 404ing; it was just quietly running a previous generation with no error to force the
+        // edit. That is the whole failure mode of a pinned model string.
+        model: 'claude-sonnet-5',
+        system: [{ type: 'text', text: systemPrompt }],
         messages,
-        max_tokens: 1024,
-        temperature: 0,
+        // ⛔ RAISED 1024 → 4096, AND THIS IS A CONSEQUENCE OF THE MODEL BUMP, NOT A TWEAK.
+        // Sonnet 5 runs ADAPTIVE THINKING BY DEFAULT when `thinking` is omitted; Sonnet 4.6 ran
+        // without it. `max_tokens` caps thinking AND response text together, so the old 1024
+        // would now be shared — and a truncated response means unparseable JSON, which this
+        // function reports as "no races found" rather than as an error. Bumping the model without
+        // bumping this would have shipped a silent empty-result bug.
+        max_tokens: 4096,
+        // ⛔ `temperature: 0` REMOVED — REQUIRED, not optional. Sampling parameters are rejected
+        // on Sonnet 5 and the request 400s with them present. Determinism was the intent; the
+        // strict JSON contract in the system prompt is what actually delivers it, and
+        // `temperature: 0` never guaranteed identical output on any model anyway.
+        //
+        // ⚠️ `effort: 'low'` REPLACES IT AS THE COST LEVER. This is date extraction, not
+        // reasoning — low effort keeps thinking shallow and latency down. Deliberately NOT
+        // `thinking: {type: 'disabled'}`: with thinking off, Sonnet 5 is measurably less likely to
+        // reach for tools, and this function is entirely dependent on it choosing to search.
+        output_config: { effort: 'low' },
         tools: [WEB_SEARCH_TOOL],
       }),
     });
@@ -95,7 +148,10 @@ async function callWithWebSearch(
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
       console.error(`[extract-races] ${resp.status}: ${body.slice(0, 400)}`);
-      return null;
+      // The status and the first line of the body travel with the failure — an HTTP rejection is
+      // almost always a request-shape problem (model pin, tool version, a parameter the model no
+      // longer accepts) and the body says which.
+      return { ok: false, reason: `api_${resp.status}: ${body.slice(0, 160)}` };
     }
 
     data = await resp.json() as { content?: unknown; stop_reason?: string };
@@ -109,10 +165,15 @@ async function callWithWebSearch(
     break;
   }
 
-  if (!data?.content) return null;
+  if (!data?.content) return { ok: false, reason: 'no_content' };
   const text = extractText(data.content);
   console.log(`[extract-races] raw: ${text.slice(0, 300)}`);
-  return text || null;
+  // ⚠️ `max_tokens` IS A NAMED SUSPECT HERE. A response cut off mid-JSON parses as nothing, and
+  // that is indistinguishable from a race we could not find unless the stop reason is carried out.
+  if (!text) {
+    return { ok: false, reason: data.stop_reason === 'max_tokens' ? 'truncated_max_tokens' : 'empty_text' };
+  }
+  return { ok: true, text };
 }
 
 function parseRaces(raw: string): { name: string; distance: string; date?: string; priority: 'A' | 'B' }[] {
@@ -164,15 +225,24 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().slice(0, 10);
     const systemPrompt = priorFinish ? SYSTEM_PROMPT_PRIOR_FINISH : SYSTEM_PROMPT_UPCOMING;
-    const raw = await callWithWebSearch(apiKey, text, today, systemPrompt);
+    const outcome = await callWithWebSearch(apiKey, text, today, systemPrompt);
 
-    if (!raw) {
-      return new Response(JSON.stringify({ races: [], error: 'No LLM response' }), {
+    if (!outcome.ok) {
+      return new Response(JSON.stringify({ races: [], error: outcome.reason }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const races = parseRaces(raw);
+    const races = parseRaces(outcome.text);
+    // ⛔ THE THIRD EMPTY-LIST PATH, NOW NAMED. Text came back and did not parse — malformed JSON,
+    // or the model answered in prose despite the contract. Previously this returned a bare empty
+    // array with NO error at all, which is why "the picker returns nothing" had three possible
+    // causes and no way to tell them apart from the client.
+    if (races.length === 0) {
+      return new Response(JSON.stringify({ races: [], error: 'parse_failed' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     return new Response(JSON.stringify({ races }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

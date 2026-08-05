@@ -8,6 +8,63 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## 🅿️ PARKED 2026-08-04 — REPLACE THE RACE-READINESS PARAGRAPH WITH CHARTS
+
+**Michael's call, parked as a to-do — not started.** *"cant we use graphs or visuals instead?"*
+
+**The idea:** `_shared/session-detail/race-readiness-llm.ts` spends a model call per workout writing
+six fields — headline, verdict, tactical_instruction, flag, projection, taper_guidance. **The numbers
+underneath are already deterministic** (`_shared/race-readiness/`, VDOT projections). Four of the six
+are better as pictures than sentences:
+
+| field | better as |
+|---|---|
+| projection | a finish-time band, not a sentence |
+| "holding pace at a lower HR" | a line going down — pace-at-HR is already computed |
+| fitness trending | a line — already computed |
+| flag | a marked point where a threshold crossed |
+| taper_guidance | ⛔ **the schedule, read out — see below** |
+
+⛔ **THE COMPONENT ALREADY EXISTS AND IS SHIPPED.** `TrendSparkline`
+(`StatePerformanceSection.tsx:750`) renders 12-week series for run efficiency, strength e1RM and bike
+power, and already handles the hard parts: recent points coloured differently, a `building · N of 12
+weeks` state for thin data, captions. Device-verified for run + strength. This is a wiring job over an
+existing chart, not a charting build.
+
+⛔ **THERE IS NO PROSE REMAINDER — taper_guidance goes too.** A first draft of this entry carved it
+out as *"the one with a real argument for words."* Michael, same day: *"we lay out the plan, we can
+phrase that."* He is right and the carve-out was wrong. **The taper is not a judgement about the
+athlete — it is a schedule the engine already built.** `taperWeeks()` (`science.ts:903`) sets its
+length from distance × priority; `buildPhaseTimeline` sets when it starts; the long-run arc carries
+the taper in its own tail; `generateRaceWeekSessions` already lays out the shakeouts and the reduced
+long run. The model was handed all of that and asked to rephrase it.
+
+So a template here is not straining to write coaching prose — it is **stating the calendar**: *"Last
+long run is three weeks out at 16 miles. Volume drops next week and again the week after. Race week is
+three easy runs and a shakeout."* That is BETTER than the model's version, because it cannot drift
+from what is actually on the athlete's calendar. All six fields go.
+
+⛔ **WHY CHARTS BEAT TEMPLATING THE REST.** The obvious cheaper move — keep the sentences, generate
+them with rules — is worse on both axes: a template writes worse than the model AND is no more
+truthful. **A chart is more honest than either.** It shows the shape *and* the gaps; `building · 7 of
+12 weeks` is something a sentence has to remember to say and a chart says by existing.
+
+⚠️ **AND THE PROMPT IS ALREADY MOSTLY GUARDRAILS.** That file is thick with rules stopping the model
+distorting facts the engine already has right — *don't use today's elevation as a stand-in for race
+terrain*, *only mention course_profile if it exists*, *every number must appear in DATA*. When the
+scaffolding is that heavy, the deterministic layer should own more of the sentence. All of it
+disappears with the model call, along with one more thing that breaks when API credit runs out.
+
+**Before building:** load the `dataviz` skill — which two or three charts earn the space, and what the
+short computed label under each says, is the actual design work. Not freestyle chart code.
+
+**Related, also parked:** `course-strategy` is the other live output-LLM of this kind. Its geometry is
+already pure math (`segmentCourseFromProfile` — grade windows, hysteresis, merges); the model only
+groups adjacent segments and writes cues. The grouping is rule-able; the cues are the real writing.
+Judged the weaker target of the two — more work, less gain.
+
+---
+
 ## ✅ CLOSED 2026-08-02 NIGHT — THE LAST TWO COPY PUSHES (confirmed on screen)
 
 All three checked on the running app. Nothing outstanding here.

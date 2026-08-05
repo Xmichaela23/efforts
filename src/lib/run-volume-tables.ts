@@ -244,3 +244,68 @@ export function validateWeeklyMiles(
     sharePct: Math.round((lr / typedMi) * 100),
   };
 }
+
+// ── Intake tier seeds (2026-08-04) ───────────────────────────────────────────
+
+/**
+ * ⛔ WHAT THE LEVEL BUTTON SEEDS INTO THE TWO EDITABLE FIELDS. Michael's table, and it is NOT the
+ * same thing as `WEEKLY_MILEAGE` / `LONG_RUN_PROGRESSION` above — those describe what the PLAN
+ * does; this describes where the ATHLETE is now. The long-run numbers differ on purpose: the plan
+ * opens a beginner at a 6-mile long run and an advanced at 10, but an advanced athlete's *current*
+ * long run is 13. One is a prescription, the other is a prerequisite.
+ *
+ * ⛔ SINGLE NUMBERS, NOT RANGES, AND THE BOTTOM OF EACH BAND. The field below the button is a
+ * number and the athlete edits from it, so a range cannot be seeded. Bottom-of-band because
+ * **under-seeding is the safer error**: the long run feeds `recent_long_run_miles`, which
+ * `getProgressionOffset` (`generators/base-generator.ts:133`) uses to decide how far INTO the
+ * long-run arc the plan starts. An inflated seed enters the arc deeper than the athlete's legs
+ * have earned; a low one just costs a week of easy running.
+ *
+ * ⚠️ SOURCED, NOT PICKED. Weekly mileage matches `WEEKLY_MILEAGE.marathon` exactly (20/30/40).
+ * The long runs sit in Higdon's Novice 2 prerequisite band (about a year of running, 15-25 mi/wk)
+ * and under Pfitzinger's 18/55 entry gate, which is where tier three belongs for a plan we would
+ * actually generate.
+ *
+ * ⚠️ THE COPY SAYS THE RANGE; THE FIELD GETS THE NUMBER. "40+ miles a week" on the button,
+ * `weeklyMi: 40` in the field.
+ */
+export type IntakeTier = 'beginner' | 'intermediate' | 'advanced';
+
+export const TIER_SEEDS: Record<IntakeTier, { weeklyMi: number; longRunMi: number }> = {
+  beginner: { weeklyMi: 20, longRunMi: 6 },
+  intermediate: { weeklyMi: 30, longRunMi: 10 },
+  advanced: { weeklyMi: 40, longRunMi: 13 },
+};
+
+/**
+ * ⛔ THE SOFT SIGNAL, AND IT IS NOT A GATE. The field's shape: nobody blocks, everybody signals —
+ * Runna warns on an implausible 5K time, Garmin drifts a confidence ring, 80/20 makes switching
+ * tiers free. Books gate (Pfitzinger's prerequisite, Higdon's "about a year of running"); apps
+ * suggest.
+ *
+ * Returns a plain statement of what the athlete entered versus what the tier assumes, ONLY when
+ * they contradict each other by enough to matter. Null means say nothing.
+ *
+ * ⚠️ 25% BELOW THE SEED IS THE TRIGGER, and it is a threshold not a science: far enough that the
+ * numbers genuinely disagree, loose enough that editing 30 down to 27 says nothing. It exists so
+ * the line is rare — a signal that fires often is decoration.
+ */
+export function tierMismatchNote(
+  tier: IntakeTier,
+  typed: { weeklyMi?: number | null; longRunMi?: number | null },
+): string | null {
+  const seed = TIER_SEEDS[tier];
+  if (!seed) return null;
+  const low = (v: number | null | undefined, s: number) =>
+    typeof v === 'number' && Number.isFinite(v) && v > 0 && v < s * 0.75;
+  const weeklyLow = low(typed.weeklyMi, seed.weeklyMi);
+  const longLow = low(typed.longRunMi, seed.longRunMi);
+  if (!weeklyLow && !longLow) return null;
+  if (weeklyLow && longLow) {
+    return `You have entered ${typed.weeklyMi} miles a week and a ${typed.longRunMi}-mile long run. This tier assumes about ${seed.weeklyMi} and ${seed.longRunMi}.`;
+  }
+  if (weeklyLow) {
+    return `You have entered ${typed.weeklyMi} miles a week. This tier assumes about ${seed.weeklyMi}.`;
+  }
+  return `You have entered a ${typed.longRunMi}-mile long run. This tier assumes about ${seed.longRunMi}.`;
+}
