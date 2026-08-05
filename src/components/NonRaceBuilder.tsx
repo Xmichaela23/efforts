@@ -1391,6 +1391,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       notYet ? 'border-white/12 bg-transparent text-white/40 cursor-default' : 'border-white/25 bg-white/[0.02] text-white'
     }`;
 
+  // The eye — the mark of the Focus section, beside its screen titles. Same CSS drawing as the tab
+  // bar's (`.eye-mark`), one size up. Decorative: `aria-hidden`, the heading text carries the name.
+  const eyeTitle = (text: string) => (
+    <span className="inline-flex items-center gap-2.5">
+      <span aria-hidden="true" className="eye-mark eye-heading shrink-0" />
+      {text}
+    </span>
+  );
+
   return (
     // h-full (not 100dvh) so it fills GoalsScreen's content area and keeps the app nav/banner when
     // embedded; standalone route still fills its container.
@@ -1406,7 +1415,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           governs any goal reached another way — this is the picker leaving, not the rule. */}
       {currentStep === 'goal' && (
         <StepLayout
-          step={stepNo('goal')} totalSteps={steps.length} title="Choose your focus"
+          step={stepNo('goal')} totalSteps={steps.length} title={eyeTitle('Choose your focus')}
           subtitle="Change it whenever you want."
           onBack={back} onContinue={next} canContinue={goalCanContinue}
           hideContinue
@@ -1469,7 +1478,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           comment above `GOAL_ORDER`. */}
       {currentStep === 'train' && (
         <StepLayout
-          step={stepNo('train')} totalSteps={steps.length} title="Train"
+          step={stepNo('train')} totalSteps={steps.length} title={eyeTitle('Train')}
           subtitle="What you're building. The rest keeps ticking over underneath."
           onBack={back} onContinue={next} canContinue={state.goal != null}
           hideContinue hideProgress
@@ -1522,7 +1531,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           being fixed; shipping them now would be three names for one block. */}
       {currentStep === 'tier' && (
         <StepLayout
-          step={stepNo('tier')} totalSteps={steps.length} title="Strength"
+          step={stepNo('tier')} totalSteps={steps.length} title={eyeTitle('Strength')}
           subtitle="Same lifts, same 5/3/1 loading. What changes is the work around them."
           onBack={back} onContinue={next} canContinue={state.strengthTier != null}
           hideContinue hideProgress

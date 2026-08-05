@@ -7,7 +7,9 @@ import { ChevronLeft, Loader2 } from 'lucide-react';
 export function StepLayout({
   step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false,
 }: {
-  step: number; totalSteps: number; title: string; subtitle?: string;
+  // ⚠️ `title` widened string → ReactNode (2026-08-05) so the Focus screens can set the eye mark
+  // beside their heading. Every existing caller passes a plain string and is unaffected.
+  step: number; totalSteps: number; title: React.ReactNode; subtitle?: string;
   onBack?: () => void; children: React.ReactNode;
   onContinue: () => void; canContinue: boolean; continueLabel?: string; saving?: boolean;
   /** A step where the CHOICE advances (tapping the card is the answer) has nothing for a Continue
