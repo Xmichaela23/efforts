@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair } from 'lucide-react';
+import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
@@ -358,7 +358,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const [showAddGoal, setShowAddGoal] = useState(false);
   // Embedded non-race builder (the rich goal builder, in-app — replaces the orphaned /goals/build route).
-  const [showBuilder, setShowBuilder] = useState(false);
+  // ⛔ THE FRONT DOOR IS THIS SCREEN, NOT THE BUILDER'S FIRST STEP (2026-08-05, SPEC §B).
+  //
+  // Built first as a step INSIDE `NonRaceBuilder`, one level down behind "Add a goal". Michael, on
+  // the deployed build: *"nothing there" … "should replace add a goal."* So the three cards render
+  // here, and the card that was tapped is handed to the builder, which starts on the screen after
+  // the door. `null` = the builder is closed; a card id = open, deep-linked to it.
+  const [showBuilder, setShowBuilder] = useState<'train' | 'race' | 'build' | null>(null);
   // Default to past goals expanded so completed events are visible immediately.
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -416,7 +422,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const emptyState = !st || Object.keys(st).length === 0;
 
     if (!emptyState) {
-      setShowBuilder(false); // builder completed (or arc-setup returned) → close the embedded view, show the result
+      setShowBuilder(null); // builder completed (or arc-setup returned) → close the embedded view, show the result
       if (st.needPaceCalibration) setShowCalibration(true);
 
       if (st.seasonPlanJustBuilt) {
@@ -1925,7 +1931,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               }
       : null;
 
-  if (showBuilder) return <div className="h-full"><NonRaceBuilder onClose={() => setShowBuilder(false)} /></div>;
+  if (showBuilder) return <div className="h-full"><NonRaceBuilder entry={showBuilder} onClose={() => setShowBuilder(null)} /></div>;
   if (showEventForm) return renderEventForm();
   if (showCapacityForm) return renderCapacityForm();
   if (showMaintenanceForm) return renderMaintenanceForm();
@@ -2329,17 +2335,35 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Bottom actions */}
       <div className="shrink-0 px-4 pb-4 pt-2 space-y-2">
-        <button
-          type="button"
-          onClick={() => setShowBuilder(true)}
-          className="w-full flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.10] transition-all"
-        >
-          <Crosshair className="h-5 w-5 shrink-0 mt-0.5 text-white/70" />
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-white/90">Add a goal</div>
-            <div className="mt-0.5 text-xs text-white/50">Focused work to build speed, strength, or endurance.</div>
-          </div>
-        </button>
+        {/* ── THE FRONT DOOR (SPEC §B) — replaces "Add a goal" ────────────────────────────────────
+            Train · Race · Build. Train drills down to the discipline picker inside the builder;
+            Race goes straight into the race flow. Build is a CREATE action, not a pick, so it gets
+            the dashed treatment and sits apart — and it is DARK, because the flow behind it is
+            spec'd and not built (`WORKORDER-build-your-own-strength-2026-08-04.md`). The honesty
+            rule: never a card that opens nothing. */}
+        {([
+          { id: 'train' as const, Icon: Crosshair, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true },
+          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true },
+          { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false },
+        ]).map(({ id, Icon, label, blurb, live }) => (
+          <button
+            key={id}
+            type="button"
+            disabled={!live}
+            onClick={() => { if (live) setShowBuilder(id); }}
+            className={`w-full flex items-start gap-3 rounded-2xl p-4 text-left transition-all ${
+              id === 'build'
+                ? `border border-dashed ${live ? 'border-white/25 bg-transparent hover:bg-white/[0.04]' : 'border-white/12 bg-transparent cursor-default'}`
+                : 'border border-white/10 bg-white/[0.06] hover:bg-white/[0.10]'
+            }`}
+          >
+            <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${live ? 'text-white/70' : 'text-white/30'}`} />
+            <div className="min-w-0">
+              <div className={`text-sm font-medium ${live ? 'text-white/90' : 'text-white/40'}`}>{label}</div>
+              <div className={`mt-0.5 text-xs ${live ? 'text-white/50' : 'text-white/30'}`}>{blurb}</div>
+            </div>
+          </button>
+        ))}
         <button
           type="button"
           onClick={() => {

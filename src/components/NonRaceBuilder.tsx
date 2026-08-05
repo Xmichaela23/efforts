@@ -807,7 +807,19 @@ type PreviewPlan = {
   placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string }>;
 };
 
-export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {}) {
+/**
+ * ⛔ `entry` = THE FRONT DOOR LIVES ON THE GOALS SCREEN, NOT IN HERE (2026-08-05, SPEC §B).
+ *
+ * The three cards are what Goals OPENS TO — Michael tapped through the first build and found them
+ * one level down, behind "Add a goal": *"nothing there."* So `GoalsScreen` renders the door and
+ * deep-links into this builder with the card that was tapped, and the builder starts on the screen
+ * AFTER the entry (the Train drill-down, or the race flow).
+ *
+ * ⚠️ The builder's own `goal` step is KEPT, not dead: the standalone route mounts this component
+ * with no props, and Back from step 1 needs somewhere to land that isn't a closed builder. Passing
+ * no `entry` gives you the full flow, door included.
+ */
+export default function NonRaceBuilder({ onClose, entry: initialEntry }: { onClose?: () => void; entry?: EntryCardId } = {}) {
   const navigate = useNavigate();
   // ⛔ `error` WAS NOT READ, AND THE BUILD BUTTON FAILED SILENTLY (2026-08-04).
   //
@@ -850,8 +862,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
   const [state, setState] = useState<NonRaceState>({
-    entry: null,
-    goal: null, discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
+    // Deep-linked from the Goals door. ⚠️ `goal` IS SEEDED HERE FOR RACE, DELIBERATELY: `getSteps`
+    // branches on it, so leaving it null for one render would flash the posture screen before the
+    // effect below swaps in the race flow. The POSTURE still comes from `reseed` a tick later —
+    // `equipmentTier` reads the arc, which may not have loaded on the first render, and the race
+    // screen reads no posture.
+    entry: initialEntry ?? null,
+    goal: initialEntry === 'race' ? 'marathon' : null,
+    discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
     // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
     // arrival instead of an empty box. Michael: *"no prefill let them chose."* A long run is
     // conditional — an athlete may not have one — and a seeded day answers that question for them
@@ -879,7 +897,10 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
     raceIntent: '', calEasy: '', calFiveK: '', runClubIntensity: 'quality',
     longRunMiles: '', targetTime: '', fixedDays: [],
   });
-  const [stepIdx, setStepIdx] = useState(0);
+  // Step 0 is the door. When Goals already asked (deep link), start on the screen AFTER it — the
+  // Train drill-down, or the race card. Back from there still closes the builder, which returns the
+  // athlete to the Goals screen the door now lives on.
+  const [stepIdx, setStepIdx] = useState(initialEntry ? 1 : 0);
 
   // ⚠️ The schedule screens are built from the POSTURE, which is only seeded when the goal is tapped
   // — so on step 1 the flow would count itself with no disciplines kept ("1 of 3") and then jump.
@@ -922,6 +943,14 @@ export default function NonRaceBuilder({ onClose }: { onClose?: () => void } = {
       targetWeeks: goal === 'get_stronger' ? STRENGTH_FOCUS_WEEKS : Math.max(s.targetWeeks, floor),
     }));
   };
+  // Deep-linked into the race flow: the goal was seeded in the initial state so the right screen
+  // renders immediately; this fills in the posture / protocol / length the tap handler would have.
+  // Once, on mount — `reseed` overwrites posture, so re-running it would wipe the athlete's edits.
+  React.useEffect(() => {
+    if (initialEntry === 'race') reseed('marathon', undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setPosture = (d: Discipline, p: Posture) => {
     setState((s) => {
       const posture = { ...s.posture, [d]: p };
