@@ -1,4 +1,25 @@
-# SPEC — Strength Focus (Barbell, 4-day) · V1
+# SPEC — Strong Focus (Barbell, 4 or 3 day) · V1
+
+> # ⛔ THE BLOCK THIS DESCRIBES HAS MOVED. READ THIS BEFORE ANY LINE BELOW.
+>
+> **Renamed 2026-08-05: the athlete-facing name is "Strong Focus", not "Strength Focus".** *Strength*
+> is the DISCIPLINE (the Train card, beside Run Focus / Ride Focus); *Strong* is the BLOCK. **[D-388].**
+>
+> **Four things below are now WRONG, and each is wrong in a way that reads as settled:**
+>
+> | line | says | actually |
+> |---|---|---|
+> | §176 | *"25 reps each: push · pull · single-leg or core"* | **floor 50, ceiling 75.** There is no 25–50 range in the book — the Triumvirate (p.48) runs 50–75, Bodyweight (p.52) says "no less than 75 per exercise". Wendler's lowest figure anywhere is 50. **[D-385]** |
+> | §176 | the three slots are the same every day | **day-type slot ROLES.** Upper days: push · pull · core. Lower days: leg · pull · core, **core last**. A press day used to carry two pulls and zero push, by design. **[D-385]** |
+> | §103 | *"no separate retest week"* — true, but the 3-day shape grew one | **deleted 2026-08-06.** Week 3 of every cycle used to break onto FOUR days. `applyVerdict` steps by a FIXED increment and the AMRAP only produces a verdict, so a fatigued lift cannot bias the weight. **[D-387]** |
+> | title | *4-day* | **4 or 3.** Three days is a genuine three days now — the two presses share one session, two mains plus ONE assistance block, bench first. **[D-387]** |
+>
+> **Also since:** the four lifts run in Wendler's p.11 order (Press · Deadlift · Bench · Squat), the
+> hill session's descent ends on the lap button **[D-390]**, and run/ride days alternate **[D-387]**.
+>
+> ⚠️ **THE CURRENT PROTOCOL IS D-385 … D-390 IN `DECISIONS-LOG-2.md`.** This file is the V1 record and
+> is kept for §0/§4 and the citation table; **it is no longer a description of what the engine builds.**
+
 
 > # ✅ BUILT 2026-07-25 — §1 AND §2 ARE SHIPPED. Substance folded into **D-324**.
 >
@@ -173,7 +194,9 @@ Wed / Sat endurance · Sun off. **Six training days, one full rest day.**
 
 1. **10–15 jumps or medicine-ball throws.**
 2. **The main lift** — three sets, last one all-out.
-3. **25 reps each: push · pull · single-leg or core.**
+3. ~~**25 reps each: push · pull · single-leg or core.**~~ ⛔ **SUPERSEDED 2026-08-05 — [D-385].**
+   **Floor 50, ceiling 75**, and the three slots are day-type ROLES, not one fixed triad: upper days
+   are push · pull · core, lower days are leg · pull · core with core last.
 
 **There is no row and no chin in the four main lifts — the pull category is where pulling comes from.**
 These three categories are also the slots the Adjust-tab add-ons fill (glute → single-leg/core; Hyrox →

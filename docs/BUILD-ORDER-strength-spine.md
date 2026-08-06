@@ -86,6 +86,10 @@ accommodation.
 > recommendation before *important* sessions. At six hours, Wednesday and Saturday both work. Do not
 > re-derive the 3-day case from my conservative number.
 
+> ⛔ **THE REP FLOOR BELOW IS SUPERSEDED — 50, not 25, and there is no 25–50 range in the book.**
+> Triumvirate (p.48) 50–75 per movement; Bodyweight (p.52) "no less than 75 per exercise". Wendler's
+> lowest figure anywhere is 50. The slots are also day-type ROLES now, not one fixed triad. **[D-385].**
+
 **Each session:** 10–15 jumps or throws → the main lift (3 sets, last one all-out) → **25 reps each of
 push, pull, and single-leg/core.** Wendler's assistance range is 25–50; an endurance athlete takes the
 bottom (Van Hooren: keep volume low). **There is no row or chin in the four main lifts — the pull
