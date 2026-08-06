@@ -408,3 +408,51 @@ Train → Strength → Strong into the existing block, and Back out one screen a
 effect on a deep link rather than from a tap, and the goal is seeded in the initial state so the
 right screen renders on the first frame. It typechecks and builds; **nobody has watched a marathon
 plan get built through the new door.**
+
+---
+
+## Q-259 — A hill session's planned duration excludes its own open recoveries (2026-08-06, **intentional, cosmetic**)
+
+`total_s` in `materialize-plan` is `steps.reduce((s, st) => s + (Number(st.duration_s) || 0), 0)`. The lap-button descents carry no `duration_s` by design ([D-390]), so they contribute **0**. A 4 × 3 min hill reads ~32 min on the calendar and takes ~40.
+
+⚠️ **`Number(undefined) || 0` is 0, not `NaN` — nothing is broken.** The total is honest about what it cannot know: an open step's length is the athlete's.
+
+**Options if it ever matters:** a nominal per-descent estimate used for DISPLAY only (never written to the step, or the whole point is lost), or a session-level `duration` override — `HILL_SESSION_MIN = 35` already exists and is closer to the truth than the computed total. **Not built; nobody has been misled yet.**
+
+---
+
+## Q-260 — The second hard-session option is an unsolved protocol, and the obvious fix is the wrong one (2026-08-06, **VERIFIED against our own doctrine, NOT built**)
+
+The strength-primary block has ONE hard aerobic session. It has **one** configuration — `4 × 3 min` uphill — and that needs **a climb you can run for three minutes.** An athlete without one is currently handed a session they cannot run, and is never asked.
+
+⛔ **DO NOT WIRE THE DOCTRINE'S "10–12 × 40 s" AND CALL IT DONE. That was built on 2026-08-06 and reverted the same day** (intake question + `run_hills_10x40s_rlap` branch, both removed). Three reasons, all from `DOCTRINE-aerobic-maintenance-run-only.md` **two sections above where the fallback is named**:
+
+1. **Long beats short AT EQUAL WORK TIME.** 12 highly trained runners, 4 × 3 min at 95% vVO2max vs 24 × 30 s at 100%, both 12 min: time >90% VO2max **327.9 ± 146.8 s vs 201.3 ± 268.4 s**. Time >90% HRmax went the OTHER way (545 vs 820) and RPE was identical — *the short session feels harder, reads harder on HR, and delivers 40% less stimulus.*
+2. **40 s is in the "moderate" band** (>30 s to <2 min), which the meta puts on the same inferior side as short (≤30 s).
+3. **The rationale for the short float is RETIRED IN OUR OWN DOC.** "VO2 stays elevated through the recovery" is struck through. So **neither** a 20 s float **nor** a lap-button descent is backed for a 40 s rep.
+
+⚠️ **AND CUTTING IT TO 6:40 STACKS A SECOND PENALTY** on an already-inferior format. That is not "effective, not maximal" — that is two.
+
+### The question, stated properly
+
+**Maximize VO2max gain at the least mechanical cost to the legs, for an athlete with no long climb.** The two halves pull against each other:
+
+- **Wen et al. 2019** (PMID 30733142): long-interval (≥2 min) **AND** high-volume (≥15 min) **AND** 4–12 weeks → significantly larger effects. Long and more is better.
+- **Fyfe et al. 2016** (PMC5093324): work-matched hard and easy endurance interfere with maximal lower-body strength almost identically. Intensity is not the mediator; total work may be. ⚠️ **It was cycling.**
+- **The discount:** uphill is concentrically biased and loses the impact transient, which is why the long form is a hill at all. **A flat substitute gives that up.**
+
+**Candidates, none evaluated** (first two are the doctrine's own table): `8–10 × 60 s hard / 60 s easy @ 4–6%` · `2 × 8 min sustained @ 3–4%` · flat long intervals · treadmill incline (never discussed; the intake has never asked).
+
+⛔ **TWO LOAD-BEARING SOURCES IN THAT DOCTRINE ARE UNNAMED** — the time-at-VO2max meta-analysis and the 12-runner head-to-head. **Find them before deciding.** A likely match for the meta is *"Time spent at or near VO2max during high-intensity interval training — a systematic review and meta-analysis"* (BMC Sports Sci Med Rehabil) — **unverified, do not cite without checking.**
+
+---
+
+## Q-261 — Nothing in the lap-button hill export is device-verified (2026-08-06, **verification debt**)
+
+There was **no `OPEN` step anywhere in this codebase** before 2026-08-06, so there is nothing to check the behaviour against and no prior export to compare. Everything about it is reasoned:
+
+- that Garmin accepts `durationType: 'OPEN'` with no `durationValue`
+- that the watch shows the step counting **up** and waits for the lap press rather than skipping it
+- that the three exporter fixes produce a well-formed workout rather than a rejected one
+
+**What settles it:** send one hill session to the watch and look at the descent step. Fixtures pin the token expansion and the step construction; **neither can prove Garmin accepts the payload.**

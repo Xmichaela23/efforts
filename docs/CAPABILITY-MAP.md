@@ -117,6 +117,8 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 | Phone-recorded workout ingest | `ingest-phone-workout/index.ts:297` | BUILT | routes through `recompute-workout` (the ordered orchestrator) since 2026-07-17 — reaches `compute-facts` and the spine | ⟨A31⟩
 | FIT-file import | `save-imported-workout/index.ts:206` | BUILT | routes through `recompute-workout` since 2026-07-17 — reaches `compute-facts` and the spine | ⟨A31⟩
 | Garmin swim length/lap reconstruction | `swim-activity-details/index.ts:315` | PARTIAL | Garmin-only (hard 400 otherwise) |
+| Lap-button (`OPEN`) workout step → Garmin | `send-workout-to-garmin/index.ts` (both step builders) + `materialize-plan` `_rlap_` hill token | BUILT 2026-08-06, **NOT device-verified — [Q-261]** | ⛔ a step with **no** time and no distance. Three places used to drop it; one coerced it to a **1-second** rest. [D-390] |
+| Hard aerobic session, strength-primary block | `strength-primary-plan.ts` `hillSession()` | BUILT — **ONE configuration only** | `4 × 3 min` uphill, lap-button descent. ⛔ **assumes a 3-min climb and never asks** — the second option is unsolved, **[Q-260]**, and the doctrine's 40 s fallback is NOT it |
 | Executed intervals + overall pace/HR/power | `compute-workout-summary/index.ts` | BUILT | writes `workouts.computed.overall/intervals` |
 | Zones, GAP series, power curve, best efforts, NP | `compute-workout-analysis/index.ts` | BUILT | ⚠️ **does NOT write `workout_analysis`** despite the name (`:2068` says so) ⟨A31⟩ |
 | Deterministic per-workout facts | `compute-facts/index.ts:1650` | BUILT | the deterministic layer; also writes `exercise_log`, `session_load`; then calls `match-cores` + `compute-snapshot` |

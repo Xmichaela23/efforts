@@ -460,3 +460,33 @@ The entry flow said **three names for one thing in four taps**: a "Strength Focu
 ⚠️ **`DOCTRINE-aerobic-maintenance-run-only.md` contradicts itself below the prescription:** *"In a strength block, short-format uphill work is the default. Longer repeats are an endurance-led tool."* That line sits under a revision that retired its own reasoning. **The code follows the newer text (4 × 3 min). The stale line is still there.**
 
 **Where the numbers live:** `shared/strength-system/strength-primary-plan.ts:682` (`hillSession`), `HILL_SESSION_MIN = 35`, `docs/DOCTRINE-aerobic-maintenance-run-only.md` §3 and "THE PRESCRIPTION THAT SURVIVES", `src/components/NonRaceBuilder.tsx` (the volume note).
+
+---
+
+### D-390 — The hill descent ends on the lap button, not a clock (2026-08-06, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
+
+**The recovery in a hill session is not a duration — it is however long it takes to get back down the hill the athlete actually has.** A 3:00 countdown answers a question it cannot know, and it is wrong in one direction every rep: at zero the watch buzzes and starts the next hard rep whether they are at the bottom or still walking down.
+
+⛔ **THE CLIMB STAYS TIMED AND THE TWO ARE DOING OPPOSITE JOBS ON PURPOSE.** 3 minutes is the DOSE ([D-389]), so the work rep is a fixed countdown wherever it leaves the athlete on the hill. **Only the descent is open. Do not "make them consistent" by opening both.**
+
+**Token:** `run_hills_{reps}x{work}s_rlap_g{lo}_{hi}[_d{walk|jog}]` — separate branch; the fixed-recovery hill is untouched and pinned by a test that says so. `hillSession()` emits the lap-button form with a **10-minute cool-down** (the fixed form's is 8).
+
+#### ⛔ THE GARMIN SIDE, AND THE THIRD FAILURE WAS THE DANGEROUS ONE
+
+The recovery carries **no `duration_s` at all**, and that absence is the instruction — it exports as **`durationType: 'OPEN'`**. Three places in `send-workout-to-garmin` treated a step with no time and no distance as malformed:
+
+| where | what it did |
+|---|---|
+| interval builder, rest branch | `Math.max(1, sec \|\| 1)` → **a ONE-SECOND rest** |
+| segment step builder | `continue` (dropped) |
+| single step builder | `continue` (dropped) |
+
+⚠️ **The first is the one that matters.** It does not drop the step and does not error, so the export **looks like it worked** and the athlete gets a 1-second recovery on the watch. Checked ahead of the coercion, not after. `durationValue` is now optional on `GarminStep`; every reader was already guarded, and an OPEN step contributes **0** to the duration estimate rather than `NaN`.
+
+**Garmin ships this as a first-class option** — "Open Repeats" beside "Structured Repeats" — and the documented friction with canned hill workouts is exactly this: preset times that do not match the athlete's hill.
+
+⚠️ **THE PLANNED DURATION NOW UNDER-READS.** `total_s` sums `duration_s`, so the open descents count as zero: the calendar shows ~32 min for a session that takes ~40. Not broken — a total that is honest about what it cannot know. **[Q-259].**
+
+⛔ **NOT INCLUDED — the short-hill fallback.** Built and reverted the same day; see **[Q-260]**. It is an unsolved protocol question, not a missing branch.
+
+**Files:** `materialize-plan/index.ts` (new branch, `expandRunToken` exported for test), `send-workout-to-garmin/index.ts`, `shared/strength-system/strength-primary-plan.ts` (`hillSession`), `materialize-plan/hills-lap-button.test.ts`. Commit `a5a1f19d`.

@@ -8,6 +8,36 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE STRENGTH BLOCK REBUILD + THE LAP-BUTTON HILL (2026-08-06, pushed + deployed, **NOT SEEN ON A DEVICE**)
+
+Six commits (`a0d1baec` → `a5a1f19d`), [D-385]–[D-390]. Deployed: `generate-strength-plan`,
+`materialize-plan`, `generate-run-plan`, `create-goal-and-materialize-plan`, `send-workout-to-garmin`.
+⚠️ **Your CURRENT block is not rewritten by any of this** — it changes what new plans build.
+
+**Build a new Strong Focus plan and check:**
+
+- [ ] **A press day carries a real push.** Bench or OHP, then a push, a pull, and abs — **50 reps
+      each**, not 25. It used to be two pulls and no push, every time.
+- [ ] **No leg work on bench or press days.** Squat day gets hip thrusts, deadlift day gets lunges —
+      different patterns, so the two leg days no longer repeat.
+- [ ] **The week opens Mon Press · Tue Deadlift · Thu Bench · Fri Squat** if you pin nothing. That is
+      Wendler p.11 verbatim.
+- [ ] **Runs and rides alternate** rather than the runs taking every open day and the rides stacking
+      onto lifts. One rest day survives unless your own asks fill the week — and then it says so.
+- [ ] **The plan is called "Strong Focus"**, and the lifting-days screen no longer promises a fourth
+      day in week 3.
+- [ ] ⛔ **THE ONE THAT NOTHING HERE CAN PROVE — [Q-261]. Send the hill session to your watch.** The
+      descent should show **no countdown**, count **up**, and wait for you to press lap. There was no
+      `OPEN` step in this codebase before 2026-08-06, so nothing local can verify Garmin accepts it.
+      ⚠️ If it exports but the descent is a **1-second** rest, the fix at the interval builder's rest
+      branch did not take.
+
+⚠️ **Known and unfixed:** the hill session's planned duration excludes its open descents, so the
+calendar under-reads it (~32 min for ~40) — [Q-259]. And an athlete with no 3-minute climb still gets
+a session they cannot run — [Q-260], deliberately not patched.
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE FOCUS FRONT DOOR (2026-08-05, pushed + client-deployed, **NOT SEEN ON A DEVICE**)
 
 Eight commits (`5634b4f3` → `8a0efcd7`), [D-382] / [D-383] / [D-384]. **Client only — no edge function

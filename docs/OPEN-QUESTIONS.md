@@ -1273,7 +1273,26 @@ enforcement here would be repairing a mechanism the derivation removes.**
 
 ---
 
-## Q-212 — Assistance does not know what the main lift is: four pushing exposures inside 24 hours (2026-07-28, **CLOSED 2026-07-29**)
+## Q-212 — Assistance does not know what the main lift is: four pushing exposures inside 24 hours (2026-07-28, **CLOSED 2026-07-29** · **HALF REVERSED 2026-08-05**)
+
+> ⛔ **BACK-ANNOTATED 2026-08-05 — THE PUSH-SLOT HALF OF THIS FIX WAS THE DEFECT. See [D-385].**
+>
+> The `balancedFor` rule below is **kept and is still right, on the PULL slot** — p.86 pairs a
+> horizontal push with a vertical pull and vice versa, and that is the half that survives.
+>
+> **The `substitutedFor` half, applied to the PUSH slot, is reversed.** A push always shares a press's
+> movement family, so the push slot ALWAYS collided and always fell through to `BALANCE_POOL.push` —
+> four movements, **all four pulls**. Bench and OHP shipped **two pulls and zero push**, every time,
+> by design. The fix for the athlete's *pick* created a worse defect in the *slot*.
+>
+> ⛔ **AND THE p.86 CITATION WAS READ TOO NARROWLY.** p.86 pairs Bench→Chin-ups, but the template runs
+> to **p.88**, whose worked example is `Bench 5/3/1 → Barbell Rows → 3 rounds of Med Ball Slams ·
+> **DIPS** · Burpees · Chin-ups · Planks`. **Dips are on the bench day, in the template quoted to
+> prove they should not be.** No page in the book turns a push slot into a pull.
+>
+> Replaced by **day-type slot roles** (upper: push · pull · core; lower: leg · pull · core).
+> `BALANCE_POOL` is deleted. `assistance-collision.test.ts` was rewritten — **its old invariant WAS
+> the bug and it passed.** Everything below is history.
 
 > ✅ **CLOSED by D-328 (`b245f79b`, `5eddff64`) — PUSHED, NOT YET DEPLOYED.** `resolveAssistance()` now
 > takes the day's main lift. A colliding pick is substituted and NAMED (`substitutedFor`, §5.2b), and
@@ -1773,7 +1792,27 @@ stored, no live reader — that is Q-211 again, with the value wrong on top.**
 
 ---
 
-## Q-214 — Main-lift REGION adjacency is not an input to placement: two pressing days in a row are never priced (2026-07-28, VERIFIED by enumeration, NOT built)
+## Q-214 — Main-lift REGION adjacency is not an input to placement: two pressing days in a row are never priced (2026-07-28, VERIFIED by enumeration · **BUILT 2026-08-05**)
+
+> ✅ **BACK-ANNOTATED 2026-08-05 — BUILT, AND THE RANKING DECISION BELOW IS SUPERSEDED. See [D-386].**
+>
+> `pressAdjacencyShortfall` exists (`_shared/week-solver.ts`), pricing the shortfall below a 3-day
+> floor — the book's own spacing (2nd ed. p.11: in all three of Wendler's suggested day sets the two
+> pressing days land 3 days apart).
+>
+> ⛔ **THE RANKING CALL BELOW — "BELOW `upperLowerShortfall`, ABOVE `shapePenalty`" — NO LONGER MEANS
+> ANYTHING: `upperLowerShortfall` IS DELETED.** It pushed every press ≥3 days from every leg day,
+> which **contradicts p.11** (the book alternates upper and lower on back-to-back days on purpose)
+> and **caused the very clustering this entry chased** — with four lifts on seven days, shoving each
+> press away from the legs shoves the two presses into each other. `upperToNearestLiftPenalty`, the
+> term this entry correctly identified as blind, is also deleted.
+>
+> **Lift spacing is now two terms, each measuring what it names:** `spreadPenalty` (heavy legs vs
+> heavy legs) and `pressAdjacencyShortfall` (press vs press). Nothing prices upper-against-lower.
+>
+> ⚠️ **ONE CONSEQUENCE THIS ENTRY DID NOT WEIGH:** ranking press spacing above `shapePenalty` puts it
+> above `preferredMissPenalty` too, so **a stated preferred day now loses to press spacing.** Pinned
+> by a test so it is a recorded fact rather than a surprise. Everything below is history.
 
 **Parent of Q-212.** Q-212 is assistance colliding with the day's main lift; this is **main lifts colliding with each other**. Michael: *"Two consecutive pressing days is what makes the dips collision hit twice instead of once. Fixing the assistance while the main-lift adjacency stays is treating the symptom."*
 
@@ -1822,7 +1861,27 @@ The current arrangement is defensible — it wins a real term against every pres
 
 ---
 
-## Q-215 — The easy-run placer cannot choose a FREE day, cannot see lifts, and asserts a 6h split it never asked about (2026-07-28, VERIFIED by code trace, NOT built)
+## Q-215 — The easy-run placer cannot choose a FREE day, cannot see lifts, and asserts a 6h split it never asked about (2026-07-28, VERIFIED by code trace · **TEST REWRITTEN 2026-08-05**)
+
+> ⛔ **BACK-ANNOTATED 2026-08-05 — `run-placement.test.ts` ASSERTED A PROHIBITION THE CODE NEVER HAD.
+> See [D-387].**
+>
+> Its headline test read *"the easy run does not stack on heavy legs while an upper lift day is
+> free"* — an absolute. The composer has only ever expressed this as a **preference**
+> (`HEAVY_LEG_STACK_PENALTY`, one anchor adjacency; its own comment says *"a tiebreak, not an
+> override"*). Pinning it as a ban made the test stronger than the thing it guarded, and it went red
+> when lift placement changed for reasons unrelated to run placement.
+>
+> **The law permits the stack outright** — verified against the matrix 2026-08-05:
+> `easy_run × lower_body_strength` **ALLOWED same day, 0h adjacent** (flipped to ✓ in May 2026 for
+> STRENGTH-PROTOCOL §6.2 — lower first, 6h gap, easy run as recovery flush).
+> `quality_run × lower_body_strength` **FORBIDDEN, 24h.** `long_run × lower_body_strength`
+> **FORBIDDEN, 48h** — that is the eccentric guard, and it is a hard prune.
+>
+> ⚠️ **AND THE PREFERENCE WAS DOING NOTHING.** The heavy-leg penalty is exactly one anchor adjacency,
+> so it CANCELS one: the deadlift day scored 0+4 and both upper days scored 4+0, a three-way tie
+> broken by `DAYS.indexOf` — the earliest day, which is the leg day. Fixed; the tie now resolves to
+> the clean upper day. Everything below is history.
 
 ⛔ **THE CODE PREDICTED THIS EXACT BEHAVIOUR BEFORE IT HAPPENED, AND THAT IS THE STRONGEST EVIDENCE HERE.** `place-week.ts:87`, written 2026-07-26:
 

@@ -4,6 +4,28 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-06 — THE STRENGTH FIX IS BUILT. THE SECOND HARD-SESSION OPTION IS THE OPEN QUESTION.**
+> `SPEC-assistance-fix.md` §0–§7 SHIPPED — press days carry a real push, no leg work on upper days,
+> legs vary across the two lower days, reps floor 50 / ceiling 75. [D-385]. Q-214 built and two
+> solver terms deleted for contradicting Wendler p.11 [D-386]; the 3-day block is genuinely three
+> days [D-387]; "Strength Focus" → "Strong Focus" [D-388]; the hill descent ends on the lap button
+> [D-390]. Six commits `a0d1baec` → `a5a1f19d`, **pushed + deployed, NOT device-verified** —
+> checklist at the top of `POLISH-PUNCH-LIST.md`.
+>
+> ⛔ **NEXT IS NOT A BUILD, IT IS A DECISION: the second hard-session option ([Q-260]).** The block's
+> one hard aerobic session is `4 × 3 min` uphill and needs a climb you can run for three minutes; an
+> athlete without one gets a session they cannot run and is never asked. **The doctrine's "10–12 ×
+> 40 s" fallback is NOT the answer** — it was built and reverted the same day, because at equal work
+> time the long form gives 327.9 s above 90% VO2max against the short form's 201.3 s, 40 s sits in
+> the band the meta calls inferior, and the rationale for its short float is struck through as
+> retired in our own doc. **Maximize VO2max at the least mechanical cost. Two sources in that
+> doctrine are unnamed and load-bearing — find them first.**
+>
+> ⚠️ **[Q-256] STILL HAS A DATE ON IT** — the 5/3/1 training-max ceiling reads a stale signup 1RM and
+> squat/OHP stall after one cycle (~Aug 24). Michael rules on the approach before it is built.
+
+---
+
 > **2026-08-05 — THE FOCUS FRONT DOOR IS BUILT. THE STRENGTH FIX BEHIND IT IS NOT.**
 > Goals is now **Focus**, opening to **Train · Race · Build**; Train drills down to Run / Ride /
 > Strength / Athletic Focus; Strength opens **Strong / Heavy / Definition**. [D-382] / [D-383] /
