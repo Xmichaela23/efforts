@@ -39,7 +39,12 @@
 // is resolved fine by Vite; both toolchains are checked (deno test + npm run build).
 // It earns the edge: the collision rule and the menu it applies to are one claim, and
 // splitting them would put the rule where the next person editing the menu cannot see it.
-import { complementFor, getMovementFamily, sharesMovementFamily } from './exercise-config.ts';
+// ⚠️ `sharesMovementFamily` IS DELIBERATELY NO LONGER IMPORTED. "Does this share the main lift's
+// family" was the question the old collision rule asked, and asking it of a push slot on a press day
+// is what produced defect #1 — a push always shares a press's family, so a push slot could never
+// hold a push. The question is now "does this fit the day's ROLE" (`fitsRole`). The helper still
+// exists and is right for other callers; it is the wrong question HERE.
+import { complementFor, getMovementFamily } from './exercise-config.ts';
 import { getExerciseConfig } from './exercise-config.ts';
 
 /** The three slots Wendler's assistance prescription defines. These are also the Adjust-tab holes —
@@ -74,12 +79,23 @@ export type AssistanceSlotMenu = {
 };
 
 /**
- * ⛔ 25 IS THE FLOOR AND IT STAYS. Decided 2026-07-28, Michael's call.
+ * ⛔ THE FLOOR IS 50 AND THE CEILING IS 75. Both are read off the book. Michael, 2026-08-05.
  *
- * It is not a picked number — it is the documented bottom of Wendler's published 25-50 range, with a
- * stated reason (Van Hooren: an endurance athlete keeps assistance volume low or builds size they
- * did not ask for). So the fix is not to replace it. **The fix is to derive POSITION WITHIN the
- * range**, which is the part that was never scaled to anything.
+ * ⚠️ **THIS SUPERSEDES THE "25 IS THE FLOOR AND IT STAYS" CALL OF 2026-07-28**, and the reason that
+ * call was made is the reason it had to go. It rested on "25 is the documented bottom of Wendler's
+ * published 25-50 range." **There is no 25-50 range in the book.** Verified page by page 2026-08-05
+ * against `~/Downloads/531_2nd_Edition_Hard_Copy.pdf`:
+ *
+ *   Triumvirate (p.48)          Dips 5x15 = 75 · Chin-ups 5x10 = 50 · Good Morning 5x12 = 60
+ *                               DB Bench 5x15 = 75 · DB Row 5x10 = 50 · Leg Press 5x15 = 75
+ *   Bodyweight (p.52)           "I recommend no less than 75 reps per exercise for each workout"
+ *   Periodization Bible (p.51)  5 sets of 10-20 reps = 50-100
+ *
+ * **Wendler's lowest number anywhere is 50, and the Triumvirate — his most-used template — runs 50
+ * to 75.** We were at 25, which is half his floor. The 50/75 band IS the Triumvirate's own band.
+ *
+ * ⚠️ THE CEILING IS ALSO WHAT MAKES THE §A TIERS POSSIBLE. At the old ceiling of 50, floor met
+ * ceiling and Strong and Heavy would have been the same block wearing two names.
  *
  * ⚠️ AND THE DERIVATION IS UNEVEN ON PURPOSE. `pullupMaxReps` exists on `performance_numbers`; there
  * is no push or single-leg equivalent. Rather than wait for all three, each slot scales on whatever
@@ -87,8 +103,8 @@ export type AssistanceSlotMenu = {
  * floor, no capacity on file". Same rule as everywhere else: cite the evidence you have, stay silent
  * where you do not. Adding a push capacity later upgrades one slot without touching the model.
  */
-export const ASSISTANCE_TOTAL_REPS_FLOOR = 25;
-export const ASSISTANCE_TOTAL_REPS_CEILING = 50;
+export const ASSISTANCE_TOTAL_REPS_FLOOR = 50;
+export const ASSISTANCE_TOTAL_REPS_CEILING = 75;
 
 export type AssistanceScaleInputs = {
   /** `performance_numbers.pullupMaxReps` — clean reps, 0 is valid. Absent → the floor. */
@@ -116,12 +132,13 @@ export function assistanceTotalReps(
 
   const developing = (inputs?.strengthPosture ?? 'develop') === 'develop';
 
-  // Pull is the one slot with a tested capacity. A 25-rep session against an 8-rep max is a
+  // Pull is the one slot with a tested capacity. A 50-rep session against an 8-rep max is a
   // different exercise from the same session against a 25-rep max.
   if (slot === 'pull' && typeof inputs?.pullupMaxReps === 'number' && inputs.pullupMaxReps > 0) {
     const cap = inputs.pullupMaxReps;
     // 8 reps sits at the floor; capacity above that walks toward the ceiling, three reps of session
-    // volume per rep of capacity. Deliberately shallow — this is insurance.
+    // volume per rep of capacity. Deliberately shallow — this is insurance. On the 50/75 band the
+    // ceiling is reached at a ~16-rep max, which is where Wendler's own top number sits anyway.
     const earned = ASSISTANCE_TOTAL_REPS_FLOOR + Math.max(0, cap - 8) * 3;
     const capped = Math.min(ASSISTANCE_TOTAL_REPS_CEILING, Math.round(earned / 5) * 5);
     return { totalReps: developing ? capped : ASSISTANCE_TOTAL_REPS_FLOOR, basis: 'capacity' };
@@ -147,16 +164,41 @@ export function assistanceBasisNote(basis: 'capacity' | 'posture' | 'floor', cap
   return 'The floor — the main lifts are heavy this cycle and this is here to maintain, not to add.';
 }
 
+/**
+ * ⛔ EVERY NAME HERE MUST RESOLVE EXACTLY IN `exercise-config.ts` — NO FUZZY MATCHES.
+ *
+ * Checked 2026-08-05 by running each through `getExerciseConfig`. Three of the names the spec
+ * proposed only FUZZY-matched, which is the D-322 bug class ("Pull Up @ 110 lb") waiting to happen —
+ * the config logs a warning and silently borrows another movement's entry:
+ *
+ *   "Incline Press"  -> borrowed 'dumbbell incline press'   USE `Incline Bench Press`
+ *   "Ab Wheel"       -> borrowed 'ab wheel rollout'         USE `Ab Wheel Rollout`
+ *   "Split Squat"    -> borrowed 'bulgarian split squat'    USE `Bulgarian Split Squat` (already here)
+ *
+ * Nothing on this menu is ever priced (see the load rule at the top), so a borrowed ratio cannot hurt
+ * anyone *through this file* — but these names are stored on the goal and read elsewhere. Use the
+ * entry that actually exists.
+ */
 export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   {
     slot: 'push',
     label: 'Push',
-    purpose: 'Chest, shoulders and triceps. Bodyweight or dumbbells keep the nervous-system cost low. On bench and press days this slot balances the pressing instead.',
-    totalReps: 25,
+    // ⛔ THE OLD SENTENCE PROMISED THE DEFECT. It read "on bench and press days this slot balances
+    // the pressing instead" — which described `BALANCE_POOL.push` handing back a pull, the behaviour
+    // this rework removes. A press day now KEEPS a push (Triumvirate p.48, Periodization Bible
+    // pp.50-51, Bodyweight p.52, and the worked concurrent example p.88 which has Dips on the bench
+    // day). What the slot does on a LOWER day is carry the leg work — see `ROLE_BY_DAY`.
+    purpose: 'Chest, shoulders and triceps. Bodyweight or dumbbells keep the nervous-system cost low. On squat and deadlift days this slot carries single-leg work instead.',
+    totalReps: ASSISTANCE_TOTAL_REPS_FLOOR,
     options: [
       { name: 'Push Up', targets: 'Chest, front shoulders, triceps', requires: null },
       { name: 'Dips', targets: 'Lower chest, triceps, front shoulders', requires: 'bar' },
       { name: 'Dumbbell Bench Press', targets: 'Chest, triceps, shoulder stability', requires: 'bench' },
+      // NEW 2026-08-05 — Wendler's own bench-day pairing in the Simplest Strength Template (p.55,
+      // "Bench Press -> Incline Press") and listed under "Shoulders or Chest" for both press days in
+      // the Periodization Bible (p.50). The push slot needed a second horizontal option so a bench
+      // day has somewhere to go that is not the main lift itself.
+      { name: 'Incline Bench Press', targets: 'Upper chest, front shoulders, triceps', requires: 'bench' },
       // ⚠️ NOT "Dumbbell Overhead Press" — that name resolves to the BARBELL overhead press entry in
       // exercise-config (ratio 1.0, counted as a total rather than per hand). Harmless here because
       // nothing on this menu is priced, but the stored name is used elsewhere, so use the entry that
@@ -167,25 +209,45 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   {
     slot: 'pull',
     label: 'Pull',
-    purpose: 'Upper back and lats — the balance against the heavy pressing in the main lifts. On a day whose main lift is itself a pull, this slot presses instead.',
-    totalReps: 25,
+    // ⛔ THE PULL SLOT IS THE ONE THE BOOK NEVER LETS GO. None of the four main lifts is a pull, so
+    // every gram of pulling volume in the block lives here. It is also the slot Q-212's
+    // plane-complement rule got RIGHT (p.86: horizontal push -> vertical pull, vertical push ->
+    // horizontal pull) and that half is kept unchanged.
+    purpose: 'Upper back and lats — the balance against the heavy pressing in the main lifts. None of the four main lifts pulls, so this is where all of it lives.',
+    totalReps: ASSISTANCE_TOTAL_REPS_FLOOR,
     options: [
       { name: 'Pull Up', targets: 'Lats, upper back, biceps', requires: 'bar' },
       { name: 'Chin Up', targets: 'Lats, biceps, upper back', requires: 'bar' },
       { name: 'Inverted Row', targets: 'Mid-back, rear shoulders, biceps', requires: 'bar' },
       { name: 'Dumbbell Row', targets: 'Mid-back, lats, biceps', requires: 'dumbbells' },
+      // NEW 2026-08-05 — Face Pull returns to the slot it actually belongs in. Wendler lists it on
+      // p.50 under "Lats or Upper Back" beside DB rows, chins and T-bar rows. It was only ever wrong
+      // as a PUSH. ⚠️ Do not call it prehab in copy; the book does not.
+      { name: 'Face Pull', targets: 'Rear shoulders, upper back', requires: null },
     ],
   },
   {
     slot: 'single_leg_core',
     label: 'Single-leg or core',
-    purpose: 'One leg at a time, or the trunk. Balance and stability the barbell lifts do not train. On squat days it hinges and on deadlift days it bends the knee, so it never repeats the day.',
-    totalReps: 25,
+    // ⛔ ON AN UPPER DAY THIS SLOT IS CORE, FULL STOP — never a leg. That was defect #2: nothing
+    // collided with a lunge on a bench day, so it passed straight through onto press days and stacked
+    // glute/ham load against the run legs. No Wendler template puts lower-body work on a press day.
+    purpose: 'One leg at a time, or the trunk. On bench and press days this is core only — the legs get their work on squat and deadlift days, and stacking them costs the running.',
+    totalReps: ASSISTANCE_TOTAL_REPS_FLOOR,
     options: [
       { name: 'Reverse Lunge', targets: 'Quads, glutes, single-leg balance', requires: null },
       { name: 'Bulgarian Split Squat', targets: 'Quads, glutes, hip stability', requires: null },
       { name: 'Single Leg Hip Thrust', targets: 'Glutes, hamstrings, hip drive', requires: null },
       { name: 'Hanging Leg Raise', targets: 'Lower abs, hip flexors, grip', requires: 'bar' },
+      // NEW 2026-08-05 — the core slot had exactly ONE core option and it needs a bar. On an upper
+      // day the slot is core-only, so an athlete without a pull-up bar had nothing to resolve to.
+      // Both are Wendler's own: "Sit-ups, Hanging Leg Raises, Ab Wheel, DB Side Bend" (p.51).
+      { name: 'Ab Wheel Rollout', targets: 'Abs, trunk stability, shoulders', requires: null },
+      { name: 'Sit Up', targets: 'Abs, hip flexors', requires: null },
+      // NEW 2026-08-05 — Wendler pairs the DEADLIFT with a squat-pattern (p.53: "the deadlift with a
+      // squatting exercise"; p.55 and p.86 both use Front Squat). The single-leg role on a hip day
+      // needed a loadable knee-dominant answer beyond the two split-squat variants.
+      { name: 'Front Squat', targets: 'Quads, upper back, trunk', requires: 'bar' },
     ],
   },
 ];
@@ -206,29 +268,79 @@ export type AssistancePicks = Partial<Record<AssistanceSlot, string>>;
  * that is no longer on the menu (a later edit) must not strand an existing goal.
  */
 /**
- * ⛔ THE BALANCE POOL (Q-212) — what a slot reaches for when the athlete's pick loads the same
- * thing the day's main lift already loaded.
+ * ⛔ THE BALANCE POOL IS DELETED. It was defect #1, and its own citation refutes it.
  *
- * ⚠️ IT IS NOT A WEAKER VERSION OF THE SAME MOVEMENT. Michael: *"the press day is already
- * pushing-heavy and the balancing work is what's missing."* Reducing dips to 12 on a press day
- * still puts the same muscles under load; the answer is to stop pushing, not to push less.
+ * It read:
  *
- * Ordered by availability — `Face Pull` first because a band or a cable is the commonest way to
- * own this movement. ⚠️ **Equipment is NOT gated here**, and that is inherited rather than
- * introduced: `resolveAssistance` has never filtered on `requires`, and bands specifically have no
- * flag at all to filter on (F-5 in `docs/BUILDER-SWEEP-FINDINGS.md`). Gating the pool while the
- * menu itself stays ungated would be a half-rule.
+ *     push: ['Face Pull', 'Band Pull Apart', 'Rear Delt Fly', 'Chest Supported Row']
+ *
+ * **Four movements, and all four are pulls.** A press day's main lift is always a press, so the push
+ * slot always collided on `sharesMovementFamily`, always fell through to this pool, and always
+ * resolved to `Face Pull`. Bench and OHP days shipped two pulls and zero push, every time, by design.
+ *
+ * ⛔ **THE p.86 CITATION IT RESTED ON WAS READ TOO NARROWLY, AND THAT IS THE WHOLE STORY.** p.86 does
+ * pair Bench->Chin-ups — but p.86 is not a one-movement template. It runs to p.88, where the same
+ * template's worked example is:
+ *
+ *     Bench Press 5/3/1 -> Barbell Rows 5x10 -> 3 rounds of:
+ *     Med Ball Slams · DIPS · Burpees · Chin-ups · Planks
+ *
+ * **Dips are on the bench day, in the exact template we quoted to prove they should not be.** p.87's
+ * "Assistance Movements for Upper Body" list is push and pull throughout — bench, dips, press,
+ * incline, DB presses, floor press, close grip, push-ups, push press, alongside chins and rows.
+ * **There is no page in this book where a push slot becomes a pull.** Verified 2026-08-05.
+ *
+ * ⚠️ WHAT SURVIVES: the plane-complement half of Q-212 (p.86's horizontal push -> vertical pull) is
+ * CORRECT and is kept, on the pull slot where it belongs. See `ROLE_BY_DAY` and `resolveRole`.
+ *
+ * ⚠️ AND EQUIPMENT IS STILL NOT GATED, deliberately and unchanged: `resolveAssistance` has never
+ * filtered on `requires`, and bands have no flag to filter on at all (F-5 in
+ * `docs/BUILDER-SWEEP-FINDINGS.md`). Gating resolution while the menu stays ungated is a half-rule.
  */
-const BALANCE_POOL: Record<'push' | 'pull' | 'knee' | 'hip', string[]> = {
-  // The day pressed, so the slot pulls.
-  push: ['Face Pull', 'Band Pull Apart', 'Rear Delt Fly', 'Chest Supported Row'],
-  // The day pulled, so the slot presses.
-  pull: ['Push Up', 'Dumbbell Bench Press'],
-  // The day was knee-dominant, so the slot hinges — and the reverse. These two are each other's
-  // answer, which is exactly why `MovementFamily` keeps `knee` and `hip` apart.
-  knee: ['Single Leg Hip Thrust'],
-  hip: ['Reverse Lunge', 'Bulgarian Split Squat'],
+
+/** What a slot actually carries on a given day. Distinct from the storage KEY — see `AssistanceSlot`. */
+type AssistanceRole = 'push' | 'pull' | 'single_leg' | 'core';
+
+/** Upper = the two pressing days (Bench, OHP). Lower = Squat and Deadlift. */
+type AssistanceDayType = 'upper' | 'lower';
+
+/**
+ * ⛔ THE SLOT KEY IS STORAGE; THE ROLE IS WHAT THE DAY ACTUALLY NEEDS. This table is the §3 contract.
+ *
+ * **Upper days (Bench, OHP) — push · pull · core.** Every template that touches a pressing day keeps
+ * a push on it and puts NO lower-body work there: Triumvirate p.48 (Press -> Dips + Chin-ups; Bench
+ * -> DB Bench + DB Row), Periodization Bible pp.50-51 (both press days LEAD with "Shoulders or
+ * Chest"), Bodyweight p.52 (Press -> Chins + Dips; Bench -> Chins + Pushups), concurrent p.87 (upper
+ * assistance, upper assistance, Core Movement).
+ *
+ * **Lower days (Squat, Deadlift) — pull · single-leg · core.** The four main lifts contain no row and
+ * no chin, so pulling volume has to live somewhere, and p.53 pairs "the squat day with an assistance
+ * pulling movement." Abs are a lower-day slot in every template (p.51 Deadlift/Squat -> Abs; p.55
+ * "Hamstrings, Lower Back, Abs"; p.48 Deadlift -> Hanging Leg Raise; p.52 Leg Raises / Sit-ups).
+ *
+ * ⚠️ **THE CORE-ON-AN-UPPER-DAY SLOT IS A CHOICE, NOT A QUOTE.** Four of the five templates put
+ * TRICEPS / UPPER BACK in that position and keep abs on the lower days. The one source for a core
+ * movement on a press day is the **concurrent chapter, p.87** — the chapter written for an athlete
+ * who lifts and conditions, which is ours. We take p.87 over the four powerlifting templates
+ * deliberately. Do not "correct" this to triceps by citing p.51; read this paragraph first.
+ *
+ * ⚠️ WHY THE KEYS MAP THIS WAY: `pull` is always the pull, so that pick is never wasted.
+ * `single_leg_core` is single-leg on leg days and core on press days — literally what its name says.
+ * `push` is the push on press days, and on leg days it takes the leftover role (core), because a
+ * push pick has nothing to say about a squat day.
+ */
+const ROLE_BY_DAY: Record<AssistanceDayType, Record<AssistanceSlot, AssistanceRole>> = {
+  upper: { push: 'push', pull: 'pull', single_leg_core: 'core' },
+  lower: { push: 'core', pull: 'pull', single_leg_core: 'single_leg' },
 };
+
+/** Which kind of day this main lift makes. `null` → unknown, and unknown degrades to unchanged (§0h). */
+function dayTypeOf(mainLiftName: string | null | undefined): AssistanceDayType | null {
+  const fam = mainLiftName ? getMovementFamily(mainLiftName) : null;
+  if (fam === 'push' || fam === 'pull') return 'upper';
+  if (fam === 'knee' || fam === 'hip') return 'lower';
+  return null;
+}
 
 export type ResolvedAssistance = {
   slot: AssistanceSlot;
@@ -261,7 +373,7 @@ export function resolveAssistance(
   picks: AssistancePicks | null | undefined,
   mainLiftName?: string | null,
 ): ResolvedAssistance[] {
-  const mainFamily = mainLiftName ? getMovementFamily(mainLiftName) : null;
+  const dayType = dayTypeOf(mainLiftName);
 
   return ASSISTANCE_MENU.map((menu) => {
     const picked = String(picks?.[menu.slot] ?? '').trim();
@@ -270,59 +382,147 @@ export function resolveAssistance(
       ? menu.options.find((o) => o.name.toLowerCase() === picked.toLowerCase())!.name
       : ASSISTANCE_DEFAULTS[menu.slot];
 
-    // No main lift at all → every pick stands, exactly as before this rule existed (§0h).
-    if (!mainFamily || !mainLiftName) return { slot: menu.slot, name, totalReps: menu.totalReps };
-    const collides = sharesMovementFamily(mainLiftName, name);
+    // No main lift, or one whose pattern we cannot read → every pick stands, exactly as before any
+    // of this existed (§0h). Unknown degrades to UNCHANGED, never to a guess.
+    if (!dayType || !mainLiftName) return { slot: menu.slot, name, totalReps: menu.totalReps };
 
-    // ⛔ NO CLASH — BUT THE SLOT CAN STILL BE THE WRONG SIDE OF THE PLANE (2026-07-28, p86).
-    //
-    // A chin-up does not COLLIDE with an overhead press: one pulls, one pushes, nothing is shared.
-    // So the rule above leaves it alone and the athlete gets chin-ups on all four lifting days —
-    // 100 reps a week of one movement for someone whose clean max is six.
-    //
-    // ⛔ THE CITATION IS p86 — THE CONCURRENT TEMPLATE — AND NOT THE ASSISTANCE CHAPTER. Checked
-    // against all five of his templates: Boring But Big, the Triumvirate and the Periodization
-    // Bible all put a SAME-PATTERN movement on the main lift's day on purpose (bench then 5x10
-    // bench; press then dips; squat then leg press). That is the hypertrophy dose.
-    //
-    // ✅ p86 is the ONE that crosses, and it is the concurrent chapter — one assistance movement,
-    // conditioning to follow, no room for volume, so the slot buys BALANCE instead:
-    //   Bench (horizontal push) -> Chin-ups (vertical pull)
-    //   Press (vertical push)   -> Bent Over Rows (horizontal pull)
-    // That is our athlete exactly. The rule is right here and would be wrong in a general block.
-    //
-    // ⚠️ ONLY WHEN THE SLOT ACTUALLY OFFERS THE COMPLEMENT. The pull slot carries both planes
-    // already (Pull Up / Chin Up are vertical; Inverted Row / Dumbbell Row are horizontal), so this
-    // needs no new movements. Where a slot has nothing in the complementary plane, the pick stands —
-    // a preference is not overridden to satisfy a rule that has no answer.
-    if (!collides) {
-      const want = complementFor(mainLiftName);
-      const picked = getExerciseConfig(name)?.pattern ?? null;
-      if (want && picked !== want) {
-        const better = menu.options.find((o) => getExerciseConfig(o.name)?.pattern === want);
-        if (better && better.name !== name) {
-          return { slot: menu.slot, name: better.name, totalReps: menu.totalReps, balancedFor: name };
-        }
-      }
-      return { slot: menu.slot, name, totalReps: menu.totalReps };
-    }
-
-    // ⛔ THE SLOT'S OWN MENU FIRST. On a deadlift day the single-leg slot already holds two
-    // knee-dominant options, so the athlete stays inside the list they chose from. The pool is the
-    // fallback for the case the pool was built for: every push option is itself a push.
-    const fromMenu = menu.options.find((o) => !sharesMovementFamily(mainLiftName, o.name));
-    const replacement = fromMenu?.name
-      ?? (mainFamily === 'push' || mainFamily === 'pull' || mainFamily === 'knee' || mainFamily === 'hip'
-        ? BALANCE_POOL[mainFamily].find((n) => !sharesMovementFamily(mainLiftName, n))
-        : undefined);
-
-    // Nothing non-colliding anywhere → keep the pick rather than invent one. Showing the athlete's
-    // own choice is better than showing a movement no rule chose.
-    if (!replacement) return { slot: menu.slot, name, totalReps: menu.totalReps };
-
-    return { slot: menu.slot, name: replacement, totalReps: menu.totalReps, substitutedFor: name };
-  });
+    return resolveRole(ROLE_BY_DAY[dayType][menu.slot], menu, name, mainLiftName, valid);
+  }).sort(orderForDay(dayType));
 }
+
+/**
+ * ⛔ THE ROWS COME OUT IN THE ORDER THE SESSION IS RUN, NOT IN STORAGE-KEY ORDER.
+ *
+ * `ASSISTANCE_MENU` is ordered push · pull · single_leg_core because those are the storage keys. On a
+ * LOWER day the push key carries core, so unsorted output read "Squat, Sit Up, Pull Up, Hip Thrust" —
+ * abs immediately after the heaviest lift of the week, and legs last. Nothing was wrong with it; it
+ * just is not how a lifter runs a session, and this block has to read as familiar to anyone who has
+ * used Strong or Hevy.
+ *
+ * **Core is last on every day, in every template.** Periodization Bible p.51 (Deadlift → Hamstrings,
+ * Quads, **Abs**; Squat → Low Back, Quads, **Abs**), Simplest Strength p.55 ("Hamstrings, Lower Back,
+ * **Abs**"), Triumvirate p.48 (Deadlift → Good Morning, **Hanging Leg Raise**), concurrent p.88
+ * (bench circuit ends on **Planks**, squat circuit ends on **Pikes**).
+ *
+ * On a lower day the leg work leads, which is p.88's squat circuit order (legs → chin-ups → pikes).
+ */
+function orderForDay(dayType: AssistanceDayType | null) {
+  const RANK: Record<AssistanceRole, number> = { push: 0, single_leg: 0, pull: 1, core: 2 };
+  return (a: ResolvedAssistance, b: ResolvedAssistance) => {
+    if (!dayType) return 0; // Unknown day → untouched, same as everything else on this path (§0h).
+    return RANK[ROLE_BY_DAY[dayType][a.slot]] - RANK[ROLE_BY_DAY[dayType][b.slot]];
+  };
+}
+
+/** Does this movement belong to the family the role demands? */
+function fitsRole(role: AssistanceRole, name: string, mainLiftName: string): boolean {
+  const fam = getMovementFamily(name);
+  switch (role) {
+    case 'push': return fam === 'push';
+    case 'pull': return fam === 'pull';
+    case 'core': return fam === 'core';
+    // The leg role is defined RELATIVE to the day: squat (knee) wants a hinge, deadlift (hip) wants
+    // a knee. That is what makes the two lower days differ from each other by construction.
+    case 'single_leg': return fam === wantedLegFamily(mainLiftName);
+  }
+}
+
+/** Squat day hinges, deadlift day bends the knee. p.53: "the deadlift with a squatting exercise". */
+function wantedLegFamily(mainLiftName: string): 'knee' | 'hip' {
+  return getMovementFamily(mainLiftName) === 'knee' ? 'hip' : 'knee';
+}
+
+/**
+ * Fill one slot for one day.
+ *
+ * ⛔ THE ORDER MATTERS: **the pick is honoured unless it cannot be.** A substitution is a cost — it
+ * shows the athlete something other than what they chose — so it is spent only when the role
+ * genuinely cannot accept the pick. Three outcomes, and the copy distinguishes all three (§5.2b):
+ *
+ *   pick stands              → no annotation
+ *   pick was the WRONG PLANE → `balancedFor`   (p.86, pull slot only)
+ *   pick was the WRONG ROLE  → `substitutedFor` (a lunge on a bench day, a push on a squat day)
+ */
+function resolveRole(
+  role: AssistanceRole,
+  menu: AssistanceSlotMenu,
+  name: string,
+  mainLiftName: string,
+  /**
+   * ⛔ DID THE ATHLETE ACTUALLY CHOOSE THIS, or is it `ASSISTANCE_DEFAULTS`? The annotations exist so
+   * a real choice is visibly READ rather than silently overridden (§5.2b). Attaching one to a value
+   * the athlete never entered produces *"You picked Push Up"* on a squat day for someone who skipped
+   * the card entirely — the app inventing a preference and then apologising for not honouring it.
+   *
+   * ⚠️ THIS MATTERS MORE AFTER THIS REWORK THAN BEFORE IT. Under the old rule substitutions were
+   * occasional; under day-type roles the push slot is re-roled on EVERY lower day, so the default
+   * path would have carried a false "you picked" note on half the block's sessions.
+   */
+  wasAthletePick: boolean,
+): ResolvedAssistance {
+  const base = { slot: menu.slot, totalReps: menu.totalReps };
+  /** Annotate a real choice; stay silent about a default. Never a target, never an apology. */
+  const note = <K extends 'substitutedFor' | 'balancedFor'>(k: K, from: string) =>
+    (wasAthletePick ? { [k]: from } : {}) as Partial<Record<K, string>>;
+
+  if (fitsRole(role, name, mainLiftName)) {
+    // ⛔ THE PICK FITS — BUT ON THE PULL SLOT IT CAN STILL BE THE WRONG SIDE OF THE PLANE (p.86).
+    //
+    // A chin-up does not collide with an overhead press: one pulls, one pushes. So role-fit alone
+    // leaves it alone, and the athlete gets chin-ups on all four lifting days — 100 reps a week of
+    // one movement for someone whose clean max is six. p.86 is the one template that crosses, and it
+    // is the concurrent chapter, which is our athlete:
+    //   Bench (horizontal push) -> Chin-ups       (vertical pull)
+    //   Press (vertical push)   -> Bent Over Rows (horizontal pull)
+    //
+    // ⛔ SCOPED TO THE PULL SLOT ON PURPOSE. Applying it to the push slot is what produced defect #1
+    // — the complement of a press is a PULL, so a "balance the plane" rule on the push slot deletes
+    // the push. Four of Wendler's five templates deliberately put a SAME-family movement on the main
+    // lift's day (bench then 5x10 bench, press then dips); that is the hypertrophy dose, and the push
+    // slot is where it lives.
+    //
+    // ⚠️ ONLY WHEN THE SLOT ACTUALLY OFFERS THE COMPLEMENT. The pull slot carries both planes already
+    // (Pull Up / Chin Up vertical; Inverted Row / Dumbbell Row / Face Pull horizontal). Where nothing
+    // in the complementary plane exists, the pick stands — a preference is not overridden to satisfy
+    // a rule that has no answer.
+    if (role === 'pull') {
+      const want = complementFor(mainLiftName);
+      if (want && (getExerciseConfig(name)?.pattern ?? null) !== want) {
+        const better = menu.options.find((o) => getExerciseConfig(o.name)?.pattern === want);
+        if (better && better.name !== name) return { ...base, name: better.name, ...note('balancedFor', name) };
+      }
+    }
+    return { ...base, name };
+  }
+
+  // ⛔ THE SLOT'S OWN MENU FIRST — the athlete stays inside the list they chose from wherever the
+  // list can answer. `ROLE_FALLBACK` is only for the case where it cannot: the push slot holds no
+  // core movement, so a squat day's core role has to come from somewhere.
+  const fromMenu = menu.options.find((o) => fitsRole(role, o.name, mainLiftName));
+  const replacement = fromMenu?.name ?? ROLE_FALLBACK[role].find((n) => fitsRole(role, n, mainLiftName));
+
+  // Nothing anywhere fits → keep the pick rather than invent one. Showing the athlete's own choice
+  // is better than showing a movement no rule chose.
+  if (!replacement) return { ...base, name };
+  return { ...base, name: replacement, ...note('substitutedFor', name) };
+}
+
+/**
+ * What a role reaches for when the slot's own menu has no answer.
+ *
+ * ⛔ THIS IS NOT THE OLD `BALANCE_POOL`. That pool answered "the day pressed, so give me a pull" and
+ * was wrong at the premise. This one answers "this slot must carry a core movement today and its own
+ * list is all pushes" — a completeness backstop, not a balancing rule. Every entry resolves exactly
+ * in `exercise-config` and is on Wendler's own lists (core: p.51 "Sit-ups, Hanging Leg Raises, Ab
+ * Wheel"; legs: p.87's lower-body assistance list).
+ */
+const ROLE_FALLBACK: Record<AssistanceRole, string[]> = {
+  // Bodyweight first — the core slot is reached on every upper day and must never need equipment.
+  core: ['Sit Up', 'Ab Wheel Rollout', 'Hanging Leg Raise', 'Plank'],
+  single_leg: ['Reverse Lunge', 'Bulgarian Split Squat', 'Single Leg Hip Thrust', 'Front Squat'],
+  push: ['Push Up', 'Dips', 'Dumbbell Bench Press', 'Incline Bench Press'],
+  pull: ['Inverted Row', 'Dumbbell Row', 'Face Pull', 'Chin Up'],
+};
 
 /**
  * The line that says a pick was replaced, and why. ⛔ Returns null when nothing was substituted —
@@ -332,6 +532,31 @@ export function resolveAssistance(
  * their choice was READ, not overridden blind. That is the difference between a substitution and an
  * override, and it is the whole reason the line exists (§5.2b).
  */
+/**
+ * Why this slot shows something other than the pick. Reads the RESOLVED movement, so the sentence
+ * cannot drift from what the row actually contains.
+ *
+ * ⛔ FACT-FIRST, NO IMPERATIVE, AND IT NAMES THE CONSEQUENCE RATHER THAN INSTRUCTING. Same voice as
+ * the rest of the block: state what the day does and what that costs, and let the athlete draw the
+ * conclusion.
+ */
+function substitutionReason(r: ResolvedAssistance, mainLiftName: string): string {
+  const fam = getMovementFamily(r.name);
+  const wasLeg = getMovementFamily(r.substitutedFor ?? '') === 'knee'
+    || getMovementFamily(r.substitutedFor ?? '') === 'hip';
+
+  // A leg movement landing on a press day. This is defect #2, and the reason is the running.
+  if (fam === 'core' && wasLeg) return `leg work stays on squat and deadlift days, so ${r.name} here.`;
+  // A push pick on a squat or deadlift day. No Wendler template presses on a lower day.
+  if (fam === 'core') return `${mainLiftName} days finish on the trunk, not more pressing — ${r.name} here.`;
+  // The leg slot on a lower day, pointed away from what the main lift already did.
+  if (fam === 'knee' || fam === 'hip') {
+    return `${mainLiftName} already loads that pattern, so ${r.name} here — the opposite one, which ` +
+      `also keeps the two lifting days from repeating.`;
+  }
+  return `${mainLiftName} days do not carry that movement, so ${r.name} here.`;
+}
+
 export function assistanceSubstitutionNote(
   rows: ResolvedAssistance[],
   mainLiftName: string,
@@ -339,15 +564,20 @@ export function assistanceSubstitutionNote(
   const lines: string[] = [];
   for (const r of rows) {
     if (r.substitutedFor) {
-      lines.push(
-        `You picked ${r.substitutedFor} — on ${mainLiftName} days it lands on the same muscles as the ` +
-        `main lift, so this slot balances instead.`);
+      // ⛔ THE OLD LINE SAID "it lands on the same muscles as the main lift, so this slot balances
+      // instead" — which was the DEFECT describing itself, and it was false besides. A substitution
+      // now only ever happens because the pick is the wrong ROLE for the day, and there are exactly
+      // three ways that occurs. Name the actual reason; a generic sentence here is how the athlete
+      // learns to distrust the ones that ARE specific.
+      lines.push(`You picked ${r.substitutedFor} — ${substitutionReason(r, mainLiftName)}`);
     } else if (r.balancedFor) {
       // Not a clash — a plane. p86: a vertical push is balanced by a horizontal pull, not by another
       // vertical movement.
+      // ⚠️ SHORTENED 2026-08-05. The trailing sentence ("Opposite direction and opposite plane is the
+      // pairing that balances it") explained the rule a second time, and these notes now stack — a
+      // day can carry two. The row already shows the movement; one clause of reason is the budget.
       lines.push(
-        `You picked ${r.balancedFor} — ${mainLiftName} works the same plane, so this slot uses ` +
-        `${r.name} instead. Opposite direction and opposite plane is the pairing that balances it.`);
+        `You picked ${r.balancedFor} — ${mainLiftName} works the same plane, so ${r.name} here instead.`);
     }
   }
   return lines.length ? lines.join(' ') : null;
@@ -419,8 +649,10 @@ export function assistancePeersFor(
       break;
     }
   }
+  // A movement that came from a role fallback rather than from a slot menu — its peers are the rest
+  // of that fallback list, for the same reason: it is what the block reaches for in that situation.
   if (!peers) {
-    for (const pool of Object.values(BALANCE_POOL)) {
+    for (const pool of Object.values(ROLE_FALLBACK)) {
       if (pool.some((n) => n.toLowerCase() === want)) {
         peers = pool.filter((n) => n.toLowerCase() !== want);
         break;
@@ -430,19 +662,24 @@ export function assistancePeersFor(
   if (!peers) return null;
 
   const main = String(mainLiftName || '').trim();
-  if (!main) return peers;
+  const dayType = dayTypeOf(main);
+  if (!main || !dayType) return peers;
 
-  // ⛔ DROP WHAT THE DAY ALREADY LOADED. Same rule, same function, as the composer's collision check —
-  // not a second reading of it.
-  let usable = peers.filter((n) => !sharesMovementFamily(main, n));
+  // ⛔ OFFER WHAT THE DAY'S ROLE ACTUALLY ACCEPTS — the same question `resolveAssistance` asks, via
+  // the same function, not a second reading of it.
+  //
+  // ⚠️ THIS USED TO FILTER ON `sharesMovementFamily`, i.e. "drop anything the day already loaded",
+  // and on a bench day that dropped every push — so the swap sheet for a push row offered pulls, the
+  // same defect the composer had. The question is not "did the day load this family" but "does this
+  // day's role for this slot accept this movement."
+  const slot = ASSISTANCE_MENU.find((m) => m.options.some((o) => o.name.toLowerCase() === want))?.slot;
+  const role: AssistanceRole | null = slot ? ROLE_BY_DAY[dayType][slot] : null;
+  let usable = role ? peers.filter((n) => fitsRole(role, n, main)) : peers;
 
-  // Every option in the slot is itself the thing the day loaded (a press day, a push slot). That is
-  // exactly the case the balance pool exists for.
-  if (usable.length === 0) {
-    const fam = getMovementFamily(main);
-    if (fam === 'push' || fam === 'pull' || fam === 'knee' || fam === 'hip') {
-      usable = BALANCE_POOL[fam].filter((n) => n.toLowerCase() !== want && !sharesMovementFamily(main, n));
-    }
+  // The slot's own list cannot answer this day's role (the push slot holds no core movement, and on a
+  // squat day that is what it needs). Reach for the same fallback the composer would.
+  if (usable.length === 0 && role) {
+    usable = ROLE_FALLBACK[role].filter((n) => n.toLowerCase() !== want && fitsRole(role, n, main));
   }
 
   // ⚠️ NEVER HAND BACK NOTHING. If no rule can find a clean option, show the slot's own list rather
