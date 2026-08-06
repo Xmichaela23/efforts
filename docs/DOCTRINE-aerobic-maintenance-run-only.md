@@ -146,6 +146,20 @@ This is the run's approximation of the bike's mech-0 property. **It is an approx
 volume: *"making someone compute a historical baseline before a screen unlocks is a data-entry exam, not an
 intake."* **Availability reveals itself in the choice.**
 
+> ✅ **HONOURED, AND HERE IS WHAT IT LOOKS LIKE IN THE APP (2026-08-06).** The terrain menu is a list
+> **inside** the D-327 hard-day card the athlete is already on, revealed under "Hard run" exactly as
+> the day picker beside it is (`NonRaceBuilder.tsx`, `hardday` step). **No new step, no new screen, no
+> question asked** — they pick the ground they have, and the app never asks whether they have it.
+>
+> ⛔ **A BINARY WOULD ALSO HAVE BEEN UNANSWERABLE, which is the second reason and it is independent
+> of the screen-cost one.** "Do you have a hill?" → *no* leaves the engine holding a default it cannot
+> derive: **nothing in this app knows whether an athlete has a treadmill**, and treadmill and flat are
+> at opposite ends of the ranking. A menu makes them name it; a binary would have made us guess.
+>
+> ⚠️ **The menu is RUN-only.** The ride has no terrain question — a turbo, a chaingang and a climb are
+> all Helgerud 4 × 4 — and picking "None" (a legal answer) hides the menu entirely, because there is
+> no hard session to give ground to.
+
 ### Why hill is the default — and the frame is the BAR, not the run
 
 ⛔ **The comparison is not "which is the better running session." It is "which leaves more for the
@@ -180,6 +194,30 @@ owns it.** *(D-325 §7: "a cap that refuses is a cap; a number that states the c
 **the default position carries that, not the words.**
 
 ### 2.1 Prohibited during a strength block
+
+> ## ⛔ THE SECOND BAN IS NARROWED BY §2.0, AND §2.0 GOVERNS. RULED BY MICHAEL 2026-08-06.
+>
+> **This section and §2.0 contradicted each other and had done since both were written.** §2.1 bans
+> *"long flat intervals at VO2 intensity"* outright; §2.0 offers flat as a legitimate athlete choice
+> with a stated cost. **They cannot both be true, and the newer, deliberate one wins.**
+>
+> **What changed:** this ban was written when a hill was assumed available, so refusing flat cost the
+> athlete nothing. The terrain menu makes the assumption explicit — and for an athlete with **no
+> climb, no treadmill and no bike**, the alternative to a flat session is **no hard aerobic session
+> at all.** A blanket ban that leaves them with nothing is not the more conservative reading; it is
+> the one that quietly hands them a worse block.
+>
+> **So:** flat VO2 intervals are **available as the athlete's own last-resort choice**, on the
+> condition §2.0 already sets — *the app states the trade, and does not choose silently.* The card
+> names the leg cost in plain words and says a treadmill or a trainer would buy the same session for
+> less. **Everything below stands as the default posture: flat is not offered, not defaulted to, and
+> not reachable except by the athlete picking it over three better options.**
+>
+> ⚠️ **THE FIRST BAN IS UNTOUCHED. Downhill intervals remain prohibited outright** — there is no
+> athlete-choice carve-out for them, and the descent rule (`descentIsJogged`) exists precisely to
+> keep the hill sessions from becoming them by accident.
+>
+> In code: `strength-primary-plan.ts` `flatSession()`. Everything below is the original rule.
 
 - **Downhill intervals.** Eccentrically biased, causes measurable muscle damage, impairs running economy for days. Directly antagonistic to the block's purpose.
 - **Long flat intervals at VO2 intensity.** Highest total ground contacts at highest force. The most expensive way to buy the stimulus.
@@ -228,6 +266,17 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 > (> 30 s to < 2 min) work intervals.** ⛔ **40 seconds sits in that moderate band. The format this
 > section prescribed is on the inferior side of the finding.**
 >
+> ⛔ **SOURCED 2026-08-06 — THIS WAS THE SECOND OF THE TWO UNNAMED LOAD-BEARING CLAIMS.**
+> *"Time spent at or near V̇O₂max during high-intensity interval training — a systematic review and
+> meta-analysis"*, **BMC Sports Sci Med Rehabil 2026, doi:10.1186/s13102-026-01766-x.** 86 articles,
+> **239 HIIT protocols**; tV̇O₂max defined as time at or above 80% V̇O₂max.
+>
+> ⚠️ **THE HEADLINE ONLY. Do not write a recovery-duration figure from this paper into anything.** A
+> "best gains when recovery is ≥ 2 min at ≤ 40%" number was carried into a draft of this section from
+> a **search summary, not the paper**, and was struck before it landed. The ranking above is what is
+> verified; the recovery moderator is not. *(The paper does analyse recovery — active vs passive —
+> but nobody here has read that result. Read it before citing it.)*
+>
 > **2. Head-to-head, at IDENTICAL working time.** 12 highly trained runners, 4 × 3 min at 95% vVO2max
 > vs 24 × 30 s at 100% — both 12 minutes of work:
 >
@@ -242,6 +291,34 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 > and felt exactly as hard.** It is the more convincing session and the weaker one. ⚠️ This repo's
 > register already records HR as a trap for detecting fatigue; it is also a trap for confirming
 > stimulus.
+>
+> ⛔ **SOURCED 2026-08-06 — IT SAID "12 highly trained runners" AND NAMED NOTHING, AND IT IS THE
+> SINGLE MOST LOAD-BEARING NUMBER IN THIS DOCUMENT.**
+> **Fleckenstein D, Braunstein B, Walter N. "Faster intervals, faster recoveries — intensified short
+> VO2max running intervals are inferior to traditional long intervals in terms of time spent above
+> 90% VO2max." *Front Sports Act Living* 2025;6:1507957. doi:10.3389/fspor.2024.1507957.
+> PMID 39835194.** 7 male / 5 female middle-distance runners, treadmill.
+>
+> ⚠️ **THE RECOVERIES WERE 1:1, AND THAT MATTERS MORE THAN IT LOOKS.** The short arm was 30 s work /
+> **30 s** at 55% vVO2max — not a 15–20 s float. So this study does **not** test the "short recovery
+> keeps VO2 elevated across the set" mechanism at the ratio that mechanism actually claims (2:1).
+> **It is still the right result to prescribe from** — it is running, work-matched, and in trained
+> runners — but do not cite it as having refuted 30/15-style work, because it did not test it.
+>
+> ⚠️ **AND THE SHORT ARM'S SPREAD WAS ENORMOUS: 201.3 ± 268.4 s — a standard deviation LARGER than
+> the mean**, against 327.9 ± 146.8 for the long form. Some runners got a great deal from the short
+> session and some got almost nothing. **The honest reading is not only "short is worse on average"
+> but "short is far less RELIABLE across athletes"** — which is the stronger argument for an engine
+> prescribing blind to an individual it cannot measure.
+>
+> ⚠️ **THE CYCLING COUNTERPOINT, NAMED SO IT STOPS BEING RE-DISCOVERED.** Rønnestad et al.,
+> **PMID 31977120** — elite cyclists, short intervals (30/15) vs **effort-matched** long intervals:
+> **better performance improvements, and NO group difference in VO2max change.** ⛔ It is cycling and
+> it is a training study, not a time-at-VO2max study. Cited here because it is the paper someone will
+> bring to argue for short reps, and what it actually shows — no VO2max advantage — **reinforces**
+> the call above rather than undercutting it. ⚠️ Do NOT attach a "the short group did ~50% more work"
+> confound to this paper; that belongs to a different, earlier study and we have no primary source
+> for the figure.
 >
 > **3. Short intervals are not useless — the honest frame is "effective, not maximal."** Short
 > intervals (≤ 30 s), low volume (≤ 5 min) and short-term HIIT all produce clear VO2max benefit and
@@ -300,10 +377,32 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 >   (parent doctrine §5.0 — one session a week holds the engine and does not build it). Take the
 >   STRUCTURE from the evidence and the VOLUME from the maintenance context.
 >
-> ⚠️ **THE SHORT FORMAT SURVIVES AS A NAMED FALLBACK, AND ONLY FOR A LOGISTICS REASON.** Three minutes
-> uphill needs a climb you can run for three minutes; 40-second hills are findable almost anywhere.
-> **When the athlete has only a short hill, 10–12 × 40 s is still effective — it is simply not
-> maximal, and the doc should say which one they are getting.** ⛔ Do not present them as equivalent.
+> ⛔ **THE SHORT-HILL ANSWER IS `10 × 60 s`, AND IT SHIPPED 2026-08-06. THIS PARAGRAPH USED TO SAY
+> `10–12 × 40 s` AND THAT IS THE ONE THING A SESSION READING IT MUST NOT BUILD.**
+>
+> The logistics problem was always real — three minutes uphill needs a climb you can run for three
+> minutes, and short hills are findable almost anywhere. What was wrong was the rep length. The
+> 40-second version **was built on 2026-08-06 and reverted the same day** ([Q-260]): 40 s sits in the
+> moderate band the meta above puts on the inferior side, and the rationale that justified its short
+> float — *"VO2 stays elevated through the recovery"* — is **struck through as retired two paragraphs
+> below.** A format whose only argument has been withdrawn is not a fallback, it is a leftover.
+>
+> **What the athlete without a long climb gets instead: `10 × 60 s hard uphill @ 4–6%, 60 s back
+> down`.** Sixty seconds is the top of the moderate band rather than the bottom of it, and the
+> descent rule is the same one the 3-minute session uses (`descentIsJogged` — walk it when a heavy
+> lower day is inside the eccentric clearance).
+>
+> ⚠️ **IT IS STILL THE LESSER SESSION AND THE COPY SAYS SO.** 60 s is *moderate*, not *long* — this
+> is the option for the hill the athlete has, not a peer of `4 × 3 min`. ⛔ Do not present them as
+> equivalent.
+>
+> ⛔ **AND THE BETTER ANSWER FOR MOST OF THESE ATHLETES IS THE TREADMILL, WHICH RANKS WITH THE HILL
+> AND NOT BELOW IT.** The belt *is* the grade, so the impact discount §2 measures is delivered
+> literally rather than approximated — and it delivers the **3-minute** rep the evidence supports.
+> An athlete with a treadmill has no reason to take the short-hill option.
+>
+> **Ranked, on this block's own axis — VO2max stimulus bought at the least cost to the legs:**
+> `hill_3min` / `treadmill`  >  `hill_short`  >  flat.
 
 **~~Short work bouts accumulate time near VO2max at lower total mechanical volume than long bouts.~~**
 *(Retired — see the box above. The second half is true and now lives in §2; the first half is false.)*
@@ -314,20 +413,31 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 
 **In a strength block, short-format uphill work is the default.** Longer repeats are an endurance-led tool.
 
-> ## ⛔ THE TOKEN GRAMMAR CANNOT SAY THIS. It is not a missing session — it is a missing UNIT.
+> ## ✅ THE TOKEN GRAMMAR CAN SAY THIS NOW — AND THE THING IT USED TO ASK FOR IS THE BANNED ONE.
 >
-> The VO2 run token is matched by **`/^run_vo2_(\d+)x(\d+)min_z5$/`** (`materialize-plan/index.ts:1468`).
-> **Minutes only.** There is no seconds form, so **`40 sec / 20 sec` and `30/30` are not expressible** —
-> the string cannot be written, let alone expanded.
+> ⛔ **THIS BOX USED TO BE A BUILD REQUEST FOR `run_vo2_10x40s20s_z5`. DO NOT BUILD IT.** It was
+> written while §3 still argued for short reps; §3 reversed above and this box did not follow, so for
+> two weeks the doctrine's engineering note asked the next session to construct precisely the format
+> the doctrine's evidence section rejects. **A seconds-capable token exists and it is not that one.**
 >
-> **What this needs:** a seconds-capable work/recovery form (`run_vo2_10x40s20s_z5` or equivalent), with
-> **recovery as a first-class part of the token** rather than the fixed 90 s float the current row assumes.
-> ⛔ **The short-interval doctrine depends entirely on the recovery being short** — that is the whole
-> mechanism by which VO2 stays elevated across the set. **A seconds token that inherits a 90 s float
-> implements the opposite of this section.**
+> **What exists (`materialize-plan/index.ts`), both seconds-native, both carrying grade and descent:**
 >
-> ⚠️ **`3–5 min repeats` — the format this section reserves for endurance-led blocks — is the ONLY one that
-> exists.** The engine can currently express exactly the structure this doctrine says not to use here.
+> | token | recovery | used by |
+> |---|---|---|
+> | `run_hills_{reps}x{work}s_rlap_g{lo}_{hi}[_d{walk\|jog}]` | **open** — ends on the lap button | the 3-minute hill |
+> | `run_hills_{reps}x{work}s_r{rest}s_g{lo}_{hi}[_d{walk\|jog}][_tm]` | fixed seconds | the short hill, the treadmill |
+>
+> Reps, work seconds, rest seconds and the grade band are all parameters, so `10 × 60 s @ 4–6%` is
+> `run_hills_10x60s_r60s_g4_6_djog` and needed no new grammar. ⚠️ **`_tm` is a LABEL switch only** —
+> a treadmill session is structurally the outdoor fixed-recovery hill; what it cannot borrow is
+> wording, because "Hill · 5–8% grade" and "Jog down" describe a hill and a descent to an athlete
+> standing on a belt.
+>
+> ⚠️ **`run_vo2_{n}x{n}min_z5` (`:1468`) is still minutes-only, still hardcodes a 90 s float, and
+> still emits no warm-up or cool-down.** That is the FLAT token, and those are the three things a
+> flat option would have to fix — an optional `_r{n}s` group defaulting to 90, the pattern
+> `cruise_*` already uses at `:1490`. ⛔ A pace anchor is legitimate there and only there: §2.2 bans
+> pace on *graded* work, and flat is the one option that is not graded.
 
 ---
 
@@ -410,6 +520,14 @@ intervals** — §2.1 prohibits those, and they remain the most expensive way to
 > should sit elsewhere in the cycle it is a one-line change.
 
 ### ⛔ THE NO-HILL ATHLETE CANNOT RUN THIS MIX — and that is where §1's "worse block" becomes concrete
+
+> ⚠️ **NARROWED 2026-08-06 — READ THE FIRST SENTENCE BELOW CAREFULLY: it says "no hill AND NO
+> TREADMILL", and that second clause is now doing real work.** The hard run has four terrains and the
+> athlete picks one on the D-327 hard-day card: `hill_3min` · `treadmill` · `hill_short` · flat.
+> **A treadmill athlete is NOT a no-hill athlete** — the belt is the grade, they get the full 3-minute
+> session and the full impact discount, and none of the cost below applies to them. **The athlete this
+> section describes is the one with no climb, no treadmill and no bike**, and they are rarer than this
+> section assumed when it was written. Everything below stands, for them.
 
 **An athlete with no hill and no treadmill does flat every week. There is nothing to mix.** ⚠️ **They are
 not choosing flat over hills — they are carrying the block's full mechanical cost with none of the

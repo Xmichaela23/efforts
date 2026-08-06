@@ -374,6 +374,19 @@ type NonRaceState = {
   // ⚠️ PRESENCE, NOT TRUTHINESS, is now what "this discipline is picked" means. Read with
   // `d in qualityDays`; `!!qualityDays[d]` is false for a chosen discipline awaiting its day.
   qualityDays: Partial<Record<'run' | 'bike', DayName | ''>>;
+  /**
+   * ⛔ WHICH GROUND THE HARD RUN HAPPENS ON. The one fact about this session the app cannot derive —
+   * whether there is a climb outside their door they can run hard for three minutes. Not in posture,
+   * not in history, not in their sport.
+   *
+   * ⚠️ THIS IS NOT A NEW STEP AND MUST NOT BECOME ONE (doctrine §2.0, 2026-07-26: *"No 'do you have
+   * a hill?' step… availability reveals itself in the choice"*). It renders inside the hard-day card
+   * they are already on, revealed under "Hard run" exactly as the day picker is.
+   *
+   * ⚠️ Only meaningful for RUN. Picking "Hard ride" or "None" leaves it unread — the ride is
+   * Helgerud 4 × 4 on any terrain, and "None" means there is no hard session to give ground to.
+   */
+  qualityRunTerrain: 'hill_3min' | 'hill_short' | 'treadmill' | 'flat';
   /** 4 (Wendler's own shape) or 3 (the two upper lifts share a day; the test week still runs four). */
   liftingDays: 3 | 4;
   /** What they NORMALLY run, in their display unit. The band is a fraction of THIS — an absolute
@@ -797,6 +810,12 @@ function assemblePayload(
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
             qualityDays: state.runClubIntensity === 'quality' ? state.qualityDays : {},
             easyDays: state.runClubIntensity === 'easy' ? state.qualityDays : {},
+            // ⚠️ RIDES ALONG WITH THE HARD-RUN PIN AND DIES WITH IT. `buildPreferredDays` writes it
+            // only when `qualityDays.run` survives the gate above — so a club run the athlete
+            // declared EASY carries no terrain, which is right: there is no hard run to give ground
+            // to, and a terrain answer sitting beside an easy day would be a preference for a
+            // session that does not exist.
+            qualityRunTerrain: state.qualityRunTerrain,
           }),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -947,7 +966,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // ran. An unlit pair here would read as "the app has no opinion", and the app does: four days is
     // Wendler's own, and it is the only shape where every lift is trained first and every top set is
     // a clean measurement. The card states that rather than hiding it behind an empty control.
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    // ⚠️ `hill_3min` IS THE SEED AND IT IS NOT AN ARBITRARY ONE — it is the session this block has
+    // built since it shipped, and the doctrine's default (§2.0: hill is the recommendation, and the
+    // default position carries that rather than the word "recommended"). An athlete who never looks
+    // at the menu gets exactly the week they got yesterday.
+    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -3164,6 +3187,73 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                     Whichever day it actually lands — yours or someone else's. The lifting is placed around it.
                   </p>
+                </div>
+              )}
+              {/* ⛔ THE TERRAIN MENU — RUN ONLY, AND IT IS NOT A NEW STEP.
+                  Doctrine §2.0 (2026-07-26) bans a "do you have a hill?" question outright:
+                  *"Asking would buy nothing and cost a screen… availability reveals itself in the
+                  choice."* So this is a menu inside the card they are already on, revealed the same
+                  way the day picker above it is — the athlete picks what they actually have and the
+                  question is never asked.
+                  ⚠️ IT MUST NOT RENDER FOR "Hard ride" OR FOR "None". The ride is Helgerud 4 × 4 on
+                  a turbo, a chaingang or a climb alike — same session, no question. And "None" is a
+                  legal answer meaning there is no hard session at all; offering it ground to run on
+                  would be asking about a workout the athlete just declined. */}
+              {active === 'run' && (
+                <div>
+                  <p className="text-white/85 text-sm mb-2">What you can run it on</p>
+                  <div className="space-y-2">
+                    {([
+                      {
+                        id: 'hill_3min' as const,
+                        title: 'A hill you can run for 3 minutes',
+                        // ⛔ FACT THEN CONSEQUENCE, NO IMPERATIVE, AND NO "RECOMMENDED" — the
+                        // default position carries that, not the words (§2.0 copy shape).
+                        body: 'Four 3-minute climbs, walk or jog back down. The climb is what keeps a hard session cheap on your legs, so more of the week is left for the bar.',
+                      },
+                      {
+                        id: 'treadmill' as const,
+                        title: 'A treadmill',
+                        // ⚠️ NAMED AS A PEER, DELIBERATELY. The belt IS the grade, so this is the
+                        // same session as the hill rather than a substitute for it — and an athlete
+                        // who has one has no reason to take the short-hill or flat option.
+                        body: 'The same four 3-minute efforts at 5-8% incline. The incline does the same job the hill does, so this costs your legs no more than running outside would.',
+                      },
+                      {
+                        id: 'hill_short' as const,
+                        title: 'Only a short hill',
+                        // ⚠️ THE COST IS STATED, NOT HIDDEN. 60 s sits in the band the evidence puts
+                        // below 3-minute reps, so this card says it is the lesser session in plain
+                        // words rather than selling it as equivalent.
+                        body: 'Ten 1-minute climbs instead. Shorter efforts buy less of what this session is for, so it holds less than the 3-minute version does — it is the session for the hill you have.',
+                      },
+                      {
+                        id: 'flat' as const,
+                        title: 'Flat ground only',
+                        // ⛔ THE COST IS THE POINT OF THIS CARD, AND THE NUDGE IS THE CONDITION THE
+                        // RULING CAME WITH (Michael, 2026-08-06). §2.1 bans this session outright;
+                        // §2.0 governs and lets the athlete own the trade — but only if the trade is
+                        // stated. An athlete who picks this without being told what it costs has not
+                        // made a choice, they have been handed a worse block quietly.
+                        // ⚠️ NO IMPERATIVE, and the nudge is a fact about what a trainer would buy
+                        // them, not an instruction to buy one.
+                        body: 'Four 3-minute efforts on the flat. This is the one option that costs your legs full price — a climb takes the impact out and flat ground puts it back, and the lifting is what pays for it. A treadmill or a cheap indoor trainer would buy you the same session for less.',
+                      },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.id} type="button"
+                        onClick={() => setState((s) => ({ ...s, qualityRunTerrain: opt.id }))}
+                        className={`w-full text-left px-4 py-3 rounded-xl border ${
+                          state.qualityRunTerrain === opt.id
+                            ? 'border-teal-400/70 bg-teal-500/10'
+                            : 'border-white/12 bg-white/[0.04]'
+                        }`}
+                      >
+                        <span className="block text-white/90 text-sm">{opt.title}</span>
+                        <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">{opt.body}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -82,6 +82,49 @@ export type OneRepMaxes = {
   overheadPress: number;
 };
 
+/**
+ * ⛔ THE TERRAIN THE HARD RUN IS ACTUALLY RUN ON — the athlete's pick, never inferred.
+ *
+ * `4 × 3 min` uphill assumes a climb you can run for three minutes, and the engine has no way to
+ * know whether one exists. It is not a property of the athlete's fitness, their sport or their
+ * postures — it is a property of the ground outside their door, and the only source for it is them.
+ *
+ * ⚠️ THIS IS NOT AN INTAKE QUESTION AND MUST NOT BECOME ONE (doctrine §2.0, decided 2026-07-26):
+ * *"No 'do you have a hill?' step… availability reveals itself in the choice."* It is a menu on the
+ * D-327 hard-day card the athlete is already looking at, revealed under "Hard run" the same way the
+ * day picker is. A binary question would also be unanswerable — a "no" tells us nothing about
+ * whether they have a treadmill.
+ *
+ * ⚠️ ABSENT MEANS `hill_3min`, which is what every block built before this shipped. The field is
+ * additive: an old goal with no terrain on its hard day builds exactly the week it built yesterday.
+ *
+ * Ranked on the block's own axis — VO2max stimulus bought at the least cost to the legs:
+ *   `hill_3min` / `treadmill`  >  `hill_short`  >  `flat`
+ */
+export type HardRunTerrain =
+  /** A climb you can run hard for three minutes. The default, and the best session here. */
+  | 'hill_3min'
+  /** A short climb. Shorter reps buy less time at the top end — see `shortHillSession`. */
+  | 'hill_short'
+  /** No hill outside, but a treadmill. The belt IS the grade, so the impact discount is real
+   *  rather than approximated — this is a peer of `hill_3min`, not a lesser option. */
+  | 'treadmill'
+  /**
+   * ⛔ LAST RESORT, AND THE ONLY OPTION THAT COSTS THE LIFTING. No climb, no treadmill, no bike.
+   *
+   * ⚠️ THE DOCTRINE CONTRADICTED ITSELF HERE AND §2.0 WON (ruled 2026-08-06). §2.1 lists "long flat
+   * intervals at VO2 intensity" as PROHIBITED during a strength block — and that is exactly this
+   * session. §2.0 offers flat as a legitimate athlete choice with a stated cost. §2.0 governs: it is
+   * the newer and deliberate rule, and §2.1's blanket ban was written when a hill was assumed
+   * available. For an athlete with none of the other three, the alternative to this is **no hard
+   * aerobic session at all**, which is worse. §2.1 carries a back-annotation saying so.
+   *
+   * ⛔ SO THE COPY HAS TO CARRY THE COST OUT LOUD — that is the condition the ruling came with, not
+   * a nicety. Flat keeps the impact transient the other three options remove, the lifting is what
+   * pays for it, and the card says a cheap treadmill or trainer would serve them better.
+   */
+  | 'flat';
+
 export type StrengthPrimaryArgs = {
   durationWeeks: number;
   /** The athlete's four barbell maxes. Required — there is no path in without them. */
@@ -145,7 +188,13 @@ export type StrengthPrimaryArgs = {
    * The doctrine's two pins are this and `longRunDay`; everything else moves around them.
    * See docs/DOCTRINE-aerobic-maintenance.md §6 and ARCH-strength-spine.md §0.6.
    */
-  hardDay?: { day: string; discipline: 'run' | 'bike' };
+  hardDay?: {
+    day: string;
+    discipline: 'run' | 'bike';
+    /** Run terrain — the athlete's pick. Absent → `hill_3min`. Ignored when `discipline` is
+     *  `bike`: the ride has one shape (Helgerud `4 × 4`) and no terrain question. */
+    terrain?: HardRunTerrain;
+  };
   /**
    * Weekly bike hours from intake (D-323 §6 — hours, never miles: the engine turns hours into
    * sessions and has never learned a ride speed).
@@ -735,6 +784,213 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
 }
 
 /**
+ * ⛔ THE SHORT-HILL SESSION — for a climb you cannot run for three minutes.
+ *
+ * `10 × 1 min hard uphill @ 4-6%, 1 min back down.` 10 min of work.
+ *
+ * ⛔ SIXTY SECONDS, AND NOT FORTY. The doctrine names `10-12 × 40 s` for the athlete without a long
+ * climb; that was built on 2026-08-06 and reverted the same day, and it must not come back. At EQUAL
+ * work time, work-matched, 1:1 recovery, 12 highly trained runners: `4 × 3 min` gave **327.9 s**
+ * above 90% VO2max against `24 × 30 s` at **201.3 s**, with no difference in how hard either felt
+ * (Fleckenstein, Braunstein & Walter 2025, Front Sports Act Living 6:1507957, PMID 39835194). The
+ * short session reads harder on heart rate and delivers less of the stimulus.
+ *
+ * ⚠️ AND SIXTY IS STILL NOT THE GOOD ONE — BE HONEST ABOUT WHICH TIER THIS IS. The time-at-VO2max
+ * meta (BMC Sports Sci Med Rehabil 2026, doi:10.1186/s13102-026-01766-x) ranks long (≥2 min) above
+ * MODERATE (>30 s to <2 min) above short (≤30 s), and 60 s sits in that middle band — the same band
+ * as the 40 s form, just at the top of it rather than the bottom. So this is not a peer of the
+ * 3-minute session: it is what the athlete with a 60-second hill can actually run, and the copy says
+ * so rather than selling it as equivalent.
+ *
+ * ⛔ THE DESCENT RULE IS THE SAME ONE, FOR THE SAME REASON. Downhill running is where the eccentric
+ * cost lives and it is the part that arrives the next morning, so it is prescribed off placement by
+ * `descentIsJogged` — not off the length of the rep. A 1-minute descent jogged next to a heavy squat
+ * day is the same damage as a 3-minute one.
+ *
+ * ⚠️ Duration is fixed and the budget subtracts it, exactly as `HILL_SESSION_MIN` does. 10 min warm-up
+ * + 10 × 60 s + 9 × 60 s + 8 min cool-down = 37 min.
+ */
+export const SHORT_HILL_SESSION_MIN = 37;
+
+function shortHillSession(day: string, lowerDays: string[] = []): PlanSession {
+  const jogged = descentIsJogged(day, lowerDays);
+  const token = `run_hills_10x60s_r60s_g4_6_d${jogged ? 'jog' : 'walk'}`;
+  return {
+    day,
+    type: 'run',
+    name: 'Short Hill Repeats',
+    // ⛔ NO PACE, ANYWHERE IN THIS COPY — same reason as the 3-minute session (§2.2).
+    description:
+      `10 × 1 min hard uphill on a 4-6% grade, 1 min ${jogged ? 'easy jog' : 'walk'} back down. `
+      + 'Hard means hard — you should not be able to hold a sentence. No pace target: on a hill the '
+      + 'number would be wrong. Shorter reps buy less time at the top end than the 3-minute version, '
+      + 'so this is the session for the hill you have rather than the better one. The climb is still '
+      + 'what keeps it cheap on your legs.'
+      + (jogged
+        ? ''
+        : ' Walk the descents — running down is the part that would reach your next heavy day.'),
+    duration: SHORT_HILL_SESSION_MIN,
+    steps_preset: [token],
+    tags: ['quality', 'hills', 'aerobic'],
+  };
+}
+
+/**
+ * ⛔ THE TREADMILL SESSION — a PEER of the outdoor hill, not a lesser option.
+ *
+ * `4 × 3 min hard @ 5-8% incline, 3 min easy between.` 12 min of work — the same dose, the same
+ * structure, the same grade band as `hillSession`.
+ *
+ * ⛔ WHY THIS RANKS WITH THE HILL AND NOT WITH FLAT: the belt IS the grade. The entire reason this
+ * protocol chose hills is that uphill running is concentrically biased and loses the impact
+ * transient (Gottschall & Kram), which is what buys a hard aerobic session the legs can still lift
+ * on. A treadmill at 6% delivers that literally rather than approximately, and it delivers the
+ * 3-minute rep the evidence actually supports. An athlete with a treadmill has no reason to take
+ * the short-hill or flat option.
+ *
+ * ⚠️ NO DESCENT, SO NO `descentIsJogged` CALL — AND THAT IS THE POINT, NOT AN OMISSION. There is
+ * nothing to run down: the recovery is the belt dropped to easy. So the eccentric load this session
+ * would otherwise owe its next heavy day is simply absent, and the walk/jog rule has nothing to
+ * decide. The token still carries `_djog` because the recovery IS an easy jog and should be paced
+ * like one.
+ *
+ * ⚠️ 10 min warm-up + 4 × 180 s + 3 × 180 s + 8 min cool-down = 39 min. Fixed; the budget subtracts it.
+ */
+export const TREADMILL_SESSION_MIN = 39;
+
+function treadmillSession(day: string): PlanSession {
+  // ⚠️ `_tm` IS A LABEL SWITCH ONLY — the structure is identical to the outdoor fixed-recovery hill.
+  // Without it the watch reads "Hill · 5-8% grade" and "Jog down" on a machine with no hill and no
+  // down, which is the same species of wrong as a pace target on a gradient: a step label that
+  // describes a session the athlete is not doing.
+  const token = 'run_hills_4x180s_r180s_g5_8_djog_tm';
+  return {
+    day,
+    type: 'run',
+    name: 'Treadmill Intervals',
+    // ⛔ NO PACE. The belt speed that means "hard" at 6% is not the one that means hard on the flat,
+    // so a number here is the same false precision the outdoor session refuses (§2.2). Effort and
+    // incline only — the athlete sets the belt to what "hard" actually is for them today.
+    description:
+      '4 × 3 min hard at 5-8% incline, 3 min easy between with the incline down. '
+      + 'Hard means hard — you should not be able to hold a sentence. No belt speed given: at 6% the '
+      + 'number that means hard is not the one it would be on the flat. '
+      + 'The incline is what keeps this cheap on your legs, so the lifting still gets what it needs — '
+      + 'and it is the same session as the outdoor hill, not a substitute for it.',
+    duration: TREADMILL_SESSION_MIN,
+    steps_preset: [token],
+    tags: ['quality', 'hills', 'aerobic'],
+  };
+}
+
+/**
+ * ⛔ THE FLAT SESSION — THE LAST RESORT, AND THE ONLY ONE THAT SENDS A BILL TO THE BAR.
+ *
+ * `4 × 3 min hard / 3 min easy on flat ground.` 12 min of work — the same dose and the same
+ * structure as the hill, on the one surface that does not discount it.
+ *
+ * ⛔ THIS IS THE SESSION §2.1 PROHIBITS, AND IT IS HERE ON PURPOSE. §2.1 bans "long flat intervals
+ * at VO2 intensity" during a strength block — the most expensive way to buy the stimulus, highest
+ * total ground contacts at highest force. §2.0 offers flat as a legitimate choice with a stated
+ * cost. **§2.0 governs** (Michael, 2026-08-06): §2.1's ban assumed a hill was available, and for an
+ * athlete with no climb, no treadmill and no bike the alternative to this session is **no hard
+ * aerobic session at all**. A blanket ban that leaves an athlete with nothing is not the safer
+ * reading. ⚠️ §2.1 carries a back-annotation pointing here; do not "fix" this against it.
+ *
+ * ⛔ AND THE COST IS PAID SOMEWHERE, SO THE COPY NAMES IT. Uphill removes the impact transient
+ * (Gottschall & Kram) and that is the entire reason this protocol chose hills; flat gives it back.
+ * §4's yield order is what absorbs it — accessory volume first, then easy run volume, then the
+ * training max holds rather than climbs. **The athlete on this option reaches item 3 soonest**, and
+ * the intake card tells them so before they pick it.
+ *
+ * ⚠️ PACE IS ALLOWED HERE AND ONLY HERE. §2.2 forbids a pace target on GRADED work because the
+ * pace-effort relationship changes with gradient and the app's velocity anchor goes invalid. Flat is
+ * not graded, so the anchor holds and the token's existing 5K − 12 s/mi is a real number rather than
+ * a measured-looking one. ⛔ Do not "make it consistent" with the hill sessions by stripping it.
+ *
+ * ⚠️ BRACKETED BY SEPARATE PRESETS, NOT BY THE EXPANDER. `run_vo2_*` builds no warm-up or cool-down
+ * of its own — its callers pass them alongside, and have since `session-factory.ts:443`. So this
+ * session names all three. 10 + 4 × 3 + 3 × 3 + 10 = 41 min.
+ *
+ * ⛔ THE COPY SAYS "WHERE THE WEEK ALLOWS", AND THAT HEDGE IS THE HONEST HALF OF A PREFERENCE.
+ *
+ * This session PREFERS 48h from heavy legs rather than `quality_run`'s 24h (Michael, 2026-08-06 —
+ * see the `preferredClearance` stamp at the solver call). Preferred, never required: measured across
+ * all 24 legal week shapes, it is **taken in 8 and quietly declined in 16, and makes none worse.**
+ *
+ * ⚠️ SO THE LINE PROMISES ONLY WHAT IT DELIVERS. It does not say the heavy days ARE two clear days
+ * away — a third of weeks can give that and the rest cannot — and it no longer says "the plan says
+ * so when it cannot", because a declined preference breaks nothing and reports nothing. Promising
+ * the clearance outright would be the defect `NonRaceBuilder.tsx:304` names on this very screen.
+ *
+ * ⛔ THE HARD VERSION WAS BUILT FIRST AND IT WAS WORSE — DO NOT GO BACK TO IT. Forcing 48h put a
+ * reported breach in 8 of 12 week shapes, and **11 of the 16 breaches were against the LONG RUN**:
+ * the solver bought this session its two days by moving a squat next to the long run, which is the
+ * same eccentric leg damage one session over, and then announced a compromise it had itself created.
+ */
+export const FLAT_SESSION_MIN = 41;
+
+function flatSession(day: string): PlanSession {
+  return {
+    day,
+    type: 'run',
+    name: 'Flat Intervals',
+    // ⛔ FACT, THEN THE CONSEQUENCE, NO IMPERATIVE — and the consequence here is the honest one:
+    // this session is paid for out of the lifting. The nudge is a statement of what would serve
+    // them better, not an instruction to go buy something.
+    description:
+      '4 × 3 min hard, 3 min easy between, on flat ground. '
+      + 'Hard means hard — you should not be able to hold a sentence. '
+      + 'This is the one version of this session that costs your legs full price: running flat keeps '
+      + 'the impact a climb takes away, and the lifting is what pays for it. Your heavy leg days are '
+      + 'held two days clear of it where the week allows. '
+      + 'A treadmill or a cheap indoor trainer would buy you the same session for less.',
+    duration: FLAT_SESSION_MIN,
+    // ⚠️ THREE PRESETS, NOT ONE — `run_vo2_*` brackets nothing itself. `_r180s_` is the explicit
+    // float: the token defaults to 90 s, which would make this a materially harder session than the
+    // one costed above.
+    steps_preset: ['warmup_run_10min_easy', 'run_vo2_4x3min_r180s_z5', 'cooldown_run_10min_easy'],
+    tags: ['quality', 'aerobic'],
+  };
+}
+
+/**
+ * ⛔ ONE OWNER FOR "WHICH HARD RUN". Every caller asks here, never for a session by name.
+ *
+ * The terrain is the athlete's pick and it arrives on `hardDay`. Absent → `hill_3min`, which is what
+ * every block built before 2026-08-06 built — so an old goal with no terrain stamped on it produces
+ * exactly the week it produced yesterday.
+ *
+ * ⚠️ THE DURATION MUST TRACK THE SESSION, AND THAT IS WHY `hardRunSessionMinutes` SITS NEXT TO THIS.
+ * The mileage budget subtracts the hard session BEFORE distributing easy volume (2026-07-28 — the
+ * +3.5 mi bug). Two owners for one fact is how that bug returns: a 39-minute treadmill session
+ * subtracted as 35 hands the athlete the difference back as easy miles, silently, every week.
+ */
+export function hardRunSessionMinutes(terrain?: HardRunTerrain): number {
+  switch (terrain) {
+    case 'hill_short': return SHORT_HILL_SESSION_MIN;
+    case 'treadmill': return TREADMILL_SESSION_MIN;
+    case 'flat': return FLAT_SESSION_MIN;
+    case 'hill_3min':
+    default: return HILL_SESSION_MIN;
+  }
+}
+
+function hardRunSession(
+  day: string,
+  lowerDays: string[],
+  terrain?: HardRunTerrain,
+): PlanSession {
+  switch (terrain) {
+    case 'hill_short': return shortHillSession(day, lowerDays);
+    case 'treadmill': return treadmillSession(day);
+    case 'flat': return flatSession(day);
+    case 'hill_3min':
+    default: return hillSession(day, lowerDays);
+  }
+}
+
+/**
  * ⛔ SWIM IS BOOKED, NOT COACHED — and the distinction is the whole feature.
  *
  * Michael, 2026-07-25: *"we keep swim, let the user add — we give a courtesy two hour-long swims we
@@ -895,10 +1151,49 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⚠️ `canSplitDay` is not passed and does not need to be: the solver asks the matrix which pairs
   // may share a day and `stackNeedsRecoveryGap` which of those actually compete. A bench beside a
   // ride needs no permission because it needs no gap.
+  /**
+   * ⛔ THE FLAT HARD RUN PREFERS 48h FROM HEAVY LEGS, NOT `quality_run`'s 24h. Michael, 2026-08-06.
+   *
+   * **His reasoning:** flat running is eccentric leg-pounding of the same species as a jogged hill
+   * descent, and the block already treats that as long-separation work — so flat should match.
+   *
+   * ⛔ PREFERRED, NOT REQUIRED, AND THE DIFFERENCE WAS MEASURED. Built as a hard constraint first: it
+   * put a reported breach in 8 of 12 week shapes and **11 of the 16 breaches landed on the LONG
+   * RUN** — a squat shoved next to the athlete's longest run to buy this session its space, which is
+   * the same eccentric damage one day over. Michael: *"prefer, don't force."* It is now a score term
+   * sitting below `breachPenalty`, so it can only choose among weeks that are already legal.
+   * **Taken in 8 of 24 legal shapes, silently declined in 16, none made worse.**
+   *
+   * ⚠️ ONE CORRECTION TO THE REASONING, RECORDED BECAUSE IT CHANGES WHAT "MATCH IT" MEANS AND NOT
+   * WHETHER TO. The block does not PLACE anything at 48h for a jogged descent. `descentIsJogged`
+   * asks the 48h cell and then **adapts the session to the placement** — it walks the descent when
+   * the clearance is not there. It is the session that yields, not the week. Flat has no walk/jog
+   * knob, so the only equivalent is to move the lifting. **The conclusion holds; the mechanism runs
+   * the other way and a future session should know it.**
+   *
+   * ⛔ WHY 48 AND NOT SOME NEW NUMBER: it is the cell the law already uses for eccentric leg work
+   * (`long_run × lower_body_strength`), and inventing a third figure would be exactly the
+   * hand-picked coefficient this repo keeps deleting.
+   *
+   * ⚠️ THE OTHER THREE TERRAINS ARE UNTOUCHED and keep 24h. Uphill removes the impact transient —
+   * that is the entire argument of doctrine §2 — so the hill and treadmill options are not paying
+   * this cost and must not be made to.
+   */
+  const flatHardRun = args.hardDay?.discipline === 'run' && args.hardDay?.terrain === 'flat';
   const solverAnchors: SolverAnchor[] = pins.map((p) => ({
     day: p.day.toLowerCase() as SolverDay,
     kind: p.kind,
     label: p.label,
+    ...(flatHardRun && p.kind === 'quality_run'
+      ? {
+          preferredClearance: {
+            against: 'lower_body_strength' as const,
+            hours: 48,
+            reason: 'flat intervals pound the legs the way a jogged descent does, so heavy leg days '
+              + 'are preferred two days clear of them rather than one — wanted, never forced',
+          },
+        }
+      : {}),
   }));
   /**
    * ⛔ THREE LIFTING DAYS, AND THE SOLVER NEEDS NO CHANGE TO DO IT (2026-07-29).
@@ -1425,7 +1720,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // (Hickson: intensity holds VO2max, frequency and duration are the expendable variables). So the
     // budget subtracts it and distributes what remains — the hard session is paid first, and the
     // easy volume flexes around it, which is the yield order the doctrine already states.
-    const hardRunMiles = hardDayIsRun && hardPinDay ? HILL_SESSION_MIN / pace : 0;
+    // ⚠️ THE MINUTES COME FROM THE TERRAIN, NOT FROM `HILL_SESSION_MIN` (2026-08-06). The four run
+    // options are 35, 37 and 39 minutes; subtracting a flat 35 for all of them hands the difference
+    // back as easy miles every week, which is the +3.5 mi bug above in miniature. One owner:
+    // `hardRunSessionMinutes`.
+    const hardRunMiles = hardDayIsRun && hardPinDay
+      ? hardRunSessionMinutes(args.hardDay?.terrain) / pace
+      : 0;
     const easyBudget = Math.max(1, held - hardRunMiles);
     // ⛔ ABOVE THE SELF-REGULATION LINE THE ENGINE STOPS SHAPING THE WEEK (2026-07-29).
     //
@@ -1751,7 +2052,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ Do NOT emit hills as a substitute for the ride: that spends mechanical budget the
       // doctrine spent the whole day protecting.
       if (hardPin && args.hardDay?.discipline === 'run') {
-        weekSessions.push(hillSession(hardPin, heavyLowerDays));
+        weekSessions.push(hardRunSession(hardPin, heavyLowerDays, args.hardDay?.terrain));
       }
     } else if (enduranceSport && !(enduranceSport === 'bike' && hasBike)) {
       // ⛔ TWO EMITTERS WERE AUTHORING RIDES AND NOTHING SUBTRACTED (found 2026-07-29 by the combo

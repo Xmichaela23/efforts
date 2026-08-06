@@ -166,11 +166,29 @@ Deno.serve(async (req: Request) => {
       // D-327 — the ONE hard aerobic day and its discipline. Collected since 2026-07-25 and dropped
       // at the caller until now. Validated here rather than trusted: an unknown discipline is
       // treated as absent, because a pin the composer cannot place is worse than no pin.
+      //
+      // ⚠️ `terrain` IS VALIDATED THE SAME WAY AND FOR THE SAME REASON (2026-08-06) — an unknown
+      // value is treated as ABSENT, and absent means `hill_3min`. That is the conservative arm: it
+      // is the session every block built before this field existed, so a malformed or stale terrain
+      // degrades to the shipped behaviour rather than to no hard session at all.
+      // ⛔ Do not add it to the allowlist without adding it to `HardRunTerrain` — an unlisted value
+      // is silently discarded here, which would look like the athlete's pick being ignored.
       hardDay: hard_day && typeof hard_day === 'object'
         && typeof (hard_day as Record<string, unknown>).day === 'string'
         && ((hard_day as Record<string, unknown>).discipline === 'run'
           || (hard_day as Record<string, unknown>).discipline === 'bike')
-        ? hard_day as { day: string; discipline: 'run' | 'bike' }
+        ? (() => {
+            const hd = hard_day as Record<string, unknown>;
+            const terrainOk = new Set(['hill_3min', 'hill_short', 'treadmill', 'flat']);
+            const terrain = typeof hd.terrain === 'string' && terrainOk.has(hd.terrain)
+              ? hd.terrain as 'hill_3min' | 'hill_short' | 'treadmill' | 'flat'
+              : undefined;
+            return {
+              day: hd.day as string,
+              discipline: hd.discipline as 'run' | 'bike',
+              ...(terrain ? { terrain } : {}),
+            };
+          })()
         : undefined,
       // Bike hours (D-323 §6) — hours, never miles. Used on the bike-PRIMARY path.
       targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0

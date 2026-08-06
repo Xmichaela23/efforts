@@ -129,6 +129,16 @@ export type ScheduleInput = {
   easyDays?: Partial<Record<'run' | 'bike', string>>;
   anchorDiscipline?: 'run' | 'bike' | null;
   anchorDay?: string;
+  /**
+   * Which ground the hard RUN happens on — the athlete's pick, only meaningful alongside
+   * `qualityDays.run`. Absent → the 3-minute hill, the session every block built before this.
+   *
+   * ⚠️ Kept as a plain string rather than importing the engine's `HardRunTerrain` union: this file
+   * is client-side and the union lives in a Deno edge module. `generate-strength-plan` validates
+   * against its own allowlist at the door and treats an unknown value as absent, so a typo here
+   * degrades to the 3-minute hill rather than to a session that does not exist.
+   */
+  qualityRunTerrain?: 'hill_3min' | 'hill_short' | 'treadmill' | 'flat';
 };
 /**
  * ⛔ THE TYPE IS THE ENFORCEMENT (§0g). `strength` is banned at the type level, not by convention.
@@ -163,6 +173,19 @@ export function buildPreferredDays(
   for (const d of ['run', 'bike'] as const) {
     const day = sched.qualityDays?.[d];
     if (day && present(d)) out[`quality_${d}`] = day;
+  }
+  // ⛔ THE TERRAIN OF THE HARD RUN — it belongs HERE and nowhere else, because it is the one fact in
+  // this session only the athlete has. Whether there is a climb outside their door that they can run
+  // hard for three minutes is not derivable from posture, sport, mileage or history, and
+  // `preferred_days` is precisely the bag for "the athlete chose this" (see the `strength?: never`
+  // note above — engine choices are banned from it for the same reason athlete choices belong).
+  //
+  // ⚠️ RIDES DO NOT GET ONE. The hard ride is Helgerud 4 × 4 whether it is a turbo, a chaingang or a
+  // climb — same session, so there is no question to ask and no key to write.
+  // ⚠️ OMITTED WHEN UNSET, like every other key here. Absent means the 3-minute hill, which is what
+  // every block built before this existed, so an un-answered menu degrades to the shipped session.
+  if (sched.qualityRunTerrain && sched.qualityDays?.run && present('run')) {
+    out.quality_run_terrain = sched.qualityRunTerrain;
   }
   // The kept session declared EASY. Same posture gate, same "omit when unset" rule — an unpinned
   // easy day is the planner's to choose, and writing one anyway would invent a preference.

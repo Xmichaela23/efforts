@@ -2598,7 +2598,24 @@ Deno.serve(async (req: Request) => {
                 const pd = gsTp.preferred_days as Record<string, string> | undefined;
                 const run = pd?.quality_run;
                 const bike = pd?.quality_bike;
-                if (run) return { hard_day: { day: run, discipline: 'run' } };
+                // ⛔ THE TERRAIN RIDES WITH THE RUN PIN AND ONLY WITH IT (2026-08-06). It is the
+                // athlete's answer to "which of these can you actually run" — a hill, a short hill,
+                // a treadmill — collected on the same D-327 card as the day. The RIDE has no terrain
+                // question: the bike session has one shape (Helgerud 4 × 4) and a turbo, a chaingang
+                // and a climb are all the same session on it.
+                // ⚠️ Absent is legal and means `hill_3min`. Forwarding nothing is what every goal
+                // created before this field builds, and it must keep building it.
+                const terrain = (gsTp.preferred_days as Record<string, unknown> | undefined)
+                  ?.quality_run_terrain;
+                if (run) {
+                  return {
+                    hard_day: {
+                      day: run,
+                      discipline: 'run',
+                      ...(typeof terrain === 'string' ? { terrain } : {}),
+                    },
+                  };
+                }
                 if (bike) return { hard_day: { day: bike, discipline: 'bike' } };
                 return {};
               })()),

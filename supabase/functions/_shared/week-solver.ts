@@ -61,6 +61,41 @@ export type Anchor = {
   kind: MatrixSessionKind;
   /** Athlete-facing label, so a refusal can name what bound it. */
   label: string;
+  /**
+   * ⛔ EXTRA ROOM THIS ANCHOR WOULD LIKE FROM ONE KIND — **A PREFERENCE, SCORED, NEVER A FLOOR.**
+   *
+   * ⚠️ THIS WAS BUILT AS A HARD CONSTRAINT FIRST AND THE SWEEP KILLED IT. Raising the flat hard
+   * run's clearance from heavy legs to 48h made 8 of 12 legal week shapes report a breach — and **11
+   * of the 16 breaches landed on the LONG RUN, not on the session being protected.** The solver was
+   * buying the flat run its two days by putting a squat next to the long run, which is eccentric leg
+   * work carrying the same 48h for the same reason. It relocated the damage and announced a
+   * compromise it had itself created. Michael, 2026-08-06: **prefer, don't force.**
+   *
+   * ⛔ SO IT IS A SCORE TERM AND IT SITS BELOW `breachPenalty`, WHICH IS THE ENTIRE SAFETY PROPERTY.
+   * `breachPenalty` is element 1 of the score vector, so ANY candidate week that breaches a real
+   * clearance loses to ANY week that does not, no matter how much preference is on offer. **This can
+   * only ever choose between weeks that are already legal.** ⛔ Do not move it above `breachPenalty`.
+   *
+   * ⚠️ WHEN THE WEEK CANNOT GIVE IT, NOTHING IS SAID — and that silence is the specification, not an
+   * omission. A preference that was not taken has broken nothing; reporting it would put a
+   * compromise line on a plan that is fully within the law. The matrix floor is still enforced,
+   * still reported when breached, and entirely unchanged by this field.
+   *
+   * ⛔ WHY NOT A NEW `MatrixSessionKind`. Minting a `quality_run_flat` would mean a row in the
+   * adjacency table, a row in the same-day ✓/✗ matrix and an entry in every kind list — a vocabulary
+   * change to express one preference for one session that is a `quality_run` in every other respect.
+   *
+   * ⚠️ `reason` is for the code, not the athlete: an unowned, unexplained strictness is the §0c error
+   * the `MethodologyConstraint` type below exists to stop, and a preference deserves the same rule.
+   */
+  preferredClearance?: {
+    /** The kind this anchor wants extra room from. */
+    against: MatrixSessionKind;
+    /** Hours wanted. Below the matrix floor it is a no-op — the floor already wins. */
+    hours: number;
+    /** Who decided, and why. */
+    reason: string;
+  };
 };
 
 export type Lift = {
@@ -182,7 +217,13 @@ export const MAX_ACTIVE_DAYS_DEFAULT = 6;
 
 // ── The core: is this candidate day legal for this lift? ────────────────────
 
-type Placement = { kind: MatrixSessionKind; dayIndex: number; label: string };
+type Placement = {
+  kind: MatrixSessionKind;
+  dayIndex: number;
+  label: string;
+  /** Carried from `Anchor.preferredClearance`. Lifts never have one — only a pinned session can. */
+  preferredClearance?: Anchor['preferredClearance'];
+};
 
 /**
  * ⛔ THIS FUNCTION IS §0c IN CODE. It takes a CANDIDATE DAY and a SESSION KIND and asks the law
@@ -291,6 +332,29 @@ function scoreKey(
     }
   }
   const spreadPenalty = lowerIdx.length > 1 ? -tightestLower : 0;
+
+  // 4a. ⛔ AN ANCHOR'S PREFERRED CLEARANCE — WANTED, NOT OWED. See `Anchor.preferredClearance`.
+  //
+  //     Measured the same way breaches are (§5 line 3, mined from `place-week:196`): the SIZE of the
+  //     shortfall, not a count, so a week that misses by a day beats one that misses by two.
+  //
+  //     ⛔ IT SITS BELOW `breachPenalty` AND THAT IS THE SAFETY PROPERTY, NOT A STYLE CHOICE. Any
+  //     week breaching a real clearance already loses on element 1, so this term can only ever
+  //     choose among weeks that are legal. It is structurally incapable of buying its preference by
+  //     breaking the long run's 48h — which is exactly what the hard-constraint version did.
+  //
+  //     ⚠️ ZERO FOR EVERY ANCHOR WITHOUT A PREFERENCE, so inserting it changed no existing week:
+  //     two candidates that both score 0 here are still separated by the terms below, in the order
+  //     they were already in.
+  let preferredClearanceShortfall = 0;
+  for (let i = 0; i < assignment.length; i++) {
+    const kind: MatrixSessionKind = lifts[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
+    for (const a of anchors) {
+      if (a.preferredClearance?.against !== kind) continue;
+      const actual = gapHours(assignment[i], a.dayIndex);
+      preferredClearanceShortfall += Math.max(0, a.preferredClearance.hours - actual);
+    }
+  }
 
   // 4b. ⛔ UPPER-DAY SPREAD IS GONE — DELETED 2026-08-05, MICHAEL'S CALL. DO NOT REINSTATE IT.
   //
@@ -437,8 +501,26 @@ function scoreKey(
   // Spacing choosing the host is spacing making a day-size decision it has no information about.
   // ⛔ `pressAdjacencyShortfall` IS THE LIFT-SPACING TERM NOW — `upperLowerShortfall` was deleted
   // 2026-08-05 (see 4c). Moving it is a design change, not a refactor — see the block at 4c-ii.
-  return [restShortfall, breachPenalty, stackPenalty, stackHostPenalty, spreadPenalty,
-    pressAdjacencyShortfall, shapePenalty,
+  // ⛔ `preferredClearanceShortfall` SITS ABOVE `spreadPenalty` AND BELOW `breachPenalty`, AND BOTH
+  // HALVES OF THAT WERE MEASURED, NOT REASONED.
+  //
+  // ⚠️ BELOW `breachPenalty` IS THE SAFETY PROPERTY. Any week breaching a real clearance loses on
+  // element 1 first, so this term can only choose among legal weeks. Moving it above would let a
+  // preference buy a violation — which is exactly the hard-constraint version this replaced.
+  //
+  // ⛔ ABOVE `spreadPenalty` IS WHAT MAKES IT DO ANYTHING AT ALL. It was placed below first, and the
+  // sweep showed it changed **nothing**: total shortfall 288 against 288, zero weeks different.
+  // `spreadPenalty` fully determines where the two heavy days go, so a term underneath it is only
+  // ever a tie-break between weeks that no longer differ. **A term whose metric cannot move is not a
+  // term (§0e).**
+  //
+  // ⚠️ WHAT IT OUTRANKS IS ITSELF A PREFERENCE, WHICH IS WHY THIS IS A LEGAL TRADE. The 48h between
+  // two heavy leg days is enforced by the MATRIX (`lower_body_strength × lower_body_strength = 48h`)
+  // and is untouched here. `spreadPenalty` only pushes them FURTHER apart than the law asks. So this
+  // trades preference for preference, never preference for law.
+  return [restShortfall, breachPenalty, stackPenalty, stackHostPenalty,
+    preferredClearanceShortfall,
+    spreadPenalty, pressAdjacencyShortfall, shapePenalty,
     orderPenalty, preferredMissPenalty, ...canonicalAssignment];
 }
 
@@ -481,6 +563,7 @@ export function solve(input: SolverInput): SolverResult {
 
   const anchorPlacements: Placement[] = anchors.map((a) => ({
     kind: a.kind, dayIndex: dayOf(a.day), label: a.label,
+    ...(a.preferredClearance ? { preferredClearance: a.preferredClearance } : {}),
   }));
   const anchorDays = new Set(anchorPlacements.map((a) => a.dayIndex));
 
@@ -708,6 +791,10 @@ export function solve(input: SolverInput): SolverResult {
       for (let i = 0; i < lifts.length; i++) {
         const kind: MatrixSessionKind = lifts[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
         for (const a of anchorPlacements) {
+          // ⚠️ THE RAW MATRIX, DELIBERATELY — `preferredClearance` must NOT be reported here. This
+          // note tells the athlete a clearance is at its floor with nothing spare, and a preference
+          // is not a floor: a week that declined it has broken nothing and must say nothing. Pricing
+          // it here is how a scored preference turns back into a manufactured compromise line.
           const required = requiredAdjacencyHours(kind, a.kind);
           if (required === 0) continue;
           const actual = gapHours(b.assignment[i], a.dayIndex);

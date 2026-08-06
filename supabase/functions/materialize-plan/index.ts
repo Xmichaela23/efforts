@@ -1465,13 +1465,29 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   }
   
   // VO2 run: run_vo2_5x3min_z5 — 5×3 min Z5, 90s float (main set ~22 min)
-  if (/^run_vo2_\d+x\d+min_z5$/.test(lower)) {
-    const m = lower.match(/^run_vo2_(\d+)x(\d+)min_z5$/);
+  //
+  // ⛔ THE RECOVERY IS NOW OPTIONAL IN THE TOKEN, AND ABSENT STILL MEANS 90 s (2026-08-06).
+  // `run_vo2_{reps}x{min}min[_r{n}s]_z5` — the same optional-group pattern `cruise_*` uses below at
+  // its `(?:_r(\d+)s)?`. The bare form is byte-identical to what it was: every plan already built on
+  // `run_vo2_5x3min_z5` expands to the same steps it did yesterday, which is the only reason this
+  // was done as an optional group rather than a required one.
+  //
+  // ⚠️ WHY IT WAS NEEDED: the flat hard-run option (the last-resort terrain — see
+  // `strength-primary-plan.ts` `flatSession`) prescribes a 3-minute float, and a 90 s float turns
+  // 4 × 3 min into a materially harder session than the one the doctrine costed.
+  //
+  // ⛔ THIS BRANCH STILL BRACKETS NOTHING, DELIBERATELY. No warm-up, no cool-down — unlike the hill
+  // tokens, which build their own. Its callers pass `warmup_run_10min_easy` and
+  // `cooldown_run_10min_easy` as separate presets (`generate-combined-plan/session-factory.ts:443`
+  // has done this since it shipped), and the flat session does the same. Adding bracketing here
+  // would silently double the warm-up on every existing caller.
+  if (/^run_vo2_\d+x\d+min(?:_r\d+s)?_z5$/.test(lower)) {
+    const m = lower.match(/^run_vo2_(\d+)x(\d+)min(?:_r(\d+)s)?_z5$/);
     if (m) {
       const reps = parseInt(m[1], 10);
       const workMin = parseInt(m[2], 10);
       const work_s = workMin * 60;
-      const rest_s = 90;
+      const rest_s = m[3] ? parseInt(m[3], 10) : 90;
       const fkp = secPerMiFromBaseline(baselines, 'fivek');
       const vo2Pace = fkp != null ? Math.max(270, fkp - 12) : undefined;
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
@@ -1547,7 +1563,12 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   }
   
   // ── HILL REPEATS — the run-only athlete's one hard aerobic session ──────────────────────────
-  // Token: run_hills_10x40s_r20s_g5_8  →  10 × 40s hard uphill, 20s easy between, grade 5-8%.
+  // Tokens: run_hills_{reps}x{work}s_rlap_g{lo}_{hi}[_d{walk|jog}]      — open, lap-button descent
+  //         run_hills_{reps}x{work}s_r{rest}s_g{lo}_{hi}[_d{walk|jog}][_tm] — fixed recovery
+  //
+  // ⚠️ THIS LINE USED TO NAME `run_hills_10x40s_r20s_g5_8`, WHICH NO LONGER EXISTS. That token was
+  // built on 2026-08-06 and reverted the same day (Q-260) — see the 40-second warning in the
+  // lap-button branch below. It is the first thing a session skims, and it named a dead session.
   // Spec: docs/DOCTRINE-aerobic-maintenance-run-only.md §2, §3, §5.
   //
   // ⛔ NO PACE TARGET, AND THAT IS THE POINT (§2.2). The pace-effort relationship changes with
@@ -1631,8 +1652,16 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       return out;
     }
   }
-  if (/^run_hills_\d+x\d+s_r\d+s_g\d+_\d+(?:_d(?:walk|jog))?$/.test(lower)) {
-    const m = lower.match(/^run_hills_(\d+)x(\d+)s_r(\d+)s_g(\d+)_(\d+)(?:_d(walk|jog))?$/);
+  // ⚠️ `_tm` IS A LABEL SWITCH AND NOTHING ELSE (2026-08-06). A treadmill session is structurally
+  // identical to the outdoor fixed-recovery hill — same reps, same work, same recovery, same grade
+  // band — so it reuses this branch rather than forking one. What it cannot reuse is the WORDING:
+  // "Hill · 5-8% grade" and "Jog down" describe a hill and a descent, and the athlete is on a belt
+  // in a room. A step label that names a session the athlete is not doing is the same species of
+  // error as a pace target on a gradient, and it reaches the watch face.
+  // ⛔ Do NOT hang any structural difference off this suffix. The moment `_tm` changes a duration or
+  // a rep count, the two sessions are two sessions and this branch is lying about being one.
+  if (/^run_hills_\d+x\d+s_r\d+s_g\d+_\d+(?:_d(?:walk|jog))?(?:_tm)?$/.test(lower)) {
+    const m = lower.match(/^run_hills_(\d+)x(\d+)s_r(\d+)s_g(\d+)_(\d+)(?:_d(walk|jog))?(_tm)?$/);
     if (m) {
       const reps = parseInt(m[1], 10);
       const work_s = parseInt(m[2], 10);
@@ -1640,8 +1669,11 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const gradeLo = parseInt(m[4], 10);
       const gradeHi = parseInt(m[5], 10);
       const descentJogged = m[6] === 'jog';
+      const treadmill = m[7] === '_tm';
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
-      const gradeLabel = `${gradeLo}-${gradeHi}% grade`;
+      const gradeLabel = treadmill
+        ? `${gradeLo}-${gradeHi}% incline`
+        : `${gradeLo}-${gradeHi}% grade`;
       // ⛔ WARM-UP AND COOL-DOWN. Without these the session was 21 minutes that opened with a maximal
       // uphill rep from cold — the athlete walks out the door and straight into it. Helgerud's own
       // protocol brackets the work with ~10 min either side, and it is the difference between a 21-min
@@ -1653,7 +1685,8 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
           kind: 'work',
           duration_s: work_s,
           // ⛔ Deliberately no `pace_sec_per_mi`. See above. Do not "fix" this by adding one.
-          label: `Hill · ${gradeLabel}`,
+          // ⚠️ Nor on the treadmill: the belt speed that means "hard" at 6% is not the flat one.
+          label: treadmill ? `Incline · ${gradeLabel}` : `Hill · ${gradeLabel}`,
         });
         if (i < reps - 1) {
           // ⛔ A JOGGED DESCENT IS THE ECCENTRIC LOAD IN THIS SESSION. Downhill running is the
@@ -1667,7 +1700,12 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
             kind: 'recovery',
             duration_s: rest_s,
             ...(descentJogged ? { pace_sec_per_mi: easyPace } : {}),
-            label: descentJogged ? 'Jog down' : 'Walk down',
+            // ⚠️ THE TREADMILL HAS NO DESCENT AND THAT IS WHY IT NEVER WALKS. There is nothing to
+            // run down, so the eccentric load the walk/jog rule exists to ration is simply absent
+            // here — the recovery is the incline dropped to easy, and it is always jogged.
+            label: treadmill
+              ? 'Easy — incline down'
+              : (descentJogged ? 'Jog down' : 'Walk down'),
           });
         }
       }
