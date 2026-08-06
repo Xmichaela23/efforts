@@ -27,11 +27,15 @@ import { mapApproachToMethodology } from '../shared/strength-system/placement/st
 import { effectiveStrengthFrequency } from '../shared/strength-system/frequency-policy.ts';
 import { addTimingLogic } from './timing-logic.ts';
 import { resolveCurrentMaxHr, ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
+// THE run-pace resolver (D-285/D-287) — the pace ladder here reads through it rather than off
+// `learned_fitness`, so this consumer cannot land on a different number from every other surface.
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import {
   calculateEffortScore,
   getPacesFromScore,
   getTargetTime,
   estimateVdotFromPace,
+  estimateVdotFromBasePace,
   type TrainingPaces
 } from './effort-score.ts';
 import {
@@ -188,11 +192,33 @@ Deno.serve(async (req: Request) => {
       ).bpm ?? ageMaxHr;
       zoneLthr = num(cfg.manual_run_lthr) ?? num(lf.run_threshold_hr) ?? ageLthr;
       zoneRestingHr = num(pn.restingHeartRate) ?? num(pn.resting_hr) ?? num(cfg.resting_heart_rate) ?? 60;
-      // VDOT (pace zones) — from the learned threshold pace; else a 5K-derived score. Pace has no
-      // age-estimated tier (you can't estimate pace from age) → no learned pace = RPE pace fallback.
+      // VDOT (pace zones) — from the learned threshold pace; else a 5K-derived score; else the
+      // athlete's EASY pace. Pace has no age-estimated tier (you can't estimate pace from age) →
+      // nothing on file at all = RPE pace fallback.
       const thrSecPerKm = num(lf.run_threshold_pace_sec_per_km);
       if (thrSecPerKm) zoneVdot = estimateVdotFromPace(thrSecPerKm * 1.60934) ?? undefined;
       if (zoneVdot === undefined && typeof effortScore === 'number' && effortScore > 0) zoneVdot = effortScore;
+      // ⛔ THE EASY-PACE RUNG, AND IT WAS THE ONE MISSING (2026-08-06). Every sustainable build —
+      // which is EVERY "getting to the finish" race — printed RPE wording instead of paces for an
+      // athlete who has an easy pace and nothing else. The two rungs above cannot fire for them:
+      // `create-goal` only sends `effort_score` on the performance_build branch, and a self-reported
+      // calibration needs BOTH an easy and a 5K pace (`calibrationFromPaces` returns null with one),
+      // so the athlete who typed only their easy pace lands here with nothing.
+      //
+      // ⚠️ NOT A NEW LADDER — `mergeRunPerformanceSeeds` (`create-goal…:336`) has had this exact
+      // rung, `estimateVdotFromBasePace` off the learned base pace, the whole time. It simply never
+      // ran on this path. Read through `resolveCurrentRunEasyPace` (D-285/D-287, THE run-pace
+      // resolver) rather than off `learned_fitness` directly, so this consumer cannot pick a
+      // different number from every other surface — and so the manual/chosen tiers count too.
+      if (zoneVdot === undefined) {
+        const easy = resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as never);
+        if (easy.sec_per_mi != null) {
+          zoneVdot = estimateVdotFromBasePace(easy.sec_per_mi) ?? undefined;
+          if (zoneVdot !== undefined) {
+            console.log(`[PlanGen] VDOT from EASY pace ${easy.sec_per_mi}s/mi (source=${easy.source}, confidence=${easy.confidence ?? '-'}, estimate=${easy.is_estimate}) → vdot ${zoneVdot}`);
+          }
+        }
+      }
       console.log(`[PlanGen] zone inputs (manual→learned→age): lthr=${zoneLthr ?? '-'} maxHR=${zoneMaxHr ?? '-'} restHR=${zoneRestingHr ?? '-'} vdot=${zoneVdot ?? '-'}`);
     } catch (zErr) {
       console.warn('[PlanGen] zone-input fetch failed (non-fatal, RPE fallback):', zErr);

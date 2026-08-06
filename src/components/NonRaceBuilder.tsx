@@ -16,7 +16,10 @@ import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY } from '@/lib/st
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
 // ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
 // week against the SAME numbers the engine builds from, or it is guessing at the athlete.
-import { validateWeeklyMiles, TIER_SEEDS, tierMismatchNote, type IntakeTier } from '@/lib/run-volume-tables';
+import {
+  validateWeeklyMiles, TIER_SEEDS, tierMismatchNote, longRunCeiling,
+  TYPICAL_PEAK_LONG_RUN_MI, type IntakeTier,
+} from '@/lib/run-volume-tables';
 // ⛔ ONE CALIBRATION, shared with the race form's. Also the ONLY vDOT engine — `effort-score.ts`.
 import {
   hasPaceBenchmark, calibrationFromPaces, saveCalibration, formatPaceInput,
@@ -1054,6 +1057,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   /** The discipline the race develops. Everything else is held or parked (Michael, 2026-08-04). */
   const raceDiscipline: Discipline = RACE_DISCIPLINE[state.raceDistance] ?? 'run';
   const raceWeeks = state.raceDate ? weeksUntilRaceApprox(state.raceDate) : null;
+  /**
+   * ⛔ HOW LONG THE BLOCK WILL ACTUALLY BE — the week race day falls in, counted from the plan's own
+   * first Monday, NOT from today.
+   *
+   * `raceWeeks` is weeks-from-now, which is the right question for "can this be planned at all" and
+   * the wrong one for "how many weeks is it". They differ whenever the plan opens on a later Monday:
+   * a Sunday race 66 days out is 10 weeks away and plan week 9. The server trims the block to the
+   * race week for exactly this reason (`planWeekContaining`, `_shared/planning-context.ts`), so a
+   * screen quoting `raceWeeks` describes a plan one week longer than the one it builds.
+   *
+   * ⚠️ THE GATE STILL READS `raceWeeks`. This is display and arithmetic only — race-week support
+   * mode depends on a race that is days away, and re-pointing the gate would change who gets in.
+   */
+  const planWeeks = (() => {
+    if (!state.raceDate || !state.startDate) return raceWeeks;
+    const start = new Date(`${state.startDate}T00:00:00`).getTime();
+    const race = new Date(`${state.raceDate}T00:00:00`).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(race) || race < start) return raceWeeks;
+    const week = Math.floor((race - start) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    return raceWeeks != null ? Math.min(raceWeeks, week) : week;
+  })();
   // The race card cannot continue on a date alone: level picks the volume table the whole plan is
   // built from, and a blank one would fall to the silent `intermediate` this card exists to replace.
   /**
@@ -1189,14 +1213,47 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const toDisplayMi = (mi: number) => Math.round(unit === 'km' ? mi * 1.609344 : mi);
   const milesFloorDisplay = milesVerdict ? Math.ceil(unit === 'km' ? milesVerdict.requiredMi * 1.609344 : milesVerdict.requiredMi) : null;
   const longRunDisplay = milesVerdict ? toDisplayMi(milesVerdict.longRunWeek1Mi) : null;
+  const typedLongRunCanonical = typeof state.longRunMiles === 'number' && state.longRunMiles > 0
+    ? (unit === 'km' ? state.longRunMiles / 1.609344 : state.longRunMiles)
+    : null;
   /** The soft signal — what they entered vs what the tier assumes. Null when they agree. */
   const mismatchNote = state.fitness
     ? tierMismatchNote(state.fitness as IntakeTier, {
         weeklyMi: typedMilesCanonical,
-        longRunMi: typeof state.longRunMiles === 'number' && state.longRunMiles > 0
-          ? (unit === 'km' ? state.longRunMiles / 1.609344 : state.longRunMiles)
-          : null,
+        longRunMi: typedLongRunCanonical,
       })
+    : null;
+
+  /**
+   * ⛔ WHAT THE LONGEST RUN ACTUALLY REACHES ON THIS TIMELINE — stated before the athlete commits.
+   *
+   * The engine builds the long run backward from race day now (`buildLongRunArc`), so a block
+   * shorter than the distance's arc climbs the same ladder and stops lower. That is the correct
+   * plan; the failure was never saying so. A 9-week marathon that tops out at a 10-mile long run is
+   * a fact the athlete can act on — race the half, or move the date — and finding it out in the
+   * race is the one outcome the screen can prevent.
+   *
+   * ⚠️ SAME FUNCTION THE ENGINE RUNS. The number here is the number that will be prescribed, off the
+   * same table, the same entry rung and the same taper — not a second estimate of it.
+   *
+   * ⚠️ IT IS NOT A WALL and it is not conditional on the mileage floor. The two say different
+   * things: the floor is about the week the block opens on, this is about the run it ends on.
+   */
+  const longRunReach = isRaceGoal && state.fitness && planWeeks
+    ? longRunCeiling(
+        RACE_DISTANCE_API[state.raceDistance] ?? '', state.fitness, planWeeks, typedLongRunCanonical,
+        { startDateISO: state.startDate, raceDateISO: state.raceDate },
+      )
+    : null;
+  const typicalPeak = TYPICAL_PEAK_LONG_RUN_MI[RACE_DISTANCE_API[state.raceDistance] ?? ''] ?? null;
+  /**
+   * ⛔ AND THE HALF IS OFFERED ONLY WHEN IT IS TRUE. "The same weeks build a half" is a claim about
+   * the athlete, not about the distance: on 10 weeks off a 6-mile long run the half arc comes up
+   * short as well, and offering it then is the same silent over-promise one distance down.
+   */
+  const halfReach = longRunReach?.shortOfTable && state.fitness
+    ? longRunCeiling('half', state.fitness, planWeeks ?? 0, typedLongRunCanonical,
+        { startDateISO: state.startDate, raceDateISO: state.raceDate })
     : null;
 
   /**
@@ -1650,10 +1707,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   race (its race-support and bridge-peak modes cap at 2 and 6 weeks). Stating a
                   number this screen cannot guarantee as though it were fixed is the failure this
                   file keeps having; the hedge is the honest half. */}
-              {raceWeeks !== null && (
+              {raceWeeks !== null && planWeeks !== null && (
                 <p className="text-white/70 text-sm mt-1.5">
-                  About {raceWeeks} week{raceWeeks === 1 ? '' : 's'} of training
-                  {raceWeeks === 20 ? ' — the longest block we build to a single race.' : '.'}
+                  About {planWeeks} week{planWeeks === 1 ? '' : 's'} of training
+                  {planWeeks === 20 ? ' — the longest block we build to a single race.' : '.'}
                 </p>
               )}
               {state.raceDate && raceWeeks === null && (
@@ -1824,6 +1881,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     <p className="text-white/60 text-xs mt-1.5 leading-relaxed">
                       The plan will open near {milesFloorDisplay} {unit} either way — that is its
                       floor for this level.
+                    </p>
+                  </div>
+                )}
+                {/* ⛔ THE CEILING, STATED. Where the block's longest run lands, against what the
+                    distance normally asks for. Fact, then consequence, then the alternative — no
+                    instruction, and no wall: they continue either way. */}
+                {longRunReach?.shortOfTable && typicalPeak && planWeeks && (
+                  <div className="rounded-lg border border-white/12 bg-white/[0.03] p-2.5">
+                    <p className="text-white/85 text-xs leading-relaxed">
+                      Over {planWeeks} weeks from where you are now, the longest run in this block
+                      reaches about {toDisplayMi(longRunReach.peakLongRunMi)} {unit}. Most{' '}
+                      {state.raceDistance.toLowerCase()} plans peak at {toDisplayMi(typicalPeak[0])}{' '}
+                      to {toDisplayMi(typicalPeak[1])}.
+                    </p>
+                    <p className="text-white/60 text-xs mt-1.5 leading-relaxed">
+                      The block builds and tapers either way, and the last long run sits two to three
+                      weeks before race day. The gap shows up late in the race, over the distance
+                      nothing in training covered.
+                      {halfReach && !halfReach.shortOfTable
+                        ? ' The same weeks build a half marathon to its full arc.'
+                        : ''}
                     </p>
                   </div>
                 )}
@@ -3224,7 +3302,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           // ⛔ THE PROTOCOL NAME MOVED HERE when the posture card came out — it was the one fact on
           // that card the week grid cannot show, and dropping it silently would have lost it.
           subtitle={isRaceGoal
-            ? `${state.raceDistance} — ${state.raceDate}${raceWeeks !== null ? `, about ${raceWeeks} weeks` : ''}.`
+            ? `${state.raceDistance} — ${state.raceDate}${planWeeks !== null ? `, about ${planWeeks} weeks` : ''}.`
             : `${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks${isStrengthFocus ? ' of Wendler 5/3/1' : ''}.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
@@ -3318,7 +3396,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     phase is a taper, not a retest (`phase-structure.ts:401`). And no promised week
                     count: the number is the server's, computed from today, and it can be cut hard
                     on a close race. "About" is doing real work in this sentence. */
-                <>Running leads to {state.raceDistance.toLowerCase()} day, about {raceWeeks ?? '—'} weeks
+                <>Running leads to {state.raceDistance.toLowerCase()} day, about {planWeeks ?? '—'} weeks
                 out, with a taper into the race. Everything you kept is held underneath it.</>
               ) : isStrengthFocus ? (
                 /* ⛔ "every third week" was false — the open set exists ONLY in the anchor cycle

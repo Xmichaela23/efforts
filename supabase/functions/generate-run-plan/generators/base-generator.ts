@@ -12,6 +12,10 @@ import {
   TOKEN_PATTERNS
 } from '../types.ts';
 import { assignDays } from './assign-days.ts';
+// ⛔ ONE SCAN FOR "WHERE IS THIS ATHLETE IN THE LONG-RUN ROW", shared with the race-day-anchored arc
+// the sustainable generator builds. A second copy here is how the intake and the engine start
+// entering the same table at different rungs. See that file's header for the deploy consequence.
+import { longRunEntryIndex } from '../../../../src/lib/run-volume-tables.ts';
 
 export abstract class BaseGenerator {
   protected params: GeneratorParams;
@@ -132,18 +136,9 @@ export abstract class BaseGenerator {
    * Caps the offset at half the progression length so the plan still builds to peak.
    */
   protected getProgressionOffset(progression: number[]): number {
-    const recentLongRun = this.params.recent_long_run_miles;
-    if (!recentLongRun || recentLongRun <= 0 || progression.length === 0) return 0;
-
-    const target = recentLongRun * 0.95;
-    let bestIndex = 0;
-    for (let i = 0; i < progression.length; i++) {
-      if (progression[i] <= target) {
-        bestIndex = i;
-      } else {
-        break;
-      }
-    }
+    // The scan itself lives in `src/lib/run-volume-tables.ts` — same rung for every caller, and the
+    // same one `buildLongRunArc` enters at. Only the cap below is this function's own.
+    const bestIndex = longRunEntryIndex(progression, this.params.recent_long_run_miles);
 
     // Allow entering up to (progression.length - duration_weeks) positions in
     // so there's always enough remaining table for the full plan duration.

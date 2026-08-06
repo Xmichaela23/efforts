@@ -22,7 +22,14 @@ import { formatPace } from '../effort-score.ts';
 // ⛔ MOVED TO `src/lib/run-volume-tables.ts` (2026-08-04). The intake validates a typed weekly
 // mileage against week 1 of this arc, so the numbers had to become shareable. One copy, imported.
 // See that file's header for the deploy consequence.
-import { LONG_RUN_PROGRESSION, WEEKLY_MILEAGE } from '../../../../src/lib/run-volume-tables.ts';
+import {
+  LONG_RUN_PROGRESSION,
+  WEEKLY_MILEAGE,
+  MAX_WEEKLY_MILEAGE_INCREASE,
+  buildLongRunArc,
+  longRunPeakWeek,
+  type LongRunArc,
+} from '../../../../src/lib/run-volume-tables.ts';
 
 
 export class SustainableGenerator extends BaseGenerator {
@@ -300,12 +307,29 @@ export class SustainableGenerator extends BaseGenerator {
     const taperPhase = phaseStructure.phases.find(p => isRestedTerminal(canonicalizePhaseName(p.name)));
     const taperStart = taperPhase?.start_week || this.params.duration_weeks;
 
-    let targetMiles: number;
-    if (weekNumber < taperStart) {
-      const progress = (weekNumber - 1) / Math.max(1, taperStart - 2);
-      targetMiles = effectiveStart + (peak - effectiveStart) * Math.min(1, progress);
-    } else {
-      targetMiles = peak * 0.5;
+    // ⛔ THE RAMP IS CEILINGED AT ~10% A WEEK (2026-08-06). The straight line from start to peak is
+    // as steep as the plan is short: a 9-week block from 19 mi/wk to a 40-mile peak asks for +3.5
+    // miles a week — an 18% jump into week 2, then 16%, then 14%. Nothing capped it, and nothing
+    // said so. `MAX_WEEKLY_MILEAGE_INCREASE` is the guard; the tables still decide the destination.
+    //
+    // ⚠️ THE CAP RUNS ON THE BUILD TREND, so it has to be walked from week 1 rather than evaluated
+    // at `weekNumber` — a capped week is the base for the next week's ceiling. Cheap (≤20 steps) and
+    // keeps the function pure, which is what every caller here assumes.
+    //
+    // ⚠️ A CUTBACK WEEK DOES NOT ADVANCE THE BUILD, and this is the same convention the long-run
+    // rows already use ("post-recovery: resume at pre-recovery level, not beyond"). Without it the
+    // trend keeps climbing underneath the deload and the athlete comes back to a week 22% over the
+    // last one they actually ran — a 10% cap that only holds on paper. The cut itself is applied
+    // after the walk, so the deloaded week is never the base for the next week's ceiling either.
+    const uncapped = (w: number) => {
+      if (w >= taperStart) return peak * 0.5;
+      const progress = (w - 1) / Math.max(1, taperStart - 2);
+      return effectiveStart + (peak - effectiveStart) * Math.min(1, progress);
+    };
+    let targetMiles = effectiveStart;
+    for (let w = 2; w <= weekNumber; w++) {
+      if (this.isRecoveryWeek(w, phaseStructure)) continue;
+      targetMiles = Math.min(uncapped(w), targetMiles * MAX_WEEKLY_MILEAGE_INCREASE);
     }
 
     if (isRecovery) {
@@ -313,6 +337,34 @@ export class SustainableGenerator extends BaseGenerator {
     }
 
     return Math.round(targetMiles);
+  }
+
+  // ── The long run, anchored to race day ─────────────────────────────────────
+
+  /** Built once per plan — the arc is a whole-plan shape, not a per-week lookup. */
+  private longRunArcMemo: LongRunArc | null | undefined;
+
+  private resolveLongRunArc(): LongRunArc | null {
+    if (this.longRunArcMemo === undefined) {
+      // ⚠️ THE PEAK WEEK RULE LIVES IN THE SHARED FILE, not here — the intake quotes the peak this
+      // arc reaches before the athlete commits, and it has to be reading the same week.
+      this.longRunArcMemo = buildLongRunArc({
+        distance: this.params.distance,
+        fitness: this.params.fitness,
+        durationWeeks: this.params.duration_weeks,
+        entryLongRunMi: this.params.recent_long_run_miles,
+        peakWeek: longRunPeakWeek({
+          durationWeeks: this.params.duration_weeks,
+          startDateISO: this.params.start_date,
+          raceDateISO: this.params.race_date,
+        }),
+      });
+      const a = this.longRunArcMemo;
+      if (a) {
+        console.log(`[PlanGen] long-run arc: peak ${a.peakMi}mi on week ${a.peakWeek} of ${this.params.duration_weeks}, longest ${a.maxMi}mi (table max ${a.tableMaxMi}), arc ${a.weeks.join('/')}`);
+      }
+    }
+    return this.longRunArcMemo;
   }
 
   private getLongRunMiles(weekNumber: number): number {
@@ -394,18 +446,20 @@ export class SustainableGenerator extends BaseGenerator {
       return Math.round(recentLongRun * 0.76);
     }
 
-    // Standard path: find where the athlete sits in the progression table.
-    const offset = this.getProgressionOffset(progression);
-    const index = weekNumber - 1 + offset;
-
-    if (index < progression.length) {
-      return progression[index] || 10;
-    }
-
-    // Beyond the table: gentle taper (2 miles/week down from the last value)
-    const lastValue = progression[progression.length - 1];
-    const weeksBeyond = index - (progression.length - 1);
-    return Math.max(8, lastValue - weeksBeyond * 2);
+    // ⛔ STANDARD PATH — ANCHORED TO RACE DAY, NOT TO WEEK 1 (2026-08-06).
+    //
+    // This used to be `index = weekNumber - 1 + offset` against a table read forward. The row's tail
+    // IS the taper, so a plan shorter than the row never reached it: a 9-week beginner marathon
+    // climbed to a 10-mile long run and then raced, with the biggest long run of the block ON RACE
+    // WEEK and no taper anywhere. The offset only shifted the entry point when the athlete had a
+    // long run on file, which a new account does not.
+    //
+    // `buildLongRunArc` (`src/lib/run-volume-tables.ts`) now lands the row's final peak on the peak
+    // week and tapers off whatever peak was actually reached. Same rows, same rungs, same ladder —
+    // read from the other end. At full length it returns exactly what this code did.
+    const arc = this.resolveLongRunArc();
+    if (!arc) return 10;
+    return arc.weeks[weekNumber - 1] ?? arc.weeks[arc.weeks.length - 1] ?? 10;
   }
 
   // ============================================================================
@@ -547,11 +601,21 @@ export class SustainableGenerator extends BaseGenerator {
       return;
     }
 
-    const milesPerDay = Math.max(3, Math.round(remainingMiles / remainingDays));
-    const easyMiles = Math.max(3, Math.min(6, milesPerDay)); // Cap at 6 miles for easy runs
+    // ⛔ THE REMAINDER IS SPREAD, NOT ROUNDED AWAY (2026-08-06). Every easy day used to get the SAME
+    // rounded number, so the week the athlete reads jumped in steps of `remainingDays` miles: a
+    // 19 → 21 mile ramp printed as 18 → 23, a 28% week-over-week rise out of a trend capped at 10%.
+    // The cap is only worth having if the printed week honours it.
+    //
+    // ⚠️ THE 3-6 MILE BAND IS UNCHANGED — this decides how the remainder lands inside it, not how
+    // big an easy run may be.
+    const target = Math.max(0, Math.round(remainingMiles));
+    const base = Math.max(3, Math.min(6, Math.floor(target / remainingDays)));
+    let leftover = target - base * remainingDays;
 
     for (let i = 0; i < remainingDays; i++) {
-      sessions.push(this.createSimpleEasyRun(easyMiles));
+      const takesOne = leftover > 0 && base < 6;
+      if (takesOne) leftover -= 1;
+      sessions.push(this.createSimpleEasyRun(base + (takesOne ? 1 : 0)));
     }
   }
 

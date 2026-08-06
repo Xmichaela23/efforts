@@ -5,6 +5,29 @@
 import type { CompletedEvent, SwimTrainingFromWorkouts } from './arc-context.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
+/**
+ * ⛔ WHICH PLAN WEEK A DATE FALLS IN, counting from the plan's own first Monday. 1-based; null when
+ * either date is unusable or the date is before the plan opens.
+ *
+ * ⚠️ THIS IS NOT `weeksUntilRace` AND THE DIFFERENCE IS THE BUG IT EXISTS FOR (2026-08-06).
+ * "Weeks out" is counted from TODAY and answers "how long has this athlete got" — the right question
+ * for a timeline refusal. A plan's LENGTH is a different question, because the block opens on the
+ * next Monday, not today. Race Sunday 2026-10-11 asked on Thursday 2026-08-06 is 10 weeks out and
+ * plan week **9**; building ten weeks put an empty week on the calendar, every day of it after the
+ * race.
+ */
+export function planWeekContaining(
+  planStartISO: string | null | undefined,
+  dateISO: string | null | undefined,
+): number | null {
+  if (!planStartISO || !dateISO) return null;
+  const start = new Date(`${planStartISO}T00:00:00`);
+  const date = new Date(`${dateISO}T00:00:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(date.getTime())) return null;
+  const days = Math.floor((date.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  return days >= 0 ? Math.floor(days / 7) + 1 : null;
+}
+
 export type TrainingTransitionMode =
   | 'peak_bridge'
   | 'recovery_rebuild'

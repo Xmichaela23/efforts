@@ -20,11 +20,16 @@ import {
   type PostRaceRecoveryResult,
   swimSecPer100YdFromArcSwimInputs,
   swimVolumeMultiplierFromArcWorkouts,
+  planWeekContaining,
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
 import { LIFT_LABEL, missingBarbellLifts, readBarbellMaxes } from '../shared/strength-system/barbell-maxes.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+// ⛔ THE INTAKE'S OWN SEED TABLE, read here to tell an ANSWER from a PREFILL. See the precedence
+// note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
+// cannot drift; `create-goal-and-materialize-plan` must be redeployed when it changes.
+import { TIER_SEEDS, type IntakeTier } from '../../../src/lib/run-volume-tables.ts';
 import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
@@ -3375,11 +3380,36 @@ Deno.serve(async (req: Request) => {
       });
       throw new AppError(timelineRefusal.code, timelineRefusal.message);
     }
-    const durationWeeks = adaptiveSupportMode
+    /**
+     * ⛔ THE PLAN WEEK RACE DAY ACTUALLY FALLS IN — and it is not always `weeksOut` (2026-08-06).
+     *
+     * `weeksOut` is counted from TODAY; the plan opens on the NEXT MONDAY. Race Sunday 2026-10-11
+     * asked from Thursday 2026-08-06 is `ceil(66/7)` = 10 weeks out, but from the plan's own Monday
+     * (2026-08-10) it is 62 days — race day lands in plan **week 9**, and the block was built ten
+     * weeks long. Week 10 began the day after the race: an empty week on the calendar, every day of
+     * it past the race, so `generateRaceWeekSessions` emitted nothing for all seven.
+     *
+     * ⚠️ `weeksOut` ITSELF IS UNTOUCHED. It feeds the timeline refusal and the planning-context
+     * signals, both of which are asking "how long has this athlete got from now" — the right
+     * question for them, and a settled one (STATE-race-builder §3). This only stops the plan being
+     * laid out past its own race day.
+     *
+     * ⚠️ IT IS A CEILING, NOT A REPLACEMENT. The floor still raises a short block; this then trims
+     * any week that would start after the race, so the two cannot disagree in the direction that
+     * puts empty weeks on the calendar.
+     */
+    const raceWeekOfPlan = planWeekContaining(plan_start_date, resolvedGoal?.target_date);
+    const durationWeeksRaw = adaptiveSupportMode
       ? Math.max(1, Math.min(weeksOut, adaptiveMode === 'race_support' ? 2 : 6))
       : allowRaceWeekSupportMode
         ? Math.max(1, Math.min(weeksOut, 2))
         : Math.max(personalizedFloorWeeks, Math.min(weeksOut, 20));
+    const durationWeeks = raceWeekOfPlan != null
+      ? Math.max(1, Math.min(durationWeeksRaw, raceWeekOfPlan))
+      : durationWeeksRaw;
+    if (raceWeekOfPlan != null && durationWeeks !== durationWeeksRaw) {
+      console.log(`[create-goal] duration trimmed ${durationWeeksRaw} → ${durationWeeks} weeks: race day falls in plan week ${raceWeekOfPlan} counting from ${plan_start_date}`);
+    }
 
     if (goalType === 'speed') {
       const hasRaceTime = baseline?.effort_source_distance && baseline?.effort_source_time;
@@ -3567,11 +3597,51 @@ Deno.serve(async (req: Request) => {
       //
       // ⚠️ MILES. `assemblePayload` canonicalises from the athlete's display unit before it leaves
       // the client (`NonRaceBuilder.tsx` `payloadNow`), so no conversion belongs here.
+      //
+      // ⛔ AND A TIER PREFILL IS NOT AN ANSWER (2026-08-06). Tapping a level on the intake DROPS
+      // `TIER_SEEDS[level].weeklyMi` into the field — 20/30/40 — so `target_weekly_miles` always
+      // arrives populated whether or not the athlete touched it. The rule above then handed the
+      // engine the LEVEL BUTTON's number and discarded everything ingested from their training.
+      // An athlete already running 35 who taps "first marathon" opened their block at 20.
+      //
+      // ⚠️ THE TEST IS EQUALITY WITH THE SEED, and it is an inference, not a flag: the client sends
+      // no provenance. It is wrong only for an athlete whose real answer is EXACTLY the seed, and
+      // for them the two numbers are claims about the same thing anyway.
+      //
+      // ⚠️ AND IT ONLY EVER MOVES THE NUMBER UP. `weeklyMiles` is not measured mileage — it is
+      // `workload_by_discipline.run / 10` (`planning-context.ts:366`), a load-unit proxy that
+      // UNDER-reports easy running by roughly a third. Higher than the seed therefore means "they
+      // are certainly running more than the level assumes" and is worth acting on; lower cannot tell
+      // "runs less" from "the proxy is lossy", so the athlete's own number stands.
       current_weekly_miles: (() => {
         const typed = Number((resolvedGoal?.training_prefs as Record<string, unknown> | undefined)?.target_weekly_miles);
+        const seed = TIER_SEEDS[fitness as IntakeTier]?.weeklyMi;
+        const untouchedSeed = Number.isFinite(typed) && seed != null && typed === seed;
+        if (untouchedSeed && weeklyMiles != null && weeklyMiles > typed) return weeklyMiles;
         return Number.isFinite(typed) && typed > 0 ? typed : weeklyMiles;
       })(),
-      ...(recent_long_run_miles != null ? { recent_long_run_miles } : {}),
+      // ⛔ THE TYPED LONGEST RUN, AND IT WAS THE SAME BUG ONE FIELD OVER. The intake asks "longest
+      // run in the last month", `assemblePayload` writes it to `training_prefs.recent_long_run_miles`
+      // — and this line read only the snapshot-derived value, so the answer was collected, stored
+      // and never read. It is load-bearing now: it is the rung the long-run arc enters the table at
+      // (`buildLongRunArc`), and the intake quotes the peak that arc reaches BEFORE the athlete
+      // commits. Dropping it here would make that quote describe a plan we did not build.
+      //
+      // Same precedence as the week above, for the same reason.
+      //
+      // ⚠️ `weeks_since_peak_long_run` BELOW STILL DESCRIBES THE SNAPSHOT'S peak, not a typed one —
+      // there is no "when" to go with the typed number. Only the peak-pivot branch in
+      // `sustainable.getLongRunMiles` reads the pair, and only for a peaked athlete on a ≤10-week
+      // plan. Left as is rather than invented; noted so the mismatch is not read as a fact.
+      ...((() => {
+        const typed = Number((resolvedGoal?.training_prefs as Record<string, unknown> | undefined)?.recent_long_run_miles);
+        const seed = TIER_SEEDS[fitness as IntakeTier]?.longRunMi;
+        const untouchedSeed = Number.isFinite(typed) && seed != null && typed === seed;
+        const resolved = (untouchedSeed && recent_long_run_miles != null && recent_long_run_miles > typed)
+          ? recent_long_run_miles
+          : (Number.isFinite(typed) && typed > 0 ? typed : recent_long_run_miles);
+        return resolved != null ? { recent_long_run_miles: resolved } : {};
+      })()),
       ...(weeks_since_peak_long_run != null ? { weeks_since_peak_long_run } : {}),
       ...(current_acwr != null ? { current_acwr } : {}),
       ...(volume_trend ? { volume_trend } : {}),

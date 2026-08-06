@@ -513,7 +513,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
-  const [eventSport, setEventSport] = useState('run');
+  // ⚠️ 'ride', NOT 'run' — run races leave this form for the Race card (see the sport select).
+  // A 'run' default would open the form on a sport its own picker no longer offers.
+  const [eventSport, setEventSport] = useState('ride');
   const [eventDistance, setEventDistance] = useState('');
   const [eventPriority, setEventPriority] = useState<'A' | 'B' | 'C'>('A');
   const [eventFitness, setEventFitness] = useState<'beginner' | 'intermediate' | 'advanced' | ''>('');
@@ -1061,7 +1063,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({}); setPlanStartDate('');
+    setEventName(''); setEventDate(''); setEventSport('ride'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({}); setPlanStartDate('');
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
     setGoalFlowError(null);
@@ -2537,6 +2539,25 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           {!planStartDate && (
             <p className="text-xs text-white/30 -mt-1">Plan start defaults to this Monday — set a date above to control when training begins.</p>
           )}
+          {/* ⛔ RUN LEAVES BY THE DOOR, NOT BY DELETION (2026-08-06, STATE-race-builder §2.3).
+              Michael, on finding both: *"oh you have 2 marathon builders"*. This form and the Race
+              card built the same run plan from different questions — the card asks for the long-run
+              day, the club night, the athlete's current week and their longest run, and it states
+              what the block's longest run will reach; this form asks none of it and cannot, because
+              it is one screen for five sports.
+              ⚠️ THE OTHER SPORTS KEEP IT. Ride, swim and tri have no card yet, and a form that opens
+              nothing is the failure the entry-card rule was written against. */}
+          <button
+            type="button"
+            onClick={() => { resetForms(); setShowBuilder('race'); }}
+            className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-left hover:bg-white/[0.08] transition-colors"
+          >
+            <span className="block text-sm text-white/85">Running a race?</span>
+            <span className="block text-xs text-white/45 mt-0.5">
+              The run builder asks for your week, your long run and the day it sits on, and says what
+              the block will reach before you commit.
+            </span>
+          </button>
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Sport</span>
             <select value={eventSport} onChange={e => {
               const v = e.target.value;
@@ -2560,7 +2581,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 );
               }
             }} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors appearance-none">
-              <option value="run">Run</option><option value="ride">Ride</option><option value="swim">Swim</option><option value="triathlon">Triathlon</option><option value="other">Other</option>
+              {/* No Run — it routes to the Race card above. `DISTANCE_OPTIONS.run` stays: an
+                  ALREADY-BUILT run event still reads its distances back through this map. */}
+              <option value="ride">Ride</option><option value="swim">Swim</option><option value="triathlon">Triathlon</option><option value="other">Other</option>
             </select>
           </label>
           {DISTANCE_OPTIONS[eventSport] && (

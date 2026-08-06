@@ -73,11 +73,22 @@ export const WEEKLY_MILEAGE: Record<string, Record<string, WeeklyMileageBand>> =
   }
 };
 /**
- * Week-by-week long-run distance, indexed from week 1. Moved verbatim from `sustainable.ts`.
+ * Week-by-week long-run distance. Moved verbatim from `sustainable.ts`.
  *
- * ⚠️ INDEXED FORWARD FROM WEEK 1, not backward from race day — the tail (the built-in taper) is
- * only reached when the plan is long enough, or when `getProgressionOffset` shifts the entry point
- * using the athlete's recent long run. That is a known limitation, not a thing to fix from here.
+ * ⛔ READ AS A SHAPE, NOT AS A CALENDAR (2026-08-06). It used to be read forward from week 1 — plan
+ * week 1 took entry 0 — so a plan shorter than the row simply stopped partway up the build and the
+ * athlete raced off the last rung they happened to reach. A 9-week beginner marathon peaked at a
+ * 10-mile long run **in race week**, with no taper, because the tail was never reached.
+ *
+ * `buildLongRunArc` below now indexes it BACKWARD from race day: the row's final pre-taper rung
+ * lands on the peak week (the last week whose long run sits more than 14 days out) and the taper
+ * that follows is the row's own tail, re-expressed as ratios of whatever peak was actually reached.
+ *
+ * ⚠️ THE ROW'S SHAPE IS LOAD-BEARING IN TWO PLACES NOW, so do not re-order it:
+ *   • the LAST THREE entries are `peak, taper, race week` — `buildLongRunArc` reads the taper ratios
+ *     off them rather than inventing coefficients.
+ *   • every 4th entry (index 3, 7, 11, …) is a RECOVERY dip. The arc keeps the peak week off a dip
+ *     by shifting its entry point down, which only works while dips stay on that cadence.
  */
 export const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
   'marathon': {
@@ -123,6 +134,245 @@ export const LONG_RUN_PROGRESSION: Record<string, Record<string, number[]>> = {
     'intermediate': [4, 5, 6, 4, 6, 7, 8, 6, 8, 9, 9, 6],
     'advanced': [6, 7, 8, 6, 8, 9, 10, 7, 9, 10, 11, 7]
   }
+};
+
+// ── The long-run arc, anchored to race day ───────────────────────────────────
+
+/**
+ * ⛔ THE WEEK-OVER-WEEK VOLUME CEILING. ~10% is the field's oldest rule of thumb and the one every
+ * commercial builder still ships (Runna, Garmin Coach, Higdon's "never more than 10%"). It is a
+ * GUARD, not a target: the tables set where the week starts and where it is going, this only stops
+ * the straight line between them from being steeper than a body absorbs.
+ *
+ * ⚠️ APPLIED TO THE BUILD TREND. A cutback week neither advances the trend nor becomes the base for
+ * the next week's ceiling, so "10%" means 10% over the biggest week the athlete has actually run —
+ * which is the claim worth making. Without that, the trend climbs underneath the deload and they
+ * come back to a week 22% over their last real one.
+ *
+ * ⚠️ APPLIED IN `generators/sustainable.ts` `calculateWeeklyMileage`, which imports it. It lives
+ * here because it is a volume-table rule, and so there is one number rather than two.
+ */
+export const MAX_WEEKLY_MILEAGE_INCREASE = 1.10;
+
+/**
+ * ⛔ WHERE THE ROW'S OWN TAPER STARTS — its LAST peak, not a fixed depth from the end.
+ *
+ * ⚠️ THE ROWS DO NOT AGREE ON THIS AND ASSUMING THEY DID WAS A BUG. The marathon rows end
+ * `peak, taper, race week` (…17, 12, 8) — a two-week taper. The half, 10K and 5K rows end
+ * `peak, race week` (…11, 12, 8) — one week. Reading a fixed three-deep tail off a half row makes
+ * its "taper" the number 12 against a peak of 11, i.e. a 9% RISE into race week.
+ *
+ * So: the last four rungs, and the LAST index holding their maximum (the 10K rows hold their peak
+ * for two weeks — the later one is where the taper begins). Everything after it is the taper.
+ */
+function tailPeakIndex(progression: number[]): number {
+  const len = progression.length;
+  const from = Math.max(0, len - 4);
+  let best = from;
+  for (let i = from; i <= len - 2; i++) {
+    if (progression[i] >= progression[best]) best = i;
+  }
+  return Math.min(best, len - 2);
+}
+
+/**
+ * Where in the row an athlete's CURRENT long run sits — the entry rung.
+ *
+ * 95% target, so there is a very slight pullback and never a regression beyond ~5%. Uncapped: the
+ * caller decides how deep the plan's own length allows them to enter (`buildLongRunArc` takes the
+ * lower of this and the race-day anchor).
+ *
+ * ⚠️ `base-generator.getProgressionOffset` calls this — one scan, not two. If you change the target
+ * fraction, both the arc and every other generator move together, which is the point.
+ */
+export function longRunEntryIndex(progression: number[], recentLongRunMi?: number | null): number {
+  if (!recentLongRunMi || recentLongRunMi <= 0 || progression.length === 0) return 0;
+  const target = recentLongRunMi * 0.95;
+  let bestIndex = 0;
+  for (let i = 0; i < progression.length; i++) {
+    if (progression[i] <= target) bestIndex = i;
+    else break;
+  }
+  return bestIndex;
+}
+
+/**
+ * ⛔ WHICH PLAN WEEK CARRIES THE PEAK LONG RUN — read off the race DATE, not the plan's length.
+ *
+ * The last week whose long run sits MORE than 14 days out. 15 days is not a taste: the generator's
+ * own `getRaceProximitySession` already calls anything inside 14 days `reduced_quality` and clamps
+ * that Sunday to 10 miles, so a peak landing there would be silently halved by a rule two functions
+ * away. Just outside it is also where Higdon's Novice rows put their longest run.
+ *
+ * ⚠️ ONE COPY, TWO CALLERS — the generator and the intake. They quote the same peak week or the
+ * screen describes a plan the engine did not build. Plan weeks start Monday and the long run is
+ * Sunday, matching `base-generator.getDateForSession`.
+ *
+ * Falls back to `durationWeeks - 2` (a two-week taper) when either date is missing.
+ */
+export function longRunPeakWeek(opts: {
+  durationWeeks: number;
+  startDateISO?: string | null;
+  raceDateISO?: string | null;
+}): number {
+  const duration = Math.floor(opts.durationWeeks);
+  const fallback = Math.max(1, duration - 2);
+  if (!opts.startDateISO || !opts.raceDateISO) return fallback;
+  const start = new Date(`${opts.startDateISO}T00:00:00`);
+  const race = new Date(`${opts.raceDateISO}T00:00:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(race.getTime())) return fallback;
+  const DAY = 24 * 60 * 60 * 1000;
+  for (let w = duration; w >= 1; w--) {
+    const longRunDay = start.getTime() + ((w - 1) * 7 + 6) * DAY; // Monday-start week → its Sunday
+    if (Math.floor((race.getTime() - longRunDay) / DAY) > 14) return Math.min(w, Math.max(1, duration - 1));
+  }
+  return fallback;
+}
+
+export interface LongRunArc {
+  /** Long run in miles for plan week w → `weeks[w - 1]`. Length === durationWeeks. */
+  weeks: number[];
+  /** The plan week the build ends on — the last long run before the taper. */
+  peakWeek: number;
+  /** The long run on that week. NOT necessarily the block's longest (the rows dip after their max). */
+  peakMi: number;
+  /** The longest run anywhere in the block — what the athlete will actually have run. */
+  maxMi: number;
+  /** The longest run this distance/level's row ever prescribes, at full length. */
+  tableMaxMi: number;
+  /** False when the plan ran out of weeks before the row's peak — the honest-ceiling case. */
+  reachesTableMax: boolean;
+}
+
+/**
+ * ⛔ THE LONG-RUN ARC, BUILT BACKWARD FROM RACE DAY (2026-08-06).
+ *
+ * Three rules, in this order:
+ *   1. **The peak week is where the race puts it**, not where week 1 does. The caller passes the
+ *      last plan week whose long run is more than 14 days out; everything after it is taper.
+ *   2. **The build is the table's own ladder**, walked one rung a week, entered at the LOWER of
+ *      (where the athlete already is) and (the rung that lands the row's final peak on the peak
+ *      week). A short plan therefore climbs the same ladder and simply stops lower — it never skips
+ *      rungs to reach a number the athlete's legs have not earned.
+ *   3. **The taper is the row's own tail as ratios of the peak actually reached** — so a block that
+ *      tops out at 10 miles tapers off 10, not off the 18 it never ran.
+ *
+ * ⚠️ NO NEW COEFFICIENTS. Every number here comes out of `LONG_RUN_PROGRESSION`.
+ *
+ * ⚠️ AT FULL LENGTH THIS IS A NO-OP. A 20-week marathon with no history enters at rung 0, walks to
+ * the row's peak on week 18 and tapers on the row's own last two values — byte-identical to what
+ * the forward read produced. Only plans shorter than the row change.
+ */
+export function buildLongRunArc(opts: {
+  distance: string;
+  fitness: string;
+  durationWeeks: number;
+  /** The athlete's current longest run, miles. Absent → the row's opening rung. */
+  entryLongRunMi?: number | null;
+  /** Plan week the peak lands on. Default `durationWeeks - 2` (a two-week taper). */
+  peakWeek?: number | null;
+}): LongRunArc | null {
+  const progression = LONG_RUN_PROGRESSION[opts.distance]?.[opts.fitness];
+  const duration = Math.floor(opts.durationWeeks);
+  if (!Array.isArray(progression) || progression.length < 4 || duration < 1) return null;
+
+  const tailPeakIdx = tailPeakIndex(progression);
+  const tailPeak = progression[tailPeakIdx];
+  /** The row's own taper, as fractions of its peak. One entry for a half, two for a marathon. */
+  const tailRatios = progression.slice(tailPeakIdx + 1).map((v) => v / tailPeak);
+
+  const peakWeek = Math.min(
+    Math.max(1, Math.floor(opts.peakWeek ?? duration - 2) || 1),
+    Math.max(1, duration - 1),
+  );
+
+  // The rung that lands the row's final peak exactly on the peak week. Negative for a plan LONGER
+  // than the row — the opening rung then repeats, which is the honest read: the extra weeks are
+  // base weeks, not peak weeks.
+  const anchorIdx = tailPeakIdx - (peakWeek - 1);
+  let startIdx = Math.min(longRunEntryIndex(progression, opts.entryLongRunMi), anchorIdx);
+
+  // ⚠️ NEVER FINISH THE BUILD ON A CUTBACK. Every 4th rung is a recovery dip; a plan whose last
+  // build week landed on one would taper off a deloaded number and race two weeks off a dip. Shift
+  // the entry DOWN a rung (never up — down costs a mile, up costs a week the legs have not had).
+  if (((startIdx + peakWeek - 1) % 4 + 4) % 4 === 3) startIdx -= 1;
+
+  const rung = (w: number) => Math.min(tailPeakIdx, Math.max(0, startIdx + w - 1));
+
+  const weeks: number[] = [];
+  for (let w = 1; w <= duration; w++) {
+    if (w <= peakWeek) weeks.push(progression[rung(w)]);
+    else weeks.push(0); // filled below, once the peak is known
+  }
+
+  // The taper, laid over the row's own tail: RACE WEEK IS ALWAYS THE LAST RATIO, and the rest are
+  // matched back from it. A plan with more taper weeks than the row carries (a race early in its
+  // plan week, or a half held to a marathon's two weeks) eases down to the row's first taper rung
+  // rather than inventing a shape.
+  const peakMi = weeks[peakWeek - 1];
+  const taperCount = duration - peakWeek;
+  const extraWeeks = Math.max(0, taperCount - tailRatios.length);
+  for (let j = 1; j <= taperCount; j++) {
+    const fromEnd = taperCount - j;
+    const ratio = fromEnd < tailRatios.length
+      ? tailRatios[tailRatios.length - 1 - fromEnd]
+      : 1 + (tailRatios[0] - 1) * (j / (extraWeeks + 1));
+    weeks[peakWeek - 1 + j] = Math.max(3, Math.round(peakMi * ratio));
+  }
+
+  const maxMi = weeks.reduce((a, b) => (b > a ? b : a), 0);
+  const tableMaxMi = progression.reduce((a, b) => (b > a ? b : a), 0);
+  return { weeks, peakWeek, peakMi, maxMi, tableMaxMi, reachesTableMax: maxMi >= tableMaxMi };
+}
+
+/**
+ * ⛔ WHAT THE LONGEST RUN IN THIS BLOCK ACTUALLY REACHES — the number the intake owes the athlete
+ * before they commit, and the one no screen has ever stated.
+ *
+ * A short timeline does not make the plan wrong; it makes its ceiling lower, and the ceiling is a
+ * fact the athlete can act on (run the half, or move the race) while a silently truncated build is
+ * one they find out about in the race. Same arc the engine builds, same file, so the number quoted
+ * here is the number that will be prescribed.
+ *
+ * ⚠️ PASS THE DATES. Without them the peak week falls back to `duration - 2`, which a race early in
+ * its plan week shifts by one — and a shifted peak week is a different rung, so the screen would
+ * quote a mile the engine does not build. `longRunPeakWeek` is the one rule; both callers use it.
+ *
+ * Returns null when the tables do not carry the distance/level — say nothing rather than guess.
+ */
+export function longRunCeiling(
+  distance: string,
+  fitness: string,
+  durationWeeks: number,
+  entryLongRunMi?: number | null,
+  dates?: { startDateISO?: string | null; raceDateISO?: string | null },
+): { peakLongRunMi: number; peakWeek: number; tableMaxMi: number; shortOfTable: boolean } | null {
+  const arc = buildLongRunArc({
+    distance,
+    fitness,
+    durationWeeks,
+    entryLongRunMi,
+    peakWeek: longRunPeakWeek({ durationWeeks, ...(dates ?? {}) }),
+  });
+  if (!arc) return null;
+  return {
+    peakLongRunMi: arc.maxMi,
+    peakWeek: arc.peakWeek,
+    tableMaxMi: arc.tableMaxMi,
+    shortOfTable: !arc.reachesTableMax,
+  };
+}
+
+/**
+ * ⛔ THE FIELD'S PEAK LONG RUN FOR THE DISTANCE, so the intake can say what "short" is short OF.
+ * Marathon 18-20 is Higdon's Novice (20), Pfitzinger's 18/55 entry (18-20) and our own rows
+ * (beginner 18, intermediate 20, advanced 20) agreeing. Half is the same three sources at 12-14.
+ */
+export const TYPICAL_PEAK_LONG_RUN_MI: Record<string, [number, number]> = {
+  marathon: [18, 20],
+  half: [12, 14],
+  '10k': [7, 9],
+  '5k': [5, 7],
 };
 
 // ── The validator ────────────────────────────────────────────────────────────
