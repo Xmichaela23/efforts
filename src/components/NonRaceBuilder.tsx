@@ -2803,24 +2803,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       {
                         id: 'hill_3min' as const,
                         title: 'A hill you can run for 3 minutes',
-                        body: 'Four 3-minute climbs. The climb keeps a hard session cheap on your legs, so more of the week is left for the bar.',
+                        body: 'Four 3-minute climbs, walk or jog back down. Running uphill may have less effect on your legs, leaving more of the week for lifting.',
                       },
                       {
                         id: 'treadmill' as const,
                         title: 'A treadmill',
-                        body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\'s job, so it costs your legs no more.',
+                        body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\'s job, so it may affect your legs no more than the hill does.',
                       },
                       {
                         id: 'hill_short' as const,
                         title: 'Only a short hill',
-                        body: 'Ten 1-minute climbs. Shorter efforts hold less than the 3-minute version — the session for the hill you have.',
+                        body: 'Ten 1-minute climbs. Shorter efforts hold less VO2 stimulus than the 3-minute version — the session for the hill you have.',
                       },
                       {
                         id: 'flat' as const,
-                        // ⛔ THE COST AND THE NUDGE ARE THE RULING'S CONDITION. §2.1 bans this session
-                        // outright and §2.0 governs only because the athlete owns a STATED trade.
+                        // ⛔ THE STATED COST IS THE RULING'S CONDITION. §2.1 bans this session outright
+                        // and §2.0 governs only because the athlete owns a STATED trade — the leg/lift
+                        // effect must stay in the copy. (The treadmill nudge was cut 2026-08-06 as a
+                        // scold: treadmill is its own card directly above, already declined here.)
                         title: 'Flat ground only',
-                        body: 'Four 3-minute efforts on the flat. The one option that costs your legs full price, and the lifting pays for it. A treadmill or cheap trainer would buy the same session for less.',
+                        body: 'Four 3-minute efforts on the flat. The same hard work, but without the climb it may have more effect on your legs, and your next lift may feel it.',
                       },
                     ]).map((opt) => (
                       <button
