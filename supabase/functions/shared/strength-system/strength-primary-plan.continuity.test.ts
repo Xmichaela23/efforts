@@ -68,15 +68,21 @@ Deno.test('the leader weeks are gone — no 5s-PRO week survives an AAA block', 
 // ── The accessory floor, under the shape that stresses it most ──────────────
 
 Deno.test('⛔ THE FLOOR HOLDS IN ALL THREE CYCLES, INCLUDING FOR A TESTED 12-REP PULL', () => {
-  // A 12-rep pull max would earn 25 + (12-8)*3 = 37 → 35 in a LEADER cycle. There are no leaders
+  // A 12-rep pull max would earn 50 + (12-8)*3 = 62 → 60 in a LEADER cycle. There are no leaders
   // here, so the tested capacity is deliberately NOT spent: the main lifts are at 95% with a rep-out
   // in every cycle, and that is the week accessory volume must not compete with.
+  //
+  // ⚠️ THE NUMBER MOVED 25 → 50 ON 2026-08-05 AND THE PROPERTY DID NOT. The floor is now Wendler's
+  // real one — his lowest figure anywhere is 50 (Triumvirate p.48 runs 50-75; Bodyweight p.52 says
+  // "no less than 75 per exercise"), and the old 25 rested on a "25-50 range" that is not in the
+  // book. What this test pins is that an ANCHOR cycle holds whatever the floor is, against a tested
+  // capacity that would otherwise buy more.
   for (const week of [1, 5, 9]) {
     const s = sessionsFor(week).find((x) => x.type === 'strength');
     const rows = (s?.strength_exercises ?? []) as any[];
     const acc = rows.filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'));
     assert(acc.length > 0, `week ${week} has no assistance rows`);
-    for (const r of acc) assertEquals(r.reps, '25 total', `week ${week}: ${r.name}`);
+    for (const r of acc) assertEquals(r.reps, '50 total', `week ${week}: ${r.name}`);
   }
 });
 

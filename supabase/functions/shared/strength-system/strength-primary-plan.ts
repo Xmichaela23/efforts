@@ -255,10 +255,25 @@ const MAIN_LIFTS: Array<{
   isLower: boolean;
   focus: 'upper' | 'lower';
 }> = [
-  { day: 'Monday',   name: 'Bench Press',    ref: 'bench',          isLower: false, focus: 'upper' },
-  { day: 'Tuesday',  name: 'Back Squat',     ref: 'squat',          isLower: true,  focus: 'lower' },
-  { day: 'Thursday', name: 'Overhead Press', ref: 'overheadPress',  isLower: false, focus: 'upper' },
-  { day: 'Friday',   name: 'Deadlift',       ref: 'deadlift',       isLower: true,  focus: 'lower' },
+  // ⛔ THIS IS WENDLER'S ORDER, VERBATIM (2nd ed. p.11), AND IT IS NOT ARBITRARY ANY MORE.
+  //
+  //     Day 1                     Day 2       Day 3          Day 4
+  //     Standing Military Press   Deadlift    Bench Press    Squat
+  //
+  // Suggested days, same page: Mon/Tue/Thu/Fri · Sun/Mon/Wed/Fri · Sun/Mon/Wed/Thu — the `day` values
+  // below are the first of those. ⚠️ They are a FALLBACK ONLY; `week-solver` places the bar around
+  // the athlete's endurance days and the solved day wins (see `dayForLift`). What this array actually
+  // fixes is the ORDER and the pairings.
+  //
+  // ⛔ IT USED TO BE Bench · Squat · OHP · Deadlift — the same two pairings (a press, then a lower
+  // lift) with the halves swapped, so it alternated correctly and simply was not the book's sequence.
+  // Michael, 2026-08-05, reading his own week: *"shouldnt it go BP Squat OHP DL? isnt that whats in
+  // the book?"* — it is not; the book leads with the press. Changed to match rather than to explain
+  // the difference away.
+  { day: 'Monday',   name: 'Overhead Press', ref: 'overheadPress',  isLower: false, focus: 'upper' },
+  { day: 'Tuesday',  name: 'Deadlift',       ref: 'deadlift',       isLower: true,  focus: 'lower' },
+  { day: 'Thursday', name: 'Bench Press',    ref: 'bench',          isLower: false, focus: 'upper' },
+  { day: 'Friday',   name: 'Back Squat',     ref: 'squat',          isLower: true,  focus: 'lower' },
 ];
 
 const ENDURANCE_DAYS = ['Wednesday', 'Saturday'];
@@ -882,7 +897,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * keeps the calendar. We are using his two-day trade one day up, and keeping his calendar.
    */
   const liftingDays = args.liftingDays === 3 ? 3 : 4;
-  const PAIRED_UPPER = MAIN_LIFTS.filter((l) => !l.isLower).map((l) => l.name);
+  // ⛔ HEAVIEST FIRST, AND THIS IS NO LONGER THE ARRAY'S ORDER (2026-08-05).
+  //
+  // `MAIN_LIFTS` now runs in Wendler's p.11 sequence — Press · Deadlift · Bench · Squat — which is
+  // the order of the WEEK. On the 3-day shape the two presses share one day, and that day's internal
+  // order is a different question with a different answer: the second lift of a session is trained
+  // fatigued, so the heavier one goes first (see `pairNoteFor`). Bench is the heavier of the two for
+  // essentially every athlete.
+  //
+  // ⚠️ TAKING BOTH FROM ONE ARRAY MADE THEM THE SAME DECISION, AND REORDERING TO THE BOOK SILENTLY
+  // PUT THE BENCH SECOND — trained fatigued behind the overhead press, on the only day where the
+  // order costs anything. Caught by `lifting-days.test.ts`. Two orderings, two sources.
+  const PAIRED_UPPER = ['Bench Press', 'Overhead Press']
+    .filter((n) => MAIN_LIFTS.some((l) => l.name === n && !l.isLower));
   const pairedSlotName = PAIRED_UPPER.join(' + ');
   const solverLifts = liftingDays === 3
     ? [
@@ -893,12 +920,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const solved = solveWeek({ anchors: solverAnchors, lifts: solverLifts });
   // ⛔ THE TEST WEEK IS SOLVED SEPARATELY, because it is a different week: four lift days, nothing
   // shared. Only computed in 3-day mode — at four days every week already is the test layout.
-  const solvedTest = liftingDays === 3
-    ? solveWeek({
-        anchors: solverAnchors,
-        lifts: MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower })),
-      })
-    : solved;
+  // ⚠️ THE SEPARATE TEST-WEEK SOLVE IS GONE with the week-3 split (see `isTestWeek`). Every week of
+  // the block now uses one layout, which is what "three lifting days" was always supposed to mean.
+  const solvedTest = solved;
 
   // ⛔ A REFUSAL IS NOT A CRASH AND IT IS NOT A SILENT FALLBACK (§5.2). The solver names the anchors
   // that bound it and what would free them; those words go to the athlete. The block is still built
@@ -1068,7 +1092,40 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // — so every day except Sunday silently became Saturday. The athlete picked from seven and got
   // one of two. That existed only because the lifting grid was fixed; with the solver placing the
   // bar around the pins, ANY day is answerable and the long run day is whatever they said.
-  const pickedLong = longRunPin ?? ENDURANCE_DAYS[ENDURANCE_DAYS.length - 1];
+  //
+  // ⛔ AND THE DEFAULT LONG-RUN DAY MUST NOT EAT THE REST DAY (2026-08-05, found by Q-214).
+  //
+  // With no pin this was a hardcoded `Saturday`, chosen with no reference to where the lifts landed.
+  // That worked only by luck: the solver happened to put an upper lift on Saturday, so the long run
+  // STACKED onto it and Sunday stayed free for rest. The moment Q-214's press-spacing term moved that
+  // upper lift off Saturday, the long run took Saturday as its own day, Sunday was occupied, and the
+  // week came out with **seven active days and no rest at all**.
+  //
+  // ⚠️ THE STACK WAS LOAD-BEARING AND NOTHING SAID SO. This block runs four lifts plus up to four
+  // runs across seven days; at three runs it is 7 sessions in 6 days, so exactly one stack is
+  // REQUIRED, and the long run onto an upper lift is the cheap one (`long_run × upper_body_strength`
+  // needs no recovery gap — pressing shares no prime movers with running). Treating Saturday as a
+  // free-standing long-run day is what removes it.
+  //
+  // So: take the default day only when doing so still leaves room for the easy runs AND one rest
+  // day. Otherwise put the long run on an upper-lift day and let it stack, which is what the working
+  // weeks were silently doing all along.
+  const defaultLong = ENDURANCE_DAYS[ENDURANCE_DAYS.length - 1];
+  const easyRunsNeeded = Math.max(0, runFreq - 1); // the long run is one of `runFreq`
+  // ⛔ THE LONG RUN KEEPS ITS DAY; THE EASY RUNS ARE WHAT STACK. Corrected 2026-08-05.
+  //
+  // A first version of this reversed the priority: when free days were tight it moved the LONG run
+  // onto a lift day to leave the free days for easy runs. On the book's Mon/Tue/Thu/Fri layout that
+  // put a long run on Thursday beside the bench press while Saturday and Sunday sat free — the most
+  // expensive session in the week stacked to protect the cheapest two.
+  //
+  // ⚠️ STACKING IS NOT THE PROBLEM, WHICH SESSION STACKS IS. `long_run × upper_body_strength` is ✓
+  // in the law and costs nothing mechanically. What it costs is the athlete's WEEKEND: an unpinned
+  // athlete gets their longest session mid-week. The easy run carries no such expectation, and the
+  // stacking fallback below already exists for it.
+  //
+  // ⚠️ AND IT ONLY EVER APPLIED TO THE UNPINNED CASE — `longRunPin` has always won outright.
+  const pickedLong = longRunPin ?? defaultLong;
   // ⛔ ONE FULL REST DAY IS RESERVED BEFORE ANY EASY RUN IS PLACED, and this is not a detail.
   //
   // `placedWeek.freeDays` means "carries neither a lift nor a pin" — it is NOT "spare". An earlier
@@ -1083,12 +1140,132 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   //
   // Sunday is preferred as the rest day when it is free — convention, and it matches what the grid
   // used to guarantee. Otherwise the last free day is held back.
-  const restReserved = placedWeek.freeDays.includes('Sunday' as DayName)
+  //
+  // ⛔ AND IT CANNOT BE THE LONG-RUN DAY (2026-08-05). This read straight off `freeDays`, so when the
+  // long run took a free day and that day was also the last one, `restReserved` and `pickedLong`
+  // resolved to the SAME day — the rest day was "reserved" and then had the long run authored onto
+  // it, and the week came out with seven active days. It only stayed hidden because the long run
+  // used to land on a day that already had a lift, which took it out of `freeDays` entirely.
+  //
+  // ⚠️ THE TWO ARE A PAIR AND HAVE TO BE PICKED AS ONE. `pickedLong` above already asks whether
+  // taking a free day leaves room for the easy runs AND a rest day; this is the other half of that
+  // question, and leaving either half out puts the week back to no rest.
+  const restCandidates = placedWeek.freeDays.filter((d) => d !== pickedLong);
+  const restReserved = restCandidates.includes('Sunday' as DayName)
     ? ('Sunday' as DayName)
-    : placedWeek.freeDays[placedWeek.freeDays.length - 1];
+    : (restCandidates[restCandidates.length - 1]
+      // Nothing free but the long-run day — the week is genuinely full, and that is REPORTED by the
+      // compromise below rather than papered over by standing the long run down.
+      ?? placedWeek.freeDays[placedWeek.freeDays.length - 1]);
+  // ⛔ THE REST DAY IS NO LONGER WITHHELD FROM PLACEMENT. Michael, 2026-08-05: *"if somone wants an
+  // easy ride on a rest day thats fine, no apps gate — we just arent stupid."*
+  //
+  // ⚠️ **`restReserved` SURVIVES AS A PREFERENCE AND STOPS BEING A GATE, and the distinction is the
+  // whole change.** It used to be subtracted from the pool before anything was placed, so an EMPTY
+  // day sat protected while the sessions the athlete asked for were stacked onto lift days — the
+  // week doubled up three days to keep one clear. Nobody asked for that trade and no commercial app
+  // makes it. Empty days are now filled before any day is doubled, and the rest day is simply
+  // whatever is left when the athlete's own asks are done.
+  //
+  // ⛔ SO REST IS AN OUTPUT, NOT A RESERVATION. An athlete who asks for little still gets days off —
+  // more of them than before, because nothing is stacked to protect one. An athlete who asks for a
+  // seven-day week gets one, and is told so (`restNote`). Neither is the engine's decision.
+  //
+  // ⚠️ `restReserved` IS STILL COMPUTED and still used for the ordering preference below — it is the
+  // day the week would rather leave clear, all else equal. It just cannot veto a session any more.
+  // ⛔ THE REST DAY IS A PREFERENCE THAT YIELDS — NOT A GATE, AND NOT A FREE-FOR-ALL EITHER.
+  // Michael, 2026-08-05: *"if somone wants an easy ride on a rest day thats fine, no apps gate — we
+  // just arent stupid."* Both halves of that sentence are rules, and they pull opposite ways:
+  //
+  //   "no apps gate"        -> a session the athlete asked for is NEVER dropped to protect a day off.
+  //   "we just arent stupid" -> and a day off is not spent when a stacked day would have saved it.
+  //
+  // So the day is held back HERE, at first pass, and released at the end of each pass only if the
+  // week genuinely could not hold the ask any other way (`easyRunDays` / `rideDays` last resorts).
+  // Stacking onto a lift day is tried FIRST, because it is legal, cheap, and costs nothing the
+  // athlete asked for.
+  //
+  // ⚠️ I BUILT THIS THE OTHER WAY FIRST — pool including the rest day, empty days filled before
+  // anything doubles up — and it was wrong twice over: a run-only athlete who asked for 3 runs got
+  // 4 (this exclusion had been silently acting as the count cap), and an athlete asking 2 runs + 2
+  // rides lost their rest day to avoid a single stacked day they would happily have taken.
   const easyDayPool = placedWeek.freeDays.filter((d) => d !== restReserved && d !== pickedLong);
+
+  /**
+   * ⛔ WHEN THE ATHLETE KEEPS BOTH DISCIPLINES, THE FREE DAYS ALTERNATE (Michael, 2026-08-05).
+   *
+   * ⚠️ **THIS IS A COMPOSER PREFERENCE ABOVE THE LAW (§4.1a), AND IT SAYS SO RATHER THAN BORROWING
+   * THE LAW'S AUTHORITY.** The clearance table rates `easy_run × easy_run` at **0h with no adjacency
+   * penalty**, deliberately — *"Easy rows are free by definition. An easy run is the recovery flush,
+   * not a second stimulus"*, and *"do not read the zeros as gaps — they were rated."* So nothing here
+   * claims two easy runs in a row are harmful, and no citation is attached. **Owner: Michael. Reason:
+   * a week that runs Tue/Wed and rides Mon/Fri reads as two blocks bolted together rather than one
+   * week.** It stands until he decides otherwise. ⛔ Do not dress this up as physiology.
+   *
+   * ⛔ THE CAUSE WAS PASS ORDER, NOT A DECISION. The run pass runs first and took EVERY free day;
+   * the ride pass ran second and could only stack onto lift days. Runs therefore clustered on the
+   * calendar's open days and rides landed wherever a lift already was. Nothing ever compared the two.
+   *
+   * ⚠️ AND THE ASYMMETRY THAT MADE IT INVISIBLE: the ride pass has a stack-onto-a-lift-day fallback
+   * and the run pass never did — although `enduranceSession` has authored the run's stacked-day note
+   * (lift first, 6h on heavy legs) the whole time. The capability existed; the day list never offered
+   * one. So the fix is allocation only, and no session authoring changes.
+   *
+   * ⛔ RUN-ONLY AND RIDE-ONLY WEEKS ARE UNTOUCHED. With one discipline there is nothing to alternate,
+   * and the run side's day count feeds its typed mileage — narrowing that pool would silently move a
+   * volume the athlete gave. Gated on `hasBike` for exactly that reason.
+   */
+  const easyRunsWanted = Math.max(0, runFreq - 1); // the long run is one of `runFreq`
+  const ridesWanted = hasBike ? Math.max(1, Math.min(3, Math.round(Number(args.bike?.days) || 2))) : 0;
+  const interleaves = hasBike && ridesWanted > 0 && enduranceSport === 'run';
+
+  let easyRunDays: string[];
+  if (!interleaves) {
+    easyRunDays = [...easyDayPool];
+    // ⛔ EASY RUNS STACK ONTO LIFT DAYS WHEN THE FREE DAYS RUN OUT — the same fallback the interleaved
+    // path and the ride pass have always had, and the run-only path never did. Without it, holding the
+    // long run on its weekend day silently cost a run: free days minus the long day minus the rest day
+    // could not seat them. `easy_run × upper_body_strength` is ✓ at 0h, and on a heavy-leg day the law
+    // asks for 6h, which the session copy states.
+    if (easyRunDays.length < easyRunsWanted) {
+      const stackable = [...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)];
+      for (const d of stackable) {
+        if (easyRunDays.length >= easyRunsWanted) break;
+        if (d === restReserved || d === pickedLong || easyRunDays.includes(d)) continue;
+        easyRunDays.push(d);
+      }
+    }
+  } else {
+    // Walk the free days in calendar order, handing them out run · ride · run · ride. When one side
+    // is satisfied the other takes the remainder — alternation is the preference, not a quota.
+    easyRunDays = [];
+    let runsTurn = true, runsTaken = 0, ridesTaken = 0;
+    for (const d of easyDayPool) {
+      if (runsTurn && runsTaken < easyRunsWanted) { easyRunDays.push(d); runsTaken++; runsTurn = false; }
+      else if (!runsTurn && ridesTaken < ridesWanted) { ridesTaken++; runsTurn = true; }
+      else if (runsTaken < easyRunsWanted) { easyRunDays.push(d); runsTaken++; }
+      else if (ridesTaken < ridesWanted) { ridesTaken++; }
+    }
+    // ⛔ AND THE RUN COUNT IS NOT THE PRICE OF ALTERNATING. Giving the bike a free day costs the run
+    // one unless the run can stack too — which is what the ride pass has always been allowed to do.
+    // Same guards as the ride's: never the rest day, never the long-run day, never a third session.
+    if (easyRunDays.length < easyRunsWanted) {
+      const stackable = [...upperLiftDays, ...MAIN_LIFTS.filter((l) => l.isLower).map(liftDay)];
+      for (const d of stackable) {
+        if (easyRunDays.length >= easyRunsWanted) break;
+        if (d === restReserved || d === pickedLong || easyRunDays.includes(d)) continue;
+        easyRunDays.push(d);
+      }
+    }
+    // ⛔ LAST RESORT — the rest day yields rather than the athlete losing a run they asked for.
+    if (easyRunDays.length < easyRunsWanted && restReserved && restReserved !== pickedLong
+        && !easyRunDays.includes(restReserved)) {
+      easyRunDays.push(restReserved);
+    }
+  }
+
   // Long-run day first (it is a pin, so it is not in `freeDays`), then whatever room is left.
-  const enduranceDays: string[] = [pickedLong, ...easyDayPool];
+  const enduranceDays: string[] = [pickedLong, ...easyRunDays];
   const runDayList: string[] = [...enduranceDays];
   // ⛔ THE HARD DAY IS ALREADY A RUN. Fixed 2026-07-27, surfaced the moment the solver started
   // stacking onto the hard-run day: an upper lift landed on Tuesday, Tuesday was therefore an
@@ -1162,7 +1339,21 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         String(pickedLong).toLowerCase() as never,
       ) + (heavyLowerDays.includes(d) ? HEAVY_LEG_STACK_PENALTY : 0),
     }))
-    .sort((a, b) => a.penalty - b.penalty || DAYS.indexOf(a.day as never) - DAYS.indexOf(b.day as never));
+    // ⛔ ON A TIE, THE CLEAN UPPER DAY WINS — AND WITHOUT THIS THE PREFERENCE DID NOTHING (2026-08-05).
+    //
+    // `HEAVY_LEG_STACK_PENALTY` is deliberately one anchor adjacency, so it EXACTLY CANCELS one:
+    // in a Sun-long / Thu-hard week the deadlift day scores 0 + 4 and both upper days score 4 + 0.
+    // All three tie, and the old tie-break was `DAYS.indexOf` — the earliest day — which is the leg
+    // day. The direction the whole comment above argues for was decided by the calendar.
+    //
+    // ⚠️ IT STAYS A TIE-BREAK, NOT A BAN. Michael, 2026-08-05: leg-day stacking is fine and the lift
+    // goes first; it simply is not preferred over a clean upper day. So this ranks BELOW `penalty` —
+    // a leg day that genuinely scores better still wins, which is what keeps an easy run off the day
+    // beside the long run. `easy_run × lower_body_strength` is ✓ in the law with a 6h gap
+    // (STRENGTH-PROTOCOL §6.2, recovery flush); nothing here overrides that.
+    .sort((a, b) => a.penalty - b.penalty
+      || Number(heavyLowerDays.includes(a.day)) - Number(heavyLowerDays.includes(b.day))
+      || DAYS.indexOf(a.day as never) - DAYS.indexOf(b.day as never));
 
   for (const c of runCandidates) {
     if (runDayList.length >= runFreq) break;
@@ -1249,9 +1440,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     if (!placed) continue;
     const { slot, weekInCycle } = placed;
     const isDeload = weekInCycle === WEEKS_PER_CYCLE;
-    // ⛔ WEEK 3 IS THE MEASUREMENT WEEK — Wendler's 95% set, the one that decides the next cycle's
-    // working number. In 3-day mode it runs on four days so no lift is read under a fatigued state.
-    const isTestWeek = liftingDays === 3 && weekInCycle === 3;
+    // ⛔ THE WEEK-3 TEST SPLIT IS GONE — REMOVED 2026-08-05, MICHAEL'S CALL. DO NOT REBUILD IT.
+    //
+    // Week 3 of every cycle used to break the 3-day shape onto FOUR days so each 95% set was read
+    // on a fresh lift. It existed for one reason: a fear that a fatigued AMRAP would mis-set the
+    // next cycle's weights.
+    //
+    // ⛔ THAT FEAR DOES NOT SURVIVE THE TRACE. `applyVerdict` steps the working number by a FIXED
+    // increment — `cappedCycleIncrementLb`, Wendler's +5 upper / +10 lower — and the AMRAP produces
+    // only a VERDICT from the reps hit against the prescription (`verdictFrom95Set`: the single at
+    // 95% completed or not). **The next weight is never computed from an estimated max off that
+    // set.** The e1RM is used for the ceiling and for a trust label, nowhere else. So a fatigued
+    // second lift cannot bias the weight; it can only miss the rep target, which is the book's own
+    // reset trigger and is true on any day.
+    //
+    // ⚠️ AND IT COST SOMETHING REAL: a "3-day" plan that silently ran four days every third week.
+    const isTestWeek = false;
     // Week 3 of every cycle is the 95% set — Wendler's own validity check (SPEC §1). Nothing here
     // marks it: the sets themselves carry it (95% of the working number, and in the anchor the top
     // set is open). The reading of that set is the transition gate's job, not the composer's.
@@ -1415,6 +1619,57 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       });
     }
 
+    // ── 3-DAY: THE TWO PRESSES ARE ONE SESSION, NOT TWO ─────────────────────────────────────────
+    //
+    // ⛔ THIS IS WENDLER'S OWN STACKING, NOT A COMPROMISE. He stacks main lifts freely: the two-day
+    // template (p.77) runs Squat 5/3/1 AND Bench 5/3/1 in one session, and the full-body template
+    // stacks three. Two presses on one day is the same move at three days a week.
+    //
+    // ⛔ WHAT WAS WRONG WAS THE DOSE, NOT THE PAIRING. The per-lift loop above authors a COMPLETE
+    // session per lift — main lift plus all three assistance slots — so the shared day emitted two
+    // sessions and **eight exercises**: two presses, two pushes, two pulls, two core. Nothing asked
+    // for that; it fell out of the loop's shape. Wendler's stacked day is the two main lifts and
+    // ONE round of assistance (p.77: "pick one or two exercises per lift" for the whole day).
+    //
+    // ⚠️ HEAVIEST FIRST, and it is `PAIRED_UPPER` that says which — bench before overhead press. The
+    // second lift of a session is trained fatigued, so the order decides which lift pays. Merged in
+    // that order rather than in whatever order the solver's day map produced.
+    //
+    // ⚠️ ASSISTANCE COMES FROM THE FIRST LIFT'S RESOLUTION and that is not a shortcut: both lifts on
+    // this day are presses, so `resolveAssistance` gives them the same day-type roles (push · pull ·
+    // core). Taking the heavier lift's block is the same three slots either way.
+    if (liftingDays === 3) {
+      const byDay = new Map<string, PlanSession[]>();
+      for (const ws of weekSessions) {
+        if (ws.type !== 'strength') continue;
+        byDay.set(String(ws.day), [...(byDay.get(String(ws.day)) ?? []), ws]);
+      }
+      for (const [, group] of byDay) {
+        if (group.length < 2) continue;
+        const ordered = [...group].sort((a, b) =>
+          PAIRED_UPPER.findIndex((n) => a.name.endsWith(n)) - PAIRED_UPPER.findIndex((n) => b.name.endsWith(n)));
+        const [first, ...rest] = ordered;
+        // Main lifts in order, then ONE assistance block — the first lift's, since both are presses.
+        const mainOf = (ws: PlanSession) => (ws.strength_exercises ?? []).filter((e: StrengthExercise) =>
+          MAIN_LIFTS.some((l) => l.name === e.name));
+        const assistanceOf = (ws: PlanSession) => (ws.strength_exercises ?? []).filter((e: StrengthExercise) =>
+          !MAIN_LIFTS.some((l) => l.name === e.name));
+        first.strength_exercises = [
+          ...ordered.flatMap(mainOf),
+          ...assistanceOf(first),
+        ];
+        first.name = `Strength — ${ordered.map((w) => w.name.replace('Strength — ', '')).join(' + ')}`;
+        // ⛔ THE ORDER IS THE COST, SO IT IS STATED (§0f) — same rule as every other stacked day.
+        const secondName = ordered[1].name.replace('Strength — ', '');
+        const firstName = ordered[0].name.replace('Strength — ', '');
+        first.description = `${String(first.description ?? '')} ${firstName} goes first and ${secondName} `
+          + `follows on the same day. The second lift of a session is trained fatigued, so it gives up `
+          + `load and reps. 5/3/1 adds weight for hitting the rep target rather than off a fresh max, `
+          + `so the fatigued lift still progresses.`.trim();
+        for (const dead of rest) weekSessions.splice(weekSessions.indexOf(dead), 1);
+      }
+    }
+
     // Endurance = maintenance, underneath.
     if (enduranceSport === 'run') {
       runDayList.forEach((day) => {
@@ -1549,6 +1804,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         if (taken.has(d)) continue;
         rideDays.push(d);
       }
+      // ⛔ LAST RESORT — the rest day yields rather than the athlete losing a ride they asked for.
+      // Every lift day has already been tried above; stacking is preferred to spending the day off.
+      if (rideDays.length < wantDays && restReserved && !taken.has(restReserved)
+          && !rideDays.includes(restReserved)) {
+        rideDays.push(restReserved);
+      }
       // ⚠️ If nothing is free the long ride still lands — an athlete who named a day gets that day.
       if (rideDays.length === 0 && longRidePin) rideDays.push(longRidePin);
       // ⛔ AND IF THE WEEK STILL CANNOT HOLD WHAT THEY ASKED FOR, SAY SO. Never silently fewer.
@@ -1562,6 +1823,25 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // violated, the athlete simply asked for more days than the week held once the pins landed.
       if (rideShortfallNote && !placementCompromises.some((c) => c.text === rideShortfallNote)) {
         placementCompromises.push({ kind: 'cost', text: rideShortfallNote });
+      }
+      // ⛔ AND IF THE REST DAY WAS THE THING THAT PAID FOR IT, THAT IS THE BIGGER SENTENCE.
+      //
+      // The rest day now yields to a session the athlete asked for (Michael, 2026-08-05). A week with
+      // no full rest day is a real recovery cost on a block whose whole premise is manageable
+      // fatigue, so it is named — the athlete traded it, and they should know they did. ⚠️ This is
+      // the one compromise in this file where silence would be worst: everything else costs a day's
+      // arrangement, this costs the recovery the block is built around.
+      // ⚠️ ASKED OF THE WEEK, NOT OF ONE VARIABLE. An earlier version tested whether the rides had
+      // taken `restReserved`, which stopped meaning anything once the rest day became a leftover
+      // rather than a slot — the runs could just as easily have taken it. Count the days that carry
+      // something and let the answer come from the week itself.
+      const occupied = new Set<string>([
+        ...strengthDays, pickedLong, ...easyRunDays, ...rideDays,
+      ].filter(Boolean) as string[]);
+      const restSpent = DAYS.every((d) => occupied.has(d));
+      const restNote = `Your ${wantDays} ride days and ${runFreq} run days fill all seven — this week has no full rest day.`;
+      if (restSpent && !placementCompromises.some((c) => c.text === restNote)) {
+        placementCompromises.push({ kind: 'cost', text: restNote });
       }
       // ⛔ THE HARD RIDE IS INSIDE THE WEEK'S HOURS, NOT AN EXTRA ON TOP (2026-07-29).
       //

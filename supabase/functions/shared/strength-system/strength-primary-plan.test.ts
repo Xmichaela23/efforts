@@ -172,7 +172,7 @@ Deno.test('⛔ JUMPS ARE ON LOWER DAYS ONLY — an upper day means legs are free
   assertEquals(lower[0].name, 'Box Jump', 'the lower day lost its primer');
 });
 
-Deno.test('a work session is jumps → main lift → 25 reps each of push / pull / single-leg-core', () => {
+Deno.test('a work session is jumps → main lift → 50 reps each of leg / pull / core', () => {
   // Was `.find(s => s.type === 'strength')` — the FIRST strength session, which assumed the grid
   // put Bench on Monday. Days are the solver's now, so name the lift instead of trusting the order.
   // ⚠️ Named off the SQUAT session now: jumps are lower-day only (see the test above), so the
@@ -183,7 +183,11 @@ Deno.test('a work session is jumps → main lift → 25 reps each of push / pull
   // single-leg slot on a BACK SQUAT day — both `knee_dominant`, so the slot repeated the pattern the
   // main lift had just loaded. The default pick collided with the default day, which is why nobody
   // had to choose anything unusual to hit it. It now takes balancing work and the description says so.
-  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push Up', 'Pull Up', 'Single Leg Hip Thrust']);
+  //
+  // ⛔ UPDATED AGAIN 2026-08-05 FOR THE DAY-TYPE ROLES, AND IT WAS PINNING A SECOND DEFECT: `Push Up`
+  // on a BACK SQUAT day. No Wendler template presses on a lower day. A lower day is now
+  // leg · pull · core (p.51, p.53, p.55, p.88), with core LAST as every template runs it.
+  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Single Leg Hip Thrust', 'Pull Up', 'Sit Up']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
   assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);
@@ -191,7 +195,7 @@ Deno.test('a work session is jumps → main lift → 25 reps each of push / pull
   // "1×25" and asserted a single set of twenty-five the prescription never asked for. The number is
   // unchanged; what is asserted now is that the row makes no claim about how it is performed.
   for (const r of rows.slice(2) as any[]) {
-    assertEquals(r.reps, '25 total');
+    assertEquals(r.reps, '50 total');
     assertEquals(r.sets, undefined, `${r.name} carries a set count it was never prescribed`);
     assertEquals(r.load_prescribed, false, `${r.name} must carry no prescribed load`);
   }
@@ -206,24 +210,34 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   const benchOf = (p: any) => p.sessions_by_week['1']
     .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!.map((r: any) => r.name);
   // ⚠️ No Box Jump — bench is an upper day, and the picks still reach it.
-  // ⛔ EXCEPT THE ONE THAT COLLIDES (Q-212). `Dips` and `Bench Press` are both `horizontal_push`, so
-  // the push slot balances instead — this is the exact case Michael raised, where dips on bench day
-  // and dips again on press day made four pushing exposures inside 24 hours. The pull and single-leg
-  // picks are untouched, because they do not clash: the rule replaces a slot, never the card.
-  // ⛔ AND THE PULL SLOT CROSSES THE PLANE (p86). `Dumbbell Row` is a HORIZONTAL pull and the bench
-  // press is a HORIZONTAL push — same plane. Wendler pairs bench with chin-ups and press with rows,
-  // so a bench day takes the vertical pull. The athlete's preference decides WHICH vertical pull
-  // they meet on the days that want one; it does not decide the plane.
-  assertEquals(benchOf(picked), ['Bench Press', 'Face Pull', 'Pull Up', 'Hanging Leg Raise']);
+  //
+  // ⛔ REWRITTEN 2026-08-05. THIS LINE USED TO ASSERT `Face Pull` IN THE PUSH SLOT ON A BENCH DAY,
+  // AND THAT WAS THE BUG, PINNED. The old rule read "Dips and Bench Press are both horizontal_push,
+  // so the push slot balances instead" — but the replacement it reached for was a list of four
+  // movements that were ALL PULLS, so a press day shipped two pulls and zero push. Every Wendler
+  // template that touches a pressing day keeps a push on it (p.48 Press -> Dips; pp.50-51 both press
+  // days LEAD with chest/shoulders; p.52 Bench -> Chins + Pushups), and the worked example of the
+  // very concurrent template the old rule cited has DIPS on the bench day (p.88).
+  //
+  // So `Dips` now STANDS on a bench day. Same family as the main lift is the point, not the problem —
+  // it is the hypertrophy dose four of the five templates prescribe.
+  //
+  // ✅ AND THE PULL SLOT STILL CROSSES THE PLANE (p.86), which was always the correct half of Q-212.
+  // `Dumbbell Row` is a HORIZONTAL pull and the bench press is a HORIZONTAL push — same plane — so a
+  // bench day takes the vertical pull. The athlete's preference decides WHICH vertical pull they
+  // meet; it does not decide the plane.
+  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Pull Up', 'Hanging Leg Raise']);
 
   // A name that is no longer on the menu must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Bench Press Machine', pull: '', single_leg_core: undefined },
   });
-  // `Push Up` is the push default and also collides with Bench Press, so the fallback path lands in
-  // the balance pool too — the substitution is a property of the DAY, not of how the pick arrived.
-  assertEquals(benchOf(stale), ['Bench Press', 'Face Pull', 'Pull Up', 'Reverse Lunge']);
+  // ⛔ AND THIS LINE PINNED DEFECT #2 AS WELL AS #1: `Reverse Lunge` — leg work — on a BENCH day.
+  // Nothing collided with the single-leg slot on an upper day, so it passed straight through and
+  // stacked glute and hamstring load against the run legs. The slot is core-only on a press day now.
+  // `Push Up` is the push default and, being a push, is exactly what the push slot should hold.
+  assertEquals(benchOf(stale), ['Bench Press', 'Push Up', 'Pull Up', 'Hanging Leg Raise']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {
@@ -408,4 +422,163 @@ Deno.test('at a maintenance dose the branch is live — one heavy day can clear'
   assertEquals(descentIsJogged('Thursday', ['Tuesday']), true);
   assertEquals(descentIsJogged('Friday', ['Tuesday']), true);
   assertEquals(descentIsJogged('Wednesday', ['Tuesday']), false);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ENDURANCE DAY ALLOCATION — the rest day, and run/ride alternation (2026-08-05)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * ⛔ THESE PIN THE TWO THINGS THAT BROKE THREE TIMES IN ONE SESSION, both invisible to every
+ * existing test because every existing fixture was run-only.
+ *
+ * The rest day was lost twice, by two different collisions, and each time the week silently came out
+ * with seven active days: once when Q-214's press-spacing term moved the upper lift off the day the
+ * long run was hardcoded to (so the long run took a free day instead of sharing), and once when
+ * `restReserved` and `pickedLong` independently resolved to the SAME last free day.
+ *
+ * ⚠️ THE COMMON SHAPE: two rules each picking a day from `freeDays` without consulting the other. Any
+ * future rule that consumes a free day belongs in this test.
+ */
+const MIX = (over: Record<string, unknown>) => composeStrengthPrimaryPlan({
+  durationWeeks: 12, oneRepMaxes: MAXES, easyPaceMinPerMile: 9, ...over,
+} as never);
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const restDaysOf = (plan: any, week: number) => {
+  const busy = new Set((plan.sessions_by_week[String(week)] ?? []).map((s: any) => s.day));
+  return DAY_NAMES.filter((d) => !busy.has(d));
+};
+
+Deno.test('⛔ THE REST DAY SURVIVES UNLESS THE ATHLETE\'S OWN ASKS FILL THE WEEK — and then it SAYS SO', () => {
+  const mixes: Array<[string, Record<string, unknown>]> = [
+    ['run only ×3', { enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20 }],
+    ['3 runs + 2 rides', { enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20, bike: { hours: 3, days: 2 } }],
+    ['4 runs + 3 rides', { enduranceSport: 'run', enduranceFrequency: 4, targetWeeklyMiles: 25, bike: { hours: 4, days: 3 } }],
+    ['2 runs + 2 rides', { enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: 12, bike: { hours: 3, days: 2 } }],
+  ];
+  // ⛔ THE RULE CHANGED 2026-08-05 AND ITS REASONING IS KEPT. The rest day used to be reserved
+  // BEFORE anything was placed and outranked the athlete's stated sessions — so someone who asked
+  // for 4 runs and 3 rides silently got 2 rides. Michael: *"we also dont need a rest day."* It is
+  // now the LAST thing yielded, after every lift day has been tried, and yielding it is REPORTED.
+  //
+  // ⚠️ SO THE PROPERTY IS NOT "there is always a rest day" — it is **"there is a rest day, or the
+  // plan told the athlete it spent theirs."** Silence is the only failure.
+  for (const [label, args] of mixes) {
+    const plan: any = MIX(args);
+    const said = ((plan.placement_compromises ?? []) as any[])
+      .map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join(' | ');
+    for (let week = 1; week <= 12; week++) {
+      const rest = restDaysOf(plan, week);
+      if (rest.length >= 1) continue;
+      assert(/no full rest day/i.test(said),
+        `${label}, week ${week}: the week has no rest day and nothing said so — compromises: ${said}`);
+    }
+  }
+});
+
+Deno.test('a week with room KEEPS its rest day — releasing it is a last resort, not the default', () => {
+  // The guard on the change above: an athlete who did not ask for a seven-day week must not get one.
+  // 2 runs + 2 rides fits comfortably, so the rest day is untouched.
+  const plan: any = MIX({ enduranceSport: 'run', enduranceFrequency: 2, targetWeeklyMiles: 12, bike: { hours: 3, days: 2 } });
+  for (let week = 1; week <= 12; week++) {
+    assert(restDaysOf(plan, week).length >= 1, `week ${week} gave up a rest day it did not need to`);
+  }
+});
+
+Deno.test('⛔ THE LONG RUN NEVER LANDS ON THE RESERVED REST DAY', () => {
+  // The exact collision: `pickedLong` and `restReserved` both resolving to the last free day. It
+  // produced a week whose rest day carried the longest session in it.
+  for (const freq of [2, 3, 4]) {
+    const plan = MIX({ enduranceSport: 'run', enduranceFrequency: freq, targetWeeklyMiles: 20, bike: { hours: 3, days: 2 } });
+    const wk = plan.sessions_by_week['1'] ?? [];
+    const long = wk.find((s: any) => s.type === 'run' && /long/i.test(String(s.name ?? '')));
+    if (!long) continue;
+    const rest = restDaysOf(plan, 1);
+    assertEquals(rest.includes(long.day), false, `runFreq ${freq}: the long run is on the rest day`);
+  }
+});
+
+Deno.test('run and ride ALTERNATE across the free days rather than the runs taking them all', () => {
+  // ⚠️ A COMPOSER PREFERENCE, NOT A CLEARANCE — `easy_run × easy_run` is rated 0h with no penalty
+  // and this claims nothing about physiology. See the block comment on `easyRunDays`. What it pins
+  // is that the ALLOCATION consults both disciplines instead of the run pass running first and
+  // taking every open day, which is what produced Tue-run/Wed-run with the rides stacked elsewhere.
+  const plan = MIX({ enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20, bike: { hours: 3, days: 2 } });
+  const wk = plan.sessions_by_week['1'] ?? [];
+  const dayOf = (t: string) => wk.filter((s: any) => s.type === t).map((s: any) => DAY_NAMES.indexOf(s.day)).sort((a: number, b: number) => a - b);
+  const runs = dayOf('run');
+  const rides = dayOf('ride');
+  assert(runs.length >= 2 && rides.length >= 2, `fixture should carry both: ${runs.length} runs, ${rides.length} rides`);
+  // At least one ride sits BETWEEN two run days — the property "the runs were not handed every
+  // open day first" expressed as something observable on the calendar.
+  const between = rides.some((r: number) => r > runs[0] && r < runs[runs.length - 1]);
+  assert(between, `no ride falls between the first and last run: runs ${runs}, rides ${rides}`);
+});
+
+/**
+ * ⛔ THE ANTI-"TUNED TO ONE ATHLETE" SWEEP. Michael, 2026-08-05: *"lets not tune to me, we should
+ * just be smart with programing for multi users with different schedules."*
+ *
+ * Every other placement test in this file pins ONE fixture, and a single fixture is precisely how a
+ * layout that only works for one athlete's week survives a green suite. Three separate defects this
+ * session were invisible for exactly that reason — every existing fixture was run-only with a
+ * Saturday long run, so the rest-day collisions and the run/ride allocation were never exercised.
+ *
+ * This sweeps 63 real schedules — the long run on each of the seven days × 2/3/4 run days × 0/2/3
+ * ride days — and asserts the properties that must hold for ALL of them rather than the exact days
+ * any one of them produces. ⛔ Assert PROPERTIES here, never a specific day: a day assertion in this
+ * test would re-create the thing it exists to prevent.
+ *
+ * ⚠️ AN OVER-SUBSCRIBED WEEK IS NOT A FAILURE. Four runs plus three rides plus four lifts is eleven
+ * sessions against six usable days, and the composer refuses a third session on any day. What is
+ * required is that it says so — `placement_compromises` names the shortfall — not that it fits.
+ */
+Deno.test('⛔ 63 ATHLETE SCHEDULES — the week holds its shape for all of them, or says why not', () => {
+  const failures: string[] = [];
+  for (const longRunDay of DAY_NAMES) {
+    for (const runFreq of [2, 3, 4]) {
+      for (const rideDays of [0, 2, 3]) {
+        const label = `long=${longRunDay} runs=${runFreq} rides=${rideDays}`;
+        const plan: any = MIX({
+          enduranceSport: 'run', enduranceFrequency: runFreq, targetWeeklyMiles: 20, longRunDay,
+          ...(rideDays ? { bike: { hours: 3, days: rideDays } } : {}),
+        });
+        for (let week = 1; week <= 12; week++) {
+          const wk = plan.sessions_by_week[String(week)] ?? [];
+          const perDay = new Map<string, number>();
+          for (const s of wk) perDay.set(s.day, (perDay.get(s.day) ?? 0) + 1);
+
+          // 1. A full rest day survives — OR the plan says it was spent. Never silently gone.
+          if (DAY_NAMES.every((d) => perDay.has(d)) && !/no full rest day/i.test(
+            ((plan.placement_compromises ?? []) as any[])
+              .map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join(' | ')
+          )) { failures.push(`${label} wk${week}: no rest day, and nothing said so`); break; }
+          // 2. Never a third session on one day — two is a stacked day, three is a training camp.
+          const over = [...perDay.entries()].find(([, n]) => n > 2);
+          if (over) { failures.push(`${label} wk${week}: ${over[0]} carries ${over[1]} sessions`); break; }
+          // 3. The athlete's stated long-run day is HONOURED, not defaulted over.
+          const long = wk.find((s: any) => s.type === 'run' && /long/i.test(String(s.name ?? '')));
+          if (long && long.day !== longRunDay) {
+            failures.push(`${label} wk${week}: long run on ${long.day}`); break;
+          }
+        }
+
+        // 4. Sessions the athlete asked for either EXIST or are named in the compromises. Silence is
+        //    the failure — a collected answer that reaches neither a session nor an explanation.
+        const wk1 = plan.sessions_by_week['1'] ?? [];
+        const said = ((plan.placement_compromises ?? []) as any[])
+          .map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join(' | ');
+        const rides = wk1.filter((s: any) => s.type === 'ride').length;
+        if (rideDays && rides < rideDays && !/ride day/i.test(said)) {
+          failures.push(`${label}: ${rides}/${rideDays} rides and nothing said so`);
+        }
+        const runs = wk1.filter((s: any) => s.type === 'run').length;
+        if (runs < runFreq && !/run/i.test(said)) {
+          failures.push(`${label}: ${runs}/${runFreq} runs and nothing said so`);
+        }
+      }
+    }
+  }
+  assertEquals(failures, [], `schedules that broke:\n  ${failures.join('\n  ')}`);
 });

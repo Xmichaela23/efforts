@@ -68,8 +68,19 @@ Deno.test('⛔ THE PLAN MUST SAY SO — a flat lift with no stated reason breaks
   // The engine already writes the explanation: `strength-primary-plan.ts` pushes a `cost` note naming
   // the lift, the ceiling and the cycle. This asserts it EXISTS for the stalled lifts and not for the
   // others, so whatever surface renders compromises has something true to render.
+  //
+  // ⛔ SCOPED TO CEILING NOTES 2026-08-05, AND THE LOOSENESS WAS A REAL DEFECT IN THE TEST. It used
+  // to join EVERY note in the channel and grep the blob for a lift name. That channel carries every
+  // stated cost the week has — clearances at their minimum, anchors back to back, and now Q-214's
+  // press-spacing note, which names both presses by construction. So "Bench Press appears in the
+  // notes" stopped meaning "bench carries a ceiling note" the moment any other note mentioned it.
+  // The assertion the comment above describes is about CEILING notes; it now reads only those.
   const notes = ((PLAN as any).placement_compromises ?? []) as Array<string | { text?: string }>;
-  const text = notes.map((n) => (typeof n === 'string' ? n : n?.text ?? '')).join(' | ');
+  const CEILING = /90% of the max on file|stop climbing/;
+  const text = notes
+    .map((n) => (typeof n === 'string' ? n : n?.text ?? ''))
+    .filter((t) => CEILING.test(t))
+    .join(' | ');
   assert(/Back Squat/.test(text), `no ceiling note for the stalled squat — got: ${text}`);
   assert(/Overhead Press/.test(text), `no ceiling note for the stalled press — got: ${text}`);
   assert(!/Bench Press/.test(text), `bench advanced and must not carry a ceiling note: ${text}`);
