@@ -340,3 +340,123 @@ thing two things. ⚠️ Not redundant, then, but *"it reads as a duplicate"* is
 the data is right.
 
 Commits `9baa35fb`, `d4eda969`, `dca84dda`, `8a0efcd7`.
+
+---
+
+### D-385 — Accessory selection is day-type roles, not family collision (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
+
+**Supersedes `docs/SPEC-assistance-fix.md` §0–§7, which dies with this entry. Partially supersedes Q-212 (see its back-annotation).**
+
+Four defects, all confirmed in code, all fixed against the 2nd edition rather than against memory:
+
+1. **A press day structurally could not show a push.** Every push option shares the main lift's family, so the slot always collided and fell through to `BALANCE_POOL.push` — four movements, **all four pulls**. Bench and OHP shipped two pulls and zero push, every time, by design.
+2. **Leg work landed on press days** — nothing collided with `single_leg_core` on an upper day, so it passed through and stacked glute/ham load against the run legs.
+3. **Squat and deadlift days ran the same leg pattern.**
+4. **The rep floor was 25.**
+
+⛔ **THE p.86 CITATION THE OLD RULE RESTED ON WAS READ TOO NARROWLY, AND THAT IS THE WHOLE STORY.** p.86 does pair Bench→Chin-ups, but the template runs to p.88, whose worked example is `Bench 5/3/1 → Barbell Rows → 3 rounds of Med Ball Slams · **DIPS** · Burpees · Chin-ups · Planks`. **Dips are on the bench day, in the template we quoted to prove they should not be.** p.87's upper-body assistance list is push and pull throughout. **No page in the book turns a push slot into a pull.**
+
+**What replaced it:** `ROLE_BY_DAY` — upper days are push · pull · core, lower days are leg · pull · core, **core last** as every template runs it (p.48, p.51, p.55, p.88). The p.86 plane rule survives **on the pull slot only**, which was always the correct half of Q-212; applying it to the push slot is what deleted the push.
+
+**Reps: floor 50, ceiling 75.** ⛔ **There is no 25–50 range in the book** — the premise of the 2026-07-28 "25 IS THE FLOOR" call. Triumvirate (p.48) runs 50–75 per movement; Bodyweight (p.52) says "no less than 75 per exercise"; Periodization Bible (p.51) is 5×10–20. Wendler's lowest figure anywhere is 50. **The 50/75 band is the Triumvirate's own.**
+
+⚠️ **Face Pull is NOT demoted** — p.50 lists it under "Lats or Upper Back". It moves to the **pull** slot. It was only ever wrong as a push. An earlier spec draft called it prehab; the book does not.
+
+⚠️ **The core-on-an-upper-day slot is a CHOICE, not a quote.** Four of five templates put arms/upper-back there and keep abs on the lower days. The one source for core on a press day is **p.87, the concurrent chapter** — written for an athlete who lifts and conditions. We take p.87 over the four powerlifting templates deliberately. Do not "correct" it to triceps by citing p.51.
+
+⛔ **AND THE APP STOPPED SAYING "You picked X" ABOUT ITS OWN DEFAULTS.** Under day-type roles the push slot is re-roled on **every** lower day, so the default path would have carried a false "you picked" note on half the block's sessions.
+
+**Files:** `src/lib/assistance-menu.ts` (roles, `ROLE_FALLBACK`, floor/ceiling, menu additions, substitution copy), `shared/strength-system/assistance-collision.test.ts` (**rewritten** — its old invariant *was* the bug and it passed). Commit `a0d1baec`.
+
+---
+
+### D-386 — Lift spacing is two terms, and neither is upper-against-lower (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
+
+**Builds Q-214. Supersedes Q-214's ranking note and deletes two terms.**
+
+**BUILT — `pressAdjacencyShortfall`.** Nothing scored two pressing days landing next to each other. Q-214 verified this by enumeration in July and it was never built.
+
+**DELETED — `upperLowerShortfall`.** It pushed every press ≥3 days from every leg day. ⛔ **Wendler's basic week (p.11) ALTERNATES upper and lower on back-to-back days on purpose** — Press · Deadlift · Bench · Squat — so the term scored the book's own week as worse than a clustered one. Worse: with four lifts on seven days, shoving each press away from the legs **shoves the two presses into each other**. It *caused* the 24h-apart pressing days Q-212 and Q-214 both chased.
+
+**DELETED — `upperToNearestLiftPenalty`.** Measured `-min(gapDays)` from each upper day to the nearest lift **of any kind**; returned −1 for four arrangements whose press gaps were 1, 2, 3 and 3 (§0e). With press spacing measured directly, what remained was another upper-against-lower term. ⚠️ **Not dead** — 0 of 85 four-day scenarios changed, **36 of 43 three-day** did, all toward the book. Michael's call, overriding the "delete only if nothing changes" rule.
+
+**CHANGED — the tie-break opens with the press.** It sorted lower-first then **alphabetically**, which is why an unanchored week opened "Monday: Back Squat". Nothing chose that; the alphabet did. Now p.11 order, so the default week is **Mon Press · Tue Deadlift · Thu Bench · Fri Squat**. Determinism is unchanged — the book order is as fixed and caller-independent as the alphabet.
+
+**What is left, each measuring what it names:** `spreadPenalty` (heavy legs vs heavy legs) and `pressAdjacencyShortfall` (press vs press). **Nothing prices upper-against-lower.** If a future session wants that back, read p.11 first — it is the arrangement such a term scores worst.
+
+⚠️ **A stated preferred day now loses to press spacing** (ranked above `preferredMissPenalty`). Q-214 weighed the ranking only against `upperLowerShortfall`; this consequence is pinned by a test so it is a recorded fact, not a surprise.
+
+**Files:** `_shared/week-solver.ts`, `_shared/week-solver.test.ts`. Commits `d2fd3234`, `24771cce`.
+
+---
+
+### D-387 — Three days means three days, and the rest day yields instead of dropping a session (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
+
+**THE WEEK-3 TEST SPLIT IS DELETED.** Week 3 of every cycle broke the 3-day shape onto **four** days so each 95% set was read fresh. ⛔ **The premise does not survive the trace:** `applyVerdict` steps the working number by a **fixed** increment (`cappedCycleIncrementLb`, +5/+10) and `verdictFrom95Set` reads only whether the prescribed single at 95% was completed. **The next weight is never computed from an estimated max off that set** — the e1RM touches the ceiling and a trust label, nothing else. A fatigued lift can miss the rep target, which is the book's own reset trigger on any day, but it **cannot bias the weight**. The split bought nothing and cost a "3-day" plan that quietly ran four days every third week.
+
+**THE PAIRED DAY IS ONE SESSION.** The per-lift loop authored a complete session per lift, so the shared day emitted two sessions and **eight exercises**. Now two mains + **one** assistance block, bench first (heaviest leads; the second lift is trained fatigued). Stacking mains is Wendler's own — p.77 runs Squat and Bench 5/3/1 in one session.
+
+**LIFT ORDER is p.11:** Press · Deadlift · Bench · Squat. ⚠️ That reorder flipped the 3-day shared day so the **bench** was trained fatigued behind the press — the week order and the shared-day order were reading from one array. Split them.
+
+**THE REST DAY YIELDS.** It was reserved before anything was placed and outranked what the athlete asked for. It is now the last thing given up, and giving it up is **reported**. ⚠️ Two collisions found on the way, both the same shape — **two rules picking a day off `freeDays` without consulting each other**: the long run was hardcoded to Saturday and only worked because a lift happened to be there to share with; and `restReserved` could resolve to the same day as the long run. Either one produced a seven-day week with no rest.
+
+**RUN AND RIDE ALTERNATE.** Runs claimed every free day first and rides could only stack onto lift days, so runs clustered and rides landed wherever a lift was. **Pass order, not a decision.** ⚠️ `easy_run × easy_run` is rated **0h with no penalty**, deliberately — so this is a composer preference with a stated owner (Michael), **not physiology**, and the code says so.
+
+**THE LONG RUN KEEPS ITS DAY.** A first version stacked the **long** run to leave free days for easy runs — on the p.11 layout that put a long run on Thursday beside the bench while Saturday and Sunday sat free. The most expensive session stacked to protect the cheapest two. Easy runs stack instead.
+
+**Files:** `shared/strength-system/strength-primary-plan.ts` + five test files. Commits `ddb31cc1`, `24771cce`.
+
+---
+
+### D-388 — "Strength Focus" is the discipline; "Strong Focus" is the block (2026-08-05, **PUSHED + CLIENT-DEPLOYED, NOT DEVICE-VERIFIED**)
+
+The entry flow said **three names for one thing in four taps**: a "Strength Focus" card → a "Strength" tier screen → you pick "Strong" → the next header says "Strength Focus · 12 weeks".
+
+**Strength is the DISCIPLINE** and keeps that name on the Train card beside Run Focus / Ride Focus / Athletic Focus. **Strong is the BLOCK** — the tier picked one screen later (D-383), and that is what `GOAL_LABELS.get_stronger` names.
+
+⚠️ **A CONSTANT ONLY WHILE STRONG IS THE ONE LIVE TIER.** Heavy and Definition are the same `get_stronger` goal with a different tier, so this must **read the tier** the day either ships. The tier does not reach the payload yet (D-383 — `strength_tier` is taken by the EQUIPMENT tier), which is the only reason a constant is honest today.
+
+⚠️ The posture step's title now reads `GOAL_LABELS` instead of a typed literal — the exact second-copy that label's own comment exists to prevent.
+
+**Also on this commit:** the volume note (PMC5093324 — work-matched hard and easy running blunted leg-press strength almost identically, 28.7% and 27.5% against 38.5% for lifting alone; **volume was the mediator, not intensity**), placed at the mileage input because that is the decision it informs. And the lifting-days card, which was still promising *"one week in four goes back to four days to test your max"* — **a fourth day the engine no longer builds**.
+
+⛔ **THE COPY GATE CAUGHT ONE AND MISSED ONE, AND BOTH MATTER.** *"How much to keep is yours to set"* trips `voiceViolation` on **keep** (banned imperative) and is second-person besides. *"give ground"* **passed the gate** and still breaks COPY-VOICE rule 10 — the banned list is finite and idioms have to be caught by reading. Passing `voiceViolation()` is necessary, not sufficient.
+
+**Files:** `src/lib/non-race-goal-seeds.ts`, `src/components/NonRaceBuilder.tsx`, `docs/SPEC-assistance-fix.md`. Commit `4cae1d76`.
+
+---
+
+### D-389 — The hard session is 12 minutes, not 15, and the two papers that decide it (2026-08-06)
+
+⛔ **THIS ENTRY EXISTS BECAUSE THE TWO FINDINGS THAT DECIDE THE HARD SESSION LIVED IN DIFFERENT FILES AND NEITHER POINTED AT THE OTHER.** One was in `DOCTRINE-aerobic-maintenance-run-only.md`, one was a code comment in `NonRaceBuilder.tsx`, and the sentence that connects them was written nowhere. **This is the canonical place. Both docs now point here.**
+
+**The session:** `run_hills_4x180s_r180s_g5_8` — 4 × 3 min uphill at 5–8%, 3 min back down. **12 min of work.**
+
+#### The two papers
+
+| | What it says | What it decides |
+|---|---|---|
+| **Wen et al. 2019** — *J Sci Med Sport* 22(8):941–947, PMID 30733142, 53 studies | *"long-interval (≥2min), high-volume (≥15min) and moderate to long-term (≥4–12weeks) HIIT displayed significantly larger effects on VO2max (SMD=0.50–2.48, p<0.05)"* | The **ceiling** — what maximal VO2max work looks like |
+| **Fyfe et al. 2016** — *Front Physiol* 7:487, PMC5093324 | Work-matched: RT only **+38.5 ± 8.5%**, HIT+RT **+28.7 ± 5.3%**, MICT+RT **+27.5 ± 4.6%** on leg press | The **cost** — what buying it spends |
+
+#### The call, and the sentence that was missing
+
+**Wen's recommendation is THREE conditions, not one — long-interval AND ≥15 min AND 4–12 weeks. We meet two.** The 3-minute rep clears the ≥2 min interval bar; a 12-week block is inside the window. **Only volume falls short: 12 min against 15.** One extra rep closes it exactly — 5 × 3 = 15.
+
+⛔ **AND THE EXTRA REP IS BOUGHT IN THE CURRENCY THAT COSTS STRENGTH.** Fyfe found that hard and easy endurance, **matched for total work**, interfere with maximal strength almost identically. So intensity is not what you pay with — **total work is**, and a fifth rep is ~6 more minutes of it (3 hard + 3 recovery). On a **strength-primary** block, the ≥15 min threshold is a *gains* target for the aerobic side, and reaching for it spends the thing the block exists to build.
+
+**So: 12 minutes. Structure from the evidence, volume from the maintenance context.** The shortfall is against one named criterion, deliberately, and is not an oversight.
+
+⚠️ **KEEP THE MAGNITUDE HONEST.** ~6 min a week against ~20 miles is small. **The lever that actually moves strength is weekly mileage, not this rep** — which is why the athlete-facing note sits on the mileage input and not on the hill session.
+
+#### ⛔ Three things about these citations that were wrong and are now fixed
+
+1. **Wen was UNNAMED.** The doctrine said *"a separate meta-analysis of RCTs"* and the sentence was near-verbatim from an abstract nobody could look up — while every neighbouring claim in the same passage (Odden 2024, Maeo 2017, Vernillo, Helgerud 2007) was named.
+2. **Fyfe was CYCLING, and the copy said running.** The conclusion reads *"whether HIT or MICT **cycling** is incorporated"*. Applying it to running overstates, since cycling carries less eccentric load. Shipped wrong on 2026-08-05, corrected 2026-08-06.
+3. **The volume half is the authors' SUGGESTION, not their result.** They wrote volume *"might be a more critical mediator"*. They held work constant and varied intensity, so what is measured is that **intensity does not mediate**. The copy stated it flatly; it no longer does.
+
+⚠️ **Helgerud's 4 × 4 is the shape this is built on, and ours is 4 × 3.** Same structure — four long reps, 3 min recovery — a minute shorter per rep. Stated, not hidden.
+
+⚠️ **`DOCTRINE-aerobic-maintenance-run-only.md` contradicts itself below the prescription:** *"In a strength block, short-format uphill work is the default. Longer repeats are an endurance-led tool."* That line sits under a revision that retired its own reasoning. **The code follows the newer text (4 × 3 min). The stale line is still there.**
+
+**Where the numbers live:** `shared/strength-system/strength-primary-plan.ts:682` (`hillSession`), `HILL_SESSION_MIN = 35`, `docs/DOCTRINE-aerobic-maintenance-run-only.md` §3 and "THE PRESCRIPTION THAT SURVIVES", `src/components/NonRaceBuilder.tsx` (the volume note).

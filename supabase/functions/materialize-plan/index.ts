@@ -1276,7 +1276,7 @@ function minutesTokenToSeconds(tok: string): number | null {
   const m = tok.match(/(\d+)\s*min/i); if (m) return parseInt(m[1],10)*60; return null;
 }
 
-function expandRunToken(tok: string, baselines: Baselines): any[] {
+export function expandRunToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = [];
   const lower = String(tok ?? '').toLowerCase();
   
@@ -1575,6 +1575,62 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
   // decides and stamps it here.
   // ⚠️ Suffix is OPTIONAL and absent means WALK. An unstamped token is one whose week we cannot see,
   // and the conservative arm is the one that adds no damage.
+  // ⛔ THE LAP-BUTTON HILL DRILL — 3:00 reps, recovery ends when the athlete presses lap.
+  //
+  // `run_hills_{reps}x180s_rlap_g{lo}_{hi}[_d{walk|jog}]`
+  //
+  // Separate token, separate branch, and the existing `_r{n}s_` hill workout below is UNTOUCHED.
+  // The two are different sessions: the fixed-recovery one prescribes the float, this one hands it
+  // to the athlete.
+  //
+  // ⛔ ONLY THE RECOVERY IS OPEN. The 3:00 work rep is always a fixed timer — that is the dose, and
+  // an open work rep is a different session entirely. Do not "simplify" this by making both open.
+  //
+  // ⚠️ THE RECOVERY STEP CARRIES NO `duration_s` AT ALL, and that absence is the instruction. It
+  // reaches Garmin as `durationType: 'OPEN'`, which is the lap-button step. ⛔ Three places in
+  // `send-workout-to-garmin` treat a step with no time and no distance as MALFORMED and drop it —
+  // and one of them, the interval builder's rest branch, does not drop it but coerces it to
+  // `Math.max(1, ...)`, i.e. a **one-second rest**, which is worse because it looks like it worked.
+  // All three are taught about `lap_button`; if this token is ever consumed by a new exporter, that
+  // exporter needs the same three answers.
+  //
+  // ⚠️ Descent suffix means the same thing it does below: absent → walk, the conservative arm.
+  if (/^run_hills_\d+x\d+s_rlap_g\d+_\d+(?:_d(?:walk|jog))?$/.test(lower)) {
+    const m = lower.match(/^run_hills_(\d+)x(\d+)s_rlap_g(\d+)_(\d+)(?:_d(walk|jog))?$/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const work_s = parseInt(m[2], 10);
+      const gradeLo = parseInt(m[3], 10);
+      const gradeHi = parseInt(m[4], 10);
+      const descentJogged = m[5] === 'jog';
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      const gradeLabel = `${gradeLo}-${gradeHi}% grade`;
+      out.push({ id: uid(), kind: 'warmup', duration_s: 600, pace_sec_per_mi: easyPace, label: 'Warm-up' });
+      for (let i = 0; i < reps; i++) {
+        out.push({
+          id: uid(),
+          kind: 'work',
+          duration_s: work_s,
+          // ⛔ Deliberately no `pace_sec_per_mi` — same reason as the fixed-recovery hill below.
+          label: `Hill · ${gradeLabel}`,
+        });
+        if (i < reps - 1) {
+          out.push({
+            id: uid(),
+            kind: 'recovery',
+            // ⛔ NO `duration_s`. The lap button ends this step, not a clock.
+            lap_button: true,
+            ...(descentJogged ? { pace_sec_per_mi: easyPace } : {}),
+            label: descentJogged ? 'Jog down — press lap when ready' : 'Walk down — press lap when ready',
+          });
+        }
+      }
+      // ⚠️ 10 MINUTES EITHER SIDE ON THIS DRILL (Michael, 2026-08-05) — the fixed-recovery hill below
+      // cools down in 8. Not copied from it; stated for this session.
+      out.push({ id: uid(), kind: 'cooldown', duration_s: 600, pace_sec_per_mi: easyPace, label: 'Cool-down' });
+      return out;
+    }
+  }
   if (/^run_hills_\d+x\d+s_r\d+s_g\d+_\d+(?:_d(?:walk|jog))?$/.test(lower)) {
     const m = lower.match(/^run_hills_(\d+)x(\d+)s_r(\d+)s_g(\d+)_(\d+)(?:_d(walk|jog))?$/);
     if (m) {

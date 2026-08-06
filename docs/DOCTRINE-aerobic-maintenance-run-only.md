@@ -243,10 +243,27 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 > register already records HR as a trap for detecting fatigue; it is also a trap for confirming
 > stimulus.
 >
-> **3. Short intervals are not useless — the honest frame is "effective, not maximal."** A separate
-> meta-analysis of RCTs: short intervals (≤ 30 s), low volume (≤ 5 min) and short-term HIIT all
-> produce clear VO2max benefit and are **time-efficient, especially for the general population** —
-> but **long-interval (≥ 2 min), high-volume (≥ 15 min) HIIT shows significantly larger effects.**
+> **3. Short intervals are not useless — the honest frame is "effective, not maximal."** Short
+> intervals (≤ 30 s), low volume (≤ 5 min) and short-term HIIT all produce clear VO2max benefit and
+> are **time-efficient, especially for the general population** — but **long-interval (≥ 2 min),
+> high-volume (≥ 15 min) HIIT shows significantly larger effects.**
+>
+> ⛔ **SOURCED 2026-08-06 — IT USED TO SAY "a separate meta-analysis of RCTs" AND NAME NOTHING.**
+> **Wen D, Utesch T, Wu J, Robertson S, Liu J, Hu G, Chen H. "Effects of different protocols of high
+> intensity interval training for VO2max improvements in adults: A meta-analysis of randomised
+> controlled trials." *J Sci Med Sport* 2019;22(8):941–947. doi:10.1016/j.jsams.2019.01.013.
+> PMID 30733142.** Fifty-three studies. The sentence above is close to verbatim from its abstract:
+> *"long-interval (≥2min), high-volume (≥15min) and moderate to long-term (≥4–12weeks) HIIT displayed
+> significantly larger effects on VO2max (SMD=0.50–2.48, p<0.05)."*
+>
+> ⚠️ **THE THRESHOLD IS THREE CONDITIONS, NOT ONE, AND WE MEET TWO.** Wen's recommendation is
+> long-interval **AND** high-volume **AND** 4–12 weeks. Our 4 × 3 min clears the interval-length
+> criterion (3 min ≥ 2 min) and the block length; it is the **volume** one it sits under — 12 min
+> against 15. That is the deliberate maintenance call below, and it is a shortfall on one criterion
+> rather than a rejection of the finding.
+>
+> ⚠️ Every other claim in this passage was named — Odden 2024, Maeo 2017, Vernillo, Helgerud 2007.
+> This one was the exception, and it is the one the rep count is positioned against.
 >
 > **4. ⚠️ The metric has a stated limitation, recorded so we do not over-lean on it.** Time ≥ 90%
 > VO2max is a **binary** measure; the continuous *% of VO2max* is a slightly more robust predictor of
@@ -267,12 +284,18 @@ Prescribe by **duration at effort**, with grade specified. Optionally gate by HR
 >
 > ### THE PRESCRIPTION THAT SURVIVES
 >
+> ⛔ **THE DECISION AND ITS SECOND HALF LIVE IN `DECISIONS-LOG-2.md` D-389.** This section says why the
+> STRUCTURE is 4 × 3; D-389 says why the VOLUME stops at 12 min rather than the 15 that Wen 2019
+> recommends — because the extra rep is bought in total endurance work, which is the thing Fyfe 2016
+> found interferes with maximal strength. **That sentence was written in neither doc until 2026-08-06.**
+>
 > **4 × 3 min uphill at 5–8%, 3 min easy between.** 12 min of work.
 >
 > - **Long-interval structure**, which is what the evidence says decides the stimulus.
 > - **Helgerud's validated shape** (4 × 4), and the same shape as the bike session — so the run-only
 >   athlete and the bike-equipped athlete get structurally equivalent work instead of one getting half.
-> - **12 min sits inside §5's stated 12–16 min.** ⚠️ The meta's "high volume" threshold is ≥ 15 min,
+> - **12 min sits inside §5's stated 12–16 min.** ⚠️ The ≥ 15 min "high volume" threshold is **Wen et
+>   al. 2019** (J Sci Med Sport 22(8):941–947, PMID 30733142 — see §3),
 >   which would be 5 × 3. **Not taken, deliberately: this is a MAINTENANCE dose, not a gains dose**
 >   (parent doctrine §5.0 — one session a week holds the engine and does not build it). Take the
 >   STRUCTURE from the evidence and the VOLUME from the maintenance context.

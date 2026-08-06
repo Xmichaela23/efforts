@@ -40,7 +40,9 @@ type GarminStep = {
   intensity: string
   description?: string
   durationType: string
-  durationValue: number
+  /** ⛔ OPTIONAL BECAUSE OF `OPEN`. A lap-button step has no duration to state — Garmin ends it when
+   *  the athlete presses lap. Every other durationType still requires this. */
+  durationValue?: number
   durationValueType?: string
   targetType?: string
   targetValue?: number
@@ -670,6 +672,14 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             const t = String((st as any)?.type || (st as any)?.kind || '').toLowerCase()
             const isRest = t === 'interval_rest' || t === 'recovery' || /rest/.test(t)
             if (isRest) {
+              // ⛔ A LAP-BUTTON REST HAS NO DURATION, AND `Math.max(1, ...)` TURNED THAT INTO ONE
+              // SECOND. That is the worst of the three failure modes this step has, because it does
+              // not drop anything and does not error — the athlete gets a 1-second recovery on the
+              // watch and the export looks like it worked. Checked FIRST, before the coercion.
+              if ((st as any)?.lap_button === true) {
+                mainArr.push({ effortLabel: 'rest', lapButton: true })
+                continue
+              }
               const sec = num((st as any)?.duration_s) ?? num((st as any)?.seconds) ?? num((st as any)?.rest_s) ?? num((st as any)?.restSeconds)
               mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
               continue
@@ -809,7 +819,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           const sMeters = Number(seg?.distanceMeters)
           // For RUNNING distance steps, suppress duration to avoid confusing time on device
           const sSeconds = (isRun && Number(seg?.distanceMeters) > 0) ? NaN : Number(seg?.duration)
-          if (!(Number.isFinite(sMeters) && sMeters > 0) && !(Number.isFinite(sSeconds) && sSeconds > 0)) {
+          // ⛔ A LAP-BUTTON STEP HAS NO TIME AND NO DISTANCE BY DESIGN — it is not malformed, and
+          // this check would silently drop it. Tested before the malformed guard, never after.
+          const sLapButton = (seg as any)?.lapButton === true
+          if (!sLapButton && !(Number.isFinite(sMeters) && sMeters > 0) && !(Number.isFinite(sSeconds) && sSeconds > 0)) {
             // Skip malformed segment rather than failing entire export
             continue
           }
@@ -819,13 +832,15 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             stepOrder: stepId,
             intensity: sIntensity,
             description: String(((seg?.effortLabel ?? interval?.effortLabel) || '')).trim() || undefined,
-            durationType: (Number.isFinite(sMeters) && sMeters > 0) ? 'DISTANCE' : 'TIME',
-            durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? ((): number => {
-              if (isSwimSport && poolUnitPref === 'yd') {
-                return Math.max(1, Math.round((sMeters as number) / 0.9144))
-              }
-              return Math.round(sMeters as number)
-            })() : Math.floor(sSeconds)
+            durationType: sLapButton ? 'OPEN' : ((Number.isFinite(sMeters) && sMeters > 0) ? 'DISTANCE' : 'TIME'),
+            ...(sLapButton ? {} : {
+              durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? ((): number => {
+                if (isSwimSport && poolUnitPref === 'yd') {
+                  return Math.max(1, Math.round((sMeters as number) / 0.9144))
+                }
+                return Math.round(sMeters as number)
+              })() : Math.floor(sSeconds),
+            }),
           }
           // Tag swim distance unit explicitly when pool is specified
           if (step.durationType === 'DISTANCE' && isSwimSport) {
@@ -902,7 +917,9 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     const intensity = mapEffortToIntensity(String(interval?.effortLabel ?? '').trim())
     const meters = Number(interval?.distanceMeters)
     const seconds = Number(interval?.duration)
-    if (!(Number.isFinite(meters) && meters > 0) && !(Number.isFinite(seconds) && seconds > 0)) {
+    // ⛔ Same rule as the segment path: a lap-button step is legitimately time-less and distance-less.
+    const lapButton = (interval as any)?.lapButton === true
+    if (!lapButton && !(Number.isFinite(meters) && meters > 0) && !(Number.isFinite(seconds) && seconds > 0)) {
       // Skip malformed interval rather than failing entire export
       continue
     }
@@ -912,13 +929,15 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       stepOrder: stepId,
       intensity,
       description: String(interval?.effortLabel ?? '').trim() || undefined,
-      durationType: (Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME',
-      durationValue: (Number.isFinite(meters) && meters > 0) ? ((): number => {
-        if (isSwimSport && poolUnitPref === 'yd') {
-          return Math.max(1, Math.round((meters as number) / 0.9144))
-        }
-        return Math.round(meters as number)
-      })() : Math.floor(seconds)
+      durationType: lapButton ? 'OPEN' : ((Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME'),
+      ...(lapButton ? {} : {
+        durationValue: (Number.isFinite(meters) && meters > 0) ? ((): number => {
+          if (isSwimSport && poolUnitPref === 'yd') {
+            return Math.max(1, Math.round((meters as number) / 0.9144))
+          }
+          return Math.round(meters as number)
+        })() : Math.floor(seconds),
+      }),
     }
     if (step.durationType === 'DISTANCE' && isSwimSport) {
       if (poolUnitPref === 'yd') step.durationValueType = 'YARD'

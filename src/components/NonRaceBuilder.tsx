@@ -2543,11 +2543,33 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   builds around, and the sessions will not shrink to meet you.
                 </p>
                 {/* ⛔ THE ONE FINDING THAT HAS TO REACH THE ATHLETE, AND IT IS COUNTERINTUITIVE.
-                    Source: PMC5093324 — work-matched hard and easy running blunted leg-press strength
-                    almost identically (28.7% and 27.5%, against 38.5% for lifting with no running).
-                    VOLUME was the mediator, not intensity. Every athlete assumes the hard run is the
-                    threat to their lifting; it is the mileage, and this is the screen where they are
-                    choosing the mileage.
+                    Every athlete assumes the hard session is the threat to their lifting. It is not.
+
+                    **Fyfe JJ, Bartlett JD, Hanson ED, Stepto NK, Bishop DJ (2016), "Endurance Training
+                    Intensity Does Not Mediate Interference to Maximal Lower-Body Strength Gain during
+                    Short-Term Concurrent Training", Frontiers in Physiology 7:487 (PMC5093324).**
+                    8 weeks, three groups: RT only +38.5 ± 8.5%, HIT+RT +28.7 ± 5.3%, MICT+RT
+                    +27.5 ± 4.6% on leg press. "All MICT sessions were work- and duration-matched to
+                    the corresponding HIT session."
+
+                    ⛔ TWO CORRECTIONS MADE 2026-08-06, BOTH AFTER THIS COPY HAD ALREADY SHIPPED:
+                    1. **IT WAS CYCLING, NOT RUNNING.** The first version of this paragraph said "hard
+                       and easy running". The trial used cycling — the conclusion reads "whether HIT or
+                       MICT cycling is incorporated". Applying it to running is a stretch in the
+                       direction of OVERSTATING, since cycling carries less eccentric load.
+                    2. **VOLUME IS THE AUTHORS' SUGGESTION, NOT THEIR RESULT.** They wrote volume
+                       "MIGHT BE a more critical mediator". They held work constant and varied
+                       intensity, so what is measured is that INTENSITY does not mediate. The copy
+                       stated the volume half flatly and now does not.
+
+                    ⚠️ What survives cleanly is the useful half: pace is not the thing. That is the
+                    finding, it is counterintuitive, and this is the screen where the volume is chosen.
+
+                    ⛔ THIS PAPER ALSO DECIDES THE HARD SESSION'S REP COUNT — see `DECISIONS-LOG-2.md`
+                    **D-389**, which holds both this and Wen 2019 (the ≥15 min VO2max threshold) and
+                    the sentence that connects them: the 5th hill rep would reach Wen's threshold and
+                    is bought in exactly the total work Fyfe found interferes with strength. Neither
+                    doc said that until 2026-08-06, and the two findings sat in different files.
 
                     ⚠️ CHECKED AGAINST `docs/COPY-VOICE.md` AND THE RUNTIME GATE, 2026-08-05. Two
                     earlier drafts failed: "How much to keep is yours to set" trips `voiceViolation`
@@ -2556,11 +2578,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     idioms have to be caught by reading. ⛔ Run any edit to this paragraph through
                     `voiceViolation()`; passing that check is necessary, not sufficient. */}
                 <p className="text-white/60 text-sm mt-3 leading-relaxed">
-                  Running volume — not pace — is what competes with strength here. Matched for equal
-                  work, hard and easy running blunt leg-strength gains about the same — 28.7% and
-                  27.5%, against 38.5% with no running — so the cost is the mileage, not the
-                  intensity. As weekly volume climbs, those strength gains get smaller. The volume set
-                  here is the one the plan builds around.
+                  Pace is not what competes with strength here — total work is. Matched for equal work,
+                  hard and easy endurance blunted leg-strength gains almost identically — 28.7% and
+                  27.5%, against 38.5% for lifting alone. Intensity was not the mediator; the authors
+                  point at total work instead. As weekly volume climbs, those strength gains get
+                  smaller. The volume set here is the one the plan builds around.
                 </p>
               </div>
             )}

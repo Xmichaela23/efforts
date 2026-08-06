@@ -675,11 +675,44 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
   // with warm-up and cool-down. The token carries the grade because the cost row is not "run VO2" —
   // it is "run VO2 AT grade" (D-325 §1), and a token that cannot carry the constraint cannot be priced.
   //
-  // ⚠️ 12 min, not the meta's "high volume" >=15 min (which would be 5 x 3). Deliberate: this is a
+  // ⚠️ 12 min, not the >=15 min "high volume" threshold (which would be 5 x 3). Deliberate: this is a
   // MAINTENANCE dose, not a gains dose — one hard session a week HOLDS the engine and does not build
   // it (parent doctrine §5.0). Structure from the evidence, volume from the maintenance context.
+  //
+  // ⛔ THE THRESHOLD IS WEN ET AL. 2019 AND IT WAS UNNAMED HERE AND IN THE DOCTRINE UNTIL 2026-08-06.
+  // Wen D, Utesch T, Wu J, Robertson S, Liu J, Hu G, Chen H, "Effects of different protocols of high
+  // intensity interval training for VO2max improvements in adults: A meta-analysis of randomised
+  // controlled trials", J Sci Med Sport 2019;22(8):941-947, doi:10.1016/j.jsams.2019.01.013,
+  // PMID 30733142. Fifty-three studies.
+  //
+  // ⚠️ IT IS THREE CONDITIONS AND WE MEET TWO. Wen recommends long-interval (>=2 min) AND high-volume
+  // (>=15 min) AND 4-12 weeks. The 3-minute rep clears the interval criterion and the block clears
+  // the duration one; the 12 minutes of work sits under the volume one. So this is a shortfall on a
+  // single named criterion, not a session built against the evidence.
   const jogged = descentIsJogged(day, lowerDays);
-  const token = `run_hills_4x180s_r180s_g5_8_d${jogged ? 'jog' : 'walk'}`;
+  // ⛔ THE DESCENT ENDS ON THE LAP BUTTON, NOT ON A CLOCK (Michael, 2026-08-06).
+  //
+  // It was `_r180s_` — a 3:00 countdown. **The descent is not a duration, it is a distance**: it is
+  // however long it takes to get back to the bottom of the hill you actually have. A timer answers a
+  // question it cannot know, and it is wrong in one direction every rep — at 3:00 the watch buzzes
+  // and starts rep 2 whether you are at the bottom or still walking down.
+  //
+  // ⚠️ THE CLIMB STAYS TIMED, AND THE TWO ARE DOING OPPOSITE JOBS ON PURPOSE. 3 minutes is the DOSE
+  // (D-389), so the work rep is a fixed countdown wherever it leaves you on the hill. Only the
+  // recovery is open. ⛔ Do not "make them consistent" by opening both.
+  //
+  // ⚠️ Garmin ships this as a first-class option — "Open Repeats" beside "Structured Repeats" — and
+  // the documented friction with canned hill workouts is exactly this: preset distances and times
+  // that do not match the athlete's hill.
+  // ⚠️ THE SHORT-HILL FALLBACK IS NOT HERE, DELIBERATELY. `4 × 3 min` needs a climb you can run
+  // for three minutes and this session assumes one. The doctrine names `10-12 × 40 s` for athletes
+  // without one — ⛔ DO NOT WIRE THAT AND CALL IT DONE. It was built on 2026-08-06 and reverted the
+  // same day: at EQUAL work time the long form gives 327.9 s above 90% VO2max against the short
+  // form's 201.3 s, 40 s sits in the "moderate" band the meta puts on the inferior side, and the
+  // "short float keeps VO2 elevated" rationale is struck through as retired in the doctrine itself.
+  // **The second option is an unsolved protocol question, not a missing branch.** See the handoff
+  // banner at the top of `docs/ENGINE-STATE.md`.
+  const token = `run_hills_4x180s_rlap_g5_8_d${jogged ? 'jog' : 'walk'}`;
   return {
     day,
     type: 'run',
@@ -687,7 +720,8 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
     // ⛔ NO PACE, ANYWHERE IN THIS COPY. The pace-effort relationship changes with gradient, so a
     // pace target here is false precision (§2.2). Effort and grade only.
     description:
-      `4 × 3 min hard uphill, 3 min ${jogged ? 'easy jog' : 'walk'} back down, on a 5-8% grade. `
+      `4 × 3 min hard uphill on a 5-8% grade, ${jogged ? 'easy jog' : 'walk'} back down. `
+      + 'The descent has no timer — press the lap button at the bottom and the next rep starts. '
       + 'Hard means hard — you should not be able to hold a sentence. No pace target: on a hill the '
       + 'number would be wrong. The climb is what keeps this cheap on your legs, so the lifting '
       + 'still gets what it needs.'
