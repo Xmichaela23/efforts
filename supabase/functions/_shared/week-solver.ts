@@ -292,33 +292,31 @@ function scoreKey(
   }
   const spreadPenalty = lowerIdx.length > 1 ? -tightestLower : 0;
 
-  // 4b. ⛔ UPPER DAYS ARE SPREAD FROM THE REST OF THE WEEK — the solver had NO term for them at
-  //     all, so upper placement fell entirely through to the tie-break. `place-week:370` ranks each
-  //     upper day by its distance from every already-placed lifting day and maximises it.
+  // 4b. ⛔ UPPER-DAY SPREAD IS GONE — DELETED 2026-08-05, MICHAEL'S CALL. DO NOT REINSTATE IT.
   //
-  //     ⛔ RENAMED 2026-07-28 (Q-214) BECAUSE THE OLD NAME WAS A CLAIM IT DOES NOT MEET. It was
-  //     `upperSpreadPenalty`, which reads as "the presses are spread apart". It is NOT: the inner
-  //     loop runs over EVERY assignment, so this is upper→NEAREST-LIFT-OF-ANY-KIND, and an upper
-  //     lift sitting next to a LOWER one pins it just as hard as another press does.
+  // It was `upperToNearestLiftPenalty` (once `upperSpreadPenalty`): `-min(gapDays)` from each upper
+  // day to the NEAREST LIFT OF ANY KIND. The name promised press spacing and the metric could not
+  // see it — measured, it returned −1 for four legal arrangements whose press gaps were 1, 2, 3 and
+  // 3 (§0e: a check whose metric cannot move is not a check). Q-214 renamed it for exactly that
+  // reason and left it in place.
   //
-  //     ⚠️ MEASURED, ON ONE REAL WEEK: it returns −1 for four legal arrangements whose press gaps
-  //     are 1, 2, 3 and 3. **It cannot tell them apart** (§0e — a check whose metric cannot move).
-  //     Note the asymmetry that gives it away: `spreadPenalty` above DOES compare lower↔lower.
-  //     The lower region has a spacing term; the upper region has one that cannot see itself.
+  // ⛔ WITH `pressAdjacencyShortfall` BUILT, THE THING IT WAS A BAD PROXY FOR IS NOW MEASURED
+  // DIRECTLY, and what remained was a term that pins an upper lift away from LOWER lifts — the same
+  // mistake `upperLowerShortfall` made (see 4c) and the same one the book contradicts: Wendler's
+  // week alternates upper and lower on back-to-back days on purpose.
   //
-  //     ⛔ SO PRESS-TO-PRESS ADJACENCY IS STILL UNPRICED. Q-214 holds the design — a region term
-  //     ranked below the (now deleted) `upperLowerShortfall` and above `shapePenalty`. Do not read this term as
-  //     covering it; that misreading is exactly what Q-214 was raised from.
-  const upperIdx = assignment.filter((_, i) => !lifts[i].isLower);
-  let tightestUpperToAnyLift = 7;
-  for (const u of upperIdx) {
-    for (const other of assignment) {
-      if (other === u) continue;
-      tightestUpperToAnyLift = Math.min(tightestUpperToAnyLift, gapDays(u, other));
-    }
-  }
-  const upperToNearestLiftPenalty = upperIdx.length > 0 && assignment.length > 1
-    ? -tightestUpperToAnyLift : 0;
+  // ⚠️ IT WAS NOT DEAD, WHICH IS WHY THIS IS A DECISION AND NOT A CLEANUP. Swept over 128 solver
+  // scenarios — every session kind on every day, every long-run × quality-run pair, both block
+  // shapes. **Zero change at four lifting days; 36 of 43 changed at three**, and every one of those
+  // changed toward the book: unpinned, the 3-day week goes from Mon Deadlift · Thu Squat · Sat
+  // presses (lower, lower, upper) to Mon Deadlift · Tue presses · Thu Squat — alternating, with the
+  // heavy legs still 3 days apart because `spreadPenalty` holds that on its own.
+  //
+  // ⛔ SO THE LIFT-SPACING TERMS ARE NOW EXACTLY TWO, AND EACH SAYS WHAT IT MEASURES:
+  //     `spreadPenalty`            heavy legs vs heavy legs
+  //     `pressAdjacencyShortfall`  press vs press
+  // Nothing prices upper-against-lower any more, deliberately. If a future session wants that back,
+  // read the p.11 week first — it is the arrangement such a term scores worst.
 
   // 4. §5.0a + §2.2 — anchors landing on consecutive days is a real cost, and it is the athlete's
   //    own two picks that caused it. Scored, never corrected: anchors are hard (§2.3).
@@ -371,11 +369,11 @@ function scoreKey(
 
   // 4c-ii. ⛔ PRESS-TO-PRESS SPACING — Q-214, decided 2026-07-28, built 2026-08-05.
   //
-  // **This is the term Q-214 says does not exist.** `upperToNearestLiftPenalty` above measures upper
-  // → nearest lift OF ANY KIND, so it returns −1 for four arrangements whose press gaps are 1, 2, 3
-  // and 3 — it structurally cannot see press↔press (§0e: a check whose metric cannot move). The
-  // lower region has had `spreadPenalty` comparing lower↔lower since the beginning; the upper region
-  // has had nothing. This is the missing half.
+  // **This is the term Q-214 says does not exist.** The old `upperToNearestLiftPenalty` measured
+  // upper → nearest lift OF ANY KIND and returned −1 for four arrangements whose press gaps were 1,
+  // 2, 3 and 3 — it structurally could not see press↔press (§0e: a check whose metric cannot move).
+  // The lower region has had `spreadPenalty` comparing lower↔lower since the beginning; the upper
+  // region had nothing. This is the missing half, and the proxy it replaced is now deleted (4b).
   //
   // ⛔ THE CLUSTERING THIS WAS BUILT AGAINST came from `upperLowerShortfall`, which pushed every
   // press ≥3 days from every leg day and so shoved the two presses into each other — the solver
@@ -440,7 +438,7 @@ function scoreKey(
   // ⛔ `pressAdjacencyShortfall` IS THE LIFT-SPACING TERM NOW — `upperLowerShortfall` was deleted
   // 2026-08-05 (see 4c). Moving it is a design change, not a refactor — see the block at 4c-ii.
   return [restShortfall, breachPenalty, stackPenalty, stackHostPenalty, spreadPenalty,
-    upperToNearestLiftPenalty, pressAdjacencyShortfall, shapePenalty,
+    pressAdjacencyShortfall, shapePenalty,
     orderPenalty, preferredMissPenalty, ...canonicalAssignment];
 }
 

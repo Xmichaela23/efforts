@@ -100,3 +100,35 @@ Deno.test('the heavy lower lifts never share a day, at either shape', () => {
 });
 
 
+
+Deno.test('⛔ THE THREE-DAY WEEK ALTERNATES WHEN NOTHING PINS IT', () => {
+  // ⛔ ADDED 2026-08-05 BECAUSE DELETING `upperToNearestLiftPenalty` BROKE NOTHING.
+  //
+  // That term clustered the 3-day week — Mon Deadlift · Thu Squat · Sat presses — and removing it
+  // changed 36 of 43 three-day solver scenarios. **Not one test noticed.** The layout was never
+  // pinned, which is how it drifted into contradicting the book with nobody seeing it.
+  //
+  // Wendler's basic week (2nd ed. p.11) alternates upper and lower on back-to-back days on purpose.
+  // With two leg lifts and one press day, the alternating arrangement is lower · upper · lower.
+  //
+  // ⛔ UNPINNED ONLY, AND THAT IS THE POINT OF THE TEST RATHER THAN A WEAKNESS OF IT. A first
+  // version asserted this on the file's shared fixture, which pins a Sunday long run — and Monday is
+  // 24h from Sunday, so `long_run × lower_body_strength` (48h, a hard prune) FORBIDS a leg lift
+  // there and the presses must lead. The law overruling the shape is the system working. What must
+  // not happen is the shape being lost when nothing is asking for it.
+  const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const p: any = composeStrengthPrimaryPlan({
+    durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
+    liftingDays: 3, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+    easyPaceMinPerMile: 9,
+  } as never);
+  for (let w = 1; w <= 12; w++) {
+    const wk = (p.sessions_by_week[String(w)] as any[])
+      .filter((s) => s.type === 'strength')
+      .sort((a, b) => DAY_ORDER.indexOf(String(a.day)) - DAY_ORDER.indexOf(String(b.day)));
+    // A session naming two lifts is the paired press day; everything else carries one lift.
+    const kinds = wk.map((s) => (/Squat|Deadlift/.test(s.name) ? 'L' : 'U')).join('');
+    assertEquals(kinds, 'LUL',
+      `week ${w} did not alternate: ${wk.map((s) => `${s.day} ${s.name}`).join(', ')}`);
+  }
+});
