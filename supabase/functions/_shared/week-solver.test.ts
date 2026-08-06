@@ -363,15 +363,72 @@ Deno.test('the classic hybrid week: Sat ride, Sun run, four lifts, one rest day'
 Deno.test('a preferred day is honoured when it costs nothing', () => {
   // Found by the week-optimizer inventory: the solver had no preferred-day term at all, so a stated
   // preference was worth exactly zero. §4.2 says scored, not hard — this is the "scored" half.
+  //
+  // ⛔ THE FIXTURE CHANGED 2026-08-05 AND THE PROPERTY DID NOT. It used to ask for Bench on the one
+  // day the baseline left FREE (Wednesday), on the reasoning that an empty day costs nothing. Once
+  // Q-214's `pressAdjacencyShortfall` shipped that stopped being true: the baseline is Mon Bench /
+  // Thu OHP — presses 3 days apart, exactly the floor — and moving Bench to Wednesday puts the two
+  // pressing days 24h apart. **That is not a free preference any more, so it was the wrong fixture
+  // for a test about free preferences.** Asking Bench to take the day OHP holds swaps the two
+  // presses, changes nothing about the spacing, and is a real preference rather than a vacuous one.
   const anchors = [anchor('saturday', 'long_ride', 'long ride'), anchor('sunday', 'long_run', 'long run')];
   const withOut = solve({ anchors, lifts: FOUR });
   if (withOut.status === 'unsolvable') throw new Error('fixture should solve');
-  const freeDay = (['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as SolverDay[])
-    .find((d) => !withOut.week.lifts.some((l) => l.day === d))!;
-  const r = solve({ anchors, lifts: FOUR, preferredDays: { 'Bench Press': freeDay } });
+  const ohpDay = withOut.week.lifts.find((l) => l.lift === 'Overhead Press')!.day;
+  const benchDay = withOut.week.lifts.find((l) => l.lift === 'Bench Press')!.day;
+  assertEquals(ohpDay === benchDay, false, 'fixture should start with the presses on different days');
+  const r = solve({ anchors, lifts: FOUR, preferredDays: { 'Bench Press': ohpDay } });
   if (r.status === 'unsolvable') throw new Error('adding a preference must not make a week unsolvable');
   const bench = r.week.lifts.find((l) => l.lift === 'Bench Press')!;
-  assertEquals(bench.day, freeDay, 'a free preference was ignored');
+  assertEquals(bench.day, ohpDay, 'a free preference was ignored');
+});
+
+Deno.test('⛔ Q-214 — a preference that would collapse press spacing is OVERRULED, and said out loud', () => {
+  // The consequence of where Q-214 ranks. `pressAdjacencyShortfall` sits above `shapePenalty`, and
+  // `preferredMissPenalty` is below both — so press spacing outranks a stated day.
+  //
+  // ⚠️ THIS IS THE PART OF THE RANKING Q-214 DID NOT DISCUSS. Its decision text weighs the term only
+  // against `upperLowerShortfall`; putting it above `shapePenalty` puts it above the preferred-day
+  // term by transitivity. Pinned here so the trade is a recorded fact and not a surprise: an athlete
+  // asking for Bench on the free Wednesday is told no, because their two press days would land 24h
+  // apart. If that is the wrong call the fix is the RANK, and this test is where it shows up.
+  const anchors = [anchor('saturday', 'long_ride', 'long ride'), anchor('sunday', 'long_run', 'long run')];
+  const base = solve({ anchors, lifts: FOUR });
+  if (base.status === 'unsolvable') throw new Error('fixture should solve');
+  const freeDay = (['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as SolverDay[])
+    .find((d) => !base.week.lifts.some((l) => l.day === d))!;
+  const r = solve({ anchors, lifts: FOUR, preferredDays: { 'Bench Press': freeDay } });
+  if (r.status === 'unsolvable') throw new Error('fixture should solve');
+  const bench = r.week.lifts.find((l) => l.lift === 'Bench Press')!;
+  assertEquals(bench.day === freeDay, false, 'press spacing should have outranked the preference');
+  // ⛔ AND THE PRESSES ARE ACTUALLY APART — the point of overruling it.
+  const pressDays = r.week.lifts.filter((l) => !l.isLower).map((l) => SOLVER_DAYS.indexOf(l.day));
+  assertEquals(gapDays(pressDays[0], pressDays[1]) >= 3, true, 'presses should meet the 3-day floor');
+});
+
+Deno.test('⛔ Q-214 — press days are never left back-to-back on a week with room to spare', () => {
+  // The reproduction that raised it: no anchors at all, four lifts, seven days. Before the term the
+  // solver returned Mon Squat · Thu Deadlift · Fri Bench · Sat OHP — legs, legs, press, press, with
+  // two pressing sessions 24h apart on a week that had three empty days.
+  const r = solve({ anchors: [], lifts: FOUR });
+  if (r.status === 'unsolvable') throw new Error('an empty week must solve');
+  const pressDays = r.week.lifts.filter((l) => !l.isLower).map((l) => SOLVER_DAYS.indexOf(l.day));
+  assertEquals(gapDays(pressDays[0], pressDays[1]) > 1, true,
+    `presses landed back to back: ${r.week.lifts.map((l) => `${l.day} ${l.lift}`).join(', ')}`);
+});
+
+Deno.test('⛔ Q-214 — when press spacing loses, the week SAYS SO (§0f: no cost computed and unsaid)', () => {
+  const r = solve({ anchors: [], lifts: FOUR });
+  if (r.status === 'unsolvable') throw new Error('an empty week must solve');
+  const pressDays = r.week.lifts.filter((l) => !l.isLower).map((l) => SOLVER_DAYS.indexOf(l.day));
+  const tight = gapDays(pressDays[0], pressDays[1]);
+  const note = r.notes.find((n) => /days apart|back-to-back days/.test(n.text));
+  if (tight < 3) {
+    assertEquals(note != null, true, 'presses are inside the floor and nothing said so');
+    assertEquals(note!.kind, 'cost');
+  } else {
+    assertEquals(note, undefined, 'the floor was met — do not narrate a term that did its job');
+  }
 });
 
 Deno.test('⛔ A PREFERENCE NEVER BREAKS A CLEARANCE — anchors and the law outrank it (§4.2)', () => {

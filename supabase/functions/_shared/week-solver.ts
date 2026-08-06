@@ -307,7 +307,7 @@ function scoreKey(
   //     The lower region has a spacing term; the upper region has one that cannot see itself.
   //
   //     ⛔ SO PRESS-TO-PRESS ADJACENCY IS STILL UNPRICED. Q-214 holds the design — a region term
-  //     ranked BELOW `upperLowerShortfall` and ABOVE `shapePenalty`. Do not read this term as
+  //     ranked below the (now deleted) `upperLowerShortfall` and above `shapePenalty`. Do not read this term as
   //     covering it; that misreading is exactly what Q-214 was raised from.
   const upperIdx = assignment.filter((_, i) => !lifts[i].isLower);
   let tightestUpperToAnyLift = 7;
@@ -342,16 +342,68 @@ function scoreKey(
     }
   }
 
-  // 4c. ⛔ UPPER↔LOWER SPACING HAS A PREFERRED FLOOR, not just "spread". Mined from
-  //     `week-optimizer:1638` — `findStrengthPair(3)` then `(2)`: three days between an upper and a
-  //     lower day is preferred, two is the floor it drops to before relaxing anything else. A pure
-  //     spread term maximises without knowing where "good enough" is, so it trades a real clearance
-  //     for a day of separation it did not need. This prices the SHORTFALL below three.
-  let upperLowerShortfall = 0;
+  // 4c. ⛔ UPPER↔LOWER SPACING IS GONE — REMOVED 2026-08-05, MICHAEL'S CALL. DO NOT REINSTATE IT.
+  //
+  // It was `upperLowerShortfall`: every upper↔lower pair scored `max(0, 3 - gapDays)`, a preferred
+  // 3-day floor mined from `week-optimizer:1638` (`findStrengthPair(3)` then `(2)`).
+  //
+  // ⛔ **IT CONTRADICTS THE BOOK IT WAS MEANT TO SERVE.** Wendler's basic week (2nd ed. p.11,
+  // verified in the PDF) is Press · Deadlift · Bench · Squat — it ALTERNATES upper and lower on
+  // back-to-back days, deliberately. A term that pushes every press 3+ days from every leg day
+  // scores the book's own week as worse than a clustered one.
+  //
+  // ⛔ AND IT CAUSED THE CLUSTERING IT LOOKED LIKE IT PREVENTED. With four lifts on seven days,
+  // shoving each press away from each leg day shoves the two presses INTO EACH OTHER — the 24h-apart
+  // pressing days Q-212 and Q-214 both chased. It spent press spacing, which matters, to buy
+  // separation between an upper and a lower lift, which barely clash: different tissue, and on this
+  // plan the endurance is maintenance.
+  //
+  // ⚠️ THE MODEL THIS PLAN ACTUALLY RUNS ON is concurrent/hybrid consolidation (Viada): hard days
+  // hard, easy days easy, priority session first when two share a day. Strength is the goal and
+  // endurance is held, not developed — so upper↔lower calendar distance is not what protects the
+  // goal. Heavy legs vs heavy legs is (`spreadPenalty`); press vs press is
+  // (`pressAdjacencyShortfall`). Both are kept. Both match the book.
+  //
+  // ⛔ THIS SUPERSEDES Q-214's RANKING NOTE, which placed `pressAdjacencyShortfall` deliberately
+  // BELOW this term so it acted as a tie-break rather than an override. **That relationship no
+  // longer exists** — there is nothing above press spacing for it to yield to. Q-214 is
+  // back-annotated; its reasoning is still correct for the world it was written in.
+
+  // 4c-ii. ⛔ PRESS-TO-PRESS SPACING — Q-214, decided 2026-07-28, built 2026-08-05.
+  //
+  // **This is the term Q-214 says does not exist.** `upperToNearestLiftPenalty` above measures upper
+  // → nearest lift OF ANY KIND, so it returns −1 for four arrangements whose press gaps are 1, 2, 3
+  // and 3 — it structurally cannot see press↔press (§0e: a check whose metric cannot move). The
+  // lower region has had `spreadPenalty` comparing lower↔lower since the beginning; the upper region
+  // has had nothing. This is the missing half.
+  //
+  // ⛔ THE CLUSTERING THIS WAS BUILT AGAINST came from `upperLowerShortfall`, which pushed every
+  // press ≥3 days from every leg day and so shoved the two presses into each other — the solver
+  // returned Mon Squat · Thu Deadlift · Fri Bench · Sat OHP on an empty week: legs, legs, press,
+  // press, 24h apart. That term is now deleted (4c), which removes the CAUSE; this term remains as
+  // the direct statement of the property, so nothing has to infer it from a side effect again.
+  //
+  // ⛔ THE FLOOR IS 3 AND IT IS THE BOOK'S, NOT A PICKED NUMBER. Wendler's basic week (2nd ed. p.11)
+  // is Press · Deadlift · Bench · Squat — it ALTERNATES, and in all three of his suggested day sets
+  // (Mon/Tue/Thu/Fri · Sun/Mon/Wed/Fri · Sun/Mon/Wed/Thu) the two pressing days land 3 days apart.
+  // Same shape as `upperLowerShortfall`'s floor, which is deliberate: a pure spread term maximises
+  // without knowing where "good enough" is and would trade a real clearance for separation it did
+  // not need. This prices only the SHORTFALL below three.
+  //
+  // ⚠️ IT WAS A TIE-BREAK AND IT IS NOW THE PRIMARY LIFT-SPACING TERM (2026-08-05). Q-214 ranked it
+  // deliberately BELOW `upperLowerShortfall` so it could only break ties — *"that's the tie-break
+  // behaviour I wanted, not an override."* **That term has since been deleted** (see 4c), so nothing
+  // above it competes for lift placement any more. The ranking note in Q-214 is superseded; the term
+  // itself is unchanged and its reasoning below still stands.
+  //
+  // ⚠️ AND IT IS SCORED, NEVER HARD. The law affirmatively permits it —
+  // `upper_body_strength × upper_body_strength = 0h` — so this is a preference ABOVE the law (§4.1a),
+  // which is exactly why it is a penalty and not a prune.
+  let pressAdjacencyShortfall = 0;
   for (let i = 0; i < assignment.length; i++) {
     for (let j = i + 1; j < assignment.length; j++) {
-      if (lifts[i].isLower === lifts[j].isLower) continue;
-      upperLowerShortfall += Math.max(0, 3 - gapDays(assignment[i], assignment[j]));
+      if (lifts[i].isLower || lifts[j].isLower) continue; // upper↔upper only — this is the whole point
+      pressAdjacencyShortfall += Math.max(0, 3 - gapDays(assignment[i], assignment[j]));
     }
   }
 
@@ -377,16 +429,19 @@ function scoreKey(
   // anchors, same lifts listed differently would score differently and re-materialize to a
   // different week. Canonical order is (lower before upper, then name) — a property of the lifts
   // themselves, not of how they arrived.
-  // ⛔ ORDER CORRECTED 2026-07-27. `stackHostPenalty` used to sit BELOW `upperLowerShortfall`, and
+  // ⛔ ORDER CORRECTED 2026-07-27. `stackHostPenalty` used to sit BELOW `upperLowerShortfall` (a
+  // term since deleted — see 4c), and
   // the consequence showed up on a week an athlete would really ask for: Thursday long run of 108
   // minutes, receiving an overhead press, because the 3-day upper↔lower floor outranked the
   // smallest-day rule. Smallest-day was mined from `place-week` precisely to stop that.
   //
   // The principle: **day size GATES which hosts are acceptable; spacing OPTIMISES among them.**
   // Spacing choosing the host is spacing making a day-size decision it has no information about.
+  // ⛔ `pressAdjacencyShortfall` IS THE LIFT-SPACING TERM NOW — `upperLowerShortfall` was deleted
+  // 2026-08-05 (see 4c). Moving it is a design change, not a refactor — see the block at 4c-ii.
   return [restShortfall, breachPenalty, stackPenalty, stackHostPenalty, spreadPenalty,
-    upperToNearestLiftPenalty, upperLowerShortfall, shapePenalty, orderPenalty,
-    preferredMissPenalty, ...canonicalAssignment];
+    upperToNearestLiftPenalty, pressAdjacencyShortfall, shapePenalty,
+    orderPenalty, preferredMissPenalty, ...canonicalAssignment];
 }
 
 function lexLess(a: number[], b: number[]): boolean {
@@ -457,8 +512,36 @@ export function solve(input: SolverInput): SolverResult {
 
   // Canonical lift order for the tie-break vector (§5.1): a property of the lifts, never of the
   // order the caller happened to list them in.
+  //
+  // ⛔ THE TIE-BREAK OPENS WITH THE PRESS, NOT THE ALPHABET (2026-08-05, Michael's call).
+  //
+  // It sorted lower-first then by NAME, purely for determinism — which is why a week with no anchors
+  // opened `Monday: Back Squat`. "Back Squat" simply sorts before "Deadlift", and lower sorted before
+  // upper. Nothing chose it; the alphabet did.
+  //
+  // ✅ Wendler's basic week (2nd ed. p.11, verified in the PDF) is **Standing Military Press ·
+  // Deadlift · Bench Press · Squat**, so that is what an unconstrained week should open as. With
+  // this order the default week is Mon Press · Tue Deadlift · Thu Bench · Fri Squat — the book
+  // verbatim, on the first of his three suggested day sets.
+  //
+  // ⚠️ DETERMINISM IS UNCHANGED, which is the only property this vector was ever protecting (§5.1).
+  // The book order is a fixed list, exactly as total and as caller-independent as the alphabet was.
+  // Lifts outside it — the 3-day shape's paired `"Bench Press + Overhead Press"` slot, and whatever
+  // `generate-run-plan` passes — fall through to the previous rule, so nothing that is not one of
+  // Wendler's four changes behaviour at all.
+  //
+  // ⛔ AND IT IS ONLY A TIE-BREAK. It is the LAST element of the score vector, so every real term —
+  // clearances, rest, stacks, heavy-leg spread, press spacing, the athlete's preferred days — is
+  // settled before this is consulted. A pinned endurance day still moves the lifts wherever it needs
+  // to. This decides the shape of a week that has nothing else to decide it.
+  const WENDLER_WEEK_ORDER = ['Overhead Press', 'Deadlift', 'Bench Press', 'Back Squat'];
   const canonicalOrder = lifts
-    .map((l, i) => ({ i, k: `${l.isLower ? '0' : '1'}:${l.name}` }))
+    .map((l, i) => {
+      const w = WENDLER_WEEK_ORDER.indexOf(l.name);
+      // `0:` sorts the book's four ahead of anything else, in p.11 sequence; `1:` keeps the old
+      // lower-first-then-alphabetical rule for everything the book does not name.
+      return { i, k: w >= 0 ? `0:${w}` : `1:${l.isLower ? '0' : '1'}:${l.name}` };
+    })
     .sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0))
     .map((x) => x.i);
 
@@ -673,6 +756,37 @@ export function solve(input: SolverInput): SolverResult {
           text: `${floorClauses.length} clearances are at their minimum with nothing spare: `
             + `${floorClauses.slice(0, -1).join('; ')}; and ${floorClauses[floorClauses.length - 1]}.`,
         });
+      }
+
+      // ⛔ Q-214 — WHEN PRESS SPACING LOSES, SAY SO. The term is a tie-break by design: it is ranked
+      // below the deleted `upperLowerShortfall`, so it could be overruled. Q-214's
+      // requirement is that the solver "records which happened, so the next session reads why rather
+      // than reconstructing it from the arrangement" — a cost computed and never said is the §0f loss.
+      //
+      // ⚠️ REPORTED ONLY WHEN THE PRESSES ARE ACTUALLY TIGHT. Silence when the floor is met; this is
+      // not a running commentary on a term that did its job.
+      // ⚠️ READ OFF `b.assignment`, NOT BACK OFF `week.lifts` — the assignment is the day INDEX the
+      // solver scored on, and `gapDays` wraps the week. Re-deriving an index from the day NAME would
+      // be a second reading of the same fact, and the kind that silently disagrees.
+      const pressIdx = lifts.map((l, i) => (l.isLower ? -1 : b.assignment[i])).filter((d) => d >= 0);
+      if (pressIdx.length > 1) {
+        let tightestPress = 7;
+        for (let i = 0; i < pressIdx.length; i++) {
+          for (let j = i + 1; j < pressIdx.length; j++) {
+            tightestPress = Math.min(tightestPress, gapDays(pressIdx[i], pressIdx[j]));
+          }
+        }
+        if (tightestPress < 3) {
+          const names = lifts.filter((l) => !l.isLower).map((l) => l.name);
+          notes.push({
+            kind: 'cost',
+            text: tightestPress === 1
+              ? `${names.join(' and ')} land on back-to-back days. Three days apart is the preferred `
+                + `spacing; the rest of the week costs more to move than this does.`
+              : `${names.join(' and ')} are ${tightestPress} days apart, under the preferred three. `
+                + `The rest of the week costs more to move than this does.`,
+          });
+        }
       }
 
       const compromises: string[] = [...b.breaches];
