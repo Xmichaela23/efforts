@@ -310,10 +310,12 @@ function DaySelect({ label, value, onChange }: { label: string; value: DayName |
 // They stated a ceiling of TWO hard aerobic days. `DOCTRINE-aerobic-maintenance.md` §6 makes it ONE,
 // so the line was wrong, not merely dead, and the dialog fired on a transition that can no longer
 // happen. Michael's call, explicitly: *"it was a late night fun thing, not necessary."*
-// The rule now lives on its own `hardday` card — one question, options limited to the disciplines
-// they kept. Do not reinstate a warning here, and do not re-add a per-discipline picker.
+// The rule now lives on the `schedule` screen's "Hard day" row — one toggle, options limited to the
+// disciplines they kept. Do not reinstate a warning here, and do not re-add a per-discipline picker.
+// ⚠️ IT WAS A STANDALONE `hardday` CARD UNTIL 2026-07-28, when the scheduler rebuild absorbed it. The
+// dead render block survived until 2026-08-06 and cost a bug — see the note where it was deleted.
 
-// ⛔ D-327 — ONE HARD AEROBIC DAY, and it is now asked ONCE on its own card (`hardday` step).
+// ⛔ D-327 — ONE HARD AEROBIC DAY, asked ONCE, now on the `schedule` screen's "Hard day" row.
 //
 // This used to be a `QualityDayPicker` on the run card and another on the bike card, with whichever
 // came second GREYED and a swap offered. That worked, but it was one question wearing two costumes:
@@ -492,13 +494,6 @@ type StepKey =
   // ⚠️ VOLUME STAYS SEPARATE. Miles and hours are HOW MUCH; this card is WHEN. Deciding the second
   // while looking at the first is what made the old run card scroll past the fold.
   | 'schedule' | 'volume'
-  // ⛔ THE ONE HARD SESSION, asked ONCE. It used to be asked per-discipline — a "Hard run day" on
-  // the run card and a "Hard ride day" on the bike card — with D-327 then greying whichever came
-  // second. That is one question wearing two costumes: the block carries exactly ONE hard aerobic
-  // day, so offering two slots and refusing the second was working around a shape that no longer
-  // fits. Its own card, after the disciplines (the options are whatever they kept) and before swim
-  // (which is booked, not coached).
-  | 'hardday'
   // ⛔ THE BLOCK SHAPE — four lifting days or three (2026-07-29). Its own card because it is not a
   // scheduling preference, it is which programme the athlete is running: at four, every lift is
   // trained first and every top set is a clean measurement; at three, two lifts share a day and one
@@ -1271,7 +1266,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     if (!longDayCalledFor(d)) return true;
     return !!(d === 'run' ? state.longRunDay : state.longRideDay);
   }) && (['run', 'bike'] as const).every((d) => !(d in state.qualityDays) || !!state.qualityDays[d]);
-  // ⛔ ONE HARD AEROBIC DAY — D-327, enforced by the SHAPE of the `hardday` card (one slot).
+  // ⛔ ONE HARD AEROBIC DAY — D-327, enforced by the SHAPE of the "Hard day" row (one slot).
   //
   // History, so nobody re-derives it: this was TWO hard days, priced-not-refused, with a one-shot
   // "Mulholland" dialog on the transition to the second. `DOCTRINE-aerobic-maintenance.md` §6 replaced
@@ -2778,6 +2773,72 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   ))}
                 </div>
               )}
+              {/* ── the ground the hard RUN happens on ──────────────────────────
+                  ⛔ IT LIVES HERE BECAUSE THIS IS THE CONTROL THAT EXISTS. It was first wired to the
+                  `hardday` STEP, which the 2026-07-28 scheduler rebuild replaced — `scheduleSteps`
+                  never pushes it, so the menu rendered nowhere and a device check found no cards.
+                  That dead step has been deleted; this is the only hard-day control.
+
+                  ⛔ STILL NOT A NEW STEP, WHICH IS WHAT §2.0 ACTUALLY REQUIRES. The doctrine bans a
+                  "do you have a hill?" question outright — *"asking would buy nothing and cost a
+                  screen… availability reveals itself in the choice."* This is a reveal inside the
+                  card they are already on, one row under the toggle that triggers it.
+
+                  ⚠️ KEYED ON `'run' in state.qualityDays`, THE SAME TEST THE DAY SELECT USES, and not
+                  on truthiness — the discipline is chosen the moment Run is tapped and the day
+                  arrives after. So the menu appears with the day picker, not after it.
+                  ⚠️ Hidden for Hard ride (one shape, Helgerud 4 × 4, no terrain question) and for
+                  neither-selected (there is no hard session to give ground to).
+
+                  ⚠️ COMPACT ON PURPOSE. This screen carries a live week preview that must stay above
+                  the fold while the athlete taps; the four options are one line of title and one of
+                  consequence, in this card's own `text-xs` register, not the full-screen cards the
+                  dead step used. The flat option's cost and its nudge survive the shortening —
+                  that was the condition its ruling came with, not decoration. */}
+              {'run' in state.qualityDays && (
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-white/85 text-sm">What you can run it on</span>
+                  <div className="space-y-1">
+                    {([
+                      {
+                        id: 'hill_3min' as const,
+                        title: 'A hill you can run for 3 minutes',
+                        body: 'Four 3-minute climbs. The climb keeps a hard session cheap on your legs, so more of the week is left for the bar.',
+                      },
+                      {
+                        id: 'treadmill' as const,
+                        title: 'A treadmill',
+                        body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\'s job, so it costs your legs no more.',
+                      },
+                      {
+                        id: 'hill_short' as const,
+                        title: 'Only a short hill',
+                        body: 'Ten 1-minute climbs. Shorter efforts hold less than the 3-minute version — the session for the hill you have.',
+                      },
+                      {
+                        id: 'flat' as const,
+                        // ⛔ THE COST AND THE NUDGE ARE THE RULING'S CONDITION. §2.1 bans this session
+                        // outright and §2.0 governs only because the athlete owns a STATED trade.
+                        title: 'Flat ground only',
+                        body: 'Four 3-minute efforts on the flat. The one option that costs your legs full price, and the lifting pays for it. A treadmill or cheap trainer would buy the same session for less.',
+                      },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.id} type="button"
+                        onClick={() => setState((st) => ({ ...st, qualityRunTerrain: opt.id }))}
+                        className={`w-full text-left px-3 py-2 rounded-lg border ${
+                          state.qualityRunTerrain === opt.id
+                            ? 'border-teal-400/70 bg-teal-500/10'
+                            : 'border-white/12 bg-white/[0.04]'
+                        }`}
+                      >
+                        <span className="block text-white/90 text-sm">{opt.title}</span>
+                        <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── runs ─────────────────────────────────────────────────────── */}
@@ -3118,148 +3179,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           one; it is a steer with the reason attached, never an override.
           ⚠️ "None" is a real answer and its cost is stated. Intensity is the protective variable
           (Hickson): easy volume alone does not hold the engine. */}
-      {currentStep === 'hardday' && (() => {
-        const kept = (['bike', 'run'] as const).filter((d) => posturePresent(d));
-        // ⚠️ PRESENCE, not truthiness — a discipline is chosen before its day is. See the
-        // `qualityDays` type note.
-        const chosen = (['run', 'bike'] as const).find((d) => d in state.qualityDays) ?? null;
-        // Bike first in the list AND pre-selected — the doctrine's recommendation, shown as the default.
-        const active: 'run' | 'bike' | null = chosen ?? null;
-        const pick = (d: 'run' | 'bike' | null, day?: DayName | '') => setState((s) => ({
-          ...s,
-          // ⛔ ONE ENTRY, EVER. The map shape is kept because `buildPreferredDays` and everything
-          // downstream reads it, but only one discipline can hold a day now — the card has one slot,
-          // so there is no second to refuse.
-          qualityDays: d ? ({ [d]: day ?? '' } as Partial<Record<'run' | 'bike', DayName | ''>>) : {},
-        }));
-        return (
-          <StepLayout
-            step={stepNo('hardday')} totalSteps={steps.length} title="Your one hard day"
-            subtitle="One hard aerobic session a week. Everything else stays easy — that is what keeps the lifting intact."
-            // ⚠️ "None" passes; a discipline with no day does not. Since the tap stopped seeding
-            // 'tuesday' (see the `qualityDays` type note), a half-answer is now reachable and this is
-            // what catches it. Declining the hard day entirely stays legal.
-            onBack={back} onContinue={next} canContinue={!active || !!state.qualityDays[active]}
-          >
-            <div className="space-y-5">
-              <div className="space-y-2">
-                {kept.map((d) => (
-                  <button
-                    key={d} type="button"
-                    onClick={() => pick(d, state.qualityDays[d] ?? '')}
-                    className={`w-full text-left px-4 py-3 rounded-xl border ${
-                      active === d ? 'border-teal-400/70 bg-teal-500/10' : 'border-white/12 bg-white/[0.04]'
-                    }`}
-                  >
-                    <span className="block text-white/90 text-sm">{d === 'bike' ? 'Hard ride' : 'Hard run'}</span>
-                    <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                      {d === 'bike'
-                        // ⛔ THE CLUB HAS TO BE NAMED ON BOTH SIDES. The run option reads "a club
-                        // night" and the ride option read "a chaingang" — which IS the club ride,
-                        // but only a cyclist reads it that way. The whole reason this screen exists
-                        // is that the hard day is usually someone else's day: the club sets it, and
-                        // the engine builds around it rather than moving it. If only one option says
-                        // so, the other looks like a session the athlete invents.
-                        ? 'Intervals, the club ride, a chaingang, a threshold turbo. Hard riding costs your legs less than hard running does, so more of the week is left for the bar.'
-                        : 'Hill repeats, a club night, track. Uphill keeps the load down, but it still costs more in the legs than a ride would.'}
-                    </span>
-                  </button>
-                ))}
-                <button
-                  type="button" onClick={() => pick(null)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border ${
-                    active === null ? 'border-teal-400/70 bg-teal-500/10' : 'border-white/12 bg-white/[0.04]'
-                  }`}
-                >
-                  <span className="block text-white/90 text-sm">None</span>
-                  <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                    All your endurance stays easy. The aerobic base drifts over these weeks and comes back when the intensity does.
-                  </span>
-                </button>
-              </div>
-              {active && (
-                <div>
-                  <p className="text-white/85 text-sm mb-2">Which day</p>
-                  <DayPicker
-                    value={(state.qualityDays[active] as DayName) || ''}
-                    onChange={(d) => pick(active, d)}
-                  />
-                  <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
-                    Whichever day it actually lands — yours or someone else's. The lifting is placed around it.
-                  </p>
-                </div>
-              )}
-              {/* ⛔ THE TERRAIN MENU — RUN ONLY, AND IT IS NOT A NEW STEP.
-                  Doctrine §2.0 (2026-07-26) bans a "do you have a hill?" question outright:
-                  *"Asking would buy nothing and cost a screen… availability reveals itself in the
-                  choice."* So this is a menu inside the card they are already on, revealed the same
-                  way the day picker above it is — the athlete picks what they actually have and the
-                  question is never asked.
-                  ⚠️ IT MUST NOT RENDER FOR "Hard ride" OR FOR "None". The ride is Helgerud 4 × 4 on
-                  a turbo, a chaingang or a climb alike — same session, no question. And "None" is a
-                  legal answer meaning there is no hard session at all; offering it ground to run on
-                  would be asking about a workout the athlete just declined. */}
-              {active === 'run' && (
-                <div>
-                  <p className="text-white/85 text-sm mb-2">What you can run it on</p>
-                  <div className="space-y-2">
-                    {([
-                      {
-                        id: 'hill_3min' as const,
-                        title: 'A hill you can run for 3 minutes',
-                        // ⛔ FACT THEN CONSEQUENCE, NO IMPERATIVE, AND NO "RECOMMENDED" — the
-                        // default position carries that, not the words (§2.0 copy shape).
-                        body: 'Four 3-minute climbs, walk or jog back down. The climb is what keeps a hard session cheap on your legs, so more of the week is left for the bar.',
-                      },
-                      {
-                        id: 'treadmill' as const,
-                        title: 'A treadmill',
-                        // ⚠️ NAMED AS A PEER, DELIBERATELY. The belt IS the grade, so this is the
-                        // same session as the hill rather than a substitute for it — and an athlete
-                        // who has one has no reason to take the short-hill or flat option.
-                        body: 'The same four 3-minute efforts at 5-8% incline. The incline does the same job the hill does, so this costs your legs no more than running outside would.',
-                      },
-                      {
-                        id: 'hill_short' as const,
-                        title: 'Only a short hill',
-                        // ⚠️ THE COST IS STATED, NOT HIDDEN. 60 s sits in the band the evidence puts
-                        // below 3-minute reps, so this card says it is the lesser session in plain
-                        // words rather than selling it as equivalent.
-                        body: 'Ten 1-minute climbs instead. Shorter efforts buy less of what this session is for, so it holds less than the 3-minute version does — it is the session for the hill you have.',
-                      },
-                      {
-                        id: 'flat' as const,
-                        title: 'Flat ground only',
-                        // ⛔ THE COST IS THE POINT OF THIS CARD, AND THE NUDGE IS THE CONDITION THE
-                        // RULING CAME WITH (Michael, 2026-08-06). §2.1 bans this session outright;
-                        // §2.0 governs and lets the athlete own the trade — but only if the trade is
-                        // stated. An athlete who picks this without being told what it costs has not
-                        // made a choice, they have been handed a worse block quietly.
-                        // ⚠️ NO IMPERATIVE, and the nudge is a fact about what a trainer would buy
-                        // them, not an instruction to buy one.
-                        body: 'Four 3-minute efforts on the flat. This is the one option that costs your legs full price — a climb takes the impact out and flat ground puts it back, and the lifting is what pays for it. A treadmill or a cheap indoor trainer would buy you the same session for less.',
-                      },
-                    ]).map((opt) => (
-                      <button
-                        key={opt.id} type="button"
-                        onClick={() => setState((s) => ({ ...s, qualityRunTerrain: opt.id }))}
-                        className={`w-full text-left px-4 py-3 rounded-xl border ${
-                          state.qualityRunTerrain === opt.id
-                            ? 'border-teal-400/70 bg-teal-500/10'
-                            : 'border-white/12 bg-white/[0.04]'
-                        }`}
-                      >
-                        <span className="block text-white/90 text-sm">{opt.title}</span>
-                        <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">{opt.body}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </StepLayout>
-        );
-      })()}
+      {/* ⛔ THE `hardday` STEP WAS DELETED 2026-08-06. IT HAD BEEN DEAD SINCE 2026-07-28.
+          The scheduler rebuild replaced `run` + `bike` + `hardday` with the one `schedule` screen,
+          and `scheduleSteps` stopped pushing this key — but the render block stayed, so the file
+          still carried a full second hard-day picker that nothing could reach.
+
+          ⚠️ IT COST A REAL BUG. The terrain menu was wired into THIS card, which reads as the
+          obvious home for it, and a device check found no cards on the schedule screen: the menu
+          was rendering nowhere. The live hard-day control is in the `schedule` step above, keyed on
+          `'run' in state.qualityDays`, and the menu now lives there — once.
+
+          ⛔ Do not restore this card to add a hard-day question. There is one control; extend it. */}
 
       {/* ⬇ SWIM SITS LAST. It is a courtesy — booked, not coached — so it follows the work rather
           than sitting above the lifting and the running it is subordinate to. The app learns no swim
