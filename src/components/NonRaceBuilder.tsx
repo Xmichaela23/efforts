@@ -1911,10 +1911,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
           So the only real question is which endurance you are keeping through the block. Michael,
           2026-07-25: *"strength is assumed, question is do you want to run ride swim — and you can't
-          develop them."* Every other goal keeps the full screen underneath. */}
+          develop them."* Every other goal keeps the full screen underneath.
+
+          ⛔ AND THE TITLE'S NAME COMES FROM `GOAL_LABELS`, IT IS NOT TYPED HERE. It used to be the
+          literal "Strength Focus", which is the exact second-copy the label's own comment was written
+          to stop — rename the block and this title silently keeps the old name. One source. */}
       {currentStep === 'posture' && isStrengthFocus && (
         <StepLayout
-          step={stepNo('posture')} totalSteps={steps.length} title={`Strength Focus · ${STRENGTH_FOCUS_WEEKS} weeks`}
+          step={stepNo('posture')} totalSteps={steps.length} title={`${GOAL_LABELS.get_stronger} · ${STRENGTH_FOCUS_WEEKS} weeks`}
           subtitle="What you're buying, before you commit to it."
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
@@ -2363,10 +2367,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   athlete to work out what the fourth day was FOR. "That is the week your next weights
                   are set from" is a consequence, not a purpose, and it reads as scheduling admin.
                   It is a MAX TEST. Name it. */}
+              {/* ⛔ THE "ONE WEEK IN FOUR GOES BACK TO FOUR DAYS" PROMISE IS GONE (2026-08-05).
+                  It described the week-3 test split, which has been removed. That split existed to
+                  protect a fresh AMRAP, and the trace killed its premise: `applyVerdict` steps the
+                  working number by a FIXED increment (+5 / +10) and `verdictFrom95Set` reads only
+                  whether the prescribed single at 95% was completed. The next weight is never
+                  computed off an estimated max from that set, so a fatigued lift cannot bias it.
+                  ⚠️ A card promising a fourth day the engine no longer builds is the worst kind of
+                  stale copy — an athlete picks three BECAUSE three is what their week holds. */}
               <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                Bench and press share a day, which may leave the second lift fatigued. One week in four
-                goes back to four days to test your max — every lift on its own day, nothing shared, so
-                the number is clean.
+                Bench and press share a day, which may leave the second lift fatigued. Three days every
+                week — nothing switches to four.
               </span>
             </button>
 
@@ -2378,23 +2389,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     Squat · Deadlift · Bench + Press
                   </p>
                 </div>
-                <div>
-                  {/* ⚠️ THE HEADING NAMES THE PURPOSE TOO, not just the week number. The option copy
-                      above now leads with "to test your max"; a panel that says only "Week 3 of each
-                      cycle" makes the athlete carry the connection across two blocks of text. */}
-                  <p className="text-white/70 text-xs font-medium mb-1">Week 3 of each cycle — the max test</p>
-                  <p className="text-white/50 text-xs leading-relaxed">
-                    Squat · Deadlift · Bench · Press — four days
-                  </p>
-                </div>
+                {/* ⛔ THE MAX-TEST WEEK PANEL IS GONE with the split it described. What replaces it is
+                    the TRADE, sourced to Wendler rather than to us — Michael's wording, 2026-08-05.
+                    Checked against `docs/COPY-VOICE.md` and `voiceViolation()`: all three sentences
+                    clean. ⚠️ The previous version ended by crediting the fourth day to "how strength
+                    tests are standardised, not the book" — an honest sentence about a thing that no
+                    longer happens, which is exactly how a screen starts lying. */}
                 <p className="text-white/45 text-xs leading-snug">
-                  Bench goes first on the shared day — the second lift of a session may give up load and
-                  reps, so the heavier one goes first. Week 3 sets the next cycle's weights, so nothing
-                  shares a day that week and every lift is read rested.
+                  The four-day plan gives each lift its own day. On three, two lifts share a day and the
+                  second is trained fatigued — that is Wendler's own three-day design, not a shortcut.
+                  Because 5/3/1 adds weight for hitting a rep target rather than a fresh max, a fatigued
+                  lift still progresses.
                 </p>
                 <p className="text-white/35 text-xs leading-snug">
-                  The three-day week is Wendler's. Testing on a fourth day is ours — it comes from how
-                  strength tests are standardised, not from the book.
+                  Bench goes first on the shared day — the heavier lift leads, so the one that gives up
+                  load and reps is the lighter of the two.
                 </p>
               </div>
             )}
@@ -2532,6 +2541,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                   A week you can hit even when work is bad — not your best one. This is what the plan
                   builds around, and the sessions will not shrink to meet you.
+                </p>
+                {/* ⛔ THE ONE FINDING THAT HAS TO REACH THE ATHLETE, AND IT IS COUNTERINTUITIVE.
+                    Source: PMC5093324 — work-matched hard and easy running blunted leg-press strength
+                    almost identically (28.7% and 27.5%, against 38.5% for lifting with no running).
+                    VOLUME was the mediator, not intensity. Every athlete assumes the hard run is the
+                    threat to their lifting; it is the mileage, and this is the screen where they are
+                    choosing the mileage.
+
+                    ⚠️ CHECKED AGAINST `docs/COPY-VOICE.md` AND THE RUNTIME GATE, 2026-08-05. Two
+                    earlier drafts failed: "How much to keep is yours to set" trips `voiceViolation`
+                    on **keep** (banned imperative) and is second-person besides (rule 1); "give
+                    ground" passed the gate and still breaks rule 10 — the banned list is finite and
+                    idioms have to be caught by reading. ⛔ Run any edit to this paragraph through
+                    `voiceViolation()`; passing that check is necessary, not sufficient. */}
+                <p className="text-white/60 text-sm mt-3 leading-relaxed">
+                  Running volume — not pace — is what competes with strength here. Matched for equal
+                  work, hard and easy running blunt leg-strength gains about the same — 28.7% and
+                  27.5%, against 38.5% with no running — so the cost is the mileage, not the
+                  intensity. As weekly volume climbs, those strength gains get smaller. The volume set
+                  here is the one the plan builds around.
                 </p>
               </div>
             )}

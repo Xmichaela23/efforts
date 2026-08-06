@@ -34,13 +34,25 @@ const ENDURANCE: Discipline[] = ['swim', 'bike', 'run'];
 export const GOAL_LABELS: Record<NonRaceGoalId, string> = {
   build_endurance: 'Build endurance',
   build_speed: 'Build speed',
-  // ⛔ THE ATHLETE-FACING NAME IS "STRENGTH FOCUS". The id stays `get_stronger` — routing, specs and
+  // ⛔ THE ATHLETE-FACING NAME IS "STRONG FOCUS". The id stays `get_stronger` — routing, specs and
   // every doc key off it — but the label the athlete reads is this one, in ONE place.
   // It said 'Get stronger', and `NonRaceBuilder` special-cased the goal CARD to display
   // "Strength Focus" while this value still flowed into the goal name, the block summary and the
   // duration copy. So the athlete picked "Strength Focus" and was handed a plan called
   // "Get stronger". Fixed here rather than by adding a second special case.
-  get_stronger: 'Strength Focus',
+  //
+  // ⛔ "STRENGTH FOCUS" → "STRONG FOCUS" (Michael, 2026-08-05). STRENGTH is the DISCIPLINE and it
+  // keeps that name on the Train card, beside Run Focus / Ride Focus / Athletic Focus. STRONG is the
+  // BLOCK — the tier picked one screen later (D-383), and the block is what this label names. Three
+  // names for one thing in four taps ("Strength Focus" card → "Strength" tier screen → pick "Strong"
+  // → "Strength Focus · 12 weeks") is what this closes.
+  //
+  // ⚠️ AND IT IS A CONSTANT ONLY WHILE STRONG IS THE ONLY LIVE TIER. Heavy and Definition are the
+  // same `get_stronger` goal with a different tier, so the day either ships this must READ THE TIER
+  // ("Heavy Focus", "Definition Focus") rather than stay hardcoded. The tier does not reach the
+  // payload yet (D-383 — `strength_tier` is taken by the EQUIPMENT tier), which is the only reason a
+  // constant is honest today. Wire the tier, then derive this.
+  get_stronger: 'Strong Focus',
   build_muscle: 'Build muscle + train',
   maintain: 'Maintain',
   starting_over: 'Starting over',

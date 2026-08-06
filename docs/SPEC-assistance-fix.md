@@ -20,7 +20,45 @@
 above is SHIPPED and folded into its D-entries. This file gets deleted when §0–§7 lands.
 **Decided by:** Michael, 2026-08-05.
 **Supersedes:** Q-212 (antagonist-balance — *partial*, see §8) and the "25 IS THE FLOOR AND IT STAYS" call of 2026-07-28 (see §8).
-**Source of truth for "by the book":** Wendler, *5/3/1* 2nd ed. (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`), assistance chapter pp.46–54, concurrent chapter p.86.
+**Source of truth for "by the book":** Wendler, *5/3/1* 2nd ed. (`~/Downloads/531_2nd_Edition_Hard_Copy.pdf`), assistance chapter pp.46–54, concurrent chapter pp.86–88.
+
+> ⛔ **AND WE RUN TWO BOOKS, NOT ONE. Read this before "correcting" anything to match the PDF.**
+> Verified page by page 2026-08-05. The **numbers** are 2nd edition and match it exactly; the
+> **structure** is *5/3/1 Forever* (2017), whose vocabulary does not appear in the 2nd edition at all.
+>
+> | What | Which book | Verified |
+> |---|---|---|
+> | Week percentages 65/75/85 · 70/80/90 · 75/85/95 · deload 40/50/60, reps 5/3/1 | 2nd ed. **p.23, "option one"** — Wendler's own recommended set | ✅ exact match to `PCT_BY_WEEK` / `ANCHOR_REPS` |
+> | No max-reps set in the deload | 2nd ed. p.24 | ✅ matches (`amrap: … && !isDeload`) |
+> | +5 lb upper / +10 lb lower per cycle | 2nd ed. p.63 | ✅ matches `cycleIncrementLb` |
+> | e1RM = `Weight × Reps × .0333 + Weight` | 2nd ed. p.99 | ✅ matches `WENDLER_EPLEY_COEFF`, pinned by test |
+> | **Training max = 85% of 1RM** | ⚠️ **NOT the 2nd ed.** — it says **90%**, on pp.21/22/30/60/91/99/104/106, with no exception. 85% and "lower it when recovery is uncertain" are *Forever* | sound for a hybrid athlete, **cited to the wrong book** |
+> | **"Leader" / "anchor"** | ⚠️ **NOT the 2nd ed.** — neither word appears anywhere in it. *Forever* | — |
+> | **Leader weeks carry no all-out set** | ⚠️ **NOT the 2nd ed.** — it gives every non-deload week a "+" set (p.23). *Forever*'s leaders drop it | deliberate, and `wendler-531.ts:44-50` argues it well |
+>
+> **Nothing here is wrong science** — it is Wendler's own later refinement, and lowering the training
+> max is the right call for someone running three days a week. **The risk is a future session opening
+> the 2nd edition, reading "90%", and "fixing" `WORKING_NUMBER_PCT_OF_1RM` back up.** That comment
+> currently attributes the 80–85% advice to Wendler without naming which book, which is the opening.
+
+> ## ⛔ THE SCHEDULING INSTRUCTION — read this before "fixing" the week to match the book
+>
+> **"Place the lifts around the pinned endurance days, book rules as far as the anchors allow."
+> NOT "force the pure book week."** Michael, 2026-08-05.
+>
+> The book's basic week (2nd ed. p.11) is **Press · Deadlift · Bench · Squat** — it alternates
+> upper/lower, and in all three of Wendler's suggested day sets the two pressing days land 3 days
+> apart. That is the target **shape**, not a layout to impose. The athlete's endurance days are
+> ANCHORS (§2.3, hard), the clearance law binds above everything, and the book gets whatever room is
+> left after both. A week that matches p.11 and breaks a 48h long-run clearance is wrong; a week that
+> misses p.11 because the anchors did not allow it is right, and should SAY it missed.
+>
+> ⚠️ **There is a live conflict, and it is not a bug to silently resolve.** `upperLowerShortfall`
+> pushes press days ≥3 days from leg days; the book puts them ADJACENT (Mon Press, Tue Deadlift).
+> The two pull opposite ways, and `upperLowerShortfall` outranks Q-214's press-spacing term by
+> Michael's explicit call — so the book's alternation loses on score (measured 5 vs 4 on the
+> no-anchor week). **Whether that floor should survive contact with p.11 is Michael's to rule on.
+> Do not reverse it in passing.**
 
 **What the remaining work does:** fixes the four accessory-selection defects (§0–§7), and builds the
 engine behind the tiers (§A). The tier changes the **strength work only** — accessory volume and
@@ -108,9 +146,40 @@ Every Wendler assistance template that touches a pressing day keeps a **push** o
 
 - **The Triumvirate (p.48):** Military Press → **Dips** 5×15 + Chin-ups 5×10. Bench → DB Bench + DB Row. Push + pull, never two pulls.
 - **Bodyweight (p.52):** Bench → **Pushups** + Chins. Press → Dips + Chins.
-- **Periodization Bible (pp.50–51):** Bench *and* Press days **lead** with "Shoulders or Chest — DB bench, Incline, **Dips, Pushups**," then a pull, then triceps. The third slot on press days is **triceps or abs — never lower body.** Lower-body days (Squat, Deadlift) carry the two leg categories **+ abs**.
-- **Simplest Strength Template (pp.52–54):** the *one* anti-repeat rule — pair each lift with an *opposing loadable* assistance: squat↔a pull, deadlift↔a squat-pattern, bench↔incline, **press↔a supine press.** Note: bench's balance is *incline* — a **different press**, not a pull. Wendler varies the push; he never deletes it.
-- **Concurrent chapter (p.86)** — the *one* template that makes the assistance the pure antagonist (bench→chins) — is the minimal 1-movement model we explicitly **did not** take (Option 2 in the decision). It's why the old code cross-balanced; see §8.
+- **Periodization Bible (pp.50–51):** Bench *and* Press days **lead** with "Shoulders or Chest — DB bench, DB Incline, DB Military, **Incline press, Dips, Pushups**," then Lats/Upper Back, then Triceps.
+- **Simplest Strength Template (pp.52–55):** the *one* anti-repeat rule — pair each lift with an *opposing loadable* assistance: squat↔a pull, deadlift↔a squat-pattern, bench↔incline, **press↔a supine press.** Note: bench's balance is *incline* — a **different press**, not a pull. Wendler varies the push; he never deletes it. The worked template (p.55) is Press→**Close Grip Bench**, Bench→**Incline Press**.
+
+> ⛔ **CORRECTED 2026-08-05 — THE THIRD SLOT ON A PRESS DAY IS NOT "TRICEPS OR ABS".** An earlier
+> draft of this line said that, and read against the pages it is wrong in a way that matters, because
+> §3 below locks the upper-day slot roles. **Four of the five templates put ARMS / UPPER BACK there
+> and put ABS on the lower days:** Periodization Bible (p.51) = Triceps; Simplest Strength (p.55) =
+> "Lats, Upper Back, Triceps, Biceps" on press days and "Hamstrings, Lower Back, Abs" on squat and
+> deadlift days; Bodyweight (p.52) = Press→Chins+Dips, Bench→Chins+Pushups, with Leg Raises on
+> deadlift day and Sit-ups on squat day; Triumvirate (p.48) = Hanging Leg Raise on deadlift day only.
+>
+> ✅ **Abs-on-an-upper-day has exactly ONE source, and it is the right one for us:** the **concurrent
+> chapter, p.87**, whose upper-body AND lower-body templates both end in a **Core Movement**. That is
+> the chapter written for an athlete who lifts and conditions — us. **So §3's upper-day core slot
+> STANDS; it is sourced from p.87, not from the four powerlifting templates.** Choosing it over
+> triceps is a deliberate call, and it should be recorded as one rather than presented as "the book
+> says abs", which the book does not.
+
+- **Concurrent chapter (pp.86–88)** — the *one* template that makes the **strength** assistance a pure antagonist (bench→chins, press→bent-over rows). Cited correctly by `assistance-menu.ts` for that pairing, and it is the minimal model we explicitly did not take (Option 2 in the decision); see §8.
+
+> ⛔ **AND p.86 IS NOT A ONE-MOVEMENT TEMPLATE — THE PAGE OUR CURRENT CODE LEANS ON REFUTES IT.**
+> Verified 2026-08-05. `resolveAssistance` cites p.86 to justify a press day resolving to a pull. The
+> pairing on p.86 is real, but it is only the *strength* half; **pp.87–88 continue the same template
+> with a conditioning circuit containing two more upper-body assistance movements and a core
+> movement.** Wendler's own worked example, p.88:
+>
+> > Bench Press 5/3/1 → Barbell Rows 5×10 → 3 rounds of: Med Ball Slams · **Dips** · Burpees ·
+> > Chin-ups · Planks
+>
+> **Dips are on the bench day, in the very template we quote to prove they should not be.** And p.87's
+> "Assistance Movements for Upper Body" list is push AND pull throughout — bench, dips, press, incline,
+> DB presses, floor press, close grip, push-ups, ring push-ups, push press, alongside the chins and
+> rows. **There is no page anywhere in this book where a push slot becomes a pull.** `BALANCE_POOL.push`
+> is invented. This is the strongest evidence for defect #1 and it comes from defect #1's own citation.
 
 **Reps floors, every template:** Triumvirate 50–75 per movement; Bodyweight "no less than 75 per exercise"; Periodization Bible 5×10–20 (50–100). Wendler's lowest number anywhere is **50**. We were at 25.
 
@@ -132,7 +201,19 @@ Replace the single global `push / pull / single_leg_core` triad with **day-type 
 ### Lower-body days (Squat, Deadlift)
 | Slot | Role | Rule | Proposed default |
 |---|---|---|---|
-| 1 | **Pull / posterior** | The 4 main lifts contain no row or chin — pulling volume must live here. Squat↔pull (book). | Squat → Chin-up or DB Row. Deadlift → a squat-pattern (Front Squat / Split Squat) per Simplest Template. |
+| 1 | **Pull / posterior** | The 4 main lifts contain no row or chin — pulling volume must live here. | Squat → Chin-up or DB Row. Deadlift → a squat-pattern (Front Squat / Bulgarian Split Squat) per Simplest Template. |
+
+> ⚠️ **CORRECTED 2026-08-05 — "Squat↔pull (book)" WAS A MISREADING OF p.53, AND THE CONCLUSION STILL
+> HOLDS ON A DIFFERENT PAGE.** p.53 says *"I have paired the squat day with an assistance pulling
+> movement."* Read alone that sounds like a row or a chin-up. **It is not:** the template it describes
+> (p.55) pairs Squat → **Straight Leg Deadlift** — a pull off the floor, a hinge, not an upper-body
+> pull. **No powerlifting template in the book puts an upper-body pull on a lower day.**
+>
+> ✅ **The real support is p.88, and it is explicit.** The concurrent chapter's worked squat session
+> is: Squat 5/3/1 → Good Mornings → 2 rounds of Hang Clean · Wall Sits · Mountain Climbers ·
+> **"Chin-ups (these can be done both days) – 15 reps"** · Pikes. Wendler puts chins on the lower day
+> and says in parentheses that they belong on both. **Same chapter as the core slot, same athlete.**
+> Cite p.88 here, not p.53.
 | 2 | **Single-leg / quad (varied across the two days)** | Must NOT repeat the same pattern on consecutive lower days. | Squat day → Bulgarian Split Squat; Deadlift day → Reverse Lunge (or swap — just not identical). |
 | 3 | **Core / abs** | Abs. | Hanging Leg Raise or Ab Wheel. |
 
@@ -148,7 +229,7 @@ Rewrite the logic in `resolveAssistance` (`assistance-menu.ts:266-324`) and `BAL
 
 - **Push slot, press-day collision → a DIFFERENT PUSH.** Never a pull. Resolve within the push family to a different movement pattern than the main lift (horizontal press → incline/vertical/dips; vertical press → horizontal press/dips). This is the core fix for defect #1.
 - **Pull slot → keep antagonist + plane-complement** (unchanged; `COMPLEMENT` map, `complementFor`). OHP → Inverted Row stays correct.
-- **Face Pull is demoted.** It is prehab, not the push slot. Remove it from `BALANCE_POOL.push` as a push-slot replacement. If we want rear-delt/upper-back prehab, it's a separate optional add-on, not the accessory slot. (Equipment substitution Face Pull→"Band Face Pulls" in `materialize-plan` becomes moot for the push slot.)
+- **Face Pull comes out of the PUSH slot — and that is the whole of it.** ⚠️ **Corrected 2026-08-05: an earlier draft said "it is prehab, demote it," and the book does not support that.** Wendler lists Face Pulls on **p.50 under "Lats or Upper Back"** as a legitimate 5×10–20 choice, right beside DB rows, chins and T-bar rows. What p.53 says is narrower — face pulls are not in the **"big" loadable** category (alongside DB benches, also excluded), so they can't be the *second lift of the day*. **Neither statement makes it prehab, and neither is the defect.** The defect is that we made an upper-back movement the answer to a **push** slot. So: remove it from `BALANCE_POOL.push`, **keep it available in the pull slot**, and do not write copy calling it prehab. (Equipment substitution Face Pull→"Band Face Pulls" in `materialize-plan` becomes moot for the push slot only.)
 - **Third slot on upper days = core/abs**, resolved independent of the main lift (no lower-body).
 - **Lower-day single-leg/quad slot = varied** between the two lower days (dedupe by movement pattern across Squat and Deadlift days).
 
@@ -184,8 +265,8 @@ Rewrite `assistanceTotalReps` (`assistance-menu.ts:109-139`) and `ASSISTANCE_TOT
 |---|---|
 | `src/lib/assistance-menu.ts` | `resolveAssistance` (266-324): day-type slot roles (§3), push-stays-push (§4), upper-day core slot, lower-day variation. `BALANCE_POOL` (222-231): drop Face-Pull-as-push. `assistanceTotalReps` + FLOOR/CEILING (90-139): 50 floor / 75 ceiling, flat (§5) — no sport split. `ASSISTANCE_MENU` (150-191): add Incline/Ab Wheel/Front-Split-Squat. `assistanceSubstitutionNote` (335-354): variation copy. `ASSISTANCE_DEFAULTS` (194-198): reset. |
 | `src/lib/exercise-config.ts` | Classification stays (`MovementFamily`, `COMPLEMENT`, `sharesMovementFamily`). May add patterns for new menu exercises. |
-| `supabase/functions/_shared/strength-system/strength-primary-plan.ts` | `assistanceRows` (289-323) + call site (1339-1346): pass day-type. (No modality threading — reps are flat; interference lives in the existing `science.ts` floors.) |
-| `supabase/functions/_shared/strength-system/assistance-collision.test.ts` | **Rewrite the pinned invariants** (§8) — Bench push slot must now assert a push, not Face Pull. |
+| `supabase/functions/shared/strength-system/strength-primary-plan.ts` | `assistanceRows` (289-323) + call site (1339-1346): pass day-type. (No modality threading — reps are flat; interference lives in the existing `science.ts` floors.) |
+| `supabase/functions/shared/strength-system/assistance-collision.test.ts` | **Rewrite the pinned invariants** (§8) — Bench push slot must now assert a push, not Face Pull. |
 | `src/components/NonRaceBuilder.tsx` | Seed-only; add the per-day override surface (§6) — likely a separate plan-side component, not the wizard. |
 | `materialize-plan/index.ts` (~1109/1384) | Equipment substitution unaffected except Face-Pull-as-push is gone. |
 
