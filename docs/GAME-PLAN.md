@@ -12,14 +12,14 @@
 > [D-390]. Six commits `a0d1baec` → `a5a1f19d`, **pushed + deployed, NOT device-verified** —
 > checklist at the top of `POLISH-PUNCH-LIST.md`.
 >
-> ⛔ **NEXT IS NOT A BUILD, IT IS A DECISION: the second hard-session option ([Q-260]).** The block's
-> one hard aerobic session is `4 × 3 min` uphill and needs a climb you can run for three minutes; an
-> athlete without one gets a session they cannot run and is never asked. **The doctrine's "10–12 ×
-> 40 s" fallback is NOT the answer** — it was built and reverted the same day, because at equal work
-> time the long form gives 327.9 s above 90% VO2max against the short form's 201.3 s, 40 s sits in
-> the band the meta calls inferior, and the rationale for its short float is struck through as
-> retired in our own doc. **Maximize VO2max at the least mechanical cost. Two sources in that
-> doctrine are unnamed and load-bearing — find them first.**
+> ✅ **SHIPPED [D-391] — the second hard-session option is done; [Q-260] is CLOSED.** The runner now
+> picks by terrain (3-min hill default · treadmill · short hill `10×1 min` · flat), bike inferred; the
+> `40 s` format was correctly never built. Cards device-verified, flat placement fixture-verified.
+>
+> ⛔ **NEXT IS A DECISION, WITH A DATE: [Q-256], the 5/3/1 training-max ceiling reads a stale signup
+> 1RM.** Squat and OHP stall after one cycle (~Aug 24); feed the ceiling from the learned / AMRAP-implied
+> max, not the frozen signup. **Michael rules on the approach before it is built.** Then [Q-252], the
+> Sunday State blackout.
 >
 > ⚠️ **[Q-256] STILL HAS A DATE ON IT** — the 5/3/1 training-max ceiling reads a stale signup 1RM and
 > squat/OHP stall after one cycle (~Aug 24). Michael rules on the approach before it is built.

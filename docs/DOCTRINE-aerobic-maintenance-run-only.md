@@ -475,13 +475,22 @@ The athlete chooses which. The app states the trade. It does not choose silently
 
 Weekly intensity remains a single budget. Run-only means it is not split.
 
-| Configuration | Session | Structure | Grade |
-|---|---|---|---|
-| Run-only, VO2 defence | 1× per week | 10–12 × 40 sec hard / 20 sec easy | 5–8% |
-| Alternative structure | 1× per week | 8–10 × 60 sec hard / 60 sec easy | 4–6% |
-| Threshold option | 1× per week | 2 × 8 min sustained | 3–4% |
+> **⚠️ TABLE CORRECTED 2026-08-06 to what SHIPPED ([D-391]).** It previously headlined
+> `10–12 × 40 sec` as the run-only VO2 defence. **That format is REJECTED and was never shipped**
+> — it was built and reverted the same day ([Q-260]); short/moderate intervals hold less time at
+> VO2max (Fleckenstein 2025; the BMC time-at-VO2max meta). The athlete now picks by terrain.
 
-Working time ~12–16 min. Session length ~35–40 min including warm-up and cool-down.
+| Terrain (athlete picks) | Session | Structure | Grade |
+|---|---|---|---|
+| A 3-min climb (**default**) | 1× per week | 4 × 3 min hard, walk/jog descent | 5–8% |
+| Treadmill | 1× per week | 4 × 3 min hard, 3 min easy | 5–8% incline |
+| Only a short hill | 1× per week | 10 × 1 min hard / ~1 min descent | 4–6% |
+| Flat ground (last resort) | 1× per week | 4 × 3 min hard / 3 min easy — full VO2, no leg discount | flat |
+
+The `2 × 8 min sustained @ 3–4%` structure folds into the short-hill option (a long, gentle drag) — it
+is not a separate menu item. Bike-owners get the `4 × 4 min` Helgerud ride instead, inferred, not asked.
+
+Working time ~10–12 min. Session length ~35–40 min including warm-up and cool-down.
 
 **One quality session, not two.** The parent doctrine's two-session configuration assumed one of them was mechanically free. Neither is here.
 

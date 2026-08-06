@@ -423,6 +423,8 @@ plan get built through the new door.**
 
 ## Q-260 — The second hard-session option is an unsolved protocol, and the obvious fix is the wrong one (2026-08-06, **VERIFIED against our own doctrine, NOT built**)
 
+> **✅ SOLVED 2026-08-06 night by [D-391] — everything below is history.** The answer was NOT a different single session (which is what this entry, correctly, could not find). It was a **four-option menu** revealed under Hard day = Run: 3-min hill (preselected) · treadmill · short hill (`10×1 min`) · flat. The 40 s format this entry warns against was never built. The runner without a 3-minute climb picks what they actually have; the flat option keeps full VO2 and is separated from heavy legs by a scored preference. Pushed + deployed; cards device-verified. See D-391.
+
 The strength-primary block has ONE hard aerobic session. It has **one** configuration — `4 × 3 min` uphill — and that needs **a climb you can run for three minutes.** An athlete without one is currently handed a session they cannot run, and is never asked.
 
 ⛔ **DO NOT WIRE THE DOCTRINE'S "10–12 × 40 s" AND CALL IT DONE. That was built on 2026-08-06 and reverted the same day** (intake question + `run_hills_10x40s_rlap` branch, both removed). Three reasons, all from `DOCTRINE-aerobic-maintenance-run-only.md` **two sections above where the fallback is named**:

@@ -760,6 +760,15 @@ Rank legal weeks by, in order:
 ⚠️ **A shortfall on any of these is REPORTED, never absorbed.** `place-week` already emits
 `compromises[]` and its contract says they must never be silently swallowed.
 
+> **2026-08-06 [D-391] — a scored term sits between (2) and (3): the flat-terrain hard run's PREFERRED
+> 48h clearance from heavy legs** (`Anchor.preferredClearance` → `preferredClearanceShortfall` in
+> `week-solver.ts`). It ranks **below real-clearance breaches** — it can never buy its separation by
+> breaching another anchor (0 breaches across a 24-shape sweep) — and **above spread**, so it outranks
+> the spread preference only. Same shape as §4.2 (a preference anchors outrank). ⚠️ **EXCEPTION to the
+> "always reported" rule above:** only flat terrain sets it, it is taken when the week allows and
+> **silently absent otherwise — a declined preference reports NOTHING**, because a preference is not a
+> floor. The "clearance at its minimum" note reads the raw matrix, not this term.
+
 ### 5.0a ⛔ CONSECUTIVE ANCHORS ARE A SHAPE, AND ONLY THE SCORE CAN SEE THEM
 
 **Added 2026-07-27.** §8.2's table is **pairwise by construction** and a pairwise table cannot express

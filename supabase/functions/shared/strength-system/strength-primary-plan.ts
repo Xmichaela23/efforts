@@ -581,7 +581,9 @@ function enduranceSession(
 }
 
 /**
- * ⛔ THE ONE HARD AEROBIC SESSION — hill repeats, for the athlete with no bike.
+ * ⛔ THE DEFAULT HARD AEROBIC SESSION — 3-min hill repeats, for the runner with a 3-min climb.
+ * One of four run terrains `hardRunSession` dispatches (hill / short hill / treadmill / flat, [D-391]);
+ * this is the preselected default. Bike-owners get `bikeQualitySession` instead.
  *
  * Spec: `docs/DOCTRINE-aerobic-maintenance-run-only.md` §2, §3, §5. Until this existed the hard day
  * was PINNED AND EMPTY: the athlete named a day, `place-week` correctly kept the bar off it, and

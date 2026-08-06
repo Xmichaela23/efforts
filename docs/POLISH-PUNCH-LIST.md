@@ -8,6 +8,19 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE HARD-RUN TERRAIN FALLBACK, FLAT PLACEMENT (2026-08-06 night, pushed + deployed, **cards SEEN, placement NOT**)
+
+[D-391], closes [Q-260]. The four terrain cards are **device-verified** (they render and select on
+"Your week" → Hard day → Run). One thing is fixture-verified only:
+
+- [ ] **Build a plan that picks "Flat ground only" and check the schedule.** On a week with room, your
+      heavy leg days should sit a day further from the flat run than from a normal hard run; on a tight
+      week they sit at the normal 24 h with **no** compromise warning. The engine never moves a squat
+      inside the long run's 48 h to buy flat its space (0 breaches across a 24-shape sweep) — this is
+      confirming the scored preference behaves in a real plan.
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE STRENGTH BLOCK REBUILD + THE LAP-BUTTON HILL (2026-08-06, pushed + deployed, **NOT SEEN ON A DEVICE**)
 
 Six commits (`a0d1baec` → `a5a1f19d`), [D-385]–[D-390]. Deployed: `generate-strength-plan`,

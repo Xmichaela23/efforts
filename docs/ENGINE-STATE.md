@@ -23,102 +23,52 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-06 — THE HARD-SESSION SECOND OPTION IS AN UNSOLVED PROTOCOL, NOT A WIRING JOB)
+## 🧭 NEXT SESSION — START HERE (2026-08-06 night — THE HARD-RUN TERRAIN FALLBACK SHIPPED; next is the Q-256 TM ceiling, which has a DATE)
 
-### YOUR JOB — decide the second hard-session option, then build it
+### YOUR JOB — [Q-256] the 5/3/1 training-max ceiling reads a STALE signup 1RM
 
-The strength-primary block has ONE hard aerobic session a week. It has one configuration and needs two:
+`tmCeilingLb` (`wendler-531.ts:197`) caps the training max at 90% of `one_rep_maxes_at_build` — a
+signup number that never updates. On a clean block, **squat (TM 90→95) and OHP (85→90) STALL after ONE
+cycle (~Aug 24)** while bench/deadlift keep climbing. Fix: feed the ceiling from the LEARNED /
+AMRAP-implied max, not the frozen signup. The +5/+10 increment stays (Wendler); only the *ceiling
+reference* changes. ⚠️ **Michael rules on the approach BEFORE it is built** — it changes safety logic.
+First stall ~Aug 24, so it has a date.
 
-| | what it is | who gets it |
-|---|---|---|
-| **Built, shipped** | `run_hills_4x180s_rlap_g5_8` — 4 × 3 min uphill at 5–8%, lap-button descent. 12 min of work. | anyone with a climb they can run for 3 minutes |
-| **UNSOLVED** | ??? | anyone without one |
+Second: **[Q-252]** the Sunday State blackout — recurs every Sunday 17:00 Pacific, blanks the State
+performance section. Top non-strength item.
 
-⛔ **DO NOT WIRE THE DOCTRINE'S "10–12 × 40 s" AND CALL IT DONE. THAT IS WHAT THIS SESSION DID AND IT
-IS WRONG.** It is sitting uncommitted (see below) and should be reverted or redesigned. Three reasons,
-all from the doctrine's own evidence:
+### WHAT SHIPPED — the hard-run terrain fallback [D-391]. PUSHED + DEPLOYED + card UI DEVICE-VERIFIED; placement fixture-verified.
 
-1. **Long intervals beat short AT EQUAL WORK TIME.** Head-to-head, 12 highly trained runners,
-   4 × 3 min at 95% vVO2max vs 24 × 30 s at 100%, both **12 minutes of work**: time >90% VO2max
-   **327.9 ± 146.8 s vs 201.3 ± 268.4 s**. Time >90% HRmax went the OTHER way (545 vs 820) and RPE
-   was identical — *the short session feels harder, reads harder on HR, and delivers 40% less
-   stimulus.*
-2. **40 s is in the "moderate" band** (>30 s to <2 min), which the meta puts on the same inferior
-   side as short (≤30 s). It is not a middle ground.
-3. **The rationale for the short float is RETIRED IN OUR OWN DOC.** "VO2 stays elevated through the
-   recovery" is struck through in `DOCTRINE-aerobic-maintenance-run-only.md`. So neither a 20 s float
-   nor a lap-button descent is currently backed for a 40 s rep — and this session picked one anyway.
+The strength block's ONE hard aerobic session now adapts to terrain. On "Your week" → Hard day → Run,
+four cards appear (3-min hill preselected): **3-min hill · treadmill · short hill (10×1 min) · flat**.
+Hard ride and None show nothing (bike = existing 4×4 Helgerud, inferred). **This CLOSES [Q-260]** — the
+answer was a four-option menu, not the 40 s format Q-260 warned against.
 
-### THE ACTUAL QUESTION, STATED PROPERLY
+- 3 commits `caae1283` → `53e050b8`. Deployed: `generate-strength-plan`, `materialize-plan`,
+  `create-goal-and-materialize-plan`, `generate-run-plan` (the last bundles the changed
+  `week-solver.ts` + `strength-primary-plan.ts` via `assign-days`). Client via Netlify.
+- Sessions: `hillSession` / `flatSession` / the short-hill + treadmill builders in
+  `strength-primary-plan.ts`; terrain travels `preferred_days.quality_run_terrain` → `hard_day.terrain`
+  → session; absent = 3-min hill, so existing plans are unchanged.
+- Flat carries a **PREFERRED (not required) 48 h clearance** from heavy legs (`week-solver.ts`
+  `preferredClearanceShortfall`, scored above `spreadPenalty` / below `breachPenalty`): takes the extra
+  separation when the week allows, silently falls back to the matrix 24 h otherwise, and **can never
+  breach another anchor to buy it.** 24-shape sweep: 0 breaches, preference taken 8/24.
+- **DEVICE-VERIFIED:** the four cards render and select on "Your week". ⚠️ **NOT device-verified:** the
+  flat placement in a live plan (fixture-verified only — 19 fixtures + the sweep).
+- Client wiring gotcha, now fixed (`9728e485`): the menu was first attached to the DEAD `hardday` step
+  (removed in the 2026-07-28 scheduler rebuild); it now lives on the live `schedule` screen keyed on
+  `'run' in state.qualityDays`. The dead step is deleted.
 
-**Maximize VO2max gain at the least mechanical cost to the legs, for an athlete with no long climb.**
-Both halves matter and they pull against each other:
+### STILL OPEN FROM BEFORE — untouched
 
-- **VO2max side.** **Wen et al. 2019** (*J Sci Med Sport* 22(8):941–947, PMID 30733142, 53 studies):
-  long-interval (≥2 min) **AND** high-volume (≥15 min) **AND** 4–12 weeks produce significantly larger
-  effects. Long and more is better.
-- **Strength side.** **Fyfe et al. 2016** (*Front Physiol* 7:487, PMC5093324): work-matched hard and
-  easy endurance interfere with maximal lower-body strength almost identically — RT only +38.5%,
-  HIT+RT +28.7%, MICT+RT +27.5%. **Intensity is not the mediator.** The authors suggest total work is
-  (their word: "might"). ⚠️ **It was CYCLING.** Applying it to running overstates.
-- **The discount.** Uphill is concentrically biased and loses the impact transient (Gottschall & Kram),
-  which is why the long form is a hill at all. **A flat substitute gives that up.**
-
-**So the second option has to buy VO2max time without buying eccentric load, on terrain that has no
-long climb.** Candidates already in the doctrine's own table, none evaluated:
-`8–10 × 60 s hard / 60 s easy @ 4–6%` · `2 × 8 min sustained @ 3–4%` · flat long intervals (loses the
-discount) · treadmill incline (never discussed; the intake has never asked).
-
-⛔ **TWO SOURCES IN THAT DOCTRINE ARE UNNAMED AND BOTH ARE LOAD-BEARING HERE:** the time-at-VO2max
-meta-analysis, and the 12-runner head-to-head. Find them before deciding. A likely match for the meta
-is *"Time spent at or near VO2max during high-intensity interval training — a systematic review and
-meta-analysis"*, BMC Sports Sci Med Rehabil — **unverified, do not cite it without checking.**
-
-### ⛔ HOW THIS SESSION WENT WRONG — the failure mode, so you do not repeat it
-
-**It treated an unsolved protocol question as a wiring task.** The doctrine named a fallback, so the
-fallback got built and the question of whether it was the right protocol was never asked. The evidence
-that undercuts it was **in the same document, two sections up.**
-
-Michael, ending the session: *"its not that you research and not build, its that we need to figure out
-this 2nd option protocol and maximize VO2 gains with both with the least impact."*
-
-⚠️ Secondary: very long replies, and repeatedly finding defects in my own work minutes after
-presenting it as done. Keep answers short; verify before reporting, not after.
-
-### WHAT SHIPPED TODAY — PUSHED + DEPLOYED, do not re-litigate
-
-**5 commits, `a0d1baec` → `24771cce`.** Deployed: `generate-strength-plan`, `materialize-plan`,
-`generate-run-plan`, `create-goal-and-materialize-plan`. **Nothing device-verified.**
-
-- **[D-385]** accessory selection — day-type roles replace family collision. Press days carry a real
-  push, no leg work on upper days, legs vary across the two lower days, reps floor 50 / ceiling 75.
-- **[D-386]** lift spacing — press-adjacency term BUILT (Q-214), `upperLowerShortfall` and
-  `upperToNearestLiftPenalty` both DELETED, tie-break now opens with the press (p.11 order).
-- **[D-387]** 3-day block is genuinely three days (week-3 test split deleted), paired day is one
-  session, rest day yields instead of dropping a session, run/ride alternate.
-- **[D-388]** "Strength Focus" → "Strong Focus".
-
-### ⛔ UNCOMMITTED ON DISK — decide before you build anything new
-
-| what | state |
-|---|---|
-| **Lap-button hill** (`materialize-plan`, `send-workout-to-garmin`, `hillSession`) + its test | **Sound. Michael approved it. Ship it.** Descent has no timer; `durationType: 'OPEN'`. Three places in the Garmin exporter would have dropped it — one silently coerced it to a **1-second** rest. |
-| **Interference copy fix** (`NonRaceBuilder`) | **Ship it — it corrects a live error.** The shipped copy said "running"; Fyfe used **cycling**. It also stated the volume claim flatly when the authors wrote "might". |
-| **Short-hill fallback** — intake question + `run_hills_10x40s_rlap` branch | ⛔ **REVERT OR REDESIGN.** This is the unsolved thing above. |
-| **D-385 … D-389** in `DECISIONS-LOG-2.md` | Written, not committed. **D-389 holds both papers and the 12-vs-15-minute call.** |
-| **`DOCTRINE-aerobic-maintenance-run-only.md`** | Wen 2019 now named (it said "a separate meta-analysis" and named nothing) + a back-pointer to D-389. |
-
-### STILL OPEN FROM BEFORE — untouched today
-
-- **[Q-256]** the 5/3/1 training-max CEILING reads a stale signup 1RM. Squat and OHP stall after one
-  cycle (~Aug 24). Michael rules on the approach before it is built. **This has a date on it.**
-- **[Q-252]** the Sunday State blackout — still live.
-- **[Q-257]** Strength Focus preconditions unsaid. **[Q-258]** front door not device-verified.
+- **[Q-257]** Strength Focus preconditions unsaid. **[Q-258]** Focus front door not device-verified.
 - Back-annotations owed on **Q-212 / Q-214 / Q-215** — D-385/386 supersede parts of all three and the
   old entries do not know it.
-- The hill session's planned duration now excludes the open descents, so the calendar under-reads it
+- The hill session's planned duration excludes the open descents, so the calendar under-reads it
   (~32 min for a ~40 min session). Not broken; unstated.
+- **[chip]** 7 `triathlon_performance.conformance` failures (missing vertical pull / face pulls),
+  pre-existing, likely D-385 fallout. Spawned as its own task — not this feature's regression.
 
 ---
 

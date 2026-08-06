@@ -490,3 +490,38 @@ The recovery carries **no `duration_s` at all**, and that absence is the instruc
 ⛔ **NOT INCLUDED — the short-hill fallback.** Built and reverted the same day; see **[Q-260]**. It is an unsolved protocol question, not a missing branch.
 
 **Files:** `materialize-plan/index.ts` (new branch, `expandRunToken` exported for test), `send-workout-to-garmin/index.ts`, `shared/strength-system/strength-primary-plan.ts` (`hillSession`), `materialize-plan/hills-lap-button.test.ts`. Commit `a5a1f19d`.
+
+---
+
+### D-391 — The hard-run terrain fallback: four options for the runner, bike inferred, flat separated by preference (2026-08-06, **PUSHED + DEPLOYED; card UI device-verified, placement fixture-verified**)
+
+**This closes [Q-260].** The strength block's ONE hard aerobic session assumed a climb the athlete can run for three minutes. Q-260 asked what the athlete without one gets, and warned that the doctrine's own `10–12 × 40 s` fallback is the WRONG answer (short/moderate intervals hold less time at VO2max — Fleckenstein 2025, the BMC time-at-VO2max meta). **The answer was not a different single session — it was a menu.**
+
+**Bike is inferred, not asked.** `hard_day.discipline` is the athlete's own pick on the D-327 "Your one hard day" card; `bike → bikeQualitySession` (4×4 Helgerud), `run → hillSession`. "None" is legal (no hard session). So the terrain question is **run-only** and only appears when Hard day = Run.
+
+**The runner gets four options** (menu inside the card they are already on — **no new intake question**, per `DOCTRINE-aerobic-maintenance-run-only.md` §2.0 "availability reveals itself in the choice"):
+
+| option | session | gives up |
+|---|---|---|
+| 3-min hill (preselected) | `4×3 min` uphill 5–8%, lap-button descent | nothing — best of both |
+| treadmill | `4×3 min` @ 5–8% incline, fixed 3-min recovery | nothing — the belt IS the grade |
+| short hill | `10×1 min` uphill 4–6% | some VO2 stimulus (1-min < 3-min reps; measured) — keeps the leg discount |
+| flat | `4×3 min` flat, pace target allowed (not graded) | the leg discount — keeps FULL VO2 |
+
+⚠️ **`2×8 min @ 3–4%` was scoped and deliberately NOT built** — it folds into "short hill" as a default. Adding a fifth card re-bloats the menu we chose to keep at four.
+
+#### The one non-obvious engine decision — flat's clearance is a PREFERENCE, not a requirement
+
+Flat is the leg-costliest option (no uphill discount, eccentric impact retained), so Michael's call (via the Wendler lens — keep hard conditioning off heavy-leg days) was to separate it further. **First built as a hard 48 h requirement — and reverted.** The 24-shape sweep showed it could not be satisfied in most weeks, and when it couldn't, the solver bought flat its space by moving a squat next to the LONG RUN — relocating the eccentric damage rather than removing it (8/12 flat weeks breached, 11/16 breaches against the long run).
+
+**So it became a scored preference** (`week-solver.ts` `Anchor.preferredClearance` → `preferredClearanceShortfall`):
+- Scored **above `spreadPenalty`, below `breachPenalty`.** Below breach = it is structurally incapable of buying its 48 h by breaching a real clearance (breach magnitude is element 1 of the score vector). Above spread = it outranks only another preference (the heavy-to-heavy 48 h is matrix-enforced and untouched). **It trades preference for preference, never preference for law.**
+- Takes the extra separation when the week allows (8/24 shapes), silently falls back to the matrix 24 h otherwise (16/24), **0 breaches on any terrain.** The clearance-at-minimum note reads the raw matrix, so a week that declined the preference says nothing.
+
+⚠️ **`generate-run-plan` bundles the changed `week-solver` via `assign-days` → `placement/simple`.** The preferred-clearance change is inert there (only flat terrain sets it; the race path never does), but it was redeployed to avoid a stale-solver bundle.
+
+#### Copy (commit `53e050b8`)
+
+Effect-framed and hedged where the leg→lifting cost is an inference, firm where measured. Dropped the money metaphor ("cheap on your legs", "pays for it", "full price", "buy for less") and the flat card's treadmill nudge (a scold — treadmill is its own card directly above). Short hill names the tradeoff precisely: "hold less **VO2 stimulus**" (measured, Fleckenstein). §2.1's blanket ban on flat VO2 is back-annotated in the doctrine: §2.0 governs, the athlete owns the stated trade.
+
+**Files:** `shared/strength-system/strength-primary-plan.ts` (session builders, `hardRunSession`), `_shared/week-solver.ts` (`preferredClearance` / `preferredClearanceShortfall`), `materialize-plan/index.ts` (`_r{n}s` recovery group on `run_vo2`, `_tm` label-only suffix), `create-goal-and-materialize-plan`, `generate-strength-plan`, `src/lib/non-race-goal-seeds.ts`, `src/components/NonRaceBuilder.tsx`, `docs/DOCTRINE-aerobic-maintenance-run-only.md`, `shared/strength-system/hard-run-terrain.test.ts` (19 fixtures). Commits `caae1283` (feature) → `9728e485` (wiring fix) → `53e050b8` (copy).
