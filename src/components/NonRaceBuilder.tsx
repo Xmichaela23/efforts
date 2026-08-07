@@ -272,6 +272,18 @@ const DAY_SHORT: Record<DayName, string> = {
  * since 2026-08-05, but on the old stacked screen the long run was three questions up the scroll.
  * Here it is a badge on the chip beside the one being tapped.
  */
+/**
+ * ⛔ THE WEEK'S THREE QUESTIONS, ASKED ON ONE CARD. The card does not change between them — the
+ * PROMPT does, and the row underneath keeps every answer already given. Three screens for three
+ * seven-chip rows was the version before this one, and it left two thirds of a phone empty under
+ * each of them.
+ */
+const WEEK_QUESTIONS = [
+  { prompt: 'Tap the days you can run. The rest are yours.', hint: 'Leave it blank and the plan picks the days.' },
+  { prompt: 'Which one is the long run?', hint: 'It grows through the block and is the last thing to come down before the race.' },
+  { prompt: 'Any standing day — a club night or a fixed hard session?', hint: 'Skip it if you have none. Tap again to clear.' },
+] as const;
+
 function WeekDayRow({
   selected, disabled = [], roles = {}, onTap,
 }: {
@@ -569,10 +581,10 @@ type StepKey =
   // ⛔ STRENGTH, ON ITS OWN CARD (2026-08-06) — one primary decision per screen. It was the fifth
   // question on "Your week" and got missed on a device.
   | 'strength'
-  // ⛔ AND THE WEEK ITSELF IS THREE CARDS (2026-08-06). "Your week" carried three seven-day rows —
-  // train / long / club — and the athlete scrolled past two identical-looking controls to reach the
-  // third. Same week on all three, marked up one question at a time (`WeekDayRow`).
-  | 'longday' | 'standing'
+  // ⛔ THE WEEK WAS BRIEFLY THREE STEPS (`longday`, `standing`) AND IS ONE AGAIN (2026-08-06).
+  // Michael: *"i thought we were doing one week 3 questions."* Three cards each holding a single
+  // seven-chip row is three taps to answer what is visibly one thing, with the phone empty beneath.
+  // The card stays; the QUESTION advances (`weekStage`), and the row keeps what has been answered.
   // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
   // strength path. Those three asked the same question in three places and none of them could show
   // the answer: how many endurance sessions fit around four lifting days, and where the one that
@@ -682,7 +694,7 @@ function getSteps(state: NonRaceState): StepKey[] {
   // two conditional notices — and Michael's device pass found it missed entirely. §2.1 recorded the
   // accretion that put it there and kept the OUTCOME on his review; this moves the question, not the
   // decision. The week card gets the training-day picker in the same pass, so it is not re-loaded.
-  if (isRaceGoal) return ['goal', 'race', 'days', 'longday', 'standing', 'strength', 'level', 'intent', 'confirm'];
+  if (isRaceGoal) return ['goal', 'race', 'days', 'strength', 'level', 'intent', 'confirm'];
 
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
@@ -1057,6 +1069,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // what the athlete came to see, and an expanded science block would push it off the fold, which is
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
+  /** Which of the week card's three questions is being asked. Card-local — never in the payload. */
+  const [weekStage, setWeekStage] = useState<0 | 1 | 2>(0);
   const [state, setState] = useState<NonRaceState>({
     // Deep-linked from the Goals door. ⚠️ `goal` IS SEEDED HERE FOR RACE, DELIBERATELY: `getSteps`
     // branches on it, so leaving it null for one render would flash the posture screen before the
@@ -2365,131 +2379,123 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the endurance
           days are typed per discipline. A total that contradicts both is a number the engine cannot
           honour. Michael, 2026-07-25: *"how many days is redundant."* */}
-      {/* ⛔ CARD 1 OF THE WEEK — WHICH DAYS. The count is DERIVED from this row now: "days a week"
-          and "which days can you train" were the same answer asked twice, and two controls for one
-          fact is how a screen starts contradicting itself. Tap five days and the count is five. */}
+      {/* ⛔ ONE WEEK, THREE QUESTIONS, ONE CARD (2026-08-06). Michael: *"i thought we were doing one
+          week 3 questions."*
+          I split it into three screens and each one held a single seven-chip row with two thirds of
+          the phone empty under it — three taps to answer what is visibly one thing. The week is the
+          control; the QUESTION moves, not the card. The row stays put and fills in while they answer,
+          which is also what makes the three questions tellable apart: the athlete watches the same
+          week gain marks instead of meeting three identical rows on three screens. */}
       {currentStep === 'days' && (
         <StepLayout
           step={stepNo('days')} totalSteps={steps.length} title="Your week"
-          subtitle={isRaceGoal ? 'Tap the days you can run. The rest are yours.' : undefined}
-          onBack={back} onContinue={next}
-          canContinue={!isRaceGoal || state.trainingDays.length === 0 || state.trainingDays.length >= 4}
+          subtitle={isRaceGoal ? WEEK_QUESTIONS[weekStage].prompt : undefined}
+          onBack={isRaceGoal && weekStage > 0 ? () => setWeekStage((n) => (n - 1) as 0 | 1 | 2) : back}
+          onContinue={isRaceGoal && weekStage < 2 ? () => setWeekStage((n) => (n + 1) as 0 | 1 | 2) : next}
+          canContinue={
+            !isRaceGoal
+              ? true
+              : weekStage === 0
+                ? (state.trainingDays.length === 0 || state.trainingDays.length >= 4)
+                : weekStage === 1
+                  ? !!state.longRunDay
+                  : true
+          }
+          continueLabel={!isRaceGoal || weekStage === 2 ? 'Continue' : 'Next'}
         >
-          <div className="space-y-5">
-            {isRaceGoal ? (
-              <div>
-                <WeekDayRow
-                  selected={state.trainingDays}
-                  roles={weekRoles}
-                  onTap={(d) => setState((st) => ({
-                    ...st,
-                    trainingDays: st.trainingDays.includes(d)
-                      ? st.trainingDays.filter((x) => x !== d)
-                      : [...st.trainingDays, d],
-                    // A day that stops being a training day cannot keep carrying the long run or the
-                    // club night — the later cards would offer a dead chip and the payload would pin
-                    // a day the athlete just took back.
-                    longRunDay: st.longRunDay === d && st.trainingDays.includes(d) ? '' : st.longRunDay,
-                    qualityDays: st.qualityDays.run === d && st.trainingDays.includes(d)
-                      ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
-                      : st.qualityDays,
-                  }))}
-                />
-                <p className="text-white/50 text-xs mt-2 leading-relaxed">
+          {isRaceGoal ? (
+            <div className="space-y-4">
+              {/* THE WEEK. One row, always here, always current — the three questions write onto it. */}
+              <WeekDayRow
+                selected={
+                  weekStage === 0 ? state.trainingDays
+                    : weekStage === 1 ? (state.longRunDay ? [state.longRunDay as DayName] : [])
+                      : (state.qualityDays.run ? [state.qualityDays.run as DayName] : [])
+                }
+                disabled={
+                  weekStage === 0 || state.trainingDays.length === 0
+                    ? []
+                    : DAYS.filter((d) => !state.trainingDays.includes(d))
+                }
+                roles={weekRoles}
+                onTap={(d) => {
+                  if (weekStage === 0) {
+                    setState((st) => ({
+                      ...st,
+                      trainingDays: st.trainingDays.includes(d)
+                        ? st.trainingDays.filter((x) => x !== d)
+                        : [...st.trainingDays, d],
+                      // A day that stops being a training day cannot keep carrying the long run or
+                      // the club night — the later questions would offer a dead chip and the payload
+                      // would pin a day the athlete just took back.
+                      longRunDay: st.longRunDay === d && st.trainingDays.includes(d) ? '' : st.longRunDay,
+                      qualityDays: st.qualityDays.run === d && st.trainingDays.includes(d)
+                        ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
+                        : st.qualityDays,
+                    }));
+                  } else if (weekStage === 1) {
+                    setState((st) => ({ ...st, longRunDay: d }));
+                  } else {
+                    setQualityDay('run', state.qualityDays.run === d ? '' : d);
+                  }
+                }}
+              />
+
+              {/* What the week says so far — the answered questions, in one line each. */}
+              <div className="space-y-1">
+                <p className="text-white/50 text-xs leading-relaxed">
                   {state.trainingDays.length === 0
-                    ? 'Leave it blank and the plan picks the days.'
+                    ? 'No days pinned — the plan picks them.'
                     : `${state.trainingDays.length} training ${state.trainingDays.length === 1 ? 'day' : 'days'}, ${7 - state.trainingDays.length} rest.`}
+                  {state.longRunDay ? ` Long run ${DAY_SHORT[state.longRunDay as DayName]}.` : ''}
+                  {state.qualityDays.run ? ` Club ${DAY_SHORT[state.qualityDays.run as DayName]}.` : ''}
                 </p>
-                {state.trainingDays.length > 0 && state.trainingDays.length < 4 && (
-                  <p className="text-white/60 text-xs mt-1.5 leading-relaxed">
-                    A marathon block is built on four days or more. Fewer than that and the long run
-                    carries a share of the week no single run should.
+                <p className="text-white/40 text-xs leading-relaxed">{WEEK_QUESTIONS[weekStage].hint}</p>
+              </div>
+
+              {weekStage === 0 && state.trainingDays.length > 0 && state.trainingDays.length < 4 && (
+                <p className="text-white/60 text-xs leading-relaxed">
+                  A marathon block is built on four days or more. Fewer than that and the long run
+                  carries a share of the week no single run should.
+                </p>
+              )}
+
+              {weekStage === 2 && clubCollision && (
+                <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
+              )}
+
+              {weekStage === 2 && state.qualityDays.run && (
+                <div>
+                  <p className="text-white/85 text-sm mb-2">Is it hard or easy?</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {([['quality', 'Hard'], ['easy', 'Easy / social']] as const).map(([k, label]) => (
+                      <button
+                        key={k} type="button"
+                        onClick={() => setState((st) => ({ ...st, runClubIntensity: k }))}
+                        className={`py-2 rounded-lg text-sm border ${state.runClubIntensity === k ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/75'}`}
+                      >{label}</button>
+                    ))}
+                  </div>
+                  <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                    A hard day gets the week&apos;s quality session. An easy one is filed as aerobic and
+                    the plan puts its hard running elsewhere.
                   </p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <p className="text-white/85 text-sm mb-2">Days a week</p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[4, 5, 6, 7].map((n) => (
-                    <button
-                      key={n} type="button" onClick={() => setState((s2) => ({ ...s2, daysPerWeek: n }))}
-                      className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
-                    >{n}</button>
-                  ))}
                 </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <p className="text-white/85 text-sm mb-2">Days a week</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[4, 5, 6, 7].map((n) => (
+                  <button
+                    key={n} type="button" onClick={() => setState((s2) => ({ ...s2, daysPerWeek: n }))}
+                    className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                  >{n}</button>
+                ))}
               </div>
-            )}
-          </div>
-        </StepLayout>
-      )}
-
-      {/* ⛔ CARD 2 — THE LONG RUN, ON THE SAME WEEK. Non-training days are inert here, so this row
-          cannot be confused with the one before it and a mis-tap is unavailable rather than merely
-          discouraged. It is REQUIRED on a race: everything else in the week is placed around it. */}
-      {currentStep === 'longday' && (
-        <StepLayout
-          step={stepNo('longday')} totalSteps={steps.length} title="Which day is the long run?"
-          subtitle="It grows through the block and is the last thing to come down before the race."
-          onBack={back} onContinue={next} canContinue={!!state.longRunDay}
-        >
-          <div className="space-y-3">
-            <WeekDayRow
-              selected={state.longRunDay ? [state.longRunDay as DayName] : []}
-              disabled={state.trainingDays.length > 0 ? DAYS.filter((d) => !state.trainingDays.includes(d)) : []}
-              roles={weekRoles}
-              onTap={(d) => setState((st) => ({ ...st, longRunDay: d }))}
-            />
-            <p className="text-white/50 text-xs leading-relaxed">
-              {state.trainingDays.length > 0
-                ? 'Only the days you said you can run.'
-                : 'You did not pin your days, so any of them can carry it.'}
-            </p>
-          </div>
-        </StepLayout>
-      )}
-
-      {/* ⛔ CARD 3 — THE STANDING DAY, WITH THE LONG RUN STILL VISIBLE. The 48-72h cost has been
-          stated since 2026-08-05, but on the stacked screen the long run was three questions up the
-          scroll; here it is an `L` on the chip beside the one being tapped. */}
-      {currentStep === 'standing' && (
-        <StepLayout
-          step={stepNo('standing')} totalSteps={steps.length} title="Run club or a standing hard day?"
-          subtitle="A session that always happens on the same day. Skip it if you have none."
-          onBack={back} onContinue={next} canContinue
-        >
-          <div className="space-y-4">
-            <WeekDayRow
-              selected={state.qualityDays.run ? [state.qualityDays.run as DayName] : []}
-              disabled={state.trainingDays.length > 0 ? DAYS.filter((d) => !state.trainingDays.includes(d)) : []}
-              roles={weekRoles}
-              onTap={(d) => setQualityDay('run', state.qualityDays.run === d ? '' : d)}
-            />
-            <p className="text-white/50 text-xs leading-relaxed">
-              C is your club night, LR the long run, E an easy day, R a rest day. Tap again to clear.
-            </p>
-            {clubCollision && (
-              <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
-            )}
-            {state.qualityDays.run && (
-              <div>
-                <p className="text-white/85 text-sm mb-2">Is it hard or easy?</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {([['quality', 'Hard'], ['easy', 'Easy / social']] as const).map(([k, label]) => (
-                    <button
-                      key={k} type="button"
-                      onClick={() => setState((st) => ({ ...st, runClubIntensity: k }))}
-                      className={`py-2 rounded-lg text-sm border ${state.runClubIntensity === k ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/75'}`}
-                    >{label}</button>
-                  ))}
-                </div>
-                <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                  A hard day gets the week&apos;s quality session. An easy one is filed as aerobic and the
-                  plan puts its hard running elsewhere.
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </StepLayout>
       )}
 
