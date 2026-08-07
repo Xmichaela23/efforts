@@ -84,10 +84,8 @@ export const DAY_ROLE_TITLE: Record<DayRole, string> = {
 };
 
 export function weekDayRoles(input: {
-  /** Lower-case day names the athlete runs. Empty = unpinned, so the engine picks. */
+  /** Lower-case day names the athlete can train. Empty = unpinned, so the engine picks. */
   trainingDays: readonly string[];
-  /** Days the athlete declared as full rest — nothing at all, not even a lift. */
-  restDays?: readonly string[];
   longRunDay?: string;
   standingDay?: string;
   /** Day vocabulary to answer in. Defaults to the lower-case names the intake uses. */
@@ -99,12 +97,8 @@ export function weekDayRoles(input: {
   for (const d of days) {
     if (input.longRunDay === d) { out[d] = 'LR'; continue; }
     if (input.standingDay === d) { out[d] = 'C'; continue; }
-    if (input.restDays?.includes(d)) { out[d] = 'R'; continue; }
     if (!pinned) continue;
-    // ⚠️ A DAY THAT IS NEITHER RUN NOR REST STAYS BLANK. Rest is now ASKED (2026-08-06) rather than
-    // inferred from the leftovers, because the leftovers are not all rest: a strength session lands
-    // on one. Calling every non-running day "R" would promise a day off that the plan then fills.
-    if (input.trainingDays.includes(d)) out[d] = 'E';
+    out[d] = input.trainingDays.includes(d) ? 'E' : 'R';
   }
   return out;
 }

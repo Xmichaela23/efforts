@@ -111,8 +111,6 @@ export type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 export type ScheduleInput = {
   /** The days the athlete said they can train. Absent/empty → the engine picks. */
   trainingDays?: DayName[];
-  /** Days declared as FULL rest — nothing at all, not even a lift. Asked, not inferred. */
-  restDays?: DayName[];
   longRunDay?: string;
   longRideDay?: string;
   /** The kept hard session PER DISCIPLINE — a club run AND a chaingang can both be true of one
@@ -177,10 +175,6 @@ export function buildPreferredDays(
    * preference and will spend a rest day before it drops a session.
    */
   if (sched.trainingDays && sched.trainingDays.length > 0) out.training_days = [...sched.trainingDays];
-  // ⛔ REST IS ASKED, NOT INFERRED (2026-08-06). The leftovers are not all rest — a strength session
-  // lands on one of them — so "the days you did not pick" and "the days you want off" are different
-  // answers, and only the athlete has the second one.
-  if (sched.restDays && sched.restDays.length > 0) out.rest_days = [...sched.restDays];
   if (present('bike')) out.long_ride = sched.longRideDay || 'saturday';
   // The kept club session = a hard day. Posture-gated both ways: a quality day for a discipline the
   // athlete dropped is not a day, it is a leftover.
