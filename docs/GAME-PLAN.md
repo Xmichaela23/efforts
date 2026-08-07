@@ -4,6 +4,15 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-06 (late) — THE MARATHON BLOCK IS A REAL PLAN NOW.** It used to peak at a 10-mile long
+> run in race week with no taper, ramp 28% in a step, and end with no race on the calendar. It builds
+> an 18-mile peak three weeks out, tapers 18 → 14 → 10, holds a 10%/wk ramp, states the base it
+> assumes, and puts race day on the calendar at 26.2. [D-392]…[D-398]; the protocol is written out
+> end to end at the top of `ENGINE-STATE.md`. **Open:** the intake's "Your week" card is still being
+> tightened [D-398], intermediate/advanced prerequisites are unwalked [Q-262], and none of the intake
+> work is device-verified [Q-264]. Commits `d4458fbd` → `e87fea0e`; deployed `generate-run-plan` v178,
+> `create-goal-and-materialize-plan` v308, `materialize-plan` v252.
+
 > **2026-08-06 — THE STRENGTH FIX IS BUILT. THE SECOND HARD-SESSION OPTION IS THE OPEN QUESTION.**
 > `SPEC-assistance-fix.md` §0–§7 SHIPPED — press days carry a real push, no leg work on upper days,
 > legs vary across the two lower days, reps floor 50 / ceiling 75. [D-385]. Q-214 built and two

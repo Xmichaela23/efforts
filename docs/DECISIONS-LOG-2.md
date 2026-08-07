@@ -608,6 +608,17 @@ The VDOT ladder ran learned threshold → **5K-derived effort score** → easy p
 
 ⚠️ **THE TOKEN IS THE DISTANCE, AND THAT NEEDED A FIX IN `materialize-plan`.** A time token makes distance the DERIVED quantity: 288 minutes expanded at the athlete's easy pace rendered the marathon as **21.3 miles**. The expander matched `longrun_(\d+)mi` — integers only — while the grammar has always allowed decimals (`validation.ts:312`), and every race distance is a decimal. Now `longrun_([\d.]+)mi` + `parseFloat`.
 
+⛔ **THE DEPLOY TRAP, TWICE, AND BOTH ARE STILL OPEN:**
+- `_shared/planning-context.ts` gained `planWeekContaining`. **Four other functions import that file
+  and were NOT redeployed** — `coach`, `compute-snapshot`, `learn-fitness-profile`,
+  `planning-context` (all last deployed 2026-08-03). The change is purely ADDITIVE and nothing else
+  calls the new function, so their behaviour is identical today — but they are carrying a stale copy
+  and the next person to change that file for real must redeploy all five.
+- `materialize-plan` (v252) shipped for the decimal fix and **had not been deployed since well before
+  this session**, so it picked up whatever else had landed on `main` in between. Its own 59 tests
+  pass and the full edge suite's 10 failures are byte-identical before and after — but that is a
+  wider surface than the two plan functions this session otherwise touched.
+
 **Race week is anchors-then-fill.** `shakeout` and `easy_short` pushed with no day-count guard, so race week ran six sessions for a four-day athlete. Neither walk direction fixes it (forward drops the shakeout; backward breaks the week before). The shakeout and the Sunday long run are ANCHORS and claim their slots first; race day is exempt from the count.
 
 ---
@@ -634,6 +645,13 @@ Michael iterated this on device until ~10:30pm and **four layouts were built and
 | one card, questions advancing on a Next tap | it arrived BLANK and asked one question at a time — a form, not a week |
 | one card, three chip rows visible at once | the week is drawn three times; it reads as three weeks |
 | seven rows, tap a day to cycle its role | rejected before build — the cycle is a hidden affordance |
+
+⚠️ **AND REST IS THE REMAINDER, NOT A QUESTION.** A fourth question ("which days are full rest?")
+was built and reverted within the hour — Michael: *"REST WILL BE WHATS LEFT."* The argument FOR it is
+recorded because it is not silly and will be re-made: the leftovers are not all rest, since a
+strength session lands on one of them, so an `R` on a non-running day promises a day off the plan
+then fills. He heard it and chose the simpler week. `rest_days` reached `buildPreferredDays` and
+`assign-days.ts` in that build and was reverted out of both; do not re-add either without asking.
 
 **What he landed on:** the week drawn ONCE; the three questions listed under it with their current answers; **pick a question, then tap the days.** That is the alarm-repeat / calendar-label pattern (mode-then-target). The run apps all repeat a day picker per question, one screen each — the version he rejected first.
 
