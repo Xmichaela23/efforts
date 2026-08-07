@@ -9,6 +9,10 @@
  * A rule rendered in three places has to BE one rule. This is that rule, and these are the two
  * judgement calls inside it that a future edit will be tempted to "simplify":
  *   1. an unpinned week carries NO letters — silence, not seven E's it has not been told;
+ *   1b. and REST IS ASKED, NOT INFERRED (2026-08-06). "The days you did not pick to run" and "the
+ *      days you want off" are different answers: a strength session lands on one of the leftovers,
+ *      so calling them all `R` promises a day off the plan then fills. A day that is neither run
+ *      nor declared-rest stays blank.
  *   2. a standing day is `C` WHATEVER its intensity — the letter names the athlete's commitment,
  *      not our classification of it. (This assertion changed sides an hour after it was written:
  *      the first version branched `H`/`E` on the hard-or-easy answer. Michael: *"club night gets
@@ -30,18 +34,23 @@ Deno.test('⛔ THE THREE CARDS, IN ORDER — the same week gaining marks', () =>
   const base = { trainingDays: FIVE, days: DAYS };
   assertEquals(
     read(weekDayRoles({ ...base })),
-    'E E E R E R E',
-    'card 1: five tapped, two rest',
+    'E E E · E · E',
+    'q1: five tapped; the other two are not yet anything',
   );
   assertEquals(
     read(weekDayRoles({ ...base, longRunDay: 'sunday' })),
-    'E E E R E R LR',
-    'card 2: Sunday becomes the long run and nothing else moves',
+    'E E E · E · LR',
+    'q2: Sunday becomes the long run and nothing else moves',
   );
   assertEquals(
-    read(weekDayRoles({ ...base, longRunDay: 'sunday', standingDay: 'tuesday' })),
+    read(weekDayRoles({ ...base, longRunDay: 'sunday', restDays: ['thursday', 'saturday'] })),
+    'E E E R E R LR',
+    'q3: rest is ASKED — Thursday and Saturday are off because they said so',
+  );
+  assertEquals(
+    read(weekDayRoles({ ...base, longRunDay: 'sunday', restDays: ['thursday', 'saturday'], standingDay: 'tuesday' })),
     'E C E R E R LR',
-    'card 3: Tuesday becomes the club night, the long run still reads LR',
+    'q4: Tuesday becomes the club night, everything else holds',
   );
 });
 
@@ -61,7 +70,7 @@ Deno.test('⛔ THE CLUB NIGHT IS `C` WHATEVER ITS INTENSITY', () => {
   // one, on the rule that the letter must agree with what gets built. `C` satisfies that rule
   // better by making no claim about intensity: it names the fact the athlete gave us — this day is
   // spoken for — and the hard-or-easy question sits directly under the row, in words.
-  const week = { trainingDays: FIVE, longRunDay: 'sunday', standingDay: 'tuesday', days: DAYS };
+  const week = { trainingDays: FIVE, longRunDay: 'sunday', standingDay: 'tuesday', restDays: ['thursday', 'saturday'], days: DAYS };
   assertEquals(read(weekDayRoles({ ...week })), 'E C E R E R LR');
   // The intensity answer still decides everything downstream (`quality_run` vs `easy_run` in
   // `preferred_days`, and so where the week's hard session lands). It just no longer moves a letter.
@@ -78,10 +87,15 @@ Deno.test('the long run outranks the standing day when the athlete puts both on 
   assertEquals(roles.sunday, 'LR');
 });
 
-Deno.test('a day dropped from the week reads R again', () => {
+Deno.test('⛔ A DAY YOU DO NOT RUN IS NOT AUTOMATICALLY REST', () => {
+  // ⚠️ CHANGED SIDES 2026-08-06: this asserted `R` for any non-running day. Rest is its own question
+  // now, because a strength session lands on one of the leftovers and an `R` there is a day off the
+  // plan then fills.
   const roles = weekDayRoles({ trainingDays: ['monday', 'wednesday', 'friday', 'sunday'], days: DAYS });
-  assertEquals(roles.tuesday, 'R');
   assertEquals(roles.monday, 'E');
+  assertEquals(roles.tuesday, undefined, 'a day with nothing said about it must stay blank');
+  const declared = weekDayRoles({ trainingDays: ['monday', 'wednesday', 'friday', 'sunday'], restDays: ['tuesday'], days: DAYS });
+  assertEquals(declared.tuesday, 'R', 'and it reads R the moment they say so');
 });
 
 Deno.test('every letter has a word, and the vocabulary is the week module\'s own', () => {

@@ -53,6 +53,8 @@ export type PlacementPins = {
   easy_run?: string | null;
   /** The days the athlete said they can train. Absent/empty = every day is available. */
   training_days?: string[] | null;
+  /** Days declared as FULL rest. Held harder than the derived rest day, released last. */
+  rest_days?: string[] | null;
 };
 
 const HARD_TAGS = ['hard_run', 'intervals', 'tempo', 'threshold'];
@@ -138,8 +140,15 @@ export function assignDays(sessions: Session[], pins?: PlacementPins | null): Se
   const needsEveryDay = sessions.length > WEEK_ORDER.length - 1;
   const restHeld = !pinnedOntoRest && !needsEveryDay ? restDay : null;
 
-  const free = (d: WeekDay) => !usedDays.has(d) && d !== restHeld && (!trainingDays || trainingDays.has(d));
-  /** The fallback pass, which may spend a declared rest day rather than drop a session. */
+  /** Days the athlete asked to have off entirely. Their own answer, so it outranks the derived one. */
+  const declaredRest = new Set(
+    (pins?.rest_days ?? []).map(toWeekDay).filter((d): d is WeekDay => !!d),
+  );
+  const free = (d: WeekDay) =>
+    !usedDays.has(d) && d !== restHeld && !declaredRest.has(d) && (!trainingDays || trainingDays.has(d));
+  /** Second pass: spend the DERIVED rest day, but still not one the athlete asked for. */
+  const freeOutsideDeclaredRest = (d: WeekDay) => !usedDays.has(d) && !declaredRest.has(d);
+  /** Last resort, so a session is never dropped — see the header. */
   const freeAnywhere = (d: WeekDay) => !usedDays.has(d);
   const take = (s: Session, d: WeekDay) => {
     s.day = d;
@@ -150,7 +159,9 @@ export function assignDays(sessions: Session[], pins?: PlacementPins | null): Se
   const place = (s: Session, order: readonly WeekDay[]) => {
     for (const d of order) if (free(d)) return take(s, d);
     for (const d of WEEK_ORDER) if (free(d)) return take(s, d);
-    // Nothing left inside the athlete's own days — spend a rest day rather than lose the session.
+    // Outside their pinned days, but still honouring the rest they asked for.
+    for (const d of WEEK_ORDER) if (freeOutsideDeclaredRest(d)) return take(s, d);
+    // Every other day is taken. A workout the plan said you were doing outranks a day off.
     for (const d of WEEK_ORDER) if (freeAnywhere(d)) return take(s, d);
     // Every day in the week is occupied. Nothing is dropped silently — the session keeps whatever
     // day it had and travels on, so a caller counting sessions in equals sessions out still balances.

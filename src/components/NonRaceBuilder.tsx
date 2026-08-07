@@ -279,9 +279,10 @@ const DAY_SHORT: Record<DayName, string> = {
  * each of them.
  */
 const WEEK_QUESTIONS = [
-  { prompt: 'Tap the days you can run. The rest are yours.', hint: 'Leave it blank and the plan picks the days.' },
-  { prompt: 'Which one is the long run?', hint: 'It grows through the block and is the last thing to come down before the race.' },
-  { prompt: 'Any standing day — a club night or a fixed hard session?', hint: 'Skip it if you have none. Tap again to clear.' },
+  { prompt: 'Which days do you run?', hint: 'Leave it blank and the plan picks them.' },
+  { prompt: 'Which one is the long run?', hint: 'It grows through the block and comes down last.' },
+  { prompt: 'Which days are full rest?', hint: 'Nothing at all — not even a lift. Skip if none.' },
+  { prompt: 'Any standing day — club night or a fixed hard session?', hint: 'Skip if none. Tap again to clear.' },
 ] as const;
 
 function WeekDayRow({
@@ -454,6 +455,8 @@ type NonRaceState = {
   daysPerWeek: number;
   /** The days the athlete can train. Empty = unanswered; rest is the remainder. */
   trainingDays: DayName[];
+  /** Days declared as full rest — nothing at all, not even a lift. */
+  restDays: DayName[];
   longRunDay: DayName | '';
   longRideDay: DayName | '';
   /** The hard day the athlete already owns — a club run, a track night, a chaingang — PER DISCIPLINE.
@@ -922,6 +925,7 @@ function assemblePayload(
           // `buildPreferredDays` omits both when no day is picked.
           preferred_days: buildPreferredDays(state.posture, {
             trainingDays: state.trainingDays,
+            restDays: state.restDays,
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
             qualityDays: state.runClubIntensity === 'quality' ? state.qualityDays : {},
             easyDays: state.runClubIntensity === 'easy' ? state.qualityDays : {},
@@ -1070,7 +1074,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
   /** Which of the week card's three questions is being asked. Card-local — never in the payload. */
-  const [weekStage, setWeekStage] = useState<0 | 1 | 2>(0);
+  const [weekStage, setWeekStage] = useState<0 | 1 | 2 | 3>(0);
   const [state, setState] = useState<NonRaceState>({
     // Deep-linked from the Goals door. ⚠️ `goal` IS SEEDED HERE FOR RACE, DELIBERATELY: `getSteps`
     // branches on it, so leaving it null for one render would flash the posture screen before the
@@ -1105,7 +1109,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // built since it shipped, and the doctrine's default (§2.0: hill is the recommendation, and the
     // default position carries that rather than the word "recommended"). An athlete who never looks
     // at the menu gets exactly the week they got yesterday.
-    daysPerWeek: 5, trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    daysPerWeek: 5, trainingDays: [], restDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -1304,6 +1308,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const weekRoles = weekDayRoles({
     trainingDays: state.trainingDays,
+    restDays: state.restDays,
     longRunDay: state.longRunDay || undefined,
     standingDay: state.qualityDays.run || undefined,
     days: DAYS,
@@ -2390,8 +2395,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         <StepLayout
           step={stepNo('days')} totalSteps={steps.length} title="Your week"
           subtitle={isRaceGoal ? WEEK_QUESTIONS[weekStage].prompt : undefined}
-          onBack={isRaceGoal && weekStage > 0 ? () => setWeekStage((n) => (n - 1) as 0 | 1 | 2) : back}
-          onContinue={isRaceGoal && weekStage < 2 ? () => setWeekStage((n) => (n + 1) as 0 | 1 | 2) : next}
+          onBack={isRaceGoal && weekStage > 0 ? () => setWeekStage((n) => (n - 1) as 0 | 1 | 2 | 3) : back}
+          onContinue={isRaceGoal && weekStage < 3 ? () => setWeekStage((n) => (n + 1) as 0 | 1 | 2 | 3) : next}
           canContinue={
             !isRaceGoal
               ? true
@@ -2401,7 +2406,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   ? !!state.longRunDay
                   : true
           }
-          continueLabel={!isRaceGoal || weekStage === 2 ? 'Continue' : 'Next'}
+          continueLabel={!isRaceGoal || weekStage === 3 ? 'Continue' : 'Next'}
         >
           {isRaceGoal ? (
             <div className="space-y-4">
@@ -2410,12 +2415,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 selected={
                   weekStage === 0 ? state.trainingDays
                     : weekStage === 1 ? (state.longRunDay ? [state.longRunDay as DayName] : [])
-                      : (state.qualityDays.run ? [state.qualityDays.run as DayName] : [])
+                      : weekStage === 2 ? state.restDays
+                        : (state.qualityDays.run ? [state.qualityDays.run as DayName] : [])
                 }
                 disabled={
                   weekStage === 0 || state.trainingDays.length === 0
                     ? []
-                    : DAYS.filter((d) => !state.trainingDays.includes(d))
+                    : weekStage === 2
+                      // Rest is picked from the days you DON'T run — a run day cannot also be rest.
+                      ? DAYS.filter((d) => state.trainingDays.includes(d))
+                      : DAYS.filter((d) => !state.trainingDays.includes(d))
                 }
                 roles={weekRoles}
                 onTap={(d) => {
@@ -2435,6 +2444,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     }));
                   } else if (weekStage === 1) {
                     setState((st) => ({ ...st, longRunDay: d }));
+                  } else if (weekStage === 2) {
+                    setState((st) => ({
+                      ...st,
+                      restDays: st.restDays.includes(d) ? st.restDays.filter((x) => x !== d) : [...st.restDays, d],
+                    }));
                   } else {
                     setQualityDay('run', state.qualityDays.run === d ? '' : d);
                   }
@@ -2448,6 +2462,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     ? 'No days pinned — the plan picks them.'
                     : `${state.trainingDays.length} training ${state.trainingDays.length === 1 ? 'day' : 'days'}, ${7 - state.trainingDays.length} rest.`}
                   {state.longRunDay ? ` Long run ${DAY_SHORT[state.longRunDay as DayName]}.` : ''}
+                  {state.restDays.length > 0 ? ` Rest ${state.restDays.map((d) => DAY_SHORT[d]).join(' ')}.` : ''}
                   {state.qualityDays.run ? ` Club ${DAY_SHORT[state.qualityDays.run as DayName]}.` : ''}
                 </p>
                 <p className="text-white/40 text-xs leading-relaxed">{WEEK_QUESTIONS[weekStage].hint}</p>
@@ -2460,11 +2475,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </p>
               )}
 
-              {weekStage === 2 && clubCollision && (
+              {weekStage === 3 && clubCollision && (
                 <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
               )}
 
-              {weekStage === 2 && state.qualityDays.run && (
+              {weekStage === 3 && state.qualityDays.run && (
                 <div>
                   <p className="text-white/85 text-sm mb-2">Is it hard or easy?</p>
                   <div className="grid grid-cols-2 gap-1.5">
