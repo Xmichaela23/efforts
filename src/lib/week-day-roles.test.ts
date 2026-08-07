@@ -9,7 +9,11 @@
  * A rule rendered in three places has to BE one rule. This is that rule, and these are the two
  * judgement calls inside it that a future edit will be tempted to "simplify":
  *   1. an unpinned week carries NO letters — silence, not seven E's it has not been told;
- *   2. a standing day declared EASY is `E`, not `H` — pinned is not hard.
+ *   2. a standing day is `C` WHATEVER its intensity — the letter names the athlete's commitment,
+ *      not our classification of it. (This assertion changed sides an hour after it was written:
+ *      the first version branched `H`/`E` on the hard-or-easy answer. Michael: *"club night gets
+ *      C."* The old reasoning — the letter must agree with what gets built — is satisfied better by
+ *      a letter that makes no claim about intensity at all.)
  *
  * Run from repo root:
  *   ~/.deno/bin/deno test --no-check src/lib/week-day-roles.test.ts
@@ -35,9 +39,9 @@ Deno.test('⛔ THE THREE CARDS, IN ORDER — the same week gaining marks', () =>
     'card 2: Sunday becomes the long run and nothing else moves',
   );
   assertEquals(
-    read(weekDayRoles({ ...base, longRunDay: 'sunday', standingDay: 'tuesday', standingIntensity: 'quality' })),
-    'E H E R E R LR',
-    'card 3: Tuesday becomes the hard day, the long run still reads LR',
+    read(weekDayRoles({ ...base, longRunDay: 'sunday', standingDay: 'tuesday' })),
+    'E C E R E R LR',
+    'card 3: Tuesday becomes the club night, the long run still reads LR',
   );
 });
 
@@ -52,20 +56,24 @@ Deno.test('⛔ AN UNPINNED WEEK SAYS NOTHING — it does not invent seven easy d
   );
 });
 
-Deno.test('⛔ A STANDING DAY DECLARED EASY IS `E`, NOT `H` — pinned is not hard', () => {
+Deno.test('⛔ THE CLUB NIGHT IS `C` WHATEVER ITS INTENSITY', () => {
+  // ⚠️ THIS CHANGED SIDES (2026-08-06). It asserted `H` for a hard club night and `E` for an easy
+  // one, on the rule that the letter must agree with what gets built. `C` satisfies that rule
+  // better by making no claim about intensity: it names the fact the athlete gave us — this day is
+  // spoken for — and the hard-or-easy question sits directly under the row, in words.
   const week = { trainingDays: FIVE, longRunDay: 'sunday', standingDay: 'tuesday', days: DAYS };
-  assertEquals(read(weekDayRoles({ ...week, standingIntensity: 'quality' })), 'E H E R E R LR');
-  assertEquals(read(weekDayRoles({ ...week, standingIntensity: 'easy' })), 'E E E R E R LR');
-  // The letter must agree with what gets built: an easy club night means the engine puts the week's
-  // quality session somewhere else, so calling that day `H` would be the screen contradicting the plan.
-  assertEquals(read(weekDayRoles({ ...week })), 'E E E R E R LR', 'an unstated intensity is not hard');
+  assertEquals(read(weekDayRoles({ ...week })), 'E C E R E R LR');
+  // The intensity answer still decides everything downstream (`quality_run` vs `easy_run` in
+  // `preferred_days`, and so where the week's hard session lands). It just no longer moves a letter.
+  assertEquals(read(weekDayRoles({ ...week, standingIntensity: 'quality' } as never)), 'E C E R E R LR');
+  assertEquals(read(weekDayRoles({ ...week, standingIntensity: 'easy' } as never)), 'E C E R E R LR');
 });
 
 Deno.test('the long run outranks the standing day when the athlete puts both on one day', () => {
   // The intake warns about this collision rather than refusing it (48-72h, 2026-08-05), so the row
   // has to render SOMETHING. It renders the long run: it is the anchor the rest is placed around.
   const roles = weekDayRoles({
-    trainingDays: FIVE, longRunDay: 'sunday', standingDay: 'sunday', standingIntensity: 'quality', days: DAYS,
+    trainingDays: FIVE, longRunDay: 'sunday', standingDay: 'sunday', days: DAYS,
   });
   assertEquals(roles.sunday, 'LR');
 });
@@ -78,7 +86,7 @@ Deno.test('a day dropped from the week reads R again', () => {
 
 Deno.test('every letter has a word, and the vocabulary is the week module\'s own', () => {
   // The chip's tooltip reads these; a letter with no expansion is a puzzle, not a label.
-  for (const role of ['R', 'E', 'LR', 'H'] as const) {
+  for (const role of ['R', 'E', 'LR', 'C'] as const) {
     assert(DAY_ROLE_TITLE[role]?.length > 0, `${role} has no title`);
   }
   // …and the day vocabulary defaults to this module's own week, so a caller that passes none still

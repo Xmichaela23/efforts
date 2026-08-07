@@ -62,14 +62,25 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
  * them, so calling every day "E" would invent an answer the athlete has not given. Only the long run
  * and a standing day — both explicit — carry a letter then.
  *
- * ⚠️ A STANDING DAY DECLARED EASY IS `E`, NOT `H`. It is pinned, but pinned is not hard: the whole
- * point of asking hard-or-easy is that the engine puts its quality session elsewhere. The letter has
- * to agree with what gets built.
+ * ⛔ THE STANDING DAY IS `C`, AND IT WAS `H`/`E` FOR AN HOUR (2026-08-06). Michael: *"club night
+ * gets C."* The first version branched on the hard-or-easy answer — `H` when they called it hard,
+ * `E` when they called it easy — on the reasoning that the letter must agree with what gets built.
+ * That reasoning was right and the letter was the wrong one to apply it to.
+ *
+ * `C` names the thing the athlete actually told us: **this day is spoken for.** It is a fact about
+ * their calendar, not a classification of the session, so it cannot contradict the plan whichever
+ * way the intensity question is answered — and the intensity is asked directly underneath it, in
+ * words, where an `H` was only ever a hint at it. It also reads as theirs rather than ours, which
+ * is the point of a fixed day: `LR` and `E` are what the plan does, `C` is what they already do.
+ *
+ * ⚠️ THE INTENSITY ANSWER IS UNTOUCHED and still decides everything downstream — `quality_run` vs
+ * `easy_run` in `preferred_days`, and therefore whether the week's hard session lands there. Only
+ * the letter stopped trying to say it.
  */
-export type DayRole = 'R' | 'E' | 'LR' | 'H';
+export type DayRole = 'R' | 'E' | 'LR' | 'C';
 
 export const DAY_ROLE_TITLE: Record<DayRole, string> = {
-  R: 'Rest', E: 'Easy run', LR: 'Long run', H: 'Hard day',
+  R: 'Rest', E: 'Easy run', LR: 'Long run', C: 'Club night',
 };
 
 export function weekDayRoles(input: {
@@ -77,8 +88,6 @@ export function weekDayRoles(input: {
   trainingDays: readonly string[];
   longRunDay?: string;
   standingDay?: string;
-  /** What the standing day is. Anything but `'quality'` reads as an easy pinned day. */
-  standingIntensity?: string;
   /** Day vocabulary to answer in. Defaults to the lower-case names the intake uses. */
   days?: readonly string[];
 }): Record<string, DayRole | undefined> {
@@ -87,7 +96,7 @@ export function weekDayRoles(input: {
   const out: Record<string, DayRole | undefined> = {};
   for (const d of days) {
     if (input.longRunDay === d) { out[d] = 'LR'; continue; }
-    if (input.standingDay === d) { out[d] = input.standingIntensity === 'quality' ? 'H' : 'E'; continue; }
+    if (input.standingDay === d) { out[d] = 'C'; continue; }
     if (!pinned) continue;
     out[d] = input.trainingDays.includes(d) ? 'E' : 'R';
   }

@@ -1292,7 +1292,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     trainingDays: state.trainingDays,
     longRunDay: state.longRunDay || undefined,
     standingDay: state.qualityDays.run || undefined,
-    standingIntensity: state.runClubIntensity,
     days: DAYS,
   }) as Partial<Record<DayName, DayRole>>;
 
@@ -2467,7 +2466,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               onTap={(d) => setQualityDay('run', state.qualityDays.run === d ? '' : d)}
             />
             <p className="text-white/50 text-xs leading-relaxed">
-              LR is your long run, E an easy day, R a rest day. Tap again to clear.
+              C is your club night, LR the long run, E an easy day, R a rest day. Tap again to clear.
             </p>
             {clubCollision && (
               <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
