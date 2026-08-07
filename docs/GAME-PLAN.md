@@ -10,7 +10,7 @@
 > assumes, and puts race day on the calendar at 26.2. [D-392]…[D-398]; the protocol is written out
 > end to end at the top of `ENGINE-STATE.md`. **Open:** the intake's "Your week" card is still being
 > tightened [D-398], intermediate/advanced prerequisites are unwalked [Q-262], and none of the intake
-> work is device-verified [Q-264]. Commits `d4458fbd` → `e87fea0e`; deployed `generate-run-plan` v178,
+> work is device-verified [Q-264]. Commits `d4458fbd` → `e87fea0e`; deployed `generate-run-plan` v180,
 > `create-goal-and-materialize-plan` v308, `materialize-plan` v252.
 
 > **2026-08-06 — THE STRENGTH FIX IS BUILT. THE SECOND HARD-SESSION OPTION IS THE OPEN QUESTION.**

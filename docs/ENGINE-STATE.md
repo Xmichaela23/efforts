@@ -68,8 +68,9 @@ pattern, not a coincidence.
 - **[D-396]** the plan may not outlive its race; race day is a row on it
 - **[D-397]** the intake's own answers reach the engine — day count, strength "none", typed long run
 
-Deployed: `generate-run-plan` (v178), `create-goal-and-materialize-plan` (v308), `materialize-plan`
-(v252). Client via Netlify, commits `d4458fbd` → `e87fea0e`.
+Deployed: `generate-run-plan` (**v180** — v178 was mid-session; the last two deploys were the
+selected-pace anchor and the race-distance fix), `create-goal-and-materialize-plan` (v308),
+`materialize-plan` (v252). Client via Netlify, commits `d4458fbd` → `c9063fcd`.
 
 ### 📐 HOW A MARATHON BLOCK IS BUILT, END TO END (as of 2026-08-06)
 
