@@ -229,6 +229,20 @@ export function longRunPeakWeek(opts: {
   return fallback;
 }
 
+/**
+ * The taper a prescriptive block uses: fractions of the peak for the weeks after it.
+ *
+ * ⚠️ SOURCED, NOT PICKED. Pfitzinger's 18/55 tapers 20 → 16 → 12 over its last three weeks (0.80,
+ * 0.60); Michael's spec is 18 → 14 → 10 (0.78, 0.56). These are the same shape, and they are
+ * SHALLOWER than the row's own tail (0.71, 0.47 — Higdon's), which is why the row's tail is not
+ * reused here: a block that generated its ramp to reach the peak did not walk the row, so it does
+ * not inherit the row's descent either.
+ */
+export const PRESCRIPTIVE_TAPER_RATIOS = [0.78, 0.55];
+
+/** The biggest step the marathon rows ever take between two build weeks (12→14→16→18). */
+const MAX_LONG_RUN_STEP_MI = 2;
+
 export interface LongRunArc {
   /** Long run in miles for plan week w → `weeks[w - 1]`. Length === durationWeeks. */
   weeks: number[];
@@ -271,6 +285,15 @@ export function buildLongRunArc(opts: {
   entryLongRunMi?: number | null;
   /** Plan week the peak lands on. Default `durationWeeks - 2` (a two-week taper). */
   peakWeek?: number | null;
+  /**
+   * The block's assumed base (`MARATHON_PREREQUISITE`). Present → the arc is a PRESCRIPTION: it
+   * opens at the prerequisite (or higher, if the athlete's own long run beats it) and climbs to the
+   * row's peak, generating the ramp when walking the row cannot get there in the weeks available.
+   * Absent → the arc walks the row from wherever the athlete actually is, and tops out where it tops.
+   */
+  prerequisiteLongRunMi?: number | null;
+  /** True when race day falls in the LAST week, so that week carries no long run to taper into. */
+  raceWeekIsLast?: boolean;
 }): LongRunArc | null {
   const progression = LONG_RUN_PROGRESSION[opts.distance]?.[opts.fitness];
   const duration = Math.floor(opts.durationWeeks);
@@ -279,49 +302,79 @@ export function buildLongRunArc(opts: {
   const tailPeakIdx = tailPeakIndex(progression);
   const tailPeak = progression[tailPeakIdx];
   /** The row's own taper, as fractions of its peak. One entry for a half, two for a marathon. */
-  const tailRatios = progression.slice(tailPeakIdx + 1).map((v) => v / tailPeak);
+  const rowTailRatios = progression.slice(tailPeakIdx + 1).map((v) => v / tailPeak);
+  const tableMaxMi = progression.reduce((a, b) => (b > a ? b : a), 0);
+  /** The row's own cutback depth (beginner 6/8 = 0.75, advanced 10/12 = 0.83). */
+  const recoveryRatio = progression[2] > 0 ? progression[3] / progression[2] : 0.75;
 
   const peakWeek = Math.min(
     Math.max(1, Math.floor(opts.peakWeek ?? duration - 2) || 1),
     Math.max(1, duration - 1),
   );
 
-  // The rung that lands the row's final peak exactly on the peak week. Negative for a plan LONGER
-  // than the row — the opening rung then repeats, which is the honest read: the extra weeks are
-  // base weeks, not peak weeks.
+  // ── The build ────────────────────────────────────────────────────────────
   const anchorIdx = tailPeakIdx - (peakWeek - 1);
   let startIdx = Math.min(longRunEntryIndex(progression, opts.entryLongRunMi), anchorIdx);
-
-  // ⚠️ NEVER FINISH THE BUILD ON A CUTBACK. Every 4th rung is a recovery dip; a plan whose last
-  // build week landed on one would taper off a deloaded number and race two weeks off a dip. Shift
-  // the entry DOWN a rung (never up — down costs a mile, up costs a week the legs have not had).
   if (((startIdx + peakWeek - 1) % 4 + 4) % 4 === 3) startIdx -= 1;
-
   const rung = (w: number) => Math.min(tailPeakIdx, Math.max(0, startIdx + w - 1));
 
+  const prerequisite = opts.prerequisiteLongRunMi ?? null;
+  // ⚠️ THE TRIGGER IS THE WALK'S HIGHEST WEEK, NOT ITS LAST. The rows dip after their maximum (the
+  // beginner row peaks 18 at rung 14 and ends its build on 17), so comparing the PEAK WEEK's value
+  // against the row max would call a full-length walk "short" and prescribe over the top of it.
+  let rowWalkMax = 0;
+  for (let w = 1; w <= peakWeek; w++) rowWalkMax = Math.max(rowWalkMax, progression[rung(w)]);
+  /**
+   * ⛔ GENERATE THE RAMP WHEN THE ROW CANNOT REACH THE PEAK IN TIME. Walking one rung a week is the
+   * right ramp for a full-length block and simply runs out of weeks on a short one — a 9-week
+   * beginner walking from rung 0 tops out at 9 miles. A prescription cannot do that: the peak is
+   * the point. So the ramp is generated from the prerequisite to the row's own maximum, stepping at
+   * the row's own biggest step (2 miles) or less, with the row's own cutback depth every 4th week.
+   *
+   * ⚠️ THE STEP IS STILL CAPPED. If the peak is further than `2 × climbing weeks`, the block lands
+   * short and `reachesTableMax` says so — a prescription may not skip rungs any more than a walk may.
+   */
+  const prescriptive = prerequisite != null && rowWalkMax < tableMaxMi;
   const weeks: number[] = [];
-  for (let w = 1; w <= duration; w++) {
-    if (w <= peakWeek) weeks.push(progression[rung(w)]);
-    else weeks.push(0); // filled below, once the peak is known
+
+  if (prescriptive) {
+    const entry = Math.max(prerequisite, Number(opts.entryLongRunMi) > 0 ? Number(opts.entryLongRunMi) : 0);
+    const cutbacks: number[] = [];
+    for (let w = 4; w < peakWeek; w += 4) cutbacks.push(w);
+    const climbing = Math.max(1, peakWeek - 1 - cutbacks.length);
+    const step = Math.max(0, Math.min(MAX_LONG_RUN_STEP_MI, (tableMaxMi - entry) / climbing));
+    let current = entry;
+    let last = entry;
+    for (let w = 1; w <= peakWeek; w++) {
+      if (w === 1) { weeks.push(Math.round(entry)); last = entry; continue; }
+      if (cutbacks.includes(w)) { weeks.push(Math.round(last * recoveryRatio)); continue; }
+      current = Math.min(tableMaxMi, last + step);
+      last = current;
+      weeks.push(Math.round(current));
+    }
+  } else {
+    for (let w = 1; w <= peakWeek; w++) weeks.push(progression[rung(w)]);
   }
 
-  // The taper, laid over the row's own tail: RACE WEEK IS ALWAYS THE LAST RATIO, and the rest are
-  // matched back from it. A plan with more taper weeks than the row carries (a race early in its
-  // plan week, or a half held to a marathon's two weeks) eases down to the row's first taper rung
-  // rather than inventing a shape.
+  // ── The taper ────────────────────────────────────────────────────────────
+  // Race day carries no long run, so when it falls in the last week the ratios are anchored to the
+  // week BEFORE it — otherwise the descent is one week late and the athlete's last real long run is
+  // a week bigger than the taper intends (18 → 16 → 14 instead of 18 → 14 → 10).
+  const tailRatios = prescriptive ? PRESCRIPTIVE_TAPER_RATIOS : rowTailRatios;
   const peakMi = weeks[peakWeek - 1];
-  const taperCount = duration - peakWeek;
+  const lastTaperWeek = opts.raceWeekIsLast ? duration - 1 : duration;
+  const taperCount = Math.max(0, lastTaperWeek - peakWeek);
   const extraWeeks = Math.max(0, taperCount - tailRatios.length);
-  for (let j = 1; j <= taperCount; j++) {
-    const fromEnd = taperCount - j;
+  for (let w = peakWeek + 1; w <= duration; w++) {
+    const j = w - peakWeek;
+    const fromEnd = Math.max(0, taperCount - j);
     const ratio = fromEnd < tailRatios.length
       ? tailRatios[tailRatios.length - 1 - fromEnd]
       : 1 + (tailRatios[0] - 1) * (j / (extraWeeks + 1));
-    weeks[peakWeek - 1 + j] = Math.max(3, Math.round(peakMi * ratio));
+    weeks[w - 1] = Math.max(3, Math.round(peakMi * ratio));
   }
 
   const maxMi = weeks.reduce((a, b) => (b > a ? b : a), 0);
-  const tableMaxMi = progression.reduce((a, b) => (b > a ? b : a), 0);
   return { weeks, peakWeek, peakMi, maxMi, tableMaxMi, reachesTableMax: maxMi >= tableMaxMi };
 }
 
@@ -407,6 +460,33 @@ export const ENGINE_START_CLAMP_FRACTION = 0.7;
  * the engine clamp are already higher, so the floor never fires there.
  */
 export const MARATHON_BASE_FLOOR_MI = 25;
+
+/**
+ * ⛔ THE PREREQUISITE — WHAT THE BLOCK ASSUMES YOU ALREADY HAVE (2026-08-06, Michael's call).
+ *
+ * This is the change of model, and it is worth naming because it reverses the posture the arc
+ * shipped with this morning. That version entered the row wherever the athlete actually was and
+ * stated the ceiling that produced — a 9-week beginner topped out at a 9-mile long run and the
+ * screen said so. Honest, and not a marathon plan: nobody finishes 26.2 off a 9-mile peak.
+ *
+ * So the block is a PRESCRIPTION with an entry requirement, which is how every published marathon
+ * plan works — Higdon's Novice 1 opens on "about a year of running", Pfitzinger's 18/55 on 55-mile
+ * weeks. The plan builds to a real 18-mile peak, and it SAYS what it assumed (`generatePlanDescription`).
+ * If the athlete is not there, the honest answer is the half, and the plan says that too.
+ *
+ * ⚠️ THE PAIR IS MICHAEL'S: 25 mi/wk and a 10-mile long run. The weekly half is not new — it is
+ * `MARATHON_BASE_FLOOR_MI`, already the intake's advisory floor since 2026-08-04. The long-run half
+ * is its companion: 10/25 is a 40% share in week 1, easing to 18/45 = 37% at peak, which is the
+ * beginner allowance this file already documents (`MAX_LONG_RUN_SHARE`, 0.35 at week 1) running
+ * slightly hot at the start by design — the long run is the session that has to happen.
+ *
+ * ⚠️ BEGINNER ONLY, AND THAT IS A KNOWN GAP. Michael specified the beginner pair. Intermediate and
+ * advanced still enter from the athlete's own long run, so a short block at those levels still
+ * peaks where the ramp lands. Filling those two rows needs their prerequisites named, not guessed.
+ */
+export const MARATHON_PREREQUISITE: Record<string, { weeklyMi: number; longRunMi: number }> = {
+  beginner: { weeklyMi: MARATHON_BASE_FLOOR_MI, longRunMi: 10 },
+};
 
 /**
  * ⛔ WHAT SHARE OF THE WEEK THE LONG RUN MAY BE. The 25-30% guidance, with the beginner allowance.

@@ -26,6 +26,7 @@ import {
   LONG_RUN_PROGRESSION,
   WEEKLY_MILEAGE,
   MAX_WEEKLY_MILEAGE_INCREASE,
+  MARATHON_PREREQUISITE,
   buildLongRunArc,
   longRunPeakWeek,
   type LongRunArc,
@@ -90,9 +91,23 @@ export class SustainableGenerator extends BaseGenerator {
   }
 
   protected generatePlanDescription(): string {
-    return `A ${this.params.duration_weeks}-week plan designed to get you to the finish line healthy and confident. ` +
+    const base = `A ${this.params.duration_weeks}-week plan designed to get you to the finish line healthy and confident. ` +
       `Uses effort-based pacing (no complicated pace charts) with optional light speedwork. ` +
       `Based on progressive training principles.`;
+    /**
+     * ⛔ THE PREREQUISITE, ON THE PLAN ITSELF (2026-08-06, Michael's words). This is what makes an
+     * 18-mile peak honest rather than reckless: the block no longer builds from wherever the athlete
+     * is, so it has to say what it assumed. Every published marathon plan opens with this line —
+     * Higdon's "about a year of running", Pfitzinger's 55-mile weeks — and this one had been
+     * building to a stated peak while assuming a base it never mentioned.
+     *
+     * ⚠️ IT NAMES THE ALTERNATIVE. "Do the half" is the actionable half of the sentence; a warning
+     * with no other door is just a disclaimer.
+     */
+    const pre = this.marathonPrerequisite();
+    if (!pre) return base;
+    return `${base} This plan assumes you're already running about ${pre.weeklyMi} miles a week with a long run around ${pre.longRunMi}. ` +
+      `If that's not where you are, do the half — this build won't be safe for you.`;
   }
 
   private generateWeekSessions(
@@ -135,8 +150,13 @@ export class SustainableGenerator extends BaseGenerator {
     
     // Long run (always on Sunday) - reduce if close to race
     if (sundayProximity === 'normal' || sundayProximity === 'reduced_quality') {
-      const adjustedLongRunMiles = sundayProximity === 'reduced_quality' 
-        ? Math.min(longRunMiles, 10) 
+      // ⛔ THE THIRD COPY OF THE SAME CEILING, and the one that survived the first sweep. A week
+      // whose SUNDAY is 8-14 days out but whose other days are further does not route through
+      // `generateRaceWeekSessions` at all — it lands here, where a flat 10 clipped the taper's
+      // first step (14 → 10) exactly as the other two did. Same rule: 0.8 of the block's peak.
+      const taperCeiling = Math.max(4, Math.round((this.resolveLongRunArc()?.maxMi ?? 18) * 0.8));
+      const adjustedLongRunMiles = sundayProximity === 'reduced_quality'
+        ? Math.min(longRunMiles, taperCeiling)
         : longRunMiles;
       sessions.push(this.createSimpleLongRun(adjustedLongRunMiles));
     }
@@ -168,7 +188,7 @@ export class SustainableGenerator extends BaseGenerator {
     }
 
     // Fill remaining days with easy runs (budget-aware: easy ∈ [3,5]mi on ≤3 slots — never cram)
-    this.fillWithSimpleEasyRuns(sessions, runningDays, weeklyMiles - usedMiles, budgeted);
+    this.fillWithSimpleEasyRuns(sessions, runningDays, weeklyMiles - usedMiles, budgeted, longRunMiles);
 
     // Assign days
     return this.assignDaysToSessions(sessions, runningDays);
@@ -254,7 +274,14 @@ export class SustainableGenerator extends BaseGenerator {
         // overwrote the 6, so the taper printed 9 → 8 → 8 and read as a plateau. Both numbers
         // survive as CEILINGS: never more than 8 inside a week of the race, never more than 10
         // inside two, however big the block got.
-        const cap = p === 'easy_medium' ? 8 : 10;
+        // ⛔ THE CEILINGS SCALE WITH THE PEAK (2026-08-06). They were flat 8 and 10 — numbers
+        // calibrated for an 18-20 mile peak, which is exactly what a prescriptive block now has.
+        // Left flat they crushed its taper: an 18 → 14 → 10 descent printed 18 → 10 → 8. As
+        // fractions they are the same guard (0.8 and 0.6 of peak = 14 and 11 off an 18) and they
+        // still bind on an arc that does NOT taper — which is what they were written for.
+        // Pfitzinger's 18/55 tapers 20 → 16 → 12: 0.80 then 0.60.
+        const peakMi = this.resolveLongRunArc()?.maxMi ?? 18;
+        const cap = Math.max(4, Math.round(peakMi * (p === 'easy_medium' ? 0.6 : 0.8)));
         sessions.push(this.createSimpleLongRun(Math.min(cap, this.getLongRunMiles(weekNumber))));
         used++;
       }
@@ -370,7 +397,12 @@ export class SustainableGenerator extends BaseGenerator {
 
     // Use athlete's actual current volume as week-1 anchor when available,
     // respecting ACWR fatigue and volume trend signals.
-    const effectiveStart = this.resolveEffectiveStartVolume(start, peak);
+    // ⛔ …BUT NOT BELOW THE BLOCK'S ASSUMED BASE (2026-08-06). A prescription that opens at the
+    // athlete's 20 mi/wk cannot carry the 18-mile long run it prescribes six weeks later — an 18 on
+    // a 36-mile week is a 50% share. The prerequisite is the floor for the same reason it is the
+    // prerequisite, and the plan states it rather than quietly assuming it.
+    const assumedBase = this.marathonPrerequisite()?.weeklyMi ?? 0;
+    const effectiveStart = Math.max(assumedBase, this.resolveEffectiveStartVolume(start, peak));
 
     const taperPhase = phaseStructure.phases.find(p => isRestedTerminal(canonicalizePhaseName(p.name)));
     const taperStart = taperPhase?.start_week || this.params.duration_weeks;
@@ -412,6 +444,12 @@ export class SustainableGenerator extends BaseGenerator {
   /** Built once per plan — the arc is a whole-plan shape, not a per-week lookup. */
   private longRunArcMemo: LongRunArc | null | undefined;
 
+  /** The block's assumed base, when this distance/level has one named. Marathon beginner today. */
+  private marathonPrerequisite(): { weeklyMi: number; longRunMi: number } | null {
+    if (this.params.distance !== 'marathon') return null;
+    return MARATHON_PREREQUISITE[this.params.fitness] ?? null;
+  }
+
   private resolveLongRunArc(): LongRunArc | null {
     if (this.longRunArcMemo === undefined) {
       // ⚠️ THE PEAK WEEK RULE LIVES IN THE SHARED FILE, not here — the intake quotes the peak this
@@ -421,11 +459,17 @@ export class SustainableGenerator extends BaseGenerator {
         fitness: this.params.fitness,
         durationWeeks: this.params.duration_weeks,
         entryLongRunMi: this.params.recent_long_run_miles,
+        // ⛔ THE BLOCK'S ASSUMED BASE. Marathon only, and only where a prerequisite is named — it
+        // turns the arc from "build from where you are" into "build to the peak this distance
+        // needs, and say what that assumed." `generatePlanDescription` states it on the plan.
+        prerequisiteLongRunMi: this.marathonPrerequisite()?.longRunMi ?? null,
         peakWeek: longRunPeakWeek({
           durationWeeks: this.params.duration_weeks,
           startDateISO: this.params.start_date,
           raceDateISO: this.params.race_date,
         }),
+        // Race day carries no long run, so the taper is anchored to the week before it.
+        raceWeekIsLast: !!(this.params.start_date && this.params.race_date),
       });
       const a = this.longRunArcMemo;
       if (a) {
@@ -647,7 +691,8 @@ export class SustainableGenerator extends BaseGenerator {
     sessions: Session[],
     targetDays: number,
     remainingMiles: number,
-    respectBudget: boolean = false
+    respectBudget: boolean = false,
+    longRunMiles: number = 0
   ): void {
     const remainingDays = Math.max(0, targetDays - sessions.length);
     if (remainingDays <= 0) return;
@@ -676,12 +721,24 @@ export class SustainableGenerator extends BaseGenerator {
     //
     // ⚠️ THE 3-6 MILE BAND IS UNCHANGED — this decides how the remainder lands inside it, not how
     // big an easy run may be.
+    // ⛔ THE EASY CEILING IS HALF THE LONG RUN, NOT A FLAT 6 (2026-08-06). Six was fine for a block
+    // that peaked at a 9-mile long run and became the binding constraint the moment the arc became
+    // a prescription: a four-day week of 18 + 3×6 tops out at 36 miles, so a 45-mile target could
+    // not be built at all — the week silently came out short and nothing said so.
+    //
+    // ⚠️ HALF THE LONG RUN IS THE FIELD'S OWN SHAPE. Pfitzinger's midweek runs run 8-11 against a
+    // 20-mile long run; Higdon's Novice 2 runs 5 against a 10. Capped at 10 so no "easy run" ever
+    // becomes a second long run, floored at 3 (protocol §5.2). Nothing changes for a low-volume
+    // block: the cap is a ceiling, and the fill only reaches it when the week's target asks it to.
+    const easyCeiling = longRunMiles > 0
+      ? Math.max(3, Math.min(10, Math.round(longRunMiles * 0.5)))
+      : 6;
     const target = Math.max(0, Math.round(remainingMiles));
-    const base = Math.max(3, Math.min(6, Math.floor(target / remainingDays)));
+    const base = Math.max(3, Math.min(easyCeiling, Math.floor(target / remainingDays)));
     let leftover = target - base * remainingDays;
 
     for (let i = 0; i < remainingDays; i++) {
-      const takesOne = leftover > 0 && base < 6;
+      const takesOne = leftover > 0 && base < easyCeiling;
       if (takesOne) leftover -= 1;
       sessions.push(this.createSimpleEasyRun(base + (takesOne ? 1 : 0)));
     }

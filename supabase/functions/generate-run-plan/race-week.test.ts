@@ -64,10 +64,15 @@ Deno.test('⛔ THE TAPER STEPS DOWN — the week-8 long run is the arc\'s number
   const peak = longRunMi(6);
   const wk7 = longRunMi(7);
   const wk8 = longRunMi(8);
-  assertEquals(peak, 9);
+  // ⚠️ 18, NOT 9. This test was written against the pre-prescription arc, which entered at the
+  // athlete's own long run and topped out at 9 on a 9-week block. `MARATHON_PREREQUISITE` (2026-08-06)
+  // enters at the assumed base instead and builds the real peak. The DEFECT it guards is unchanged:
+  // a constant overwriting the taper's own number.
+  assertEquals(peak, 18, 'the beginner marathon block no longer peaks at 18');
   assert(wk7! < peak!, `week 7 (${wk7}) did not come down from the peak (${peak})`);
   assert(wk8! < wk7!, `THE PLATEAU: week 8 (${wk8}) did not come down from week 7 (${wk7})`);
-  assert(wk8 !== 8, 'week 8 is exactly 8 miles again — check the hardcoded constant is gone');
+  assertEquals(wk7, 14, 'the first taper week is not the arc\'s 14 — check the 0.8-of-peak ceiling');
+  assertEquals(wk8, 10, 'the second taper week is not the arc\'s 10 — check the 0.6-of-peak ceiling');
 });
 
 Deno.test('⛔ RACE WEEK HONOURS THE DAY COUNT (4 days asked, 4 training days built)', () => {

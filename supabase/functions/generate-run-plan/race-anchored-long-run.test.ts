@@ -12,7 +12,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import { SustainableGenerator } from './generators/sustainable.ts';
 
 type Sess = { name?: string; description?: string; tags?: string[]; duration?: number };
-type Plan = { sessions_by_week: Record<string, Sess[]> };
+type Plan = { sessions_by_week: Record<string, Sess[]>; description?: string };
 
 const MICHAELS_CASE = {
   distance: 'marathon',
@@ -111,9 +111,21 @@ Deno.test('⛔ no week is more than 10% over the biggest week before it', () => 
   }
 });
 
-Deno.test('⛔ the block opens on the athlete\'s week, not the table\'s (19 mi, not 20)', () => {
+Deno.test('⛔ THE BLOCK OPENS AT ITS ASSUMED BASE — 25, not the athlete\'s 19', () => {
+  // ⚠️ THIS TEST CHANGED SIDES ON 2026-08-06 AND THAT IS THE POINT. It used to read "the block
+  // opens on the ATHLETE'S week, not the table's" and asserted 14-22 off a 19 mi/wk athlete. The
+  // marathon block is a prescription now (`MARATHON_PREREQUISITE`): it opens at the base it assumes
+  // and STATES that assumption on the plan, because an 18-mile peak six weeks later cannot sit on a
+  // 19-mile week. The old assertion was correct for the old model and is kept here in words so the
+  // reversal is visible rather than silently rewritten.
   const wk1 = weekMiles(build(), 1);
-  assert(wk1 >= 14 && wk1 <= 22, `week 1 came out at ${wk1} mi off a 19 mi/wk athlete`);
+  assert(wk1 >= 24 && wk1 <= 28, `week 1 came out at ${wk1} mi against a 25-mile assumed base`);
+  assert(
+    /assumes you're already running about 25 miles a week/.test(
+      (build() as unknown as { description?: string }).description ?? '',
+    ),
+    'the plan does not state the base it assumed — which is what makes the 18-mile peak honest',
+  );
 });
 
 Deno.test('sessions print PACE when a VDOT is on file, and RPE wording when it is not', () => {
