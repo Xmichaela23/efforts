@@ -72,6 +72,40 @@ Deployed: `generate-run-plan` (**v180** — v178 was mid-session; the last two d
 selected-pace anchor and the race-distance fix), `create-goal-and-materialize-plan` (v308),
 `materialize-plan` (v252). Client via Netlify, commits `d4458fbd` → `c9063fcd`.
 
+
+### ⚠️ ABOUT THIS HANDOFF — read before you trust it
+
+**This session closed badly and you should know how, because it changes what to check.**
+
+**The intake card was built four times and rejected four times.** Not because the design was hard —
+because I kept guessing at what Michael meant instead of asking, and each rebuild burned an hour of
+his evening. The rejected layouts are in [D-398] with their reasons. **If you find yourself about to
+redesign that card: stop and ask him what he wants to see, in one question.**
+
+**These docs were written at the end of that**, by the person who made every one of the changes. So:
+
+- **The numbers ARE verified.** All 14 load-bearing claims in the protocol section above were checked
+  against the code mechanically at close (peaks, shares, prerequisite bases, the 9-week arc week by
+  week, the 20-week no-op, taper ratios, the 10% cap, the peak-week date rule). 14/14. Most are also
+  test-backed. Re-run that audit rather than re-deriving it.
+- **A version number was wrong** — the close said `generate-run-plan` v178; it was v180. Found by
+  checking `supabase functions list` instead of trusting what I had written mid-session. **Verify
+  deployed versions against the dashboard, not against this file.**
+- **Three docs were stale and only found because Michael asked twice** — CAPABILITY-MAP #15
+  (it said the old race form still builds marathons; run was routed out of it),
+  `ENDURANCE-PROVENANCE.md` (traced a long-run path that no longer exists), and
+  `SPEC-shared-endurance-model.md` (its E3 step would DELETE the tables the marathon block is now
+  built on). All patched — but the lesson is that the sweep should have run before the close, not
+  after being asked for it twice.
+- **What I would trust least here:** anything about INTENT or what remains. The mechanical claims
+  hold; my read of what Michael wants was wrong repeatedly on 2026-08-06.
+
+**The pattern of the night, and it is worth carrying forward:** six separate defects were the same
+shape — *a computed value overwritten by a literal, or a screen quoting a plan the engine did not
+build.* Three hardcoded taper ceilings, a hardcoded race-week long run, a duration priced at a
+fitness-tier constant while the sessions printed another pace, and an intake ceiling reading a
+different arc than the engine. If you find a seventh, that is the pattern — not a coincidence.
+
 ### 📐 HOW A MARATHON BLOCK IS BUILT, END TO END (as of 2026-08-06)
 
 **Read this before changing any number in it.** Seven decisions ([D-392]…[D-398]) rebuilt this in one
