@@ -71,6 +71,79 @@ pattern, not a coincidence.
 Deployed: `generate-run-plan` (v178), `create-goal-and-materialize-plan` (v308), `materialize-plan`
 (v252). Client via Netlify, commits `d4458fbd` → `e87fea0e`.
 
+### 📐 HOW A MARATHON BLOCK IS BUILT, END TO END (as of 2026-08-06)
+
+**Read this before changing any number in it.** Seven decisions ([D-392]…[D-398]) rebuilt this in one
+night; this is the result assembled in one place, because assembling it from seven entries is how the
+next session gets it wrong.
+
+**The model, in one line: it is a PRESCRIPTION with a stated prerequisite — not a plan that adapts to
+wherever the athlete is.** Published marathon plans work this way (Higdon's "about a year of running",
+Pfitzinger's 55-mile weeks). The alternative was tried the same morning and produced a 9-week block
+peaking at a 9-mile long run — honest about itself, and not a marathon plan.
+
+**1. The window.** `durationWeeks = max(floor, min(weeksOut, 20))`, then **trimmed to the plan week
+race day falls in** (`planWeekContaining`). `weeksOut` counts from today; the block opens next Monday,
+so those differ and the untrimmed version built an empty week after the race.
+
+**2. The peak week.** The last week whose long run sits **more than 14 days out** (`longRunPeakWeek`).
+Not `duration − 2`: inside 14 days `getRaceProximitySession` clamps the long run, so a peak landing
+there is silently halved.
+
+**3. The prerequisite** (`marathonPrerequisiteFor`) — computed from the window, never stored. Work
+backward from the peak at the only two rates allowed: **2 mi/week** on the long run (the rows' own
+biggest step) and **10%/week** on volume.
+
+| level | peak long run | peak weekly | share | example: 9-week base |
+|---|---|---|---|---|
+| beginner | 18 | 40 | 45% | 27 mi/wk + a 10-mile long run |
+| intermediate | 20 | 50 | 40% | 34 mi/wk + 12 |
+| advanced | 20 | 60 | 33% | 41 mi/wk + 12 |
+
+Short windows quote a high base; **14+ weeks stops binding** (bottoms out at the row's own opening,
+20 mi/wk + 6). Below ~5 weeks it is **unmeetable** and the plan names the half instead.
+
+**4. The long-run arc** (`buildLongRunArc`). Enters at the prerequisite (or higher, if the athlete's
+own long run beats it) and climbs the row's own ladder — one rung a week, cutback every 4th at the
+row's own depth. When the row cannot reach its peak in the weeks available, the ramp is GENERATED at
++2/week instead. **Capped at 20 miles whatever the window** — extra weeks buy volume and weeks near
+the peak, never a bigger single run. Peak lands on the peak week; taper follows at Pfitzinger's shape
+(**0.78 / 0.55** of peak), anchored to the last week that carries a long run so race week does not
+push the descent late. A 9-week beginner: **10 / 12 / 14 / 11 / 16 / 18 / 14 / 10 / race.**
+
+**5. Weekly volume** (`calculateWeeklyMileage`). Opens at the prerequisite base, ramps to the peak
+weekly **capped at 10%/week**, and **peaks on the same week the long run does** (it used to target
+`taperStart`, three weeks later, so the 18-miler landed in a 36-mile week). A cutback week neither
+advances the trend nor becomes the base for the next ceiling, and **the peak week is never a cutback
+week** — it is struck from `recovery_weeks` at the source so the day count, the volume, the speedwork
+gate and the strength overlay cannot disagree about it.
+
+**6. Session sizing.** Easy runs are **3 mi to half the long run (max 10)**, remainder spread rather
+than rounded per-day. Race week is **anchors-then-fill**: the shakeout and the Sunday long run claim
+slots first, race day is exempt from the day count. Two proximity ceilings survive as **fractions of
+the peak** (0.8 at 8-14 days, 0.6 inside 7) — flat 8 and 10 crushed the taper into 18 → 10 → 8.
+
+**7. Paces and durations.** The athlete's **SELECTED** easy pace (`resolveCurrentRunEasyPace` —
+"use my runs" / "use my number") anchors everything: the VDOT is derived FROM it, the exact number
+prints verbatim, and `milesToMinutes` is overridden to price every duration at it. A 5K time is a
+seed, not the anchor. Nothing on file → RPE wording, never an invented pace.
+
+**8. Race day** is a row on the calendar, on the actual race weekday, **anchored to the distance**
+(`longrun_26.2mi_easypace`) with duration derived from pace — never the reverse, which is what
+rendered a marathon as 21.3 miles.
+
+**9. What the athlete is told.** The plan states its prerequisite (*"assumes you're already running
+about 25 miles a week with a long run around 10. If that's not where you are, do the half"*). The
+intake states the mileage floor and, when the block cannot reach the norm, the peak it WILL reach —
+off the same arc the engine builds, so the two cannot disagree. The timeline gate **warns**; the only
+hard refusals left are under four weeks (the phase builder cannot lay out a block) and the pace
+benchmark on a time goal.
+
+**⚠️ WHAT IS NOT DONE:** [Q-262] intermediate/advanced never walked end to end; [Q-263] advanced
+cannot reach 60 mi/wk on four run days and nothing says so; [Q-264] none of the intake work is
+device-verified.
+
+
 ### (superseded 2026-08-06 late — previous banner, kept for its shipped record) 2026-08-06 night — THE HARD-RUN TERRAIN FALLBACK SHIPPED; next is the Q-256 TM ceiling, which has a DATE)
 
 ### YOUR JOB — [Q-256] the 5/3/1 training-max ceiling reads a STALE signup 1RM
