@@ -905,7 +905,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // ⚠️ IT BECOMES LOAD-BEARING WITH THE TIMELINE WALL. A refusal the athlete cannot see is worse
   // than no refusal: without the message they cannot tell "too close" from "broken", and the only
   // action left is to tap it again.
-  const { complete, preview, saving, previewError, error: buildError } = useArcSetupComplete();
+  const { complete, preview, saving, previewError, previewAdvisories, error: buildError } = useArcSetupComplete();
   // ⛔ THE WEEK, BEFORE IT IS ACCEPTED. Nothing here writes: `preview()` calls the composer with the
   // goal inline and persists neither a goal nor a plan.
   const [previewWeek, setPreviewWeek] = React.useState<PreviewSession[] | null>(null);
@@ -3313,11 +3313,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               same thing in days they recognise, and says it specifically. The one fact it carried
               that the grid cannot — the protocol — moved to the subtitle. */}
           <div className="space-y-3">
-            {/* ⛔ THE REFUSAL, WHERE THE ATHLETE TAPPED. `complete()` can be turned down by the
-                server — the timeline wall (`race_too_close` / `race_too_close_personalized`) is the
-                one that fires on this card, and the message it carries already names the weeks
-                needed, the weeks available, and the two ways out. Rendering it verbatim rather than
-                re-wording it client-side keeps one sentence in one place.
+            {/* ⛔ THE REFUSAL, WHERE THE ATHLETE TAPPED. `complete()` can still be turned down by
+                the server, but the timeline wall is no longer what does it — that gate was demoted
+                to the advisory below (2026-08-06, "warn, no wall"). What reaches here now is
+                `race_within_build_window` (under four weeks the phase builder cannot lay out a
+                block at all) and the pace-benchmark gate. Rendered verbatim rather than re-worded
+                client-side, so one sentence lives in one place.
                 ⚠️ Sits ABOVE the start-date field on purpose: it is the reason the tap did nothing,
                 and a reason below the fold is a reason nobody reads. */}
             {buildError && (
@@ -3325,6 +3326,23 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <p className="text-white/90 text-sm leading-relaxed">{buildError}</p>
               </div>
             )}
+            {/* ⛔ THE TIMELINE NOTICE — THE DEMOTED REFUSAL (2026-08-06). Michael: *same "warn, no
+                wall" as the mileage floor.* Same amber surface as that notice on the level card,
+                deliberately: the athlete has now met this treatment once and knows it means "this
+                is a real cost and you may continue."
+                ⚠️ IT COMES FROM THE SERVER, verbatim. The floor it quotes is `MIN_WEEKS` — or the
+                athlete's own measured floor when memory has one — and neither is knowable here.
+                Re-deriving it client-side is how the intake starts quoting a number the engine does
+                not hold anyone to.
+                ⚠️ IT NEEDS THE PREVIEW. It arrives with the previewed plan, so an athlete who taps
+                straight through to Build never sees it. Acceptable — the build screen's own copy
+                already states the weeks, and the level card states the long run this timeline
+                reaches. This is the third statement of the same cost, not the only one. */}
+            {previewAdvisories.map((note) => (
+              <div key={note} className="rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-3">
+                <p className="text-white/85 text-sm leading-relaxed">{note}</p>
+              </div>
+            ))}
             <div>
               <p className="text-white/70 text-sm mb-2">Start the week of</p>
               <input

@@ -220,19 +220,31 @@ export function resolveMarathonFloorWeeks(input: {
 }
 
 /**
- * The one hard refusal on the race path: a race closer than the shortest block we know how to build.
+ * ⛔ THIS WARNS. IT DOES NOT REFUSE — Michael, 2026-08-06: *same "warn, no wall" as the mileage
+ * floor.* A race closer than the usual block is now a stated fact on the build screen, not a stop.
  *
- * ⛔ WHY THIS REFUSES WHEN THE MILEAGE FLOOR ONLY WARNS. Michael's line, 2026-08-04: *timeline,
- * unlike mileage, is where we stop.* A weekly volume under the floor is a judgement about someone's
- * body and they own it (§5.2b — breach states cost, never refuses). A race inside the floor is
- * arithmetic: there is no plan to hand them, so continuing would mean shipping a fabricated one.
+ * ⛔ IT REFUSED FOR TWO DAYS AND THE REASONING IS KEPT, BECAUSE IT IS NOT SILLY. The 2026-08-04
+ * line was *timeline, unlike mileage, is where we stop* — a weekly volume under the floor is a
+ * judgement about someone's body and they own it (§5.2b), while a race inside the floor is
+ * arithmetic. **What that argument gets wrong is the word "arithmetic."** There IS a plan to hand
+ * them: the engine builds to the weeks available, tapers into race day, and — since 2026-08-06 —
+ * states the long run it will actually reach. A short block is a worse plan, not an impossible one,
+ * and "worse, and here is how" is the same shape as every other cost this app states.
  *
- * ⛔ THE SUPPORT MODES ARE EXEMPT ON EVIDENCE, NOT ON WEEKS. `race_support` (≤2 weeks) and
- * `bridge_peak` (≤6) sit BELOW every sane floor by construction, so a naive `weeksOut < floor`
- * would have deleted both. They pass only with proof of a build underneath: an active run plan, or
- * a floor that came from real memory.
+ * ⚠️ SO THE REFUSAL IS GONE AND THE SENTENCE IS NOT. The caller renders this on the build screen
+ * beside the mileage-floor notice; nothing stops.
+ *
+ * ⚠️ THE ONE REMAINING WALL IS STRUCTURAL AND IT IS NOT THIS ONE: below four weeks the phase
+ * builder cannot lay out a block at all (`base-generator.determinePhaseStructure` throws, and
+ * `validateRequest` rejects). That is a fact about the builder, not a judgement about the athlete.
+ *
+ * ⛔ THE SUPPORT MODES STAY EXEMPT — they now suppress the WARNING rather than the refusal.
+ * `race_support` (≤2 weeks) and `bridge_peak` (≤6) sit BELOW every sane floor by construction, and
+ * they fire only with proof of a build underneath (an active run plan, or a floor from real
+ * memory). Telling an athlete mid-build that a marathon "usually takes 14 weeks" is noise — the
+ * engine already knows their race is in nine days and is building for exactly that.
  */
-export function marathonTimelineRefusal(input: {
+export function marathonTimelineAdvisory(input: {
   /** `distanceToApiValue(goal.distance)` — 'marathon', 'half', '10k', '5k'. */
   distanceApi: string;
   weeksOut: number;
@@ -251,16 +263,24 @@ export function marathonTimelineRefusal(input: {
 
   const isMarathon = input.distanceApi === 'marathon';
   // ⚠️ TWO MESSAGES, BECAUSE ONE OF THEM WOULD BE A LIE. The original opened "Based on your recent
-  // training history…" — untrue for the athlete this now catches most often, who has none. Telling
-  // them to go fix history they never had is worse than saying nothing.
-  const message = isMarathon
-    ? (input.floorIsMeasured
-      ? `Based on your recent training history, this marathon needs about ${input.floorWeeks} weeks. Your race is ${input.weeksOut} weeks out. Pick a later date, or a shorter race.`
-      : `A marathon build at this level takes about ${input.floorWeeks} weeks. Your race is ${input.weeksOut} weeks out. Pick a later date, or a shorter race — and once you have training on file we can judge this on your own history instead of your level.`)
-    : `Your race is ${input.weeksOut} weeks away. ${input.distanceApi} needs at least ${input.floorWeeks} weeks.`;
+  // training history…" — untrue for the athlete this catches most often, who has none.
+  //
+  // ⚠️ AND NEITHER TELLS THEM WHAT TO DO ANY MORE. Both used to end "Pick a later date, or a
+  // shorter race" — the right ending for a refusal and the wrong one for a notice they are about to
+  // continue past. Fact, then what it costs. The alternatives are theirs to reach for.
+  const DISTANCE_LABEL: Record<string, string> = {
+    marathon: 'A marathon build',
+    half: 'A half marathon build',
+    '10k': 'A 10K build',
+    '5k': 'A 5K build',
+  };
+  const label = DISTANCE_LABEL[input.distanceApi] ?? `A ${input.distanceApi} build`;
+  const opening = isMarathon && input.floorIsMeasured
+    ? `Based on your recent training history, a marathon build usually takes about ${input.floorWeeks} weeks`
+    : `${label} at this level usually takes about ${input.floorWeeks} weeks`;
 
   return {
-    code: isMarathon && input.floorIsMeasured ? 'race_too_close_personalized' : 'race_too_close',
-    message,
+    code: isMarathon && input.floorIsMeasured ? 'race_close_personalized' : 'race_close',
+    message: `${opening}. Your race is ${input.weeksOut} out. The block is built to the weeks you have, and its longest run stops where the ramp stops.`,
   };
 }

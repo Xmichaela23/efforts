@@ -56,7 +56,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError, resolveMarathonFloorWeeks, marathonTimelineRefusal } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError, resolveMarathonFloorWeeks, marathonTimelineAdvisory } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -3340,32 +3340,35 @@ Deno.serve(async (req: Request) => {
       : false;
 
     /**
-     * ⛔ THE TIMELINE REFUSAL — RE-ENABLED. THIS IS THE ONE HARD WALL ON THIS PATH.
+     * ⛔ THE TIMELINE GATE — NOW A WARNING (2026-08-06). Michael: *same "warn, no wall" as the
+     * mileage floor.* It threw for two days; it states the cost now and the plan builds.
      *
-     * ⛔ IT WAS DEAD. The condition opened with `!ADAPTIVE_MARATHON_DECISIONS_ENABLED`, and that
-     * flag defaults to **on** (`:232`), so the whole block was unreachable in every real request.
-     * `MIN_WEEKS` was computed at `:3137` and thrown away. Combined with the fallback floor above,
-     * a brand-new account claiming "advanced" could build a THREE-WEEK marathon plan. Nothing
-     * anywhere refused it.
+     * ⛔ THE ARGUMENT IT REVERSES, KEPT SO NOBODY RE-DERIVES IT. The 2026-08-04 call was *timeline,
+     * unlike mileage, is where we stop* — mileage is a judgement about a body and the athlete owns
+     * it, a race inside the floor is arithmetic. The half that was wrong is "arithmetic": the
+     * engine DOES have a plan for them. It builds to the weeks available, tapers into race day, and
+     * (since this morning) states the long run it will actually reach. Short is a worse block, not
+     * an impossible one, and this app's whole posture on worse-but-chosen is to price it.
      *
-     * ⛔ WHY THIS ONE STOPS WHEN THE MILEAGE FLOOR ONLY WARNS. Michael drew the line and it holds
-     * up: *timeline, unlike mileage, is where we stop.* A weekly mileage below the floor is a
-     * judgement about a person's body, and they own that — §5.2b, breach states cost and never
-     * refuses. A race that is closer than the shortest block we know how to build is **arithmetic**:
-     * there is no plan to hand them, so "state the cost and continue" would mean shipping a
-     * fabricated one.
+     * ⚠️ WHAT MUST STILL BE TRUE FOR THAT TO HOLD — check these before weakening anything else:
+     *   • `durationWeeks` is trimmed to the race week, so no plan is laid out past its own race.
+     *   • `buildLongRunArc` anchors the peak to race day at any length, so a 6-week block still
+     *     tapers instead of racing off its biggest week.
+     *   • The intake states the ceiling: what the longest run reaches vs the 18-20 norm.
+     * The warning without those three is a shrug. With them it is a priced decision.
      *
-     * ⛔ AND THE SUPPORT MODES SURVIVE, BECAUSE THE DISCRIMINATOR IS EVIDENCE, NOT WEEKS.
-     * `race_support` (≤2 weeks) and `bridge_peak` (≤6) exist for a real athlete mid-build whose
-     * race is imminent — and by construction those windows sit BELOW any sane floor, so a naive
-     * `weeksOut < floor` gate would have deleted both. They are exempted when, and only when, there
-     * is evidence the athlete has a build underneath them:
-     *   • `allowRaceWeekSupportMode` — an ACTIVE RUN PLAN on file (the pre-existing test, `:3258`)
-     *   • `marathonFloorIsMeasured` — real `athlete_memory`, so the short block is the engine's
-     *     considered answer about this athlete rather than a fitness-tier default
-     * A brand-new account has neither, which is precisely the case that was slipping through.
+     * ⚠️ THE ONE WALL LEFT IS STRUCTURAL, AND IT IS NOT THIS ONE. Under four weeks the phase
+     * builder cannot lay out a block at all (`determinePhaseStructure` throws, `validateRequest`
+     * rejects). That is a fact about the builder, not a verdict on the athlete — see the guard
+     * below `durationWeeks`.
+     *
+     * ⛔ THE SUPPORT MODES STAY EXEMPT and now suppress the WARNING. `race_support` (≤2 weeks) and
+     * `bridge_peak` (≤6) fire only with evidence of a build underneath — an active run plan
+     * (`allowRaceWeekSupportMode`) or a floor from real memory (`marathonFloorIsMeasured`). Telling
+     * an athlete mid-build that a marathon "usually takes 14 weeks" is noise; the engine already
+     * knows their race is in nine days and is building for exactly that.
      */
-    const timelineRefusal = marathonTimelineRefusal({
+    const timelineAdvisory = marathonTimelineAdvisory({
       distanceApi,
       weeksOut,
       floorWeeks: personalizedFloorWeeks,
@@ -3373,12 +3376,14 @@ Deno.serve(async (req: Request) => {
       allowRaceWeekSupportMode,
       adaptiveSupportMode,
     });
-    if (timelineRefusal) {
-      console.log('[race-too-close]', {
+    /** Stated on the build screen, never thrown. Same surface as the mileage-floor notice. */
+    const advisories: Array<{ code: string; message: string }> = [];
+    if (timelineAdvisory) {
+      console.log('[race-close]', {
         user_id, distanceApi, fitness, weeksOut,
         floor: personalizedFloorWeeks, measured: marathonFloorIsMeasured,
       });
-      throw new AppError(timelineRefusal.code, timelineRefusal.message);
+      advisories.push(timelineAdvisory);
     }
     /**
      * ⛔ THE PLAN WEEK RACE DAY ACTUALLY FALLS IN — and it is not always `weeksOut` (2026-08-06).
@@ -3409,6 +3414,27 @@ Deno.serve(async (req: Request) => {
       : durationWeeksRaw;
     if (raceWeekOfPlan != null && durationWeeks !== durationWeeksRaw) {
       console.log(`[create-goal] duration trimmed ${durationWeeksRaw} → ${durationWeeks} weeks: race day falls in plan week ${raceWeekOfPlan} counting from ${plan_start_date}`);
+    }
+
+    /**
+     * ⛔ THE LAST WALL, AND IT IS THE BUILDER'S, NOT A VERDICT ON THE ATHLETE (2026-08-06).
+     *
+     * With the timeline gate demoted to a warning, this is the only thing left that refuses a race
+     * on its date — and it refuses because `determinePhaseStructure` literally cannot lay out a
+     * block under four weeks (`base-generator.ts:279` throws; `validateRequest` rejects the same).
+     * Without this the athlete would get a raw 400 with `validation_errors` in it, which is a wall
+     * with worse manners: same outcome, no sentence they can act on.
+     *
+     * ⚠️ THE SUPPORT MODES ARE EXEMPT and they are the reason this is not simply `< 4`. A
+     * `race_support` block is 1-2 weeks BY DESIGN — it is not a build, it is the last week of one.
+     * They are gated on evidence upstream (an active run plan, or a floor from real memory), so if
+     * one is in play the short duration is the engine's considered answer, not an accident.
+     */
+    if (durationWeeks < 4 && !allowRaceWeekSupportMode && !adaptiveSupportMode) {
+      throw new AppError(
+        'race_within_build_window',
+        `Your race is ${weeksOut === 1 ? 'a week' : `${weeksOut} weeks`} out, which leaves ${durationWeeks} week${durationWeeks === 1 ? '' : 's'} of training — under the four the plan builder needs to lay out a block with a taper. A later date, or a race you are already trained for, is what this one can build.`,
+      );
     }
 
     if (goalType === 'speed') {
@@ -3735,6 +3761,12 @@ Deno.serve(async (req: Request) => {
         success: true, mode, goal_id: null, preview: true,
         sport: 'run', combined: false,
         run_preview: generated?.preview ?? null, plan: generated?.plan ?? null,
+        // ⛔ THE COST, TRAVELLING WITH THE PLAN IT DESCRIBES. The timeline notice is the demoted
+        // refusal (2026-08-06): it used to be an `AppError` the client rendered as a dead end, and
+        // it is now a line beside the week the athlete is about to accept. Preview is where it
+        // belongs — after this point they have committed, and a cost stated after the decision is
+        // not a cost, it is an excuse.
+        ...(advisories.length ? { advisories } : {}),
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -3792,6 +3824,9 @@ Deno.serve(async (req: Request) => {
         // Training transition context — tells the UI how the plan was shaped
         transition_mode: trainingTransition.mode,
         transition_reasoning: trainingTransition.reasoning,
+        // Carried on the committed build too, so a caller that skipped the preview (the old race
+        // form, the wizard) still receives the sentence rather than only the athlete who previewed.
+        ...(advisories.length ? { advisories } : {}),
         readiness_state: adaptiveMarathonDecision?.readiness_state,
         recommended_mode: adaptiveMarathonDecision?.recommended_mode,
         risk_tier: adaptiveMarathonDecision?.risk_tier,

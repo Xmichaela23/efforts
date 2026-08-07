@@ -40,6 +40,14 @@ export function useArcSetupComplete() {
   const [error, setError] = useState<string | null>(null);
   /** Why the preview failed, so the copy can say it instead of shrugging. */
   const [previewError, setPreviewError] = useState<string | null>(null);
+  /**
+   * ⛔ WHAT THE PLAN COSTS, WHEN IT STILL BUILT (2026-08-06). The server returns `advisories` beside
+   * the plan — today that is the demoted timeline gate, which used to arrive as an `AppError` and
+   * dead-end the build. A separate channel from `previewError` on purpose: one means "there is no
+   * plan", the other means "here is the plan, and here is what is short about it", and collapsing
+   * them is how the first version of this hook turned three different failures into one shrug.
+   */
+  const [previewAdvisories, setPreviewAdvisories] = useState<string[]>([]);
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
   const [conflictOverlay, setConflictOverlay] = useState<ConflictOverlay | null>(null);
 
@@ -151,6 +159,12 @@ export function useArcSetupComplete() {
         return null;
       }
       setPreviewError(null);
+      const notes = (data as { advisories?: Array<{ message?: string }> }).advisories;
+      setPreviewAdvisories(
+        Array.isArray(notes)
+          ? notes.map((a) => String(a?.message ?? '')).filter(Boolean)
+          : [],
+      );
       return (data as { plan?: Record<string, unknown> }).plan ?? null;
     },
     [],
@@ -272,5 +286,5 @@ export function useArcSetupComplete() {
     [navigate, startLoop, rollbackInsertedGoals],
   );
 
-  return { complete, preview, saving, error, previewError, saveBanner, conflictOverlay, handleConflictChoice };
+  return { complete, preview, saving, error, previewError, previewAdvisories, saveBanner, conflictOverlay, handleConflictChoice };
 }

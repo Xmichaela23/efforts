@@ -162,24 +162,27 @@ Deno.test('buildExistingGuardError — event/non-race eligibility, distance + st
   assertEquals(buildExistingGuardError({ goal_type: 'event', sport: 'run', distance: 'marathon', status: 'active' }, { checkStatus: true }), null);
 });
 
-// ── THE MARATHON TIMELINE GATE (2026-08-04) ──────────────────────────────────
-// ⛔ THIS GATE WAS DEAD FOR MONTHS AND NO TEST COULD HAVE CAUGHT IT — it lived inline behind a
-// feature flag that defaults to the value that disables it. The point of these is that the
-// decision is now executable.
-import { resolveMarathonFloorWeeks, marathonTimelineRefusal } from './non-race-routing.ts';
+// ── THE MARATHON TIMELINE GATE — NOW A WARNING (demoted 2026-08-06) ──────────
+// ⛔ IT WAS DEAD FOR MONTHS, THEN A HARD REFUSAL FOR TWO DAYS, AND IT NOW WARNS. Michael, 2026-08-06:
+// *same "warn, no wall" as the mileage floor.* These tests changed sides with it: the assertions that
+// used to prove a refusal now prove a SENTENCE, and the ones that proved silence still prove silence.
+//
+// ⚠️ WHAT DID NOT CHANGE, AND IS THE REASON THIS FILE IS STILL WORTH READING: the floor resolver, the
+// evidence-not-weeks discriminator, and the two-message split are all untouched. The gate decides the
+// same cases; only its consequence moved.
+import { resolveMarathonFloorWeeks, marathonTimelineAdvisory } from './non-race-routing.ts';
 import { resolveAdaptiveMarathonDecisionFromMemory } from '../_shared/athlete-memory.ts';
 
-/** MIN_WEEKS.marathon, mirrored from `index.ts:226` — the level-scaled static table. */
+/** MIN_WEEKS.marathon, mirrored from `index.ts:231` — the level-scaled static table. */
 const MIN_WEEKS_MARATHON = { beginner: 14, intermediate: 10, advanced: 8 };
 
-Deno.test('⛔ THE BUG: a no-history "advanced" runner cannot build a 3-week marathon', () => {
+Deno.test('⛔ THE DEMOTION: a no-history "advanced" 3-week marathon is WARNED, not refused', () => {
   // Step 1 — the adaptive engine, with NO athlete_memory, really does answer "3 weeks".
   const adaptive = resolveAdaptiveMarathonDecisionFromMemory(null, {
     weeksOut: 3, spacingWeeks: null, fitness: 'advanced',
   });
   assertEquals(adaptive.minimum_feasible_weeks, 3, 'the fallback floor moved — re-check this whole gate');
   assertEquals(adaptive.decision_source.rule_statuses['run.minimum_feasible_weeks'], 'insufficient_data');
-  // and it recommends a short block off that fallback, which is what used to be honoured
   assertEquals(adaptive.recommended_mode, 'race_support');
 
   // Step 2 — the floor resolver refuses to treat that as personal, and defers to the static table.
@@ -190,87 +193,108 @@ Deno.test('⛔ THE BUG: a no-history "advanced" runner cannot build a 3-week mar
   });
   assertEquals(floor, { floorWeeks: 8, measured: false });
 
-  // Step 3 — the gate refuses. This is the assertion the slice exists for.
-  const refusal = marathonTimelineRefusal({
+  // Step 3 — the gate SPEAKS. It no longer stops. (The 4-week structural floor in the handler is
+  // what actually turns a 3-week race away now, and it is a fact about the builder, not the athlete.)
+  const note = marathonTimelineAdvisory({
     distanceApi: 'marathon', weeksOut: 3,
     floorWeeks: floor.floorWeeks, floorIsMeasured: floor.measured,
     allowRaceWeekSupportMode: false,          // brand-new account: no active run plan
     adaptiveSupportMode: true,                // the engine DID ask for race_support…
   });
-  assert(refusal, 'a 3-week marathon from a no-history "advanced" account was allowed through');
-  assertEquals(refusal!.code, 'race_too_close');
-  assert(refusal!.message.includes('8 weeks'), 'the message must name the weeks NEEDED');
-  assert(refusal!.message.includes('3 weeks out'), 'the message must name the weeks AVAILABLE');
-  assert(/later date/.test(refusal!.message) && /shorter race/.test(refusal!.message),
-    'the message must offer both ways out');
+  assert(note, 'the 3-week case stopped producing a notice entirely — the athlete is told nothing');
+  assertEquals(note!.code, 'race_close');
+  assert(note!.message.includes('8 weeks'), 'the message must name the weeks it usually takes');
+  assert(note!.message.includes('3 out'), 'the message must name the weeks available');
+  // ⛔ IT MAY NOT TELL THEM WHAT TO DO. Both messages used to end "Pick a later date, or a shorter
+  // race" — the right ending for a refusal, the wrong one for a line they will continue past.
+  assert(!/later date/.test(note!.message) && !/shorter race/.test(note!.message),
+    'a warning must state the cost, not issue instructions');
   // ⚠️ And it must NOT claim to have read history it does not have.
-  assert(!refusal!.message.includes('recent training history'),
+  assert(!note!.message.includes('recent training history'),
     'the no-evidence message must not cite training history the athlete has none of');
 });
 
-Deno.test('every level is held to its own static floor when there is no history', () => {
+Deno.test('⛔ NOTHING THROWS: the advisory is data, at every level and every distance', () => {
+  // The whole point of the demotion — there is no input to this function that refuses a build.
+  for (const distanceApi of ['marathon', 'half', '10k', '5k']) {
+    for (const weeksOut of [1, 2, 3, 5, 8, 12, 20]) {
+      for (const measured of [true, false]) {
+        const out = marathonTimelineAdvisory({
+          distanceApi, weeksOut, floorWeeks: 14, floorIsMeasured: measured,
+          allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
+        });
+        assert(out === null || (typeof out.message === 'string' && typeof out.code === 'string'),
+          `${distanceApi} @ ${weeksOut}wk returned something other than a notice`);
+      }
+    }
+  }
+});
+
+Deno.test('every level still gets its own static floor quoted when there is no history', () => {
   for (const [fitness, floorWeeks] of Object.entries(MIN_WEEKS_MARATHON)) {
-    const tooClose = marathonTimelineRefusal({
+    const note = marathonTimelineAdvisory({
       distanceApi: 'marathon', weeksOut: floorWeeks - 1,
       floorWeeks, floorIsMeasured: false,
       allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
     });
-    assert(tooClose, `${fitness}: ${floorWeeks - 1} weeks out slipped past a ${floorWeeks}-week floor`);
-    // exactly at the floor is fine — the gate is "closer than", not "at or closer than"
+    assert(note, `${fitness}: ${floorWeeks - 1} weeks out said nothing against a ${floorWeeks}-week floor`);
+    assert(note!.message.includes(`${floorWeeks} weeks`), `${fitness}: the floor is not in the sentence`);
+    // exactly at the floor is silent — the gate is "closer than", not "at or closer than"
     assertEquals(
-      marathonTimelineRefusal({
+      marathonTimelineAdvisory({
         distanceApi: 'marathon', weeksOut: floorWeeks,
         floorWeeks, floorIsMeasured: false,
         allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
       }),
       null,
-      `${fitness}: a race exactly at the floor was refused`,
+      `${fitness}: a race exactly at the floor was warned about`,
     );
   }
 });
 
-Deno.test('⛔ the support modes SURVIVE — the discriminator is evidence, not weeks', () => {
-  // An athlete mid-build with an active run plan, race in 2 weeks. This is what race_support is FOR
-  // and a naive `weeksOut < floor` gate would have deleted it.
+Deno.test('⛔ the support modes stay EXEMPT — they now suppress the warning, not a refusal', () => {
+  // An athlete mid-build with an active run plan, race in 2 weeks. This is what race_support is FOR,
+  // and telling them a marathon "usually takes 8 weeks" is noise: the engine knows, and is building
+  // for exactly the race they have.
   assertEquals(
-    marathonTimelineRefusal({
+    marathonTimelineAdvisory({
       distanceApi: 'marathon', weeksOut: 2, floorWeeks: 8, floorIsMeasured: false,
       allowRaceWeekSupportMode: true, adaptiveSupportMode: false,
     }),
     null,
-    'an athlete with an active run plan was refused race-week support',
+    'an athlete with an active run plan was warned about their own race week',
   );
 
   // An athlete with REAL memory whose engine-computed floor is 6 and whose race is 5 weeks out.
   assertEquals(
-    marathonTimelineRefusal({
+    marathonTimelineAdvisory({
       distanceApi: 'marathon', weeksOut: 5, floorWeeks: 6, floorIsMeasured: true,
       allowRaceWeekSupportMode: false, adaptiveSupportMode: true,
     }),
     null,
-    'a measured short block (bridge_peak) was refused',
+    'a measured short block (bridge_peak) was warned about',
   );
 
   // ⚠️ THE PAIR THAT MATTERS: same weeks, same mode, different evidence → different answer.
-  const unmeasured = marathonTimelineRefusal({
+  const unmeasured = marathonTimelineAdvisory({
     distanceApi: 'marathon', weeksOut: 5, floorWeeks: 10, floorIsMeasured: false,
     allowRaceWeekSupportMode: false, adaptiveSupportMode: true,
   });
-  assert(unmeasured, 'an UNMEASURED short block slipped through on the adaptive mode alone');
+  assert(unmeasured, 'an UNMEASURED short block said nothing on the adaptive mode alone');
 });
 
 Deno.test('a measured floor stays personal, and says so', () => {
-  const refusal = marathonTimelineRefusal({
+  const note = marathonTimelineAdvisory({
     distanceApi: 'marathon', weeksOut: 4, floorWeeks: 12, floorIsMeasured: true,
     allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
   });
-  assert(refusal);
-  assertEquals(refusal!.code, 'race_too_close_personalized');
-  assert(refusal!.message.includes('recent training history'));
+  assert(note);
+  assertEquals(note!.code, 'race_close_personalized');
+  assert(note!.message.includes('recent training history'));
 });
 
 Deno.test('a measured floor is honoured over the static table — the engine still earns its keep', () => {
-  // An experienced athlete whose own history says 6 weeks is enough should NOT be held to 10.
+  // An experienced athlete whose own history says 6 weeks is enough should NOT be warned at 7.
   const floor = resolveMarathonFloorWeeks({
     staticFloorWeeks: MIN_WEEKS_MARATHON.intermediate,
     adaptiveMinWeeks: 6,
@@ -278,13 +302,13 @@ Deno.test('a measured floor is honoured over the static table — the engine sti
   });
   assertEquals(floor, { floorWeeks: 6, measured: true });
   assertEquals(
-    marathonTimelineRefusal({
+    marathonTimelineAdvisory({
       distanceApi: 'marathon', weeksOut: 7,
       floorWeeks: floor.floorWeeks, floorIsMeasured: true,
       allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
     }),
     null,
-    'a 7-week race was refused against a measured 6-week floor',
+    'a 7-week race was warned against a measured 6-week floor',
   );
   // low_confidence is still MEASURED — a hedged real value, not an absence.
   assertEquals(
@@ -293,12 +317,13 @@ Deno.test('a measured floor is honoured over the static table — the engine sti
   );
 });
 
-Deno.test('non-marathon distances keep their own message and code', () => {
-  const r = marathonTimelineRefusal({
+Deno.test('non-marathon distances keep their own message and code, and read like English', () => {
+  const r = marathonTimelineAdvisory({
     distanceApi: 'half', weeksOut: 2, floorWeeks: 4, floorIsMeasured: false,
     allowRaceWeekSupportMode: false, adaptiveSupportMode: false,
   });
   assert(r);
-  assertEquals(r!.code, 'race_too_close');
-  assert(r!.message.includes('half'));
+  assertEquals(r!.code, 'race_close');
+  // "A half build" was the old label and reads as a typo; the distance gets a written-out name.
+  assert(r!.message.startsWith('A half marathon build'), `bad label: ${r!.message}`);
 });

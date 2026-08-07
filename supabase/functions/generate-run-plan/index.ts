@@ -85,6 +85,11 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    // The request is legal but not ideal — a block shorter than the distance usually takes, most
+    // often. Logged, never thrown: the caller states that cost at intake (2026-08-06).
+    if (requestValidation.warnings?.length) {
+      console.warn('[PlanGen] request warnings:', requestValidation.warnings);
+    }
 
     // Effort Score for Performance Build plans — no estimation, no guessing
     let effortScore: number | undefined;

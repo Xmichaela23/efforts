@@ -151,14 +151,27 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
       '10k':      { base: 4, noBase: 4 },
       '5k':       { base: 4, noBase: 4 },
     };
+    // ⛔ A WARNING SINCE 2026-08-06 — IT WAS AN ERROR, AND THAT MADE IT THE SECOND TIMELINE WALL.
+    //
+    // Michael demoted the timeline gate in `create-goal-and-materialize-plan` to "warn, no wall"
+    // (same posture as the mileage floor). This rejected the identical case one call later: a
+    // beginner marathon under 14 weeks came back `400 Invalid request` with `validation_errors`,
+    // so demoting only the caller would have moved the wall rather than removed it — and moved it
+    // somewhere with worse manners, since this message reaches the athlete as a failed preview.
+    //
+    // ⚠️ THE FOUR-WEEK MINIMUM ABOVE STAYS AN ERROR, and the difference is the point: four weeks is
+    // what `determinePhaseStructure` can physically lay out (it throws below that), while this is a
+    // judgement about whether the block is long enough to be GOOD. The first is the builder's
+    // arithmetic; the second is the athlete's decision, priced at intake — the engine anchors the
+    // long run to race day at any length and the intake states the peak it will reach.
     const limits = minByDistance[request.distance];
     if (limits) {
       const minWeeks = hasBase ? limits.base : limits.noBase;
       if (request.duration_weeks < minWeeks) {
-        errors.push(
+        warnings.push(
           hasBase
-            ? `Even with your training base, a ${request.distance} plan needs at least ${minWeeks} weeks for a proper peak and taper. Got ${request.duration_weeks}.`
-            : `A ${request.distance} plan needs at least ${minWeeks} weeks to build safely. Got ${request.duration_weeks}.`
+            ? `Even with your training base, a ${request.distance} plan usually takes ${minWeeks} weeks for a full peak and taper. This one is ${request.duration_weeks}.`
+            : `A ${request.distance} plan usually takes ${minWeeks} weeks to build. This one is ${request.duration_weeks}.`
         );
       }
     }
