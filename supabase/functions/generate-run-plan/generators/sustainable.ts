@@ -209,80 +209,148 @@ export class SustainableGenerator extends BaseGenerator {
     raceProximity: { dayProximity: Record<string, ReturnType<typeof this.getRaceProximitySession>> },
     runningDays: number
   ): Session[] {
-    const sessions: Session[] = [];
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const prox = raceProximity.dayProximity;
+    const sessions: Session[] = [];
+    let used = 0;                                   // counts against the athlete's day count
+    const room = () => used < runningDays;
 
+    /**
+     * ⛔ ANCHORS FIRST, THEN FILL — and the day count binds on both (2026-08-06). Michael, on the
+     * export: six runs in the race week of a plan built for four days a week.
+     *
+     * `shakeout` and `easy_short` pushed with NO guard at all, so race week ignored the answer
+     * entirely. But bolting the guard onto a Monday→Sunday walk drops the wrong sessions — the
+     * early-week easy runs spend the budget and the Saturday shakeout falls off the end. Walking
+     * BACKWARD from the race fixes race week and breaks the week before it, which is not a race
+     * week at all: it ends up training Thursday, Friday and Sunday with the first half of the week
+     * empty.
+     *
+     * So neither direction is the rule. **Priority is.** Two sessions give the week its shape and
+     * claim their slots before anything else: the SHAKEOUT (the one session race week exists for)
+     * and the SUNDAY LONG RUN (the anchor every other day is placed around). Everything else is
+     * filler and takes what is left, in day order. Race day itself is exempt — it is not a training
+     * day the athlete chose.
+     */
     for (const day of days) {
-      const proximity = raceProximity.dayProximity[day];
-
-      switch (proximity) {
-        case 'race':
-          // Race day - don't add a training session
-          break;
-          
-        case 'shakeout':
-          // 1-2 days before race: very short shakeout
-          sessions.push(this.createShakeoutRun(day));
-          break;
-          
-        case 'easy_short':
-          // 3-4 days before race: short easy run
-          sessions.push(this.createSession(
-            day,
-            'Easy Run',
-            '3-4 miles very easy. Keep the legs loose and stay relaxed.',
-            this.milesToMinutes(4),
-            [TOKEN_PATTERNS.easy_run_miles(4)],
-            ['easy_run', 'taper']
-          ));
-          break;
-          
-        case 'easy_medium':
-          // 5-7 days before race: normal easy, maybe light strides
-          if (day === 'Tuesday' && sessions.length < runningDays) {
-            // Light strides to stay sharp
-            sessions.push(this.createSession(
-              day,
-              'Easy + Strides',
-              '4 miles easy with 4×100m strides. Keep it light and fun!',
-              this.milesToMinutes(4) + 5,
-              [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
-              ['easy_run', 'strides', 'taper']
-            ));
-          } else if (day === 'Sunday') {
-            // Reduced long run
-            sessions.push(this.createSimpleLongRun(8));
-          } else if (sessions.length < runningDays) {
-            sessions.push(this.createSimpleEasyRun(4, day));
-          }
-          break;
-          
-        case 'reduced_quality':
-          // 8-14 days before race - reduced but still training
-          if (day === 'Tuesday' && sessions.length < runningDays) {
-            sessions.push(this.createSession(
-              day,
-              'Easy + Strides',
-              '4 miles easy with 4×100m strides. Keep it light!',
-              this.milesToMinutes(4) + 5,
-              [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
-              ['easy_run', 'strides']
-            ));
-          } else if (day === 'Sunday') {
-            // Reduced long run (10 miles max)
-            sessions.push(this.createSimpleLongRun(Math.min(10, this.getLongRunMiles(weekNumber))));
-          } else if (sessions.length < runningDays && day !== 'Saturday') {
-            sessions.push(this.createSimpleEasyRun(5, day));
-          }
-          break;
-          
-        case 'normal':
-          // More than 14 days out - should not be in race week, skip
-          break;
+      const p = prox[day];
+      if (p === 'race') {
+        // ⛔ THE RACE IS ON THE CALENDAR NOW. This case read "don't add a training session" and did
+        // nothing at all, so a completion plan ended on a Saturday shakeout with NOTHING on race
+        // day. `performance-build` has built a race-day row since it shipped; this path never did,
+        // and the athlete's own event was the one thing missing from the plan built for it.
+        sessions.push(this.createCompletionRaceDay(day));
+        continue;
+      }
+      if (p === 'shakeout' && room()) {
+        sessions.push(this.createShakeoutRun(day));
+        used++;
+        continue;
+      }
+      if (day === 'Sunday' && (p === 'easy_medium' || p === 'reduced_quality') && room()) {
+        // ⛔ THE TAPER'S OWN NUMBER, NOT A CONSTANT. The `easy_medium` arm read
+        // `createSimpleLongRun(8)` — a literal three functions away from the arc that had already
+        // computed this week's long run. On the 9-week case the arc stepped 9 → 8 → 6 → 4 and this
+        // overwrote the 6, so the taper printed 9 → 8 → 8 and read as a plateau. Both numbers
+        // survive as CEILINGS: never more than 8 inside a week of the race, never more than 10
+        // inside two, however big the block got.
+        const cap = p === 'easy_medium' ? 8 : 10;
+        sessions.push(this.createSimpleLongRun(Math.min(cap, this.getLongRunMiles(weekNumber))));
+        used++;
       }
     }
 
-    return sessions;
+    // ── Filler, in day order, until the count is spent ────────────────────────
+    for (const day of days) {
+      if (!room()) break;
+      if (sessions.some((s) => s.day === day)) continue;   // anchored (or the race) — leave it
+      const p = prox[day];
+
+      if (p === 'easy_short') {
+        // 3-4 days before race: short easy run
+        sessions.push(this.createSession(
+          day,
+          'Easy Run',
+          '3-4 miles very easy. Keep the legs loose and stay relaxed.',
+          this.milesToMinutes(4),
+          [TOKEN_PATTERNS.easy_run_miles(4)],
+          ['easy_run', 'taper']
+        ));
+        used++;
+      } else if (p === 'easy_medium') {
+        // 5-7 days before race: normal easy, maybe light strides
+        if (day === 'Tuesday') {
+          sessions.push(this.createSession(
+            day,
+            'Easy + Strides',
+            '4 miles easy with 4×100m strides. Keep it light and fun!',
+            this.milesToMinutes(4) + 5,
+            [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
+            ['easy_run', 'strides', 'taper']
+          ));
+        } else {
+          sessions.push(this.createSimpleEasyRun(4, day));
+        }
+        used++;
+      } else if (p === 'reduced_quality' && day !== 'Saturday') {
+        // 8-14 days before race — reduced but still training. Saturday stays clear before Sunday.
+        if (day === 'Tuesday') {
+          sessions.push(this.createSession(
+            day,
+            'Easy + Strides',
+            '4 miles easy with 4×100m strides. Keep it light!',
+            this.milesToMinutes(4) + 5,
+            [TOKEN_PATTERNS.easy_run_miles(4), TOKEN_PATTERNS.strides_4x100m],
+            ['easy_run', 'strides']
+          ));
+        } else {
+          sessions.push(this.createSimpleEasyRun(5, day));
+        }
+        used++;
+      }
+      // 'normal' (more than 14 days out) cannot occur in a week that reached this function.
+    }
+
+    // Monday-first. This week bypasses `assignDaysToSessions` — it is already day-assigned — so
+    // nothing downstream would reorder it, and the anchors were placed out of order by design.
+    return sessions.sort((a, b) => days.indexOf(a.day) - days.indexOf(b.day));
+  }
+
+  /**
+   * ⛔ RACE DAY, ON A COMPLETION PLAN — and it is NOT `performance-build`'s race day.
+   *
+   * That one prescribes M pace off the athlete's VDOT and signs off with "Trust your training. Go
+   * crush it." This path has no goal pace by construction — the intake card says so in as many
+   * words (*"Getting to the finish: easy running and long runs. No pace targets to hit."*) — so the
+   * row states the distance and the effort the whole block was written in, and targets nothing.
+   *
+   * ⚠️ THE TOKEN IS TIME-BASED, DELIBERATELY. `longrun_{n}mi_easypace` is matched by
+   * `materialize-plan` with `longrun_(\d+)mi` — INTEGERS ONLY — and every race distance is a
+   * decimal (26.2, 13.1, 6.2, 3.1), so a distance token would parse to nothing and materialize as
+   * an empty workout. The minutes form is integer by construction and both the validator and the
+   * expander accept it. The DISTANCE is in the name and the description, where it is read.
+   *
+   * ⚠️ A run session with an empty `steps_preset` FAILS `validatePlanSchema`, so "no token" is not
+   * an option here even though the combined-plan tri race row does exactly that (different
+   * validator, different path).
+   */
+  private createCompletionRaceDay(day: string): Session {
+    const miles = this.getRaceDistanceMiles();
+    const duration = this.milesToMinutes(miles);
+    const raceName = this.params.race_name || 'Race';
+    const distanceLabel: Record<string, string> = {
+      marathon: 'Marathon', half: 'Half marathon', '10k': '10K', '5k': '5K',
+    };
+    const label = distanceLabel[this.params.distance] ?? 'Race';
+    return this.createSession(
+      day,
+      `${raceName} — ${label}`,
+      `${miles} miles. The effort you have run all block: conversational at the start, and it will not stay that way. ` +
+      `No pace target — this block was built to get you here able to finish.`,
+      duration,
+      [TOKEN_PATTERNS.long_run(duration)],
+      ['race_day', 'event', this.params.distance],
+    );
   }
 
   // ============================================================================

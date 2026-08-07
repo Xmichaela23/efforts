@@ -1201,9 +1201,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       + 'between them instead of the 48 to 72 most plans leave. It is kept as you set it. Moving '
       + 'the long run, if it is the one that can move, opens the gap.';
   })();
-  /** Level card: a tier, and two numbers that survived editing. */
-  const levelCanContinue = !!state.fitness
-    && Number(state.targetMiles) > 0 && Number(state.longRunMiles) > 0;
+  /**
+   * Level card: a tier and a weekly mileage. ⚠️ THE LONGEST RUN IS NOT GATED (2026-08-06) — it is
+   * no longer prefilled, and requiring a number we stopped supplying would turn "I don't have one"
+   * into a wall. Absent is a legal answer: the arc opens at the row's first rung, which is where a
+   * beginner starts anyway.
+   */
+  const levelCanContinue = !!state.fitness && Number(state.targetMiles) > 0;
   /**
    * Intent card. A time goal needs the time AND a pace to write it against — the calibration is
    * offered inline, so this is a completable state, not a wall.
@@ -1841,7 +1845,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     // mind about the tier, and comes back expects the new tier's numbers — not
                     // their edits to the old one silently kept under a different heading.
                     targetMiles: TIER_SEEDS[t.id].weeklyMi,
-                    longRunMiles: TIER_SEEDS[t.id].longRunMi,
+                    // ⛔ THE LONG-RUN SEED IS GONE (2026-08-06). It stayed prefilled at the tier's
+                    // number — 6 for a beginner — and that number is not decoration: it is the rung
+                    // `buildLongRunArc` enters the table at, so an athlete who never touched the
+                    // field had the block's ceiling set by a guess we made on their behalf and
+                    // showed back to them as their own answer. Michael's own build shipped with
+                    // `Recent Long Run Miles: 6` he never typed.
+                    // ⚠️ THE FIELD STAYS. Blank and a seeded 6 produce the IDENTICAL plan for a
+                    // true beginner (both enter at rung 0), so nothing is lost by leaving it empty
+                    // — while a beginner who really does run 10-mile long runs can still say so and
+                    // enter the arc where they actually are. Killing the field would have cost them
+                    // that for no gain. Same rule as the days and long-run-day controls
+                    // (2026-07-29): *"no prefill let them chose."*
+                    longRunMiles: '',
                     targetTouched: true,
                   }))}
                   className={optBtn(state.fitness === t.id)}
@@ -1874,6 +1890,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       `getProgressionOffset` uses it to pick where in the long-run arc the plan
                       starts. Absent, the arc always opens at week 1 no matter who the athlete is. */}
                   <p className="text-white/85 text-sm mb-2">Longest run in the last month</p>
+                  <p className="text-white/50 text-xs mb-2 leading-relaxed">
+                    Leave it blank if there isn&apos;t one — the plan opens at its first step.
+                  </p>
                   <div className="flex items-center gap-2">
                     <input
                       type="number" inputMode="decimal" min={0}

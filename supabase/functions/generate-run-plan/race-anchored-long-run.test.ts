@@ -35,8 +35,16 @@ function build(extra: Record<string, unknown> = {}): Plan {
 const milesIn = (d: string) => { const m = d.match(/(\d+(?:\.\d+)?)\s*miles/); return m ? +m[1] : null; };
 const longRun = (p: Plan, wk: number) =>
   milesIn((p.sessions_by_week[String(wk)] ?? []).find((s) => (s.tags ?? []).includes('long_run'))?.description ?? '');
+/**
+ * Training miles only. ⚠️ THE RACE IS NOT TRAINING VOLUME — since 2026-08-06 race day is a real row
+ * on this path (26.2 miles of it), and counting it would make race week a 37% "jump" over the peak
+ * and turn the ramp guard into a test of arithmetic nobody is doing. The guard is about the weeks
+ * that BUILD; the race is the thing they build toward.
+ */
 const weekMiles = (p: Plan, wk: number) =>
-  (p.sessions_by_week[String(wk)] ?? []).reduce((sum, s) => sum + (milesIn(s.description ?? '') ?? 0), 0);
+  (p.sessions_by_week[String(wk)] ?? [])
+    .filter((s) => !(s.tags ?? []).includes('race_day'))
+    .reduce((sum, s) => sum + (milesIn(s.description ?? '') ?? 0), 0);
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysBeforeRace = (wk: number) => Math.floor(

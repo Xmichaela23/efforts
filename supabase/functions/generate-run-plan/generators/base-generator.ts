@@ -150,6 +150,24 @@ export abstract class BaseGenerator {
   }
 
   /**
+   * ⛔ THE RACE DISTANCE IN MILES — one map, because a race day is now built on BOTH paths.
+   *
+   * `performance-build` has carried this since it shipped; `sustainable` needed it when the
+   * completion path finally got a race-day entry of its own (2026-08-06 — until then a completion
+   * plan ended on a Saturday shakeout with nothing on race day at all). A second copy of four
+   * numbers is how the two paths start disagreeing about how long a half marathon is.
+   */
+  protected getRaceDistanceMiles(): number {
+    const distanceMap: Record<string, number> = {
+      'marathon': 26.2,
+      'half': 13.1,
+      '10k': 6.2,
+      '5k': 3.1,
+    };
+    return distanceMap[this.params.distance] || 26.2; // Default to marathon if unknown
+  }
+
+  /**
    * Neuromuscular governor: when heavy lower-body strength work is being
    * introduced alongside the running plan, reduce early-week long-run volume
    * to prevent CNS overload from concurrent new stressors.

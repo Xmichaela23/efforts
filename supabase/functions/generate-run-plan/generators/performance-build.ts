@@ -870,13 +870,9 @@ export class PerformanceBuildGenerator extends BaseGenerator {
    * NOT hardcoded - uses user's actual race distance
    */
   private getRaceDistance(): number {
-    const distanceMap: Record<string, number> = {
-      'marathon': 26.2,
-      'half': 13.1,
-      '10k': 6.2,
-      '5k': 3.1
-    };
-    return distanceMap[this.params.distance] || 26.2; // Default to marathon if unknown
+    // Moved to `base-generator.getRaceDistanceMiles` (2026-08-06) when the sustainable path gained
+    // its own race day. Same four numbers, same default — kept as a name so nothing else moved.
+    return this.getRaceDistanceMiles();
   }
 
   // ============================================================================

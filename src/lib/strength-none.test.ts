@@ -69,3 +69,35 @@ Deno.test('zero is the language the persistence layer already speaks', () => {
   // the payload never sent 0. This test is the note that it must keep being reachable.
   assertEquals(strengthFrequencyForPosture('out'), 0);
 });
+
+
+// ── THE LONG-RUN SEED (2026-08-06) ───────────────────────────────────────────
+
+import { TIER_SEEDS, buildLongRunArc } from './run-volume-tables.ts';
+
+Deno.test('⛔ A BLANK LONGEST RUN BUILDS THE SAME PLAN AS THE SEED IT REPLACED', () => {
+  // The seed was killed on the level card: the field stays, unprefilled. That is only safe because
+  // a beginner's seed (6) and no answer at all enter the row at the SAME rung — so a true beginner
+  // loses nothing, and nobody is handed a number they never typed.
+  const seeded = buildLongRunArc({
+    distance: 'marathon', fitness: 'beginner', durationWeeks: 9,
+    entryLongRunMi: TIER_SEEDS.beginner.longRunMi, peakWeek: 6,
+  })!;
+  const blank = buildLongRunArc({
+    distance: 'marathon', fitness: 'beginner', durationWeeks: 9,
+    entryLongRunMi: null, peakWeek: 6,
+  })!;
+  assertEquals(blank.weeks, seeded.weeks, 'blank and the old seed no longer agree — the seed was load-bearing after all');
+});
+
+Deno.test('⛔ AND A BEGINNER WHO REALLY RUNS 10 STILL GETS CREDIT FOR IT', () => {
+  // The reason the field survived instead of being deleted outright.
+  const blank = buildLongRunArc({
+    distance: 'marathon', fitness: 'beginner', durationWeeks: 9, entryLongRunMi: null, peakWeek: 6,
+  })!;
+  const real = buildLongRunArc({
+    distance: 'marathon', fitness: 'beginner', durationWeeks: 9, entryLongRunMi: 10, peakWeek: 6,
+  })!;
+  assert(real.maxMi > blank.maxMi, 'typing a real 10-mile long run no longer changes the block');
+  assert(real.weeks[0] > blank.weeks[0], 'the block still opens at the row\'s first rung for them');
+});
