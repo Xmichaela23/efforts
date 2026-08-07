@@ -26,7 +26,9 @@ import {
   LONG_RUN_PROGRESSION,
   WEEKLY_MILEAGE,
   MAX_WEEKLY_MILEAGE_INCREASE,
-  MARATHON_PREREQUISITE,
+  PRESCRIPTIVE_TAPER_RATIOS,
+  marathonPrerequisiteFor,
+  type MarathonPrerequisite,
   buildLongRunArc,
   longRunPeakWeek,
   type LongRunArc,
@@ -36,6 +38,21 @@ import {
 export class SustainableGenerator extends BaseGenerator {
   generatePlan(): TrainingPlan {
     const phaseStructure = this.determinePhaseStructure();
+    /**
+     * ⛔ THE PEAK WEEK IS NEVER A CUTBACK WEEK, AND IT IS STRUCK ONCE HERE. The cutback cadence is
+     * every 4th week and the peak week is derived from the race date, so on some windows they
+     * collide: an 11-week block put its 18-miler inside a deloaded week that ALSO dropped to three
+     * running days — a 36-mile week carrying a 50% long run.
+     *
+     * ⚠️ STRUCK FROM THE PHASE STRUCTURE, not from a local flag. `getRunningDaysForWeek`,
+     * `calculateWeeklyMileage`, the speedwork gate and the strength overlay each re-derive recovery
+     * from this array; fixing one of them leaves the week half-deloaded in a way nothing reports.
+     */
+    const arcPeak = this.resolveLongRunArc()?.peakWeek ?? -1;
+    if (phaseStructure.recovery_weeks.includes(arcPeak)) {
+      phaseStructure.recovery_weeks = phaseStructure.recovery_weeks.filter((w) => w !== arcPeak);
+      console.log(`[PlanGen] week ${arcPeak} un-deloaded: it carries the peak long run`);
+    }
     const sessions_by_week: Record<string, Session[]> = {};
     const weekly_summaries: Record<string, any> = {};
     const volume_notes: string[] = []; // E3b glass-box: budget-vs-legal-week reconciliation surfaced here
@@ -106,6 +123,13 @@ export class SustainableGenerator extends BaseGenerator {
      */
     const pre = this.marathonPrerequisite();
     if (!pre) return base;
+    // ⛔ TOO SHORT FOR ANY HONEST PREREQUISITE. Past this the block would be asking the athlete to
+    // arrive already marathon-fit so it can "build" them two miles. Name the half; do not pretend.
+    if (!pre.meetable) {
+      return `${base} This window is too short to build a marathon from any starting point we could ` +
+        `honestly ask for — it would need you race-ready on day one. The half is the build this ` +
+        `timeline supports.`;
+    }
     return `${base} This plan assumes you're already running about ${pre.weeklyMi} miles a week with a long run around ${pre.longRunMi}. ` +
       `If that's not where you are, do the half — this build won't be safe for you.`;
   }
@@ -421,9 +445,25 @@ export class SustainableGenerator extends BaseGenerator {
     // trend keeps climbing underneath the deload and the athlete comes back to a week 22% over the
     // last one they actually ran — a 10% cap that only holds on paper. The cut itself is applied
     // after the walk, so the deloaded week is never the base for the next week's ceiling either.
+    /**
+     * ⛔ THE WEEK PEAKS WHERE THE LONG RUN PEAKS (2026-08-06). This ramped toward `taperStart`, which
+     * on a race block is two or three weeks AFTER the long-run peak — so the biggest long run landed
+     * on a week the volume had not caught up to yet. A 9-week beginner peaked an 18-mile run inside a
+     * 36-mile week: a 50% share, against the 45% the tables are built on. Volume and the long run
+     * peak together now, which is also what every periodisation model does.
+     *
+     * ⚠️ AFTER THE PEAK THE WEEK FOLLOWS THE LONG RUN DOWN, on the same ratios (0.78 / 0.55) rather
+     * than a flat half — a taper that cuts volume faster than it cuts the long run raises the share
+     * exactly when it should be falling.
+     */
+    const arcPeakWeek = this.resolveLongRunArc()?.peakWeek ?? Math.max(1, taperStart - 1);
     const uncapped = (w: number) => {
-      if (w >= taperStart) return peak * 0.5;
-      const progress = (w - 1) / Math.max(1, taperStart - 2);
+      if (w > arcPeakWeek) {
+        const j = w - arcPeakWeek;
+        const ratio = PRESCRIPTIVE_TAPER_RATIOS[Math.min(j - 1, PRESCRIPTIVE_TAPER_RATIOS.length - 1)];
+        return peak * ratio;
+      }
+      const progress = (w - 1) / Math.max(1, arcPeakWeek - 1);
       return effectiveStart + (peak - effectiveStart) * Math.min(1, progress);
     };
     let targetMiles = effectiveStart;
@@ -432,7 +472,11 @@ export class SustainableGenerator extends BaseGenerator {
       targetMiles = Math.min(uncapped(w), targetMiles * MAX_WEEKLY_MILEAGE_INCREASE);
     }
 
-    if (isRecovery) {
+    // ⛔ NEVER DELOAD THE WEEK THAT CARRIES THE PEAK LONG RUN. The cutback cadence is every 4th week
+    // and the peak week is derived from the race date, so on some windows they collide — an 11-week
+    // block put its 18-miler inside a deloaded 26-mile week, a 69% share. The long run is the point
+    // of that week; the cutback moves, not the peak.
+    if (isRecovery && weekNumber !== arcPeakWeek) {
       targetMiles = targetMiles * 0.7;
     }
 
@@ -444,10 +488,31 @@ export class SustainableGenerator extends BaseGenerator {
   /** Built once per plan — the arc is a whole-plan shape, not a per-week lookup. */
   private longRunArcMemo: LongRunArc | null | undefined;
 
-  /** The block's assumed base, when this distance/level has one named. Marathon beginner today. */
-  private marathonPrerequisite(): { weeklyMi: number; longRunMi: number } | null {
+  private prereqMemo: MarathonPrerequisite | null | undefined;
+
+  /**
+   * The block's assumed base — computed from THIS window, so a short block quotes a high base and a
+   * long one quotes almost nothing. Marathon only: the shorter distances build from where you are.
+   *
+   * ⚠️ THE SAME `peakWeek` THE ARC USES. The prerequisite is derived from how many climbing weeks
+   * there are before the peak, so reading a different peak week here would quote a base that does
+   * not match the ramp the plan actually runs.
+   */
+  private marathonPrerequisite(): MarathonPrerequisite | null {
     if (this.params.distance !== 'marathon') return null;
-    return MARATHON_PREREQUISITE[this.params.fitness] ?? null;
+    if (this.prereqMemo === undefined) {
+      this.prereqMemo = marathonPrerequisiteFor({
+        distance: this.params.distance,
+        fitness: this.params.fitness,
+        durationWeeks: this.params.duration_weeks,
+        peakWeek: longRunPeakWeek({
+          durationWeeks: this.params.duration_weeks,
+          startDateISO: this.params.start_date,
+          raceDateISO: this.params.race_date,
+        }),
+      });
+    }
+    return this.prereqMemo;
   }
 
   private resolveLongRunArc(): LongRunArc | null {

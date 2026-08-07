@@ -16,16 +16,21 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
-  MARATHON_PREREQUISITE,
-  MARATHON_BASE_FLOOR_MI,
+  MAX_LONG_RUN_SHARE,
+  WEEKLY_MILEAGE,
   LONG_RUN_PROGRESSION,
+  PEAK_LONG_RUN_CEILING_MI,
   buildLongRunArc,
+  marathonPrerequisiteFor,
 } from './run-volume-tables.ts';
+
+const pre = (fitness: string, durationWeeks: number, peakWeek?: number) =>
+  marathonPrerequisiteFor({ distance: 'marathon', fitness, durationWeeks, peakWeek })!;
 
 /** Michael's acceptance case: 9 weeks, race Sunday 2026-10-11, plan opens Monday 2026-08-10. */
 const NINE_WEEK = {
   distance: 'marathon', fitness: 'beginner', durationWeeks: 9,
-  prerequisiteLongRunMi: MARATHON_PREREQUISITE.beginner.longRunMi,
+  prerequisiteLongRunMi: pre('beginner', 9, 6).longRunMi,
   peakWeek: 6, raceWeekIsLast: true,
 } as const;
 
@@ -75,13 +80,70 @@ Deno.test('⛔ THE PREREQUISITE IS THE FLOOR, NOT A REPLACEMENT — a stronger a
   // what a prerequisite IS, and it is why `generatePlanDescription` must never lose it.
 });
 
-Deno.test('the weekly half of the prerequisite is the floor the intake already advises', () => {
-  // Not a new number: `MARATHON_BASE_FLOOR_MI` has been the intake's advisory floor since 2026-08-04.
-  assertEquals(MARATHON_PREREQUISITE.beginner.weeklyMi, MARATHON_BASE_FLOOR_MI);
-  assertEquals(MARATHON_PREREQUISITE.beginner.longRunMi, 10);
-  // 10 of 25 is a 40% opening share, easing to 18 of ~36 as the ramp climbs. Deliberately hot at the
-  // start — the long run is the session that has to happen.
-  assert(MARATHON_PREREQUISITE.beginner.longRunMi / MARATHON_PREREQUISITE.beginner.weeklyMi <= 0.4);
+Deno.test('⛔ THE NUMBERS MICHAEL SPECIFIED FALL OUT OF THE FORMULA, not the other way round', () => {
+  // 9-week beginner: peak week 6, one cutback → 4 climbing weeks.
+  //   long run  18 − 2×4        = 10
+  //   weekly    40 / 1.1⁴ = 27.3 → 27
+  // Both are what he named by hand, which is the check that this is the RULE he was describing.
+  const p = pre('beginner', 9, 6);
+  assertEquals(p.longRunMi, 10);
+  assert(p.weeklyMi >= 27 && p.weeklyMi <= 28, `weekly base came out ${p.weeklyMi}, wanted 27-28`);
+  assertEquals(p.peakLongRunMi, 18);
+  assertEquals(p.peakWeeklyMi, 40);
+  assertEquals(p.meetable, true);
+});
+
+Deno.test('⛔ THE PEAK IS UNIVERSAL AND THE BASE IS WHAT MOVES — 45 / 40 / 33% by level', () => {
+  // Michael: same peak at every level, higher assumed base, share 45/40/33. Those shares are the
+  // ratios `MAX_LONG_RUN_SHARE` already documents the tables as embodying — 18/40, 20/50, 20/60.
+  const expected: Record<string, number> = { beginner: 0.45, intermediate: 0.40, advanced: 0.33 };
+  for (const level of ['beginner', 'intermediate', 'advanced']) {
+    const p = pre(level, 9, 6);
+    assert(p.peakLongRunMi >= 18 && p.peakLongRunMi <= 20, `${level} peaks at ${p.peakLongRunMi}`);
+    assertEquals(p.peakLongRunMi, Math.min(PEAK_LONG_RUN_CEILING_MI, Math.max(...LONG_RUN_PROGRESSION.marathon[level])));
+    assertEquals(p.peakWeeklyMi, WEEKLY_MILEAGE.marathon[level].peak);
+    const share = p.peakLongRunMi / p.peakWeeklyMi;
+    assert(Math.abs(share - expected[level]) < 0.02, `${level} share ${(share * 100).toFixed(0)}%, wanted ${expected[level] * 100}%`);
+    // and the base climbs with the level, because the peak it must reach does
+    if (level !== 'beginner') assert(p.weeklyMi > pre('beginner', 9, 6).weeklyMi);
+  }
+  // the shares are the file's own documented ratios, not a second set
+  assert(MAX_LONG_RUN_SHARE.beginner < 0.45 + 0.01);
+});
+
+Deno.test('⛔ THE BASE SCALES DOWN AS THE WINDOW GROWS, and stops binding on a long one', () => {
+  // Michael: short windows quote a higher base, long windows near-zero.
+  const windows = [6, 8, 9, 11, 12, 14, 16, 18];
+  let previous = Infinity;
+  for (const weeks of windows) {
+    const p = pre('beginner', weeks, weeks - 3);
+    assert(p.weeklyMi <= previous, `${weeks} weeks asked MORE base (${p.weeklyMi}) than a shorter window`);
+    assert(p.peakLongRunMi === 18, `${weeks} weeks no longer peaks at 18`);
+    previous = p.weeklyMi;
+  }
+  // A long window bottoms out at the row's own opening — it requires nothing the plan would not
+  // have started at anyway.
+  const long = pre('beginner', 18, 15);
+  assertEquals(long.weeklyMi, WEEKLY_MILEAGE.marathon.beginner.start);
+  assertEquals(long.longRunMi, LONG_RUN_PROGRESSION.marathon.beginner[0]);
+});
+
+Deno.test('⛔ THE PEAK NEVER EXCEEDS 20, however long the window', () => {
+  // Extra weeks add volume and weeks near the peak — not a longer single run.
+  for (const weeks of [12, 18, 24, 30]) {
+    for (const level of ['beginner', 'intermediate', 'advanced']) {
+      assert(pre(level, weeks, weeks - 3).peakLongRunMi <= PEAK_LONG_RUN_CEILING_MI);
+    }
+  }
+});
+
+Deno.test('⛔ BELOW THE BUILD WEEKS IT NEEDS, THE PREREQUISITE GOES UNMEETABLE → the half', () => {
+  // Past 80% of the peak the block is asking the athlete to arrive with a 16-mile long run so it can
+  // "build" them to 18. That is not a marathon build; the plan names the half instead.
+  assertEquals(pre('beginner', 9, 6).meetable, true);
+  assertEquals(pre('beginner', 6, 3).meetable, true);
+  assertEquals(pre('beginner', 4, 2).meetable, false);
+  assertEquals(pre('beginner', 3, 1).meetable, false);
 });
 
 Deno.test('⛔ A FULL-LENGTH BLOCK IS UNTOUCHED — it walks the row, it does not need the prescription', () => {
@@ -89,14 +151,14 @@ Deno.test('⛔ A FULL-LENGTH BLOCK IS UNTOUCHED — it walks the row, it does no
   // is byte-identical to the row. The prescription exists for blocks too short to walk there.
   const arc = buildLongRunArc({
     distance: 'marathon', fitness: 'beginner', durationWeeks: 20,
-    prerequisiteLongRunMi: MARATHON_PREREQUISITE.beginner.longRunMi,
+    prerequisiteLongRunMi: pre('beginner', 20, 18).longRunMi,
   })!;
   assertEquals(arc.weeks, LONG_RUN_PROGRESSION.marathon.beginner);
 });
 
-Deno.test('no prerequisite named → the old behaviour, unchanged', () => {
-  // Intermediate and advanced have no prerequisite row yet, so they still enter where the athlete is.
-  assertEquals(MARATHON_PREREQUISITE.intermediate, undefined);
+Deno.test('no prerequisite passed → the old behaviour, unchanged', () => {
+  // The shorter distances (and any caller that does not ask for one) still build from where the
+  // athlete is and top out where the ramp lands.
   const arc = buildLongRunArc({
     distance: 'marathon', fitness: 'intermediate', durationWeeks: 9,
     entryLongRunMi: 10, peakWeek: 6, raceWeekIsLast: true,

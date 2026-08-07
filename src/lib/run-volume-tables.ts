@@ -303,7 +303,8 @@ export function buildLongRunArc(opts: {
   const tailPeak = progression[tailPeakIdx];
   /** The row's own taper, as fractions of its peak. One entry for a half, two for a marathon. */
   const rowTailRatios = progression.slice(tailPeakIdx + 1).map((v) => v / tailPeak);
-  const tableMaxMi = progression.reduce((a, b) => (b > a ? b : a), 0);
+  // Capped at 20: a longer window adds weeks near the peak, never a bigger single run.
+  const tableMaxMi = Math.min(PEAK_LONG_RUN_CEILING_MI, progression.reduce((a, b) => (b > a ? b : a), 0));
   /** The row's own cutback depth (beginner 6/8 = 0.75, advanced 10/12 = 0.83). */
   const recoveryRatio = progression[2] > 0 ? progression[3] / progression[2] : 0.75;
 
@@ -462,31 +463,97 @@ export const ENGINE_START_CLAMP_FRACTION = 0.7;
 export const MARATHON_BASE_FLOOR_MI = 25;
 
 /**
- * ⛔ THE PREREQUISITE — WHAT THE BLOCK ASSUMES YOU ALREADY HAVE (2026-08-06, Michael's call).
- *
- * This is the change of model, and it is worth naming because it reverses the posture the arc
- * shipped with this morning. That version entered the row wherever the athlete actually was and
- * stated the ceiling that produced — a 9-week beginner topped out at a 9-mile long run and the
- * screen said so. Honest, and not a marathon plan: nobody finishes 26.2 off a 9-mile peak.
- *
- * So the block is a PRESCRIPTION with an entry requirement, which is how every published marathon
- * plan works — Higdon's Novice 1 opens on "about a year of running", Pfitzinger's 18/55 on 55-mile
- * weeks. The plan builds to a real 18-mile peak, and it SAYS what it assumed (`generatePlanDescription`).
- * If the athlete is not there, the honest answer is the half, and the plan says that too.
- *
- * ⚠️ THE PAIR IS MICHAEL'S: 25 mi/wk and a 10-mile long run. The weekly half is not new — it is
- * `MARATHON_BASE_FLOOR_MI`, already the intake's advisory floor since 2026-08-04. The long-run half
- * is its companion: 10/25 is a 40% share in week 1, easing to 18/45 = 37% at peak, which is the
- * beginner allowance this file already documents (`MAX_LONG_RUN_SHARE`, 0.35 at week 1) running
- * slightly hot at the start by design — the long run is the session that has to happen.
- *
- * ⚠️ BEGINNER ONLY, AND THAT IS A KNOWN GAP. Michael specified the beginner pair. Intermediate and
- * advanced still enter from the athlete's own long run, so a short block at those levels still
- * peaks where the ramp lands. Filling those two rows needs their prerequisites named, not guessed.
+ * ⛔ THE PEAK LONG RUN IS CAPPED AT 20, WHATEVER THE WINDOW (2026-08-06). Michael: *extra weeks add
+ * volume and repeat long runs, not a longer single run.* Nobody's build is improved by a 24-miler;
+ * the field stops at 20-22 (Higdon 20, Pfitzinger 20-22, Daniels caps by TIME at 2.5-3h). A longer
+ * window buys weeks NEAR the peak and a bigger week, not a bigger single run.
  */
-export const MARATHON_PREREQUISITE: Record<string, { weeklyMi: number; longRunMi: number }> = {
-  beginner: { weeklyMi: MARATHON_BASE_FLOOR_MI, longRunMi: 10 },
-};
+export const PEAK_LONG_RUN_CEILING_MI = 20;
+
+export interface MarathonPrerequisite {
+  /** The weekly mileage the block assumes you already have. */
+  weeklyMi: number;
+  /** The long run it assumes you already have. */
+  longRunMi: number;
+  /** What this block builds to — the row's max, capped at 20. */
+  peakLongRunMi: number;
+  /** What the weekly ramp targets. The peak long run lands at 45/40/33% of it by level. */
+  peakWeeklyMi: number;
+  /**
+   * False when the window is too short for ANY honest prerequisite — the athlete would have to
+   * arrive already marathon-fit. The plan says so and names the half rather than pretending.
+   */
+  meetable: boolean;
+}
+
+/**
+ * ⛔ THE PREREQUISITE — WHAT THE BLOCK ASSUMES YOU HAVE, COMPUTED FROM THE WINDOW (2026-08-06).
+ *
+ * THE MODEL, and it reverses the posture the arc shipped with this morning: that version entered
+ * the row wherever the athlete actually was and stated the ceiling it produced — a 9-week beginner
+ * topped out at a 9-mile long run and the screen said so. Honest, and not a marathon plan; nobody
+ * finishes 26.2 off a 9-mile peak. So the block builds the peak the distance needs and STATES what
+ * it assumed, which is how every published plan is written (Higdon's "about a year of running",
+ * Pfitzinger's 55-mile weeks).
+ *
+ * ⛔ IT IS A FUNCTION OF THE WINDOW, NOT A CONSTANT — that is the whole design. Work backward from
+ * the peak at the only rates the block may use:
+ *   • the long run climbs at most 2 miles a week (the rows' own biggest step), so a window with C
+ *     climbing weeks must OPEN at `peak − 2C`;
+ *   • the week climbs at most 10% (`MAX_WEEKLY_MILEAGE_INCREASE` — Michael: *hold the cap, do not
+ *     raise the ramp*), so it must open at `peakWeekly / 1.1^C`.
+ * Short windows quote a high base; long windows stop binding and bottom out at the row's own
+ * opening, which is where a plan with time to spare starts anyway.
+ *
+ * ⚠️ THE PEAK IS THE SAME AT EVERY LEVEL AND THE BASE IS WHAT MOVES. 18/20/20 against 40/50/60 is a
+ * 45% / 40% / 33% long-run share — the exact ratios `MAX_LONG_RUN_SHARE` below documents the tables
+ * as already embodying. None of these numbers is new; they are the tables read backward.
+ *
+ * ⚠️ 9 WEEKS, BEGINNER, WORKED: peak week 6, one cutback → C = 4. Long run 18 − 8 = **10**. Weekly
+ * 40 / 1.1⁴ = 27.3 → **28**. Both are the numbers Michael specified by hand, which is the check
+ * that the formula is the rule he was describing rather than a fit to one case.
+ */
+export function marathonPrerequisiteFor(opts: {
+  distance: string;
+  fitness: string;
+  durationWeeks: number;
+  /** The week the peak lands on. Defaults to a two-week taper. */
+  peakWeek?: number | null;
+}): MarathonPrerequisite | null {
+  const band = WEEKLY_MILEAGE[opts.distance]?.[opts.fitness];
+  const row = LONG_RUN_PROGRESSION[opts.distance]?.[opts.fitness];
+  if (!band || !Array.isArray(row) || row.length === 0) return null;
+
+  const duration = Math.floor(opts.durationWeeks);
+  const peakWeek = Math.min(
+    Math.max(1, Math.floor(opts.peakWeek ?? duration - 2) || 1),
+    Math.max(1, duration - 1),
+  );
+  let cutbacks = 0;
+  for (let w = 4; w < peakWeek; w += 4) cutbacks++;
+  const climbing = Math.max(1, peakWeek - 1 - cutbacks);
+
+  const peakLongRunMi = Math.min(PEAK_LONG_RUN_CEILING_MI, row.reduce((a, b) => (b > a ? b : a), 0));
+  const peakWeeklyMi = band.peak;
+  const neededLongRun = peakLongRunMi - MAX_LONG_RUN_STEP_MI * climbing;
+  const neededWeekly = peakWeeklyMi / Math.pow(MAX_WEEKLY_MILEAGE_INCREASE, climbing);
+
+  /**
+   * ⚠️ UNMEETABLE AT 80% OF THE PEAK, and it is a judgement with a reason: past it the block asks
+   * the athlete to arrive with a 16-mile long run so it can "build" them to 18 — which is not a
+   * marathon build, it is two weeks of tapering. It fires below about six weeks; the timeline
+   * advisory has been stating the shortfall since fourteen.
+   */
+  const meetable = neededLongRun <= peakLongRunMi * 0.8;
+
+  return {
+    weeklyMi: Math.max(band.start, Math.round(neededWeekly)),
+    longRunMi: Math.max(row[0], Math.round(neededLongRun)),
+    peakLongRunMi,
+    peakWeeklyMi,
+    meetable,
+  };
+}
 
 /**
  * ⛔ WHAT SHARE OF THE WEEK THE LONG RUN MAY BE. The 25-30% guidance, with the beginner allowance.

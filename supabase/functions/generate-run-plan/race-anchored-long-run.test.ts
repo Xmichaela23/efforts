@@ -118,11 +118,13 @@ Deno.test('⛔ THE BLOCK OPENS AT ITS ASSUMED BASE — 25, not the athlete\'s 19
   // and STATES that assumption on the plan, because an 18-mile peak six weeks later cannot sit on a
   // 19-mile week. The old assertion was correct for the old model and is kept here in words so the
   // reversal is visible rather than silently rewritten.
+  // ⚠️ THE BASE IS COMPUTED FROM THE WINDOW, so this asserts the SHAPE rather than a number: a
+  // 10-week block opens near its own prerequisite (≈26 mi/wk at this level) and says so.
   const wk1 = weekMiles(build(), 1);
-  assert(wk1 >= 24 && wk1 <= 28, `week 1 came out at ${wk1} mi against a 25-mile assumed base`);
+  assert(wk1 >= 22 && wk1 <= 30, `week 1 came out at ${wk1} mi against its computed base`);
   assert(
-    /assumes you're already running about 25 miles a week/.test(
-      (build() as unknown as { description?: string }).description ?? '',
+    /assumes you're already running about \d+ miles a week with a long run around \d+/.test(
+      build().description ?? '',
     ),
     'the plan does not state the base it assumed — which is what makes the 18-mile peak honest',
   );
