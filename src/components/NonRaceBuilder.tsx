@@ -2489,6 +2489,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
               )}
 
+              {/* ⛔ A DISABLED BUTTON WITH NO REASON IS THE DEFECT, NOT THE GATE (2026-08-06). Continue
+                  was already blocked below four run days and without a long-run day, and said
+                  nothing — so the athlete taps a dead control and cannot tell "not yet" from
+                  "broken". The gate stands; it states itself now.
+                  ⚠️ THESE TWO ARE STRUCTURAL, WHICH IS WHY THEY BLOCK where the mileage floor only
+                  warns: the block cannot be laid out around a long run that has no day, and four
+                  days is the shape every marathon row is written for. */}
+              {isRaceGoal && (state.trainingDays.length < 4 || !state.longRunDay) && (
+                <div className="rounded-lg border border-amber-400/25 bg-amber-400/[0.06] p-2.5 space-y-1">
+                  {state.trainingDays.length < 4 && (
+                    <p className="text-white/85 text-xs leading-relaxed">
+                      A marathon block is built on four run days or more — {state.trainingDays.length === 0
+                        ? 'none are picked yet'
+                        : `${4 - state.trainingDays.length} more to go`}. Fewer than that and the long
+                      run carries a share of the week no single run should.
+                    </p>
+                  )}
+                  {!state.longRunDay && (
+                    <p className="text-white/85 text-xs leading-relaxed">
+                      Pick the long run. It is the anchor everything else in the week is placed around.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {clubCollision && <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>}
             </div>
           ) : (
