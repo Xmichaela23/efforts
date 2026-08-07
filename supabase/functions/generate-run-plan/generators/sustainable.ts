@@ -666,7 +666,16 @@ export class SustainableGenerator extends BaseGenerator {
       const z = hr[zoneIdx];
       parts.push(`HR ${z.min}–${z.max ?? '+'}`);
     }
-    if (paces) parts.push(`~${formatPace(paces[paceKey])}/mi`);
+    // ⛔ THE BASE LINE IS THE SELECTED PACE ITSELF, not the table's nearest rung to it. The VDOT is
+    // DERIVED from this number upstream, so printing the table's `base` back would quote the athlete
+    // their own pace ±a few seconds — the round trip is lossy and they would notice, because the
+    // number they selected is on the screen they selected it from.
+    const selected = this.params.easy_pace_sec_per_mi;
+    if (paceKey === 'base' && selected && selected > 0) {
+      parts.push(`~${formatPace(selected)}/mi`);
+    } else if (paces) {
+      parts.push(`~${formatPace(paces[paceKey])}/mi`);
+    }
     return parts.join(' · ');
   }
 
@@ -834,10 +843,28 @@ export class SustainableGenerator extends BaseGenerator {
     }
   }
 
-  /** Athlete easy pace (min/mi) — from VDOT (E3a zone inputs) when present, else the fitness default. */
+  /**
+   * Athlete easy pace (min/mi). ⛔ THE SELECTION FIRST (2026-08-06) — `easy_pace_sec_per_mi` is the
+   * number the athlete chose ("use my runs" / "use my number", Q-174), and it is used VERBATIM
+   * rather than round-tripped through the VDOT table, so the plan prints the pace they picked.
+   * Then the VDOT's base pace, then the per-level default.
+   */
   private enduranceEasyPaceMinPerMile(): number {
+    const selected = this.params.easy_pace_sec_per_mi;
+    if (selected && selected > 0) return selected / 60;
     if (this.params.vdot && this.params.vdot > 0) return paceZonesFromVdot(this.params.vdot).base / 60;
     return this.getEasyPaceMinPerMile();
+  }
+
+  /**
+   * ⛔ EVERY DURATION IN THIS PLAN IS PRICED AT THE ATHLETE'S OWN PACE (2026-08-06). The base class
+   * prices miles at a PER-LEVEL CONSTANT (`getEasyPaceMinPerMile` — beginner 11:00/mi), so a plan
+   * whose sessions printed 12:35/mi stored its durations as though they were run at 11:00. That gap
+   * is what rendered a 26.2-mile race as 21.3 miles once a downstream surface divided one by the
+   * other. One pace, everywhere.
+   */
+  protected override milesToMinutes(miles: number): number {
+    return Math.round(miles * this.enduranceEasyPaceMinPerMile());
   }
 
   /**

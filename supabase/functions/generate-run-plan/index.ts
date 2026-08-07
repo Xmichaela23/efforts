@@ -154,6 +154,8 @@ Deno.serve(async (req: Request) => {
     let zoneMaxHr: number | undefined;
     let zoneRestingHr: number | undefined;
     let zoneVdot: number | undefined;
+    /** The athlete's SELECTED easy pace, sec/mi — the anchor for prescribed pace and duration. */
+    let zoneEasySecPerMi: number | undefined;
     try {
       const sbZones = createClient(
         Deno.env.get('SUPABASE_URL')!,
@@ -197,34 +199,41 @@ Deno.serve(async (req: Request) => {
       ).bpm ?? ageMaxHr;
       zoneLthr = num(cfg.manual_run_lthr) ?? num(lf.run_threshold_hr) ?? ageLthr;
       zoneRestingHr = num(pn.restingHeartRate) ?? num(pn.resting_hr) ?? num(cfg.resting_heart_rate) ?? 60;
-      // VDOT (pace zones) — from the learned threshold pace; else a 5K-derived score; else the
-      // athlete's EASY pace. Pace has no age-estimated tier (you can't estimate pace from age) →
-      // nothing on file at all = RPE pace fallback.
+      /**
+       * ⛔ THE ATHLETE'S SELECTED EASY PACE OUTRANKS EVERYTHING (2026-08-06, Michael's call).
+       *
+       * It used to be the LAST rung: learned threshold pace → 5K-derived effort score → easy pace.
+       * So an athlete who had run a 25:21 5K and then SELECTED "use my runs, 12:35" got a plan
+       * written off the 5K — every prescribed pace, every stored duration, computed from a number
+       * they had explicitly declined in favour of another one. The 5K is a display and seed value;
+       * it is not what the athlete said to train by.
+       *
+       * ⛔ `resolveCurrentRunEasyPace` IS THE SELECTION (Q-174, D-285/D-287). Its top tier is exactly
+       * this: `performance_numbers.easy_pace_source === 'manual'` means *use MY number* and beats
+       * even a high-confidence learned pace; `'learned'` means *track my runs* and skips the manual
+       * tier so a stale typed value cannot resurface. Reading it first is all this change is.
+       *
+       * ⚠️ ONE ANCHOR, NOT TWO. The VDOT is derived FROM the selected pace so the quality zones move
+       * with it — a plan whose easy runs come from one athlete's pace and whose strides come from
+       * another's is the disagreement this file has produced twice already. The exact selected
+       * number also travels as `easy_pace_sec_per_mi` so the base line and every duration print the
+       * athlete's own value rather than a table round-trip of it.
+       *
+       * ⚠️ THE FALLBACKS ARE UNCHANGED AND STILL IN ORDER — a learned threshold pace, then a 5K
+       * score, then nothing (which is the RPE wording, never an invented pace).
+       */
+      const selectedEasy = resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as never);
       const thrSecPerKm = num(lf.run_threshold_pace_sec_per_km);
-      if (thrSecPerKm) zoneVdot = estimateVdotFromPace(thrSecPerKm * 1.60934) ?? undefined;
-      if (zoneVdot === undefined && typeof effortScore === 'number' && effortScore > 0) zoneVdot = effortScore;
-      // ⛔ THE EASY-PACE RUNG, AND IT WAS THE ONE MISSING (2026-08-06). Every sustainable build —
-      // which is EVERY "getting to the finish" race — printed RPE wording instead of paces for an
-      // athlete who has an easy pace and nothing else. The two rungs above cannot fire for them:
-      // `create-goal` only sends `effort_score` on the performance_build branch, and a self-reported
-      // calibration needs BOTH an easy and a 5K pace (`calibrationFromPaces` returns null with one),
-      // so the athlete who typed only their easy pace lands here with nothing.
-      //
-      // ⚠️ NOT A NEW LADDER — `mergeRunPerformanceSeeds` (`create-goal…:336`) has had this exact
-      // rung, `estimateVdotFromBasePace` off the learned base pace, the whole time. It simply never
-      // ran on this path. Read through `resolveCurrentRunEasyPace` (D-285/D-287, THE run-pace
-      // resolver) rather than off `learned_fitness` directly, so this consumer cannot pick a
-      // different number from every other surface — and so the manual/chosen tiers count too.
-      if (zoneVdot === undefined) {
-        const easy = resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as never);
-        if (easy.sec_per_mi != null) {
-          zoneVdot = estimateVdotFromBasePace(easy.sec_per_mi) ?? undefined;
-          if (zoneVdot !== undefined) {
-            console.log(`[PlanGen] VDOT from EASY pace ${easy.sec_per_mi}s/mi (source=${easy.source}, confidence=${easy.confidence ?? '-'}, estimate=${easy.is_estimate}) → vdot ${zoneVdot}`);
-          }
-        }
+      if (selectedEasy.sec_per_mi != null) {
+        zoneEasySecPerMi = selectedEasy.sec_per_mi;
+        zoneVdot = estimateVdotFromBasePace(selectedEasy.sec_per_mi) ?? undefined;
+        console.log(`[PlanGen] pace anchor: SELECTED easy ${selectedEasy.sec_per_mi}s/mi (source=${selectedEasy.source}, confidence=${selectedEasy.confidence ?? '-'}) → vdot ${zoneVdot ?? '-'}`);
+      } else if (thrSecPerKm) {
+        zoneVdot = estimateVdotFromPace(thrSecPerKm * 1.60934) ?? undefined;
+      } else if (typeof effortScore === 'number' && effortScore > 0) {
+        zoneVdot = effortScore;
       }
-      console.log(`[PlanGen] zone inputs (manual→learned→age): lthr=${zoneLthr ?? '-'} maxHR=${zoneMaxHr ?? '-'} restHR=${zoneRestingHr ?? '-'} vdot=${zoneVdot ?? '-'}`);
+      console.log(`[PlanGen] zone inputs (manual→learned→age): lthr=${zoneLthr ?? '-'} maxHR=${zoneMaxHr ?? '-'} restHR=${zoneRestingHr ?? '-'} vdot=${zoneVdot ?? '-'} easy=${zoneEasySecPerMi ?? '-'}s/mi`);
     } catch (zErr) {
       console.warn('[PlanGen] zone-input fetch failed (non-fatal, RPE fallback):', zErr);
     }
@@ -237,6 +246,7 @@ Deno.serve(async (req: Request) => {
       max_hr: zoneMaxHr,
       resting_hr: zoneRestingHr,
       vdot: zoneVdot,
+      easy_pace_sec_per_mi: zoneEasySecPerMi,   // the selection; outranks the VDOT for base pace + durations
       weekly_hours: request.weekly_hours,           // E3b — TOTAL time budget; engine reserves strength, sizes endurance
       strength_frequency: request.strength_frequency, // E3b — drives the strength reservation (× ~1hr)
       run_lean: request.run_lean,                   // E3b — endurance split to run (1.0 run-only); rideHrs carried for bike

@@ -158,6 +158,12 @@ export interface GeneratorParams {
     power: number;   // seconds per mile
     speed: number;   // seconds per mile
   };
+  /**
+   * The athlete's SELECTED easy pace in sec/mile (`resolveCurrentRunEasyPace` — Q-174's "use my
+   * runs" / "use my number"). When present it is THE anchor: prescribed base pace and every stored
+   * duration come from it, and the VDOT below is derived from it rather than from a 5K time.
+   */
+  easy_pace_sec_per_mi?: number;
   // E3a — the athlete's learned zone inputs for the shared endurance zone model (SPEC-e3a-nonrace-zones).
   // Consumed by the non-race (sustainable) prescription; performance_build ignores them (uses effort_paces).
   lthr?: number;        // learned run lactate-threshold HR (→ Friel %LTHR zones)
