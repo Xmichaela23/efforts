@@ -248,6 +248,69 @@ const DAY_SHORT: Record<DayName, string> = {
   monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
 };
 
+/**
+ * ⛔ ONE WEEK, MARKED UP ACROSS THREE CARDS (2026-08-06). Michael, on the split: *"one week laid
+ * out — how does the user distinguish?"*
+ *
+ * The three questions that used to stack on "Your week" are each a seven-day row, and three
+ * identical rows on three consecutive screens are indistinguishable — the athlete taps by muscle
+ * memory and cannot tell which one they are answering. So it is not three rows. It is THE SAME WEEK,
+ * carried forward and accumulating marks:
+ *
+ *   card 1  tap the days you train              → they fill
+ *   card 2  tap which of those is long          → non-training days DIM AND GO DEAD; the pick takes an `L`
+ *   card 3  tap a standing hard day, if any     → the `L` is still showing, so the collision is visible
+ *
+ * ⚠️ THE DIMMING IS THE DISTINGUISHER, not a colour legend. By card 2 the row has visibly changed
+ * shape — four of seven chips are inert — so it cannot be mistaken for card 1, and a mis-tap is not
+ * available rather than merely discouraged.
+ *
+ * ⚠️ AND IT MAKES THE THIRD CARD HONEST. The club-next-to-long-run cost (48-72h) has been stated
+ * since 2026-08-05, but on the old stacked screen the long run was three questions up the scroll.
+ * Here it is a badge on the chip beside the one being tapped.
+ */
+function WeekDayRow({
+  selected, disabled = [], badges = {}, onTap,
+}: {
+  /** Days shown as chosen ON THIS CARD. */
+  selected: DayName[];
+  /** Days that cannot be picked here — rendered inert, never merely styled. */
+  disabled?: DayName[];
+  /** One letter per already-assigned day, carried from the earlier cards. */
+  badges?: Partial<Record<DayName, string>>;
+  onTap: (d: DayName) => void;
+}) {
+  return (
+    <div className="grid grid-cols-7 gap-1 min-w-0">
+      {DAYS.map((d) => {
+        const off = disabled.includes(d);
+        const on = selected.includes(d);
+        const badge = badges[d];
+        return (
+          <button
+            key={d}
+            type="button"
+            disabled={off}
+            onClick={() => !off && onTap(d)}
+            className={`relative py-2 rounded-lg text-[11px] min-w-0 border ${
+              off
+                ? 'border-white/5 text-white/20 bg-transparent'
+                : on
+                  ? 'border-teal-400 bg-teal-500 text-white'
+                  : 'border-white/12 bg-white/[0.04] text-white/75'
+            }`}
+          >
+            {DAY_SHORT[d]}
+            {badge && !on && (
+              <span className="absolute top-0.5 right-1 text-[9px] leading-none text-teal-300/90">{badge}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange: (d: DayName) => void; allowed?: DayName[] }) {
   const days = allowed ?? DAYS;
   return (
@@ -494,6 +557,10 @@ type StepKey =
   // ⛔ STRENGTH, ON ITS OWN CARD (2026-08-06) — one primary decision per screen. It was the fifth
   // question on "Your week" and got missed on a device.
   | 'strength'
+  // ⛔ AND THE WEEK ITSELF IS THREE CARDS (2026-08-06). "Your week" carried three seven-day rows —
+  // train / long / club — and the athlete scrolled past two identical-looking controls to reach the
+  // third. Same week on all three, marked up one question at a time (`WeekDayRow`).
+  | 'longday' | 'standing'
   // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
   // strength path. Those three asked the same question in three places and none of them could show
   // the answer: how many endurance sessions fit around four lifting days, and where the one that
@@ -603,7 +670,7 @@ function getSteps(state: NonRaceState): StepKey[] {
   // two conditional notices — and Michael's device pass found it missed entirely. §2.1 recorded the
   // accretion that put it there and kept the OUTCOME on his review; this moves the question, not the
   // decision. The week card gets the training-day picker in the same pass, so it is not re-loaded.
-  if (isRaceGoal) return ['goal', 'race', 'days', 'strength', 'level', 'intent', 'confirm'];
+  if (isRaceGoal) return ['goal', 'race', 'days', 'longday', 'standing', 'strength', 'level', 'intent', 'confirm'];
 
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
@@ -800,7 +867,11 @@ function assemblePayload(
           // ⚠️ Safe to omit — the one downstream reader (`create-goal:2549`) is the RUN-plan branch
           // and already falls back to '4-5'.
           ...(goal === 'get_stronger' ? {} : {
-            days_per_week: state.daysPerWeek,
+            // ⛔ DERIVED ON THE RACE PATH (2026-08-06). "Days a week" and "which days can you train" were
+            // the same answer asked twice; the row is the question now and the count falls out of it.
+            // Blank stays legal — an athlete who pinned nothing keeps the seeded count and the engine
+            // picks the days, which is what every block before today did.
+            days_per_week: isRace && state.trainingDays.length >= 4 ? state.trainingDays.length : state.daysPerWeek,
             weekly_hours_available: hoursForTier(state.commitment),
           }),
           // ⛔ 'out' MEANS ZERO, AND IT DID NOT (2026-08-06). Michael, on a preview built after
@@ -2264,170 +2335,128 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the endurance
           days are typed per discipline. A total that contradicts both is a number the engine cannot
           honour. Michael, 2026-07-25: *"how many days is redundant."* */}
+      {/* ⛔ CARD 1 OF THE WEEK — WHICH DAYS. The count is DERIVED from this row now: "days a week"
+          and "which days can you train" were the same answer asked twice, and two controls for one
+          fact is how a screen starts contradicting itself. Tap five days and the count is five. */}
       {currentStep === 'days' && (
         <StepLayout
           step={stepNo('days')} totalSteps={steps.length} title="Your week"
-          subtitle={isRaceGoal ? 'How many days, which one is long, and anything you cannot move.' : undefined}
+          subtitle={isRaceGoal ? 'Tap the days you can run. The rest are yours.' : undefined}
           onBack={back} onContinue={next}
-          canContinue={state.daysPerWeek >= 4 && state.daysPerWeek <= 7 && (!isRaceGoal || !!state.longRunDay)}
+          canContinue={!isRaceGoal || state.trainingDays.length === 0 || state.trainingDays.length >= 4}
         >
           <div className="space-y-5">
-            <div>
-              <p className="text-white/85 text-sm mb-2">Days a week</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[4, 5, 6, 7].map((n) => (
-                  <button
-                    key={n} type="button" onClick={() => setState((s) => ({ ...s, daysPerWeek: n }))}
-                    className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
-                  >{n}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* ⛔ WHICH DAYS, NOT JUST HOW MANY (2026-08-06). The count above says how much; this says
-                WHEN, and they are different questions — an athlete who can give five days but never a
-                Thursday was answering "5" and hoping. Rest is the REMAINDER of this row, not a second
-                picker: two controls for one fact is how a screen starts contradicting itself.
-
-                ⚠️ IT REACHES THE ENGINE. `buildPreferredDays` writes `training_days`, `assign-days.ts`
-                filters its placement to them, and it is a PREFERENCE there — if the week's sessions
-                cannot fit inside the days given, one takes a rest day rather than being dropped. A
-                control that goes nowhere is the defect this file keeps producing; this one is wired
-                before it is drawn.
-
-                ⚠️ OPTIONAL, LIKE EVERY OTHER PIN HERE. Untouched means the engine picks, which is
-                exactly what every block built before today did. */}
-            <div>
-              <p className="text-white/85 text-sm mb-2">Which days can you train?</p>
-              <div className="grid grid-cols-7 gap-1 min-w-0">
-                {DAYS.map((d) => {
-                  const on = state.trainingDays.includes(d);
-                  return (
-                    <button
-                      key={d} type="button"
-                      onClick={() => setState((st) => ({
-                        ...st,
-                        trainingDays: on
-                          ? st.trainingDays.filter((x) => x !== d)
-                          : [...st.trainingDays, d],
-                      }))}
-                      className={`py-2 rounded-lg text-[11px] min-w-0 ${on ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
-                    >{DAY_SHORT[d]}</button>
-                  );
-                })}
-              </div>
-              <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                {state.trainingDays.length === 0
-                  ? 'Leave it blank and the plan picks the days.'
-                  : `${state.trainingDays.length} training ${state.trainingDays.length === 1 ? 'day' : 'days'}, ${7 - state.trainingDays.length} rest.`}
-              </p>
-            </div>
-
-            {/* ⛔ THE LONG RUN DAY — RESTORED TO THIS CARD (2026-08-05). Michael's instruction when
-                the five screens were agreed: *"Long-run day stays — it's the solver's anchor and
-                it's not derivable from anything else. Keep it on screen 2 next to days-per-week."*
-                The restructure dropped the card it used to live on and never moved the question, so
-                the solver was placing the long run with no input from the athlete at all. It is
-                REQUIRED on a race — everything else in the week is placed around it. */}
-            {isRaceGoal && (
+            {isRaceGoal ? (
               <div>
-                <p className="text-white/85 text-sm mb-2">Which day is the long run?</p>
-                <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
-                <p className="text-white/60 text-sm mt-1.5 leading-relaxed">
-                  It grows through the block and is the last thing to come down before the race.
-                  Everything else is placed around it.
-                </p>
-              </div>
-            )}
-
-            {/* ⛔ THE HARD DAY YOU ALREADY OWN — AND IT USES THE MECHANISM THAT ALREADY EXISTS.
-                Michael, 2026-08-05: *"the anchor exists in both original marathon and it should be
-                in strength focus."* He is right and my first pass was wrong twice over: I invented
-                a new `fixedDays` concept, then grepped for "fixed"/"locked", found nothing, and
-                declared the club anchor unwired.
-
-                ⛔ IT WAS WIRED THE WHOLE TIME, UNDER A DIFFERENT NAME. `qualityDays` — the strength
-                flow's *"the hard day you already own — a club run, a track night, a chaingang"* —
-                maps through `buildPreferredDays` to `preferred_days.quality_run`, which
-                `reconcile-athlete-state-week-optimizer.ts:190` hands the solver, and which the
-                optimizer actively places around (it penalises easy runs adjacent to it). A new
-                field would have been a second vocabulary beside a working one.
-
-                ⚠️ RUN ONLY ON THIS PATH. The strength flow offers run OR bike because the block
-                carries exactly one hard aerobic day across disciplines. A race build's hard day is
-                in the race's own discipline by definition.
-                ⚠️ Optional — declining is a real answer. `buildPreferredDays` omits the key
-                entirely when no day is set, and the solver then places quality itself. */}
-            {isRaceGoal && (
-              <div>
-                <p className="text-white/85 text-sm mb-2">
-                  Run club or a standing hard day? <span className="text-white/45">Optional</span>
-                </p>
-                <DayPicker
-                  value={(state.qualityDays.run as DayName | undefined) ?? ''}
-                  onChange={(d) => setState((s) => ({
-                    ...s,
-                    // Tapping the day already chosen clears it — declining has to stay reachable
-                    // once a day is picked, or "optional" is only true before the first tap.
-                    qualityDays: s.qualityDays.run === d ? {} : { run: d },
+                <WeekDayRow
+                  selected={state.trainingDays}
+                  onTap={(d) => setState((st) => ({
+                    ...st,
+                    trainingDays: st.trainingDays.includes(d)
+                      ? st.trainingDays.filter((x) => x !== d)
+                      : [...st.trainingDays, d],
+                    // A day that stops being a training day cannot keep carrying the long run or the
+                    // club night — the later cards would offer a dead chip and the payload would pin
+                    // a day the athlete just took back.
+                    longRunDay: st.longRunDay === d && st.trainingDays.includes(d) ? '' : st.longRunDay,
+                    qualityDays: st.qualityDays.run === d && st.trainingDays.includes(d)
+                      ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
+                      : st.qualityDays,
                   }))}
                 />
-                {/* ⛔ NAME THE RUN CLUB EXPLICITLY. Michael, 2026-08-05. "A hard day you already
-                    run" is abstract — an athlete has to translate it. "Run club" is the concrete
-                    thing most people are actually protecting, and naming it is what makes them
-                    realise the question applies to them. Track night and chaingang follow as the
-                    other shapes of the same commitment. */}
-                <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                  Run club, track night, a standing group session. Tap again to clear.
+                <p className="text-white/50 text-xs mt-2 leading-relaxed">
+                  {state.trainingDays.length === 0
+                    ? 'Leave it blank and the plan picks the days.'
+                    : `${state.trainingDays.length} training ${state.trainingDays.length === 1 ? 'day' : 'days'}, ${7 - state.trainingDays.length} rest.`}
                 </p>
-
-                {/* ⛔ HARD OR EASY — AND THE APP HAS ASKED THIS SINCE `ArcSetupWizard` SHIPPED.
-                    Michael, 2026-08-05: *"we need to juggle whether run club is quality day."* He is
-                    right, and `ArcSetupWizard.tsx:1736` already carries the two-way question with
-                    the wording below. The marathon intake assumed every club night was a hard night,
-                    so a Sunday-social-run athlete would have had the week's intervals pinned to the
-                    one session they run at conversation pace.
-
-                    ⚠️ WORDING LIFTED, NOT REWRITTEN. Two screens asking one question in two
-                    vocabularies is how an athlete learns the answers mean different things. */}
-                {!!state.qualityDays.run && (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-white/50 text-xs">What kind of session?</p>
-                    {([
-                      ['quality', 'Track / tempo / intervals', 'Hard effort. Counts as your quality run for the week.'],
-                      ['easy', 'Easy / social run', 'Conversational pace. Counts as aerobic. The plan adds a separate quality session.'],
-                    ] as const).map(([k, title, sub]) => (
-                      <button
-                        key={k} type="button"
-                        onClick={() => setState((st) => ({ ...st, runClubIntensity: k }))}
-                        className={`w-full text-left px-3 py-2.5 rounded-xl border ${
-                          state.runClubIntensity === k
-                            ? 'border-teal-400/70 bg-teal-400/[0.07]'
-                            : 'border-white/12 bg-white/[0.03]'
-                        }`}
-                      >
-                        <span className="block text-sm text-white/90">{title}</span>
-                        <span className="block text-[13px] text-white/55 mt-0.5">{sub}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* ⛔ HARD DAYS WANT 48–72 HOURS, AND THE LONG RUN IS A HARD DAY. Pinning the club
-                    night next to the long run stacks two hard days back to back — the one placement
-                    fact the athlete can see and the engine cannot fix, because both days are theirs.
-
-                    ⚠️ §5.2b — IT STATES THE COST AND NEVER REFUSES. The club night is a fact about
-                    their week, not a preference to be overruled; `assign-days.ts` honours the pin
-                    even when it lands on the rest day. This says what it costs and leaves it. */}
-                {clubCollision && (
-                  <p className="text-amber-300/85 text-xs mt-3 leading-relaxed">
-                    {clubCollision}
+                {state.trainingDays.length > 0 && state.trainingDays.length < 4 && (
+                  <p className="text-white/60 text-xs mt-1.5 leading-relaxed">
+                    A marathon block is built on four days or more. Fewer than that and the long run
+                    carries a share of the week no single run should.
                   </p>
                 )}
               </div>
+            ) : (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Days a week</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[4, 5, 6, 7].map((n) => (
+                    <button
+                      key={n} type="button" onClick={() => setState((s2) => ({ ...s2, daysPerWeek: n }))}
+                      className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    >{n}</button>
+                  ))}
+                </div>
+              </div>
             )}
+          </div>
+        </StepLayout>
+      )}
 
+      {/* ⛔ CARD 2 — THE LONG RUN, ON THE SAME WEEK. Non-training days are inert here, so this row
+          cannot be confused with the one before it and a mis-tap is unavailable rather than merely
+          discouraged. It is REQUIRED on a race: everything else in the week is placed around it. */}
+      {currentStep === 'longday' && (
+        <StepLayout
+          step={stepNo('longday')} totalSteps={steps.length} title="Which day is the long run?"
+          subtitle="It grows through the block and is the last thing to come down before the race."
+          onBack={back} onContinue={next} canContinue={!!state.longRunDay}
+        >
+          <div className="space-y-3">
+            <WeekDayRow
+              selected={state.longRunDay ? [state.longRunDay as DayName] : []}
+              disabled={state.trainingDays.length > 0 ? DAYS.filter((d) => !state.trainingDays.includes(d)) : []}
+              onTap={(d) => setState((st) => ({ ...st, longRunDay: d }))}
+            />
+            <p className="text-white/50 text-xs leading-relaxed">
+              {state.trainingDays.length > 0
+                ? 'Only the days you said you can run.'
+                : 'You did not pin your days, so any of them can carry it.'}
+            </p>
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ⛔ CARD 3 — THE STANDING DAY, WITH THE LONG RUN STILL VISIBLE. The 48-72h cost has been
+          stated since 2026-08-05, but on the stacked screen the long run was three questions up the
+          scroll; here it is an `L` on the chip beside the one being tapped. */}
+      {currentStep === 'standing' && (
+        <StepLayout
+          step={stepNo('standing')} totalSteps={steps.length} title="Run club or a standing hard day?"
+          subtitle="A session that always happens on the same day. Skip it if you have none."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-4">
+            <WeekDayRow
+              selected={state.qualityDays.run ? [state.qualityDays.run as DayName] : []}
+              disabled={state.trainingDays.length > 0 ? DAYS.filter((d) => !state.trainingDays.includes(d)) : []}
+              badges={state.longRunDay ? { [state.longRunDay as DayName]: 'L' } : {}}
+              onTap={(d) => setQualityDay('run', state.qualityDays.run === d ? '' : d)}
+            />
+            <p className="text-white/50 text-xs leading-relaxed">
+              {state.longRunDay ? `L is your long run (${DAY_SHORT[state.longRunDay as DayName]}).` : ''} Tap again to clear.
+            </p>
+            {clubCollision && (
+              <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
+            )}
+            {state.qualityDays.run && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Is it hard or easy?</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([['quality', 'Hard'], ['easy', 'Easy / social']] as const).map(([k, label]) => (
+                    <button
+                      key={k} type="button"
+                      onClick={() => setState((st) => ({ ...st, runClubIntensity: k }))}
+                      className={`py-2 rounded-lg text-sm border ${state.runClubIntensity === k ? 'border-teal-400 bg-teal-500/10 text-white' : 'border-white/12 text-white/75'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+                <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                  A hard day gets the week&apos;s quality session. An easy one is filed as aerobic and the
+                  plan puts its hard running elsewhere.
+                </p>
+              </div>
+            )}
           </div>
         </StepLayout>
       )}
