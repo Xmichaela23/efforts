@@ -177,6 +177,60 @@ export function selectGoalsForCombined<T extends { id: string }>(
   return all.length < 2 ? null : all;
 }
 
+// ── THE RUNNING-DAY COUNT (2026-08-06) ───────────────────────────────────────
+
+/**
+ * ⛔ THE ATHLETE'S NUMBER IS THE MAX OF THE BAND, NOT THE MIN. Michael, on the preview: *"asking
+ * for 4 runs its giving 5."*
+ *
+ * `create-goal` built `${n}-${n+1}` from the intake's day count, and `getRunningDaysForWeek`
+ * (`base-generator.ts:669`) takes the band's MAX on every build week — its MIN only on cutbacks and
+ * the taper. So the band OPENED at the answer and the block ran a day above it, all the way through.
+ * Anchored at the max instead, the band still does its real job (a cutback week drops a day) without
+ * quietly adding one.
+ *
+ * ⛔ TWO SILENT 400s DIED WITH IT. `validateRequest` accepts exactly four strings, and per-approach
+ * `APPROACH_CONSTRAINTS.supported_days` narrows that further: the old mapping sent `'7-8'` (not a
+ * legal string) for seven days, and `'6-7'` for six on a completion plan (`sustainable` supports
+ * only `'3-4' | '4-5' | '5-6'`). Both were rejected requests — picking the top option on the app's
+ * most common race goal could not build a plan at all.
+ *
+ * ⚠️ WHERE THE APPROACH CANNOT TAKE THE NUMBER, SAY SO. `performance_build` has no 3-4 band: two
+ * quality sessions plus a long run do not fit four days. That athlete gets five — and an advisory,
+ * because the whole class of bug this file exists to prevent is an answer quietly replaced.
+ *
+ * @param asked the intake's day count (4-7), or anything unusable → the engine's own default
+ * @param supportedDays `APPROACH_CONSTRAINTS[approach].supported_days` — passed in, never re-listed
+ */
+export function resolveRunDaysPerWeek(
+  asked: unknown,
+  supportedDays: string[],
+): { range: string; advisory: { code: string; message: string } | null } {
+  const fallback = supportedDays.includes('4-5') ? '4-5' : (supportedDays[0] ?? '4-5');
+  const n = Number(asked);
+  if (!Number.isFinite(n) || n < 1) return { range: fallback, advisory: null };
+
+  const wanted = `${Math.max(1, Math.round(n) - 1)}-${Math.round(n)}`;
+  if (supportedDays.includes(wanted)) return { range: wanted, advisory: null };
+
+  // Nearest legal band, measured on its MAX — the number the athlete will actually run.
+  const nearest = supportedDays
+    .map((band) => ({ band, max: Number(band.split('-')[1]) }))
+    .filter((b) => Number.isFinite(b.max))
+    .sort((a, b) => Math.abs(a.max - n) - Math.abs(b.max - n))[0];
+  if (!nearest) return { range: fallback, advisory: null };
+
+  return {
+    range: nearest.band,
+    advisory: {
+      code: 'run_days_adjusted',
+      message: nearest.max > n
+        ? `You asked for ${Math.round(n)} running days. A time goal places two quality sessions and the long run, so this block builds on ${nearest.max}.`
+        : `You asked for ${Math.round(n)} running days. The block builds on ${nearest.max} and keeps a rest day.`,
+    },
+  };
+}
+
 // ── THE MARATHON TIMELINE GATE (2026-08-04) ──────────────────────────────────
 //
 // ⛔ EXTRACTED SO IT CAN BE TESTED, NOT JUST TRACED. The decision lived inline in a 3,600-line

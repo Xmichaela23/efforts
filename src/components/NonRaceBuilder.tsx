@@ -793,7 +793,18 @@ function assemblePayload(
             days_per_week: state.daysPerWeek,
             weekly_hours_available: hoursForTier(state.commitment),
           }),
-          strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
+          // ⛔ 'out' MEANS ZERO, AND IT DID NOT (2026-08-06). Michael, on a preview built after
+          // picking None: *"its also prescribing strength when user says none."* This read
+          // `develop ? 4 : 2`, so the two postures that are not develop — maintain AND out — both
+          // sent 2. The race card's None writes `posture.strength = 'out'` and correctly omits the
+          // protocol, and then `persistArcSetup` put one back: seeing a frequency of 2 on the
+          // payload it writes `strength_protocol = mapStrengthFocusToProtocol('general')` into the
+          // goal row (`arc-setup-persistence.ts:186-201`), which is the field
+          // `create-goal…:3761` gates the whole strength overlay on. Two lifting days, from an
+          // athlete who said none.
+          // ⚠️ ZERO IS ALREADY THE LANGUAGE FOR THIS — the same writer maps `freq === 0` to
+          // `strength_protocol: 'none'`. The path existed; nothing could reach it.
+          strength_frequency: strengthFrequencyForPosture(state.posture?.strength),
           // ⛔ THE BLOCK SHAPE, and it is a SEPARATE FIELD from `strength_frequency` above on purpose
           // (2026-07-29). That one is the retired D-323 dial and branches downstream still clamp it
           // to 2; this one says how many DAYS the four lifts occupy. Sent only when the athlete picks
@@ -856,9 +867,27 @@ function assemblePayload(
         },
       },
     ],
-    strength_frequency: state.posture?.strength === 'develop' ? 4 : 2, // Get Strong = the 4-day develop arc; don't offer 2×/week the engine overrides
+    // The TOP-LEVEL copy, and it is the one that actually did the damage — `persistArcSetup` reads
+    // this as the `parent` frequency and writes a protocol into the goal row from it. Same rule.
+    strength_frequency: strengthFrequencyForPosture(state.posture?.strength),
     ...(state.startDate ? { plan_start_date: state.startDate } : {}), // Week 1 start → create-goal → the plan's calendar
   };
+}
+
+/**
+ * ⛔ HOW MANY LIFTING DAYS A POSTURE MEANS. One rule, two call sites in the payload — they used to
+ * be two copies of the same ternary and both were missing the `out` case.
+ *
+ * develop → 4 (the Get Stronger U/L/U/L arc), maintain → 2, out or unset → **0**.
+ *
+ * ⚠️ 0 IS LOAD-BEARING, NOT COSMETIC. `arc-setup-persistence` maps a frequency of 0 to
+ * `strength_protocol: 'none'`, and a non-zero one to a REAL protocol regardless of what the athlete
+ * chose — so sending 2 for `out` is what put lifting into a plan that asked for none.
+ */
+function strengthFrequencyForPosture(p: Posture | undefined): 0 | 2 | 4 {
+  if (p === 'develop') return 4;
+  if (p === 'maintain') return 2;
+  return 0;
 }
 
 /** Just what the confirm-screen preview renders — the plan carries far more. */

@@ -56,7 +56,7 @@ import {
   readSwimsPerWeekForOptimizer,
 } from '../_shared/tri-optimizer-prefs.ts';
 // D-214: non-race routing helpers (extracted + unit-tested; the wrapper itself can't run locally).
-import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError, resolveMarathonFloorWeeks, marathonTimelineAdvisory } from './non-race-routing.ts';
+import { selectGoalsForCombined, isNonRaceGoalType, proxyDistanceForNonRaceGoal, sanitizePerDisciplinePosture, resolveNonRaceStrengthProtocol, resolveStrengthFocusMode, buildExistingGuardError, resolveMarathonFloorWeeks, marathonTimelineAdvisory, resolveRunDaysPerWeek } from './non-race-routing.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -83,6 +83,11 @@ import {
   getPacesFromScore,
   type TrainingPaces,
 } from '../generate-run-plan/effort-score.ts';
+// ⛔ THE GENERATOR'S OWN DAY-COUNT VOCABULARY, not a copy of it. `days_per_week` is one of four
+// legal strings per approach and `validateRequest` rejects anything else — a second list here is
+// how this wrapper starts sending bands the engine 400s on (it sent two of them until 2026-08-06).
+// Same cross-function import precedent as `effort-score` above and `adapt-plan:25`.
+import { APPROACH_CONSTRAINTS } from '../generate-run-plan/types.ts';
 
 type GoalAction = 'keep' | 'replace';
 type RequestMode = 'create' | 'build_existing' | 'link_existing';
@@ -3588,16 +3593,51 @@ Deno.serve(async (req: Request) => {
     }
     // ── End combined plan routing ─────────────────────────────────────────
 
+    const runApproach = (allowRaceWeekSupportMode || adaptiveSupportMode)
+      ? 'sustainable'
+      : (goalType === 'complete' ? 'sustainable' : 'performance_build');
+
+    /**
+     * ⛔ THE ATHLETE'S NUMBER IS THE MAX, NOT THE MIN (2026-08-06). Michael, on the preview:
+     * *"asking for 4 runs its giving 5."*
+     *
+     * This line read `${n}-${n+1}` — it turned the answer into a band that OPENS at what they asked
+     * for, and `getRunningDaysForWeek` (`base-generator.ts:669`) uses the band's MAX on every build
+     * week and its MIN only on cutbacks and the taper. So four came back as five runs a week for
+     * the whole block, five came back as six, and nothing said so.
+     *
+     * The band still exists and still earns its keep — a cutback week SHOULD drop a day — but it is
+     * anchored the other way now: `${n-1}-${n}`. Build weeks get exactly the number they picked;
+     * recovery weeks get one fewer.
+     *
+     * ⛔ TWO MORE BUGS FELL OUT OF THE SAME LINE, both live and both silent 400s:
+     *   • **7 days built `'7-8'`**, which is not one of the four legal strings — `validateRequest`
+     *     rejected the whole request.
+     *   • **6 days built `'6-7'` on a completion plan**, and `sustainable` does not support `'6-7'`
+     *     (`APPROACH_CONSTRAINTS`) — rejected too. Picking the top option on the most common race
+     *     goal in the app could not build a plan.
+     * Anchoring at the max fixes both by construction: the four numbers now map onto the four legal
+     * strings instead of walking off the end of them.
+     *
+     * ⚠️ AND WHERE THE APPROACH CANNOT TAKE IT, THE OVERRIDE IS STATED, NOT SILENT. A time goal runs
+     * `performance_build`, which needs five (two quality sessions plus the long run plus easy days)
+     * and does not support `'3-4'`. That athlete still gets five — but the advisory says so, because
+     * a request quietly answered with a different number is the failure this file keeps producing.
+     */
+    const runDays = resolveRunDaysPerWeek(
+      resolvedGoal?.training_prefs?.days_per_week,
+      APPROACH_CONSTRAINTS[runApproach]?.supported_days ?? ['4-5'],
+    );
+    if (runDays.advisory) advisories.push(runDays.advisory);
+
     const generateBody: Record<string, any> = {
       user_id,
       distance: distanceApi,
       fitness,
       goal: goalType,
       duration_weeks: durationWeeks,
-      approach: (allowRaceWeekSupportMode || adaptiveSupportMode) ? 'sustainable' : (goalType === 'complete' ? 'sustainable' : 'performance_build'),
-      days_per_week: resolvedGoal?.training_prefs?.days_per_week
-        ? `${resolvedGoal.training_prefs.days_per_week}-${Math.min(7, Number(resolvedGoal.training_prefs.days_per_week) + 1)}`
-        : '4-5',
+      approach: runApproach,
+      days_per_week: runDays.range,
       race_date: resolvedGoal?.target_date,
       race_name: resolvedGoal?.name,
       // ⛔ THE PINNED DAYS, AND UNTIL NOW THEY STOPPED HERE. The intake asks which day the long run

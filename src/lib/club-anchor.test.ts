@@ -113,9 +113,22 @@ Deno.test('⛔ heavy sends neural_speed WITHOUT turning strength into a develop 
     /state\.posture\?\.strength === 'maintain' && state\.strengthProtocol === 'neural_speed'/.test(SRC),
     'the heavy override is no longer gated on maintain — check it has not become a develop block',
   );
+  // ⚠️ THIS USED TO PIN THE LITERAL TERNARY `develop ? 4 : 2`, and that expression was DELETED on
+  // 2026-08-06 — it was the strength-none leak: 'out' is not 'develop', so declining strength sent 2
+  // lifting days and `arc-setup-persistence` rebuilt a protocol from them. The rule the assertion
+  // was protecting (heavy stays at 2, it does not become a develop block) is unchanged; it now
+  // lives in one named helper instead of two copies of a ternary, so pin the RULE.
   assert(
-    /strength_frequency: state\.posture\?\.strength === 'develop' \? 4 : 2/.test(SRC),
-    'strength_frequency changed shape — confirm the heavy pick still sends 2, not 4',
+    /strength_frequency: strengthFrequencyForPosture\(state\.posture\?\.strength\)/.test(SRC),
+    'the payload no longer routes strength frequency through the one helper',
+  );
+  assert(
+    /if \(p === 'maintain'\) return 2;/.test(SRC),
+    'strength_frequency changed shape — confirm the heavy pick (maintain) still sends 2, not 4',
+  );
+  assert(
+    /if \(p === 'develop'\) return 4;/.test(SRC) && /return 0;/.test(SRC),
+    'the develop→4 / out→0 rungs changed — an out posture must never ask for lifting days',
   );
 });
 
