@@ -51,6 +51,8 @@ export type PlacementPins = {
   long_run?: string | null;
   quality_run?: string | null;
   easy_run?: string | null;
+  /** The days the athlete said they can train. Absent/empty = every day is available. */
+  training_days?: string[] | null;
 };
 
 const HARD_TAGS = ['hard_run', 'intervals', 'tempo', 'threshold'];
@@ -101,6 +103,19 @@ export function assignDays(sessions: Session[], pins?: PlacementPins | null): Se
   const longRunDay = toWeekDay(pins?.long_run) ?? 'Sunday';
   const pinnedQuality = toWeekDay(pins?.quality_run);
   const pinnedEasy = toWeekDay(pins?.easy_run);
+  /**
+   * ⛔ THE DAYS THE ATHLETE SAID THEY CAN TRAIN (2026-08-06). Until now the only rest this function
+   * knew about was the one it DERIVED — the day before the long run — so "I can't run Thursdays" had
+   * nowhere to go. The intake asks now, and an answer nothing reads is the defect this file's own
+   * header was written about.
+   *
+   * ⚠️ A PREFERENCE, NOT A WALL — same rule as the derived rest day directly below. If the week's
+   * sessions cannot fit inside the days they gave, the extra session takes a non-training day rather
+   * than vanishing: a workout the plan said you were doing outranks a heuristic about your calendar.
+   */
+  const trainingDays = Array.isArray(pins?.training_days) && pins!.training_days!.length > 0
+    ? new Set(pins!.training_days!.map(toWeekDay).filter((d): d is WeekDay => !!d))
+    : null;
 
   const out: Session[] = [];
   const usedDays = new Set<string>();
@@ -123,7 +138,9 @@ export function assignDays(sessions: Session[], pins?: PlacementPins | null): Se
   const needsEveryDay = sessions.length > WEEK_ORDER.length - 1;
   const restHeld = !pinnedOntoRest && !needsEveryDay ? restDay : null;
 
-  const free = (d: WeekDay) => !usedDays.has(d) && d !== restHeld;
+  const free = (d: WeekDay) => !usedDays.has(d) && d !== restHeld && (!trainingDays || trainingDays.has(d));
+  /** The fallback pass, which may spend a declared rest day rather than drop a session. */
+  const freeAnywhere = (d: WeekDay) => !usedDays.has(d);
   const take = (s: Session, d: WeekDay) => {
     s.day = d;
     usedDays.add(d);
@@ -133,6 +150,8 @@ export function assignDays(sessions: Session[], pins?: PlacementPins | null): Se
   const place = (s: Session, order: readonly WeekDay[]) => {
     for (const d of order) if (free(d)) return take(s, d);
     for (const d of WEEK_ORDER) if (free(d)) return take(s, d);
+    // Nothing left inside the athlete's own days — spend a rest day rather than lose the session.
+    for (const d of WEEK_ORDER) if (freeAnywhere(d)) return take(s, d);
     // Every day in the week is occupied. Nothing is dropped silently — the session keeps whatever
     // day it had and travels on, so a caller counting sessions in equals sessions out still balances.
     out.push(s);

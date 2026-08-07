@@ -19,6 +19,7 @@ import {
   buildLongRunArc,
   longRunPeakWeek,
   longRunCeiling,
+  marathonPrerequisiteFor,
 } from './run-volume-tables.ts';
 
 const LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
@@ -121,11 +122,17 @@ Deno.test('no dates → a two-week taper; no table → silence, not a guess', ()
 Deno.test('⛔ the intake quotes the peak the ENGINE builds — same rule, same week, same rung', () => {
   // The screen calls `longRunCeiling`, the generator calls `buildLongRunArc` with `longRunPeakWeek`.
   // If these two ever disagree, the athlete is told a plan we did not build.
+  // ⚠️ THE ARC ARGUMENTS MOVED WITH THE MODEL (2026-08-06): `longRunCeiling` now passes the
+  // prerequisite and the race-week flag too, because the engine does. This test's whole point is
+  // that the two argument lists stay identical, so it has to carry the new ones as well.
   const dates = { startDateISO: '2026-08-10', raceDateISO: '2026-10-11' };
+  const peakWeek = longRunPeakWeek({ durationWeeks: 10, ...dates });
   const quoted = longRunCeiling('marathon', 'beginner', 10, 6, dates)!;
   const built = buildLongRunArc({
     distance: 'marathon', fitness: 'beginner', durationWeeks: 10, entryLongRunMi: 6,
-    peakWeek: longRunPeakWeek({ durationWeeks: 10, ...dates }),
+    prerequisiteLongRunMi: marathonPrerequisiteFor({ distance: 'marathon', fitness: 'beginner', durationWeeks: 10, peakWeek })?.longRunMi ?? null,
+    raceWeekIsLast: true,
+    peakWeek,
   })!;
   assertEquals(quoted.peakLongRunMi, built.maxMi);
   assertEquals(quoted.peakWeek, built.peakWeek);

@@ -22,8 +22,14 @@ export function StepLayout({
    *  nothing to measure is better absent than wrong. */
   hideProgress?: boolean;
 }) {
+  // ⛔ WIDTH IS CLAMPED HERE, ONCE (2026-08-06). Every step of the marathon intake slid sideways
+  // under the thumb and clipped its own copy on the right — a mobile screen must not scroll
+  // horizontally, and fixing it per-step is how it comes back on the next screen anyone adds.
+  // `min-w-0` is the load-bearing half: a flex child defaults to `min-width: auto`, so ONE wide
+  // descendant (a long word, a 7-across grid, an input's intrinsic size) pushes the whole column
+  // past the viewport and nothing above it can stop it.
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 w-full max-w-full min-w-0 overflow-x-hidden box-border">
       {/* Progress */}
       {!hideProgress && (
       <div className="shrink-0 px-4 pt-3 pb-2">
@@ -51,13 +57,18 @@ export function StepLayout({
       )}
 
       {/* Title */}
-      <div className="shrink-0 px-4 pb-4">
-        <h2 className="text-[1.3rem] font-semibold text-white leading-snug tracking-tight">{title}</h2>
+      <div className="shrink-0 px-4 pb-4 min-w-0">
+        <h2 className="text-[1.3rem] font-semibold text-white leading-snug tracking-tight break-words">{title}</h2>
         {subtitle && <p className="mt-1.5 text-[15px] text-white/55 leading-relaxed">{subtitle}</p>}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-3">
+      {/* ⛔ THE BOTTOM PADDING IS THE CONTINUE BUTTON'S HEIGHT, NOT DECORATION. The button is the
+          last flex child of a `h-full` column, and on iOS the visual viewport is shorter than that
+          column while the toolbar is up — so the final field on a long step sat behind it and could
+          not be scrolled clear. `pb-4` became a full button's worth of room. `break-words` stops a
+          long unbroken string doing what the width clamp above exists to prevent. */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-24 space-y-3 break-words">
         {children}
       </div>
 

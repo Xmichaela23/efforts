@@ -62,8 +62,11 @@ export interface GeneratePlanRequest {
    */
   preferred_days?: {
     long_run?: string | null;
+    training_days?: string[] | null;
     quality_run?: string | null;
     easy_run?: string | null;
+    /** The days the athlete said they can train; the rest are theirs. Absent = engine's choice. */
+    training_days?: string[] | null;
   };
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
@@ -139,6 +142,8 @@ export interface GeneratorParams {
     long_run?: string | null;
     quality_run?: string | null;
     easy_run?: string | null;
+    /** The days the athlete said they can train; the rest are theirs. Absent = engine's choice. */
+    training_days?: string[] | null;
   };
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;

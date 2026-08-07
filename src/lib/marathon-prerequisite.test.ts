@@ -175,3 +175,38 @@ Deno.test('a block too short to reach the peak lands short and SAYS so', () => {
   assert(arc.peakMi < 18, `a 5-week block reached ${arc.peakMi} — the step cap is not holding`);
   assertEquals(arc.reachesTableMax, false);
 });
+
+// ── THE NOTICE MUST QUOTE THE PLAN (2026-08-06) ──────────────────────────────
+
+import { longRunCeiling } from './run-volume-tables.ts';
+
+Deno.test('⛔ THE INTAKE\'s NUMBER IS THE ENGINE\'s NUMBER, at every entry point', () => {
+  // THE BUG: `longRunCeiling` passed only the athlete's typed long run, so it quoted the arc that
+  // would be built if the block started where they are — "reaches about 9 miles" — while the
+  // generator entered at the assumed base and built 18. The screen described a plan that stopped
+  // existing the moment the block became a prescription.
+  const dates = { startDateISO: '2026-08-10', raceDateISO: '2026-10-11' };
+  const peakWeek = 6;
+  for (const entry of [null, 6, 10, 14, 18]) {
+    const quoted = longRunCeiling('marathon', 'beginner', 9, entry, dates)!;
+    const built = buildLongRunArc({
+      distance: 'marathon', fitness: 'beginner', durationWeeks: 9, entryLongRunMi: entry,
+      prerequisiteLongRunMi: pre('beginner', 9, peakWeek).longRunMi,
+      raceWeekIsLast: true, peakWeek,
+    })!;
+    assertEquals(
+      quoted.peakLongRunMi, built.maxMi,
+      `entry ${entry}: the notice says ${quoted.peakLongRunMi} and the plan builds ${built.maxMi}`,
+    );
+    assertEquals(quoted.shortOfTable, !built.reachesTableMax);
+  }
+});
+
+Deno.test('and it goes quiet when the block DOES reach the norm', () => {
+  // The notice exists to name a shortfall. A prescriptive 9-week block reaches 18, so there is no
+  // shortfall to name and the screen says nothing — the prerequisite line on the plan carries the
+  // assumption instead.
+  assertEquals(longRunCeiling('marathon', 'beginner', 9, null, {
+    startDateISO: '2026-08-10', raceDateISO: '2026-10-11',
+  })!.shortOfTable, false);
+});

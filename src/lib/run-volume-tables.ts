@@ -401,12 +401,20 @@ export function longRunCeiling(
   entryLongRunMi?: number | null,
   dates?: { startDateISO?: string | null; raceDateISO?: string | null },
 ): { peakLongRunMi: number; peakWeek: number; tableMaxMi: number; shortOfTable: boolean } | null {
+  // ⛔ THE SAME ENTRY THE ENGINE USES, INCLUDING THE PREREQUISITE (2026-08-06). This passed only the
+  // athlete's typed long run, so it quoted the arc that would be built if the block started where
+  // they are — "reaches about 9 miles" — while the generator entered at the assumed base and built
+  // 18. The screen was describing a plan that stopped existing when the block became a prescription.
+  // Every input the generator passes is passed here, in the same order, for that reason.
+  const peakWeek = longRunPeakWeek({ durationWeeks, ...(dates ?? {}) });
   const arc = buildLongRunArc({
     distance,
     fitness,
     durationWeeks,
     entryLongRunMi,
-    peakWeek: longRunPeakWeek({ durationWeeks, ...(dates ?? {}) }),
+    prerequisiteLongRunMi: marathonPrerequisiteFor({ distance, fitness, durationWeeks, peakWeek })?.longRunMi ?? null,
+    raceWeekIsLast: !!(dates?.startDateISO && dates?.raceDateISO),
+    peakWeek,
   });
   if (!arc) return null;
   return {

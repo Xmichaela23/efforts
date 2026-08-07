@@ -558,81 +558,22 @@ export class SustainableGenerator extends BaseGenerator {
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
     if (!progression) return 10;
 
-    // Peak pivot: athlete is already at or near peak fitness and this is a
-    // short plan. Route to either a maintenance arc (peak-bridge) or an
-    // ascending re-entry arc depending on how recently the peak occurred.
-    const recentLongRun = this.params.recent_long_run_miles;
-    if (recentLongRun && this.isAtPeakFitness(progression) && this.params.duration_weeks <= 10) {
-      const totalWeeks = this.params.duration_weeks;
-      const raceWeekMiles = Math.max(4, Math.round(recentLongRun * 0.30));
-      const weeksSincePeak = this.params.weeks_since_peak_long_run ?? 0;
-      const transitionMode = this.params.transition_mode;
-
-      const taperStartWeek = totalWeeks <= 6
-        ? totalWeeks - 1
-        : Math.round(totalWeeks * 0.72);
-
-      const recoveryWeeks: number[] = [];
-      for (let w = 4; w <= totalWeeks; w += 4) {
-        if (w < taperStartWeek) recoveryWeeks.push(w);
-      }
-      const isThisRecovery = recoveryWeeks.includes(weekNumber);
-
-      // Decide arc: if peak was recent (<=2 weeks) and not a recovery rebuild,
-      // use the original descending maintenance arc. Otherwise use ascending re-entry.
-      const needsReEntry = weeksSincePeak > 2
-        || transitionMode === 'recovery_rebuild'
-        || (transitionMode === 'peak_bridge' && weeksSincePeak > 2);
-
-      if (needsReEntry) {
-        // Ascending re-entry: same structure as performance-build's re-entry arc
-        if (isThisRecovery) {
-          return Math.max(6, Math.round(recentLongRun * 0.55));
-        }
-        if (weekNumber >= taperStartWeek) {
-          const taperWeeksTotal = totalWeeks - taperStartWeek + 1;
-          const taperWeekIdx = weekNumber - taperStartWeek;
-          const taperEntryMiles = Math.round(recentLongRun * 0.70);
-          const dropPerWeek = (taperEntryMiles - raceWeekMiles) / Math.max(1, taperWeeksTotal);
-          return Math.max(raceWeekMiles, Math.round(taperEntryMiles - taperWeekIdx * dropPerWeek));
-        }
-        const startPct = Math.max(0.55, 0.75 - (weeksSincePeak - 2) * 0.05);
-        const targetPct = 0.90;
-        const buildWeeks = taperStartWeek - 1;
-        const effectiveBuildWeeks = Math.max(1, buildWeeks - recoveryWeeks.filter(w => w < taperStartWeek).length);
-        const stepPerWeek = (targetPct - startPct) / effectiveBuildWeeks;
-        let buildStep = 0;
-        for (let w = 1; w < weekNumber; w++) {
-          if (!recoveryWeeks.includes(w)) buildStep++;
-        }
-        const pct = Math.min(targetPct, startPct + buildStep * stepPerWeek);
-        const governor = this.getStructuralGovernor(weekNumber);
-        return Math.max(6, Math.round(recentLongRun * pct * governor));
-      }
-
-      // Original descending maintenance arc (peak is current)
-      if (isThisRecovery) {
-        return Math.max(6, Math.round(recentLongRun * 0.55));
-      }
-      if (weekNumber >= taperStartWeek) {
-        const taperWeeksTotal = totalWeeks - taperStartWeek + 1;
-        const taperWeekIdx = weekNumber - taperStartWeek;
-        const taperEntryMiles = Math.round(recentLongRun * 0.70);
-        const dropPerWeek = (taperEntryMiles - raceWeekMiles) / Math.max(1, taperWeeksTotal);
-        return Math.max(raceWeekMiles, Math.round(taperEntryMiles - taperWeekIdx * dropPerWeek));
-      }
-      const lastRecovery = [...recoveryWeeks].reverse()[0] ?? null;
-      if (!lastRecovery || weekNumber < lastRecovery) {
-        const preBuildWeeks = lastRecovery ? lastRecovery - 1 : taperStartWeek - 1;
-        const highMark = Math.round(recentLongRun * 0.90);
-        const dropMark = Math.round(recentLongRun * 0.78);
-        const dropPerWeek = preBuildWeeks > 1 ? (highMark - dropMark) / (preBuildWeeks - 1) : 0;
-        const governor = this.getStructuralGovernor(weekNumber);
-        return Math.max(dropMark, Math.round((highMark - (weekNumber - 1) * dropPerWeek) * governor));
-      }
-      return Math.round(recentLongRun * 0.76);
-    }
-
+    /**
+     * ⛔ THE PEAK-PIVOT BRANCH IS GONE (2026-08-06), and it was ~70 lines of percentage arithmetic
+     * that ran INSTEAD of the arc for any athlete with a long run over ~13 miles on a ≤10-week plan.
+     *
+     * IT WAS THE LAST THING QUOTING A DIFFERENT PLAN THAN THE ONE BUILT. The intake states the peak
+     * this block will reach by running `buildLongRunArc`; this branch returned its own numbers from
+     * `recent_long_run_miles × 0.90 / 0.78 / 0.76 / 0.55…`, so a 14-mile athlete was told 18 and
+     * built 13. One arc, one number, or the screen is fiction.
+     *
+     * ⚠️ WHAT IT DID THAT THE ARC NOW DOES BETTER: it entered from the athlete's own long run (the
+     * arc's `entryLongRunMi`), held near it rather than rebuilding from zero (the arc's row walk
+     * from that entry), and tapered into the race (the arc's race-day-anchored taper). Its one
+     * genuinely distinct input was `transition_mode` / `weeks_since_peak_long_run` — a post-taper
+     * athlete got a gentler re-entry. That signal no longer shapes the long run on this path; it
+     * still reaches `resolveEffectiveStartVolume`, which is where the fatigue guard lives.
+     */
     // ⛔ STANDARD PATH — ANCHORED TO RACE DAY, NOT TO WEEK 1 (2026-08-06).
     //
     // This used to be `index = weekNumber - 1 + offset` against a table read forward. The row's tail

@@ -48,6 +48,9 @@ export default function WeekGrid({
     .filter((i) => i >= 0);
   const adjacentPressDays = upperIdx.length === 2 && Math.abs(upperIdx[0] - upperIdx[1]) === 1;
 
+  /** 41 → "41m"; 126 → "2h06". Same shape as the week total above it. */
+  const fmtMins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}m`);
+
   const activeDays = new Set(sessions.map((s) => s.day)).size;
   const mins = sessions.reduce((a, s) => a + (Number(s.duration) || 0), 0);
 
@@ -70,15 +73,31 @@ export default function WeekGrid({
           const accessories = (lift?.strength_exercises ?? [])
             .map((e) => e.name)
             .filter((n) => n !== lift?.name.replace('Strength — ', '') && n !== 'Box Jump');
+          /**
+           * ⛔ THE EM-DASH WAS THE LIFT SLOT, AND ON A RUN PLAN IT WAS EVERY ROW (2026-08-06).
+           * This grid was built for the strength block, so it printed the lift first and fell back
+           * to "—" when there wasn't one. On a run-only marathon week that read as
+           * "— · Easy Run" seven times over, which looks like a column that failed to load.
+           *
+           * The dash now means what it says — nothing is scheduled that day — and every session
+           * carries its own duration, which is the number the athlete is actually deciding on.
+           */
+          const label = (s: WeekGridSession) => {
+            const name = s.type === 'strength' ? s.name.replace('Strength — ', '') : s.name;
+            const mins = Number(s.duration) || 0;
+            return mins > 0 ? `${name} ${fmtMins(mins)}` : name;
+          };
+          const ordered = [...(lift ? [lift] : []), ...endur];
           return (
             <div key={d} className="flex items-baseline gap-2 text-xs leading-tight py-px">
               <span className="text-white/40 w-8 shrink-0">{d.slice(0, 3)}</span>
               <span className="flex-1 min-w-0">
-                <span className={lift ? 'text-white/85' : 'text-white/30'}>
-                  {lift ? lift.name.replace('Strength — ', '') : '—'}
-                </span>
-                {endur.length > 0 && (
-                  <span className="text-white/55">{'  ·  '}{endur.map((s) => s.name).join(' · ')}</span>
+                {ordered.length === 0 ? (
+                  <span className="text-white/30">—</span>
+                ) : (
+                  <span className={lift ? 'text-white/85' : 'text-white/70'}>
+                    {ordered.map(label).join('  ·  ')}
+                  </span>
                 )}
                 {accessories.length > 0 && (
                   <span className="block text-white/35 truncate">{accessories.join(' · ')}</span>

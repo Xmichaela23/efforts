@@ -365,6 +365,8 @@ type NonRaceState = {
   commitment: CommitmentTier;
   targetWeeks: number;
   daysPerWeek: number;
+  /** The days the athlete can train. Empty = unanswered; rest is the remainder. */
+  trainingDays: DayName[];
   longRunDay: DayName | '';
   longRideDay: DayName | '';
   /** The hard day the athlete already owns — a club run, a track night, a chaingang — PER DISCIPLINE.
@@ -489,6 +491,9 @@ type StepKey =
   | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
   | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
+  // ⛔ STRENGTH, ON ITS OWN CARD (2026-08-06) — one primary decision per screen. It was the fifth
+  // question on "Your week" and got missed on a device.
+  | 'strength'
   // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
   // strength path. Those three asked the same question in three places and none of them could show
   // the answer: how many endurance sessions fit around four lifting days, and where the one that
@@ -593,7 +598,12 @@ function getSteps(state: NonRaceState): StepKey[] {
   //   • `length` — already skipped on a race; the date owns it.
   // ⛔ RACE SKIPS THE TRAIN PICKER. It is reached from the entry card directly — racing is an intent
   // that spans disciplines, not one of the four ongoing focuses (SPEC §B).
-  if (isRaceGoal) return ['goal', 'race', 'days', 'level', 'intent', 'confirm'];
+  // ⛔ STRENGTH IS ITS OWN CARD (2026-08-06). It sat at the bottom of "Your week" — three stacked
+  // options with two-line descriptions, below the day count, the long-run day, the club night and
+  // two conditional notices — and Michael's device pass found it missed entirely. §2.1 recorded the
+  // accretion that put it there and kept the OUTCOME on his review; this moves the question, not the
+  // decision. The week card gets the training-day picker in the same pass, so it is not re-loaded.
+  if (isRaceGoal) return ['goal', 'race', 'days', 'strength', 'level', 'intent', 'confirm'];
 
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
@@ -816,6 +826,7 @@ function assemblePayload(
           // athlete is jogging and chatting. `runClubIntensity` decides which key it lands in;
           // `buildPreferredDays` omits both when no day is picked.
           preferred_days: buildPreferredDays(state.posture, {
+            trainingDays: state.trainingDays,
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
             qualityDays: state.runClubIntensity === 'quality' ? state.qualityDays : {},
             easyDays: state.runClubIntensity === 'easy' ? state.qualityDays : {},
@@ -997,7 +1008,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // built since it shipped, and the doctrine's default (§2.0: hill is the recommendation, and the
     // default position carries that rather than the word "recommended"). An athlete who never looks
     // at the menu gets exactly the week they got yesterday.
-    daysPerWeek: 5, longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    daysPerWeek: 5, trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -1830,7 +1841,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'level' && (
         <StepLayout
           step={stepNo('level')} totalSteps={steps.length} title="Where are you with the marathon?"
-          subtitle="This sets where the plan starts. Adjust the numbers if they are not yours."
+          subtitle="Your level sets the plan. The week below is what it assumes you are running now."
           onBack={back} onContinue={next} canContinue={levelCanContinue}
         >
           <div className="space-y-4">
@@ -1862,8 +1873,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   }))}
                   className={optBtn(state.fitness === t.id)}
                 >
+                  {/* ⛔ ONE LINE EACH. Three cards with two-line blurbs pushed the mileage field and
+                      both advisory notices below the fold on a phone, so the athlete met the CTA
+                      before the numbers the CTA commits them to. `line-clamp-2` keeps a long blurb
+                      from re-creating that on the next copy edit. */}
                   <span className="font-medium">{t.label}</span>
-                  <span className="block text-white/55 text-sm mt-0.5">{t.blurb}</span>
+                  <span className="block text-white/55 text-sm mt-0.5 leading-snug line-clamp-2">{t.blurb}</span>
                 </button>
               ))}
             </div>
@@ -2269,6 +2284,45 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </div>
             </div>
 
+            {/* ⛔ WHICH DAYS, NOT JUST HOW MANY (2026-08-06). The count above says how much; this says
+                WHEN, and they are different questions — an athlete who can give five days but never a
+                Thursday was answering "5" and hoping. Rest is the REMAINDER of this row, not a second
+                picker: two controls for one fact is how a screen starts contradicting itself.
+
+                ⚠️ IT REACHES THE ENGINE. `buildPreferredDays` writes `training_days`, `assign-days.ts`
+                filters its placement to them, and it is a PREFERENCE there — if the week's sessions
+                cannot fit inside the days given, one takes a rest day rather than being dropped. A
+                control that goes nowhere is the defect this file keeps producing; this one is wired
+                before it is drawn.
+
+                ⚠️ OPTIONAL, LIKE EVERY OTHER PIN HERE. Untouched means the engine picks, which is
+                exactly what every block built before today did. */}
+            <div>
+              <p className="text-white/85 text-sm mb-2">Which days can you train?</p>
+              <div className="grid grid-cols-7 gap-1 min-w-0">
+                {DAYS.map((d) => {
+                  const on = state.trainingDays.includes(d);
+                  return (
+                    <button
+                      key={d} type="button"
+                      onClick={() => setState((st) => ({
+                        ...st,
+                        trainingDays: on
+                          ? st.trainingDays.filter((x) => x !== d)
+                          : [...st.trainingDays, d],
+                      }))}
+                      className={`py-2 rounded-lg text-[11px] min-w-0 ${on ? 'bg-teal-500 text-white' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    >{DAY_SHORT[d]}</button>
+                  );
+                })}
+              </div>
+              <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                {state.trainingDays.length === 0
+                  ? 'Leave it blank and the plan picks the days.'
+                  : `${state.trainingDays.length} training ${state.trainingDays.length === 1 ? 'day' : 'days'}, ${7 - state.trainingDays.length} rest.`}
+              </p>
+            </div>
+
             {/* ⛔ THE LONG RUN DAY — RESTORED TO THIS CARD (2026-08-05). Michael's instruction when
                 the five screens were agreed: *"Long-run day stays — it's the solver's anchor and
                 it's not derivable from anything else. Keep it on screen 2 next to days-per-week."*
@@ -2374,21 +2428,23 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </div>
             )}
 
-            {/* ⛔ STRENGTH WAS IN THE PLAN AND NOTHING ASKED. Michael, 2026-08-05: *"we need to add
-                strength as an option."* `non-race-goal-seeds.ts` seeds a marathon goal with
-                `strength = 'maintain'`, so two lifting days — Upper Body: Posture and Lower Body:
-                Durability — arrived in the preview as the athlete's plan without the athlete ever
-                being asked. A default is fine; a default presented as a choice already made is not.
+          </div>
+        </StepLayout>
+      )}
 
-                ⚠️ TWO OPTIONS, NOT THREE, AND THE MISSING ONE IS DELIBERATE. Heavy/progressive
-                lifting (`develop`) is not offered under a race build: `canSetDevelop` would allow it
-                (two develops are within the ceiling) and it would pull `strength_frequency` to 4
-                (`assemblePayload`), putting a four-day strength block underneath a marathon. Running
-                is the goal here; strength holds the athlete together while it happens. The full
-                developer picker stays where it belongs, on Get Stronger. */}
-            {isRaceGoal && (
+      {/* ⛔ STRENGTH GETS ITS OWN CARD (2026-08-06). It was the fifth question on "Your week", under
+          the day count, the long-run day, the club night and two conditional notices — and a device
+          pass found it missed. §2.1 kept the OUTCOME of that screen on Michael's review ("keep as
+          is"); this moves the question off it, which is the thing that review did not cover.
+          The decision itself is unchanged: two options, and None. */}
+      {currentStep === 'strength' && (
+        <StepLayout
+          step={stepNo('strength')} totalSteps={steps.length} title="Strength work"
+          subtitle="Running is the goal. This is what holds you together while you chase it."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-4">
               <div>
-                <p className="text-white/85 text-sm mb-2">Strength work</p>
                 <div className="space-y-2">
                   {([
                     ['durability', 'Keep me together',
@@ -2427,7 +2483,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   </p>
                 )}
               </div>
-            )}
           </div>
         </StepLayout>
       )}

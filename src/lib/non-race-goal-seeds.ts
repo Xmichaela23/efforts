@@ -109,6 +109,8 @@ export const COMMITMENT_TIERS: Array<{ id: CommitmentTier; label: string; blurb:
 // (mirrors ArcSetupWizard's design). Strength days are the co-equal Mon/Thu when strength is present.
 export type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 export type ScheduleInput = {
+  /** The days the athlete said they can train. Absent/empty → the engine picks. */
+  trainingDays?: DayName[];
   longRunDay?: string;
   longRideDay?: string;
   /** The kept hard session PER DISCIPLINE — a club run AND a chaingang can both be true of one
@@ -164,6 +166,15 @@ export function buildPreferredDays(
   const out: AthletePreferredDays = {};
   const present = (d: Discipline) => posture[d] != null && posture[d] !== 'out';
   if (present('run')) out.long_run = sched.longRunDay || 'sunday';
+  /**
+   * ⛔ THE DAYS THE ATHLETE CAN TRAIN (2026-08-06). The rest are theirs — rest is the REMAINDER, not
+   * a second question, which is why this is one list and not two.
+   *
+   * ⚠️ OMITTED WHEN UNSET, like every other key in this bag: absent means "the engine picks", which
+   * is the behaviour every block built before this ran on. `assign-days.ts` treats it as a
+   * preference and will spend a rest day before it drops a session.
+   */
+  if (sched.trainingDays && sched.trainingDays.length > 0) out.training_days = [...sched.trainingDays];
   if (present('bike')) out.long_ride = sched.longRideDay || 'saturday';
   // The kept club session = a hard day. Posture-gated both ways: a quality day for a discipline the
   // athlete dropped is not a day, it is a leftover.
