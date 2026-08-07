@@ -48,14 +48,49 @@ Deno.test('⛔ AND IT LANDS ON THE ACTUAL RACE DAY, not a hardcoded Sunday', () 
   assertEquals(race!.day, 'Saturday');
 });
 
-Deno.test('the race row carries a token the materializer can actually expand', () => {
-  // ⚠️ TIME-BASED ON PURPOSE. `longrun_{n}mi_easypace` is matched by `materialize-plan` with
-  // `longrun_(\d+)mi` — integers only — and every race distance is a decimal, so a distance token
-  // would expand to nothing. A run session with an EMPTY steps_preset fails `validatePlanSchema`,
-  // so "no token" is not available either.
+Deno.test('⛔ THE RACE IS ANCHORED TO DISTANCE, NOT DURATION', () => {
+  // THE BUG (2026-08-06): the token was time-based, which makes DISTANCE the derived quantity.
+  // `materialize-plan` expanded 288 minutes at the athlete's easy pace and rendered the marathon as
+  // 21.3 miles — the 288 had been written at the fitness-tier pace (11:00/mi) and read back at
+  // their real one (13:30/mi). A race distance is a fact; it may not be an output.
   const race = week(build(), 9).find((s) => tagged(s, 'race_day'))!;
   assertEquals(race.steps_preset?.length, 1);
-  assert(/^longrun_\d+min_easypace$/.test(race.steps_preset![0]), `unexpandable token: ${race.steps_preset![0]}`);
+  assertEquals(race.steps_preset![0], 'longrun_26.2mi_easypace');
+  assert(
+    !/\d+min/.test(race.steps_preset![0]),
+    'the race token is time-based again — distance will be back-derived from it',
+  );
+});
+
+Deno.test('the duration is the ATHLETE\'s easy pace, not the fitness tier\'s', () => {
+  // `milesToMinutes` prices miles at a per-level constant (beginner 11:00/mi) while every session's
+  // printed pace comes from the VDOT. Using the constant is how the two numbers disagreed.
+  const withPace = week(build({ vdot: 26 }), 9).find((s) => tagged(s, 'race_day'))!;
+  const tierOnly = week(build({ vdot: undefined }), 9).find((s) => tagged(s, 'race_day'))!;
+  assert(
+    (withPace.duration ?? 0) > (tierOnly.duration ?? 0),
+    `a slower athlete got a shorter race: ${withPace.duration} vs ${tierOnly.duration}`,
+  );
+  // 26.2 miles at ~12:24/mi (VDOT 26 base) ≈ 5h25. The rendered duration comes from the
+  // materializer's own easy baseline, so this is the generator's estimate agreeing with its paces.
+  const perMile = (withPace.duration ?? 0) / 26.2;
+  assert(perMile > 11 && perMile < 15, `race priced at ${perMile.toFixed(1)} min/mi`);
+});
+
+Deno.test('⛔ AND THE EXPANDER TAKES DECIMALS — every race distance is one', () => {
+  // The grammar always allowed them (`validation.ts:312`); the expander matched `longrun_(\d+)mi`
+  // and parseInt, so a decimal fell through to the TIME branches. This is that regex, pinned.
+  const expander = /longrun_([\d.]+)mi_easypace/;
+  for (const [token, miles] of [
+    ['longrun_26.2mi_easypace', 26.2],
+    ['longrun_13.1mi_easypace', 13.1],
+    ['longrun_6.2mi_easypace', 6.2],
+    ['longrun_18mi_easypace', 18],
+  ] as const) {
+    const m = token.match(expander);
+    assert(m, `${token} does not match the expander's pattern`);
+    assertEquals(parseFloat(m![1]), miles);
+  }
 });
 
 Deno.test('⛔ THE TAPER STEPS DOWN — the week-8 long run is the arc\'s number, not a constant 8', () => {

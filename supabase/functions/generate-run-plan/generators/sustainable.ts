@@ -375,11 +375,21 @@ export class SustainableGenerator extends BaseGenerator {
    * words (*"Getting to the finish: easy running and long runs. No pace targets to hit."*) — so the
    * row states the distance and the effort the whole block was written in, and targets nothing.
    *
-   * ⚠️ THE TOKEN IS TIME-BASED, DELIBERATELY. `longrun_{n}mi_easypace` is matched by
-   * `materialize-plan` with `longrun_(\d+)mi` — INTEGERS ONLY — and every race distance is a
-   * decimal (26.2, 13.1, 6.2, 3.1), so a distance token would parse to nothing and materialize as
-   * an empty workout. The minutes form is integer by construction and both the validator and the
-   * expander accept it. The DISTANCE is in the name and the description, where it is read.
+   * ⛔ THE TOKEN IS THE DISTANCE, AND IT USED TO BE THE DURATION — that was the bug (2026-08-06).
+   * A time token makes DISTANCE the derived quantity: `materialize-plan` expanded 288 minutes at the
+   * athlete's easy pace and rendered the marathon as **21.3 miles**. The 288 had been written at the
+   * fitness-tier pace (11:00/mi) and read back at their real one (13:30/mi), and a race is the one
+   * session whose distance is a fact, not an output. Distance in, duration derived — never the
+   * other way round.
+   *
+   * ⚠️ IT NEEDED A FIX IN THE EXPANDER TO BE POSSIBLE. `longrun_{n}mi_easypace` matched
+   * `longrun_(\d+)mi` there — integers only — while the token grammar had always allowed decimals
+   * (`validation.ts:312`). Every race distance is a decimal, so the branch could never fire for one.
+   *
+   * ⚠️ THE DURATION IS THE ATHLETE'S PACE, NOT THE TIER'S. `milesToMinutes` prices miles at a
+   * per-level constant (beginner 11:00/mi); `enduranceEasyPaceMinPerMile` uses the VDOT the rest of
+   * this generator writes its paces from. Using the first is how the two numbers disagreed in the
+   * first place. 26.2 at 13:30/mi ≈ 5h54.
    *
    * ⚠️ A run session with an empty `steps_preset` FAILS `validatePlanSchema`, so "no token" is not
    * an option here even though the combined-plan tri race row does exactly that (different
@@ -387,7 +397,7 @@ export class SustainableGenerator extends BaseGenerator {
    */
   private createCompletionRaceDay(day: string): Session {
     const miles = this.getRaceDistanceMiles();
-    const duration = this.milesToMinutes(miles);
+    const duration = Math.round(miles * this.enduranceEasyPaceMinPerMile());
     const raceName = this.params.race_name || 'Race';
     const distanceLabel: Record<string, string> = {
       marathon: 'Marathon', half: 'Half marathon', '10k': '10K', '5k': '5K',
@@ -399,7 +409,7 @@ export class SustainableGenerator extends BaseGenerator {
       `${miles} miles. The effort you have run all block: conversational at the start, and it will not stay that way. ` +
       `No pace target — this block was built to get you here able to finish.`,
       duration,
-      [TOKEN_PATTERNS.long_run(duration)],
+      [TOKEN_PATTERNS.long_run_miles(miles)],
       ['race_day', 'event', this.params.distance],
     );
   }

@@ -1316,13 +1316,26 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
-  // Long run DISTANCE based: longrun_18mi_easypace
-  if (/longrun_\d+mi_easypace/.test(lower)) {
-    const m = lower.match(/longrun_(\d+)mi/);
+  // Long run DISTANCE based: longrun_18mi_easypace — AND longrun_26.2mi_easypace (2026-08-06).
+  //
+  // ⛔ DECIMALS WERE ALWAYS IN THE GRAMMAR AND NEVER IN THE EXPANDER. `validation.ts:312` accepts
+  // `/^longrun_[\d.]+mi_easypace$/` and `run_mp_[\d.]+mi` right below this even carries a comment
+  // saying it supports them — this one matched `\d+` and `parseInt`, so `longrun_26.2mi_easypace`
+  // fell through every branch to the time-based ones and the race materialised as a DURATION. The
+  // renderer then back-derived distance from that duration ÷ the athlete's easy pace and printed a
+  // 26.2-mile marathon as 21.3 miles, because the duration had been written at the fitness-tier
+  // pace (11:00/mi) and re-read at the athlete's real one (13:30/mi).
+  //
+  // ⚠️ EVERY RACE DISTANCE IS A DECIMAL — 26.2, 13.1, 6.2, 3.1. There is no version of this that
+  // works on integers.
+  if (/longrun_[\d.]+mi_easypace/.test(lower)) {
+    const m = lower.match(/longrun_([\d.]+)mi/);
     if (m) {
-      const miles = parseInt(m[1], 10);
-      out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined });
-      return out;
+      const miles = parseFloat(m[1]);
+      if (Number.isFinite(miles) && miles > 0) {
+        out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined });
+        return out;
+      }
     }
   }
   
