@@ -372,6 +372,8 @@ Four defects, all confirmed in code, all fixed against the 2nd edition rather th
 
 ### D-386 — Lift spacing is two terms, and neither is upper-against-lower (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
 
+> ⛔ **SUPERSEDED 2026-08-06 by [D-394] — the gate WARNS now, it does not refuse.** Michael: *same "warn, no wall" as the mileage floor.* The reasoning below (*a race inside the floor is arithmetic*) was half wrong: the engine DOES have a plan for them once the arc is anchored to race day and the ceiling is stated. Everything below is history.
+
 **Builds Q-214. Supersedes Q-214's ranking note and deletes two terms.**
 
 **BUILT — `pressAdjacencyShortfall`.** Nothing scored two pressing days landing next to each other. Q-214 verified this by enumeration in July and it was never built.
@@ -525,3 +527,118 @@ Flat is the leg-costliest option (no uphill discount, eccentric impact retained)
 Effect-framed and hedged where the leg→lifting cost is an inference, firm where measured. Dropped the money metaphor ("cheap on your legs", "pays for it", "full price", "buy for less") and the flat card's treadmill nudge (a scold — treadmill is its own card directly above). Short hill names the tradeoff precisely: "hold less **VO2 stimulus**" (measured, Fleckenstein). §2.1's blanket ban on flat VO2 is back-annotated in the doctrine: §2.0 governs, the athlete owns the stated trade.
 
 **Files:** `shared/strength-system/strength-primary-plan.ts` (session builders, `hardRunSession`), `_shared/week-solver.ts` (`preferredClearance` / `preferredClearanceShortfall`), `materialize-plan/index.ts` (`_r{n}s` recovery group on `run_vo2`, `_tm` label-only suffix), `create-goal-and-materialize-plan`, `generate-strength-plan`, `src/lib/non-race-goal-seeds.ts`, `src/components/NonRaceBuilder.tsx`, `docs/DOCTRINE-aerobic-maintenance-run-only.md`, `shared/strength-system/hard-run-terrain.test.ts` (19 fixtures). Commits `caae1283` (feature) → `9728e485` (wiring fix) → `53e050b8` (copy).
+
+---
+
+### D-392 — The marathon block is a PRESCRIPTION with a prerequisite, and the prerequisite is computed from the window (2026-08-06, **PUSHED + DEPLOYED, fixture-verified**)
+
+**Supersedes the arc's opening posture from the same morning.** The first version entered the long-run row wherever the athlete actually was and stated the ceiling that produced — a 9-week beginner topped out at a **9-mile long run** and the intake said so. Honest, and not a marathon plan: nobody finishes 26.2 off a 9-mile peak. "Honest about a plan that cannot work" is a worse answer than "here is the plan that works, and here is what it assumes."
+
+**Michael's numbers turned out to be a formula.** He specified a 28 mi/wk base and a 10-mile long run for a 9-week beginner. Those are exactly `40 / 1.1⁴` and `18 − 2×4` — the peak worked backward at the only two rates the block may use: **2 miles a week** on the long run (the rows' own biggest step) and **10% a week** on volume (his cap, held, explicitly not raised). So `marathonPrerequisiteFor` computes it per window instead of storing a pair, and his hand-named numbers became the test that the formula is the rule he was describing rather than a fit to one case.
+
+| | peak long run | peak weekly | share | 9-week base |
+|---|---|---|---|---|
+| beginner | 18 | 40 | 45% | 27 mi/wk + 10 mi |
+| intermediate | 20 | 50 | 40% | 34 mi/wk + 12 mi |
+| advanced | 20 | 60 | 33% | 41 mi/wk + 12 mi |
+
+⚠️ **NONE OF THOSE NUMBERS IS NEW.** 18/20/20 against 40/50/60 are `LONG_RUN_PROGRESSION`'s maxima and `WEEKLY_MILEAGE`'s peaks, and 45/40/33 are the shares `MAX_LONG_RUN_SHARE` already documents the tables as embodying. This is the tables read backward.
+
+**Short windows quote a high base; long ones stop binding** (14wk+ bottoms out at the row's own opening, 20 mi/wk + a 6-mile long run). Below ~5 weeks the prerequisite goes **unmeetable** — it would ask the athlete to arrive with a 16-mile long run so the block can "build" them to 18 — and the plan names the half instead of pretending.
+
+**The peak long run is capped at 20 whatever the window.** Michael: *extra weeks add volume and repeat long runs, not a longer single run.* Higdon 20, Pfitzinger 20-22, Daniels caps by TIME.
+
+**The plan states the assumption**, in `generatePlanDescription`: *"This plan assumes you're already running about 25 miles a week with a long run around 10. If that's not where you are, do the half — this build won't be safe for you."* That sentence is what makes an 18-mile peak honest rather than reckless, and it is the whole reason the model is allowed to change.
+
+⚠️ **THE TRADE, STATED: an athlete whose real long run is 6 is prescribed a 10 in week 1** — a 67% jump — and the only thing protecting them is that sentence. That is what a prerequisite IS. Do not remove it.
+
+⚠️ **BEGINNER-DERIVED ONLY IN PRACTICE — see [Q-262].** The function is level-general and the rows exist for all three, but only the beginner case has been walked end to end.
+
+Two defects surfaced by verifying the matrix, both fixed here: **the week peaked three weeks after the long run** (the ramp targeted `taperStart`, so the 18-miler landed in a 36-mile week — a 50% share against the 45% the tables are built on), and **the peak week could be a cutback week** (every-4th-week cadence vs a race-date-derived peak; an 11-week block put its 18-miler in a deloaded week that also dropped to three running days). Volume peaks with the long run now and follows it down; the peak week is struck from `recovery_weeks` once, at the source.
+
+---
+
+### D-393 — The long-run arc is anchored to RACE DAY, not to week 1 (2026-08-06, **PUSHED + DEPLOYED, fixture-verified**)
+
+`LONG_RUN_PROGRESSION` was read forward from week 1, and **the row's tail IS the taper** — so any plan shorter than its row never reached it. A 9-week beginner climbed to a 10-mile long run and raced on it: the biggest long run of the block in race week, no taper anywhere.
+
+`buildLongRunArc` (`src/lib/run-volume-tables.ts`) lands the row's final peak on the **peak week** — the last week whose long run sits **more than 14 days out** — and tapers off whatever peak was actually reached. 15 days is not a taste: `getRaceProximitySession` already clamps anything inside 14 days, so a peak landing there would be silently halved by a rule two functions away.
+
+⚠️ **AT FULL LENGTH IT IS A NO-OP** — a 20-week marathon with no history returns the row unchanged, taper included. Pinned by a test.
+
+**The taper caps became fractions of the peak (0.8 / 0.6).** They were flat 8 and 10 — numbers calibrated for exactly an 18-20 mile peak — and left flat they crushed the taper they were written to protect: 18 → 14 → 10 printed as 18 → 10 → 8. **There were THREE copies**, and the third (on the non-race-week path) survived the first sweep.
+
+**The easy-run ceiling is half the long run, max 10, not a flat 6.** Six was the binding constraint the moment the peak moved: a four-day week of 18 + 3×6 tops out at 36, so a higher target could not be built and the week silently came up short.
+
+**The peak-pivot branch is DELETED** (~70 lines of percentage arithmetic that ran *instead* of the arc for any athlete with a long run over ~13 miles on a ≤10-week plan). It was the last thing quoting a different plan than the one built: a 14-mile athlete was told 18 and built 13. Its one distinct input was `transition_mode`, which still reaches `resolveEffectiveStartVolume` where the fatigue guard lives.
+
+---
+
+### D-394 — The marathon timeline gate WARNS; it does not refuse (2026-08-06, **PUSHED + DEPLOYED**)
+
+**Supersedes [D-386].** Michael: *same "warn, no wall" as the mileage floor.*
+
+The 2026-08-04 call was *timeline, unlike mileage, is where we stop* — mileage is a judgement about a body, a race inside the floor is arithmetic. **The half that was wrong is "arithmetic":** the engine does have a plan for them. It builds to the weeks available, anchors the peak to race day, tapers into it, and states the long run it will reach. Short is a worse block, not an impossible one, and this app's posture on worse-but-chosen is to price it.
+
+⚠️ **THAT ONLY HOLDS BECAUSE OF D-392/D-393.** The warning without the race-day anchor, the duration trim and the stated ceiling is a shrug. With them it is a priced decision.
+
+**There were TWO walls.** `generate-run-plan/validation.ts` rejected the identical case one call later (a beginner marathon under 14 weeks came back `400 Invalid request`), so demoting only the caller would have moved the wall somewhere with worse manners. Both demoted; the four-week minimum stays an ERROR because it is what `determinePhaseStructure` can physically lay out.
+
+**The support modes still suppress the warning** (`race_support` / `bridge_peak`, gated on evidence). **Not touched:** the triathlon path's own `race_too_close`, now the only hard timeline refusal in the file.
+
+---
+
+### D-395 — The athlete's SELECTED easy pace anchors every prescribed pace and duration (2026-08-06, **PUSHED + DEPLOYED**)
+
+The VDOT ladder ran learned threshold → **5K-derived effort score** → easy pace. So an athlete with a 25:21 5K on file who had SELECTED "use my runs, 12:35" got every session written off the 5K — a number they had explicitly declined. The easy pace was last because when that rung shipped (the same morning) the question was "can we print a pace at all"; once the athlete can choose, the answer outranks the seed.
+
+`resolveCurrentRunEasyPace` already IS the selection (Q-174 tiers). Reading it FIRST is most of the change. **One anchor, not two:** the VDOT is derived FROM the selected pace so the quality zones move with it, and the exact number travels as `easy_pace_sec_per_mi` and prints verbatim rather than round-tripping through the table.
+
+**`milesToMinutes` is overridden on the sustainable generator.** The base class prices miles at a per-level constant (beginner 11:00/mi), so a plan printing 12:35 stored durations as though run at 11:00 — the same two-sources gap that rendered a 26.2-mile race as **21.3 miles**.
+
+⚠️ **THE "A TIME" PATH IS UNCHANGED** — `performance_build` builds from `effort_paces`, where a race result is the right anchor for interval targets.
+
+---
+
+### D-396 — A plan may not outlive its race, and race day is a row on it (2026-08-06, **PUSHED + DEPLOYED**)
+
+**The plan outlived the race.** `weeksOut` is counted from TODAY; the block opens next Monday. A race 10 weeks out landing in plan week 9 built an empty week 10 on the calendar. Trimmed by `planWeekContaining` (`_shared/planning-context.ts`); `weeksOut` itself is untouched because the timeline question and the length question are different questions.
+
+**The race was not on the calendar.** `case 'race'` said *"don't add a training session"* and added nothing, so a completion plan ended on a Saturday shakeout. It has a row now, on the actual race weekday (not `performance-build`'s hardcoded Sunday), stating the distance and targeting no pace — this path has no goal pace by construction.
+
+⚠️ **THE TOKEN IS THE DISTANCE, AND THAT NEEDED A FIX IN `materialize-plan`.** A time token makes distance the DERIVED quantity: 288 minutes expanded at the athlete's easy pace rendered the marathon as **21.3 miles**. The expander matched `longrun_(\d+)mi` — integers only — while the grammar has always allowed decimals (`validation.ts:312`), and every race distance is a decimal. Now `longrun_([\d.]+)mi` + `parseFloat`.
+
+**Race week is anchors-then-fill.** `shakeout` and `easy_short` pushed with no day-count guard, so race week ran six sessions for a four-day athlete. Neither walk direction fixes it (forward drops the shakeout; backward breaks the week before). The shakeout and the Sunday long run are ANCHORS and claim their slots first; race day is exempt from the count.
+
+---
+
+### D-397 — The intake's own answers reach the engine: day count, strength "none", typed long run (2026-08-06, **PUSHED + DEPLOYED**)
+
+Three separate "collected, stored, never read" defects on the marathon path.
+
+**The day count was the band's MIN.** `create-goal` built `${n}-${n+1}` and `getRunningDaysForWeek` takes the band's MAX on build weeks — so 4 came back as 5 runs a week, all block. Anchored at the max now (`${n-1}-${n}`): build weeks get the number picked, cutbacks one fewer. **Two silent 400s died with it** — 7 days built `'7-8'` (not a legal string) and 6 days built `'6-7'`, which `sustainable` does not support, so the top option on the app's most common race goal could not build a plan at all.
+
+**"None" for strength shipped two lifting days.** No single file was wrong; the answer was reconstituted three steps downstream. The card writes `posture.strength = 'out'` and correctly sends no protocol → `assemblePayload` sent `develop ? 4 : 2` (out is not develop, so 2) → `arc-setup-persistence` sees a non-zero frequency and WRITES a protocol into the goal row → `create-goal:3761` gates the whole overlay on that field. One helper now: develop 4, maintain 2, **out or unset 0** — and 0 was already the language the persistence layer spoke.
+
+**The tier seed beat ingested volume, and the typed long run was dropped.** `target_weekly_miles` always arrives populated (the level button seeds it), so the engine took the LEVEL BUTTON's number over everything ingested. Equality with `TIER_SEEDS` now marks it a prefill, and it loses to ingested volume **when that is higher** — one-directional because `weeklyMiles` is `workload/10`, a proxy that under-reports easy running by roughly a third. `recent_long_run_miles` from `training_prefs` is read at all for the first time.
+
+---
+
+### D-398 — The intake week card: the week drawn once, the questions under it (2026-08-06, **PUSHED, NOT device-verified**)
+
+Michael iterated this on device until ~10:30pm and **four layouts were built and rejected**. Recorded so nobody rebuilds one:
+
+| built | rejected because |
+|---|---|
+| three separate cards (days / long run / club) | *"ONE FUCKING CARD"* — a screen per question, two thirds of the phone empty under each |
+| one card, questions advancing on a Next tap | it arrived BLANK and asked one question at a time — a form, not a week |
+| one card, three chip rows visible at once | the week is drawn three times; it reads as three weeks |
+| seven rows, tap a day to cycle its role | rejected before build — the cycle is a hidden affordance |
+
+**What he landed on:** the week drawn ONCE; the three questions listed under it with their current answers; **pick a question, then tap the days.** That is the alarm-repeat / calendar-label pattern (mode-then-target). The run apps all repeat a day picker per question, one screen each — the version he rejected first.
+
+- **The week arrives laid out** (5 days, long run Sunday — what the plan builds anyway when nothing is pinned). ⚠️ This overrides the 2026-07-29 no-prefill rule *only here*: that rule was written against controls arriving ANSWERED and hiding the question; a blank week reads as a broken screen.
+- **Fill carries the day's ROLE, a ring carries what you are editing.** Crossed at first — the fill marked the active question, so selecting "Club night" with none set blanked the whole row.
+- **Every day is tappable on every question.** Greying out non-run days meant an athlete whose long run is Saturday tapped Saturday and got nothing; picking a rest day now adds it as a run day and assigns it.
+- **The gate states itself** — four run days and a long-run day are required (both structural), and the disabled button now says which is missing.
+- Roles: **R rest · E easy · LR long run · C club night**, derived once in `week-budget.ts` (`weekDayRoles`), pinned by six tests. `C` is deliberate over `H`/`E`: it names the athlete's commitment rather than classifying the session, so it cannot contradict the plan whichever way the hard/easy answer goes.

@@ -458,3 +458,58 @@ There was **no `OPEN` step anywhere in this codebase** before 2026-08-06, so the
 - that the three exporter fixes produce a well-formed workout rather than a rejected one
 
 **What settles it:** send one hill session to the watch and look at the descent step. Fixtures pin the token expansion and the step construction; **neither can prove Garmin accepts the payload.**
+
+---
+
+## Q-262 — Intermediate and advanced marathon blocks have no prerequisite walked end to end (2026-08-06, **unverified — engine gap**)
+
+`marathonPrerequisiteFor` ([D-392]) is level-general and returns sane numbers for all three tiers
+(intermediate 34 mi/wk + 12 mi long run at 9 weeks; advanced 41 + 12). **Only the beginner case has
+been walked end to end**, and only beginner has been checked against a built plan.
+
+**Why it matters:** a 9-week BEGINNER block peaks at 18. A 9-week INTERMEDIATE block, entering from
+the athlete's own long run rather than a prescription, peaks at about 12. A beginner out-building an
+intermediate on the same timeline is incoherent, and it is the shape an athlete would notice.
+
+**What would settle it:** run the same fixture matrix used for beginner (6/8/9/11/12/14/16/18 weeks)
+at intermediate and advanced, and confirm the peak lands 18-20 with the share at 40% / 33%. The
+matrix script pattern is in the D-392 verification.
+
+⚠️ **NOT A BUG YET** — the tables and the function already carry the numbers. It is unwalked, not
+missing.
+
+---
+
+## Q-263 — An advanced athlete cannot reach a 60 mi/wk peak on four run days, and nothing says so (2026-08-06, **verified arithmetic, intentional-for-now**)
+
+The legal week is `long run + (days − 1) × easy ceiling`, and the easy ceiling is half the long run
+capped at 10 ([D-393]). At four run days that is `20 + 3×10 = 50`, against an advanced peak target of
+60. Beginner (40) fits at four days; intermediate (50) needs five; advanced (60) needs six.
+
+So an advanced athlete picking four days gets a ~44-50 mile peak and a 45% long-run share instead of
+33%, **and the intake does not mention it.** Same class as the long-run ceiling line that D-392's
+prerequisite made unnecessary — a stated consequence, not a wall.
+
+**Options when it is picked up:** state it on the week card ("six days carries the volume this level
+builds to"), or let the easy ceiling rise with the weekly target rather than only with the long run.
+⚠️ The second changes every sustainable plan's easy-run sizing — do not do it casually.
+
+---
+
+## Q-264 — Nothing from the 2026-08-06 mobile pass is device-verified (2026-08-06, **unverified**)
+
+Six structural fixes to the marathon intake shipped on reasoning + a clean build, with no device
+between them and production: the horizontal-scroll clamp (`min-w-0` at the shared wizard chrome), the
+Continue-button padding, the week card's layout ([D-398]), the role letters, the day-count gate copy,
+and `WeekGrid`'s durations.
+
+**Michael saw the week card and reported two of them fixed** (the untappable long-run/club days, the
+blank week). **He did NOT confirm:** whether the chips read cleanly at ~46px, whether any screen still
+scrolls sideways, whether the Continue button still covers the last field on the level and strength
+cards, or whether the preview week's durations render.
+
+**What would settle it:** one pass through the marathon flow on the phone, looking at those four.
+
+⚠️ **HIS LAST QUESTION WAS "are the chips more readable now?" AND IT WAS NEVER ANSWERED.** If they
+are not: delete the 9px role letters entirely — the three question rows underneath already state
+`Sun` / `None` in words, so the letters are decoration carrying a load they cannot hold.

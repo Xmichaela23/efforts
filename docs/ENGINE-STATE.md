@@ -23,7 +23,55 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-06 night — THE HARD-RUN TERRAIN FALLBACK SHIPPED; next is the Q-256 TM ceiling, which has a DATE)
+## 🧭 NEXT SESSION — START HERE (2026-08-06 late — THE MARATHON BLOCK BECAME A REAL PLAN; the intake week card is still being tightened)
+
+### YOUR JOB — finish the marathon intake's "Your week" card, then the two prerequisite rows
+
+Michael was on device until ~10:30pm iterating this ONE card and it is the only thing left mid-flight.
+It is live and usable; it is not finished. **Read [D-398] before touching it — four layouts were
+built and rejected tonight, and the reasons are recorded so you do not rebuild one of them.**
+
+The shape he landed on: **the week drawn ONCE, the three questions listed under it, pick a question
+then tap the days.** Open, in his words:
+
+- **the chips may still be hard to read.** Fill now carries the day's ROLE (rest hollow, run filled,
+  long run teal, club amber) and a ring carries which day answers the open question. **Not verified —
+  he asked "are they more readable now?" and the session ended before he answered.** If the 9px role
+  letters are the problem, delete them: the three question rows already say `Sun` / `None` in words.
+- **[Q-262] intermediate and advanced have no prerequisite row** (see below). Beginner peaks at 18 on
+  a 9-week block; intermediate on the same 9 weeks peaks at ~12. That is incoherent and it is the
+  next real engine job.
+- **[Q-263] an advanced athlete cannot reach 60 mi/wk on 4 run days** — long run + 3 easy at the
+  half-the-long-run ceiling caps at ~50. The intake does not say so.
+
+⚠️ **NOTHING FROM TONIGHT IS DEVICE-VERIFIED EXCEPT WHAT HE SAW ON SCREEN.** He confirmed the card
+renders and that the long-run/club days were untappable (fixed). Every plan-shape claim below is
+FIXTURE-verified only.
+
+### WHAT SHIPPED — the marathon block stopped being a truncated table walk [D-392 … D-397]
+
+A 9-week beginner marathon used to peak at a **10-mile long run in race week with no taper**, ramp
+volume 28% in a single step, and end on a Saturday shakeout with **no race on the calendar**. It now
+builds to an **18-mile peak three weeks out**, tapers 18 → 14 → 10, holds a ~10%/wk ramp, and puts
+race day on the calendar at 26.2 miles.
+
+The through-line, and the thing to keep: **every one of these was a computed value being overwritten
+by a literal, or a screen quoting a plan the engine did not build.** Six separate instances in one
+session (three hardcoded taper ceilings, a hardcoded race-week long run, a duration priced at a
+fitness-tier constant, an intake ceiling reading a different arc). If you find a seventh, that is the
+pattern, not a coincidence.
+
+- **[D-392]** the marathon block is a PRESCRIPTION with a computed prerequisite — `marathonPrerequisiteFor`
+- **[D-393]** the long-run arc is anchored to RACE DAY, not week 1 — `buildLongRunArc`
+- **[D-394]** the timeline gate WARNS, it does not refuse (supersedes D-386's refusal)
+- **[D-395]** the athlete's SELECTED easy pace anchors every prescribed pace and duration
+- **[D-396]** the plan may not outlive its race; race day is a row on it
+- **[D-397]** the intake's own answers reach the engine — day count, strength "none", typed long run
+
+Deployed: `generate-run-plan` (v178), `create-goal-and-materialize-plan` (v308), `materialize-plan`
+(v252). Client via Netlify, commits `d4458fbd` → `e87fea0e`.
+
+### (superseded 2026-08-06 late — previous banner, kept for its shipped record) 2026-08-06 night — THE HARD-RUN TERRAIN FALLBACK SHIPPED; next is the Q-256 TM ceiling, which has a DATE)
 
 ### YOUR JOB — [Q-256] the 5/3/1 training-max ceiling reads a STALE signup 1RM
 

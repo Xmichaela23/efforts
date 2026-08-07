@@ -1,5 +1,11 @@
 # Race builder — state of play, 2026-08-05
 
+> ⛔ **PARTLY SUPERSEDED 2026-08-06.** The marathon block was rebuilt that night: the long-run arc is
+> anchored to race day, the block is a prescription with a stated prerequisite, the timeline gate
+> warns instead of refusing, and the intake's "Your week" card was rebuilt four times. Read
+> **[D-392] … [D-398]** before trusting §2 or §3 here. §2.7's open items and §4's method note still
+> stand.
+
 **Read this before touching the marathon/race intake.** It is the shared record for the run of work
 on 2026-08-04/05: what shipped, what is deliberately not built, and what is left. Written the day
 of, from the code, not from memory.
@@ -168,7 +174,7 @@ find what works."*
 | Call | Michael's words |
 |---|---|
 | The mileage floor **warns**, it does not block | *"warn, no wall"* |
-| The timeline gate is the **one** hard refusal on this path | — |
+| ~~The timeline gate is the **one** hard refusal on this path~~ **REVERSED 2026-08-06 — see [D-394]. It warns now.** | *"same warn, no wall as the mileage floor"* |
 | Elevation is **asked**, never inferred | *"app is fully deterministic"* |
 | Name + date is all the race picker needs | *"name and date is all we need"* |
 | The race-readiness LLM is killed in favour of visuals | *"i wanna kill it"* / *"cant we use graphs or visuals instead?"* |

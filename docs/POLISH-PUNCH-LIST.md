@@ -8,6 +8,22 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-08-06 late (the marathon block)
+
+DEPLOYED but NOT device-verified. One pass through Focus → Race → Marathon closes all of it.
+
+- [ ] **The plan itself.** A 9-week beginner build should now peak at an **18-mile long run three
+      weeks out**, taper 18 → 14 → 10, open near 25-28 mi/wk, and end with **race day on the
+      calendar at 26.2 miles**. The plan's description should state the base it assumes.
+- [ ] **Paces.** Every session should print the easy pace you have SELECTED (`use my runs` /
+      `use my number`), not a 5K-derived one — and durations should be priced at the same pace.
+- [ ] **The week card.** Chips readable at phone size? Any screen still scrolling sideways? Does
+      Continue still cover the last field on the level or strength cards? Preview durations real?
+      (See [Q-264] — and if the role letters are the problem, delete them.)
+- [ ] **Strength "None"** should produce zero lifting sessions, and the day count you pick should be
+      the number of runs you get.
+
+
 ## ⏳ AWAITING MICHAEL — THE HARD-RUN TERRAIN FALLBACK, FLAT PLACEMENT (2026-08-06 night, pushed + deployed, **cards SEEN, placement NOT**)
 
 [D-391], closes [Q-260]. The four terrain cards are **device-verified** (they render and select on
