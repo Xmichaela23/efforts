@@ -272,18 +272,6 @@ const DAY_SHORT: Record<DayName, string> = {
  * since 2026-08-05, but on the old stacked screen the long run was three questions up the scroll.
  * Here it is a badge on the chip beside the one being tapped.
  */
-/**
- * ⛔ THE WEEK'S THREE QUESTIONS, ASKED ON ONE CARD. The card does not change between them — the
- * PROMPT does, and the row underneath keeps every answer already given. Three screens for three
- * seven-chip rows was the version before this one, and it left two thirds of a phone empty under
- * each of them.
- */
-const WEEK_QUESTIONS = [
-  { prompt: 'Tap the days you can run. The rest are yours.', hint: 'Leave it blank and the plan picks the days.' },
-  { prompt: 'Which one is the long run?', hint: 'It grows through the block and is the last thing to come down before the race.' },
-  { prompt: 'Any standing day — a club night or a fixed hard session?', hint: 'Skip it if you have none. Tap again to clear.' },
-] as const;
-
 function WeekDayRow({
   selected, disabled = [], roles = {}, onTap,
 }: {
@@ -1069,8 +1057,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // what the athlete came to see, and an expanded science block would push it off the fold, which is
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
-  /** Which of the week card's three questions is being asked. Card-local — never in the payload. */
-  const [weekStage, setWeekStage] = useState<0 | 1 | 2>(0);
   const [state, setState] = useState<NonRaceState>({
     // Deep-linked from the Goals door. ⚠️ `goal` IS SEEDED HERE FOR RACE, DELIBERATELY: `getSteps`
     // branches on it, so leaving it null for one render would flash the posture screen before the
@@ -1105,7 +1091,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // built since it shipped, and the doctrine's default (§2.0: hill is the recommendation, and the
     // default position carries that rather than the word "recommended"). An athlete who never looks
     // at the menu gets exactly the week they got yesterday.
-    daysPerWeek: 5, trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    daysPerWeek: 5,
+    // ⛔ THE WEEK ARRIVES LAID OUT (2026-08-06). It opened empty — seven blank chips the athlete had
+    // to fill before anything happened — and a blank week reads as a broken screen, not as a
+    // question. Michael: *"your week is still blank."*
+    //
+    // ⚠️ THIS OVERRIDES THE 2026-07-29 NO-PREFILL RULE, DELIBERATELY, AND ONLY HERE. That rule was
+    // written against controls that arrive ANSWERED and hide the question (a lit "3 runs" pill the
+    // athlete never chose). This is the opposite case: the answer is visible, every chip is one tap
+    // to change, and the alternative is a form. Five days with the long run on Sunday is what the
+    // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
+    // applying it silently, which is the honest half of that rule rather than the letter of it.
+    trainingDays: ['monday', 'tuesday', 'wednesday', 'friday', 'sunday'], longRunDay: 'sunday', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -2379,95 +2376,59 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the endurance
           days are typed per discipline. A total that contradicts both is a number the engine cannot
           honour. Michael, 2026-07-25: *"how many days is redundant."* */}
-      {/* ⛔ ONE WEEK, THREE QUESTIONS, ONE CARD (2026-08-06). Michael: *"i thought we were doing one
-          week 3 questions."*
-          I split it into three screens and each one held a single seven-chip row with two thirds of
-          the phone empty under it — three taps to answer what is visibly one thing. The week is the
-          control; the QUESTION moves, not the card. The row stays put and fills in while they answer,
-          which is also what makes the three questions tellable apart: the athlete watches the same
-          week gain marks instead of meeting three identical rows on three screens. */}
+      {/* ⛔ ONE CARD, AND THE ATHLETE SEES THEIR WEEK ON IT (2026-08-06). It arrived blank and then
+          asked its three questions one Next-tap at a time — a form. The week is laid out on arrival
+          (five days, long run Sunday: what the plan builds anyway when nothing is pinned) and all
+          three questions are on the card at once. Every chip is one tap. */}
       {currentStep === 'days' && (
         <StepLayout
           step={stepNo('days')} totalSteps={steps.length} title="Your week"
-          subtitle={isRaceGoal ? WEEK_QUESTIONS[weekStage].prompt : undefined}
-          onBack={isRaceGoal && weekStage > 0 ? () => setWeekStage((n) => (n - 1) as 0 | 1 | 2) : back}
-          onContinue={isRaceGoal && weekStage < 2 ? () => setWeekStage((n) => (n + 1) as 0 | 1 | 2) : next}
-          canContinue={
-            !isRaceGoal
-              ? true
-              : weekStage === 0
-                ? (state.trainingDays.length === 0 || state.trainingDays.length >= 4)
-                : weekStage === 1
-                  ? !!state.longRunDay
-                  : true
-          }
-          continueLabel={!isRaceGoal || weekStage === 2 ? 'Continue' : 'Next'}
+          subtitle={isRaceGoal ? 'Tap to change it.' : undefined}
+          onBack={back} onContinue={next}
+          canContinue={!isRaceGoal || (state.trainingDays.length >= 4 && !!state.longRunDay)}
         >
           {isRaceGoal ? (
             <div className="space-y-4">
-              {/* THE WEEK. One row, always here, always current — the three questions write onto it. */}
-              <WeekDayRow
-                selected={
-                  weekStage === 0 ? state.trainingDays
-                    : weekStage === 1 ? (state.longRunDay ? [state.longRunDay as DayName] : [])
-                      : (state.qualityDays.run ? [state.qualityDays.run as DayName] : [])
-                }
-                disabled={
-                  weekStage === 0 || state.trainingDays.length === 0
-                    ? []
-                    : DAYS.filter((d) => !state.trainingDays.includes(d))
-                }
-                roles={weekRoles}
-                onTap={(d) => {
-                  if (weekStage === 0) {
-                    setState((st) => ({
-                      ...st,
-                      trainingDays: st.trainingDays.includes(d)
-                        ? st.trainingDays.filter((x) => x !== d)
-                        : [...st.trainingDays, d],
-                      // A day that stops being a training day cannot keep carrying the long run or
-                      // the club night — the later questions would offer a dead chip and the payload
-                      // would pin a day the athlete just took back.
-                      longRunDay: st.longRunDay === d && st.trainingDays.includes(d) ? '' : st.longRunDay,
-                      qualityDays: st.qualityDays.run === d && st.trainingDays.includes(d)
-                        ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
-                        : st.qualityDays,
-                    }));
-                  } else if (weekStage === 1) {
-                    setState((st) => ({ ...st, longRunDay: d }));
-                  } else {
-                    setQualityDay('run', state.qualityDays.run === d ? '' : d);
-                  }
-                }}
-              />
-
-              {/* What the week says so far — the answered questions, in one line each. */}
-              <div className="space-y-1">
-                <p className="text-white/50 text-xs leading-relaxed">
-                  {state.trainingDays.length === 0
-                    ? 'No days pinned — the plan picks them.'
-                    : `${state.trainingDays.length} training ${state.trainingDays.length === 1 ? 'day' : 'days'}, ${7 - state.trainingDays.length} rest.`}
-                  {state.longRunDay ? ` Long run ${DAY_SHORT[state.longRunDay as DayName]}.` : ''}
-                  {state.qualityDays.run ? ` Club ${DAY_SHORT[state.qualityDays.run as DayName]}.` : ''}
-                </p>
-                <p className="text-white/40 text-xs leading-relaxed">{WEEK_QUESTIONS[weekStage].hint}</p>
+              <div>
+                <p className="text-white/85 text-sm mb-1.5">Run days</p>
+                <WeekDayRow
+                  selected={state.trainingDays}
+                  roles={weekRoles}
+                  onTap={(d) => setState((st) => ({
+                    ...st,
+                    trainingDays: st.trainingDays.includes(d)
+                      ? st.trainingDays.filter((x) => x !== d)
+                      : [...st.trainingDays, d],
+                    longRunDay: st.longRunDay === d && st.trainingDays.includes(d) ? '' : st.longRunDay,
+                    qualityDays: st.qualityDays.run === d && st.trainingDays.includes(d)
+                      ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
+                      : st.qualityDays,
+                  }))}
+                />
               </div>
 
-              {weekStage === 0 && state.trainingDays.length > 0 && state.trainingDays.length < 4 && (
-                <p className="text-white/60 text-xs leading-relaxed">
-                  A marathon block is built on four days or more. Fewer than that and the long run
-                  carries a share of the week no single run should.
+              <div>
+                <p className="text-white/85 text-sm mb-1.5">Long run</p>
+                <WeekDayRow
+                  selected={state.longRunDay ? [state.longRunDay as DayName] : []}
+                  disabled={DAYS.filter((d) => !state.trainingDays.includes(d))}
+                  roles={weekRoles}
+                  onTap={(d) => setState((st) => ({ ...st, longRunDay: d }))}
+                />
+              </div>
+
+              <div>
+                <p className="text-white/85 text-sm mb-1.5">
+                  Club night <span className="text-white/40">optional</span>
                 </p>
-              )}
-
-              {weekStage === 2 && clubCollision && (
-                <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
-              )}
-
-              {weekStage === 2 && state.qualityDays.run && (
-                <div>
-                  <p className="text-white/85 text-sm mb-2">Is it hard or easy?</p>
-                  <div className="grid grid-cols-2 gap-1.5">
+                <WeekDayRow
+                  selected={state.qualityDays.run ? [state.qualityDays.run as DayName] : []}
+                  disabled={DAYS.filter((d) => !state.trainingDays.includes(d))}
+                  roles={weekRoles}
+                  onTap={(d) => setQualityDay('run', state.qualityDays.run === d ? '' : d)}
+                />
+                {state.qualityDays.run && (
+                  <div className="grid grid-cols-2 gap-1.5 mt-2">
                     {([['quality', 'Hard'], ['easy', 'Easy / social']] as const).map(([k, label]) => (
                       <button
                         key={k} type="button"
@@ -2476,12 +2437,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       >{label}</button>
                     ))}
                   </div>
-                  <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                    A hard day gets the week&apos;s quality session. An easy one is filed as aerobic and
-                    the plan puts its hard running elsewhere.
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
+
+              <p className="text-white/50 text-xs leading-relaxed">
+                {state.trainingDays.length} run {state.trainingDays.length === 1 ? 'day' : 'days'}, {7 - state.trainingDays.length} rest.
+                {state.longRunDay ? ` Long run ${DAY_SHORT[state.longRunDay as DayName]}.` : ''}
+                {state.qualityDays.run ? ` Club ${DAY_SHORT[state.qualityDays.run as DayName]}.` : ''}
+              </p>
+              {clubCollision && <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>}
             </div>
           ) : (
             <div>
