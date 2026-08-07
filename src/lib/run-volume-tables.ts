@@ -9,6 +9,12 @@
 // copy of the numbers. A second copy is how the intake starts telling the athlete one thing while
 // the engine builds another.
 //
+// ⚠️ AND THE FILE OUTGREW THAT (2026-08-06). It now holds the ARC ITSELF (`buildLongRunArc`), the
+// prerequisite (`marathonPrerequisiteFor`) and the peak-week rule (`longRunPeakWeek`) — because the
+// intake does not merely validate against the tables any more, it QUOTES the plan the engine will
+// build. Same reason, one step further: the screen and the engine run the same function or they
+// disagree. See `ENGINE-STATE.md` → "HOW A MARATHON BLOCK IS BUILT, END TO END".
+//
 // Same move, same direction, same reason as `src/lib/session-frequency-defaults.ts`, whose header
 // records the precedent: the canonical copy lives in `src/lib/` and the deno edge functions import
 // it directly via a relative path. Supabase bundles `src/lib/` into each function at deploy time.
@@ -592,7 +598,17 @@ export type WeeklyMilesVerdict =
       bound: 'base_floor' | 'engine_clamp' | 'long_run_share';
     };
 
-/** Week-1 long run the plan will prescribe for this distance + level (offset 0 = no history). */
+/**
+ * The row's OPENING rung.
+ *
+ * ⚠️ THIS IS NO LONGER "WEEK 1's LONG RUN" ON THE MARATHON PATH (2026-08-06), and the name is kept
+ * only because `runVolumeFloorMi`'s share rule and its tests are written against it. A marathon
+ * block now opens at the PREREQUISITE (`marathonPrerequisiteFor` — 10 miles for a beginner, not the
+ * row's 6), so this under-states the real week-1 long run. It is harmless today because the
+ * `base_floor` rule (25) wins the `max()` for every marathon level, so the share rule never binds —
+ * but if that floor ever moves, this must become the prerequisite or the intake will quote a floor
+ * derived from a long run the plan does not prescribe.
+ */
 export function longRunWeek1Mi(distance: string, fitness: string): number | null {
   const arc = LONG_RUN_PROGRESSION[distance]?.[fitness];
   return arc && arc.length > 0 ? arc[0] : null;
