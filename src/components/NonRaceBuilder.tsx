@@ -275,47 +275,48 @@ const DAY_SHORT: Record<DayName, string> = {
 function WeekDayRow({
   selected, disabled = [], roles = {}, onTap,
 }: {
-  /** Days shown as chosen ON THIS CARD. */
+  /** The day(s) answering the ACTIVE question — ringed, not filled. */
   selected: DayName[];
-  /** Days that cannot be picked here — rendered inert, never merely styled. */
   disabled?: DayName[];
-  /** What each day already is, across the whole week. Absent = not decided yet. */
+  /** What each day IS. This is what the fill carries. */
   roles?: Partial<Record<DayName, DayRole>>;
   onTap: (d: DayName) => void;
 }) {
+  /**
+   * ⛔ THE FILL CARRIES WHAT THE DAY IS; THE RING CARRIES WHAT YOU ARE EDITING (2026-08-06).
+   * It was the other way round — the fill marked the active question's answer — so selecting "Club
+   * night" with none set emptied every chip and the row went flat, leaving a 9px letter to carry
+   * the whole week. Michael: *"they should grey out or something… it's a little hard to read."*
+   *
+   * Two states, two channels: rest is dim and hollow, a run day is filled, the long run is the
+   * accent, the club night is amber. The day you are about to change gets a ring on top of
+   * whatever it already is.
+   */
+  const skin: Record<DayRole, string> = {
+    R: 'bg-transparent border-white/10 text-white/30',
+    E: 'bg-white/[0.10] border-white/20 text-white/90',
+    LR: 'bg-teal-500 border-teal-400 text-white',
+    C: 'bg-amber-400/20 border-amber-400/50 text-amber-100',
+  };
   return (
     <div className="grid grid-cols-7 gap-1 min-w-0">
       {DAYS.map((d) => {
         const off = disabled.includes(d);
-        const on = selected.includes(d);
-        const role = roles[d];
+        const role = roles[d] ?? 'R';
+        const active = selected.includes(d);
         return (
           <button
             key={d}
             type="button"
             disabled={off}
             onClick={() => !off && onTap(d)}
-            title={role ? DAY_ROLE_TITLE[role] : undefined}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[11px] min-w-0 border ${
-              off
-                ? 'border-white/5 text-white/20 bg-transparent'
-                : on
-                  ? 'border-teal-400 bg-teal-500 text-white'
-                  : 'border-white/12 bg-white/[0.04] text-white/75'
-            }`}
+            title={DAY_ROLE_TITLE[role]}
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-lg text-[11px] min-w-0 border ${
+              off ? 'bg-transparent border-white/5 text-white/15' : skin[role]
+            } ${active && !off ? 'ring-2 ring-teal-300/70' : ''}`}
           >
-            <span className="leading-none">{DAY_SHORT[d]}</span>
-            {/* ⛔ THE ROLE, ON EVERY DAY, ON EVERY CARD (2026-08-06). Michael: *"R rest, E easy, LR
-                over the days that get chosen so it's clear."* The fill told the athlete WHICH days
-                they had tapped; it never told them what those days ARE. With the letter the row
-                reads as a week at a glance — and it reads the same on all three cards, because it
-                is the same week. A day with no letter is one nothing has decided yet, which is the
-                honest state before they pin anything. */}
-            <span className={`leading-none text-[9px] ${
-              off ? 'text-white/25' : on ? 'text-white/80' : 'text-teal-300/80'
-            }`}>
-              {role ?? '\u00A0'}
-            </span>
+            <span className="leading-none font-medium">{DAY_SHORT[d]}</span>
+            <span className="leading-none text-[9px] opacity-80">{role}</span>
           </button>
         );
       })}
@@ -2390,7 +2391,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'days' && (
         <StepLayout
           step={stepNo('days')} totalSteps={steps.length} title="Your week"
-          subtitle={isRaceGoal ? 'Pick a question, then tap the days.' : undefined}
+          subtitle={isRaceGoal ? 'Four easy runs minimum, plus a long day. Choose a line below, then tap a day.' : undefined}
           onBack={back} onContinue={next}
           canContinue={!isRaceGoal || (state.trainingDays.length >= 4 && !!state.longRunDay)}
         >
