@@ -570,10 +570,11 @@ type StepKey =
   // ⛔ STRENGTH, ON ITS OWN CARD (2026-08-06) — one primary decision per screen. It was the fifth
   // question on "Your week" and got missed on a device.
   | 'strength'
-  // ⛔ THE WEEK WAS BRIEFLY THREE STEPS (`longday`, `standing`) AND IS ONE AGAIN (2026-08-06).
+  // ⛔ THE WEEK WAS BRIEFLY THREE STEPS AND IS ONE AGAIN (2026-08-06). Those step keys are gone.
   // Michael: *"i thought we were doing one week 3 questions."* Three cards each holding a single
   // seven-chip row is three taps to answer what is visibly one thing, with the phone empty beneath.
-  // The card stays; the QUESTION advances (`weekStage`), and the row keeps what has been answered.
+  // The card stays and the week is drawn once; the three questions sit under it and you pick one
+  // (`weekQuestion`) before tapping days. `weekStage` — the Next-tap version — is gone too. [D-398]
   // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
   // strength path. Those three asked the same question in three places and none of them could show
   // the answer: how many endurance sessions fit around four lifting days, and where the one that

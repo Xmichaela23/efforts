@@ -1,5 +1,15 @@
 # SPEC — Shared Endurance Model (zones as the spine; forgiving↔sharp as one intensity dial)
 
+> ⛔ **STOP — E3's "delete `WEEKLY_MILEAGE` + `LONG_RUN_PROGRESSION`" IS NOW A BREAKING CHANGE (2026-08-06).**
+> When this spec was written those two tables were placeholders on a path nothing depended on. The
+> marathon block is now BUILT on them: `buildLongRunArc` walks `LONG_RUN_PROGRESSION` rung by rung,
+> and `marathonPrerequisiteFor` derives the athlete's assumed base by working backward from
+> `WEEKLY_MILEAGE`'s peak. Deleting them deletes the marathon protocol ([D-392]…[D-393]; written out
+> end to end at the top of `ENGINE-STATE.md`).
+> **If E3 is picked up, the shared model must first REPRODUCE those rows' shape** — the ladder, its
+> cutback cadence, its tail — or the race path loses its peak, its taper and its prerequisite in one
+> move. This is not an argument against E3; it is the work E3 now has to do.
+
 **Status: SPEC — review before cut. Not approved, not implemented.** Companion to `ENDURANCE-PROVENANCE.md` (the placeholder audit), `RUN-PROTOCOL.md` (the cited run science), `SPEC-intensity-baselines.md` (the dual-anchor zone model), `archive/ISLAND-PROPOSAL.md` (the periodization authority this lives beside). **Captured:** 2026-06-28.
 
 ---

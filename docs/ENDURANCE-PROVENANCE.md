@@ -1,5 +1,16 @@
 # ENDURANCE-PROVENANCE.md — Hardcoded-number provenance audit: non-race RUN generation path
 
+> ⛔ **PARTLY SUPERSEDED 2026-08-06 — THE SUSTAINABLE LONG-RUN PATH IN THIS TRACE NO LONGER EXISTS.**
+> `getLongRunMiles` does not walk `LONG_RUN_PROGRESSION` forward from week 1 any more, and it does not
+> call `isAtPeakFitness` or `getProgressionOffset` at all: the peak-pivot branch was DELETED and the
+> arc moved to `src/lib/run-volume-tables.ts` (`buildLongRunArc` + `marathonPrerequisiteFor` +
+> `longRunPeakWeek`), shared with the intake so both quote one arc. `calculateWeeklyMileage` also
+> changed (10%/wk cap, peaks with the long run, cutback weeks do not advance the trend).
+> **Read `ENGINE-STATE.md` → "HOW A MARATHON BLOCK IS BUILT, END TO END" for the current path.**
+> `isAtPeakFitness` / `getProgressionOffset` are still live — but only for `performance-build`
+> (`:1187`, `:1563`), which this document does not trace. Everything else here (the phase structure,
+> the `FITNESS_TO_VOLUME` dead-table finding, §5) still holds.
+
 **Scope:** Every prescribed/hardcoded number on the LIVE non-race RUN plan generation path.
 **Trigger config:** a non-race RUN goal (`goal_type ∈ {capacity, maintenance}`, `sport='run'`) →
 `create-goal-and-materialize-plan/index.ts:2374-2395` invokes `generate-run-plan` with
@@ -22,8 +33,10 @@ create-goal-and-materialize-plan/index.ts:2374  (sport==='run', non-race)
            ├─ getCurrentPhase / isRecoveryWeek                base-generator.ts:451 / 464
            ├─ calculateWeeklyMileage → WEEKLY_MILEAGE         sustainable.ts:314 / 66   (LIVE, drives volume)
            │    └─ resolveEffectiveStartVolume                base-generator.ts:197    (LIVE)
-           ├─ getLongRunMiles → LONG_RUN_PROGRESSION          sustainable.ts:347 / 19   (LIVE, drives long run)
-           │    ├─ isAtPeakFitness / getProgressionOffset / getStructuralGovernor  base-generator.ts:178/133/164
+           ├─ getLongRunMiles → buildLongRunArc                  sustainable.ts / src/lib/run-volume-tables.ts
+           │    ⛔ 2026-08-06: the arc is built ONCE per plan from the prerequisite + the race-day
+           │    peak week, not walked per-week off the row. isAtPeakFitness / getProgressionOffset
+           │    are NOT on this path any more (performance-build only).
            ├─ createSimpleLongRun / EasyRun / OptionalSpeedwork  sustainable.ts:447/495/464
            │    └─ milesToMinutes → getEasyPaceMinPerMile     base-generator.ts:850/807 (LIVE, drives durations)
            └─ assignDaysToSessions                            base-generator.ts:697
