@@ -27,6 +27,9 @@ import {
 } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
+// ⛔ ONE READING OF THE WEEK, shared with whatever renders it next — the letters under the day chips
+// are the same rule on all three intake cards, so the rule cannot live on any one of them.
+import { weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -269,12 +272,6 @@ const DAY_SHORT: Record<DayName, string> = {
  * since 2026-08-05, but on the old stacked screen the long run was three questions up the scroll.
  * Here it is a badge on the chip beside the one being tapped.
  */
-/** What a day IS, once the athlete has said. `null` = not known yet, and blank is honest. */
-type DayRole = 'R' | 'E' | 'LR' | 'H';
-const ROLE_TITLE: Record<DayRole, string> = {
-  R: 'Rest', E: 'Easy run', LR: 'Long run', H: 'Hard day',
-};
-
 function WeekDayRow({
   selected, disabled = [], roles = {}, onTap,
 }: {
@@ -298,7 +295,7 @@ function WeekDayRow({
             type="button"
             disabled={off}
             onClick={() => !off && onTap(d)}
-            title={role ? ROLE_TITLE[role] : undefined}
+            title={role ? DAY_ROLE_TITLE[role] : undefined}
             className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[11px] min-w-0 border ${
               off
                 ? 'border-white/5 text-white/20 bg-transparent'
@@ -1291,17 +1288,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ A CLUB NIGHT DECLARED EASY IS `E`, NOT `H`. It is pinned, but pinned is not hard, and the
    * whole point of asking hard-or-easy is that the engine puts its quality session elsewhere.
    */
-  const weekRoles = (() => {
-    const out: Partial<Record<DayName, DayRole>> = {};
-    const pinned = state.trainingDays.length > 0;
-    for (const d of DAYS) {
-      if (state.longRunDay === d) { out[d] = 'LR'; continue; }
-      if (state.qualityDays.run === d) { out[d] = state.runClubIntensity === 'quality' ? 'H' : 'E'; continue; }
-      if (!pinned) continue;
-      out[d] = state.trainingDays.includes(d) ? 'E' : 'R';
-    }
-    return out;
-  })();
+  const weekRoles = weekDayRoles({
+    trainingDays: state.trainingDays,
+    longRunDay: state.longRunDay || undefined,
+    standingDay: state.qualityDays.run || undefined,
+    standingIntensity: state.runClubIntensity,
+    days: DAYS,
+  }) as Partial<Record<DayName, DayRole>>;
 
   const clubCollision = (() => {
     if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;

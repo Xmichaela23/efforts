@@ -42,3 +42,54 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
  * defect is a correct value with no reader. If the budget comes back, it comes back with a claim
  * that survives its own citation.
  */
+
+// ── WHAT EACH DAY IS, ONCE THE ATHLETE HAS SAID (2026-08-06) ─────────────────
+
+/**
+ * ⛔ ONE READING OF THE WEEK. Michael, on the three intake cards: *"R rest, E easy, LR over the days
+ * that get chosen so it's clear."*
+ *
+ * The marathon intake asks its week across three screens — which days you run, which is long, which
+ * is a standing hard day — and every one of them renders the same seven chips. The letter under each
+ * chip is what makes them legible, and it has to be the SAME letter on all three or the cards
+ * contradict each other while the athlete is still filling them in.
+ *
+ * ⛔ SO IT LIVES HERE, NOT IN THE COMPONENT. It was inline in `NonRaceBuilder` and therefore
+ * untestable (TSX cannot be imported by `deno test`), and the State screen's rescheduler is meant to
+ * render this same week later — the precedent this module was created on.
+ *
+ * ⚠️ NOTHING IS LABELLED UNTIL THE DAYS ARE PINNED. With no training days chosen the engine picks
+ * them, so calling every day "E" would invent an answer the athlete has not given. Only the long run
+ * and a standing day — both explicit — carry a letter then.
+ *
+ * ⚠️ A STANDING DAY DECLARED EASY IS `E`, NOT `H`. It is pinned, but pinned is not hard: the whole
+ * point of asking hard-or-easy is that the engine puts its quality session elsewhere. The letter has
+ * to agree with what gets built.
+ */
+export type DayRole = 'R' | 'E' | 'LR' | 'H';
+
+export const DAY_ROLE_TITLE: Record<DayRole, string> = {
+  R: 'Rest', E: 'Easy run', LR: 'Long run', H: 'Hard day',
+};
+
+export function weekDayRoles(input: {
+  /** Lower-case day names the athlete can train. Empty = unpinned, so the engine picks. */
+  trainingDays: readonly string[];
+  longRunDay?: string;
+  standingDay?: string;
+  /** What the standing day is. Anything but `'quality'` reads as an easy pinned day. */
+  standingIntensity?: string;
+  /** Day vocabulary to answer in. Defaults to the lower-case names the intake uses. */
+  days?: readonly string[];
+}): Record<string, DayRole | undefined> {
+  const days = input.days ?? WEEK_DAYS.map((d) => d.toLowerCase());
+  const pinned = input.trainingDays.length > 0;
+  const out: Record<string, DayRole | undefined> = {};
+  for (const d of days) {
+    if (input.longRunDay === d) { out[d] = 'LR'; continue; }
+    if (input.standingDay === d) { out[d] = input.standingIntensity === 'quality' ? 'H' : 'E'; continue; }
+    if (!pinned) continue;
+    out[d] = input.trainingDays.includes(d) ? 'E' : 'R';
+  }
+  return out;
+}
