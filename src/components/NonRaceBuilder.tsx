@@ -1308,28 +1308,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     days: DAYS,
   }) as Partial<Record<DayName, DayRole>>;
 
-  /** Rest → easy → long run → club night → rest. One long run and one club night in a week. */
-  const cycleDay = (d: DayName) => setState((st) => {
-    const isRun = st.trainingDays.includes(d);
-    const isLong = st.longRunDay === d;
-    const isClub = st.qualityDays.run === d;
-    const clearClub = () => { const q = { ...st.qualityDays }; delete q.run; return q; };
-    if (isClub) {
-      // club → rest
-      return { ...st, qualityDays: clearClub(), trainingDays: st.trainingDays.filter((x) => x !== d) };
-    }
-    if (isLong) {
-      // long → club (and it stays a run day)
-      return { ...st, longRunDay: '', qualityDays: { ...st.qualityDays, run: d } };
-    }
-    if (isRun) {
-      // easy → long, taking the title off whichever day held it
-      return { ...st, longRunDay: d, qualityDays: st.qualityDays.run === d ? clearClub() : st.qualityDays };
-    }
-    // rest → easy
-    return { ...st, trainingDays: [...st.trainingDays, d] };
-  });
-
   const clubCollision = (() => {
     if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;
     const club = state.qualityDays.run;
@@ -2425,7 +2403,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     : weekQuestion === 'long' ? (state.longRunDay ? [state.longRunDay as DayName] : [])
                       : (state.qualityDays.run ? [state.qualityDays.run as DayName] : [])
                 }
-                disabled={weekQuestion === 'run' ? [] : DAYS.filter((d) => !state.trainingDays.includes(d))}
+                /* ⛔ NOTHING IS DEAD ON THIS ROW (2026-08-06). The long-run and club questions greyed
+                   out every day that was not already a run day, so an athlete whose long run is
+                   Saturday tapped Saturday and got nothing — the fix for that is not an error, it
+                   is to make the tap mean what they obviously meant. Picking a rest day for the
+                   long run ADDS it as a run day and assigns it. */
                 roles={weekRoles}
                 onTap={(d) => {
                   if (weekQuestion === 'run') {
@@ -2443,9 +2425,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         : st.qualityDays,
                     }));
                   } else if (weekQuestion === 'long') {
-                    setState((st) => ({ ...st, longRunDay: d }));
+                    setState((st) => ({
+                      ...st,
+                      longRunDay: d,
+                      // Picking a rest day makes it a run day — you cannot long-run on a day off.
+                      trainingDays: st.trainingDays.includes(d) ? st.trainingDays : [...st.trainingDays, d],
+                      qualityDays: st.qualityDays.run === d
+                        ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
+                        : st.qualityDays,
+                    }));
                   } else {
-                    setQualityDay('run', state.qualityDays.run === d ? '' : d);
+                    const clearing = state.qualityDays.run === d;
+                    setState((st) => ({
+                      ...st,
+                      qualityDays: clearing
+                        ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
+                        : { ...st.qualityDays, run: d },
+                      trainingDays: clearing || st.trainingDays.includes(d) ? st.trainingDays : [...st.trainingDays, d],
+                      longRunDay: !clearing && st.longRunDay === d ? '' : st.longRunDay,
+                    }));
                   }
                 }}
               />
