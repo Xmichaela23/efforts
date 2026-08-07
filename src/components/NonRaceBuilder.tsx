@@ -269,15 +269,21 @@ const DAY_SHORT: Record<DayName, string> = {
  * since 2026-08-05, but on the old stacked screen the long run was three questions up the scroll.
  * Here it is a badge on the chip beside the one being tapped.
  */
+/** What a day IS, once the athlete has said. `null` = not known yet, and blank is honest. */
+type DayRole = 'R' | 'E' | 'LR' | 'H';
+const ROLE_TITLE: Record<DayRole, string> = {
+  R: 'Rest', E: 'Easy run', LR: 'Long run', H: 'Hard day',
+};
+
 function WeekDayRow({
-  selected, disabled = [], badges = {}, onTap,
+  selected, disabled = [], roles = {}, onTap,
 }: {
   /** Days shown as chosen ON THIS CARD. */
   selected: DayName[];
   /** Days that cannot be picked here — rendered inert, never merely styled. */
   disabled?: DayName[];
-  /** One letter per already-assigned day, carried from the earlier cards. */
-  badges?: Partial<Record<DayName, string>>;
+  /** What each day already is, across the whole week. Absent = not decided yet. */
+  roles?: Partial<Record<DayName, DayRole>>;
   onTap: (d: DayName) => void;
 }) {
   return (
@@ -285,14 +291,15 @@ function WeekDayRow({
       {DAYS.map((d) => {
         const off = disabled.includes(d);
         const on = selected.includes(d);
-        const badge = badges[d];
+        const role = roles[d];
         return (
           <button
             key={d}
             type="button"
             disabled={off}
             onClick={() => !off && onTap(d)}
-            className={`relative py-2 rounded-lg text-[11px] min-w-0 border ${
+            title={role ? ROLE_TITLE[role] : undefined}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-[11px] min-w-0 border ${
               off
                 ? 'border-white/5 text-white/20 bg-transparent'
                 : on
@@ -300,10 +307,18 @@ function WeekDayRow({
                   : 'border-white/12 bg-white/[0.04] text-white/75'
             }`}
           >
-            {DAY_SHORT[d]}
-            {badge && !on && (
-              <span className="absolute top-0.5 right-1 text-[9px] leading-none text-teal-300/90">{badge}</span>
-            )}
+            <span className="leading-none">{DAY_SHORT[d]}</span>
+            {/* ⛔ THE ROLE, ON EVERY DAY, ON EVERY CARD (2026-08-06). Michael: *"R rest, E easy, LR
+                over the days that get chosen so it's clear."* The fill told the athlete WHICH days
+                they had tapped; it never told them what those days ARE. With the letter the row
+                reads as a week at a glance — and it reads the same on all three cards, because it
+                is the same week. A day with no letter is one nothing has decided yet, which is the
+                honest state before they pin anything. */}
+            <span className={`leading-none text-[9px] ${
+              off ? 'text-white/25' : on ? 'text-white/80' : 'text-teal-300/80'
+            }`}>
+              {role ?? '\u00A0'}
+            </span>
           </button>
         );
       })}
@@ -1264,6 +1279,29 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     (state.posture.strength ?? 'maintain') === 'out'
       ? 'none'
       : state.strengthProtocol === 'neural_speed' ? 'heavy' : 'durability';
+
+  /**
+   * ⛔ ONE READING OF THE WEEK, SHARED BY THE THREE CARDS. Derived, never stored — a fourth copy of
+   * "what is Tuesday" is how the cards would start disagreeing with each other and with the plan.
+   *
+   * ⚠️ NOTHING IS LABELLED UNTIL THE DAYS ARE PINNED. With no training days chosen the engine picks
+   * them, so calling every day "E" would be inventing an answer the athlete has not given. Only the
+   * long run and a standing day — both explicit — carry a letter then.
+   *
+   * ⚠️ A CLUB NIGHT DECLARED EASY IS `E`, NOT `H`. It is pinned, but pinned is not hard, and the
+   * whole point of asking hard-or-easy is that the engine puts its quality session elsewhere.
+   */
+  const weekRoles = (() => {
+    const out: Partial<Record<DayName, DayRole>> = {};
+    const pinned = state.trainingDays.length > 0;
+    for (const d of DAYS) {
+      if (state.longRunDay === d) { out[d] = 'LR'; continue; }
+      if (state.qualityDays.run === d) { out[d] = state.runClubIntensity === 'quality' ? 'H' : 'E'; continue; }
+      if (!pinned) continue;
+      out[d] = state.trainingDays.includes(d) ? 'E' : 'R';
+    }
+    return out;
+  })();
 
   const clubCollision = (() => {
     if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;
@@ -2350,6 +2388,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               <div>
                 <WeekDayRow
                   selected={state.trainingDays}
+                  roles={weekRoles}
                   onTap={(d) => setState((st) => ({
                     ...st,
                     trainingDays: st.trainingDays.includes(d)
@@ -2406,6 +2445,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             <WeekDayRow
               selected={state.longRunDay ? [state.longRunDay as DayName] : []}
               disabled={state.trainingDays.length > 0 ? DAYS.filter((d) => !state.trainingDays.includes(d)) : []}
+              roles={weekRoles}
               onTap={(d) => setState((st) => ({ ...st, longRunDay: d }))}
             />
             <p className="text-white/50 text-xs leading-relaxed">
@@ -2430,11 +2470,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             <WeekDayRow
               selected={state.qualityDays.run ? [state.qualityDays.run as DayName] : []}
               disabled={state.trainingDays.length > 0 ? DAYS.filter((d) => !state.trainingDays.includes(d)) : []}
-              badges={state.longRunDay ? { [state.longRunDay as DayName]: 'L' } : {}}
+              roles={weekRoles}
               onTap={(d) => setQualityDay('run', state.qualityDays.run === d ? '' : d)}
             />
             <p className="text-white/50 text-xs leading-relaxed">
-              {state.longRunDay ? `L is your long run (${DAY_SHORT[state.longRunDay as DayName]}).` : ''} Tap again to clear.
+              LR is your long run, E an easy day, R a rest day. Tap again to clear.
             </p>
             {clubCollision && (
               <p className="text-white/60 text-xs leading-relaxed">{clubCollision}</p>
