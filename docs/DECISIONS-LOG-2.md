@@ -760,3 +760,43 @@ sweep + "the builder names no run day of its own"), `generate-triathlon-plan/slo
 (every long-run weekday; pin-on-long-run refused; refusal reduces count).
 
 ⚠️ Touches `_shared/week-optimizer.ts` — **the `_shared` deploy trap applies.** Not yet deployed.
+
+---
+
+### D-402 — One plan-deletion path, and a teardown failure is a VALUE not an exception (2026-08-07, **committed `65facc83` — not pushed, not deployed**)
+
+Task 3 of `HANDOFF-placement-unification-2026-08-07.md`. Deleting a plan was two paths that disagreed.
+`AppContext.deletePlanCascade` is now the only one behind a user-facing delete button: it resolves the
+plan's `goal_id` and routes to `delete-goal` when there is one (the robust op — handles standalone,
+combined, and rebuild), falling back to `delete-plan` for goal-less plans. The weekly-planner path it
+replaces did neither half correctly — it left the goal untouched (the phantom on Focus) **and** it
+bulk-deleted COMPLETED workouts by name-matching "Week 1".."Week 4", unscoped to the plan, so any
+workout in history with that name went with it. Executed workouts are the athlete's record; a plan
+delete does not touch them.
+
+**The phantom-forever mechanism, which is not what the handoff guessed.** The handoff assumed a
+dangling plan-ref made the goal undeletable. Traced: no such branch exists — every FK into `goals` is
+`ON DELETE SET NULL`, and a goal with no plans is a clean two-step delete. The real cause was that
+`invokeFunction`'s `fetch` was unguarded, so a cold start or network blip on the `delete-plan` call at
+step 4 threw past the goal delete at step 5 into the outer catch → 500, goal still there, forever,
+because the thing that fails is the PLAN teardown while the thing the athlete is removing is the GOAL.
+It now returns `_ok: false`. The design already intended this — step 5 runs before the rebuild, and the
+`planErrors` message exists to say "goal gone, plan left behind" — but that only holds if a teardown
+failure is a value. `delete-plan` also validates `plan_id` as a UUID before the interpolated `.or()`
+filter (a non-UUID was a PostgREST 500, i.e. a failed teardown) and treats an already-gone plan as
+success.
+
+**Rebuild counts LIVE plans only.** A directly-linked COMPLETED/ENDED combined plan used to contribute
+its `goals_served` siblings and could rebuild a season around last year's races.
+
+**Rejected: widening the `goals_served` sweep to every status.** It would have killed the dangling
+reference an ended combined plan keeps to a deleted goal — at the cost of deleting a finished season's
+plan as a side effect of removing its race. The reference is inert: `GoalsScreen.plansByGoalId`
+(`GoalsScreen.tsx:686`) keys by goal id, so an entry for a goal that no longer exists is never looked
+up. Asymmetry documented in code instead of "fixed".
+
+Regression lock: `delete-goal/plan-goal-links.test.ts` (16 fixtures; the phantom — goal with zero
+linked plans → nothing to tear down, no siblings, no rebuild — is the permanent one). The client
+routing has no automated cover; there is no client test runner in this repo.
+
+⚠️ Deploy list: `delete-goal`, `delete-plan`. Client change ships with the Netlify build.

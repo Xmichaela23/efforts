@@ -535,6 +535,13 @@ fix). Noticed while sport-colouring those chips [D-399]; not chased, per "stay o
 
 ## Q-266 — Placement + deletion unification are queued for the engineer stage (2026-08-07, **tracked in the handoff, not yet built**)
 
+> **CLOSED 2026-08-07 — both tasks built.** Task 2 → [D-401] (and the causal claim below did not
+> survive the trace — see [Q-268]; the fix runs toward `week-optimizer.ts`, not
+> `strength-system/placement`). Task 3 → [D-402], committed `65facc83`: one `deletePlanCascade` path
+> routing through `delete-goal`, and the phantom's real cause was an unguarded `fetch` in
+> `delete-goal`'s `invokeFunction`, not a dangling plan-ref. Neither is pushed or deployed.
+> Everything below is history.
+
 Two VERIFIED findings homed in `docs/HANDOFF-placement-unification-2026-08-07.md` (this Q exists so a
 future session greps OPEN-QUESTIONS and finds them):
 - **Placement fork (Task 2).** `generate-combined-plan/week-builder.ts` uses its own strength
