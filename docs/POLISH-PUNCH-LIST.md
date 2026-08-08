@@ -8,6 +8,21 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE WIZARD VISUAL LANGUAGE + STRONG FOCUS (2026-08-07, pushed/deployed, **preview-verified only**)
+
+[D-399], [D-400]. Confirmed in the browser preview, not on a device. One pass through Focus closes it:
+
+- [ ] **Strong Focus flow** — Train → Strength Focus → Strong. The whole flow should read AMBER (CTA,
+      progress bar, selected cards + chips). On "Your week": the Run/Ride hard-day toggle should be
+      gold/green, the Runs count gold, the Rides count green; the block chrome amber.
+- [ ] **Train card** is a **Gauge** dial (was the run pulse). **Focus heading** wears the eye sigil.
+- [ ] **Marathon flow** still reads gold end to end after the restructure; the "Your week" card is
+      anchors-only (run days "Auto"; only long run + standing session tappable).
+- [ ] **Strength "Keep it heavy"** builds without crashing — the `LOWER_HYPERTROPHY` guard ([D-400])
+      is deployed; this is the device confirmation of the fix.
+
+---
+
 ## ⏳ AWAITING MICHAEL — 2026-08-06 late (the marathon block)
 
 DEPLOYED but NOT device-verified. One pass through Focus → Race → Marathon closes all of it.

@@ -4,6 +4,15 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-07 — THE NON-RACE BUILDER GOT ITS VISUAL LANGUAGE.** It is now the "digital galaxy" with
+> a discipline-driven accent [D-399]; Strong Focus wears amber end to end and the sport selectors
+> carry their own colours (run gold, ride green); the Train card is a Gauge (was the run icon); the
+> Focus heading wears the eye sigil; the strength `LOWER_HYPERTROPHY` crash is guarded + deployed
+> [D-400]. Marathon `a2d772ee`, Strong Focus `749c2072`, sigils + docs in the end-of-session commit.
+> **NONE device-verified** (preview only). **Next:** the engineer stage
+> (`HANDOFF-placement-unification-2026-08-07.md` — placement + deletion unification) or the open engine
+> gaps [Q-262]/[Q-263].
+
 > **2026-08-06 (late) — THE MARATHON BLOCK IS A REAL PLAN NOW.** It used to peak at a 10-mile long
 > run in race week with no taper, ramp 28% in a step, and end with no race on the calendar. It builds
 > an 18-mile peak three weeks out, tapers 18 → 14 → 10, holds a 10%/wk ramp, states the base it

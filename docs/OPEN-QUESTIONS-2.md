@@ -498,6 +498,12 @@ builds to"), or let the easy ceiling rise with the weekly target rather than onl
 
 ## Q-264 — Nothing from the 2026-08-06 mobile pass is device-verified (2026-08-06, **unverified**)
 
+> **⤳ 2026-08-07:** the "Your week" card was restructured again — **anchors-only** (run days
+> read-only "Auto"; only long-run + standing-session tappable; [D-399] + the [D-398] back-annotation),
+> so the chip-readability question now targets THAT card. And today's whole visual pass (marathon
+> galaxy flow + Strong Focus amber + gold/green sport chips + Gauge Train icon + Focus eye-mark) is
+> ALSO pushed and NOT device-verified. **One device pass through Focus settles all of it.**
+
 Six structural fixes to the marathon intake shipped on reasoning + a clean build, with no device
 between them and production: the horizontal-scroll clamp (`min-w-0` at the shared wizard chrome), the
 Continue-button padding, the week card's layout ([D-398]), the role letters, the day-count gate copy,
@@ -513,3 +519,29 @@ cards, or whether the preview week's durations render.
 ⚠️ **HIS LAST QUESTION WAS "are the chips more readable now?" AND IT WAS NEVER ANSWERED.** If they
 are not: delete the 9px role letters entirely — the three question rows underneath already state
 `Sun` / `None` in words, so the letters are decoration carrying a load they cannot hold.
+
+---
+
+## Q-265 — The Strong Focus hard-day toggle lets an athlete pick BOTH a run and a ride hard day (2026-08-07, **unverified — noticed in passing, LEAD not a confirmed bug**)
+
+On the Strong Focus scheduler ("Your week"), the copy says *"One hard session a week holds top-end
+aerobic fitness"* — singular. But the Hard-day control (`NonRaceBuilder.tsx` ~3026) toggles `run` and
+`bike` **independently** (`d in qualityDays`), so an athlete can select both and get TWO hard sessions
+(a run club AND a ride club). Question: is that intended — a two-discipline athlete legitimately has
+both — or should it be single-select to match the copy? Left untouched (the session was on the icon
+fix). Noticed while sport-colouring those chips [D-399]; not chased, per "stay on the fix".
+
+---
+
+## Q-266 — Placement + deletion unification are queued for the engineer stage (2026-08-07, **tracked in the handoff, not yet built**)
+
+Two VERIFIED findings homed in `docs/HANDOFF-placement-unification-2026-08-07.md` (this Q exists so a
+future session greps OPEN-QUESTIONS and finds them):
+- **Placement fork (Task 2).** `generate-combined-plan/week-builder.ts` uses its own strength
+  placement (~280–492) and imports no `strength-system/placement`, so lower strength landed ON the
+  long-run day on a real marathon build. Run-dispersion cause is marked UNCONFIRMED in the handoff.
+- **Deletion split (Task 3).** The weekly-planner delete (`AppLayout.handlePlanDeleted:1453`)
+  name-matches workouts + `deletePlan`, never touches the goal → a phantom goal survives on Focus. The
+  robust path is `delete-goal`; route the planner delete through it.
+
+Server-side, gated deploy. Task 1 of that handoff (the [D-400] crash-guard) is already done.

@@ -637,6 +637,13 @@ Three separate "collected, stored, never read" defects on the marathon path.
 
 ### D-398 — The intake week card: the week drawn once, the questions under it (2026-08-06, **PUSHED, NOT device-verified**)
 
+> **⤳ CONTINUED 2026-08-07 — see [D-399].** The card was restructured further: run days are now
+> read-only **"Auto"** (only the long run and the standing session are tappable), the card sits ABOVE
+> the day row, the run/ride club toggle is inline, and **"Club night" → "Standing session"**. The
+> per-day role FILL described below is superseded — the pills now pin only the long run and the
+> standing session (`weekRoles` gets `trainingDays: []`). The mode-then-target pattern and the four
+> rejected layouts below still stand; everything below is history.
+
 Michael iterated this on device until ~10:30pm and **four layouts were built and rejected**. Recorded so nobody rebuilds one:
 
 | built | rejected because |
@@ -660,3 +667,44 @@ then fills. He heard it and chose the simpler week. `rest_days` reached `buildPr
 - **Every day is tappable on every question.** Greying out non-run days meant an athlete whose long run is Saturday tapped Saturday and got nothing; picking a rest day now adds it as a run day and assigns it.
 - **The gate states itself** — four run days and a long-run day are required (both structural), and the disabled button now says which is missing.
 - Roles: **R rest · E easy · LR long run · C club night**, derived once in `week-budget.ts` (`weekDayRoles`), pinned by six tests. `C` is deliberate over `H`/`E`: it names the athlete's commitment rather than classifying the session, so it cannot contradict the plan whichever way the hard/easy answer goes.
+
+---
+
+### D-399 — The non-race builder is ONE themed instrument: the "digital galaxy" visual language + a discipline-driven accent (2026-08-07, **PUSHED, NOT device-verified**)
+
+The wizard was generic teal — Michael: *"generic 8 sleep wellness crap"*. It is now the "digital
+galaxy": a deep-space frame under an accent that is **driven by the discipline/goal, not hand-picked
+per screen.** The whole point is that `NonRaceBuilder` + `StepLayout` are ONE frame — theme the frame
+once and every step (marathon, Strong Focus, and every future non-race path) inherits it.
+
+**The system lives in exactly three places — do not scatter it (full recipe: `docs/REFERENCE-wizard-visual-language.md`):**
+1. `src/components/wizard/StepLayout.tsx` — the `accent?: string` prop → `A = var(--wiz-accent-rgb, <UNIVERSAL_RGB>)`; drives the instrument-key CTA, the progress bar, the commit-step shimmer.
+2. `src/index.css` — `.wizard-galaxy` + `::before`/`::after` (nebula / light / stars / grain), the nav-lock (`body.wizard-active`), `.wizard-key-shine`.
+3. `--wiz-accent-rgb` set on the wizard root in `NonRaceBuilder.tsx`, read from `SPORT_COLORS` (`context-utils.ts`) via `getDisciplineColorRgb()`. **Never a literal hex.**
+
+**The rules that came out of it:**
+- **Accent = the leading discipline, else the goal's own colour.** `wizAccent = state.discipline ?? (goal === 'marathon' ? 'run' : goal === 'get_stronger' ? 'strength' : undefined)`. The `get_stronger` fallback was the whole Strong Focus fix — `state.discipline` is never `'strength'` on that path, so without it the entire flow rendered on the off-white universal accent while marathon (run/gold) did not. run=gold, strength=amber.
+- **A sport SELECTOR carries its own sport colour; the block chrome carries the accent.** On the Strong Focus scheduler the Run/Ride hard-day toggle + Runs/Rides count chips are gold/green (the app's multisport wayfinding language, the same pattern the marathon club toggle uses); the block itself stays amber. It is identity, not a cost signal — the §5 note against implying a hard ride is "cheaper" than a hard run is about COPY, and no number here claims one.
+- **Sigils, not borrowed icons.** The Train entry card was literally the run discipline icon (`Activity`) → **`Gauge`** (the live card is `GoalsScreen.tsx:2394`; NonRaceBuilder's `ENTRY_COPY` is a decoy, kept in sync). The Focus heading (`GoalsScreen.tsx`) now wears the `eye-mark` sigil like the Focus tab + the wizard step titles, instead of being the one Focus surface without it.
+
+Client-only, Netlify. Marathon layer commit `a2d772ee`; Strong Focus `749c2072`; sigils in the docs commit. **Preview-verified, NOT device-verified.**
+
+---
+
+### D-400 — `LOWER_HYPERTROPHY` is a registered intent, and the placement predicates are TOTAL (2026-08-07, **PUSHED + DEPLOYED**)
+
+"Keep it heavy" (`neural_speed`) emits `LOWER_HYPERTROPHY` (`performance-neural.ts:162`, formerly
+`as any`). That intent was **not in `INTENT_DEFS`**, so `isLowerIntent`/`isUpperIntent` did
+`INTENT_DEFS[intent].category` on `undefined` and threw `Cannot read properties of undefined (reading
+'category')` — the WHOLE plan build crashed (arc-preview → `create-goal-and-materialize-plan`).
+
+The fix, and the invariant: **register the intent** (`intent-taxonomy.ts` — added to the
+`StrengthIntent` union + an `INTENT_DEFS` entry: lower, repRange [8,12], intensity [65,75],
+avoidWithinHoursOf {LONG:48, QUALITY:24}), **drop the `as any`, and make the predicates total** —
+`INTENT_DEFS[intent]?.category === 'lower'`. A placement predicate over a taxonomy must degrade to
+`false`, never throw, or one unregistered intent takes down the entire generator.
+
+Deployed to all **7 strength bundlers** (the `_shared` trap): `create-goal-and-materialize-plan`,
+`generate-combined-plan`, `generate-run-plan`, `generate-strength-plan`, `generate-triathlon-plan`,
+`materialize-plan`, `rematerialize-strength-block`. Commit `a2d772ee`. **This is Task 1 of
+`HANDOFF-placement-unification-2026-08-07.md` — done.**
