@@ -1650,8 +1650,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     </span>
   );
 
-  // Wizard accent: chosen discipline, or run for a marathon race. Drives the gold chrome + selections.
-  const wizAccent: Discipline | undefined = state.discipline ?? (state.goal === 'marathon' ? 'run' : undefined);
+  // Wizard accent: chosen discipline, or the goal's own colour when no single discipline leads —
+  // run/gold for a marathon race, strength/amber for a Strong Focus block. Without the strength
+  // fallback the whole get_stronger flow rendered on the off-white universal accent (state.discipline
+  // is never set to 'strength' on this path), so the amber chrome marathon gets never engaged. Drives
+  // the CTA, progress bar and every selection state.
+  const wizAccent: Discipline | undefined =
+    state.discipline ?? (state.goal === 'marathon' ? 'run' : state.goal === 'get_stronger' ? 'strength' : undefined);
 
   return (
     // h-full (not 100dvh) so it fills GoalsScreen's content area and keeps the app nav/banner when
@@ -3028,7 +3033,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         if (d in next) delete next[d]; else next[d] = '';
                         return { ...st, qualityDays: next };
                       })}
-                      className={`px-3 py-1.5 rounded-lg text-sm ${on ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                      // Sport colour, not the block's amber accent — this is a discipline SELECTOR, so
+                      // it speaks the app's wayfinding language (run gold, ride green), the same
+                      // treatment the marathon club toggle uses. It is identity, not a cost signal:
+                      // the §5 note against implying a hard ride is "cheaper" than a hard run is about
+                      // COPY, and no number here claims one.
+                      className="px-3 py-1.5 rounded-lg text-sm border"
+                      style={on
+                        ? { borderColor: `rgb(${getDisciplineColorRgb(d)})`, backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.16)`, color: '#fff' }
+                        : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
                     >{d === 'run' ? 'Run' : 'Ride'}</button>
                   );
                 })}
@@ -3184,7 +3197,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   {[2, 3, 4].map((n) => (
                     <button
                       key={n} type="button" onClick={() => setState((st) => ({ ...st, runDays: n }))}
-                      className={`w-10 py-1.5 rounded-lg text-sm ${state.runDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                      className="w-10 py-1.5 rounded-lg text-sm border"
+                      style={state.runDays === n
+                        ? { borderColor: `rgb(${getDisciplineColorRgb('run')})`, backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.16)`, color: '#fff' }
+                        : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
                     >{n}</button>
                   ))}
                 </div>
@@ -3200,7 +3216,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   {[1, 2, 3].map((n) => (
                     <button
                       key={n} type="button" onClick={() => setState((st) => ({ ...st, rideDays: n }))}
-                      className={`w-10 py-1.5 rounded-lg text-sm ${state.rideDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                      className="w-10 py-1.5 rounded-lg text-sm border"
+                      style={state.rideDays === n
+                        ? { borderColor: `rgb(${getDisciplineColorRgb('bike')})`, backgroundColor: `rgba(${getDisciplineColorRgb('bike')},0.16)`, color: '#fff' }
+                        : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
                     >{n}</button>
                   ))}
                 </div>

@@ -24,7 +24,9 @@ The dispersion helper `easyRunAnchorAdjacencyPenalty` / `easyRunHardAnchorMinGap
 
 ---
 
-## Task 1 — DEPLOY the already-made strength-crash fix (first)
+## Task 1 — DONE ✅ (commit `a2d772ee`, all 7 functions deployed 2026-08-07). Only Tasks 2–3 remain.
+
+### ~~Task 1~~ — DEPLOY the already-made strength-crash fix (first)
 
 Edited on disk (verify, then deploy):
 - `shared/strength-system/protocols/intent-taxonomy.ts` — registered `LOWER_HYPERTROPHY` (`StrengthIntent` union + `INTENT_DEFS`); made `isLowerIntent`/`isUpperIntent`/`isFullBodyIntent` **total** (`INTENT_DEFS[intent]?.category`).
