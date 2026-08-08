@@ -159,7 +159,7 @@ export function createBaseHypertrophyLower(
   }
 
   return {
-    intent: 'LOWER_HYPERTROPHY' as any,
+    intent: 'LOWER_HYPERTROPHY',
     priority: 'required',
     name: 'Lower Body: Hypertrophy Base',
     description: `Week ${wip} Base — Structural foundation. ${sets}×${reps} @ ${tier === 'barbell' ? `${load}% 1RM` : 'heavy DBs'}, RIR ${rir}. Build tissue tolerance before moving to neural loading in build phase.`,

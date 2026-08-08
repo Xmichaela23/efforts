@@ -15,6 +15,7 @@ export type StrengthIntent =
   | 'LOWER_NEURAL'
   | 'LOWER_DURABILITY'
   | 'LOWER_POWER'
+  | 'LOWER_HYPERTROPHY'
   | 'LOWER_MAINTENANCE'
   // Upper Body
   | 'UPPER_STRENGTH'
@@ -145,7 +146,31 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     intensityRange: [50, 75],
     allowedProtocols: ['upper_aesthetics', 'minimum_dose'],
   },
-  
+
+  // Base-phase hypertrophy lower — the structural block the neural_speed protocol runs BEFORE its
+  // heavy neural loading (see performance-neural.ts:createBaseHypertrophyLower: 3×8–10 @ 65–72% 1RM,
+  // trap-bar DL / back squat / hip thrust). Moderate load + volume, so it's NOT a "heavy" lower
+  // (placement/simple.ts heavyLowerIntents = neural/power); higher rep volume means real DOMS, so it
+  // guards the long run like the neural lower does.
+  LOWER_HYPERTROPHY: {
+    category: 'lower',
+    isNeural: false,
+    isDurability: false,
+    priorityDefault: 'required',
+    sessionCost: 'medium',
+    avoidWithinHoursOf: {
+      LONG: 48, // compound lower volume → DOMS peaks 24–48h; keep it clear of the long run
+      QUALITY: 24,
+    },
+    maxWeeklySets: 18,
+    maxWeeklyWorkingReps: 150,
+    repProfileDefaults: ['hypertrophy'],
+    exerciseFamilies: ['bilateral_compound', 'unilateral_stability'],
+    repRange: [8, 12],
+    intensityRange: [65, 75],
+    allowedProtocols: ['neural_speed'],
+  },
+
   // ============================================================================
   // UPPER BODY INTENTS
   // ============================================================================
@@ -251,21 +276,24 @@ export function getIntentMetadata(intent: StrengthIntent): IntentMetadata {
  * Check if an intent is lower body
  */
 export function isLowerIntent(intent: StrengthIntent): boolean {
-  return INTENT_DEFS[intent].category === 'lower';
+  // Total function: an intent not in INTENT_DEFS (e.g. the power lane's `LOWER_HYPERTROPHY as any`,
+  // see strength-focus-split.ts:35-39) returns false rather than throwing, so callers' `else` branch
+  // (placement/simple.ts:178 → otherSessions) handles it instead of the whole plan build crashing.
+  return INTENT_DEFS[intent]?.category === 'lower';
 }
 
 /**
  * Check if an intent is upper body
  */
 export function isUpperIntent(intent: StrengthIntent): boolean {
-  return INTENT_DEFS[intent].category === 'upper';
+  return INTENT_DEFS[intent]?.category === 'upper';
 }
 
 /**
  * Check if an intent is full body
  */
 export function isFullBodyIntent(intent: StrengthIntent): boolean {
-  return INTENT_DEFS[intent].category === 'fullbody';
+  return INTENT_DEFS[intent]?.category === 'fullbody';
 }
 
 /**

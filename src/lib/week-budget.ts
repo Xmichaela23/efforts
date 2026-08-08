@@ -80,7 +80,7 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
 export type DayRole = 'R' | 'E' | 'LR' | 'C';
 
 export const DAY_ROLE_TITLE: Record<DayRole, string> = {
-  R: 'Rest', E: 'Easy run', LR: 'Long run', C: 'Club night',
+  R: 'Rest', E: 'Easy run', LR: 'Long run', C: 'Standing session',
 };
 
 export function weekDayRoles(input: {

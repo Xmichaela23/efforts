@@ -3,9 +3,13 @@
 // ArcSetupWizard (Cut B2) so the non-race builder reuses it without importing the 3000-line wizard.
 import React from 'react';
 import { ChevronLeft, Loader2 } from 'lucide-react';
+import { getDisciplineColorRgb } from '@/lib/context-utils';
+
+// Universal (brand / sport-agnostic) chrome reads as warm bone rather than any one sport's hue.
+const UNIVERSAL_RGB = '236, 233, 227';
 
 export function StepLayout({
-  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false,
+  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false, accent,
 }: {
   // ⚠️ `title` widened string → ReactNode (2026-08-05) so the Focus screens can set the eye mark
   // beside their heading. Every existing caller passes a plain string and is unaffected.
@@ -21,7 +25,18 @@ export function StepLayout({
    *  screen cannot stand behind, and this wizard has shipped that bug once already. A bar with
    *  nothing to measure is better absent than wrong. */
   hideProgress?: boolean;
+  /** Sport that tints the chrome — a Discipline ('run'|'bike'|'swim'|'strength') resolves to its
+   *  SPORT_COLORS hue; omit (or 'universal') for the sport-agnostic warm-bone chrome. The progress
+   *  bar and the Continue key take this color; content inside a step tints itself. */
+  accent?: string;
 }) {
+  // The chrome tints off the `--wiz-accent-rgb` CSS var so a wizard can set it ONCE on its root and
+  // every step + every selection-state inside inherits it — no need to thread `accent` through 35
+  // call sites. An explicit `accent` prop overrides the inherited var locally.
+  const A = `var(--wiz-accent-rgb, ${UNIVERSAL_RGB})`;
+  const accentOverride = accent && accent !== 'universal' ? getDisciplineColorRgb(accent) : undefined;
+  // The final step is the commit ("Build plan") — it alone earns the shimmer, so motion means "this is the one".
+  const isCommit = step >= totalSteps;
   // ⛔ WIDTH IS CLAMPED HERE, ONCE (2026-08-06). Every step of the marathon intake slid sideways
   // under the thumb and clipped its own copy on the right — a mobile screen must not scroll
   // horizontally, and fixing it per-step is how it comes back on the next screen anyone adds.
@@ -29,7 +44,10 @@ export function StepLayout({
   // descendant (a long word, a 7-across grid, an input's intrinsic size) pushes the whole column
   // past the viewport and nothing above it can stop it.
   return (
-    <div className="flex flex-col h-full min-h-0 w-full max-w-full min-w-0 overflow-x-hidden box-border">
+    <div
+      className="flex flex-col h-full min-h-0 w-full max-w-full min-w-0 overflow-x-hidden box-border"
+      style={accentOverride ? ({ ['--wiz-accent-rgb']: accentOverride } as React.CSSProperties) : undefined}
+    >
       {/* Progress */}
       {!hideProgress && (
       <div className="shrink-0 px-4 pt-3 pb-2">
@@ -37,7 +55,10 @@ export function StepLayout({
           {Array.from({ length: totalSteps }).map((_, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full transition-colors ${i < step ? 'bg-teal-400' : 'bg-white/15'}`}
+              className="h-1 flex-1 rounded-full transition-colors"
+              style={i < step
+                ? { backgroundColor: `rgb(${A})`, boxShadow: `0 0 7px rgba(${A}, 0.55)` }
+                : { backgroundColor: 'rgba(255,255,255,0.14)' }}
             />
           ))}
         </div>
@@ -72,15 +93,26 @@ export function StepLayout({
         {children}
       </div>
 
-      {/* Continue */}
+      {/* Continue — instrument key, backlit by the accent; the final (commit) step also shimmers */}
       {!hideContinue && (
       <div className="shrink-0 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-zinc-950">
         <button
           type="button"
           onClick={onContinue}
           disabled={!canContinue || saving}
-          className="w-full min-h-[52px] rounded-xl bg-teal-500 text-white font-semibold text-base disabled:opacity-40 flex items-center justify-center gap-2"
+          className="relative w-full min-h-[52px] rounded-xl text-[#ECEAE3] font-semibold text-base disabled:opacity-40 flex items-center justify-center gap-2 overflow-hidden"
+          style={{
+            border: `1px solid rgba(${A}, 0.42)`,
+            backgroundColor: 'rgba(4,4,10,0.5)',
+            backgroundImage:
+              `radial-gradient(600px 150px at 50% -20%, rgba(${A},0.22) 0%, rgba(0,0,0,0) 66%),` +
+              'linear-gradient(to bottom, rgba(255,255,255,0.07) 0%, rgba(0,0,0,0) 42%)',
+            boxShadow:
+              '0 0 0 1px rgba(255,255,255,0.05) inset, 0 1px 0 rgba(255,255,255,0.09) inset,' +
+              `0 12px 30px rgba(0,0,0,0.5), 0 0 26px rgba(${A},0.10)`,
+          }}
         >
+          {!saving && <span aria-hidden className="wizard-key-shine" />}
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {continueLabel}
         </button>

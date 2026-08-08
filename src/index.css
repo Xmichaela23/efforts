@@ -945,6 +945,54 @@
   }
 }
 
+/* Modal-lock the plan builder: while the wizard is mounted it hides the app tab bar (industry norm
+   for a multi-step creation flow — finish or cancel, don't lose a draft to a mistap) and reclaims
+   the space the bar reserved. NonRaceBuilder toggles body.wizard-active on mount/unmount. */
+body.wizard-active .mobile-tabbar { display: none; }
+body.wizard-active { --tabbar-h: 0px; }
+
+/* Wizard commit key — slow gold shimmer sweep. Only the final (commit) step renders this,
+   so motion reads as "this is the one to press". See StepLayout.tsx. */
+.wizard-key-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,240,200,0.04) 47%, rgba(255,233,175,0.24) 50%, rgba(255,240,200,0.04) 53%, transparent 60%);
+  transform: translateX(-120%);
+  animation: wizardKeySweep 7s ease-in-out infinite;
+}
+@keyframes wizardKeySweep {
+  0% { transform: translateX(-120%); }
+  40%, 100% { transform: translateX(120%); }
+}
+
+/* Wizard galaxy — the flow sits in deep lit space. ::before is the nebula + a warm light source
+   glowing from BEHIND the content + a scatter of stars over a dark base; ::after is a fine grain
+   for airbrushed depth. Both sit at negative z inside an isolated context so content reads on top.
+   Scoped to the builder (not AppLayout) so dense screens stay calm. */
+.wizard-galaxy { position: relative; isolation: isolate; }
+.wizard-galaxy::before {
+  content: ""; position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  background-color: #070718;
+  background-image:
+    radial-gradient(60% 44% at 50% 28%, rgba(255,216,150,0.22), transparent 62%),
+    radial-gradient(82% 54% at 8% 0%, rgba(255,188,84,0.24), transparent 60%),
+    radial-gradient(76% 58% at 97% 20%, rgba(138,104,230,0.32), transparent 60%),
+    radial-gradient(80% 60% at 50% 118%, rgba(56,112,206,0.24), transparent 62%),
+    radial-gradient(44% 34% at 85% 90%, rgba(232,78,156,0.15), transparent 64%),
+    radial-gradient(1.2px 1.2px at 18% 22%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at 78% 58%, rgba(255,240,210,0.5), transparent),
+    radial-gradient(1px 1px at 60% 34%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1px 1px at 33% 74%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.4px 1.4px at 88% 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
+}
+.wizard-galaxy::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  opacity: 0.10; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 /* Logo pulse animation - slow, rhythmic heartbeat */
 @keyframes logoPulse {
   0%, 100% { opacity: 0.7; }

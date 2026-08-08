@@ -32,11 +32,11 @@ import {
   createUpperStrengthSession,
   createUpperMaintenanceSession,
 } from './performance-neural.ts';
-// NB: performance-neural's createBaseHypertrophyLower is deliberately NOT reused — it emits
-// `intent: 'LOWER_HYPERTROPHY' as any` (performance-neural.ts:162), which is not a valid
-// StrengthIntent and throws in isUpper/isLowerIntent. The power lane uses the neural/maintenance
-// lowers (valid intents). The base-phase hypertrophy ramp is a later refinement, pending a fix to
-// that latent neural bug.
+// NB (2026-08-07): the latent neural bug is FIXED — `LOWER_HYPERTROPHY` is now a registered
+// StrengthIntent (intent-taxonomy.ts) and the `as any` is gone, so isUpper/isLowerIntent no longer
+// throw on it (and are total functions besides). createBaseHypertrophyLower is safe to reuse here if
+// the base-phase ramp is wanted; this lane still uses the neural/maintenance lowers by choice, not
+// because hypertrophy would crash.
 
 export type SplitLane = 'build' | 'power';
 
