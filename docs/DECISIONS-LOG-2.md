@@ -708,3 +708,55 @@ Deployed to all **7 strength bundlers** (the `_shared` trap): `create-goal-and-m
 `generate-combined-plan`, `generate-run-plan`, `generate-strength-plan`, `generate-triathlon-plan`,
 `materialize-plan`, `rematerialize-strength-block`. Commit `a2d772ee`. **This is Task 1 of
 `HANDOFF-placement-unification-2026-08-07.md` — done.**
+
+---
+
+### D-401 — Placement is the OPTIMIZER's, in every generator; the count stays the caller's (2026-08-07, **IN WORKING TREE — not committed, not pushed, not deployed**)
+
+Task 2 of `HANDOFF-placement-unification-2026-08-07.md`. The handoff asked for
+`strength-system/placement` (`simplePlacementPolicy`) to be adopted inside `generate-combined-plan`.
+**Rejected, and reversed:** that module is a hardcoded Hal Higdon / Jack Daniels weekday grid
+(`placement/simple.ts` says so in its own header), so adopting it would install a SECOND
+day-authority — which the handoff's own constraint, and CLAUDE.md, forbid. Combined-plan already
+uses the sole authority. Unification therefore runs the other way: toward `_shared/week-optimizer.ts`.
+
+**What was actually broken** (the handoff's causal claim did not survive the trace — see [Q-268]):
+
+1. `generate-combined-plan/week-builder.ts` placed the second easy run of a run-only plan on a
+   literal `grid.get('Thursday')`. No optimizer, no dispersion, no check of what was already on the
+   day. Whenever the optimizer put the quality run on Thursday — the common case — the athlete got
+   intervals **and** an easy run on the same day; when `run_easy_day` also resolved to Thursday, two
+   easy runs stacked on it. A 640-config sweep over full plan length hit it in **13,440 of 30,720
+   generated weeks**. After: **0**.
+2. `generate-triathlon-plan` laid out every standalone tri plan from a literal table with no
+   long-run guard at all. `strength_1` is the LOWER slot (sessionIndex 0) and sat on Monday whatever
+   day the long run was — **the one live generator where lower-on-long-run was genuinely reachable.**
+3. When the optimizer REFUSED a strength slot (no legal lower day — e.g. a Monday long run, where
+   48h-pre blocks Sunday and the long run blocks Monday), the tri generator read the partial answer,
+   found the slot unset, and fell back to the literal Monday. **The guard produced the right answer
+   and the default overrode it.** A refusal now reduces the session count instead.
+
+**The rule established: the optimizer owns WHICH DAY, the caller owns HOW MANY.** New
+`preferences.easy_run_count` (default 1 → every existing caller byte-identical) and
+`preferred_days.easy_run_extra`. The count still comes from the builder, so run volume did not move:
+of the weeks whose run count fell, **every single one was explained by deleting a stacked session —
+zero unexplained losses** (measured, not asserted).
+
+Also: **dispersion is discipline-generic now.** `easyRunAnchorAdjacencyPenalty` was run-only, so easy
+bike/swim work was placed first-available with no spacing term; it is now
+`easyAnchorAdjacencyPenalty(day, qualityDay, longDay)` with the run version delegating, applied to
+easy_bike as well. And the load balancer may no longer stack two sessions of the SAME kind on one day
+— the same-day matrix has nothing to say about `easy_run × easy_run`, so once a week carried two, the
+balancer consolidated both onto one day and the rest-budget pass then cleared the day and dropped
+BOTH ("displaced easy_run + easy_run").
+
+Science: the RULES are cited, the weights are ours. Seiler polarized/80-20 → spread the easy days so
+the hard days can be hard. Hickson 1980 concurrent-training interference → lower-body strength clear
+of the long run. Bowerman → Daniels hard-easy → the adjacency penalty. The `+4`/`+8` literals are
+tuning params, uncited, and labelled as such in code.
+
+Regression locks: `generate-combined-plan/easy-session-placement.test.ts` (bug case + 640-config
+sweep + "the builder names no run day of its own"), `generate-triathlon-plan/slot-placement.test.ts`
+(every long-run weekday; pin-on-long-run refused; refusal reduces count).
+
+⚠️ Touches `_shared/week-optimizer.ts` — **the `_shared` deploy trap applies.** Not yet deployed.

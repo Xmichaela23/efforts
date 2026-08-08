@@ -545,3 +545,64 @@ future session greps OPEN-QUESTIONS and finds them):
   robust path is `delete-goal`; route the planner delete through it.
 
 Server-side, gated deploy. Task 1 of that handoff (the [D-400] crash-guard) is already done.
+
+---
+
+## Q-267 — Plan-generator fragmentation: four generators, opaque routing — clean it up + make it clear (2026-08-07, **LEAD — Michael-directed, AFTER Task 2/3 land**)
+
+Four generators with overlapping logic — `generate-combined-plan`, `generate-run-plan`,
+`generate-triathlon-plan`, `generate-plan` — and the routing between them is non-obvious. A single
+marathon (race + non-race run) goes to **`generate-run-plan`**, not `generate-combined-plan`
+(`create-goal-and-materialize-plan:3786`/`:2801`); `generate-combined-plan` is only the multi-sport
+develop path; `generate-triathlon-plan` is a separate legacy generator (`:3108`).
+
+**This session is the evidence the cleanup is real:** the routing confused the assistant, the
+`HANDOFF-placement-unification-2026-08-07.md` mis-attributed the marathon symptom to
+`generate-combined-plan`, and a placement fix nearly landed in the wrong generator. Michael: *"we need
+to clean up the bunk plans and make this clear."*
+
+**Scope (a LEAD, not yet designed):** make the routing explicit and/or consolidate toward fewer
+generators (CLAUDE.md "Plan generation is fragmented"; north star = single source of truth,
+`TARGET-ARCHITECTURE.md`). ⛔ **Do NOT start until Task 2 (placement) + Task 3 (deletion) land** —
+Task 2 is actively rewriting generator internals (`week-optimizer.ts`, `generate-combined-plan`), so
+consolidating now would be consolidating a moving target.
+
+---
+
+## Q-268 — "Lower-body strength on the long-run day": NOT reproducible from any generator — look downstream (2026-08-07, **UNVERIFIED — needs the plan artifact**)
+
+`HANDOFF-placement-unification-2026-08-07.md` reported a real marathon build with lower-body strength
+placed ON the Sunday long run, and marked it **CONFIRMED**, attributing it to
+`generate-combined-plan/week-builder.ts` having its own strength placement instead of
+`strength-system/placement`.
+
+**The fork is real. The causation is not.** A sweep of 640 configs × full plan length (~30,720
+generated weeks — days_per_week 4-7 × hours × support/performance × long-run Sun/Sat × five
+`strength_preferred_days` pin sets incl. pins ON the long-run day × separated/consolidated ×
+both ordering preferences) produced **zero** instances. The optimizer's guard holds
+(`_shared/week-optimizer.ts` `lowerBodyBlockedDays` — long_run is blocked; `sequentialOk` enforces the
+24/48h windows), and the builder's legacy fallback only considers Mon–Fri with `longRunActualDay`
+blocked. `generate-run-plan` is also clean: `placement/strength-slot-resolver.ts:buildEasyDays`
+excludes the long-run day before any slot is scored.
+
+**Where it most likely DID come from — downstream re-layout, not generation:**
+- **`adapt-plan` → `maybeRelayoutStrengthForCurrentWeek`** (`adapt-plan/index.ts:820`, fires on the
+  `action=auto` ingest path). It re-places the CURRENT week's strength via
+  `buildStrengthSessionsForPlanWeek` → `simplePlacementPolicy`, deriving the week shape from
+  `extractPrimaryScheduleForWeekSessions` (`generate-run-plan/strength-overlay.ts:523`). That extractor
+  votes on `type === 'run'` + a `long_run` tag; if it fails to identify the long run in a
+  combined-plan week, `longRunDay` falls back to a template default and the exclusion then protects
+  **the wrong day** — which would put lower work on the real long run. Untested against
+  combined-plan session shapes.
+- **`rematerialize-strength-block`** — same family, not traced this session.
+- The relayout is **schedule-triggered** (it fires when the week's run signature changes vs
+  `cfg.strength_primary_sig_by_week`), which fits a plan that looked fine at build time and drifted.
+
+**What would settle it:** the actual plan row — `plans.sessions_by_week` for the offending week plus
+`config.strength_primary_sig_by_week` — or a `[tri-generator]`/`[adapt-plan]` log line from that build.
+Without it this stays a hypothesis; do not "fix" the generators again, they are covered by the
+regression locks in [D-401].
+
+⚠️ **Do NOT read this as "the generators were fine."** [D-401] fixed two real placement defects found
+while chasing this one, including the standalone-tri generator's missing long-run guard, which is the
+one place the reported symptom WAS reachable. It just isn't the marathon path Michael was on.

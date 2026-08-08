@@ -1,5 +1,16 @@
 # Handoff — unify plan-gen placement (ALL plan types) + deploy the strength-crash fix (2026-08-07)
 
+> ## STATUS 2026-08-07 (late) — Tasks 1 + 2 done, Task 3 half done. **Everything below is the ORIGINAL brief; two of its claims were WRONG. Read this box first.**
+>
+> - **Task 1** — done + deployed (D-400).
+> - **Task 2** — done in code, **in the working tree only: not committed, not pushed, not deployed**. Substance is in **D-401**. Two corrections to the brief below:
+>   - §"Task 2 #1" told the next session to adopt `simplePlacementPolicy` inside `generate-combined-plan`. **Do not.** It is a hardcoded Higdon/Daniels weekday grid and would install a second day-authority, contradicting this doc's own constraint. Unification went the other way — toward `_shared/week-optimizer.ts`.
+>   - §"CONFIRMED: strength placement is forked" — the FORK is real, the CAUSATION is not. Lower-on-long-run is **not reproducible from any generator** (30,720-week sweep, zero hits). Filed as **Q-268**; the likely source is a downstream re-layout (`adapt-plan maybeRelayoutStrengthForCurrentWeek` / `rematerialize-strength-block`), not generation. Needs the plan artifact.
+>   - The UNCONFIRMED dispersion cause **is now pinned**: `week-builder.ts` placed the second easy run on a literal `grid.get('Thursday')`. 13,440 of 30,720 weeks had an easy run stacked on the hard day. Now 0.
+> - **Task 3** — **server half done** (`delete-goal` transport-failure guard, `delete-plan` UUID validation + already-deleted no-op + non-fatal cache invalidation). **Client half NOT done and owned by the parallel chat:** route `AppLayout.handlePlanDeleted` through `delete-goal` when `plan.goal_id` is present, and retire the "Week 1–4" name-match workout deletion. See Task 3 below, unchanged.
+>
+> **Deploy list is unchanged and the `_shared` trap applies** (`week-optimizer.ts` changed): the 7 strength bundlers **plus** `delete-goal` and `delete-plan`.
+
 **Role:** focused **engineer stage**, server-side only. A parallel chat owns the wizard UI — **do NOT touch client code** (`src/components/NonRaceBuilder.tsx`, `wizard/StepLayout.tsx`, etc.). This stage is the strength system + the plan generators, with `deno test` + a gated deploy.
 
 **Scope: uniform placement across ALL plan types** — run, combined/multi-sport, triathlon, duathlon. The reference (the "good" one) is Strong Focus / the run plan. The trace below is done; **two of its claims are marked UNCONFIRMED — verify before acting on them.**
