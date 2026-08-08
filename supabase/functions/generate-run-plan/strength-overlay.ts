@@ -9,7 +9,13 @@ import {
   getProtocol,
   resolveStrengthProtocolForGoal,
 } from '../shared/strength-system/protocols/selector.ts';
-import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
+// ⛔ THE LIFTS ARE PLACED BY THE ENGINE NOW, NOT BY A WEEKDAY GRID (2026-08-08).
+// `simplePlacementPolicy` held Higdon's and Daniels' EXAMPLE weeks as literal weekdays
+// (Mon=Upper, Wed=Lower, Fri=Optional …) and could not answer the only question that matters —
+// "is this day clear of the long run" — for any athlete who does not run long on Sunday.
+// `solverPlacementPolicy` asks `_shared/week-solver.ts`, which reads the same law the runs do.
+// See that file's header for what it deliberately does NOT decide.
+import { solverPlacementPolicy } from '../shared/strength-system/placement/solver.ts';
 import { isGetStrongArc, resolveStrengthArcProtocol } from '../shared/strength-system/strength-arc.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import {
@@ -644,21 +650,30 @@ function computeStrengthForPlanWeek(args: {
     ? (taperParams.effectiveFrequency as 0 | 1 | 2 | 3 | 4)
     : args.frequency;
 
-  const placedSessions = simplePlacementPolicy.assignSessions(
+  /**
+   * ⛔ THE METHODOLOGY / PROTOCOL / FREQUENCY ARGUMENTS ARE GONE, AND THAT IS THE POINT.
+   *
+   * They existed to select a weekday template — `getPlacementStrategy(ctx)` returned Higdon's grid
+   * or Daniels' — and a template is what this change removes. Every one of them was an input to
+   * WHICH DAYS, never to whether a day is legal:
+   *   • `methodology` / `protocol` chose the grid.
+   *   • `strengthFrequency` decided how many of the grid's slots to fill; the solver takes the
+   *     number of lifts it is handed and `SPEC-week-solver` §0a #4 makes lift frequency
+   *     non-negotiable, so the count is already expressed by `filteredSessions.length`.
+   *   • `noDoubles` forbade a second session on a day that already had one — the solver's stack
+   *     gate is stricter (arithmetic: it stacks only when the week cannot hold the sessions
+   *     otherwise), so this is subsumed rather than dropped.
+   *
+   * ⚠️ `injuryHotspots` IS THE ONE REAL LOSS AND IT IS NAMED HERE RATHER THAN QUIETLY SHED. It
+   * protected the day before the long run from heavy legs. That is a legitimate rule with an owner,
+   * and the solver has the shape to carry it — `Anchor.preferredClearance` — but wiring it is a
+   * behaviour change to a live safety rule and belongs in its own slice with its own fixture, not
+   * bundled into a placement swap. Filed rather than forgotten.
+   */
+  const placedSessions = solverPlacementPolicy.assignSessions(
     filteredSessions,
     args.primarySchedule,
     guardrails,
-    args.methodology
-      ? {
-          methodology: args.methodology,
-          // Use the resolver's output so placement sees the actual protocol the athlete is
-          // running (e.g., `neural_speed`), not the raw `protocolId` which may have been undefined.
-          protocol: resolved.protocolId,
-          strengthFrequency: placementFrequency,
-          noDoubles: args.effectiveNoDoubles,
-          injuryHotspots: args.memoryContext?.injuryHotspots ?? [],
-        }
-      : undefined,
   );
 
   const resolvedPlaced = args.memoryContext

@@ -104,6 +104,32 @@ export type Lift = {
 };
 
 /**
+ * A session with NO fixed day that the solver places — the easy runs, the extra swims and rides.
+ *
+ * ⛔ THIS IS THE THIRD CLASS, AND THE SOLVER HAD ONLY TWO. `Anchor` is endurance-with-a-day and
+ * `Lift` is strength-without-one, so "endurance the athlete has not pinned" had nowhere to live: the
+ * output was `{ lifts }` and every easy run in the app was placed by something else
+ * (`week-optimizer`'s greedy per-pass scoring for combined/tri, `assign-days.chooseSpreadDays` for
+ * run plans, an unscored one-shot sort in the strength composer). Three algorithms, three answers.
+ *
+ * ⚠️ `kind` is a real `MatrixSessionKind`, so the law answers for it exactly as it does for a lift.
+ * Nothing about this type is run-specific — `easy_bike` and `easy_swim` are the same shape, which is
+ * the point. Slice 1 only builds and tests `easy_run`.
+ */
+export type FlexibleSession = {
+  name: string;
+  kind: MatrixSessionKind;
+};
+
+export type PlacedFlexible = {
+  name: string;
+  kind: MatrixSessionKind;
+  day: SolverDay;
+  /** Set when this session shares its day with an anchor or a lift. */
+  sharesDayWith?: { label: string };
+};
+
+/**
  * A constraint STRICTER than the law, admitted only under §4.1a.
  *
  * ⛔ BOTH FIELDS ARE REQUIRED AND THAT IS THE POINT. `getDanielsStrategy`'s polarisation rule is
@@ -123,6 +149,37 @@ export type MethodologyConstraint = {
 export type SolverInput = {
   anchors: Anchor[];
   lifts: Lift[];
+  /**
+   * Sessions with no fixed day, spread around everything that has one (§ slice 1).
+   *
+   * ⛔ ABSENT OR EMPTY MUST BE BYTE-IDENTICAL TO BEFORE THIS FIELD EXISTED. Every current caller
+   * (`strength-primary-plan.ts:1251`) passes neither, and the Get Stronger block is live — so the
+   * whole flexible path hangs off one `if` and touches no lift score. The regression test for that
+   * is `flexible: absent → result is identical to omitting the field entirely`.
+   */
+  flexible?: FlexibleSession[];
+  /**
+   * Days a CALLER'S methodology would rather not use for flexible sessions — scored, never a filter.
+   *
+   * ⛔ `owner` AND `reason` ARE REQUIRED FOR THE SAME REASON `MethodologyConstraint` REQUIRES THEM
+   * (§4.1a). A day this engine avoids without saying whose rule it is and why is unowned strictness,
+   * and this file already carries the scar: the flat hard run's clearance was raised as a hard
+   * constraint and relocated the damage onto the long run. The first caller is `generate-run-plan`,
+   * whose inherited grid holds the day BEFORE the long run for rest ("prep for Sunday long run") and
+   * treats the athlete's non-training days the same way.
+   *
+   * ⚠️ RANKED BELOW SPREAD AND BELOW THE LAW'S OWN day-after-long-run rule. A caller preference may
+   * break a tie between equally-spread weeks; it may not buy itself a worse-shaped one.
+   */
+  flexibleAvoid?: { days: SolverDay[]; owner: string; reason: string };
+  /**
+   * The athlete's stated day for a flexible session, keyed by `FlexibleSession.name` — scored, and
+   * the weakest term there is. §4.2: preferred days are scored, anchors outrank them.
+   *
+   * ⚠️ It biases the DAY SET, not which session lands on which day. Two easy runs are
+   * interchangeable; asserting otherwise would be precision the input does not carry.
+   */
+  flexiblePreferred?: Record<string, SolverDay>;
   /**
    * ⛔ §4.2 — PREFERRED DAYS ARE SCORED, NOT HARD, AND ANCHORS OUTRANK THEM.
    *
@@ -168,6 +225,15 @@ export type PlacedLift = {
 
 export type SolvedWeek = {
   lifts: PlacedLift[];
+  /**
+   * The flexible sessions, placed. Always present; empty when none were asked for, so a reader
+   * never has to distinguish "absent" from "none".
+   *
+   * ⚠️ `activeDays` / `restDays` COUNT THESE. An easy run on an otherwise-free day makes that day
+   * active, and a caller reading `restDays` to mean "nothing scheduled" would be wrong if it did
+   * not. That is why they are recomputed rather than carried through from the lift pass.
+   */
+  flexible: PlacedFlexible[];
   activeDays: SolverDay[];
   restDays: SolverDay[];
 };
@@ -532,6 +598,217 @@ function lexLess(a: number[], b: number[]): boolean {
   return false;
 }
 
+// ── Flexible endurance: the exhaustive spread (slice 1) ─────────────────────
+
+/**
+ * Longest run of back-to-back training days, and the gaps between occupied days (ascending).
+ *
+ * Ported from `generate-run-plan/generators/assign-days.ts` (`weekShape`), which is the only
+ * dispersion in the app that scores the WHOLE arrangement instead of one day at a time.
+ *
+ * ⛔ THIS WRAPS AND THE SOURCE DOES NOT — the one deliberate deviation, and it is a BUG FIX.
+ *
+ * ⚠️ Written non-wrapping first, to match `assign-days` exactly, and the test sweep caught it inside
+ * a minute: with a **Sunday** long run and one easy run, a linear gap scores Monday as SIX days away
+ * — the most spread day in the week — when the athlete runs it **the morning after the long run**.
+ * It did not merely fail to avoid the worst day; it actively selected it, and it outranked the owned
+ * "not the day after the long run" term that exists to prevent exactly that.
+ *
+ * A training week REPEATS. Sunday→Monday is one day of recovery, not six, which is why `gapDays` at
+ * the top of this file already wraps and says so in the same words. The Monday-first array is a
+ * rendering convention; treating its edge as a physiological boundary is how a calendar artifact
+ * gets to overrule a recovery rule. Streak wraps for the same reason — Sat+Sun+Mon is three days
+ * back to back however the array is indexed.
+ *
+ * ⚠️ `gaps` therefore sums to 7 (a circular partition), so comparing profiles compares real spacing.
+ */
+function weekShape(occupied: ReadonlySet<number>): { streak: number; gaps: number[] } {
+  const idx = [...occupied].sort((a, b) => a - b);
+  if (idx.length === 0) return { streak: 0, gaps: [] };
+  if (idx.length === 7) return { streak: 7, gaps: [1, 1, 1, 1, 1, 1, 1] };
+
+  // Circular gaps between consecutive occupied days; the last wraps the week boundary.
+  const gaps: number[] = [];
+  for (let i = 1; i < idx.length; i++) gaps.push(idx[i] - idx[i - 1]);
+  gaps.push(idx[0] + 7 - idx[idx.length - 1]);
+
+  // Longest circular run of occupied days: the largest block between two gaps of more than one day.
+  let streak = 0;
+  let cur = 0;
+  for (let i = 0; i < 14; i++) {
+    const occ = occupied.has(i % 7);
+    cur = occ ? cur + 1 : 0;
+    if (cur > streak) streak = Math.min(cur, idx.length);
+  }
+  return { streak, gaps: gaps.sort((a, b) => a - b) };
+}
+
+/** >0 when `a` is the more evenly spread gap profile. Both arrays are sorted ascending. */
+function moreSpread(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** Every `k`-sized subset of `pool`, in index order. `pool` is ≤ 7 days, so this stays tiny. */
+function combinations<T>(pool: readonly T[], k: number): T[][] {
+  if (k <= 0) return [[]];
+  if (k > pool.length) return [];
+  const out: T[][] = [];
+  const walk = (start: number, acc: T[]) => {
+    if (acc.length === k) { out.push([...acc]); return; }
+    for (let i = start; i < pool.length; i++) {
+      acc.push(pool[i]);
+      walk(i + 1, acc);
+      acc.pop();
+    }
+  };
+  walk(0, []);
+  return out;
+}
+
+/**
+ * ⛔ THE WHOLE SUBSET IS SCORED, NOT ONE DAY AT A TIME — and that is the entire reason this exists
+ * rather than a call into `week-optimizer`.
+ *
+ * `assign-days.ts` learned this the expensive way and wrote the case down: *"on a three-easy week it
+ * took Monday, then Thursday (both furthest-from-Sunday at the time), and was then FORCED to put the
+ * third run next to one of them. Monday/Wednesday/Friday was available the whole time and
+ * unreachable one step at a time."* `week-optimizer`'s run branch is exactly that greedy shape —
+ * `orderFor(placedSoFar)` re-scored per placement — so it can still walk into the trap the run
+ * generator already climbed out of. There are at most C(7,k) subsets; the exhaustive answer is free.
+ *
+ * ⛔ WHAT IS *NOT* DECIDED HERE: legality. Same-day and adjacency come from the law
+ * (`sameDayLegal` / `adjacencyBreach` → `schedule-session-constraints.ts`) and this function only
+ * ever ranks days the law has already allowed. It cannot place an easy run on the long-run day,
+ * because the matrix says `easy_run × long_run = false` — not because anything here says so.
+ *
+ * ⚠️ AND IT INVENTS NO CLEARANCE. `easy_run` carries 0h adjacency against every kind in the table,
+ * so "not the day either side of the long run" is NOT a rule and must never be coded as one (§4.1a,
+ * unowned strictness). It is what maximal spread produces when the week has room, and nothing more.
+ * The one exception is owned and cited below.
+ */
+function chooseSpreadDays(
+  count: number,
+  legalDays: readonly number[],
+  occupiedBefore: ReadonlySet<number>,
+  /** Anchor day indices by kind, for the one owned preference term. */
+  anchorPlacements: readonly Placement[],
+  /** Caller-owned discouraged days (§4.1a — owner and reason live on the input). */
+  avoid: ReadonlySet<number>,
+  /** Athlete-stated days for this kind group. */
+  preferred: ReadonlySet<number>,
+): number[] | null {
+  if (count <= 0) return [];
+  if (legalDays.length < count) return null;
+
+  /**
+   * ⛔ THE ONE OWNED PREFERENCE, AND IT IS THE LAW'S OWN WORDS — not this file's opinion.
+   * `schedule-session-constraints.ts` rule list: *"After long_run → next day: prefer easy_swim or
+   * rest — not easy_run (back-to-back run tissue load). easy_run only as last resort with an explicit
+   * trade-off."* It is prose in the law rather than a cell in `ADJACENCY_HOURS`, so it is a scored
+   * cost, never a filter — encoding it as a clearance would forbid weeks athletes really do train.
+   *
+   * ⚠️ IT RANKS BELOW SPREAD ON PURPOSE. The brief for this slice is "fewest back-to-back days, then
+   * most even gaps"; a term added here must break ties between equally-spread weeks, not overrule
+   * the property it was asked to produce.
+   */
+  const dayAfterLongRun = new Set(
+    anchorPlacements.filter((a) => a.kind === 'long_run').map((a) => (a.dayIndex + 1) % 7),
+  );
+
+  type Scored = {
+    days: number[];
+    restShortfall: number;
+    shared: number;
+    streak: number;
+    gaps: number[];
+    selfAdjacent: number;
+    afterLong: number;
+    avoided: number;
+    preferredMiss: number;
+  };
+
+  const score = (days: number[]): Scored => {
+    const occupied = new Set<number>([...occupiedBefore, ...days]);
+    const shape = weekShape(occupied);
+    return {
+      days,
+      // Mirrors the lift score's element 1: ONE full rest day protected, not rest maximised.
+      restShortfall: Math.max(0, 1 - (7 - occupied.size)),
+      // Prefer each session its own day; sharing is legal (easy_run × strength = ✓) and is what
+      // protects the rest day on a full week, so it is ranked BELOW `restShortfall`, never above.
+      shared: days.filter((d) => occupiedBefore.has(d)).length,
+      streak: shape.streak,
+      gaps: shape.gaps,
+      /**
+       * ⛔ WHICH PAIR IS TOUCHING, WHEN SOMETHING MUST TOUCH — and spread genuinely cannot say.
+       *
+       * ⚠️ Found by the test sweep, and it is not a tie-break for neatness. Four sessions in seven
+       * days cannot all sit two days apart (4 gaps summing to 7 needs one gap of 1), so an adjacency
+       * is forced. Mon/Wed/Fri, Tue/Thu/Sat and Tue/Wed/Fri around a Sunday long run have the
+       * **identical** circular gap profile [1,2,2,2] and the identical streak — they are rotations
+       * of one shape. "Maximally spread" is silent between them, and without this term the calendar
+       * tie-break picked Tue/Wed/Fri: two easy runs back to back, which is the exact complaint
+       * (*"easy runs clump Mon-Tue-Wed-Thu"*) that started all of this.
+       *
+       * So when an adjacency is unavoidable, spend it against an ANCHOR rather than between two
+       * flexible sessions. ⛔ NOT A NEW RULE — `week-optimizer.easySelfAdjacencyPenalty` has scored
+       * easy-run-beside-easy-run since it was written (+4 adjacent, +8 same day). This is that
+       * concept, in the one place that scores whole arrangements instead of one day at a time.
+       */
+      selfAdjacent: days.reduce(
+        (n, d, i) => n + days.slice(i + 1).filter((o) => gapDays(d, o) === 1).length,
+        0,
+      ),
+      afterLong: days.filter((d) => dayAfterLongRun.has(d)).length,
+      avoided: days.filter((d) => avoid.has(d)).length,
+      // Missing a stated preference costs; there is nothing to miss when none was given.
+      preferredMiss: preferred.size === 0
+        ? 0
+        : [...preferred].filter((p) => !days.includes(p)).length,
+    };
+  };
+
+  let best: Scored | null = null;
+  for (const combo of combinations(legalDays, count)) {
+    const s = score(combo);
+    if (best === null) { best = s; continue; }
+    if (s.restShortfall !== best.restShortfall) { if (s.restShortfall < best.restShortfall) best = s; continue; }
+    if (s.shared !== best.shared) { if (s.shared < best.shared) best = s; continue; }
+    if (s.streak !== best.streak) { if (s.streak < best.streak) best = s; continue; }
+    const g = moreSpread(s.gaps, best.gaps);
+    if (g !== 0) { if (g > 0) best = s; continue; }
+    /**
+     * ⛔ THE TWO RECOVERY RULES OUTRANK `selfAdjacent`, AND A REAL TEST FORCED THE ORDER.
+     *
+     * `avoided` carries the run generator's inherited rule (the day BEFORE the long run is held for
+     * rest) and `afterLong` carries the shared law's (the day AFTER is not for an easy run). Both
+     * sat below `selfAdjacent` in the first draft, and `base-week-spread.test.ts` caught it inside
+     * one run: on a six-run week the solver rested **Friday** — spending the day before AND the day
+     * after the long run — because that arrangement happened to keep two easy runs off consecutive
+     * days. It optimised my tie-break at the cost of both owned recovery rules.
+     *
+     * ⚠️ AND THE REORDER COSTS ALMOST NOTHING, WHICH IS THE TELL THAT IT IS RIGHT. On a Sunday long
+     * run with three easy days the engine now finds Tue/Thu/Fri — identical spread to the previous
+     * answer, both recovery days clear, and the one unavoidable adjacency spent between two easy
+     * runs, which is the cheapest place in the week to spend it.
+     */
+    if (s.avoided !== best.avoided) { if (s.avoided < best.avoided) best = s; continue; }
+    if (s.afterLong !== best.afterLong) { if (s.afterLong < best.afterLong) best = s; continue; }
+    if (s.selfAdjacent !== best.selfAdjacent) { if (s.selfAdjacent < best.selfAdjacent) best = s; continue; }
+    if (s.preferredMiss !== best.preferredMiss) { if (s.preferredMiss < best.preferredMiss) best = s; continue; }
+    // ⛔ DETERMINISM (§5.1): calendar order settles anything the real terms tied on, so two runs of
+    // the solver on one input can never disagree.
+    for (let i = 0; i < count; i++) {
+      if (s.days[i] !== best.days[i]) { if (s.days[i] < best.days[i]) best = s; break; }
+    }
+  }
+  return best ? [...best.days].sort((a, b) => a - b) : null;
+}
+
 // ── solve() ─────────────────────────────────────────────────────────────────
 
 export function solve(input: SolverInput): SolverResult {
@@ -712,7 +989,97 @@ export function solve(input: SolverInput): SolverResult {
     if (best) {
       const b = best as { key: number[]; assignment: number[]; breaches: string[] };
       const activeSet = new Set<number>([...anchorDays, ...b.assignment]);
+
+      // ── Flexible endurance, placed around everything that now has a day ──────────────────────
+      //
+      // ⛔ TWO-STAGE, AND THE LIMIT IS STATED RATHER THAN HIDDEN. The lifts are solved first and the
+      // easy runs are spread into what is left, so a lift can take a day that would have made the
+      // runs spread better. Co-enumerating the two would fix that and would also re-rank every
+      // existing Get Stronger week — which is a behaviour change to a live block, not slice 1.
+      // The honest version of this slice is: anchors are absolute, lifts are solved, flexible fills.
+      const flexibleReq = input.flexible ?? [];
+      const placedFlexible: PlacedFlexible[] = [];
+      let flexibleDays: number[] = [];
+      if (flexibleReq.length > 0) {
+        const liftPlacements: Placement[] = lifts.map((l, i) => ({
+          kind: (l.isLower ? 'lower_body_strength' : 'upper_body_strength') as MatrixSessionKind,
+          dayIndex: b.assignment[i],
+          label: l.name,
+        }));
+        const settled = [...anchorPlacements, ...liftPlacements];
+        // ⛔ ONE KIND AT A TIME, AND EACH SESSION SEES THE ONES ALREADY PLACED. Slice 1 ships a
+        // single kind (easy_run), but the loop is per-kind so `easy_bike` / `easy_swim` drop in
+        // without restructuring — they simply ask the law a different row.
+        const byKind = new Map<MatrixSessionKind, FlexibleSession[]>();
+        for (const f of flexibleReq) {
+          const arr = byKind.get(f.kind) ?? [];
+          arr.push(f);
+          byKind.set(f.kind, arr);
+        }
+        for (const [kind, sessions] of byKind) {
+          const placedSoFar: Placement[] = [
+            ...settled,
+            ...placedFlexible.map((p) => ({
+              kind: p.kind, dayIndex: SOLVER_DAYS.indexOf(p.day), label: p.name,
+            })),
+          ];
+          // The law decides which days are candidates. Nothing else does.
+          const legalDays: number[] = [];
+          for (let d = 0; d < 7; d++) {
+            if (!sameDayLegal(kind, d, placedSoFar)) continue;
+            if (adjacencyBreach(kind, d, placedSoFar)) continue;
+            legalDays.push(d);
+          }
+          const occupiedBefore = new Set<number>(placedSoFar.map((p) => p.dayIndex));
+          const avoid = new Set<number>(
+            (input.flexibleAvoid?.days ?? []).map((d) => SOLVER_DAYS.indexOf(d)).filter((i) => i >= 0),
+          );
+          // Only the preferences belonging to THIS kind group — a stated easy-run day must not pull
+          // the quality run onto it.
+          const preferred = new Set<number>(
+            sessions
+              .map((s) => input.flexiblePreferred?.[s.name])
+              .filter((d): d is SolverDay => !!d)
+              .map((d) => SOLVER_DAYS.indexOf(d))
+              .filter((i) => i >= 0 && legalDays.includes(i)),
+          );
+          const chosen = chooseSpreadDays(
+            sessions.length, legalDays, occupiedBefore, anchorPlacements, avoid, preferred,
+          );
+          if (chosen === null) {
+            // ⛔ §5.2b — NEVER SUBTRACT. Not enough legal days is a refusal that states the
+            // arithmetic, not a quiet decision to place fewer easy runs than were asked for.
+            return {
+              status: 'unsolvable',
+              code: 'SOLVER_GRIDLOCK_NO_ROOM',
+              bindingAnchors: anchors,
+              options: [
+                `Reduce the number of ${kind.replace(/_/g, ' ')} sessions.`,
+                `Free a day by moving a fixed endurance session.`,
+              ],
+              message:
+                `${sessions.length} ${kind.replace(/_/g, ' ')} sessions need ${sessions.length} legal days, ` +
+                `and only ${legalDays.length} of the seven clear the sessions already placed. ` +
+                `⛔ No session was removed to produce this answer.`,
+            };
+          }
+          sessions.forEach((s, i) => {
+            const day = chosen[i];
+            const host = placedSoFar.find((p) => p.dayIndex === day);
+            placedFlexible.push({
+              name: s.name,
+              kind: s.kind,
+              day: SOLVER_DAYS[day],
+              ...(host ? { sharesDayWith: { label: host.label } } : {}),
+            });
+          });
+          flexibleDays = [...flexibleDays, ...chosen];
+        }
+        for (const d of flexibleDays) activeSet.add(d);
+      }
+
       const week: SolvedWeek = {
+        flexible: placedFlexible,
         lifts: lifts.map((l, i) => {
           const anchorHere = anchorPlacements.find((a) => a.dayIndex === b.assignment[i]);
           const kind: MatrixSessionKind = l.isLower ? 'lower_body_strength' : 'upper_body_strength';

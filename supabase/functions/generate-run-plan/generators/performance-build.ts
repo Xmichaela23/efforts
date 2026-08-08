@@ -285,9 +285,9 @@ export class PerformanceBuildGenerator extends BaseGenerator {
           // I-pace work this close to the marathon adds fatigue without benefit.
           if (day === 'Tuesday') {
             sessions.push(this.createRaceWeekActivation());
-          } else if (day === 'Sunday') {
+          } else if (day === this.longRunDay()) {
             // Reduced long run (8-10 miles max)
-            sessions.push(this.createVDOTLongRun(8, 0));
+            sessions.push(this.createVDOTLongRun(8, 0, day));
           } else if (sessions.length < runningDays) {
             sessions.push(this.createSession(
               day,
@@ -315,10 +315,10 @@ export class PerformanceBuildGenerator extends BaseGenerator {
               [TOKEN_PATTERNS.easy_run_miles(4)],
               ['easy_run']
             ));
-          } else if (day === 'Sunday') {
+          } else if (day === this.longRunDay()) {
             // Long run uses dynamic progression - already handles taper
-            sessions.push(this.createVDOTLongRun(this.getLongRunMiles(weekNumber, false), 0));
-          } else if (sessions.length < runningDays && day !== 'Saturday') {
+            sessions.push(this.createVDOTLongRun(this.getLongRunMiles(weekNumber, false), 0, day));
+          } else if (sessions.length < runningDays && day !== this.dayBeforeLongRun()) {
             sessions.push(this.createSession(
               day,
               'Easy Run',
@@ -1650,7 +1650,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       `Quality long run with structured M-pace segments. Practice returning to M pace under fatigue.`;
 
     return this.createSession(
-      'Sunday',
+      '',                       // the placer decides — the athlete's long-run pin (2026-08-08)
       'Quality Long Run',
       description,
       totalTimeRounded,
@@ -2008,7 +2008,13 @@ export class PerformanceBuildGenerator extends BaseGenerator {
    * Long run with VDOT pacing description (TIME-BASED per Jack Daniels method)
    * Uses time caps: 2.5 hours for easy runs, 3 hours for runs with M-pace segments
    */
-  private createVDOTLongRun(targetMiles: number, mpMiles: number = 0): Session {
+  /**
+   * ⚠️ `day` DEFAULTS TO EMPTY, WHICH MEANS "THE PLACER DECIDES" (2026-08-08). The normal path leaves
+   * it blank so `assign-days-solver` anchors the long run on the athlete's pin. Race week is the one
+   * caller that assigns its own days and never reaches the placer, so it passes one explicitly — a
+   * blank there would put a long run in the plan with no day at all.
+   */
+  private createVDOTLongRun(targetMiles: number, mpMiles: number = 0, day: string = ''): Session {
     const hasMPaceSegments = mpMiles > 0;
     
     // Calculate actual time based on pace, applying Jack Daniels time caps
@@ -2077,7 +2083,10 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       description += ` [Time capped at ${timeCap} minutes per Jack Daniels' method to prevent excessive fatigue.]`;
     }
     
-    return this.createSession('Sunday', 'Long Run', description, durationMinutes, tokens, ['long_run']);
+    // ⛔ THE PIN, NOT SUNDAY (2026-08-08) — same fix as `sustainable.createSimpleLongRun`. An empty
+    // day means "the placer decides", and `assign-days-solver` anchors it on the athlete's
+    // `preferred_days.long_run`, defaulting to Sunday when they never answered.
+    return this.createSession(day, 'Long Run', description, durationMinutes, tokens, ['long_run']);
   }
 
   /**

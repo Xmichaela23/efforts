@@ -186,19 +186,22 @@ export class SustainableGenerator extends BaseGenerator {
       return this.generateRaceWeekSessions(weekNumber, raceProximity, runningDays);
     }
     
-    // Check Sunday proximity for long run adjustments
-    const sundayProximity = this.getRaceProximitySession(
-      this.getDaysUntilRace(weekNumber, 'Sunday', this.params.start_date, this.params.race_date)
+    // ⛔ THE TAPER READS THE ATHLETE'S LONG-RUN DAY, NOT SUNDAY (2026-08-08). This asked "how far is
+    // SUNDAY from the race" and then sized the long run by the answer. For a Saturday runner that is
+    // the wrong day by one, and for a Wednesday runner it is wrong by four — the taper's first step
+    // was being decided off a day the athlete does not run long on.
+    const longRunProximity = this.getRaceProximitySession(
+      this.getDaysUntilRace(weekNumber, this.longRunDay(), this.params.start_date, this.params.race_date)
     );
-    
-    // Long run (always on Sunday) - reduce if close to race
-    if (sundayProximity === 'normal' || sundayProximity === 'reduced_quality') {
+
+    // Long run — reduce if close to race
+    if (longRunProximity === 'normal' || longRunProximity === 'reduced_quality') {
       // ⛔ THE THIRD COPY OF THE SAME CEILING, and the one that survived the first sweep. A week
       // whose SUNDAY is 8-14 days out but whose other days are further does not route through
       // `generateRaceWeekSessions` at all — it lands here, where a flat 10 clipped the taper's
       // first step (14 → 10) exactly as the other two did. Same rule: 0.8 of the block's peak.
       const taperCeiling = Math.max(4, Math.round((this.resolveLongRunArc()?.maxMi ?? 18) * 0.8));
-      const adjustedLongRunMiles = sundayProximity === 'reduced_quality'
+      const adjustedLongRunMiles = longRunProximity === 'reduced_quality'
         ? Math.min(longRunMiles, taperCeiling)
         : longRunMiles;
       sessions.push(this.createSimpleLongRun(adjustedLongRunMiles));
@@ -339,7 +342,11 @@ export class SustainableGenerator extends BaseGenerator {
         used++;
         continue;
       }
-      if (day === 'Sunday' && (p === 'easy_medium' || p === 'reduced_quality') && room()) {
+      // ⛔ THE ANCHOR IS THE ATHLETE'S LONG-RUN DAY, NOT SUNDAY (2026-08-08). Race week places its own
+      // days and never reaches the solver, so this branch is the ONLY thing that puts a taper long
+      // run on the calendar — reading `'Sunday'` here meant a Saturday runner's last long run either
+      // moved to Sunday or vanished, depending on where the race fell.
+      if (day === this.longRunDay() && (p === 'easy_medium' || p === 'reduced_quality') && room()) {
         // ⛔ THE TAPER'S OWN NUMBER, NOT A CONSTANT. The `easy_medium` arm read
         // `createSimpleLongRun(8)` — a literal three functions away from the arc that had already
         // computed this week's long run. On the 9-week case the arc stepped 9 → 8 → 6 → 4 and this
@@ -354,7 +361,8 @@ export class SustainableGenerator extends BaseGenerator {
         // Pfitzinger's 18/55 tapers 20 → 16 → 12: 0.80 then 0.60.
         const peakMi = this.resolveLongRunArc()?.maxMi ?? 18;
         const cap = Math.max(4, Math.round(peakMi * (p === 'easy_medium' ? 0.6 : 0.8)));
-        sessions.push(this.createSimpleLongRun(Math.min(cap, this.getLongRunMiles(weekNumber))));
+        // Race week assigns its own days — the long run must carry one out of this branch.
+        sessions.push(this.createSimpleLongRun(Math.min(cap, this.getLongRunMiles(weekNumber)), day));
         used++;
       }
     }
@@ -383,8 +391,8 @@ export class SustainableGenerator extends BaseGenerator {
       if (sessions.some((s) => s.day === day)) return false;   // anchored (or the race) — leave it
       const p = prox[day];
       if (p === 'easy_short' || p === 'easy_medium') return true;
-      // 8-14 days before race — Saturday stays clear before Sunday.
-      return p === 'reduced_quality' && day !== 'Saturday';
+      // 8-14 days before race — the day before the long run stays clear for it.
+      return p === 'reduced_quality' && day !== this.dayBeforeLongRun();
     };
     const chosen = new Set(
       this.spreadAcross(days.filter(fillable), Math.max(0, runningDays - used)),
@@ -724,14 +732,34 @@ export class SustainableGenerator extends BaseGenerator {
   /**
    * Create simple long run — zone-led (Z2 aerobic) when learned data exists; RPE fallback otherwise.
    */
-  private createSimpleLongRun(miles: number): Session {
+  /**
+   * ⛔ THE LONG RUN'S DAY IS THE ATHLETE'S, AND THIS FUNCTION USED TO OVERRULE IT (2026-08-08).
+   *
+   * The intake asks which day the long run is. `create-goal` forwards it, `assign-days-solver`
+   * hands it to `week-solver` as a hard anchor, and the whole engine below that is built to shape
+   * the week around it. None of it ever ran: this factory wrote a literal `'Sunday'` onto the
+   * session, so it arrived at the placer ALREADY CARRYING A DAY. Pass 1 of the adapter treats a
+   * session that has a day as immovable — correctly, that is how race week keeps its shape — so
+   * Sunday became the anchor and the athlete's answer was discarded one layer above the machine
+   * built to honour it. A Saturday runner got a Sunday long run and nothing said why.
+   *
+   * ⚠️ SO THE DAY IS NOW AN ARGUMENT, AND ITS ABSENCE MEANS "THE SOLVER DECIDES". Callers that
+   * genuinely own the day still pass one: `generateRaceWeekSessions` assigns its own days and
+   * returns without going through the placer at all, so a session left blank there would reach the
+   * plan with no day. That path passes its day explicitly and is byte-identical.
+   *
+   * ⚠️ AN UNPINNED ATHLETE STILL GETS SUNDAY. `assign-days-solver` defaults the anchor to Sunday
+   * when `preferred_days.long_run` is absent, so this is not a behaviour change for anyone who
+   * never answered the question — it is only a change for the athletes who did.
+   */
+  private createSimpleLongRun(miles: number, day: string = ''): Session {
     const duration = this.milesToMinutes(miles);
     const zt = this.enduranceZoneTag(1, 'base'); // Z2 aerobic
     const description = zt
       ? `${miles} miles — Z2 aerobic (${zt}). Easy and conversational; talk in full sentences throughout. Time on feet, not speed.`
       : `${miles} miles at easy, conversational pace. You should be able to talk in full sentences throughout. Focus on time on your feet, not speed.`;
     return this.createSession(
-      'Sunday',
+      day,
       'Long Run',
       description,
       duration,
@@ -757,7 +785,13 @@ export class SustainableGenerator extends BaseGenerator {
         ? `${baseMiles} miles easy${baseTag ? ` (${baseTag})` : ''}, then 6×100m strides at Z5 effort (${z5}) — quick, relaxed, full recovery. Strides optional; skip if tired.`
         : `${baseMiles} miles easy, then 6×100m strides (quick but relaxed sprints with full recovery). Strides are optional - skip if tired. Focus on good form and having fun.`;
       return this.createSession(
-        'Tuesday',
+        // ⛔ NO FIXED DAY (2026-08-08). This read `'Tuesday'`, which made the speedwork a pre-placed
+        // session — an immovable anchor to the placer. Harmless while the long run was also nailed to
+        // Sunday; the moment the long run started honouring the athlete's pin, an athlete who runs
+        // long on TUESDAY got both sessions stacked on the same day, because the adapter found the day
+        // already claimed and forced the long run onto it anyway. The quality run is flexible: hand it
+        // to the solver as a `quality_run` and let the law space it off the long run.
+        '',
         'Easy Run + Strides',
         description,
         baseDuration + 10, // 10 min for strides
@@ -771,7 +805,7 @@ export class SustainableGenerator extends BaseGenerator {
         ? `${baseMiles} miles with ${pickups} pickups at Z4–Z5 effort (${z4}): 30–60s comfortably hard, then easy jog to recover. Easy base${baseTag ? ` (${baseTag})` : ''}.`
         : `${baseMiles} miles with ${pickups} pick-ups: run comfortably hard for 30-60 seconds when you feel like it, then easy jog to recover. No watch needed - run by feel and enjoy it!`;
       return this.createSession(
-        'Tuesday',
+        '',                     // the placer decides — see the strides branch above (2026-08-08)
         'Fartlek Run',
         description,
         baseDuration, // Fartlek is within the 4 mile run, not additional

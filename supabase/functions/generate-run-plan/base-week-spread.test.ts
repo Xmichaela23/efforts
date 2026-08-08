@@ -40,10 +40,18 @@ const s = (name: string, tags: string[]): Session => ({
 const dayOf = (week: Session[], name: string) => week.find((x) => x.name === name)?.day;
 
 /** Longest run of back-to-back training days. */
+/**
+ * Longest run of back-to-back training days. ⛔ WRAPS — a training week repeats, so Sat+Sun+Mon is
+ * three days back to back however the Monday-first array is indexed. `week-solver.weekShape` made the
+ * same correction for the same reason; a non-wrapping count here would score a Saturday long run as
+ * spread when it is adjacent to Sunday.
+ */
 const streak = (days: (string | undefined)[]): number => {
   const on = ORDER.map((d) => days.includes(d));
+  const n = on.filter(Boolean).length;
+  if (n === 0) return 0;
   let best = 0, cur = 0;
-  for (const v of on) { cur = v ? cur + 1 : 0; if (cur > best) best = cur; }
+  for (let i = 0; i < 14; i++) { cur = on[i % 7] ? cur + 1 : 0; if (cur > best) best = Math.min(cur, n); }
   return best;
 };
 
@@ -85,7 +93,25 @@ for (const approach of APPROACHES) {
           !(days.includes('Monday') && days.includes('Tuesday') && days.includes('Wednesday') && days.includes('Thursday')),
           `the reported clump: ${days.join(', ')}`,
         );
-        assert(streak(days) <= 2, `${streak(days)} back-to-back running days: ${days.join(', ')}`);
+        /**
+         * ⛔ THE BOUND IS ARITHMETIC, NOT A CONSTANT (corrected 2026-08-08). This asserted a flat
+         * `<= 2`, which was right only while every long run was on a Sunday. Once the athlete's pin
+         * reached the long run, a **Saturday** pin holds Friday for rest and leaves five sessions to
+         * share six days — two free days split a seven-day circle into two blocks, and five sessions
+         * across two blocks is a three-day block however they are arranged. The old constant called
+         * that a regression when it is the best week that exists.
+         *
+         * So the test computes the floor — `ceil(occupied / free)` — and asserts the placer HITS it.
+         * That is a strictly stronger check than `<= 2`: it binds on every shape, including the ones
+         * where 2 was never achievable and the ones where 1 is.
+         */
+        const occupied = new Set(days).size;
+        const free = 7 - occupied;
+        const floor = free > 0 ? Math.ceil(occupied / free) : 7;
+        assert(
+          streak(days) <= floor,
+          `${streak(days)} back-to-back running days, best possible is ${floor}: ${days.join(', ')}`,
+        );
       });
     }
   }

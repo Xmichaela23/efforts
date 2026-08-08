@@ -11,7 +11,8 @@ import {
   FITNESS_TO_VOLUME,
   TOKEN_PATTERNS
 } from '../types.ts';
-import { assignDays } from './assign-days.ts';
+import { assignDays, toWeekDay } from './assign-days.ts';
+import { assignDaysViaSolver } from './assign-days-solver.ts';
 // ⛔ ONE SCAN FOR "WHERE IS THIS ATHLETE IN THE LONG-RUN ROW", shared with the race-day-anchored arc
 // the sustainable generator builds. A second copy here is how the intake and the engine start
 // entering the same table at different rungs. See that file's header for the deploy consequence.
@@ -707,8 +708,40 @@ export abstract class BaseGenerator {
    * were collected from the athlete, stored, and never read by the six generators behind this
    * method. See `assign-days.ts` for the reasoning and for what deliberately did NOT change.
    */
+  /**
+   * ⛔ ONE READER FOR "WHICH DAY IS THE LONG RUN", and it is the athlete's answer (2026-08-08).
+   *
+   * The generators asked this question by writing the literal `'Sunday'` in six places — the long-run
+   * factory, the taper's proximity probe, the race-week anchor branch, the rest-day-before rule — and
+   * every one of them was a separate chance to disagree with `assign-days-solver`, which had been
+   * reading the real pin the whole time and defaulting to Sunday only when it was absent.
+   *
+   * ⚠️ THE DEFAULT IS SUNDAY AND MUST STAY SUNDAY. `assign-days-solver:85` uses the same fallback, so
+   * an athlete who never answered the question gets exactly the week they got yesterday. This method
+   * exists so the two cannot drift, not to change what unpinned means.
+   *
+   * ⚠️ AND IT NORMALISES. Pins arrive lowercase from the client and Title-case from anything that has
+   * been through a generator; `toWeekDay` owns that and an unresolvable pin falls back rather than
+   * being guessed at.
+   */
+  protected longRunDay(): string {
+    return toWeekDay(this.params.preferred_days?.long_run) ?? 'Sunday';
+  }
+
+  /** The day held clear before the long run — the inherited "prep for the long run" rest day. */
+  protected dayBeforeLongRun(): string {
+    const order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const i = order.indexOf(this.longRunDay());
+    return order[(i + order.length - 1) % order.length];
+  }
+
   protected assignDaysToSessions(sessions: Session[], _numDays: number): Session[] {
-    return assignDays(sessions, this.params.preferred_days);
+    // ⛔ ROUTED ONTO THE SHARED SOLVER (slice 2 of the placement collapse). `assign-days.ts` is
+    // deliberately still present and still exported — it is the reference this was diffed against
+    // and the fallback if a device test says the new shape is wrong. Retiring it is its own slice.
+    // Measured on the same inputs: 4 of 12 week shapes improved (fewer back-to-back days), 8
+    // identical, 0 worse; session counts unchanged everywhere. See `assign-days-parity.test.ts`.
+    return assignDaysViaSolver(sessions, this.params.preferred_days);
   }
 
   /**
