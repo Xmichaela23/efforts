@@ -101,7 +101,34 @@ function violatesMinimumSwimSpread(candidate: DayName, existingSwimDays: DayName
   return false;
 }
 
-/** Penalize easy_run on calendar days touching quality_run or long_run (hard quality / long stimulus neighbors). */
+/**
+ * Penalize an EASY session on calendar days touching that discipline's quality or long day.
+ *
+ * Discipline-agnostic since 2026-08-07: run was the only discipline with a dispersion term, so
+ * bike and swim easy work was placed first-available with no spacing at all (the tri half of the
+ * "clumped easy sessions" report). The rule is the same physiology in every discipline — Seiler's
+ * polarized distribution wants the easy days spread so the hard days can be hard, and hard-easy
+ * (Bowerman → Daniels) wants a day of separation around the week's two hard stimuli.
+ *
+ * The +4 weights are ours and uncited — tuning params, not literature. The RULE they encode is
+ * the cited part.
+ */
+export function easyAnchorAdjacencyPenalty(
+  d: DayName,
+  qualityDay: DayName | undefined,
+  longDay: DayName | undefined,
+): number {
+  let p = 0;
+  if (qualityDay) {
+    if (dayBefore(qualityDay) === d || dayAfter(qualityDay) === d) p += 4;
+  }
+  if (longDay) {
+    if (dayBefore(longDay) === d || dayAfter(longDay) === d) p += 4;
+  }
+  return p;
+}
+
+/** Run-specific alias. Kept as its own export — `generate-plan`'s Get Stronger composer calls it by name. */
 // ⛔ EXPORTED 2026-07-28. The Get Stronger composer placed easy runs first-available with no spacing
 // term at all, and put one on the single worst day this function scores (+8: the day after the long
 // run AND the day before the hard run). The rule existed and nothing outside this file could ask it.
@@ -110,22 +137,20 @@ export function easyRunAnchorAdjacencyPenalty(
   qualityRunDay: DayName | undefined,
   longRun: DayName,
 ): number {
-  let p = 0;
-  if (qualityRunDay) {
-    if (dayBefore(qualityRunDay) === d || dayAfter(qualityRunDay) === d) p += 4;
-  }
-  if (dayBefore(longRun) === d || dayAfter(longRun) === d) p += 4;
-  return p;
+  return easyAnchorAdjacencyPenalty(d, qualityRunDay, longRun);
 }
 
-/** Larger = more separation from quality_run and long_run on the calendar (breaks ties after penalty). */
-function easyRunHardAnchorMinGap(
+/** Larger = more separation from the discipline's hard anchors (breaks ties after the penalty). */
+function easyAnchorMinGap(
   d: DayName,
-  qualityRunDay: DayName | undefined,
-  longRun: DayName,
+  qualityDay: DayName | undefined,
+  longDay: DayName | undefined,
+  alreadyPlaced: DayName[] = [],
 ): number {
-  const anchors: DayName[] = [longRun];
-  if (qualityRunDay) anchors.push(qualityRunDay);
+  const anchors: DayName[] = [...alreadyPlaced];
+  if (longDay) anchors.push(longDay);
+  if (qualityDay) anchors.push(qualityDay);
+  if (anchors.length === 0) return 7;
   let minGap = 7;
   for (const a of anchors) {
     const g = Math.abs(DAY_INDEX[d] - DAY_INDEX[a]);
@@ -133,6 +158,22 @@ function easyRunHardAnchorMinGap(
     minGap = Math.min(minGap, wrap);
   }
   return minGap;
+}
+
+/**
+ * Penalty for stacking a second/third EASY session of the same discipline next to one already
+ * placed. Without this, "disperse" only means "away from the hard days" — two easy runs would
+ * happily land on consecutive days, which is the clumping half of the 2026-08-07 report.
+ */
+function easySelfAdjacencyPenalty(d: DayName, alreadyPlaced: DayName[]): number {
+  let p = 0;
+  for (const a of alreadyPlaced) {
+    const g = Math.abs(DAY_INDEX[d] - DAY_INDEX[a]);
+    const wrap = Math.min(g, 7 - g);
+    if (wrap === 0) p += 8;
+    else if (wrap === 1) p += 4;
+  }
+  return p;
 }
 
 // ── Public types ────────────────────────────────────────────────────────────
@@ -188,8 +229,18 @@ export interface WeekOptimizerInputs {
      * placement requires same-day matrix **and** sequentialOk (§4.5: not calendar day after quality_bike).
      */
     quality_run?: DayName;
-    /** Mid-week easy run — when set, tried first for `easy_run` placement. */
+    /** Mid-week easy run — when set, tried first for `easy_run` placement (first slot only). */
     easy_run?: DayName;
+    /**
+     * How many easy runs to place (1–3). Defaults to 1 — the count this module placed before
+     * 2026-08-07, so every existing caller is byte-identical.
+     *
+     * Callers that build MORE than one easy run must say so here rather than placing the extras
+     * themselves: `generate-combined-plan` used to add its second easy run on a hardcoded
+     * Thursday, which stacked it on the quality run. The count is the caller's business (it owns
+     * run volume); the DAYS are this module's (it owns placement).
+     */
+    easy_run_count?: number;
     /** Mid-week easy bike — when set, tried first and must appear or conflict. */
     easy_bike?: DayName;
     /**
@@ -246,7 +297,15 @@ export interface PreferredDaysOut {
   easy_bike?: DayName;
   long_run?: DayName;
   quality_run?: DayName;
+  /** First easy run. `easy_run_extra` carries any others — see `easy_run_count`. */
   easy_run?: DayName;
+  /**
+   * Easy runs beyond the first, calendar-ordered. Empty/absent for the 1× default.
+   * A separate key rather than turning `easy_run` into an array: `easy_run` is read as a single
+   * DayName by the reconciler, `create-goal-and-materialize-plan`, `combined-schedule-prefs`, and
+   * the tri generator, and widening it would have been a silent breakage in four places.
+   */
+  easy_run_extra?: DayName[];
   /** Ordered `[easy_day, quality_day]`; optional third index for focus swim program maps to `swim_third_day`. */
   swim?: DayName[];
   /**
@@ -904,6 +963,16 @@ function mutatingBalancerMove(
     src.splice(idx, 0, removed);
     return false;
   }
+  // ⛔ NEVER stack two sessions of the SAME kind on one day. The same-day matrix scores
+  // cross-kind pairs and has nothing to say about easy_run × easy_run, so once a week carried
+  // more than one easy run (2026-08-07) the balancer would happily consolidate both onto one
+  // day chasing a load score — collapsing two dispersed sessions into a double, and then the
+  // rest-budget pass would clear the day and drop BOTH ("displaced easy_run + easy_run").
+  // Two of the same kind on a day is never the layout anyone asked for.
+  if (trial[toDay].some((s) => s.kind === removed.kind)) {
+    src.splice(idx, 0, removed);
+    return false;
+  }
   if (!canPlaceWithModifier(trial, toDay, removed.kind, ctx.athlete)) {
     src.splice(idx, 0, removed);
     return false;
@@ -946,6 +1015,14 @@ function findDayWithKind(
     if (days[d].some((s) => s.kind === kind)) return d;
   }
   return undefined;
+}
+
+/** Every day carrying `kind`, calendar-ordered. The balancer may have moved them, so re-read the grid. */
+function findDaysWithKind(
+  days: Record<DayName, SessionSlot[]>,
+  kind: SessionKind,
+): DayName[] {
+  return ALL_DAYS.filter((d) => days[d].some((s) => s.kind === kind));
 }
 
 function rebuildSwimSlotsFromDays(
@@ -1356,10 +1433,24 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     );
   } else {
     const ebPref = inputs.preferences.easy_bike;
-    const ebBase: DayName[] = ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'];
-    const easyBikeCandidates = ebPref ? biasOrderForPreferredDay(ebBase, ebPref) : ebBase;
     // Prefer Monday when open so easy_bike shares a day with later upper/strength (MODERATE)
     // rather than sitting alone as LOW-only mid-week — avoids rest-budget pass wiping an isolated easy_bike day.
+    const ebBase: DayName[] = ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'];
+    // 2026-08-07: the bike half of the dispersion rule. This order used to be a flat literal, so an
+    // easy bike would sit the day before or after the quality bike / long ride whenever Monday was
+    // taken — the same clumping the run side has scored against since it was written. Same penalty
+    // function, this discipline's anchors. The literal above stays as the final tie-break, so a week
+    // with no bike anchors to disperse from is unchanged.
+    const ebScored = [...ebBase].sort((a, b) => {
+      const pa = easyAnchorAdjacencyPenalty(a, qualityBikeDay, longRide);
+      const pb = easyAnchorAdjacencyPenalty(b, qualityBikeDay, longRide);
+      if (pa !== pb) return pa - pb;
+      const ga = easyAnchorMinGap(a, qualityBikeDay, longRide);
+      const gb = easyAnchorMinGap(b, qualityBikeDay, longRide);
+      if (ga !== gb) return gb - ga;
+      return ebBase.indexOf(a) - ebBase.indexOf(b);
+    });
+    const easyBikeCandidates = ebPref ? biasOrderForPreferredDay(ebScored, ebPref) : ebScored;
     for (const c of easyBikeCandidates) {
       if (c === longRide || c === longRun) continue;
       if (qualityBikeDay && c === qualityBikeDay) continue;
@@ -1391,10 +1482,22 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     strengthDays.push(consolidatedQrLowerDay);
   }
   let easyRunDay: DayName | undefined;
+  /** Every easy_run this week, calendar-ordered. Index 0 mirrors `easyRunDay`. */
+  const easyRunDaysPlaced: DayName[] = [];
   // §SESSION-FREQUENCY-DEFAULTS §2: when runs_per_week < 3, only long_run + quality_run are
   // budgeted for the week; easy_run is dropped entirely. The placeEasyRun closure short-circuits.
   const runsPerWeek = inputs.preferences.runs_per_week ?? 3;
   const skipEasyRun = runsPerWeek < 3;
+  /**
+   * How many easy runs this week. Defaults to 1 — the count this module has always placed.
+   *
+   * ⛔ THE CALLER MUST ASK FOR MORE THAN ONE, and that is deliberate. Before 2026-08-07 the
+   * combined-plan builder placed a SECOND easy run on a hardcoded `grid.get('Thursday')`
+   * (`generate-combined-plan/week-builder.ts`), never asking this module — which is why it landed
+   * on top of the quality run in 100% of run-only plans. Moving the day-choice here is the fix;
+   * the COUNT stays the caller's, so no plan's run volume changes as a side effect.
+   */
+  const easyRunCount = Math.max(1, Math.min(3, inputs.preferences.easy_run_count ?? 1));
 
   const placeEasyRun = (): void => {
     if (skipEasyRun) {
@@ -1404,42 +1507,47 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       return;
     }
     const easyRunTiebreak: DayName[] = ['tuesday', 'thursday', 'monday', 'wednesday', 'friday'];
-    const scored = (
-      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as DayName[]
-    ).slice().sort((a, b) => {
-      const pa = easyRunAnchorAdjacencyPenalty(a, qualityRunDay, longRun);
-      const pb = easyRunAnchorAdjacencyPenalty(b, qualityRunDay, longRun);
-      if (pa !== pb) return pa - pb;
-      const ga = easyRunHardAnchorMinGap(a, qualityRunDay, longRun);
-      const gb = easyRunHardAnchorMinGap(b, qualityRunDay, longRun);
-      if (ga !== gb) return gb - ga;
-      return easyRunTiebreak.indexOf(a) - easyRunTiebreak.indexOf(b);
-    });
-    const prefEr = inputs.preferences.easy_run;
-    const easyRunOrder = prefEr ? [prefEr, ...scored.filter((d) => d !== prefEr)] : scored;
     const dAfterLongRun = dayAfter(longRun);
-    let picked: DayName | undefined;
-    for (const c of easyRunOrder) {
-      if (c === longRide || c === longRun) continue;
-      if (c === dAfterLongRun) continue;
-      if (qualityRunDay && c === qualityRunDay) continue;
-      if (days[c].length > 0) continue;
-      if (!canPlace(days, c, 'easy_run')) continue;
-      if (!sequentialOk(days, c, 'easy_run', inputs.athlete)) continue;
-      picked = c;
-      break;
-    }
-    if (!picked) {
-      for (const c of easyRunOrder) {
-        if (c === longRide || c === longRun) continue;
-        if (c === dAfterLongRun) continue;
-        if (qualityRunDay && c === qualityRunDay) continue;
-        if (!canPlace(days, c, 'easy_run')) continue;
-        if (!sequentialOk(days, c, 'easy_run', inputs.athlete)) continue;
-        picked = c;
-        break;
-      }
-    }
+    const prefEr = inputs.preferences.easy_run;
+
+    /** Re-scored each pass so easy run N+1 disperses away from the ones already down. */
+    const orderFor = (placedSoFar: DayName[]): DayName[] => {
+      const scored = (
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as DayName[]
+      ).slice().sort((a, b) => {
+        const pa = easyAnchorAdjacencyPenalty(a, qualityRunDay, longRun) + easySelfAdjacencyPenalty(a, placedSoFar);
+        const pb = easyAnchorAdjacencyPenalty(b, qualityRunDay, longRun) + easySelfAdjacencyPenalty(b, placedSoFar);
+        if (pa !== pb) return pa - pb;
+        const ga = easyAnchorMinGap(a, qualityRunDay, longRun, placedSoFar);
+        const gb = easyAnchorMinGap(b, qualityRunDay, longRun, placedSoFar);
+        if (ga !== gb) return gb - ga;
+        return easyRunTiebreak.indexOf(a) - easyRunTiebreak.indexOf(b);
+      });
+      // The athlete's pinned easy-run day only leads the FIRST pass — a pin names one day, not
+      // every easy day, and re-leading it on pass 2 would just re-offer an occupied slot.
+      return prefEr && placedSoFar.length === 0
+        ? [prefEr, ...scored.filter((d) => d !== prefEr)]
+        : scored;
+    };
+
+    const pickOne = (placedSoFar: DayName[]): DayName | undefined => {
+      const easyRunOrder = orderFor(placedSoFar);
+      const usable = (c: DayName, requireEmpty: boolean): boolean => {
+        if (c === longRide || c === longRun) return false;
+        if (c === dAfterLongRun) return false;
+        if (qualityRunDay && c === qualityRunDay) return false;
+        if (placedSoFar.includes(c)) return false;
+        if (requireEmpty && days[c].length > 0) return false;
+        if (!canPlace(days, c, 'easy_run')) return false;
+        if (!sequentialOk(days, c, 'easy_run', inputs.athlete)) return false;
+        return true;
+      };
+      for (const c of easyRunOrder) if (usable(c, true)) return c;
+      for (const c of easyRunOrder) if (usable(c, false)) return c;
+      return undefined;
+    };
+
+    let picked = pickOne([]);
     if (!picked && dAfterLongRun !== longRide && dAfterLongRun !== longRun &&
       (!qualityRunDay || dAfterLongRun !== qualityRunDay)) {
       if (canPlace(days, dAfterLongRun, 'easy_run') &&
@@ -1456,7 +1564,23 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     }
     if (picked) {
       easyRunDay = picked;
+      easyRunDaysPlaced.push(picked);
       place(days, picked, 'easy_run');
+
+      // Additional easy runs the caller budgeted for. Each is dispersed against the anchors AND
+      // against the easy runs already down; a slot that can't be found is a trade-off, never a
+      // silently-stacked double (that stack was the pre-2026-08-07 behavior).
+      for (let n = easyRunDaysPlaced.length; n < easyRunCount; n++) {
+        const extra = pickOne([...easyRunDaysPlaced]);
+        if (!extra) {
+          trade_offs.push(
+            `Easy run ${n + 1} of ${easyRunCount} dropped — no weekday left with clean separation from ${tfDay(longRun)}${qualityRunDay ? `, ${tfDay(qualityRunDay)}` : ''} and the easy runs already placed.`,
+          );
+          break;
+        }
+        easyRunDaysPlaced.push(extra);
+        place(days, extra, 'easy_run');
+      }
     } else {
       // §A.4 (`docs/BRICK-PROTOCOL.md` companion): if easy_bike was placed AND its day was in
       // the easy_run candidate set, the new matrix flip (easy_bike × easy_run = ✗) is the
@@ -1464,7 +1588,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       // otherwise fall back to the generic density message.
       const ebDay = easyBikeDay;
       const easyBikeBlockedRun = ebDay != null
-        && easyRunOrder.includes(ebDay)
+        && orderFor([]).includes(ebDay)
         && ebDay !== longRide
         && ebDay !== longRun
         && ebDay !== dAfterLongRun
@@ -2070,6 +2194,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   const dayHasKind = (d: DayName | undefined, k: SessionKind): boolean =>
     !!d && days[d].some((s) => s.kind === k);
 
+  // ⛔ READ THE EASY-RUN DAYS *HERE*, not next to the post-balancer rebuild above. The rest-budget
+  // pass sits between the two and can clear a day outright; a snapshot taken before it reported an
+  // easy run on a day that is now a rest day. `easy_run` was already scrubbed by `dayHasKind`, so
+  // an earlier snapshot produced the incoherent `easy_run: absent, easy_run_extra: [Friday]`.
+  const easyRunDaysFinal = findDaysWithKind(days, 'easy_run');
+
   const finalSwims = swimSlots.filter(
     (s) => days[s.day].some((slot) => slot.kind === s.kind),
   );
@@ -2085,7 +2215,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     ...(dayHasKind(qualityBikeDay, 'quality_bike') ? { quality_bike: qualityBikeDay! } : {}),
     ...(dayHasKind(easyBikeDay, 'easy_bike') ? { easy_bike: easyBikeDay! } : {}),
     ...(dayHasKind(qualityRunDay, 'quality_run') ? { quality_run: qualityRunDay! } : {}),
-    ...(dayHasKind(easyRunDay, 'easy_run') ? { easy_run: easyRunDay! } : {}),
+    ...(easyRunDaysFinal.length ? { easy_run: easyRunDaysFinal[0]! } : {}),
+    ...(easyRunDaysFinal.length > 1 ? { easy_run_extra: easyRunDaysFinal.slice(1) } : {}),
     ...(swimArray.length ? { swim: swimArray } : {}),
     ...(finalStrength.length ? { strength: finalStrength } : {}),
   };

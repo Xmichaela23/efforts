@@ -68,6 +68,12 @@ export interface AthleteState {
   run_quality_day?: number;
   /** Mid-week easy aerobic run. Default: Friday. */
   run_easy_day?: number;
+  /**
+   * Easy runs beyond the first (Sun-first day indices), chosen and dispersed by the week
+   * optimizer. Written only by `reconcileAthleteStateWithWeekOptimizer`; the builder places
+   * additional easy runs on exactly these days and nowhere else.
+   */
+  run_easy_extra_days?: number[];
   /** Mid-week bike quality (threshold / tempo / sweet spot). Default: Tuesday. */
   bike_quality_day?: number;
   /** Mid-week easy aerobic bike (second ride). Default: Wednesday. */

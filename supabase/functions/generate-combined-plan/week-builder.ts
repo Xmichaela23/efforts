@@ -1726,14 +1726,38 @@ export function buildWeek(
   // and run-only easy-session paths below). Defaults to 3 (existing behavior preserved
   // when reconciler hasn't populated session_frequency_defaults).
   const runsBudget = athleteState.session_frequency_defaults?.runs_per_week ?? 3;
-  // Run-only: mid-week easy run (fixed Thursday — not tied to swim prefs)
-  const thursdayRunSlot = grid.get('Thursday');
-  if (runsBudget >= 3 && !hasTri && !thursdayRunSlot?.isRest) {
-    const easyMi = isRecovery
-      ? Math.max(2, Math.round(longRunMiles * 0.30))
-      : Math.max(4, Math.round(longRunMiles * 0.40));
-    const thuEasy = easyRun('Thursday', easyMi, servedGoal);
-    thursdayRunSlot!.sessions.push(stridesOnEasyRun ? addStridesToEasyRun(thuEasy) : thuEasy);
+  // ── Run-only: the SECOND easy run ─────────────────────────────────────────
+  //
+  // ⛔ THIS WAS A LITERAL `grid.get('Thursday')` UNTIL 2026-08-07, and it is the whole of the
+  // "easy runs clumped, one landed on the hard day" report. It placed an easy run on Thursday
+  // with no reference to the optimizer, no dispersion term, and no check of what was already
+  // there — so on every run-only plan whose quality run the optimizer put on Thursday (the
+  // common case), the athlete got intervals AND an easy run on the same day. A 640-config sweep
+  // hit it in 100% of run-only combined plans, plus a same-day double easy run whenever
+  // `run_easy_day` also resolved to Thursday.
+  //
+  // The day now comes from `run_easy_extra_days`, which the reconciler fills from the optimizer's
+  // `preferred_days.easy_run_extra` — scored against long_run, quality_run, and the easy runs
+  // already placed. The COUNT is unchanged (still one extra on run-only plans, none on tri), so
+  // no plan's run volume moves; only the weekday does. `_shared/week-optimizer.ts` stays the sole
+  // day-authority — this file no longer names a run day.
+  const extraEasyRunDays = (athleteState.run_easy_extra_days ?? [])
+    .map((idx) => DAYS_OF_WEEK[(idx + 6) % 7])
+    .filter((d): d is string => !!d);
+  if (runsBudget >= 3 && !hasTri) {
+    for (const d of extraEasyRunDays) {
+      const slot = grid.get(d);
+      if (!slot || slot.isRest || slot.sessions.length >= 2) continue;
+      // Defense-in-depth: the optimizer already refuses to co-locate these, but a stale
+      // AthleteState (pins carried across a regenerate) must not resurrect the stacked hard day.
+      if (d === runQualityDay || d === longRunActualDay) continue;
+      if (slot.sessions.some((s) => s.type === 'run')) continue;
+      const easyMi = isRecovery
+        ? Math.max(2, Math.round(longRunMiles * 0.30))
+        : Math.max(4, Math.round(longRunMiles * 0.40));
+      const extraEasy = easyRun(d, easyMi, servedGoal);
+      slot.sessions.push(stridesOnEasyRun ? addStridesToEasyRun(extraEasy) : extraEasy);
+    }
   }
 
   // ── Second swim slot (easy / technique / race-specific aerobic from template) ─
@@ -1774,7 +1798,15 @@ export function buildWeek(
   // §SESSION-FREQUENCY-DEFAULTS §2: when runs_per_week < 3, easy_run is dropped
   // (long_run + quality_run only). `runsBudget` declared earlier (above run-only path).
   const runEasySlot = grid.get(runEasyDay);
-  if (runsBudget >= 3 && !runEasySlot?.isRest && !['taper'].includes(phase)) {
+  // Same guard as the extra-easy-run block above: `runEasyDay` falls back to a literal Friday when
+  // `run_easy_day` is unset (:1152), and `adjDay` only dodges the quality run — nothing stopped it
+  // landing on the long run, or on a day that already has a run.
+  const runEasyDayClean =
+    runEasyDay !== runQualityDay &&
+    runEasyDay !== longRunActualDay &&
+    !extraEasyRunDays.includes(runEasyDay) &&
+    !(runEasySlot?.sessions.some((s) => s.type === 'run') ?? false);
+  if (runsBudget >= 3 && runEasyDayClean && !runEasySlot?.isRest && !['taper'].includes(phase)) {
     if (isRecovery) {
       const recMi = Math.max(2, Math.round(longRunMiles * 0.25));
       runEasySlot!.sessions.push(easyRun(runEasyDay, recMi, servedGoal));

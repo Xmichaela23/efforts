@@ -219,7 +219,9 @@ Deno.serve(async (req: Request) => {
     // Task 7 (consolidation): scheduling is the optimizer's responsibility for ALL combined-plan
     // entrypoints. The reconciler internally short-circuits (returns state unchanged) for AthleteStates
     // that cannot be optimized — e.g. when long_run_day is missing — so it is safe to call unconditionally.
-    const scheduleState: AthleteState = reconcileAthleteStateWithWeekOptimizer(state703Cutoff);
+    const scheduleState: AthleteState = reconcileAthleteStateWithWeekOptimizer(state703Cutoff, {
+      hasTriGoal,
+    });
 
     // ── Build phase timeline ────────────────────────────────────────────────
     const { blocks: builtBlocks, totalWeeks, raceAnchors, phaseStructureTradeOffs } = buildPhaseTimeline(goals, startDate, scheduleState);
@@ -241,6 +243,7 @@ Deno.serve(async (req: Request) => {
         bike_quality_label: scheduleState.bike_quality_label,
         run_quality_day: scheduleState.run_quality_day,
         run_easy_day: scheduleState.run_easy_day,
+        run_easy_extra_days: scheduleState.run_easy_extra_days,
         long_ride_day: scheduleState.long_ride_day,
         long_run_day: scheduleState.long_run_day,
         swim_easy_day: scheduleState.swim_easy_day,

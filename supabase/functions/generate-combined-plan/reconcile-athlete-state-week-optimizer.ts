@@ -128,7 +128,33 @@ function resolveSessionFrequencyDefaults(state: AthleteState): SessionFrequencyD
   return computeSessionFrequencyDefaults(inputs);
 }
 
-function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | null {
+/**
+ * How many easy runs the week-builder will place, so the optimizer can choose their DAYS.
+ *
+ * ⛔ THIS NUMBER IS A MIRROR OF THE BUILDER, NOT A NEW POLICY. `week-builder.ts` places two easy
+ * runs on run-only plans (its `runsBudget >= 3` blocks) and one on tri plans. Before 2026-08-07 the
+ * second one went on a hardcoded `grid.get('Thursday')` — no optimizer, no dispersion, and in
+ * practice on top of the quality run. Passing the count here moves the day-choice to the sole
+ * day-authority while leaving run VOLUME exactly where it was; if the builder's run budget ever
+ * changes, this has to change with it.
+ */
+function easyRunCountForPlan(state: AthleteState, opts?: ReconcileOptions): number {
+  const runsBudget = state.session_frequency_defaults?.runs_per_week
+    ?? resolveSessionFrequencyDefaults(state).runs_per_week;
+  if (runsBudget < 3) return 0;
+  return opts?.hasTriGoal ? 1 : 2;
+}
+
+export interface ReconcileOptions {
+  /**
+   * True when any goal is triathlon-shaped. Only affects the easy-run COUNT (see
+   * `easyRunCountForPlan`) — the builder places a second easy run on run-only plans and one on
+   * tri plans. Omitted → treated as tri (1×), which is this module's pre-2026-08-07 behavior.
+   */
+  hasTriGoal?: boolean;
+}
+
+function buildWeekOptimizerInputs(state: AthleteState, opts?: ReconcileOptions): WeekOptimizerInputs | null {
   const lr = state.long_ride_day != null ? sunIndexToDayName(state.long_ride_day) : undefined;
   const lrun = state.long_run_day != null ? sunIndexToDayName(state.long_run_day) : undefined;
   // Task 7: long_run is the minimum anchor; long_ride is optional (run-only plans).
@@ -189,6 +215,7 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
       ...(restDays.length ? { rest_days: restDays } : {}),
       ...(qr ? { quality_run: qr } : {}),
       ...(state.run_easy_day != null ? { easy_run: sunIndexToDayName(state.run_easy_day) } : {}),
+      easy_run_count: easyRunCountForPlan(state, opts),
       ...(state.bike_easy_day != null ? { easy_bike: sunIndexToDayName(state.bike_easy_day) } : {}),
       ...(swimPref.length ? { swim: swimPref } : {}),
       ...(strengthPreferredDays ? { strength_preferred_days: strengthPreferredDays } : {}),
@@ -219,7 +246,10 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
  * placement hints. Returns state unchanged when no `long_run_day` anchor is present (e.g.
  * bike-only / swim-only configurations the optimizer can't anchor).
  */
-export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): AthleteState {
+export function reconcileAthleteStateWithWeekOptimizer(
+  state: AthleteState,
+  opts?: ReconcileOptions,
+): AthleteState {
   const incomingPins = {
     bike_quality_day: state.bike_quality_day,
     bike_quality_label: state.bike_quality_label,
@@ -229,7 +259,7 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     has_group_ride_url: Boolean(String(state.group_ride_route_url ?? '').trim()),
   };
 
-  const inputs = buildWeekOptimizerInputs(state);
+  const inputs = buildWeekOptimizerInputs(state, opts);
   if (!inputs) {
     console.log('[generate-combined-plan] reconcileAthleteStateWithWeekOptimizer: skipped_no_long_run_anchor', incomingPins);
     return state;
@@ -273,6 +303,11 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     ...(pd.easy_bike != null ? { bike_easy_day: dayNameToSunIndex(pd.easy_bike) } : {}),
     ...(pd.quality_run ? { run_quality_day: dayNameToSunIndex(pd.quality_run) } : {}),
     ...(pd.easy_run ? { run_easy_day: dayNameToSunIndex(pd.easy_run) } : {}),
+    // Extra easy runs, optimizer-chosen and dispersed. The builder places on exactly these days —
+    // it no longer picks any run day of its own (the hardcoded Thursday is gone).
+    ...(pd.easy_run_extra?.length
+      ? { run_easy_extra_days: pd.easy_run_extra.map(dayNameToSunIndex) }
+      : {}),
     ...(pd.swim?.[0] != null ? { swim_easy_day: dayNameToSunIndex(pd.swim[0]) } : {}),
     ...(pd.swim?.[1] != null ? { swim_quality_day: dayNameToSunIndex(pd.swim[1]) } : {}),
     ...(pd.swim?.[2] != null ? { swim_third_day: dayNameToSunIndex(pd.swim[2]) } : {}),
