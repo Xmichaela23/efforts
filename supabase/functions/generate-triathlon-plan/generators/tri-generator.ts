@@ -26,6 +26,9 @@ import {
   swimSessionPhilosophyLead,
 } from '../../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 
+import { deriveOptimalWeek } from '../../_shared/week-optimizer.ts';
+import type { DayName, StrengthPreferredSlot, WeekOptimizerInputs } from '../../_shared/week-optimizer.ts';
+
 import { triathlonProtocol } from '../../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../../shared/strength-system/protocols/triathlon_performance.ts';
 import type { ProtocolContext } from '../../shared/strength-system/protocols/types.ts';
@@ -137,10 +140,18 @@ function appendPoolGearLine(
 }
 
 /**
- * Default week layout (slot → canonical day name).
- * All session placement in generateWeek() routes through slotDay() so that
- * athlete-supplied preferred_days can override any slot without touching each
- * individual call site.
+ * LAST-RESORT week layout (slot → canonical day name).
+ *
+ * ⛔ THIS TABLE IS NO LONGER THE DEFAULT. Until 2026-08-07 it was: this generator laid out every
+ * standalone triathlon plan from these literals, overridden only by explicit athlete pins. It has
+ * no long-run guard (`strength_1` is the LOWER slot and sat on Monday whatever day the long run
+ * was), no hard/easy spacing, and no dispersion — so of the three live generators this was the one
+ * where heavy lower work could genuinely land on or beside the long run.
+ *
+ * `buildSlotMap` now derives the layout from `_shared/week-optimizer.ts`, the sole day-authority
+ * (CLAUDE.md), exactly as `generate-combined-plan` does. This table survives only as the fallback
+ * for when the optimizer cannot anchor a week or throws — plan generation must never fail on a
+ * scheduling nicety.
  */
 const DEFAULT_SLOT_DAYS: Record<string, string> = {
   easy_swim:              'Monday',
@@ -151,18 +162,72 @@ const DEFAULT_SLOT_DAYS: Record<string, string> = {
   easy_run:               'Friday',
   long_ride:              'Saturday',
   long_run:               'Sunday',
+  // ⚠️ slot 1 is sessionIndex 0 = LOWER body; slot 2 is sessionIndex 1 = UPPER
+  // (`buildProtocolStrengthSession`). Naming them 1/2 hides that; do not reorder.
   strength_1:             'Monday',
   strength_2:             'Wednesday',
 };
+
+const SUN_FIRST_DAYS: DayName[] = [
+  'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+];
+
+/** `'Monday'` / `'mon'` / `'monday'` → `'monday'`, or undefined when unrecognised. */
+function toDayName(raw: string | undefined | null): DayName | undefined {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return undefined;
+  const hit = SUN_FIRST_DAYS.find((d) => d === s || d.startsWith(s.slice(0, 3)));
+  return hit;
+}
+
+function titleCase(d: DayName): string {
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
 
 export class TriathlonGenerator {
   protected params: TriGeneratorParams;
   /** Resolved slot → canonical day map built once from preferred_days */
   private readonly slotMap: Record<string, string>;
+  /**
+   * Strength sessions the week can actually hold, after the optimizer had its say.
+   *
+   * ⛔ THIS IS NOT `params.strength_frequency`, AND THE DIFFERENCE IS THE BUG. When the optimizer
+   * cannot find a legal day for the lower session — e.g. a Monday long run, where the 48h-pre rule
+   * blocks Sunday and the long run itself blocks Monday — it places only the upper one and says so
+   * in `conflicts`. Reading that partial answer, finding `strength_1` unset, and falling back to
+   * the literal `'Monday'` put knee-dominant work on the long-run day: the guard produced the right
+   * answer and the default overrode it. A refusal has to survive as a refusal.
+   */
+  private readonly effectiveStrengthFrequency: number;
 
   constructor(params: TriGeneratorParams) {
     this.params = params;
-    this.slotMap = this.buildSlotMap(params.preferred_days);
+    const layout = this.optimizerLayout(params.preferred_days);
+    this.slotMap = this.buildSlotMap(params.preferred_days, layout.slots);
+    this.effectiveStrengthFrequency = this.resolveStrengthFrequency(params, layout);
+  }
+
+  /**
+   * The optimizer's strength verdict caps the requested frequency. An explicit athlete pin still
+   * wins — a pinned day is a stated constraint, not a guess — and the long-run guard at the
+   * placement site catches the case where the pin itself is the unsafe thing.
+   */
+  private resolveStrengthFrequency(
+    params: TriGeneratorParams,
+    layout: { ok: boolean; strengthDayCount: number },
+  ): number {
+    const requested = Math.max(0, params.strength_frequency ?? 0);
+    if (requested === 0) return 0;
+    const pinned = Array.isArray(params.preferred_days?.strength)
+      ? params.preferred_days!.strength!.filter(Boolean).length
+      : 0;
+    if (pinned > 0 || !layout.ok) return requested;
+    if (layout.strengthDayCount < requested) {
+      console.log(
+        `[tri-generator] strength ${requested}× → ${layout.strengthDayCount}×: the week optimizer found no legal day for the remaining session(s) around long_run / long_ride.`,
+      );
+    }
+    return Math.min(requested, layout.strengthDayCount);
   }
 
   /**
@@ -171,8 +236,11 @@ export class TriathlonGenerator {
    */
   private buildSlotMap(
     pd?: TriGeneratorParams['preferred_days'],
+    optimizerSlots: Partial<Record<string, string>> = {},
   ): Record<string, string> {
-    const m = { ...DEFAULT_SLOT_DAYS };
+    // Optimizer-derived layout first, hardcoded table only if that fails. Athlete pins are then
+    // overlaid on top exactly as before — a pin still wins, this only changes what it wins against.
+    const m = { ...DEFAULT_SLOT_DAYS, ...optimizerSlots };
     if (!pd) return m;
     if (pd.quality_bike) m.quality_bike   = canonicalDay(pd.quality_bike);
     if (pd.easy_bike)    m.mid_ride       = canonicalDay(pd.easy_bike);
@@ -192,6 +260,105 @@ export class TriathlonGenerator {
       if (pd.strength[1]) m.strength_2 = canonicalDay(pd.strength[1]);
     }
     return m;
+  }
+
+  /**
+   * Week layout from `_shared/week-optimizer.ts` — the same authority `generate-combined-plan`
+   * uses. Returns a partial slot map; anything it can't decide falls through to DEFAULT_SLOT_DAYS.
+   *
+   * What this buys a standalone tri plan that the literal table never did:
+   *  - lower-body strength is kept off the long-run day and 24h clear of leg-quality work
+   *    (Hickson 1980 concurrent-training interference; `lowerBodyBlockedDays` + `sequentialOk`)
+   *  - hard/easy spacing and easy-session dispersion across all three disciplines
+   *  - the same-day compatibility matrix, instead of whatever the literals happened to collide on
+   *
+   * ⛔ BEST-EFFORT BY DESIGN. Any throw or un-anchorable week returns `{}` and the caller keeps
+   * the old literals. A scheduling refinement must never be the reason a plan fails to generate.
+   */
+  private optimizerLayout(
+    pd?: TriGeneratorParams['preferred_days'],
+  ): { slots: Partial<Record<string, string>>; ok: boolean; strengthDayCount: number } {
+    try {
+      const longRun = toDayName(pd?.long_run) ?? 'sunday';
+      const longRide = toDayName(pd?.long_ride) ?? 'saturday';
+      const qualityBike = toDayName(pd?.quality_bike);
+      const qualityRun = toDayName(pd?.quality_run);
+      const easyRun = toDayName(pd?.easy_run);
+      const easyBike = toDayName(pd?.easy_bike);
+      const swimPins = (Array.isArray(pd?.swim) ? pd!.swim : [])
+        .map(toDayName)
+        .filter((d): d is DayName => !!d);
+      const strengthPins = (Array.isArray(pd?.strength) ? pd!.strength : [])
+        .map(toDayName)
+        .filter((d): d is DayName => !!d);
+
+      const strengthFrequency = Math.max(0, Math.min(3, this.params.strength_frequency ?? 0)) as 0 | 1 | 2 | 3;
+      const strengthIntent: 'performance' | 'support' =
+        this.params.strength_intent === 'performance' ? 'performance' : 'support';
+
+      const inputs: WeekOptimizerInputs = {
+        anchors: {
+          long_run: longRun,
+          long_ride: longRide,
+          ...(qualityBike ? { quality_bike: { day: qualityBike, intensity: 'quality' as const } } : {}),
+        },
+        preferences: {
+          // This generator always builds two swims (easy + quality slots) and one mid-week ride.
+          swims_per_week: 2,
+          strength_frequency: strengthFrequency,
+          // ⚠️ NOT `params.days_per_week` — that field counts SESSIONS ("8–12 typical" per its own
+          // doc comment), not calendar days. Feeding it here would ask for an 11-day week. 6 is the
+          // optimizer's own default and matches this generator's realized footprint.
+          training_days: 6,
+          bikes_per_week: 3,
+          runs_per_week: 3,
+          ...(qualityRun ? { quality_run: qualityRun } : {}),
+          ...(easyRun ? { easy_run: easyRun } : {}),
+          ...(easyBike ? { easy_bike: easyBike } : {}),
+          ...(swimPins.length ? { swim: swimPins } : {}),
+          ...(strengthPins.length ? { strength_preferred_days: strengthPins } : {}),
+        },
+        athlete: {
+          ...(this.params.training_intent ? { training_intent: this.params.training_intent } : {}),
+          strength_intent: strengthIntent,
+        },
+      };
+
+      const week = deriveOptimalWeek(inputs);
+      const opt = week.preferred_days;
+      const out: Partial<Record<string, string>> = {};
+      if (opt.long_run) out.long_run = titleCase(opt.long_run);
+      if (opt.long_ride) out.long_ride = titleCase(opt.long_ride);
+      if (opt.quality_bike) out.quality_bike = titleCase(opt.quality_bike);
+      if (opt.easy_bike) out.mid_ride = titleCase(opt.easy_bike);
+      if (opt.quality_run) out.quality_run = titleCase(opt.quality_run);
+      if (opt.easy_run) out.easy_run = titleCase(opt.easy_run);
+      if (opt.swim?.[0]) out.easy_swim = titleCase(opt.swim[0]);
+      if (opt.swim?.[1]) out.quality_swim = titleCase(opt.swim[1]);
+
+      // ⛔ MATCH BY `kind`, NOT BY INDEX. Slot 1 is sessionIndex 0 = LOWER and slot 2 is UPPER,
+      // but the optimizer exports `preferred_days.strength` UPPER-FIRST. Index-mapping the two
+      // would put the lower session on the upper day — inverting the one guard (lower vs long run)
+      // this whole change exists to give the tri path.
+      const strengthOut = opt.strength;
+      let strengthDayCount = 0;
+      if (Array.isArray(strengthOut) && strengthOut.length > 0 && typeof strengthOut[0] === 'object') {
+        const slots = strengthOut as StrengthPreferredSlot[];
+        strengthDayCount = slots.length;
+        const lower = slots.find((s) => s.kind === 'lower_body_strength');
+        const upper = slots.find((s) => s.kind === 'upper_body_strength');
+        // A slot the optimizer declined to fill is left for `effectiveStrengthFrequency` to drop.
+        // Writing the literal back in here is precisely how the refusal used to get overridden.
+        if (lower) out.strength_1 = titleCase(lower.day);
+        if (upper) out.strength_2 = titleCase(upper.day);
+        // 1× lands on whichever single day it found, whatever kind that is.
+        if (slots.length === 1) out.strength_1 = titleCase(slots[0]!.day);
+      }
+      return { slots: out, ok: true, strengthDayCount };
+    } catch (e) {
+      console.warn('[tri-generator] week-optimizer layout unavailable, using default slot days:', e);
+      return { slots: {}, ok: false, strengthDayCount: 0 };
+    }
   }
 
   /** Return the canonical day name for a given session slot. */
@@ -450,20 +617,38 @@ export class TriathlonGenerator {
     // ── Strength (optional, protocol-driven) ─────────────────────────────────
     // Use preferred strength days from the slot map; fall back to a brick-safe
     // swap only when the requested day already contains a brick this week.
-    if ((this.params.strength_frequency ?? 0) > 0 && !isRecovery && !recoveryRebuildW1) {
+    if (this.effectiveStrengthFrequency > 0 && !isRecovery && !recoveryRebuildW1) {
       const phaseStartWeek = ps.phases.find(p => p.name === phase.name)?.start_week ?? 1;
       const wipForStrength = Math.max(1, week - phaseStartWeek + 1);
 
       const brickDays = sessions.filter(s => s.tags?.includes('brick')).map(s => s.day);
-      const strDay1 = brickDays.includes(dayStrength1) ? dayQualBike : dayStrength1;
 
-      const strSession = this.buildProtocolStrengthSession(strDay1, phase, wipForStrength, 0, brickDays);
-      if (strSession) sessions.push(strSession);
+      /**
+       * ⛔ NEVER THE LONG-RUN DAY, whatever the slot map says.
+       *
+       * The last line of defence, and it has to exist even now that the optimizer picks the days:
+       * an explicit `preferred_days.strength` pin overrides the optimizer (deliberately — a pin is
+       * a stated constraint), and the brick-collision swaps below redirect to `quality_bike` /
+       * `mid_ride` without re-checking anything. Both routes can still land on the long run.
+       *
+       * The tri protocols emit FULL-BODY sessions (`triathlon.ts` → knee/hinge work in both
+       * slots), so this applies to both — there is no "upper is fine here" case on this path.
+       * Hickson 1980 / §8.2: the long run is eccentric, and heavy leg work may not share it.
+       */
+      const placeStrength = (day: string, sessionIndex: 0 | 1): void => {
+        if (day === dayLongRun) {
+          console.log(
+            `[tri-generator] week ${week}: strength slot ${sessionIndex + 1} dropped — resolved to ${day}, the long-run day.`,
+          );
+          return;
+        }
+        const s = this.buildProtocolStrengthSession(day, phase, wipForStrength, sessionIndex, brickDays);
+        if (s) sessions.push(s);
+      };
 
-      if ((this.params.strength_frequency ?? 0) >= 2) {
-        const strDay2 = brickDays.includes(dayStrength2) ? dayMidRide : dayStrength2;
-        const strSession2 = this.buildProtocolStrengthSession(strDay2, phase, wipForStrength, 1, brickDays);
-        if (strSession2) sessions.push(strSession2);
+      placeStrength(brickDays.includes(dayStrength1) ? dayQualBike : dayStrength1, 0);
+      if (this.effectiveStrengthFrequency >= 2) {
+        placeStrength(brickDays.includes(dayStrength2) ? dayMidRide : dayStrength2, 1);
       }
     }
 
