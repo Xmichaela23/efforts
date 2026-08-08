@@ -23,10 +23,11 @@
 // `generate-run-plan` must be redeployed after any change here (CLAUDE.md, the `_shared` deploy
 // trap — it applies to `src/lib/` identically).
 //
-// ⚠️ A THIRD COPY OF `LONG_RUN_PROGRESSION` STILL EXISTS at
-// `generate-run-plan/generators/simple-completion.ts:19`. It is left alone deliberately: that
-// generator is one of the five dead ones (`CAPABILITY-MAP` "I almost rebuilt this" #4) and is not
-// switched on. Do not "consolidate" it without first deciding whether that file should exist.
+// ✅ The third copy of `LONG_RUN_PROGRESSION` is GONE. It lived in
+// `generate-run-plan/generators/simple-completion.ts:19`, one of the six dead run generators, and
+// that file was deleted 2026-08-07 (plan-generator quarantine, census
+// `docs/AUDIT-plan-generators-2026-08-07.md` §7). This file and `generators/sustainable.ts` are now
+// the only copies — sustainable imports from here, so there is one table, not two.
 
 /**
  * ⛔ THE TABLE THE LIVE MARATHON PATH ACTUALLY USES, AND IT IS NOT THE ONE YOU WILL BE POINTED AT.
@@ -35,7 +36,9 @@
  * exported, it carries `longRunCap` and `weeklyIncrease`, and `base-generator.ts` has four
  * accessors for it. **Neither live generator calls any of them.** `calculateStartingVolume`,
  * `calculatePeakVolume`, `getLongRunCap` and `getWeeklyIncrease` are reached only from
- * `distributeVolume` (zero callers) and `generators/volume-progression.ts` (a dead generator).
+ * `distributeVolume`, which itself has zero callers. (Its other caller,
+ * `generators/volume-progression.ts`, was a dead generator and was deleted 2026-08-07 — so those
+ * four accessors are now reachable from nothing that runs.)
  *
  * What actually runs for a marathon is `calculateWeeklyMileage` in `generators/sustainable.ts`,
  * reading a private `WEEKLY_MILEAGE` const — **and the two tables disagree**:

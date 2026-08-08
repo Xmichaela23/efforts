@@ -128,7 +128,10 @@ export function easyAnchorAdjacencyPenalty(
   return p;
 }
 
-/** Run-specific alias. Kept as its own export — `generate-plan`'s Get Stronger composer calls it by name. */
+/** Run-specific alias. Kept as its own export — the Get Stronger composer calls it by name
+ *  (`shared/strength-system/strength-primary-plan.ts:1667`, reached via `generate-strength-plan`).
+ *  This comment used to say `generate-plan`; that was never the caller, and that dead 71-line
+ *  validator was deleted 2026-08-07. */
 // ⛔ EXPORTED 2026-07-28. The Get Stronger composer placed easy runs first-available with no spacing
 // term at all, and put one on the single worst day this function scores (+8: the day after the long
 // run AND the day before the hard run). The rule existed and nothing outside this file could ask it.
