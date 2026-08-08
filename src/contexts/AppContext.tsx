@@ -130,6 +130,7 @@ interface AppContextType {
   plansLoading: boolean;
   addPlan: (plan: any) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
+  deletePlanCascade: (planId: string) => Promise<{ ok: boolean; message: string }>;
   endPlan: (planId: string) => Promise<any>;
   resumePlan: (planId: string, resumeFromWeek?: number) => Promise<any>;
   pausePlan: (planId: string) => Promise<any>;
@@ -160,6 +161,7 @@ const defaultAppContext: AppContextType = {
   plansLoading: false,
   addPlan: async () => {},
   deletePlan: async () => {},
+  deletePlanCascade: async () => ({ ok: false, message: 'Not ready.' }),
   endPlan: async () => {},
   resumePlan: async () => {},
   pausePlan: async () => {},
@@ -694,6 +696,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  /**
+   * The ONE plan-deletion op for user-facing "delete this plan" buttons.
+   *
+   * A plan that serves a race goal cannot be deleted on its own: `plans.goal_id`
+   * is `ON DELETE SET NULL`, and nothing in `delete-plan` touches `goals`, so
+   * deleting the plan by itself left the goal behind as a phantom on Focus with
+   * no plan under it. Route through `delete-goal` — the same edge function the
+   * Focus/Goals delete uses — which tears down every linked plan (via
+   * `delete-plan`), deletes the goal, and rebuilds the season plan when the goal
+   * shared a live combined plan with other races.
+   *
+   * Plans with no goal (standalone / strength blocks / legacy) keep the plain
+   * `delete-plan` path.
+   */
+  const deletePlanCascade = async (planId: string): Promise<{ ok: boolean; message: string }> => {
+    try {
+      const userId = getStoredUserId();
+      if (!userId) return { ok: false, message: 'Sign in to delete plans.' };
+
+      // Prefer the already-loaded row; re-read if this plan isn't in the cache
+      // (deep-link, stale list) so the goal link can't be missed.
+      let goalId: string | null = detailedPlans?.[planId]?.goal_id ?? null;
+      if (!goalId) {
+        const { data } = await supabase
+          .from('plans')
+          .select('goal_id')
+          .eq('id', String(planId))
+          .eq('user_id', userId)
+          .maybeSingle<{ goal_id: string | null }>();
+        goalId = data?.goal_id ?? null;
+      }
+
+      if (!goalId) {
+        await deletePlan(planId);
+        return { ok: true, message: 'Plan deleted.' };
+      }
+
+      const { data, error } = await supabase.functions.invoke('delete-goal', {
+        body: { goal_id: String(goalId), user_id: userId },
+      });
+      if (error) throw error;
+      const payload = (data ?? {}) as { success?: boolean; message?: string; error?: string };
+      if (!payload.success) {
+        return { ok: false, message: String(payload.error || 'Delete failed.') };
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent('plans:invalidate'));
+        window.dispatchEvent(new CustomEvent('goals:invalidate'));
+      } catch {
+        /* ignore */
+      }
+      await loadPlans();
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
+      return { ok: true, message: String(payload.message || 'Plan and race removed.') };
+    } catch (error) {
+      console.error('Error in deletePlanCascade:', error);
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : 'Delete failed.',
+      };
+    }
+  };
+
   const endPlan = async (planId: string) => {
     try {
       if (!getStoredUserId()) throw new Error('User must be authenticated to end plans');
@@ -892,6 +963,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         plansLoading,
         addPlan,
         deletePlan,
+        deletePlanCascade,
         endPlan,
         resumePlan,
         pausePlan,

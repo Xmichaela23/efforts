@@ -90,7 +90,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     completedPlans,
     detailedPlans,
     addPlan,
-    deletePlan,
+    deletePlanCascade,
     loadProviderData,
     refreshPlans,
   } = useAppContext();
@@ -1450,32 +1450,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   };
 
+  // One deletion path for both surfaces. This used to bulk-delete COMPLETED
+  // workouts whose name contained "Week 1".."Week 4" — unscoped to the plan, so
+  // it reached any workout in history with that name — and then call
+  // `deletePlan`, which never touches `goals`. The goal survived as a phantom on
+  // Focus. Both halves are retired: `deletePlanCascade` routes a goal-linked
+  // plan through `delete-goal` (which tears down its planned rows via
+  // `delete-plan`), and executed workouts are the athlete's record — a plan
+  // delete does not touch them.
   const handlePlanDeleted = async (planId: string) => {
-    try {
-      const planWorkouts = workouts?.filter(w => {
-        const matchesPattern = w.name && (
-          w.name.includes('Week 1') ||
-          w.name.includes('Week 2') ||
-          w.name.includes('Week 3') ||
-          w.name.includes('Week 4')
-        );
-        return matchesPattern;
-      }) || [];
-
-      for (const workout of planWorkouts) {
-        try {
-          await deleteWorkout(workout.id);
-        } catch (e) {
-          console.warn('[AppLayout] bulk delete plan legacy workout failed:', workout.id, e);
-        }
-      }
-
-      await deletePlan(planId);
-      setShowAllPlans(true);
-
-    } catch {
-      alert('Error deleting plan. Please try again.');
+    const result = await deletePlanCascade(planId);
+    if (!result.ok) {
+      alert(result.message || 'Error deleting plan. Please try again.');
+      return;
     }
+    setShowAllPlans(true);
   };
 
   // Dead simple swipe detection

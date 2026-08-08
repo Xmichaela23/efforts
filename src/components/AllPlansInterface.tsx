@@ -1985,7 +1985,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Plan</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{selectedPlanDetail.name}"? This will also delete all associated workouts. This action cannot be undone.
+                    {selectedPlanDetail.goal_id
+                      ? `Deleting "${selectedPlanDetail.name}" also removes the race it was built for, and every planned session in it. Completed workouts are kept. If another race is still on the calendar, a new plan is built around it. This cannot be undone.`
+                      : `Deleting "${selectedPlanDetail.name}" removes every planned session in it. Completed workouts are kept. This cannot be undone.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

@@ -5,7 +5,11 @@
 //
 // Behavior matrix (sync; one HTTP roundtrip):
 //
-//   - Goal had no plan                          → just delete goal.
+//   - Goal had no plan                          → just delete goal. (The "phantom"
+//                                                 case: a goal whose plan was
+//                                                 already deleted elsewhere. It
+//                                                 must stay deletable — see the
+//                                                 no_linked_plans reason below.)
 //   - Goal had a STANDALONE plan only           → delete that plan, delete goal,
 //                                                 leave any other plans alone.
 //   - Goal was on a COMBINED plan w/ siblings   → delete combined plan; if ≥2
@@ -14,12 +18,23 @@
 //                                                 remains, build single-sport
 //                                                 plan; if 0, no rebuild.
 //
+// A COMPLETED/ENDED plan is season history and is never torn down by a goal
+// delete (except via the direct `goal_id` link, which has always behaved that
+// way). The rebuild trigger is narrower still — live combined plans only. See
+// `plan-goal-links.ts`.
+//
 // `training_prefs`, `target_time`, `name`, `target_date` on remaining goals are
 // athlete intent and are NEVER touched here. The torn-down `delete-plan` edge
 // function handles `goals.race_readiness_projection`, `goals.projection`, and
 // the training caches (`coach_cache`, `block_adaptation_cache`) for the deleted plan(s).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import {
+  LIVE_PLAN_STATUSES,
+  plansLinkedToGoal,
+  rebuildSiblingGoalIds,
+  type PlanRow,
+} from './plan-goal-links.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,14 +73,6 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
-}
-
-type PlanRow = {
-  id: string
-  goal_id: string | null
-  config: Record<string, unknown> | null
-  plan_type?: string | null
-  status?: string | null
 }
 
 /**
@@ -119,26 +126,19 @@ async function cleanupPlanningArtifactsForFreshStart(
   return { notes, errors }
 }
 
-/** Combined plans store every served goal on `config.plan_contract_v1.goals_served`; standalone plans don't. */
-function goalsServedFromPlan(plan: PlanRow): string[] {
-  const cfg = (plan.config ?? {}) as Record<string, unknown>
-  const pc = cfg?.plan_contract_v1 as Record<string, unknown> | undefined
-  const served = pc?.goals_served
-  if (Array.isArray(served) && served.length > 0) {
-    return [
-      ...new Set(
-        served.map((x) => (x != null ? String(x).trim() : '')).filter((s) => s.length > 0),
-      ),
-    ]
-  }
-  if (plan.goal_id != null && String(plan.goal_id).trim()) return [String(plan.goal_id).trim()]
-  return []
-}
-
-function isCombinedPlan(plan: PlanRow): boolean {
-  return goalsServedFromPlan(plan).length > 1
-}
-
+/**
+ * ⛔ NEVER THROWS. A transport-level failure has to come back as `_ok: false`, not as an exception.
+ *
+ * THE PHANTOM-GOAL BUG (2026-08-07): the `fetch` below was unguarded, so a cold-start timeout,
+ * a DNS blip, or any network throw from `delete-plan` unwound straight past the goal delete at
+ * step 5 into the outer catch — 500, and the goal row still there. The athlete sees "delete
+ * failed", presses it again, and gets the same result forever, because the thing that fails is
+ * the PLAN teardown while the thing they are trying to remove is the GOAL.
+ *
+ * The function already intends the opposite: step 5 deletes the goal before the rebuild, and the
+ * `planErrors` message at the bottom exists precisely to report "goal gone, plan left behind".
+ * That design only holds if a teardown failure is a value rather than an exception.
+ */
 async function invokeFunction(
   functionsBaseUrl: string,
   serviceKey: string,
@@ -146,17 +146,28 @@ async function invokeFunction(
   name: string,
   payload: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const r = await fetch(`${functionsBaseUrl}/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Service-role for cross-function trust + Authorization for any per-user edge logic.
-      apikey: serviceKey,
-      Authorization: authHeader || `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify(payload),
-  })
-  const text = await r.text()
+  let r: Response
+  try {
+    r = await fetch(`${functionsBaseUrl}/${name}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Service-role for cross-function trust + Authorization for any per-user edge logic.
+        apikey: serviceKey,
+        Authorization: authHeader || `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (e) {
+    console.warn(`[delete-goal] ${name} transport failure:`, e)
+    return { error: `transport: ${String(e)}`, _ok: false }
+  }
+  let text = ''
+  try {
+    text = await r.text()
+  } catch (e) {
+    return { error: `body_read: ${String(e)}`, _http_status: r.status, _ok: false }
+  }
   let parsed: Record<string, unknown> = {}
   try {
     parsed = text ? JSON.parse(text) : {}
@@ -230,39 +241,31 @@ Deno.serve(async (req) => {
     if (dpErr) console.warn('[delete-goal] load direct plans:', dpErr.message)
 
     // No direct equality on jsonb arrays in PostgREST without a contains filter.
-    // We over-fetch active+rolling plans (small N) and filter in code.
+    // We over-fetch live plans (small N) and filter in code.
+    //
+    // The status filter is deliberate and asymmetric with the `goal_id` query
+    // above, which has none. A COMPLETED/ENDED combined plan that lists this goal
+    // in `goals_served` is NOT torn down: it is season history, and the reference
+    // it keeps is inert (`GoalsScreen.plansByGoalId` keys by goal id, so an entry
+    // for a deleted goal is never looked up). Widening this to every status would
+    // delete a finished season's plan as a side effect of removing its race.
     const { data: candidatePlans, error: cpErr } = await supabase
       .from('plans')
       .select('id, goal_id, config, plan_type, status')
       .eq('user_id', userId)
-      .in('status', ['active', 'paused', 'rolling'])
+      .in('status', [...LIVE_PLAN_STATUSES])
     if (cpErr) console.warn('[delete-goal] load candidate plans:', cpErr.message)
 
-    const seenPlanIds = new Set<string>()
-    const allPlans: PlanRow[] = []
-    for (const p of (directPlans ?? []) as PlanRow[]) {
-      if (!seenPlanIds.has(p.id)) {
-        seenPlanIds.add(p.id)
-        allPlans.push(p)
-      }
-    }
-    for (const p of (candidatePlans ?? []) as PlanRow[]) {
-      if (seenPlanIds.has(p.id)) continue
-      const served = goalsServedFromPlan(p)
-      if (served.includes(goalId)) {
-        seenPlanIds.add(p.id)
-        allPlans.push(p)
-      }
-    }
+    const allPlans: PlanRow[] = plansLinkedToGoal(
+      (directPlans ?? []) as PlanRow[],
+      (candidatePlans ?? []) as PlanRow[],
+      goalId,
+    )
 
-    // 3) Did the goal participate in any COMBINED plan that still has siblings?
-    let combinedSiblingGoalIds = new Set<string>()
-    for (const p of allPlans) {
-      if (!isCombinedPlan(p)) continue
-      for (const gid of goalsServedFromPlan(p)) {
-        if (gid && gid !== goalId) combinedSiblingGoalIds.add(gid)
-      }
-    }
+    // 3) Did the goal share a LIVE combined plan with other goals? Only that
+    //    justifies a rebuild — a finished season's combined plan must not drag
+    //    its old siblings into a new build.
+    const combinedSiblingGoalIds = new Set<string>(rebuildSiblingGoalIds(allPlans, goalId))
 
     // 4) Tear down each linked plan via delete-plan (handles its own goal-projection
     //    + coach_cache / block_adaptation_cache cleanup for the served goals).
@@ -280,6 +283,12 @@ Deno.serve(async (req) => {
     }
 
     // 5) Delete the goal row itself.
+    //
+    // ⛔ THIS RUNS EVEN WHEN EVERY PLAN TEARDOWN FAILED, and that is the point. The athlete asked
+    // to remove a GOAL; a plan that would not tear down is reported separately in `planErrors` and
+    // surfaced in the toast. Gating the goal delete on plan success is what left phantoms on Focus
+    // that could never be cleared — the goal's own delete kept failing for a reason that had
+    // nothing to do with the goal.
     const { error: delErr } = await supabase
       .from('goals')
       .delete()
@@ -375,10 +384,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    // A plan that failed to tear down is now UNREACHABLE by goal (the FK on
+    // plans.goal_id is ON DELETE SET NULL, so deleting the goal orphans it).
+    // Say so in the message rather than reporting a clean removal.
+    if (planErrors.length) {
+      toastMessage = `${toastMessage} ${planErrors.length} linked plan${planErrors.length === 1 ? '' : 's'} could not be removed — open Plans and delete ${planErrors.length === 1 ? 'it' : 'them'}.`
+    }
+
     return json({
       success: true,
       deleted_goal_id: goalId,
       deleted_plan_ids: deletedPlanIds,
+      // Pins the phantom case: a goal whose plan was already gone is a normal,
+      // successful delete, not an error.
+      reason: allPlans.length === 0 ? 'no_linked_plans' : undefined,
       plan_errors: planErrors.length ? planErrors : null,
       rebuilt_plan_id: rebuiltPlanId,
       rebuild_error: rebuildError,
