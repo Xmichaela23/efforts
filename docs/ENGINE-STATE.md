@@ -23,21 +23,91 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-07 — the non-race builder got its visual language; Strong Focus wears it; the engineer stage is queued)
+## 🧭 NEXT SESSION — START HERE (2026-08-07, late — the placement engine is DECIDED; do not re-litigate it)
 
-### YOUR JOB — one of three, all scoped and written down
+### THE DECISION — one placement engine, and it's `place-week`
 
-1. **The terminal engineer stage** — read `docs/HANDOFF-placement-unification-2026-08-07.md`.
-   Server-side, gated deploy, **do NOT touch client wizard code.** Task 1 (the strength
-   `LOWER_HYPERTROPHY` crash-guard) is **DONE + deployed** [D-400]. **Task 2** = unify plan-gen
-   placement across ALL plan types — lower strength off the long-run day + easy-run dispersion; the
-   combined-plan forked its own placement (trace confirmed; TWO claims marked UNCONFIRMED in the
-   handoff — verify before acting). **Task 3** = unify plan deletion — the weekly-planner delete
-   orphans the goal, route it through `delete-goal`.
-2. **The engine gaps still open from 08-06:** [Q-262] intermediate/advanced marathon blocks have no
-   prerequisite walked end to end (a 9-wk intermediate peaks ~12 mi vs beginner's 18 — incoherent);
-   [Q-263] an advanced athlete can't reach a 60 mi/wk peak on 4 run days and nothing says so.
-3. **Device-verify what shipped today** — all pushed/deployed, NONE device-verified (see below).
+There are TWO placement solvers today: `_shared/week-optimizer.ts` (combined + tri) and
+`shared/strength-system/place-week.ts` (Strong Focus). **They already share one law** — both read
+clearances from `_shared/schedule-session-constraints.ts` (Robineau's 6h same-legs, 48h off long
+run/ride, 24h off quality, 0h easy). The fork is only in the two solvers.
+
+**`place-week` is the trunk. `week-optimizer` gets folded into it as a subroutine — NOT the reverse.**
+Why: place-week models the athlete's week the way athletes actually live (fixed real-life anchors,
+solve everything around them), already handles N lifting days, and already does the hardest,
+safety-critical thing — keeping lower-body strength off the long-run day (the exact bug that started
+this drill). week-optimizer treats every day as "movable" and caps strength at 1–3 days; wrong model,
+wrong ceiling. **Do not reopen this.** (One corroboration found during the 08-07 cleanup:
+`place-week`'s composer already calls week-optimizer's `easyRunAnchorAdjacencyPenalty` at
+`strength-primary-plan.ts:1667` — so folding the dispersion in is partly already wired.)
+
+### THE MODEL (in Michael's words)
+
+- **Anchors** = athlete-fixed sessions: long run, long ride, and the scheduled club run/ride.
+- Each anchor is **hard or social.** A hard one (a club run that's really a tempo) *becomes* the
+  week's hard session and everything spaces off it — and it **consumes the week's hard budget** (do
+  NOT also prescribe a separate quality session on top). A social one is fixed but low-interference
+  (an easy run can share its day).
+- **The athlete picks the anchor days**, including the long ones. No forced weekend-long.
+- Everything else (easy volume, extra quality, strength) is **flexible**, placed around the anchors
+  by the one shared law.
+- Marathon vs tri vs strength = just *which* sessions are anchors. One engine, tailored by input,
+  never a new builder.
+
+### THE ONE GAP TO BUILD
+
+`place-week` today places lifts + fixed endurance around athlete pins. It does NOT yet place
+**flexible endurance** (the easy runs, the extra swims/rides). That single addition is the whole
+generalization — week-optimizer's dispersion (`easyRunAnchorAdjacencyPenalty`) folds in here as the
+"place the flexible endurance" step. Everything else place-week already does.
+
+### NEXT STEPS, in order — this stage is READ/TRACE, no build
+
+0. **Are last night's placement commits sound? (gates everything.)** Ten tests are red on `main`:
+   7 in `generate-triathlon-plan/…/triathlon_performance.conformance.test.ts`, 3 in
+   `generate-combined-plan/d031-convergence-e2e.test.ts`. They sit right next to the tri commit
+   (`9f89484b`) and combined-placement commit (`6a2b576d`). For EACH: real REGRESSION, or a STALE
+   FIXTURE asserting old behavior the fix intentionally changed? If a regression, STOP and report —
+   don't build the foundation on broken placement.
+1. **Validate `place-week` can host a tri** (read, not build): can its pin-first model arrange
+   swim/bike/run/brick around fixed long-run + long-ride anchors? How deep does its
+   "endurance-fixed / strength-solved" assumption run — only its inputs (`EndurancePin[]` + lift
+   count), or through the solver?
+2. **Build the generalization:** teach place-week to place flexible endurance around anchors.
+3. **Route** marathon → tri → combined onto place-week; retire `week-optimizer` as a separate authority.
+
+### DO NOT re-band-aid the marathon
+
+Commit `95f38bf3` has TWO parts. **KEEP** the `sustainable.ts` change — a real correctness fix (a
+Thursday marathon was emitting 26.2-mi rows on Thu/Fri/Sat/Sun, four marathons; now the plan ends on
+race day). **REPLACE** the `assign-days.ts` `chooseSpreadDays` — a local dispersion band-aid, a
+*second* spread algorithm; it dies when the run plan routes onto the engine.
+
+### STRENGTH SPINE (grounded 2026-08-07)
+
+Wendler 5/3/1 is the chassis. For a concurrent athlete: **5's PRO (no-AMRAP) on leg-loaded lifts near
+key runs; upper body can push** — Wendler's own marathon article says exactly this, and it IS the
+per-modality clearance law. Autoregulate in Wendler's vocabulary (bar speed / "is it affecting the
+run"), not clinical RPE. **Leader/Anchor** blocks = the strength-focus/endurance-focus knob, native
+to 5/3/1 Forever. Science note: Hickson (1980) established the interference effect but is not the last
+word — modern work shows it's manageable-to-negligible for trained athletes with proper spacing, and
+strength is ergogenic for endurance (Rønnestad; running-economy meta-analyses). The placement rules
+(48/24/6/0h) are the durable takeaway.
+
+### STATE AT CLOSE (2026-08-07 late → 08-08 AM)
+
+- **On `main`, NONE pushed:** deletion (`65facc83`), combined placement (`6a2b576d`), marathon
+  race-day + band-aid (`95f38bf3`), tri routed onto week-optimizer (`9f89484b`), audit census
+  (`578c7d08`), D-402 docs (`8fbaa02a`), dead-generator cleanup (merged from
+  `cleanup/quarantine-dead-generators-2026-08-07` — 8 files, 6,403 lines removed, zero test failures
+  introduced, verified against a pristine-main baseline), plus this banner.
+- **Nothing deployed** — server still runs the 5:36pm 08-07 strength-crash fix. Deletion + placement
+  fixes are saved but live NOWHERE. Deploy list when ready: week-optimizer importers (create-goal,
+  generate-combined-plan, generate-triathlon-plan, arc-setup-chat) + generate-run-plan + delete-goal +
+  delete-plan.
+- **Nothing device-verified.**
+- **Stale docs to fix (deletion made them lie):** CAPABILITY-MAP.md:43-46,152-153,
+  POLISH-PUNCH-LIST.md:773-774, GAME-PLAN.md:416 still name the deleted generators as existing ruins.
 
 ### WHAT SHIPPED TODAY — the wizard became one themed instrument [D-399, D-400]
 
