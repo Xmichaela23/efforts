@@ -57,6 +57,18 @@ export class SustainableGenerator extends BaseGenerator {
     const weekly_summaries: Record<string, any> = {};
     const volume_notes: string[] = []; // E3b glass-box: budget-vs-legal-week reconciliation surfaced here
 
+    /**
+     * ⛔ THE BLOCK ENDS ON RACE DAY. `duration_weeks` is derived from the weeks-until-race, but the
+     * race does not have to land on the last day of the last week — a Thursday marathon leaves
+     * Friday, Saturday and Sunday hanging off the end, and if the arithmetic puts it earlier still,
+     * a whole week after it. Those days used to be built: `getRaceProximitySession` calls every day
+     * on or after the race `'race'`, so the trailing days each got their own 26.2-mile row.
+     *
+     * ⚠️ `duration_weeks` REPORTS WHAT WAS BUILT. The plan states the number of weeks it actually
+     * contains rather than the number the request asked for; the two differ only where the old
+     * behaviour was emitting post-race weeks, which were never real weeks.
+     */
+    let weeksBuilt = this.params.duration_weeks;
     for (let week = 1; week <= this.params.duration_weeks; week++) {
       const phase = this.getCurrentPhase(week, phaseStructure);
       const isRecovery = this.isRecoveryWeek(week, phaseStructure);
@@ -66,6 +78,13 @@ export class SustainableGenerator extends BaseGenerator {
       weekly_summaries[week.toString()] = this.generateWeeklySummary(
         week, weekSessions, phase, isRecovery
       );
+      if (weekSessions.some((s) => (s.tags ?? []).includes('race_day'))) {
+        weeksBuilt = week;
+        if (week < this.params.duration_weeks) {
+          console.log(`[PlanGen] plan ends on race day: week ${week} of a requested ${this.params.duration_weeks}`);
+        }
+        break;
+      }
     }
 
     // E3b Part 2 — carry the budget split (one number, no double-count). rideHrs has no consumer yet;
@@ -78,7 +97,7 @@ export class SustainableGenerator extends BaseGenerator {
     return {
       name: this.generatePlanName(),
       description: this.generatePlanDescription(),
-      duration_weeks: this.params.duration_weeks,
+      duration_weeks: weeksBuilt,
       units: this.params.units ?? 'imperial',
       baselines_required: {
         run: ['easyPace'] // Only need easy pace - effort-based training
@@ -260,6 +279,29 @@ export class SustainableGenerator extends BaseGenerator {
     const room = () => used < runningDays;
 
     /**
+     * ⛔ THE BAND IS NOT THE DAY. `getRaceProximitySession` returns `'race'` for
+     * `daysUntilRace <= 0` (`base-generator.ts:90`) — every day ON OR AFTER the race, not the race
+     * itself. A Thursday marathon therefore reported `'race'` on Thursday, Friday, Saturday AND
+     * Sunday, and the loop below pushed a full 26.2-mile row on each of them: **the athlete's
+     * export carried the same marathon four times**, in a plan built for four running days a week.
+     *
+     * ⚠️ FIXING THE BAND ITSELF WOULD BE WRONG. `<= 0` is what makes the *week* a race week; the
+     * caller (`checkWeekRaceProximity`) needs that. What was missing is the distinction between the
+     * race day and the days that trail it, so read the raw day count here and keep the band alone —
+     * `getRaceProximitySession` is shared with `performance-build` and the six other generators.
+     *
+     * Days are consecutive integers counting down, so at most ONE day in a week can be exactly 0:
+     * emitting on `=== 0` cannot double-count, and cannot miss a race that falls inside this week.
+     */
+    const daysOut = (day: string) =>
+      this.getDaysUntilRace(weekNumber, day, this.params.start_date, this.params.race_date);
+    /** Past the finish line. Nothing is scheduled here — the plan ends on race day. */
+    const afterRace = (day: string) => {
+      const d = daysOut(day);
+      return d !== null && d < 0;
+    };
+
+    /**
      * ⛔ ANCHORS FIRST, THEN FILL — and the day count binds on both (2026-08-06). Michael, on the
      * export: six runs in the race week of a plan built for four days a week.
      *
@@ -277,12 +319,18 @@ export class SustainableGenerator extends BaseGenerator {
      * day the athlete chose.
      */
     for (const day of days) {
+      // ⛔ THE PLAN ENDS ON RACE DAY. Every day past the finish line is skipped outright — no race
+      // row, no shakeout, no filler. It is not a training day, and it is not a second marathon.
+      if (afterRace(day)) continue;
       const p = prox[day];
       if (p === 'race') {
         // ⛔ THE RACE IS ON THE CALENDAR NOW. This case read "don't add a training session" and did
         // nothing at all, so a completion plan ended on a Saturday shakeout with NOTHING on race
         // day. `performance-build` has built a race-day row since it shipped; this path never did,
         // and the athlete's own event was the one thing missing from the plan built for it.
+        //
+        // ⚠️ EXACTLY ONCE. The `afterRace` guard above is what makes that true: `p === 'race'` is
+        // reached only where `daysOut === 0`, and one week holds at most one such day.
         sessions.push(this.createCompletionRaceDay(day));
         continue;
       }
@@ -311,10 +359,40 @@ export class SustainableGenerator extends BaseGenerator {
       }
     }
 
-    // ── Filler, in day order, until the count is spent ────────────────────────
+    /**
+     * ── Filler, SPREAD across the week rather than stacked at the front ───────────────────────
+     *
+     * ⛔ THIS LOOP USED TO WALK MONDAY→SUNDAY AND STOP WHEN THE DAY COUNT RAN OUT, which is why a
+     * taper week came back **Mon-Tue-Wed-Thu with Friday and Saturday empty**. The day budget was
+     * spent on the first four candidates it met, in calendar order, and everything after them was
+     * simply never reached — four consecutive running days and then a three-day hole, in the week
+     * before a marathon.
+     *
+     * ⚠️ IT IS NOT `assign-days.ts`. That file's ordering is genuinely dispersed (Mon/Wed/Fri
+     * first) — but a race week never reaches it: `generateWeekSessions` returns this function's
+     * output directly, and the sort at the bottom is the only placement it gets. Looking there for
+     * this bug finds nothing wrong, because nothing there is wrong.
+     *
+     * The rule now: collect every day that COULD take a session, then pick evenly across that span
+     * instead of off the front. Four slots over seven candidate days gives Mon/Wed/Fri/Sun, not
+     * Mon/Tue/Wed/Thu. Anchors are already placed and are not re-examined; the day count still
+     * binds exactly as before, so no week grows.
+     */
+    const fillable = (day: string): boolean => {
+      if (afterRace(day)) return false;
+      if (sessions.some((s) => s.day === day)) return false;   // anchored (or the race) — leave it
+      const p = prox[day];
+      if (p === 'easy_short' || p === 'easy_medium') return true;
+      // 8-14 days before race — Saturday stays clear before Sunday.
+      return p === 'reduced_quality' && day !== 'Saturday';
+    };
+    const chosen = new Set(
+      this.spreadAcross(days.filter(fillable), Math.max(0, runningDays - used)),
+    );
+
     for (const day of days) {
       if (!room()) break;
-      if (sessions.some((s) => s.day === day)) continue;   // anchored (or the race) — leave it
+      if (!chosen.has(day)) continue;
       const p = prox[day];
 
       if (p === 'easy_short') {
@@ -343,8 +421,8 @@ export class SustainableGenerator extends BaseGenerator {
           sessions.push(this.createSimpleEasyRun(4, day));
         }
         used++;
-      } else if (p === 'reduced_quality' && day !== 'Saturday') {
-        // 8-14 days before race — reduced but still training. Saturday stays clear before Sunday.
+      } else if (p === 'reduced_quality') {
+        // 8-14 days before race — reduced but still training. (Saturday was excluded by `fillable`.)
         if (day === 'Tuesday') {
           sessions.push(this.createSession(
             day,
@@ -365,6 +443,29 @@ export class SustainableGenerator extends BaseGenerator {
     // Monday-first. This week bypasses `assignDaysToSessions` — it is already day-assigned — so
     // nothing downstream would reorder it, and the anchors were placed out of order by design.
     return sessions.sort((a, b) => days.indexOf(a.day) - days.indexOf(b.day));
+  }
+
+  /**
+   * Pick `slots` items spread evenly across `candidates`, keeping their order.
+   *
+   * ⚠️ EVEN ACROSS THE CANDIDATES, NOT ACROSS THE WEEK. The candidate list is already the days a
+   * session may legally land on, so spreading over it respects every exclusion (the race, the days
+   * after it, the anchored days, the Saturday-before-Sunday rule) without knowing what any of them
+   * are. Taking the first `slots` — what this replaced — is what stacked a taper week Mon-to-Thu.
+   *
+   * Ends are always taken so the week still opens and closes with a run; `slots >= candidates`
+   * returns everything, which is the common case and is byte-identical to the old walk.
+   */
+  private spreadAcross<T>(candidates: readonly T[], slots: number): T[] {
+    if (slots <= 0) return [];
+    if (slots >= candidates.length) return [...candidates];
+    // One session in a taper week belongs in the middle of it, not on the Monday by accident.
+    if (slots === 1) return [candidates[Math.floor((candidates.length - 1) / 2)]];
+    // step > 1 whenever slots < length, so the rounded indices strictly increase — no duplicates.
+    const step = (candidates.length - 1) / (slots - 1);
+    const picked: T[] = [];
+    for (let i = 0; i < slots; i++) picked.push(candidates[Math.round(i * step)]);
+    return picked;
   }
 
   /**

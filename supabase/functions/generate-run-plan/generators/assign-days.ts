@@ -83,6 +83,121 @@ function isHard(s: Session): boolean {
   return s.tags.some((t) => HARD_TAGS.includes(t));
 }
 
+/** Compare two ascending gap vectors lexicographically. > 0 means `a` is the more spread-out. */
+function moreSpread(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** Longest run of back-to-back training days, and the gaps between them (ascending). */
+function weekShape(occupied: ReadonlySet<string>): { streak: number; gaps: number[] } {
+  const idx = WEEK_ORDER.map((d, i) => (occupied.has(d) ? i : -1)).filter((i) => i >= 0);
+  let streak = 0;
+  let cur = 0;
+  for (const d of WEEK_ORDER) {
+    cur = occupied.has(d) ? cur + 1 : 0;
+    if (cur > streak) streak = cur;
+  }
+  const gaps: number[] = [];
+  for (let i = 1; i < idx.length; i++) gaps.push(idx[i] - idx[i - 1]);
+  return { streak, gaps: gaps.sort((a, b) => a - b) };
+}
+
+/** Every `k`-sized subset of `pool`, in index order. `pool` is ≤ 7 days, so this stays tiny. */
+function combinations<T>(pool: readonly T[], k: number): T[][] {
+  if (k <= 0) return [[]];
+  if (k > pool.length) return [];
+  const out: T[][] = [];
+  const walk = (start: number, acc: T[]) => {
+    if (acc.length === k) { out.push([...acc]); return; }
+    for (let i = start; i < pool.length; i++) {
+      acc.push(pool[i]);
+      walk(i + 1, acc);
+      acc.pop();
+    }
+  };
+  walk(0, []);
+  return out;
+}
+
+/**
+ * ⛔ CHOOSE THE EASY DAYS AGAINST THE WEEK THAT ALREADY EXISTS — the base-week clumping fix
+ * (2026-08-07). Michael's export: *"easy runs clump Mon-Tue-Wed-Thu, Fri/Sat empty."*
+ *
+ * The old easy pass walked a FIXED preference list (`Monday, Wednesday, Friday, …`) and took the
+ * first free day each time. That list is dispersed **in isolation** and blind in practice: the
+ * quality session is already on Tuesday (`createOptionalSpeedwork` hardcodes it), so "Monday, then
+ * Wednesday" places two easy runs either side of it and hands the athlete Mon-Tue-Wed back-to-back
+ * with a four-day hole after it. At five and six running days it degenerated further — Mon-Fri
+ * solid, because after Mon/Wed/Fri the list simply falls through to Tuesday and Thursday and fills
+ * the gaps it just created.
+ *
+ * ⚠️ THE LIST WAS NEVER THE PROBLEM — READING IT WITHOUT LOOKING AT THE CALENDAR WAS. The rule now:
+ * of the days still free, take the one FURTHEST from everything already placed, and repeat. Ties
+ * fall back to the same preference list, so an unpinned week whose free days exactly match its easy
+ * runs comes out where it always did (the `UNPINNED OUTPUT IS THE OLD GRID` guard covers this).
+ *
+ * ⚠️ WHAT IT DELIBERATELY DOES NOT TOUCH: the pins (a pinned easy day is taken first, unconditional),
+ * the derived rest day (`free` already excludes it), the athlete's training days, and the hard
+ * sessions — quality still goes Tuesday/Thursday-by-default so this cannot move a club night.
+ *
+ * ⚠️ DISTANCE IS LINEAR WITHIN THE WEEK, NOT CYCLIC. Sunday and the following Monday are adjacent in
+ * real life, and treating them so would push every easy run off Monday for every athlete with a
+ * Sunday long run — a much larger change than this bug asks for. Left as-is deliberately.
+ */
+function chooseSpreadDays(
+  count: number,
+  isFree: (d: WeekDay) => boolean,
+  alreadyPlaced: ReadonlySet<string>,
+  pinned: WeekDay | null,
+  preference: readonly WeekDay[],
+): WeekDay[] {
+  // The pin is a fact about the athlete's week, not a candidate to be scored.
+  const forced: WeekDay[] = pinned && isFree(pinned) ? [pinned] : [];
+  const pool = WEEK_ORDER.filter((d) => isFree(d) && !forced.includes(d));
+  const need = Math.min(count - forced.length, pool.length);
+  if (need <= 0) return forced.slice(0, count);
+
+  const prefSum = (days: readonly WeekDay[]) =>
+    days.reduce((n, d) => {
+      const i = preference.indexOf(d);
+      return n + (i < 0 ? preference.length : i);
+    }, 0);
+
+  /**
+   * ⛔ THE WHOLE SUBSET IS SCORED, NOT ONE DAY AT A TIME. A greedy day-by-day pick looks right and
+   * is not: on a three-easy week it took Monday, then Thursday (both furthest-from-Sunday at the
+   * time), and was then FORCED to put the third run next to one of them. Monday/Wednesday/Friday
+   * was available the whole time and unreachable one step at a time. There are at most 7 candidate
+   * days, so the exhaustive answer costs nothing and is the honest one.
+   *
+   * Ranked, in order: fewest back-to-back training days, then the most even gaps, then the engine's
+   * own preference list (so ties land where they have always landed), then calendar order.
+   */
+  let best: WeekDay[] | null = null;
+  let bestShape: { streak: number; gaps: number[] } | null = null;
+  for (const combo of combinations(pool, need)) {
+    const days = [...forced, ...combo];
+    const shape = weekShape(new Set<string>([...alreadyPlaced, ...days]));
+    if (best === null) { best = combo; bestShape = shape; continue; }
+    const s = shape.streak - bestShape!.streak;
+    if (s > 0) continue;
+    if (s === 0) {
+      const g = moreSpread(shape.gaps, bestShape!.gaps);
+      if (g < 0) continue;
+      if (g === 0 && prefSum(days) >= prefSum([...forced, ...best])) continue;
+    }
+    best = combo;
+    bestShape = shape;
+  }
+  // Calendar order, so session N of the week still lands on the Nth day of it — the easy runs are
+  // not interchangeable (the volume fill gives the earlier ones the spare mile).
+  return [...forced, ...(best ?? [])].sort((a, b) => WEEK_ORDER.indexOf(a) - WEEK_ORDER.indexOf(b));
+}
+
 /**
  * Place a week's sessions onto days, honouring the athlete's pins.
  *
@@ -177,8 +292,23 @@ export function assignDays(sessions: Session[], pins?: PlacementPins | null): Se
   for (const s of remaining.filter((x) => !x.tags.includes('long_run') && isHard(x))) {
     place(s, qualityOrder);
   }
-  for (const s of remaining.filter((x) => !x.tags.includes('long_run') && !isHard(x))) {
-    place(s, easyOrder);
+  // ── EASY RUNS: spread across what is left, rather than walked off a fixed list ───────────────
+  // See `chooseSpreadDays`. Anything that does not fit the chosen days (more easy runs than free
+  // days) still falls through to `place()`, so the no-session-is-dropped guarantee is unchanged.
+  const easySessions = remaining.filter((x) => !x.tags.includes('long_run') && !isHard(x));
+  if (easySessions.length > 0) {
+    const spreadDays = chooseSpreadDays(
+      easySessions.length,
+      free,
+      usedDays,
+      pinnedEasy && free(pinnedEasy) ? pinnedEasy : null,
+      easyOrder,
+    );
+    easySessions.forEach((s, i) => {
+      const d = spreadDays[i];
+      if (d) take(s, d);
+      else place(s, easyOrder);   // ran out of free days — the fallback owns it from here
+    });
   }
 
   return out;
