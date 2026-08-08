@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus } from 'lucide-react';
+import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
@@ -100,7 +100,7 @@ const ENTRY_ORDER: EntryCardId[] = ['train', 'race', 'build'];
 const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string | null }> = {
   // Colours mirror the Goals door exactly (`GoalsScreen`) — same three cards, so the same palette.
   // Build carries none: it has no discipline until the athlete writes one.
-  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Activity, color: getDisciplineColor('mobility') },
+  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Gauge, color: getDisciplineColor('mobility') },
   race: { label: 'Race', blurb: 'Train for any race', Icon: Flag, color: FOCUS_RACE_COLOR },
   build: { label: 'Build', blurb: 'Write your own, the engine does the math', Icon: Plus, color: null },
 };

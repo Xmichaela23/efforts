@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus } from 'lucide-react';
+import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus, Gauge } from 'lucide-react';
 // The one discipline palette (`SPORT_COLORS`). Never hand-pick a hex for a discipline.
 import { getDisciplineColor, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 import { differenceInWeeks, format } from 'date-fns';
@@ -2130,8 +2130,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
-        {/* Matches the tab that opens it (AppLayout) and the word the whole flow uses. */}
-        <h2 className="text-2xl font-semibold text-white/90">Focus</h2>
+        {/* Matches the tab that opens it (AppLayout) and the word the whole flow uses. The eye-mark
+            is the Focus section's sigil — same CSS the tab bar and the wizard step titles use, so
+            this heading wears it too instead of being the one Focus surface without it. */}
+        <h2 className="text-2xl font-semibold text-white/90 inline-flex items-center gap-2.5">
+          <span aria-hidden="true" className="eye-mark eye-heading shrink-0" />
+          Focus
+        </h2>
         <button onClick={onClose} className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white/80 transition-all">
           <X className="h-5 w-5" />
         </button>
@@ -2391,7 +2396,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
         {([
-          { id: 'train' as const, Icon: Activity, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true, color: getDisciplineColor('mobility') },
+          { id: 'train' as const, Icon: Gauge, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true, color: getDisciplineColor('mobility') },
           { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true, color: FOCUS_RACE_COLOR },
           { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false, color: null },
         ]).map(({ id, Icon, label, blurb, live, color }) => (
