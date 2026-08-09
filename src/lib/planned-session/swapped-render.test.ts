@@ -23,6 +23,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   isDisciplineSwapped,
   swappedSessionBlock,
+  swappedStructureIsStale,
   getDisciplineSwaps,
 } from '../session-discipline-swap.ts';
 import { deriveWorkoutTitle } from '../derive-workout-title.ts';
@@ -134,4 +135,87 @@ Deno.test('⚠️ THE PATCH STILL LEAVES THE SOURCE STRUCTURE ON THE ROW — pin
 
   // And the swapped result is recognised, so the renderers suppress what the patch left behind.
   assert(isDisciplineSwapped({ ...source, ...patch } as never));
+});
+
+// ═══ THE HARD RIDE (2026-08-09) — a real 4×4, not a relabelled run ═══════════════════════════
+
+Deno.test('⛔ HARD + FTP → the real 4×4 tokens at PROTOCOL length, not the run\'s time', () => {
+  /**
+   * ⛔ THE THREE-TOKEN FORM `generate-combined-plan/session-factory.ts:604` ships — warm-up, the
+   * Helgerud 4×4, cool-down. NOT `bikeQualitySession`'s bare `['bike_vo2_4x4min_R4min']`, which has
+   * no warm-up and opens cold with a maximal effort.
+   *
+   * ⛔ AND THE TIME IS THE PROTOCOL'S, NOT THE SOURCE SESSION'S. The hill run below is 63 min; the
+   * ride is 57. This is the ONE place the swap's "same time" rule is deliberately broken — padding
+   * a 4×4 to fill someone else's hour adds junk minutes to a session whose value is its structure.
+   */
+  const hill = {
+    id: 'h9', type: 'run', name: 'Hill Repeats', workout_status: 'planned', date: '2026-08-20',
+    total_duration_seconds: 3780, tags: ['intervals'],          // 63 min
+    computed: { steps: [{ seconds: 900, label: 'Warm up 1.5 mi easy' }, { seconds: 120, label: 'Walk down' }] },
+    workout_structure: { title: 'Hill Repeats' },
+  };
+  const [ride] = getDisciplineSwaps(hill as never, ['run', 'ride'], [], null, 250);
+  assertEquals(ride.to, 'ride');
+  assertEquals(ride.patch.steps_preset, [
+    'warmup_bike_quality_15min_fastpedal',
+    'bike_vo2_4x4min_R4min',
+    'cooldown_bike_10min_easy',
+  ]);
+  assertEquals(ride.patch.duration, 57, '15 warm-up + 4×(4+4) + 10 cool-down');
+  assertEquals(ride.patch.total_duration_seconds, 57 * 60);
+  assert(ride.needsMaterialize, 'the watts only exist after materialize-plan expands the tokens');
+
+  // ⛔ THE RUN'S STRUCTURE IS CLEARED — this is the only patch that may do it, because it writes a
+  // total on the same line. "Walk down" cannot survive onto a bike.
+  assertEquals(ride.patch.computed, null);
+  assertEquals(ride.patch.workout_structure, null);
+  assertEquals(ride.patch.intervals, null);
+
+  // And the resulting row still knows how long it is, from the total the patch pinned.
+  const swapped = { ...hill, ...ride.patch };
+  assertEquals(plannedDurationSeconds(swapped as never), 57 * 60);
+});
+
+Deno.test('⛔ HARD without FTP → the ride is NOT OFFERED (no watts, no session)', () => {
+  const hill = {
+    id: 'h9', type: 'run', name: 'Hill Repeats', workout_status: 'planned',
+    total_duration_seconds: 3780, tags: ['intervals'],
+  };
+  assertEquals(getDisciplineSwaps(hill as never, ['run', 'ride'], [], null, null), []);
+  assertEquals(getDisciplineSwaps(hill as never, ['run', 'ride'], [], null, 0), []);
+});
+
+Deno.test('⛔ EASY swaps are UNCHANGED by all of this — no FTP, no tokens, time preserved', () => {
+  const easy = {
+    id: 'e9', type: 'run', name: 'Easy Run', workout_status: 'planned',
+    total_duration_seconds: 3780, tags: ['easy_run'],
+    computed: { steps: [{ distanceMeters: 8046.7, paceTarget: '9:30/mi', seconds: 2865 }] },
+  };
+  const [ride] = getDisciplineSwaps(easy as never, ['run', 'ride'], [], null, null);
+  assertEquals(ride.to, 'ride');
+  assertEquals(ride.patch.steps_preset, null, 'an easy swap writes no tokens');
+  assertEquals(ride.needsMaterialize, false, 'an easy swap needs no server expansion');
+  assert(!('duration' in ride.patch), 'the easy swap preserves the row\'s own time');
+  assert(!('computed' in ride.patch), 'the easy swap must not clear computed — it holds the duration');
+  // Time-matched, as before.
+  assertEquals(plannedDurationSeconds({ ...easy, ...ride.patch } as never), 3780);
+});
+
+Deno.test('⛔ THE RENDER SPLIT — stale run structure is hidden, a REAL bike session is not', () => {
+  /**
+   * ⚠️ THE INTERACTION THAT COULD HAVE BROKEN THE FEATURE SILENTLY. The swapped-render guard hides
+   * `computed.steps` on swapped rows — correct for an easy swap, and it would have HIDDEN THE 4×4
+   * on a hard one. `steps_preset` is the tell: present ⇒ written for the target sport and expanded
+   * for it; absent ⇒ whatever is in `computed` belongs to the sport left behind.
+   */
+  const easySwapped = { type: 'ride', tags: ['discipline_swapped', 'swapped_from:run'], steps_preset: null,
+    computed: { steps: [{ distanceMeters: 8046.7, paceTarget: '9:30/mi' }] } };
+  assert(swappedStructureIsStale(easySwapped as never), 'the run steps must be suppressed');
+
+  const hardSwapped = { type: 'ride', tags: ['discipline_swapped', 'swapped_from:run'],
+    steps_preset: ['warmup_bike_quality_15min_fastpedal', 'bike_vo2_4x4min_R4min', 'cooldown_bike_10min_easy'],
+    computed: { steps: [{ duration_s: 240, power_range: { lower: 275, upper: 300 } }] } };
+  assert(!swappedStructureIsStale(hardSwapped as never), 'the REAL 4×4 must render');
+  assert(isDisciplineSwapped(hardSwapped as never), 'it is still a swap, for every other purpose');
 });

@@ -13,6 +13,7 @@ import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipli
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
+import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -860,6 +861,8 @@ export default function WorkoutCalendar({
   }, [events]);
 
   const declaredPosture = useDeclaredPosture();
+  // ⛔ Gates the HARD-ride swap — the chip must agree with the surfaces it leads to.
+  const resolvedFtp = useResolvedFtp();
   const swappableIds = useMemo(() => {
     const rows = (events ?? [])
       .map((e) => (e as { _src?: unknown })?._src)
@@ -867,11 +870,11 @@ export default function WorkoutCalendar({
     const available = availableDisciplines(rows);
     const ids: Set<string> = new Set();
     for (const r of rows) {
-      if (getDisciplineSwaps(r, available, [], declaredPosture).length > 0) ids.add(String(r?.id ?? ''));
+      if (getDisciplineSwaps(r, available, [], declaredPosture, resolvedFtp).length > 0) ids.add(String(r?.id ?? ''));
     }
     ids.delete('');
     return ids;
-  }, [events, declaredPosture]);
+  }, [events, declaredPosture, resolvedFtp]);
 
 
   // Day-stacked ordering (Bug: calendar cells ignored strength_ordering_preference —

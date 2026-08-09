@@ -48,9 +48,15 @@ Deno.test('⛔ VOLUME IS PRESERVED — the duration is untouched and no distance
 });
 
 Deno.test('⛔ INTENSITY IS PRESERVED — easy stays easy, hard stays hard', () => {
+  /**
+   * ⚠️ THE FTP ARGUMENT IS NEW (2026-08-09) AND IT CHANGED THIS TEST. A hard ride is now written as
+   * real 4×4 tokens whose watts come from FTP, so it is only OFFERED when the athlete has one.
+   * Before: `getDisciplineSwaps(hardRun, ['run','ride'])` returned the ride unconditionally.
+   * The no-FTP case is asserted in its own test below.
+   */
   assertEquals(intensityOf(easyRun), 'easy');
   assertEquals(intensityOf(hardRun), 'hard');
-  const [hardRide] = getDisciplineSwaps(hardRun, ['run', 'ride']);
+  const [hardRide] = getDisciplineSwaps(hardRun, ['run', 'ride'], [], null, 250);
   assertEquals(hardRide.patch.type, 'ride');
   assert(/hard work|effort is the same/i.test(String(hardRide.patch.description)),
     'a hard session came back as an easy one — the swap re-dosed the week');
@@ -291,15 +297,40 @@ Deno.test('⛔ BK-LR — a long ride correctly offers NOTHING', () => {
 
 Deno.test('⛔ a hard RUN can become a hard RIDE — the doctrine prefers it', () => {
   const hill = { id: 'h1', type: 'run', name: 'Hill Repeats', workout_status: 'planned', total_duration_seconds: 1920, tags: ['intervals'] };
-  const opts = getDisciplineSwaps(hill, ['run', 'ride', 'swim']);
+  // ⚠️ FTP PASSED (2026-08-09) — a hard ride is a watt session now, so it needs one. Before this
+  // change the same call took four arguments and returned the ride regardless.
+  const opts = getDisciplineSwaps(hill, ['run', 'ride', 'swim'], [], null, 250);
   assertEquals(opts.map((o) => o.to), ['ride'], 'a hard session must not offer a swim');
   assertEquals(opts[0].patch.name, 'Bike Intervals');
   assertEquals(opts[0].warnings, [], 'the doctrine-preferred direction should not warn');
 });
 
+Deno.test('⛔ NO FTP → THE HARD RIDE IS NOT OFFERED AT ALL (2026-08-09)', () => {
+  /**
+   * ⛔ IT FAILS CLOSED, and that is the whole point. `expandBikeToken` builds every work step as
+   * `pctRange(1.1, 1.2) × FTP`; with no FTP it returns `undefined` and the athlete receives a 4×4
+   * interval session carrying NO targets — an artefact that looks like a prescription and is not
+   * one. Not offering the control is the honest outcome.
+   *
+   * ⚠️ AND THE HARD RUN IS LEFT WITH NOTHING, deliberately — swim is already excluded for hard work,
+   * so a hard session for an athlete with no FTP offers no swap. That is the simpler of the two
+   * fallbacks and it does not invent an easy block out of a hard session.
+   */
+  const hill = { id: 'h1', type: 'run', name: 'Hill Repeats', workout_status: 'planned', total_duration_seconds: 1920, tags: ['intervals'] };
+  assertEquals(getDisciplineSwaps(hill, ['run', 'ride', 'swim'], [], null, null), []);
+  assertEquals(getDisciplineSwaps(hill, ['run', 'ride', 'swim'], [], null, 0), []);
+  assertEquals(getDisciplineSwaps(hill, ['run', 'ride', 'swim']), [], 'omitted argument = no FTP');
+
+  // ⚠️ EASY SWAPS ARE UNAFFECTED BY FTP — an easy ride is a time block with no targets by design.
+  const easy = { id: 'e1', type: 'run', name: 'Easy Run', workout_status: 'planned', total_duration_seconds: 2700, tags: ['easy_run'] };
+  assertEquals(getDisciplineSwaps(easy, ['run', 'ride', 'swim'], [], null, null).map((o) => o.to), ['ride', 'swim']);
+});
+
 Deno.test('⛔ a hard RIDE → hard RUN is allowed and WARNS — it spends protected budget', () => {
   const bikeInt = { id: 'h2', type: 'ride', name: 'Bike Intervals', workout_status: 'planned', total_duration_seconds: 2700, tags: ['intervals'] };
-  const opts = getDisciplineSwaps(bikeInt, ['run', 'ride', 'swim']);
+  // ⚠️ THIS DIRECTION NEEDS NO FTP — the gate only requires one when the TARGET is the ride, and
+  // here the target is the run. Asserted without it, so that stays true.
+  const opts = getDisciplineSwaps(bikeInt, ['run', 'ride', 'swim'], [], null, null);
   assertEquals(opts.map((o) => o.to), ['run'], 'a hard session must not offer a swim');
   assert(opts[0].warnings.some((w) => /costs the legs more/i.test(w)), `warnings: ${opts[0].warnings.join(' | ')}`);
   assertEquals(opts[0].patch.type, 'run', 'the warning became a gate');

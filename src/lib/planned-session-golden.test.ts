@@ -566,12 +566,23 @@ Deno.test('GOLDEN · title (already consolidated — pinned so stage 4 cannot re
 // ── THE SWAP GATE (the composite reader — duration × discipline × band × status) ──────────────
 
 Deno.test('GOLDEN · swap options, no posture declared', () => {
+  /**
+   * ⚠️ ⛔ ROW D CHANGED (2026-08-09), DELIBERATELY — it is the only value this stage moved.
+   *
+   *     before — 'D': ['ride']     (a hard session always offered the bike)
+   *     after  — 'D': []           (…only when the athlete has a usable FTP)
+   *
+   * A hard ride is no longer a relabelled run: the patch writes real 4×4 tokens and
+   * `materialize-plan` prices them at `1.1–1.2 × FTP`. With no FTP those steps carry no targets at
+   * all, so the control is not offered. This call passes no FTP, hence the empty list; the
+   * with-FTP case is pinned directly below.
+   */
   const available = ['run', 'ride', 'swim'] as const;
   const golden: Record<string, string[]> = {
-    'A': ['ride', 'swim'],   // easy run
+    'A': ['ride', 'swim'],   // easy run — unaffected, easy swaps never consult FTP
     'B': ['ride', 'swim'],
     'C': ['run', 'swim'],    // easy ride
-    'D': ['ride'],           // hard → run↔ride only, never swim
+    'D': [],                 // hard, and no FTP passed → the bike cannot be written
     'E': [],                 // long run
     'F': [],                 // long ride
     'G': ['run', 'ride'],    // easy swim

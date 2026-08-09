@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 // ⛔ ONE SWAP PREDICATE + ONE CLEAN BLOCK, shared by all three surfaces.
-import { isDisciplineSwapped, swappedSessionBlock } from '@/lib/session-discipline-swap';
+import { swappedSessionBlock, swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces.
 import PlannedSessionHeader from './PlannedSessionHeader';
 import { Copy } from 'lucide-react';
@@ -58,7 +58,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
    * outright would have deleted the one thing a swap is supposed to preserve. The row object is
    * left intact; only the renderers below stop reading it.
    */
-  const swapped = isDisciplineSwapped(workout as never);
+  const swapped = swappedStructureIsStale(workout as never);
   const hasStructured = !swapped && !!(structureAny && typeof structureAny === 'object');
   const hasComputedV3 = !swapped && Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
   // D-196: grouped swim actions (Copy FORM · Send to Apple Watch · Send to Garmin) up top.

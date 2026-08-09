@@ -29,6 +29,7 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { isUnmatchedAgainstPlan, unmatchedPrompt } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
+import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import {
   availableDisciplines,
   disciplineOf,
@@ -141,6 +142,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
    * `workout.` — it now evaluates on the null render, where it would have thrown.
    */
   const declaredPosture = useDeclaredPosture();
+  // ⛔ Gates the HARD-ride swap — see `useResolvedFtp`. Must sit ABOVE the guard (Stage H).
+  const resolvedFtp = useResolvedFtp();
 
   // plannedWorkouts context removed; rely on server unified data/routes
   //
@@ -545,7 +548,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     })
     .filter((x): x is { kind: MatrixSessionKind; label: string } => x !== null);
   const swapOptions: SwapOption[] = !isCompleted && swapRow
-    ? getDisciplineSwaps(swapRow, availableDisciplines(swapWeek), swapSameDay, declaredPosture)
+    ? getDisciplineSwaps(swapRow, availableDisciplines(swapWeek), swapSameDay, declaredPosture, resolvedFtp)
     : [];
 
   const getWorkoutType = () => {
@@ -1288,6 +1291,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       // ⛔ THE EXISTING WRITE PATH. `updatePlannedWorkout` is the same helper Delete
                       // and the rest of this view already use — a swap must not invent a second one.
                       await updatePlannedWorkout(id, opt.patch as Parameters<typeof updatePlannedWorkout>[1]);
+                      /**
+                       * ⛔ THE HARD RIDE NEEDS THE SERVER TO EXPAND ITS TOKENS INTO WATTS — see the
+                       * same call in `TodaysEffort.handleApplyDisciplineSwap`. Both apply paths do
+                       * this, and `needsMaterialize` is why neither re-derives the condition.
+                       */
+                      if (opt.needsMaterialize) {
+                        try {
+                          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: id } });
+                        } catch (e) {
+                          console.warn('[Swap] materialize-plan failed for the hard ride:', e);
+                        }
+                      }
                       invalidateWorkoutScreens();
                       setShowSwapPanel(false);
                       onClose();

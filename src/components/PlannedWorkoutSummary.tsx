@@ -15,7 +15,7 @@ import {
 } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE + ONE CLEAN BLOCK, shared by all three surfaces.
-import { isDisciplineSwapped, swappedSessionBlock } from '@/lib/session-discipline-swap';
+import { swappedSessionBlock, swappedStructureIsStale } from '@/lib/session-discipline-swap';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -320,7 +320,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
    * session swapped TO swim would print the ORIGINAL run's metres as pool yardage — a fabricated
    * distance under a swim's name. A swapped session has no distance; that is the point of it.
    */
-  const yards = isDisciplineSwapped(workout as never) ? null : computeSwimYards(workout);
+  const yards = swappedStructureIsStale(workout as never) ? null : computeSwimYards(workout);
   const title = getTitle(workout);
   /**
    * ⛔ THE FLAG IS PASSED DOWN, NOT COMPARED AFTERWARDS (corrected 2026-08-09). The first version
@@ -341,7 +341,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
    * reads the same `computed.steps` for its third rung — the duration is the one thing a swap
    * preserves, so the data has to stay readable even though it must stop being displayed.
    */
-  const swapped = isDisciplineSwapped(workout as never);
+  const swapped = swappedStructureIsStale(workout as never);
   const swapBlock = swapped ? swappedSessionBlock(workout as never) : null;
   const lines = swapBlock
     ? swapBlock.effort

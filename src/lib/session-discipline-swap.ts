@@ -71,6 +71,11 @@ export type SwapOption = {
   label: string;
   /** The patch to apply to `planned_workouts`. Duration is deliberately absent — see `buildSwap`. */
   patch: Record<string, unknown>;
+  /**
+   * True when the patch wrote tokens that only become a real session after `materialize-plan`
+   * expands them (the hard ride's watts). The apply path must invoke it for this row.
+   */
+  needsMaterialize: boolean;
   /** Non-blocking. Empty when the swap creates no conflict with the rest of that day. */
   warnings: string[];
 };
@@ -119,6 +124,24 @@ export function isDisciplineSwapped(s: SwappableSession | null | undefined): boo
   if (!s) return false;
   const tags = (s.tags ?? []).map((t) => String(t));
   return tags.includes(SWAPPED_TAG) || tags.some((t) => t.startsWith(SWAPPED_FROM_PREFIX));
+}
+
+/**
+ * ⛔ SHOULD THE RENDERERS HIDE THIS ROW'S STRUCTURE? Not every swap leaves stale structure behind.
+ *
+ * ⚠️ THE DISTINCTION EXISTS BECAUSE OF THE HARD RIDE (2026-08-09). An EASY swap writes
+ * `steps_preset: null` and leaves `computed.steps` holding the SOURCE sport's session — that is the
+ * "5.0 mi @ run pace on a ride" bug, and it must be suppressed. A HARD swap to the bike writes real
+ * bike tokens and has `materialize-plan` regenerate `computed` from them, so its steps ARE the
+ * ride's — suppressing those would hide the 4×4 the athlete is meant to do.
+ *
+ * ⛔ THE TELL IS `steps_preset`. Present ⇒ something was written FOR the target sport and expanded
+ * for it. Absent ⇒ nothing was, and whatever is in `computed` belongs to the sport left behind.
+ */
+export function swappedStructureIsStale(s: SwappableSession | null | undefined): boolean {
+  if (!isDisciplineSwapped(s)) return false;
+  const preset = (s as { steps_preset?: unknown } | null)?.steps_preset;
+  return !(Array.isArray(preset) && preset.length > 0);
 }
 
 /**
@@ -308,6 +331,16 @@ export function getDisciplineSwaps(
    * means "not declared" and is NOT a verdict — see the gate below.
    */
   posture?: PerDisciplinePosture | null,
+  /**
+   * ⛔ THE ATHLETE'S USABLE FTP, AND IT GATES ONE THING ONLY: hard → ride. A hard ride is written as
+   * real 4×4 tokens that `materialize-plan` turns into watts by multiplying FTP; with no FTP the
+   * expansion yields interval steps carrying **no targets**, which looks like a prescription and is
+   * not one. Null → the hard ride is not offered at all.
+   *
+   * ⚠️ EASY SWAPS DO NOT CONSULT IT. An easy ride is a time block with no targets by design, so it
+   * needs nothing from the athlete's numbers and must keep working for an athlete who has none.
+   */
+  ftp?: number | null,
 ): SwapOption[] {
   const from = disciplineOf(session.type);
   if (!from) return [];
@@ -375,22 +408,86 @@ export function getDisciplineSwaps(
    * and swim sessions deliberately carry no `steps_preset`. Offering "hard swim instead" would
    * promise a prescription this app cannot write. An easy swim is a time block, which it can.
    */
-  const targets = available.filter((d) => (band === 'hard' ? d !== 'swim' : true));
+  const hasUsableFtp = Number.isFinite(ftp as number) && (ftp as number) > 0;
+  /**
+   * ⛔ HARD → RIDE NEEDS AN FTP; HARD → SWIM IS EXCLUDED OUTRIGHT (see above). So a hard session for
+   * an athlete with no FTP correctly offers NOTHING — the simpler of the two fallbacks, and the
+   * honest one: the app cannot write the session it would be promising.
+   */
+  const targets = available.filter((d) => {
+    if (band !== 'hard') return true;
+    if (d === 'swim') return false;
+    if (d === 'ride') return hasUsableFtp;
+    return true;
+  });
 
   return targets
     .filter((d) => d !== from)
     .map((to) => {
       const { name, description } = describeSwap(to, band, minutes);
+      /**
+       * ═══ THE HARD RIDE IS A REAL SESSION, NOT A RELABEL (2026-08-09). ═══════════════════════════
+       *
+       * ⛔ A hard swap to the bike writes the SAME THREE TOKENS `generate-combined-plan/session-factory.ts:604`
+       * uses for its bike quality work — warm-up, the Helgerud 4×4, cool-down. `materialize-plan`'s
+       * `expandBikeToken` then turns `bike_vo2_4x4min_R4min` into work steps at
+       * `pctRange(1.1, 1.2) × FTP`, so the athlete gets real watts instead of a run wearing a ride's
+       * name.
+       *
+       * ⚠️ NOT `bikeQualitySession`'s TOKEN LIST. That one is the bare `['bike_vo2_4x4min_R4min']` —
+       * no warm-up, no cool-down — which expands to 32 min of intervals opening cold with a maximal
+       * effort. The three-token form is the one the combined-plan factory ships and the one a human
+       * should actually ride. (`bikeQualitySession`'s own 45-vs-32 gap is a pre-existing Strong Focus
+       * inconsistency and is deliberately NOT touched here.)
+       *
+       * ⛔ PROTOCOL LENGTH, NOT THE SOURCE SESSION'S TIME — the one place the swap's "same time" rule
+       * is broken, on purpose. 15 warm-up + 4×(4+4) + 10 cool-down = 57 min, and it is what the
+       * protocol IS. Padding it to a 63-minute run's length would add junk minutes to a session whose
+       * whole value is its structure; truncating it would break the protocol. Easy swaps stay
+       * time-matched, because an easy block has no structure to protect.
+       */
+      const HARD_RIDE_TOKENS = [
+        'warmup_bike_quality_15min_fastpedal',
+        'bike_vo2_4x4min_R4min',
+        'cooldown_bike_10min_easy',
+      ];
+      const HARD_RIDE_MIN = 15 + 4 * (4 + 4) + 10;   // 57 — warm-up + 4×4 + cool-down
+      const isHardRide = band === 'hard' && to === 'ride';
       return {
         to,
         label: to === 'ride' ? 'Ride instead' : to === 'swim' ? 'Swim instead' : 'Run instead',
+        /**
+         * ⚠️ THE CALLER MUST RE-MATERIALISE A HARD RIDE. Writing the tokens is half the job — the
+         * watts only exist once `materialize-plan` expands them for this row. Both apply paths do
+         * this; `needsMaterialize` is how they know without re-deriving the condition.
+         */
+        needsMaterialize: isHardRide,
         patch: {
           type: to,
           name,
           description,
-          // ⛔ duration is NOT in the patch — it is already correct on the row and re-writing it is
-          // how a preserved value gets accidentally rounded. Stated so nobody "fixes" the omission.
-          steps_preset: null,
+          // ⛔ duration is NOT in the patch for easy swaps — it is already correct on the row and
+          // re-writing it is how a preserved value gets accidentally rounded. The HARD ride is the
+          // exception: its length is the protocol's, so it is written explicitly.
+          ...(isHardRide
+            ? {
+                duration: HARD_RIDE_MIN,
+                total_duration_seconds: HARD_RIDE_MIN * 60,
+                /**
+                 * ⛔ THE STALE STRUCTURE MUST GO HERE, and only here. `materialize-plan` overwrites
+                 * `computed` from the tokens, but `workout_structure` and `intervals` are the RUN's
+                 * and nothing else clears them — they are what printed "Walk down" on a ride.
+                 *
+                 * ⚠️ SAFE ONLY BECAUSE `total_duration_seconds` IS WRITTEN ON THE LINE ABOVE.
+                 * `computed.steps` is rung 3 of `plannedDurationSeconds`; clearing it without pinning
+                 * a total first would delete the session's duration. See the fixtures.
+                 */
+                computed: null,
+                workout_structure: null,
+                intervals: null,
+              }
+            : {}),
+          steps_preset: isHardRide ? HARD_RIDE_TOKENS : null,
           /**
            * ⛔ THE STALE RENDERED COPY HAD TO GO WITH IT. `rendered_description` is the
            * materialiser's expanded prose for the ORIGINAL discipline, and several surfaces prefer

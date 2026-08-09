@@ -12,6 +12,7 @@ import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
+import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 // ⛔ ONE SHARED SWAP LAYER (2026-08-08). Pure logic + the clearance law live in the lib; this file
 // owns only the UI and the write. Every plan type — marathon, Strong Focus, combined, tri — renders
 // planned sessions through here, so the swap is inherited rather than re-implemented per generator.
@@ -30,7 +31,7 @@ import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
-import { isDisciplineSwapped } from '@/lib/session-discipline-swap';
+import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
 import PlannedSessionHeader from './PlannedSessionHeader';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
@@ -159,6 +160,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip' | 'swap'>('detail');
   const [swappingSession, setSwappingSession] = useState(false);
   const declaredPosture = useDeclaredPosture();
+  // ⛔ Gates the HARD-ride swap: no usable FTP, no watts, so it is not offered.
+  const resolvedFtp = useResolvedFtp();
   const [dismissedNotes, setDismissedNotes] = useState<Set<string>>(new Set());
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
 
@@ -613,6 +616,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const { error } = await supabase
         .from('planned_workouts').update(option.patch).eq('id', workout.id).eq('user_id', userId);
       if (error) throw error;
+      /**
+       * ⛔ THE HARD RIDE IS NOT FINISHED UNTIL THE SERVER EXPANDS IT (2026-08-09). The patch wrote
+       * TOKENS (`warmup_bike_quality_15min_fastpedal` · `bike_vo2_4x4min_R4min` ·
+       * `cooldown_bike_10min_easy`); the WATTS only exist once `materialize-plan` runs
+       * `expandBikeToken` against the athlete's FTP. Without this call the athlete opens a session
+       * with a name, a length, and no steps.
+       *
+       * ⚠️ AWAITED, so the invalidations below fire against the expanded row. The same single-row
+       * entry point `usePlannedWorkoutLink` and `UnifiedWorkoutView` already use — no new function.
+       */
+      if (option.needsMaterialize) {
+        try {
+          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(workout.id) } });
+        } catch (e) {
+          // ⚠️ The swap itself succeeded; only the expansion failed. Say so rather than implying the
+          // whole action failed — the row is a ride either way, and a re-open re-materialises it.
+          console.warn('[swap] materialize-plan failed for the hard ride:', e);
+        }
+      }
       toast({ title: `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`, variant: 'default' });
       setSelectedPlannedWorkout(null);
       setPlannedDrawerStep('detail');
@@ -1660,7 +1682,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const swapGlyph = (() => {
                   if (!isPlannedRow || isCompleted) return null;
                   const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
-                  const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never), [], declaredPosture);
+                  const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never), [], declaredPosture, resolvedFtp);
                   if (opts.length === 0) return null;
                   const openSwap = () => {
                     setSelectedPlannedWorkout(workout);
@@ -1791,7 +1813,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           // ⚠️ NOT ON A SWAPPED ROW — the chip falls back to `computed.steps`
                           // distances, which on a swap still hold the SOURCE sport's metres.
                           const swimChip = String(workout.type || '').toLowerCase() === 'swim'
-                            && !isDisciplineSwapped(workout as never)
+                            && !swappedStructureIsStale(workout as never)
                             ? formatPlannedSwimDistanceChip(workout as any)
                             : null;
                           return swimChip ? (
@@ -2124,6 +2146,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         })
                         .filter(Boolean) as Array<{ kind: any; label: string }>,
                       declaredPosture,
+                      // ⛔ Gates the HARD ride only — see `useResolvedFtp`. Easy swaps ignore it.
+                      resolvedFtp,
                     )
                   : [];
                 if (plannedDrawerStep === 'swap' && w) {
