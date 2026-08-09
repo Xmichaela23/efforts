@@ -18,6 +18,7 @@ import {
   matrixKindFor,
   swapWarnings,
 } from './session-discipline-swap.ts';
+import { SWAP_TAG } from '../../supabase/functions/activate-plan/preserve-athlete-edits.ts';
 
 const easyRun = { id: '1', type: 'run', name: 'Easy Run', duration: 45, tags: ['easy_run'], steps_preset: ['run_easy_45min'] };
 const longRun = { id: '2', type: 'run', name: 'Long Run', duration: 90, tags: ['long_run'] };
@@ -134,4 +135,48 @@ Deno.test('⛔ MARATHON: an easy run becomes a ride, same day, same time', () =>
   assertEquals(opts.length, 1);
   assertEquals(opts[0].patch.type, 'ride');
   assert(/50 min/.test(String(opts[0].patch.description)));
+});
+
+
+// ── the surface that actually opens a planned session ────────────────────────────────────────
+
+Deno.test('⛔ THE CALENDAR ROW — a planned run opened from the week offers the ride', () => {
+  // The shape `UnifiedWorkoutView` hands in: a `planned_workouts` row with a status and a date.
+  const row = {
+    id: 'p1', type: 'run', name: 'Easy Run', duration: 45,
+    workout_status: 'planned', date: '2026-08-10', tags: ['easy_run'],
+  };
+  const opts = getDisciplineSwaps(row, ['run', 'ride']);
+  assertEquals(opts.map((o) => o.to), ['ride']);
+  assertEquals(opts[0].patch.type, 'ride');
+});
+
+Deno.test('⛔ a completed or skipped session is NOT swappable — that would rewrite history', () => {
+  const done = { id: 'p2', type: 'run', name: 'Easy Run', duration: 45, workout_status: 'completed', tags: ['easy_run'] };
+  const skipped = { ...done, id: 'p3', workout_status: 'skipped' };
+  assertEquals(getDisciplineSwaps(done, ['run', 'ride']), []);
+  assertEquals(getDisciplineSwaps(skipped, ['run', 'ride']), []);
+});
+
+Deno.test('a row with no status is treated as planned — absence is not "completed"', () => {
+  const opts = getDisciplineSwaps({ id: 'p4', type: 'run', duration: 40, tags: [] }, ['run', 'ride']);
+  assertEquals(opts.length, 1);
+});
+
+
+// ── the contract with the server ─────────────────────────────────────────────────────────────
+
+Deno.test('⛔ THE SWAP TAG MATCHES THE ONE activate-plan LOOKS FOR', () => {
+  /**
+   * The swap survives a plan rebuild because `activate-plan/preserve-athlete-edits.ts` recognises
+   * the row by this tag. Two string literals in two files is exactly how that silently stops
+   * working — the tag would still be written, the rebuild would stop seeing it, and the swap would
+   * quietly start reverting again with nothing failing.
+   *
+   * ⚠️ Asserted rather than shared: the edge file must not pull the client lib into its bundle for
+   * one string, and the client must not import an edge function's internals. The test is the seam.
+   */
+  const patch = getDisciplineSwaps(easyRun, ['run', 'ride'])[0].patch;
+  const tags = patch.tags as string[];
+  assert(tags.includes(SWAP_TAG), `the swap writes ${JSON.stringify(tags)}, activate-plan looks for "${SWAP_TAG}"`);
 });

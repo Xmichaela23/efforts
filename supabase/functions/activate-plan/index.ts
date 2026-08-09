@@ -4,6 +4,10 @@
 //           (persists steps_preset, strength_exercises, description, tags)
 //           and then calls materialize-plan to compute computed.steps.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+// ⛔ ATHLETE EDITS SURVIVE THE REBUILD (2026-08-08). The delete below is an idempotency guard, and it
+// was also silently discarding everything the athlete had done to these rows — skips and discipline
+// swaps alike. The rules live in their own file so they are unit-testable without standing up a plan.
+import { preserveAthleteEdits, type PlannedRowLike } from './preserve-athlete-edits.ts'
 import {
   getStepsIntensity,
   calculateDurationWorkload,
@@ -372,6 +376,23 @@ Deno.serve(async (req) => {
       || computeNextMonday()
     const anchorMonday: string = mondayOf(startDate)
 
+    /**
+     * ⛔ READ WHAT THE ATHLETE DID BEFORE DESTROYING IT. The delete below is unconditional, so this
+     * snapshot is the only chance to carry a skip or a discipline swap across. Non-fatal: a read
+     * that fails costs the athlete their edits, which is today's behaviour, and must never cost them
+     * the activation.
+     */
+    let priorRows: PlannedRowLike[] = []
+    try {
+      const { data: prior } = await supabase
+        .from('planned_workouts')
+        .select('week_number,day_number,date,type,name,description,steps_preset,tags,workout_status,skip_reason,skip_note')
+        .eq('training_plan_id', planId)
+      priorRows = Array.isArray(prior) ? prior as PlannedRowLike[] : []
+    } catch (e) {
+      console.warn('[activate-plan] could not snapshot athlete edits before rebuild:', e)
+    }
+
     // Idempotency: Delete existing planned workouts for this plan before inserting new ones
     // This prevents duplicates if activate-plan is called multiple times
     try {
@@ -604,6 +625,16 @@ Deno.serve(async (req) => {
 
     let inserted = 0
     if (rows.length) {
+      /**
+       * ⛔ RE-APPLY IMMEDIATELY BEFORE THE INSERT, so everything the plan owns has already been
+       * regenerated and only the athlete's own fields are overwritten. Mutates `rows` in place.
+       */
+      if (priorRows.length > 0) {
+        const preserved = preserveAthleteEdits(rows as PlannedRowLike[], priorRows)
+        // ⛔ SAY WHAT WAS CARRIED OVER — AND WHAT WAS NOT. A restored edit the athlete cannot see is
+        // indistinguishable from a bug, and a DROPPED one is worse.
+        for (const n of preserved.notes) console.log('[activate-plan] preserve:', n)
+      }
       const { error } = await supabase.from('planned_workouts').insert(rows as any)
       if (error) throw error
       inserted = rows.length
