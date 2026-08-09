@@ -17,8 +17,11 @@ import {
   intensityOf,
   matrixKindFor,
   swapWarnings,
+  originOf,
   resolveMinutes,
+  SWAPPED_FROM_PREFIX,
 } from './session-discipline-swap.ts';
+import { SWAPPED_FROM_PREFIX as SERVER_SWAPPED_FROM_PREFIX } from '../../supabase/functions/get-week/planned-exists-key.ts';
 import { SWAP_TAG } from '../../supabase/functions/activate-plan/preserve-athlete-edits.ts';
 
 const easyRun = { id: '1', type: 'run', name: 'Easy Run', duration: 45, tags: ['easy_run'], steps_preset: ['run_easy_45min'] };
@@ -315,4 +318,37 @@ Deno.test('⛔ the stale rendered copy is always cleared', () => {
       assertEquals(o.patch.rendered_description, null, `${o.to}: stale copy survived`);
     }
   }
+});
+
+// ═══ THE CONTRACT WITH get-week — the duplicate-session fix depends on it ════════════════════
+
+Deno.test('⛔ THE swapped_from PREFIX MATCHES THE ONE get-week READS', () => {
+  /**
+   * The client writes `swapped_from:<discipline>`; `get-week/planned-exists-key.ts` reads it to
+   * credit a swapped row with its ORIGINAL discipline, which is what stops the blob's session being
+   * re-inserted beside it. Two literals in two codebases is exactly how that silently breaks — the
+   * tag would still be written, get-week would stop recognising it, and the duplicate would come
+   * back with nothing failing.
+   */
+  assertEquals(SWAPPED_FROM_PREFIX, SERVER_SWAPPED_FROM_PREFIX);
+});
+
+Deno.test('⛔ the swap records the ORIGINAL discipline, and keeps it across repeated swaps', () => {
+  const run = { id: 's1', type: 'run', name: 'Easy Run', total_duration_seconds: 3780, tags: ['easy_run'], workout_status: 'planned' };
+  const toRide = getDisciplineSwaps(run, ['run', 'ride', 'swim']).find((o) => o.to === 'ride')!;
+  assert((toRide.patch.tags as string[]).includes('swapped_from:run'), `tags: ${JSON.stringify(toRide.patch.tags)}`);
+
+  // Now swap that ride onward to a swim. The origin must STILL be run — that is what the blob holds.
+  const asRide = { ...run, ...toRide.patch } as never;
+  const toSwim = getDisciplineSwaps(asRide, ['run', 'ride', 'swim']).find((o) => o.to === 'swim')!;
+  assert(
+    (toSwim.patch.tags as string[]).includes('swapped_from:run'),
+    `second swap lost the origin: ${JSON.stringify(toSwim.patch.tags)}`,
+  );
+  assert(!(toSwim.patch.tags as string[]).includes('swapped_from:ride'), 'the origin was overwritten with the last hop');
+});
+
+Deno.test('originOf reads the tag back; an unswapped session has none', () => {
+  assertEquals(originOf({ type: 'run', tags: ['easy_run'] }), null);
+  assertEquals(originOf({ type: 'ride', tags: ['discipline_swapped', 'swapped_from:run'] }), 'run');
 });

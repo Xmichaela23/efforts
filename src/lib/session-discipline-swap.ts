@@ -69,6 +69,23 @@ const DISCIPLINE_OF: Record<string, Discipline | null> = {
   swim: 'swim', swimming: 'swim',
 };
 
+/** Prefix for the origin tag. One literal, shared with `get-week` via an asserted test. */
+export const SWAPPED_FROM_PREFIX = 'swapped_from:';
+
+/**
+ * The discipline the PLAN originally prescribed, read back off a previous swap's tag.
+ * Null when this session has never been swapped — the caller then uses its current discipline.
+ */
+export function originOf(s: SwappableSession): Discipline | null {
+  for (const t of s.tags ?? []) {
+    const raw = String(t);
+    if (!raw.startsWith(SWAPPED_FROM_PREFIX)) continue;
+    const d = disciplineOf(raw.slice(SWAPPED_FROM_PREFIX.length));
+    if (d) return d;
+  }
+  return null;
+}
+
 export function disciplineOf(type: string | null | undefined): Discipline | null {
   return DISCIPLINE_OF[String(type ?? '').toLowerCase()] ?? null;
 }
@@ -276,7 +293,26 @@ export function getDisciplineSwaps(
            * it had failed, or worse, quietly prescribe the wrong session.
            */
           rendered_description: null,
-          tags: [...new Set([...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))), 'discipline_swapped'])],
+          /**
+           * ⛔ THE TAG RECORDS WHAT THE PLAN ORIGINALLY ASKED FOR (2026-08-08), and that is load-bearing.
+           *
+           * `get-week` re-materialises planned rows from `plans.sessions_by_week` on every read and
+           * decides "is this session already here?" on `plan|date|TYPE`. A swap changes the type, so
+           * the blob's run looked MISSING and get-week inserted a second row — the athlete's Tuesday
+           * ended up holding the swapped ride AND a freshly re-created run, on every calendar load.
+           * `swapped_from:<original>` is what lets that check find the slot without the blob being
+           * touched. The swap stays individualised; the plan keeps saying what it prescribed.
+           *
+           * ⛔ THE EARLIEST ORIGIN WINS, NOT THE LAST HOP. Swapping run → ride → swim must still
+           * report `swapped_from:run`, because `run` is what the blob holds and what get-week will
+           * look for. Recording the immediately-previous discipline would leave the blob's run
+           * unmatched on the second swap and the duplicate would come straight back.
+           */
+          tags: [...new Set([
+            ...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))),
+            'discipline_swapped',
+            `swapped_from:${originOf(session) ?? from}`,
+          ])],
         },
         warnings: [
           ...swapWarnings(to, band, sameDayOthers),

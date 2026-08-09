@@ -17,6 +17,9 @@
 // - Provides weekly stats and training plan context
 // - No daily context generation - moved to dedicated overall context system
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+// ⛔ THE MEMBERSHIP KEY LIVES IN ITS OWN FILE so it can be unit-tested without a database — the
+// duplicate-session bug it fixes was invisible until a device showed it. See that file's header.
+import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -150,8 +153,15 @@ Deno.serve(async (req)=>{
           count: plans.length
         });
         // Preload existing planned rows in range for quick membership checks
-        const { data: prePlanned } = await supabase.from('planned_workouts').select('id,training_plan_id,date,type').eq('user_id', userId).gte('date', fromISO).lt('date', addDays(toISO, 1));
-        const existsKey = new Set((Array.isArray(prePlanned) ? prePlanned : []).map((r)=>`${String(r.training_plan_id)}|${String(r.date)}|${String(r.type).toLowerCase()}`));
+        /**
+         * ⛔ `tags` IS SELECTED NOW, AND IT IS THE WHOLE FIX. The membership key was
+         * `plan|date|type`, and `type` stopped being immutable when the discipline swap shipped: a
+         * swapped run reads as a ride, the blob's run looks MISSING, and the insert below re-created
+         * it on every read. `buildExistsKeys` credits a swapped row to its ORIGINAL discipline as
+         * well, using the `swapped_from:` tag the swap writes. The blob is never touched.
+         */
+        const { data: prePlanned } = await supabase.from('planned_workouts').select('id,training_plan_id,date,type,tags').eq('user_id', userId).gte('date', fromISO).lt('date', addDays(toISO, 1));
+        const existsKey = buildExistsKeys(Array.isArray(prePlanned) ? prePlanned : []);
         // Iterate dates in window
         const dates = [];
         {
@@ -274,7 +284,7 @@ Deno.serve(async (req)=>{
                   });
                   continue;
                 }
-                const key = `${String(plan.id)}|${iso}|${normType}`;
+                const key = plannedKey(plan.id, iso, normType);
                 if (debug) console.log('[get-week] Checking key:', key, 'exists:', existsKey.has(key));
                 if (existsKey.has(key)) {
                   if (debug) console.log('[get-week] Skipping - workout already exists');

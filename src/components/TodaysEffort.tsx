@@ -84,7 +84,15 @@ const WorkoutCardExpandable: React.FC<{
           transition: 'max-height 0.3s ease-out',
         }}
       >
-        <PlannedWorkoutSummary workout={workout} baselines={baselines} hideLines={false} />
+        <PlannedWorkoutSummary
+                    workout={workout}
+                    baselines={baselines}
+                    hideLines={false}
+                    /* ⛔ THE DRAWER'S HEADER ALREADY PRINTS THIS DESCRIPTION (DrawerDescription,
+                       above). Without this the same "~63 min easy…" text rendered twice on one
+                       screen — device-confirmed. Structured content is unaffected. */
+                    suppressDescriptionFallback
+                  />
         {/* Fade gradient when collapsed and content overflows */}
         {!isExpanded && needsExpansion && (
           <div
@@ -1700,11 +1708,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       </span>
                     )}
                     {isPlannedRow && !isCompleted && (() => {
-                      const d = disciplineOf(workoutType);
-                      if (!d) return null;
-                      if (intensityOf(workout) === 'long') return null;
-                      const others = availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []);
-                      if (others.filter((x) => x !== d).length === 0) return null;
+                      /**
+                       * ⛔ ASK `getDisciplineSwaps`, DO NOT RE-STATE ITS RULES (fixed 2026-08-08).
+                       *
+                       * This block hand-rolled the gate — `disciplineOf`, a `long` check, an
+                       * available-sports count — while the calendar chip asked the real function.
+                       * Two gates, two answers: the glyph rendered on the chip and not here, which is
+                       * exactly the divergence the comment on the chip warned about. It also silently
+                       * skipped the duration and status conditions, so it was a DIFFERENT rule, not
+                       * merely a copy of one.
+                       */
+                      const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
+                      const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never));
+                      if (opts.length === 0) return null;
                       return (
                         <button
                           type="button"

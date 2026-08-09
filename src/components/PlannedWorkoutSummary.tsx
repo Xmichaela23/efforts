@@ -21,6 +21,18 @@ interface PlannedWorkoutSummaryProps {
   baselines?: Baselines;
   exportHints?: ExportHints;
   hideLines?: boolean;
+  /**
+   * ⛔ THE CALLER ALREADY PRINTED THE DESCRIPTION (2026-08-08). `buildWeeklySubtitle`'s last resort
+   * is `rendered_description || description` — correct when this block stands alone, and a DUPLICATE
+   * inside a drawer whose header already renders the same string. Device-confirmed: a plain planned
+   * run showed the full "~63 min easy…" text under the title AND again under the "Easy Run 63:00"
+   * sub-header.
+   *
+   * ⚠️ OPT-IN, so every other caller is byte-identical, and it suppresses ONLY the plain-description
+   * fallback — structured content (intervals, swim buckets, strength rows) still renders, because
+   * that is not what was duplicated.
+   */
+  suppressDescriptionFallback?: boolean;
   suppressNotes?: boolean;
 }
 
@@ -328,7 +340,7 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
   } catch { return undefined; }
 }
 
-export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes }) => {
+export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes, suppressDescriptionFallback }) => {
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
@@ -337,6 +349,12 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const yards = computeSwimYards(workout);
   const title = getTitle(workout);
   const lines = suppressNotes ? (buildStructuredSubtitleOnly(workout, baselines) || '') : (buildWeeklySubtitle(workout, baselines) || '');
+  // See `suppressDescriptionFallback`: drop the subtitle only when it IS the caller's description.
+  const rawDesc = String(
+    (workout as { rendered_description?: string; description?: string })?.rendered_description
+    || (workout as { description?: string })?.description || '',
+  ).trim();
+  const linesShown = suppressDescriptionFallback && rawDesc && lines.trim() === rawDesc ? '' : lines;
   const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
   const isMobility = String((workout as any)?.type||'').toLowerCase()==='mobility';
   const strengthItems: string[] = (() => {
@@ -648,9 +666,12 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
               </span>
             ) : (
               (() => {
+                // ⚠️ `linesShown` throughout: when the caller already printed this exact description,
+                // the whole subtitle (including the strides tooltip) collapses rather than duplicating.
+                if (!linesShown) return null;
                 // Single line - check if it contains strides
-                if (/strides/i.test(lines)) {
-                  const parts = String(lines).split(/(strides)/i);
+                if (/strides/i.test(linesShown)) {
+                  const parts = String(linesShown).split(/(strides)/i);
                   return (
                     <span>
                       {parts.map((part, idx) => {
@@ -676,7 +697,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
                     </span>
                   );
                 }
-                return <span>{lines}</span>;
+                return <span>{linesShown}</span>;
               })()
             )}
           </div>
