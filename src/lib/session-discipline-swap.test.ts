@@ -352,3 +352,66 @@ Deno.test('originOf reads the tag back; an unswapped session has none', () => {
   assertEquals(originOf({ type: 'run', tags: ['easy_run'] }), null);
   assertEquals(originOf({ type: 'ride', tags: ['discipline_swapped', 'swapped_from:run'] }), 'run');
 });
+
+// ═══ POSTURE — swap what is HELD, never what is being TRAINED ════════════════════════════════
+//
+// ⛔ TRAINING SPECIFICITY. A `develop` discipline is what the block exists to improve, and adaptation
+// is specific to the mode of exercise — riding instead of the run the plan is developing deletes that
+// week's progression while looking like a fair trade. A `maintain` discipline is held, not trained.
+//
+// ⚠️ Reads `per_discipline_posture`, which already exists on every plan type and is what distinguishes
+// a strength-focus block from a run-focus one. No new field, no plan-type branching.
+
+const easyRunPlanned = {
+  id: 'pr', type: 'run', name: 'Easy Run', workout_status: 'planned',
+  total_duration_seconds: 3000, tags: ['easy_run'],
+};
+const easyRidePlanned = {
+  id: 'pb', type: 'ride', name: 'Easy Ride', workout_status: 'planned',
+  total_duration_seconds: 4320, tags: ['easy'],
+};
+
+Deno.test('⛔ a MAINTAIN run offers the swap', () => {
+  const opts = getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], { run: 'maintain', bike: 'maintain' });
+  assertEquals(opts.map((o) => o.to), ['ride']);
+});
+
+Deno.test('⛔ a DEVELOP run offers NOTHING — that is what the plan is training', () => {
+  const opts = getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], { run: 'develop', bike: 'maintain' });
+  assertEquals(opts, []);
+});
+
+Deno.test('⛔ a MAINTAIN ride in a RUN-FOCUS plan offers the swap', () => {
+  // The mirror case, and the one that proves this is not run-specific: run develops, bike is held,
+  // so the ride is swappable and the run is not — same posture map, opposite answers.
+  const posture = { run: 'develop' as const, bike: 'maintain' as const };
+  assertEquals(getDisciplineSwaps(easyRidePlanned, ['run', 'ride'], [], posture).map((o) => o.to), ['run']);
+  assertEquals(getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], posture), []);
+});
+
+Deno.test('⛔ a STRENGTH-FOCUS block: both endurance sports are held, both swappable', () => {
+  // Get Stronger — strength develops, run and bike are maintenance. Neither endurance session is the
+  // thing being trained, so both may be swapped.
+  const posture = { strength: 'develop' as const, run: 'maintain' as const, bike: 'maintain' as const };
+  assert(getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], posture).length > 0);
+  assert(getDisciplineSwaps(easyRidePlanned, ['run', 'ride'], [], posture).length > 0);
+});
+
+Deno.test('⛔ AN UNDECLARED POSTURE DOES NOT BLOCK — a missing signal is not a verdict', () => {
+  // Race plans and anything built before postures existed carry none. Failing closed would silently
+  // remove the control from all of them (SPEC-week-solver §0h).
+  assertEquals(getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], null).map((o) => o.to), ['ride']);
+  assertEquals(getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], undefined).map((o) => o.to), ['ride']);
+  // A posture map that simply says nothing about THIS discipline is equally not a verdict.
+  assertEquals(getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], { bike: 'maintain' }).map((o) => o.to), ['ride']);
+});
+
+Deno.test('an OUT discipline is not swappable either — it is parked, not held', () => {
+  assertEquals(getDisciplineSwaps(easyRunPlanned, ['run', 'ride'], [], { run: 'out' }), []);
+});
+
+Deno.test('posture uses the BIKE key for a ride, as the intake writes it', () => {
+  // `per_discipline_posture` is keyed swim/bike/run/strength — the swap's discipline is `ride`.
+  const opts = getDisciplineSwaps(easyRidePlanned, ['run', 'ride'], [], { bike: 'develop' });
+  assertEquals(opts, [], 'a develop BIKE was offered a swap — the key mapping is wrong');
+});

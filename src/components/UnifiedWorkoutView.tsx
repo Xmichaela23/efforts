@@ -28,6 +28,8 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // calendar, into this view. Same logic, correct surface.
 // ⛔ THE UNMATCHED CUE — one rule, unit-tested, shared with the calendar and Today's card.
 import { isUnmatchedAgainstPlan, unmatchedPrompt } from '@/lib/associate-candidates';
+// ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
+import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import {
   availableDisciplines,
   disciplineOf,
@@ -120,6 +122,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   initialTab,
   origin = 'other'
 }) => {
+  /**
+   * ⛔ ABOVE THE EARLY RETURN, DELIBERATELY (2026-08-09). This component returns at the next line
+   * when `workout` is falsy, and EVERY other hook in it sits below that — a pre-existing
+   * Rules-of-Hooks violation (eslint reports it on each one). Adding another hook underneath would
+   * have deepened it: if `workout` is ever falsy on one render and truthy on the next, React throws
+   * *"Rendered more hooks than during the previous render"*.
+   *
+   * ⚠️ NOT FIXING THE WHOLE FILE HERE — hoisting a dozen hooks above that return is its own change
+   * with its own blast radius. This one is placed correctly so it adds nothing to the debt.
+   */
+  const declaredPosture = useDeclaredPosture();
+
   if (!workout) {
     return (
       <div className="p-6 text-center">
@@ -1209,7 +1223,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     })
                     .filter((x): x is { kind: MatrixSessionKind; label: string } => x !== null);
                   const swapOptions: SwapOption[] = row
-                    ? getDisciplineSwaps(row, availableDisciplines(week), sameDay)
+                    ? getDisciplineSwaps(row, availableDisciplines(week), sameDay, declaredPosture)
                     : [];
 
                   const applySwap = async (opt: SwapOption) => {

@@ -11,6 +11,8 @@ import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, Circle
 import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipline-swap';
 // ⛔ THE SAME "did this miss a planned slot" RULE the workout view uses — never a second copy.
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
+// ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
+import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
@@ -857,6 +859,7 @@ export default function WorkoutCalendar({
     return ids;
   }, [events]);
 
+  const declaredPosture = useDeclaredPosture();
   const swappableIds = useMemo(() => {
     const rows = (events ?? [])
       .map((e) => (e as { _src?: unknown })?._src)
@@ -864,11 +867,11 @@ export default function WorkoutCalendar({
     const available = availableDisciplines(rows);
     const ids: Set<string> = new Set();
     for (const r of rows) {
-      if (getDisciplineSwaps(r, available).length > 0) ids.add(String(r?.id ?? ''));
+      if (getDisciplineSwaps(r, available, [], declaredPosture).length > 0) ids.add(String(r?.id ?? ''));
     }
     ids.delete('');
     return ids;
-  }, [events]);
+  }, [events, declaredPosture]);
 
 
   // Day-stacked ordering (Bug: calendar cells ignored strength_ordering_preference —

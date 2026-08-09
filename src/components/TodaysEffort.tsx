@@ -10,6 +10,8 @@ import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight } from 'lu
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 // ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
+// ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
+import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 // ⛔ ONE SHARED SWAP LAYER (2026-08-08). Pure logic + the clearance law live in the lib; this file
 // owns only the UI and the write. Every plan type — marathon, Strong Focus, combined, tri — renders
 // planned sessions through here, so the swap is inherited rather than re-implemented per generator.
@@ -150,6 +152,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [skippingSession, setSkippingSession] = useState(false);
   const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip' | 'swap'>('detail');
   const [swappingSession, setSwappingSession] = useState(false);
+  const declaredPosture = useDeclaredPosture();
   const [dismissedNotes, setDismissedNotes] = useState<Set<string>>(new Set());
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
 
@@ -1711,7 +1714,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                        * merely a copy of one.
                        */
                       const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
-                      const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never));
+                      const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never), [], declaredPosture);
                       if (opts.length === 0) return null;
                       /**
                        * ⛔ A `<span>`, NOT A `<button>` — the row itself IS a `<button>` (:1613) and a
@@ -2059,6 +2062,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           return kind ? { kind, label: String(it?.name || 'another session') } : null;
                         })
                         .filter(Boolean) as Array<{ kind: any; label: string }>,
+                      declaredPosture,
                     )
                   : [];
                 if (plannedDrawerStep === 'swap' && w) {

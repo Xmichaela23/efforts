@@ -27,6 +27,9 @@
 // for; there is exactly one.
 
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
+// ⛔ ONE POSTURE SANITISER, and it is the server's. `@shared/state-trend` is already imported by the
+// client (`useStateTrends`), so this reads the same three values the State screen groups by.
+import type { PerDisciplinePosture } from '@shared/state-trend';
 import {
   areSameDayCompatible,
   type MatrixSessionKind,
@@ -235,9 +238,45 @@ export function getDisciplineSwaps(
   session: SwappableSession,
   available: ReadonlyArray<Discipline>,
   sameDayOthers: ReadonlyArray<{ kind: MatrixSessionKind; label: string }> = [],
+  /**
+   * The athlete's declared `per_discipline_posture`, straight off `goals.training_prefs`. Absent
+   * means "not declared" and is NOT a verdict — see the gate below.
+   */
+  posture?: PerDisciplinePosture | null,
 ): SwapOption[] {
   const from = disciplineOf(session.type);
   if (!from) return [];
+
+  /**
+   * ⛔ YOU MAY SWAP WHAT IS HELD, NEVER WHAT IS BEING TRAINED (2026-08-09).
+   *
+   * Training specificity is the reason, and it is not a preference: a discipline set to `develop` is
+   * the thing the block exists to improve, and adaptation is specific to the mode of exercise. Riding
+   * instead of the run the plan is developing does not deliver the run's stimulus — it deletes that
+   * week's progression while looking like a fair trade. A `maintain` discipline is held, not trained;
+   * swapping the modality there costs nothing the plan was buying (it is the same reasoning the
+   * engine uses to put an easy RIDE the day after a long run).
+   *
+   * ⚠️ THIS READS DATA THAT ALREADY EXISTS, on every plan type. `per_discipline_posture` is written
+   * at intake and is what tells a strength-focus block from a run-focus one — so a maintain ride in a
+   * run-focus plan is swappable and the run is not, with no new field and no plan-type branching.
+   *
+   * ⛔ AN UNDECLARED POSTURE DOES NOT BLOCK — `SPEC-week-solver` §0h: *a missing signal is not a
+   * verdict*. Race plans and anything built before postures existed carry none, and failing closed
+   * would silently remove the control from every one of them. Unknown → behave exactly as before.
+   */
+  /**
+   * ⛔ THE POSTURE MAP IS KEYED `bike`, THE SWAP'S DISCIPLINE IS `ride` — and the first version of
+   * this gate read `posture['ride']`, which is always undefined. Every ride therefore looked
+   * undeclared and sailed through the gate, including a DEVELOP bike in a cycling-focus block. Two
+   * vocabularies for one concept, caught by its own test rather than on a device.
+   *
+   * ⚠️ `non-race-goal-seeds` writes `{ swim, bike, run, strength }`; `disciplineOf` returns
+   * `run | ride | swim`. One translation, stated here, so neither side has to change.
+   */
+  const POSTURE_KEY: Record<Discipline, string> = { run: 'run', ride: 'bike', swim: 'swim' };
+  const declared = posture?.[POSTURE_KEY[from]];
+  if (declared && declared !== 'maintain') return [];
   /**
    * ⛔ UNSTARTED ONLY, AND THE CHECK LIVES HERE (2026-08-08). The callers each had their own
    * `!isCompleted` guard, which meant "should the button exist" and "should the swap be offered"
