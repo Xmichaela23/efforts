@@ -23,6 +23,8 @@ import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
+import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
 import {
@@ -720,8 +722,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             // Prefer computed fields if available
             const computed = w.computed || {};
             const renderedDesc = w.rendered_description || w.description || '';
-            const totalSeconds = computed.total_duration_seconds;
-            const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof w.duration === 'number' ? w.duration : 0);
+            /**
+             * ⛔ ONE PLANNED-DURATION READER (stage 2). This read `computed.total_duration_seconds`
+             * and nothing else — so a row carrying the total at its ROOT (priority 1 everywhere else)
+             * fell through to `w.duration`, or to 0. It now agrees with the calendar and the card.
+             */
+            const duration = plannedDurationMinutes(w) ?? (typeof w.duration === 'number' ? w.duration : 0);
             // Parse steps_preset/export_hints/intervals which may be JSON strings
             const stepsPresetParsed = parseMaybeJson((w as any).steps_preset);
             const exportHintsParsed = parseMaybeJson((w as any).export_hints);
@@ -1266,8 +1272,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
             const computed = (w as any).computed || {};
             const renderedDesc = (w as any).rendered_description || (w as any).description || '';
-            const totalSeconds = computed.total_duration_seconds;
-            const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
+            // ⛔ ONE PLANNED-DURATION READER (stage 2) — same fix as the sibling mapper above.
+            const duration = plannedDurationMinutes(w) ?? (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
             const parseMaybeJson = (v: any) => { if (Array.isArray(v)) return v; if (v && typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
             const tags = (() => { const raw=(w as any).tags; if (Array.isArray(raw)) return raw; try { const p=JSON.parse(raw); return Array.isArray(p)?p:[]; } catch { return []; } })();
             const steps_preset = parseMaybeJson((w as any).steps_preset) || null;
@@ -1576,12 +1582,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         return true;
       })
       .reduce((total: number, w: any) => {
-        // Priority 1: Use computed.total_duration_seconds (from materialization)
-        const sec = Number((w as any)?.computed?.total_duration_seconds);
-        if (Number.isFinite(sec) && sec > 0) {
-          return total + Math.round(sec / 60);
-        }
-        // Priority 2: Use planned.duration (stored in minutes by generator)
+        /**
+         * ⛔ ONE PLANNED-DURATION READER (stage 2). This summed `computed.total_duration_seconds`
+         * only, so every row storing its total at the ROOT was counted as `duration` minutes or as
+         * zero — a weekly total that quietly undercounted whichever rows materialization stored the
+         * other way.
+         */
+        const mins = plannedDurationMinutes(w);
+        if (mins != null) return total + mins;
+        // Fallback: `duration` (stored in minutes by the generator) for rows with no structure at all.
         const min = Number((w as any)?.duration);
         if (Number.isFinite(min) && min > 0) {
           return total + min;

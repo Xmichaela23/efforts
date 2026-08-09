@@ -117,7 +117,7 @@ Accessors, one each, in `src/lib/planned-session/`:
 
 | accessor | replaces |
 |---|---|
-| `plannedDurationSeconds()` | `resolveMovingSeconds`, `computeMinutes`, 2 inline reads |
+| `plannedDurationSeconds()` | `resolveMovingSeconds`'s **planned branch**, `computeMinutes`, 4 inline reads |
 | `plannedDiscipline()` | the 4 client normalizers |
 | `plannedIntensityBand()` | `intensityOf` (currently in the swap lib) |
 | `plannedTitle()` | **already consolidated** (`deriveWorkoutTitle`) — leave alone |
@@ -214,12 +214,62 @@ That last one is the mis-attach defect surviving on the server: an unrecognised 
 the athlete's planned runs. The client half is fixed; **this half is not**. Needs its own stage, its
 own fixtures, and a deploy.
 
-### Stage 2 — duration reads (client-only, no deploy) — NEXT
+### Stage 2 — duration reads (client-only, no deploy) ✅ SHIPPED 2026-08-09
 
-Everything calls `plannedDurationSeconds`. Delete `computeMinutes` and the two inline reads;
-`resolvePlannedDurationMinutes` becomes a wrapper that keeps its null contract.
+`src/lib/planned-session/duration.ts` — **two** accessors, and the split is the load-bearing part:
 
-### Stage H — Rules-of-Hooks hoist in `UnifiedWorkoutView` (client-only)
+| accessor | answers | on nothing |
+|---|---|---|
+| `plannedDurationSeconds(row)` | "how long is this planned session?" — the five-rung ladder | `null` |
+| `storedPlannedTotalSeconds(row)` | "is there an authoritative stored total?" — root only | `null` |
+
+⛔ **`resolvePlannedDurationMinutes` WRAPS THE SECOND, NOT THE FIRST.** Wrapping
+`plannedDurationSeconds` would have handed the badge the whole ladder — steps, intervals, prose —
+which is precisely the set of fallbacks §1 forbids it. Pinned by `GOLDEN (stage 2) · the badge reader
+gained NO fallbacks`, and the ⚠️ DRIFT assertion (rows A, C, D) still holds, as §1 said it must.
+
+Migrated: `resolveMovingSeconds`'s planned branch (now a one-line delegation; **the completed branch
+did not move**), `PlannedWorkoutSummary.computeMinutes` (**deleted**), `session-discipline-swap.resolveMinutes`,
+and the inline reads.
+
+⚠️ **ONE DELIBERATE BEHAVIOUR CHANGE, and it is pinned in `⚠️ CHANGED (stage 2)`.** `computeMinutes`
+preferred the **steps-sum over the stored total**; every other reader preferred the stored total. On a
+row carrying both and disagreeing (fixture P: root 3600s, steps 2400s) the summary printed **40 min**
+while the chip the athlete tapped to reach it printed **60 min**. §1 names the stored-total-first
+ladder authoritative, so the summary was the outlier. All four surfaces now say 60.
+
+⛔ **TWO CAPABILITIES WERE KEPT THAT A NAIVE COLLAPSE WOULD HAVE DROPPED SILENTLY** — each lived in
+exactly one of the two readers being merged, so "delete the narrower one" would have lost them:
+
+- **distance steps priced from pace** (`computeMinutes` only) — without it, "6 × 800m @ 5k pace" reads
+  as having no duration at all. Fixture M.
+- **`computed` arriving as a JSON string** (`computeMinutes` only; `resolveMovingSeconds` returned
+  null) — the transport's shape is no longer a source of disagreement. Fixture N.
+
+⚠️ **§1's four-priority table was incomplete** — there is a **fifth** rung, scraping a duration out of
+`steps_preset` tokens and the description. Undocumented and uncovered by stage 0; now fixture O.
+
+⛔ **TWO CORRECTIONS TO THIS SPEC'S OWN SCOPE LIST, both found by grep:**
+
+1. **There were FOUR inline reads, not two.** §1 named `AllPlansInterface:723` and
+   `watchConnectivity:144`. The real set on planned rows: `AllPlansInterface:723`, **`:1269`**
+   (identical mapper), **`:1580`** (the weekly-total reducer) and **`TodaysEffort:497`**. All four read
+   `computed.total_duration_seconds` **only** — ignoring the root total that ranks *first* everywhere
+   else — so any row materialization stored at the root fell through to `duration` or to zero. The
+   weekly total silently undercounted those rows. `TodaysEffort:497` is the serious one: it feeds a
+   **write** into the `workouts` row created to trigger the RPE prompt, and its ternary's precedence
+   meant a row with a root total got **30 minutes** written.
+2. **`watchConnectivity:144` is not an inline read and is dead code.** It is inside
+   `convertToWatchWorkout`, which takes an already-extracted `structure`, not a row — so
+   `plannedDurationSeconds` does not apply to it. It has **no callers**; `TodaysEffort:40` imports it
+   (with `sendWorkoutToWatch` and `isWatchConnectivityAvailable`) and never calls any of the three.
+   Left as found — deleting an exported function is stage 4's business, not a migration's.
+
+⚠️ Same class as `watchConnectivity`, also untouched and also NOT row readers:
+`PreRunScreen.tsx:70` and `services/plans/templates/workoutDisplayTemplates.ts` both render a
+`computed`/structure blob someone else already resolved.
+
+### Stage H — Rules-of-Hooks hoist in `UnifiedWorkoutView` (client-only) — NEXT
 
 `UnifiedWorkoutView.tsx:125` early-returns on `!workout`, and **every hook in the component sits below
 it**. eslint flags each one; the file carries ~125 errors and a meaningful share are this. If `workout`

@@ -26,7 +26,8 @@
 // A second copy of the clearance matrix on the client is the divergence this codebase keeps paying
 // for; there is exactly one.
 
-import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
+// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
+import { plannedDurationSeconds } from './planned-session/duration';
 // ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
 import { normalizeDiscipline, postureKey, type Discipline as CanonicalDiscipline } from './discipline';
 // ⛔ ONE POSTURE SANITISER, and it is the server's. `@shared/state-trend` is already imported by the
@@ -195,9 +196,16 @@ function describeSwap(d: Discipline, band: IntensityBand, minutes: number): { na
  * session can be swapped; a private ladder here is a fourth answer, and the fourth answer is how
  * this bug survived two fixes. The only thing added is `duration` (minutes) as a last resort, for
  * raw `planned_workouts` rows that never went through the unified mapper.
+ *
+ * ⛔ STAGE 2: IT NOW CALLS `plannedDurationSeconds` DIRECTLY, and the hack it replaces is worth
+ * naming. It used to call `resolveMovingSeconds({ workout_status: 'planned', ...s })` — spreading a
+ * fake status in to force the planned branch of a reader that is really two readers. Worse, the
+ * spread came SECOND, so a session carrying `workout_status: 'completed'` silently overrode it and
+ * the swap gate priced an executed session's moving time. The planned reader has no status gate, so
+ * the coercion is gone and the intent is stated instead of simulated.
  */
 export function resolveMinutes(s: SwappableSession): number {
-  const secs = resolveMovingSeconds({ workout_status: 'planned', ...(s as Record<string, unknown>) });
+  const secs = plannedDurationSeconds(s as Record<string, unknown>);
   if (Number.isFinite(secs) && (secs as number) > 0) return Math.max(1, Math.round((secs as number) / 60));
   const mins = Number(s.duration);
   if (Number.isFinite(mins) && mins > 0) return Math.round(mins);

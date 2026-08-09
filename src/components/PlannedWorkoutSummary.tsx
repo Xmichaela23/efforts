@@ -1,7 +1,8 @@
 import React from 'react';
 import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints } from '@/services/plans/normalizer';
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
-import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
+// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
+import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -60,75 +61,17 @@ function parseComputed(workout: any): any | null {
   } catch { return (workout as any)?.computed || null; }
 }
 
-function computeMinutes(workout: any, baselines?: Baselines, exportHints?: ExportHints): number | null {
-  // Prefer recompute from computed.steps (client authoritative), then fall back
-  try {
-    const compA = parseComputed(workout);
-    const steps: any[] = Array.isArray(compA?.steps) ? compA.steps : [];
-    if (steps.length > 0) {
-      const secPerMeterFromPace = (pace?: string): number | null => {
-        try {
-          if (!pace) return null;
-          const m = String(pace).match(/(\d+):(\d{2})\/(mi|km)/i);
-          if (!m) return null;
-          const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-          const unit = m[3].toLowerCase();
-          const meters = unit === 'mi' ? 1609.34 : 1000;
-          return sec / meters;
-        } catch { return null; }
-      };
-      const sumSec = steps.reduce((acc: number, st: any) => {
-        // Direct seconds
-        const s = Number(st?.seconds);
-        if (Number.isFinite(s) && s > 0) return acc + s;
-        const d = Number((st as any)?.durationSeconds);
-        if (Number.isFinite(d) && d > 0) return acc + d;
-        // Distance-based step with pace target → estimate
-        const meters = Number(st?.distanceMeters);
-        if (Number.isFinite(meters) && meters > 0) {
-          // Prefer numeric planned pace when available
-          const pr: any = (st as any)?.pace_range;
-          let secPerMeter: number | null = null;
-          if (Array.isArray(pr) && pr.length === 2) {
-            const a = Number(pr[0]); const b = Number(pr[1]);
-            if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
-              const mid = (a + b) / 2;
-              secPerMeter = mid / 1609.34;
-            }
-          } else if (pr && typeof pr === 'object' && typeof pr.lower === 'number' && typeof pr.upper === 'number') {
-            const a = Number(pr.lower); const b = Number(pr.upper);
-            if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
-              const mid = (a + b) / 2;
-              secPerMeter = mid / 1609.34;
-            }
-          }
-          if (secPerMeter == null && typeof (st as any)?.pace_sec_per_mi === 'number') {
-            const sec = Number((st as any).pace_sec_per_mi);
-            if (Number.isFinite(sec) && sec > 0) secPerMeter = sec / 1609.34;
-          }
-          if (secPerMeter == null) {
-            secPerMeter = secPerMeterFromPace(typeof st?.paceTarget === 'string' ? st.paceTarget : undefined);
-          }
-          const spm = secPerMeter;
-          if (spm != null) return acc + meters * spm;
-        }
-        return acc;
-      }, 0);
-      if (sumSec > 0) return Math.max(1, Math.round(sumSec / 60));
-    }
-  } catch {}
-  try {
-    const compB = parseComputed(workout);
-    const ts = Number(compB?.total_duration_seconds) || Number((workout as any)?.total_duration_seconds);
-    if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
-  } catch {}
-  try {
-    // Final fallback: derive from stored totals only (no guessing)
-    const minutes = resolvePlannedDurationMinutes(workout as any);
-    if (typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) return Math.round(minutes);
-  } catch {}
-  return null;
-}
+/**
+ * ⛔ `computeMinutes` IS DELETED (stage 2, 2026-08-09) — see `src/lib/planned-session/duration.ts`.
+ *
+ * It was the app's FOURTH duration ladder and the only one that preferred the **steps-sum over the
+ * stored total**; every other reader preferred the stored total. So a row carrying both, disagreeing,
+ * printed one number on the calendar and on Today's card and a different one here.
+ *
+ * ⚠️ ITS ONE REAL CAPABILITY WAS KEPT, NOT DROPPED: pricing a distance-based step from its pace
+ * target, so "6 × 800m @ 5k pace" still reads as a duration. That moved into `stepSeconds` in the
+ * shared reader. Its `baselines` / `exportHints` parameters were never read and are gone.
+ */
 
 function computeSwimYards(workout: any): number | null {
   const type = String((workout as any)?.type || '').toLowerCase();
@@ -352,7 +295,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
-    return computeMinutes(workout, baselines, exportHints);
+    return plannedDurationMinutes(workout);
   })();
   const yards = computeSwimYards(workout);
   const title = getTitle(workout);

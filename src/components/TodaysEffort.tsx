@@ -29,6 +29,8 @@ import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDiscip
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
+import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
@@ -493,10 +495,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       
       // Only create workout record for run/ride (these trigger RPE popup)
       if (isRun || isRide) {
-        // Get duration from planned workout (in minutes)
-        const durationMinutes = workout.duration || workout.computed?.total_duration_seconds 
-          ? Math.round((workout.computed?.total_duration_seconds || 0) / 60) || workout.duration || 30
-          : 30;
+        /**
+         * ⛔ ONE PLANNED-DURATION READER (stage 2) — and this one WRITES, so it mattered most.
+         *
+         * It read `computed.total_duration_seconds` only, and the ternary's precedence made it worse:
+         * a row with `duration` set but no computed total took the true branch, computed
+         * `Math.round(0 / 60)` → `0`, and only then fell through `|| workout.duration || 30`. A row
+         * storing its total at the ROOT — priority 1 for every other reader — got 30 minutes written
+         * into the `workouts` row it creates.
+         *
+         * ⚠️ The 30-minute default is KEPT for the genuinely-unknown case: this row is being created
+         * to trigger the RPE prompt, and it needs some duration to exist.
+         */
+        const durationMinutes = plannedDurationMinutes(workout)
+          ?? (Number.isFinite(Number(workout.duration)) && Number(workout.duration) > 0 ? Number(workout.duration) : 30);
         
         // Create workout record in workouts table (like imported/hooked workouts)
         const workoutData: any = {
