@@ -103,6 +103,55 @@ export function originOf(s: SwappableSession): Discipline | null {
   return null;
 }
 
+/** The tag every swapped row carries, beside `swapped_from:<origin>`. */
+export const SWAPPED_TAG = 'discipline_swapped';
+
+/**
+ * ⛔ IS THIS ROW A SWAP? The one predicate every SURFACE asks before it renders structure.
+ *
+ * ⚠️ IT READS THE TAG, NOT THE ABSENCE OF `steps_preset`. The swap patch clears `steps_preset` and
+ * `rendered_description`, and for a while that was treated as "the row is clean now". It is not:
+ * `computed.steps`, `intervals`, `workout_structure` and `export_hints` are UNTOUCHED by the patch
+ * and still hold the SOURCE sport's prescription. A row with no `steps_preset` and a full
+ * `computed.steps` is exactly the shape that renders a run's mileage under a ride's name.
+ */
+export function isDisciplineSwapped(s: SwappableSession | null | undefined): boolean {
+  if (!s) return false;
+  const tags = (s.tags ?? []).map((t) => String(t));
+  return tags.includes(SWAPPED_TAG) || tags.some((t) => t.startsWith(SWAPPED_FROM_PREFIX));
+}
+
+/**
+ * ⛔ WHAT A SWAPPED SESSION IS ALLOWED TO SAY — a time and an effort, and nothing else.
+ *
+ * The bug this closes, in the athlete's words: a swapped Easy Ride printed *"5.0 mi @ run pace"*,
+ * and a swapped hard ride printed the hill-RUN structure — warmup miles, repeats, and **"Walk
+ * down"** — under the name "Bike Intervals". The swap changed `type` and `name`; the STRUCTURE
+ * underneath was still the run's, and three surfaces faithfully rendered it.
+ *
+ * ⛔ THE APP DOES NOT KNOW THE EQUIVALENT SESSION YET, AND MUST NOT PRETEND. Converting a hill-run
+ * prescription into a real hard-ride prescription means the athlete's FTP and a generated interval
+ * set (`bikeQualitySession`) — that is a server-backed build, not a relabel. Until it exists, the
+ * honest artefact is a time block with the effort named: it is what the swap actually promises
+ * ("same time, same effort, different surface") and it prescribes nothing it cannot back up.
+ *
+ * ⚠️ NO DISTANCE, NO PACE, NO WATTS — deliberately. A number carried across a modality change is
+ * wrong in a way that looks right, which is the single most expensive kind of wrong in this app.
+ */
+export function swappedSessionBlock(s: SwappableSession): { effort: string; note: string } {
+  const to = disciplineOf(s.type);
+  const band = intensityOf(s);
+  const noun = to === 'ride' ? 'ride' : to === 'swim' ? 'swim' : 'run';
+  const effort = band === 'hard'
+    ? `Hard ${noun}, no target`
+    : `Easy ${noun}, no pace target`;
+  const from = originOf(s);
+  const note = from
+    ? `Swapped from your planned ${from === 'ride' ? 'ride' : from}. Same time, same effort.`
+    : 'Swapped from another sport. Same time, same effort.';
+  return { effort, note };
+}
+
 /**
  * ⛔ INTENSITY IS PRESERVED, NOT RE-DECIDED. Michael's rule: *"easy stays easy, hard stays hard."*
  * A swap is a modality change; turning an athlete's hard session into an easy one because the target

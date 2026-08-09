@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+// ⛔ ONE SWAP PREDICATE + ONE CLEAN BLOCK, shared by all three surfaces.
+import { isDisciplineSwapped, swappedSessionBlock } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces.
 import PlannedSessionHeader from './PlannedSessionHeader';
 import { Copy } from 'lucide-react';
@@ -40,8 +42,25 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       return ws || null;
     } catch { return (workout as any)?.workout_structure || null; }
   })();
-  const hasStructured = !!(structureAny && typeof structureAny === 'object');
-  const hasComputedV3 = Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
+  /**
+   * ═══ A SWAPPED SESSION RENDERS AS TIME + EFFORT, NEVER AS THE SOURCE SPORT'S PRESCRIPTION. ═════
+   *
+   * ⛔ THE LIVE BUG (2026-08-09). The swap patch clears `steps_preset` and `rendered_description`
+   * and nothing else — `computed.steps`, `workout_structure`, `intervals` and `export_hints` still
+   * hold the ORIGINAL sport's session. So a swapped Easy Ride printed *"5.0 mi @ run pace"*, and a
+   * swapped hard ride printed the hill-RUN structure: run warmup miles, the repeats, and **"Walk
+   * down"** — under the name "Bike Intervals". Every surface rendered it faithfully, because every
+   * surface was reading data that was never cleaned.
+   *
+   * ⚠️ THE STRUCTURE IS SUPPRESSED FOR CONTENT, NOT FOR DURATION — and that distinction is the
+   * whole care in this fix. `plannedDurationSeconds`'s third rung IS `computed.steps[].seconds`, so
+   * a session whose total was never materialised carries its time NOWHERE ELSE. Nulling `computed`
+   * outright would have deleted the one thing a swap is supposed to preserve. The row object is
+   * left intact; only the renderers below stop reading it.
+   */
+  const swapped = isDisciplineSwapped(workout as never);
+  const hasStructured = !swapped && !!(structureAny && typeof structureAny === 'object');
+  const hasComputedV3 = !swapped && Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
   // D-196: grouped swim actions (Copy FORM · Send to Apple Watch · Send to Garmin) up top.
   const isPlanned = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
   const isIosNative = Capacitor.getPlatform() === 'ios';
@@ -728,7 +747,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           description={displaySummary ?? null}
           action={headerAction}
           durationExtra={(() => {
-            if (parentDisc !== 'swim') return null;
+            // ⚠️ Same leak as the card: the chip and `totalYdFromStruct` both come from structure
+            // the swap did not clear.
+            if (parentDisc !== 'swim' || swapped) return null;
             const chip = formatPlannedSwimDistanceChip(workout as any);
             if (chip) return <span className="text-sm text-white/60">{chip}</span>;
             if (typeof totalYdFromStruct === 'number' && totalYdFromStruct > 0) {
@@ -815,6 +836,22 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           {displaySummary}
         </div>
       )}
+      {/**
+        * ⛔ THE SWAPPED SESSION'S WHOLE BODY. A time block with the effort named, and nothing from
+        * the sport it was swapped OUT of. The steps list below is skipped entirely — `lines` is
+        * derived from `computed.steps` / `workout_structure`, which still hold the source sport's
+        * prescription, and its empty-state ("No structured steps found.") would be a worse lie than
+        * the structure it replaces: this session HAS no structure by design.
+        */}
+      {swapped ? (() => {
+        const { effort, note } = swappedSessionBlock(workout as never);
+        return (
+          <div className="p-1 space-y-1">
+            <div className="text-sm text-gray-200 font-light tracking-normal">{effort}</div>
+            <div className="text-[13px] text-white/45 font-light leading-snug">{note}</div>
+          </div>
+        );
+      })() : (
       <div className="p-1">
         {totalSecsFromSteps>0 && (
           <div className="text-xs text-gray-300 font-light tracking-normal mb-1">Total duration: {(() => { const m=Math.floor(totalSecsFromSteps/60); const s=totalSecsFromSteps%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
@@ -857,7 +894,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           })}
         </ul>
       </div>
-      
+      )}
+
       {/* Export buttons removed per design: use inline text links above */}
     </div>
   );

@@ -128,6 +128,20 @@ export function deriveWorkoutTitle(workout: WorkoutLike | null | undefined): str
     if (type === 'run') return 'Brick — Run off the bike';
   }
 
+  /**
+   * ── A SWAPPED SESSION ANSWERS WITH ITS OWN NAME ──────────────────────────
+   *
+   * ⛔ THE THIRD LEAK IN THE SAME BUG (2026-08-09). The swap patch sets `name` ("Bike Intervals",
+   * "Easy Ride") but leaves `workout_structure` alone — and the next block lets
+   * `workout_structure.title` OVERRIDE `name`. So a run swapped to a ride kept announcing itself
+   * with the run's structured title ("Hill Repeats"), and the derived-label regexes below read the
+   * same stale `steps`/`desc` for good measure.
+   *
+   * ⚠️ THIS IS WHY THE TITLE HAD TO BE FIXED HERE AND NOT PER SURFACE — all three call
+   * `deriveWorkoutTitle`, so all three inherited the wrong name from one line.
+   */
+  if (hasTag(workout, 'discipline_swapped') && nm) return nm;
+
   // ── Structured title precedence ──────────────────────────────────────────
   // PlannedWorkoutSummary's pattern: workout_structure.title overrides name.
   const stTit = structuredTitle(workout);

@@ -29,6 +29,8 @@ import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDiscip
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
+import { isDisciplineSwapped } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
 import PlannedSessionHeader from './PlannedSessionHeader';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
@@ -1786,7 +1788,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         description={null}
                         action={swapGlyph}
                         durationExtra={(() => {
+                          // ⚠️ NOT ON A SWAPPED ROW — the chip falls back to `computed.steps`
+                          // distances, which on a swap still hold the SOURCE sport's metres.
                           const swimChip = String(workout.type || '').toLowerCase() === 'swim'
+                            && !isDisciplineSwapped(workout as never)
                             ? formatPlannedSwimDistanceChip(workout as any)
                             : null;
                           return swimChip ? (

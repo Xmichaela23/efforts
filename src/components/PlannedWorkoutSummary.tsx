@@ -14,6 +14,8 @@ import {
   sumSwimYardsFromStepsPresetTokens,
 } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE SWAP PREDICATE + ONE CLEAN BLOCK, shared by all three surfaces.
+import { isDisciplineSwapped, swappedSessionBlock } from '@/lib/session-discipline-swap';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -313,7 +315,12 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
     if (t==='strength') return null; // avoid misleading 45min placeholders
     return plannedDurationMinutes(workout);
   })();
-  const yards = computeSwimYards(workout);
+  /**
+   * ⚠️ ALSO A SWAP LEAK. `computeSwimYards` falls back to `computed.steps[].distanceMeters`, so a
+   * session swapped TO swim would print the ORIGINAL run's metres as pool yardage — a fabricated
+   * distance under a swim's name. A swapped session has no distance; that is the point of it.
+   */
+  const yards = isDisciplineSwapped(workout as never) ? null : computeSwimYards(workout);
   const title = getTitle(workout);
   /**
    * ⛔ THE FLAG IS PASSED DOWN, NOT COMPARED AFTERWARDS (corrected 2026-08-09). The first version
@@ -322,9 +329,25 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
    * with nothing failing. The builder now declines to produce the fallback at all, so there is no
    * string to compare.
    */
-  const lines = suppressNotes
-    ? (buildStructuredSubtitleOnly(workout, baselines) || '')
-    : (buildWeeklySubtitle(workout, baselines, suppressDescriptionFallback) || '');
+  /**
+   * ⛔ A SWAPPED SESSION GETS THE CLEAN BLOCK, NOT THE SOURCE SPORT'S SUBTITLE (2026-08-09).
+   *
+   * `buildWeeklySubtitle` reads `computed.steps`, `steps_preset` and `intervals` — and the swap
+   * patch clears only `steps_preset`. So on a swapped Easy Ride it reached the RUN's computed steps
+   * and printed *"5.0 mi @ run pace"* under a ride's name; on a swapped hard ride it printed the
+   * hill-run structure, "Walk down" included.
+   *
+   * ⚠️ SUPPRESSED AT THE SUBTITLE, NOT BY BLANKING THE ROW. `plannedDurationMinutes` above still
+   * reads the same `computed.steps` for its third rung — the duration is the one thing a swap
+   * preserves, so the data has to stay readable even though it must stop being displayed.
+   */
+  const swapped = isDisciplineSwapped(workout as never);
+  const swapBlock = swapped ? swappedSessionBlock(workout as never) : null;
+  const lines = swapBlock
+    ? swapBlock.effort
+    : suppressNotes
+      ? (buildStructuredSubtitleOnly(workout, baselines) || '')
+      : (buildWeeklySubtitle(workout, baselines, suppressDescriptionFallback) || '');
   const linesShown = lines;
   const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
   const isMobility = String((workout as any)?.type||'').toLowerCase()==='mobility';
