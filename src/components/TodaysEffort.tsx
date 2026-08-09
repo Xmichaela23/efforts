@@ -1683,7 +1683,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       const d = disciplineOf(workoutType);
                       if (!d) return null;
                       if (intensityOf(workout) === 'long') return null;
-                      const others = availableDisciplines(Array.isArray(unifiedItems) ? unifiedItems : []);
+                      const others = availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []);
                       if (others.filter((x) => x !== d).length === 0) return null;
                       return (
                         <button
@@ -1989,7 +1989,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const swapOptions: SwapOption[] = w
                   ? getDisciplineSwaps(
                       w,
-                      availableDisciplines(Array.isArray(unifiedItems) ? unifiedItems : []),
+                      // ⛔ THE WEEK, NOT THE DAY (2026-08-08). `unifiedItems` is filtered to
+                      // `activeDate`, so asking it which sports the athlete has answered with only
+                      // today's — usually just the one the open session already is, so no other
+                      // sport was ever offered and the control never rendered.
+                      availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []),
                       // The rest of that day, in the law's vocabulary, so the warnings are real.
                       (Array.isArray(unifiedItems) ? unifiedItems : [])
                         .filter((it: any) => String(it?.date).slice(0, 10) === String(w.date).slice(0, 10)

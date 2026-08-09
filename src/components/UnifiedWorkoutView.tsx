@@ -181,9 +181,26 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [showSwapPanel, setShowSwapPanel] = useState(false);
   const [swapping, setSwapping] = useState(false);
 
-  // Unified week data for the workout's date (single-day window)
+  /**
+   * ⛔ WIDENED FROM ONE DAY TO THE WEEK (2026-08-08), and this is what made the swap render.
+   *
+   * The window was `(dateIso, dateIso)` — a single day — and the swap asked it "which sports does
+   * this athlete have?". On a Tuesday holding only a run and a lift, the honest answer from one day
+   * is "run", so there was no OTHER sport to offer and the control never appeared. On any surface.
+   *
+   * ⚠️ SAFE TO WIDEN: the only other consumer (`unifiedItems.find`, below) matches on **id**, not on
+   * date, so a larger window returns the same item. One fetch, not two.
+   */
   const dateIso = String((workout as any)?.date || '').slice(0,10);
-  const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
+  const weekWindow = (() => {
+    const d = dateIso ? new Date(`${dateIso}T00:00:00`) : new Date();
+    const dow = (d.getDay() + 6) % 7;                 // Monday-first, the app's convention
+    const mon = new Date(d); mon.setDate(d.getDate() - dow);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const iso = (x: Date) => x.toISOString().slice(0, 10);
+    return { from: iso(mon), to: iso(sun) };
+  })();
+  const { items: unifiedItems = [] } = useWeekUnified(weekWindow.from, weekWindow.to);
   
   // Listen for workout invalidation events to refresh data (both singular and plural events)
   useEffect(() => {
@@ -1149,7 +1166,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                    */
                   type SwapRow = SwappableSession & { date?: string | null };
                   const row = ((unifiedWorkout || workout) ?? {}) as SwapRow;
-                  const week = (Array.isArray(plannedWorkouts) ? plannedWorkouts : []) as SwapRow[];
+                  /**
+                   * ⛔ `plannedWorkouts` WAS ALWAYS EMPTY HERE, and it was the whole bug. This view
+                   * calls `usePlannedWorkouts({ fetchWindowedPlanned: false })` — that flag sets the
+                   * React Query `enabled: false` (`usePlannedWorkouts.ts:63`) and makes the refresh
+                   * effect return early (`:309`), so the hook is used ONLY for its write helpers and
+                   * its `plannedWorkouts` array never populates. Deriving the athlete's sports from
+                   * it therefore always answered "none", and the swap silently offered nothing.
+                   *
+                   * The week comes from `useWeekUnified` above, which is fetched and is the same data
+                   * the rest of this view renders from.
+                   */
+                  const week = (Array.isArray(unifiedItems) ? unifiedItems : []).map((it: any) =>
+                    (it?.planned ?? it?.planned_workout ?? it) as SwapRow);
                   const sameDay = week
                     .filter((it) => String(it?.date).slice(0, 10) === String(row?.date).slice(0, 10)
                       && String(it?.id) !== String(row?.id))

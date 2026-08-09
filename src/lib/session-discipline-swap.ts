@@ -43,7 +43,11 @@ export type SwappableSession = {
   workout_status?: string | null;
   name?: string | null;
   description?: string | null;
+  /** Minutes. Present on raw `planned_workouts` rows. */
   duration?: number | null;
+  /** SECONDS, and the app's authoritative total — see `resolveMinutes`. */
+  total_duration_seconds?: number | null;
+  computed?: { total_duration_seconds?: number | null } | null;
   tags?: string[] | null;
   steps_preset?: string[] | null;
 };
@@ -135,6 +139,35 @@ function describeSwap(d: Discipline, band: IntensityBand, minutes: number): { na
 }
 
 /**
+ * ⛔ THE DURATION DOES NOT LIVE WHERE I ASSUMED, AND THAT IS WHY THE SWAP NEVER RENDERED (2026-08-08).
+ *
+ * This read `session.duration` and returned [] when it was falsy — so on a real row the gate closed
+ * before anything else was evaluated, silently, on every surface. `resolvePlannedDuration.ts` is the
+ * app's own resolver and it reads **`total_duration_seconds` — SECONDS, on the root** — with an
+ * explicit note: *"Single source of truth: authoritative stored total only (no fallbacks)"*. That is
+ * where the "63:00" on the screen comes from. `duration` (minutes) is populated on raw
+ * `planned_workouts` rows but not on the unified item the view actually holds.
+ *
+ * ⚠️ WHY THIS TAKES A FALLBACK WHERE THE SHARED RESOLVER REFUSES ONE. That resolver returns null
+ * rather than guess, because it feeds a DISPLAYED badge and a wrong duration on screen is a lie.
+ * Here the number is not displayed — it decides whether a swap can be offered and what the swapped
+ * session's copy says. Refusing to answer costs the athlete the control entirely, which is the bug
+ * being fixed. So: the authoritative total when it exists, then the row's own minutes, then nothing.
+ *
+ * ⛔ ORDER MATTERS AND SECONDS COME FIRST. Reading `duration` first would take a stale or rounded
+ * minute value over the stored total the rest of the app trusts.
+ */
+export function resolveMinutes(s: SwappableSession): number {
+  const rootSeconds = Number(s.total_duration_seconds);
+  if (Number.isFinite(rootSeconds) && rootSeconds > 0) return Math.max(1, Math.round(rootSeconds / 60));
+  const computedSeconds = Number(s.computed?.total_duration_seconds);
+  if (Number.isFinite(computedSeconds) && computedSeconds > 0) return Math.max(1, Math.round(computedSeconds / 60));
+  const mins = Number(s.duration);
+  if (Number.isFinite(mins) && mins > 0) return Math.round(mins);
+  return 0;
+}
+
+/**
  * Check a proposed swap against the rest of that day. ⛔ WARN, NEVER GATE.
  *
  * Michael: *"guardrail = WARN, not gate."* The law's own framing agrees — `easy_run` carries 0h
@@ -190,7 +223,7 @@ export function getDisciplineSwaps(
   const band = intensityOf(session);
   if (band === 'long') return [];
 
-  const minutes = Number(session.duration) > 0 ? Number(session.duration) : 0;
+  const minutes = resolveMinutes(session);
   if (minutes <= 0) return [];
 
   return available

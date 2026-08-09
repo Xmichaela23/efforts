@@ -17,6 +17,7 @@ import {
   intensityOf,
   matrixKindFor,
   swapWarnings,
+  resolveMinutes,
 } from './session-discipline-swap.ts';
 import { SWAP_TAG } from '../../supabase/functions/activate-plan/preserve-athlete-edits.ts';
 
@@ -179,4 +180,75 @@ Deno.test('⛔ THE SWAP TAG MATCHES THE ONE activate-plan LOOKS FOR', () => {
   const patch = getDisciplineSwaps(easyRun, ['run', 'ride'])[0].patch;
   const tags = patch.tags as string[];
   assert(tags.includes(SWAP_TAG), `the swap writes ${JSON.stringify(tags)}, activate-plan looks for "${SWAP_TAG}"`);
+});
+
+
+// ═══ THE GATE CLOSED ON REAL DATA — three empty inputs, found 2026-08-08 ════════════════════
+//
+// The swap never rendered on any surface. Not cache, not deploy: `getDisciplineSwaps` returned []
+// on every real row, for two independent reasons, either of which alone was fatal.
+
+Deno.test('⛔ REAL ROW SHAPE — the duration lives in total_duration_seconds, not `duration`', () => {
+  /**
+   * `resolvePlannedDuration.ts` is the app's own resolver and reads `total_duration_seconds`
+   * (SECONDS, root). That is where the "63:00" on screen comes from. The unified item the view holds
+   * carries no `duration` at all, so the old `Number(session.duration) > 0` gate closed on it.
+   */
+  const realRow = {
+    id: 'r1', type: 'run', name: 'Easy Run', workout_status: 'planned',
+    date: '2026-08-11', total_duration_seconds: 3780, tags: ['easy_run'],   // 63:00
+  };
+  assertEquals(resolveMinutes(realRow), 63);
+  const opts = getDisciplineSwaps(realRow, ['run', 'ride']);
+  assertEquals(opts.length, 1, 'the gate still closes on a row with no `duration` field');
+  assert(/63 min/.test(String(opts[0].patch.description)));
+});
+
+Deno.test('the authoritative seconds win over a stale minutes field', () => {
+  assertEquals(resolveMinutes({ total_duration_seconds: 3780, duration: 20 }), 63);
+  assertEquals(resolveMinutes({ computed: { total_duration_seconds: 1800 } }), 30);
+  assertEquals(resolveMinutes({ duration: 45 }), 45);          // raw planned_workouts row
+  assertEquals(resolveMinutes({}), 0);                          // nothing to go on → no offer
+});
+
+Deno.test('⛔ A ONE-DAY WINDOW CANNOT NAME THE ATHLETE\'S SPORTS', () => {
+  // Both surfaces asked a single day "which sports does this athlete have?". A Tuesday holding a run
+  // and a lift answers "run" — so there was no OTHER sport and the control never appeared.
+  const tuesdayOnly = [
+    { type: 'run', name: 'Easy Run', total_duration_seconds: 3780 },
+    { type: 'strength', name: 'Strength — Deadlift', total_duration_seconds: 3600 },
+  ];
+  assertEquals(availableDisciplines(tuesdayOnly), ['run'], 'a single day cannot see the bike');
+
+  // The WEEK can. This is the Strong Focus week from the screenshot.
+  const wholeWeek = [
+    ...tuesdayOnly,
+    { type: 'ride', name: 'Easy Ride', total_duration_seconds: 4320 },      // Mon BK-EZ 72:00
+    { type: 'ride', name: 'Long Ride', total_duration_seconds: 6480 },      // Sat BK-LR 108:00
+    { type: 'run', name: 'Long Run', total_duration_seconds: 4560 },        // Sun RN-LR 76:00
+  ];
+  assertEquals(availableDisciplines(wholeWeek), ['run', 'ride']);
+});
+
+Deno.test('⛔ THE SCREENSHOT CASE END TO END — Tue Easy Run offers the ride', () => {
+  // Strong Focus, week of Aug 17, athlete has bike days. This is the exact row that rendered nothing.
+  const week = [
+    { type: 'ride', name: 'Easy Ride', total_duration_seconds: 4320, date: '2026-08-17' },
+    { type: 'strength', name: 'Strength — Deadlift', total_duration_seconds: 3600, date: '2026-08-18' },
+    { type: 'run', name: 'Easy Run', total_duration_seconds: 3780, date: '2026-08-18' },
+    { type: 'ride', name: 'Long Ride', total_duration_seconds: 6480, date: '2026-08-22' },
+    { type: 'run', name: 'Long Run', total_duration_seconds: 4560, date: '2026-08-23' },
+  ];
+  const tuesdayRun = week[2];
+  assertEquals(intensityOf(tuesdayRun), 'easy', 'the easy run was misread as long/hard');
+  const opts = getDisciplineSwaps(
+    { ...tuesdayRun, workout_status: 'planned' },
+    availableDisciplines(week),
+    [{ kind: 'lower_body_strength', label: 'Strength — Deadlift' }],
+  );
+  assertEquals(opts.map((o) => o.to), ['ride'], 'the swap still offers nothing on the real week');
+  assertEquals(opts[0].patch.type, 'ride');
+  assert(/63 min/.test(String(opts[0].patch.description)), 'the 63 minutes were lost');
+  // Tuesday also holds the deadlift — same legs, so it must warn and still offer.
+  assert(opts[0].warnings.length > 0 && /same legs/i.test(opts[0].warnings[0]));
 });
