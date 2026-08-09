@@ -79,3 +79,43 @@ Deno.test('the mapped row keeps the fields the gate\'s other conditions read', (
   assertEquals(mapped.workout_status, 'planned');
   assert(Array.isArray(mapped.tags), 'tags were dropped — the long/hard check reads them');
 });
+
+
+Deno.test('⛔ THE CARD\'S REAL SHAPE — time in computed.steps, no stored total', () => {
+  /**
+   * The row that shipped the bug. `get-week`'s planned select carries no `duration` column, and this
+   * session's `total_duration_seconds` is null — its length lives in `computed.steps[].seconds`,
+   * which is exactly what `resolveMovingSeconds` (the resolver the ROW prints with) sums at its
+   * Priority 3. The swap gate read only the root totals, so the card showed "63:00" and the gate
+   * computed 0 — the glyph was hidden on that surface and nowhere else.
+   */
+  const item = {
+    id: 'p9', date: '2026-08-18', type: 'run', status: 'planned',
+    planned: {
+      id: 'p9', name: 'Easy Run', type: 'run', workout_status: 'planned',
+      total_duration_seconds: null, tags: ['easy_run'],
+      steps: [{ seconds: 1890 }, { seconds: 1890 }],   // 63 min total
+    },
+  };
+  const mapped = mapUnifiedItemToPlanned(item as never);
+  assertEquals((mapped as { total_duration_seconds?: number | null }).total_duration_seconds, null);
+  assertEquals(resolveMinutes(mapped as never), 63, 'the gate cannot see a duration the row prints');
+  const opts = getDisciplineSwaps(mapped as never, ['run', 'ride']);
+  assertEquals(opts.map((o) => o.to), ['ride'], 'the top-card glyph is still hidden');
+});
+
+Deno.test('the gate agrees with what the row displays, on every duration shape', () => {
+  // Whatever `resolveMovingSeconds` finds is what the athlete sees; the gate must not disagree.
+  const shapes = [
+    { planned: { total_duration_seconds: 3780 }, expect: 63 },
+    { planned: { total_duration_seconds: null, steps: [{ seconds: 3000 }] }, expect: 50 },
+    { planned: { total_duration_seconds: null }, expect: 0 },
+  ];
+  for (const { planned, expect } of shapes) {
+    const mapped = mapUnifiedItemToPlanned({
+      id: 'x', date: '2026-08-18', type: 'run', status: 'planned',
+      planned: { id: 'x', type: 'run', workout_status: 'planned', tags: [], ...planned },
+    } as never);
+    assertEquals(resolveMinutes(mapped as never), expect, `shape ${JSON.stringify(planned)}`);
+  }
+});
