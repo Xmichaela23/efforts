@@ -23,6 +23,12 @@ interface PlannedWorkoutSummaryProps {
   exportHints?: ExportHints;
   hideLines?: boolean;
   /**
+   * ⛔ SUPPRESS THIS COMPONENT'S OWN TITLE + DURATION LINE. Set it wherever
+   * `PlannedSessionHeader` is rendered directly above — otherwise the sport-coloured title and the
+   * `63:00` appear twice on one screen, which is exactly what the Today's drawer was doing.
+   */
+  hideHeader?: boolean;
+  /**
    * ⛔ THE CALLER ALREADY PRINTED THE DESCRIPTION (2026-08-08). `buildWeeklySubtitle`'s last resort
    * is `rendered_description || description` — correct when this block stands alone, and a DUPLICATE
    * inside a drawer whose header already renders the same string. Device-confirmed: a plain planned
@@ -301,7 +307,7 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
   } catch { return undefined; }
 }
 
-export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes, suppressDescriptionFallback }) => {
+export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes, suppressDescriptionFallback, hideHeader }) => {
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
@@ -558,10 +564,19 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1">
+        {/**
+          * ⛔ `hideHeader` EXISTS BECAUSE THE DRAWER PRINTS THIS TWICE OTHERWISE (2026-08-09).
+          * `PlannedSessionHeader` now owns the sport-coloured title and the duration on all three
+          * planned surfaces. Where that header is above this component — the Today's drawer — this
+          * line is the SECOND copy, which is the "63 min printed twice" the athlete sees.
+          *
+          * ⚠️ IT HIDES THE TITLE AND THE DURATION ONLY. The yardage and workload chips are this
+          * component's own facts, not the header's, so they keep rendering.
+          */}
         <div className="font-light tracking-normal text-base flex items-center gap-2" style={{ color: disciplineColor }}>
-          <span>{title}</span>
+          {!hideHeader && <span>{title}</span>}
           <span className="flex items-center gap-1">
-            {(typeof minutes === 'number') ? (
+            {(typeof minutes === 'number' && !hideHeader) ? (
               <span className="text-xs text-white font-light">{minutes}:00</span>
             ) : null}
             {(typeof yards === 'number') ? (

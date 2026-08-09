@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+// ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces.
+import PlannedSessionHeader from './PlannedSessionHeader';
 import { Copy } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -15,11 +17,13 @@ import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
 type StructuredPlannedViewProps = {
   workout: any;
   showHeader?: boolean;
+  /** Right-hand slot on the header's title line — the swap glyph, supplied by `UnifiedWorkoutView`. */
+  headerAction?: React.ReactNode;
   onEdit?: () => void;
   onComplete?: () => void;
 };
 
-const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, showHeader = true, onEdit, onComplete }) => {
+const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, showHeader = true, headerAction, onEdit, onComplete }) => {
   const { toast } = useToast();
   // Normalize possibly stringified JSON blobs from planned_workouts
   const computedAny: any = (() => {
@@ -703,40 +707,36 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   return (
     <div className="space-y-3">
+      {/**
+        * ⛔ ONE HEADER, SHARED WITH THE TWO TODAY'S SURFACES (2026-08-09) — `PlannedSessionHeader`.
+        * This block had its own title logic, its own `text-white`, and its own `{durationMin} min`,
+        * so the full planned screen announced a session differently from the card and the drawer
+        * that lead to it: white title instead of the sport colour, `63 min` instead of `63:00`.
+        *
+        * ⚠️ THE SWIM AND STRENGTH TITLE SPECIAL-CASES MOVED INTO `deriveWorkoutTitle`'s territory,
+        * not deleted — the swim distance chip is passed through as `durationExtra` so it keeps its
+        * place beside the duration.
+        *
+        * ⛔ `headerAction` IS THE SWAP CONTROL, hosted here so it sits in the same slot as on the
+        * other two surfaces. The button beside Reschedule/Delete stays where it is; this is the
+        * glyph, and both ask the same `getDisciplineSwaps`.
+        */}
       {showHeader && (
-        <div className="flex items-center justify-between">
-          <div className="text-base font-light tracking-normal text-white">{(() => {
-            // For strength workouts, check workout_structure.title first, then workout.name, then workout.title
-            const t = String((workout as any)?.type || '').toLowerCase();
-            if (t === 'strength') {
-              const stTitle = String(ws?.title || '').trim();
-              const name = stTitle || String((workout as any)?.name || '').trim();
-              if (name && name.toLowerCase() !== 'strength') {
-                // Check if it has a date suffix like "Strength - 11/24/2025" (from WorkoutBuilder)
-                const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
-                if (hasDateSuffix) {
-                  const nameWithoutDate = name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
-                  return nameWithoutDate || 'Planned';
-                }
-                return name;
-              }
+        <PlannedSessionHeader
+          workout={workout}
+          size="panel"
+          description={displaySummary ?? null}
+          action={headerAction}
+          durationExtra={(() => {
+            if (parentDisc !== 'swim') return null;
+            const chip = formatPlannedSwimDistanceChip(workout as any);
+            if (chip) return <span className="text-sm text-white/60">{chip}</span>;
+            if (typeof totalYdFromStruct === 'number' && totalYdFromStruct > 0) {
+              return <span className="text-sm text-white/60">{`${Math.round(totalYdFromStruct)} yd`}</span>;
             }
-            if (t === 'swim') return plannedSwimSessionLabel(workout as any);
-            return String(ws?.title || (workout as any)?.title || (workout as any)?.name || '') || 'Planned';
-          })()}</div>
-          <div className="text-sm text-gray-500 flex items-center gap-3">
-            {(() => {
-              if (parentDisc !== 'swim') return null;
-              const chip = formatPlannedSwimDistanceChip(workout as any);
-              if (chip) return <span>{chip}</span>;
-              if (typeof totalYdFromStruct === 'number' && totalYdFromStruct > 0) {
-                return <span>{`${Math.round(totalYdFromStruct)} yd`}</span>;
-              }
-              return null;
-            })()}
-            {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}
-          </div>
-        </div>
+            return null;
+          })()}
+        />
       )}
       {String(parentDisc).toLowerCase()==='swim' && (
         <div className="mt-2">
@@ -805,7 +805,12 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           )}
         </div>
       )}
-      {displaySummary && (
+      {/**
+        * ⛔ THE DESCRIPTION MOVED INTO THE HEADER (2026-08-09), which renders it BELOW the title and
+        * duration. Leaving this block would print it twice whenever `showHeader` is set — the same
+        * double copy the Today's drawer had.
+        */}
+      {!showHeader && displaySummary && (
         <div className="text-sm text-gray-200 font-light tracking-normal leading-snug">
           {displaySummary}
         </div>

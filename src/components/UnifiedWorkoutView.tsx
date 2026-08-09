@@ -513,6 +513,41 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
   }
 
+  /**
+   * ═══ THE SWAP, COMPUTED ONCE FOR THIS SCREEN (2026-08-09). ═══════════════════════════════════
+   *
+   * ⛔ IT USED TO LIVE INSIDE THE DELETE/RESCHEDULE BLOCK, which renders BELOW the planned header —
+   * so the header could not offer the swap without computing the gate a second time. Two
+   * computations of one gate on one screen is precisely how the three surfaces drifted apart in the
+   * first place. One computation, two consumers: the header glyph and the button beside Delete.
+   *
+   * ⛔ `it.planned_workout ?? it` — NOT `it.planned`. `get-week`'s internal `planned` object carries
+   * no `type` (the sport is on the ITEM), so mapping the week through it made
+   * `availableDisciplines` answer `[]` and the swap returned nothing for EVERY planned session on
+   * this screen, for every athlete. The `?? it.planned_workout` fallback that would have worked was
+   * unreachable, because `it.planned` is always truthy.
+   */
+  type SwapRowT = SwappableSession & { date?: string | null };
+  const swapRow = ((unifiedWorkout || workout) ?? {}) as SwapRowT;
+  const swapWeek = (Array.isArray(unifiedItems) ? unifiedItems : []).map((it: any) =>
+    (it?.planned_workout ?? it) as SwapRowT);
+  const swapSameDay = swapWeek
+    .filter((it) => String(it?.date).slice(0, 10) === String(swapRow?.date).slice(0, 10)
+      && String(it?.id) !== String(swapRow?.id))
+    .map((it): { kind: MatrixSessionKind; label: string } | null => {
+      const d = disciplineOf(it?.type);
+      const kind: MatrixSessionKind | null =
+        String(it?.type || '').toLowerCase() === 'strength'
+          ? (/squat|deadlift|lunge|leg/i.test(String(it?.name || ''))
+            ? 'lower_body_strength' : 'upper_body_strength')
+          : d ? matrixKindFor(d, intensityOf(it)) : null;
+      return kind ? { kind, label: String(it?.name || 'another session') } : null;
+    })
+    .filter((x): x is { kind: MatrixSessionKind; label: string } => x !== null);
+  const swapOptions: SwapOption[] = !isCompleted && swapRow
+    ? getDisciplineSwaps(swapRow, availableDisciplines(swapWeek), swapSameDay, declaredPosture)
+    : [];
+
   const getWorkoutType = () => {
     // Trust explicit stored type first (prevents misclassification when provider field is missing/ambiguous)
     const storedType = String((workout as any)?.type || '').toLowerCase();
@@ -1157,7 +1192,30 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const disc = String(plannedForView?.type || '').toLowerCase();
                   return (
                     <>
-                      <StructuredPlannedView workout={plannedForView} showHeader={true} />
+                      <StructuredPlannedView
+                        workout={plannedForView}
+                        showHeader={true}
+                        /**
+                         * ⛔ THE SWAP GLYPH, IN THE SAME SLOT AS THE OTHER TWO SURFACES. Same
+                         * `swapOptions` the button beside Delete uses, so the two cannot disagree —
+                         * they are one computation with two renders.
+                         */
+                        headerAction={swapOptions.length > 0 ? (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Swap sport for this session"
+                            title="Swap sport"
+                            className="p-1 -m-1 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSwapPanel((v) => !v); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowSwapPanel((v) => !v); }
+                            }}
+                          >
+                            <ArrowLeftRight className="w-3.5 h-3.5" />
+                          </span>
+                        ) : null}
+                      />
                       {disc === 'ride' && (
                         <PlannedGroupRideRouteMap
                           routeSnapshot={(plannedForView as any)?.route_snapshot}
@@ -1219,38 +1277,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                    * one answer, asked in the same place the swap itself is decided. A second copy of
                    * those conditions here is how the button and the sheet start disagreeing.
                    */
-                  type SwapRow = SwappableSession & { date?: string | null };
-                  const row = ((unifiedWorkout || workout) ?? {}) as SwapRow;
-                  /**
-                   * ⛔ `plannedWorkouts` WAS ALWAYS EMPTY HERE, and it was the whole bug. This view
-                   * calls `usePlannedWorkouts({ fetchWindowedPlanned: false })` — that flag sets the
-                   * React Query `enabled: false` (`usePlannedWorkouts.ts:63`) and makes the refresh
-                   * effect return early (`:309`), so the hook is used ONLY for its write helpers and
-                   * its `plannedWorkouts` array never populates. Deriving the athlete's sports from
-                   * it therefore always answered "none", and the swap silently offered nothing.
-                   *
-                   * The week comes from `useWeekUnified` above, which is fetched and is the same data
-                   * the rest of this view renders from.
-                   */
-                  const week = (Array.isArray(unifiedItems) ? unifiedItems : []).map((it: any) =>
-                    (it?.planned ?? it?.planned_workout ?? it) as SwapRow);
-                  const sameDay = week
-                    .filter((it) => String(it?.date).slice(0, 10) === String(row?.date).slice(0, 10)
-                      && String(it?.id) !== String(row?.id))
-                    .map((it): { kind: MatrixSessionKind; label: string } | null => {
-                      const d = disciplineOf(it?.type);
-                      const kind: MatrixSessionKind | null =
-                        String(it?.type || '').toLowerCase() === 'strength'
-                          ? (/squat|deadlift|lunge|leg/i.test(String(it?.name || ''))
-                            ? 'lower_body_strength' : 'upper_body_strength')
-                          : d ? matrixKindFor(d, intensityOf(it)) : null;
-                      return kind ? { kind, label: String(it?.name || 'another session') } : null;
-                    })
-                    .filter((x): x is { kind: MatrixSessionKind; label: string } => x !== null);
-                  const swapOptions: SwapOption[] = row
-                    ? getDisciplineSwaps(row, availableDisciplines(week), sameDay, declaredPosture)
-                    : [];
-
+                  // ⛔ HOISTED — computed once near the top of this component so the planned
+                  // header and this button ask the SAME gate. See `swapOptions` there.
+                  const row = swapRow;
                   const applySwap = async (opt: SwapOption) => {
                     const id = String(row?.id || '');
                     if (!id) return;

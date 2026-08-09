@@ -29,6 +29,8 @@ import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDiscip
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
+import PlannedSessionHeader from './PlannedSessionHeader';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -1641,6 +1643,44 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return label;
                 })();
 
+                /**
+                 * ⛔ THE SWAP GLYPH — SAME GATE AS THE OTHER TWO SURFACES, RENDERED IN THE HEADER.
+                 *
+                 * ⚠️ IT USED TO BE `absolute top-2 right-2`, WHICH IS WHERE THE DURATION SITS. The
+                 * glyph and the `63:00` were stacked on the same pixels, so the control existed in
+                 * the DOM and could not be seen — reported as "the top card has no glyph" while the
+                 * gate was answering correctly all along. It now goes in the header's action slot,
+                 * beside the duration rather than on top of it.
+                 *
+                 * ⛔ A `<span role="button">`, NOT A `<button>` — the row itself IS a `<button>`, and
+                 * nesting one inside another is invalid HTML that browsers may drop or relocate.
+                 */
+                const swapGlyph = (() => {
+                  if (!isPlannedRow || isCompleted) return null;
+                  const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
+                  const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never), [], declaredPosture);
+                  if (opts.length === 0) return null;
+                  const openSwap = () => {
+                    setSelectedPlannedWorkout(workout);
+                    setPlannedDrawerStep('swap');
+                  };
+                  return (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Swap sport for this session"
+                      title="Swap sport"
+                      className="p-1 -m-1 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSwap(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openSwap(); }
+                      }}
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                    </span>
+                  );
+                })();
+
                 return (
                   <button
                     key={workout.id}
@@ -1728,48 +1768,35 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         unlinked
                       </span>
                     )}
-                    {isPlannedRow && !isCompleted && (() => {
-                      /**
-                       * ⛔ ASK `getDisciplineSwaps`, DO NOT RE-STATE ITS RULES (fixed 2026-08-08).
-                       *
-                       * This block hand-rolled the gate — `disciplineOf`, a `long` check, an
-                       * available-sports count — while the calendar chip asked the real function.
-                       * Two gates, two answers: the glyph rendered on the chip and not here, which is
-                       * exactly the divergence the comment on the chip warned about. It also silently
-                       * skipped the duration and status conditions, so it was a DIFFERENT rule, not
-                       * merely a copy of one.
-                       */
-                      const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
-                      const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never), [], declaredPosture);
-                      if (opts.length === 0) return null;
-                      /**
-                       * ⛔ A `<span>`, NOT A `<button>` — the row itself IS a `<button>` (:1613) and a
-                       * button inside a button is invalid HTML (2026-08-09). React's own
-                       * `validateDOMNesting` flags it, and browsers are free to drop or relocate the
-                       * inner control, which is exactly the "renders in a test, missing on device"
-                       * shape of this bug. `role="button"` + a keyboard handler keeps it operable
-                       * without nesting interactive elements.
-                       */
-                      const openSwap = () => {
-                        setSelectedPlannedWorkout(workout);
-                        setPlannedDrawerStep('swap');
-                      };
-                      return (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          aria-label="Swap sport for this session"
-                          title="Swap sport"
-                          className="absolute top-2 right-2 p-1.5 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSwap(); }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openSwap(); }
-                          }}
-                        >
-                          <ArrowLeftRight className="w-3.5 h-3.5" />
-                        </span>
-                      );
-                    })()}
+                    {/**
+                      * ⛔ PLANNED ROWS USE THE SHARED HEADER (2026-08-09) — the same component the
+                      * drawer and the full planned screen render, so all three agree on the title's
+                      * sport colour, on the duration, and on where the swap control sits.
+                      *
+                      * ⚠️ COMPLETED ROWS KEEP THE BLOCK BELOW. A completed row's right-hand side is
+                      * provider attribution (Strava/Garmin), not a planned duration, and its title
+                      * carries the ✓ — a different header for a different kind of row, not a second
+                      * opinion about the same one.
+                      */}
+                    {isPlannedRow ? (
+                      <PlannedSessionHeader
+                        workout={workout}
+                        size="card"
+                        /* Titles-only list — the description belongs to the drawer, not the card. */
+                        description={null}
+                        action={swapGlyph}
+                        durationExtra={(() => {
+                          const swimChip = String(workout.type || '').toLowerCase() === 'swim'
+                            ? formatPlannedSwimDistanceChip(workout as any)
+                            : null;
+                          return swimChip ? (
+                            <span className="rounded-md border border-blue-400/35 bg-blue-500/18 px-2 py-0.5 text-[11px] text-blue-200/95">
+                              {swimChip}
+                            </span>
+                          ) : null;
+                        })()}
+                      />
+                    ) : (
                     <div className="flex items-center justify-between gap-3">
                       <div
                         className="font-medium tracking-normal text-base"
@@ -1798,30 +1825,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         )}
                       </div>
 
-                      {/* Right side: planned duration OR import attribution (completed) */}
-                      {isPlannedRow ? (() => {
-                        const sec = resolveMovingSeconds(workout);
-                        const swimChip =
-                          String(workout.type || '').toLowerCase() === 'swim'
-                            ? formatPlannedSwimDistanceChip(workout as any)
-                            : null;
-                        const durOk = Number.isFinite(sec as any) && (sec as number) > 0;
-                        if (!durOk && !swimChip) return null;
-                        const mins = durOk ? Math.round((sec as number) / 60) : null;
-                        return (
-                          <span
-                            className="flex items-center gap-2 text-xs font-light tabular-nums flex-shrink-0"
-                            style={{ color: 'rgba(255,255,255,0.70)' }}
-                          >
-                            {mins != null ? <span>{mins}:00</span> : null}
-                            {swimChip ? (
-                              <span className="rounded-md border border-blue-400/35 bg-blue-500/18 px-2 py-0.5 text-[11px] text-blue-200/95">
-                                {swimChip}
-                              </span>
-                            ) : null}
-                          </span>
-                        );
-                      })() : showImportAttribution ? (
+                      {/* Right side: import attribution. The planned duration is the shared
+                          header's job now, so this branch is completed-only. */}
+                      {showImportAttribution ? (
+
                         <div
                           className="flex items-center gap-1.5 flex-shrink-0"
                           style={{
@@ -1857,6 +1864,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         </div>
                       ) : null}
                     </div>
+                    )}
 
                     {isSkipped && (
                       <div
@@ -1929,18 +1937,33 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               </>
             ) : (
               <>
-                <DrawerTitle className="text-white font-light tracking-wide text-lg">
-                  {(() => {
-                    const w = selectedPlannedWorkout;
-                    if (!w) return 'Planned Workout';
-                    // Same shared helper as the chip surface above — both reach the same
-                    // canonical title for any given workout. Closes the divergence the
-                    // ENGINE-STATE Known Broken entry filed.
-                    return deriveWorkoutTitle(w as any);
-                  })()}
+                {/**
+                  * ⛔ ONE HEADER, SHARED WITH THE OTHER TWO SURFACES (2026-08-09) —
+                  * `PlannedSessionHeader`. It renders the sport-coloured title and the duration on
+                  * one line and the description BELOW it. This drawer previously did the opposite:
+                  * `DrawerDescription` printed the description ABOVE, and `PlannedWorkoutSummary`
+                  * then printed the title and `63:00` under it.
+                  *
+                  * ⚠️ `DrawerTitle` AND `DrawerDescription` STAY MOUNTED, SCREEN-READER-ONLY. Radix
+                  * derives the dialog's accessible name from the title and its `aria-describedby`
+                  * from the description, and warns when either is missing — so deleting them to fix
+                  * the layout would trade a visual bug for an accessibility one. They carry the same
+                  * strings the visible header renders; only the presentation moved.
+                  */}
+                <DrawerTitle className="sr-only">
+                  {selectedPlannedWorkout ? deriveWorkoutTitle(selectedPlannedWorkout as any) : 'Planned Workout'}
                 </DrawerTitle>
-                <DrawerDescription className="text-white/60 font-light">
-                  {(() => {
+                <DrawerDescription className="sr-only">
+                  {String(
+                    (selectedPlannedWorkout as any)?.rendered_description
+                    || (selectedPlannedWorkout as any)?.description
+                    || 'Planned session details',
+                  )}
+                </DrawerDescription>
+                <PlannedSessionHeader
+                  workout={selectedPlannedWorkout}
+                  size="panel"
+                  description={(() => {
                     const w = selectedPlannedWorkout;
                     const sheetSkipped = w && String(w.workout_status || '').toLowerCase() === 'skipped';
                     if (sheetSkipped) {
@@ -1979,7 +2002,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                     return desc;
                   })()}
-                </DrawerDescription>
+                />
               </>
             )}
           </DrawerHeader>
@@ -2016,8 +2039,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     baselines={baselines as any}
                     hideLines={false}
                     /**
-                     * ⛔ THE DRAWER HEADER ALREADY PRINTED THIS (2026-08-09). `DrawerDescription`
-                     * (:1910) renders `rendered_description || description`, and this block's
+                     * ⛔ THE DRAWER HEADER ALREADY PRINTED THIS (2026-08-09). `PlannedSessionHeader`
+                     * above renders `rendered_description || description`, and this block's
                      * subtitle falls back to the SAME string — so a plain planned run showed
                      * "~50 min easy…" twice on one screen.
                      *
@@ -2029,6 +2052,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                      * was wrong.
                      */
                     suppressDescriptionFallback
+                    /**
+                     * ⛔ THE HEADER IS ABOVE THIS (2026-08-09). `PlannedSessionHeader` in the
+                     * DrawerHeader renders the sport-coloured title and `63:00`; without this the
+                     * component prints both again a few pixels lower. That second copy is the
+                     * "~63 min printed twice" on this surface.
+                     */
+                    hideHeader
                   />
                 </>
               );
