@@ -6,8 +6,19 @@ import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-prefe
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Calendar, Clock, Dumbbell, Activity, X, Copy } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
+// ⛔ ONE SHARED SWAP LAYER (2026-08-08). Pure logic + the clearance law live in the lib; this file
+// owns only the UI and the write. Every plan type — marathon, Strong Focus, combined, tri — renders
+// planned sessions through here, so the swap is inherited rather than re-implemented per generator.
+import {
+  availableDisciplines,
+  getDisciplineSwaps,
+  matrixKindFor,
+  intensityOf,
+  disciplineOf,
+  type SwapOption,
+} from '@/lib/session-discipline-swap';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -135,7 +146,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [skippingSession, setSkippingSession] = useState(false);
-  const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip'>('detail');
+  const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip' | 'swap'>('detail');
+  const [swappingSession, setSwappingSession] = useState(false);
   const [dismissedNotes, setDismissedNotes] = useState<Set<string>>(new Set());
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
 
@@ -557,6 +569,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       toast({ title: 'Error', description: 'Failed to mark workout as complete', variant: 'destructive' });
     } finally {
       setMarkingComplete(false);
+    }
+  };
+
+  /**
+   * ⛔ THE SAME WRITE PATH AS SKIP, DELIBERATELY. `handleApplySkip` below patches
+   * `planned_workouts` and fires `planned:invalidate` + `week:invalidate`; a swap is the same kind of
+   * athlete-owned edit to a planned row and must not invent a second one. The DIFFERENCE is only
+   * which columns move.
+   *
+   * ⚠️ NEVER BLOCKED. A swap with warnings is still applied — the warnings are shown beside the
+   * button, not in place of it. That is the guardrail rule: warn, do not gate.
+   */
+  const handleApplyDisciplineSwap = async (workout: any, option: SwapOption) => {
+    const userId = getStoredUserId();
+    if (!userId || !workout?.id) {
+      toast({ title: 'Error', description: 'Please log in to change a session', variant: 'destructive' });
+      return;
+    }
+    setSwappingSession(true);
+    try {
+      const { error } = await supabase
+        .from('planned_workouts').update(option.patch).eq('id', workout.id).eq('user_id', userId);
+      if (error) throw error;
+      toast({ title: `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`, variant: 'default' });
+      setSelectedPlannedWorkout(null);
+      setPlannedDrawerStep('detail');
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+    } catch (err: any) {
+      toast({ title: 'Could not swap this session', description: err?.message || 'Try again', variant: 'destructive' });
+    } finally {
+      setSwappingSession(false);
     }
   };
 
@@ -1570,7 +1614,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   <button
                     key={workout.id}
                     type="button"
-                    className={`w-full text-left transition-all ${!isCompleted ? 'backdrop-blur-md' : ''} ${phosphorPill.className}`}
+                    className={`w-full text-left transition-all relative ${!isCompleted ? 'backdrop-blur-md' : ''} ${phosphorPill.className}`}
                     style={{
                       ...phosphorPill.style,
                       borderRadius: '10px',
@@ -1625,6 +1669,39 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       onEditEffort && onEditEffort(workout);
                     }}
                   >
+                    {/**
+                      * ⛔ THE CUE, NOT A SECOND CONTROL. Michael asked for a swap symbol on Today's
+                      * Effort to take the athlete to the swap. It OPENS THE DRAWER at the swap step —
+                      * it does not swap anything itself, because a one-tap discipline change on a
+                      * card the athlete may have brushed past is not a decision, it is an accident.
+                      *
+                      * ⚠️ IT ONLY APPEARS WHERE A SWAP EXISTS: an unstarted planned ENDURANCE session
+                      * that is not the long one. A glyph that opens an empty sheet teaches the athlete
+                      * to ignore glyphs.
+                      */}
+                    {isPlannedRow && !isCompleted && (() => {
+                      const d = disciplineOf(workoutType);
+                      if (!d) return null;
+                      if (intensityOf(workout) === 'long') return null;
+                      const others = availableDisciplines(Array.isArray(unifiedItems) ? unifiedItems : []);
+                      if (others.filter((x) => x !== d).length === 0) return null;
+                      return (
+                        <button
+                          type="button"
+                          aria-label="Swap sport for this session"
+                          title="Swap sport"
+                          className="absolute top-2 right-2 p-1.5 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedPlannedWorkout(workout);
+                            setPlannedDrawerStep('swap');
+                          }}
+                        >
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                        </button>
+                      );
+                    })()}
                     <div className="flex items-center justify-between gap-3">
                       <div
                         className="font-medium tracking-normal text-base"
@@ -1904,6 +1981,60 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {(() => {
                 const w = selectedPlannedWorkout;
                 const sheetSkipped = w && String(w.workout_status || '').toLowerCase() === 'skipped';
+                /**
+                 * ⚠️ THE SPORTS ON OFFER COME FROM THE ATHLETE'S OWN WEEK, not a new field — a plan
+                 * that has never contained a swim is not evidence they can swim. `unifiedItems` is
+                 * the week the client already holds, so this costs no fetch.
+                 */
+                const swapOptions: SwapOption[] = w
+                  ? getDisciplineSwaps(
+                      w,
+                      availableDisciplines(Array.isArray(unifiedItems) ? unifiedItems : []),
+                      // The rest of that day, in the law's vocabulary, so the warnings are real.
+                      (Array.isArray(unifiedItems) ? unifiedItems : [])
+                        .filter((it: any) => String(it?.date).slice(0, 10) === String(w.date).slice(0, 10)
+                          && it?.id !== w.id)
+                        .map((it: any) => {
+                          const d = disciplineOf(it?.type);
+                          const kind = String(it?.type || '').toLowerCase() === 'strength'
+                            ? (/squat|deadlift|lunge|leg/i.test(String(it?.name || '')) ? 'lower_body_strength' : 'upper_body_strength')
+                            : d ? matrixKindFor(d, intensityOf(it)) : null;
+                          return kind ? { kind, label: String(it?.name || 'another session') } : null;
+                        })
+                        .filter(Boolean) as Array<{ kind: any; label: string }>,
+                    )
+                  : [];
+                if (plannedDrawerStep === 'swap' && w) {
+                  return (
+                    <div className="flex flex-col gap-2 w-full">
+                      <div className="text-[13px] text-white/70 pb-1">
+                        Same day, same time. Pick the sport you want instead.
+                      </div>
+                      {swapOptions.map((opt) => (
+                        <button
+                          key={opt.to}
+                          type="button"
+                          disabled={swappingSession}
+                          onClick={() => handleApplyDisciplineSwap(w, opt)}
+                          className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                        >
+                          <div className="text-sm font-medium">{opt.label}</div>
+                          {/* ⛔ WARN, NEVER GATE — the button above still works. */}
+                          {opt.warnings.map((warn) => (
+                            <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>
+                          ))}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="w-full px-4 py-2 rounded-xl text-[13px] text-white/55 hover:text-white/80"
+                        onClick={() => setPlannedDrawerStep('detail')}
+                      >
+                        Back
+                      </button>
+                    </div>
+                  );
+                }
                 if (plannedDrawerStep === 'skip' && w) {
                   return (
                     <SkipSessionReasonPanel
@@ -1928,6 +2059,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 }
                 return (
                   <>
+              {/* ⛔ THE SWAP ENTRY. Endurance sessions only, and only when there is somewhere to go —
+                  a long session and a one-sport athlete both correctly offer nothing, so the control
+                  hides rather than opening an empty sheet. */}
+              {swapOptions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPlannedDrawerStep('swap')}
+                  className="w-full px-4 py-3 rounded-xl font-medium tracking-wide text-white/85 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                  Swap sport
+                </button>
+              )}
               {/* Logger shortcut (Strength/Mobility/Pilates-Yoga) */}
               {selectedPlannedWorkout && (() => {
                 const raw = String(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
