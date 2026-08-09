@@ -26,6 +26,8 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // write. The first cut of this shipped on `TodaysEffort`, which renders nothing when today has no
 // planned session, so the control never appeared where the athlete actually opens one: from the
 // calendar, into this view. Same logic, correct surface.
+// ⛔ THE UNMATCHED CUE — one rule, unit-tested, shared with the calendar and Today's card.
+import { isUnmatchedAgainstPlan, unmatchedPrompt } from '@/lib/associate-candidates';
 import {
   availableDisciplines,
   disciplineOf,
@@ -201,6 +203,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     return { from: iso(mon), to: iso(sun) };
   })();
   const { items: unifiedItems = [] } = useWeekUnified(weekWindow.from, weekWindow.to);
+  /** The planned sessions on this activity's own day — the cue's evidence, not a new fetch. */
+  const sameDayPlannedRows = (Array.isArray(unifiedItems) ? unifiedItems : [])
+    .filter((it: { date?: string | null }) => String(it?.date ?? '').slice(0, 10) === dateIso)
+    .map((it: { planned?: unknown }) => (it?.planned ?? null))
+    .filter(Boolean);
   
   // Listen for workout invalidation events to refresh data (both singular and plural events)
   useEffect(() => {
@@ -861,12 +868,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             (!currentPlannedId && !linkedPlanned) ? (
               <button
                 onClick={()=>setAssocOpen(true)}
+                title={unmatchedPrompt(sameDayPlannedRows as never)}
                 className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
                 style={{
                   borderColor: `rgba(${sportRgb}, 0.32)`,
                   boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.10)`,
                 }}
-              >Attach</button>
+              >{/**
+                  * ⛔ "ATTACH" WAS A BARE VERB (2026-08-08). It appeared exactly when auto-attach
+                  * found nothing, and said nothing about WHY or what was still owed — so the athlete
+                  * had to open the activity to discover a miss, and then guess what it meant.
+                  * The copy now names the session the day is still owed.
+                  */}
+                {isUnmatchedAgainstPlan(workout as never, sameDayPlannedRows as never)
+                  ? unmatchedPrompt(sameDayPlannedRows as never)
+                  : 'Attach'}</button>
             ) : (
               <button
                 onClick={async()=>{

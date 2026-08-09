@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+// ⛔ ONE RANKER, unit-tested — the dialog owns the UI, not the rules.
+import { rankAssociateCandidates } from '@/lib/associate-candidates';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 
@@ -34,6 +36,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         const userId = getStoredUserId();
         if (!userId) { setCandidates([]); setLoading(false); return; }
 
+        // `type` is no longer a filter — it ranks the results. See the query below.
         const type = normalizeSportType(workout?.type);
         const d = String(workout?.date || '').slice(0,10);
         const toIso = (base: string, delta: number) => {
@@ -52,7 +55,22 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           .from('planned_workouts')
           .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id')
           .eq('user_id', userId)
-          .eq('type', type)
+          /**
+           * ⛔ NO `.eq('type', …)` ANY MORE — and the AUTO matcher still has one (2026-08-08).
+           *
+           * This dialog is the human's override, and it already accepted that a human may override
+           * the DATE rule: it searches a ±`windowDays` window while `auto-attach-planned:420` demands
+           * the exact day. It simply never considered that they might override the SPORT rule — which
+           * is the rule the discipline swap makes wrong. Swap a run to a ride, then run anyway, and
+           * the matcher correctly declines (`:419`) and this dialog came back EMPTY, so the athlete
+           * could not fix it by hand either.
+           *
+           * ⚠️ THE SERVER ALREADY ALLOWS IT. The explicit-planned-id path in `auto-attach-planned`
+           * performs no discipline check at all, so the cross-sport link works today; the gate was
+           * only ever this query.
+           *
+           * ⛔ Cross-sport rows are SEPARATED AND LABELLED, never mixed in (see `rankAssociateCandidates`).
+           */
           .in('workout_status', ['planned','in_progress','completed'])
           .gte('date', from)
           .lte('date', to)
@@ -223,7 +241,9 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           <div className="text-sm text-gray-500">No matching planned rows in ±{windowDays} days.</div>
         ) : (
           <div className="space-y-2 max-h-64 overflow-auto">
-            {candidates.map((p) => {
+            {(() => {
+              const ranked = rankAssociateCandidates(workout?.type, workout?.date, candidates as never);
+              const render = (p: ReturnType<typeof rankAssociateCandidates>['sameSport'][number] & { week_number?: number; day_number?: number }) => {
               const isSameDay = String(p.date || '').slice(0,10) === String(workout?.date || '').slice(0,10);
               return (
                 <button 
@@ -240,9 +260,28 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
                     {isSameDay && <span className="ml-2 text-xs text-blue-500 font-semibold">• Same day</span>}
                   </div>
                   <div className="text-xs text-gray-500">Week {p.week_number}, Day {p.day_number}</div>
+                  {/* ⛔ WARN, NEVER GATE — the row above is still tappable. */}
+                  {p.crossSportNote && (
+                    <div className="text-xs text-amber-600 mt-1">{p.crossSportNote}</div>
+                  )}
                 </button>
               );
-            })}
+              };
+              return (
+                <>
+                  {ranked.sameSport.map(render)}
+                  {ranked.otherSport.length > 0 && (
+                    <>
+                      {/* The divider is the safeguard: a mis-tap cannot happen in one mixed column. */}
+                      <div className="pt-2 pb-1 text-[11px] uppercase tracking-wide text-gray-400 border-t border-gray-200/60">
+                        A different sport
+                      </div>
+                      {ranked.otherSport.map(render)}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
         <div className="flex justify-between gap-2 pt-2">

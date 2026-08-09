@@ -8,6 +8,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
+// ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
+import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ ONE SHARED SWAP LAYER (2026-08-08). Pure logic + the clearance law live in the lib; this file
 // owns only the UI and the write. Every plan type — marathon, Strong Focus, combined, tri — renders
 // planned sessions through here, so the swap is inherited rather than re-implemented per generator.
@@ -1679,6 +1681,24 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       * that is not the long one. A glyph that opens an empty sheet teaches the athlete
                       * to ignore glyphs.
                       */}
+                    {/**
+                      * ⛔ THE MISS, ON THE CARD (2026-08-08). A completed activity that left a planned
+                      * session owed says so here, so the athlete does not have to open it to find out.
+                      * Tapping the card opens the activity, where the link button lives.
+                      */}
+                    {isCompleted && isUnmatchedAgainstPlan(
+                      workout as never,
+                      (Array.isArray(unifiedItems) ? unifiedItems : [])
+                        .map((it: { planned?: unknown }) => it?.planned ?? null)
+                        .filter(Boolean) as never,
+                    ) && (
+                      <span
+                        className="absolute top-2 right-2 text-[10px] text-amber-300/85"
+                        title="Didn't match a planned session — tap to link it"
+                      >
+                        unlinked
+                      </span>
+                    )}
                     {isPlannedRow && !isCompleted && (() => {
                       const d = disciplineOf(workoutType);
                       if (!d) return null;

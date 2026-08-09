@@ -6,9 +6,11 @@ import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePill
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
-import { Activity, ArrowLeftRight, Bike, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
 // ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the same function the drawer control uses. See the glyph.
 import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipline-swap';
+// ⛔ THE SAME "did this miss a planned slot" RULE the workout view uses — never a second copy.
+import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
@@ -824,6 +826,37 @@ export default function WorkoutCalendar({
    * ⚠️ THE WEEK IS THE UNIT for "which sports does this athlete have" — a single day answers "run"
    * for a Tuesday holding a run and a lift, which is what hid this control everywhere until now.
    */
+  /**
+   * ⛔ COMPLETED ACTIVITIES THAT MISSED A PLANNED SLOT — TrainingPeaks shows this in the week, not
+   * only inside the activity, so an athlete learns about a miss while looking at their calendar
+   * rather than by opening something (2026-08-08).
+   *
+   * ⚠️ IT IS NOT "unlinked". An extra easy spin on a rest day is unlinked and has missed nothing —
+   * `isUnmatchedAgainstPlan` requires the DAY to still owe a planned session, which is exactly the
+   * swap-then-did-the-other-sport case. A marker that fires on every extra teaches people to ignore
+   * markers.
+   */
+  const unmatchedIds = useMemo(() => {
+    const rows = (events ?? []).map((e) => (e as { _src?: unknown })?._src).filter(Boolean) as Array<Record<string, unknown>>;
+    const byDay = new Map<string, Array<Record<string, unknown>>>();
+    for (const r of rows) {
+      const d = String(r?.date ?? '').slice(0, 10);
+      const arr = byDay.get(d) ?? [];
+      arr.push(r);
+      byDay.set(d, arr);
+    }
+    const ids: Set<string> = new Set();
+    for (const [, dayRows] of byDay) {
+      const planned = dayRows.filter((r) => String(r?.workout_status ?? '').toLowerCase() !== 'completed'
+        || !!r?.completed_workout_id);
+      for (const r of dayRows) {
+        if (isUnmatchedAgainstPlan(r as never, planned as never)) ids.add(String(r?.id ?? ''));
+      }
+    }
+    ids.delete('');
+    return ids;
+  }, [events]);
+
   const swappableIds = useMemo(() => {
     const rows = (events ?? [])
       .map((e) => (e as { _src?: unknown })?._src)
@@ -1296,6 +1329,14 @@ export default function WorkoutCalendar({
                             {content}
                             {renderDisciplineIcon(true)}
                             {renderCompletedCheckmark()}
+                            {/* ⛔ THE MISS, VISIBLE IN THE WEEK. Opens the activity, where the
+                                "Didn't match your planned … — link it?" button lives. */}
+                            {unmatchedIds.has(String(workoutId || '')) && (
+                              <Link2Off
+                                className="inline-block w-2.5 h-2.5 ml-1 text-amber-300/80 align-baseline"
+                                aria-label="Did not match a planned session — tap to link"
+                              />
+                            )}
                           </>
                         );
                       }
