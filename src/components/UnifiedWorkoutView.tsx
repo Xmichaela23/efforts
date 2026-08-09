@@ -123,24 +123,25 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   origin = 'other'
 }) => {
   /**
-   * ⛔ ABOVE THE EARLY RETURN, DELIBERATELY (2026-08-09). This component returns at the next line
-   * when `workout` is falsy, and EVERY other hook in it sits below that — a pre-existing
-   * Rules-of-Hooks violation (eslint reports it on each one). Adding another hook underneath would
-   * have deepened it: if `workout` is ever falsy on one render and truthy on the next, React throws
-   * *"Rendered more hooks than during the previous render"*.
+   * ═══ EVERY HOOK IN THIS COMPONENT RUNS BEFORE ANY RETURN. DO NOT ADD ONE BELOW THE GUARD. ═══
    *
-   * ⚠️ NOT FIXING THE WHOLE FILE HERE — hoisting a dozen hooks above that return is its own change
-   * with its own blast radius. This one is placed correctly so it adds nothing to the debt.
+   * ⛔ STAGE H (2026-08-09) — see `docs/SPEC-planned-session-consolidation.md`. The `if (!workout)`
+   * early return used to sit HERE, with all 26 remaining hooks underneath it. That is a
+   * Rules-of-Hooks violation: React identifies hooks by CALL ORDER, so a render where `workout` is
+   * falsy calls one hook and the next render calls twenty-six. React throws *"Rendered more hooks
+   * than during the previous render"* and the component that every workout tap goes through
+   * unmounts.
+   *
+   * ⚠️ IT NEVER FIRED, WHICH IS WHY IT SURVIVED. It needs `workout` to go falsy→truthy while the
+   * component stays mounted; the call sites mount it with a workout already in hand. A latent crash
+   * is still a crash, and the guard cost nothing to move.
+   *
+   * ⛔ THE FIX IS ORDER ONLY. Every hook below runs unconditionally and the guard became a
+   * render-time branch after the last of them (search "STAGE H · THE GUARD"). Nothing about what any
+   * hook DOES changed. The one substantive edit is `isCompleted` reading `workout?.` instead of
+   * `workout.` — it now evaluates on the null render, where it would have thrown.
    */
   const declaredPosture = useDeclaredPosture();
-
-  if (!workout) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-muted-foreground">No workout selected</p>
-      </div>
-    );
-  }
 
   // plannedWorkouts context removed; rely on server unified data/routes
   //
@@ -170,7 +171,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     }
     return false;
   })();
-  const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed' && looksExecuted;
+  // ⚠️ `workout?.` — STAGE H. This ran only after the `!workout` guard and could assume a row; it now
+  // evaluates on the null render too. `looksExecuted` already handled it (`workout || {}`).
+  const isCompleted = String(workout?.workout_status || workout?.status || '').toLowerCase() === 'completed' && looksExecuted;
   // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
   // below reference `isStrengthFamily` in their dependency arrays, which are evaluated at render
   // time. A later `const` would be in the temporal dead zone → "Cannot access before initialization".
@@ -487,6 +490,26 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       }
     })();
   }, [activeTab, isCompleted, (workout as any)?.id, (workout as any)?.planned_id, linkedPlanned?.id, hydratedPlanned?.id]);
+
+  /**
+   * ═══ STAGE H · THE GUARD. Every hook above; nothing but rendering below. ═══════════════════════
+   *
+   * ⛔ THIS IS THE LAST LINE THAT MAY PRECEDE A HOOK. It is the same guard that used to sit at the
+   * top of the component, moved here so it can no longer change how many hooks a render calls. It
+   * renders identically — a new hook added ABOVE this line is safe; one added BELOW it re-opens the
+   * Rules-of-Hooks violation stage H closed, and eslint will say so.
+   *
+   * ⚠️ THE EFFECTS ABOVE ALL SELF-GUARD, so this render costs nothing. They bail on `!workout?.id`,
+   * `!isCompleted` or `!pid`; `useWorkoutDetail` is passed `undefined` (isCompleted is false without
+   * a row) and fetches nothing; `useWeekUnified` gets the current week and its result is unread.
+   */
+  if (!workout) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">No workout selected</p>
+      </div>
+    );
+  }
 
   const getWorkoutType = () => {
     // Trust explicit stored type first (prevents misclassification when provider field is missing/ambiguous)
