@@ -454,7 +454,7 @@ Deno.serve(async (req)=>{
     let plannedRows = null;
     let pErr = null;
     try {
-      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,workload_planned,units,pool_unit,pool_length_m,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,duration,workload_planned,units,pool_unit,pool_length_m,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
         ascending: true
       }).order('created_at', {
         ascending: true
@@ -467,7 +467,7 @@ Deno.serve(async (req)=>{
       pErr = e1;
       // Fallback for schemas without completed_workout_id or created_at
       try {
-        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,units,pool_unit,pool_length_m,route_url,route_snapshot').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,duration,units,pool_unit,pool_length_m,route_url,route_snapshot').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
           ascending: true
         }).order('id', {
           ascending: true
@@ -527,7 +527,7 @@ Deno.serve(async (req)=>{
         });
         // Reload planned rows that were adjusted (best-effort, limited scope) so UI sees cooldown immediately
         try {
-          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,units,pool_unit,pool_length_m,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,duration,units,pool_unit,pool_length_m,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
             ascending: true
           }).order('created_at', {
             ascending: true
@@ -762,6 +762,10 @@ Deno.serve(async (req)=>{
             name: p?.name ?? null,
             steps: processedSteps,
             total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+          // ⛔ STAGE 3 — the `duration` COLUMN (minutes), carried so the client stops needing its own
+          // mapper to see it. `materialize-plan` writes it (`:3480`, `:3532`); this select omitted it,
+          // so `planned_workout.duration` was structurally absent and every surface fell back.
+          duration: Number(p?.duration) > 0 ? Number(p.duration) : null,
             description: p?.description || p?.rendered_description || null,
             tags: p?.tags || null,
             steps_preset: p?.steps_preset ?? null,
@@ -1043,6 +1047,10 @@ Deno.serve(async (req)=>{
           name: p?.name || null,
           steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+          // ⛔ STAGE 3 — the `duration` COLUMN (minutes), carried so the client stops needing its own
+          // mapper to see it. `materialize-plan` writes it (`:3480`, `:3532`); this select omitted it,
+          // so `planned_workout.duration` was structurally absent and every surface fell back.
+          duration: Number(p?.duration) > 0 ? Number(p.duration) : null,
           description: p?.description || p?.rendered_description || null,
           tags: p?.tags || null,
           steps_preset: p?.steps_preset ?? null,
@@ -1119,6 +1127,10 @@ Deno.serve(async (req)=>{
           name: p?.name || null,
           steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+          // ⛔ STAGE 3 — the `duration` COLUMN (minutes), carried so the client stops needing its own
+          // mapper to see it. `materialize-plan` writes it (`:3480`, `:3532`); this select omitted it,
+          // so `planned_workout.duration` was structurally absent and every surface fell back.
+          duration: Number(p?.duration) > 0 ? Number(p.duration) : null,
           description: p?.description || p?.rendered_description || null,
           tags: p?.tags || null,
           steps_preset: p?.steps_preset ?? null,
@@ -1502,6 +1514,10 @@ Deno.serve(async (req)=>{
         computed: (Array.isArray(p.steps) && p.steps.length > 0) ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null } : null,
         steps_preset: p.steps_preset ?? null,
         total_duration_seconds: p.total_duration_seconds ?? null,
+        // ⛔ STAGE 3 — `duration` (MINUTES) now travels on the server contract. It is the last
+        // resort of `resolveMinutes` for rows that carry no structure at all, and its absence here
+        // is why the client mapper had to exist. See `docs/SPEC-planned-session-consolidation.md`.
+        duration: p.duration ?? null,
         strength_exercises: p.strength_exercises ?? null,
         mobility_exercises: p.mobility_exercises ?? null,
         tags: Array.isArray(p.tags) ? p.tags : [],

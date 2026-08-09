@@ -282,11 +282,55 @@ One mechanical move: hoist all hooks above the guard, convert the early return t
 **No behaviour change.** Must land **before stage 3** touches this file. Not urgent (the crash needs a
 specific transition) but it is a latent crash in the component every workout tap goes through.
 
-### Stage 3 — row shape (⚠️ needs a `get-week` deploy)
+### Stage 3 — row shape ✅ BUILT 2026-08-09 (⚠️ NOT YET DEPLOYED — needs `get-week`)
 
-Add `duration` to `get-week`'s select and its mapper; delete the client mapper; surfaces consume the
-server contract. **`get-week` is on every calendar read — this stage goes alone**, after 1, 2 and H are
-proven on device.
+**Server** (`get-week`): `duration` added to the **three** client-facing selects (`:457` primary,
+`:470` schema-fallback, `:530` post-materialize reload — §3 named only one), to the **three**
+constructed `planned` objects, and to `toPlannedWorkout`. **Client:** `mapUnifiedItemToPlanned`
+deleted; all four call sites read `planned_workout` directly.
+
+⛔ **§3 ABOVE IS WRONG AND IS LEFT STANDING AS THE LESSON.** It says the client mapper "is a shadow of"
+the server's. **Neither was a superset of the other:**
+
+| only in the CLIENT copy | only in the SERVER copy |
+|---|---|
+| `duration`, `timing`, `pairing` | `display_overrides`, `expand_spec`, `pace_annotation`, `workout_title` |
+
+Deleting the client mapper on the strength of that sentence would have dropped three fields silently.
+Only `duration` was load-bearing, and stage 3 moves it onto the contract. **`timing` and `pairing` were
+structurally always null** — `timing`'s column never existed on `planned_workouts` (`TodaysEffort`
+computes the day's timings at render via `computeDayTimings`), `pairing` was never selected, and
+neither was `workout_metadata`, the object both fell back to. Consumers read them with `??`, so
+`undefined` and `null` behave identically.
+
+⚠️ **`duration` IS A REAL COLUMN** — `materialize-plan:3480`/`:3532` writes it, in minutes.
+`get-week`'s select simply never asked for it. That omission is the whole reason a client mapper had to
+exist.
+
+⛔ **`duration` IS NOT A RUNG OF `plannedDurationSeconds`, DELIBERATELY.** It is minutes, and it stays
+the swap gate's own last resort (`resolveMinutes`) for rows carrying no structure at all. Fixture Q
+pins the pair: the seconds reader says `null`, the gate still sizes the session at 50 min. Both correct.
+
+**The guardrail, answered:** distance-priced steps survive and are *safer* on this path — the server
+parses `paceTarget` itself and emits a numeric `pace_range` in sec/mi (`get-week:1010`), which
+`stepSeconds` reads first (fixture R agrees with stage 2's string-priced M to within 2s). JSON-string
+`computed` **cannot occur** on the server contract at all — `toPlannedWorkout` builds `computed` as an
+object or null — but the capability stays in the reader because the direct table readers
+(`usePlannedWorkoutLink`, `StrengthLogger`) still see the string form.
+
+⚠️ **ONE BEHAVIOUR CHANGE, at `TodaysEffort:793` only.** Three call sites filter `!!it?.planned` first,
+so their fallback was unreachable. That one maps every item, so an item with no `planned` block used to
+get a stub from `{}` — a nameless placeholder card. It now drops out of the day instead. Reachable only
+for an item `get-week` could not classify (executed row, no `computed.overall`, no intervals, no logged
+sets, no planned link → status `null`, `get-week:881`).
+
+⚠️ **`workout-mappers.test.ts` was RETARGETED, not deleted** — it now runs the *server's* shape into
+the gate. Because `toPlannedWorkout` is a closure and cannot be imported, the test mirrors it, and a
+**drift guard** reads `get-week/index.ts` and asserts the mirror claims no field the real mapper lacks.
+Negative-control checked: removing `duration` from `get-week` fails the guard.
+
+⚠️ **PRECONDITION NOT MET.** This section originally said stage 3 lands "after 1, 2 and H are proven on
+device". They are pushed, not device-verified. Stated, not resolved — the call is Michael's.
 
 ### Stage 4 — cleanup, then delete this file
 

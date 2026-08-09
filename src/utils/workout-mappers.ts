@@ -6,87 +6,31 @@
  * to add new fields.
  */
 
-import { PlannedWorkout } from '@/types/planned-workout';
 
 /**
- * Maps a unified item from get-week API to a PlannedWorkout
- * 
- * This is the SINGLE SOURCE OF TRUTH for planned workout transformation.
- * If you need to add a new field, add it here and it will be available everywhere.
+ * ⛔ `mapUnifiedItemToPlanned` IS DELETED (stage 3, 2026-08-09).
+ * See `docs/SPEC-planned-session-consolidation.md` §3.
+ *
+ * It was the CLIENT's copy of a shape the server already builds (`get-week:1489 toPlannedWorkout`),
+ * and every surface read `it?.planned_workout ?? mapUnifiedItemToPlanned(it)` — so the server's copy
+ * won wherever it existed and this one was a shadow that had to be kept in sync by hand. It wasn't:
+ * the two drifted, and the SPEC's own summary of the drift ("the client's is a shadow of it") was
+ * itself wrong. Neither was a superset.
+ *
+ *   only in the CLIENT copy — `duration`, `timing`, `pairing`
+ *   only in the SERVER copy — `display_overrides`, `expand_spec`, `pace_annotation`, `workout_title`
+ *
+ * ⚠️ ONLY `duration` WAS LOAD-BEARING, and stage 3 moved it onto the server contract (the `duration`
+ * column is real and `materialize-plan` writes it; `get-week`'s select simply omitted it). `timing`
+ * and `pairing` were **structurally always null** — `timing`'s column never existed on
+ * `planned_workouts` (see the note at `TodaysEffort.tsx`, where the day's timings are computed at
+ * render by `computeDayTimings`), `pairing` was never selected, and neither was `workout_metadata`,
+ * the object both of them fell back to. Their consumers read them with `??` and treat null and
+ * undefined alike, so dropping them changes nothing.
+ *
+ * ⛔ DO NOT RE-ADD A CLIENT MAPPER. If a field is missing from a planned row, add it to `get-week`'s
+ * select AND to `toPlannedWorkout`, and redeploy `get-week`. That is the whole point of the stage.
  */
-export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
-  const planned = item.planned || {};
-  
-  const rawSt = String(item.status || planned.workout_status || 'planned').toLowerCase();
-  const workoutStatus: PlannedWorkout['workout_status'] =
-    rawSt === 'skipped' ? 'skipped' : rawSt === 'completed' ? 'completed' : 'planned';
-
-  return {
-    // Core identifiers
-    id: planned.id || item.id,
-    date: item.date,
-    type: item.type || planned.type,
-    workout_status: workoutStatus,
-    skip_reason: planned.skip_reason ?? null,
-    skip_note: planned.skip_note ?? null,
-    
-    // Name and description
-    name: planned.name || null,
-    description: planned.description || null,
-    rendered_description: planned.rendered_description || planned.description || null,
-    
-    // Workout structure and steps
-    computed: (Array.isArray(planned.steps) && planned.steps.length > 0) 
-      ? { 
-          steps: planned.steps, 
-          total_duration_seconds: planned.total_duration_seconds || null 
-        }
-      : null,
-    steps_preset: planned.steps_preset ?? null,
-    total_duration_seconds: planned.total_duration_seconds || null,
-    // ⛔ CARRIED, NOT DROPPED — see the note on `PlannedWorkout.duration`. Without this the mapped
-    // row is a different shape from the raw row and duration-dependent logic diverges by surface.
-    duration: planned.duration ?? null,
-    
-    // Exercise data
-    strength_exercises: planned.strength_exercises ?? null,
-    mobility_exercises: planned.mobility_exercises ?? null,
-    
-    // Metadata
-    tags: Array.isArray(planned.tags) ? planned.tags : [],
-    export_hints: planned.export_hints ?? null,
-    workout_structure: planned.workout_structure ?? null,
-    friendly_summary: planned.friendly_summary ?? null,
-    
-    // Optional fields
-    planned_id: planned.id,
-    training_plan_id: planned.training_plan_id ?? null,
-    source: item.source || 'training_plan',
-    provider: item.provider || 'workouts',
-    workout_metadata: planned.workout_metadata ?? null,
-    
-    // Brick/transition fields
-    brick_group_id: planned.brick_group_id ?? null,
-    brick_order: planned.brick_order ?? null,
-    transition_s: planned.transition_s ?? null,
-
-    // Units / swim pool (must mirror get-week `planned_workout`; mapper is fallback when that blob is absent)
-    units: planned.units ?? null,
-    pool_unit: planned.pool_unit ?? null,
-    pool_length_m: typeof planned.pool_length_m === 'number' ? planned.pool_length_m : null,
-    route_url: typeof planned.route_url === 'string' ? planned.route_url : null,
-    route_snapshot: planned.route_snapshot ?? null,
-
-    // §6.2 / §6.5 same-day pairing ordering (Today's Efforts renders AM before PM).
-    // Server stashes `timing` and `pairing` inside `workout_metadata` at activation; pull them
-    // back here so the client has flat fields to read.
-    timing: (() => {
-      const t = planned.timing ?? planned.workout_metadata?.timing;
-      return t === 'AM' || t === 'PM' ? t : null;
-    })(),
-    pairing: planned.pairing ?? planned.workout_metadata?.pairing ?? null,
-  };
-}
 
 /**
  * Maps a unified item to a completed workout structure

@@ -18,7 +18,6 @@ import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
-import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // ⛔ THE SWAP LOGIC IS NOT REBUILT HERE (2026-08-08). `session-discipline-swap.ts` owns the options,
 // the intensity band, the duration/volume preservation and the clearance warnings — and it reads the
@@ -302,8 +301,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       item.planned?.id === plannedId || item.id === plannedId
     );
     
+    // ⛔ THE SERVER'S CONTRACT (stage 3). `planned_workout` is attached to exactly the items with a
+    // `planned` block — which this branch has already established — so the client-mapper fallback
+    // that used to sit here was unreachable.
     if (unifiedPlanned?.planned) {
-      return unifiedPlanned.planned_workout ?? mapUnifiedItemToPlanned(unifiedPlanned);
+      return unifiedPlanned.planned_workout;
     }
     
     // If not found in unified data, use the original workout (this should not happen in normal flow)

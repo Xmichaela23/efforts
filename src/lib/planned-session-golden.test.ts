@@ -27,7 +27,7 @@
  * Run:
  *   ~/.deno/bin/deno test --no-check --allow-read src/lib/planned-session-golden.test.ts
  */
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds.ts';
 import { resolvePlannedDurationMinutes } from '../utils/resolvePlannedDuration.ts';
 import { deriveWorkoutTitle } from './derive-workout-title.ts';
@@ -448,6 +448,88 @@ Deno.test('GOLDEN (stage 2) · resolveMovingSeconds still answers stage 0 exactl
   // ⚠️ And the planned reader is NOT what produced that: it would read J's root total. Same number
   // here by coincidence of the fixture, different question — which is exactly why they stay separate.
   assertEquals(plannedDurationSeconds(j), 3000);
+});
+
+// ── STAGE 3 — the SERVER's row shape ─────────────────────────────────────────────────────────
+//
+// ⛔ THE CLIENT MAPPER IS GONE, so `planned_workout` from `get-week` is the only planned row any
+// surface sees. These pin that the shape it emits still feeds the one duration reader correctly —
+// especially the two capabilities stage 2 rescued, whose survival across the server shape was NOT
+// self-evident and is the guardrail this stage was given.
+
+const SERVER_ROWS: Array<{ label: string; row: Row }> = [
+  {
+    label: 'Q · server row — `duration` (minutes) and nothing else, the field stage 3 added',
+    row: {
+      id: 'q', type: 'run', name: 'Easy Run', workout_status: 'planned', date: '2026-08-11',
+      total_duration_seconds: null, computed: null, duration: 50, tags: ['easy_run'],
+    },
+  },
+  {
+    label: 'R · server row — distance steps carrying the SERVER\'s pace_range shape',
+    row: {
+      id: 'r', type: 'run', name: 'Intervals', workout_status: 'planned', date: '2026-08-21',
+      total_duration_seconds: null, duration: null, tags: ['intervals'],
+      // ⚠️ `get-week:1010` builds this from `paceTarget`: sec-per-MILE, ±5%, `unit: 'mi'`.
+      computed: {
+        total_duration_seconds: null,
+        steps: Array.from({ length: 6 }, () => ({
+          distanceMeters: 800,
+          pace_range: { lower: 428, upper: 473, unit: 'mi' },
+        })),
+      },
+    },
+  },
+  {
+    label: 'S · server row — steps sum, the shape that hid the glyph',
+    row: {
+      id: 's', type: 'run', name: 'Easy Run', workout_status: 'planned', date: '2026-08-18',
+      total_duration_seconds: null, duration: null, tags: ['easy_run'],
+      computed: { total_duration_seconds: null, steps: [{ seconds: 1890 }, { seconds: 1890 }] },
+    },
+  },
+];
+
+Deno.test('GOLDEN (stage 3) · the server contract feeds the one duration reader', () => {
+  const golden: Record<string, { secs: number | null; swapMin: number }> = {
+    // ⚠️ Q: `duration` is MINUTES and is NOT a rung of `plannedDurationSeconds` — deliberately. It is
+    // the swap gate's own last resort (`resolveMinutes`), for rows with no structure at all. So the
+    // seconds reader says "I don't know" and the gate still sizes the session. Both are correct.
+    'Q': { secs: null, swapMin: 50 },
+    'R': { secs: 1344, swapMin: 22 },   // 6 × 800m at the midpoint of 428-473 sec/mi (450.5)
+    'S': { secs: 3780, swapMin: 63 },
+  };
+  for (const [key, want] of Object.entries(golden)) {
+    const row = SERVER_ROWS.find((r) => r.label.startsWith(`${key} ·`))!.row;
+    assertEquals(plannedDurationSeconds(row), want.secs, `${key}: plannedDurationSeconds`);
+    assertEquals(resolveMinutes(row as never), want.swapMin, `${key}: resolveMinutes`);
+  }
+});
+
+Deno.test('⛔ (stage 3) · the two capabilities stage 2 rescued survive the SERVER shape', () => {
+  /**
+   * ⛔ THE GUARDRAIL THIS STAGE WAS GIVEN, ANSWERED EXPLICITLY.
+   *
+   * 1. DISTANCE-PRICED STEPS — survive, and are in fact SAFER on this path. Stage 2's fixture M
+   *    priced them from a `paceTarget` STRING; the server parses that string itself and emits a
+   *    numeric `pace_range` in sec/mi (`get-week:1010`), which `stepSeconds` reads first. Row R
+   *    proves the numeric form prices to the same ~1342s as the string form did.
+   *
+   * 2. JSON-STRING `computed` — **cannot occur on this path at all.** `toPlannedWorkout` BUILDS
+   *    `computed` as an object (`{ steps, total_duration_seconds }`) or null; it never passes a
+   *    string through. The capability stays in `plannedDurationSeconds` because the DIRECT table
+   *    readers still exist (`usePlannedWorkoutLink`, `StrengthLogger`) and those do see the string
+   *    form. It is not dead code — it is simply not reachable from the server contract.
+   */
+  const r = SERVER_ROWS.find((x) => x.label.startsWith('R ·'))!.row;
+  const m = { computed: { steps: Array.from({ length: 6 }, () => ({ distanceMeters: 800, paceTarget: '7:30/mi' })) } };
+  const viaServer = plannedDurationSeconds(r)!;
+  const viaString = plannedDurationSeconds(m)!;
+  assert(Math.abs(viaServer - viaString) <= 2, `numeric ${viaServer} vs string ${viaString} must agree`);
+
+  // The server never emits a string `computed` — but the reader must still handle one, for the
+  // direct-table paths the client still has.
+  assertEquals(plannedDurationSeconds({ computed: JSON.stringify({ total_duration_seconds: 2700 }) }), 2700);
 });
 
 Deno.test('GOLDEN · availableDisciplines over a real week', () => {

@@ -13,7 +13,6 @@ import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipli
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
-import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -537,11 +536,12 @@ export default function WorkoutCalendar({
     prefetch(toDateOnlyString(nextMon), toDateOnlyString(nextSun));
   }, [queryClient, fromISO, toISO, weekStaleMs]);
 
-  // Adapt unified items → planned + workouts shapes expected below
-  // Use mapper - SINGLE SOURCE OF TRUTH
+  // ⛔ THE SERVER'S CONTRACT, NOT A CLIENT COPY (stage 3). `get-week` attaches `planned_workout` to
+  // exactly the items that carry `planned`, which is the filter directly above — so the old
+  // `?? mapUnifiedItemToPlanned(it)` fallback was unreachable here and is gone with the mapper.
   const unifiedPlanned = unifiedItems
     .filter((it:any)=> !!it?.planned)
-    .map((it:any)=> it?.planned_workout ?? mapUnifiedItemToPlanned(it));
+    .map((it:any)=> it.planned_workout);
   // Only include completed workouts (items with executed data)
   // Pass FULL unified item so UI receives complete data (executed, planned, computed) without patching
   const unifiedWorkouts = unifiedItems

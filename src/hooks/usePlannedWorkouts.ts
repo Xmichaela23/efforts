@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 type PlannedWorkout = any;
 
-/** Use server-provided planned_workout when present (smart server, dumb client) */
-const toPlannedWorkout = (item: any): PlannedWorkout =>
-  item?.planned_workout ?? mapUnifiedItemToPlanned(item);
+/**
+ * ⛔ THE SERVER'S CONTRACT, FULL STOP (stage 3). `get-week` attaches `planned_workout` to exactly the
+ * items carrying `planned`, and both call sites below filter on `!!it?.planned` first — so the old
+ * `?? mapUnifiedItemToPlanned(item)` fallback was unreachable, and the client mapper it named is gone.
+ */
+const toPlannedWorkout = (item: any): PlannedWorkout => item?.planned_workout;
 
 export type UsePlannedWorkoutsOptions = {
   /** When false, skip the large windowed `get-week` fetch (e.g. home already loads the week via `useWeekUnified`). Mutations still work. Default true. */

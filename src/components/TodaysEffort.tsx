@@ -35,7 +35,7 @@ import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { WorkoutExecutionContainer } from './workout-execution';
-import { mapUnifiedItemToPlanned, mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
+import { mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -784,15 +784,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // Trust get-week completely - it already figured out what to show
     // If status='completed', show executed data
     // If status='planned', show planned data
-    return items.map((it:any) => {
-      const isCompleted = String(it?.status||'').toLowerCase()==='completed';
-      
-      if (isCompleted) {
-        return it?.completed_workout ?? mapUnifiedItemToCompleted(it);
-      } else {
-        return it?.planned_workout ?? mapUnifiedItemToPlanned(it);
-      }
-    });
+    //
+    /**
+     * ⚠️ THE ONE PLACE STAGE 3 CHANGES BEHAVIOUR, AND IT IS A NARROW ONE — flagged, not slipped in.
+     *
+     * The other three call sites filter `!!it?.planned` before mapping, so the client fallback there
+     * was unreachable. This one maps EVERY item, so the planned branch could receive an item with no
+     * `planned` block — and `mapUnifiedItemToPlanned` answered with a stub built from `{}`: no name,
+     * no tags, no plan, `workout_status: 'planned'`. A nameless placeholder card.
+     *
+     * ⛔ WHEN THAT HAPPENS: only for an item `get-week` could not classify — an executed row with no
+     * `computed.overall`, no intervals, no logged sets AND no planned link, so its status resolves to
+     * `null` rather than `'completed'` (`get-week:881`). A workout that has not been computed yet.
+     *
+     * ⚠️ SUCH AN ITEM IS NOW DROPPED FROM THE DAY rather than rendered as a blank planned card. If
+     * that placeholder was load-bearing, restore it here — not by reviving the client mapper.
+     */
+    return items
+      .map((it:any) => {
+        const isCompleted = String(it?.status||'').toLowerCase()==='completed';
+        if (isCompleted) return it?.completed_workout ?? mapUnifiedItemToCompleted(it);
+        return it?.planned_workout ?? null;
+      })
+      .filter(Boolean);
   }, [unifiedItems]);
 
   // §6.5 strength_ordering_preference resolution. Extract a primitive planId from the day's
