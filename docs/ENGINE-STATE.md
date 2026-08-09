@@ -23,7 +23,29 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-08 late → 08-09 — the discipline swap shipped; the engine unification is HALF done)
+## 🧭 NEXT SESSION — START HERE (2026-08-08 late → 08-09 — planned-session consolidation is ACTIVE; swap feature done)
+
+### ⚡ ACTIVE — planned-session consolidation → read `docs/SPEC-planned-session-consolidation.md` FIRST
+
+A planned session is read several ways that drift (duration 4 ways, discipline 2 vocabularies,
+2 mapper shapes) — the root cause of a full day of swap bugs. The SPEC stages the collapse onto ONE
+read-model, verified by golden fixtures.
+
+- **Stage 0 (golden fixtures pinning current behavior): SHIPPED + committed** (`623ade5c`,
+  `src/lib/planned-session-golden.test.ts`).
+- **Stage 1 (discipline normalizer + postureKey) is HALF-BUILT and UNCOMMITTED in the working tree** —
+  the previous terminal ran out of context mid-stage. New `src/lib/discipline.ts` plus partial edits to
+  `session-discipline-swap.ts`, `associate-candidates.ts`, `AssociatePlannedDialog.tsx`, the golden test,
+  and the SPEC.
+- **FIRST THING NEXT SESSION:** `git status`, reconcile the uncommitted Stage 1 against SPEC §Stage 1 —
+  finish it or `git restore` and redo cleanly. It found a real correction: `useStateTrends` uses the
+  server's `bike` vocab consistently (State screen) and must NOT be migrated — analysis side, leave it.
+- Then Stages 2 (duration) → 3 (row shape, needs a `get-week` deploy) → 4 (cleanup + lint) → Stage H
+  (Rules-of-Hooks hoist in `UnifiedWorkoutView`, before stage 3). ONE stage per session; fixtures verify each.
+
+Everything below (swap feature, engine routing) is DONE + deployed. Michael's open device checks: the
+swap converts to one chip and STICKS after a reload, and the existing phantom duplicate rows from swap
+testing are deletable in-app now (`get-week` won't re-insert).
 
 ### THE DECISION EVOLVED — the placement engine is `week-solver`, NOT `place-week`
 
