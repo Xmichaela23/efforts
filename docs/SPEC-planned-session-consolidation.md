@@ -157,12 +157,64 @@ That boundary is acceptable because the readers **are** the drift surface: every
 of this file was a reader disagreeing with another reader over the same row. It is not sufficient for
 layout or positioning regressions, which stay a device check.
 
-### Stage 1 — discipline (client-only, no deploy) — NEXT
+### Stage 1 — discipline (client-only, no deploy) ✅ SHIPPED 2026-08-09
 
-Add `normalizeDiscipline` + `postureKey`. Migrate the four client normalizers. **Fixes the `bike`/`ride`
-posture split and the unknown→`run` default.** Highest defect yield, lowest risk.
+`src/lib/discipline.ts` — `normalizeDiscipline()` (canonical `run|ride|swim|strength`, **null on
+unknown, never `run`**), `postureKey()` (`ride → bike`, the ONE named translation) and
+`disciplineFromPostureKey()`.
 
-### Stage 2 — duration reads (client-only, no deploy)
+Migrated: `session-discipline-swap.disciplineOf` (now narrows the canonical answer, filtering only
+`strength`), `associate-candidates.normalizeSport` (adapter returning `''` for callers that rank
+rather than gate), `AssociatePlannedDialog.normalizeSportType` (**deleted — it ended `|| 'run'`**).
+
+⛔ **TWO QUESTIONS, TWO ACCESSORS — and getting this wrong was a live regression, caught on review.**
+The first cut pointed `normalizeSport` straight at `normalizeDiscipline`, which knows only the four
+trainable disciplines. `walk`, `hike` and `mobility` — all real `planned_workouts.type` values, written
+today by `StrengthLogger.tsx:3866` and `PilatesYogaLogger.tsx:251` — collapsed to `''`. A completed
+walk then ranked **cross-sport** against a planned walk: pushed under the "A different sport" divider,
+labelled *"Planned session — you did a session"*. **All 23 tests were green through it**, because the
+12 pinned shapes are run/ride/swim/strength only.
+
+So `discipline.ts` now exposes both, and which one you call is a real decision:
+
+| accessor | answers | walk → | use it when |
+|---|---|---|---|
+| `normalizeDiscipline` | "one of the four trainable disciplines?" | `null` | anything that **gates** — swap, posture, intensity |
+| `normalizeSessionType` | "which `planned_workouts.type` row?" | `'walk'` | anything that **ranks or labels** rows |
+
+Unknown is still `null` on both — `walk` came back, `kayak` did not. Pinned by a new fixture,
+`GOLDEN (stage 1) · the NON-DISCIPLINE planned types survive the migration`.
+
+⚠️ **A note for stage 4's lint rule:** two ad-hoc sport ladders remain in `src` and are NOT among the
+four normalizers this stage names — `MobileSummary.tsx:288` (`isRide`, display-side) and
+`GarminDataService.ts:580` (provider mapping). Neither was touched. Left as found; the lint rule should
+decide whether they are in scope.
+
+⛔ **THE FOURTH CLIENT NORMALIZER WAS DELIBERATELY NOT MIGRATED.** `useStateTrends:69` uses
+`_shared/state-trend`'s `disciplineOf`, which emits `bike` — and it is CORRECT there.
+`StatePerformanceSection:1305-1306` looks up **both** `declaredPosture[card.discipline]` **and**
+`activeDisciplines.includes(card.discipline)`, and `StateDisplayV1` cards are keyed `bike`
+(`assemble.ts:33 ORDER`). Migrating it without the server contract would break the State screen twice.
+It belongs to the analysis-side follow-up below.
+
+Golden fixtures: drift #2 resolved and rewritten in place with its before-values preserved; a second
+✅ RESOLVED test pins the one-vocabulary property; a third pins the non-discipline row types (above).
+**No other golden value moved** — the fixtures confirmed the blast radius was what was intended, but
+see the walk regression: they did not confirm it, because they did not cover it.
+
+### Stage 1b — the ANALYSIS-side vocabulary (server-touching) — OPEN, NOT SCOPED
+
+Still on `bike`, still divergent, and **explicitly not covered by stage 1 or its fixtures**:
+
+- `_shared/state-trend/assemble.ts:167` `disciplineOf` → `bike` (+ `ORDER`, the `StateDisplayV1` cards)
+- `coach/index.ts:5503` `normDisc` → `ride`
+- `auto-attach-planned/index.ts:16` `sportSubtype` → **still returns `'run'` on unknown** ⚠
+
+That last one is the mis-attach defect surviving on the server: an unrecognised activity is offered
+the athlete's planned runs. The client half is fixed; **this half is not**. Needs its own stage, its
+own fixtures, and a deploy.
+
+### Stage 2 — duration reads (client-only, no deploy) — NEXT
 
 Everything calls `plannedDurationSeconds`. Delete `computeMinutes` and the two inline reads;
 `resolvePlannedDurationMinutes` becomes a wrapper that keeps its null contract.

@@ -27,6 +27,8 @@
 // for; there is exactly one.
 
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
+// ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
+import { normalizeDiscipline, postureKey, type Discipline as CanonicalDiscipline } from './discipline';
 // ⛔ ONE POSTURE SANITISER, and it is the server's. `@shared/state-trend` is already imported by the
 // client (`useStateTrends`), so this reads the same three values the State screen groups by.
 import type { PerDisciplinePosture } from '@shared/state-trend';
@@ -37,7 +39,12 @@ import {
   stackNeedsRecoveryGap,
 } from '../../supabase/functions/_shared/schedule-session-constraints.ts';
 
-export type Discipline = 'run' | 'ride' | 'swim';
+/**
+ * ⚠️ THE SWAP'S SET IS A SUBSET OF THE CANONICAL ONE. `normalizeDiscipline` also returns `strength`;
+ * a strength session is not swappable by discipline (a different swap exists for its exercises), so
+ * this narrows rather than redefines. One vocabulary, one narrowing, stated.
+ */
+export type Discipline = Exclude<CanonicalDiscipline, 'strength'>;
 
 /** The session as the client holds it (`planned_workouts` row, loosely typed at the call site). */
 export type SwappableSession = {
@@ -67,11 +74,16 @@ export type SwapOption = {
   warnings: string[];
 };
 
-const DISCIPLINE_OF: Record<string, Discipline | null> = {
-  run: 'run', running: 'run',
-  ride: 'ride', bike: 'ride', cycling: 'ride',
-  swim: 'swim', swimming: 'swim',
-};
+/**
+ * ⛔ MIGRATED TO THE CANONICAL NORMALIZER (stage 1, 2026-08-09). This carried its own three-entry map
+ * and its own substring ladder — a fourth opinion about what "bike" means. It now narrows the one
+ * canonical answer, and `strength` (which the canonical set includes and the swap does not) is the
+ * only thing it filters.
+ */
+export function disciplineOf(type: string | null | undefined): Discipline | null {
+  const d = normalizeDiscipline(type);
+  return d && d !== 'strength' ? d : null;
+}
 
 /** Prefix for the origin tag. One literal, shared with `get-week` via an asserted test. */
 export const SWAPPED_FROM_PREFIX = 'swapped_from:';
@@ -88,10 +100,6 @@ export function originOf(s: SwappableSession): Discipline | null {
     if (d) return d;
   }
   return null;
-}
-
-export function disciplineOf(type: string | null | undefined): Discipline | null {
-  return DISCIPLINE_OF[String(type ?? '').toLowerCase()] ?? null;
 }
 
 /**
@@ -274,8 +282,9 @@ export function getDisciplineSwaps(
    * ⚠️ `non-race-goal-seeds` writes `{ swim, bike, run, strength }`; `disciplineOf` returns
    * `run | ride | swim`. One translation, stated here, so neither side has to change.
    */
-  const POSTURE_KEY: Record<Discipline, string> = { run: 'run', ride: 'bike', swim: 'swim' };
-  const declared = posture?.[POSTURE_KEY[from]];
+  // ⚠️ `postureKey` is the ONE named translation (`ride → bike`). It replaced a private map here —
+  // and before that, a direct `posture[from]` read that was always `undefined` for a ride.
+  const declared = posture?.[postureKey(from)];
   if (declared && declared !== 'maintain') return [];
   /**
    * ⛔ UNSTARTED ONLY, AND THE CHECK LIVES HERE (2026-08-08). The callers each had their own

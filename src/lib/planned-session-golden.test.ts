@@ -38,7 +38,13 @@ import {
   intensityOf,
   resolveMinutes,
 } from './session-discipline-swap.ts';
-import { normalizeSport } from './associate-candidates.ts';
+import { normalizeSport, rankAssociateCandidates } from './associate-candidates.ts';
+import {
+  disciplineFromPostureKey,
+  normalizeDiscipline,
+  normalizeSessionType,
+  postureKey,
+} from './discipline.ts';
 
 /** Which readers each surface calls — the coverage claim, checkable rather than asserted in prose. */
 export const SURFACE_READERS = {
@@ -215,19 +221,80 @@ Deno.test('GOLDEN · discipline — every normalizer, every shape', () => {
   }
 });
 
-Deno.test('⚠️ DRIFT · unknown types are handled three different ways', () => {
+Deno.test('✅ RESOLVED (stage 1) · unknown types are null on every CLIENT normalizer', () => {
   /**
-   * The swap returns null; the associate lib passes the string through; and two OTHER normalizers not
-   * imported here — `auto-attach-planned:16 sportSubtype` and `AssociatePlannedDialog:23
-   * normalizeSportType` — return **'run'**, silently calling an unrecognised activity a run.
+   * ⛔ THIS ASSERTION CHANGED IN STAGE 1, DELIBERATELY. Pinned before:
    *
-   * ⛔ STAGE 1 COLLAPSES THESE TO `null`. When it does, this assertion changes — deliberately, in the
-   * stage-1 diff. It is pinned here so that change is visible rather than incidental.
+   *     disciplineOf('kayak')    → null
+   *     normalizeSport('kayak')  → 'kayak'     (passthrough)
+   *     …and two others returned 'run'         (the mis-attach)
+   *
+   * `AssociatePlannedDialog:23 normalizeSportType` ended `return t || 'run'` — an unrecognised
+   * activity became a RUN in the dialog that decides which planned session a completed activity links
+   * to. Every client normalizer now delegates to `normalizeDiscipline`, which returns null.
+   *
+   * ⚠️ `normalizeSport` returns `''` rather than null: its callers rank and label rows instead of
+   * gating on them, and an empty string keeps comparisons total without naming a sport. It is an
+   * adapter over the same single answer, not a second opinion.
+   *
+   * ⛔ THE SERVER SIDE STILL RETURNS 'run' — `auto-attach-planned:16 sportSubtype`. Out of scope for
+   * stage 1 (server-touching, needs a deploy) and NOT covered by these client fixtures. Continuity is
+   * not total; see the SPEC's scope note.
    */
   assertEquals(disciplineOf('kayak'), null);
-  assertEquals(normalizeSport('kayak'), 'kayak');
+  assertEquals(normalizeSport('kayak'), '');
   assertEquals(disciplineOf(''), null);
   assertEquals(normalizeSport(''), '');
+  // And the canonical normalizer itself, which all three now share.
+  assertEquals(normalizeDiscipline('kayak'), null);
+  assertEquals(normalizeDiscipline('rowing'), null);
+  assertEquals(normalizeDiscipline('walk'), null, 'walk is a real activity, just not in this vocabulary');
+});
+
+Deno.test('✅ RESOLVED (stage 1) · one vocabulary — `bike` and `ride` are the same sport', () => {
+  // The split that offered a DEVELOP bike a swap. Both spellings now land on `ride`, and the ONE
+  // named boundary translates back for the posture map's `bike` key.
+  assertEquals(normalizeDiscipline('bike'), 'ride');
+  assertEquals(normalizeDiscipline('Cycling'), 'ride');
+  assertEquals(normalizeDiscipline('ride'), 'ride');
+  assertEquals(postureKey('ride'), 'bike');
+  assertEquals(postureKey('run'), 'run');
+  assertEquals(disciplineFromPostureKey('bike'), 'ride');
+});
+
+Deno.test('GOLDEN (stage 1) · the NON-DISCIPLINE planned types survive the migration', () => {
+  /**
+   * ⛔ THIS TEST EXISTS BECAUSE THE STAGE-0 FIXTURES MISSED A REGRESSION. The 12 pinned shapes are
+   * all run/ride/swim/strength, so nothing covered `walk`, `mobility` or `pilates_yoga` — and the
+   * first cut of stage 1 pointed `normalizeSport` at `normalizeDiscipline`, which knows only the four
+   * disciplines. Every walk collapsed to `''`, which made a completed walk rank as CROSS-SPORT
+   * against a planned walk and print *"Planned session — you did a session"*. Green the whole time.
+   *
+   * ⚠️ TWO QUESTIONS, TWO ANSWERS, BOTH PINNED HERE. `normalizeDiscipline` answers "is this one of the
+   * four trainable disciplines" — a walk is NOT, and null is correct. `normalizeSessionType` answers
+   * "which `planned_workouts.type` row is this" — a walk IS one. Anything that GATES asks the first;
+   * anything that RANKS or LABELS asks the second.
+   */
+  for (const walkish of ['walk', 'Walking', 'hike']) {
+    assertEquals(normalizeDiscipline(walkish), null, `${walkish}: not a discipline`);
+    assertEquals(normalizeSessionType(walkish), 'walk', `${walkish}: is a planned row type`);
+    assertEquals(normalizeSport(walkish), 'walk', `${walkish}: ranks as itself`);
+  }
+  assertEquals(normalizeSessionType('mobility'), 'mobility');
+  assertEquals(normalizeSessionType('pilates_yoga'), 'pilates_yoga');
+  assertEquals(normalizeDiscipline('mobility'), null);
+
+  // ⛔ AND THE FIX SURVIVES: unknown is still null on BOTH. `walk` came back; `kayak` did not.
+  assertEquals(normalizeSessionType('kayak'), null);
+  assertEquals(normalizeSport('kayak'), '');
+
+  // The behaviour that actually broke: same-type walks are ONE list, not two.
+  const ranked = rankAssociateCandidates('walk', '2026-08-09', [
+    { id: 'p1', type: 'walk', date: '2026-08-09' },
+  ]);
+  assertEquals(ranked.sameSport.length, 1, 'a planned walk is the same sport as a walk');
+  assertEquals(ranked.otherSport.length, 0);
+  assertEquals(ranked.sameSport[0].crossSportNote, null, 'and carries no cross-sport warning');
 });
 
 Deno.test('GOLDEN · availableDisciplines over a real week', () => {

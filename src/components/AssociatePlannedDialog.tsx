@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // ⛔ ONE RANKER, unit-tested — the dialog owns the UI, not the rules.
 import { rankAssociateCandidates } from '@/lib/associate-candidates';
+// ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts`.
+import { normalizeDiscipline } from '@/lib/discipline';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 
@@ -19,16 +21,6 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
 
   const windowDays = 7; // Increased from 3 to 7 days to catch more planned workouts
 
-  // Normalize sport type to match server-side logic
-  const normalizeSportType = (s: string | null | undefined): string => {
-    const t = String(s||'').toLowerCase();
-    if (t.includes('swim')) return 'swim';
-    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return 'ride';
-    if (t.includes('run') || t.includes('jog')) return 'run';
-    if (t.includes('walk') || t.includes('hike')) return 'walk';
-    return t || 'run';
-  };
-
   const searchForCandidates = async () => {
       try {
         setLoading(true);
@@ -36,8 +28,18 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         const userId = getStoredUserId();
         if (!userId) { setCandidates([]); setLoading(false); return; }
 
-        // `type` is no longer a filter — it ranks the results. See the query below.
-        const type = normalizeSportType(workout?.type);
+        /**
+         * ⛔ THE PRIVATE `normalizeSportType` IS DELETED (stage 1, 2026-08-09) AND ITS DEFAULT WAS A
+         * BUG. It ended `return t || 'run'`, so an unrecognised activity type became a **run** in the
+         * dialog that decides which planned session a completed activity links to — a kayak, a rowing
+         * machine, any provider sport nobody mapped, all answered with "run".
+         *
+         * ⚠️ `type` IS DIAGNOSTIC ONLY. It is not a filter (see the query below) and it is not the
+         * ranker's input — `rankAssociateCandidates` is handed the RAW `workout.type` and normalises
+         * it itself, so there is exactly one place that decides what a sport name means. This just
+         * puts the app's own answer in the log next to the raw string that produced it.
+         */
+        const type = normalizeDiscipline(workout?.type);
         const d = String(workout?.date || '').slice(0,10);
         const toIso = (base: string, delta: number) => {
           const p = base.split('-').map((x)=>parseInt(x,10));

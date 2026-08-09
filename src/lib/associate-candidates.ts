@@ -18,6 +18,9 @@
 // (`coach/index.ts:5518-5522`), so the substitution shows up as itself instead of being erased. This
 // is TrainingPeaks' behaviour and it is also the only version that keeps the week-mix honest.
 
+// ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
+import { normalizeSessionType } from './discipline';
+
 export type CandidateRow = {
   id: string;
   name?: string | null;
@@ -38,27 +41,26 @@ export type RankedCandidates = {
   otherSport: RankedCandidate[];
 };
 
-const SPORT_OF: Record<string, string> = {
-  run: 'run', running: 'run', jog: 'run',
-  ride: 'ride', bike: 'ride', cycling: 'ride', cycle: 'ride',
-  swim: 'swim', swimming: 'swim',
-  strength: 'strength', weights: 'strength',
-  walk: 'walk', hike: 'walk',
-  mobility: 'mobility',
-};
-
-/** Same normalisation the server uses (`auto-attach-planned:16` `sportSubtype`). One vocabulary. */
+/**
+ * ⛔ MIGRATED TO THE CANONICAL NORMALIZER (stage 1, 2026-08-09). This carried its own map and its own
+ * substring ladder, and — unlike the others — passed unknown strings THROUGH unchanged. So a `kayak`
+ * planned row and a `kayak` activity matched each other by accident, while a type nobody mapped could
+ * still be ranked as though it were a real sport.
+ *
+ * ⚠️ THE RETURN TYPE WIDENS TO `string` DELIBERATELY. Callers here rank and label rows rather than
+ * gate on them, and `''` for "cannot name it" keeps every comparison total without inventing a sport.
+ * `normalizeSessionType` is the single source of what a name means; this is the one adapter.
+ *
+ * ⛔ IT DELEGATES TO `normalizeSessionType`, NOT `normalizeDiscipline` — and that is the whole point.
+ * The first draft of this migration used `normalizeDiscipline`, which knows only the four trainable
+ * disciplines, and it silently collapsed `walk`, `hike` and `mobility` to `''`. A completed walk then
+ * ranked as **cross-sport** against a planned walk, under a "A different sport" divider, reading
+ * *"Planned session — you did a session"*. This function ranks `planned_workouts` ROWS, whose type
+ * column carries `walk | mobility | pilates_yoga` as well — so the row vocabulary is the right one
+ * here, and the discipline vocabulary is the right one wherever something GATES.
+ */
 export function normalizeSport(t: string | null | undefined): string {
-  const s = String(t ?? '').trim().toLowerCase();
-  if (!s) return '';
-  if (SPORT_OF[s]) return SPORT_OF[s];
-  if (s.includes('ride') || s.includes('bike') || s.includes('cycl')) return 'ride';
-  if (s.includes('run') || s.includes('jog')) return 'run';
-  if (s.includes('swim')) return 'swim';
-  if (s.includes('strength') || s.includes('weight')) return 'strength';
-  if (s.includes('walk') || s.includes('hike')) return 'walk';
-  if (s.includes('mobility')) return 'mobility';
-  return s;
+  return normalizeSessionType(t) ?? '';
 }
 
 const LABEL: Record<string, string> = {
