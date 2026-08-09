@@ -33,15 +33,18 @@ read-model, verified by golden fixtures.
 
 - **Stage 0 (golden fixtures pinning current behavior): SHIPPED + committed** (`623ade5c`,
   `src/lib/planned-session-golden.test.ts`).
-- **Stage 1 (discipline normalizer + postureKey) is HALF-BUILT and UNCOMMITTED in the working tree** —
-  the previous terminal ran out of context mid-stage. New `src/lib/discipline.ts` plus partial edits to
-  `session-discipline-swap.ts`, `associate-candidates.ts`, `AssociatePlannedDialog.tsx`, the golden test,
-  and the SPEC.
-- **FIRST THING NEXT SESSION:** `git status`, reconcile the uncommitted Stage 1 against SPEC §Stage 1 —
-  finish it or `git restore` and redo cleanly. It found a real correction: `useStateTrends` uses the
-  server's `bike` vocab consistently (State screen) and must NOT be migrated — analysis side, leave it.
-- Then Stages 2 (duration) → 3 (row shape, needs a `get-week` deploy) → 4 (cleanup + lint) → Stage H
-  (Rules-of-Hooks hoist in `UnifiedWorkoutView`, before stage 3). ONE stage per session; fixtures verify each.
+- **Stage 1 (discipline vocabulary): DONE + committed** (`12d92d17`, `src/lib/discipline.ts`). Two
+  accessors — `normalizeDiscipline` (gates: swap/posture/intensity, null on unknown, NEVER run) and
+  `normalizeSessionType` (ranks/labels, keeps walk/hike/mobility/pilates instead of collapsing to '').
+  `useStateTrends` stays on the server `bike` vocab (State screen — do NOT migrate). LESSON: stage-0
+  fixtures pin only the 4 trainable disciplines, so a walk regression slipped through green — widen
+  fixtures whenever a stage touches non-trainable types.
+- **NEXT: Stage 2 (duration).** Everything calls one `plannedDurationSeconds`; delete `computeMinutes`
+  + the inline reads; `resolvePlannedDurationMinutes` becomes a thin wrapper. Client-only, no deploy.
+- Then Stage 3 (row shape, needs a `get-week` deploy, goes alone) → Stage 4 (cleanup + a lint rule;
+  two more ad-hoc sport ladders flagged for it: `MobileSummary.tsx:288`, `GarminDataService.ts:580`) →
+  Stage H (Rules-of-Hooks hoist in `UnifiedWorkoutView`, before stage 3). ONE stage per session;
+  the golden fixtures verify each — a stage that changes a pinned value must show it in the diff.
 
 Everything below (swap feature, engine routing) is DONE + deployed. Michael's open device checks: the
 swap converts to one chip and STICKS after a reload, and the existing phantom duplicate rows from swap
