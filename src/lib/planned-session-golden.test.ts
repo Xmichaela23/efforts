@@ -1,7 +1,7 @@
 /**
  * ═══ STAGE 0 — GOLDEN FIXTURES. The contract the consolidation must not break. ═══════════════
  *
- * See `docs/SPEC-planned-session-consolidation.md`. A planned session is represented several ways and
+ * See D-403 (`docs/DECISIONS-LOG-2.md`). A planned session is represented several ways and
  * they drift; stages 1–4 collapse them onto one read-model. This file pins what every reader returns
  * TODAY, for the row shapes the app actually produces, so a migration that changes an answer says so
  * out loud instead of shipping quietly.

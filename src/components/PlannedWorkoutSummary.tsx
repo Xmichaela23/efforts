@@ -138,12 +138,17 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptio
           else if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) parts.push('Restorative');
         }
         
-        // Add duration if available (duration is in minutes, total_duration_seconds is in seconds)
-        let durationMins: number | null = null;
-        if (typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
+        /**
+         * ⛔ ONE DURATION READER (stage 4). Two IDENTICAL copies of this ladder survived stage 2 —
+         * it deleted `computeMinutes` and missed these, because they sit in the subtitle builders
+         * rather than the badge path. The enforcement scan found them.
+         *
+         * ⚠️ `?? duration` IS KEPT: the accessor answers in seconds and knows nothing about the
+         * `duration` MINUTES column, which is the only time some library-plan rows carry.
+         */
+        let durationMins: number | null = plannedDurationMinutes(workout);
+        if (durationMins == null && typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
           durationMins = Math.round((workout as any).duration);
-        } else if (typeof (workout as any)?.total_duration_seconds === 'number' && (workout as any).total_duration_seconds > 0) {
-          durationMins = Math.round((workout as any).total_duration_seconds / 60);
         }
         if (durationMins && durationMins > 0) {
           parts.push(`${durationMins}min`);
@@ -235,12 +240,17 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
         else if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) parts.push('Restorative');
       }
       
-      // Add duration if available (duration is in minutes, total_duration_seconds is in seconds)
-      let durationMins: number | null = null;
-      if (typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
+      /**
+       * ⛔ ONE DURATION READER (stage 4). Two IDENTICAL copies of this ladder survived stage 2 —
+       * it deleted `computeMinutes` and missed these, because they sit in the subtitle builders
+       * rather than the badge path. The enforcement scan found them.
+       *
+       * ⚠️ `?? duration` IS KEPT: the accessor answers in seconds and knows nothing about the
+       * `duration` MINUTES column, which is the only time some library-plan rows carry.
+       */
+      let durationMins: number | null = plannedDurationMinutes(workout);
+      if (durationMins == null && typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
         durationMins = Math.round((workout as any).duration);
-      } else if (typeof (workout as any)?.total_duration_seconds === 'number' && (workout as any).total_duration_seconds > 0) {
-        durationMins = Math.round((workout as any).total_duration_seconds / 60);
       }
       if (durationMins && durationMins > 0) {
         parts.push(`${durationMins}min`);

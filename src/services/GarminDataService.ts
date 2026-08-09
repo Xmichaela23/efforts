@@ -1,6 +1,9 @@
 // src/services/GarminDataService.ts
 // Updated to use Supabase Edge Functions instead of local proxy
 
+// ⛔ ONE VOCABULARY (stage 4). See `src/lib/discipline.ts`.
+import { normalizeProviderSport } from '@/lib/discipline';
+
 const SUPABASE_FUNCTION_BASE = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task';
 
 export interface GarminActivity {
@@ -570,26 +573,26 @@ private static detectSport(activity: GarminActivity): 'running' | 'cycling' | 's
   return '';
 }
 
+/**
+ * ⛔ ONE VOCABULARY (stage 4). These carried three private substring ladders — a fourth opinion about
+ * what a sport name means, in the service that decides which activities teach the athlete's baselines.
+ * They now ask `normalizeProviderSport`, the ONE named provider→canon boundary.
+ *
+ * ⚠️ THE PROVIDER BOUNDARY, NOT `normalizeDiscipline` — deliberately, and it was measured. The
+ * canonical normalizer answers `null` for `road_biking`, `mountain_biking` and `mtb` (it tests
+ * `includes('bike')`, and "biking" does not contain "bike"), so folding these onto it would have
+ * dropped every MTB and gravel ride out of the learning pipeline silently. See `src/lib/discipline.ts`.
+ */
 private static isRunningActivity(typeKey: string): boolean {
-  return typeKey.toLowerCase().includes('run');
+  return normalizeProviderSport(typeKey) === 'run';
 }
 
 private static isCyclingActivity(typeKey: string): boolean {
-  const cycling = typeKey.toLowerCase();
-  return (
-    cycling.includes('cycl') ||
-    cycling.includes('bik') ||
-    cycling.includes('ride') ||
-    cycling.includes('road_bik') ||
-    cycling.includes('gravel') ||
-    cycling.includes('mtb') ||
-    cycling.includes('mountain_bik') ||
-    cycling.includes('ebike')
-  );
+  return normalizeProviderSport(typeKey) === 'ride';
 }
 
 private static isSwimmingActivity(typeKey: string): boolean {
-  return typeKey.toLowerCase().includes('swim');
+  return normalizeProviderSport(typeKey) === 'swim';
 }
 
 private static async analyzeRunningData(

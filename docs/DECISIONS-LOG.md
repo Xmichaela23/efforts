@@ -2801,6 +2801,18 @@ prints "est. from your max HR" until one exists.**
 
 ## D-361 — A SESSION MUST BE ABLE TO ATTACH, AND THE ANALYZER MUST FOLLOW IT (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
+> ⛔ **THE CLASS THIS ENTRY KEPT RE-DISCOVERING IS NOW CLOSED ON THE CLIENT — see [D-403] (2026-08-09).**
+> This entry fixed three readers; its own extension below found a fourth and called it "the same bug's
+> fourth face". It was. There were **four duration ladders and six discipline normalizers** on the
+> client, and D-403 collapses them onto `src/lib/planned-session/duration.ts` and
+> `src/lib/discipline.ts`, with a **source-scan test that fails on a new one** — because the pattern
+> here was that every fix found one more reader and none of them stopped the next from being written.
+>
+> ⚠️ **THE HALF THIS ENTRY NAMES IS STILL OPEN.** The note below — *"`workout-detail` selects
+> `total_duration_seconds` and NOT `duration`, in three places, so the resolver ran and found
+> nothing"* — is a SERVER select, and D-403 fixed the equivalent omission in `get-week` only.
+> `workout-detail` was not touched. Same bug, different function. Everything below is history.
+
 > ⚠️ **EXTENDED 2026-08-02 — THERE WAS A FOURTH READER, AND IT WAS MISSED.** This entry fixed three
 > surfaces that each answered "how long was this planned" in one place. `buildPlannedTotals`
 > (`_shared/session-detail/build.ts`) was never wired to `resolvePlannedDurationSeconds` and is the same

@@ -1516,7 +1516,7 @@ Deno.serve(async (req)=>{
         total_duration_seconds: p.total_duration_seconds ?? null,
         // ⛔ STAGE 3 — `duration` (MINUTES) now travels on the server contract. It is the last
         // resort of `resolveMinutes` for rows that carry no structure at all, and its absence here
-        // is why the client mapper had to exist. See `docs/SPEC-planned-session-consolidation.md`.
+        // is why the client mapper had to exist. See D-403 (`docs/DECISIONS-LOG-2.md`).
         duration: p.duration ?? null,
         strength_exercises: p.strength_exercises ?? null,
         mobility_exercises: p.mobility_exercises ?? null,

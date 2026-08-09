@@ -124,7 +124,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   /**
    * ═══ EVERY HOOK IN THIS COMPONENT RUNS BEFORE ANY RETURN. DO NOT ADD ONE BELOW THE GUARD. ═══
    *
-   * ⛔ STAGE H (2026-08-09) — see `docs/SPEC-planned-session-consolidation.md`. The `if (!workout)`
+   * ⛔ STAGE H (2026-08-09) — see D-403 (`docs/DECISIONS-LOG-2.md`). The `if (!workout)`
    * early return used to sit HERE, with all 26 remaining hooks underneath it. That is a
    * Rules-of-Hooks violation: React identifies hooks by CALL ORDER, so a render where `workout` is
    * falsy calls one hook and the next render calls twenty-six. React throws *"Rendered more hooks

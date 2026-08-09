@@ -24,7 +24,7 @@ import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-to
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
-import { plannedDurationMinutes } from '@/lib/planned-session/duration';
+import { plannedDurationMinutes, plannedDurationSeconds } from '@/lib/planned-session/duration';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
 import {
@@ -521,8 +521,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           else out.push(String((workout as any).rendered_description || (workout as any).description || ''));
         }
         return out;
+      // ⛔ ONE DURATION READER (stage 4). The key was `computed?.total_duration_seconds`, which is
+      // one rung of the ladder — so a row whose total sits at the ROOT never invalidated this memo.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [disc, (workout as any)?.id, (workout as any)?.computed?.total_duration_seconds]);
+      }, [disc, (workout as any)?.id, plannedDurationSeconds(workout)]);
       return (<ul className="list-disc pl-5">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
     } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
   });

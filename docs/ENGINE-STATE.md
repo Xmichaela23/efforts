@@ -25,7 +25,8 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 ---
 ## 🧭 NEXT SESSION — START HERE (2026-08-08 late → 08-09 — planned-session consolidation is ACTIVE; swap feature done)
 
-### ⚡ ACTIVE — planned-session consolidation → read `docs/SPEC-planned-session-consolidation.md` FIRST
+### ⚡ ACTIVE — planned-session consolidation → read **D-403** in `docs/DECISIONS-LOG-2.md` FIRST
+(The SPEC that used to be here was deleted on completion, per the spec lifecycle in `CLAUDE.md`.)
 
 A planned session is read several ways that drift (duration 4 ways, discipline 2 vocabularies,
 2 mapper shapes) — the root cause of a full day of swap bugs. The SPEC stages the collapse onto ONE

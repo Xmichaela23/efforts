@@ -800,3 +800,105 @@ linked plans → nothing to tear down, no siblings, no rebuild — is the perman
 routing has no automated cover; there is no client test runner in this repo.
 
 ⚠️ Deploy list: `delete-goal`, `delete-plan`. Client change ships with the Netlify build.
+
+---
+
+### D-403 — ONE planned-session read-model: one duration reader, one discipline vocabulary, one row contract (2026-08-09, **stages 0–3 committed; stage 4 in working tree — NOT pushed, `get-week` NOT deployed**)
+
+**The problem.** A planned session was represented several ways and they drifted. Every bug in the
+discipline-swap work of 2026-08-08/09 was an instance of one class, not three separate defects:
+
+- The swap gate read the root duration; the row printed the steps-sum. Card showed `63:00`, gate
+  computed `0`, and the control vanished **on one surface only**.
+- The posture map keys the bike as `bike`; the swap's vocabulary says `ride`. The gate read
+  `posture['ride']` — always `undefined` — so a **develop** bike was offered a swap it should never
+  have had.
+- A duplicate calendar session, because `get-week`'s membership key included `type`, and `type`
+  stopped being immutable the day the swap shipped.
+
+Each was fixed at its own call site. **The class was not fixed, and the unit tests were green through
+all of it** — they tested the readers against row shapes the app does not actually produce.
+
+**The decision.** Collapse onto one read-model, in five stages, each shippable and verified by golden
+fixtures pinned BEFORE any migration (`src/lib/planned-session-golden.test.ts`, stage 0).
+
+| what | where | replaced |
+|---|---|---|
+| `plannedDurationSeconds()` / `plannedDurationMinutes()` | `src/lib/planned-session/duration.ts` | 4 ladders + 6 inline reads |
+| `storedPlannedTotalSeconds()` | same file | the badge's narrow contract |
+| `normalizeDiscipline()` / `normalizeSessionType()` / `normalizeProviderSport()` / `postureKey()` | `src/lib/discipline.ts` | 6 normalizers + 2 more found in stage 4 |
+| the server's `planned_workout` | `get-week:1489 toPlannedWorkout` (+ `duration`) | `mapUnifiedItemToPlanned`, **deleted** |
+
+**⛔ THE FIVE THINGS THAT WOULD HAVE BEEN LOST BY A NAIVE COLLAPSE.** Each was caught by tracing or by
+a fixture, not by review, and each is the reason this entry is long:
+
+1. **`normalizeSport` knew `walk`/`hike`/`mobility`.** Pointing it at `normalizeDiscipline` (four
+   trainable disciplines) collapsed all three to `''`, so a completed walk ranked **cross-sport**
+   against a planned walk: *"Planned session — you did a session"*. Hence TWO accessors —
+   `normalizeDiscipline` for anything that **gates**, `normalizeSessionType` for anything that
+   **ranks or labels** over `planned_workouts.type`.
+2. **Distance-priced steps** lived only in `PlannedWorkoutSummary.computeMinutes`. Without them
+   "6 × 800m @ 5k pace" reads as having no duration at all.
+3. **`computed` as a JSON string** lived only in `computeMinutes`; `resolveMovingSeconds` returned
+   null for it. Not reachable from the server contract, but the direct table readers still see it.
+4. **`resolveMovingSeconds` is TWO readers keyed on `workout_status`.** Only the PLANNED branch moved.
+   Collapsing both would put executed-time logic behind a planned-session name.
+5. **The two row mappers were NOT in a superset relationship**, though the spec said the client's was
+   "a shadow of" the server's. Client-only: `duration`, `timing`, `pairing`. Server-only:
+   `display_overrides`, `expand_spec`, `pace_annotation`, `workout_title`. Only `duration` was
+   load-bearing (a real column `materialize-plan` writes; `get-week` never selected it). `timing` and
+   `pairing` were structurally always null.
+
+**Rejected: making `resolvePlannedDurationMinutes` wrap `plannedDurationSeconds`.** It feeds a
+displayed badge and a wrong duration on screen is a lie, so its null-on-nothing contract is
+deliberate. It wraps `storedPlannedTotalSeconds` — the root total alone. Pinned by a fixture, because
+"don't add fallbacks" as a comment is what failed the first time.
+
+**Rejected: defaulting an unknown discipline to `run`.** Two normalizers did, in the code that decides
+which planned session a completed activity attaches to. A kayak was offered the athlete's runs. A
+discipline we cannot name is `null`.
+
+**Rejected: folding `GarminDataService` onto `normalizeDiscipline`.** Measured: `road_biking`,
+`mountain_biking` and `mtb` all answer **null** there (the ladder tests `includes('bike')`, and
+"biking" does not contain "bike"). Every MTB and gravel ride would have dropped out of the learning
+pipeline silently. Provider vocabulary is a genuinely different question and got its own named
+boundary, `normalizeProviderSport`.
+
+**Deliberate behaviour changes — two, both pinned:**
+- **The summary now prefers the stored total over the steps-sum.** `computeMinutes` was the only
+  reader that preferred the sum; on a row carrying both (root 3600s, steps 2400s) the summary printed
+  40 min while the chip you tapped to reach it printed 60. All four surfaces now say 60.
+- **`TodaysEffort` drops an item `get-week` could not classify** instead of rendering a nameless
+  placeholder card (executed row, no `computed.overall`, no intervals, no logged sets, no planned
+  link → status `null`, `get-week:881`). One-line revert if that placeholder mattered.
+
+**⛔ THE ENFORCEMENT IS THE POINT** — `src/lib/planned-session/enforcement.test.ts`. A source scan
+(not eslint: a custom rule needs a plugin package, and `CLAUDE.md` forbids speculative npm deps) that
+fails on a new `.total_duration_seconds` read, a new discipline substring ladder, a revived client
+mapper, or a normalizer that answers `'run'`. Negative-control verified: a file with all three
+violations fails all three rules. **Without this, the class regrows** — that is exactly how four
+duration ladders came to exist, each individually defensible.
+
+⚠️ **A BASELINE, NOT A CLEAN BILL.** The scan froze **15 pre-existing ladders in 11 files** as known
+debt (mostly analysis-side / completed-side, which SPEC §2 scoped out — see Stage 1b below). The list
+may only shrink. Honest limit: it is per-FILE, so a new ladder inside one of those 11 still slips.
+
+**What is still OPEN — this decision does not claim continuity is total:**
+- **Stage 1b, the analysis-side vocabulary.** `_shared/state-trend/assemble.ts:167` emits `bike` and is
+  CORRECT there (`StateDisplayV1` cards are keyed `bike`); `useStateTrends` was deliberately NOT
+  migrated. `auto-attach-planned/index.ts:16 sportSubtype` **still returns `'run'` on unknown** — the
+  mis-attach defect surviving on the server. Needs its own stage, fixtures and a deploy.
+- **The 15 baselined ladders.**
+
+**Verification.** 26 golden fixtures + 8 contract tests + 5 enforcement tests. `workout-mappers.test.ts`
+was retargeted at the server's shape and carries a **drift guard** that reads `get-week/index.ts` and
+fails if the real mapper loses a field the test mirrors — negative-control checked. `tsc` error count
+identical before/after at every stage. **No device verification yet on any stage.**
+
+⚠️ **Deploy list: `get-week` ONLY** — it is on every calendar read, which is why stage 3 went alone.
+Everything else is client and ships with the Netlify build.
+
+> **Supersedes the spec doc.** `docs/SPEC-planned-session-consolidation.md` was the build contract for
+> this work and is **deleted** per the spec lifecycle in `CLAUDE.md`. Its substance is above; its two
+> wrong claims are recorded here rather than lost — §3's "the client's is a shadow of it" (they were
+> not comparable) and §1's four-priority duration table (there is a fifth rung, prose-scraping).

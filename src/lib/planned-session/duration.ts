@@ -2,7 +2,7 @@
 // planned-session/duration — ONE duration reader for a PLANNED session
 // =============================================================================
 //
-// Stage 2 of `docs/SPEC-planned-session-consolidation.md`.
+// Stage 2 of D-403 (`docs/DECISIONS-LOG-2.md`).
 //
 // ⛔ THE BUG THIS CLOSES, which was paid for twice. The swap gate read the root total; the row
 // printed the steps-sum. Today's card read `63:00` while the gate computed `0`, so the swap control
@@ -16,7 +16,7 @@
 // file exists to end. See SPEC §1.
 //
 // ⚠️ THIS FILE TAKES A ROW, NOT A `computed` BLOB. Consumers handed an already-extracted structure
-// (`PreRunScreen`, `workoutDisplayTemplates`, `watchConnectivity.convertToWatchWorkout`) are a
+// (`PreRunScreen`, `workoutDisplayTemplates`) are a
 // different concern and are deliberately untouched — they are not reading a planned session, they are
 // rendering a structure someone else already resolved.
 

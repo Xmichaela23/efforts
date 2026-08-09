@@ -9,7 +9,7 @@
 
 /**
  * ⛔ `mapUnifiedItemToPlanned` IS DELETED (stage 3, 2026-08-09).
- * See `docs/SPEC-planned-session-consolidation.md` §3.
+ * See D-403 in `docs/DECISIONS-LOG-2.md`.
  *
  * It was the CLIENT's copy of a shape the server already builds (`get-week:1489 toPlannedWorkout`),
  * and every surface read `it?.planned_workout ?? mapUnifiedItemToPlanned(it)` — so the server's copy

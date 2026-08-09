@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+// ⛔ ONE VOCABULARY (stage 4). See `src/lib/discipline.ts`.
+import { normalizeDiscipline } from '@/lib/discipline';
 import { supabase } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative, { NextUp } from './SessionNarrative';
@@ -285,7 +287,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           label (est(FTP) vs personal). Run/swim/strength already show their per-session substance
           (GAP pace, pace/100, e1RM); this brings bike to parity. */}
       {(() => {
-        const isRide = type.includes('ride') || type.includes('bike') || type.includes('cycl');
+        // ⛔ ONE VOCABULARY (stage 4) — was a private substring ladder. See `src/lib/discipline.ts`.
+        const isRide = normalizeDiscipline(type) === 'ride';
         if (!isRide) return null;
         let wa: any = (completed as any)?.workout_analysis;
         if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { wa = null; } }

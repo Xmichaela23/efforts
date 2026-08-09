@@ -119,37 +119,19 @@ export async function clearWatchWorkout(): Promise<boolean> {
 }
 
 /**
- * Convert a planned workout structure to watch format
+ * ⛔ `convertToWatchWorkout` IS DELETED (stage 4, 2026-08-09) — a dead duration reader.
+ *
+ * It read `structure.total_duration_seconds || 0` and was flagged in stage 2 as one of the inline
+ * duration reads. It was NOT one: it took an already-extracted `structure`, not a planned row, so the
+ * consolidated accessor never applied to it. And it had **no callers** — `TodaysEffort` imported it
+ * and never called it. Deleted rather than migrated, because migrating dead code is how a reader
+ * survives a cleanup.
+ *
+ * ⚠️ `sendWorkoutToWatch` AND `clearWatchWorkout` (above) ARE ALSO UNCALLED, and `sendWorkoutToWatch`
+ * is now unreachable by construction — the only producer of its `WatchWorkoutData` argument was the
+ * function deleted here. Left in place: neither is a duration reader and both were already dead
+ * before this migration, so removing them is a separate decision.
+ * `isWatchConnectivityAvailable` IS live (`TodaysEffort:343`).
  */
-export function convertToWatchWorkout(
-  id: string,
-  name: string,
-  type: 'run' | 'ride',
-  structure: {
-    total_duration_seconds?: number;
-    steps?: Array<{
-      kind: string;
-      duration_seconds?: number;
-      distance_m?: number;
-      hr_zone?: number;
-      hr_range?: { lower: number; upper: number };
-      pace_range?: { lower: number; upper: number };
-    }>;
-  }
-): WatchWorkoutData {
-  return {
-    id,
-    name,
-    type,
-    totalDurationSeconds: structure.total_duration_seconds || 0,
-    steps: (structure.steps || []).map(step => ({
-      kind: step.kind as WatchWorkoutStep['kind'],
-      durationSeconds: step.duration_seconds,
-      distanceMeters: step.distance_m,
-      hrZone: step.hr_zone,
-      hrRange: step.hr_range,
-      paceRange: step.pace_range,
-    })),
-  };
-}
+
 

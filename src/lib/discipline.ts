@@ -2,7 +2,7 @@
 // discipline — ONE canonical vocabulary for the planning side
 // =============================================================================
 //
-// Stage 1 of `docs/SPEC-planned-session-consolidation.md`.
+// Stage 1 of D-403 (`docs/DECISIONS-LOG-2.md`).
 //
 // ⛔ THE TWO DEFECTS THIS CLOSES, both already paid for once:
 //
@@ -90,6 +90,31 @@ export function normalizeSessionType(raw: string | null | undefined): SessionTyp
   if (s.includes('walk') || s.includes('hik')) return 'walk';
   if (s.includes('mobility')) return 'mobility';
   if (s.includes('pilates') || s.includes('yoga')) return 'pilates_yoga';
+  return null;
+}
+
+/**
+ * ⛔ THE PROVIDER BOUNDARY — Garmin/Strava activity-type keys → canon. The THIRD named translation,
+ * alongside `postureKey` and `matrixKindFor`.
+ *
+ * ⚠️ IT EXISTS BECAUSE `normalizeDiscipline` IS NOT ENOUGH HERE, AND THE PROOF IS SPECIFIC. Folding
+ * `GarminDataService.isCyclingActivity` straight onto the canonical normalizer was tried and measured
+ * during stage 4: **`road_biking` → null, `mountain_biking` → null, `mtb` → null.** The canonical
+ * ladder tests `includes('bike')`, and "biking" does not contain "bike". Garmin's real keys would have
+ * stopped registering as rides — a silent loss of every mountain-bike and gravel ride from the
+ * learning pipeline, with nothing failing.
+ *
+ * ⛔ SO THE PROVIDER'S NOISE LIVES HERE, IN ONE NAMED PLACE, instead of in a private ladder inside a
+ * service. Canon is asked FIRST and always wins; this only adds vocabulary canon does not carry.
+ * ⚠️ Unknown is still `null`, never `'run'`.
+ */
+export function normalizeProviderSport(raw: string | null | undefined): Discipline | null {
+  const canonical = normalizeDiscipline(raw);
+  if (canonical) return canonical;
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return null;
+  // `bik` (not `bike`) is what catches road_biking / mountain_biking / ebike.
+  if (s.includes('bik') || s.includes('gravel') || s.includes('mtb')) return 'ride';
   return null;
 }
 
