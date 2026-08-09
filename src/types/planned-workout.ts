@@ -26,6 +26,16 @@ export interface PlannedWorkout {
     total_duration_seconds: number | null;
   } | null;
   steps_preset: string[] | null;
+  /**
+   * Minutes, as the `planned_workouts` row stores it.
+   *
+   * ⛔ THE MAPPER DROPPED THIS AND IT CAUSED A REAL DIVERGENCE (2026-08-09). `mapUnifiedItemToPlanned`
+   * carried only `total_duration_seconds`, so a mapped row and the raw row it came from answered
+   * "how long is this session" differently — the calendar reads `_src` (raw) and Today's card reads
+   * the mapped copy, and any gate that needs a duration therefore fired on one surface and not the
+   * other. Two shapes for one row is the bug; this closes it.
+   */
+  duration?: number | null;
   total_duration_seconds: number | null;
   
   // Exercise data

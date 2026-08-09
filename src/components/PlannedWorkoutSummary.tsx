@@ -154,7 +154,13 @@ function computeSwimYards(workout: any): number | null {
   return null;
 }
 
-function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | undefined {
+/**
+ * ⚠️ `skipDescriptionFallback` suppresses ONLY this function's last resort — the raw
+ * `rendered_description || description`. Structured output (intervals, swim buckets, strength rows)
+ * is unaffected, because that is not what duplicates. Set by a caller that already printed the
+ * description itself; see `PlannedWorkoutSummaryProps.suppressDescriptionFallback`.
+ */
+function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptionFallback?: boolean): string | undefined {
   try {
     const pn = (baselines as any)?.performanceNumbers || {};
     try {
@@ -224,6 +230,7 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
         if (parts.length > 0) return parts.join(' • ');
         
         // Fallback to description if no structured data
+        if (skipDescriptionFallback) return undefined;
         const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
         if (desc) return desc;
       }
@@ -244,6 +251,7 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
     }
     const friendly = String((workout as any)?.friendly_summary || '').trim();
     if (friendly) return friendly;
+    if (skipDescriptionFallback) return undefined;
     const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
     return desc || undefined;
   } catch { return undefined; }
@@ -348,13 +356,17 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   })();
   const yards = computeSwimYards(workout);
   const title = getTitle(workout);
-  const lines = suppressNotes ? (buildStructuredSubtitleOnly(workout, baselines) || '') : (buildWeeklySubtitle(workout, baselines) || '');
-  // See `suppressDescriptionFallback`: drop the subtitle only when it IS the caller's description.
-  const rawDesc = String(
-    (workout as { rendered_description?: string; description?: string })?.rendered_description
-    || (workout as { description?: string })?.description || '',
-  ).trim();
-  const linesShown = suppressDescriptionFallback && rawDesc && lines.trim() === rawDesc ? '' : lines;
+  /**
+   * ⛔ THE FLAG IS PASSED DOWN, NOT COMPARED AFTERWARDS (corrected 2026-08-09). The first version
+   * suppressed the subtitle when it was byte-identical to the row's description — which is fragile
+   * in exactly the way that matters: any whitespace or prefix difference and the duplicate returns
+   * with nothing failing. The builder now declines to produce the fallback at all, so there is no
+   * string to compare.
+   */
+  const lines = suppressNotes
+    ? (buildStructuredSubtitleOnly(workout, baselines) || '')
+    : (buildWeeklySubtitle(workout, baselines, suppressDescriptionFallback) || '');
+  const linesShown = lines;
   const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
   const isMobility = String((workout as any)?.type||'').toLowerCase()==='mobility';
   const strengthItems: string[] = (() => {

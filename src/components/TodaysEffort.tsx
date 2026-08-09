@@ -84,15 +84,7 @@ const WorkoutCardExpandable: React.FC<{
           transition: 'max-height 0.3s ease-out',
         }}
       >
-        <PlannedWorkoutSummary
-                    workout={workout}
-                    baselines={baselines}
-                    hideLines={false}
-                    /* ⛔ THE DRAWER'S HEADER ALREADY PRINTS THIS DESCRIPTION (DrawerDescription,
-                       above). Without this the same "~63 min easy…" text rendered twice on one
-                       screen — device-confirmed. Structured content is unaffected. */
-                    suppressDescriptionFallback
-                  />
+        <PlannedWorkoutSummary workout={workout} baselines={baselines} hideLines={false} />
         {/* Fade gradient when collapsed and content overflows */}
         {!isExpanded && needsExpansion && (
           <div
@@ -1721,21 +1713,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
                       const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never));
                       if (opts.length === 0) return null;
+                      /**
+                       * ⛔ A `<span>`, NOT A `<button>` — the row itself IS a `<button>` (:1613) and a
+                       * button inside a button is invalid HTML (2026-08-09). React's own
+                       * `validateDOMNesting` flags it, and browsers are free to drop or relocate the
+                       * inner control, which is exactly the "renders in a test, missing on device"
+                       * shape of this bug. `role="button"` + a keyboard handler keeps it operable
+                       * without nesting interactive elements.
+                       */
+                      const openSwap = () => {
+                        setSelectedPlannedWorkout(workout);
+                        setPlannedDrawerStep('swap');
+                      };
                       return (
-                        <button
-                          type="button"
+                        <span
+                          role="button"
+                          tabIndex={0}
                           aria-label="Swap sport for this session"
                           title="Swap sport"
-                          className="absolute top-2 right-2 p-1.5 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setSelectedPlannedWorkout(workout);
-                            setPlannedDrawerStep('swap');
+                          className="absolute top-2 right-2 p-1.5 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSwap(); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openSwap(); }
                           }}
                         >
                           <ArrowLeftRight className="w-3.5 h-3.5" />
-                        </button>
+                        </span>
                       );
                     })()}
                     <div className="flex items-center justify-between gap-3">
@@ -1983,6 +1986,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     workout={selectedPlannedWorkout}
                     baselines={baselines as any}
                     hideLines={false}
+                    /**
+                     * ⛔ THE DRAWER HEADER ALREADY PRINTED THIS (2026-08-09). `DrawerDescription`
+                     * (:1910) renders `rendered_description || description`, and this block's
+                     * subtitle falls back to the SAME string — so a plain planned run showed
+                     * "~50 min easy…" twice on one screen.
+                     *
+                     * ⚠️ THE FIRST ATTEMPT PUT THIS PROP ON THE WRONG INSTANCE. There are two
+                     * `PlannedWorkoutSummary` usages in this file — one at :87 inside the collapsible
+                     * summary helper, and this one, which is the drawer's. The prop went on :87, so
+                     * it fired somewhere the athlete was not looking and the drawer was untouched.
+                     * A unit test could not catch that: the component was correct, the CALL SITE
+                     * was wrong.
+                     */
+                    suppressDescriptionFallback
                   />
                 </>
               );

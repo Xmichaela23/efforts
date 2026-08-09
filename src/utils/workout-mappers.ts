@@ -44,6 +44,9 @@ export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
       : null,
     steps_preset: planned.steps_preset ?? null,
     total_duration_seconds: planned.total_duration_seconds || null,
+    // ⛔ CARRIED, NOT DROPPED — see the note on `PlannedWorkout.duration`. Without this the mapped
+    // row is a different shape from the raw row and duration-dependent logic diverges by surface.
+    duration: planned.duration ?? null,
     
     // Exercise data
     strength_exercises: planned.strength_exercises ?? null,
