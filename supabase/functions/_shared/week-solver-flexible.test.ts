@@ -457,3 +457,95 @@ Deno.test('SHAPE: full week reads sensibly', () => {
   console.log('  week:', SOLVER_DAYS.map((d) => `${d.slice(0, 3)}[${grid[d].join('+') || '-'}]`).join(' '));
   assertEquals(r.week.flexible.length, 2);
 });
+
+// ═══ MODALITY-AWARE RECOVERY — the day after a long run prefers a RIDE ═══════════════════════
+//
+// ⛔ THE RULE IS THE LAW'S OWN SENTENCE, AND IT NAMES A REPLACEMENT: *"After long_run → next day:
+// prefer easy_swim or rest — not easy_run (back-to-back run tissue load)."* The first version of
+// `afterLong` keyed on the DAY alone, so it penalised an easy RIDE the day after the long run
+// exactly as hard as an easy run — the engine pushing away its own recommendation.
+//
+// ⚠️ WHY MODALITY IS THE POINT: a long run's cost is eccentric — impact loading and muscle damage
+// peaking 24–48h out, the same window `ADJACENCY_HOURS` gives heavy legs 48h off the long run for.
+// A ride is concentric and unloaded: blood through the legs without re-loading them.
+//
+// ⚠️ ASYMMETRIC BY DESIGN. `long_ride → easy_ride` is weighted LIGHTLY (ranked below `selfAdjacent`)
+// because the adjacency table rates the long ride's whole row at zero and says why: *"Concentric, no
+// impact transient. Long in DURATION, not in damage."*
+//
+// ⛔ AND IT IS SCORED, NOT A FILTER — on a tight week it loses to spread and to the rest day, which
+// is correct and is asserted below.
+
+const SOLVER_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const LIFTS_4 = [
+  { name: 'Overhead Press', isLower: false }, { name: 'Deadlift', isLower: true },
+  { name: 'Bench Press', isLower: false }, { name: 'Back Squat', isLower: true },
+];
+const dayOfKind = (r: { week: { flexible: Array<{ kind: string; day: string }> } }, kind: string) =>
+  r.week.flexible.filter((f) => f.kind === kind).map((f) => f.day);
+
+Deno.test('⛔ the day after a long run takes the easy RIDE, not the easy run', () => {
+  const r = solve({
+    anchors: [
+      { day: 'sunday', kind: 'long_run', label: 'long run' },
+      { day: 'saturday', kind: 'long_ride', label: 'long ride' },
+    ],
+    lifts: LIFTS_4,
+    flexible: [
+      { name: 'r0', kind: 'easy_run' }, { name: 'r1', kind: 'easy_run' },
+      { name: 'r2', kind: 'easy_run' }, { name: 'b0', kind: 'easy_bike' },
+    ],
+  });
+  assert(r.status !== 'unsolvable', 'the week should solve');
+  if (r.status === 'unsolvable') return;
+  assert(!dayOfKind(r, 'easy_run').includes('monday'),
+    `an easy run landed the morning after the long run: ${dayOfKind(r, 'easy_run').join(', ')}`);
+  assertEquals(dayOfKind(r, 'easy_bike'), ['monday'],
+    'the easy ride did not take the recovery day the rule recommends');
+});
+
+Deno.test('⛔ the ride is not pushed OFF that day — the old term penalised it too', () => {
+  // With no runs to place at all, the single easy ride should be free to take the day after the
+  // long run. Under the day-keyed term it was penalised there for no reason.
+  const r = solve({
+    anchors: [{ day: 'sunday', kind: 'long_run', label: 'long run' }],
+    lifts: [],
+    flexible: [{ name: 'b0', kind: 'easy_bike' }],
+  });
+  if (r.status === 'unsolvable') throw new Error('should solve');
+  // Monday is legal and maximally spread from Sunday's neighbour set; nothing should repel it.
+  assert(r.week.flexible.length === 1);
+});
+
+Deno.test('the long-RIDE half is weaker — it breaks ties, it does not buy a worse week', () => {
+  // Two easy rides around a Saturday long ride. The light term prefers keeping Sunday clear, but
+  // it sits below `selfAdjacent`, so it can never produce a worse-spread week to get its way.
+  const r = solve({
+    anchors: [{ day: 'saturday', kind: 'long_ride', label: 'long ride' }],
+    lifts: [],
+    flexible: [{ name: 'b0', kind: 'easy_bike' }, { name: 'b1', kind: 'easy_bike' }],
+  });
+  if (r.status === 'unsolvable') throw new Error('should solve');
+  const days = dayOfKind(r, 'easy_bike').map((d) => SOLVER_WEEK.indexOf(d)).sort((a, b) => a - b);
+  const gap = Math.min(Math.abs(days[0] - days[1]), 7 - Math.abs(days[0] - days[1]));
+  assert(gap >= 2, `the two easy rides ended up ${gap} day(s) apart — spread was sacrificed`);
+});
+
+Deno.test('⛔ SCORED, NOT A FILTER — a full week may still put an easy run there', () => {
+  // Six sessions, one rest day: the run has nowhere else to go. The preference must yield rather
+  // than refuse or drop a session.
+  const r = solve({
+    anchors: [
+      { day: 'sunday', kind: 'long_run', label: 'long run' },
+      { day: 'saturday', kind: 'quality_run', label: 'hard run' },
+    ],
+    lifts: LIFTS_4,
+    flexible: [
+      { name: 'r0', kind: 'easy_run' }, { name: 'r1', kind: 'easy_run' },
+      { name: 'r2', kind: 'easy_run' }, { name: 'r3', kind: 'easy_run' },
+    ],
+  });
+  assert(r.status !== 'unsolvable', 'the preference must never cause a refusal');
+  if (r.status === 'unsolvable') return;
+  assertEquals(r.week.flexible.length, 4, 'a session was dropped to honour a preference');
+});

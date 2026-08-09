@@ -1472,6 +1472,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     return n;
   };
 
+  /**
+   * How many impact sessions land the morning after a long run. The engine's modality-aware recovery
+   * preference lives in `week-solver`; this is the composer reading the same property back so its own
+   * tie-breaks cannot quietly undo it.
+   */
+  const impactAfterLongRun = (r: ReturnType<typeof solveWeek>): number => {
+    if (r.status === 'unsolvable') return Number.MAX_SAFE_INTEGER;
+    const dayAfter = new Set(
+      solverAnchors.filter((a) => a.kind === 'long_run')
+        .map((a) => (SOLVER_DAY_ORDER.indexOf(a.day) + 1) % 7),
+    );
+    return r.week.flexible.filter(
+      (f) => f.kind === 'easy_run' && dayAfter.has(SOLVER_DAY_ORDER.indexOf(f.day)),
+    ).length;
+  };
+
   const solveWithFlexible = () => {
     for (let n = flexibleWanted.length; n >= 0; n--) {
       const flexible = flexibleWanted.slice(0, n);
@@ -1492,10 +1508,24 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             + 'they otherwise tie — allowed, never banned',
         },
       });
+      /**
+       * ⛔ AND IT MUST NOT BUY ITSELF A WORSE RECOVERY DAY EITHER (2026-08-08).
+       *
+       * Q-215 is "prefer a clean upper day over a heavy-leg day"; the day-after-the-long-run rule is
+       * about impact through damaged tissue. When they pull apart, the tissue rule wins — it is the
+       * one the clearance table gives heavy legs 48h for, and Q-215's own words are that it yields
+       * to anything that genuinely scores better.
+       *
+       * ⚠️ MEASURED. On long-ride Sat / long-run Sun / 4 runs + 2 rides the solver correctly put the
+       * easy runs on Tue/Thu/Fri and the easy RIDE on Monday — and this comparison then threw that
+       * away, because the avoided variant tied on adjacency and won the tie. Monday came back with a
+       * run on it, the morning after the long run, with a free ride sitting elsewhere in the week.
+       */
+      const takeAvoided = avoided.status !== 'unsolvable'
+        && selfAdjacentCount(avoided) <= selfAdjacentCount(plain)
+        && impactAfterLongRun(avoided) <= impactAfterLongRun(plain);
       // The preference is taken only when it buys nothing worse. Ties go to the preference.
-      if (avoided.status !== 'unsolvable' && selfAdjacentCount(avoided) <= selfAdjacentCount(plain)) {
-        return avoided;
-      }
+      if (takeAvoided) return avoided;
       if (plain.status !== 'unsolvable') return plain;
     }
     return liftOnlySolve;

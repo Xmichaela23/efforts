@@ -692,6 +692,8 @@ function combinations<T>(pool: readonly T[], k: number): T[][] {
  */
 function chooseSpreadDays(
   count: number,
+  /** The kind being placed. The recovery preference below is MODALITY-aware, so it must know. */
+  kind: MatrixSessionKind,
   legalDays: readonly number[],
   occupiedBefore: ReadonlySet<number>,
   /** Anchor day indices by kind, for the one owned preference term. */
@@ -715,9 +717,45 @@ function chooseSpreadDays(
    * most even gaps"; a term added here must break ties between equally-spread weeks, not overrule
    * the property it was asked to produce.
    */
-  const dayAfterLongRun = new Set(
-    anchorPlacements.filter((a) => a.kind === 'long_run').map((a) => (a.dayIndex + 1) % 7),
-  );
+  /**
+   * ⛔ THE RULE IS MODALITY-AWARE, AND READING IT AS "keep the day after the long run clear" LOST
+   * HALF OF IT (2026-08-08).
+   *
+   * The law's sentence names a REPLACEMENT, not an exclusion: *"After long_run → next day: prefer
+   * easy_swim **or rest** — not easy_run (back-to-back run tissue load)."* The first draft of this
+   * term keyed only on the DAY, so it penalised every kind equally — an easy RIDE the day after the
+   * long run scored exactly as badly as an easy run, when the ride is the thing the rule is
+   * recommending. The engine was pushing away its own answer.
+   *
+   * ⛔ WHY THE MODALITY IS THE WHOLE POINT. A long run's cost is eccentric: impact loading and
+   * muscle damage that peak 24–48h out (the same window `ADJACENCY_HOURS` gives heavy legs 48h off
+   * the long run for). Another easy run puts impact back through the same tissue inside that window.
+   * A ride or a swim is concentric and unloaded — it moves blood through the legs without re-loading
+   * them, which is what "active recovery" means and why cross-training is the standard prescription
+   * for the day after a long effort.
+   *
+   * ⚠️ ASYMMETRIC ON PURPOSE. `long_ride → easy_ride` is NOT the same case and must not be weighted
+   * as if it were: the adjacency table already rates the long ride's row as all zeros, and says why
+   * — *"Concentric, no impact transient. Long in DURATION, not in damage."* So back-to-back riding
+   * is a fatigue question, not a tissue one. It is carried as a SEPARATE, WEAKER term below.
+   *
+   * ⛔ SCORED, NEVER A FILTER — unchanged. `easy_run` carries 0h against `long_run` in the clearance
+   * table, deliberately, and encoding this as a clearance would forbid weeks athletes really do
+   * train. On a tight week it loses to spread and to the rest day, which is correct.
+   */
+  const IMPACT_KINDS: ReadonlySet<MatrixSessionKind> = new Set(['easy_run', 'quality_run', 'long_run']);
+  /** The day after a long RUN, and only for a kind that puts impact back through the same legs. */
+  const dayAfterLongRun = IMPACT_KINDS.has(kind)
+    ? new Set(anchorPlacements.filter((a) => a.kind === 'long_run').map((a) => (a.dayIndex + 1) % 7))
+    : new Set<number>();
+  /**
+   * The weaker half: the day after a long RIDE, for another ride. Ranked BELOW `selfAdjacent`, which
+   * is how "lightly" is expressed in a lexicographic comparator — it breaks ties and nothing more.
+   */
+  const SAME_WHEEL_KINDS: ReadonlySet<MatrixSessionKind> = new Set(['easy_bike', 'quality_bike']);
+  const dayAfterLongRide = SAME_WHEEL_KINDS.has(kind)
+    ? new Set(anchorPlacements.filter((a) => a.kind === 'long_ride').map((a) => (a.dayIndex + 1) % 7))
+    : new Set<number>();
 
   type Scored = {
     days: number[];
@@ -727,6 +765,7 @@ function chooseSpreadDays(
     gaps: number[];
     selfAdjacent: number;
     afterLong: number;
+    afterLongRide: number;
     avoided: number;
     preferredMiss: number;
   };
@@ -764,6 +803,7 @@ function chooseSpreadDays(
         0,
       ),
       afterLong: days.filter((d) => dayAfterLongRun.has(d)).length,
+      afterLongRide: days.filter((d) => dayAfterLongRide.has(d)).length,
       avoided: days.filter((d) => avoid.has(d)).length,
       // Missing a stated preference costs; there is nothing to miss when none was given.
       preferredMiss: preferred.size === 0
@@ -799,6 +839,10 @@ function chooseSpreadDays(
     if (s.avoided !== best.avoided) { if (s.avoided < best.avoided) best = s; continue; }
     if (s.afterLong !== best.afterLong) { if (s.afterLong < best.afterLong) best = s; continue; }
     if (s.selfAdjacent !== best.selfAdjacent) { if (s.selfAdjacent < best.selfAdjacent) best = s; continue; }
+    // ⚠️ BELOW `selfAdjacent` — this is the LIGHT half of the recovery preference (see
+    // `dayAfterLongRide`). A long ride costs duration, not tissue, so it may break a tie and may not
+    // buy itself a worse-shaped week.
+    if (s.afterLongRide !== best.afterLongRide) { if (s.afterLongRide < best.afterLongRide) best = s; continue; }
     if (s.preferredMiss !== best.preferredMiss) { if (s.preferredMiss < best.preferredMiss) best = s; continue; }
     // ⛔ DETERMINISM (§5.1): calendar order settles anything the real terms tied on, so two runs of
     // the solver on one input can never disagree.
@@ -1044,7 +1088,7 @@ export function solve(input: SolverInput): SolverResult {
               .filter((i) => i >= 0 && legalDays.includes(i)),
           );
           const chosen = chooseSpreadDays(
-            sessions.length, legalDays, occupiedBefore, anchorPlacements, avoid, preferred,
+            sessions.length, kind, legalDays, occupiedBefore, anchorPlacements, avoid, preferred,
           );
           if (chosen === null) {
             // ⛔ §5.2b — NEVER SUBTRACT. Not enough legal days is a refusal that states the
