@@ -20,6 +20,23 @@ import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
+// ⛔ THE SWAP LOGIC IS NOT REBUILT HERE (2026-08-08). `session-discipline-swap.ts` owns the options,
+// the intensity band, the duration/volume preservation and the clearance warnings — and it reads the
+// SAME `schedule-session-constraints` law the solver does. This surface owns only the button and the
+// write. The first cut of this shipped on `TodaysEffort`, which renders nothing when today has no
+// planned session, so the control never appeared where the athlete actually opens one: from the
+// calendar, into this view. Same logic, correct surface.
+import {
+  availableDisciplines,
+  disciplineOf,
+  getDisciplineSwaps,
+  intensityOf,
+  matrixKindFor,
+  type SwapOption,
+  type SwappableSession,
+} from '@/lib/session-discipline-swap';
+import type { MatrixSessionKind } from '../../supabase/functions/_shared/schedule-session-constraints';
+import { ArrowLeftRight } from 'lucide-react';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
@@ -160,7 +177,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [showReschedulePopup, setShowReschedulePopup] = useState(false);
   const [rescheduleValidation, setRescheduleValidation] = useState<any>(null);
   const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
-  const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
+  const { plannedWorkouts, updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
+  const [showSwapPanel, setShowSwapPanel] = useState(false);
+  const [swapping, setSwapping] = useState(false);
 
   // Unified week data for the workout's date (single-day window)
   const dateIso = String((workout as any)?.date || '').slice(0,10);
@@ -1116,9 +1135,80 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     </div>
                   );
                 })()}
-                {/* Delete/Reschedule buttons for planned workouts */}
-                {!isCompleted && onDelete && (
-                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
+                {/* Delete/Reschedule/Swap buttons for planned workouts */}
+                {!isCompleted && onDelete && (() => {
+                  /**
+                   * ⛔ THE SWAP, BESIDE RESCHEDULE AND DELETE — the three things an athlete can do to
+                   * a session they have not started. Reschedule moves the DAY, this moves the SPORT.
+                   *
+                   * ⚠️ RENDER CONDITIONS ARE THE LIB'S, NOT THIS FILE'S. `getDisciplineSwaps` returns
+                   * [] for a strength session, a long session, a session with no duration, and an
+                   * athlete with only one sport — so "should this button exist" is one question with
+                   * one answer, asked in the same place the swap itself is decided. A second copy of
+                   * those conditions here is how the button and the sheet start disagreeing.
+                   */
+                  type SwapRow = SwappableSession & { date?: string | null };
+                  const row = ((unifiedWorkout || workout) ?? {}) as SwapRow;
+                  const week = (Array.isArray(plannedWorkouts) ? plannedWorkouts : []) as SwapRow[];
+                  const sameDay = week
+                    .filter((it) => String(it?.date).slice(0, 10) === String(row?.date).slice(0, 10)
+                      && String(it?.id) !== String(row?.id))
+                    .map((it): { kind: MatrixSessionKind; label: string } | null => {
+                      const d = disciplineOf(it?.type);
+                      const kind: MatrixSessionKind | null =
+                        String(it?.type || '').toLowerCase() === 'strength'
+                          ? (/squat|deadlift|lunge|leg/i.test(String(it?.name || ''))
+                            ? 'lower_body_strength' : 'upper_body_strength')
+                          : d ? matrixKindFor(d, intensityOf(it)) : null;
+                      return kind ? { kind, label: String(it?.name || 'another session') } : null;
+                    })
+                    .filter((x): x is { kind: MatrixSessionKind; label: string } => x !== null);
+                  const swapOptions: SwapOption[] = row
+                    ? getDisciplineSwaps(row, availableDisciplines(week), sameDay)
+                    : [];
+
+                  const applySwap = async (opt: SwapOption) => {
+                    const id = String(row?.id || '');
+                    if (!id) return;
+                    setSwapping(true);
+                    try {
+                      // ⛔ THE EXISTING WRITE PATH. `updatePlannedWorkout` is the same helper Delete
+                      // and the rest of this view already use — a swap must not invent a second one.
+                      await updatePlannedWorkout(id, opt.patch as Parameters<typeof updatePlannedWorkout>[1]);
+                      invalidateWorkoutScreens();
+                      setShowSwapPanel(false);
+                      onClose();
+                    } catch (err) {
+                      console.error('[Swap] failed:', err);
+                      alert(`Could not swap this session: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                    } finally {
+                      setSwapping(false);
+                    }
+                  };
+
+                  return (
+                  <div className="mt-4 pt-3 border-t border-white/10">
+                  {showSwapPanel && swapOptions.length > 0 && (
+                    <div className="mb-3 flex flex-col gap-2">
+                      <div className="text-[13px] text-white/70">Same day, same time. Pick the sport you want instead.</div>
+                      {swapOptions.map((opt) => (
+                        <button
+                          key={opt.to}
+                          type="button"
+                          disabled={swapping}
+                          onClick={() => applySwap(opt)}
+                          className="w-full px-3 py-2.5 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                        >
+                          <div className="text-sm font-medium">{opt.label}</div>
+                          {/* ⛔ WARN, NEVER GATE — the button above still applies the swap. */}
+                          {opt.warnings.map((warn) => (
+                            <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>
+                          ))}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1198,8 +1288,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     >
                       Delete
                     </Button>
+                    {swapOptions.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-white/60 hover:text-white/80 hover:bg-white/10 gap-1.5"
+                        onClick={() => setShowSwapPanel((v) => !v)}
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        Swap sport
+                      </Button>
+                    )}
                   </div>
-                )}
+                  </div>
+                  );
+                })()}
               </div>
             </div>
           </TabsContent>

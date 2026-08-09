@@ -39,6 +39,8 @@ export type Discipline = 'run' | 'ride' | 'swim';
 export type SwappableSession = {
   id?: string;
   type?: string | null;
+  /** `planned` / `completed` / `skipped`. A session already done or skipped is not swappable. */
+  workout_status?: string | null;
   name?: string | null;
   description?: string | null;
   duration?: number | null;
@@ -177,6 +179,14 @@ export function getDisciplineSwaps(
 ): SwapOption[] {
   const from = disciplineOf(session.type);
   if (!from) return [];
+  /**
+   * ⛔ UNSTARTED ONLY, AND THE CHECK LIVES HERE (2026-08-08). The callers each had their own
+   * `!isCompleted` guard, which meant "should the button exist" and "should the swap be offered"
+   * were two questions asked in two places — exactly how a button and its sheet start disagreeing.
+   * Swapping the sport of a session already logged would also rewrite history, not a plan.
+   */
+  const status = String(session.workout_status ?? 'planned').toLowerCase();
+  if (status === 'completed' || status === 'skipped') return [];
   const band = intensityOf(session);
   if (band === 'long') return [];
 
