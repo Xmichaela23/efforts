@@ -23,91 +23,68 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-07, late — the placement engine is DECIDED; do not re-litigate it)
+## 🧭 NEXT SESSION — START HERE (2026-08-08 late → 08-09 — the discipline swap shipped; the engine unification is HALF done)
 
-### THE DECISION — one placement engine, and it's `place-week`
+### THE DECISION EVOLVED — the placement engine is `week-solver`, NOT `place-week`
 
-There are TWO placement solvers today: `_shared/week-optimizer.ts` (combined + tri) and
-`shared/strength-system/place-week.ts` (Strong Focus). **They already share one law** — both read
-clearances from `_shared/schedule-session-constraints.ts` (Robineau's 6h same-legs, 48h off long
-run/ride, 24h off quality, 0h easy). The fork is only in the two solvers.
+The 08-07 banner said "place-week is the trunk." That was superseded by the actual build: everything
+routed onto **`_shared/week-solver.ts`** — the clean anchor solver (typed refusals, N lifting days,
+parameterized max-days), reading the one shared law (`_shared/schedule-session-constraints.ts`).
+`place-week` is now a **fallback** for Get Stronger only. Do not resurrect the place-week-as-trunk framing.
 
-**`place-week` is the trunk. `week-optimizer` gets folded into it as a subroutine — NOT the reverse.**
-Why: place-week models the athlete's week the way athletes actually live (fixed real-life anchors,
-solve everything around them), already handles N lifting days, and already does the hardest,
-safety-critical thing — keeping lower-body strength off the long-run day (the exact bug that started
-this drill). week-optimizer treats every day as "movable" and caps strength at 1–3 days; wrong model,
-wrong ceiling. **Do not reopen this.** (One corroboration found during the 08-07 cleanup:
-`place-week`'s composer already calls week-optimizer's `easyRunAnchorAdjacencyPenalty` at
-`strength-primary-plan.ts:1667` — so folding the dispersion in is partly already wired.)
+**Where each plan places its days now (verify by grep before trusting):**
+- `week-solver` — **run plans** (marathon + time-goal, via `generate-run-plan/generators/assign-days-solver.ts`)
+  AND **Strong Focus** (`strength-primary-plan.ts:1251 solveWeek`).
+- `week-optimizer` — **combined-plan** and **triathlon**, still. NOT yet migrated.
+- So there are STILL TWO live engines. **The remaining unification: route combined + tri onto
+  `week-solver` too, then `week-optimizer` retires.** That is the open north-star work.
 
-### THE MODEL (in Michael's words)
+### WHAT SHIPPED TODAY — do NOT re-litigate; built, pushed, deployed
 
-- **Anchors** = athlete-fixed sessions: long run, long ride, and the scheduled club run/ride.
-- Each anchor is **hard or social.** A hard one (a club run that's really a tempo) *becomes* the
-  week's hard session and everything spaces off it — and it **consumes the week's hard budget** (do
-  NOT also prescribe a separate quality session on top). A social one is fixed but low-interference
-  (an easy run can share its day).
-- **The athlete picks the anchor days**, including the long ones. No forced weekend-long.
-- Everything else (easy volume, extra quality, strength) is **flexible**, placed around the anchors
-  by the one shared law.
-- Marathon vs tri vs strength = just *which* sessions are anchors. One engine, tailored by input,
-  never a new builder.
+1. **Run plans + Strong Focus route through `week-solver`.** The long-run day is the ATHLETE'S pick
+   (the `'Sunday'` hardcode killed in 5 places in `sustainable.ts`); lift placement moved off the
+   Higdon/Daniels weekday grid onto the engine; the `chooseSpreadDays` band-aid retired. (`3bd57a7c`.)
+2. **Strong Focus builds exactly what the wizard asks** — one hard day on the picked discipline,
+   everything else easy, picked run/ride counts + typed volumes honored exactly, no sport silently
+   dropped, nothing capped. Hard ride = Helgerud 4×4 VO2 (`bikeQualitySession` — was built and never
+   fired). No priority inference; the wizard already asks. (in `3bd57a7c` + follow-ups.)
+3. **Recovery placement:** the day after a long run prefers the CROSS-sport easy session (ride/swim
+   over run) — modality-aware, SCORED not gated. (`c60edd3a`.)
+4. **Discipline swap (run/ride/swim) — full feature, all plans.** In-session swap on any planned
+   endurance session (`UnifiedWorkoutView`, `TodaysEffort`, calendar glyphs); one shared lib
+   `src/lib/session-discipline-swap.ts`. Survives a plan rebuild (`activate-plan/preserve-athlete-edits.ts`).
+   Completes end to end (auto-attach reads the live `planned_workouts.type`). TrainingPeaks-style
+   mismatch handling — cross-sport manual associate (`AssociatePlannedDialog`) + an unmatched cue that
+   fires only when the day still owes a session. `get-week` no longer re-inserts the swapped-away run
+   (`swapped_from:<discipline>` tag → `get-week/planned-exists-key.ts`). Commits `842c6ae7`,
+   `a1d6f812`, `56ee5310`, `cb1e51aa`, `91fd56b4`.
+5. **Deletion fix (phantom goal)** — the one thing DEVICE-VERIFIED today. (`65facc83`.)
+6. **Dead-generator cleanup** — 8 files / 6,403 lines removed. (`a1aab89b`.)
 
-### THE ONE GAP TO BUILD
+### DEPLOYED — everything touched is live (verify against the dashboard, not this file)
 
-`place-week` today places lifts + fixed endurance around athlete pins. It does NOT yet place
-**flexible endurance** (the easy runs, the extra swims/rides). That single addition is the whole
-generalization — week-optimizer's dispersion (`easyRunAnchorAdjacencyPenalty`) folds in here as the
-"place the flexible endurance" step. Everything else place-week already does.
+All PUSHED. Deployed today across passes: `generate-run-plan`, `generate-strength-plan`,
+`materialize-plan`, `generate-combined-plan`, `generate-triathlon-plan`,
+`create-goal-and-materialize-plan`, `arc-setup-chat`, `delete-goal`, `delete-plan`, `activate-plan`,
+`get-week`.
 
-### NEXT STEPS, in order — this stage is READ/TRACE, no build
+### UNVERIFIED — what Michael still needs to check on a device
 
-0. **Are last night's placement commits sound? (gates everything.)** Ten tests are red on `main`:
-   7 in `generate-triathlon-plan/…/triathlon_performance.conformance.test.ts`, 3 in
-   `generate-combined-plan/d031-convergence-e2e.test.ts`. They sit right next to the tri commit
-   (`9f89484b`) and combined-placement commit (`6a2b576d`). For EACH: real REGRESSION, or a STALE
-   FIXTURE asserting old behavior the fix intentionally changed? If a regression, STOP and report —
-   don't build the foundation on broken placement.
-1. **Validate `place-week` can host a tri** (read, not build): can its pin-first model arrange
-   swim/bike/run/brick around fixed long-run + long-ride anchors? How deep does its
-   "endurance-fixed / strength-solved" assumption run — only its inputs (`EndurancePin[]` + lift
-   count), or through the solver?
-2. **Build the generalization:** teach place-week to place flexible endurance around anchors.
-3. **Route** marathon → tri → combined onto place-week; retire `week-optimizer` as a separate authority.
+- **The swap converts to ONE chip and STICKS after a reload.** The duplicate-on-read bug (get-week
+  re-inserting the swapped-away session) was fixed LAST; Michael saw the duplicate before that fix.
+  "Swap → one session, survives a calendar reload" is NOT re-confirmed on device yet.
+- **Existing phantom duplicate rows** from Michael's swap testing are still in the DB — the fix stops
+  NEW ones, not OLD ones. Deletable in the app now (get-week won't re-insert). A read-only audit query
+  to find them all was offered, not run.
+- **Strong Focus / marathon plan shape** — Michael saw plans build (screenshots), no full acceptance run.
 
-### DO NOT re-band-aid the marathon
+### STILL OPEN / next jobs
 
-Commit `95f38bf3` has TWO parts. **KEEP** the `sustainable.ts` change — a real correctness fix (a
-Thursday marathon was emitting 26.2-mi rows on Thu/Fri/Sat/Sun, four marathons; now the plan ends on
-race day). **REPLACE** the `assign-days.ts` `chooseSpreadDays` — a local dispersion band-aid, a
-*second* spread algorithm; it dies when the run plan routes onto the engine.
-
-### STRENGTH SPINE (grounded 2026-08-07)
-
-Wendler 5/3/1 is the chassis. For a concurrent athlete: **5's PRO (no-AMRAP) on leg-loaded lifts near
-key runs; upper body can push** — Wendler's own marathon article says exactly this, and it IS the
-per-modality clearance law. Autoregulate in Wendler's vocabulary (bar speed / "is it affecting the
-run"), not clinical RPE. **Leader/Anchor** blocks = the strength-focus/endurance-focus knob, native
-to 5/3/1 Forever. Science note: Hickson (1980) established the interference effect but is not the last
-word — modern work shows it's manageable-to-negligible for trained athletes with proper spacing, and
-strength is ergogenic for endurance (Rønnestad; running-economy meta-analyses). The placement rules
-(48/24/6/0h) are the durable takeaway.
-
-### STATE AT CLOSE (2026-08-07 late → 08-08 AM)
-
-- **On `main`, NONE pushed:** deletion (`65facc83`), combined placement (`6a2b576d`), marathon
-  race-day + band-aid (`95f38bf3`), tri routed onto week-optimizer (`9f89484b`), audit census
-  (`578c7d08`), D-402 docs (`8fbaa02a`), dead-generator cleanup (merged from
-  `cleanup/quarantine-dead-generators-2026-08-07` — 8 files, 6,403 lines removed, zero test failures
-  introduced, verified against a pristine-main baseline), plus this banner.
-- **Nothing deployed** — server still runs the 5:36pm 08-07 strength-crash fix. Deletion + placement
-  fixes are saved but live NOWHERE. Deploy list when ready: week-optimizer importers (create-goal,
-  generate-combined-plan, generate-triathlon-plan, arc-setup-chat) + generate-run-plan + delete-goal +
-  delete-plan.
-- **Nothing device-verified.**
-- **Stale docs to fix (deletion made them lie):** CAPABILITY-MAP.md:43-46,152-153,
-  POLISH-PUNCH-LIST.md:773-774, GAME-PLAN.md:416 still name the deleted generators as existing ruins.
+1. **Finish the engine unification** — route combined-plan + triathlon onto `week-solver`; retire
+   `week-optimizer`. Last of "one placement engine."
+2. **Doc pass owed:** CAPABILITY-MAP.md, POLISH-PUNCH-LIST.md, GAME-PLAN.md still name the deleted
+   generators as live ruins; and NONE of today's placement/swap work is in CAPABILITY-MAP or
+   DECISIONS-LOG yet — this banner is the only record. A proper end-of-session doc pass is outstanding.
 
 ### WHAT SHIPPED TODAY — the wizard became one themed instrument [D-399, D-400]
 
