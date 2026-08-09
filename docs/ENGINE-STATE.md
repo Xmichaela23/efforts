@@ -23,33 +23,41 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-08 late → 08-09 — planned-session consolidation is ACTIVE; swap feature done)
+## 🧭 NEXT SESSION — START HERE (2026-08-09 — consolidation + swap feature COMPLETE; all pushed/deployed, NOT device-verified in a clean pass)
 
-### ⚡ ACTIVE — planned-session consolidation → read **D-403** in `docs/DECISIONS-LOG-2.md` FIRST
-(The SPEC that used to be here was deleted on completion, per the spec lifecycle in `CLAUDE.md`.)
+### ✅ DONE THIS SESSION — do not rebuild
 
-A planned session is read several ways that drift (duration 4 ways, discipline 2 vocabularies,
-2 mapper shapes) — the root cause of a full day of swap bugs. The SPEC stages the collapse onto ONE
-read-model, verified by golden fixtures.
+**Planned-session consolidation — COMPLETE → D-403 (`docs/DECISIONS-LOG-2.md`).** A planned session's
+duration/discipline/row-shape were read several ways that drifted (the root cause of a full day of
+swap bugs). Now ONE reader each — `src/lib/planned-session/duration.ts`, `src/lib/discipline.ts`, the
+`get-week` server contract — enforced by a source-scan test (`src/lib/planned-session/enforcement.test.ts`)
+that fails if a new file reads the old way. Stages 0/1/2/3/H all shipped; `get-week` deployed. 15
+out-of-scope ladders frozen as KNOWN_DEBT (analysis/completed side, per-file). `useStateTrends` stays
+on the server `bike` vocab (State screen) — do NOT migrate.
 
-- **Stage 0 (golden fixtures pinning current behavior): SHIPPED + committed** (`623ade5c`,
-  `src/lib/planned-session-golden.test.ts`).
-- **Stage 1 (discipline vocabulary): DONE + committed** (`12d92d17`, `src/lib/discipline.ts`). Two
-  accessors — `normalizeDiscipline` (gates: swap/posture/intensity, null on unknown, NEVER run) and
-  `normalizeSessionType` (ranks/labels, keeps walk/hike/mobility/pilates instead of collapsing to '').
-  `useStateTrends` stays on the server `bike` vocab (State screen — do NOT migrate). LESSON: stage-0
-  fixtures pin only the 4 trainable disciplines, so a walk regression slipped through green — widen
-  fixtures whenever a stage touches non-trainable types.
-- **NEXT: Stage 2 (duration).** Everything calls one `plannedDurationSeconds`; delete `computeMinutes`
-  + the inline reads; `resolvePlannedDurationMinutes` becomes a thin wrapper. Client-only, no deploy.
-- Then Stage 3 (row shape, needs a `get-week` deploy, goes alone) → Stage 4 (cleanup + a lint rule;
-  two more ad-hoc sport ladders flagged for it: `MobileSummary.tsx:288`, `GarminDataService.ts:580`) →
-  Stage H (Rules-of-Hooks hoist in `UnifiedWorkoutView`, before stage 3). ONE stage per session;
-  the golden fixtures verify each — a stage that changes a pinned value must show it in the diff.
+**Discipline swap — COMPLETE.** Swap a planned endurance session's sport, on all 3 planned surfaces
+(one shared `PlannedSessionHeader`). Only on `maintain`-posture disciplines (specificity: swap what's
+held, not what the plan trains), only sports in the athlete's own week. Survives a plan rebuild
+(`activate-plan/preserve-athlete-edits.ts`, deployed) and a `get-week` re-read (`swapped_from` tag →
+`get-week/planned-exists-key.ts`). Completes end-to-end (auto-attach reads the live `planned_workouts.type`).
+TrainingPeaks-style mismatch handling — cross-sport manual associate + an unmatched cue. Swapped
+sessions render a clean time+effort block (not the source sport's leftover steps). **Hard-ride swap →
+a real 4×4 bike VO2 workout** (reuses `bikeQualitySession` via `materialize-plan {planned_workout_id}`),
+**gated on FTP** — no usable FTP, the hard-ride offer is withheld (easy swaps unaffected).
 
-Everything below (swap feature, engine routing) is DONE + deployed. Michael's open device checks: the
-swap converts to one chip and STICKS after a reload, and the existing phantom duplicate rows from swap
-testing are deletable in-app now (`get-week` won't re-insert).
+### ⚠️ NOT VERIFIED — Michael's device checks (all pushed + deployed, none confirmed in one clean pass)
+
+- Swap converts to ONE chip and STICKS after a reload; all 3 surfaces render identically.
+- Hard run → "Ride instead" → **Bike Intervals 57:00 with watt steps** (needs Michael's FTP to resolve
+  ≥medium/manual; if it doesn't, the hard-ride offer correctly won't appear — that's the gate, not a bug).
+- Existing phantom duplicate rows from earlier swap testing are deletable in-app now (`get-week` won't re-insert).
+
+### STILL OPEN (recorded, not blocking)
+
+- **Engine unification unfinished:** combined-plan + triathlon still on `week-optimizer`; run + Strong
+  Focus are on `week-solver`. Routing combined+tri onto `week-solver` is the remaining north-star work.
+- **D-403 Stage 1b:** server-side `sportSubtype` returns `run` on an unknown activity (mis-attach,
+  client-fixed only); `workout-detail`'s select; the analysis-side ladders.
 
 ### THE DECISION EVOLVED — the placement engine is `week-solver`, NOT `place-week`
 
