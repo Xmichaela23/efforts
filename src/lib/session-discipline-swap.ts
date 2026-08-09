@@ -45,6 +45,8 @@ export type SwappableSession = {
   description?: string | null;
   /** Minutes. Present on raw `planned_workouts` rows. */
   duration?: number | null;
+  /** The materialiser's expanded prose for the CURRENT discipline. Cleared by a swap. */
+  rendered_description?: string | null;
   /** SECONDS, and the app's authoritative total — see `resolveMinutes`. */
   total_duration_seconds?: number | null;
   computed?: { total_duration_seconds?: number | null } | null;
@@ -118,23 +120,29 @@ export function matrixKindFor(d: Discipline, band: IntensityBand): MatrixSession
  * swim courtesy sessions deliberately carry none.
  */
 function describeSwap(d: Discipline, band: IntensityBand, minutes: number): { name: string; description: string } {
-  const mins = Math.max(1, Math.round(minutes));
+  /**
+   * ⛔ THE COPY DOES NOT RESTATE THE DURATION (2026-08-08). Every surface that shows this session
+   * already prints its time — the chip reads `RN 63:00`, the drawer prints a duration block — so a
+   * description opening `~63 min` says the same number twice on one screen. It read that way because
+   * the first draft wrote copy to be read alone; it never is.
+   *
+   * ⚠️ `minutes` is still passed and still used — for the hard-session line, where "the hard work"
+   * needs no number, and to keep the signature honest about what the copy is derived from.
+   */
+  void minutes;
   if (d === 'swim') {
-    return {
-      name: 'Easy Swim',
-      description: `~${mins} min easy in the pool. Swapped from another sport — time kept, no pace target.`,
-    };
+    return { name: 'Easy Swim', description: 'Easy in the pool. Swapped from another sport — same time, no pace target.' };
   }
   const noun = d === 'ride' ? 'Ride' : 'Run';
   if (band === 'hard') {
     return {
       name: d === 'ride' ? 'Bike Intervals' : 'Hard Run',
-      description: `~${mins} min including the hard work. Swapped from another sport — the effort is the same, the surface is not.`,
+      description: 'Swapped from another sport — the effort is the same, the surface is not.',
     };
   }
   return {
     name: `Easy ${noun}`,
-    description: `~${mins} min easy, all conversational. Swapped from another sport — time kept, no pace target.`,
+    description: 'Easy, all conversational. Swapped from another sport — same time, no pace target.',
   };
 }
 
@@ -226,7 +234,27 @@ export function getDisciplineSwaps(
   const minutes = resolveMinutes(session);
   if (minutes <= 0) return [];
 
-  return available
+  /**
+   * ⛔ HARD SESSIONS ARE SWAPPABLE BETWEEN RUN AND RIDE — BUT NEVER TO SWIM (decided 2026-08-08).
+   *
+   * Michael asked whether `hard` should be excluded like `long` is. It should not, and the engine's
+   * own doctrine is why: `strength-primary-plan.ts` states *"If the athlete has a bike, the doctrine
+   * puts the hard session THERE (`DOCTRINE-aerobic-maintenance.md` §6: 'both means a choice, and the
+   * bike wins') — hard riding costs the legs less than hard running does."* Blocking hard run → hard
+   * ride would forbid the swap the engine would rather have made itself.
+   *
+   * ⚠️ THE REVERSE IS THE ONE THAT COSTS. The same passage: *"Do NOT emit hills as a substitute for
+   * the ride: that spends mechanical budget the doctrine spent the whole day protecting."* So hard
+   * ride → hard run is allowed and WARNS — warn, never gate.
+   *
+   * ⛔ SWIM IS EXCLUDED FOR HARD WORK, and this is not squeamishness. The app does not coach swims at
+   * all: *"swim is booked, not coached … no yardage, no sets, no drills"*, no swim pace is learned,
+   * and swim sessions deliberately carry no `steps_preset`. Offering "hard swim instead" would
+   * promise a prescription this app cannot write. An easy swim is a time block, which it can.
+   */
+  const targets = available.filter((d) => (band === 'hard' ? d !== 'swim' : true));
+
+  return targets
     .filter((d) => d !== from)
     .map((to) => {
       const { name, description } = describeSwap(to, band, minutes);
@@ -240,9 +268,23 @@ export function getDisciplineSwaps(
           // ⛔ duration is NOT in the patch — it is already correct on the row and re-writing it is
           // how a preserved value gets accidentally rounded. Stated so nobody "fixes" the omission.
           steps_preset: null,
+          /**
+           * ⛔ THE STALE RENDERED COPY HAD TO GO WITH IT. `rendered_description` is the
+           * materialiser's expanded prose for the ORIGINAL discipline, and several surfaces prefer
+           * it over `description` (`TodaysEffort:1886`, `UnifiedWorkoutView:542`). Leaving it in
+           * place meant a swapped ride kept printing the run's sentence — the swap would look like
+           * it had failed, or worse, quietly prescribe the wrong session.
+           */
+          rendered_description: null,
           tags: [...new Set([...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))), 'discipline_swapped'])],
         },
-        warnings: swapWarnings(to, band, sameDayOthers),
+        warnings: [
+          ...swapWarnings(to, band, sameDayOthers),
+          // The doctrine's own caution, surfaced rather than enforced.
+          ...(band === 'hard' && from === 'ride' && to === 'run'
+            ? ['Hard running costs the legs more than hard riding — the plan put this on the bike for that reason.']
+            : []),
+        ],
       };
     });
 }

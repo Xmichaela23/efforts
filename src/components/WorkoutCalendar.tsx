@@ -6,7 +6,9 @@ import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePill
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
-import { Activity, Bike, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowLeftRight, Bike, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
+// ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the same function the drawer control uses. See the glyph.
+import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipline-swap';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
@@ -811,6 +813,31 @@ export default function WorkoutCalendar({
     return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider, _src: ev._src }));
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
+  /**
+   * ⛔ WHICH SESSIONS CAN BE SWAPPED — computed ONCE for the whole week, from the same events the
+   * chips render from (2026-08-08).
+   *
+   * ⚠️ IT ASKS `getDisciplineSwaps`, it does not re-state its conditions. Unstarted, endurance, not
+   * the long session, a resolvable duration and another sport available are five rules, and a second
+   * copy of them here is how the glyph and the control start disagreeing about the same session.
+   *
+   * ⚠️ THE WEEK IS THE UNIT for "which sports does this athlete have" — a single day answers "run"
+   * for a Tuesday holding a run and a lift, which is what hid this control everywhere until now.
+   */
+  const swappableIds = useMemo(() => {
+    const rows = (events ?? [])
+      .map((e) => (e as { _src?: unknown })?._src)
+      .filter(Boolean) as Array<Parameters<typeof getDisciplineSwaps>[0] & { id?: string }>;
+    const available = availableDisciplines(rows);
+    const ids: Set<string> = new Set();
+    for (const r of rows) {
+      if (getDisciplineSwaps(r, available).length > 0) ids.add(String(r?.id ?? ''));
+    }
+    ids.delete('');
+    return ids;
+  }, [events]);
+
+
   // Day-stacked ordering (Bug: calendar cells ignored strength_ordering_preference —
   // 4th consumer the May-13 consolidation never wired up). One week-level dominant
   // planId (single-plan weeks are the overwhelmingly common case; same first-found
@@ -1277,6 +1304,22 @@ export default function WorkoutCalendar({
                         <>
                           {content}
                           {renderDisciplineIcon(false)}
+                          {/**
+                            * ⛔ SWAP-ABILITY IS VISIBLE WITHOUT OPENING ANYTHING (2026-08-08). The
+                            * control existed only inside the drawer, so the athlete had to open a
+                            * session to discover the session could be changed. The glyph is the cue.
+                            *
+                            * ⚠️ SAME GATE AS THE CONTROL ITSELF — `getDisciplineSwaps` decides, not a
+                            * second copy of its conditions. A glyph that appears where no swap exists
+                            * teaches the athlete to ignore glyphs; a glyph missing where one does is
+                            * the bug this whole thread has been about.
+                            */}
+                          {swappableIds.has(String(workoutId || '')) && (
+                            <ArrowLeftRight
+                              className="inline-block w-2.5 h-2.5 ml-1 opacity-45 align-baseline"
+                              aria-label="Can be swapped to another sport"
+                            />
+                          )}
                         </>
                       );
                     };

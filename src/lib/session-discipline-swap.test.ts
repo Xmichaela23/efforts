@@ -36,7 +36,10 @@ Deno.test('⛔ VOLUME IS PRESERVED — the duration is untouched and no distance
   const [ride] = getDisciplineSwaps(easyRun, ['run', 'ride']);
   // `duration` is deliberately absent from the patch: the row already holds it.
   assert(!('duration' in ride.patch), 'the swap rewrote a duration it should have left alone');
-  assert(/45 min/.test(String(ride.patch.description)), 'the time the athlete was going to spend was lost');
+  // ⚠️ The COPY no longer restates the duration — every surface already prints it. What matters is
+  // that the row's own time is untouched, which is what "volume preserved" actually means.
+  assert(!/\d+\s*min/.test(String(ride.patch.description)), 'the copy restates a duration the UI already shows');
+  assertEquals(resolveMinutes({ ...easyRun, ...ride.patch }), 45, 'the session lost its time');
   // ⛔ The run token must not ride along — it would be graded against a prescription that is gone.
   assertEquals(ride.patch.steps_preset, null, 'a run token survived onto a ride');
 });
@@ -124,7 +127,7 @@ Deno.test('⛔ STRONG FOCUS: Monday\'s engine-chosen ride flips back to a run', 
   ]);
   const toRun = opts.find((o) => o.to === 'run')!;
   assertEquals(toRun.patch.type, 'run');
-  assert(/90 min/.test(String(toRun.patch.description)), 'the 90 minutes were not preserved');
+  assertEquals(resolveMinutes({ ...mondayRide, ...toRun.patch }), 90, 'the 90 minutes were not preserved');
   assertEquals(toRun.warnings, [], 'an easy run beside a press is legal and should warn about nothing');
 });
 
@@ -135,7 +138,7 @@ Deno.test('⛔ MARATHON: an easy run becomes a ride, same day, same time', () =>
   );
   assertEquals(opts.length, 1);
   assertEquals(opts[0].patch.type, 'ride');
-  assert(/50 min/.test(String(opts[0].patch.description)));
+  assertEquals(opts[0].patch.rendered_description, null, 'the stale run copy would still print');
 });
 
 
@@ -201,7 +204,7 @@ Deno.test('⛔ REAL ROW SHAPE — the duration lives in total_duration_seconds, 
   assertEquals(resolveMinutes(realRow), 63);
   const opts = getDisciplineSwaps(realRow, ['run', 'ride']);
   assertEquals(opts.length, 1, 'the gate still closes on a row with no `duration` field');
-  assert(/63 min/.test(String(opts[0].patch.description)));
+  assertEquals(resolveMinutes({ ...realRow, ...opts[0].patch }), 63);
 });
 
 Deno.test('the authoritative seconds win over a stale minutes field', () => {
@@ -248,7 +251,68 @@ Deno.test('⛔ THE SCREENSHOT CASE END TO END — Tue Easy Run offers the ride',
   );
   assertEquals(opts.map((o) => o.to), ['ride'], 'the swap still offers nothing on the real week');
   assertEquals(opts[0].patch.type, 'ride');
-  assert(/63 min/.test(String(opts[0].patch.description)), 'the 63 minutes were lost');
+  assertEquals(resolveMinutes({ ...tuesdayRun, ...opts[0].patch }), 63, 'the 63 minutes were lost');
   // Tuesday also holds the deadlift — same legs, so it must warn and still offer.
   assert(opts[0].warnings.length > 0 && /same legs/i.test(opts[0].warnings[0]));
+});
+
+// ═══ BIKE DIRECTION — the swap is not accidentally run-only ═══════════════════════════════════
+
+Deno.test('⛔ BK-EZ — an easy RIDE offers "Run instead" and "Swim instead"', () => {
+  // `available.filter(d => d !== from)` is symmetric, but nothing asserted it from the bike side.
+  const bkEz = {
+    id: 'b1', type: 'ride', name: 'Easy Ride', workout_status: 'planned',
+    date: '2026-08-17', total_duration_seconds: 4320, tags: ['easy'],   // BK-EZ 72:00
+  };
+  const opts = getDisciplineSwaps(bkEz, ['run', 'ride', 'swim']);
+  assertEquals(opts.map((o) => o.to).sort(), ['run', 'swim']);
+  assertEquals(opts.find((o) => o.to === 'run')!.patch.type, 'run');
+  assertEquals(resolveMinutes({ ...bkEz, ...opts[0].patch }), 72, 'the ride lost its 72 minutes');
+});
+
+Deno.test('⛔ BK-LR — a long ride correctly offers NOTHING', () => {
+  const bkLr = {
+    id: 'b2', type: 'ride', name: 'Long Ride', workout_status: 'planned',
+    date: '2026-08-22', total_duration_seconds: 6480, tags: ['long_ride'],
+  };
+  assertEquals(intensityOf(bkLr), 'long');
+  assertEquals(getDisciplineSwaps(bkLr, ['run', 'ride', 'swim']), []);
+});
+
+// ═══ HARD SESSIONS — swappable run↔ride, never to swim ═══════════════════════════════════════
+//
+// ⛔ DECIDED FROM THE ENGINE'S OWN DOCTRINE, not taste. `strength-primary-plan.ts` quotes
+// `DOCTRINE-aerobic-maintenance.md` §6: with both sports, the hard session belongs on the BIKE
+// because hard riding costs the legs less. So hard run → hard ride is the swap the engine would
+// have made itself, and forbidding it would contradict the plan that produced the session.
+
+Deno.test('⛔ a hard RUN can become a hard RIDE — the doctrine prefers it', () => {
+  const hill = { id: 'h1', type: 'run', name: 'Hill Repeats', workout_status: 'planned', total_duration_seconds: 1920, tags: ['intervals'] };
+  const opts = getDisciplineSwaps(hill, ['run', 'ride', 'swim']);
+  assertEquals(opts.map((o) => o.to), ['ride'], 'a hard session must not offer a swim');
+  assertEquals(opts[0].patch.name, 'Bike Intervals');
+  assertEquals(opts[0].warnings, [], 'the doctrine-preferred direction should not warn');
+});
+
+Deno.test('⛔ a hard RIDE → hard RUN is allowed and WARNS — it spends protected budget', () => {
+  const bikeInt = { id: 'h2', type: 'ride', name: 'Bike Intervals', workout_status: 'planned', total_duration_seconds: 2700, tags: ['intervals'] };
+  const opts = getDisciplineSwaps(bikeInt, ['run', 'ride', 'swim']);
+  assertEquals(opts.map((o) => o.to), ['run'], 'a hard session must not offer a swim');
+  assert(opts[0].warnings.some((w) => /costs the legs more/i.test(w)), `warnings: ${opts[0].warnings.join(' | ')}`);
+  assertEquals(opts[0].patch.type, 'run', 'the warning became a gate');
+});
+
+Deno.test('an EASY session still offers the swim — only hard work excludes it', () => {
+  const opts = getDisciplineSwaps(easyRun, ['run', 'ride', 'swim']);
+  assert(opts.some((o) => o.to === 'swim'), 'the swim was excluded from an easy session');
+});
+
+Deno.test('⛔ the stale rendered copy is always cleared', () => {
+  // `rendered_description` is the materialiser's prose for the ORIGINAL discipline and several
+  // surfaces prefer it over `description`. Left in place, a swapped ride prints the run's sentence.
+  for (const from of [easyRun, { ...easyRide, tags: ['easy'] }]) {
+    for (const o of getDisciplineSwaps(from, ['run', 'ride', 'swim'])) {
+      assertEquals(o.patch.rendered_description, null, `${o.to}: stale copy survived`);
+    }
+  }
 });
