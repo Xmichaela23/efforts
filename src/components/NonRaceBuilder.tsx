@@ -4077,10 +4077,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ))}
             <div>
               <p className="text-white/70 text-sm mb-2">Start the week of</p>
+              {/* ⛔ NO `min` — A BLOCK MAY START IN THE PAST (2026-08-10).
+                  This carried `min={new Date().toISOString()…}`, which greyed out every earlier day
+                  in the picker, so an athlete who has been running the block for a fortnight could
+                  not say so: the only start they were allowed to declare was one that had not
+                  happened yet.
+
+                  ⚠️ THE SAME QUESTION IS ASKED TWICE ON THIS SCREEN AND THE TWO DISAGREED. The race
+                  flow's "Start the week of" (`:2174`) has never had a floor. One control accepted a
+                  past week and the other refused it, for the same field, in the same builder — so
+                  this is the two being reconciled, not a new permission.
+
+                  ⚠️ IT ALSO FIXES A UTC SLIP ON THE WAY OUT. `toISOString()` is UTC, so after 17:00
+                  Pacific the floor was already TOMORROW and the picker greyed out the athlete's own
+                  current day — the same class of boundary bug as Q-252. It leaves with the floor.
+                  ⛔ The RACE DATE field above still carries `min={…toISOString()…}` and still has
+                  that slip. Left alone: "can a race be in the past" is a different question and was
+                  not asked. */}
               <input
                 type="date"
                 value={state.startDate}
-                min={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
                 className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-[rgba(var(--wiz-accent-rgb,236,233,227),0.50)]"
               />
