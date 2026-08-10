@@ -4,6 +4,23 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> **2026-08-09 — THE STRONG FOCUS WORK ORDER IS DONE, AND IT IS WAITING ON ONE DEVICE PASS.**
+> Six fixes, D-404 → D-408 + Q-269. The block now runs Wendler's **standard** assistance templates
+> rather than the concurrent chapter (arms on press days, legs+abs on leg days, no plane swap); the
+> assistance carries a **suggested** starting weight while the prescription stays "by feel"; the
+> deload week eases the **endurance** as well as the bar; the AMRAP catch-up proposes a training max
+> at cycle boundaries, consent-first, **at the app's 85% and not the book's 90%**; and anchor days
+> **lock at input** so a collision cannot be entered. Five commits on `main`, 14 edge functions
+> deployed `2026-08-10 04:35:19`.
+> ⛔ **NONE OF IT IS DEVICE-VERIFIED, and the acceptance run was deliberately held to the end so it
+> would be ONE pass.** That pass is the next thing that happens — checklist in the `NEXT SESSION`
+> banner at the top of `ENGINE-STATE.md` and in `POLISH-PUNCH-LIST.md`.
+> **Parked on purpose, both with their reasoning written where someone would look:** the
+> `lower_body_strength × long_ride = 0` clearance (its own change, its own sweep) and Q-269 (the
+> 3-day shape's single weekly pull — verified against Wendler p.76, tagged do-not-fix).
+> **Next after the run:** the engineer stage (`HANDOFF-placement-unification-2026-08-07.md`) or
+> [Q-267] plan-generator fragmentation.
+
 > **2026-08-07 — THE NON-RACE BUILDER GOT ITS VISUAL LANGUAGE.** It is now the "digital galaxy" with
 > a discipline-driven accent [D-399]; Strong Focus wears amber end to end and the sport selectors
 > carry their own colours (run gold, ride green); the Train card is a Gauge (was the run icon); the

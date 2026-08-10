@@ -8,6 +8,28 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE STRONG FOCUS ACCEPTANCE RUN (2026-08-09, pushed + deployed, **NOT device-verified**)
+
+**D-404 → D-408 + Q-269. Five commits, 14 edge functions, zero device passes.** Held to the end on
+purpose so it is ONE run rather than six — the full checklist is in the `NEXT SESSION` banner at the
+top of `ENGINE-STATE.md`, which is the authoritative copy. In short:
+
+**Build:** Strength Focus, 12 weeks, run · long run Sun · long ride Sat · hard day Thu (run, 3-min
+hills) · a loadable push pick. Keep the hard day off the long-run day.
+
+- [ ] **Intake** — anchor-held days grey out and say which anchor; tapping your own day releases it;
+      the club night cannot land on the long-run day; third accessory dropdown is "Single-leg".
+- [ ] **Week 1** — press days keep the pull pick and finish on triceps; leg days are leg · leg · abs
+      with no chin-up; loadable accessories show a greyed overwritable weight, chins/dips blank.
+- [ ] **Week 4** — Thursday is an easy run; endurance down ~⅓; strength 60 → 35 min.
+- [ ] **End of week 4** — log the week-3 AMRAP, then the training-max card on the coach week tab.
+      Tapping it is the only consent-gated write in the batch.
+
+⚠️ **The 7 failing `triathlon_performance.conformance` tests are pre-existing** (verified with the
+changes stashed) — not part of this run.
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE WIZARD VISUAL LANGUAGE + STRONG FOCUS (2026-08-07, pushed/deployed, **preview-verified only**)
 
 [D-399], [D-400]. Confirmed in the browser preview, not on a device. One pass through Focus closes it:

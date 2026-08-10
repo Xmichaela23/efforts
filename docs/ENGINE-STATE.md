@@ -23,286 +23,98 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-09 — consolidation + swap feature COMPLETE; all pushed/deployed, NOT device-verified in a clean pass)
+## 🧭 NEXT SESSION — START HERE (2026-08-09 — Strong Focus work order COMPLETE: D-404→D-408 + Q-269, all pushed + deployed, **NOT device-verified — the acceptance run is pending**)
 
-### ✅ DONE THIS SESSION — do not rebuild
+### ⛔ YOUR JOB: DO NOT START NEW WORK. THE ACCEPTANCE RUN IS OUTSTANDING.
 
-**Planned-session consolidation — COMPLETE → D-403 (`docs/DECISIONS-LOG-2.md`).** A planned session's
-duration/discipline/row-shape were read several ways that drifted (the root cause of a full day of
-swap bugs). Now ONE reader each — `src/lib/planned-session/duration.ts`, `src/lib/discipline.ts`, the
-`get-week` server contract — enforced by a source-scan test (`src/lib/planned-session/enforcement.test.ts`)
-that fails if a new file reads the old way. Stages 0/1/2/3/H all shipped; `get-week` deployed. 15
-out-of-scope ladders frozen as KNOWN_DEBT (analysis/completed side, per-file). `useStateTrends` stays
-on the server `bike` vocab (State screen) — do NOT migrate.
+Six fixes shipped across five commits and fourteen edge functions today, and **not one line of it has
+been seen on a device.** Michael deliberately held the acceptance run to the end so it would be ONE
+pass instead of six — *"no mid-stream acceptance runs."* That pass has not happened yet.
 
-**Discipline swap — COMPLETE.** Swap a planned endurance session's sport, on all 3 planned surfaces
-(one shared `PlannedSessionHeader`). Only on `maintain`-posture disciplines (specificity: swap what's
-held, not what the plan trains), only sports in the athlete's own week. Survives a plan rebuild
-(`activate-plan/preserve-athlete-edits.ts`, deployed) and a `get-week` re-read (`swapped_from` tag →
-`get-week/planned-exists-key.ts`). Completes end-to-end (auto-attach reads the live `planned_workouts.type`).
-TrainingPeaks-style mismatch handling — cross-sport manual associate + an unmatched cue. Swapped
-sessions render a clean time+effort block (not the source sport's leftover steps). **Hard-ride swap →
-a real 4×4 bike VO2 workout** (reuses `bikeQualitySession` via `materialize-plan {planned_workout_id}`),
-**gated on FTP** — no usable FTP, the hard-ride offer is withheld (easy swaps unaffected).
+**So: if Michael arrives with a screenshot or a built plan, that is the session. Read the checklist
+below, compare against it, and fix what it shows.** If he arrives with something else, ask whether the
+acceptance run happened before you take new scope — a green suite proves the code is right, not that
+it is *right on a phone*.
 
-### ⚠️ NOT VERIFIED — Michael's device checks (all pushed + deployed, none confirmed in one clean pass)
+**The plan to build (these parameters, not others):** Strength Focus, 12 weeks, **run** as the
+endurance discipline. Long run **Sunday**, long ride **Saturday**, hard day **Thursday / run /
+3-min hills**. A **loadable** push pick (Dumbbell Shoulder Press or Dumbbell Bench Press) so the
+weight suggestion has something to show. ⚠️ Keep the hard day off the long-run day — the picker now
+locks that, and locking it IS one of the things to verify.
 
-- Swap converts to ONE chip and STICKS after a reload; all 3 surfaces render identically.
-- Hard run → "Ride instead" → **Bike Intervals 57:00 with watt steps** (needs Michael's FTP to resolve
-  ≥medium/manual; if it doesn't, the hard-ride offer correctly won't appear — that's the gate, not a bug).
-- Existing phantom duplicate rows from earlier swap testing are deletable in-app now (`get-week` won't re-insert).
+**Reference numbers** for a 150/200/225/95 athlete: TM `{bench:125, squat:170, deadlift:190,
+overheadPress:80}`, week-1 top sets **65 / 105 / 140 / 160**.
 
-### STILL OPEN (recorded, not blocking)
+### ✅ WHAT TO LOOK AT, IN ORDER
 
-- **Engine unification unfinished:** combined-plan + triathlon still on `week-optimizer`; run + Strong
-  Focus are on `week-solver`. Routing combined+tri onto `week-solver` is the remaining north-star work.
-- **D-403 Stage 1b:** server-side `sportSubtype` returns `run` on an unknown activity (mis-attach,
-  client-fixed only); `workout-detail`'s select; the analysis-side ladders.
+**Intake**
+- The day pickers **grey out and NAME** a day another anchor holds ("Sat — long ride"), on all three
+  cards including the `WeekDayRow` on the intake step.
+- **Tap your own picked day to release it.** Every card. Then that day frees up everywhere.
+- Putting the club night on the long-run day should be **impossible**, not silently wipe the long run.
+- Accessory card: third dropdown is **"Single-leg"**, four options, no core/arm. The intro no longer
+  promises "you'll get the opposite movement instead."
 
-### THE DECISION EVOLVED — the placement engine is `week-solver`, NOT `place-week`
+**Week 1**
+- Press days: your pull pick **stands** (no swap to a row); third slot is **triceps**.
+- Squat/deadlift days: **two leg movements + abs, NO chin-up**.
+- Loadable accessories carry a **greyed, overwritable** weight; chins and dips are **blank**.
+- Session description reads *"On the assistance: split the reps…"* after the main-lift labels.
+- Easy runs read *"Easy by choice this block"* — not "held underneath at maintenance".
 
-The 08-07 banner said "place-week is the trunk." That was superseded by the actual build: everything
-routed onto **`_shared/week-solver.ts`** — the clean anchor solver (typed refusals, N lifting days,
-parameterized max-days), reading the one shared law (`_shared/schedule-session-constraints.ts`).
-`place-week` is now a **fallback** for Get Stronger only. Do not resurrect the place-week-as-trunk framing.
+**Week 4 (deload)**
+- Thursday is an **Easy Run**, not Hill Repeats.
+- Endurance drops ~⅓ (140 → 92 min on the fixture); strength 60 → **35** min.
 
-**Where each plan places its days now (verify by grep before trusting):**
-- `week-solver` — **run plans** (marathon + time-goal, via `generate-run-plan/generators/assign-days-solver.ts`)
-  AND **Strong Focus** (`strength-primary-plan.ts:1251 solveWeek`).
-- `week-optimizer` — **combined-plan** and **triathlon**, still. NOT yet migrated.
-- So there are STILL TWO live engines. **The remaining unification: route combined + tri onto
-  `week-solver` too, then `week-optimizer` retires.** That is the open north-star work.
+**End of week 4** — log the week-3 AMRAP, then check the coach week tab for *"Adopt your Bench Press
+working number"*. **Tapping it is the only consent-gated write in the whole batch.**
 
-### WHAT SHIPPED TODAY — do NOT re-litigate; built, pushed, deployed
+### ✅ SHIPPED THIS SESSION — DO NOT RE-LITIGATE
 
-1. **Run plans + Strong Focus route through `week-solver`.** The long-run day is the ATHLETE'S pick
-   (the `'Sunday'` hardcode killed in 5 places in `sustainable.ts`); lift placement moved off the
-   Higdon/Daniels weekday grid onto the engine; the `chooseSpreadDays` band-aid retired. (`3bd57a7c`.)
-2. **Strong Focus builds exactly what the wizard asks** — one hard day on the picked discipline,
-   everything else easy, picked run/ride counts + typed volumes honored exactly, no sport silently
-   dropped, nothing capped. Hard ride = Helgerud 4×4 VO2 (`bikeQualitySession` — was built and never
-   fired). No priority inference; the wizard already asks. (in `3bd57a7c` + follow-ups.)
-3. **Recovery placement:** the day after a long run prefers the CROSS-sport easy session (ride/swim
-   over run) — modality-aware, SCORED not gated. (`c60edd3a`.)
-4. **Discipline swap (run/ride/swim) — full feature, all plans.** In-session swap on any planned
-   endurance session (`UnifiedWorkoutView`, `TodaysEffort`, calendar glyphs); one shared lib
-   `src/lib/session-discipline-swap.ts`. Survives a plan rebuild (`activate-plan/preserve-athlete-edits.ts`).
-   Completes end to end (auto-attach reads the live `planned_workouts.type`). TrainingPeaks-style
-   mismatch handling — cross-sport manual associate (`AssociatePlannedDialog`) + an unmatched cue that
-   fires only when the day still owes a session. `get-week` no longer re-inserts the swapped-away run
-   (`swapped_from:<discipline>` tag → `get-week/planned-exists-key.ts`). Commits `842c6ae7`,
-   `a1d6f812`, `56ee5310`, `cb1e51aa`, `91fd56b4`.
-5. **Deletion fix (phantom goal)** — the one thing DEVICE-VERIFIED today. (`65facc83`.)
-6. **Dead-generator cleanup** — 8 files / 6,403 lines removed. (`a1aab89b`.)
+All five commits are on `main` (`eee1a86c`, `09796193`, `f0273584`, `c49f9f7d`, `d2941935`) and all
+14 edge functions are deployed at `2026-08-10 04:35:19`.
 
-### DEPLOYED — everything touched is live (verify against the dashboard, not this file)
+- **D-404** — a strength-purpose block runs Wendler's **standard** assistance templates, not the
+  concurrent chapter. The p.86 plane-swap is gated behind `AssistanceTemplate` and **off** by default;
+  upper-day third slot is **arms**, not core. `isDirectArm()` is a **second accessor, not a new
+  `MovementPattern` value** — a pushdown's pattern is `horizontal_push` and must keep colliding with
+  bench.
+- **D-405** — leg days are **leg · leg · abs, no pull** (p.51). Also halved a real dose problem D-404
+  opened: the pull pick was standing on all four days at a 50-rep floor that only scales **up**.
+- **D-406** — assistance carries a **suggestion**, and the prescription is still "by feel".
+  `load_prescribed` stays `false` (it is the *identity* of an assistance row, D-370). Derivation has
+  **no invented percentage** — `weightForReps(e1RM, 12, rir 2)`, Wendler p.32 inverted.
+- **D-407** — the deload week eases the **endurance** too. Intensity first, then volume to ⅔.
+- **D-408** — AMRAP catch-up at cycle boundaries, consent-first. ⛔ **Uses the app's 85%
+  (`WORKING_NUMBER_PCT_OF_1RM`), NOT the book's 90%** — 90% would silently ratchet every athlete's
+  training max by ~6% disguised as adopting their own AMRAP.
+- **Scheduler** — anchor days lock at input; two silent unpicks removed; the composer's pin-absorption
+  guards deleted (they hid `SOLVER_GRIDLOCK_ANCHOR_COLLISION` and discarded matrix-legal pairs).
 
-All PUSHED. Deployed today across passes: `generate-run-plan`, `generate-strength-plan`,
-`materialize-plan`, `generate-combined-plan`, `generate-triathlon-plan`,
-`create-goal-and-materialize-plan`, `arc-setup-chat`, `delete-goal`, `delete-plan`, `activate-plan`,
-`get-week`.
+### ⚠️ UNVERIFIED / OPEN — and what would settle each
 
-### UNVERIFIED — what Michael still needs to check on a device
+- **EVERYTHING ABOVE IS DEPLOYED-NOT-VERIFIED.** Settled by the acceptance run.
+- **7 failing tests in `protocols/triathlon_performance.conformance.test.ts` are PRE-EXISTING.**
+  Verified identical with every one of this session's changes stashed. **They are not yours; do not
+  "fix" them as part of a Strong Focus follow-up.** Same for 2 `deno check` type errors
+  (`_shared/state-trend/assemble.ts`, `strength-system/placement/solver.ts`) and the lint baseline.
+- **The ride-clearance number is PARKED, deliberately** — `lower_body_strength × long_ride = 0`. That
+  0 is a *reasoned* decision (concentric, no impact transient), not an oversight; the stale thing was
+  `place-week.ts`'s doc comment claiming 48h, now fixed. Whether 0 is *right* is open and written into
+  that file: the damage half is well supported, the "therefore zero fatigue cost" half is stronger
+  than the literature. **Moving it is its own change with its own sweep, not a number to set on the fly.**
+- **Q-269 — the 3-day shape pulls once a week, INTENTIONAL, tagged do-not-fix.** Verified against
+  Wendler p.76. If a rep-count table makes it look like a hole, read Q-269 before touching anything.
+- **A four-day loaded-days score term was BUILT, SWEPT, AND REVERTED.** Three measurements, all inert
+  (210 weeks, 714 run-days identical with the term stashed). **Do not rebuild it** — the reason it
+  cannot move anything is upstream, in the ride-clearance 0 above.
 
-- **The swap converts to ONE chip and STICKS after a reload.** The duplicate-on-read bug (get-week
-  re-inserting the swapped-away session) was fixed LAST; Michael saw the duplicate before that fix.
-  "Swap → one session, survives a calendar reload" is NOT re-confirmed on device yet.
-- **Existing phantom duplicate rows** from Michael's swap testing are still in the DB — the fix stops
-  NEW ones, not OLD ones. Deletable in the app now (get-week won't re-insert). A read-only audit query
-  to find them all was offered, not run.
-- **Strong Focus / marathon plan shape** — Michael saw plans build (screenshots), no full acceptance run.
+### 🔎 IF YOU NEED TO GO DEEPER
 
-### STILL OPEN / next jobs
-
-1. **Finish the engine unification** — route combined-plan + triathlon onto `week-solver`; retire
-   `week-optimizer`. Last of "one placement engine."
-2. **Doc pass owed:** CAPABILITY-MAP.md, POLISH-PUNCH-LIST.md, GAME-PLAN.md still name the deleted
-   generators as live ruins; and NONE of today's placement/swap work is in CAPABILITY-MAP or
-   DECISIONS-LOG yet — this banner is the only record. A proper end-of-session doc pass is outstanding.
-
-### WHAT SHIPPED TODAY — the wizard became one themed instrument [D-399, D-400]
-
-The non-race builder was generic-teal "wellness app". It is now the "digital galaxy": a deep-space
-frame with a **discipline-driven accent** — `--wiz-accent-rgb` ← `SPORT_COLORS` via `StepLayout`'s
-`accent` prop, one system for every step. **[D-399]** holds the whole visual language + its reference
-doc (`docs/REFERENCE-wizard-visual-language.md`).
-
-- **Marathon flow** (commit `a2d772ee`): galaxy/gold, flow reorder (goal → race → level → days →
-  strength → intent → confirm), "Your week" restructured to **anchors-only** (run days read-only
-  "Auto"; only long-run + standing-session tappable), "Club night" → "Standing session · run or ride
-  club". This CONTINUES [D-398] — that entry's "C club night" roles + per-day role fill are superseded
-  (see its back-annotation).
-- **Strong Focus** (commit `749c2072`): the amber accent now engages across the whole `get_stronger`
-  flow (it rendered off-white before — `wizAccent` had no goal→colour fallback the way marathon did).
-  The Run/Ride hard-day toggle + Runs/Rides count chips carry their own `SPORT_COLORS` (run gold, ride
-  green); the block chrome stays amber.
-- **Two sigil fixes** (uncommitted at handoff — commit with the docs): Train card `Activity` →
-  `Gauge` (it was literally the run discipline icon; the LIVE card is `GoalsScreen.tsx:2394`,
-  NonRaceBuilder's `ENTRY_COPY` is a decoy); the Focus heading (`GoalsScreen.tsx`) now wears the
-  `eye-mark` sigil like the Focus tab + the wizard step titles.
-- **Strength `LOWER_HYPERTROPHY` crash-guard** [D-400]: "Keep it heavy" (`neural_speed`) emitted an
-  unregistered intent → `INTENT_DEFS[intent].category` threw → the whole build crashed. Registered the
-  intent + made `isLower/isUpper/isFullBodyIntent` total. **Deployed to all 7 strength bundlers.**
-
-⚠️ **NONE OF TODAY'S UI IS DEVICE-VERIFIED** — browser-preview only. On the phone, check: the amber
-Strong Focus flow, the gold/green sport chips, the Gauge Train icon, the Focus eye-mark, and the
-restructured marathon "Your week" card ([Q-264] extended — the chip question now targets an
-anchors-only card). The 08-06 marathon plan-shape work ([D-392]…[D-398], `generate-run-plan` v180 /
-`create-goal-and-materialize-plan` v308 / `materialize-plan` v252) is still FIXTURE-verified only.
-
-
-### ⚠️ ABOUT THIS HANDOFF — read before you trust it
-
-**This session closed badly and you should know how, because it changes what to check.**
-
-**The intake card was built four times and rejected four times.** Not because the design was hard —
-because I kept guessing at what Michael meant instead of asking, and each rebuild burned an hour of
-his evening. The rejected layouts are in [D-398] with their reasons. **If you find yourself about to
-redesign that card: stop and ask him what he wants to see, in one question.**
-
-**These docs were written at the end of that**, by the person who made every one of the changes. So:
-
-- **The numbers ARE verified.** All 14 load-bearing claims in the protocol section above were checked
-  against the code mechanically at close (peaks, shares, prerequisite bases, the 9-week arc week by
-  week, the 20-week no-op, taper ratios, the 10% cap, the peak-week date rule). 14/14. Most are also
-  test-backed. Re-run that audit rather than re-deriving it.
-- **A version number was wrong** — the close said `generate-run-plan` v178; it was v180. Found by
-  checking `supabase functions list` instead of trusting what I had written mid-session. **Verify
-  deployed versions against the dashboard, not against this file.**
-- **Three docs were stale and only found because Michael asked twice** — CAPABILITY-MAP #15
-  (it said the old race form still builds marathons; run was routed out of it),
-  `ENDURANCE-PROVENANCE.md` (traced a long-run path that no longer exists), and
-  `SPEC-shared-endurance-model.md` (its E3 step would DELETE the tables the marathon block is now
-  built on). All patched — but the lesson is that the sweep should have run before the close, not
-  after being asked for it twice.
-- **What I would trust least here:** anything about INTENT or what remains. The mechanical claims
-  hold; my read of what Michael wants was wrong repeatedly on 2026-08-06.
-
-**The pattern of the night, and it is worth carrying forward:** six separate defects were the same
-shape — *a computed value overwritten by a literal, or a screen quoting a plan the engine did not
-build.* Three hardcoded taper ceilings, a hardcoded race-week long run, a duration priced at a
-fitness-tier constant while the sessions printed another pace, and an intake ceiling reading a
-different arc than the engine. If you find a seventh, that is the pattern — not a coincidence.
-
-### 📐 HOW A MARATHON BLOCK IS BUILT, END TO END (as of 2026-08-06)
-
-**Read this before changing any number in it.** Seven decisions ([D-392]…[D-398]) rebuilt this in one
-night; this is the result assembled in one place, because assembling it from seven entries is how the
-next session gets it wrong.
-
-**The model, in one line: it is a PRESCRIPTION with a stated prerequisite — not a plan that adapts to
-wherever the athlete is.** Published marathon plans work this way (Higdon's "about a year of running",
-Pfitzinger's 55-mile weeks). The alternative was tried the same morning and produced a 9-week block
-peaking at a 9-mile long run — honest about itself, and not a marathon plan.
-
-**1. The window.** `durationWeeks = max(floor, min(weeksOut, 20))`, then **trimmed to the plan week
-race day falls in** (`planWeekContaining`). `weeksOut` counts from today; the block opens next Monday,
-so those differ and the untrimmed version built an empty week after the race.
-
-**2. The peak week.** The last week whose long run sits **more than 14 days out** (`longRunPeakWeek`).
-Not `duration − 2`: inside 14 days `getRaceProximitySession` clamps the long run, so a peak landing
-there is silently halved.
-
-**3. The prerequisite** (`marathonPrerequisiteFor`) — computed from the window, never stored. Work
-backward from the peak at the only two rates allowed: **2 mi/week** on the long run (the rows' own
-biggest step) and **10%/week** on volume.
-
-| level | peak long run | peak weekly | share | example: 9-week base |
-|---|---|---|---|---|
-| beginner | 18 | 40 | 45% | 27 mi/wk + a 10-mile long run |
-| intermediate | 20 | 50 | 40% | 34 mi/wk + 12 |
-| advanced | 20 | 60 | 33% | 41 mi/wk + 12 |
-
-Short windows quote a high base; **14+ weeks stops binding** (bottoms out at the row's own opening,
-20 mi/wk + 6). Below ~5 weeks it is **unmeetable** and the plan names the half instead.
-
-**4. The long-run arc** (`buildLongRunArc`). Enters at the prerequisite (or higher, if the athlete's
-own long run beats it) and climbs the row's own ladder — one rung a week, cutback every 4th at the
-row's own depth. When the row cannot reach its peak in the weeks available, the ramp is GENERATED at
-+2/week instead. **Capped at 20 miles whatever the window** — extra weeks buy volume and weeks near
-the peak, never a bigger single run. Peak lands on the peak week; taper follows at Pfitzinger's shape
-(**0.78 / 0.55** of peak), anchored to the last week that carries a long run so race week does not
-push the descent late. A 9-week beginner: **10 / 12 / 14 / 11 / 16 / 18 / 14 / 10 / race.**
-
-**5. Weekly volume** (`calculateWeeklyMileage`). Opens at the prerequisite base, ramps to the peak
-weekly **capped at 10%/week**, and **peaks on the same week the long run does** (it used to target
-`taperStart`, three weeks later, so the 18-miler landed in a 36-mile week). A cutback week neither
-advances the trend nor becomes the base for the next ceiling, and **the peak week is never a cutback
-week** — it is struck from `recovery_weeks` at the source so the day count, the volume, the speedwork
-gate and the strength overlay cannot disagree about it.
-
-**6. Session sizing.** Easy runs are **3 mi to half the long run (max 10)**, remainder spread rather
-than rounded per-day. Race week is **anchors-then-fill**: the shakeout and the Sunday long run claim
-slots first, race day is exempt from the day count. Two proximity ceilings survive as **fractions of
-the peak** (0.8 at 8-14 days, 0.6 inside 7) — flat 8 and 10 crushed the taper into 18 → 10 → 8.
-
-**7. Paces and durations.** The athlete's **SELECTED** easy pace (`resolveCurrentRunEasyPace` —
-"use my runs" / "use my number") anchors everything: the VDOT is derived FROM it, the exact number
-prints verbatim, and `milesToMinutes` is overridden to price every duration at it. A 5K time is a
-seed, not the anchor. Nothing on file → RPE wording, never an invented pace.
-
-**8. Race day** is a row on the calendar, on the actual race weekday, **anchored to the distance**
-(`longrun_26.2mi_easypace`) with duration derived from pace — never the reverse, which is what
-rendered a marathon as 21.3 miles.
-
-**9. What the athlete is told.** The plan states its prerequisite (*"assumes you're already running
-about 25 miles a week with a long run around 10. If that's not where you are, do the half"*). The
-intake states the mileage floor and, when the block cannot reach the norm, the peak it WILL reach —
-off the same arc the engine builds, so the two cannot disagree. The timeline gate **warns**; the only
-hard refusals left are under four weeks (the phase builder cannot lay out a block) and the pace
-benchmark on a time goal.
-
-**⚠️ WHAT IS NOT DONE:** [Q-262] intermediate/advanced never walked end to end; [Q-263] advanced
-cannot reach 60 mi/wk on four run days and nothing says so; [Q-264] none of the intake work is
-device-verified.
-
-
-### (superseded 2026-08-06 late — previous banner, kept for its shipped record) 2026-08-06 night — THE HARD-RUN TERRAIN FALLBACK SHIPPED; next is the Q-256 TM ceiling, which has a DATE)
-
-### YOUR JOB — [Q-256] the 5/3/1 training-max ceiling reads a STALE signup 1RM
-
-`tmCeilingLb` (`wendler-531.ts:197`) caps the training max at 90% of `one_rep_maxes_at_build` — a
-signup number that never updates. On a clean block, **squat (TM 90→95) and OHP (85→90) STALL after ONE
-cycle (~Aug 24)** while bench/deadlift keep climbing. Fix: feed the ceiling from the LEARNED /
-AMRAP-implied max, not the frozen signup. The +5/+10 increment stays (Wendler); only the *ceiling
-reference* changes. ⚠️ **Michael rules on the approach BEFORE it is built** — it changes safety logic.
-First stall ~Aug 24, so it has a date.
-
-Second: **[Q-252]** the Sunday State blackout — recurs every Sunday 17:00 Pacific, blanks the State
-performance section. Top non-strength item.
-
-### WHAT SHIPPED — the hard-run terrain fallback [D-391]. PUSHED + DEPLOYED + card UI DEVICE-VERIFIED; placement fixture-verified.
-
-The strength block's ONE hard aerobic session now adapts to terrain. On "Your week" → Hard day → Run,
-four cards appear (3-min hill preselected): **3-min hill · treadmill · short hill (10×1 min) · flat**.
-Hard ride and None show nothing (bike = existing 4×4 Helgerud, inferred). **This CLOSES [Q-260]** — the
-answer was a four-option menu, not the 40 s format Q-260 warned against.
-
-- 3 commits `caae1283` → `53e050b8`. Deployed: `generate-strength-plan`, `materialize-plan`,
-  `create-goal-and-materialize-plan`, `generate-run-plan` (the last bundles the changed
-  `week-solver.ts` + `strength-primary-plan.ts` via `assign-days`). Client via Netlify.
-- Sessions: `hillSession` / `flatSession` / the short-hill + treadmill builders in
-  `strength-primary-plan.ts`; terrain travels `preferred_days.quality_run_terrain` → `hard_day.terrain`
-  → session; absent = 3-min hill, so existing plans are unchanged.
-- Flat carries a **PREFERRED (not required) 48 h clearance** from heavy legs (`week-solver.ts`
-  `preferredClearanceShortfall`, scored above `spreadPenalty` / below `breachPenalty`): takes the extra
-  separation when the week allows, silently falls back to the matrix 24 h otherwise, and **can never
-  breach another anchor to buy it.** 24-shape sweep: 0 breaches, preference taken 8/24.
-- **DEVICE-VERIFIED:** the four cards render and select on "Your week". ⚠️ **NOT device-verified:** the
-  flat placement in a live plan (fixture-verified only — 19 fixtures + the sweep).
-- Client wiring gotcha, now fixed (`9728e485`): the menu was first attached to the DEAD `hardday` step
-  (removed in the 2026-07-28 scheduler rebuild); it now lives on the live `schedule` screen keyed on
-  `'run' in state.qualityDays`. The dead step is deleted.
-
-### STILL OPEN FROM BEFORE — untouched
-
-- **[Q-257]** Strength Focus preconditions unsaid. **[Q-258]** Focus front door not device-verified.
-- Back-annotations owed on **Q-212 / Q-214 / Q-215** — D-385/386 supersede parts of all three and the
-  old entries do not know it.
-- The hill session's planned duration excludes the open descents, so the calendar under-reads it
-  (~32 min for a ~40 min session). Not broken; unstated.
-- **[chip]** 7 `triathlon_performance.conformance` failures (missing vertical pull / face pulls),
-  pre-existing, likely D-385 fallout. Spawned as its own task — not this feature's regression.
+`docs/DECISIONS-LOG-2.md` D-404→D-408 carry the full reasoning and the back-annotations to D-328/D-385.
+`docs/OPEN-QUESTIONS-2.md` Q-269. The assistance load rule is at the top of `src/lib/assistance-menu.ts`
+and D-406 **narrowed** it rather than reversing it — read that header before touching anything that
+prices an accessory.
 
 ---
 
