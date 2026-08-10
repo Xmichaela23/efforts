@@ -522,7 +522,22 @@ are not: delete the 9px role letters entirely — the three question rows undern
 
 ---
 
-## Q-265 — The Strong Focus hard-day toggle lets an athlete pick BOTH a run and a ride hard day (2026-08-07, **unverified — noticed in passing, LEAD not a confirmed bug**)
+## Q-265 — The Strong Focus hard-day toggle lets an athlete pick BOTH a run and a ride hard day (2026-08-07, **✅ CONFIRMED AND CLOSED 2026-08-10**)
+
+> ✅ **CLOSED 2026-08-10 — it was real, it was reproduced on device, and it is fixed.** The lead was
+> right: the toggle wrote each discipline independently, both chips lit, and Michael hit it on a
+> device screenshot. It is a **radio group** now — picking a discipline REPLACES the other
+> (`NonRaceBuilder.tsx`, the hard-day row's `role="radiogroup"`); tapping the lit one still clears it,
+> because the whole row is optional.
+>
+> ⚠️ **AND IT WAS WORSE THAN THE COPY MISMATCH THIS ENTRY NOTICED.** Three things broke together
+> whenever both were selected: D-327 has no answer for two hard disciplines; `hardDaySport` resolves
+> run-first, so the day row wrote only to `run` and left `bike` holding `''` — which the Continue gate
+> then blocked on, invisibly; and the terrain menu is gated on `'run' in qualityDays`, so an athlete
+> who had just tapped Ride was reading *"What you can run it on"*. The answer to this entry's own
+> question — intended or not — is **single-select**, and the copy was right all along.
+>
+> Everything below is history.
 
 On the Strong Focus scheduler ("Your week"), the copy says *"One hard session a week holds top-end
 aerobic fitness"* — singular. But the Hard-day control (`NonRaceBuilder.tsx` ~3026) toggles `run` and
@@ -648,3 +663,59 @@ day in a standard template. A rep-count table is not either of those.
 
 **Where this is pinned in code:** `src/lib/assistance-menu.ts`, the `ROLE_BY_DAY.lower` block — the
 one place a future session would edit to put a pull back on the leg days. It carries a pointer here.
+
+---
+
+## Q-270 — The endurance-frequency default chain is FOUR layers deep and it is intentional (2026-08-10, **INTENTIONAL — DO NOT "FIX"**)
+
+⛔ **This entry exists because the outermost layer looks exactly like a bug, and one session already
+came within a commit of removing it.** Read this before touching any of the four.
+
+An unset `run_days` on a Strength Focus build becomes **two runs a week**, via four independent
+fallbacks, each of which would separately produce the same 2:
+
+| # | where | what it does |
+|---|---|---|
+| 1 | `create-goal-and-materialize-plan/index.ts:~2583` | `run_days` absent or outside 2–4 → `2` |
+| 2 | `generate-strength-plan/index.ts:136` | `endurance_frequency` non-finite → `2` |
+| 3 | `generate-strength-plan/index.ts:257` | stored on the plan row as `endurance_frequency ?? 2` |
+| 4 | `shared/strength-system/strength-primary-plan.ts:1531` | `DEFAULT_ENDURANCE_SESSIONS = 2` |
+
+⚠️ **#4 IS A FLOOR, NOT A FALLBACK** — `Math.max(2, Math.min(4, …))`. A *selected* run block never
+runs fewer than two days, by design. So **removing #1 alone changes nothing observable**: #2 supplies
+2 and #4 floors at 2 anyway. Anyone "cleaning this up" has to understand they are proposing to change
+the minimum run frequency of the block, not to delete a stray literal.
+
+### The two legitimate callers, traced 2026-08-10
+
+The branch is reached only for `posture.strength === 'develop'` with no endurance discipline
+developing. Eight call sites exist across `GoalsScreen.tsx`, `useArcSetupComplete.ts` and
+`useConflictResolutionLoop.ts`; two of them arrive with no `run_days` **correctly**:
+
+1. **A bike-only Strength Focus block.** `assemblePayload` sends `run_days` only when
+   `strength === 'develop' && runDays >= 2`, and an athlete who dropped running has no count to send.
+   Downstream `runSelected` is false (`strength-primary-plan.ts:1341`) and `askedRunDays` is `0` — the
+   value is computed and never read. Failing loudly here would kill a build over a meaningless field.
+2. **`mode: 'build_existing'` on a goal row stored before 2026-08-10.** Four of the eight sites
+   rebuild from the goal's stored `training_prefs`. Every Strength Focus goal already in the database
+   predates the intake gate, so none carry `run_days`. Refusing would break rebuild and
+   conflict-resolution on existing goals.
+
+### What DID change, and it is the actual fix
+
+The hole was never the fallback — it was the **intake**, which let an athlete finish "Your week"
+without answering *"Runs a week"* while the card said **"Auto"**, a word that named this literal as
+though it were a decision. Frequency is not optional: weekly volume ÷ sessions = session length, and
+25 miles over 2 runs is a different plan from 25 over 4. The count is **required** now
+(`src/lib/schedule-gate.ts`, pinned by `schedule-gate.test.ts`), so a NEW build cannot reach #1 unless
+running is out of the block entirely.
+
+### The one thing that is not settled
+
+#1 now `console.warn`s when it fires **on a run-sport block** (the case where the value is actually
+read). Nobody has confirmed by log whether that branch is ever hit in production — the trace above is
+a code read, not a runtime observation. **If that warning appears on a build created after
+2026-08-10, the intake gate is leaking and THAT is the bug to chase — not the default.**
+
+⚠️ The warn is in an edge function and is **not live until `create-goal-and-materialize-plan` is
+deployed.**

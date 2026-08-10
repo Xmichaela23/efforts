@@ -43,7 +43,11 @@ export type ScheduleGateInput = {
   rideShown: boolean;
   longRunDay: string;
   longRideDay: string;
-  /** 0 = never picked, which is legal — the engine places them. */
+  /**
+   * 0 = never picked, and it is NOT legal — see the note in `scheduleBlockedReason`. The server's
+   * fallback for an unsent `run_days` is a hardcoded 2, so leaving this at 0 does not mean "the
+   * engine decides", it means "the engine got 2 and nobody said so".
+   */
   runDays: number;
   rideDays: number;
   /** Typed on the previous step. '' = never entered. */
@@ -61,10 +65,42 @@ export type ScheduleGateInput = {
 export function longDayCalledFor(i: ScheduleGateInput, d: 'run' | 'bike'): boolean {
   return d === 'run'
     ? i.runDays >= 2 && Number(i.targetMiles) > 0
+    // ⛔ ONE RIDE A WEEK NEEDS NO LONG-RIDE DAY. With a single ride there is nothing to distinguish
+    // it FROM — it is the week's ride, long by default. The threshold is the rule, not an accident.
     : i.rideDays >= 2 && Number(i.rideHours) > 0;
 }
 
 export function scheduleBlockedReason(i: ScheduleGateInput): string | null {
+  /**
+   * ⛔ FREQUENCY IS REQUIRED, AND CALLING IT OPTIONAL WAS A LIE WITH A NUMBER BEHIND IT (2026-08-10).
+   *
+   * These two rows read "Optional · Auto" for one day. "Auto" was not the engine being clever —
+   * `create-goal-and-materialize-plan/index.ts:2583` reads
+   *
+   *     endurance_frequency: run_days >= 2 && run_days <= 4 ? run_days : 2
+   *
+   * a hardcoded fallback of TWO. So the card told the athlete the app had it handled while it
+   * quietly chose two runs a week; at 25 weekly miles that is two 12.5-mile runs, which is a
+   * different plan, not a different phrasing of one.
+   *
+   * ⚠️ AND IT IS NOT THE SAME KIND OF QUESTION AS THE HARD DAY. The hard day is a SESSION you can
+   * decline and the week is still complete. Frequency is a PARAMETER that always has a value:
+   * weekly volume ÷ sessions = session length, and session length is what decides whether the week
+   * is feasible at all. No plan builder in the field makes it optional, because there is no
+   * "unanswered" state — only an answer the athlete gave or one given for them.
+   *
+   * ⛔ REQUIRING IT ALSO KILLS A TRAP THAT WAS REPORTED ON DEVICE: with the count unset,
+   * `longDayCalledFor` was false and Continue was LIVE; picking a count made the long run required
+   * and Continue DIED. Answering an optional question created a new requirement. Now the count is
+   * asked from the start, so the gate only ever moves toward enabled — one reason at a time, each
+   * replaced by the next, never a new one appearing because the athlete answered something.
+   *
+   * ⚠️ THIS DOES NOT REVERSE THE 2026-07-29 NO-PREFILL RULE. That rule says do not answer for the
+   * athlete; a silent server-side 2 is answering for them with the answer hidden. The pills stay
+   * unlit and the row reads "Pick one" — the principle is enforced here, not abandoned.
+   */
+  if (i.runShown && i.runDays < 2) return 'Runs a week has no number yet.';
+  if (i.rideShown && i.rideDays < 1) return 'Rides a week has no number yet.';
   if (i.runShown && longDayCalledFor(i, 'run') && !i.longRunDay) return 'The long run has no day yet.';
   if (i.rideShown && longDayCalledFor(i, 'bike') && !i.longRideDay) return 'The long ride has no day yet.';
   // ⛔ THE HARD DAY IS OPTIONAL (D-327 permits one; it never required one), so only a HALF-answer

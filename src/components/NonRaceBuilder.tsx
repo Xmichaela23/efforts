@@ -1458,11 +1458,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * open on — it is a question the athlete may decline, and a declinable question in the first slot
    * reads as a requirement. Michael: *"long run long ride should be above, this is optional."*
    *
-   * ⚠️ THE COUNTS SIT LAST BECAUSE THEY ARE OPTIONAL TOO, which the card never used to admit. They
-   * read "Auto" rather than "—" when unset: `assemblePayload` omits `run_days`/`ride_days` unless
-   * the athlete picks one, and the engine then places what it likes. An em-dash reads as a hole; the
-   * word "Auto" is the same fact stated as an answer, and it is exactly what the race card already
-   * prints for its own engine-placed run days.
+   * ⚠️ THE COUNTS SIT LAST BUT THEY ARE REQUIRED — only the hard day is optional. They briefly read
+   * "Optional · Auto", which was wrong twice over: "Auto" named a hardcoded server fallback of 2 as
+   * though it were a decision, and "Optional" invited the athlete to skip the half of the volume
+   * question that turns miles into sessions. See the note on the rows themselves.
    *
    * ⛔ THE COUNTS ARE ROWS TOO. "Runs: 3" is an answer exactly like "Long run: Sat", and keeping
    * them visible as permanent pill grids is what pushed the hard day's own rationale off the bottom
@@ -1508,20 +1507,32 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       optional: true,
       shown: true,
     },
+    /**
+     * ⛔ FREQUENCY IS REQUIRED, AND "AUTO" WAS A LIE (2026-08-10). These read "Optional · Auto" for
+     * one day. "Auto" was not the engine deciding — `create-goal-and-materialize-plan:2583` falls
+     * back to a hardcoded 2 when `run_days` is absent, so the card claimed the app had it handled
+     * while it silently chose two runs a week. Michael: *"what's auto?"*
+     *
+     * ⚠️ AND FREQUENCY IS NOT THE HARD DAY'S KIND OF QUESTION. The hard day is a session you can
+     * decline; the week is complete without it. Frequency is a parameter that always has a value —
+     * weekly volume ÷ sessions = session length, which is what decides whether the week is even
+     * feasible. The athlete gave the volume two screens ago; this is the other half of that answer,
+     * and it was being filled in for them.
+     */
     {
       key: 'runs' as const,
       kind: 'count' as const,
       label: 'Runs a week',
-      answer: state.runDays > 0 ? String(state.runDays) : 'Auto',
-      optional: true,
+      answer: state.runDays > 0 ? String(state.runDays) : 'Pick one',
+      optional: false,
       shown: scheduleRunShown,
     },
     {
       key: 'rides' as const,
       kind: 'count' as const,
       label: 'Rides a week',
-      answer: state.rideDays > 0 ? String(state.rideDays) : 'Auto',
-      optional: true,
+      answer: state.rideDays > 0 ? String(state.rideDays) : 'Pick one',
+      optional: false,
       shown: scheduleRideShown,
     },
   ]).filter((r) => r.shown);

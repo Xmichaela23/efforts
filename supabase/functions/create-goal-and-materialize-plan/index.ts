@@ -2574,13 +2574,42 @@ Deno.serve(async (req: Request) => {
               }
             }
 
+            /**
+             * ⚠️ THE `: 2` BELOW IS INTENTIONAL AND HAS LEGITIMATE CALLERS — DO NOT "FIX" IT. See
+             * Q-270. It is the outermost layer of a four-deep default chain (here,
+             * `generate-strength-plan:136` and `:257`, and the `DEFAULT_ENDURANCE_SESSIONS` FLOOR at
+             * `strength-primary-plan:1531`), and removing this one alone changes nothing observable
+             * because the next layer supplies the same 2.
+             *
+             * Two callers legitimately arrive with no `run_days`:
+             *   · a BIKE-ONLY Strong Focus block — there is no running to count, `runSelected` is
+             *     false downstream, and the value is computed and never read;
+             *   · `mode: 'build_existing'` on a goal row stored before the intake started requiring
+             *     the number (2026-08-10) — four of the eight call sites rebuild from the stored
+             *     prefs.
+             *
+             * ⛔ WHAT IT IS NOT ALLOWED TO BE IS SILENT. Until 2026-08-10 the Strong Focus intake
+             * could reach this with an unanswered "Runs a week" and the athlete would be built two
+             * runs a week having chosen nothing — the card even said "Auto", which named this
+             * literal as though it were a decision. The intake now requires the number, so from a
+             * NEW build this branch should be unreachable unless running is out entirely. This warn
+             * is how we find out whether that is true, rather than assuming it.
+             */
+            const gsRunDaysGiven = Number(gsTp.run_days) >= 2 && Number(gsTp.run_days) <= 4;
+            if (!gsRunDaysGiven && gsSport === 'run') {
+              console.warn(
+                `[create-goal] endurance_frequency DEFAULTED to 2 — run_days was ${JSON.stringify(gsTp.run_days)} `
+                + `on a RUN-sport Strength Focus block (user ${user_id}, goal ${String((resolvedGoal as any)?.id ?? 'inline')}). `
+                + 'Expected only on goals stored before 2026-08-10; a new build reaching this means the intake gate is leaking. See Q-270.',
+              );
+            }
             const gsBody: Record<string, any> = {
               user_id,
               // The composer rounds this DOWN to a whole number of four-week cycles (12 → 12, 10 → 8).
               duration_weeks: Number((resolvedGoal as any)?.target_weeks) || 12,
               endurance_sport: gsSport,         // sport-agnostic maintenance (run / bike / none)
               // run frequency from intake (2/3/4); engine spreads miles + stacks extras onto upper lift days
-              endurance_frequency: Number(gsTp.run_days) >= 2 && Number(gsTp.run_days) <= 4 ? Number(gsTp.run_days) : 2,
+              endurance_frequency: gsRunDaysGiven ? Number(gsTp.run_days) : 2,
               goal_name: String(resolvedGoal?.name || 'Strength Focus'),
               ...(gsTargetWeeklyMiles ? { target_weekly_miles: gsTargetWeeklyMiles } : {}),
               ...(gsEasyPaceMinPerMile ? { easy_pace_min_per_mile: gsEasyPaceMinPerMile } : {}),
