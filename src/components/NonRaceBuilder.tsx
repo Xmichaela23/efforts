@@ -17,7 +17,11 @@ import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type Assista
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
-import { scheduleBlockedReason as scheduleGateReason } from '@/lib/schedule-gate';
+import {
+  scheduleBlockedReason as scheduleGateReason,
+  SCHEDULE_OPTIONAL_ROWS,
+  SCHEDULE_ROW_ORDER,
+} from '@/lib/schedule-gate';
 // ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
 // week against the SAME numbers the engine builds from, or it is guessing at the athlete.
 import {
@@ -1453,15 +1457,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * THE SCHEDULER'S QUESTIONS, as a disclosure list: one line each when closed, showing its ANSWER,
    * and its controls only while open.
    *
-   * ⛔ ORDER: THE TWO REQUIRED ANCHORS, THEN THE OPTIONAL ONES (2026-08-10). Long run, long ride,
-   * hard day, then the counts. The hard day used to LEAD this card, and it was the wrong thing to
-   * open on — it is a question the athlete may decline, and a declinable question in the first slot
-   * reads as a requirement. Michael: *"long run long ride should be above, this is optional."*
+   * ⛔ ORDER IS A RULE, AND IT LIVES IN `schedule-gate.ts` — `SCHEDULE_ROW_ORDER`. Everything the
+   * athlete MUST answer comes first; the one thing they may decline comes last. The hard day has now
+   * been moved twice for this reason: it originally LED the card (a declinable question in the first
+   * slot reads as a requirement), then sat under the two long days, and now sits at the bottom under
+   * the counts. Sorting by the shared constant means the next reorder argues with a fixture rather
+   * than with a comment.
    *
-   * ⚠️ THE COUNTS SIT LAST BUT THEY ARE REQUIRED — only the hard day is optional. They briefly read
-   * "Optional · Auto", which was wrong twice over: "Auto" named a hardcoded server fallback of 2 as
-   * though it were a decision, and "Optional" invited the athlete to skip the half of the volume
-   * question that turns miles into sessions. See the note on the rows themselves.
+   * ⚠️ THE COUNTS ARE REQUIRED — only the hard day is optional. They briefly read "Optional · Auto",
+   * which was wrong twice over: "Auto" named a hardcoded server fallback of 2 as though it were a
+   * decision, and "Optional" invited the athlete to skip the half of the volume question that turns
+   * miles into sessions.
    *
    * ⛔ THE COUNTS ARE ROWS TOO. "Runs: 3" is an answer exactly like "Long run: Sat", and keeping
    * them visible as permanent pill grids is what pushed the hard day's own rationale off the bottom
@@ -1477,7 +1483,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       kind: 'day' as const,
       label: 'Long run',
       answer: state.longRunDay ? DAY_SHORT[state.longRunDay as DayName] : 'Pick one',
-      optional: false,
       shown: scheduleRunShown,
     },
     {
@@ -1485,16 +1490,39 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       kind: 'day' as const,
       label: 'Long ride',
       answer: state.longRideDay ? DAY_SHORT[state.longRideDay as DayName] : 'Pick one',
-      optional: false,
+      shown: scheduleRideShown,
+    },
+    /**
+     * ⛔ FREQUENCY IS REQUIRED, AND "AUTO" WAS A LIE (2026-08-10). These read "Optional · Auto" for
+     * one day. "Auto" was not the engine deciding — `create-goal-and-materialize-plan:~2583` falls
+     * back to a hardcoded 2 when `run_days` is absent (Q-270), so the card claimed the app had it
+     * handled while it silently chose two runs a week. Michael: *"what's auto?"*
+     *
+     * ⚠️ AND FREQUENCY IS NOT THE HARD DAY'S KIND OF QUESTION. The hard day is a session you can
+     * decline; the week is complete without it. Frequency is a parameter that always has a value —
+     * weekly volume ÷ sessions = session length, which is what decides whether the week is even
+     * feasible. The athlete gave the volume two screens ago; this is the other half of that answer.
+     */
+    {
+      key: 'runs' as const,
+      kind: 'count' as const,
+      label: 'Runs a week',
+      answer: state.runDays > 0 ? String(state.runDays) : 'Pick one',
+      shown: scheduleRunShown,
+    },
+    {
+      key: 'rides' as const,
+      kind: 'count' as const,
+      label: 'Rides a week',
+      answer: state.rideDays > 0 ? String(state.rideDays) : 'Pick one',
       shown: scheduleRideShown,
     },
     {
       /**
-       * ⛔ OPTIONAL, AND IT SAYS SO. D-327 allows ONE hard aerobic day and never required it — the
-       * block is strength-led, and an athlete with no club night and no appetite for intervals is
-       * having a normal week, not an incomplete one. The gate has always let this pass empty; the
-       * screen simply never admitted it, so a blank row read as an unanswered question. The chip is
-       * the admission, and the closed answer is "None" rather than "None yet".
+       * ⛔ LAST, AND OPTIONAL. D-327 allows ONE hard aerobic day and never required it — the block
+       * is strength-led, and an athlete with no club night and no appetite for intervals is having
+       * a normal week, not an incomplete one. The gate lets this pass empty; the chip is the screen
+       * admitting it, and the closed answer is "None" rather than "None yet".
        */
       key: 'hard' as const,
       kind: 'day' as const,
@@ -1504,38 +1532,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         : hardDayValue
           ? `${hardDaySport === 'run' ? 'Run' : 'Ride'} · ${DAY_SHORT[hardDayValue as DayName]}`
           : `${hardDaySport === 'run' ? 'Run' : 'Ride'} · pick a day`,
-      optional: true,
       shown: true,
     },
-    /**
-     * ⛔ FREQUENCY IS REQUIRED, AND "AUTO" WAS A LIE (2026-08-10). These read "Optional · Auto" for
-     * one day. "Auto" was not the engine deciding — `create-goal-and-materialize-plan:2583` falls
-     * back to a hardcoded 2 when `run_days` is absent, so the card claimed the app had it handled
-     * while it silently chose two runs a week. Michael: *"what's auto?"*
-     *
-     * ⚠️ AND FREQUENCY IS NOT THE HARD DAY'S KIND OF QUESTION. The hard day is a session you can
-     * decline; the week is complete without it. Frequency is a parameter that always has a value —
-     * weekly volume ÷ sessions = session length, which is what decides whether the week is even
-     * feasible. The athlete gave the volume two screens ago; this is the other half of that answer,
-     * and it was being filled in for them.
-     */
-    {
-      key: 'runs' as const,
-      kind: 'count' as const,
-      label: 'Runs a week',
-      answer: state.runDays > 0 ? String(state.runDays) : 'Pick one',
-      optional: false,
-      shown: scheduleRunShown,
-    },
-    {
-      key: 'rides' as const,
-      kind: 'count' as const,
-      label: 'Rides a week',
-      answer: state.rideDays > 0 ? String(state.rideDays) : 'Pick one',
-      optional: false,
-      shown: scheduleRideShown,
-    },
-  ]).filter((r) => r.shown);
+  ])
+    .filter((r) => r.shown)
+    // ⛔ SORTED BY THE SHARED ORDER, NOT BY POSITION IN THIS ARRAY. Declaration order is easy to
+    // edit without noticing what it means; `SCHEDULE_ROW_ORDER` is pinned by a fixture.
+    .sort((x, y) => SCHEDULE_ROW_ORDER.indexOf(x.key) - SCHEDULE_ROW_ORDER.indexOf(y.key))
+    .map((r) => ({ ...r, optional: SCHEDULE_OPTIONAL_ROWS.has(r.key) }));
   /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Four of the five rows are posture-gated,
    * and posture is editable on an earlier step — so walking Back, dropping the bike, and walking

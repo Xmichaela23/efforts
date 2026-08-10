@@ -36,6 +36,29 @@
  * Run: ~/.deno/bin/deno test --no-check src/lib/schedule-gate.test.ts
  */
 
+/**
+ * ⛔ THE ORDER THE CARD ASKS ITS QUESTIONS IN — REQUIRED FIRST, THE OPTIONAL ONE LAST.
+ *
+ * ⚠️ IT LIVES HERE, BESIDE THE GATE, BECAUSE IT HAS BEEN GOT WRONG TWICE. The hard day originally
+ * LED this card, which reads as a requirement — a declinable question in the first slot tells the
+ * athlete they must answer it. It was moved once (2026-08-10) to sit under the two long days, and
+ * then again to the bottom, under the counts. Order is a rule here, not a layout preference:
+ * everything the athlete MUST answer comes first, and the one thing they may decline comes last.
+ *
+ * A literal array in the component is a rule nothing can check. This one is pinned by
+ * `schedule-gate.test.ts`, so the next reorder has to argue with a test rather than a comment.
+ */
+export const SCHEDULE_ROW_ORDER = ['long', 'ride', 'runs', 'rides', 'hard'] as const;
+export type ScheduleRowKey = typeof SCHEDULE_ROW_ORDER[number];
+
+/**
+ * The rows the athlete may leave unanswered. ⚠️ EXACTLY ONE. The hard day is a SESSION you can
+ * decline and still have a complete week (D-327 permits one; it never required one). Everything
+ * else is a parameter that always has a value — see the note in `scheduleBlockedReason` on why
+ * frequency in particular is not optional however much it looks like it.
+ */
+export const SCHEDULE_OPTIONAL_ROWS: ReadonlySet<ScheduleRowKey> = new Set<ScheduleRowKey>(['hard']);
+
 export type ScheduleGateInput = {
   /** Is the Long run / Runs a week pair on screen? Same predicate the rows use. */
   runShown: boolean;

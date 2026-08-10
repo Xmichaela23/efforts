@@ -11,10 +11,45 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { voiceViolation } from '../../supabase/functions/_shared/state-trend/week-accent.ts';
 import {
   longDayCalledFor,
+  SCHEDULE_OPTIONAL_ROWS,
+  SCHEDULE_ROW_ORDER,
   scheduleBlockedReason,
   scheduleCanContinue,
   type ScheduleGateInput,
 } from './schedule-gate.ts';
+
+// ── THE CARD'S ORDER ─────────────────────────────────────────────────────────────────────────────
+Deno.test('⛔ REQUIRED ROWS FIRST, THE OPTIONAL ONE LAST', () => {
+  /**
+   * The hard day has been moved TWICE for this rule, which is why the rule is pinned rather than
+   * commented: it originally LED the card — a declinable question in the first slot reads as a
+   * requirement — then sat under the two long days, and now sits at the bottom under the counts.
+   */
+  assertEquals([...SCHEDULE_ROW_ORDER], ['long', 'ride', 'runs', 'rides', 'hard']);
+  assertEquals(SCHEDULE_ROW_ORDER[SCHEDULE_ROW_ORDER.length - 1], 'hard', 'the optional row is last');
+  // Stated as the RULE, not as the current arrangement — this is what survives the next reorder.
+  const optionalIndexes = SCHEDULE_ROW_ORDER
+    .map((k, i) => (SCHEDULE_OPTIONAL_ROWS.has(k) ? i : -1))
+    .filter((i) => i >= 0);
+  const requiredIndexes = SCHEDULE_ROW_ORDER
+    .map((k, i) => (SCHEDULE_OPTIONAL_ROWS.has(k) ? -1 : i))
+    .filter((i) => i >= 0);
+  assertEquals(
+    Math.min(...optionalIndexes) > Math.max(...requiredIndexes),
+    true,
+    'an optional row sits above a required one',
+  );
+});
+
+Deno.test('⛔ EXACTLY ONE ROW IS OPTIONAL, AND IT IS THE HARD DAY', () => {
+  // Frequency looks optional and is not — the server's fallback for an unsent count is a hardcoded
+  // 2 (Q-270), so "optional" there means "answered by a literal, silently". The hard day is the one
+  // question where declining is a complete answer.
+  assertEquals([...SCHEDULE_OPTIONAL_ROWS], ['hard']);
+  for (const key of ['runs', 'rides', 'long', 'ride'] as const) {
+    assertEquals(SCHEDULE_OPTIONAL_ROWS.has(key), false, `${key} must not be optional`);
+  }
+});
 
 /** A run+bike athlete who has answered everything the card asks. */
 const complete = (over: Partial<ScheduleGateInput> = {}): ScheduleGateInput => ({
