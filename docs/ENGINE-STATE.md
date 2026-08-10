@@ -63,6 +63,15 @@ and **D-409**, **D-411**.
 - Blocks may now **start in the past** — the confirm step's `min` was refusing it while the race
   screen's identical field never had one.
 
+**[Q-252] — CLOSED and VERIFIED today, the one thing here that IS seen working.** The State
+performance section blanked every Sunday 17:00 Pacific: `compute-snapshot` gated the trend build on a
+UTC calendar week (**D-413** — now a timezone-free gate). Underneath it, the ACWR `asOf` resolved in a
+hardcoded `America/Los_Angeles` for every athlete because no caller passed a timezone (**D-414** — now
+a stored `user_baselines.timezone`, UTC fallback, LA literal dead; Stage 3 UTC-caller audit done, no
+change). PUSHED `71b083ab` + `5f63bdf2`, compute-snapshot + backfill-strength-load DEPLOYED, migration
+applied. Verified: Michael's cards returned and his client wrote its zone. **This is separate from the
+acceptance run above — it does not discharge it.**
+
 **Focus screen, deload copy, build landing** — `e30c8c8a`, `b32e503a`, **D-412**.
 - The live plan **vanished on small phones**: the "Start something new" block was `shrink-0` and
   starved the scroller to one line. The whole page is one list now.

@@ -111,6 +111,13 @@ get the memo). See also [Q-233] (deliberate bodyweight imprecisions) and [D-351]
 
 ## Q-252 — ⛔ THE STATE TRENDS VANISH EVERY SUNDAY AT 5PM PACIFIC. A UTC WEEK BOUNDARY DECIDES THE ATHLETE'S WEEK IS HISTORY (2026-08-02) — **ROOT-CAUSED, REPRODUCED, NOT FIXED**
 
+> ✅ **CLOSED 2026-08-10 — all three stages shipped. See [D-413] (the timezone-free gate — fixes the
+> blackout) and [D-414] (stored athlete timezone, LA default killed, Stage 3 UTC-caller audit).**
+> Verified: Michael's cards returned on device; his client wrote `America/Los_Angeles` to the new
+> `user_baselines.timezone` column and the server resolves it. One residual filed inside D-414 (a
+> Sunday-evening compute still *labels* its row with the UTC Monday — harmless, reader agrees).
+> **Everything below is history.**
+
 **Symptom:** the entire State performance section — run, ride, swim AND strength cards — disappears.
 No error on screen, no error in the app. `StatePerformanceSection` returns `null` and the screen
 simply ends. Michael, live: *"we lost all the perfmace metrics!!! run ride swim and strgnth gone!!!"*

@@ -125,9 +125,11 @@
 > FELT), and [Q-223] means the AMRAP advance only fires on a rebuild. **Decide rep-record vs e1RM
 > first; everything else follows.**
 >
-> ⚠️ **[Q-252] HAS A DEADLINE — it recurs this Sunday at 17:00 Pacific.** The State performance section
-> blanks because `compute-snapshot:670` gates the trend build on a UTC week. Restored by hand tonight;
-> that is a patch. **Do not open by shifting the timezone** — Michael: *"this section is rolling too"*.
+> ✅ **[Q-252] CLOSED 2026-08-10 — D-413 (timezone-free gate) + D-414 (stored athlete tz, LA default
+> killed). Shipped + deployed + verified before the deadline.** ~~HAS A DEADLINE — it recurs this Sunday
+> at 17:00 Pacific.~~ The State performance section blanked because `compute-snapshot` gated the trend
+> build on a UTC week. **Not a patch this time — rooted:** the gate no longer reads a clock, and the
+> section builds on the rolling read as Michael said it should.
 >
 > Also filed: **[Q-251]** (planned load counts three-fifths of a strength session as zero) and
 > **[Q-253]** (accessories now have no home on State — a gap, not a resolution).

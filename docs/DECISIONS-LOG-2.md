@@ -1403,3 +1403,53 @@ and hands off in the same pass, via the same teardown the Home tab runs.
 > sessionStorage and the recovery branch restores them the next time Focus opens inside the 24h TTL.
 > **Deleting that write as redundant would silently drop conflict notices with nothing on screen saying
 > so.** Noted in the code at the tempting spot.
+
+### D-413 — The State trend build is timezone-free: it stops blanking every Sunday (2026-08-10, **PUSHED `71b083ab` + DEPLOYED compute-snapshot + VERIFIED (cards returned on device; fixture pins the Sunday instant)**) — closes [Q-252] Stage 1
+
+**The bug ([Q-252]).** `compute-snapshot/index.ts` gated the whole `state_trends_v1` build on
+`if (targetWeek === mondayOfToday())`. `mondayOfToday()` reads the runtime clock and edge functions
+run in **UTC**, so from 17:00 Pacific every Sunday UTC ticks into Monday, the athlete's current week
+fails the equality, the block is skipped, `state_trends_v1` writes **null**, and run/ride/swim/strength
+all vanish from State. Nothing threw and nothing logged — the "(non-fatal)" `catch` below it was a red
+herring; the code never ran. `coach_cache` masked it until a coach regen, which then wrote the null
+over the last good copy.
+
+**Why the gate was wrong, not just its timezone.** The trend build is **now-anchored** — its windows
+are `todayISO()` / `isoMinus(...)`, never `targetWeek`. So the calendar week was never what it read;
+the gate's only real job is "don't rebuild the rolling trend on a historical recompute." Michael:
+*"this section is rolling too."*
+
+**The fix.** A pure, clock-free gate (`compute-snapshot/state-trend-gate.ts`): live callers pass no
+`week_start` and always build; only an explicit **past** `week_start` (`recompute-workout`) skips, and
+the skip now **logs its reason** (Q-252 step 3 — no more silent skip). Confirmed the split is clean:
+`compute-facts` and `backfill` invoke with no `week_start`; only `recompute-workout` passes one.
+11 deno fixtures, including the Sunday-seam repro pinned to a real instant (`2026-08-03T00:00Z` =
+17:00 Sun Pacific). Ripple: only the `state_trends_v1` block moves; existing rows untouched.
+
+### D-414 — The athlete's timezone is stored and read; the Los Angeles default is dead (2026-08-10, **PUSHED `5f63bdf2` + DEPLOYED compute-snapshot + backfill-strength-load + migration applied + VERIFIED (client wrote `America/Los_Angeles`; server resolves it)**) — closes [Q-252] Stage 2
+
+**The deeper fault under Q-252.** `compute-snapshot:421` read
+`body.timezone ? String(body.timezone) : 'America/Los_Angeles'`, and **no server caller ever passed
+`timezone`** — so every athlete's ACWR `asOf` day was resolved in one developer's timezone. Latent for
+anyone outside Pacific; a user-agnostic violation one line from the Sunday bug.
+
+**Rooted.** New nullable `user_baselines.timezone` (IANA, **no DEFAULT** — null means "not yet
+reported", distinct from a real value). `AppContext` reports `Intl.DateTimeFormat().resolvedOptions()
+.timeZone` on an authenticated load, only when it changed (same pattern as unit persistence).
+`_shared/athlete-timezone.ts` resolves **override → stored → UTC** and never throws (a malformed stored
+value degrades to UTC, never a region). `compute-snapshot/acwr-as-of.ts` extracts the `asOf` rule so
+the timezone behaviour is fixtured (20 fixtures across the two new files; non-Pacific instants so a
+returning LA default fails loudly). `backfill` passes the tz it already reads for free;
+`recompute-workout` deliberately does **not** (the callee reads the same column — no redundant
+round-trip). **The only live LA literals left are race-*weather* defaults** (`fetch-race-weather-archive`,
+`course-strategy`) — a location default, not identity; deliberately untouched.
+
+**No-tz fallback = UTC, decided (Michael, *"no defaults to me"*).** Neutral, self-correcting on the
+next authenticated load.
+
+**Stage 3 (audit the other UTC callers) — done, no code change.** `compute-snapshot:311` (writer) and
+`coach:2331` (reader) both key off `mondayOfToday()`, so they **agree** — post-seam they label the row
+next-week's Monday but the content is now-anchored and correct, no divergence. `compute-snapshot:698`
+`asOf` is a rolling window; a few hours' tz shift never blanks it. The one tz-sensitive spot was the
+ACWR `asOf`, fixed above. **Residual, filed not fixed:** a Sunday-evening live compute still *labels*
+its snapshot row with the UTC Monday; harmless today (reader agrees), localizable later with the now-stored tz.
