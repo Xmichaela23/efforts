@@ -432,6 +432,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const emptyState = !st || Object.keys(st).length === 0;
 
     if (!emptyState) {
+      let handedToSchedule = false;
       setShowBuilder(null); // builder completed (or arc-setup returned) → close the embedded view, show the result
       if (st.needPaceCalibration) setShowCalibration(true);
 
@@ -481,16 +482,26 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
          * ⛔ SO THE STORAGE WRITE IS NOW LOAD-BEARING RATHER THAN A FALLBACK. Removing it would
          * silently drop conflict notices entirely, and nothing on screen would say so.
          */
-        if (st.announcePlanReady === false) onGoToSchedule?.();
+        if (st.announcePlanReady === false) {
+          handedToSchedule = true;
+          onGoToSchedule?.();
+        }
       } else if (st.fromArcSetup) {
         void refreshGoals();
         setShowArcSetupNextStep(true);
       }
 
-      try {
-        navigate(location.pathname, { replace: true, state: {} });
-      } catch {
-        void 0;
+      // ⛔ WHEN WE HANDED OFF TO THE SCHEDULE, DO NOT RE-NAVIGATE HERE. `onGoToSchedule` already sent
+      // us to `/` with a state-clearing replace. Re-navigating to the captured `/goals` path (to clear
+      // state) trips the `/goals` deep-link effect in AppLayout, which sets `showGoals` back to true —
+      // re-opening Focus a frame after we left it. That was the "plan lands on Focus, not the schedule"
+      // bug: the go-home fired and this line clobbered it. State is already clean on `/`.
+      if (!handedToSchedule) {
+        try {
+          navigate(location.pathname, { replace: true, state: {} });
+        } catch {
+          void 0;
+        }
       }
       return;
     }
@@ -1251,10 +1262,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       }
       onPlanBuilt?.();
       await refreshGoals();
-      setPlanReadyGoalId(goal.id);
-      window.setTimeout(() => {
-        setPlanReadyGoalId((prev) => (prev === goal.id ? null : prev));
-      }, 6000);
+      // ⛔ UNIVERSAL: a finished build lands on the Home schedule, not on a chip on Focus. Building
+      // from a SAVED goal used to stay here and flash a 6s "plan ready" indicator on the goal card —
+      // the marathon case Michael hit, where the intake path (onGoToSchedule) already goes to the
+      // calendar. Same destination for both now.
+      onGoToSchedule?.();
       return { success: true };
     } catch (err: any) {
       console.error('Build plan failed:', err);
