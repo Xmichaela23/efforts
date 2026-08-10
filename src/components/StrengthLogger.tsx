@@ -4551,10 +4551,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <button
                 type="button"
                 onClick={beginSession}
-                className="shrink-0 ml-auto mt-0.5 px-4 py-1.5 rounded-full bg-white/[0.10] backdrop-blur-md border-2 border-white/25 text-sm font-medium text-white/90 hover:bg-white/[0.16] hover:border-white/40 transition-all"
+                className="shrink-0 ml-auto mt-0.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/[0.14] backdrop-blur-md border-2 border-white/35 text-sm font-medium text-white/95 hover:bg-white/[0.20] hover:border-white/50 transition-all"
                 aria-label="Start the session timer"
               >
-                Start
+                <span aria-hidden="true" className="text-[13px] leading-none">▸</span>
+                Start session
               </button>
             ))}
           </div>
