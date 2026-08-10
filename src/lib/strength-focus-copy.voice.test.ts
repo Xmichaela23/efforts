@@ -18,7 +18,7 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { voiceViolation } from '../../supabase/functions/_shared/state-trend/week-accent.ts';
-import { HARD_DAY_WHY, VOLUME_WHY } from './strength-focus-copy.ts';
+import { HARD_DAY_WHY, HARD_RIDE_SHAPE, VOLUME_WHY } from './strength-focus-copy.ts';
 
 /**
  * The sentences rendered directly on the two intake cards. They do not live in a module — they are
@@ -38,6 +38,8 @@ const CARD_LINES: ReadonlyArray<[string, string]> = [
   ['schedule/subtitle', 'Your days. The lifting is placed around them.'],
   ['schedule/hard-day', 'One hard session a week holds top-end aerobic fitness. It does not build it. A run or ride club goes here.'],
   ['schedule/tap-cue', 'Tap a day for your hard session'],
+  ['schedule/ride-heading', 'What the hard ride is'],
+  ['schedule/run-heading', 'What you can run it on'],
   ['schedule/empty', 'The week appears once your days are in.'],
 ];
 
@@ -52,6 +54,20 @@ Deno.test('every HARD_DAY_WHY section is clean (it was never asserted either)', 
   for (const s of HARD_DAY_WHY) {
     assertEquals(voiceViolation(s.heading), null, `heading: ${s.heading}`);
     assertEquals(voiceViolation(s.body), null, `body of "${s.heading}"`);
+  }
+});
+
+Deno.test('the hard RIDE describes itself, and never prices itself against the run', () => {
+  assertEquals(voiceViolation(HARD_RIDE_SHAPE), null);
+  // ⛔ THE SHAPE IS THE POINT — Ride used to render nothing at all where Run had four options with
+  // their consequences, so the row just stopped. The numbers are what make it an answer.
+  assertEquals(/4-minute|four 4-minute/i.test(HARD_RIDE_SHAPE), true, 'the interval length');
+  assertEquals(/three minutes|3 min/i.test(HARD_RIDE_SHAPE), true, 'the recovery');
+  // ⚠️ AND IT MUST NOT CLAIM A HARD RIDE IS CHEAPER THAN A HARD RUN. Schumann 2022 (43 studies)
+  // found no modality moderation; the standing instruction is not to build a claim on Wilson 2012's
+  // split. Each branch describes itself. Comparative language here is the tell that it slipped.
+  for (const banned of ['easier', 'cheaper', 'less costly', 'gentler', 'safer than']) {
+    assertEquals(HARD_RIDE_SHAPE.toLowerCase().includes(banned), false, `prices the ride: "${banned}"`);
   }
 });
 

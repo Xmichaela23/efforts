@@ -482,6 +482,36 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
 ];
 
 /**
+ * ⛔ THE HARD RIDE SAYS WHAT IT IS (2026-08-10).
+ *
+ * The hard-day row asks Run or Ride, and only Run got an answer — "What you can run it on", four
+ * options with their consequences. Ride got NOTHING: the athlete picked it and the row simply
+ * stopped, which reads as an unfinished screen rather than a settled question. Michael, on the
+ * device: *"ride has no description."*
+ *
+ * ⚠️ AND THE ASYMMETRY IS REAL, WHICH IS WHY THIS IS A STATEMENT AND NOT A MENU. The run's terrain
+ * question exists because terrain CHANGES THE SESSION — a 3-minute hill, a treadmill incline, a
+ * short hill and flat ground are four different stimuli with four different costs to the next lift,
+ * and §2.0 only permits the flat version because the athlete owns a stated trade. A bike has no such
+ * fork: the interval is the same work on a climb, a flat road or a trainer, because the resistance
+ * is the athlete's own power rather than the ground. So the ride does not get a menu it has no
+ * choices for — it gets the one thing the run branch also gives, which is knowing what was agreed to.
+ *
+ * **Helgerud J, Høydal K, Wang E, et al. (2007), "Aerobic High-Intensity Intervals Improve VO2max
+ * More Than Moderate Training", Med Sci Sports Exerc 39(4):665-671.** Four 4-minute efforts at
+ * 90-95% of maximal heart rate, three minutes of active recovery between. This is the shape the
+ * generator already builds for a hard ride; the copy is catching up to it, not deciding it.
+ *
+ * ⚠️ NOT SAID: that a hard ride costs less than a hard run. Schumann 2022 (43 studies) found no
+ * modality moderation, and the standing instruction is not to build a new claim on Wilson 2012's
+ * split. The two branches describe themselves; neither is priced against the other.
+ */
+export const HARD_RIDE_SHAPE =
+  'Four 4-minute efforts hard, three minutes easy between them. A climb, a flat road or a trainer '
+  + 'all deliver it — on a bike the resistance is your own power, so the ground does not change the '
+  + 'session the way it does on foot.';
+
+/**
  * ⛔ THE VOLUME RATIONALE, MOVED OFF THE CARD (2026-08-09).
  *
  * This was six lines of prose sitting BETWEEN the two inputs on "How much" — weekly running miles

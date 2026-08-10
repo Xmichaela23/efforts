@@ -9,12 +9,15 @@ import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/l
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
 import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
-import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY, VOLUME_WHY } from '@/lib/strength-focus-copy';
+import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY, HARD_RIDE_SHAPE, VOLUME_WHY } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
 import { anchorDaysTaken } from '@/lib/anchor-days';
+// The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
+// beside a fully built week, which is exactly the kind of rule that rots inside a component.
+import { scheduleBlockedReason as scheduleGateReason } from '@/lib/schedule-gate';
 // ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
 // week against the SAME numbers the engine builds from, or it is guessing at the athlete.
 import {
@@ -1146,7 +1149,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [showVolumeWhy, setShowVolumeWhy] = useState(false);
   // ⛔ WHICH DAY QUESTION THE SCHEDULER'S ONE DAY ROW IS ANSWERING. Three anchors, one row — the
   // race path's pattern, brought to the card that had three `<select>`s and no week on screen.
-  const [scheduleQuestion, setScheduleQuestion] = useState<'hard' | 'long' | 'ride' | 'runs' | 'rides'>('hard');
+  const [scheduleQuestion, setScheduleQuestion] = useState<'hard' | 'long' | 'ride' | 'runs' | 'rides' | null>(null);
   /** Which of the week's three questions the day row is currently answering. Card-local. */
   const [weekQuestion, setWeekQuestion] = useState<'run' | 'long' | 'club'>('long');
   // The standing session can be a run club or a ride club — this picks which, and the day pins to
@@ -1446,23 +1449,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * screen. The hard day therefore reads "Run · Tue" rather than a bare day — which discipline it is
    * is half of that answer, and the toggle that says so is only visible while the row is open.
    */
+  /**
+   * THE SCHEDULER'S QUESTIONS, as a disclosure list: one line each when closed, showing its ANSWER,
+   * and its controls only while open.
+   *
+   * ⛔ ORDER: THE TWO REQUIRED ANCHORS, THEN THE OPTIONAL ONES (2026-08-10). Long run, long ride,
+   * hard day, then the counts. The hard day used to LEAD this card, and it was the wrong thing to
+   * open on — it is a question the athlete may decline, and a declinable question in the first slot
+   * reads as a requirement. Michael: *"long run long ride should be above, this is optional."*
+   *
+   * ⚠️ THE COUNTS SIT LAST BECAUSE THEY ARE OPTIONAL TOO, which the card never used to admit. They
+   * read "Auto" rather than "—" when unset: `assemblePayload` omits `run_days`/`ride_days` unless
+   * the athlete picks one, and the engine then places what it likes. An em-dash reads as a hole; the
+   * word "Auto" is the same fact stated as an answer, and it is exactly what the race card already
+   * prints for its own engine-placed run days.
+   *
+   * ⛔ THE COUNTS ARE ROWS TOO. "Runs: 3" is an answer exactly like "Long run: Sat", and keeping
+   * them visible as permanent pill grids is what pushed the hard day's own rationale off the bottom
+   * of the screen on 2026-08-09.
+   *
+   * ⚠️ ANSWERS ARE WRITTEN FOR THE CLOSED STATE, so each has to be legible with nothing else on
+   * screen. The hard day therefore reads "Run · Tue" rather than a bare day — which discipline it is
+   * is half of that answer, and the toggle that says so is only visible while the row is open.
+   */
   const scheduleRows = ([
-    {
-      key: 'hard' as const,
-      kind: 'day' as const,
-      label: 'Hard day',
-      answer: !hardDaySport
-        ? 'None yet'
-        : hardDayValue
-          ? `${hardDaySport === 'run' ? 'Run' : 'Ride'} · ${DAY_SHORT[hardDayValue as DayName]}`
-          : `${hardDaySport === 'run' ? 'Run' : 'Ride'} · pick a day`,
-      shown: true,
-    },
     {
       key: 'long' as const,
       kind: 'day' as const,
       label: 'Long run',
       answer: state.longRunDay ? DAY_SHORT[state.longRunDay as DayName] : 'Pick one',
+      optional: false,
       shown: scheduleRunShown,
     },
     {
@@ -1470,20 +1486,42 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       kind: 'day' as const,
       label: 'Long ride',
       answer: state.longRideDay ? DAY_SHORT[state.longRideDay as DayName] : 'Pick one',
+      optional: false,
       shown: scheduleRideShown,
+    },
+    {
+      /**
+       * ⛔ OPTIONAL, AND IT SAYS SO. D-327 allows ONE hard aerobic day and never required it — the
+       * block is strength-led, and an athlete with no club night and no appetite for intervals is
+       * having a normal week, not an incomplete one. The gate has always let this pass empty; the
+       * screen simply never admitted it, so a blank row read as an unanswered question. The chip is
+       * the admission, and the closed answer is "None" rather than "None yet".
+       */
+      key: 'hard' as const,
+      kind: 'day' as const,
+      label: 'Hard day',
+      answer: !hardDaySport
+        ? 'None'
+        : hardDayValue
+          ? `${hardDaySport === 'run' ? 'Run' : 'Ride'} · ${DAY_SHORT[hardDayValue as DayName]}`
+          : `${hardDaySport === 'run' ? 'Run' : 'Ride'} · pick a day`,
+      optional: true,
+      shown: true,
     },
     {
       key: 'runs' as const,
       kind: 'count' as const,
       label: 'Runs a week',
-      answer: String(state.runDays || '—'),
+      answer: state.runDays > 0 ? String(state.runDays) : 'Auto',
+      optional: true,
       shown: scheduleRunShown,
     },
     {
       key: 'rides' as const,
       kind: 'count' as const,
       label: 'Rides a week',
-      answer: String(state.rideDays || '—'),
+      answer: state.rideDays > 0 ? String(state.rideDays) : 'Auto',
+      optional: true,
       shown: scheduleRideShown,
     },
   ]).filter((r) => r.shown);
@@ -1491,10 +1529,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Four of the five rows are posture-gated,
    * and posture is editable on an earlier step — so walking Back, dropping the bike, and walking
    * forward again would leave a row open that no longer renders, with its day chips quietly writing
-   * to a discipline that is not in the plan. Falls back to the hard day, which every Strong Focus
-   * week has.
+   * to a discipline that is not in the plan.
+   *
+   * ⚠️ AND NOTHING IS OPEN BY DEFAULT-BY-NAME. The initial value is null and resolves to the FIRST
+   * shown row, so the card always opens on a question the athlete has, whichever disciplines they
+   * kept. Hardcoding a key here is how the card ended up opening on the optional question.
    */
-  const scheduleAsk = scheduleRows.some((r) => r.key === scheduleQuestion) ? scheduleQuestion : 'hard';
+  const scheduleAsk = (scheduleQuestion && scheduleRows.some((r) => r.key === scheduleQuestion))
+    ? scheduleQuestion
+    : (scheduleRows[0]?.key ?? 'hard');
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
       : scheduleAsk === 'long' ? (state.longRunDay || '')
@@ -1678,16 +1721,37 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * this card — the volume comes from the discipline screens before it. So an athlete who skipped
    * those is not blocked here for a number they were never shown.
    */
-  const longDayCalledFor = (d: 'run' | 'bike') => (d === 'run'
-    ? state.runDays >= 2 && Number(state.targetMiles) > 0
-    : state.rideDays >= 2 && Number(state.rideHours) > 0);
-
-  const scheduleCanContinue = (['run', 'bike'] as const).every((d) => {
-    if (!posturePresent(d)) return true;
-    if ((d === 'run' ? state.runDays : state.rideDays) <= 0) return false;
-    if (!longDayCalledFor(d)) return true;
-    return !!(d === 'run' ? state.longRunDay : state.longRideDay);
-  }) && (['run', 'bike'] as const).every((d) => !(d in state.qualityDays) || !!state.qualityDays[d]);
+  /**
+   * ⛔ THE GATE MOVED TO `src/lib/schedule-gate.ts` (2026-08-10) — REPLACE MEANS DELETE.
+   *
+   * It was an inline expression here, and it shipped a state where the athlete looked at a fully
+   * built six-day week and a dead Continue button with nothing saying why. Two faults, both now
+   * pinned by fixtures that could not exist while the rule lived in TSX:
+   *   1. it required `runDays`/`rideDays` > 0, and 0 is the LEGAL UNSET — `assemblePayload` omits
+   *      those fields unless the athlete picks one, so the payload called them optional while the
+   *      gate called them required. That is why the preview built a perfect week and the button
+   *      refused.
+   *   2. it asked about disciplines by POSTURE while the rows render on a narrower test, so a
+   *      question the card never showed could still block it.
+   *
+   * ⚠️ THE CALLER NOW PASSES WHAT IT RENDERS — `scheduleRunShown` / `scheduleRideShown` are the same
+   * booleans the rows are built from, so an off-screen question cannot block the screen. And the
+   * gate returns a SENTENCE, from which `canContinue` is derived, so the button and its explanation
+   * are one decision.
+   */
+  const scheduleGateInput = {
+    runShown: scheduleRunShown,
+    rideShown: scheduleRideShown,
+    longRunDay: state.longRunDay,
+    longRideDay: state.longRideDay,
+    runDays: state.runDays,
+    rideDays: state.rideDays,
+    targetMiles: state.targetMiles,
+    rideHours: state.rideHours,
+    qualityDays: state.qualityDays,
+  };
+  const scheduleBlockedReason = scheduleGateReason(scheduleGateInput);
+  const scheduleCanContinue = scheduleBlockedReason === null;
   // ⛔ ONE HARD AEROBIC DAY — D-327, enforced by the SHAPE of the "Hard day" row (one slot).
   //
   // History, so nobody re-derives it: this was TWO hard days, priced-not-refused, with a one-shot
@@ -3274,21 +3338,41 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         button) so the two toggles are not nested inside a button. */}
                     {active && row.key === 'hard' ? (
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
-                        <span className="text-sm text-white shrink-0">{row.label}</span>
-                        <div className="flex gap-1">
+                        <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
+                          {row.label}
+                          {row.optional && (
+                            <span className="text-[10px] uppercase tracking-wide text-white/35 font-normal">Optional</span>
+                          )}
+                        </span>
+                        {/* ⛔ RUN OR RIDE — ONE, NEVER BOTH (2026-08-10). This was a plain per-button
+                            toggle, so both could be lit at once, and on the device they were.
+                            THREE THINGS BROKE AT ONCE when they were:
+                              · D-327 allows exactly ONE hard aerobic day. Two selected disciplines is
+                                a state the doctrine has no answer for.
+                              · `hardDaySport` resolves run-first, so the day row wrote only to `run`
+                                and left `bike` holding '' — and `scheduleCanContinue` requires every
+                                selected discipline to have a day, so Continue died with no way to see
+                                why. A dead button with an invisible cause is the worst of the three.
+                              · the terrain menu is gated on `'run' in qualityDays`, so an athlete who
+                                had just tapped Ride was reading "What you can run it on".
+                            A RADIO IS THE RIGHT CONTROL for one-of-n and this is now one: picking a
+                            discipline REPLACES whatever was there. Tapping the lit one still clears
+                            it, because the whole row is optional and opting back out has to be as
+                            easy as opting in. */}
+                        <div className="flex gap-1" role="radiogroup" aria-label="Hard session discipline">
                           {/* ⚠️ `d in qualityDays`, NOT `!!qualityDays[d]` — the discipline is chosen
                               the moment it is tapped and its day arrives after. Truthiness would
-                              unlight the button the athlete just pressed. Tapping again clears it. */}
+                              unlight the button the athlete just pressed. */}
                           {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
                             const on = d in state.qualityDays;
                             return (
                               <button
-                                key={d} type="button"
-                                onClick={() => setState((st) => {
-                                  const next = { ...st.qualityDays };
-                                  if (d in next) delete next[d]; else next[d] = '';
-                                  return { ...st, qualityDays: next };
-                                })}
+                                key={d} type="button" role="radio" aria-checked={on}
+                                onClick={() => setState((st) => ({
+                                  // REPLACE, never merge — the other discipline's key goes with it.
+                                  ...st,
+                                  qualityDays: on ? {} : { [d]: '' },
+                                }))}
                                 // Sport colour, not the block's accent — this is a discipline
                                 // SELECTOR, so it speaks the app's wayfinding language (run gold,
                                 // ride green), the same treatment the marathon club toggle uses. It
@@ -3311,7 +3395,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         aria-expanded={active}
                         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
                       >
-                        <span className={`text-sm ${active ? 'text-white' : 'text-white/70'}`}>{row.label}</span>
+                        <span className={`text-sm flex items-center gap-1.5 ${active ? 'text-white' : 'text-white/70'}`}>
+                          {row.label}
+                          {/* ⚠️ THE CHIP RIDES ON THE LABEL, NOT IN THE ANSWER SLOT. "None" is a real
+                              answer to an optional question and must not be read as an unfinished
+                              one — the word that makes that true has to be visible while the row is
+                              CLOSED, which is most of the time. */}
+                          {row.optional && (
+                            <span className="text-[10px] uppercase tracking-wide text-white/35">Optional</span>
+                          )}
+                        </span>
                         <span className={`text-sm text-right ${active ? 'text-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'text-white/40'}`}>{row.answer}</span>
                       </button>
                     )}
@@ -3508,6 +3601,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 </div>
                               </div>
                             )}
+                            {/* ── and the hard RIDE says what it is ──────────────────────────
+                                ⛔ RIDE USED TO GET NOTHING. Run offered four terrain options with
+                                their consequences; Ride ended the row in silence, which reads as an
+                                unfinished screen rather than a settled question. *"Ride has no
+                                description."*
+
+                                ⚠️ A STATEMENT, NOT A MENU, AND THE ASYMMETRY IS REAL. Terrain forks
+                                the RUN because it changes the stimulus and the cost to the next lift
+                                — which is the only reason §2.0 permits the flat version at all. A
+                                bike has no such fork: resistance is the athlete's own power, so the
+                                interval is the same work wherever it happens. The ride gets the one
+                                thing the run branch actually gives, which is knowing what was agreed
+                                to. Copy + citation in `HARD_RIDE_SHAPE`. */}
+                            {'bike' in state.qualityDays && (
+                              <div className="space-y-1 pt-1">
+                                <span className="text-white/85 text-sm">What the hard ride is</span>
+                                <p className="text-white/45 text-xs leading-snug">{HARD_RIDE_SHAPE}</p>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -3516,6 +3628,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               })}
             </div>
+
+            {/* ⛔ THE GATE STATES ITSELF. A disabled Continue that says nothing is indistinguishable
+                from a broken one — the race card learned that on 2026-08-06 and this card never did,
+                which is how an athlete ended up looking at a fully built six-day week beside a dead
+                button. One sentence, from the same expression that disables it, so the button and
+                the reason cannot disagree. */}
+            {scheduleBlockedReason && (
+              <p className="text-white/60 text-xs leading-relaxed">{scheduleBlockedReason}</p>
+            )}
 
             {/* ⛔ THE WEEK, NOW BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY.
                 It led this card on the reasoning that the answer must stay on screen while they tap
