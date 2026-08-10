@@ -683,6 +683,13 @@ then fills. He heard it and chose the simpler week. `rest_days` reached `buildPr
 **What he landed on:** the week drawn ONCE; the three questions listed under it with their current answers; **pick a question, then tap the days.** That is the alarm-repeat / calendar-label pattern (mode-then-target). The run apps all repeat a day picker per question, one screen each — the version he rejected first.
 
 - **The week arrives laid out** (5 days, long run Sunday — what the plan builds anyway when nothing is pinned). ⚠️ This overrides the 2026-07-29 no-prefill rule *only here*: that rule was written against controls arriving ANSWERED and hiding the question; a blank week reads as a broken screen.
+  > ⚠️ **THE NO-PREFILL RULE WAS TESTED AGAIN ON 2026-08-10 AND HELD — see [D-409].** The Strong Focus
+  > counts ("Runs a week", "Rides a week") shipped unset under this rule, and the server's fallback for
+  > an absent `run_days` is a hardcoded **2** — so "no prefill" was quietly producing a prefill with the
+  > answer HIDDEN, which is the same defect one layer down. The fix was to REQUIRE the answer, not to
+  > pre-select one: pills stay unlit, the row reads "Pick one". ⛔ Do not read D-409's "counts are
+  > required" as permission to seed a default here. Both entries say the same thing — never answer for
+  > the athlete.
 - **Fill carries the day's ROLE, a ring carries what you are editing.** Crossed at first — the fill marked the active question, so selecting "Club night" with none set blanked the whole row.
 - **Every day is tappable on every question.** Greying out non-run days meant an athlete whose long run is Saturday tapped Saturday and got nothing; picking a rest day now adds it as a run day and assigns it.
 - **The gate states itself** — four run days and a long-run day are required (both structural), and the disabled button now says which is missing.
@@ -823,7 +830,9 @@ routing has no automated cover; there is no client test runner in this repo.
 
 ---
 
-### D-403 — ONE planned-session read-model: one duration reader, one discipline vocabulary, one row contract (2026-08-09, **stages 0–3 committed; stage 4 in working tree — NOT pushed, `get-week` NOT deployed**)
+### D-403 — ONE planned-session read-model: one duration reader, one discipline vocabulary, one row contract (2026-08-09, **SHIPPED — stage 4 landed in `ae1a099e`**)
+
+> ⚠️ **HEADER CORRECTED 2026-08-10.** It read *"stage 4 in working tree — NOT pushed"* for a day after the work was pushed (`ae1a099e`, "Stage 4 — cleanup + enforcement; planned-session migration complete"). Verified against `git log`. A status line that outlives its own commit is how the next session re-does finished work.
 
 **The problem.** A planned session was represented several ways and they drifted. Every bug in the
 discipline-swap work of 2026-08-08/09 was an instance of one class, not three separate defects:
@@ -925,7 +934,9 @@ Everything else is client and ships with the Netlify build.
 
 ---
 
-### D-404 — A strength-purpose block runs the STANDARD assistance templates, not the concurrent chapter (2026-08-09, **IN WORKING TREE — not committed, not pushed, not deployed**)
+### D-404 — A strength-purpose block runs the STANDARD assistance templates, not the concurrent chapter (2026-08-09, **SHIPPED — `eee1a86c`**)
+
+> ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log` (`eee1a86c`). It claimed uncommitted for a day after it shipped.
 
 **Supersedes the assistance-template half of D-385 and the pull-slot half of D-328. Both are back-annotated.**
 
@@ -1041,7 +1052,9 @@ function importing `assistance-menu.ts` or `exercise-config.ts` must be redeploy
 
 ---
 
-### D-405 — Leg days are LEG · LEG · ABS. No pull. (2026-08-09, **IN WORKING TREE — not committed, not pushed, not deployed**)
+### D-405 — Leg days are LEG · LEG · ABS. No pull. (2026-08-09, **SHIPPED — `09796193`**)
+
+> ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log` (`09796193`, "D-405..408").
 
 **Supersedes the lower-day half of D-385. Same reframe as D-404, one page over.**
 
@@ -1077,7 +1090,9 @@ one" is flatly untrue said about a same-family movement), plus both test files.
 
 ---
 
-### D-406 — Assistance carries a SUGGESTION, and the prescription is still "by feel" (2026-08-09, **IN WORKING TREE — not committed, not pushed, not deployed**)
+### D-406 — Assistance carries a SUGGESTION, and the prescription is still "by feel" (2026-08-09, **SHIPPED — `09796193`**, plus the `f0273584` follow-up)
+
+> ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log`.
 
 **Narrows the load rule at the top of `src/lib/assistance-menu.ts` (Michael, 2026-07-25). Read that
 rule before touching this; the exception is narrow on purpose and the rule is otherwise intact.**
@@ -1157,7 +1172,9 @@ zero net new lint errors. **No device verification** — the ghost render has no
 
 ---
 
-### D-407 — The deload week eases the ENDURANCE too (2026-08-09, **IN WORKING TREE**)
+### D-407 — The deload week eases the ENDURANCE too (2026-08-09, **SHIPPED — `09796193`**)
+
+> ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log`. ⛔ And its narration carried a missing space — *"…aerobic base.Deload week —"* — on every deload week until 2026-08-10; see the join fix in `enduranceSession` and `session-description-join.test.ts`.
 
 On weeks 4/8/12 the bar dropped to 40/50/60% and the session to 35 min — and the athlete's hard hill
 repeats ran at **full intensity anyway**, alongside full easy volume. A week that removes the barbell
@@ -1232,3 +1249,157 @@ reaching back and moving weights under sessions they have already seen.
 **Verification.** 15 fixtures, including a `WIRED` case that pins the recompute-don't-trust contract,
 the rolled-over-week rejection and the second-tap no-op. `deno check` on `adapt-plan`: **zero errors
 in this code** (2 remain, pre-existing, identical with the changes stashed). **No device run.**
+
+---
+
+### D-409 — Endurance FREQUENCY is a required answer, not an optional one (2026-08-10, **PUSHED + DEPLOYED (client); NOT device-verified**)
+
+**Michael, looking at "Runs a week · OPTIONAL · Auto":** *"is it necessary? user has picked miles and
+hours already — what's auto?"*
+
+⛔ **"Auto" named a hardcoded literal as though it were a decision.**
+`create-goal-and-materialize-plan/index.ts:~2583`:
+
+```js
+endurance_frequency: Number(run_days) >= 2 && Number(run_days) <= 4 ? Number(run_days) : 2
+```
+
+Two runs a week, chosen by a fallback, presented to the athlete as the app having it handled. At 25
+weekly miles that is two 12.5-mile runs — a different plan, not a different phrasing of one.
+
+**The distinction that settles it:** the hard day is a **session you can decline** and the week is
+still complete. Frequency is a **parameter that always has a value** — weekly volume ÷ sessions =
+session length, which is what decides whether the week is feasible at all. There is no "unanswered"
+state, only an answer the athlete gave or one given for them. No plan builder in the field makes it
+optional.
+
+**So:** the counts are required and read **"Pick one"** until picked. `Optional` now appears on
+exactly one row, the hard day. Both facts are pinned — `SCHEDULE_OPTIONAL_ROWS` is asserted to
+contain exactly `hard`, with runs/rides explicitly asserted NOT optional.
+
+⛔ **IT ALSO KILLED A REPORTED TRAP.** With the count unset, `longDayCalledFor` was false, no long run
+was demanded, and Continue was LIVE. Picking a count made the long run required and Continue **DIED**
+— answering an optional question created a new requirement. The gate asks for the count first now, so
+it only ever moves toward enabled, and `schedule-gate.test.ts` pins **monotonicity**: walking the card
+in order, once the gate opens it never closes again.
+
+> ⚠️ **THIS DOES NOT REVERSE THE 2026-07-29 NO-PREFILL RULE — read that before "restoring" a default
+> here.** That rule (recorded in-line at the entry above, and in `NonRaceBuilder`'s initial state) says
+> *do not answer for the athlete*: Michael on lit pills, *"still preselcted"*. A silent server-side 2
+> is answering for them **with the answer hidden**, which is the same defect one layer down. The pills
+> stay unlit and the row says "Pick one" — the principle is enforced here, not abandoned. Anyone
+> reading "counts are now required" as permission to pre-select 3 has inverted it.
+
+**Cross-ref:** Q-270 (the four-layer default chain, INTENTIONAL — the `: 2` stays and now warns),
+`src/lib/schedule-gate.ts`, `schedule-gate.test.ts`.
+
+---
+
+### D-410 — The strength session clock: an explicit Start, a persisted wall-clock stamp, an editable duration after (2026-08-10, **PUSHED + DEPLOYED (client); NOT device-verified**)
+
+**The bug it began as.** `StrengthLogger`'s session start was `useState<Date>(new Date())` — a value
+that died with the component. Every remount restamped it to now while the DRAFT restored intact, so a
+session interrupted once (nav away, cold-start restore, foreground reopen) saved only the length of its
+**last stretch**. Strength durations were silently UNDER-counted, and the longer the session the worse
+the lie.
+
+**Three decisions, in the order they were made:**
+
+1. **`startedAt` is the authority; elapsed is derived.** The same rule Q-TIMER established for rest
+   deadlines, applied one level up. An absolute wall-clock stamp in localStorage, keyed on the draft's
+   own identity-scoped session key (D-132), so a remount RESUMES and a backgrounded session counts the
+   time away with no reconcile pass of its own.
+2. **Opening the logger is not starting a workout.** Michael, after the first version shipped:
+   *"it's just going and the only way to stop it is to load a rep."* The athlete opens the logger to
+   load plates and swap an exercise; anchoring to mount charged all of that to the session. An explicit
+   **Start** tap, matching Strong and Hevy. ⛔ **With a safety net: logging a set IS starting a
+   workout**, whatever they tapped — the auto-start watches SET STATE rather than the Done button, so
+   it covers the RIR modal, the bulk mark-done, a duration timer expiring, and a restored draft.
+   `ensureSessionStart` is idempotent, so the net can fire freely and can never move a running clock.
+3. **A start is only RESUMED when the session has logged work**, and **Stop exists**. An abandoned open
+   left a stamp that the next open inherited — a running clock with no Start control on screen and no
+   way off it. The resume now requires a draft (written only once ≥1 set is completed, D-132 Layer 3)
+   and CLEARS the stale slot rather than skipping it. `SESSION_CLOCK_KEY` went `v1 → v2` to orphan every
+   mount-stamped start in the field without a migration.
+
+⚠️ **STOP IS AN END, NOT A PAUSE.** A pause means carrying accumulated-elapsed alongside `startedAt`,
+which is exactly the derived-value-as-authority shape Q-TIMER was written to remove. The saved duration
+is correctable instead — **duration is now visible and editable on the strength performance screen**,
+which it never was: `TodaysEffort` blanks it for strength on purpose and strength load is volume-based,
+so the number was **write-only** before today.
+
+⚠️ **MOBILITY IS BRANCHED, NOT CARRIED ALONG** — same component, `logger_mode: 'mobility'`. No clock, no
+readout, and `floorMinutes: 0` so its saved duration is byte-for-byte what it was. Strength floors at 1,
+because 0 reads downstream as "no duration recorded" rather than "a very short session".
+
+**Cross-ref:** `src/lib/strength-session-clock.ts` + 22 fixtures; Q-TIMER; D-132.
+
+---
+
+### D-411 — "Your week" is a disclosure list: every answer visible, one question's controls open (2026-08-10, **PUSHED + DEPLOYED (client); NOT device-verified**)
+
+⛔ **THREE LAYOUTS FAILED ON THIS SCREEN FOR ONE REASON**, and the reason is worth more than the fix:
+the card's parts were laid out in a COLUMN, so every part competed with every other for the fold and
+whichever lost went off screen.
+
+| version | how it failed |
+|---|---|
+| three `<select>`s under a nine-rem empty box | day controls below the fold; the box showed no selection at all |
+| answer card + shared day row + counts + rationale + terrain, stacked | chips floated with no container; the hard-day rationale ended up hundreds of pixels below the control it explains |
+
+Michael, on the device: *"shouldn't these day chips stay in a box"* and *"description gets totally
+lost."* **Both are the same defect** — things that belong together were merely NEAR each other, and
+scrolling separated them.
+
+**The answer is not more trimming.** This screen is FIVE questions, and a stack shows all five sets of
+controls whether or not they are being answered. A **disclosure list** shows all five ANSWERS and only
+the open question's CONTROLS — the settings-screen pattern, and Runna's and Hevy's setup flows.
+
+- **Containment becomes structural.** The chips live inside the open row, which lives inside the card.
+  They cannot float, because there is nowhere to float to. The old layout had to *remember* to box
+  them; this one cannot forget.
+- **A control cannot drift from its explanation.** The hard day's rationale, its (i) and the terrain
+  sub-question are inside the hard-day row. The distance is fixed at zero.
+- **⛔ THE ROW ORDER IS A RULE, AND IT LIVES IN `SCHEDULE_ROW_ORDER`.** Required first, the declinable
+  question last. The hard day was repositioned THREE times before this — a rule re-learned every few
+  hours is a rule that was never written down. A fixture asserts the general rule (no optional row above
+  a required one), so a legitimate reorder passes and putting the optional question back on top does not.
+- The counts became rows too, reversing the previous day's arrangement: "Runs: 3" is an answer exactly
+  like "Long run: Sat".
+
+⚠️ **`DaySelect` WAS DELETED, AND ITS REASON KEPT.** Three day questions as three seven-button grids
+took three rows and pushed the week off screen — *"you need to be able to click and see everything
+without scrolling."* That objection is not reversed: it is answered with ONE row serving whichever
+question is open. **`WeekDayRow` was not built for this** — it had shipped since `12d73e19` and was
+unreachable from this path only because `scheduleSteps` never pushes the `days` step on Strong Focus.
+**Built and starved, not missing.**
+
+⚠️ `DayRole` gained `H` and `LB`. **The `H` is not the `H` reverted on 2026-08-06** — that one
+classified a STANDING day the athlete merely told us about (why `C` replaced it); this one is the answer
+to a question the app asked outright, so hard is what the slot IS. A fixture pins that both coexist.
+
+---
+
+### D-412 — A finished intake build lands on the Home calendar. Always. (2026-08-10, **PUSHED + DEPLOYED (client); NOT device-verified**)
+
+The athlete fills in nine screens to get a **week**. The build used to land on Focus and raise a green
+*"Season plan ready"* card — an acknowledgement between the tap and the result, announcing a plan that
+renders a few pixels below it, calling a Strong Focus block a "season plan", and (on a short phone)
+pushing the live plan into the region that collapses.
+
+**Two passes.** First the completion card was made optional (`announcePlanReady`, default true) so the
+intake could land on Focus with the plan showing while the Arc SEASON wizard — longer, ends in merges
+worth acknowledging — keeps its banner. Then Michael, twice more: *take me to the schedule.* **Every
+finished build now goes to the Home calendar.**
+
+⚠️ **FOCUS IS STILL THE ROUTE AND IT IS NOT A DETOUR.** `/goals` is where `complete()` navigates and
+where the landing state is consumed — closing the embedded builder, refreshing plans and goals, reading
+the schedule signals. Bouncing to Home from `complete()` would skip all three. The landing does its work
+and hands off in the same pass, via the same teardown the Home tab runs.
+
+> ⛔ **AND THE SIGNALS STORAGE WRITE IS NOW LOAD-BEARING.** A first version held the athlete on Focus
+> when a build produced conflicts or trade-offs, so they could be read; **that condition was removed at
+> Michael's call.** It is safe only because `persistArcScheduleSignalsNotice` writes them to
+> sessionStorage and the recovery branch restores them the next time Focus opens inside the 24h TTL.
+> **Deleting that write as redundant would silently drop conflict notices with nothing on screen saying
+> so.** Noted in the code at the tempting spot.

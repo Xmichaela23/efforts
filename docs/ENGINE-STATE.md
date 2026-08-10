@@ -23,98 +23,113 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-09 — Strong Focus work order COMPLETE: D-404→D-408 + Q-269, all pushed + deployed, **NOT device-verified — the acceptance run is pending**)
+## 🧭 NEXT SESSION — START HERE (2026-08-10 — the strength logger's session clock + the whole Strong Focus intake reworked. **12 commits, 2 edge deploys, ZERO device-verified.**)
 
-### ⛔ YOUR JOB: DO NOT START NEW WORK. THE ACCEPTANCE RUN IS OUTSTANDING.
+### ⛔ YOUR JOB: THE ACCEPTANCE RUN. IT IS NOW TWO SESSIONS OVERDUE.
 
-Six fixes shipped across five commits and fourteen edge functions today, and **not one line of it has
-been seen on a device.** Michael deliberately held the acceptance run to the end so it would be ONE
-pass instead of six — *"no mid-stream acceptance runs."* That pass has not happened yet.
+The 2026-08-09 banner said the same thing and the run did not happen — then a full day of screenshot-
+driven UI work landed on top of it. **Everything below is pushed and live and none of it has been seen
+working.** Do not start new work. If Michael opens with a new request, say this first.
 
-**So: if Michael arrives with a screenshot or a built plan, that is the session. Read the checklist
-below, compare against it, and fix what it shows.** If he arrives with something else, ask whether the
-acceptance run happened before you take new scope — a green suite proves the code is right, not that
-it is *right on a phone*.
+⚠️ **AND THE PATTERN IN TODAY'S BUGS IS THE ARGUMENT FOR IT.** Of the nine defects fixed today, **six
+were invisible to every test in the repo** — a collapsed flex child, a floating chip row, a dead
+Continue button, a running clock with no off switch, a banner in the way, a missing space. Fixtures
+caught none of them and could not have. **A device pass is not bookkeeping on this screen; it is the
+only instrument that works.**
 
-**The plan to build (these parameters, not others):** Strength Focus, 12 weeks, **run** as the
-endurance discipline. Long run **Sunday**, long ride **Saturday**, hard day **Thursday / run /
-3-min hills**. A **loadable** push pick (Dumbbell Shoulder Press or Dumbbell Bench Press) so the
-weight suggestion has something to show. ⚠️ Keep the hard day off the long-run day — the picker now
-locks that, and locking it IS one of the things to verify.
+### WHAT SHIPPED — all PUSHED, client live via Netlify, 2 edge functions DEPLOYED
 
-**Reference numbers** for a 150/200/225/95 athlete: TM `{bench:125, squat:170, deadlift:190,
-overheadPress:80}`, week-1 top sets **65 / 105 / 140 / 160**.
+**The strength logger's session clock** — `0ddd07dd`, `9be42ee1`, `06018cef`, and **D-410**.
+- Start was `useState<Date>(new Date())`: every remount restamped it while the draft restored, so an
+  interrupted session saved only its **last stretch**. Durations were silently under-counted.
+- Now: an explicit **Start** tap, a persisted wall-clock stamp (`src/lib/strength-session-clock.ts`),
+  auto-start on the first completed set, a **Stop**, and duration **editable on the performance
+  screen** — where it had never been shown at all.
+- ⚠️ Also fixed, pre-existing and unrelated: **the save appeared to hang.** `finalizeSave` awaited
+  `calculate-workload` and `auto-attach-planned` AFTER the row was written, and swallowed their errors
+  anyway. Fire-and-forget now. A second stuck-spinner (the no-valid-exercises guard never lowered it)
+  went with it.
 
-### ✅ WHAT TO LOOK AT, IN ORDER
+**The Strong Focus intake** — `d0a97264`, `249b8f86`, `76efd25b`, `7f56cc78`, `49a73960`, `ce53a02a`,
+and **D-409**, **D-411**.
+- "Your week" is a **disclosure list** now (D-411). Three previous layouts failed the same way: parts
+  in a column, competing for the fold.
+- **Continue was dead on a fully built week** — the gate demanded a count the payload calls optional.
+  Extracted to `src/lib/schedule-gate.ts` so it can be RUN; it returns a SENTENCE and the button is
+  derived from it, so a disabled Continue can never again be silent.
+- Frequency is **required** (D-409); "Auto" was naming a hardcoded `2`.
+- Hard day is **single-select** (closes **Q-265**) and **optional**, and the ride branch finally
+  describes itself.
+- Blocks may now **start in the past** — the confirm step's `min` was refusing it while the race
+  screen's identical field never had one.
 
-**Intake**
-- The day pickers **grey out and NAME** a day another anchor holds ("Sat — long ride"), on all three
-  cards including the `WeekDayRow` on the intake step.
-- **Tap your own picked day to release it.** Every card. Then that day frees up everywhere.
-- Putting the club night on the long-run day should be **impossible**, not silently wipe the long run.
-- Accessory card: third dropdown is **"Single-leg"**, four options, no core/arm. The intro no longer
-  promises "you'll get the opposite movement instead."
+**Focus screen, deload copy, build landing** — `e30c8c8a`, `b32e503a`, **D-412**.
+- The live plan **vanished on small phones**: the "Start something new" block was `shrink-0` and
+  starved the scroller to one line. The whole page is one list now.
+- `"…the aerobic base.Deload week —"` — a missing space on weeks 4, 8 and 12. Fixed at the JOIN, not
+  in the string.
+- A finished build lands on the **Home calendar**, always.
 
-**Week 1**
-- Press days: your pull pick **stands** (no swap to a row); third slot is **triceps**.
-- Squat/deadlift days: **two leg movements + abs, NO chin-up**.
-- Loadable accessories carry a **greyed, overwritable** weight; chins and dips are **blank**.
-- Session description reads *"On the assistance: split the reps…"* after the main-lift labels.
-- Easy runs read *"Easy by choice this block"* — not "held underneath at maintenance".
+**Deployed:** `create-goal-and-materialize-plan` **v315** (the Q-270 warn) and `generate-strength-plan`
+**v86** (the deload space). ⚠️ The deload fix reaches **newly built** plans only — blocks already
+materialized keep the old string on their rows.
 
-**Week 4 (deload)**
-- Thursday is an **Easy Run**, not Hill Repeats.
-- Endurance drops ~⅓ (140 → 92 min on the fixture); strength 60 → **35** min.
+### ⛔ THE CHECKS OWED — this is the acceptance run
 
-**End of week 4** — log the week-3 AMRAP, then check the coach week tab for *"Adopt your Bench Press
-working number"*. **Tapping it is the only consent-gated write in the whole batch.**
+**Strength logger**
+1. Fresh logger shows **Start**, no timer, nothing ticking.
+2. Tap Start → elapsed runs. Tap **Stop** → timer goes, Start returns, **logged sets untouched**.
+3. Skip Start, tap Done on a set → the clock appears and starts there.
+4. Stop after logging, then log another set → **it stays stopped**.
+5. Leave the logger and return; background the app 2 min → time away is counted, not restarted.
+6. Save a real session → spinner clears when the row is written, not after two edge calls.
+7. Performance tab → four tiles, **Duration** ≈ what the header read. Tap it, type a number, Enter.
+8. Mobility logger → **no Start pill, no timer** (branched deliberately).
 
-### ✅ SHIPPED THIS SESSION — DO NOT RE-LITIGATE
+**Strong Focus intake**
+9. Never open "Runs a week" → it reads **"Pick one"**, and Continue explains what is missing.
+10. Answer in order → **Continue only ever moves toward enabled**, never back.
+11. Hard day: tap Run then Ride → the first turns **off**. Tap the lit one → clears to "None",
+    Continue stays live.
+12. Ride selected → **"What the hard ride is"**, not the hill options.
+13. Row order top to bottom: Long run · Long ride · Runs a week · Rides a week · **Hard day OPTIONAL**.
+14. "How much" opens straight into the inputs; the (i) sits on the label and opens **below both**.
+15. Finish a build → lands on the **Home calendar**, plan's week showing, **Home lit** in the tab bar.
 
-All five commits are on `main` (`eee1a86c`, `09796193`, `f0273584`, `c49f9f7d`, `d2941935`) and all
-14 edge functions are deployed at `2026-08-10 04:35:19`.
+**Focus screen**
+16. **On the small phone**: open Focus → the live plan is under CURRENT, doors a scroll below.
 
-- **D-404** — a strength-purpose block runs Wendler's **standard** assistance templates, not the
-  concurrent chapter. The p.86 plane-swap is gated behind `AssistanceTemplate` and **off** by default;
-  upper-day third slot is **arms**, not core. `isDirectArm()` is a **second accessor, not a new
-  `MovementPattern` value** — a pushdown's pattern is `horizontal_push` and must keep colliding with
-  bench.
-- **D-405** — leg days are **leg · leg · abs, no pull** (p.51). Also halved a real dose problem D-404
-  opened: the pull pick was standing on all four days at a 50-rep floor that only scales **up**.
-- **D-406** — assistance carries a **suggestion**, and the prescription is still "by feel".
-  `load_prescribed` stays `false` (it is the *identity* of an assistance row, D-370). Derivation has
-  **no invented percentage** — `weightForReps(e1RM, 12, rir 2)`, Wendler p.32 inverted.
-- **D-407** — the deload week eases the **endurance** too. Intensity first, then volume to ⅔.
-- **D-408** — AMRAP catch-up at cycle boundaries, consent-first. ⛔ **Uses the app's 85%
-  (`WORKING_NUMBER_PCT_OF_1RM`), NOT the book's 90%** — 90% would silently ratchet every athlete's
-  training max by ~6% disguised as adopting their own AMRAP.
-- **Scheduler** — anchor days lock at input; two silent unpicks removed; the composer's pin-absorption
-  guards deleted (they hid `SOLVER_GRIDLOCK_ANCHOR_COLLISION` and discarded matrix-legal pairs).
+**A newly built block**
+17. Weeks 4/8/12 read `"…holds the aerobic base. Deload week — the hard session comes off."`
 
-### ⚠️ UNVERIFIED / OPEN — and what would settle each
+### ⚠️ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
 
-- **EVERYTHING ABOVE IS DEPLOYED-NOT-VERIFIED.** Settled by the acceptance run.
-- **7 failing tests in `protocols/triathlon_performance.conformance.test.ts` are PRE-EXISTING.**
-  Verified identical with every one of this session's changes stashed. **They are not yours; do not
-  "fix" them as part of a Strong Focus follow-up.** Same for 2 `deno check` type errors
-  (`_shared/state-trend/assemble.ts`, `strength-system/placement/solver.ts`) and the lint baseline.
-- **The ride-clearance number is PARKED, deliberately** — `lower_body_strength × long_ride = 0`. That
-  0 is a *reasoned* decision (concentric, no impact transient), not an oversight; the stale thing was
-  `place-week.ts`'s doc comment claiming 48h, now fixed. Whether 0 is *right* is open and written into
-  that file: the damage half is well supported, the "therefore zero fatigue cost" half is stronger
-  than the literature. **Moving it is its own change with its own sweep, not a number to set on the fly.**
-- **Q-269 — the 3-day shape pulls once a week, INTENTIONAL, tagged do-not-fix.** Verified against
-  Wendler p.76. If a rep-count table makes it look like a hole, read Q-269 before touching anything.
-- **A four-day loaded-days score term was BUILT, SWEPT, AND REVERTED.** Three measurements, all inert
-  (210 weeks, 714 run-days identical with the term stashed). **Do not rebuild it** — the reason it
-  cannot move anything is upstream, in the ride-clearance 0 above.
+- **Backdating.** The client no longer blocks a past start. I traced the server and it holds:
+  `activate-plan:440` computes dates arithmetically with **no comparison against today**, and the
+  auto-attach hazard its own comment names (*"a backdated plan hoovered up whatever was logged"*,
+  AUDIT-performance-state-2026-07-29 **F1**) is closed — the content gate at
+  `auto-attach-planned:476` exists now. ⛔ **That is a code read, not a run.** Backdate a block over
+  dates you have already trained and confirm only genuinely-matching sessions attach.
+- **Q-270's warn has never fired in a log.** If it appears on a goal created after 2026-08-10, the
+  intake gate is leaking — chase that, not the default.
+- **Two active blocks showed under CURRENT** after a build (screenshot, 2026-08-10). `complete()` on
+  the intake path never passes `replace_plan_id`, though `plan-goal-conflict.ts` exists to compute one.
+  **Michael deleted the old block and moved on — the question was never answered.** Hypothesis, not a
+  finding: the intake has no replacement question at all.
+- **`activate-plan:676`'s comment is STALE** — it says the auto-attach content check "is" the real bug.
+  It was, and the check landed. One-line correction, nobody has made it.
+- **The Race day field still carries the UTC `min` slip** the start-date field just lost (Q-252's
+  class). Left alone deliberately: "can a race be in the past" was not asked.
 
-### 🔎 IF YOU NEED TO GO DEEPER
+### ⚠️ TWO THINGS ABOUT THE DOCS THEMSELVES
 
-`docs/DECISIONS-LOG-2.md` D-404→D-408 carry the full reasoning and the back-annotations to D-328/D-385.
-`docs/OPEN-QUESTIONS-2.md` Q-269. The assistance load rule is at the top of `src/lib/assistance-menu.ts`
-and D-406 **narrowed** it rather than reversing it — read that header before touching anything that
-prices an accessory.
+- ✅ **D-403 → D-407's stale "IN WORKING TREE" headers are CORRECTED** (2026-08-10). They claimed
+  uncommitted for a day after shipping; verified against `git log` (`ae1a099e`, `eee1a86c`,
+  `09796193`, `f0273584`) and each now carries a dated correction note. **A status line that outlives
+  its own commit is how the next session re-does finished work** — check these before trusting any
+  D-entry's header.
+- `DECISIONS-LOG-2.md` is **~170KB** and past the ~150KB cap. Per `CLAUDE.md` it should freeze at its
+  current number and continue in `DECISIONS-LOG-3.md`. Not done today.
 
 ---
 
