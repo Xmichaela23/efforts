@@ -102,6 +102,12 @@ interface GoalsScreenProps {
   onSelectPlan?: (planId: string) => void;
   onViewAllPlans?: () => void;
   onPlanBuilt?: () => void;
+  /**
+   * ⛔ WHERE AN INTAKE BUILD LANDS. The athlete finished the wizard to get a SCHEDULE, so that is
+   * where they go — the Home calendar with the week on it, not this screen with a card describing
+   * the block. Wired by AppLayout to the same teardown the Home tab uses.
+   */
+  onGoToSchedule?: () => void;
   /** Increment when opening Goals from FAB "Upload course" — expands first active run event goal. */
   expandRunEventForCourseNonce?: number;
   currentPlans?: Array<{ id: string; name: string; currentWeek?: number; status: string; goal_id?: string | null; config?: any; plan_type?: string }>;
@@ -347,7 +353,7 @@ function StrengthPreferencesPanel({
 }
 
 const GoalsScreen: React.FC<GoalsScreenProps> = ({
-  onClose, onSelectPlan, onViewAllPlans, onPlanBuilt,
+  onClose, onSelectPlan, onViewAllPlans, onPlanBuilt, onGoToSchedule,
   expandRunEventForCourseNonce = 0,
   currentPlans = [], completedPlans = [],
 }) => {
@@ -453,6 +459,29 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         } else {
           clearArcScheduleSignalsNoticeStorage();
         }
+        /**
+         * ⛔ EVERY FINISHED INTAKE BUILD LANDS ON THE HOME CALENDAR. ALWAYS. The athlete filled in
+         * nine screens to get a WEEK; handing them this screen — a card describing the block they
+         * just described — is one more thing to tap through. Michael, three times: take me to the
+         * schedule.
+         *
+         * ⚠️ THIS SCREEN IS STILL THE ROUTE, DELIBERATELY, AND IT IS NOT A DETOUR. `/goals` is what
+         * `complete()` navigates to and it is where the state above is consumed: closing the
+         * embedded builder, refreshing plans and goals, and reading the schedule signals. Bouncing
+         * to Home from `complete()` instead would skip all three. So the landing does its work and
+         * then hands off, in the same pass — the athlete sees Focus for a frame at most.
+         *
+         * ⚠️ A SIGNALS NOTICE IS DEFERRED, NOT LOST — and this is the line to check if that ever
+         * stops being true. A build with conflicts or trade-offs briefly rendered them here, and an
+         * earlier version of this hand-off held the athlete on Focus so they could be read. That
+         * condition is GONE at Michael's call. It is safe because `persistArcScheduleSignalsNotice`
+         * has already written them to sessionStorage above, and the recovery branch at the bottom of
+         * this effect restores them the next time Focus opens within the 24h TTL — which is the case
+         * that branch was written for ("user opened Calendar then returned").
+         * ⛔ SO THE STORAGE WRITE IS NOW LOAD-BEARING RATHER THAN A FALLBACK. Removing it would
+         * silently drop conflict notices entirely, and nothing on screen would say so.
+         */
+        if (st.announcePlanReady === false) onGoToSchedule?.();
       } else if (st.fromArcSetup) {
         void refreshGoals();
         setShowArcSetupNextStep(true);
@@ -477,6 +506,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         pin_restore_skipped: r.pin_restore_skipped ?? [],
       });
     }
+    // ⚠️ `onGoToSchedule` IS DELIBERATELY NOT A DEPENDENCY. AppLayout passes an inline arrow, so it
+    // is a new function every render — listing it would re-run this effect on any parent re-render
+    // and fire the hand-off again. This effect keys on the NAVIGATION, which is the thing that
+    // actually happened once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, location.pathname, navigate, refreshGoals, refreshPlans]);
 
   useEffect(() => {

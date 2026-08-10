@@ -1570,6 +1570,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setShowAllPlans(true);
                 }}
                 onPlanBuilt={() => { refreshPlans(); }}
+                onGoToSchedule={() => {
+                  // ⛔ AFTER AN INTAKE BUILD: GO TO THE SCHEDULE. Same teardown the Home tab runs —
+                  // `handleBackToDashboard` closes the Goals stack and, because we are on `/goals`,
+                  // navigates to `/`. The lamp has to move with it or the tab bar would say Focus
+                  // while the calendar is on screen.
+                  refreshPlans();
+                  handleBackToDashboard();
+                  setActiveBottomNav('home');
+                }}
                 currentPlans={currentPlans as any}
                 completedPlans={completedPlans as any}
               />
