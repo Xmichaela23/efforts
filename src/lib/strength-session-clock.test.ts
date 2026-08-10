@@ -21,6 +21,7 @@ import {
   formatSessionMinutes,
   moveSessionStart,
   parseEditedMinutes,
+  readResumableStart,
   readSessionStart,
 } from './strength-session-clock.ts';
 
@@ -69,8 +70,12 @@ const computeSessionKey = (date: string, id: string | null) => `strength_logger_
 const DATE = '2026-08-09';
 const PLANNED_ID = 'plan-upper';
 
-/** The mount effect: READ, never stamp. */
-const mountHydrate = (s: ReturnType<typeof mem>, key: string, now: number) => readSessionStart(s, key, now);
+/**
+ * The mount effect: READ, never stamp — and only resume a session with real logged work.
+ * `hasLoggedWork` mirrors the component's "does a draft exist under this key" check.
+ */
+const mountHydrate = (s: ReturnType<typeof mem>, key: string, now: number, hasLoggedWork = true) =>
+  readResumableStart(s, key, now, hasLoggedWork);
 /** `beginSession` — the Start tap, and the auto-start fallback. */
 const beginSession = (s: ReturnType<typeof mem>, key: string, now: number) => ensureSessionStart(s, key, now);
 
@@ -108,6 +113,34 @@ Deno.test('a mount NEVER stamps — opening the logger repeatedly starts nothing
   assertEquals(mountHydrate(s, key, T0 + 3 * MIN), null);
   assertEquals(mountHydrate(s, key, T0 + 90 * MIN), null, 'still not started 90 minutes later');
   assertEquals(s._dump()[SESSION_CLOCK_KEY], undefined, 'and nothing was ever written');
+});
+
+// ── REGRESSION: the phantom clock ("its just going and the only way to stop it is to load a rep")
+Deno.test('an ABANDONED open leaves no clock for the next session to inherit', () => {
+  const s = mem();
+  const key = computeSessionKey(DATE, null);   // the day's ad-hoc slot
+
+  // Session A: the athlete opens the logger, taps Start, logs nothing, and leaves.
+  beginSession(s, key, T0);
+
+  // Session B, later the same day: a FRESH open of the same ad-hoc slot. There is no draft under
+  // this key (no set was ever completed), so there is nothing to resume — the logger must offer
+  // Start, not a clock already at 40 minutes that has no Stop next to it.
+  assertEquals(mountHydrate(s, key, T0 + 40 * MIN, /* hasLoggedWork */ false), null);
+
+  // ...and the abandoned slot is GONE, not merely ignored. Left in place it would come back on
+  // the next open, which is exactly how this was reported.
+  assertEquals(readSessionStart(s, key, T0 + 40 * MIN), null, 'the stale slot is cleared, not skipped');
+  assertEquals(mountHydrate(s, key, T0 + 41 * MIN, true), null, 'and it cannot resurrect');
+});
+
+Deno.test('a session WITH logged work still resumes across a remount', () => {
+  const s = mem();
+  const key = computeSessionKey(DATE, PLANNED_ID);
+  const start = beginSession(s, key, T0);
+  // A set has been completed, so the draft exists and the resume gate opens.
+  assertEquals(mountHydrate(s, key, T0 + 40 * MIN, true), start);
+  assertEquals(elapsedMinutesForSave(start, T0 + 40 * MIN), 40);
 });
 
 Deno.test('SAFETY NET: a set logged before Start is tapped starts the clock there', () => {

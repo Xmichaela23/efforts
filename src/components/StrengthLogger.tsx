@@ -48,7 +48,7 @@ import {
   ensureSessionStart,
   formatElapsed,
   moveSessionStart,
-  readSessionStart,
+  readResumableStart,
 } from '@/lib/strength-session-clock';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
 
@@ -1337,10 +1337,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       : null
   );
   const clockKeyRef = useRef<string | null>(null);
+  /**
+   * Set by Stop, cleared by Start. Without it the safety net below would re-arm the clock on the
+   * very next completed set and Stop would do nothing on the only kind of session where anyone
+   * would reach for it — one with logged work in it.
+   */
+  const clockStoppedRef = useRef(false);
   useEffect(() => {
     if (isMobilitySession) return;
     const key = clockKeyRef.current === null ? computeSessionKey(clockOpenedIdRef.current) : sessionKey;
     const now = Date.now();
+    // "Is there real logged work under this key" — the draft, which is written only once ≥1 set is
+    // completed (D-132 Layer 3). It gates the resume: see `readResumableStart`.
+    const hasLoggedWork = (() => {
+      try { return localStorage.getItem(key) !== null; } catch { return false; }
+    })();
     if (clockKeyRef.current !== null && clockKeyRef.current !== key) {
       // The key MOVED mid-session — the athlete changed the performed date, or opened ad-hoc and
       // then picked a planned workout. The draft follows its key; the clock has to follow too, or
@@ -1352,9 +1363,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
     clockKeyRef.current = key;
-    // READ, NEVER STAMP. A mount does not start a workout. It only asks whether one is already
-    // running under this key — which is what makes a remount RESUME rather than restart.
-    setWorkoutStartMs(readSessionStart(localStorage, key, now));
+    // READ, NEVER STAMP. A mount does not start a workout. It only asks whether one with real work
+    // in it is already running under this key — which is what makes a remount RESUME rather than
+    // restart, without letting an abandoned open leave a clock the next session inherits.
+    setWorkoutStartMs(readResumableStart(localStorage, key, now, hasLoggedWork));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, isMobilitySession]);
 
@@ -1369,9 +1381,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (isMobilitySession) return;
     const key = clockKeyRef.current || computeSessionKey(clockOpenedIdRef.current);
     clockKeyRef.current = key;
+    clockStoppedRef.current = false;
     const now = Date.now();
     setWorkoutStartMs(ensureSessionStart(localStorage, key, now));
     setClockNowMs(now);
+  };
+
+  /**
+   * Stop the clock and go back to Start. It does NOT touch a single logged set — this is the timer,
+   * not the workout.
+   *
+   * Stop is an END, not a pause: tapping Start again begins a new stamp rather than resuming the
+   * old total. A pause would mean carrying accumulated-elapsed alongside `startedAt`, which is
+   * exactly the derived-value-as-authority shape Q-TIMER was written to get rid of. The saved
+   * duration stays correctable on the performance screen, which is where a number the clock got
+   * wrong is meant to be fixed.
+   */
+  const stopSession = () => {
+    if (isMobilitySession) return;
+    clockStoppedRef.current = true;
+    try { clearSessionStart(localStorage, clockKeyRef.current || sessionKey, Date.now()); } catch { /* storage gone; the slot expires on its own */ }
+    setWorkoutStartMs(null);
   };
 
   // SAFETY NET. Watches for the first completed set and starts the clock if the athlete never
@@ -1383,6 +1413,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   );
   useEffect(() => {
     if (isMobilitySession || !hasCompletedSet || workoutStartMs != null) return;
+    if (clockStoppedRef.current) return;  // Stop means stopped; only Start restarts it
     beginSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasCompletedSet, workoutStartMs, isMobilitySession]);
@@ -4017,6 +4048,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       .filter(ex => ex.sets.length > 0);
 
     if (validExercises.length === 0) {
+      // ⛔ THIS RETURN USED TO LEAVE `isSaving` TRUE. The spinner was raised at the top of this
+      // function and nothing lowered it on the way out, so tapping Save with nothing loggable
+      // parked the overlay on "Saving workout…" forever — a save that never started, presented as
+      // a save that never finished. The only escape was leaving the screen.
+      setIsSaving(false);
       alert('Please add at least one exercise with a name to save the workout.');
       return;
     }
@@ -4146,35 +4182,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         }
       }
 
-      // Calculate workload for completed workout
-      try {
-        const workoutId = saved?.id || completedWorkout.id;
-
-        await supabase.functions.invoke('calculate-workload', {
-          body: {
-            workout_id: workoutId,
-            workout_data: {
-              type: completedWorkout.type,
-              duration: completedWorkout.duration,
-              steps_preset: (completedWorkout as any).steps_preset,
-              strength_exercises: completedWorkout.strength_exercises,
-              mobility_exercises: completedWorkout.mobility_exercises,
-              workout_status: 'completed'
-            }
+      // ⛔ THE WORKOUT IS ALREADY SAVED BY THIS POINT — DO NOT HOLD THE SPINNER ON THESE.
+      //
+      // Both calls were AWAITED, so "Saving workout…" stayed on screen until two edge functions
+      // came back. Reported on device as a stalled save: the row was written, the athlete was
+      // staring at a spinner, and the overlay's own copy ("you don't need to stay here") was the
+      // tell that someone already knew this was slow. A cold-started function or a bad connection
+      // turns that into an apparently hung save on work that is safely persisted.
+      //
+      // Neither is load-bearing for the save. Their errors were ALREADY swallowed by empty catches
+      // — i.e. the code was waiting on results it had decided in advance to ignore. Workload also
+      // recomputes on the ingest path, and auto-attach has its own server-side triggers.
+      const savedWorkoutId = saved?.id || completedWorkout.id;
+      void supabase.functions.invoke('calculate-workload', {
+        body: {
+          workout_id: savedWorkoutId,
+          workout_data: {
+            type: completedWorkout.type,
+            duration: completedWorkout.duration,
+            steps_preset: (completedWorkout as any).steps_preset,
+            strength_exercises: completedWorkout.strength_exercises,
+            mobility_exercises: completedWorkout.mobility_exercises,
+            workout_status: 'completed'
           }
-        });
-      } catch {
-      }
+        }
+      }).catch(() => { /* recomputed on ingest; never block the save UI on it */ });
 
-      // Auto-attach to planned workout if possible
-      try {
-        const workoutId = saved?.id || completedWorkout.id;
-
-        await supabase.functions.invoke('auto-attach-planned', {
-          body: { workout_id: workoutId }
-        });
-      } catch {
-      }
+      void supabase.functions.invoke('auto-attach-planned', {
+        body: { workout_id: savedWorkoutId }
+      }).catch(() => { /* server-side attach paths cover this; never block the save UI on it */ });
     } catch (e) {
       // Only update state if component is still mounted
       if (isMountedRef.current) {
@@ -4489,15 +4525,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 Strength only; mobility renders nothing here. `role="timer"` with no aria-live so a
                 screen reader can be pointed at it without being read a new number every second. */}
             {!isMobilitySession && (workoutStartMs != null ? (
-              <div className="shrink-0 ml-auto flex flex-col items-end leading-none" aria-label="Session elapsed time">
-                <span className="text-[10px] uppercase tracking-wide text-white/40">Elapsed</span>
-                <span
-                  role="timer"
-                  aria-live="off"
-                  className="mt-0.5 text-base font-medium tabular-nums text-white/80"
+              <div className="shrink-0 ml-auto flex items-center gap-2">
+                <div className="flex flex-col items-end leading-none" aria-label="Session elapsed time">
+                  <span className="text-[10px] uppercase tracking-wide text-white/40">Elapsed</span>
+                  <span
+                    role="timer"
+                    aria-live="off"
+                    className="mt-0.5 text-base font-medium tabular-nums text-white/80"
+                  >
+                    {formatElapsed(sessionElapsedSeconds)}
+                  </span>
+                </div>
+                {/* A running clock the athlete cannot turn off is the bug this shipped with. Stop
+                    ends the timer and nothing else — every logged set stays exactly where it is. */}
+                <button
+                  type="button"
+                  onClick={stopSession}
+                  className="px-2.5 py-1 rounded-full bg-white/[0.08] border border-white/20 text-[11px] font-medium text-white/60 hover:bg-white/[0.14] hover:text-white/90 transition-all"
+                  aria-label="Stop the session timer"
                 >
-                  {formatElapsed(sessionElapsedSeconds)}
-                </span>
+                  Stop
+                </button>
               </div>
             ) : (
               <button

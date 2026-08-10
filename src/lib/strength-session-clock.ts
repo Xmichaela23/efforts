@@ -21,8 +21,16 @@
  * Run: ~/.deno/bin/deno test --no-check src/lib/strength-session-clock.test.ts
  */
 
-/** localStorage slot: one map of sessionKey -> startedAt (epoch ms). */
-export const SESSION_CLOCK_KEY = 'strength_session_starts_v1';
+/**
+ * localStorage slot: one map of sessionKey -> startedAt (epoch ms).
+ *
+ * ⚠️ v1 → v2 IS A DELIBERATE ORPHANING. v1 was written by the build that stamped the start on
+ * MOUNT. Those stamps are not the same kind of value as a v2 stamp — a v1 entry means "the screen
+ * was opened", a v2 entry means "the athlete started". Resuming a v1 stamp under v2 rules is what
+ * produced a running clock on a fresh logger with no Start button in sight and no way to stop it.
+ * The bump drops every one of them without needing a migration or a hand-cleared browser.
+ */
+export const SESSION_CLOCK_KEY = 'strength_session_starts_v2';
 
 /**
  * Same 24h window the draft uses (`restoreSessionProgress`). A start older than that belongs to
@@ -73,6 +81,39 @@ export function readSessionStart(storage: ClockStorage, key: string, nowMs: numb
   if (!Number.isFinite(ms)) return null;
   if (nowMs - ms >= SESSION_CLOCK_TTL_MS) return null;
   return ms;
+}
+
+/**
+ * The start to RESUME on a remount — or null, which means "show Start".
+ *
+ * ⛔ AN ABANDONED OPEN MUST NOT LEAVE A CLOCK BEHIND. A start whose session has no logged work is
+ * from a screen that was opened and walked away from. Resuming it means the next open of the same
+ * day's ad-hoc slot inherits a clock that is already running, with no Start control on screen
+ * (there is a running timer, so the header shows the timer) and no way to stop it. Reported on
+ * device: *"its just going and the only way to stop it is to load a rep."*
+ *
+ * `hasLoggedWork` is the caller's answer to "does a saved DRAFT exist for this key" — and the draft
+ * is written only once at least one set is completed (D-132 Layer 3). So this reads as: resume a
+ * session that was really being trained, drop one that was only being looked at. The abandoned slot
+ * is CLEARED here rather than left to expire, or it comes back on the next open.
+ *
+ * The cost, stated plainly: tap Start, do five minutes of setup, navigate away and back, and the
+ * clock is gone because no set was completed in between. The first completed set starts it again.
+ * That is the right trade against a phantom clock the athlete cannot turn off.
+ */
+export function readResumableStart(
+  storage: ClockStorage,
+  key: string,
+  nowMs: number,
+  hasLoggedWork: boolean,
+): number | null {
+  const start = readSessionStart(storage, key, nowMs);
+  if (start == null) return null;
+  if (!hasLoggedWork) {
+    clearSessionStart(storage, key, nowMs);
+    return null;
+  }
+  return start;
 }
 
 /**
