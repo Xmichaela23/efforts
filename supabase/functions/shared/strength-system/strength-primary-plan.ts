@@ -437,7 +437,15 @@ function suggestedAssistanceWeight(
   if (cfg.displayFormat === 'bodyweight' || cfg.displayFormat === 'band' || cfg.displayFormat === 'dipsAdded') return {};
   if (/^(dip|dips)$/i.test(String(name).trim())) return {};
 
-  const parentMax = Number(oneRepMaxes[cfg.primaryRef]);
+  // ⛔ TWO VOCABULARIES FOR THE SAME FOUR LIFTS, AND INDEXING ONE WITH THE OTHER SILENTLY RETURNS
+  // NOTHING. `exercise-config` calls it `primaryRef: 'overhead'`; `OneRepMaxes` calls the same lift
+  // `overheadPress`. A direct `oneRepMaxes[cfg.primaryRef]` therefore resolved `undefined` for every
+  // overhead-referenced accessory — Dumbbell Shoulder Press got no suggestion, with no error and no
+  // test failure, because "no suggestion" is a legitimate output. Found by printing the acceptance
+  // block and reading a blank where a number belonged.
+  // ⚠️ `hipThrust` HAS NO `OneRepMaxes` KEY AT ALL and maps to null on purpose — an accessory priced
+  // off a hip thrust has no max on file to price against, so silence is the correct answer.
+  const parentMax = Number(oneRepMaxes[ONE_RM_KEY_FOR_REF[cfg.primaryRef] as keyof typeof oneRepMaxes]);
   if (!Number.isFinite(parentMax) || parentMax <= 0) return {};
 
   const accessoryMax = parentMax * cfg.ratio;
@@ -448,6 +456,19 @@ function suggestedAssistanceWeight(
   const rounded = Math.round(w / 5) * 5;
   return rounded >= 5 ? { weight_suggested: rounded } : {};
 }
+
+/**
+ * `exercise-config`'s `primaryRef` → the `OneRepMaxes` key for the same lift. ⛔ THE ONE PLACE THE
+ * TWO VOCABULARIES MEET. Do not "simplify" this away by indexing directly; see the note at the call
+ * site. `hipThrust` → null because there is no max on file for it.
+ */
+const ONE_RM_KEY_FOR_REF: Record<string, keyof OneRepMaxes | null> = {
+  bench: 'bench',
+  squat: 'squat',
+  deadlift: 'deadlift',
+  overhead: 'overheadPress',
+  hipThrust: null,
+};
 
 /** 50 total broken into the sets a lifter runs is 3-5 × 10-15; p.51 prescribes 5 × 10-20. */
 const ASSISTANCE_SUGGESTION_REPS = 12;

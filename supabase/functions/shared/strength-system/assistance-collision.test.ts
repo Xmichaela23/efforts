@@ -397,3 +397,27 @@ Deno.test('D-406 — no maxes on file means no suggestion, not a guess', () => {
     assertEquals(r.weight_suggested, undefined, `${r.name} invented a number with no maxes on file`);
   }
 });
+
+Deno.test('D-406 — every menu option resolves against the OneRepMaxes vocabulary, not primaryRef\'s', () => {
+  // ⛔ THE GUARD ON A SILENT MISS. `exercise-config` says `primaryRef: 'overhead'`; `OneRepMaxes` says
+  // `overheadPress`. Indexing one with the other returns `undefined`, which this feature reads as
+  // "no suggestion" — a legitimate output, so nothing failed and the number was simply absent.
+  // Asserts by OUTPUT: every loadable menu option must actually produce a suggestion for an athlete
+  // with all four maxes on file.
+  const maxes = { bench: 150, squat: 200, deadlift: 225, overheadPress: 95 };
+  const loadable = ['Dumbbell Shoulder Press', 'Dumbbell Bench Press', 'Incline Bench Press',
+    'Dumbbell Row', 'Front Squat', 'Reverse Lunge', 'Bulgarian Split Squat', 'Single Leg Hip Thrust',
+    'Dumbbell Curl', 'Hammer Curl', 'Tricep Extension', 'Tricep Pushdown', 'Close Grip Bench Press'];
+  for (const name of loadable) {
+    const plan = composeStrengthPrimaryPlan({
+      durationWeeks: 12, oneRepMaxes: maxes, enduranceSport: null, enduranceFrequency: 0,
+      assistancePicks: { push: name, pull: name, single_leg_core: name },
+    });
+    const rows = (Object.values(plan.sessions_by_week).flat() as any[])
+      .flatMap((s: any) => s.strength_exercises ?? [])
+      .filter((e: any) => e.name === name);
+    if (!rows.length) continue; // the pick was re-roled off every day; nothing to assert
+    assertEquals(rows.some((r: any) => typeof r.weight_suggested === 'number' && r.weight_suggested > 0),
+      true, `${name} produced no suggestion for an athlete with all four maxes on file`);
+  }
+});
