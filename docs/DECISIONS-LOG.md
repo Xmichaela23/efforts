@@ -2053,6 +2053,22 @@ reach is the thing that gets tuned in six months by someone who assumes it fires
 
 ## D-328 — Assistance CROSSES THE PLANE on a lifting day — and the citation behind it was wrong twice before it was right (2026-07-28/29, PUSHED `b245f79b`+`87b2b068` · **NOT DEPLOYED — see the banner**)
 
+> ↩ **THE RULE BELOW IS NOW OFF BY DEFAULT — D-404 (2026-08-09), after D-385 had already narrowed it to
+> the pull slot.** It is gated behind `AssistanceTemplate = 'standard' | 'concurrent'` in
+> `src/lib/assistance-menu.ts` and runs **only** under `concurrent`, which has no production caller. A
+> **strength-purpose** block defaults to `standard` (Triumvirate p.48 / Periodization Bible p.50), where
+> the athlete keeps the plane they picked — chins stay on the press day.
+>
+> ⛔ **THE ENTRY'S OWN THIRD SECTION IS WHY, AND IT IS WORTH READING BEFORE THE RULE.** This entry got
+> its citation wrong twice, and the durable lesson it drew — *the crossing rule belongs to p.86, the
+> CONCURRENT chapter, and only there* — is **exactly correct and is what retired it.** The one thing it
+> did not question is the sentence right after: *"That is our athlete exactly."* That premise is what
+> D-404 changed. The scoping was right; the athlete was misread.
+>
+> ⚠️ **The rule is retained, not deleted, and is tested on both branches** — a future concurrent or
+> hypertrophy block is the case it was written for. Everything below is history for a strength block and
+> live for a concurrent one.
+
 **Extends Q-212 past collision.** Q-212 fixed the case where the athlete's pick loaded the *same* thing as the day's main lift (push-ups after bench). This is the case Q-212 leaves alone and should not: a **chin-up does not collide with an overhead press** — one pulls, one pushes — so the slot stood, and an athlete whose clean max is six reps got chin-ups on all four lifting days. **100 reps a week of one movement.**
 
 - **The rule.** On a day with no collision, the slot still checks the *plane*. Bench (horizontal push) → the pull slot wants a **vertical** pull (chin-up). Press (vertical push) → it wants a **horizontal** pull (row). `complementFor()` in `exercise-config.ts`; applied in `resolveAssistance()`, `src/lib/assistance-menu.ts`.

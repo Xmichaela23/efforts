@@ -345,6 +345,20 @@ Commits `9baa35fb`, `d4eda969`, `dca84dda`, `8a0efcd7`.
 
 ### D-385 — Accessory selection is day-type roles, not family collision (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
 
+> ↩ **PARTIALLY SUPERSEDED by D-404 (2026-08-09).** Two of this entry's calls are reversed, both by one
+> premise change and neither on the merits: **(1)** the upper-day third slot is **arms, not core** —
+> `ROLE_BY_DAY.upper.single_leg_core: 'arm'`; **(2)** the pull slot **no longer crosses the plane** by
+> default, the p.86 rule now being gated behind `AssistanceTemplate` and off under `standard`.
+>
+> ⚠️ **The paragraph below that says *"Do not 'correct' it to triceps by citing p.51"* was right, and
+> D-404 is not that correction.** This entry's warrant is the clause *"the concurrent chapter — written
+> for an athlete who lifts and conditions"*. A **strength-purpose** block is not the concurrent case, so
+> p.50–51 governs it and p.87 does not. Which chapter has jurisdiction, not which page reads better.
+>
+> **Everything else here still stands** — the four defects, the push-slot fix, the 50/75 rep band, Face
+> Pull in the pull slot, and the no-false-"you picked" rule. **Everything below is history for the two
+> reversed calls and current for the rest.**
+
 **Supersedes `docs/SPEC-assistance-fix.md` §0–§7, which dies with this entry. Partially supersedes Q-212 (see its back-annotation).**
 
 Four defects, all confirmed in code, all fixed against the 2nd edition rather than against memory:
@@ -902,3 +916,119 @@ Everything else is client and ships with the Netlify build.
 > this work and is **deleted** per the spec lifecycle in `CLAUDE.md`. Its substance is above; its two
 > wrong claims are recorded here rather than lost — §3's "the client's is a shadow of it" (they were
 > not comparable) and §1's four-priority duration table (there is a fifth rung, prose-scraping).
+
+---
+
+### D-404 — A strength-purpose block runs the STANDARD assistance templates, not the concurrent chapter (2026-08-09, **IN WORKING TREE — not committed, not pushed, not deployed**)
+
+**Supersedes the assistance-template half of D-385 and the pull-slot half of D-328. Both are back-annotated.**
+
+**The premise changed; the merits were never re-litigated.** D-328 and D-385 both rest on one clause —
+*"the concurrent chapter, which is our athlete."* Wendler's p.86–88 is written for a lifter whose
+conditioning is being programmed alongside the lifting, and both entries read Efforts' athlete as that
+case, so the concurrent chapter governed the assistance.
+
+**A strength-purpose block is not that case.** The athlete chose to point a stretch at strength; their
+running or riding is their own business and is not what the assistance is arranged around. Under that
+premise the **standard** templates govern — Triumvirate p.48 and Periodization Bible p.50–51 — and
+those two pages say something different from p.86–88.
+
+⚠️ **THIS IS NOT THE CORRECTION D-385 FORBADE, and the distinction is the whole entry.** D-385 closed
+with *"Do not 'correct' it to triceps by citing p.51."* It was right to: nothing new has been learned
+about p.51 or p.87, and re-deciding them on the merits would be a session overturning a read it cannot
+improve on. What changed is **which chapter has jurisdiction**, which is upstream of the merits.
+
+**Two changes, both from that one premise:**
+
+1. **The pull slot no longer crosses the plane.** The p.86 rule (vertical push → horizontal pull) is now
+   gated behind `AssistanceTemplate = 'standard' | 'concurrent'`, defaulting to `standard`. The athlete
+   keeps chins on the press day; the 25–100 rep scaler is what makes the count survivable for a
+   low-capacity athlete, which was already the mechanism handling the "clean max is six" problem the
+   swap was reaching for. ⚠️ **`concurrent` has NO production caller** — retained, stated in the code as
+   retained, and tested on both branches. If a concurrent or hypertrophy block never arrives, delete it.
+2. **The upper-day third slot is ARMS, not core.** p.50–51 closes press day and bench day on **triceps**
+   and keeps abs on the two lower days. `ROLE_BY_DAY.upper.single_leg_core: 'core' → 'arm'`.
+
+**Rejected: a fourth slot.** The work order originally asked for an added arm slot. p.50–51 puts triceps
+*inside* the day's three, not beside them, and a fourth accessory adds volume to a block whose whole
+reframe is that **strength is preserved under high cardio and size is not** (Wilson 2012, AMPK–mTOR) —
+so it chases strength and buys no pump volume. Michael's call, 2026-08-09. Three slots stayed three and
+**the storage keys never moved** — `AssistancePicks` is untouched, so no migration and no default for
+picks saved before today.
+
+⚠️ **Abs were not deleted.** `ROLE_BY_DAY.lower` re-roles the push key to core, so squat day and
+deadlift day each close on the trunk — twice a week, which is p.51's own prescription. Pinned by its own
+test (*"abs did not vanish: they hold both LOWER days"*) so the swap cannot quietly become a deletion.
+
+⛔ **`isDirectArm()` IS A SECOND ACCESSOR, NOT A SECOND TAXONOMY — and this is the CLAUDE.md
+`MovementGroup`-vs-`MovementPattern` shape one axis over.** A triceps pushdown's `pattern` is
+`horizontal_push`, and that is **correct**: it genuinely loads the pressing pattern, so it must keep
+colliding with a bench press. It is simply blind to *"compound press or direct arm work?"* — the
+question the arm slot asks. So `armIsolation?: boolean` was added to `ExerciseConfig` (6 entries) with
+`isDirectArm()` sitting **beside** `getMovementFamily()`, each noting which question it answers.
+**Adding `arm` to `MovementPattern` would have made a pushdown stop sharing a family with the bench
+press and sent the collision rule quietly blind.** `fitsRole('arm')` therefore reads the flag, never
+the family — testing `fam === 'push'` would let a compound press fill the arm slot and a pushdown fill
+the push slot, shipping a press day with three presses and no isolation.
+
+⚠️ **The arm options had to join the MENU, not just `ROLE_FALLBACK`.** The slot's own list is searched
+before the fallback, so a menu with no arm movement would have meant the athlete's pick was overridden
+on **every** press day — the app asking a question it could never honour. Four options added to
+`single_leg_core` (Diamond Push Up, Tricep Extension, Tricep Pushdown, Close Grip Bench Press),
+bodyweight first so the slot is never gated on a cable stack.
+
+**Biceps are selectable, triceps stays the default** (Michael, 2026-08-09). Dumbbell Curl and Hammer
+Curl are on the menu **last**, and the ordering IS the default — `resolveRole` takes the first option
+that fits the role, so an athlete who never opens the card lands on Diamond Push Up. Put a curl above
+the triceps options and every un-picked press day silently becomes a biceps day; a test pins the
+ordering for exactly that reason.
+
+⚠️ **The rationale is a preference, not a template quote, and the code says so.** p.50–51 lists
+"Triceps" for both press days and no direct biceps work anywhere — because the pull slot already
+trains them: a chin-up is elbow flexion under load. Triceps is the arm the block does not otherwise
+hit directly. Curls are there because an athlete may want them and the slot honours picks (§5.2b).
+
+⛔ **A CURL NEEDED NO COLLISION EXEMPTION, BECAUSE THERE IS NO COLLISION CHECK LEFT TO EXEMPT IT
+FROM — and this is worth recording because it is not what the entry points suggest.** The concern was
+reasonable: a curl and a chin-up are both elbow flexion and both family `pull`, so a rule reasoning
+about the pull family would read the pairing as redundant and override the pick. But
+`sharesMovementFamily` has been **deliberately un-imported** from `assistance-menu.ts` since D-385
+(the note sits at the top of the file) — "does this share a family" was the OLD collision question and
+it is asked **nowhere** in the resolution path. `fitsRole('arm')` reads `isDirectArm` and nothing else,
+so the pick passes through untouched. A test now pins the curl-beside-chin pairing so that stays true
+if anyone reintroduces family reasoning into the slot.
+
+⚠️ **`armIsolation` therefore spans BOTH families, which is the point of it being its own axis** —
+triceps are `horizontal_push`, curls are `horizontal_pull`, and both answers are correct on the
+collision axis. "Direct arm work" is not a question push/pull can answer in either direction.
+
+**A standing D-322 guard was added** while confirming the new names. `getExerciseConfig()` fuzzy-matches,
+so an unknown name does not fail — it silently borrows another movement's entry, ratio and display
+format. "The name resolves" is not evidence against that (`Nonexistent Widget Press` resolves). The new
+test asserts an **exact** `EXERCISE_CONFIG` key for every menu option and every default: 23 names, all
+exact, including all six added here.
+
+**Also in this change (copy only, same work order):**
+- **The by-feel line names its own subject.** `ASSISTANCE_GUIDANCE` is concatenated straight after the
+  main-lift labels (`strength-primary-plan.ts:2174`), so *"Load by feel — about 7 out of 10"* read as
+  autoregulate-the-**main-lift**, contradicting the AMRAP the third set is built on. Now opens *"On the
+  assistance:"*, which fixes both consumers from one string (the builder card at
+  `NonRaceBuilder.tsx:2862` is the second).
+- **"Held underneath at maintenance" is gone.** Both emit sites (`strength-primary-plan.ts` ~L592 per
+  session, ~L2476 block overview) positioned the plan as the actor and the athlete as the object. Now
+  *"Easy by choice this block"* / *"keeps ticking over, all easy"*. The Hickson clause stays — easy
+  volume is what holds the base — so the sentence still says why easy is not a throwaway.
+
+**Files:** `src/lib/assistance-menu.ts` (`AssistanceTemplate`, `ROLE_BY_DAY`, `fitsRole`, `RANK`,
+`ROLE_FALLBACK`, menu options, `substitutionReason`, `ASSISTANCE_GUIDANCE`), `src/lib/exercise-config.ts`
+(`armIsolation`, `isDirectArm`), `supabase/functions/shared/strength-system/strength-primary-plan.ts`
+(both narration strings), plus `assistance-collision.test.ts` and `strength-primary-plan.test.ts`.
+
+**Verification.** 293 passing in `shared/strength-system`. ⚠️ **7 pre-existing failures in
+`protocols/triathlon_performance.conformance.test.ts` are NOT mine** — confirmed identical with these
+changes stashed; a different protocol, untouched. Same for 3 pre-existing type errors under `--check`
+and 4 pre-existing lint errors in `exercise-config.ts`. **No device verification.**
+
+⛔ **DEPLOY LIST when this ships:** `src/lib/*` is bundled into edge functions at deploy time, so every
+function importing `assistance-menu.ts` or `exercise-config.ts` must be redeployed — `grep -rln
+"assistance-menu\|exercise-config" supabase/functions --include=index.ts` before pushing.

@@ -589,7 +589,14 @@ function enduranceSession(
     // Hickson is that cutting INTENSITY is what loses the aerobic base, so the volume is what gives
     // here and the effort is what holds. It is also the guardrail that makes the honoured-not-capped
     // mileage safe — a high-volume EASY week is not the interference case, a high-volume hard one is.
-    description: `~${mins} min easy, all conversational — you could hold a sentence throughout. Held underneath the lifting, not trained.${extraNote ?? ''}`,
+    // ⛔ "EASY BY CHOICE", NOT "HELD UNDERNEATH". The old wording — *"held underneath the lifting,
+    // not trained"* — described the athlete's running as something being suppressed, which is the
+    // wrong read of who picked this block. Nobody demoted the running: an all-around athlete chose
+    // to point a stretch at strength, and the endurance ticks over because that is what they
+    // decided. Same prescription, same physiology, and the reason is now the athlete's rather than
+    // the plan's. ⚠️ THE SECOND CLAUSE IS THE FACT AND STAYS — easy volume is what holds the base
+    // (Hickson: intensity is what loses it), so the sentence still says why easy is not a throwaway.
+    description: `~${mins} min easy, all conversational — you could hold a sentence throughout. Easy by choice this block — strength takes the hard work, and easy volume is what holds the aerobic base.${extraNote ?? ''}`,
     duration: mins,
     // `easy` still rides along on the long session: it IS run at easy effort (the description says
     // conversational throughout). The `long` tag says WHICH session it is; `easy` says how hard.
@@ -2472,8 +2479,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const cycles = cyclesForBlock(weeks, args.blockShape);
   const leaders = cycles.filter((c) => c.kind === 'leader').length;
   const anchorStart = cycles[cycles.length - 1].startWeek;
+  // ⛔ SAME REFRAME AS THE PER-SESSION LINE (~L592), and it matters more here because this one is
+  // the block's opening paragraph — the first sentence the athlete reads about their own running.
+  // "Held underneath at maintenance" positions the plan as the actor and the athlete as the object.
+  // The athlete chose a strength block; the endurance ticking over is the consequence of their
+  // decision, not something done to them.
   const enduranceNote = enduranceSport
-    ? ` ${enduranceSport === 'bike' ? 'Riding' : 'Running'} is held underneath at maintenance, all easy.`
+    ? ` ${enduranceSport === 'bike' ? 'Riding' : 'Running'} keeps ticking over, all easy — strength is what this stretch develops.`
     : '';
 
   // ⛔ THE CEILING, SAID ONCE. Every lift that pinned, in one sentence, with its own number.

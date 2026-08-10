@@ -63,6 +63,28 @@ export interface ExerciseConfig {
   ratioIsTotal?: boolean;  // TRUE = ratio gives total load, divide by 2 for perHand display
                            // FALSE/undefined = ratio already represents per-implement load
   confidence?: 'high' | 'medium' | 'low';  // Expected variance: high=±10%, medium=±15%, low=±20%
+  /**
+   * ⛔ DIRECT ARM WORK — A SECOND QUESTION OVER THE SAME DATA, NOT A SECOND TAXONOMY. Added
+   * 2026-08-09 for the assistance `arm` role (Periodization Bible p.50-51: both press days finish
+   * on triceps).
+   *
+   * A triceps pushdown's `pattern` is `horizontal_push`, and that is CORRECT — it genuinely loads
+   * the pressing pattern, so it must still collide with a bench press. It is simply BLIND to the
+   * question the arm slot asks, which is *"is this a compound press or direct arm work?"* Both
+   * movements answer `push` on the family axis and must answer differently here.
+   *
+   * ⚠️ THE FLAG SPANS BOTH FAMILIES, which is the point of it being its own axis. Triceps movements
+   * are `horizontal_push`; curls are `horizontal_pull` — and a curl and a chin-up are BOTH elbow
+   * flexion, so that family answer is right too. "Direct arm work" is simply not a question the
+   * push/pull axis can answer in either direction, which is why it gets its own.
+   *
+   * ⛔ SO DO NOT "FIX" THIS BY ADDING `arm` TO `MovementPattern`. That would make a pushdown stop
+   * sharing a family with the bench press, and the collision rule — the thing that keeps a press
+   * day from stacking three pressing movements — would go quietly blind. Same data, two questions,
+   * two accessors, side by side. See CLAUDE.md on `MovementGroup` vs `MovementPattern`, which is
+   * this exact shape one axis over.
+   */
+  armIsolation?: boolean;
   notes?: string;
 }
 
@@ -414,6 +436,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // Close Grip Bench: ~90% of regular bench
   'close grip bench press': {
     pattern: 'horizontal_push',
+    armIsolation: true,
     primaryRef: 'bench',
     ratio: 0.90,
     displayFormat: 'total',
@@ -1037,6 +1060,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'diamond push up': {
     pattern: 'horizontal_push',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
@@ -1044,6 +1068,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'diamond push ups': {
     pattern: 'horizontal_push',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
@@ -2236,6 +2261,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'dumbbell curls': {
     pattern: 'horizontal_pull',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'perHand',
@@ -2243,6 +2269,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'hammer curls': {
     pattern: 'horizontal_pull',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'perHand',
@@ -2257,6 +2284,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'tricep extensions': {
     pattern: 'horizontal_push',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'perHand',
@@ -2264,6 +2292,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'tricep pushdown': {
     pattern: 'horizontal_push',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'total',
@@ -2561,6 +2590,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'dumbbell curl': {
     pattern: 'horizontal_pull',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'perHand',
@@ -2582,6 +2612,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'hammer curl': {
     pattern: 'horizontal_pull',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'perHand',
@@ -2667,6 +2698,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   'tricep extension': {
     pattern: 'horizontal_push',
+    armIsolation: true,
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'perHand',
@@ -2976,6 +3008,22 @@ export function complementOfPattern(p: MovementPattern | null | undefined): Move
 /** The pattern that balances this exercise, by NAME. */
 export function complementFor(exerciseName: string): MovementPattern | null {
   return complementOfPattern(getExerciseConfig(exerciseName)?.pattern ?? null);
+}
+
+/**
+ * Is this DIRECT ARM WORK, by name? ⛔ Sits deliberately beside `getMovementFamily`, and the two
+ * answer different questions about the same entry:
+ *
+ *   `getMovementFamily('Tricep Pushdown')` → `'push'`  — "what does it load?" (collision)
+ *   `isDirectArm('Tricep Pushdown')`       → `true`    — "is it isolation?"  (the p.50 arm slot)
+ *   `getMovementFamily('Bench Press')`     → `'push'`
+ *   `isDirectArm('Bench Press')`           → `false`
+ *
+ * Reads the config flag, never the name — an entry that has not opted in is not arm work, so a new
+ * movement defaults to "no" rather than to a guess off the string "tricep" (§0h).
+ */
+export function isDirectArm(exerciseName: string): boolean {
+  return getExerciseConfig(exerciseName)?.armIsolation === true;
 }
 
 /** The collision family of an exercise by NAME. ⛔ Reads the TYPED pattern, never the description. */

@@ -222,11 +222,21 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   // So `Dips` now STANDS on a bench day. Same family as the main lift is the point, not the problem —
   // it is the hypertrophy dose four of the five templates prescribe.
   //
-  // ✅ AND THE PULL SLOT STILL CROSSES THE PLANE (p.86), which was always the correct half of Q-212.
-  // `Dumbbell Row` is a HORIZONTAL pull and the bench press is a HORIZONTAL push — same plane — so a
-  // bench day takes the vertical pull. The athlete's preference decides WHICH vertical pull they
-  // meet; it does not decide the plane.
-  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Pull Up', 'Hanging Leg Raise']);
+  // ⛔ AND THE PULL SLOT NO LONGER CROSSES THE PLANE — REVERSED 2026-08-09. The paragraph this
+  // replaces read *"the pull slot STILL crosses the plane (p.86), which was always the correct half
+  // of Q-212"*, and asserted `Pull Up` here off a `Dumbbell Row` pick. The half was correct; the
+  // TEMPLATE was not. p.86-88 is the concurrent chapter, written for an athlete whose conditioning
+  // is programmed alongside. This block's purpose is strength — the athlete's endurance is their own
+  // business — so it runs the STANDARD templates (p.48 / p.50), which never cross planes.
+  //
+  // So the athlete's `Dumbbell Row` now STANDS on a bench day. Same plane as the main lift is not the
+  // problem here any more than `Dips` after a bench press was. The crossing rule still exists and is
+  // still tested — under `template: 'concurrent'`, in `assistance-collision.test.ts`.
+  //
+  // ⛔ AND THE THIRD SLOT IS ARMS, NOT ABS — D-404, 2026-08-09. This line ended `Hanging Leg Raise`
+  // until today. The athlete's core pick is a legitimate choice and it still stands on both LOWER
+  // days; on a press day p.50-51 closes on triceps, so the slot resolves to the arm fallback.
+  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Dumbbell Row', 'Diamond Push Up']);
 
   // A name that is no longer on the menu must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
@@ -235,9 +245,10 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   });
   // ⛔ AND THIS LINE PINNED DEFECT #2 AS WELL AS #1: `Reverse Lunge` — leg work — on a BENCH day.
   // Nothing collided with the single-leg slot on an upper day, so it passed straight through and
-  // stacked glute and hamstring load against the run legs. The slot is core-only on a press day now.
-  // `Push Up` is the push default and, being a push, is exactly what the push slot should hold.
-  assertEquals(benchOf(stale), ['Bench Press', 'Push Up', 'Pull Up', 'Hanging Leg Raise']);
+  // stacked glute and hamstring load against the run legs. The slot is single-role on a press day
+  // now — arms as of D-404, abs before it, never legs either way, which is the part that matters
+  // here. `Push Up` is the push default and, being a push, is exactly what the push slot should hold.
+  assertEquals(benchOf(stale), ['Bench Press', 'Push Up', 'Pull Up', 'Diamond Push Up']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {

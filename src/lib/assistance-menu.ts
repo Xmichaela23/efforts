@@ -44,7 +44,7 @@
 // is what produced defect #1 — a push always shares a press's family, so a push slot could never
 // hold a push. The question is now "does this fit the day's ROLE" (`fitsRole`). The helper still
 // exists and is right for other callers; it is the wrong question HERE.
-import { complementFor, getMovementFamily } from './exercise-config.ts';
+import { complementFor, getMovementFamily, isDirectArm } from './exercise-config.ts';
 import { getExerciseConfig } from './exercise-config.ts';
 
 /** The three slots Wendler's assistance prescription defines. These are also the Adjust-tab holes —
@@ -63,8 +63,13 @@ export type AssistanceOption = {
   name: string;
   /** What it works, in the athlete's words. Shown beside the option so the choice is informed. */
   targets: string;
-  /** Equipment the movement needs. `null` = bodyweight, always available. */
-  requires: 'dumbbells' | 'bar' | 'bench' | null;
+  /**
+   * Equipment the movement needs. `null` = bodyweight, always available.
+   * ⚠️ ADVISORY ONLY — nothing filters on it (see the swap-sheet note on `ASSISTANCE_PEERS`), so a
+   * new value here changes what the athlete READS beside an option and gates nothing.
+   * `cable` added 2026-08-09 for the arm slot's pushdown.
+   */
+  requires: 'dumbbells' | 'bar' | 'bench' | 'cable' | null;
 };
 
 export type AssistanceSlotMenu = {
@@ -228,11 +233,18 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   },
   {
     slot: 'single_leg_core',
-    label: 'Single-leg or core',
-    // ⛔ ON AN UPPER DAY THIS SLOT IS CORE, FULL STOP — never a leg. That was defect #2: nothing
+    label: 'Single-leg, core or arms',
+    // ⛔ ON AN UPPER DAY THIS SLOT IS ARMS — never a leg, and as of 2026-08-09 no longer core either
+    // (D-404, see `ROLE_BY_DAY`). The never-a-leg half is defect #2 and is unchanged: nothing
     // collided with a lunge on a bench day, so it passed straight through onto press days and stacked
     // glute/ham load against the run legs. No Wendler template puts lower-body work on a press day.
-    purpose: 'One leg at a time, or the trunk. On bench and press days this is core only — the legs get their work on squat and deadlift days, and stacking them costs the running.',
+    //
+    // ⚠️ THE ARM OPTIONS HAD TO JOIN THIS MENU, not just `ROLE_FALLBACK`. The slot's own list is
+    // searched before the fallback, so a menu with no arm movement on it would have meant the
+    // athlete's pick was overridden on EVERY press day — the app asking a question and then never
+    // being able to honour the answer. Now the athlete picks which triceps movement they meet, the
+    // same way they pick their push and their pull.
+    purpose: 'One leg at a time, the trunk, or arms. On bench and press days this is triceps — the legs get their work on squat and deadlift days, and stacking them costs the running. Abs live on the squat and deadlift days.',
     totalReps: ASSISTANCE_TOTAL_REPS_FLOOR,
     options: [
       { name: 'Reverse Lunge', targets: 'Quads, glutes, single-leg balance', requires: null },
@@ -248,6 +260,25 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
       // squatting exercise"; p.55 and p.86 both use Front Squat). The single-leg role on a hip day
       // needed a loadable knee-dominant answer beyond the two split-squat variants.
       { name: 'Front Squat', targets: 'Quads, upper back, trunk', requires: 'bar' },
+      // NEW 2026-08-09 (D-404) — the arm half of the slot. Wendler's Periodization Bible p.50-51
+      // closes BOTH press days on triceps, and this block runs the standard templates. Bodyweight
+      // option first so the slot is never gated on a cable stack.
+      { name: 'Diamond Push Up', targets: 'Triceps, inner chest', requires: null },
+      { name: 'Tricep Extension', targets: 'Triceps, long head', requires: 'dumbbells' },
+      { name: 'Tricep Pushdown', targets: 'Triceps', requires: 'cable' },
+      { name: 'Close Grip Bench Press', targets: 'Triceps, inner chest, front shoulders', requires: 'bench' },
+      // ⛔ BICEPS ARE LAST IN THIS LIST ON PURPOSE, AND THE ORDER IS THE DEFAULT. `resolveRole`
+      // searches the slot's own menu top-down and takes the FIRST option that fits the role, so an
+      // athlete who never opens the card lands on `Diamond Push Up`. Put a curl above the triceps
+      // options and every un-picked press day silently becomes a biceps day.
+      //
+      // ⚠️ THESE ARE A PREFERENCE, NOT A TEMPLATE QUOTE — say so rather than dressing it as Wendler.
+      // p.50-51 lists "Triceps" for both press days and no direct biceps work anywhere, because the
+      // pull slot already trains them: a chin-up is elbow flexion under load. Triceps is the arm the
+      // block does NOT otherwise hit directly, which is why it stays the default. Curls are here
+      // because an athlete may want them, and the slot honours picks (§5.2b).
+      { name: 'Dumbbell Curl', targets: 'Biceps, forearms', requires: 'dumbbells' },
+      { name: 'Hammer Curl', targets: 'Biceps, brachialis, forearms', requires: 'dumbbells' },
     ],
   },
 ];
@@ -299,7 +330,27 @@ export type AssistancePicks = Partial<Record<AssistanceSlot, string>>;
  */
 
 /** What a slot actually carries on a given day. Distinct from the storage KEY — see `AssistanceSlot`. */
-type AssistanceRole = 'push' | 'pull' | 'single_leg' | 'core';
+type AssistanceRole = 'push' | 'pull' | 'single_leg' | 'core' | 'arm';
+
+/**
+ * ⛔ WHICH OF WENDLER'S ASSISTANCE TEMPLATES THIS BLOCK IS RUNNING. Added 2026-08-09; it is the
+ * axis D-328/D-385 were both missing rather than a new taxonomy (`AssistanceRole` answers "what does this slot
+ * carry today", this answers "under whose rules").
+ *
+ * `standard`   — Triumvirate p.48 / Periodization Bible p.50. The block's PURPOSE is strength; the
+ *                athlete's endurance is their own business and is not what the assistance is being
+ *                arranged around. The athlete's picks stand on the plane they chose.
+ * `concurrent` — p.86-88, the chapter for an athlete whose conditioning is being programmed
+ *                alongside. Presses take a complementary-plane pull, so the same movement does not
+ *                land on all four lifting days.
+ *
+ * ⚠️ `concurrent` HAS NO PRODUCTION CALLER TODAY, and that is stated rather than hidden. It was the
+ * only behaviour until this change; it is retained because a future concurrent or hypertrophy block
+ * is the case it was written for, and deleting doctrine we sourced and then re-derive later is how
+ * this codebase grows a second vocabulary. If a second block never arrives, delete the branch — do
+ * not leave it here as scenery.
+ */
+export type AssistanceTemplate = 'standard' | 'concurrent';
 
 /** Upper = the two pressing days (Bench, OHP). Lower = Squat and Deadlift. */
 type AssistanceDayType = 'upper' | 'lower';
@@ -318,11 +369,32 @@ type AssistanceDayType = 'upper' | 'lower';
  * pulling movement." Abs are a lower-day slot in every template (p.51 Deadlift/Squat -> Abs; p.55
  * "Hamstrings, Lower Back, Abs"; p.48 Deadlift -> Hanging Leg Raise; p.52 Leg Raises / Sit-ups).
  *
- * ⚠️ **THE CORE-ON-AN-UPPER-DAY SLOT IS A CHOICE, NOT A QUOTE.** Four of the five templates put
- * TRICEPS / UPPER BACK in that position and keep abs on the lower days. The one source for a core
- * movement on a press day is the **concurrent chapter, p.87** — the chapter written for an athlete
- * who lifts and conditions, which is ours. We take p.87 over the four powerlifting templates
- * deliberately. Do not "correct" this to triceps by citing p.51; read this paragraph first.
+ * ⛔ **THE UPPER-DAY THIRD SLOT IS ARMS, AND THIS REVERSED ON 2026-08-09 (D-404 supersedes D-385).**
+ * It was CORE, on D-385's reasoning, which is kept verbatim because the reversal is about its premise
+ * and not its logic:
+ *
+ * > *"Four of the five templates put TRICEPS / UPPER BACK in that position and keep abs on the lower
+ * > days. The one source for a core movement on a press day is the concurrent chapter, p.87 — the
+ * > chapter written for an athlete who lifts and conditions, which is ours. We take p.87 over the
+ * > four powerlifting templates deliberately. Do not 'correct' this to triceps by citing p.51."*
+ *
+ * ⚠️ **AND THIS IS NOT THAT CORRECTION.** D-385 forbade re-deciding p.87-vs-p.51 on the merits, and
+ * it was right to — nothing new has been learned about either page. What changed is **which chapter
+ * governs**. D-385's warrant is the clause *"which is ours"*: it read this athlete as the concurrent
+ * case, so the concurrent chapter won. A **strength-purpose block is not the concurrent case.** The
+ * athlete chose to point a stretch at strength; their running is their own business and is not what
+ * the assistance is being arranged around. Under that premise p.50-51 governs and p.87 does not,
+ * and p.50-51 is explicit — press day and bench day both close on **triceps**, abs live on the two
+ * lower days. Different premise, different answer; the merits were never re-litigated.
+ *
+ * ⚠️ **ABS ARE NOT LOST — they were never only here.** `lower` re-roles the push key to core, so
+ * squat day and deadlift day each carry a core movement. Twice a week, which is what p.51 itself
+ * prescribes.
+ *
+ * ⛔ **AND IT IS A SWAP, NOT A FOURTH SLOT.** p.50-51 puts triceps INSIDE the day's three, not
+ * beside them. A fourth accessory would add volume to a block whose whole reframe is that strength
+ * is preserved under high cardio and size is not — so it chases strength and buys no pump volume.
+ * Three slots stay three, and the storage keys never move.
  *
  * ⚠️ WHY THE KEYS MAP THIS WAY: `pull` is always the pull, so that pick is never wasted.
  * `single_leg_core` is single-leg on leg days and core on press days — literally what its name says.
@@ -330,7 +402,7 @@ type AssistanceDayType = 'upper' | 'lower';
  * push pick has nothing to say about a squat day.
  */
 const ROLE_BY_DAY: Record<AssistanceDayType, Record<AssistanceSlot, AssistanceRole>> = {
-  upper: { push: 'push', pull: 'pull', single_leg_core: 'core' },
+  upper: { push: 'push', pull: 'pull', single_leg_core: 'arm' },
   lower: { push: 'core', pull: 'pull', single_leg_core: 'single_leg' },
 };
 
@@ -372,6 +444,14 @@ export type ResolvedAssistance = {
 export function resolveAssistance(
   picks: AssistancePicks | null | undefined,
   mainLiftName?: string | null,
+  /**
+   * ⛔ DEFAULTS TO `standard`, and the default is the decision — not a convenience. Every block that
+   * reaches this resolver today is a strength-purpose block (`strength-primary-plan.ts` is the sole
+   * production caller). Defaulting to `concurrent` to "preserve behaviour" would keep the wrong
+   * template as the thing you get by forgetting, which is how the old rule reached every day of
+   * every block in the first place.
+   */
+  template: AssistanceTemplate = 'standard',
 ): ResolvedAssistance[] {
   const dayType = dayTypeOf(mainLiftName);
 
@@ -386,7 +466,7 @@ export function resolveAssistance(
     // of this existed (§0h). Unknown degrades to UNCHANGED, never to a guess.
     if (!dayType || !mainLiftName) return { slot: menu.slot, name, totalReps: menu.totalReps };
 
-    return resolveRole(ROLE_BY_DAY[dayType][menu.slot], menu, name, mainLiftName, valid);
+    return resolveRole(ROLE_BY_DAY[dayType][menu.slot], menu, name, mainLiftName, valid, template);
   }).sort(orderForDay(dayType));
 }
 
@@ -407,7 +487,10 @@ export function resolveAssistance(
  * On a lower day the leg work leads, which is p.88's squat circuit order (legs → chin-ups → pikes).
  */
 function orderForDay(dayType: AssistanceDayType | null) {
-  const RANK: Record<AssistanceRole, number> = { push: 0, single_leg: 0, pull: 1, core: 2 };
+  // ⚠️ `arm` RANKS WITH `core` — LAST. Same reason and the same page: p.50-51 closes the upper days
+  // on triceps exactly as it closes the lower days on abs. The isolation movement is the last thing
+  // in the session under every template.
+  const RANK: Record<AssistanceRole, number> = { push: 0, single_leg: 0, pull: 1, core: 2, arm: 2 };
   return (a: ResolvedAssistance, b: ResolvedAssistance) => {
     if (!dayType) return 0; // Unknown day → untouched, same as everything else on this path (§0h).
     return RANK[ROLE_BY_DAY[dayType][a.slot]] - RANK[ROLE_BY_DAY[dayType][b.slot]];
@@ -421,6 +504,12 @@ function fitsRole(role: AssistanceRole, name: string, mainLiftName: string): boo
     case 'push': return fam === 'push';
     case 'pull': return fam === 'pull';
     case 'core': return fam === 'core';
+    // ⛔ `arm` DOES NOT READ THE FAMILY, and it cannot. A triceps pushdown's family is `push` — the
+    // same answer a bench press gives — because that is the truth on the COLLISION axis. The arm
+    // role asks a different question, so it reads the flag built for it (`isDirectArm`). Testing
+    // `fam === 'push'` here would let a compound press fill the arm slot and a pushdown fill the
+    // push slot, and a press day would ship three pressing movements and no isolation.
+    case 'arm': return isDirectArm(name);
     // The leg role is defined RELATIVE to the day: squat (knee) wants a hinge, deadlift (hip) wants
     // a knee. That is what makes the two lower days differ from each other by construction.
     case 'single_leg': return fam === wantedLegFamily(mainLiftName);
@@ -459,6 +548,7 @@ function resolveRole(
    * path would have carried a false "you picked" note on half the block's sessions.
    */
   wasAthletePick: boolean,
+  template: AssistanceTemplate,
 ): ResolvedAssistance {
   const base = { slot: menu.slot, totalReps: menu.totalReps };
   /** Annotate a real choice; stay silent about a default. Never a target, never an apology. */
@@ -485,7 +575,17 @@ function resolveRole(
     // (Pull Up / Chin Up vertical; Inverted Row / Dumbbell Row / Face Pull horizontal). Where nothing
     // in the complementary plane exists, the pick stands — a preference is not overridden to satisfy
     // a rule that has no answer.
-    if (role === 'pull') {
+    //
+    // ⛔ AND IT IS THE CONCURRENT TEMPLATE'S RULE, SO IT RUNS ONLY UNDER THAT TEMPLATE (2026-08-09).
+    // Everything above this line is p.86-88 reasoning, and p.86-88 is the CONCURRENT chapter. The
+    // paragraph above says so in as many words — *"the concurrent chapter, which is our athlete"* —
+    // and that premise is what changed: a strength-purpose block is a strength-purpose block, and
+    // the standard templates (p.48 / p.50) do not cross planes. Under `standard` the athlete keeps
+    // chins on the press day and the 25-100 scaler is what makes the rep count survivable, which is
+    // the mechanism that was ALREADY handling the "clean max is six" problem this rule was reaching
+    // for. ⚠️ The ROLE rules below are template-independent and are untouched — a lunge still does
+    // not belong on a bench day under either template.
+    if (role === 'pull' && template === 'concurrent') {
       const want = complementFor(mainLiftName);
       if (want && (getExerciseConfig(name)?.pattern ?? null) !== want) {
         const better = menu.options.find((o) => getExerciseConfig(o.name)?.pattern === want);
@@ -522,6 +622,9 @@ const ROLE_FALLBACK: Record<AssistanceRole, string[]> = {
   single_leg: ['Reverse Lunge', 'Bulgarian Split Squat', 'Single Leg Hip Thrust', 'Front Squat'],
   push: ['Push Up', 'Dips', 'Dumbbell Bench Press', 'Incline Bench Press'],
   pull: ['Inverted Row', 'Dumbbell Row', 'Face Pull', 'Chin Up'],
+  // Bodyweight first, same rule as `core` — the arm slot is reached on EVERY upper day, so its
+  // fallback must never need a cable stack. All four are on p.50's triceps list.
+  arm: ['Diamond Push Up', 'Tricep Pushdown', 'Tricep Extension', 'Close Grip Bench Press'],
 };
 
 /**
@@ -545,6 +648,20 @@ function substitutionReason(r: ResolvedAssistance, mainLiftName: string): string
   const wasLeg = getMovementFamily(r.substitutedFor ?? '') === 'knee'
     || getMovementFamily(r.substitutedFor ?? '') === 'hip';
 
+  // ⛔ ARM IS TESTED FIRST AND BY FLAG, because its FAMILY IS `push` — a triceps movement would
+  // otherwise fall past every branch below and land on the generic sentence. Same reason `fitsRole`
+  // cannot read the family for this role. Added 2026-08-09 with D-404.
+  if (isDirectArm(r.name)) {
+    if (wasLeg) {
+      // A leg pick on a press day — defect #2's case, now landing on arms instead of abs.
+      return `leg work stays on squat and deadlift days, so ${r.name} here.`;
+    }
+    // ⚠️ NAMES THE ARM IT ACTUALLY LANDED ON rather than asserting "triceps". The substitution path
+    // reaches triceps today because they lead the menu, but the sentence must not be a second copy
+    // of that ordering — the whole contract of this function is that it reads the RESOLVED movement.
+    const arm = fam === 'pull' ? 'biceps' : 'triceps';
+    return `press days finish on ${arm}, and abs stay on the squat and deadlift days — ${r.name} here.`;
+  }
   // A leg movement landing on a press day. This is defect #2, and the reason is the running.
   if (fam === 'core' && wasLeg) return `leg work stays on squat and deadlift days, so ${r.name} here.`;
   // A push pick on a squat or deadlift day. No Wendler template presses on a lower day.
@@ -594,8 +711,15 @@ export function assistanceSubstitutionNote(
 // "break the 25 reps" while `assistanceTotalReps()` scales the total to 50 on a tested capacity —
 // so on the athletes it scaled for, this line named a rep count the session did not prescribe. The
 // row above it already carries the real total. Shortened 2026-07-29 to fit the card without scroll.
+// ⛔ THE SENTENCE NAMES ITS OWN SUBJECT, and that is the fix, not a style choice. The server
+// composer concatenates this straight after the main-lift labels (`strength-primary-plan.ts:2174`
+// → *"Overhead Press 55×5, 60×5, 70×5+. Load by feel — about 7 out of 10…"*), so an unqualified
+// "load by feel" read as autoregulate-the-MAIN-LIFT — which contradicts the AMRAP the third set is
+// built on. The percentages are prescribed; only the assistance is by feel. Naming the subject in
+// the constant fixes BOTH consumers at once (the builder card at `NonRaceBuilder.tsx:2862` reads
+// slightly redundant under its own picker, which is the cheap side of the trade).
 export const ASSISTANCE_GUIDANCE =
-  'Split the reps however suits that day. Load by feel — about 7 out of 10, a few reps left. Going to failure costs the next main lift.';
+  'On the assistance: split the reps however suits that day. Load by feel — about 7 out of 10, a few reps left. Going to failure costs the next main lift.';
 
 /**
  * ⛔ THE SWAP OPTIONS FOR AN ASSISTANCE ROW ARE THE PLAN'S OWN, NOT THE EXERCISE LIBRARY'S.

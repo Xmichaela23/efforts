@@ -32,8 +32,10 @@ import {
   assistancePeersFor,
   ASSISTANCE_TOTAL_REPS_FLOOR,
   ASSISTANCE_TOTAL_REPS_CEILING,
+  ASSISTANCE_MENU,
+  ASSISTANCE_DEFAULTS,
 } from '../../../../src/lib/assistance-menu.ts';
-import { getMovementFamily } from '../../../../src/lib/exercise-config.ts';
+import { getMovementFamily, isDirectArm, EXERCISE_CONFIG } from '../../../../src/lib/exercise-config.ts';
 
 const PICKS = { push: 'Dips', pull: 'Chin Up', single_leg_core: 'Single Leg Hip Thrust' };
 const UPPER = ['Bench Press', 'Overhead Press'];
@@ -72,22 +74,100 @@ Deno.test('REGRESSION §0.1 — Face Pull is never the answer to a PUSH slot', (
 
 // ── REGRESSION §0.2 — lower-body work was dumped on upper days ───────────────────────────────────
 
-Deno.test('REGRESSION §0.2 — no leg work on any press day, and the third slot is core', () => {
+Deno.test('REGRESSION §0.2 — no leg work on any press day, and the third slot is ARMS', () => {
+  // ⛔ THE SECOND ASSERTION FLIPPED ON 2026-08-09 (D-404 supersedes D-385): it read `'core'`, because
+  // the upper-day third slot was abs. It is triceps now — p.50-51 closes both press days on arms,
+  // and this block runs the standard templates, not the concurrent chapter that put core here.
+  // ⚠️ THE FIRST ASSERTION IS THE ACTUAL §0.2 REGRESSION and is untouched: no leg work on a press
+  // day, whatever the third slot carries. That is the defect this test exists for.
   for (const main of UPPER) {
     for (const row of resolveAssistance(PICKS, main)) {
       const fam = getMovementFamily(row.name);
       assertEquals(fam === 'knee' || fam === 'hip', false, `${row.name} is leg work on a ${main} day`);
     }
-    assertEquals(getMovementFamily(nameFor(main, 'single_leg_core')), 'core', `${main} third slot`);
+    assertEquals(isDirectArm(nameFor(main, 'single_leg_core')), true, `${main} third slot`);
   }
 });
 
-Deno.test('REGRESSION §0.2 — the core slot resolves without equipment', () => {
+Deno.test('D-322 — every menu name has an EXACT config key, not a fuzzy borrow', () => {
+  // ⛔ `getExerciseConfig()` FUZZY-MATCHES. A name with no entry does not fail — it silently borrows
+  // another movement's entry, logs a warning nobody reads, and takes that movement's ratio and
+  // display format. That is the D-322 bug class, and "the name resolves" is NOT evidence against it:
+  // `Nonexistent Widget Press` resolves too. The only real check is an EXACT key, so that is what
+  // this asserts. Every name the athlete can pick, plus every default the engine falls back to.
+  const names = new Set([
+    ...ASSISTANCE_MENU.flatMap((m) => m.options.map((o) => o.name)),
+    ...Object.values(ASSISTANCE_DEFAULTS),
+  ]);
+  for (const name of names) {
+    assertEquals(
+      Object.prototype.hasOwnProperty.call(EXERCISE_CONFIG, name.toLowerCase()), true,
+      `"${name}" has no exact EXERCISE_CONFIG key — it will fuzzy-borrow another movement's entry`,
+    );
+  }
+});
+
+Deno.test('a CURL picked into the arm slot survives a press day, alongside the chin', () => {
+  // ⛔ THE PAIRING THIS PINS: `Chin Up` in the pull slot and a curl in the arm slot, SAME DAY. Both
+  // are elbow flexion and both are family `pull`, so any rule that reasons about the pull family
+  // would read the second one as redundant and override the athlete's pick.
+  //
+  // ⚠️ AND THE REASON IT SURVIVES IS THAT NO SUCH RULE EXISTS ANY MORE, which is worth stating
+  // because it is NOT what you would guess from the entry points. `sharesMovementFamily` has been
+  // deliberately un-imported from `assistance-menu.ts` since D-385 (see the note at the top of that
+  // file): "does this share a family" was the OLD collision question and it is asked nowhere in the
+  // resolution path. `fitsRole('arm')` reads `isDirectArm` and nothing else. So a curl needs no
+  // exemption — there is nothing to be exempted from. This test exists so that stays true: it fails
+  // the moment anyone reintroduces family reasoning into the arm slot.
+  for (const main of UPPER) {
+    for (const curl of ['Dumbbell Curl', 'Hammer Curl']) {
+      const picks = { push: 'Dips', pull: 'Chin Up', single_leg_core: curl };
+      const rows = resolveAssistance(picks, main);
+      const arm = rows.find((r) => r.slot === 'single_leg_core')!;
+      assertEquals(arm.name, curl, `${main}: the curl was overridden`);
+      assertEquals(arm.substitutedFor, undefined, `${main}: the curl was substituted`);
+      assertEquals(arm.balancedFor, undefined, `${main}: the curl was plane-swapped`);
+      assertEquals(isDirectArm(arm.name), true, `${main}: the curl is not flagged as arm work`);
+      // The chin is still there, in its own slot, untouched by the curl sitting beside it.
+      assertEquals(nameFor(main, 'pull', picks), 'Chin Up', `${main}: the chin was displaced`);
+    }
+  }
+});
+
+Deno.test('⛔ THE ARM SLOT DEFAULTS TO TRICEPS — a curl is opt-in, never inherited', () => {
+  // The biceps options are LAST in the menu and `resolveRole` takes the first fitting option, so an
+  // athlete who never opens the card gets triceps. If the menu is ever reordered this fails, which
+  // is the point: chins already train biceps, and triceps is the arm the block does not otherwise
+  // hit directly. Pinned for the default path AND for a leg pick that has to be re-roled.
+  for (const main of UPPER) {
+    for (const picks of [null, { push: 'Push Up', pull: 'Chin Up', single_leg_core: 'Reverse Lunge' }]) {
+      const arm = resolveAssistance(picks as never, main).find((r) => r.slot === 'single_leg_core')!;
+      assertEquals(getMovementFamily(arm.name), 'push', `${main}: defaulted to a curl, not triceps`);
+      assertEquals(isDirectArm(arm.name), true, `${main}: default is not arm work at all`);
+    }
+  }
+});
+
+Deno.test('REGRESSION §0.2 — abs did not vanish: they hold both LOWER days', () => {
+  // ⛔ THE GUARD ON D-404. Swapping the upper-day slot core → arm is only defensible because core was
+  // never only there: `lower` re-roles the push key to core, so squat day and deadlift day each
+  // close on the trunk. Twice a week, which is what p.51 prescribes. If this test ever fails, the
+  // swap has quietly deleted abs from the block and the reasoning behind it no longer holds.
+  for (const main of LOWER) {
+    assertEquals(getMovementFamily(nameFor(main, 'push')), 'core', `${main} carries no core`);
+  }
+});
+
+Deno.test('REGRESSION §0.2 — the third slot resolves without equipment, on every day type', () => {
   // The slot held exactly one core option and it needed a pull-up bar. On an upper day the slot is
-  // core-only, so a bar-less athlete had nothing to land on.
+  // single-role, so a bar-less athlete had nothing to land on. Same hazard now applies to arms —
+  // a pushdown needs a cable stack — so the fallback leads with bodyweight and this pins it.
   const barless = { push: 'Push Up', pull: 'Dumbbell Row', single_leg_core: 'Reverse Lunge' };
   for (const main of UPPER) {
-    assertEquals(getMovementFamily(nameFor(main, 'single_leg_core', barless)), 'core', `${main}`);
+    assertEquals(isDirectArm(nameFor(main, 'single_leg_core', barless)), true, `${main}`);
+  }
+  for (const main of LOWER) {
+    assertEquals(getMovementFamily(nameFor(main, 'push', barless)), 'core', `${main}`);
   }
 });
 
@@ -131,15 +211,32 @@ Deno.test('§5 — reps are FLAT across sports; only tested capacity moves them,
     'the anchor cycle holds the floor whatever the capacity');
 });
 
-// ── The p.86 plane rule — kept, and scoped to the pull slot ──────────────────────────────────────
+// ── The p.86 plane rule — now the CONCURRENT template's rule, and only its ───────────────────────
 
-Deno.test('p.86 — the pull slot crosses the plane, and ONLY the pull slot', () => {
-  // Overhead Press is a vertical push, so it wants a horizontal pull.
-  assertEquals(nameFor('Overhead Press', 'pull'), 'Inverted Row');
-  // Bench Press is horizontal, so a vertical pull stands.
+// ⛔ THIS TEST REVERSED ON 2026-08-09 AND THE OLD ASSERTION IS KEPT DIRECTLY BELOW IT, on purpose.
+// It used to read `nameFor('Overhead Press', 'pull') === 'Inverted Row'` UNCONDITIONALLY. That was
+// correct for the rule as scoped then and is wrong now: p.86-88 is the CONCURRENT chapter, and a
+// strength-purpose block runs the STANDARD templates (p.48 / p.50), which never cross planes. The
+// rule is not deleted — it is gated — so both halves are pinned and neither can rot unobserved.
+
+Deno.test('standard template — the athlete keeps the plane they picked (p.48 / p.50)', () => {
+  // The default, and the only thing production reaches today. Chins stay on the press day; the
+  // 25-100 scaler is what makes the rep count survivable for a low-capacity athlete, NOT a swap.
+  assertEquals(nameFor('Overhead Press', 'pull'), 'Chin Up');
   assertEquals(nameFor('Bench Press', 'pull'), 'Chin Up');
-  // ⛔ AND THE PUSH SLOT DOES NOT CROSS. Its complement is a pull; crossing here deletes the push.
+  // ⚠️ ROLE rules are template-independent and must survive the gate — a press day still presses.
   assertEquals(getMovementFamily(nameFor('Overhead Press', 'push')), 'push');
+});
+
+Deno.test('concurrent template — the pull slot crosses the plane, and ONLY the pull slot', () => {
+  const concurrent = (main: string, slot: string) =>
+    resolveAssistance(PICKS as never, main, 'concurrent').find((r) => r.slot === slot)!.name;
+  // Overhead Press is a vertical push, so it wants a horizontal pull.
+  assertEquals(concurrent('Overhead Press', 'pull'), 'Inverted Row');
+  // Bench Press is horizontal, so a vertical pull stands.
+  assertEquals(concurrent('Bench Press', 'pull'), 'Chin Up');
+  // ⛔ AND THE PUSH SLOT DOES NOT CROSS. Its complement is a pull; crossing here deletes the push.
+  assertEquals(getMovementFamily(concurrent('Overhead Press', 'push')), 'push');
 });
 
 // ── §0h — an unknown main lift degrades to UNCHANGED, never to a guess ───────────────────────────
@@ -163,9 +260,15 @@ Deno.test('§0h — no main lift, or one with no readable pattern, leaves every 
 
 Deno.test('a fuzzy-matched main lift is treated as the movement it matched, not as unknown', () => {
   // Pins the behaviour above so it is a recorded fact rather than a surprise. "…Press" matches a
-  // vertical press, so this is an upper day: push · pull · core, with the p.86 plane rule applied.
+  // vertical press, so this is an upper day: push · pull · arm (D-404; was core before 2026-08-09).
+  //
+  // ⚠️ THE FAMILY LIST READS `push` TWICE AND THAT IS CORRECT, not a bug in the assertion. A triceps
+  // movement's family IS `push` — the collision axis is right about that, which is exactly why the
+  // arm role reads `isDirectArm` instead. The third row is checked on the axis that distinguishes it.
   const rows = resolveAssistance(PICKS, 'Nonexistent Widget Press');
-  assertEquals(rows.map((r) => getMovementFamily(r.name)), ['push', 'pull', 'core']);
+  assertEquals(rows.map((r) => getMovementFamily(r.name)), ['push', 'pull', 'push']);
+  assertEquals(isDirectArm(rows[2].name), true, 'the third slot is direct arm work, not a second press');
+  assertEquals(isDirectArm(rows[0].name), false, 'the push slot is a compound press, not isolation');
 });
 
 // ── The copy — it names the pick, and never invents one ──────────────────────────────────────────
