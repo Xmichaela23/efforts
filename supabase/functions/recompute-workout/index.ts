@@ -175,6 +175,10 @@ Deno.serve(async (req) => {
   //    older watermark and be REFUSED by trg_guard_snapshot_watermark. Non-fatal; self-heals next run.
   try {
     const source_watermark = new Date().toISOString();
+    // Q-252 Stage 2: do NOT fetch/pass the athlete's zone here — compute-snapshot resolves it from
+    // the stored user_baselines.timezone itself. Passing it would be a redundant DB round-trip for a
+    // value the callee already reads. The body override exists for callers that already hold the tz
+    // (the client, and backfill which selects user_baselines anyway), not for this headless path.
     await invokeWithRetry(serviceClient, 'compute-snapshot', {
       user_id: workout.user_id,
       ...(workoutDate ? { week_start: mondayOf(workoutDate) } : {}),

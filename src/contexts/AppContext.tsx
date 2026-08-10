@@ -407,7 +407,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', userId).single();
       if (error && error.code !== 'PGRST116') throw error;
       if (!data) return null;
-      
+
+      // Report the athlete's timezone to the server. [Q-252 Stage 2]
+      // The server does ATHLETE-LOCAL day math (the ACWR `asOf` day, compute-snapshot/index.ts:~435)
+      // and had no way to know the zone — it fell back to a hardcoded 'America/Los_Angeles', so every
+      // athlete's day boundary was one developer's. Nothing else reports it: `body.timezone` exists on
+      // the server but no caller has ever set it. This is the write that fills the column.
+      // Fire-and-forget on an already-authenticated read, and only when it actually changed, so a
+      // normal load costs nothing and a move/travel self-corrects on the next load.
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && tz !== (data as any).timezone) {
+          void supabase.from('user_baselines').update({ timezone: tz }).eq('user_id', userId)
+            .then(({ error: tzErr }) => {
+              if (tzErr) console.warn('[AppContext] timezone report failed:', tzErr.message);
+            });
+        }
+      } catch (e) {
+        console.warn('[AppContext] timezone resolve failed:', e);
+      }
+
       // Fix birthday timezone issue - ensure it's always YYYY-MM-DD format
       let formattedBirthday = data.birthday;
       if (data.birthday) {

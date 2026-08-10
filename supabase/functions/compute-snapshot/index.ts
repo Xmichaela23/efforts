@@ -22,6 +22,8 @@ import {
   parseLocalDate,
 } from "../_shared/parse-local-date.ts";
 import { stateTrendGate } from "./state-trend-gate.ts";
+import { resolveAcwrAsOf } from "./acwr-as-of.ts";
+import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
   assembleStateTrends,
   toStateTrendsV1,
@@ -44,7 +46,6 @@ import { resolvePlanPhase } from "../_shared/plan-phase.ts";
 import { resolvePlanWeekIndex } from "../_shared/plan-week.ts";
 import { computeEfficiencyIndex } from "../_shared/efficiency-index.ts"; // ONE efficiency formula (grade-adjusted feed)
 import { projectStandardRaces } from "../_shared/race-readiness/index.ts"; // goal-free VDOT 5k/10k/half/marathon
-import { localDateInTz } from "../_shared/local-date.ts";
 import { deriveSnapshotWatermark } from "./watermark.ts";
 
 // ---------------------------------------------------------------------------
@@ -379,6 +380,16 @@ serve(async (req: Request) => {
       }));
 
     // -----------------------------------------------------------------------
+    // 2c. The athlete's TIMEZONE, from the athlete. [Q-252 Stage 2]
+    //     Was `body.timezone ? ... : 'America/Los_Angeles'` — and no server caller has ever passed
+    //     `timezone`, so every athlete's ACWR day was resolved in one developer's home zone. The
+    //     stored value is what the client reported on its last authenticated load; UTC until then.
+    //     Never throws — a timezone lookup must not be able to fail a snapshot write.
+    // -----------------------------------------------------------------------
+    const storedTimezone = await fetchAthleteTimezone(supabase, userId);
+    const userTz = resolveAthleteTimezone({ bodyTimezone: body.timezone, storedTimezone });
+
+    // -----------------------------------------------------------------------
     // 3. Split facts into target week vs prior 4 weeks
     // -----------------------------------------------------------------------
     const targetFacts = facts.filter((f) => f.date >= targetWeek && f.date <= rangeEnd);
@@ -415,12 +426,12 @@ serve(async (req: Request) => {
     // "Today" is the ATHLETE-LOCAL date, matching coach's asOfDate convention
     // (coach/index.ts:1171) so persisted == live at all hours — server UTC would
     // roll to tomorrow during the athlete's evening and window a day off coach.
-    // Timezone from the request if provided, else America/Los_Angeles (a
-    // headless/ingest recompute has no client tz; the server clock is UTC).
+    // ⛔ [Q-252 Stage 2] THE ZONE IS THE ATHLETE'S, NOT A HARDCODE. This line used to end in
+    // `: 'America/Los_Angeles'`, and no server caller ever passed `body.timezone` — so every
+    // athlete's ACWR day was computed in Pacific. Resolved in §2c above from the stored zone;
+    // UTC (a neutral, not a home) until the client reports one. Do not put a region back here.
     // -----------------------------------------------------------------------
-    const userTz = body.timezone ? String(body.timezone) : 'America/Los_Angeles';
-    const nowYmd = localDateInTz(new Date(), userTz);
-    const acwrAsOf = nowYmd < rangeEnd ? nowYmd : rangeEnd;
+    const acwrAsOf = resolveAcwrAsOf({ now: new Date(), timezone: userTz, rangeEnd });
     const acwrResult = computeAcwr(acwrLoadRows, { asOfDate: acwrAsOf });
     const acwr = acwrResult.ratio;
 

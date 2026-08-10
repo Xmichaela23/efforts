@@ -35,6 +35,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveUser } from '../_shared/require-user.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
+import { resolveAthleteTimezone } from '../_shared/athlete-timezone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,10 +102,14 @@ serve(async (req) => {
     // this pass is a no-op and says so, rather than inventing a weight to make the numbers move.
     const { data: baselineRow } = await admin
       .from('user_baselines')
-      .select('weight, units')
+      // `timezone` rides along on a read this pass already does (Q-252 Stage 2) — it is threaded
+      // into the compute-snapshot invoke at the end so this headless path names the athlete's zone
+      // explicitly instead of leaving the callee to infer one.
+      .select('weight, units, timezone')
       .eq('user_id', userId)
       .maybeSingle();
     const bodyweightLb = resolveBodyweightLb(baselineRow as any);
+    const athleteTimezone = resolveAthleteTimezone({ storedTimezone: (baselineRow as any)?.timezone });
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     // 1. COMPLETED strength workouts — re-priced by the canonical writer
@@ -178,7 +183,7 @@ serve(async (req) => {
       // One snapshot rebuild at the end, so the weekly aggregates every screen reads are built from
       // the re-priced facts rather than the ones they replaced.
       try {
-        await invoke('compute-snapshot', { user_id: userId });
+        await invoke('compute-snapshot', { user_id: userId, timezone: athleteTimezone });
       } catch (e: any) {
         console.error('[backfill-strength-load] snapshot rebuild failed (re-run to refresh):', e?.message ?? e);
       }
