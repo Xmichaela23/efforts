@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthCompareTable';
+import { useAppContext } from '@/contexts/AppContext';
+// The session clock's display + parse rules, shared with the logger so the number that ticks in the
+// header and the number that reads back here can never format or validate differently.
+import { MAX_SESSION_MINUTES, formatSessionMinutes, parseEditedMinutes } from '@/lib/strength-session-clock';
 // THE app's exercise vocabulary — the same canonical keys exercise_log and the State trend group
 // on. Imported rather than re-implemented so this screen cannot disagree with them about what a
 // lift is called (audit F5: five separate name-matchers, and counting is not the place to add one).
@@ -86,6 +91,32 @@ const extractExercisesFromComputed = (workout: any) => {
 };
 
 export default function StrengthPerformanceSummary({ planned, completed, type, sessionDetail, onRecompute, recomputing, recomputeError }: StrengthPerformanceSummaryProps) {
+  // ── SESSION DURATION, AND IT IS EDITABLE ─────────────────────────────────────────────────────
+  //
+  // Strength duration was WRITE-ONLY until now: the logger saved `workouts.duration` and no strength
+  // surface rendered it (`TodaysEffort` blanks it for strength on purpose). A number nobody can see
+  // is a number nobody can correct — and the session clock, however well anchored, still cannot know
+  // that the athlete took a phone call between sets. Strong and Hevy both answer this the same way:
+  // the timer runs live in the logger, and the saved duration is editable afterwards.
+  //
+  // The EDIT belongs here rather than in the live logger — mid-session the clock is the truth and a
+  // manual override would immediately be overwritten by the next tick. After the save, the athlete
+  // is the truth.
+  const { updateWorkout } = useAppContext();
+  const savedDurationMin = Number(completed?.duration) || 0;
+  // Local mirror so the tile shows the corrected number immediately; `completed` is refetched by the
+  // parent on its own schedule and would otherwise snap back to the old value for a beat.
+  const [durationMin, setDurationMin] = useState<number>(savedDurationMin);
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [durationDraft, setDurationDraft] = useState('');
+  const [durationSaving, setDurationSaving] = useState(false);
+  const [durationError, setDurationError] = useState<string | null>(null);
+  // Follow the row when the parent hands us a different workout (or a refetch of this one), but not
+  // while an edit is open — that would yank the field out from under the athlete mid-type.
+  useEffect(() => {
+    if (!editingDuration) setDurationMin(savedDurationMin);
+  }, [savedDurationMin, editingDuration]);
+
   let plannedExercises = extractExercisesFromComputed(planned);
   
   if (plannedExercises.length === 0) {
@@ -370,6 +401,34 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   );
   const totalVolumeLb = strengthVolume?.completed_total_lb ?? 0;
 
+  const commitDuration = async () => {
+    const parsed = parseEditedMinutes(durationDraft);
+    if (parsed === null) {
+      setDurationError(`Enter whole minutes, 1 to ${MAX_SESSION_MINUTES}.`);
+      return;
+    }
+    if (!workoutId) {
+      setDurationError('This session has no id to save against.');
+      return;
+    }
+    if (parsed === durationMin) { setEditingDuration(false); setDurationError(null); return; }
+    setDurationSaving(true);
+    setDurationError(null);
+    try {
+      await updateWorkout(String(workoutId), { duration: parsed });
+      setDurationMin(parsed);
+      setEditingDuration(false);
+      // The analyzer stamps `execution_summary.session_duration` from this column, so a correction
+      // only reaches it on the next recompute. Ask for one when the screen offers it.
+      void onRecompute?.();
+    } catch {
+      // Keep the field open holding what was typed — a failed write must not look like a save.
+      setDurationError('Could not save. Try again.');
+    } finally {
+      setDurationSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* THE BLOCK THIS SESSION BELONGED TO — one quiet line above the numbers it frames, so a light
@@ -536,20 +595,61 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         }}
       />
       {(totals.sets > 0 || totalVolumeLb > 0) && (
-        <div className="grid grid-cols-3 gap-2 pt-3 mt-1 border-t border-white/10 text-center">
+        <>
+        <div className="grid grid-cols-4 gap-2 pt-3 mt-1 border-t border-white/10 text-center">
           <div>
             <div className="text-lg font-semibold text-white">{totals.sets}</div>
-            <div className="text-xs text-white/50">Total Sets</div>
+            <div className="text-[11px] text-white/50">Total Sets</div>
           </div>
           <div>
             <div className="text-lg font-semibold text-white">{totals.reps}</div>
-            <div className="text-xs text-white/50">Total Reps</div>
+            <div className="text-[11px] text-white/50">Total Reps</div>
           </div>
           <div>
             <div className="text-lg font-semibold text-white">{totalVolumeLb.toLocaleString()}</div>
-            <div className="text-xs text-white/50">Volume (lbs)</div>
+            <div className="text-[11px] text-white/50">Volume (lbs)</div>
+          </div>
+          {/* DURATION — the fourth tile, and the only editable one. It reads "—" on sessions logged
+              before the clock existed, and the edit is how those get a number at all. */}
+          <div>
+            {editingDuration ? (
+              <input
+                type="number"
+                inputMode="numeric"
+                autoFocus
+                disabled={durationSaving}
+                value={durationDraft}
+                onChange={(e) => { setDurationDraft(e.target.value); setDurationError(null); }}
+                onBlur={() => { void commitDuration(); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLInputElement).blur(); }
+                  if (e.key === 'Escape') { setEditingDuration(false); setDurationError(null); }
+                }}
+                className="w-full bg-white/[0.10] border border-white/25 rounded-md px-1 py-0.5 text-lg font-semibold text-white text-center tabular-nums outline-none focus:border-white/50"
+                aria-label="Session duration in minutes"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setDurationDraft(durationMin > 0 ? String(durationMin) : '');
+                  setDurationError(null);
+                  setEditingDuration(true);
+                }}
+                className="relative w-full text-lg font-semibold text-white hover:text-white/80"
+                aria-label={durationMin > 0 ? `Session duration ${durationMin} minutes, edit` : 'Add session duration'}
+              >
+                {formatSessionMinutes(durationMin)}
+                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
+              </button>
+            )}
+            <div className="text-[11px] text-white/50">{editingDuration ? 'Minutes' : 'Duration'}</div>
           </div>
         </div>
+        {durationError && (
+          <div className="text-[11px] text-amber-300/90 text-right">{durationError}</div>
+        )}
+        </>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="text-sm text-gray-700">

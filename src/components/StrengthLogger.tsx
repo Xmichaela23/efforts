@@ -38,6 +38,17 @@ import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { calculateRestTime, isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
+// THE SESSION CLOCK — a persisted wall-clock start, so a remount resumes the session instead of
+// restarting it. Same rule as Q-TIMER's rest deadlines: elapsed is DERIVED, `startedAt` is the
+// authority. Keyed by the draft's own identity-scoped session key (D-132).
+import {
+  clearSessionStart,
+  elapsedMinutesForSave,
+  elapsedSeconds,
+  ensureSessionStart,
+  formatElapsed,
+  moveSessionStart,
+} from '@/lib/strength-session-clock';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
 
 /**
@@ -604,7 +615,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
-  const [workoutStartTime] = useState<Date>(new Date());
+  // ⛔ `workoutStartTime` LIVED HERE AS `useState<Date>(new Date())` AND IT WAS THE BUG. A value that
+  // lives and dies with the component restamped itself on every remount — while the DRAFT restored
+  // intact — so an interrupted session saved only its last stretch. The start now comes from
+  // localStorage (`strength-session-clock`), stamped once per identity-scoped session key.
+  // `null` until the stamping effect below `computeSessionKey` runs; a mount never fabricates a start.
+  const [workoutStartMs, setWorkoutStartMs] = useState<number | null>(null);
+  // The tick's only job: move `now` so the derived elapsed re-renders. Elapsed is never accumulated.
+  const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now());
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
   const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
@@ -683,6 +701,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // rest AGAIN and no alert ever fired. Reconciling from `endsAt` first means the in-app timer
             // is CORRECT the instant we return, so cancelling the notification is finally safe.
             const expired = reconcileTimersFromClock();
+
+            // SESSION CLOCK: the 1s tick was suspended out there, so `clockNowMs` is stale by however
+            // long the athlete was away. Nudging it here makes the header read correctly on the frame
+            // we return rather than up to a second later. No reconcile pass is needed beyond this —
+            // elapsed is `now - startedAt` and `startedAt` never moved.
+            setClockNowMs(Date.now());
 
             // A timer that ran out while away has ALREADY buzzed via its notification. Do not haptic
             // again on return — that is a double-fire, and it is the other half of "inconsistent".
@@ -1277,7 +1301,62 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Pre-D-132 drafts were keyed by date alone; read as a fallback (still identity-guarded).
   const legacySessionKey = () => `strength_logger_session_${sessionDateStr()}`;
   const sessionKey = computeSessionKey(sourcePlannedId);
-  
+
+  // ── THE SESSION CLOCK ────────────────────────────────────────────────────────────────────────
+  //
+  // STRENGTH ONLY. Mobility runs through this same component in `logger_mode: 'mobility'` and is
+  // deliberately untouched — no stamp, no tick, no header readout. It keeps the mount-anchored
+  // duration it has always had (see the fallback in `finalizeSave`).
+  //
+  // The start hangs on the DRAFT'S OWN identity-scoped key (D-132), so the clock and the sets it
+  // times can never disagree about which workout this is.
+  const isMobilitySession = String(scheduledWorkout?.logger_mode || '').toLowerCase() === 'mobility';
+  // Mount stamp. Two jobs: it is the mobility path's duration anchor (unchanged behaviour), and it
+  // is the strength path's last resort if localStorage is unavailable (private mode, quota).
+  const mountedAtMsRef = useRef<number>(Date.now());
+  // The OPENED workout's id, exactly as `restoreSessionProgress` derives it — captured at mount
+  // because `sourcePlannedId` is hydrated a beat later and the clock must key correctly on the
+  // FIRST pass or it stamps a phantom 'adhoc' start it then has to migrate away from.
+  const clockOpenedIdRef = useRef<string | null>(
+    scheduledWorkout?.id && String(scheduledWorkout?.workout_status || 'planned').toLowerCase() !== 'completed'
+      ? String(scheduledWorkout.id)
+      : null
+  );
+  const clockKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isMobilitySession) return;
+    const key = clockKeyRef.current === null ? computeSessionKey(clockOpenedIdRef.current) : sessionKey;
+    const now = Date.now();
+    if (clockKeyRef.current !== null && clockKeyRef.current !== key) {
+      // The key MOVED mid-session — the athlete changed the performed date, or opened ad-hoc and
+      // then picked a planned workout. The draft follows its key; the clock has to follow too, or
+      // the next remount reads an empty slot and restarts. Destination wins (see moveSessionStart).
+      const moved = moveSessionStart(localStorage, clockKeyRef.current, key, now);
+      clockKeyRef.current = key;
+      setWorkoutStartMs(moved ?? ensureSessionStart(localStorage, key, now));
+      return;
+    }
+    clockKeyRef.current = key;
+    // IDEMPOTENT: first mount stamps, every later mount gets the ORIGINAL stamp back. This is the
+    // line that cures the under-count — a remount now RESUMES the session instead of restarting it.
+    setWorkoutStartMs(ensureSessionStart(localStorage, key, now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey, isMobilitySession]);
+
+  // The 1s tick. It needs its OWN interval: the rest-timer tick is gated on `anyTimerRunning` and
+  // is torn down the moment no rest is armed — which is most of a session, including all of the
+  // first exercise. All this moves is `now`; elapsed is derived from `startedAt`, never accumulated,
+  // so a suspended tick loses nothing and the foreground nudge in the app-state listener is enough.
+  useEffect(() => {
+    if (isMobilitySession || !workoutStartMs) return;
+    setClockNowMs(Date.now());
+    const id = window.setInterval(() => setClockNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [isMobilitySession, workoutStartMs]);
+
+  const sessionElapsedSeconds = isMobilitySession ? 0 : elapsedSeconds(workoutStartMs, clockNowMs);
+
+
   // Save session progress to localStorage
   const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
     try {
@@ -1355,11 +1434,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
 
+  /**
+   * End the session clock. DELIBERATELY NOT INSIDE `clearSessionProgress` — that runs on six paths
+   * that are edits, not endings: deleting the last exercise, removing the last add-on, the "clear"
+   * button in the Pick-planned menu, and the D-110 orphan verify. Hooking the clock there would
+   * restart the timer because the athlete deleted a row. The session ends in exactly two places: a
+   * CONFIRMED SAVE, and an explicit DISCARD.
+   */
+  const endSessionClock = () => {
+    try { clearSessionStart(localStorage, clockKeyRef.current || sessionKey, Date.now()); } catch { /* storage gone; the slot expires on its own */ }
+    clockKeyRef.current = null;
+    setWorkoutStartMs(null);
+  };
+
   // Discard the draft and leave. Reps otherwise persist across nav/backgrounding (saveSessionProgress),
   // so this is the deliberate "throw this away" — mainly for a session opened by mistake or a test dry-run.
   // Quiet by design (a muted link with a two-tap confirm); persistence covers accidental navigation.
   const discardSession = () => {
     try { clearSessionProgress(); } catch { /* draft already gone */ }
+    endSessionClock();  // the one edit path that IS an ending
     setExercises([createEmptyExercise()]);
     setAttachedAddons([]);
     setNotesText('');
@@ -3839,8 +3932,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // BEFORE the await save — so a failed/interrupted save (network error, or the iOS resume
     // remount churn killing the component mid-save) destroyed the draft AND never persisted
     // the workout = total data loss. The draft is now cleared only AFTER a confirmed save.
-    const workoutEndTime = new Date();
-    const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
+    // DURATION comes from the PERSISTED start, not from when this component happened to mount.
+    // Pre-fix, a session interrupted once (nav away, cold-start restore, foreground reopen) saved
+    // only the stretch since its last remount.
+    //
+    // MOBILITY IS BRANCHED, NOT CARRIED ALONG. It has no clock: it falls back to the mount stamp
+    // AND to the old floor of 0, so its saved duration is byte-for-byte what it was before this
+    // feature existed. Strength floors at 1 — see `elapsedMinutesForSave` for why the two differ.
+    const startMs = workoutStartMs ?? mountedAtMsRef.current;
+    const durationMinutes = elapsedMinutesForSave(startMs, Date.now(), isMobilitySession ? 0 : 1);
 
     // Keep exercises with names and any sets (for manual logging, be permissive)
     const validExercises = exercises
@@ -3967,6 +4067,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // Save confirmed — NOW it's safe to clear the local draft (see the note in finalizeSave:
       // clearing before the await risked losing logged work on a failed/interrupted save).
       clearSessionProgress();
+      endSessionClock();  // the duration is banked on the row now; the slot must not outlive it
 
       // Readiness check-in dual-write (D-142, Q-049 Phase 1 step 3). The check-in
       // is now a first-class DAILY signal in readiness_checkins (source of truth,
@@ -4323,6 +4424,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               >
                 Deload
               </span>
+            )}
+            {/* SESSION CLOCK — the live elapsed readout, in the header beside the title, which is
+                where Strong and Hevy put it. NOT in the rest-timer overlay: that pill is a
+                transient state (it appears when a rest is armed and leaves when it ends), and the
+                session clock is the opposite — it is true for the whole session and must not come
+                and go with rest. No show/hide toggle, matching both apps.
+
+                Strength only; mobility renders nothing here. `role="timer"` with no aria-live so a
+                screen reader can be pointed at it without being read a new number every second. */}
+            {!isMobilitySession && workoutStartMs != null && (
+              <div className="shrink-0 ml-auto flex flex-col items-end leading-none" aria-label="Session elapsed time">
+                <span className="text-[10px] uppercase tracking-wide text-white/40">Elapsed</span>
+                <span
+                  role="timer"
+                  aria-live="off"
+                  className="mt-0.5 text-base font-medium tabular-nums text-white/80"
+                >
+                  {formatElapsed(sessionElapsedSeconds)}
+                </span>
+              </div>
             )}
           </div>
           {/* Row 2: controls — date + Pick planned get their own row, full room, no
