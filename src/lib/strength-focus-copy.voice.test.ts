@@ -27,8 +27,9 @@ import { HARD_DAY_WHY, VOLUME_WHY } from './strength-focus-copy.ts';
  * here is an edit that was never gated.
  */
 const CARD_LINES: ReadonlyArray<[string, string]> = [
-  // "How much" — the one-line claim that survives above the two inputs, and the floor framing.
-  ['volume/claim', 'Pace is not what competes with strength here — total work is.'],
+  // ⚠️ "How much" NO LONGER CARRIES A CLAIM LINE (2026-08-10). The card leads straight into the two
+  // inputs on the subtitle's holding-dose framing; the claim sentence moved into VOLUME_WHY, where
+  // it opens the first section. Asserted below rather than here.
   ['volume/floor', 'A week you can hit when work is bad, not your best one.'],
   ['volume/run-label', 'Weekly running to hold'],
   ['volume/ride-label', 'Weekly riding to hold'],
@@ -65,6 +66,17 @@ Deno.test('the gate is actually live — a known-bad line still fails', () => {
   // returns null the check has been neutered and every assertion above is worthless.
   assertEquals(voiceViolation('How much to keep is yours to set'), 'keep');
   assertEquals(voiceViolation('Nice work this week!'), 'exclamation mark');
+});
+
+Deno.test('the claim sentence survives the move off the card, and OPENS the rationale', () => {
+  // ⛔ IT WAS REMOVED FROM THE CARD, NOT DELETED (2026-08-10). "How much" leads straight into its two
+  // inputs now — an athlete who reads the claim and one who never sees it both do the same thing,
+  // type a number, so it bought nothing at the top of the screen. It is the first thing anyone who
+  // taps the (i) reads, ahead of the numbers that support it. If a future trim drops it entirely,
+  // the app has quietly stopped saying the one counterintuitive thing it knows about this choice.
+  const claim = 'Pace is not what competes with strength here — total work is.';
+  assertEquals(voiceViolation(claim), null);
+  assertEquals(VOLUME_WHY[0].body.startsWith(claim), true, 'the claim must OPEN the first section');
 });
 
 Deno.test('VOLUME_WHY carries the numbers, the paper, and both hedges', () => {

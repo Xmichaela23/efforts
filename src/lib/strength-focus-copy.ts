@@ -524,10 +524,16 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
 export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
   {
     heading: 'What the trial found',
+    // ⛔ THE CLAIM SENTENCE LIVES HERE NOW, NOT ON THE CARD (2026-08-10). It was the one line left
+    // above the inputs, and it was still a paragraph of argument on a screen whose only job is to
+    // take two numbers. The card leads straight into the inputs on the holding-dose framing the
+    // subtitle already carries; anyone who wants to know why the number matters taps the (i) and
+    // reads it as the first thing in here, where it belongs with the evidence for it.
     body:
-      'Eight weeks, three groups. Lifting alone gained 38.5% on leg press. Hard cycling alongside the '
-      + 'lifting gained 28.7%, easy cycling 27.5% — almost the same number. Every endurance session was '
-      + 'matched for equal work and equal duration, so pace was not what separated them. '
+      'Pace is not what competes with strength here — total work is. Eight weeks, three groups: '
+      + 'lifting alone gained 38.5% on leg press, hard cycling alongside the lifting gained 28.7%, '
+      + 'easy cycling 27.5% — almost the same number. Every endurance session was matched for equal '
+      + 'work and equal duration, so pace was not what separated them. '
       + '(Fyfe et al. 2016, Frontiers in Physiology 7:487.)',
   },
   {

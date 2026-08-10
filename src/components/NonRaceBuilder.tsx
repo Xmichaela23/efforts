@@ -426,6 +426,28 @@ function DayPicker({ value, onChange, allowed, taken }: {
 // `DayPicker` above is untouched and still used by the per-discipline cards, where nothing competes
 // for the screen.
 
+/**
+ * The (i) that opens the volume rationale, sitting on an input LABEL rather than on a line of its
+ * own — so the receipt stays one tap away without the card spending a row to advertise it.
+ *
+ * ⚠️ A COMPONENT RATHER THAN TWO COPIES OF THE MARKUP, because it renders against whichever field
+ * the card actually has: the running label normally, the riding label for a bike-only athlete. Two
+ * inline copies is how one of them ends up with a different aria-label or a stale handler.
+ */
+function VolumeWhyToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label="Why the volume number matters"
+      className="shrink-0 text-white/40 hover:text-white/70 transition-colors"
+    >
+      <Info className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
 // ⛔ THE HARD DAY THE ATHLETE ALREADY OWNS — asked ON the discipline's own card, never as a separate
 // "Fixed sessions" screen. Michael, 2026-07-25: *"run club hard conditioning day needs to be in
 // here."* A club run is a RUN fact; splitting it out asked the athlete to hold their running in their
@@ -1124,7 +1146,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [showVolumeWhy, setShowVolumeWhy] = useState(false);
   // ⛔ WHICH DAY QUESTION THE SCHEDULER'S ONE DAY ROW IS ANSWERING. Three anchors, one row — the
   // race path's pattern, brought to the card that had three `<select>`s and no week on screen.
-  const [scheduleQuestion, setScheduleQuestion] = useState<'hard' | 'long' | 'ride'>('hard');
+  const [scheduleQuestion, setScheduleQuestion] = useState<'hard' | 'long' | 'ride' | 'runs' | 'rides'>('hard');
   /** Which of the week's three questions the day row is currently answering. Card-local. */
   const [weekQuestion, setWeekQuestion] = useState<'run' | 'long' | 'club'>('long');
   // The standing session can be a run club or a ride club — this picks which, and the day pins to
@@ -1412,14 +1434,72 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const scheduleRunShown = state.posture?.run != null && state.posture?.run !== 'out';
   const scheduleRideShown = state.posture?.bike === 'maintain';
-  const scheduleAsk: 'hard' | 'long' | 'ride' =
-    (scheduleQuestion === 'long' && !scheduleRunShown) || (scheduleQuestion === 'ride' && !scheduleRideShown)
-      ? 'hard'
-      : scheduleQuestion;
+  /**
+   * THE SCHEDULER'S FIVE QUESTIONS, as a disclosure list: one line each when closed, showing its
+   * ANSWER, and its controls only while open.
+   *
+   * ⛔ THE COUNTS ARE ROWS TOO. "Runs: 3" is an answer exactly like "Long run: Sat", and keeping
+   * them visible as permanent pill grids is what pushed the hard day's own rationale off the bottom
+   * of the screen on 2026-08-09.
+   *
+   * ⚠️ ANSWERS ARE WRITTEN FOR THE CLOSED STATE, so each has to be legible with nothing else on
+   * screen. The hard day therefore reads "Run · Tue" rather than a bare day — which discipline it is
+   * is half of that answer, and the toggle that says so is only visible while the row is open.
+   */
+  const scheduleRows = ([
+    {
+      key: 'hard' as const,
+      kind: 'day' as const,
+      label: 'Hard day',
+      answer: !hardDaySport
+        ? 'None yet'
+        : hardDayValue
+          ? `${hardDaySport === 'run' ? 'Run' : 'Ride'} · ${DAY_SHORT[hardDayValue as DayName]}`
+          : `${hardDaySport === 'run' ? 'Run' : 'Ride'} · pick a day`,
+      shown: true,
+    },
+    {
+      key: 'long' as const,
+      kind: 'day' as const,
+      label: 'Long run',
+      answer: state.longRunDay ? DAY_SHORT[state.longRunDay as DayName] : 'Pick one',
+      shown: scheduleRunShown,
+    },
+    {
+      key: 'ride' as const,
+      kind: 'day' as const,
+      label: 'Long ride',
+      answer: state.longRideDay ? DAY_SHORT[state.longRideDay as DayName] : 'Pick one',
+      shown: scheduleRideShown,
+    },
+    {
+      key: 'runs' as const,
+      kind: 'count' as const,
+      label: 'Runs a week',
+      answer: String(state.runDays || '—'),
+      shown: scheduleRunShown,
+    },
+    {
+      key: 'rides' as const,
+      kind: 'count' as const,
+      label: 'Rides a week',
+      answer: String(state.rideDays || '—'),
+      shown: scheduleRideShown,
+    },
+  ]).filter((r) => r.shown);
+  /**
+   * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Four of the five rows are posture-gated,
+   * and posture is editable on an earlier step — so walking Back, dropping the bike, and walking
+   * forward again would leave a row open that no longer renders, with its day chips quietly writing
+   * to a discipline that is not in the plan. Falls back to the hard day, which every Strong Focus
+   * week has.
+   */
+  const scheduleAsk = scheduleRows.some((r) => r.key === scheduleQuestion) ? scheduleQuestion : 'hard';
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
       : scheduleAsk === 'long' ? (state.longRunDay || '')
-        : (state.longRideDay || '');
+        : scheduleAsk === 'ride' ? (state.longRideDay || '')
+          : '';
   /**
    * ⛔ NO `trainingDays`, DELIBERATELY — and it is the same call the race row makes for the same
    * reason. This path gives COUNTS (two runs, one ride), never a list of days; the solver places
@@ -3004,54 +3084,42 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           onBack={back} onContinue={next} canContinue
         >
           <div className="space-y-4">
-            {/* ⛔ THE CLAIM ABOVE THE INPUTS, THE RECEIPT BEHIND THE (i) (2026-08-09).
-                This was six lines of prose sitting BETWEEN the two fields — running miles above it,
-                riding hours below — so on a phone the second question was off screen and an athlete
-                who trains both never learned it existed. Michael: the controls get pushed below the
-                fold.
+            {/* ⛔ NO ARGUMENT ON THIS CARD AT ALL — IT LEADS STRAIGHT INTO THE INPUTS (2026-08-10).
+                ═══════════════════════════════════════════════════════════════════════════════════
+                Two passes were needed to get here, and the first stopped one step short. What was
+                here originally: six lines of Fyfe sitting BETWEEN the two fields, so on a phone the
+                riding-hours question was off screen and an athlete who trains both never learned it
+                existed. That moved behind the (i) on 2026-08-09, leaving one claim sentence above
+                the inputs — *"Pace is not what competes with strength here — total work is."*
 
-                One sentence survives on the card because it is counterintuitive and this is the
-                screen where the volume is chosen: every athlete assumes the hard session is what
-                threatens their lifting, and it is not. The numbers, the paper, and the two things
-                that paper does NOT say are one tap away in `VOLUME_WHY` — the same shape the
-                scheduler's hard-day (i) already uses, which is itself the `TrainingBaselines:1581`
-                pattern.
+                ⛔ THAT SENTENCE IS GONE TOO. It was still a line of ARGUMENT at the top of a screen
+                whose entire job is to take two numbers, and the framing the card needs is already in
+                the subtitle: *"Your holding dose while strength leads."* An athlete who reads the
+                claim and agrees does the same thing as one who never saw it — types a number. So it
+                buys nothing at the top and costs the first line of the card.
 
-                ⚠️ Both corrections from 2026-08-06 moved WITH the text, not away from it: it was
-                cycling rather than running, and volume-as-mediator is the authors' suggestion rather
-                than their result. `strength-focus-copy.voice.test.ts` asserts both survive, and runs
-                every string here through `voiceViolation()` — which is what the comment this
-                replaced only ever asked a human to remember to do. */}
-            <div className="flex items-start gap-1.5">
-              <p className="text-white/70 text-sm leading-relaxed">
-                Pace is not what competes with strength here — total work is.
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowVolumeWhy((v) => !v)}
-                aria-expanded={showVolumeWhy}
-                aria-label="Why the volume number matters"
-                className="shrink-0 mt-0.5 text-white/40 hover:text-white/70 transition-colors"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {showVolumeWhy && (
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
-                {VOLUME_WHY.map((s) => (
-                  <div key={s.heading}>
-                    <p className="text-white/70 text-xs font-medium">{s.heading}</p>
-                    <p className="text-white/45 text-xs leading-snug">{s.body}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+                It is not deleted: it now OPENS `VOLUME_WHY`, ahead of the numbers that support it,
+                which is the one place it can be read by someone who actually wants the reasoning.
+
+                ⚠️ THE (i) MOVES TO THE INPUT LABEL, so the receipt stays one tap away with no line
+                of its own. It hangs off whichever field renders first — bike-only athletes get it on
+                the riding label — because a card can be missing either input and the tap must not
+                disappear with it.
+
+                ⚠️ Both corrections from 2026-08-06 live inside `VOLUME_WHY`: it was cycling rather
+                than running, and volume-as-mediator is the authors' suggestion rather than their
+                result. `strength-focus-copy.voice.test.ts` asserts both survive any trim, and runs
+                every string through `voiceViolation()` — which is what the comment this all replaced
+                only ever asked a human to remember to do. */}
             {posturePresent('run') && (
               <div>
                 {/* ⛔ THE ATHLETE'S OWN UNIT. `unit` comes off their baselines and the payload
                     canonicalises back to miles on the way out — a metric athlete typing 22 means
                     22 km, and showing them "mi/wk" would silently take it as 22 miles. */}
-                <p className="text-white/85 text-sm mb-2">Weekly running to hold</p>
+                <p className="text-white/85 text-sm mb-2 flex items-center gap-1.5">
+                  Weekly running to hold
+                  <VolumeWhyToggle open={showVolumeWhy} onToggle={() => setShowVolumeWhy((v) => !v)} />
+                </p>
                 <div className="flex items-center gap-2">
                   <input
                     type="number" inputMode="numeric" min={0} placeholder={unit === 'km' ? 'e.g. 22' : 'e.g. 14'}
@@ -3075,21 +3143,23 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   A week you can hit when work is bad, not your best one.
                 </p>
                 {/* ⛔ THE FYFE PARAGRAPH LIVED HERE AND IS NOW `VOLUME_WHY` IN
-                    `src/lib/strength-focus-copy.ts`, BEHIND THE (i) AT THE TOP OF THIS CARD.
-                    It sat BETWEEN the two inputs, six lines of it, and pushed the riding-hours
-                    question off a phone screen — so the athlete who trains both never saw the second
-                    field. Its whole substance moved: the numbers, the paper, and both 2026-08-06
-                    corrections (it was cycling, not running; volume-as-mediator is the authors'
-                    suggestion, not their result). The one counterintuitive sentence stayed on the
-                    card, above both inputs where it frames them.
-                    ⚠️ The standing instruction to run any edit through `voiceViolation()` moved with
-                    it, and is finally EXECUTED rather than remembered —
-                    `strength-focus-copy.voice.test.ts`. */}
+                    `src/lib/strength-focus-copy.ts`, BEHIND THE (i) ON THE LABEL ABOVE. It sat
+                    BETWEEN the two inputs, six lines of it, and pushed the riding-hours question off
+                    a phone screen — so the athlete who trains both never saw the second field. Its
+                    whole substance moved, including the claim sentence that briefly stayed behind. */}
               </div>
             )}
             {state.posture?.bike === 'maintain' && (
               <div>
-                <p className="text-white/85 text-sm mb-2">Weekly riding to hold</p>
+                {/* ⚠️ THE (i) ONLY RENDERS HERE WHEN THERE IS NO RUNNING FIELD ABOVE IT. One tap, one
+                    place — a bike-only athlete would otherwise have no route to the rationale at
+                    all, and an athlete with both would get the same panel offered twice. */}
+                <p className="text-white/85 text-sm mb-2 flex items-center gap-1.5">
+                  Weekly riding to hold
+                  {!posturePresent('run') && (
+                    <VolumeWhyToggle open={showVolumeWhy} onToggle={() => setShowVolumeWhy((v) => !v)} />
+                  )}
+                </p>
                 <div className="flex items-center gap-2">
                   <input
                     type="number" inputMode="numeric" min={0} placeholder="e.g. 3"
@@ -3126,6 +3196,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </p>
               </div>
             )}
+            {/* ⛔ THE PANEL OPENS AT THE BOTTOM, NOT BESIDE THE (i) THAT TOGGLES IT. Rendering it
+                inline under the running label would push the riding field off the screen the moment
+                it is tapped — which is the exact defect this whole card was rewritten to fix, and it
+                would arrive only for the athlete who asked for more detail. Below both inputs, it
+                costs nothing until it is opened and nothing that matters after. */}
+            {showVolumeWhy && (
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
+                {VOLUME_WHY.map((s) => (
+                  <div key={s.heading}>
+                    <p className="text-white/70 text-xs font-medium">{s.heading}</p>
+                    <p className="text-white/45 text-xs leading-snug">{s.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </StepLayout>
       )}
@@ -3139,293 +3224,297 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           subtitle="Your days. The lifting is placed around them."
           onBack={back} onContinue={next} canContinue={scheduleCanContinue}
         >
-          <div className="space-y-4">
-            {/* ⛔ THE ANSWER CARD AND ONE DAY ROW — RESTORED FROM THE RACE PATH, NOT REBUILT
-                (2026-08-09).
+          {/* ⛔ ONE CARD, ONE OPEN QUESTION — A DISCLOSURE LIST (2026-08-10).
+              ═══════════════════════════════════════════════════════════════════════════════════
+              THREE LAYOUTS HAVE NOW FAILED ON THIS SCREEN, EACH FOR THE SAME REASON: the card's
+              parts were laid out in a COLUMN, so every part competed with every other part for the
+              fold, and whichever lost went off screen.
 
-                What was here: an empty `min-h-[9rem]` box reading "Pick your days and the week
-                appears here" — nine rems of nothing that showed no selection at all — and three
-                separate `<select>` day pickers stacked under it. Between them they used the whole
-                screen and pushed the day controls below the fold, so the athlete scrolled to answer
-                and scrolled back to see.
+                1. Three `<select>`s under a nine-rem empty box → the day controls were below the
+                   fold and the box showed no selection at all.
+                2. (2026-08-09) An answer card + a shared day row + the counts + the rationale + the
+                   terrain menu, stacked → the day chips floated with no container of their own,
+                   and the hard-day rationale ended up several hundred pixels BELOW the Hard day
+                   control it explains. Michael, on the device: *"shouldn't these day chips stay in
+                   a box"* and *"description gets totally lost."* Both are the same defect —
+                   things that belong together were merely NEAR each other, and scrolling separated
+                   them.
 
-                What replaced it already existed. `WeekDayRow` (`:276`) has shipped since
-                `12d73e19`, refined through five commits, and renders exactly this: seven chips whose
-                FILL says what each day is and whose RING says which day the open question is about,
-                with days another anchor holds greyed AND NAMED. It was unreachable from here only
-                because `scheduleSteps` never pushes the `days` step on the Strong Focus path — built
-                and starved, not missing.
+              ⛔ SO THE FIX IS NOT MORE TRIMMING. It is that this screen is FIVE QUESTIONS, and a
+              stack shows all five at once whether or not they are being answered. A disclosure list
+              shows all five ANSWERS and only the open question's CONTROLS — the pattern behind
+              every settings screen worth copying, and behind Runna's and Hevy's setup flows.
+              Collapsed, a row is one line. Open, it carries its day chips, its rationale and its
+              sub-questions INSIDE its own bounds, so a control can never drift away from the
+              sentence that explains it.
 
-                ⛔ AND THE THREE SELECTS WERE NOT A MISTAKE TO UNDO BLINDLY. `DaySelect` (`:415`)
-                carries its own reason: three day questions as three seven-button grids took three
-                rows and pushed the week off the screen — *"you need to be able to click and see
-                everything without scrolling."* That objection stands. This does not answer it by
-                going back to grids; it answers it the way the race card did, with ONE row that
-                serves whichever question is selected. Three questions, seven chips, one row.
+              ⛔ AND IT MAKES CONTAINMENT AUTOMATIC. The chips are inside the open row, which is
+              inside the card — they cannot float, because there is nowhere to float to. The old
+              layout had to remember to box them; this one cannot forget.
 
-                ⚠️ THE COUNTS ARE NOT DAY QUESTIONS and stay as their own compact rows below — how
-                many runs and rides is a number the solver places, not a day the athlete pins. */}
+              ⚠️ THE COUNTS ARE ROWS TOO, and that is a change of mind from yesterday. "Runs: 3" is
+              an ANSWER exactly like "Long run: Sat" — it earns a line when closed and its pills when
+              open. Keeping them as permanently-visible pills was what pushed the rationale down.
+
+              ⚠️ ONE OPEN AT A TIME, DELIBERATELY. Two open rows is the stack again, with extra
+              chrome. `scheduleQuestion` holds the single open key and every row reads it. */}
+          <div className="space-y-3">
             <div className="rounded-xl border border-white/10 overflow-hidden">
-              {([
-                ['hard', 'Hard day', hardDayValue ? DAY_SHORT[hardDayValue as DayName] : 'Pick one', true],
-                ['long', 'Long run', state.longRunDay ? DAY_SHORT[state.longRunDay as DayName] : 'Pick one', posturePresent('run')],
-                ['ride', 'Long ride', state.longRideDay ? DAY_SHORT[state.longRideDay as DayName] : 'Pick one', state.posture?.bike === 'maintain'],
-              ] as const).filter(([, , , shown]) => shown).map(([k, label, answer], i) => {
-                const active = scheduleAsk === k;
-                const rowCls = `w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left ${i > 0 ? 'border-t border-white/8' : ''} ${active ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] border-l-2 border-l-[rgb(var(--wiz-accent-rgb,236,233,227))]' : ''}`;
-                // ⛔ THE HARD DAY'S DISCIPLINE TOGGLE RIDES INSIDE ITS OWN ACTIVE ROW — the same
-                // placement the race card gives the club's Run/Ride pair, and for the same reason:
-                // it belongs beside the question it qualifies, and a div (not a button) so the two
-                // toggles are not nested inside a button. Only the ACTIVE row grows, so the day row
-                // beneath does not move as the athlete switches questions.
-                if (k === 'hard' && active) {
-                  return (
-                    <div key={k} className={rowCls}>
-                      <span className="text-sm text-white shrink-0">{label}</span>
-                      <div className="flex gap-1">
-                        {/* ⚠️ `d in qualityDays`, NOT `!!qualityDays[d]` — the discipline is chosen the
-                            moment it is tapped and its day arrives after. Truthiness would unlight the
-                            button the athlete just pressed. Tapping again clears the discipline. */}
-                        {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
-                          const on = d in state.qualityDays;
-                          return (
-                            <button
-                              key={d} type="button"
-                              onClick={() => setState((st) => {
-                                const next = { ...st.qualityDays };
-                                if (d in next) delete next[d]; else next[d] = '';
-                                return { ...st, qualityDays: next };
-                              })}
-                              // Sport colour, not the block's accent — this is a discipline SELECTOR, so
-                              // it speaks the app's wayfinding language (run gold, ride green), the same
-                              // treatment the marathon club toggle uses. It is identity, not a cost
-                              // signal: the §5 note against implying a hard ride is "cheaper" than a
-                              // hard run is about COPY, and no number here claims one.
-                              className="px-3 py-1 rounded-md text-xs border"
-                              style={on
-                                ? { borderColor: `rgb(${getDisciplineColorRgb(d)})`, backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.16)`, color: '#fff' }
-                                : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}
-                            >{d === 'run' ? 'Run' : 'Ride'}</button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                }
+              {scheduleRows.map((row, i) => {
+                const active = scheduleAsk === row.key;
+                const border = i > 0 ? 'border-t border-white/8' : '';
+                const activeSkin = active
+                  ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] border-l-2 border-l-[rgb(var(--wiz-accent-rgb,236,233,227))]'
+                  : '';
                 return (
-                  <button key={k} type="button" onClick={() => setScheduleQuestion(k)} className={rowCls}>
-                    <span className={`text-sm ${active ? 'text-white' : 'text-white/70'}`}>{label}</span>
-                    <span className={`text-sm text-right ${active ? 'text-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'text-white/40'}`}>{answer}</span>
-                  </button>
+                  <div key={row.key} className={`${border} ${activeSkin}`}>
+                    {/* THE HEADER LINE — label + answer, tappable, always one line high.
+                        ⚠️ The Hard day's Run/Ride toggle rides in the header when that row is open,
+                        because it QUALIFIES the question rather than answering it, and a div (not a
+                        button) so the two toggles are not nested inside a button. */}
+                    {active && row.key === 'hard' ? (
+                      <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
+                        <span className="text-sm text-white shrink-0">{row.label}</span>
+                        <div className="flex gap-1">
+                          {/* ⚠️ `d in qualityDays`, NOT `!!qualityDays[d]` — the discipline is chosen
+                              the moment it is tapped and its day arrives after. Truthiness would
+                              unlight the button the athlete just pressed. Tapping again clears it. */}
+                          {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
+                            const on = d in state.qualityDays;
+                            return (
+                              <button
+                                key={d} type="button"
+                                onClick={() => setState((st) => {
+                                  const next = { ...st.qualityDays };
+                                  if (d in next) delete next[d]; else next[d] = '';
+                                  return { ...st, qualityDays: next };
+                                })}
+                                // Sport colour, not the block's accent — this is a discipline
+                                // SELECTOR, so it speaks the app's wayfinding language (run gold,
+                                // ride green), the same treatment the marathon club toggle uses. It
+                                // is identity, not a cost signal: the §5 note against implying a
+                                // hard ride is "cheaper" than a hard run is about COPY, and no
+                                // number here claims one.
+                                className="px-3 py-1 rounded-md text-xs border"
+                                style={on
+                                  ? { borderColor: `rgb(${getDisciplineColorRgb(d)})`, backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.16)`, color: '#fff' }
+                                  : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}
+                              >{d === 'run' ? 'Run' : 'Ride'}</button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setScheduleQuestion(row.key)}
+                        aria-expanded={active}
+                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
+                      >
+                        <span className={`text-sm ${active ? 'text-white' : 'text-white/70'}`}>{row.label}</span>
+                        <span className={`text-sm text-right ${active ? 'text-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'text-white/40'}`}>{row.answer}</span>
+                      </button>
+                    )}
+
+                    {/* THE OPEN QUESTION'S CONTROLS — inside the row, which is inside the card. */}
+                    {active && (
+                      <div className="px-3 pb-3 space-y-2">
+                        {row.kind === 'day' ? (
+                          <>
+                            {/* Tap-to-pick cue, contextual to the open question. */}
+                            <p className="text-[rgba(var(--wiz-accent-rgb,236,233,227),0.85)] text-xs">
+                              {row.key === 'hard'
+                                ? (hardDaySport ? 'Tap a day for your hard session' : 'Choose run or ride, then tap a day')
+                                : row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
+                            </p>
+                            {/* ⛔ ONE ROW, EVERY DAY QUESTION. `taken` excludes the OPEN question's
+                                own anchor, which is what leaves that anchor releasable —
+                                `anchor-days.ts` answers this for all three, so the lock is not
+                                re-derived here. A day another anchor holds renders NAMED ("Sat is
+                                your long ride"), never merely dead. */}
+                            <WeekDayRow
+                              selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
+                              roles={scheduleRoles}
+                              taken={anchorDaysTaken(state, row.key === 'hard' ? 'hard day' : row.key === 'long' ? 'long run' : 'long ride')}
+                              // ⚠️ INERT UNTIL A DISCIPLINE IS CHOSEN. `qualityDays` is keyed by
+                              // sport, so there is no slot to write a day into before Run or Ride is
+                              // tapped. The cue line above says which choice unlocks it — a dead row
+                              // with no reason is worse than one that explains itself.
+                              disabled={row.key === 'hard' && !hardDaySport ? DAYS : []}
+                              onTap={(d) => {
+                                // ⛔ TAP YOUR OWN DAY TO RELEASE IT — every question toggles, so no
+                                // pick is ever stuck and the athlete never hunts for a control to
+                                // undo one. Days the other anchors hold are locked in the row, so a
+                                // plain toggle is safe here.
+                                if (row.key === 'hard') {
+                                  if (!hardDaySport) return;
+                                  setState((st) => {
+                                    const q = { ...st.qualityDays };
+                                    q[hardDaySport] = q[hardDaySport] === d ? '' : d;
+                                    return { ...st, qualityDays: q };
+                                  });
+                                } else if (row.key === 'long') {
+                                  setState((st) => ({ ...st, longRunDay: st.longRunDay === d ? '' : d }));
+                                } else {
+                                  setState((st) => ({ ...st, longRideDay: st.longRideDay === d ? '' : d }));
+                                }
+                              }}
+                            />
+                          </>
+                        ) : (
+                          // COUNTS — the athlete says how many, `week-optimizer` says which days.
+                          <div className="flex items-center gap-1.5">
+                            {(row.key === 'runs' ? [2, 3, 4] : [1, 2, 3]).map((n) => {
+                              const sport = row.key === 'runs' ? 'run' : 'bike';
+                              const on = (row.key === 'runs' ? state.runDays : state.rideDays) === n;
+                              return (
+                                <button
+                                  key={n} type="button"
+                                  onClick={() => setState((st) => (row.key === 'runs' ? { ...st, runDays: n } : { ...st, rideDays: n }))}
+                                  className="w-10 py-1.5 rounded-lg text-sm border"
+                                  style={on
+                                    ? { borderColor: `rgb(${getDisciplineColorRgb(sport)})`, backgroundColor: `rgba(${getDisciplineColorRgb(sport)},0.16)`, color: '#fff' }
+                                    : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
+                                >{n}</button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* ⛔ THE HARD DAY'S RATIONALE AND ITS SUB-QUESTION LIVE INSIDE THE HARD DAY
+                            ROW. They used to sit under the whole card, and on 2026-08-09 the counts
+                            were moved above them — which put a sentence explaining the FIRST control
+                            an entire screen away from it. *"Description gets totally lost."* Inside
+                            the row, the distance is structural: it cannot grow. */}
+                        {row.key === 'hard' && (
+                          <>
+                            {/* ⛔ IT HAS TO SAY WHAT THE SESSION IS FOR (2026-07-29). "Never yields —
+                                intensity holds your aerobic fitness" stated the RULE and not the
+                                PURPOSE, so an athlete read a protected slot with no idea what it buys.
+                                Michael: *"hard run/ride should ad its purpose: maintain vo2 max not
+                                speed or if you have a run or ride club."*
+
+                                ⛔ THE FIRST DRAFT SAID "not speed" AND IT WAS NOT SOURCED. That clause
+                                borrowed Schumann's −0.28 explosive-strength effect, a claim about the
+                                WHOLE BLOCK (DOCTRINE §5.0.3) and not about this session. Attaching a
+                                real citation to the wrong sentence is what D-328 and D-329 were both
+                                corrections for. Removed.
+
+                                ✅ WHAT IS SOURCED — `DOCTRINE-aerobic-maintenance.md` §3 and §5.0:
+                                it HOLDS (Hickson 1981/1982/1985 — frequency 6→2 d/wk and duration
+                                40→13 min both held VO2max for 15 weeks; only the intensity cut lost
+                                it), and it does NOT build (one interval session a week is below the
+                                improvement threshold for trained athletes). "Holds, does not build"
+                                is the honest pair, and the doctrine asks for it by name.
+
+                                ⚠️ "top-end aerobic fitness", not "VO2 max" — COPY-VOICE rule 9 bans
+                                the metric name as it bans "aerobic base" and "Z2".
+
+                                ⚠️ NOT SAID, DELIBERATELY: that a hard RIDE costs less than a hard RUN.
+                                §5's modality split is Wilson 2012 and Schumann 2022 (43 studies) found
+                                no modality moderation at all; the standing instruction is not to build
+                                a new claim on it. The Run/Ride buttons stay neutral.
+
+                                ✅ THE CITATIONS ARE BEHIND THE (i). Michael: *"maybe thats an (i) with
+                                that and the citations?"* The claim is one line; the receipt is one tap
+                                away in `HARD_DAY_WHY`, where the Hickson years, the once-a-week
+                                threshold and the reasons two other claims were CUT are written down.
+                                Same pattern as `TrainingBaselines.tsx:1581`. */}
+                            <div className="flex items-start gap-1.5 pt-0.5">
+                              <p className="text-white/45 text-xs leading-snug">
+                                One hard session a week holds top-end aerobic fitness. It does not build
+                                it. A run or ride club goes here.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setShowHardDayWhy((v) => !v)}
+                                aria-expanded={showHardDayWhy}
+                                aria-label="What the hard day is for"
+                                className="shrink-0 mt-px text-white/40 hover:text-white/70 transition-colors"
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            {showHardDayWhy && (
+                              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
+                                {HARD_DAY_WHY.map((s) => (
+                                  <div key={s.heading}>
+                                    <p className="text-white/70 text-xs font-medium">{s.heading}</p>
+                                    <p className="text-white/45 text-xs leading-snug">{s.body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* ── the ground the hard RUN happens on ──────────────────────────
+                                ⛔ STILL NOT A NEW STEP, WHICH IS WHAT §2.0 REQUIRES. The doctrine bans
+                                a "do you have a hill?" question outright — *"asking would buy nothing
+                                and cost a screen… availability reveals itself in the choice."* This is
+                                a reveal inside the row that triggers it, which is as close to the
+                                choice as it can get.
+
+                                ⚠️ KEYED ON `'run' in state.qualityDays`, not on truthiness — the
+                                discipline is chosen the moment Run is tapped and the day arrives
+                                after, so the menu appears WITH the day chips rather than after them.
+                                Hidden for Hard ride (one shape, Helgerud 4 × 4, no terrain question)
+                                and when neither is selected.
+
+                                ⚠️ COMPACT ON PURPOSE: one line of title and one of consequence, in
+                                this card's `text-xs` register, not the full-screen cards the deleted
+                                `hardday` step used. The flat option's stated cost survives the
+                                shortening — that was the condition its ruling came with, not
+                                decoration. */}
+                            {'run' in state.qualityDays && (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-white/85 text-sm">What you can run it on</span>
+                                <div className="space-y-1">
+                                  {([
+                                    {
+                                      id: 'hill_3min' as const,
+                                      title: 'A hill you can run for 3 minutes',
+                                      body: 'Four 3-minute climbs, walk or jog back down. Running uphill may have less effect on your legs, leaving more of the week for lifting.',
+                                    },
+                                    {
+                                      id: 'treadmill' as const,
+                                      title: 'A treadmill',
+                                      body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\'s job, so it may affect your legs no more than the hill does.',
+                                    },
+                                    {
+                                      id: 'hill_short' as const,
+                                      title: 'Only a short hill',
+                                      body: 'Ten 1-minute climbs. Shorter efforts hold less VO2 stimulus than the 3-minute version — the session for the hill you have.',
+                                    },
+                                    {
+                                      id: 'flat' as const,
+                                      // ⛔ THE STATED COST IS THE RULING'S CONDITION. §2.1 bans this
+                                      // session outright and §2.0 governs only because the athlete owns
+                                      // a STATED trade — the leg/lift effect must stay in the copy.
+                                      title: 'Flat ground only',
+                                      body: 'Four 3-minute efforts on the flat. The same hard work, but without the climb it may have more effect on your legs, and your next lift may feel it.',
+                                    },
+                                  ]).map((opt) => (
+                                    <button
+                                      key={opt.id} type="button"
+                                      onClick={() => setState((st) => ({ ...st, qualityRunTerrain: opt.id }))}
+                                      className={`w-full text-left px-3 py-2 rounded-lg border ${
+                                        state.qualityRunTerrain === opt.id
+                                          ? 'border-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]'
+                                          : 'border-white/12 bg-white/[0.04]'
+                                      }`}
+                                    >
+                                      <span className="block text-white/90 text-sm">{opt.title}</span>
+                                      <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </div>
-
-            {/* Tap-to-pick cue, contextual to the open question, so the row reads as tappable. */}
-            <p className="text-[rgba(var(--wiz-accent-rgb,236,233,227),0.85)] text-xs -mb-1">
-              {scheduleAsk === 'hard'
-                ? (hardDaySport ? 'Tap a day for your hard session' : 'Choose run or ride, then tap a day')
-                : scheduleAsk === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
-            </p>
-            {/* ⛔ ONE ROW, THREE QUESTIONS. `taken` excludes the OPEN question's own anchor, which is
-                what leaves that anchor releasable — `anchor-days.ts` already answers this for all
-                three, so the lock is not re-derived here. A day another anchor holds renders named
-                ("Sat is your long ride"), never merely dead. */}
-            <WeekDayRow
-              selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
-              roles={scheduleRoles}
-              taken={anchorDaysTaken(state, scheduleAsk === 'hard' ? 'hard day' : scheduleAsk === 'long' ? 'long run' : 'long ride')}
-              // ⚠️ THE HARD-DAY ROW IS INERT UNTIL A DISCIPLINE IS CHOSEN. `qualityDays` is keyed by
-              // sport, so there is no slot to write a day into before Run or Ride is tapped — the
-              // old select simply did not render until then, and a dead-looking row with no reason
-              // is worse than a row that says which choice unlocks it (the cue line above does).
-              disabled={scheduleAsk === 'hard' && !hardDaySport ? DAYS : []}
-              onTap={(d) => {
-                // ⛔ TAP YOUR OWN DAY TO RELEASE IT — every question toggles, so no pick is ever
-                // stuck and the athlete never hunts for a control to undo one. Days the other
-                // anchors hold are locked in the row, so a plain toggle is safe here.
-                if (scheduleAsk === 'hard') {
-                  if (!hardDaySport) return;
-                  setState((st) => {
-                    const q = { ...st.qualityDays };
-                    q[hardDaySport] = q[hardDaySport] === d ? '' : d;
-                    return { ...st, qualityDays: q };
-                  });
-                } else if (scheduleAsk === 'long') {
-                  setState((st) => ({ ...st, longRunDay: st.longRunDay === d ? '' : d }));
-                } else {
-                  setState((st) => ({ ...st, longRideDay: st.longRideDay === d ? '' : d }));
-                }
-              }}
-            />
-
-            {/* ── how many, per discipline ──────────────────────────────────
-                ⛔ THE COUNTS KEEP THEIR ROWS; THE DAYS LEFT THEM. Each `DaySelect` that sat under a
-                count is now the day row above — the SAME question, asked once in the place that can
-                show the answer, instead of three dropdowns that could each only show their own.
-                A count is not a day: the athlete says how many, `week-optimizer` says which. */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              {posturePresent('run') && (
-                <div className="flex items-center gap-2">
-                  <span className="text-white/85 text-sm whitespace-nowrap w-12">Runs</span>
-                  {[2, 3, 4].map((n) => (
-                    <button
-                      key={n} type="button" onClick={() => setState((st) => ({ ...st, runDays: n }))}
-                      className="w-9 py-1.5 rounded-lg text-sm border"
-                      style={state.runDays === n
-                        ? { borderColor: `rgb(${getDisciplineColorRgb('run')})`, backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.16)`, color: '#fff' }
-                        : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
-                    >{n}</button>
-                  ))}
-                </div>
-              )}
-              {state.posture?.bike === 'maintain' && (
-                <div className="flex items-center gap-2">
-                  <span className="text-white/85 text-sm whitespace-nowrap w-12">Rides</span>
-                  {[1, 2, 3].map((n) => (
-                    <button
-                      key={n} type="button" onClick={() => setState((st) => ({ ...st, rideDays: n }))}
-                      className="w-9 py-1.5 rounded-lg text-sm border"
-                      style={state.rideDays === n
-                        ? { borderColor: `rgb(${getDisciplineColorRgb('bike')})`, backgroundColor: `rgba(${getDisciplineColorRgb('bike')},0.16)`, color: '#fff' }
-                        : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
-                    >{n}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ── what the hard day is for ─────────────────────────────────── */}
-            <div className="space-y-1.5">
-              {/* ⛔ IT HAS TO SAY WHAT THE SESSION IS FOR (2026-07-29). "Never yields — intensity
-                  holds your aerobic fitness" stated the RULE and not the PURPOSE, so an athlete read
-                  a protected slot with no idea what it buys or why they would want one. Michael:
-                  *"hard run/ride should ad its purpose: maintain vo2 max not speed or if you have a
-                  run or ride club."*
-
-                  ⛔ THE FIRST DRAFT SAID "not speed" AND IT WAS NOT SOURCED. That clause borrowed
-                  Schumann's −0.28 explosive-strength effect, which is a claim about the WHOLE BLOCK
-                  ("this block builds strength, not explosive speed", punch list / DOCTRINE §5.0.3)
-                  — not about this session. Attaching a real citation to the wrong sentence is
-                  exactly what D-328 and D-329 were both corrections for. Removed.
-
-                  ✅ WHAT IS ACTUALLY SOURCED — `DOCTRINE-aerobic-maintenance.md` §3 and §5.0:
-                  - It HOLDS. Hickson's maintenance trilogy (1981 frequency / 1982 duration / 1985
-                    intensity) cut frequency 6→2 d/wk and duration 40→13 min with VO2max held for 15
-                    weeks; only the intensity cut lost it. Intensity is the protective variable.
-                  - It does NOT build. §5.0, sourced 2026-07-26: one interval session a week is
-                    BELOW the improvement threshold for trained athletes — 2–3/wk is the range where
-                    gains happen, while roughly one every 1–2 weeks preserves. *"The block does not
-                    build the engine. It holds it. Any copy promising aerobic improvement during a
-                    strength-led block is unsupported."* So "holds, does not build" is the honest
-                    pair, and it is the sentence the doctrine asks for by name.
-
-                  ⚠️ "top-end aerobic fitness", not "VO2 max" — COPY-VOICE rule 9 bans the metric
-                  name the same way it bans "aerobic base" and "Z2".
-
-                  ⚠️ NOT SAID, DELIBERATELY: that a hard RIDE costs less than a hard RUN. §5's
-                  modality split is Wilson 2012, and Schumann 2022 (43 studies) found no modality
-                  moderation at all — the doctrine's standing instruction is do not build a new
-                  claim on it. The Run/Ride buttons stay neutral.
-
-                  ✅ THE CITATIONS ARE BEHIND THE (i), NOT ON THE CARD. Michael: *"maybe thats an (i)
-                  with that and the citations?"* The card carries the claim in one line and the
-                  receipt sits one tap away in `HARD_DAY_WHY` — which is where the Hickson years, the
-                  one-session-a-week threshold, and the reasons two other claims were CUT are all
-                  written down. The pattern is the one `TrainingBaselines.tsx:1581` already uses. */}
-              <div className="flex items-start gap-1.5">
-                <p className="text-white/45 text-xs leading-snug">
-                  One hard session a week holds top-end aerobic fitness. It does not build it. A run
-                  or ride club goes here.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowHardDayWhy((v) => !v)}
-                  aria-expanded={showHardDayWhy}
-                  aria-label="What the hard day is for"
-                  className="shrink-0 mt-px text-white/40 hover:text-white/70 transition-colors"
-                >
-                  <Info className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {showHardDayWhy && (
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
-                  {HARD_DAY_WHY.map((s) => (
-                    <div key={s.heading}>
-                      <p className="text-white/70 text-xs font-medium">{s.heading}</p>
-                      <p className="text-white/45 text-xs leading-snug">{s.body}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* ── the ground the hard RUN happens on ──────────────────────────
-                  ⛔ IT LIVES HERE BECAUSE THIS IS THE CONTROL THAT EXISTS. It was first wired to the
-                  `hardday` STEP, which the 2026-07-28 scheduler rebuild replaced — `scheduleSteps`
-                  never pushes it, so the menu rendered nowhere and a device check found no cards.
-                  That dead step has been deleted; this is the only hard-day control.
-
-                  ⛔ STILL NOT A NEW STEP, WHICH IS WHAT §2.0 ACTUALLY REQUIRES. The doctrine bans a
-                  "do you have a hill?" question outright — *"asking would buy nothing and cost a
-                  screen… availability reveals itself in the choice."* This is a reveal inside the
-                  card they are already on, one row under the toggle that triggers it.
-
-                  ⚠️ KEYED ON `'run' in state.qualityDays`, THE SAME TEST THE DAY SELECT USES, and not
-                  on truthiness — the discipline is chosen the moment Run is tapped and the day
-                  arrives after. So the menu appears with the day picker, not after it.
-                  ⚠️ Hidden for Hard ride (one shape, Helgerud 4 × 4, no terrain question) and for
-                  neither-selected (there is no hard session to give ground to).
-
-                  ⚠️ COMPACT ON PURPOSE. This screen carries a live week preview that must stay above
-                  the fold while the athlete taps; the four options are one line of title and one of
-                  consequence, in this card's own `text-xs` register, not the full-screen cards the
-                  dead step used. The flat option's cost and its nudge survive the shortening —
-                  that was the condition its ruling came with, not decoration. */}
-              {'run' in state.qualityDays && (
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-white/85 text-sm">What you can run it on</span>
-                  <div className="space-y-1">
-                    {([
-                      {
-                        id: 'hill_3min' as const,
-                        title: 'A hill you can run for 3 minutes',
-                        body: 'Four 3-minute climbs, walk or jog back down. Running uphill may have less effect on your legs, leaving more of the week for lifting.',
-                      },
-                      {
-                        id: 'treadmill' as const,
-                        title: 'A treadmill',
-                        body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\'s job, so it may affect your legs no more than the hill does.',
-                      },
-                      {
-                        id: 'hill_short' as const,
-                        title: 'Only a short hill',
-                        body: 'Ten 1-minute climbs. Shorter efforts hold less VO2 stimulus than the 3-minute version — the session for the hill you have.',
-                      },
-                      {
-                        id: 'flat' as const,
-                        // ⛔ THE STATED COST IS THE RULING'S CONDITION. §2.1 bans this session outright
-                        // and §2.0 governs only because the athlete owns a STATED trade — the leg/lift
-                        // effect must stay in the copy. (The treadmill nudge was cut 2026-08-06 as a
-                        // scold: treadmill is its own card directly above, already declined here.)
-                        title: 'Flat ground only',
-                        body: 'Four 3-minute efforts on the flat. The same hard work, but without the climb it may have more effect on your legs, and your next lift may feel it.',
-                      },
-                    ]).map((opt) => (
-                      <button
-                        key={opt.id} type="button"
-                        onClick={() => setState((st) => ({ ...st, qualityRunTerrain: opt.id }))}
-                        className={`w-full text-left px-3 py-2 rounded-lg border ${
-                          state.qualityRunTerrain === opt.id
-                            ? 'border-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]'
-                            : 'border-white/12 bg-white/[0.04]'
-                        }`}
-                      >
-                        <span className="block text-white/90 text-sm">{opt.title}</span>
-                        <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* ⛔ THE WEEK, NOW BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY.
