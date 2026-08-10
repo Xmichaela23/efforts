@@ -42,57 +42,106 @@ const KEY_LOWER = 'strength_logger_session_2026-08-09_plan-lower';
 const KEY_ADHOC = 'strength_logger_session_2026-08-09_adhoc';
 
 // ── REGRESSION: the reset bug ────────────────────────────────────────────────────────────────
-Deno.test('remount RESUMES the clock, it does not restart it (the under-count bug)', () => {
+Deno.test('the start is stamped ONCE and never moves (the under-count bug)', () => {
   const s = mem();
-  // Mount 1 — athlete opens the logger and starts working.
+  // The session starts — Start tapped, or the first set logged.
   const first = ensureSessionStart(s, KEY_UPPER, T0);
   assertEquals(first, T0);
 
-  // 40 minutes in, the app is backgrounded and the WebView is rebuilt; the draft restores and the
-  // component mounts again. Pre-fix this restamped the start to now and the session became "0 min".
-  const second = ensureSessionStart(s, KEY_UPPER, T0 + 40 * MIN);
-  assertEquals(second, T0, 'a remount must return the ORIGINAL start');
-
-  // ...and again, twice more mid-session.
+  // Everything downstream that could touch the start — a remount hydrating, the auto-start
+  // fallback re-firing, a key migration landing back on the same slot — must return the ORIGINAL.
+  // Pre-fix the start lived in component state, so each of these restamped it to now and the
+  // session collapsed to the length of its last stretch.
+  assertEquals(ensureSessionStart(s, KEY_UPPER, T0 + 40 * MIN), T0);
   assertEquals(ensureSessionStart(s, KEY_UPPER, T0 + 41 * MIN), T0);
   assertEquals(ensureSessionStart(s, KEY_UPPER, T0 + 52 * MIN), T0);
 
   // Save at 62 minutes reports 62, not the 10 since the last remount.
-  assertEquals(elapsedMinutesForSave(second, T0 + 62 * MIN), 62);
+  assertEquals(elapsedMinutesForSave(T0, T0 + 62 * MIN), 62);
 });
 
-Deno.test('the logger\'s own mount sequence, end to end (planned session, interrupted twice)', () => {
-  // Mirrors StrengthLogger's `computeSessionKey` verbatim. If that expression changes and this
-  // does not, the clock and the draft have started keying differently — which is the whole failure
-  // mode D-132 was written to stop.
-  const computeSessionKey = (date: string, id: string | null) => `strength_logger_session_${date}_${id || 'adhoc'}`;
-  const DATE = '2026-08-09';
-  const PLANNED_ID = 'plan-upper';
+/**
+ * Mirrors StrengthLogger's `computeSessionKey` verbatim. If that expression changes and this does
+ * not, the clock and the draft have started keying differently — the failure mode D-132 exists to
+ * stop.
+ */
+const computeSessionKey = (date: string, id: string | null) => `strength_logger_session_${date}_${id || 'adhoc'}`;
+const DATE = '2026-08-09';
+const PLANNED_ID = 'plan-upper';
+
+/** The mount effect: READ, never stamp. */
+const mountHydrate = (s: ReturnType<typeof mem>, key: string, now: number) => readSessionStart(s, key, now);
+/** `beginSession` — the Start tap, and the auto-start fallback. */
+const beginSession = (s: ReturnType<typeof mem>, key: string, now: number) => ensureSessionStart(s, key, now);
+
+Deno.test('the logger\'s own sequence, end to end (Start tapped, then interrupted twice)', () => {
   const s = mem();
+  const key = computeSessionKey(DATE, PLANNED_ID);
 
-  // MOUNT 1. `sourcePlannedId` is still null on the first pass, so the effect keys off the OPENED
-  // workout's id — the same read `restoreSessionProgress` does.
-  const key1 = computeSessionKey(DATE, PLANNED_ID);
-  const start1 = ensureSessionStart(s, key1, T0);
-  // ...then `sourcePlannedId` hydrates, the effect re-runs, and the key is identical: no migration,
-  // no phantom 'adhoc' slot.
-  assertEquals(computeSessionKey(DATE, PLANNED_ID), key1);
-  assertEquals(ensureSessionStart(s, key1, T0 + 200), start1);
+  // MOUNT. `sourcePlannedId` is still null on the first pass, so the effect keys off the OPENED
+  // workout's id — the same read `restoreSessionProgress` does. Nothing is running yet.
+  assertEquals(mountHydrate(s, key, T0), null, 'the logger opens NOT STARTED');
 
-  // 25 min in: the athlete leaves for the calendar and comes back. Component remounts, draft
+  // The athlete spends 6 minutes loading plates and swapping an exercise, THEN taps Start.
+  const start = beginSession(s, key, T0 + 6 * MIN);
+  assertEquals(start, T0 + 6 * MIN, 'the clock begins at the tap, not at the open');
+
+  // 25 min of work later the athlete leaves for the calendar and comes back: remount, draft
   // restores, refs are new. Pre-fix the session became "0 min" here.
-  const start2 = ensureSessionStart(s, computeSessionKey(DATE, PLANNED_ID), T0 + 25 * MIN);
-  assertEquals(start2, T0);
+  assertEquals(mountHydrate(s, key, T0 + 31 * MIN), start, 'a remount RESUMES');
 
-  // 48 min in: iOS kills and rebuilds the WebView on foreground. Same again.
-  const start3 = ensureSessionStart(s, computeSessionKey(DATE, PLANNED_ID), T0 + 48 * MIN);
-  assertEquals(start3, T0);
+  // And again when iOS rebuilds the WebView on foreground.
+  assertEquals(mountHydrate(s, key, T0 + 54 * MIN), start);
 
-  // SAVE at 71 minutes.
-  assertEquals(elapsedMinutesForSave(start3, T0 + 71 * MIN), 71);
-  // ...and the slot is released with the draft, so tomorrow's session starts clean.
-  clearSessionStart(s, computeSessionKey(DATE, PLANNED_ID), T0 + 71 * MIN);
-  assertEquals(readSessionStart(s, computeSessionKey(DATE, PLANNED_ID), T0 + 71 * MIN), null);
+  // SAVE 71 minutes after the tap — and the 6 minutes of setup before it are not in the number.
+  assertEquals(elapsedMinutesForSave(start, T0 + 77 * MIN), 71);
+
+  // The slot is released with the draft, so tomorrow's session opens NOT STARTED again.
+  clearSessionStart(s, key, T0 + 77 * MIN);
+  assertEquals(mountHydrate(s, key, T0 + 77 * MIN), null);
+});
+
+Deno.test('a mount NEVER stamps — opening the logger repeatedly starts nothing', () => {
+  const s = mem();
+  const key = computeSessionKey(DATE, PLANNED_ID);
+  assertEquals(mountHydrate(s, key, T0), null);
+  assertEquals(mountHydrate(s, key, T0 + 3 * MIN), null);
+  assertEquals(mountHydrate(s, key, T0 + 90 * MIN), null, 'still not started 90 minutes later');
+  assertEquals(s._dump()[SESSION_CLOCK_KEY], undefined, 'and nothing was ever written');
+});
+
+Deno.test('SAFETY NET: a set logged before Start is tapped starts the clock there', () => {
+  const s = mem();
+  const key = computeSessionKey(DATE, PLANNED_ID);
+  assertEquals(mountHydrate(s, key, T0), null);
+  // The athlete ignores Start and goes straight to lifting. The first completed set fires the
+  // auto-start — this is the line that stops a real session saving at zero.
+  const start = beginSession(s, key, T0 + 2 * MIN);
+  assertEquals(start, T0 + 2 * MIN);
+  assertEquals(elapsedMinutesForSave(start, T0 + 47 * MIN), 45);
+});
+
+Deno.test('the safety net can never RESET a running clock, however often it fires', () => {
+  const s = mem();
+  const key = computeSessionKey(DATE, PLANNED_ID);
+  const start = beginSession(s, key, T0);          // Start tapped
+  // Every later completed set re-evaluates the auto-start guard. Even if the null-check were to
+  // let one through, `ensureSessionStart` is idempotent and the original stamp survives.
+  assertEquals(beginSession(s, key, T0 + 5 * MIN), start);
+  assertEquals(beginSession(s, key, T0 + 40 * MIN), start);
+  assertEquals(elapsedMinutesForSave(start, T0 + 40 * MIN), 40);
+});
+
+Deno.test('a restored draft that already holds completed sets resumes, it does not re-stamp', () => {
+  const s = mem();
+  const key = computeSessionKey(DATE, PLANNED_ID);
+  const start = beginSession(s, key, T0);
+  // Remount: the hydrate effect and the auto-start effect both run off the same commit, and on
+  // that pass `workoutStartMs` is still null — so the safety net fires too. It must be harmless.
+  const hydrated = mountHydrate(s, key, T0 + 33 * MIN);
+  const autoStarted = beginSession(s, key, T0 + 33 * MIN);
+  assertEquals(hydrated, start);
+  assertEquals(autoStarted, start, 'the double-fire on remount returns the ORIGINAL stamp');
 });
 
 Deno.test('a session backgrounded for 20 minutes counts the time away', () => {

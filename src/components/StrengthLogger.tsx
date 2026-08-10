@@ -38,9 +38,9 @@ import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { calculateRestTime, isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
-// THE SESSION CLOCK — a persisted wall-clock start, so a remount resumes the session instead of
-// restarting it. Same rule as Q-TIMER's rest deadlines: elapsed is DERIVED, `startedAt` is the
-// authority. Keyed by the draft's own identity-scoped session key (D-132).
+// THE SESSION CLOCK — a persisted wall-clock start, stamped by an explicit Start tap and resumed
+// (never restarted) by a remount. Same rule as Q-TIMER's rest deadlines: elapsed is DERIVED,
+// `startedAt` is the authority. Keyed by the draft's own identity-scoped session key (D-132).
 import {
   clearSessionStart,
   elapsedMinutesForSave,
@@ -48,6 +48,7 @@ import {
   ensureSessionStart,
   formatElapsed,
   moveSessionStart,
+  readSessionStart,
 } from '@/lib/strength-session-clock';
 // The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
 
@@ -1304,19 +1305,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // ── THE SESSION CLOCK ────────────────────────────────────────────────────────────────────────
   //
+  // ⛔ OPENING THE LOGGER IS NOT STARTING A WORKOUT. The athlete opens it to see the day, load
+  // plates, swap an exercise, argue with the prescription. Anchoring the clock to mount charged all
+  // of that to the session. Strong and Hevy both put an explicit Start tap in the way, and so does
+  // this now: the logger opens NOT STARTED, with no elapsed on screen, and the clock begins on the
+  // tap. Setup does not count.
+  //
+  // SAFETY NET: logging a set IS starting a workout, whatever the athlete tapped. If a set is
+  // completed while the clock is still unstarted, it starts right there (see the auto-start effect)
+  // — so a real session can never save at zero because someone went straight to lifting.
+  //
   // STRENGTH ONLY. Mobility runs through this same component in `logger_mode: 'mobility'` and is
-  // deliberately untouched — no stamp, no tick, no header readout. It keeps the mount-anchored
-  // duration it has always had (see the fallback in `finalizeSave`).
+  // deliberately untouched — no start control, no stamp, no tick, no header readout. It keeps the
+  // mount-anchored duration it has always had (see the fallback in `finalizeSave`).
   //
   // The start hangs on the DRAFT'S OWN identity-scoped key (D-132), so the clock and the sets it
-  // times can never disagree about which workout this is.
+  // times can never disagree about which workout this is — and because it is an absolute wall-clock
+  // stamp in localStorage, a REMOUNT RESUMES the session instead of restarting it. That is the
+  // under-count fix, and the explicit Start does not weaken it: Start is idempotent, so a resumed
+  // session that re-renders its Start control could not restamp even if it were tapped.
   const isMobilitySession = String(scheduledWorkout?.logger_mode || '').toLowerCase() === 'mobility';
   // Mount stamp. Two jobs: it is the mobility path's duration anchor (unchanged behaviour), and it
-  // is the strength path's last resort if localStorage is unavailable (private mode, quota).
+  // is the strength path's last resort for a save with no started clock at all (see finalizeSave).
   const mountedAtMsRef = useRef<number>(Date.now());
   // The OPENED workout's id, exactly as `restoreSessionProgress` derives it — captured at mount
   // because `sourcePlannedId` is hydrated a beat later and the clock must key correctly on the
-  // FIRST pass or it stamps a phantom 'adhoc' start it then has to migrate away from.
+  // FIRST pass or it reads the wrong slot and shows Start on an already-running session.
   const clockOpenedIdRef = useRef<string | null>(
     scheduledWorkout?.id && String(scheduledWorkout?.workout_status || 'planned').toLowerCase() !== 'completed'
       ? String(scheduledWorkout.id)
@@ -1330,23 +1344,54 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (clockKeyRef.current !== null && clockKeyRef.current !== key) {
       // The key MOVED mid-session — the athlete changed the performed date, or opened ad-hoc and
       // then picked a planned workout. The draft follows its key; the clock has to follow too, or
-      // the next remount reads an empty slot and restarts. Destination wins (see moveSessionStart).
+      // the next remount reads an empty slot and offers Start on a running session. Destination
+      // wins (see moveSessionStart); null means this session was never started, and stays unstarted.
       const moved = moveSessionStart(localStorage, clockKeyRef.current, key, now);
       clockKeyRef.current = key;
-      setWorkoutStartMs(moved ?? ensureSessionStart(localStorage, key, now));
+      setWorkoutStartMs(moved);
       return;
     }
     clockKeyRef.current = key;
-    // IDEMPOTENT: first mount stamps, every later mount gets the ORIGINAL stamp back. This is the
-    // line that cures the under-count — a remount now RESUMES the session instead of restarting it.
-    setWorkoutStartMs(ensureSessionStart(localStorage, key, now));
+    // READ, NEVER STAMP. A mount does not start a workout. It only asks whether one is already
+    // running under this key — which is what makes a remount RESUME rather than restart.
+    setWorkoutStartMs(readSessionStart(localStorage, key, now));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, isMobilitySession]);
+
+  /**
+   * Start the clock. The Start tap calls it; the first completed set calls it as a fallback.
+   *
+   * IDEMPOTENT via `ensureSessionStart` — calling it on a session that is already running returns
+   * the ORIGINAL stamp and writes nothing. That is what lets the safety net fire freely without
+   * ever being able to reset a running clock.
+   */
+  const beginSession = () => {
+    if (isMobilitySession) return;
+    const key = clockKeyRef.current || computeSessionKey(clockOpenedIdRef.current);
+    clockKeyRef.current = key;
+    const now = Date.now();
+    setWorkoutStartMs(ensureSessionStart(localStorage, key, now));
+    setClockNowMs(now);
+  };
+
+  // SAFETY NET. Watches for the first completed set and starts the clock if the athlete never
+  // tapped Start. Deliberately keyed off the SET STATE rather than the Done button, so every path
+  // that can complete a set is covered — the Done tap, a duration timer running out, and a restored
+  // draft that already holds completed work.
+  const hasCompletedSet = exercises.some(
+    (ex) => Array.isArray(ex?.sets) && ex.sets.some((s) => s?.completed)
+  );
+  useEffect(() => {
+    if (isMobilitySession || !hasCompletedSet || workoutStartMs != null) return;
+    beginSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCompletedSet, workoutStartMs, isMobilitySession]);
 
   // The 1s tick. It needs its OWN interval: the rest-timer tick is gated on `anyTimerRunning` and
   // is torn down the moment no rest is armed — which is most of a session, including all of the
   // first exercise. All this moves is `now`; elapsed is derived from `startedAt`, never accumulated,
   // so a suspended tick loses nothing and the foreground nudge in the app-state listener is enough.
+  // Nothing ticks before Start: `workoutStartMs` is null and there is no elapsed to move.
   useEffect(() => {
     if (isMobilitySession || !workoutStartMs) return;
     setClockNowMs(Date.now());
@@ -3932,12 +3977,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // BEFORE the await save — so a failed/interrupted save (network error, or the iOS resume
     // remount churn killing the component mid-save) destroyed the draft AND never persisted
     // the workout = total data loss. The draft is now cleared only AFTER a confirmed save.
-    // DURATION comes from the PERSISTED start, not from when this component happened to mount.
+    // DURATION comes from the STARTED clock, not from when this component happened to mount.
     // Pre-fix, a session interrupted once (nav away, cold-start restore, foreground reopen) saved
     // only the stretch since its last remount.
     //
-    // MOBILITY IS BRANCHED, NOT CARRIED ALONG. It has no clock: it falls back to the mount stamp
-    // AND to the old floor of 0, so its saved duration is byte-for-byte what it was before this
+    // THE FALLBACK IS NOW A GENUINE EDGE, NOT THE NORM. The clock is started by the Start tap OR
+    // by the first completed set, so any session with logged work has one. What is left is a save
+    // with ZERO completed sets — weights typed in, Done never tapped, Save pressed — plus a
+    // storage failure. Both fall back to the mount stamp, which is the pre-clock behaviour, and
+    // the athlete can correct the number on the performance screen.
+    //
+    // MOBILITY IS BRANCHED, NOT CARRIED ALONG. It has no clock at all: it always takes the mount
+    // stamp AND the old floor of 0, so its saved duration is byte-for-byte what it was before this
     // feature existed. Strength floors at 1 — see `elapsedMinutesForSave` for why the two differ.
     const startMs = workoutStartMs ?? mountedAtMsRef.current;
     const durationMinutes = elapsedMinutesForSave(startMs, Date.now(), isMobilitySession ? 0 : 1);
@@ -4425,15 +4476,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 Deload
               </span>
             )}
-            {/* SESSION CLOCK — the live elapsed readout, in the header beside the title, which is
-                where Strong and Hevy put it. NOT in the rest-timer overlay: that pill is a
-                transient state (it appears when a rest is armed and leaves when it ends), and the
-                session clock is the opposite — it is true for the whole session and must not come
-                and go with rest. No show/hide toggle, matching both apps.
+            {/* SESSION CLOCK — Start, then the live elapsed readout, in the header beside the
+                title, which is where Strong and Hevy put both. NOT in the rest-timer overlay: that
+                pill is a transient state (it appears when a rest is armed and leaves when it ends),
+                and the session clock is the opposite — it is true for the whole session and must
+                not come and go with rest. No show/hide toggle, matching both apps.
+
+                BEFORE START there is no elapsed on screen at all — not a paused 0:00. A zero that
+                sits there looks like a clock that is running and broken, and it invites the athlete
+                to read setup time as session time, which is the thing the Start tap exists to stop.
 
                 Strength only; mobility renders nothing here. `role="timer"` with no aria-live so a
                 screen reader can be pointed at it without being read a new number every second. */}
-            {!isMobilitySession && workoutStartMs != null && (
+            {!isMobilitySession && (workoutStartMs != null ? (
               <div className="shrink-0 ml-auto flex flex-col items-end leading-none" aria-label="Session elapsed time">
                 <span className="text-[10px] uppercase tracking-wide text-white/40">Elapsed</span>
                 <span
@@ -4444,7 +4499,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   {formatElapsed(sessionElapsedSeconds)}
                 </span>
               </div>
-            )}
+            ) : (
+              <button
+                type="button"
+                onClick={beginSession}
+                className="shrink-0 ml-auto mt-0.5 px-4 py-1.5 rounded-full bg-white/[0.10] backdrop-blur-md border-2 border-white/25 text-sm font-medium text-white/90 hover:bg-white/[0.16] hover:border-white/40 transition-all"
+                aria-label="Start the session timer"
+              >
+                Start
+              </button>
+            ))}
           </div>
           {/* Row 2: controls — date + Pick planned get their own row, full room, no
               longer squeezing the title. */}
