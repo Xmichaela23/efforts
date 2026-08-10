@@ -1349,7 +1349,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // now it was collected at intake, written to the goal, and never forwarded — so the bar was placed
   // as though the athlete's biggest ride of the week did not exist.
   const longRidePin = hasBike ? asDay(args.bike?.longRideDay) : null;
-  if (longRidePin && !pins.some((p) => p.day === longRidePin)) {
+  // ⛔ NO `!pins.some(day === …)` GUARD ANY MORE — REMOVED 2026-08-09. It read as harmless dedupe and
+  // was silent pin ABSORPTION: two anchors on one day meant the SECOND ONE VANISHED, before the
+  // solver ever saw it. `week-solver` has a typed refusal for exactly this
+  // (`SOLVER_GRIDLOCK_ANCHOR_COLLISION`) whose copy says *"Both are fixed, so this is yours to
+  // resolve — the engine will not pick one"* — and it could never fire from this path.
+  // ⚠️ IT ALSO DISCARDED LEGAL PAIRS. `SAME_DAY_COMPATIBLE` permits some anchors to share a day; the
+  // blanket guard dropped those too, so the athlete lost a session the law would have allowed.
+  // ⛔ THE REAL FIX IS AT INPUT — the day picker greys out and locks a day another anchor already
+  // holds, so the collision is never entered. This is the BACKSTOP: anything that still arrives
+  // collided now reaches the solver, which answers properly instead of the composer hiding it.
+  if (longRidePin) {
     pins.push({ day: longRidePin, kind: 'long_ride', label: 'your long ride' });
   }
   /**
@@ -1369,11 +1379,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⚠️ ONLY A LEADING SPORT GETS A DEFAULT LONG DAY. A sport held at maintenance is easy volume by
   // definition — inventing a long run for it would be the engine adding a session nobody asked for.
   // A long day the athlete PINNED is still honoured either way (`longRunPin`, above).
+  // ⚠️ THIS GUARD STAYS, AND IT IS NOT THE ABSORPTION BUG. The others dropped a day the ATHLETE
+  // CHOSE; this one declines to invent a DEFAULT on a day already spoken for. Never adding an
+  // unrequested session is the opposite failure from silently removing a requested one.
   if (!longRunPin && runSelected && !pins.some((p) => p.day === DEFAULT_LONG_DAY)) {
     pins.push({ day: DEFAULT_LONG_DAY as DayName, kind: 'long_run', label: 'your long run' });
   }
   const hardPin = asDay(args.hardDay?.day);
-  if (hardPin && !pins.some((p) => p.day === hardPin)) {
+  // ⛔ GUARD REMOVED (2026-08-09) — same absorption. The hard day was LAST in this order, so it lost
+  // every collision: an athlete who put their club night on their long-run day simply had no hard
+  // session in the block, with nothing said anywhere.
+  if (hardPin) {
     pins.push({
       day: hardPin,
       kind: args.hardDay!.discipline === 'bike' ? 'quality_bike' : 'quality_run',

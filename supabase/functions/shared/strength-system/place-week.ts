@@ -164,9 +164,29 @@ function gapDays(a: DayName, b: DayName): number {
  *
  * Straight from `SCHEDULING-RULES.md` §4.2/§4.3 via the shared kind lists, so a change to the law
  * lands here without an edit:
- *   long ride / long run       → 48h  (glycogen depletion + muscle damage on top of the signalling window)
+ *   long run                   → 48h  (glycogen depletion + muscle damage on top of the signalling window)
  *   quality ride / quality run → 24h  (same prime movers loaded at intensity)
+ *   LONG RIDE                  → 0h   ⚠️ NOT 48h — see below
  *   easy anything              → 0h   (an easy run stacks with lifting; lift first)
+ *
+ * ⛔ **THE LONG RIDE IS 0h, AND THIS COMMENT SAID 48h UNTIL 2026-08-09.** It read
+ * "long ride / long run → 48h", pairing them — while the function beneath it delegates to
+ * `ADJACENCY_HOURS_ROWS`, where `lower_body_strength × long_ride` is **0** and has been, deliberately.
+ * The table states its own reason: *"Concentric, no impact transient. Long in DURATION, not in
+ * damage… a long ride does not cost the week a leg day"* (§8.4).
+ *
+ * ⚠️ THE PROSE WAS THE STALE HALF, NOT THE TABLE — and reading it as the law produced a confident
+ * wrong finding on 2026-08-09 ("the matrix contradicts its own doctrine"). It does not; this comment
+ * contradicted the matrix. **The table is the law. This list is a convenience copy and convenience
+ * copies rot** — if they disagree again, believe the table.
+ *
+ * ⚠️ WHETHER 0 IS THE RIGHT NUMBER IS A SEPARATE, OPEN QUESTION and is deliberately NOT settled here.
+ * The damage half of the argument is well supported (cycling is concentric-dominant; running's
+ * plyometric loading causes greater muscle damage). The "therefore zero cost" half is stronger than
+ * the literature: there is no consensus on which modality interferes less, and some studies find
+ * cycling's effect on lower-body strength LARGER than running's [Fyfe 2016; Doma review]. A long ride
+ * is a real glycogen and central-fatigue load even with no muscle damage. Changing it is a design
+ * decision with wide placement ripples, not a typo fix — it needs its own D-entry and its own sweep.
  *
  * ⛔ UPPER-BODY DAYS NEED NONE OF THIS, and that is not a convenience — it is why the stacked lift is
  * always a press or a bench. The constraint is about SHARED PRIME MOVERS. Pressing does not compete

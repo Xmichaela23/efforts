@@ -14,6 +14,7 @@ import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY } from '@/lib/st
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
 import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
+import { anchorDaysTaken } from '@/lib/anchor-days';
 // ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
 // week against the SAME numbers the engine builds from, or it is guessing at the athlete.
 import {
@@ -273,13 +274,29 @@ const DAY_SHORT: Record<DayName, string> = {
  * Here it is a badge on the chip beside the one being tapped.
  */
 function WeekDayRow({
-  selected, disabled = [], roles = {}, onTap,
+  selected, disabled = [], roles = {}, taken = {}, onTap,
 }: {
   /** The day(s) answering the ACTIVE question — ringed, not filled. */
   selected: DayName[];
   disabled?: DayName[];
   /** What each day IS. This is what the fill carries. */
   roles?: Partial<Record<DayName, DayRole>>;
+  /**
+   * ⛔ DAYS ANOTHER ANCHOR ALREADY HOLDS — day → that anchor's athlete-facing name. Same lock as
+   * `DayPicker` and `DaySelect`, and this row was the last card without it (2026-08-09).
+   *
+   * ⚠️ IT REPLACES A SILENT UNPICK, WHICH IS THE WHOLE POINT. This row asks two questions against
+   * one set of days — long run, and the standing session — and it used to resolve a collision by
+   * BLANKING whichever answer was older: tapping your club onto your long-run day wiped the long
+   * run, on a different line of the same card, with nothing said. The athlete had answered, and the
+   * answer quietly stopped existing. Locking states the conflict before the tap instead of
+   * destroying an answer after it.
+   *
+   * ⚠️ DISTINCT FROM `disabled`, which means "not a candidate for this question at all". `taken`
+   * means "spoken for, and here is by what" — it renders named, not merely dead.
+   */
+  taken?: Partial<Record<DayName, string>>;
+  /** ⛔ Tapping the day this question already holds RELEASES it — see the toggle note below. */
   onTap: (d: DayName) => void;
 }) {
   /**
@@ -301,22 +318,28 @@ function WeekDayRow({
   return (
     <div className="grid grid-cols-7 gap-1 min-w-0">
       {DAYS.map((d) => {
-        const off = disabled.includes(d);
         const role = roles[d] ?? 'R';
         const active = selected.includes(d);
+        // ⚠️ THE ACTIVE QUESTION'S OWN DAY IS NEVER LOCKED, or it could not be released.
+        const heldBy = active ? undefined : taken[d];
+        const off = disabled.includes(d) || !!heldBy;
         return (
           <button
             key={d}
             type="button"
             disabled={off}
             onClick={() => !off && onTap(d)}
-            title={DAY_ROLE_TITLE[role]}
+            title={heldBy ? `${DAY_SHORT[d]} is your ${heldBy}` : (active ? 'Tap again to clear' : DAY_ROLE_TITLE[role])}
+            aria-label={heldBy
+              ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
+              : (active ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
             className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-lg text-[11px] min-w-0 border ${
               off ? 'bg-transparent border-white/5 text-white/15' : skin[role]
             } ${active && !off ? 'ring-2 ring-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)]' : ''}`}
           >
             <span className="leading-none font-medium">{DAY_SHORT[d]}</span>
-            <span className="leading-none text-[9px] opacity-80">{role}</span>
+            {/* Named, not just greyed — an inert square is a puzzle; "long run" is an answer. */}
+            <span className="leading-none text-[9px] opacity-80">{heldBy ? '—' : role}</span>
           </button>
         );
       })}
@@ -324,18 +347,57 @@ function WeekDayRow({
   );
 }
 
-function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange: (d: DayName) => void; allowed?: DayName[] }) {
+/**
+ * ⛔ A DAY ALREADY HELD BY ANOTHER ANCHOR IS LOCKED, NOT AVAILABLE-THEN-RESOLVED (2026-08-09).
+ *
+ * The long run, the long ride and the hard day are ANCHORS: the solver treats them as fixed and
+ * places the barbell around them. Two anchors on one day is therefore not a preference the engine
+ * can arbitrate — `week-solver` has a typed refusal for it whose own copy says *"Both are fixed, so
+ * this is yours to resolve — the engine will not pick one."*
+ *
+ * ⚠️ SO THE FIX BELONGS AT INPUT. The collision that is never entered needs no dedupe, no refusal
+ * screen and no explanation after the fact. `taken` greys the day and disables the button, and the
+ * label says WHICH anchor holds it — an inert grey square is a puzzle, a grey square that says
+ * "long run" is an answer.
+ *
+ * ⛔ THIS REPLACES A LAST-WRITE-WINS CLEAR. The club-day handler used to blank `longRunDay` when the
+ * club took its day — a silent unpick of something the athlete had already chosen, on a different
+ * card, with no message. Locking says the same thing before the fact instead of after it.
+ */
+function DayPicker({ value, onChange, allowed, taken }: {
+  /** ⛔ Receives `''` when the athlete taps the day already selected — the release. */
+  value: DayName | ''; onChange: (d: DayName | '') => void; allowed?: DayName[];
+  /** day → the athlete-facing name of the anchor holding it. Absent = free. */
+  taken?: Partial<Record<DayName, string>>;
+}) {
   const days = allowed ?? DAYS;
   return (
     <div className={allowed ? 'flex gap-1' : 'grid grid-cols-7 gap-1'}>
-      {days.map((d) => (
-        <button
-          key={d} type="button" onClick={() => onChange(d)}
-          className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-lg text-xs ${value === d ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
-        >
-          {DAY_SHORT[d]}
-        </button>
-      ))}
+      {days.map((d) => {
+        // ⚠️ THE CURRENT VALUE IS NEVER LOCKED. A picker whose own selection reads as taken cannot be
+        // re-confirmed and looks broken to the athlete who set it.
+        const heldBy = value === d ? undefined : taken?.[d];
+        return (
+          <button
+            key={d} type="button" disabled={!!heldBy}
+            // ⛔ TAP-TO-RELEASE. Tapping the selected day clears it rather than re-confirming a
+            // choice that was already made — no pick is ever stuck, on any card.
+            onClick={() => { if (!heldBy) onChange(value === d ? '' : d); }}
+            title={heldBy ? `${DAY_SHORT[d]} is your ${heldBy}` : undefined}
+            aria-label={heldBy
+              ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
+              : (value === d ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
+            className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-lg text-xs ${
+              heldBy
+                ? 'bg-white/[0.02] text-white/25 border border-white/[0.06] cursor-not-allowed'
+                : value === d
+                  ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]'
+                  : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+          >
+            {DAY_SHORT[d]}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -350,7 +412,11 @@ function DayPicker({ value, onChange, allowed }: { value: DayName | ''; onChange
  * ⚠️ `DayPicker` above is unchanged and still used by every other card, where the screen is not
  * competing with a live result.
  */
-function DaySelect({ label, value, onChange }: { label: string; value: DayName | ''; onChange: (d: DayName) => void }) {
+function DaySelect({ label, value, onChange, taken }: {
+  label: string; value: DayName | ''; onChange: (d: DayName) => void;
+  /** day → the athlete-facing name of the anchor holding it. See `DayPicker` for why this locks. */
+  taken?: Partial<Record<DayName, string>>;
+}) {
   return (
     <label className="flex items-center gap-2 text-sm">
       <span className="text-white/70 whitespace-nowrap">{label}</span>
@@ -361,9 +427,16 @@ function DaySelect({ label, value, onChange }: { label: string; value: DayName |
         style={{ fontSize: '16px' }}
       >
         <option value="" className="bg-neutral-900">Pick a day</option>
-        {DAYS.map((d) => (
-          <option key={d} value={d} className="bg-neutral-900">{DAY_SHORT[d]}</option>
-        ))}
+        {DAYS.map((d) => {
+          const heldBy = value === d ? undefined : taken?.[d];
+          return (
+            // ⚠️ NAMED, NOT JUST DISABLED. A greyed option with no reason reads as a bug; "Sat — long
+            // ride" reads as the app remembering what the athlete already told it.
+            <option key={d} value={d} disabled={!!heldBy} className="bg-neutral-900">
+              {heldBy ? `${DAY_SHORT[d]} — ${heldBy}` : DAY_SHORT[d]}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
@@ -2522,27 +2595,40 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     : (state.qualityDays[clubSport] ? [state.qualityDays[clubSport] as DayName] : [])
                 }
                 roles={weekRoles}
+                // ⚠️ EACH QUESTION IS SHOWN THE OTHER'S DAY, never its own — excluding its own is
+                // what leaves it releasable.
+                taken={weekQuestion === 'long'
+                  ? anchorDaysTaken(state, 'long run')
+                  : anchorDaysTaken(state, 'hard day')}
                 onTap={(d) => {
+                  // ⛔ TAP YOUR OWN DAY TO RELEASE IT. Both questions toggle: an assigned pick is
+                  // cleared by tapping it again, so a day is never stuck and the athlete never has to
+                  // find some other control to undo a choice. `WeekDayRow` locks days the OTHER
+                  // question holds, so the only day either branch can be tapped on is its own or a
+                  // free one — which is what makes a plain toggle safe here.
                   if (weekQuestion === 'long') {
+                    const releasing = state.longRunDay === d;
                     setState((st) => ({
                       ...st,
-                      longRunDay: d,
-                      trainingDays: st.trainingDays.includes(d) ? st.trainingDays : [...st.trainingDays, d],
-                      qualityDays: st.qualityDays.run === d
-                        ? (() => { const q = { ...st.qualityDays }; delete q.run; return q; })()
-                        : st.qualityDays,
+                      longRunDay: releasing ? '' : d,
+                      trainingDays: (releasing || st.trainingDays.includes(d)) ? st.trainingDays : [...st.trainingDays, d],
+                      // ⛔ THE SILENT UNPICK IS GONE (2026-08-09). This branch used to DELETE
+                      // `qualityDays.run` when the long run took its day — the athlete's club night,
+                      // erased from a different line of the same card with nothing said. The club day
+                      // is locked in the row now, so this collision cannot be entered.
                     }));
                   } else {
-                    const clearing = state.qualityDays[clubSport] === d;
+                    const releasing = state.qualityDays[clubSport] === d;
                     setState((st) => {
                       const q = { ...st.qualityDays };
-                      if (clearing) delete q[clubSport]; else q[clubSport] = d;
+                      if (releasing) delete q[clubSport]; else q[clubSport] = d;
                       return {
                         ...st,
                         qualityDays: q,
                         // a RUN club is a run day; a RIDE club is not
-                        trainingDays: (clearing || clubSport === 'bike' || st.trainingDays.includes(d)) ? st.trainingDays : [...st.trainingDays, d],
-                        longRunDay: !clearing && clubSport === 'run' && st.longRunDay === d ? '' : st.longRunDay,
+                        trainingDays: (releasing || clubSport === 'bike' || st.trainingDays.includes(d)) ? st.trainingDays : [...st.trainingDays, d],
+                        // ⛔ AND THE MIRROR OF THE SAME UNPICK IS GONE — this used to blank
+                        // `longRunDay`. Same reason: the long-run day is locked in the row.
                       };
                     });
                   }
@@ -3204,7 +3290,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     >{n}</button>
                   ))}
                 </div>
-                <DaySelect label="Long run" value={state.longRunDay} onChange={(d) => setState((st) => ({ ...st, longRunDay: d }))} />
+                <DaySelect label="Long run" value={state.longRunDay} taken={anchorDaysTaken(state, 'long run')} onChange={(d) => setState((st) => ({ ...st, longRunDay: d }))} />
               </div>
             )}
 
@@ -3223,7 +3309,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     >{n}</button>
                   ))}
                 </div>
-                <DaySelect label="Long ride" value={state.longRideDay} onChange={(d) => setState((st) => ({ ...st, longRideDay: d }))} />
+                <DaySelect label="Long ride" value={state.longRideDay} taken={anchorDaysTaken(state, 'long ride')} onChange={(d) => setState((st) => ({ ...st, longRideDay: d }))} />
               </div>
             )}
 
@@ -3254,7 +3340,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   (`place-week.ts`), not a session squeezed into what the grid left over. Telling the
                   athlete their long run must be a weekend, because of lifting days the engine no
                   longer fixes, is the tail wagging the dog. */}
-              <DayPicker value={state.longRunDay} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
+              <DayPicker value={state.longRunDay} taken={anchorDaysTaken(state, 'long run')} onChange={(d) => setState((s) => ({ ...s, longRunDay: d }))} />
               {state.posture?.strength === 'develop' && (
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                   Whichever day you actually run long. The lifting is placed around it — heavy legs
@@ -3518,7 +3604,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </div>
             <div>
               <p className="text-white/85 text-sm mb-2">Long ride day</p>
-              <DayPicker value={state.longRideDay} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
+              <DayPicker value={state.longRideDay} taken={anchorDaysTaken(state, 'long ride')} onChange={(d) => setState((s) => ({ ...s, longRideDay: d }))} />
             </div>
           </div>
         </StepLayout>
