@@ -84,11 +84,79 @@ Deno.test('a day dropped from the week reads R again', () => {
   assertEquals(roles.monday, 'E');
 });
 
+// ── THE STRONG FOCUS ANCHORS — `H` and `LB` (2026-08-09) ────────────────────────────────────────
+//
+// That scheduler asks three day questions where the race card asks two, and it had NO day row at
+// all: three `<select>`s under an empty box reading "Pick your days and the week appears here".
+// `WeekDayRow` already existed and was simply unreachable from that path. These two letters are what
+// it was missing.
+
+Deno.test('⛔ THE STRONG FOCUS ROW FILLS IN AS ANCHORS ARE PICKED, AND SAYS NOTHING ELSE', () => {
+  // This path gives COUNTS, never a day list — the solver places the runs and rides. So every chip
+  // starts blank and only the athlete's own three anchors ever light up.
+  const base = { trainingDays: [], days: DAYS };
+  assertEquals(read(weekDayRoles({ ...base })), '· · · · · · ·', 'nothing picked, nothing claimed');
+  assertEquals(
+    read(weekDayRoles({ ...base, hardDay: 'tuesday' })),
+    '· H · · · · ·',
+    'the one hard day',
+  );
+  assertEquals(
+    read(weekDayRoles({ ...base, hardDay: 'tuesday', longRunDay: 'sunday' })),
+    '· H · · · · LR',
+    'and the long run — the rest of the week is still unanswered',
+  );
+  assertEquals(
+    read(weekDayRoles({ ...base, hardDay: 'tuesday', longRunDay: 'sunday', longRideDay: 'saturday' })),
+    '· H · · · LB LR',
+    'all three anchors, five chips still blank',
+  );
+});
+
+Deno.test('⛔ `H` HERE IS NOT THE `H` THAT WAS REVERTED — the difference is who asked', () => {
+  // The reverted `H` classified a STANDING day the athlete merely told us about; `C` replaced it
+  // because the letter was our label on their calendar entry. This `H` is the ANSWER to a question
+  // the app asked outright — "which day is your one hard session" — so hard is what the slot IS.
+  // Both letters therefore coexist, and a week can legitimately carry each.
+  const roles = weekDayRoles({
+    trainingDays: FIVE, days: DAYS, standingDay: 'tuesday', hardDay: 'thursday',
+  });
+  assertEquals(roles.tuesday, 'C', 'a day they already train on stays theirs');
+  assertEquals(roles.thursday, 'H', 'a day the app asked them to nominate reads as the hard one');
+});
+
+Deno.test('the new anchors do not disturb the race card', () => {
+  // The race flow passes neither `hardDay` nor `longRideDay`. Adding the parameters must leave every
+  // week that path renders byte-identical — this is the assertion that catches a precedence edit.
+  const base = { trainingDays: FIVE, days: DAYS, longRunDay: 'sunday', standingDay: 'tuesday' };
+  assertEquals(read(weekDayRoles({ ...base })), 'E C E R E R LR');
+  assertEquals(
+    read(weekDayRoles({ ...base, hardDay: undefined, longRideDay: undefined })),
+    'E C E R E R LR',
+    'explicitly-absent anchors read the same as never-passed ones',
+  );
+});
+
+Deno.test('anchor precedence is declared, so a bypassed lock still renders one stable answer', () => {
+  // `anchor-days.ts` prevents two anchors on one day at INPUT, so this should be unreachable. It is
+  // pinned anyway: an order that exists only by accident is one a refactor reshuffles silently.
+  const all = { trainingDays: [], days: DAYS, longRunDay: 'sunday', longRideDay: 'sunday', hardDay: 'sunday' };
+  assertEquals(weekDayRoles(all).sunday, 'LR', 'the long run outranks the long ride outranks the hard day');
+  assertEquals(
+    weekDayRoles({ trainingDays: [], days: DAYS, longRideDay: 'sunday', hardDay: 'sunday' }).sunday,
+    'LB',
+  );
+});
+
 Deno.test('every letter has a word, and the vocabulary is the week module\'s own', () => {
   // The chip's tooltip reads these; a letter with no expansion is a puzzle, not a label.
-  for (const role of ['R', 'E', 'LR', 'C'] as const) {
+  for (const role of ['R', 'E', 'LR', 'C', 'H', 'LB'] as const) {
     assert(DAY_ROLE_TITLE[role]?.length > 0, `${role} has no title`);
   }
+  // ⚠️ AND EVERY LETTER IS DISTINGUISHABLE FROM EVERY OTHER, which `LR`/`LB` put at risk — they are
+  // one character apart on a 9px chip, so the WORDS behind them have to be unmistakable.
+  const titles = Object.values(DAY_ROLE_TITLE);
+  assertEquals(new Set(titles).size, titles.length, 'two roles share a title');
   // …and the day vocabulary defaults to this module's own week, so a caller that passes none still
   // gets seven answers rather than an empty object.
   const defaulted = weekDayRoles({ trainingDays: WEEK_DAYS.map((d) => d.toLowerCase()) });

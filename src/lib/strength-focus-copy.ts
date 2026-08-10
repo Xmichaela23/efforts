@@ -480,3 +480,68 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
       + 'falls on is what lets the lifting be placed around it rather than on top of it.',
   },
 ];
+
+/**
+ * ⛔ THE VOLUME RATIONALE, MOVED OFF THE CARD (2026-08-09).
+ *
+ * This was six lines of prose sitting BETWEEN the two inputs on "How much" — weekly running miles
+ * above it, weekly riding hours below — so on a phone the second field was off screen and an athlete
+ * who trains both never saw there was a second question. Michael, on the device: the controls get
+ * pushed below the fold.
+ *
+ * ⚠️ THE CLAIM STAYS ON THE CARD; THE RECEIPT MOVES BEHIND THE (i). One line survives above the
+ * inputs — *"Pace is not what competes with strength — total work is."* — because it is
+ * counterintuitive, every athlete assumes the hard session is the threat to their lifting, and this
+ * is the screen where the volume is chosen. The numbers, the paper and the two things the paper does
+ * NOT say are one tap away, in the same shape `HARD_DAY_WHY` already uses on the scheduler.
+ *
+ * ⛔ BOTH CORRECTIONS FROM 2026-08-06 SURVIVE THE MOVE, AND THEY ARE THE REASON THIS IS THREE
+ * SECTIONS RATHER THAN A PARAGRAPH:
+ *   1. **It was CYCLING, not running.** The trial's conclusion reads "whether HIT or MICT cycling is
+ *      incorporated". Cycling carries less eccentric load, so reading it across to running errs
+ *      toward overstating the cost — that hedge is not decoration, it is the condition the claim is
+ *      allowed on.
+ *   2. **Volume is the authors' SUGGESTION, not their result.** They wrote it "might be" the more
+ *      critical mediator. Work was held constant while intensity varied, so what is measured is that
+ *      INTENSITY does not mediate. An earlier draft stated the volume half flatly; it does not now,
+ *      and the section that says so is titled for it.
+ *
+ * **Fyfe JJ, Bartlett JD, Hanson ED, Stepto NK, Bishop DJ (2016), "Endurance Training Intensity Does
+ * Not Mediate Interference to Maximal Lower-Body Strength Gain during Short-Term Concurrent
+ * Training", Frontiers in Physiology 7:487 (PMC5093324).** Eight weeks; RT only +38.5 ± 8.5%,
+ * HIT+RT +28.7 ± 5.3%, MICT+RT +27.5 ± 4.6% on leg press. "All MICT sessions were work- and
+ * duration-matched to the corresponding HIT session."
+ *
+ * ⛔ THE SAME PAPER DECIDES THE HARD SESSION'S REP COUNT — `DECISIONS-LOG-2.md` **D-389**, which
+ * holds this and Wen 2019 together: the 5th hill rep would reach Wen's VO2max threshold and is
+ * bought in exactly the total work Fyfe found interferes with strength.
+ *
+ * ⚠️ VOICE — every string here is asserted clean against `voiceViolation()` in
+ * `strength-focus-copy.voice.test.ts`. Passing that gate is necessary, not sufficient: two earlier
+ * drafts of the old paragraph passed a hand-read and broke rule 10 on idiom. Read it as well as
+ * running it.
+ */
+export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
+  {
+    heading: 'What the trial found',
+    body:
+      'Eight weeks, three groups. Lifting alone gained 38.5% on leg press. Hard cycling alongside the '
+      + 'lifting gained 28.7%, easy cycling 27.5% — almost the same number. Every endurance session was '
+      + 'matched for equal work and equal duration, so pace was not what separated them. '
+      + '(Fyfe et al. 2016, Frontiers in Physiology 7:487.)',
+  },
+  {
+    heading: 'What it does not say',
+    body:
+      'The authors point at total work instead, and they call that a possibility rather than a result — '
+      + 'work was held constant while intensity varied, so what the trial measures is that intensity '
+      + 'does not mediate. The endurance was also cycling. Running carries more eccentric load, so '
+      + 'reading the number across to running errs toward overstating the cost.',
+  },
+  {
+    heading: 'Why the number here matters',
+    body:
+      'As weekly volume climbs, the strength gained across a block gets smaller. The number entered on '
+      + 'this screen is the one the plan builds around, and the sessions do not shrink to meet it.',
+  },
+];

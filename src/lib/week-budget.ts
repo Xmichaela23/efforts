@@ -76,11 +76,30 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
  * ⚠️ THE INTENSITY ANSWER IS UNTOUCHED and still decides everything downstream — `quality_run` vs
  * `easy_run` in `preferred_days`, and therefore whether the week's hard session lands there. Only
  * the letter stopped trying to say it.
+ *
+ * ⛔ TWO LETTERS ADDED FOR THE STRONG FOCUS SCHEDULER (2026-08-09) — `H` and `LB`.
+ *
+ * That screen asks THREE day questions, not two: the one hard day, the long run, and the long ride.
+ * It had no day row at all — three `<select>`s and an empty box reading "Pick your days and the week
+ * appears here" — and the row it needed already existed on the race path (`WeekDayRow`), missing
+ * only a letter for the two anchors the race flow never has.
+ *
+ * ⚠️ `H` IS NOT THE `H` THAT WAS REVERTED ABOVE, AND THE DIFFERENCE IS THE WHOLE REASON BOTH EXIST.
+ * That one tried to classify a STANDING day the athlete had merely told us about — our label on
+ * their calendar entry, which is why `C` replaced it. This `H` marks the day the athlete chose IN
+ * ANSWER to "which day is your one hard session" — the question is ours, the day is the answer to
+ * it, and hard is what the slot IS. A screen that asks the intensity question directly gets to name
+ * the result; a screen that only learns a day does not.
+ *
+ * ⚠️ AND THE STRENGTH PATH PINS NOTHING ELSE. It gives COUNTS (two runs, one ride), not a list of
+ * days — the solver places those. So `trainingDays` is empty there and every non-anchor day stays
+ * blank, which is the unpinned rule above doing exactly what it was written for: the row fills in as
+ * anchors are picked and never invents an easy day the athlete has not been asked about.
  */
-export type DayRole = 'R' | 'E' | 'LR' | 'C';
+export type DayRole = 'R' | 'E' | 'LR' | 'C' | 'H' | 'LB';
 
 export const DAY_ROLE_TITLE: Record<DayRole, string> = {
-  R: 'Rest', E: 'Easy run', LR: 'Long run', C: 'Standing session',
+  R: 'Rest', E: 'Easy run', LR: 'Long run', C: 'Standing session', H: 'Hard day', LB: 'Long ride',
 };
 
 export function weekDayRoles(input: {
@@ -88,6 +107,10 @@ export function weekDayRoles(input: {
   trainingDays: readonly string[];
   longRunDay?: string;
   standingDay?: string;
+  /** The one hard session's day — Strong Focus's own anchor. Absent on the race flow. */
+  hardDay?: string;
+  /** The long ride's day. Absent on the race flow, which has no bike anchor. */
+  longRideDay?: string;
   /** Day vocabulary to answer in. Defaults to the lower-case names the intake uses. */
   days?: readonly string[];
 }): Record<string, DayRole | undefined> {
@@ -95,7 +118,13 @@ export function weekDayRoles(input: {
   const pinned = input.trainingDays.length > 0;
   const out: Record<string, DayRole | undefined> = {};
   for (const d of days) {
+    // ⚠️ ANCHOR ORDER IS DECLARED, NOT INCIDENTAL. Two anchors on one day is prevented at input
+    // (`anchor-days.ts` locks a day the moment another anchor holds it), so this order should never
+    // arbitrate anything — it is here so that if a lock is ever bypassed the row still renders one
+    // stable answer instead of flickering between two.
     if (input.longRunDay === d) { out[d] = 'LR'; continue; }
+    if (input.longRideDay === d) { out[d] = 'LB'; continue; }
+    if (input.hardDay === d) { out[d] = 'H'; continue; }
     if (input.standingDay === d) { out[d] = 'C'; continue; }
     if (!pinned) continue;
     out[d] = input.trainingDays.includes(d) ? 'E' : 'R';
