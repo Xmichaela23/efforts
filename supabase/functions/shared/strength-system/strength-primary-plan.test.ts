@@ -187,7 +187,13 @@ Deno.test('a work session is jumps → main lift → 50 reps each of leg / pull 
   // ⛔ UPDATED AGAIN 2026-08-05 FOR THE DAY-TYPE ROLES, AND IT WAS PINNING A SECOND DEFECT: `Push Up`
   // on a BACK SQUAT day. No Wendler template presses on a lower day. A lower day is now
   // leg · pull · core (p.51, p.53, p.55, p.88), with core LAST as every template runs it.
-  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Single Leg Hip Thrust', 'Pull Up', 'Sit Up']);
+  //
+  // ⛔ UPDATED A THIRD TIME 2026-08-09 (D-405): the `Pull Up` in the middle is gone, and a lower day
+  // is now leg · leg · core. p.51 is two lines and neither has a pull on it — Deadlift day is
+  // hamstrings/quads/abs, Squat day is low back/quads/abs. `Single Leg Hip Thrust` (hip) is the
+  // opposite-family slot on a knee-dominant day and `Reverse Lunge` (knee) is the main lift's own
+  // family, which is exactly p.51's "low back, quads". The pull pick runs on the two press days.
+  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Single Leg Hip Thrust', 'Reverse Lunge', 'Sit Up']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
   assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);

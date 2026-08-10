@@ -25,6 +25,10 @@
 // ============================================================================
 
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
+// ⛔ ONE SOURCE FOR WENDLER'S ESTIMATOR. The inverse lives beside the forward direction in
+// `estimate-1rm.ts`; re-deriving `e1RM ÷ (1 + r × 0.0333)` here would be a second copy of the
+// coefficient the athlete is invited to check our arithmetic against.
+import { weightForReps } from '../../../../src/lib/estimate-1rm.ts';
 import { strengthFocusDescription } from '../../../../src/lib/strength-focus-copy.ts';
 import {
   FALLBACK_EASY_MIN_PER_MILE as FALLBACK_EASY_MIN_PER_MILE_SHARED,
@@ -278,6 +282,17 @@ type StrengthExercise = {
    *  work is auto-regulated by design (see `assistanceRows`); materialize must not derive a load for
    *  it, and the logger must not show one. Absent/true → every other row behaves as before. */
   load_prescribed?: boolean;
+  /** ⛔ A STARTING POINT FOR THE LOGGER'S ENTRY BOX — NOT A PRESCRIPTION, AND NOT A QUIETER `weight`
+   *  (D-406). It rides ONLY on assistance rows, always alongside `load_prescribed: false`, and the
+   *  two do not contradict: the plan still declines to name a load, and this is a number the athlete
+   *  can start from and immediately overwrite.
+   *  ⚠️ NO SURFACE MAY RENDER THIS AS WHAT THE PLAN ASKED FOR. "By feel" stays the prescription
+   *  everywhere it is shown today — the compare table's own words: *"by feel is not decoration, it
+   *  is the prescription."* A surface that prints this number as a target has reintroduced the
+   *  forced progression on a secondary movement that the load rule exists to prevent.
+   *  ⚠️ ABSENT on bodyweight movements, on movements with no coefficient, and whenever the athlete's
+   *  maxes cannot answer. Absent means "no suggestion", never "zero". */
+  weight_suggested?: number;
   /** ⛔ THE PER-SET PRESCRIPTION. 5/3/1 is three sets at three weights; the app's one-weight-per-
    *  exercise shape cannot say that, and copying the top set onto all three prefills the phone with
    *  a weight the athlete was not asked to lift twice a session, four days a week, for twelve weeks.
@@ -372,6 +387,73 @@ export const JUMPS: StrengthExercise = { name: 'Box Jump', sets: 3, reps: 5, wei
  * These three slots are also the Adjust-tab holes — a glute focus loads single-leg/core, a pull-up
  * focus loads pull. An add-on REPLACES the pick in a slot; it never adds a fourth.
  */
+/**
+ * ⛔ THE ASSISTANCE **SUGGESTION** — D-406. Read the load rule at the top of `assistance-menu.ts`
+ * before touching this; this function is the one narrow exception to it and it is narrow on purpose.
+ *
+ * **What did NOT change:** the plan still prescribes no assistance load. `weight` stays `'By feel'`,
+ * `load_prescribed` stays `false`, and every surface that renders the prescription keeps rendering
+ * "by feel". *"The absence is the design"* is still true of the PRESCRIPTION.
+ *
+ * **What this adds** is a starting point for the athlete's entry box, so a beginner facing
+ * `Dumbbell Row — 50 total, by feel` is not asked to invent a number from nothing on their first
+ * session. It is greyed, overwritable, and never echoed back as what the plan asked for.
+ *
+ * ── HOW THE NUMBER IS DERIVED, AND WHY EVERY STEP IS SOURCED ─────────────────────────────────────
+ *
+ *   accessory e1RM  =  parent lift's max × `ratio`     (`exercise-config`, `primaryRef` + `ratio`)
+ *   suggestion      =  weightForReps(accessory e1RM, 12, rir 2)   (Wendler's own formula, p.32)
+ *
+ * ⛔ **THERE IS NO INVENTED PERCENTAGE ANYWHERE IN THAT.** The obvious implementation — "take 65% of
+ * the accessory's max" — is precisely the fabricated intensity `materialize-plan` strips on sight,
+ * and it would be a number nobody could source. Instead the rep target and the reps-in-reserve are
+ * the inputs, and the percentage FALLS OUT of Wendler's estimator: 12 reps with 2 left is ~68% of
+ * max, because that is what his equation says, not because anyone chose 68.
+ *
+ * ⚠️ **12 REPS IS THE ONE JUDGEMENT CALL AND IT IS THE SLOT'S OWN NUMBER**, not a new one: a 50-rep
+ * total broken into the sets a lifter actually runs is 3-5 sets of 10-15, and p.51's own prescription
+ * for these slots is "5 sets of 10-20". 12 sits inside both. **RIR 2 is the guidance verbatim** —
+ * *"a few reps left, never to failure"* — expressed as arithmetic instead of as a chosen percentage.
+ *
+ * ⛔ **RETURNS `{}` — NOT A ZERO, NOT A NULL — WHENEVER IT CANNOT ANSWER**, so the field is simply
+ * absent on the row and every consumer sees "no suggestion" rather than "a suggestion of nothing".
+ * Three cases, and all three are correct silences:
+ *   · **bodyweight and bands** (chins, dips, push-ups, sit-ups, face pull) — Michael's rule, and the
+ *     honest one: the athlete finds their own level, and a band that assists a chin builds strength
+ *     faster than grinding ugly reps.
+ *   · **no coefficient** — the movement has no `primaryRef`/`ratio` pair to derive from.
+ *   · **no max on file** for the parent lift.
+ */
+function suggestedAssistanceWeight(
+  name: string,
+  oneRepMaxes?: Record<string, number> | null,
+): { weight_suggested?: number } {
+  if (!oneRepMaxes) return {};
+  const cfg = getExerciseConfig(name);
+  if (!cfg || !cfg.primaryRef || !(cfg.ratio > 0)) return {};
+  // ⚠️ BODYWEIGHT AND BAND MOVEMENTS ARE EXCLUDED BY DISPLAY FORMAT, not by a name list. `Dips` has a
+  // real bench ratio and would otherwise price — it is bodyweight work for the athlete this block is
+  // written for, and the work order is explicit that chins and dips get no suggested number.
+  if (cfg.displayFormat === 'bodyweight' || cfg.displayFormat === 'band' || cfg.displayFormat === 'dipsAdded') return {};
+  if (/^(dip|dips)$/i.test(String(name).trim())) return {};
+
+  const parentMax = Number(oneRepMaxes[cfg.primaryRef]);
+  if (!Number.isFinite(parentMax) || parentMax <= 0) return {};
+
+  const accessoryMax = parentMax * cfg.ratio;
+  let w = weightForReps(accessoryMax, ASSISTANCE_SUGGESTION_REPS, ASSISTANCE_SUGGESTION_RIR);
+  // perHand entries whose ratio describes the TOTAL must be halved before rounding, so the number
+  // lands on a real dumbbell rather than on half of one. Mirrors `calculatePrescribedWeight`.
+  if (cfg.displayFormat === 'perHand' && cfg.ratioIsTotal) w = w / 2;
+  const rounded = Math.round(w / 5) * 5;
+  return rounded >= 5 ? { weight_suggested: rounded } : {};
+}
+
+/** 50 total broken into the sets a lifter runs is 3-5 × 10-15; p.51 prescribes 5 × 10-20. */
+const ASSISTANCE_SUGGESTION_REPS = 12;
+/** `ASSISTANCE_GUIDANCE` verbatim: "a few reps left, never to failure." */
+const ASSISTANCE_SUGGESTION_RIR = 2;
+
 function assistanceRows(
   picks: AssistancePicks | null | undefined,
   // ⛔ THE VOLUME IS DERIVED PER SLOT AND PER CYCLE (2026-07-28). 25 stays the floor — it is the
@@ -386,6 +468,12 @@ function assistanceRows(
   // pre-Q-212 behaviour, so a caller that does not know its main lift degrades to the old shape
   // rather than to a wrong one (§0h).
   mainLiftName?: string | null,
+  /**
+   * ⛔ THE ATHLETE'S MAIN-LIFT MAXES, AND THEY BUY A SUGGESTION — NEVER A PRESCRIPTION. Added
+   * 2026-08-09 (D-406). Absent → no suggestion is emitted at all, which is the pre-D-406 shape
+   * exactly, so any caller that does not have maxes degrades to unchanged rather than to a guess.
+   */
+  oneRepMaxes?: Record<string, number> | null,
 ): { rows: StrengthExercise[]; note: string | null } {
   const resolved = resolveAssistance(picks, mainLiftName);
   const rows = resolved.map((a) => ({
@@ -402,8 +490,19 @@ function assistanceRows(
     // performed. ⚠️ `reps` is typed `number | string` precisely for this kind of qualitative row.
     sets: undefined,
     reps: `${assistanceTotalReps(a.slot, scale).totalReps} total`,
+    // ⛔ STILL 'By feel', AND `load_prescribed` IS STILL false. Both are load-bearing and D-406 did
+    // NOT touch either. `weight` is what every surface RENDERS as the prescription, and the
+    // prescription has not changed: the plan still declines to name a load. `load_prescribed: false`
+    // is separately the one answer to "is this row assistance?" (`src/lib/assistance-slot.ts`,
+    // D-370) — flipping it would make the server matcher, the logger, the compare table and the
+    // performance summary stop recognising the row, and work the athlete did would read as a skip.
     weight: 'By feel',
     load_prescribed: false,
+    // ⚠️ A SEPARATE FIELD FOR A SEPARATE CLAIM. `weight_suggested` is not a quieter `weight` — it is
+    // a STARTING POINT for the logger's entry box, greyed and overwritable, and no surface may
+    // render it as what the plan asked for. Omitted entirely for bodyweight movements and wherever
+    // the maxes cannot answer, because an absent suggestion is honest and a fabricated one is not.
+    ...suggestedAssistanceWeight(a.name, oneRepMaxes),
   }));
   return { rows, note: mainLiftName ? assistanceSubstitutionNote(resolved, mainLiftName) : null };
 }
@@ -559,14 +658,50 @@ function runIntensityToken(kind: 'easy' | 'long', durationMin: number): string {
     : `run_easy_${durationMin}min`;
 }
 
+/**
+ * ⛔ THE DELOAD WEEK EASES THE ENDURANCE TOO — D-407, and until now it did not, which made the
+ * deload a strength deload wearing a whole week's name.
+ *
+ * On weeks 4/8/12 the bar drops to 40/50/60% and the session shortens to 35 minutes — and the
+ * athlete's Thursday hill repeats ran at FULL intensity anyway, alongside full easy volume. A week
+ * that removes the barbell stimulus and keeps the hard running is not a deload; it is a different
+ * week with the same name.
+ *
+ * ⚠️ **INTENSITY IS CUT FIRST, VOLUME SECOND, AND THE ORDER IS THE WHOLE RULE.** Interference and
+ * fatigue scale with endurance INTENSITY far more than with duration, and hard running costs the
+ * legs more than anything else on the calendar [Wilson 2012, J Strength Cond Res]. So the hard
+ * session is downgraded before a single easy minute is touched.
+ *
+ * ⚠️ **AND THE EASY WORK IS TRIMMED, NOT DELETED.** Two-thirds, and light spinning and jogging stay
+ * on the calendar: Hickson's maintenance trilogy is that cutting INTENSITY is what preserves the
+ * aerobic base while frequency holds — a week off entirely is a detraining week, not a recovery one.
+ * Same reasoning as `maintenanceDoseFor` on the builder's volume card, which also lands on ~2/3.
+ */
+const DELOAD_EASY_VOLUME_FACTOR = 2 / 3;
+
+/** Deload trim for one easy session's minutes. ⚠️ Floors at 15 so a short day does not vanish. */
+function deloadEasyMinutes(mins: number | undefined, isDeload: boolean): number | undefined {
+  if (!isDeload || mins == null || !Number.isFinite(mins)) return mins;
+  return Math.max(15, Math.round(mins * DELOAD_EASY_VOLUME_FACTOR));
+}
+
 function enduranceSession(
   sport: 'run' | 'bike',
   day: string,
   overrideMins?: number,
   extraNote?: string,
   kind: 'easy' | 'long' = 'easy',
+  /**
+   * ⛔ THE TRIM LIVES HERE, NOT AT THE CALL SITES, AND THAT IS A CORRECTION (D-407). Trimming
+   * `overrideMins` before the call looked equivalent and is not: an override is OPTIONAL, and every
+   * caller that omits it falls through to the default below — where a call-site trim cannot reach.
+   * Caught by printing a deload week and seeing four untouched 35-minute runs.
+   * ⚠️ So the trim must sit AFTER the `??`, on the resolved number, which is the only place that
+   * sees every path.
+   */
+  isDeload = false,
 ): PlanSession {
-  const mins = overrideMins ?? (sport === 'bike' ? 45 : 35);
+  const mins = deloadEasyMinutes(overrideMins ?? (sport === 'bike' ? 45 : 35), isDeload)!;
   // ⛔ NAME AND TAGS DERIVE FROM `kind`, THE SAME SOURCE AS THE TOKEN. Fixed 2026-07-27.
   //
   // They used to be hardcoded — `'Easy Run'` and `['easy', …]` — while `runIntensityToken(kind)`
@@ -2117,7 +2252,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         pullupMaxReps: args.pullupMaxReps,
         strengthPosture: args.blockShape?.strengthPosture,
         cycleKind: slot.kind,
-      }, lift.name);
+      }, lift.name, args.oneRepMaxes);
       const ex: StrengthExercise[] = isDeload
         ? [main]
         : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance.rows];
@@ -2285,7 +2420,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // or the athlete pinned a long day, and then every day of it is easy by definition.
         weekSessions.push(enduranceSession(
           'run', day, runMinutesByDay[day], note,
-          runHasLongDay && day === longRunDay ? 'long' : 'easy',
+          runHasLongDay && day === longRunDay ? 'long' : 'easy', isDeload,
         ));
       });
       // ⛔ THE HARD DAY GETS FILLED. Until now the pin reserved a day and nothing was authored for
@@ -2299,7 +2434,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ Do NOT emit hills as a substitute for the ride: that spends mechanical budget the
       // doctrine spent the whole day protecting.
       if (hardPin && args.hardDay?.discipline === 'run') {
-        weekSessions.push(hardRunSession(hardPin, heavyLowerDays, args.hardDay?.terrain));
+        // ⛔ ON A DELOAD WEEK THE HARD SESSION IS DOWNGRADED, NOT DELETED (D-407). Dropping it would
+        // hand back a blank day, which `place-week` already learned is worse than dropping the pin —
+        // the week visibly loses a day and the athlete reads it as a bug. The day keeps an easy run
+        // at the trimmed volume, so frequency holds (Hickson) while the intensity that drives the
+        // interference goes away (Wilson 2012).
+        weekSessions.push(isDeload
+          ? enduranceSession('run', hardPin, hardRunSessionMinutes(args.hardDay?.terrain),
+            'Deload week — the hard session comes off. Easy running only, and the same rule as every '
+            + 'other easy day: conversational throughout.', 'easy', true)
+          : hardRunSession(hardPin, heavyLowerDays, args.hardDay?.terrain));
       }
     } else if (enduranceSport === 'bike' && !hasBike) {
       // ⛔ TWO EMITTERS WERE AUTHORING RIDES AND NOTHING SUBTRACTED (found 2026-07-29 by the combo
@@ -2322,7 +2466,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // which is the RUN day list — fine while every block had a run in it, empty the moment a
       // bike-only athlete stopped being handed a phantom one, and the rides silently vanished.
       // These rides are requested from the solve like every other flexible session.
-      solvedRideDays.forEach((day) => weekSessions.push(enduranceSession('bike', day)));
+      solvedRideDays.forEach((day) => weekSessions.push(
+        enduranceSession('bike', day, undefined, undefined, 'easy', isDeload)));
     }
 
     // ── The bike, when the athlete keeps one ────────────────────────────────────────────────────
@@ -2449,7 +2594,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           : (stackedWithLift
             ? ` Shares the day with the lift: the lift goes first. They share no prime movers, so back to back is fine.`
             : undefined);
-        weekSessions.push(enduranceSession('bike', day, mins, rideNote, isLong ? 'long' : 'easy'));
+        weekSessions.push(enduranceSession(
+          'bike', day, mins, rideNote, isLong ? 'long' : 'easy', isDeload));
       });
       // ⛔ AND THE HARD DAY, IF THEY CHOSE THE BIKE FOR IT. Same fix as the run's: the pin already
       // reserved this day, so without this the week visibly loses one. D-327 makes run and bike

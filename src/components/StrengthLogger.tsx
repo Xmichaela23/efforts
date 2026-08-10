@@ -131,6 +131,12 @@ interface LoggedExercise {
   planned_name?: string;
   /** `false` = one of the block's assistance slots (never priced). Absent on every other row. */
   load_prescribed?: boolean;
+  /** ⛔ A STARTING POINT FOR THE WEIGHT BOX — NOT A PRESCRIPTION (D-406). Rides only on assistance
+   *  rows, always beside `load_prescribed: false`. The plan still says "by feel"; this is a number
+   *  the athlete can start from and overwrite, so a beginner is not asked to invent one from
+   *  nothing. ⚠️ It must NEVER be rendered as a target, a prescription, or a thing to progress —
+   *  see the load rule at the top of `src/lib/assistance-menu.ts`. Absent = no suggestion. */
+  weight_suggested?: number;
 }
 
 interface StrengthLoggerProps {
@@ -1572,6 +1578,31 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    * — a freeball accessory the athlete typed in. It classifies by NAME, so it must not outrank the
    * block's own declaration: a plan is allowed to prescribe a "primary" movement as assistance.
    */
+  /**
+   * ⛔ THE GREYED STARTING NUMBER FOR AN ASSISTANCE SET — D-406, and it is a GHOST, not a value.
+   *
+   * Returns the composer's `weight_suggested` only while the set is genuinely empty. The moment the
+   * athlete types anything it stops being returned, so the suggestion can never overwrite, re-appear
+   * over, or be confused with what they actually lifted.
+   *
+   * ⚠️ IT IS NOT WRITTEN INTO `set.weight` AND MUST NOT BE. If it were, an untouched suggestion
+   * would be SAVED as the load the athlete used — a number nobody lifted, feeding the e1RM history
+   * and eventually the block's own progression. The row stays empty until a human fills it; this
+   * only paints a hint on top and seeds the keypad. Same idiom as `from_previous`, which the cell
+   * already greys the same way.
+   */
+  const suggestedGhostWeight = (
+    exercise: LoggedExercise,
+    set: { weight?: number | null; completed?: boolean } | null | undefined,
+  ): number | null => {
+    const sug = Number(exercise?.weight_suggested);
+    if (!Number.isFinite(sug) || sug <= 0) return null;
+    if (set?.completed) return null;
+    const w = Number(set?.weight);
+    if (Number.isFinite(w) && w > 0) return null;
+    return sug;
+  };
+
   const isAssistanceRow = (exercise: LoggedExercise): boolean => {
     if (exercise?.load_prescribed === false) return true;
     if (/total/i.test(String(exercise?.target_reps ?? ''))) return true;
@@ -2034,6 +2065,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // ⚠️ Read as an explicit `false`, never as "falsy" — an absent field on a legacy row must
             // not silently turn a main lift into an assistance row.
             load_prescribed: s?.load_prescribed === false ? false : undefined,
+            // ⛔ CARRIED, NOT APPLIED (D-406). This only makes the number available to the weight
+            // box as a greyed starting point; it does not become the row's `weight`, and nothing
+            // here treats it as a prescription. Guarded on a finite positive so an absent
+            // suggestion stays absent rather than becoming a prescribed zero.
+            weight_suggested: Number.isFinite(s?.weight_suggested) && s.weight_suggested > 0
+              ? s.weight_suggested : undefined,
           } as LoggedExercise;
         }
         // Per-set prescription when the row carries one; otherwise the row's single weight on every
@@ -5299,15 +5336,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     setIndex,
                                     field: 'weight',
                                     title: 'Weight',
-                                    initialValue: set.weight === 0 ? '' : String(set.weight ?? ''),
+                                    initialValue: String(
+                                    suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '')),
+                                  ),
                                     allowDecimal: true,
                                   })
                                 }
                                 className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-full tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
-                                <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
-                                  {set.weight === 0 ? '' : (set.weight ?? '—')}
+                                <span className={(set.from_previous && !set.completed) || suggestedGhostWeight(exercise, set) != null ? 'text-white/35' : ''}>
+                                  {suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '—'))}
                                 </span>
                                 {/* Q-042: subtle tap-to-type affordance */}
                                 <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
@@ -5329,15 +5368,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     setIndex,
                                     field: 'weight',
                                     title: 'Weight',
-                                    initialValue: set.weight === 0 ? '' : String(set.weight ?? ''),
+                                    initialValue: String(
+                                    suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '')),
+                                  ),
                                     allowDecimal: true,
                                   })
                                 }
                                 className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-full tabular-nums"
                                 style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                               >
-                                <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
-                                  {set.weight === 0 ? '' : (set.weight ?? '—')}
+                                <span className={(set.from_previous && !set.completed) || suggestedGhostWeight(exercise, set) != null ? 'text-white/35' : ''}>
+                                  {suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '—'))}
                                 </span>
                                 {/* Q-042: subtle tap-to-type affordance */}
                                 <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
@@ -5358,15 +5399,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   setIndex,
                                   field: 'weight',
                                   title: 'Weight',
-                                  initialValue: set.weight === 0 ? '' : String(set.weight ?? ''),
+                                  initialValue: String(
+                                    suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '')),
+                                  ),
                                   allowDecimal: true,
                                 })
                               }
                               className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-full focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
                               style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                             >
-                              <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
-                                {set.weight === 0 ? '' : (set.weight ?? '—')}
+                              <span className={(set.from_previous && !set.completed) || suggestedGhostWeight(exercise, set) != null ? 'text-white/35' : ''}>
+                                {suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '—'))}
                               </span>
                               {/* Q-042: subtle tap-to-type affordance */}
                               <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />

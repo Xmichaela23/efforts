@@ -1,0 +1,205 @@
+/**
+ * THE AMRAP CATCH-UP — D-408.
+ *
+ * ⛔ **THIS IS A PROPOSAL ENGINE. IT WRITES NOTHING AND DECIDES NOTHING.** It returns what the
+ * athlete could adopt; adopting is a tap. That is not politeness, it is the rule the auto-progression
+ * block was DELETED for breaking (`adapt-plan/index.ts:1119-1138`): silent writes raised prescribed
+ * weight on every ingest with no prompt and no consent, and *"the athlete opened the logger to a
+ * number they never agreed to."* Anything here that starts writing has rebuilt that defect.
+ *
+ * ── WHAT IT IS FOR ───────────────────────────────────────────────────────────────────────────────
+ *
+ * The training max ratchets on a fixed +5 upper / +10 lower per cycle, and that spine is deliberate
+ * and stays. But the anchor cycle's last set is an AMRAP, and an AMRAP is a MEASUREMENT: an athlete
+ * who hits 185×12 has just proven a max the fixed schedule will take cycles to reach. Wendler
+ * recalculates at boundaries for exactly this reason (2nd ed. p.24, p.30-31) — the boundary is a
+ * place to CHECK progress, not to throw it away.
+ *
+ * ⛔ **AT BOUNDARIES ONLY, AND THERE IS NO THRESHOLD.** The formula IS the trigger. Wendler never
+ * proposes a mid-block "your e1RM moved 8%" rule; he recomputes when a cycle ends and compares. A
+ * percentage gate here would be an invented number doing work the arithmetic already does.
+ *
+ * ── ⚠️ THE 85% TRAP, AND IT IS THE WHOLE REASON TO READ THIS BEFORE EDITING ──────────────────────
+ *
+ * Wendler's book says the training max is **90%** of the 1RM. **This app uses 85%**, deliberately and
+ * with its reason written down (`WORKING_NUMBER_PCT_OF_1RM`): his own guidance is to lower it when
+ * the athlete carries other physical demands, and an endurance athlete is exactly that case.
+ *
+ * So this module takes 85% of the estimate, **not 90%**, and it imports the constant rather than
+ * spelling a number. Writing `0.90` here — even though the book says 0.90 — would mean the first
+ * boundary silently ratchets every athlete from an 85% training max to a 90% one, a ~6% jump on top
+ * of the fixed increment, arriving disguised as "adopting your AMRAP". That is a policy change
+ * wearing a measurement's clothes, and nobody would see it in a diff.
+ */
+
+import { estimate1RM } from '../../../../src/lib/estimate-1rm.ts';
+import { WORKING_NUMBER_PCT_OF_1RM, roundDownToIncrement, WEEKS_PER_CYCLE } from './loading/wendler-531.ts';
+
+/** The four lifts, keyed as `training_max` on `plans.config` keys them. */
+export type LiftRef = 'bench' | 'squat' | 'deadlift' | 'overheadPress';
+
+/** One completed AMRAP set, as the logger writes it back. */
+export type AmrapSet = {
+  lift: LiftRef;
+  /** Load on the bar for that set. */
+  weight: number;
+  /** Reps ACTUALLY completed. ⚠️ Not the prescribed minimum — the whole point is the overshoot. */
+  reps: number;
+  /** Block week the set was performed in, for the copy and for picking within a cycle. */
+  week: number;
+};
+
+export type TrainingMaxProposal = {
+  lift: LiftRef;
+  /** What the block is currently using. */
+  currentTm: number;
+  /** Wendler's estimator applied to the best AMRAP in the block. */
+  estimated1RM: number;
+  /** `WORKING_NUMBER_PCT_OF_1RM` of that estimate, on the plate grid. Always > `currentTm`. */
+  proposedTm: number;
+  /** The set that produced it, so the athlete can see the evidence rather than a verdict. */
+  from: { weight: number; reps: number; week: number };
+};
+
+/**
+ * The proposals for one boundary. Empty array = nothing to offer, which is the common case and is
+ * not a failure.
+ *
+ * @param amraps every completed AMRAP in the block so far. Sets with junk values are skipped rather
+ *   than throwing — a malformed log must not be able to break a boundary.
+ * @param currentTrainingMax the block's working numbers, per lift, INCLUDING the fixed increments
+ *   already applied for the cycle being entered. ⚠️ Comparing against the block's STARTING number
+ *   would re-propose a rise the spine has already delivered.
+ * @param atBoundary whether this is a cycle/deload boundary. False → nothing, always.
+ */
+export function amrapTrainingMaxCatchUp(
+  amraps: AmrapSet[] | null | undefined,
+  currentTrainingMax: Partial<Record<LiftRef, number>> | null | undefined,
+  atBoundary: boolean,
+): TrainingMaxProposal[] {
+  if (!atBoundary || !amraps?.length || !currentTrainingMax) return [];
+
+  // Best set per lift BY ESTIMATE, not by weight and not by reps. 185×12 and 205×5 are not
+  // comparable by either column alone — comparing them is the entire reason the formula exists
+  // (p.32's worked example is exactly that question).
+  const best = new Map<LiftRef, { set: AmrapSet; e1rm: number }>();
+  for (const s of amraps) {
+    const weight = Number(s?.weight);
+    const reps = Number(s?.reps);
+    if (!Number.isFinite(weight) || weight <= 0) continue;
+    if (!Number.isFinite(reps) || reps < 1) continue;
+    // ⚠️ NO RIR OFFSET. 5/3/1 does not collect reps-in-reserve and an AMRAP is taken to a hard stop
+    // by definition; a phantom offset would inflate every estimate. Same rule `estimate1RM`'s own
+    // doc states for this protocol.
+    const e1rm = estimate1RM(weight, reps, 0);
+    const prior = best.get(s.lift);
+    if (!prior || e1rm > prior.e1rm) best.set(s.lift, { set: { ...s, weight, reps }, e1rm });
+  }
+
+  const proposals: TrainingMaxProposal[] = [];
+  for (const [lift, { set, e1rm }] of best) {
+    const currentTm = Number(currentTrainingMax[lift]);
+    if (!Number.isFinite(currentTm) || currentTm <= 0) continue;
+
+    // ⛔ THE APP'S PERCENTAGE, NOT THE BOOK'S. See the 85% trap at the top of this file.
+    // `roundDownToIncrement` for the same reason it is used when the block is built: an overshoot
+    // writes a set the athlete cannot complete, an undershoot is absorbed, and the error is not
+    // symmetric.
+    const proposedTm = roundDownToIncrement(e1rm * WORKING_NUMBER_PCT_OF_1RM);
+
+    // ⛔ RAISES ONLY. A proposal to LOWER the training max is a different mechanism with a different
+    // trigger — Wendler's reset-on-stall, which fires on FAILED reps, not on a modest AMRAP. Letting
+    // this path lower the number would mean one good-but-unremarkable set could undo the spine's
+    // accumulated progress, and the athlete would watch their weights fall after a session they
+    // completed. Silence is the correct output when the estimate does not beat what they are on.
+    if (proposedTm <= currentTm) continue;
+
+    proposals.push({
+      lift,
+      currentTm,
+      estimated1RM: Math.round(e1rm),
+      proposedTm,
+      from: { weight: set.weight, reps: set.reps, week: set.week },
+    });
+  }
+
+  // Deterministic order so a UI list and a test agree. Biggest gap first: the lift that has drifted
+  // furthest from what the athlete can actually do is the one worth reading first.
+  return proposals.sort((a, b) => (b.proposedTm - b.currentTm) - (a.proposedTm - a.currentTm));
+}
+
+/**
+ * The athlete-facing sentence for one proposal. ⚠️ Fact-first, no imperative, and it NAMES THE
+ * EVIDENCE — the set they did, not a verdict about them. The athlete draws the conclusion.
+ */
+export function catchUpReason(p: TrainingMaxProposal): string {
+  return `Week ${p.from.week}: ${p.from.weight} × ${p.from.reps} estimates a ${p.estimated1RM} max. `
+    + `Working number ${p.currentTm} → ${p.proposedTm}.`;
+}
+
+/**
+ * ⛔ IS THIS WEEK A BOUNDARY? Week 4 of every cycle is the deload and the cycle's last week — the
+ * place Wendler recalculates (p.30-31). Reads `WEEKS_PER_CYCLE` rather than spelling 4, so a change
+ * to the cycle length cannot leave this gate firing on the wrong week.
+ *
+ * ⚠️ WEEK 0 / NEGATIVE / NON-FINITE IS `false`, NOT A MODULO ACCIDENT. `0 % 4 === 0` would make an
+ * unknown current-week look like a boundary and offer a training-max change to an athlete who has
+ * not lifted yet.
+ */
+export function isCatchUpBoundary(currentWeek: number | null | undefined): boolean {
+  const w = Number(currentWeek);
+  if (!Number.isFinite(w) || w < 1) return false;
+  return Math.floor(w) % WEEKS_PER_CYCLE === 0;
+}
+
+/** How a stored workout row looks to this extractor. Deliberately loose — it is DB shape, not ours. */
+export type WorkoutRowish = {
+  strength_exercises?: unknown;
+  workout_date?: string | null;
+  week_number?: number | null;
+};
+
+/**
+ * Pull every completed AMRAP set out of stored workout rows.
+ *
+ * ⛔ THE `amrap` FLAG IS THE SIGNAL, AND IT IS THE COMPOSER'S OWN. `set_plan[].amrap` is stamped by
+ * `wendler-531.ts` on exactly one set — anchor cycle, not deload, last set — and the logger carries it
+ * onto the logged set. Inferring "the heaviest set" instead would silently promote an ordinary top set
+ * into a measurement.
+ *
+ * ⚠️ COMPLETED ONLY. An untouched or abandoned set has whatever the prefill left in it; treating that
+ * as a measurement would propose a training max off a number nobody lifted.
+ */
+export function extractAmrapSets(
+  rows: WorkoutRowish[] | null | undefined,
+  liftOf: (exerciseName: string) => LiftRef | null,
+): AmrapSet[] {
+  const out: AmrapSet[] = [];
+  for (const row of rows ?? []) {
+    const exercises = Array.isArray(row?.strength_exercises) ? row.strength_exercises : [];
+    for (const ex of exercises as any[]) {
+      const lift = liftOf(String(ex?.name ?? ''));
+      if (!lift) continue;
+      for (const set of (Array.isArray(ex?.sets) ? ex.sets : []) as any[]) {
+        if (set?.amrap !== true) continue;
+        if (set?.completed !== true) continue;
+        const weight = Number(set?.weight);
+        const reps = Number(set?.reps);
+        if (!Number.isFinite(weight) || weight <= 0) continue;
+        if (!Number.isFinite(reps) || reps < 1) continue;
+        out.push({ lift, weight, reps, week: Number(row?.week_number) || 0 });
+      }
+    }
+  }
+  return out;
+}
+
+/** Exercise name → the `training_max` key. ⚠️ Absent → null, and the set is ignored (§0h). */
+export function liftRefForExercise(name: string): LiftRef | null {
+  const n = String(name ?? '').toLowerCase();
+  if (/(^|\b)(bench)/.test(n) && !/close.?grip|incline|dumbbell/.test(n)) return 'bench';
+  if (/(back )?squat/.test(n) && !/front|split|goblet/.test(n)) return 'squat';
+  if (/deadlift/.test(n) && !/romanian|stiff|single/.test(n)) return 'deadlift';
+  if (/overhead press|^press$|military/.test(n) && !/dumbbell/.test(n)) return 'overheadPress';
+  return null;
+}

@@ -355,9 +355,15 @@ Commits `9baa35fb`, `d4eda969`, `dca84dda`, `8a0efcd7`.
 > for an athlete who lifts and conditions"*. A **strength-purpose** block is not the concurrent case, so
 > p.50–51 governs it and p.87 does not. Which chapter has jurisdiction, not which page reads better.
 >
+> ↩ **AND THE LOWER-DAY HALF IS SUPERSEDED TOO — D-405 (2026-08-09).** `ROLE_BY_DAY.lower` is now
+> **leg · leg · abs with NO pull**: p.51 is two explicit lines (Deadlift → hamstrings, quads, abs;
+> Squat → low back, quads, abs) and neither carries one. The reasoning below — *"the four main lifts
+> contain no row or chin, so pulling volume has to live somewhere"* — is true of the book and not of
+> this template; the pulling lives on the two press days (p.50).
+>
 > **Everything else here still stands** — the four defects, the push-slot fix, the 50/75 rep band, Face
-> Pull in the pull slot, and the no-false-"you picked" rule. **Everything below is history for the two
-> reversed calls and current for the rest.**
+> Pull in the pull slot, and the no-false-"you picked" rule. **Everything below is history for the
+> three reversed calls and current for the rest.**
 
 **Supersedes `docs/SPEC-assistance-fix.md` §0–§7, which dies with this entry. Partially supersedes Q-212 (see its back-annotation).**
 
@@ -1032,3 +1038,197 @@ and 4 pre-existing lint errors in `exercise-config.ts`. **No device verification
 ⛔ **DEPLOY LIST when this ships:** `src/lib/*` is bundled into edge functions at deploy time, so every
 function importing `assistance-menu.ts` or `exercise-config.ts` must be redeployed — `grep -rln
 "assistance-menu\|exercise-config" supabase/functions --include=index.ts` before pushing.
+
+---
+
+### D-405 — Leg days are LEG · LEG · ABS. No pull. (2026-08-09, **IN WORKING TREE — not committed, not pushed, not deployed**)
+
+**Supersedes the lower-day half of D-385. Same reframe as D-404, one page over.**
+
+D-404 applied the standard-template premise to the upper days. This applies it to the lower days,
+where D-385 had reasoned: *"the four main lifts contain no row and no chin, so pulling volume has to
+live somewhere, and p.53 pairs 'the squat day with an assistance pulling movement.'"* True of the book
+as a whole; **not true of the template this block runs.** p.51 is two explicit lines:
+
+> **Deadlift day → hamstrings, quads, abs. Squat day → low back, quads, abs.**
+
+No pull on either. The pulling lives on the two press days, where p.50 puts it ("Lats or Upper Back"
+on both), and that is where the athlete's pull pick runs now.
+
+**`ROLE_BY_DAY.lower.pull: 'pull' → 'leg_match'`.** The new role takes the main lift's OWN leg family,
+mirroring `single_leg`, which takes the opposite. Together they are p.51's line: squat (knee) → low
+back (hip) + quads (knee); deadlift (hip) → hamstrings (hip) + quads (knee). Reading the main lift's
+family rather than a fixed value is what keeps the two lower days different by construction.
+
+⛔ **AND IT CLOSES A DOSE PROBLEM D-404 OPENED — this is the half I would not have found without
+printing the block.** Turning off the plane swap left the pull pick standing on all four days. The rep
+scaler's floor is **50 and it only scales UP**, so a beginner whose chin max is six was being handed
+**50 chins × 4 days = 200 a week** of one movement. Two days halves it to 100 — the exact number
+D-328 was written to fix (*"100 reps a week of one movement"*).
+
+⚠️ **The work order assumed the scaler would absorb this** — *"scale chin reps to capacity (the 25–100
+scaler already does this)"*. That premise was stale on both halves: D-385 replaced the range with
+**50–75**, and it has no downward travel at all. Recorded because the same assumption will look
+reasonable to the next reader.
+
+**Files:** `src/lib/assistance-menu.ts` (`AssistanceRole`, `ROLE_BY_DAY`, `fitsRole`, `RANK`,
+`ROLE_FALLBACK.leg_match`, `substitutionReason` — which needed a second sentence, since "the opposite
+one" is flatly untrue said about a same-family movement), plus both test files.
+
+---
+
+### D-406 — Assistance carries a SUGGESTION, and the prescription is still "by feel" (2026-08-09, **IN WORKING TREE — not committed, not pushed, not deployed**)
+
+**Narrows the load rule at the top of `src/lib/assistance-menu.ts` (Michael, 2026-07-25). Read that
+rule before touching this; the exception is narrow on purpose and the rule is otherwise intact.**
+
+**What did NOT change, and this is most of the entry.** `weight` stays `'By feel'`. `load_prescribed`
+stays `false`. `percent_1rm` stays absent. Every surface that renders the prescription keeps rendering
+"by feel" — including `StrengthCompareTable`, whose own comment is *"'by feel' is not decoration: it is
+the prescription."* **The plan still names no assistance load.** *"The absence is the design"* remains
+true of the PRESCRIPTION.
+
+**What is new** is `weight_suggested` — a greyed, overwritable starting point in the logger's weight
+box, so a beginner facing `Dumbbell Row — 50 total, by feel` is not asked to invent a number from
+nothing on their first session.
+
+⛔ **`load_prescribed: false` WAS DELIBERATELY NOT TOUCHED, and that was the whole design constraint.**
+The work order originally proposed reversing it for loadable moves. It is not "no weight given" — it is
+the **one answer to "is this row assistance?"** (`src/lib/assistance-slot.ts`, D-370), read by the
+server matcher (`_shared/strength/match-exercises.ts` Tier 3), the logger, the compare table and the
+performance summary. Flipping it would have made those stop recognising the row, and **work the athlete
+did would read as a skip**; the main-lift finder at `StrengthLogger.tsx` would have started picking up
+curls. A separate field for a separate claim.
+
+**The derivation, with no invented percentage anywhere in it:**
+
+```
+accessory e1RM = parent lift's max × ratio        (exercise-config primaryRef + ratio)
+suggestion     = weightForReps(accessory e1RM, 12, rir 2)   (Wendler p.32, inverted)
+```
+
+⛔ The obvious implementation — *"take 65% of the accessory's max"* — is exactly the **fabricated
+intensity `materialize-plan` strips on sight**, and 65 would have been a number nobody could source.
+Instead the rep target and the reps-in-reserve are the inputs and the percentage FALLS OUT of Wendler's
+own estimator (~68%). `weightForReps` was added **beside** `estimate1RM` in `estimate-1rm.ts` rather
+than inlined, so the coefficient the athlete is invited to check has one home.
+
+⚠️ **12 reps is the one judgement call and it is the slot's own number** — a 50-rep total run as
+3–5 sets is 10–15 each, and p.51 prescribes "5 sets of 10–20". **RIR 2 is `ASSISTANCE_GUIDANCE`
+verbatim** ("a few reps left, never to failure") expressed as arithmetic.
+
+**The four missing coefficients were SOURCED, not estimated** — Strength Level population averages
+against its 212 lb average male bench, `confidence: 'low'` on all four because a ratio of averages is
+not a within-athlete ratio:
+
+| movement | avg 1RM | ratio | format |
+|---|---|---|---|
+| Dumbbell Curl | 46 lb per dumbbell | 0.22 | perHand |
+| Hammer Curl | 50 lb per dumbbell | 0.24 | perHand |
+| Tricep Extension | 45 lb per dumbbell | 0.21 | perHand |
+| Tricep Pushdown | 119 lb cable | 0.56 | total |
+
+⚠️ **The file's "known-wrong ratios" warning is now PARTLY STALE and was checked rather than trusted.**
+It names two: `Single Leg Hip Thrust` at "two-legged 0.9× deadlift" — **now 0.25, confidence low, fixed
+since that was written** — and `Dumbbell Overhead Press` resolving to the barbell entry, **still wrong
+(ratio 1.0) but not on this menu**, which uses `Dumbbell Shoulder Press`.
+
+**Three correct silences.** `weight_suggested` is **absent**, never zero, for: bodyweight and band
+movements (excluded by `displayFormat`, plus an explicit `Dips` guard — it carries a real 0.9 bench
+ratio and would otherwise price); movements with no coefficient; and any athlete with no max on file.
+
+⛔ **BOTH `materialize-plan` WHITELISTS WERE UPDATED (`~2263` and `~2550`) — this is the trap that
+stranded `load_prescribed` for four days.** That object is a whitelist; a field not listed reaches
+materialize and dies there silently, with no error and no test to catch it.
+
+**The logger never writes it.** `suggestedGhostWeight()` returns the number only while the set is
+genuinely empty and uncompleted, and it is painted on top rather than assigned to `set.weight`. ⚠️ If it
+were assigned, an untouched suggestion would be **saved as the load the athlete used** — a number nobody
+lifted, feeding the e1RM history and eventually the block's own progression.
+
+**Files:** `src/lib/exercise-config.ts` (4 coefficients), `src/lib/estimate-1rm.ts` (`weightForReps`),
+`shared/strength-system/strength-primary-plan.ts` (`suggestedAssistanceWeight`, the `weight_suggested`
+field on `StrengthExercise`), `supabase/functions/materialize-plan/index.ts` (both whitelists),
+`src/components/StrengthLogger.tsx` (carry + ghost render).
+
+**Verification.** 300 passing; 3 new contract tests pin that the prescription is unchanged, that
+bodyweight movements never get a number, and that no maxes means no suggestion. `npm run build` clean;
+zero net new lint errors. **No device verification** — the ghost render has not been seen on a phone.
+
+---
+
+### D-407 — The deload week eases the ENDURANCE too (2026-08-09, **IN WORKING TREE**)
+
+On weeks 4/8/12 the bar dropped to 40/50/60% and the session to 35 min — and the athlete's hard hill
+repeats ran at **full intensity anyway**, alongside full easy volume. A week that removes the barbell
+stimulus and keeps the hard running is not a deload; it is a different week with the same name.
+
+⚠️ **INTENSITY FIRST, VOLUME SECOND, AND THE ORDER IS THE RULE.** Interference and fatigue scale with
+endurance INTENSITY far more than with duration [Wilson 2012, JSCR], so the hard session is downgraded
+before an easy minute is touched. Easy work then trims to **2/3** — the same figure `maintenanceDoseFor`
+lands on — and stays on the calendar rather than being deleted: Hickson's trilogy is that cutting
+intensity preserves the base while frequency holds, so a week off is a detraining week.
+
+**The hard session is DOWNGRADED, not dropped.** Dropping it hands back a blank day, which `place-week`
+already learned is worse than dropping the pin. The day keeps an easy run at the trimmed volume.
+
+⛔ **THE TRIM LIVES INSIDE `enduranceSession`, AFTER THE `??`, AND THE FIRST VERSION WAS WRONG.** I
+trimmed `overrideMins` at the four call sites, which looked equivalent and is not — an override is
+OPTIONAL, and every caller that omits it falls through to the internal default where a call-site trim
+cannot reach. **Caught by printing a deload week and seeing four untouched 35-minute runs.** Recorded
+because the bug was invisible in the diff and obvious in the output.
+
+**Verified by fixture, not device.** 12-week run block: week 3 = 140 min endurance across 4 sessions
+with Hill Repeats on Thursday; week 4 = **92 min, no hard session**, strength 60 → 35.
+
+---
+
+### D-408 — The AMRAP catch-up proposes; it never writes (2026-08-09, **CORE BUILT + FIXTURED; NOT WIRED — see status**)
+
+`supabase/functions/shared/strength-system/amrap-catch-up.ts` + 9 fixtures.
+
+The fixed +5 upper / +10 lower spine stays. But the anchor cycle's last set is an AMRAP, and an AMRAP
+is a **measurement** — an athlete who hits 185×9 has proven a max the schedule will take cycles to
+reach. Wendler recalculates at boundaries for exactly this (p.24, p.30-31). **The formula is the
+trigger; there is no percentage gate**, because a threshold would be an invented number doing work the
+arithmetic already does.
+
+⛔ **IT USES THE APP'S 85%, NOT THE BOOK'S 90%, AND THIS IS THE ENTRY'S REAL CONTENT.** The work order
+specified 90% (correctly, per the book). **This app's training max is 85%** — `WORKING_NUMBER_PCT_OF_1RM`,
+a documented deliberate deviation: Wendler's own guidance is to lower it when the athlete carries other
+physical demands, and an endurance athlete is that case. Building the catch-up at 90% would mean the
+first boundary **silently ratchets every athlete from an 85% training max to a 90% one** — a ~6% jump on
+top of the fixed increment, arriving disguised as "adopting your AMRAP". A policy change wearing a
+measurement's clothes, invisible in a diff. The module imports the constant rather than spelling a number,
+and a test pins both the value and the constant.
+
+**Other decisions:** best set chosen **by estimate**, not by weight or reps (185×5 beats 150×12 — neither
+column alone answers it, which is why p.32 prints the formula). **Raises only** — reset-on-stall is a
+different mechanism with a different trigger (FAILED reps), and letting this path lower the number would
+undo the spine's progress after a session the athlete completed. Compares against the **current** TM
+including increments already applied, or it re-offers a rise already given. Malformed rows are skipped,
+never thrown. No RIR offset — 5/3/1 does not collect it and an AMRAP is to a hard stop by definition.
+
+**WIRED 2026-08-09, three pieces, consent-first throughout:**
+
+1. **Suggest** — `adapt-plan` emits `strength_training_max` per lift, gated on `isCatchUpBoundary`.
+   Reads the block's own workouts, not a rolling 4-week window: the question is "the best AMRAP THIS
+   BLOCK produced", and a window would make the answer depend on when the athlete opened the app.
+   Wrapped in try/catch — a missing catch-up is a quiet nothing, a 500 is a dead screen.
+2. **Apply** — `acceptSuggestion` on `str_tm_*`. ⛔ **THE TAP CARRIES ONLY WHICH LIFT, NEVER THE
+   NUMBER.** The value is recomputed server-side by the same fixtured function, so a stale card
+   cannot write an arbitrary working weight. It **re-checks the boundary** (a card left on screen
+   while the week rolled over does not apply) and writes **one key**, plus a `training_max_history`
+   entry recording the evidence — spreading a recomputed object would rewrite three lifts the athlete
+   did not consent to. Naturally idempotent: once adopted, the proposal no longer beats the TM.
+3. **Surface** — rides the existing `plan_adaptation_suggestions` channel into `PlanAdaptationCard`,
+   with `reason` carried into `details` because for this suggestion the EVIDENCE is the content. A
+   bespoke second surface for one suggestion type would be the doubled disease in miniature.
+
+⚠️ **Already-materialized weeks are NOT rewritten**, deliberately: the next cycle is authored from
+`config.training_max`, so the change lands on the cycle the athlete is about to start rather than
+reaching back and moving weights under sessions they have already seen.
+
+**Verification.** 15 fixtures, including a `WIRED` case that pins the recompute-don't-trust contract,
+the rolled-over-week rejection and the second-tap no-op. `deno check` on `adapt-plan`: **zero errors
+in this code** (2 remain, pre-existing, identical with the changes stashed). **No device run.**

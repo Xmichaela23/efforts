@@ -36,6 +36,7 @@ import {
   ASSISTANCE_DEFAULTS,
 } from '../../../../src/lib/assistance-menu.ts';
 import { getMovementFamily, isDirectArm, EXERCISE_CONFIG } from '../../../../src/lib/exercise-config.ts';
+import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
 const PICKS = { push: 'Dips', pull: 'Chin Up', single_leg_core: 'Single Leg Hip Thrust' };
 const UPPER = ['Bench Press', 'Overhead Press'];
@@ -183,13 +184,34 @@ Deno.test('REGRESSION §0.3 — squat day and deadlift day do not run the same l
   assertEquals(getMovementFamily(dead), 'knee', 'deadlift day should bend the knee');
 });
 
-Deno.test('§3 — a lower day is pull · single-leg · core, and carries no pressing', () => {
+Deno.test('§3 — a lower day is LEG · LEG · core, carries no pressing and NO PULL', () => {
+  // ⛔ THE PULL ASSERTION INVERTED ON 2026-08-09 (D-405). It read `includes('pull') === true`, on the
+  // reasoning that none of the four main lifts pulls so the volume had to live somewhere. True of the
+  // book as a whole; not of p.51, which is the template this block runs and is two explicit lines —
+  // **Deadlift day → hamstrings, quads, abs. Squat day → low back, quads, abs.** The pulling lives on
+  // the two press days (p.50, "Lats or Upper Back" on both), which is where the pick runs now.
   for (const main of LOWER) {
     const fams = familiesOn(main);
-    assertEquals(fams.includes('pull'), true, `${main} lost its pull — the four main lifts have none`);
+    assertEquals(fams.includes('pull'), false, `${main} carried a pull; p.51 puts none on a leg day`);
     assertEquals(fams.includes('core'), true, `${main} lost its abs`);
     assertEquals(fams.includes('push'), false, `${main} carried a push; no Wendler template does`);
+    // ⚠️ TWO LEG MOVEMENTS, AND THEY MUST BE THE TWO FAMILIES — that is what p.51's line resolves to.
+    // One family twice would be the pattern-repeat defect §0.3 exists for, one family over.
+    const legs = fams.filter((f) => f === 'knee' || f === 'hip');
+    assertEquals(legs.length, 2, `${main} did not carry two leg movements: ${fams.join(', ')}`);
+    assertEquals(new Set(legs).size, 2, `${main} ran the same leg family twice: ${legs.join(', ')}`);
   }
+});
+
+Deno.test('the pull pick runs on the two PRESS days only — 2 days, not 4', () => {
+  // ⛔ THE DOSE GUARD ON D-404 + D-405 TOGETHER, and the reason it is worth its own test. Turning off
+  // the plane swap (D-404) left the athlete's pull pick standing on all four days: the rep scaler's
+  // floor is 50 and it only scales UP, so a beginner whose chin max is six was handed **200 chins a
+  // week** of one movement. Two days halves that to 100 — the exact number D-328 was written to fix.
+  const days = [...UPPER, ...LOWER];
+  const chinDays = days.filter((m) => resolveAssistance(PICKS, m).some((r) => r.name === 'Chin Up'));
+  assertEquals(chinDays.length, 2, `Chin Up ran on ${chinDays.length} days: ${chinDays.join(', ')}`);
+  assertEquals(chinDays.sort(), [...UPPER].sort(), 'the pull pick must be on the two press days');
 });
 
 // ── REGRESSION §0.4 — reps floored at 25, half the book's floor ──────────────────────────────────
@@ -313,4 +335,65 @@ Deno.test('the swap sheet never hands back an empty list', () => {
 Deno.test('a movement outside the assistance framework is not ours — null, not []', () => {
   assertEquals(assistancePeersFor('Back Squat', 'Bench Press'), null);
   assertEquals(assistancePeersFor('', 'Bench Press'), null);
+});
+
+// ── D-406 — the assistance SUGGESTION, and the four things it must never become ──────────────────
+
+Deno.test('D-406 — a suggestion never becomes a prescription', () => {
+  const maxes = { bench: 150, squat: 200, deadlift: 225, overhead: 95 };
+  const rows = composeStrengthPrimaryPlan({
+    durationWeeks: 12, oneRepMaxes: maxes, enduranceSport: null, enduranceFrequency: 0,
+    assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Dumbbell Curl' },
+  }).sessions_by_week['1']
+    .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!
+    .filter((e: any) => e.load_prescribed === false);
+
+  assertEquals(rows.length > 0, true, 'no assistance rows to check');
+  for (const r of rows as any[]) {
+    // ⛔ THE PRESCRIPTION IS UNCHANGED. Both of these are what every surface renders and reads; if
+    // either moves, the suggestion has stopped being a suggestion.
+    assertEquals(r.weight, 'By feel', `${r.name} stopped saying "By feel"`);
+    assertEquals(r.load_prescribed, false, `${r.name} lost the assistance marker`);
+    // ⚠️ AND NO FABRICATED INTENSITY. A percentage on one of these rows is the exact thing
+    // materialize-plan strips on sight.
+    assertEquals(r.percent_1rm, undefined, `${r.name} carries a fabricated intensity`);
+    // Absent means "no suggestion" — never a prescribed zero.
+    if ('weight_suggested' in r) {
+      assertEquals(typeof r.weight_suggested === 'number' && r.weight_suggested > 0, true,
+        `${r.name} carries a non-positive suggestion`);
+    }
+  }
+});
+
+Deno.test('D-406 — bodyweight movements get NO suggested weight, ever', () => {
+  const maxes = { bench: 150, squat: 200, deadlift: 225, overhead: 95 };
+  // ⛔ `Dips` IS THE CASE THAT MATTERS. It carries a real bench ratio (0.9) and would price happily,
+  // which is exactly why it is excluded deliberately rather than by accident: for the athlete this
+  // block is written for it is bodyweight work, and the athlete finds their own level.
+  const plan = composeStrengthPrimaryPlan({
+    durationWeeks: 12, oneRepMaxes: maxes, enduranceSport: null, enduranceFrequency: 0,
+    assistancePicks: { push: 'Dips', pull: 'Chin Up', single_leg_core: 'Diamond Push Up' },
+  });
+  const all = Object.values(plan.sessions_by_week).flat() as any[];
+  const bodyweight = all.flatMap((s: any) => s.strength_exercises ?? [])
+    .filter((e: any) => ['Dips', 'Chin Up', 'Diamond Push Up', 'Sit Up', 'Push Up'].includes(e.name));
+  assertEquals(bodyweight.length > 0, true, 'no bodyweight rows in the block');
+  for (const r of bodyweight) {
+    assertEquals(r.weight_suggested, undefined, `${r.name} was handed a suggested weight`);
+  }
+});
+
+Deno.test('D-406 — no maxes on file means no suggestion, not a guess', () => {
+  // §0h, one field over: unknown degrades to ABSENT, never to a number.
+  const plan = composeStrengthPrimaryPlan({
+    durationWeeks: 12, oneRepMaxes: {} as any, enduranceSport: null, enduranceFrequency: 0,
+    assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Dumbbell Curl' },
+  });
+  const assistance = (Object.values(plan.sessions_by_week).flat() as any[])
+    .flatMap((s: any) => s.strength_exercises ?? [])
+    .filter((e: any) => e.load_prescribed === false);
+  assertEquals(assistance.length > 0, true, 'no assistance rows to check');
+  for (const r of assistance) {
+    assertEquals(r.weight_suggested, undefined, `${r.name} invented a number with no maxes on file`);
+  }
 });

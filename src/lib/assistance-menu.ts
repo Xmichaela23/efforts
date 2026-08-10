@@ -24,11 +24,28 @@
  * 5×5 one day, 2×12 the next — and picks a load that feels about 7 out of 10, finishing as though
  * they had a few more in them.
  *
- * ⚠️ This is why `ratio` and `primaryRef` in `exercise-config.ts` are IRRELEVANT here even for the
- * loaded options. Two of them are known-wrong (`Single Leg Hip Thrust` carries the two-legged 0.9×
- * deadlift ratio; `Dumbbell Overhead Press` resolves to the barbell entry). Neither can hurt anyone
- * through this menu, because nothing on this menu is ever priced. Do not "fix" this by deriving a
- * weight — the absence is the design.
+ * ⛔ **NARROWED 2026-08-09 BY D-406, AND THE RULE ABOVE IS OTHERWISE INTACT — read this before you
+ * read the paragraph that follows it, which is now partly historical.**
+ *
+ * The PRESCRIPTION is still nothing: `weight` is still `'By feel'`, `load_prescribed` is still
+ * `false`, `percent_1rm` is still absent, and every surface that renders what the plan asked for
+ * still renders "by feel". **"The absence is the design" is still true of the prescription.**
+ *
+ * What D-406 adds is a separate field, `weight_suggested` — a greyed, overwritable starting point in
+ * the LOGGER'S ENTRY BOX, so a beginner facing `Dumbbell Row — 50 total, by feel` is not asked to
+ * invent a number from nothing on their first session. It is never rendered as a target, never
+ * written into the logged set, and absent entirely for bodyweight movements.
+ *
+ * ⚠️ This is why `ratio` and `primaryRef` in `exercise-config.ts` were IRRELEVANT here even for the
+ * loaded options. **They are now read — by exactly one function, `suggestedAssistanceWeight` in
+ * `strength-primary-plan.ts`, and by nothing else.** So the accuracy of a ratio on this menu now
+ * matters where it did not before.
+ *
+ * ⚠️ The two this paragraph called known-wrong were CHECKED rather than trusted, 2026-08-09:
+ * `Single Leg Hip Thrust` is **now 0.25 with `confidence: 'low'`** — fixed at some point after this
+ * warning was written — and `Dumbbell Overhead Press` is **still wrong (ratio 1.0) but is not on this
+ * menu**, which offers `Dumbbell Shoulder Press`. Do not delete this warning; a future menu addition
+ * can reintroduce exactly this hazard, and the suggestion path would now surface it to an athlete.
  *
  * What the athlete may record afterwards is a different question: an optional note of what they
  * actually grabbed, so next week they remember. That is a log, not a prescription.
@@ -330,7 +347,7 @@ export type AssistancePicks = Partial<Record<AssistanceSlot, string>>;
  */
 
 /** What a slot actually carries on a given day. Distinct from the storage KEY — see `AssistanceSlot`. */
-type AssistanceRole = 'push' | 'pull' | 'single_leg' | 'core' | 'arm';
+type AssistanceRole = 'push' | 'pull' | 'single_leg' | 'core' | 'arm' | 'leg_match';
 
 /**
  * ⛔ WHICH OF WENDLER'S ASSISTANCE TEMPLATES THIS BLOCK IS RUNNING. Added 2026-08-09; it is the
@@ -364,10 +381,27 @@ type AssistanceDayType = 'upper' | 'lower';
  * Chest"), Bodyweight p.52 (Press -> Chins + Dips; Bench -> Chins + Pushups), concurrent p.87 (upper
  * assistance, upper assistance, Core Movement).
  *
- * **Lower days (Squat, Deadlift) — pull · single-leg · core.** The four main lifts contain no row and
- * no chin, so pulling volume has to live somewhere, and p.53 pairs "the squat day with an assistance
- * pulling movement." Abs are a lower-day slot in every template (p.51 Deadlift/Squat -> Abs; p.55
- * "Hamstrings, Lower Back, Abs"; p.48 Deadlift -> Hanging Leg Raise; p.52 Leg Raises / Sit-ups).
+ * ⛔ **Lower days (Squat, Deadlift) — LEG · LEG · CORE. NO PULL. Reversed 2026-08-09 (D-405), same
+ * reframe as the upper days one page over.** They were pull · single-leg · core on this reasoning:
+ *
+ * > *"The four main lifts contain no row and no chin, so pulling volume has to live somewhere, and
+ * > p.53 pairs 'the squat day with an assistance pulling movement.'"*
+ *
+ * That is true of the book as a whole and **not** of the template this block runs. p.51 is explicit
+ * and it is two lines: **Deadlift day → hamstrings, quads, abs. Squat day → low back, quads, abs.**
+ * No pull on either. The pulling volume lives on the two press days, where p.50 puts it ("Lats or
+ * Upper Back" on both), and that is where the athlete's pull pick now runs.
+ *
+ * ⚠️ **AND IT FIXES A REAL DOSE PROBLEM THE UPPER-DAY CHANGE CREATED.** Turning off the plane swap
+ * (D-404) left the athlete's pull pick standing on all four days — a beginner whose chin max is six
+ * was getting **50 chins × 4 days = 200 a week** of one movement, because the rep scaler's floor is
+ * 50 and it only scales UP. Two days halves it to 100. That number is not a coincidence: 100 reps a
+ * week of one movement is the exact complaint D-328 was written to solve.
+ *
+ * **The two leg slots are the main lift's own family and its opposite**, which is how p.51's two
+ * lines resolve: squat (knee) → low back (hip) + quads (knee); deadlift (hip) → hamstrings (hip) +
+ * quads (knee). Abs are a lower-day slot in every template (p.51; p.55 "Hamstrings, Lower Back,
+ * Abs"; p.48 Deadlift -> Hanging Leg Raise; p.52 Leg Raises / Sit-ups).
  *
  * ⛔ **THE UPPER-DAY THIRD SLOT IS ARMS, AND THIS REVERSED ON 2026-08-09 (D-404 supersedes D-385).**
  * It was CORE, on D-385's reasoning, which is kept verbatim because the reversal is about its premise
@@ -403,7 +437,7 @@ type AssistanceDayType = 'upper' | 'lower';
  */
 const ROLE_BY_DAY: Record<AssistanceDayType, Record<AssistanceSlot, AssistanceRole>> = {
   upper: { push: 'push', pull: 'pull', single_leg_core: 'arm' },
-  lower: { push: 'core', pull: 'pull', single_leg_core: 'single_leg' },
+  lower: { push: 'core', pull: 'leg_match', single_leg_core: 'single_leg' },
 };
 
 /** Which kind of day this main lift makes. `null` → unknown, and unknown degrades to unchanged (§0h). */
@@ -490,7 +524,7 @@ function orderForDay(dayType: AssistanceDayType | null) {
   // ⚠️ `arm` RANKS WITH `core` — LAST. Same reason and the same page: p.50-51 closes the upper days
   // on triceps exactly as it closes the lower days on abs. The isolation movement is the last thing
   // in the session under every template.
-  const RANK: Record<AssistanceRole, number> = { push: 0, single_leg: 0, pull: 1, core: 2, arm: 2 };
+  const RANK: Record<AssistanceRole, number> = { push: 0, single_leg: 0, pull: 1, leg_match: 1, core: 2, arm: 2 };
   return (a: ResolvedAssistance, b: ResolvedAssistance) => {
     if (!dayType) return 0; // Unknown day → untouched, same as everything else on this path (§0h).
     return RANK[ROLE_BY_DAY[dayType][a.slot]] - RANK[ROLE_BY_DAY[dayType][b.slot]];
@@ -510,6 +544,13 @@ function fitsRole(role: AssistanceRole, name: string, mainLiftName: string): boo
     // `fam === 'push'` here would let a compound press fill the arm slot and a pushdown fill the
     // push slot, and a press day would ship three pressing movements and no isolation.
     case 'arm': return isDirectArm(name);
+    // ⛔ THE MAIN LIFT'S OWN LEG FAMILY — the mirror of `single_leg`, not a duplicate of it. p.51
+    // gives each lower day TWO leg movements, and they are the two families: squat (knee) → low
+    // back (hip) + quads (knee); deadlift (hip) → hamstrings (hip) + quads (knee). `single_leg`
+    // takes the opposite family, this one takes the main lift's own, and together they are p.51's
+    // line. Reading the family of the MAIN LIFT (not a fixed value) is what makes the two lower
+    // days differ from each other by construction, the same way `single_leg` does.
+    case 'leg_match': return fam != null && fam === getMovementFamily(mainLiftName);
     // The leg role is defined RELATIVE to the day: squat (knee) wants a hinge, deadlift (hip) wants
     // a knee. That is what makes the two lower days differ from each other by construction.
     case 'single_leg': return fam === wantedLegFamily(mainLiftName);
@@ -622,6 +663,12 @@ const ROLE_FALLBACK: Record<AssistanceRole, string[]> = {
   single_leg: ['Reverse Lunge', 'Bulgarian Split Squat', 'Single Leg Hip Thrust', 'Front Squat'],
   push: ['Push Up', 'Dips', 'Dumbbell Bench Press', 'Incline Bench Press'],
   pull: ['Inverted Row', 'Dumbbell Row', 'Face Pull', 'Chin Up'],
+  // ⛔ BOTH FAMILIES, HIP FIRST WITHIN EACH. `fitsRole` filters this list by the day's wanted
+  // family, so it must be able to answer for a knee day AND a hip day — a single-family list would
+  // silently strand one of the two lower days. Every entry resolves exactly and is on Wendler's
+  // lower-body assistance lists (p.51 "low back / hamstrings / quads", p.87).
+  leg_match: ['Romanian Deadlift', 'Good Morning', 'Back Extension', 'Reverse Lunge',
+    'Bulgarian Split Squat', 'Front Squat', 'Leg Curl', 'Hip Thrust'],
   // Bodyweight first, same rule as `core` — the arm slot is reached on EVERY upper day, so its
   // fallback must never need a cable stack. All four are on p.50's triceps list.
   arm: ['Diamond Push Up', 'Tricep Pushdown', 'Tricep Extension', 'Close Grip Bench Press'],
@@ -666,8 +713,15 @@ function substitutionReason(r: ResolvedAssistance, mainLiftName: string): string
   if (fam === 'core' && wasLeg) return `leg work stays on squat and deadlift days, so ${r.name} here.`;
   // A push pick on a squat or deadlift day. No Wendler template presses on a lower day.
   if (fam === 'core') return `${mainLiftName} days finish on the trunk, not more pressing — ${r.name} here.`;
-  // The leg slot on a lower day, pointed away from what the main lift already did.
+  // The leg slots on a lower day. ⛔ TWO CASES NOW, AND THEY NEED DIFFERENT SENTENCES (D-405): the
+  // slot that takes the OPPOSITE family, and the one that takes the main lift's OWN. Before the pull
+  // came off the leg days there was only one, so the single "the opposite one" line was safe; said
+  // about a same-family movement it would be flatly untrue.
   if (fam === 'knee' || fam === 'hip') {
+    if (fam === getMovementFamily(mainLiftName)) {
+      return `${mainLiftName} days carry legs and abs, not pulling — ${r.name} here, working what ` +
+        `the day already trains.`;
+    }
     return `${mainLiftName} already loads that pattern, so ${r.name} here — the opposite one, which ` +
       `also keeps the two lifting days from repeating.`;
   }

@@ -2260,7 +2260,17 @@ function expandTokensForRow(
             // defined a three-option shortlist.
             // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader
             // that treats absent as assistance would turn every main lift into one.
-            ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}) } as any;
+            ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}),
+            // ⛔ AND CARRY THE SUGGESTION (2026-08-09, D-406) — SAME WHITELIST, SAME TRAP. This is the
+            // second field the composer authors for assistance rows, and it dies here exactly as
+            // `load_prescribed` did for four days unless it is listed. It is NOT a prescribed load:
+            // `weight_suggested` is a starting point for the logger's entry box, and the block above
+            // still clears `weightDisplay`/`prescribed`/`percent_1rm` for these rows. The two coexist
+            // on purpose — the plan names no weight, and the athlete is handed somewhere to start.
+            // ⚠️ GUARDED ON A FINITE POSITIVE. Absent means "no suggestion"; a zero would render as a
+            // prescribed nothing, which is the shape of the bug this field exists to avoid.
+            ...(Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
+              ? { weight_suggested: (ex as any).weight_suggested } : {}) } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -2547,7 +2557,17 @@ function expandTokensForRow(
             // defined a three-option shortlist.
             // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader
             // that treats absent as assistance would turn every main lift into one.
-            ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}) } as any;
+            ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}),
+            // ⛔ AND CARRY THE SUGGESTION (2026-08-09, D-406) — SAME WHITELIST, SAME TRAP. This is the
+            // second field the composer authors for assistance rows, and it dies here exactly as
+            // `load_prescribed` did for four days unless it is listed. It is NOT a prescribed load:
+            // `weight_suggested` is a starting point for the logger's entry box, and the block above
+            // still clears `weightDisplay`/`prescribed`/`percent_1rm` for these rows. The two coexist
+            // on purpose — the plan names no weight, and the athlete is handed somewhere to start.
+            // ⚠️ GUARDED ON A FINITE POSITIVE. Absent means "no suggestion"; a zero would render as a
+            // prescribed nothing, which is the shape of the bug this field exists to avoid.
+            ...(Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
+              ? { weight_suggested: (ex as any).weight_suggested } : {}) } as any;
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

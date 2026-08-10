@@ -74,6 +74,30 @@ export function estimate1RM(weight: number, reps: number, rirOffset = 0): number
   return weight * effectiveReps * WENDLER_EPLEY_COEFF + weight;
 }
 
+/**
+ * ⛔ THE INVERSE — the weight that yields `reps` from a known 1RM. Lives HERE, beside the forward
+ * direction, because it is the same claim read backwards: `estimate1RM` is `w × (1 + r × 0.0333)`,
+ * so this is `e1RM ÷ (1 + r × 0.0333)`. Re-deriving that algebra at a call site would be a second
+ * copy of Wendler's coefficient, and the next session would have two places to fix it.
+ *
+ * ⚠️ THIS IS NOT A PRESCRIPTION AND MUST NOT BECOME ONE. It exists so a SUGGESTION can be derived
+ * without inventing a percentage — the alternative was picking a number like "65% of the accessory's
+ * max", which is exactly the fabricated intensity `materialize-plan` strips on sight. Wendler's own
+ * formula is the only anchor in the system that is not made up.
+ *
+ * @param oneRM   the max to work back from
+ * @param reps    the target rep count
+ * @param rir     reps left in reserve. ⚠️ Passing 2 asks "what could I lift for `reps` with two left
+ *   in the tank", which is the assistance instruction ("a few reps left, never to failure") stated
+ *   as arithmetic rather than as a percentage somebody chose.
+ */
+export function weightForReps(oneRM: number, reps: number, rir = 0): number {
+  if (!Number.isFinite(oneRM) || oneRM <= 0) return 0;
+  const effectiveReps = Math.max(1, Math.round((Number(reps) || 0) + (Number(rir) || 0)));
+  if (effectiveReps === 1) return oneRM;
+  return oneRM / (1 + effectiveReps * WENDLER_EPLEY_COEFF);
+}
+
 /** The stored/displayed form: nearest 5 lb, matching how plates actually load. */
 export function estimate1RMRounded(weight: number, reps: number, rirOffset = 0): number {
   const raw = estimate1RM(weight, reps, rirOffset);

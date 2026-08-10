@@ -909,6 +909,10 @@ export default function CoachWeekTab() {
                   code === 'strength_relayout' ||
                   code.startsWith('str_prog_') ||
                   code.startsWith('str_deload_') ||
+                  // D-408 — adopting a training max off the block's best AMRAP. ⛔ The tap is the
+                  // consent; `adapt-plan` recomputes the number server-side and never trusts one
+                  // posted back, so a stale card cannot write an arbitrary working weight.
+                  code.startsWith('str_tm_') ||
                   code.startsWith('end_')
                 ) {
                   try {

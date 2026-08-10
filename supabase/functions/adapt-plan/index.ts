@@ -43,6 +43,13 @@ import {
 } from '../_shared/strength-profiles.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import { isAcwrFatiguedSignal, type AcwrWeekIntent } from '../_shared/acwr-state.ts';
+// ⛔ THE DECISION LOGIC IS NOT IN THIS FILE, ON PURPOSE. Everything about WHICH training max to
+// propose lives in `amrap-catch-up.ts` and is covered by fixtures; this edge function only queries
+// and renders. A rule inlined here would be a rule with no test.
+import {
+  amrapTrainingMaxCatchUp, extractAmrapSets, liftRefForExercise, isCatchUpBoundary, catchUpReason,
+  type LiftRef,
+} from '../shared/strength-system/amrap-catch-up.ts';
 import type { ArcPlanPhaseBucket } from '../_shared/arc-narrative-state.ts';
 
 const corsHeaders = {
@@ -58,7 +65,8 @@ type AdaptationSuggestion = {
     | 'strength_deload'
     | 'endurance_pace_update'
     | 'endurance_deload'
-    | 'strength_relayout';
+    | 'strength_relayout'
+    | 'strength_training_max';
   title: string;
   description: string;
   exercise?: string;
@@ -67,6 +75,14 @@ type AdaptationSuggestion = {
   unit: string;
   confidence: 'low' | 'medium' | 'high';
   reason: string;
+};
+
+/** Athlete-facing names for the four `training_max` keys. ⚠️ The KEY is storage; this is the label. */
+const LIFT_LABEL: Record<LiftRef, string> = {
+  bench: 'Bench Press',
+  squat: 'Back Squat',
+  deadlift: 'Deadlift',
+  overheadPress: 'Overhead Press',
 };
 
 function roundTo5(n: number): number {
@@ -422,6 +438,57 @@ Deno.serve(async (req) => {
           }
         }
       }
+    }
+
+    // =========================================================================
+    // AMRAP CATCH-UP — the training max, at a cycle boundary (D-408)
+    // =========================================================================
+    //
+    // ⛔ CONSENT-FIRST AND NOTHING ELSE. This block only ever PUSHES A SUGGESTION. The write happens
+    // in `acceptSuggestion`, on a tap. The silent auto-progression that used to live on this path was
+    // deleted for exactly this reason: it moved prescribed weight on every ingest with no prompt, and
+    // *"the athlete opened the logger to a number they never agreed to."*
+    try {
+      const planCfg = parseJson<any>(activePlan?.config) || {};
+      const currentTm = planCfg?.training_max || null;
+      const currentWeek = Number(activePlan?.current_week);
+      if (currentTm && isCatchUpBoundary(currentWeek)) {
+        // ⚠️ THE BLOCK'S OWN WORKOUTS, not a rolling four weeks. The catch-up asks "what is the best
+        // AMRAP THIS BLOCK has produced" — a window would silently drop the evidence as the block ran
+        // on, and the answer would change depending on when the athlete happened to open the app.
+        const { data: strengthWorkouts } = await supabase
+          .from('workouts')
+          .select('strength_exercises,workout_date,week_number')
+          .eq('user_id', user_id)
+          .eq('type', 'strength')
+          .order('workout_date', { ascending: true });
+
+        const amraps = extractAmrapSets(strengthWorkouts as any[], liftRefForExercise);
+        for (const p of amrapTrainingMaxCatchUp(amraps, currentTm, true)) {
+          suggestions.push({
+            id: `str_tm_${p.lift.toLowerCase()}`,
+            type: 'strength_training_max',
+            // ⚠️ "Adopt", not "increase". The athlete is accepting a measurement they produced, not
+            // being handed a target somebody set for them.
+            title: `Adopt your ${LIFT_LABEL[p.lift]} working number`,
+            description:
+              `Your best all-out set this block estimates a higher max than the block is built on. `
+              + `Adopting updates the working number; the fixed +5/+10 per cycle carries on from there.`,
+            exercise: LIFT_LABEL[p.lift],
+            current_value: p.currentTm,
+            suggested_value: p.proposedTm,
+            unit: isMetric ? 'kg' : 'lbs',
+            // ⛔ ALWAYS 'high', AND IT IS NOT A HEDGE. This is arithmetic on a set the athlete
+            // completed, not a trend inferred from noisy sessions like `strength_progression` above.
+            confidence: 'high',
+            reason: catchUpReason(p),
+          });
+        }
+      }
+    } catch (e) {
+      // ⚠️ NEVER LET THIS BREAK THE WHOLE SUGGEST RESPONSE. Every other suggestion here is
+      // independent of it, and a missing catch-up is a quiet nothing while a 500 is a dead screen.
+      console.error('[adapt-plan] amrap catch-up skipped:', e);
     }
 
     if (strength_relayout) {
@@ -932,6 +999,87 @@ async function acceptSuggestion(
       applied: true,
       type: isDeload ? 'strength_deload' : 'strength_progression',
       detail: `${liftName} weight ${isDeload ? 'reduced' : 'increased'} by ${Math.round((factor - 1) * 100)}%`,
+    };
+  }
+
+  // ── AMRAP CATCH-UP: adopt the training max (D-408) ─────────────────────────────────────────────
+  //
+  // ⛔ THIS IS THE ONLY PLACE THE TRAINING MAX MOVES OUTSIDE OF PLAN GENERATION, and it runs ONLY
+  // from an explicit tap on the suggestion. Nothing on the ingest path may call it.
+  if (suggestionId.startsWith('str_tm_')) {
+    const liftKey = ({
+      str_tm_bench: 'bench', str_tm_squat: 'squat',
+      str_tm_deadlift: 'deadlift', str_tm_overheadpress: 'overheadPress',
+    } as Record<string, LiftRef>)[suggestionId];
+    if (!liftKey) return { applied: false, type: 'strength_training_max', detail: `Unknown lift in ${suggestionId}` };
+
+    const { data: plans } = await supabase
+      .from('plans')
+      .select('id,config,current_week')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .limit(1);
+    const plan = plans?.[0];
+    if (!plan) return { applied: false, type: 'strength_training_max', detail: 'No active plan' };
+
+    const cfg = parseJson<any>(plan.config) || {};
+    const currentTm = cfg?.training_max || null;
+    if (!currentTm) return { applied: false, type: 'strength_training_max', detail: 'This plan has no training max to update' };
+
+    // ⛔ RECOMPUTED AT APPLY TIME, NEVER TRUSTED FROM THE CLIENT. The tap says WHICH lift, not what
+    // number — a suggested_value posted back would let a stale screen (or anything else) write an
+    // arbitrary training max. The same fixtured function that produced the offer produces the value.
+    // ⚠️ It also re-checks the boundary: a suggestion left on screen while the week rolled over must
+    // not still apply.
+    if (!isCatchUpBoundary(Number(plan.current_week))) {
+      return { applied: false, type: 'strength_training_max', detail: 'Not at a cycle boundary any more — nothing was changed' };
+    }
+    const { data: strengthWorkouts } = await supabase
+      .from('workouts')
+      .select('strength_exercises,workout_date,week_number')
+      .eq('user_id', userId)
+      .eq('type', 'strength')
+      .order('workout_date', { ascending: true });
+
+    const amraps = extractAmrapSets(strengthWorkouts as any[], liftRefForExercise);
+    const proposal = amrapTrainingMaxCatchUp(amraps, currentTm, true).find((p) => p.lift === liftKey);
+    if (!proposal) {
+      return { applied: false, type: 'strength_training_max', detail: 'That offer is no longer current — nothing was changed' };
+    }
+
+    // ⛔ ONLY THIS ONE LIFT'S KEY MOVES. Spreading a whole recomputed object would quietly rewrite
+    // the other three, and the athlete consented to one.
+    const nextConfig = {
+      ...cfg,
+      training_max: { ...currentTm, [liftKey]: proposal.proposedTm },
+      // A written record of a consented change, so the next block's `priorTrainingMax` inherits a
+      // number whose origin can be read rather than guessed at.
+      training_max_history: [
+        ...(Array.isArray(cfg?.training_max_history) ? cfg.training_max_history : []),
+        {
+          lift: liftKey,
+          from: proposal.currentTm,
+          to: proposal.proposedTm,
+          basis: 'amrap_catch_up',
+          evidence: proposal.from,
+          adopted_at: new Date().toISOString(),
+        },
+      ],
+    };
+
+    await supabase
+      .from('plans')
+      .update({ config: nextConfig, updated_at: new Date().toISOString() })
+      .eq('id', plan.id);
+
+    // ⚠️ THE ALREADY-MATERIALIZED WEEKS ARE NOT REWRITTEN HERE, and that is deliberate rather than
+    // unfinished: the next cycle is authored from `config.training_max`, so the change lands where
+    // the athlete expects it — the cycle they are about to start — and does not reach back and move
+    // weights under sessions they have already seen.
+    return {
+      applied: true,
+      type: 'strength_training_max',
+      detail: `${LIFT_LABEL[liftKey]} working number ${proposal.currentTm} → ${proposal.proposedTm}`,
     };
   }
 

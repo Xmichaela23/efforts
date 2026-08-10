@@ -604,7 +604,11 @@ export function useCoachWeekContext(date?: string) {
       // Merge strength relayout from adapt-plan suggest (same payload auto-adapt would persist).
       // adapt-plan uses id + description; coach card expects code + details (same mapping as relayout).
       const adapt = adaptResult.data as {
-        suggestions?: Array<{ id?: string; type?: string; title?: string; description?: string }>;
+        suggestions?: Array<{
+          id?: string; type?: string; title?: string; description?: string;
+          /** ⚠️ Carried for `strength_training_max`, where the evidence sentence IS the content. */
+          reason?: string;
+        }>;
       } | null;
       const adaptErr = adaptResult.error;
       if (!adaptErr && adapt?.suggestions?.length) {
@@ -631,8 +635,14 @@ export function useCoachWeekContext(date?: string) {
           }
         }
 
+        // ⛔ THE AMRAP CATCH-UP RIDES THE SAME CHANNEL AS THE ENDURANCE OFFERS (D-408), deliberately.
+        // It is a proposal the athlete accepts or ignores, which is exactly what this card is for —
+        // a second bespoke surface for one suggestion type would be the doubled disease in miniature.
+        // ⚠️ The `reason` is carried into `details` rather than the generic description, because for
+        // this suggestion the EVIDENCE is the whole point: the athlete should see the set they did.
         const enduranceSuggestions = adapt.suggestions.filter(
-          (s) => s.type === 'endurance_pace_update' || s.type === 'endurance_ftp_update',
+          (s) => s.type === 'endurance_pace_update' || s.type === 'endurance_ftp_update'
+            || s.type === 'strength_training_max',
         );
         if (enduranceSuggestions.length) {
           const wsv = { ...(merged.weekly_state_v1 as CoachWeekContextV1['weekly_state_v1']) };
@@ -645,7 +655,9 @@ export function useCoachWeekContext(date?: string) {
             extras.push({
               code,
               title: s.title ?? '',
-              details: s.description ?? '',
+              details: s.type === 'strength_training_max'
+                ? [s.reason, s.description].filter(Boolean).join(' ')
+                : (s.description ?? ''),
             });
           }
           if (extras.length) {
