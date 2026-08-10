@@ -21,6 +21,7 @@ import {
   mondayOfToday,
   parseLocalDate,
 } from "../_shared/parse-local-date.ts";
+import { stateTrendGate } from "./state-trend-gate.ts";
 import {
   assembleStateTrends,
   toStateTrendsV1,
@@ -667,18 +668,21 @@ serve(async (req: Request) => {
     // Non-fatal: a failure here must never break the snapshot write.
     // -----------------------------------------------------------------------
     let stateTrendsV1: StateTrendsV1 | null = null;
-    // ⛔ [Q-252] THIS LINE BLANKS THE ENTIRE STATE PERFORMANCE SECTION EVERY SUNDAY AT 17:00 PACIFIC.
-    // `mondayOfToday()` resolves against the RUNTIME clock and edge functions run in UTC, so once UTC
-    // ticks into Monday the athlete's actual current week fails this equality and the whole block is
-    // SKIPPED — `state_trends_v1` stays null, and run/ride/swim/strength all vanish from State.
-    // ⚠️ Nothing throws and nothing is logged. The `catch` below says "(non-fatal)" and is a RED
-    // HERRING — the code never runs at all. An hour was lost to that catch on 2026-08-02.
-    // Proved that night: this call for `2026-07-27` returned null; the same call for `2026-08-03`
-    // returned a full contract with all four cards. The assembler is fine; the gate is the bug.
-    // ⛔ AND THE DEEPER OBJECTION (Michael): the section is a ROLLING 7-DAY read — it should probably
-    // not be gated on a calendar week at all. Do not "fix" this by shifting the timezone until that
-    // question is answered. See Q-252.
-    if (targetWeek === mondayOfToday()) {
+    // [Q-252, fixed 2026-08-10] THE GATE IS TIMEZONE-FREE NOW — DO NOT PUT A CLOCK BACK IN IT.
+    // This used to read `if (targetWeek === mondayOfToday())`, which blanked the entire State
+    // performance section every Sunday from 17:00 Pacific: edge functions run in UTC, so once UTC
+    // ticked into Monday the athlete's own current week failed the equality, the block was skipped,
+    // `state_trends_v1` was written null, and run/ride/swim/strength all vanished. Nothing threw and
+    // nothing logged — the "(non-fatal)" catch below is a RED HERRING, the code never ran at all
+    // (an hour was lost to that catch on 2026-08-02). The build is now-anchored (`todayISO()` /
+    // `isoMinus(...)` below), so the calendar week was never what it was reading.
+    // The rule and its reasoning live in `./state-trend-gate.ts`: live callers pass no `week_start`
+    // and always build; only an explicit PAST `week_start` (recompute-workout) skips.
+    const trendGate = stateTrendGate({ bodyWeekStart: body.week_start, targetWeek, mondayNow: mondayOfToday() });
+    if (!trendGate.build) {
+      // Q-252 step 3: a skipped build must never be silent again.
+      console.log(`[compute-snapshot] ${trendGate.skipReason}`);
+    } else {
       try {
         const asOf = todayISO();
         const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
