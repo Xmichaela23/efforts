@@ -752,7 +752,13 @@ function enduranceSession(
     // decided. Same prescription, same physiology, and the reason is now the athlete's rather than
     // the plan's. ⚠️ THE SECOND CLAUSE IS THE FACT AND STAYS — easy volume is what holds the base
     // (Hickson: intensity is what loses it), so the sentence still says why easy is not a throwaway.
-    description: `~${mins} min easy, all conversational — you could hold a sentence throughout. Easy by choice this block — strength takes the hard work, and easy volume is what holds the aerobic base.${extraNote ?? ''}`,
+    // ⛔ THE JOIN OWNS THE SPACE, NOT THE CALLERS (2026-08-10). This was a bare `${extraNote ?? ''}`,
+    // and the convention was that every note string arrived carrying its own leading space. Two of
+    // the three callers remembered; the DELOAD note did not, and weeks 4, 8 and 12 shipped
+    // *"…holds the aerobic base.Deload week — the hard session comes off."* A convention that has to
+    // be remembered at every call site is a convention that gets broken at one of them, so the join
+    // normalises instead: exactly one space, whatever the caller passed.
+    description: `~${mins} min easy, all conversational — you could hold a sentence throughout. Easy by choice this block — strength takes the hard work, and easy volume is what holds the aerobic base.${extraNote ? ` ${extraNote.trimStart()}` : ''}`,
     duration: mins,
     // `easy` still rides along on the long session: it IS run at easy effort (the description says
     // conversational throughout). The `long` tag says WHICH session it is; `easy` says how hard.

@@ -1799,7 +1799,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
   const handleConfirm = () => {
     if (!state.goal) return;
-    void complete(payloadNow());
+    // ⛔ NO COMPLETION CARD ON THE INTAKE (2026-08-10). `complete()` lands on Focus either way; this
+    // says land on the PLAN rather than on a banner announcing it. The athlete tapped "Build plan"
+    // and the block renders under CURRENT on that same screen — an acknowledgement in between
+    // answers a question nobody asked, and on a short phone it pushed the plan itself down into the
+    // region that collapses. The Arc season wizard keeps its banner; see the note on `complete()`.
+    void complete(payloadNow(), { announcePlanReady: false });
   };
 
   /**

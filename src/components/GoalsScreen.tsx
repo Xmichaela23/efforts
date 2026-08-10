@@ -412,6 +412,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const st = location.state as {
       fromArcSetup?: boolean;
       seasonPlanJustBuilt?: boolean;
+      /** Absent or true = show the completion card. The intake passes false — see `complete()`. */
+      announcePlanReady?: boolean;
       builtPlanId?: string | null;
       needPaceCalibration?: boolean;
       schedule_signals?: {
@@ -430,7 +432,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       if (st.seasonPlanJustBuilt) {
         void refreshPlans?.();
         void refreshGoals();
-        setArcPlanReady({ planId: st.builtPlanId ?? null });
+        // ⛔ THE INTAKE LANDS ON THE PLAN, NOT ON A CARD SAYING THERE IS ONE (2026-08-10). The
+        // athlete tapped "Build plan"; the block itself renders under CURRENT a few pixels below.
+        // A green "Season plan ready" banner between the tap and the result is a step that answers
+        // a question nobody asked, and on a short phone it pushed the live plan into the region
+        // that collapses. The Arc SEASON wizard still announces (default true) — that journey is
+        // longer and ends in merges worth acknowledging.
+        if (st.announcePlanReady !== false) setArcPlanReady({ planId: st.builtPlanId ?? null });
         setShowArcSetupNextStep(false);
         const sig = st.schedule_signals;
         if (scheduleSignalsNonEmpty(sig)) {
@@ -2368,23 +2376,37 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             {expandedGoalId === '__past' && inactiveGoals.map(renderGoalCard)}
           </div>
         )}
-      </div>
 
-      {/* Bottom actions */}
-      <div className="shrink-0 px-4 pb-4 pt-2 space-y-2">
-        {/* The other half of the "Current" label above — these three START something, they are not
-            what is running. Without the pair, the door read as a second copy of the live block. */}
-        <div className="flex items-center gap-3 pb-1">
-          <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Start something new</span>
-          <div className="h-px flex-1 bg-white/10" />
-        </div>
-        {/* ── THE FRONT DOOR (SPEC §B) — replaces "Add a goal" ────────────────────────────────────
+        {/* ⛔ THE DOORS SCROLL WITH THE PAGE — THEY ARE NOT AN ACTION BAR (2026-08-10).
+
+            This block used to sit OUTSIDE the scroller as `shrink-0`, pinned to the bottom of the
+            flex column. It is three content cards and two links — roughly 500px that could not
+            shrink — so on a short phone the `flex-1` region above it collapsed to about one line
+            tall, and the athlete's LIVE PLAN was the thing that disappeared. Michael, on a small
+            device: the actual plan on the Focus screen is lost. The "Current" divider still
+            rendered, which is what made it read as an empty section rather than a clipped one.
+
+            ⚠️ THE PRIORITY WAS INVERTED, AND THAT IS THE REAL BUG. This screen answers "what am I
+            doing" and then offers "start something else". Pinning the offer and letting the answer
+            collapse is backwards on every viewport where it matters. Nothing here is a primary
+            action needing a fixed bar; the whole page is one list now, so on a tall screen it looks
+            identical and on a short one the plan is what you see first.
+
+            ⚠️ `px-4` COMES FROM THE SCROLLER NOW — repeating it here would double the inset. */}
+        <div className="pt-2 pb-4 space-y-2">
+          {/* The other half of the "Current" label above — these three START something, they are not
+              what is running. Without the pair, the door read as a second copy of the live block. */}
+          <div className="flex items-center gap-3 pb-1">
+            <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Start something new</span>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
+          {/* ── THE FRONT DOOR (SPEC §B) — replaces "Add a goal" ────────────────────────────────────
             Train · Race · Build. Train drills down to the discipline picker inside the builder;
             Race goes straight into the race flow. Build is a CREATE action, not a pick, so it gets
             the dashed treatment and sits apart — and it is DARK, because the flow behind it is
             spec'd and not built (`WORKORDER-build-your-own-strength-2026-08-04.md`). The honesty
             rule: never a card that opens nothing. */}
-        {/* ⛔ DISCIPLINE COLOURS, FROM THE ONE PALETTE (Michael, 2026-08-05: *"everything should use
+          {/* ⛔ DISCIPLINE COLOURS, FROM THE ONE PALETTE (Michael, 2026-08-05: *"everything should use
             discipline colors"*). `SPORT_COLORS` in `context-utils.ts` is the single source — do not
             hand-pick a hex here. Train has no ONE discipline (it holds all four), so it takes the
             palette's unclaimed colour rather than borrowing run's or strength's and implying a
@@ -2395,11 +2417,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
-        {([
+          {([
           { id: 'train' as const, Icon: Gauge, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true, color: getDisciplineColor('mobility') },
           { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true, color: FOCUS_RACE_COLOR },
           { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false, color: null },
-        ]).map(({ id, Icon, label, blurb, live, color }) => (
+          ]).map(({ id, Icon, label, blurb, live, color }) => (
           <button
             key={id}
             type="button"
@@ -2425,13 +2447,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               <div className={`mt-1 text-sm leading-relaxed ${live ? 'text-white/60' : 'text-white/30'}`}>{blurb}</div>
             </div>
           </button>
-        ))}
-        {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
+          ))}
+          {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
             season should be in race"*). It now lives inside the Race flow, under the race fields,
             as the way out for an athlete racing more than once — see the `race` step in
             `NonRaceBuilder`. The handler moved with it (`onPlanSeason`, passed down at the builder
             mount above); the route it opens (`/arc-setup`) is unchanged. */}
-        {inactiveGoals.length > 0 && (
+          {inactiveGoals.length > 0 && (
           <button
             className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-xs text-white/55 hover:text-white/80 transition-colors"
             onClick={() => setExpandedGoalId(prev => prev === '__past' ? null : '__past')}
@@ -2441,8 +2463,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               Past goals <span className="text-white/40">({inactiveGoals.length})</span>
             </span>
           </button>
-        )}
-        {completedPlans.length > 0 && (
+          )}
+          {completedPlans.length > 0 && (
           <button
             onClick={() => onViewAllPlans?.()}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-xs text-white/55 hover:text-white/80 transition-colors"
@@ -2452,7 +2474,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               View past plans <span className="text-white/40">({completedPlans.length})</span>
             </span>
           </button>
-        )}
+          )}
+        </div>
       </div>
 
       <input

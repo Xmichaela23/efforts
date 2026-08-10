@@ -170,8 +170,25 @@ export function useArcSetupComplete() {
     [],
   );
 
+  /**
+   * ⛔ `announcePlanReady` — WHETHER THE LANDING SHOWS A COMPLETION CARD (2026-08-10).
+   *
+   * Both callers of `complete()` land on Focus, and both used to raise the green "Season plan ready"
+   * banner there. On the INTAKE that banner is a step the athlete does not need: they tapped "Build
+   * plan", and the plan itself renders on the same screen a few pixels below the card telling them
+   * it exists. Michael: navigate straight to the plan showing, no intermediate completion state.
+   *
+   * ⚠️ IT IS AN OPTION RATHER THAN A DELETION because the two callers are not the same journey. The
+   * Arc SEASON setup is a long multi-race wizard that can end with merges and co-equal fallbacks, and
+   * it keeps its acknowledgement (default `true`) until someone decides otherwise on that flow. The
+   * intake opts out.
+   *
+   * ⚠️ SCHEDULE SIGNALS ARE NOT AFFECTED, deliberately. Conflicts and trade-offs are facts ABOUT the
+   * plan, not a "we're done" banner — suppressing those would be hiding something the athlete needs.
+   */
   const complete = useCallback(
-    async (payload: ArcSetupPayload) => {
+    async (payload: ArcSetupPayload, opts?: { announcePlanReady?: boolean }) => {
+      const announcePlanReady = opts?.announcePlanReady !== false;
       setSaving(true);
       setError(null);
       setSaveBanner(null);
@@ -277,7 +294,10 @@ export function useArcSetupComplete() {
         replace: true,
         state: {
           fromArcSetup: true,
+          // Still true on both paths — it is what closes the embedded builder and refreshes plans
+          // and goals on the landing. Only the ACKNOWLEDGEMENT is optional.
           seasonPlanJustBuilt: true,
+          announcePlanReady,
           builtPlanId: planId,
           ...(scheduleSignals ? { schedule_signals: scheduleSignals } : {}),
         },
