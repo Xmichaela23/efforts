@@ -108,30 +108,36 @@ Deno.test('D-322 — every menu name has an EXACT config key, not a fuzzy borrow
   }
 });
 
-Deno.test('a CURL picked into the arm slot survives a press day, alongside the chin', () => {
-  // ⛔ THE PAIRING THIS PINS: `Chin Up` in the pull slot and a curl in the arm slot, SAME DAY. Both
-  // are elbow flexion and both are family `pull`, so any rule that reasons about the pull family
-  // would read the second one as redundant and override the athlete's pick.
-  //
-  // ⚠️ AND THE REASON IT SURVIVES IS THAT NO SUCH RULE EXISTS ANY MORE, which is worth stating
-  // because it is NOT what you would guess from the entry points. `sharesMovementFamily` has been
-  // deliberately un-imported from `assistance-menu.ts` since D-385 (see the note at the top of that
-  // file): "does this share a family" was the OLD collision question and it is asked nowhere in the
-  // resolution path. `fitsRole('arm')` reads `isDirectArm` and nothing else. So a curl needs no
-  // exemption — there is nothing to be exempted from. This test exists so that stays true: it fails
-  // the moment anyone reintroduces family reasoning into the arm slot.
-  for (const main of UPPER) {
-    for (const curl of ['Dumbbell Curl', 'Hammer Curl']) {
-      const picks = { push: 'Dips', pull: 'Chin Up', single_leg_core: curl };
-      const rows = resolveAssistance(picks, main);
-      const arm = rows.find((r) => r.slot === 'single_leg_core')!;
-      assertEquals(arm.name, curl, `${main}: the curl was overridden`);
-      assertEquals(arm.substitutedFor, undefined, `${main}: the curl was substituted`);
-      assertEquals(arm.balancedFor, undefined, `${main}: the curl was plane-swapped`);
-      assertEquals(isDirectArm(arm.name), true, `${main}: the curl is not flagged as arm work`);
-      // The chin is still there, in its own slot, untouched by the curl sitting beside it.
-      assertEquals(nameFor(main, 'pull', picks), 'Chin Up', `${main}: the chin was displaced`);
+Deno.test('a CURL reaches the arm slot via the SWAP POOL, and survives beside the chin', () => {
+  // ⛔ REWRITTEN 2026-08-09. This used to pick a curl through `assistancePicks.single_leg_core` —
+  // the dropdown no longer offers core or arm movements, so that route is gone. The PROPERTY it was
+  // guarding is unchanged and still worth pinning: a curl and a chin-up are both elbow flexion and
+  // both family `pull`, so any rule reasoning about the pull family would read the second as
+  // redundant. Nothing does — `fitsRole('arm')` reads `isDirectArm` and nothing else, and
+  // `sharesMovementFamily` has been un-imported from this file since D-385.
+  for (const curl of ['Dumbbell Curl', 'Hammer Curl']) {
+    assertEquals(isDirectArm(curl), true, `${curl} is not flagged as arm work`);
+    for (const main of UPPER) {
+      // The swap sheet offers it on a press day — the athlete's route to it now.
+      const peers = assistancePeersFor('Diamond Push Up', main) ?? [];
+      assertEquals(peers.includes(curl), true, `${main}: the swap sheet does not offer ${curl}`);
+      // And the chin is untouched in its own slot while an arm movement sits beside it.
+      assertEquals(nameFor(main, 'pull'), 'Chin Up', `${main}: the chin was displaced`);
     }
+  }
+});
+
+Deno.test('⛔ A MOVEMENT OFF THE MENU MUST STILL BE REACHABLE — no orphans', () => {
+  // ⛔ THE HAZARD THE MENU NARROWING CREATED. Core and arm options were removed from the
+  // `single_leg_core` dropdown; a movement that is on no menu AND in no `ROLE_FALLBACK` pool is
+  // unreachable — the athlete can neither pick it nor swap to it, and it silently stops existing.
+  // The curls were menu-only and would have been orphaned.
+  for (const name of ['Sit Up', 'Hanging Leg Raise', 'Ab Wheel Rollout',
+    'Diamond Push Up', 'Tricep Pushdown', 'Tricep Extension', 'Close Grip Bench Press',
+    'Dumbbell Curl', 'Hammer Curl']) {
+    const onMenu = ASSISTANCE_MENU.some((m) => m.options.some((o) => o.name === name));
+    const peers = assistancePeersFor(name, 'Bench Press');
+    assertEquals(onMenu || peers != null, true, `${name} is unreachable — no menu, no swap pool`);
   }
 });
 

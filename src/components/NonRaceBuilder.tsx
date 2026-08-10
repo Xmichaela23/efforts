@@ -2903,18 +2903,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   together taught the athlete the rule fires everywhere, which it does not.
                 So: one example, and one that is unambiguously a swap. Push Up on bench day collides
                 — both horizontal push — and the slot takes balancing work instead. */}
-            {/* ⛔ THE LAST SENTENCE IS A PROMISE, AND IT WAS CHECKED BEFORE IT WAS WRITTEN.
+            {/* ⛔ THE SWAP SENTENCE IS A PROMISE, AND IT WAS CHECKED BEFORE IT WAS WRITTEN.
                 The Swap sheet is D-290, SHIPPED — `StrengthLogger.tsx:4440` renders the button on
                 EVERY exercise row (accessories included, not just the main lifts), and
                 `getInSlotAlternatives` offers substitutes filtered by movement pattern + the
                 athlete's own equipment. `swapRestOfPlan` persists the choice past today.
                 ⚠️ IF THAT BUTTON EVER MOVES OR NARROWS TO MAIN LIFTS ONLY, THIS LINE BECOMES A LIE
                 on the screen where the athlete is deciding whether to care about the picks at all. */}
+            {/* ⛔ THE PLANE-SWAP SENTENCE IS GONE (2026-08-09, D-404). It read: "Where the main lift
+                already covers one — push-ups after bench press — you'll get the opposite movement
+                instead." That behaviour was the CONCURRENT template's rule (p.86-88), and a
+                strength-purpose block runs the STANDARD templates, which never cross planes. The
+                line survived the code it described by four days.
+                ⚠️ AND IT WAS TEACHING THE WRONG EXPECTATION EVEN BEFORE THAT: an athlete told their
+                pick gets replaced reads the whole card as advisory. Their picks are kept — what
+                MOVES is which day a slot's role lands on, which is a different claim and the one
+                worth making. */}
             <p className="text-white/70 text-sm leading-relaxed">
-              You&apos;ll get these most days. Where the main lift already covers one — push-ups after
-              bench press — you&apos;ll get the opposite movement instead. Anything can be swapped in
-              the session.
-            </p>
+              Three slots, placed by the day. Your picks are kept — on squat and deadlift days you
+              get the leg work you chose; on bench and press days those slots carry triceps and the
+              leg days carry abs, both chosen for you. Anything can be swapped in the session.</p>
             <div className="space-y-3">
               {ASSISTANCE_MENU.map((menu) => {
                 const picked = state.assistancePicks[menu.slot] ?? ASSISTANCE_DEFAULTS[menu.slot];

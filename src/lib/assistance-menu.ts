@@ -250,52 +250,36 @@ export const ASSISTANCE_MENU: AssistanceSlotMenu[] = [
   },
   {
     slot: 'single_leg_core',
-    label: 'Single-leg, core or arms',
-    // ⛔ ON AN UPPER DAY THIS SLOT IS ARMS — never a leg, and as of 2026-08-09 no longer core either
-    // (D-404, see `ROLE_BY_DAY`). The never-a-leg half is defect #2 and is unchanged: nothing
-    // collided with a lunge on a bench day, so it passed straight through onto press days and stacked
-    // glute/ham load against the run legs. No Wendler template puts lower-body work on a press day.
+    // ⚠️ THE KEY IS STILL `single_leg_core` AND CANNOT CHANGE — it is persisted on
+    // `goals.training_prefs.assistance_picks`, and renaming it would strand every existing goal. The
+    // LABEL is what the athlete reads, and it now names what they actually pick.
+    label: 'Single-leg',
+    // ⛔ CORE AND ARM OPTIONS WERE REMOVED FROM THIS DROPDOWN (2026-08-09, Michael's call).
     //
-    // ⚠️ THE ARM OPTIONS HAD TO JOIN THIS MENU, not just `ROLE_FALLBACK`. The slot's own list is
-    // searched before the fallback, so a menu with no arm movement on it would have meant the
-    // athlete's pick was overridden on EVERY press day — the app asking a question and then never
-    // being able to honour the answer. Now the athlete picks which triceps movement they meet, the
-    // same way they pick their push and their pull.
-    purpose: 'One leg at a time, the trunk, or arms. On bench and press days this is triceps — the legs get their work on squat and deadlift days, and stacking them costs the running. Abs live on the squat and deadlift days.',
+    // The slot carries three different roles across the week — single-leg on lower days, ARM on
+    // press days (D-404), and core is the `push` key's job on lower days — so the dropdown was
+    // asking the athlete to choose a movement for a role their pick would rarely land in. An athlete
+    // picking `Sit Up` here got a lunge on both leg days and a triceps movement on both press days,
+    // and their pick appeared nowhere.
+    //
+    // ⚠️ NOTHING GOES BLANK, and that is `ROLE_FALLBACK`'s whole job — core resolves to `Sit Up` and
+    // arm to `Diamond Push Up`, bodyweight-first so neither is gated on equipment. Both remain
+    // swappable in the session: `assistancePeersFor` looks a movement up in the fallback pools when
+    // it is on no menu, so a Sit Up row still offers the rest of the ab list.
+    //
+    // ⛔ SO A MOVEMENT DROPPED FROM HERE MUST EXIST IN A `ROLE_FALLBACK` POOL OR IT BECOMES
+    // UNREACHABLE — no menu, no swap sheet, gone. The curls were menu-only and were added to
+    // `ROLE_FALLBACK.arm` in the same change for exactly that reason.
+    purpose: 'One leg at a time. This is the leg work on squat and deadlift days. On bench and press days the slot carries triceps instead, and abs sit on the leg days — both chosen for you, both swappable in the session.',
     totalReps: ASSISTANCE_TOTAL_REPS_FLOOR,
     options: [
       { name: 'Reverse Lunge', targets: 'Quads, glutes, single-leg balance', requires: null },
       { name: 'Bulgarian Split Squat', targets: 'Quads, glutes, hip stability', requires: null },
       { name: 'Single Leg Hip Thrust', targets: 'Glutes, hamstrings, hip drive', requires: null },
-      { name: 'Hanging Leg Raise', targets: 'Lower abs, hip flexors, grip', requires: 'bar' },
-      // NEW 2026-08-05 — the core slot had exactly ONE core option and it needs a bar. On an upper
-      // day the slot is core-only, so an athlete without a pull-up bar had nothing to resolve to.
-      // Both are Wendler's own: "Sit-ups, Hanging Leg Raises, Ab Wheel, DB Side Bend" (p.51).
-      { name: 'Ab Wheel Rollout', targets: 'Abs, trunk stability, shoulders', requires: null },
-      { name: 'Sit Up', targets: 'Abs, hip flexors', requires: null },
-      // NEW 2026-08-05 — Wendler pairs the DEADLIFT with a squat-pattern (p.53: "the deadlift with a
-      // squatting exercise"; p.55 and p.86 both use Front Squat). The single-leg role on a hip day
-      // needed a loadable knee-dominant answer beyond the two split-squat variants.
+      // Wendler pairs the DEADLIFT with a squat pattern (p.53: "the deadlift with a squatting
+      // exercise"; p.55 and p.86 both use Front Squat) — the leg role on a hip day needs a loadable
+      // knee-dominant answer beyond the two split-squat variants.
       { name: 'Front Squat', targets: 'Quads, upper back, trunk', requires: 'bar' },
-      // NEW 2026-08-09 (D-404) — the arm half of the slot. Wendler's Periodization Bible p.50-51
-      // closes BOTH press days on triceps, and this block runs the standard templates. Bodyweight
-      // option first so the slot is never gated on a cable stack.
-      { name: 'Diamond Push Up', targets: 'Triceps, inner chest', requires: null },
-      { name: 'Tricep Extension', targets: 'Triceps, long head', requires: 'dumbbells' },
-      { name: 'Tricep Pushdown', targets: 'Triceps', requires: 'cable' },
-      { name: 'Close Grip Bench Press', targets: 'Triceps, inner chest, front shoulders', requires: 'bench' },
-      // ⛔ BICEPS ARE LAST IN THIS LIST ON PURPOSE, AND THE ORDER IS THE DEFAULT. `resolveRole`
-      // searches the slot's own menu top-down and takes the FIRST option that fits the role, so an
-      // athlete who never opens the card lands on `Diamond Push Up`. Put a curl above the triceps
-      // options and every un-picked press day silently becomes a biceps day.
-      //
-      // ⚠️ THESE ARE A PREFERENCE, NOT A TEMPLATE QUOTE — say so rather than dressing it as Wendler.
-      // p.50-51 lists "Triceps" for both press days and no direct biceps work anywhere, because the
-      // pull slot already trains them: a chin-up is elbow flexion under load. Triceps is the arm the
-      // block does NOT otherwise hit directly, which is why it stays the default. Curls are here
-      // because an athlete may want them, and the slot honours picks (§5.2b).
-      { name: 'Dumbbell Curl', targets: 'Biceps, forearms', requires: 'dumbbells' },
-      { name: 'Hammer Curl', targets: 'Biceps, brachialis, forearms', requires: 'dumbbells' },
     ],
   },
 ];
@@ -397,6 +381,11 @@ type AssistanceDayType = 'upper' | 'lower';
  * was getting **50 chins × 4 days = 200 a week** of one movement, because the rep scaler's floor is
  * 50 and it only scales UP. Two days halves it to 100. That number is not a coincidence: 100 reps a
  * week of one movement is the exact complaint D-328 was written to solve.
+ *
+ * ⛔ **DO NOT ADD A PULL BACK HERE TO 'BALANCE' THE 3-DAY SHAPE — see Q-269.** On 3 days bench and
+ * press share a day, so the block pulls ONCE a week, and that is Wendler's own 3-day rotation
+ * (p.76), whose instruction is that assistance stays the same. Verified 2026-08-09; a rep-count
+ * table showing 50 against the 4-day's 100 is the thing that makes this look like a hole.
  *
  * **The two leg slots are the main lift's own family and its opposite**, which is how p.51's two
  * lines resolve: squat (knee) → low back (hip) + quads (knee); deadlift (hip) → hamstrings (hip) +
@@ -671,7 +660,14 @@ const ROLE_FALLBACK: Record<AssistanceRole, string[]> = {
     'Bulgarian Split Squat', 'Front Squat', 'Leg Curl', 'Hip Thrust'],
   // Bodyweight first, same rule as `core` — the arm slot is reached on EVERY upper day, so its
   // fallback must never need a cable stack. All four are on p.50's triceps list.
-  arm: ['Diamond Push Up', 'Tricep Pushdown', 'Tricep Extension', 'Close Grip Bench Press'],
+  // ⛔ TRICEPS FIRST — THE ORDER IS THE DEFAULT. `resolveRole` takes the first entry that fits, so an
+  // athlete who never touches the swap sheet gets `Diamond Push Up`: bodyweight, no equipment, and
+  // triceps is the arm this block does not otherwise train directly (the pull slot already loads
+  // biceps — a chin-up is elbow flexion under load).
+  // ⚠️ THE CURLS LIVE HERE NOW because they were removed from the `single_leg_core` menu. A movement
+  // on no menu and in no pool is unreachable — no pick, no swap, gone.
+  arm: ['Diamond Push Up', 'Tricep Pushdown', 'Tricep Extension', 'Close Grip Bench Press',
+    'Dumbbell Curl', 'Hammer Curl'],
 };
 
 /**

@@ -613,3 +613,38 @@ regression locks in [D-401].
 ⚠️ **Do NOT read this as "the generators were fine."** [D-401] fixed two real placement defects found
 while chasing this one, including the standalone-tri generator's missing long-run guard, which is the
 one place the reported symptom WAS reachable. It just isn't the marathon path Michael was on.
+
+---
+
+## Q-269 — 3-day Strength Focus pulls ONCE a week, and that is by the book (2026-08-09, **INTENTIONAL — DO NOT "FIX"**)
+
+⛔ **THE INSTRUCTION FIRST, BECAUSE THIS ONE IS BUILT TO BE RE-CHASED: do NOT add a pull to the leg
+days to "balance" the 3-day shape.** If you have arrived here from a table showing one pull exposure
+a week and it looks like a hole, it is not. Read this entry, then leave it alone.
+
+**What it looks like.** D-405 took the pull off squat and deadlift days (p.51: *Deadlift day →
+hamstrings, quads, abs. Squat day → low back, quads, abs* — no pull on either). The pull now lives on
+the press days. On the **4-day** shape that is two exposures a week, 100 reps. On the **3-day** shape
+bench and press share a day, so there is exactly **one upper day** — one pull exposure, 50 reps.
+
+And none of the four main lifts pulls, so that single slot is the entire block's pulling volume. It
+reads alarming. **I raised it as a concern on 2026-08-09 and I was wrong to.**
+
+✅ **VERIFIED AGAINST THE PRIMARY, Michael 2026-08-09: Wendler's own 3-day rotation (2nd ed. p.76)
+pulls once a week in some weeks**, and the chapter's own instruction is that **assistance stays the
+same — "don't overthink it."** A single weekly pull on a fixed 3-day week is not a gap in our
+implementation of the template; it *is* the template. The 3-day shape has fewer sessions and
+therefore fewer accessory slots, which is what choosing it means.
+
+⚠️ **WHY THE WRONG FIX IS TEMPTING.** p.46's *"if you train your chest, train your back"* is easy to
+read as a weekly balance quota, and a table comparing 100 reps against 50 makes the 3-day column look
+broken. It is a within-SESSION principle, and the 3-day session already carries a pull. Reaching for
+"add a pull to the leg days" reverses **D-405** on a misreading — the same class of mistake D-385's
+own back-annotation records, one page over.
+
+⛔ **What WOULD be a real finding, and neither has been observed:** an athlete on the 3-day shape whose
+pull capacity measurably regresses across a block, or a Wendler page prescribing pulling on a lower
+day in a standard template. A rep-count table is not either of those.
+
+**Where this is pinned in code:** `src/lib/assistance-menu.ts`, the `ROLE_BY_DAY.lower` block — the
+one place a future session would edit to put a pull back on the leg days. It carries a pointer here.
