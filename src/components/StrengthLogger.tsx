@@ -5363,7 +5363,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {/* AMRAP's instruction sits ABOVE its set — mirroring how the bar-speed
                                 cue sits above the exercise (Michael 2026-08-11). */}
                             {set.amrap && (targetHint || cue) && (
-                              <div className="pl-[30px] pr-1 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
+                              <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
                               </div>
                             )}
