@@ -5150,7 +5150,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               ? `${exRepTotal} reps done`
                               : (<><span>{exRepsLeft}</span><span className="text-[11px] font-semibold text-white/55 ml-1">reps left</span></>)}
                           </span>
-                          <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden" aria-hidden="true">
+                          <span className="w-28 h-1.5 rounded-full bg-white/[0.08] overflow-hidden" aria-hidden="true">
                             <span
                               className="block h-full rounded-full transition-all duration-300"
                               style={{
@@ -5367,7 +5367,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     placeholder sits where the eyes already are. */}
                                 {shown === '' && set.amrap && !done
                                   ? <span className="text-amber-300/55 text-[11px] tracking-wide">AMRAP</span>
-                                  : shown}
+                                  : (shown === '' ? ' ' : shown)}
                               </span>
                             </button>
                           );
