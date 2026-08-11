@@ -432,7 +432,7 @@ async function runSessionDetailPipelineAndPersist(
     const [plannedRes, weekWorkoutsRes, , arcCtx, snapRes] = await Promise.all([
       supabase
         .from('planned_workouts')
-        .select('id,date,type,name,description,rendered_description,duration,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id')
+        .select('id,date,type,name,description,rendered_description,duration,total_duration_seconds,workload_planned,computed,strength_exercises,training_plan_id,workout_status,completed_workout_id')
         .eq('user_id', userId)
         .gte('date', weekStartDate)
         .lte('date', weekEndDate),
@@ -623,9 +623,36 @@ async function runSessionDetailPipelineAndPersist(
       }
     }
 
+    // ⛔ ON A STACKED DAY, TODAY'S OTHER SESSION IS NEXT — NOT TOMORROW (Michael 2026-08-11).
+    // The old filter was `date > workoutDate` (strictly future), so finishing the lift on a day that
+    // also had a run/ride pointed NEXT at the next day and stepped over the session still to do. The
+    // rule now: a SAME-DAY planned slot that isn't this session and isn't already completed wins;
+    // only when today is clear does NEXT fall through to the earliest future slot. Same code for
+    // run / ride / lift, so every discipline's stacked day reads the same.
+    const currentPlannedId = String(effectivePlannedId || plannedId || row?.planned_id || '');
+    // A slot counts as DONE by its own status/link, or by a completed workout attached to it this week.
+    const completedPlannedIds = new Set(
+      weekWorkouts.map((w: any) => String(w?.planned_id || '')).filter(Boolean),
+    );
+    const isPlannedDone = (p: any) =>
+      String(p?.workout_status || '').toLowerCase() === 'completed'
+      || !!p?.completed_workout_id
+      || completedPlannedIds.has(String(p?.id || ''));
+    const notThisSession = (p: any) => !currentPlannedId || String(p?.id || '') !== currentPlannedId;
+    // Stable within a day (planned rows carry no intra-day time): id tiebreak so 3+ stacked sessions
+    // resolve deterministically rather than flapping between renders.
+    const byDateThenId = (a: any, b: any) =>
+      String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id));
+
     let nextPlanned = plannedRows
-      .filter((p: any) => String(p?.date || '') > workoutDate)
-      .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
+      .filter((p: any) => String(p?.date || '').slice(0, 10) === workoutDate && notThisSession(p) && !isPlannedDone(p))
+      .sort(byDateThenId)[0] ?? null;
+
+    if (!nextPlanned) {
+      nextPlanned = plannedRows
+        .filter((p: any) => String(p?.date || '') > workoutDate && !isPlannedDone(p))
+        .sort(byDateThenId)[0] ?? null;
+    }
 
     if (!nextPlanned) {
       const dayAfter = addDaysISO(workoutDate, 1);
