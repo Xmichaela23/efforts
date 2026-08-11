@@ -36,6 +36,8 @@ import { isBandAssistedMovement } from '@/lib/band-assistance';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
 import { calculateRestTime, isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
+// The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
+import { hasRepTotal, parseRepTotal, repsRemaining, repTotalLine } from '@/lib/rep-total';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 // THE SESSION CLOCK — a persisted wall-clock start, stamped by an explicit Start tap and resumed
@@ -1643,7 +1645,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   const isAssistanceRow = (exercise: LoggedExercise): boolean => {
     if (exercise?.load_prescribed === false) return true;
-    if (/total/i.test(String(exercise?.target_reps ?? ''))) return true;
+    // ONE detection (`@/lib/rep-total`), not a second inline regex — the countdown and the blank-set
+    // rule ask the same question and must never diverge from this one.
+    if (hasRepTotal(exercise?.target_reps)) return true;
     if (exercise?.planned_name || exercise?.target_reps) return false; // prescribed, and not assistance
     return roleForExercise(String(exercise?.name || '')) === 'accessory';
   };
@@ -2052,6 +2056,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // as open reps exactly like "AMRAP" does, and without this it fell through as a fixed 5 and
         // took the ordinary 2–3 RIR gate instead of the near-max one.
         const isAmrap = typeof repsRaw === 'string' && (/amrap/i.test(repsRaw) || /^\d+\s*\+$/.test(repsRaw.trim()));
+        // ⛔ AN ASSISTANCE REP TOTAL IS NOT A SET OF THAT MANY REPS (2026-08-11). "50 total" was
+        // parsed to 50 and written onto every prescribed set, so the row opened reading "one set of
+        // 50" — which is not what the block asked for and not how assistance is trained: it is a
+        // total to hit across as many sets as you need (Wendler, 5/3/1 2nd ed. p.24/p.102). The row
+        // now opens with ONE blank set and the countdown above it does the accounting.
+        // ⚠️ Reps only. A LOADED assistance movement (Romanian Deadlift) keeps its weight prefill —
+        // the total is about reps, and blanking the weight would throw away a real prescription.
+        const isRepTotalRow = hasRepTotal(repsRaw);
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
@@ -2114,7 +2126,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Per-set prescription when the row carries one; otherwise the row's single weight on every
         // set, exactly as before.
         const planned = plannedSetsFor(s);
-        const targetSets = Math.max(1, planned?.length ?? sets);
+        // A rep total opens as ONE blank set — the athlete taps Add Set per chunk. Any prescribed
+        // set count on an assistance row is the composer's arithmetic for reaching the total, not
+        // an instruction about how to break it up.
+        const targetSets = isRepTotalRow ? 1 : Math.max(1, planned?.length ?? sets);
         for (let i=0;i<targetSets;i+=1) {
           const p = planned?.[i];
           const setWeight = p?.weight != null ? round5(p.weight) : weightNum;
@@ -2139,6 +2154,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           } else if (shouldConvertToDuration) {
             // Convert reps to duration_seconds for duration-based exercises
             baseSet.duration_seconds = reps;
+          } else if (isRepTotalRow) {
+            // Blank, deliberately: the athlete logs each chunk (15 / 15 / 12 / 8). `reps` is left
+            // undefined rather than 0 so the cell reads empty and the countdown still shows the
+            // whole total owed — `completedReps` ignores both, but 0 would render as a logged zero.
           } else {
             // An all-out set opens at 0 — the athlete enters what they actually got. The prescribed
             // number is the FLOOR, not the target, and prefilling it would anchor them to it.
@@ -2642,12 +2661,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
         // Clean name - remove any notes that might have been concatenated
         const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
+        // The assistance rep TOTAL, on the strength_exercises pass-through. ⛔ THIS PATH NEVER
+        // CARRIED `target_reps` AT ALL, so the countdown had nothing to read here and the total was
+        // still being prefilled as a rep count. Both are fixed together — shipping only the blank
+        // set would leave the athlete with no number to work toward. Detection reads the raw row's
+        // `target_reps` first and falls back to `reps`, which is where "50 total" actually arrives
+        // on these rows. See parseFromComputed for the full reasoning.
+        const rawTargetReps = exercise.target_reps ?? exercise.reps;
+        const isRepTotalRow = hasRepTotal(rawTargetReps);
         const result = {
           id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
           name: cleanName || '',
           notes: rawNotes || undefined,
           expanded: true,
-          sets: Array.from({ length: plannedSetsFor(exercise)?.length ?? (exercise.sets || 3) }, (_, setIndex) => {
+          target_reps: isRepTotalRow ? String(rawTargetReps).trim() : undefined,
+          sets: Array.from({ length: isRepTotalRow ? 1 : (plannedSetsFor(exercise)?.length ?? (exercise.sets || 3)) }, (_, setIndex) => {
             const plannedSet = plannedSetsFor(exercise)?.[setIndex];
             const baseSet: LoggedSet = {
               weight: isBodyweightMove(exercise.name) ? 0 : (plannedSet?.weight ?? exercise.weight ?? 0),
@@ -2681,6 +2709,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             } else if (isDurationLogged(exercise.name) && numericReps) {
               // Convert reps to duration_seconds for duration-based exercises (e.g., "Planks 3×60" where 60 is seconds, not reps)
               baseSet.duration_seconds = numericReps;
+            } else if (isRepTotalRow) {
+              // Blank on purpose — the athlete logs each chunk; the countdown does the accounting.
             } else if (numericReps) {
               // Rep-based exercises (traditional lifts)
               baseSet.reps = numericReps;
@@ -2901,12 +2931,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
             const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
             const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
+            // The assistance rep TOTAL, on the strength_exercises pass-through. ⛔ THIS PATH NEVER
+            // CARRIED `target_reps` AT ALL, so the countdown had nothing to read here and the total was
+            // still being prefilled as a rep count. Both are fixed together — shipping only the blank
+            // set would leave the athlete with no number to work toward. Detection reads the raw row's
+            // `target_reps` first and falls back to `reps`, which is where "50 total" actually arrives
+            // on these rows. See parseFromComputed for the full reasoning.
+            const rawTargetReps = exercise.target_reps ?? exercise.reps;
+            const isRepTotalRow = hasRepTotal(rawTargetReps);
             return {
               id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
               name: cleanName || '',
               notes: rawNotes || undefined,
               expanded: true,
-              sets: Array.from({ length: plannedSetsFor(exercise)?.length ?? (exercise.sets || 3) }, (_, setIndex) => {
+              target_reps: isRepTotalRow ? String(rawTargetReps).trim() : undefined,
+              sets: Array.from({ length: isRepTotalRow ? 1 : (plannedSetsFor(exercise)?.length ?? (exercise.sets || 3)) }, (_, setIndex) => {
                 const plannedSet = plannedSetsFor(exercise)?.[setIndex];
                 const baseSet: LoggedSet = {
                   weight: isBodyweightMove(exercise.name) ? 0 : (plannedSet?.weight ?? exercise.weight ?? 0),
@@ -2932,6 +2971,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   baseSet.duration_seconds = exercise.duration_seconds;
                 } else if (isDurationLogged(exercise.name) && numericReps) {
                   baseSet.duration_seconds = numericReps;
+                } else if (isRepTotalRow) {
+                  // Blank on purpose — the athlete logs each chunk; the countdown does the accounting.
                 } else if (numericReps) {
                   baseSet.reps = numericReps;
                 }
@@ -3604,8 +3645,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (exercise.id === exerciseId) {
         const lastSet = exercise.sets[exercise.sets.length - 1];
         const exerciseType = equipmentForExercise(exercise.name);
+        // A rep-total accessory opens each new set BLANK — chunks vary by feel (15/15/12/8), and
+        // copying the previous reps would tick the countdown for work not done (Michael 2026-08-11).
+        const isRepTotalRow = hasRepTotal(exercise.target_reps);
         const newSet: LoggedSet = {
-          reps: lastSet?.reps ?? undefined, // Preserve undefined for "until" patterns
+          reps: isRepTotalRow ? undefined : (lastSet?.reps ?? undefined), // blank on rep-total; else copy (until-pattern safe)
           duration_seconds: lastSet?.duration_seconds, // Copy duration for duration-based exercises
           weight: lastSet?.weight || 0,
           barType: lastSet?.barType || 'standard',
@@ -5078,11 +5122,43 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // an empty set returns the work_set line and misses to null off the main lifts.
                   const titleCue = barSpeedCueFor(exercise, {} as any);
 
+                  // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in 5/3/1 is a
+                  // total to reach across as many sets as you need, so the live number is "how many
+                  // do I still owe" — not "which set am I on". It takes the SAME line as the
+                  // bar-speed cue above, and the two can never collide: `barSpeedCueFor` misses to
+                  // null off the four main lifts, and a main lift's prescription is a number, never
+                  // a total. Only COMPLETED sets count (`repsRemaining`) — a typed-but-unticked set
+                  // is not banked work, the same rule the save path and the missed-Done prompt use.
+                  const exRepTotal = parseRepTotal(exercise.target_reps);
+                  const exHasRepTotal = hasRepTotal(exercise.target_reps);
+                  const exRepsLeft = exRepTotal != null ? repsRemaining(exRepTotal, exercise.sets) : 0;
+
                   return (
                     <>
                       {titleCue && (
                         <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-amber-300/70 leading-snug">
                           {titleCue}
+                        </div>
+                      )}
+                      {/* Rep-total countdown (option A) — a prominent number + progress bar, its own
+                          strip under the title. It does NOT replace the Reps column: every set keeps
+                          its own reps field; this just totals what's left and drops as sets complete. */}
+                      {exRepTotal != null && (
+                        <div className="flex items-center gap-2.5 px-1.5 pt-0.5 pb-2.5" aria-live="polite" aria-label={repTotalLine(exRepTotal, exRepsLeft)}>
+                          <span className={`text-[15px] font-bold tabular-nums leading-none whitespace-nowrap ${exRepsLeft <= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                            {exRepsLeft <= 0
+                              ? `${exRepTotal} reps done`
+                              : (<><span>{exRepsLeft}</span><span className="text-[11px] font-semibold text-white/55 ml-1">reps left</span></>)}
+                          </span>
+                          <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden" aria-hidden="true">
+                            <span
+                              className="block h-full rounded-full transition-all duration-300"
+                              style={{
+                                width: `${Math.max(0, Math.min(1, (exRepTotal - exRepsLeft) / exRepTotal)) * 100}%`,
+                                background: exRepsLeft <= 0 ? '#5fd08a' : 'linear-gradient(90deg,#c9772a,#f2953b)',
+                              }}
+                            />
+                          </span>
                         </div>
                       )}
                       <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
@@ -5259,14 +5335,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               </button>
                             );
                           }
-                          // An "until" pattern prescribes no reps and gets no cell. ⛔ EXCEPTION
-                          // (Q-097/D-224): an AMRAP or rep-max set has reps:undefined BY DESIGN —
-                          // the open count IS the measurement — so it keeps an editable, empty
-                          // field, or the test has nowhere to record and saves "0 reps".
-                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest) {
+                          // An "until" pattern prescribes no reps and gets no cell. ⛔ EXCEPTIONS,
+                          // and all three are sets whose reps are undefined BY DESIGN rather than
+                          // absent — take one out and the athlete has nowhere to type:
+                          //   · AMRAP / rep-max test — the open count IS the measurement (Q-097/D-224);
+                          //   · an assistance REP TOTAL — the set opens blank so each chunk is
+                          //     logged (2026-08-11). Without this the blank-set change would render
+                          //     an accessory with no reps field at all.
+                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal) {
                             return <span aria-hidden="true" />;
                           }
-                          const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest) ? '' : '—'));
+                          const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest || exHasRepTotal) ? '' : '—'));
                           return (
                             <button
                               type="button"
@@ -5326,9 +5405,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // to print "target 5+" and nothing said which one was the all-out set. Only
                         // the flagged set is open-ended, and it is the one whose count moves the
                         // training max (D-338), so it gets its own words.
+                        // ⚠️ AND ON AN ASSISTANCE ROW THERE IS NO PER-SET TARGET AT ALL. "target 50
+                        // total" printed on every set was the same claim the countdown above now
+                        // makes once, and printed per set it read as "50 on this set" — the exact
+                        // misreading the rep-total work exists to remove. Suppressed on
+                        // `hasRepTotal`, not on the parsed number, so a malformed "total" drops the
+                        // meaningless label too instead of rendering "target total".
                         const targetHint = set.amrap
                           ? `AMRAP · ${exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum`
-                          : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null);
+                          : (exHasRepTotal
+                            ? null
+                            : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
                         const cue = barSpeedCueFor(exercise, set);
                         const platesOpen = !isDurationBased && !exIsBodyweight && exEquip === 'barbell'
                           && expandedPlates[`${exercise.id}-${setIndex}`];
