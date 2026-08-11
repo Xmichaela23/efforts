@@ -857,7 +857,11 @@ Deno.serve(async (req)=>{
                   reps: Number(set?.reps ?? 0) || 0,
                   weight: Number(set?.weight ?? 0) || 0,
                   rir: typeof set?.rir === 'number' ? set.rir : undefined,
-                  completed: Boolean(set?.completed)
+                  completed: Boolean(set?.completed),
+                  // Band assist (help lb) — on dips/chins the band IS the load and the progression
+                  // (D-351). This server normalizer was silently dropping it, so Performance showed
+                  // "10 reps" with no assist no matter what the client did (2026-08-11).
+                  ...(set?.resistance_level != null ? { resistance_level: set.resistance_level } : {})
                 }))
               : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
             reps: Number(exercise.reps || 0) || 0,
