@@ -5071,9 +5071,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // Readable, not the .38 the first pass used — these are labels the athlete reads
                   // mid-set with a bar in their hands.
                   const labelCls = 'text-[9px] font-semibold uppercase tracking-[0.08em] text-white/[0.78] leading-none';
+                  // ONE bar-speed cue for the whole lift, right under the title (Michael 2026-08-10) —
+                  // Wendler's explosive-rep instruction, main 5/3/1 lifts only. It was repeated on every
+                  // working set's detail line; that space now carries plate math. `barSpeedCueFor` with
+                  // an empty set returns the work_set line and misses to null off the main lifts.
+                  const titleCue = barSpeedCueFor(exercise, {} as any);
 
                   return (
                     <>
+                      {titleCue && (
+                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-amber-300/70 leading-snug">
+                          {titleCue}
+                        </div>
+                      )}
                       <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
                         <span className={labelCls}>Set</span>
                         <span className={labelCls}>Previous</span>
@@ -5110,7 +5120,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // protocol that killed RIR) cannot drift between the two renders.
                         // No anchor on a TEST — prior data is from a different context (Q-097/Q-102).
                         const prior = exIsBaselineTest ? undefined : priorSetsForEx?.[setIndex];
-                        const priorTxt = prior ? (formatLastSet(prior, exercise.rir_tracked) || '').replace(/^last:\s*/, '') : '';
+                        // Previous only where it MEANS something (Michael 2026-08-10): the AMRAP top
+                        // set (last cycle's rep count shows progress) and accessories (which chase a
+                        // rep total). A fixed 5/3/1 main set is prescribed off the training max — the
+                        // target IS the number, so "previous" there is noise. rir_tracked !== false
+                        // marks the accessories; set.amrap marks the top set.
+                        const showPrevious = set.amrap === true || exercise.rir_tracked !== false;
+                        const priorTxt = (showPrevious && prior) ? (formatLastSet(prior, exercise.rir_tracked) || '').replace(/^last:\s*/, '') : '';
                         // Tap Previous to reuse it. Goes through `updateSet`, so provenance clears
                         // exactly as it does for any other athlete edit (from_previous, prefilled,
                         // and — since this writes no `rir` — the rir_autofilled flag is untouched).
@@ -5217,20 +5233,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   {shownW}
                                 </span>
                               </button>
-                              {/* Plate math, reachable from the weight cell rather than from a
-                                  second row of controls. Sibling of the number button, not nested
-                                  inside it — a button inside a button is invalid and swallows taps. */}
-                              {exEquip === 'barbell' && (
-                                <button
-                                  type="button"
-                                  onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                  className={`absolute -top-1.5 right-0 h-4 px-1 flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-wide transition-colors ${platesOpen ? 'text-amber-200' : 'text-amber-300/70 hover:text-amber-200'}`}
-                                  aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
-                                  aria-expanded={platesOpen ? true : false}
-                                >
-                                  plates
-                                </button>
-                              )}
                             </div>
                           );
                         };
@@ -5373,7 +5375,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   {priorTxt}
                                 </button>
                               ) : (
-                                <span className="text-[11px] text-white/25 leading-none">—</span>
+                                <span className="text-[11px] text-white/25 leading-none">{showPrevious ? '—' : ''}</span>
                               )}
 
                               {renderWeightCell()}
@@ -5405,14 +5407,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 (D-326 — a QUALITY check on a prescribed set, a STOP RULE on an
                                 AMRAP; `barSpeedLineFor` keys on the set so the two can't swap), and
                                 the duration control for timed work. */}
-                            {(targetHint || cue || isDurationBased) && (
+                            {(targetHint || (set.amrap && cue) || (!isDurationBased && !exIsBodyweight && exEquip === 'barbell') || isDurationBased) && (
                               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-[30px] pr-1 pt-1.5">
                                 {targetHint && (
                                   <span className={`text-[10px] font-medium leading-none ${set.amrap ? 'text-amber-300/70' : 'text-white/45'}`}>
                                     {targetHint}
                                   </span>
                                 )}
-                                {cue && <span className="text-[10px] font-medium text-white/55 leading-snug">{cue}</span>}
+                                {/* Plate math lives on this line now — off the weight number (Michael 2026-08-10). */}
+                                {!isDurationBased && !exIsBodyweight && exEquip === 'barbell' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                                    className={`text-[10px] font-semibold uppercase tracking-wide transition-colors ${platesOpen ? 'text-amber-200' : 'text-amber-300/70 hover:text-amber-200'}`}
+                                    aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
+                                    aria-expanded={platesOpen ? true : false}
+                                  >
+                                    plates
+                                  </button>
+                                )}
+                                {/* AMRAP keeps its stop-rule on its own row; the working-set bar-speed
+                                    cue moved to ONE line under the exercise title. */}
+                                {set.amrap && cue && <span className="text-[10px] font-medium text-amber-300/70 leading-snug">{cue}</span>}
                                 {isDurationBased && (
                                   !isDurationRunning ? (
                                     <button

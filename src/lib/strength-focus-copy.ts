@@ -275,7 +275,10 @@ export type BarSpeedMoment =
 export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   warmup: 'Light weight, heavy intent. Move it fast.',
   // ⛔ NO REP-CHASING LINE ANYWHERE NEAR A PRESCRIBED SET.
-  work_set: 'Every rep at the same speed as the first.',
+  // Wendler's working-set instruction is EXPLOSIVE bar speed — move the bar as fast as possible on
+  // every rep; grinding is reserved for the "+" set (5/3/1 2nd ed. p.24). Michael 2026-08-10:
+  // "same speed as the first" read as unhelpful; this is the same intent in his preferred framing.
+  work_set: 'Every rep explosive — move the bar as fast as you can.',
   // ⚠️ REVERSED 2026-08-01 from "Slow rep = last rep." — see the doctrine note above. Grinding reps
   // are real reps; the ceiling is failure, not slowness.
   amrap: 'Grind it out. Stop before failure.',
