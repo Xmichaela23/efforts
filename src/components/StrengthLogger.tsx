@@ -285,129 +285,6 @@ async function cancelRestNotification(key: string): Promise<void> {
 
 // Rest length: `src/lib/strength-rest-timer.ts` (extracted 2026-08-03 so it can be fixtured).
 
-// Readiness Check Banner Component
-interface ReadinessCheckBannerProps {
-  isExpanded: boolean;
-  onToggle: () => void;
-  onSubmit: (data: { energy: number; soreness: number; sleep: number }) => void;
-  data: { energy: number; soreness: number; sleep: number } | null;
-}
-
-const ReadinessCheckBanner: React.FC<ReadinessCheckBannerProps> = ({ 
-  isExpanded, 
-  onToggle, 
-  onSubmit, 
-  data 
-}) => {
-  // Hooper 1–7 (D-234/D-235): defaults are the rescaled equivalents of the old 1–10 defaults (7→5, 3→2).
-  const [energy, setEnergy] = useState(data?.energy || 5);
-  const [soreness, setSoreness] = useState(data?.soreness || 2);
-  const [sleep, setSleep] = useState(data?.sleep || 7); // sleep is HOURS — unchanged
-
-  const handleSubmit = () => {
-    onSubmit({ energy, soreness, sleep });
-  };
-
-  return (
-    <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
-      {/* Collapsed state */}
-      {!isExpanded ? (
-        <button
-          onClick={onToggle}
-          className="w-full px-4 py-3 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-white/60">▶</span>
-            <span className="text-sm font-medium text-white/90">Quick check-in (optional)</span>
-          </div>
-          <span className="text-sm text-white/60">
-            Energy • Soreness • Sleep
-          </span>
-        </button>
-      ) : (
-        /* Expanded state */
-        <div className="p-4">
-          <button
-            onClick={onToggle}
-            className="w-full flex items-center gap-2 mb-4"
-          >
-            <span className="text-sm text-white/60">▼</span>
-            <span className="text-sm font-medium text-white/90">Quick check-in</span>
-          </button>
-          
-          {/* Energy slider */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-white/90">Energy level</label>
-              <span className="text-lg text-white/90">{energy}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-white/60">Low</span>
-              <input
-                type="range"
-                min="1"
-                max="7"
-                value={energy}
-                onChange={(e) => setEnergy(Number(e.target.value))}
-                className="flex-1 h-2 bg-white/[0.15] rounded-lg"
-              />
-              <span className="text-sm text-white/60">High</span>
-            </div>
-          </div>
-          
-          {/* Soreness slider */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-white/90">Muscle soreness</label>
-              <span className="text-lg text-white/90">{soreness}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-white/60">None</span>
-              <input
-                type="range"
-                min="1"
-                max="7"
-                value={soreness}
-                onChange={(e) => setSoreness(Number(e.target.value))}
-                className="flex-1 h-2 bg-white/[0.15] rounded-lg"
-              />
-              <span className="text-sm text-white/60">Severe</span>
-            </div>
-          </div>
-          
-          {/* Sleep input */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-white/90">Sleep last night</label>
-              <span className="text-lg text-white/90">{sleep}h</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-white/60">0h</span>
-              <input
-                type="range"
-                min="0"
-                max="12"
-                step="0.5"
-                value={sleep}
-                onChange={(e) => setSleep(Number(e.target.value))}
-                className="flex-1 h-2 bg-white/[0.15] rounded-lg"
-              />
-              <span className="text-sm text-white/60">12h</span>
-            </div>
-          </div>
-          
-          <button
-            onClick={handleSubmit}
-            className="w-full py-2 rounded-full bg-white/[0.12] border-2 border-white/35 text-white hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300 text-sm font-medium"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Save
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // Plate Math Component
 const PlateMath: React.FC<{ 
@@ -905,14 +782,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [isSaved, setIsSaved] = useState(false);
   const isMountedRef = useRef(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Readiness check state
-  const [showReadinessCheck, setShowReadinessCheck] = useState(false);
-  const [readinessData, setReadinessData] = useState<{
-    energy: number;
-    soreness: number;
-    sleep: number;
-  } | null>(null);
   
   // Helper: detect common bodyweight movements (no default load)
   const isBodyweightMove = (raw?: string): boolean => {
@@ -3994,11 +3863,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // Readiness check handlers
-  const handleReadinessSubmit = (data: { energy: number; soreness: number; sleep: number }) => {
-    setReadinessData(data);
-    setShowReadinessCheck(false);
-  };
-
   const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
     // Set loading state
     setIsSaving(true);
@@ -4081,7 +3945,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const workoutMetadata = createWorkoutMetadata({
       session_rpe: typeof extra?.rpe === 'number' ? extra.rpe : undefined,
       notes: extra?.notes,
-      readiness: readinessData || undefined
     });
 
     const completedWorkout = isMobilityMode ? {
@@ -4155,32 +4018,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // clearing before the await risked losing logged work on a failed/interrupted save).
       clearSessionProgress();
       endSessionClock();  // the duration is banked on the row now; the slot must not outlive it
-
-      // Readiness check-in dual-write (D-142, Q-049 Phase 1 step 3). The check-in
-      // is now a first-class DAILY signal in readiness_checkins (source of truth,
-      // D-140), keyed (user_id, date) and decoupled from the workout. We KEEP the
-      // workout_metadata.readiness JSONB write above — injury-flag extraction and
-      // compute-facts still read it (guardrail: those consumers stay unchanged) —
-      // and ALSO upsert the daily row here. Fail-soft on purpose: a missing table
-      // (pre-migration) or any error must NEVER block the workout save.
-      if (readinessData) {
-        try {
-          const rcUserId = getStoredUserId();
-          if (rcUserId) {
-            await supabase.from('readiness_checkins').upsert({
-              user_id: rcUserId,
-              date: workoutDate,
-              energy: readinessData.energy,
-              soreness: readinessData.soreness,
-              sleep: readinessData.sleep,
-              source: 'workout_logger',
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'user_id,date' });
-          }
-        } catch (rcErr) {
-          console.warn('[readiness] check-in dual-write failed (non-fatal):', rcErr);
-        }
-      }
 
       // ⛔ THE WORKOUT IS ALREADY SAVED BY THIS POINT — DO NOT HOLD THE SPINNER ON THESE.
       //
@@ -4682,14 +4519,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="mt-1 text-sm text-white/60 px-4">Source: {sourcePlannedName}</div>
         )}
       </div>
-
-      {/* Readiness Check Banner */}
-      <ReadinessCheckBanner 
-        isExpanded={showReadinessCheck}
-        onToggle={() => setShowReadinessCheck(!showReadinessCheck)}
-        onSubmit={handleReadinessSubmit}
-        data={readinessData}
-      />
 
       {/* Main content container with proper mobile scrolling */}
       <div className="space-y-2 w-full pb-3">
