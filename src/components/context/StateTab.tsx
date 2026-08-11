@@ -1288,7 +1288,11 @@ export default function StateTab({
 
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
-  const weekNarrative = wsv.coach?.narrative ?? null;
+  // 2026-08-11: the week-narrative blurb is retired from the UI (Michael — no value; it narrated the
+  // planned-vs-actual bar directly beneath it and could contradict it). The server still computes
+  // `coach.narrative` via composeCoachWeekInsight (_shared/insights/coach-week-insights.ts, D-306) — now
+  // UNRENDERED / orphaned. Left for the app-wide audit to delete the composer + payload field (a bigger
+  // call with its own ripples than a client render cut). This surface is client-only, no deploy.
   const raceWeekGuidance = wsv.coach?.grounded_race_week_guidance_v1;
   const trends = wsv.trends;
   const readinessLabel = trends.readiness_label;
@@ -1502,7 +1506,7 @@ export default function StateTab({
               {loadHeadline && (
                 <span className="text-[14px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
               )}
-              {(weekNarrative || readinessWhy) && (
+              {(readinessWhy || readinessSuggestion) && (
                 <div className="flex flex-col">
                   <button
                     type="button"
@@ -1518,7 +1522,6 @@ export default function StateTab({
                       {/* D-232: the FATIGUED headline expands to its real factors, then the loaded-legs suggestion, then prose. */}
                       {readinessWhy && <span className="text-[13px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
                       {readinessSuggestion && <span className="text-[13px] text-white/60 leading-snug mt-1">{readinessSuggestion}</span>}
-                      {weekNarrative && <span className="text-[13px] text-white/55 leading-snug mt-1">{weekNarrative}</span>}
                     </>
                   )}
                 </div>
