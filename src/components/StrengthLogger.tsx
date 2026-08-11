@@ -5363,7 +5363,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {/* AMRAP's instruction sits ABOVE its set — mirroring how the bar-speed
                                 cue sits above the exercise (Michael 2026-08-11). */}
                             {set.amrap && (targetHint || cue) && (
-                              <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
+                              // No horizontal padding here — the set container already adds px-1.5, so
+                              // this lands flush with the bar-speed cue above the exercise (which has
+                              // its own px-1.5 and no container). Same vertical line as "SET".
+                              <div className="pt-0.5 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
                               </div>
                             )}
