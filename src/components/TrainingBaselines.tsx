@@ -1134,7 +1134,7 @@ return (
                           <button
                             key={discipline.id}
                             onClick={() => toggleDiscipline(discipline.id)}
-                            className={`relative flex items-center justify-center gap-1.5 py-2.5 rounded-full border text-center transition-all duration-300 backdrop-blur-lg ${
+                            className={`relative flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-center transition-all duration-300 backdrop-blur-lg ${
                               isActive
                                 ? 'border-transparent'
                                 : hasBaseline
@@ -1227,7 +1227,7 @@ return (
                                       type="button"
                                       onClick={() => void handleFiveKNudgeYes()}
                                       disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-teal-500/25 text-teal-200 border border-teal-500/40 hover:bg-teal-500/35 disabled:opacity-50"
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-teal-500/25 text-teal-200 border border-teal-500/40 hover:bg-teal-500/35 disabled:opacity-50"
                                     >
                                       Yes
                                     </button>
@@ -1235,7 +1235,7 @@ return (
                                       type="button"
                                       onClick={() => void handleFiveKNudgeNo()}
                                       disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/[0.06] text-white/70 border border-white/15 hover:bg-white/10 disabled:opacity-50"
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-white/[0.06] text-white/70 border border-white/15 hover:bg-white/10 disabled:opacity-50"
                                     >
                                       No
                                     </button>
@@ -1586,7 +1586,7 @@ return (
                               ) : !showFtpDatePicker ? (
                                 <button 
                                   onClick={() => setShowFtpDatePicker(true)}
-                                  className="text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-white/10 text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+                                  className="text-xs px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 bg-white/10 text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
                                 >
                                   <Calendar className="h-3.5 w-3.5" />
                                   Schedule FTP Test
@@ -2026,7 +2026,7 @@ return (
                       <button
                         onClick={refreshLearnedProfile}
                         disabled={learningProfile}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-50"
                         type="button"
                       >
                         {learningProfile ? (
@@ -2245,7 +2245,7 @@ return (
                               <button
                                 onClick={refreshLearnedProfile}
                                 disabled={learningProfile}
-                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium rounded-full bg-teal-500/20 border border-teal-500/50 text-teal-400 hover:bg-teal-500/30 transition-all disabled:opacity-50"
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium rounded-xl bg-teal-500/20 border border-teal-500/50 text-teal-400 hover:bg-teal-500/30 transition-all disabled:opacity-50"
                                 type="button"
                               >
                                 {learningProfile ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
@@ -2280,7 +2280,7 @@ return (
                     {!stravaConnected ? (
                       <button
                         onClick={connectStrava}
-                        className="w-full px-4 py-3 text-white bg-orange-500 hover:bg-orange-600 transition-colors font-medium rounded-full"
+                        className="w-full px-4 py-3 text-white bg-orange-500 hover:bg-orange-600 transition-colors font-medium rounded-xl"
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Connect with Strava
@@ -2292,7 +2292,7 @@ return (
                         </div>
                           <button
                             onClick={disconnectStrava}
-                            className="px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 hover:bg-white/[0.12]"
+                            className="px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 hover:bg-white/[0.12]"
                             style={{ fontFamily: 'Inter, sans-serif' }}
                           >
                             Disconnect
@@ -2311,7 +2311,7 @@ return (
                         type="button"
                         onClick={() => void refreshGroupRideSnapshotsFromBaselines()}
                         disabled={routeSnapRefreshBusy || !getStoredUserId()}
-                        className="w-full px-4 py-2.5 text-sm font-medium text-white/90 bg-white/[0.06] hover:bg-white/[0.1] border border-white/20 rounded-full transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        className="w-full px-4 py-2.5 text-sm font-medium text-white/90 bg-white/[0.06] hover:bg-white/[0.1] border border-white/20 rounded-xl transition-colors disabled:opacity-40 disabled:pointer-events-none"
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {routeSnapRefreshBusy ? 'Updating route stats…' : 'Refresh saved Strava route stats'}
@@ -2343,7 +2343,7 @@ return (
                     {!garminConnected ? (
                       <button
                         onClick={connectGarmin}
-                        className="w-full px-4 py-3 text-white bg-blue-500 hover:bg-blue-600 transition-colors font-medium rounded-full"
+                        className="w-full px-4 py-3 text-white bg-blue-500 hover:bg-blue-600 transition-colors font-medium rounded-xl"
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Connect with Garmin
@@ -2355,7 +2355,7 @@ return (
                         </div>
                           <button
                             onClick={disconnectGarmin}
-                            className="px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 hover:bg-white/[0.12]"
+                            className="px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 hover:bg-white/[0.12]"
                             style={{ fontFamily: 'Inter, sans-serif' }}
                           >
                             Disconnect
@@ -2395,7 +2395,7 @@ return (
                 <button
                   onClick={handleSave}
                   disabled={!hasChanges || saving}
-                    className="w-full py-3 px-4 rounded-full bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40 disabled:hover:bg-white/[0.05] disabled:hover:border-white/20 disabled:cursor-default"
+                    className="w-full py-3 px-4 rounded-xl bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40 disabled:hover:bg-white/[0.05] disabled:hover:border-white/20 disabled:cursor-default"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                     {saving ? 'Saving...' : 'Save Baselines'}
