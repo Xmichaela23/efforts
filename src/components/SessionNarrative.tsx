@@ -128,9 +128,12 @@ export function NextUp({ session }: { session: NextSession }) {
   })() : null;
 
   return (
-    <div className="flex items-start gap-2">
-      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">Next</span>
-      <p className="text-sm text-gray-300">
+    // Label ABOVE the text, matching the other labeled blocks on this screen. Beside-the-paragraph
+    // (flex) left the "NEXT" label orphaned at the top-left of a multi-line prescription and read as
+    // off-centered (Michael 2026-08-11).
+    <div>
+      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Next</span>
+      <p className="text-sm text-gray-300 mt-1 leading-snug">
         {dayName && <span className="text-gray-400">{dayName} </span>}
         {session.name}
         {session.prescription && (
