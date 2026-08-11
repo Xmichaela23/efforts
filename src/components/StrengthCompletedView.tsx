@@ -3,6 +3,10 @@ import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthComp
 import { useAppContext } from '@/contexts/AppContext';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
+// The one completed-set shape + the one D-204 "untouched prefill" rule, shared with the server
+// hydrators and the Performance summary so band assist / amrap / duration_seconds never get dropped
+// by a hand-listed rebuild (2026-08-11).
+import { normalizeCompletedStrengthSet, isUntouchedPrefill, type CompletedStrengthSet } from '@/lib/normalize-strength-set';
 
 interface StrengthCompletedViewProps {
   workoutData: any;
@@ -21,12 +25,9 @@ interface StrengthCompletedViewProps {
 interface CompletedExercise {
   id: string;
   name: string;
-  sets?: Array<{
-    reps: number;
-    weight: number;
-    rir?: number;
-    completed: boolean;
-  }>;
+  // The shared completed-set shape — carries resistance_level / amrap / duration_seconds so this
+  // view's receipts read the same fields the normalizer preserves.
+  sets?: CompletedStrengthSet[];
   notes?: string;
   reps?: number;
   weight?: number;
@@ -174,14 +175,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         const reps = parseInt(match[2], 10);
         const weight = Number(ex?.weight || 0);
         
-        // Generate sets array
-        const generatedSets = Array.from({ length: numSets }, () => ({
-          reps,
-          weight,
-          rir: undefined,
-          completed: true
-        }));
-        
+        // Generate sets array — through the shared normalizer so this legacy branch produces the
+        // same set shape as the standard one below.
+        const generatedSets = Array.from({ length: numSets }, () =>
+          normalizeCompletedStrengthSet({ reps, weight, completed: true }));
+
         return { ...ex, name: cleanName, sets: generatedSets };
       }
     }
@@ -189,19 +187,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     // Handle standard format with sets array
     const safeSets = Array.isArray(ex?.sets)
       ? ex.sets
-          // D-204: drop pure untouched prefills (completed!==true && prefilled) so the
-          // Details receipts + volume reflect what was performed, not the prescription.
-          .filter((s: any) => !(s?.completed !== true && s?.prefilled === true))
-          .map((s: any) => ({
-            reps: Number((s?.reps as any) ?? 0) || 0,
-            weight: Number((s?.weight as any) ?? 0) || 0,
-            rir: typeof s?.rir === 'number' ? s.rir : undefined,
-            completed: Boolean(s?.completed),
-            prefilled: Boolean(s?.prefilled),
-            // Carry the band assist through — on dips/chins it IS the load, and this reconstruction
-            // was silently dropping it, so Performance showed "10 reps" with no assist (2026-08-11).
-            ...(s?.resistance_level != null ? { resistance_level: s.resistance_level } : {}),
-          }))
+          // D-204: drop pure untouched prefills so the Details receipts + volume reflect what was
+          // performed, not the prescription. Shape and filter are one shared rule each now — the map
+          // spreads every logged field through (band assist, amrap, duration_seconds).
+          .filter((s: any) => !isUntouchedPrefill(s))
+          .map(normalizeCompletedStrengthSet)
       : [];
     return { ...ex, name: cleanName, sets: safeSets };
   // D-204: drop exercises with no performed sets (pure untouched prefills) so skipped

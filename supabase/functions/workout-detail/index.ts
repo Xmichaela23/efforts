@@ -21,6 +21,12 @@ import {
 } from '../_shared/plan-context.ts';
 import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
+// ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11). Both normalizers below used to
+// rebuild each set by hand — `{reps, weight, rir, completed, prefilled}` — dropping `resistance_level`
+// (band assist), `amrap` and `duration_seconds`. This scope=workout hydrator is the object that WINS
+// the client's completedData merge, so its whitelist was the reason band assist never reached mobile
+// Performance. Shared with get-week and the client so the shape cannot diverge again.
+import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-strength-set.ts';
 // D-349: unit-aware, human-bounded body-weight resolver — the same one the load score and the
 // backfill use, so a session's lb column and its load score are priced off an identical number.
 import { resolveBodyweightLb } from '../_shared/workload.ts';
@@ -284,25 +290,10 @@ function buildDetailCoreForSession(row: any): { detail: any; processingComplete:
   try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
   try {
     let se = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })();
+    // Normalize strength_exercises sets shape for client (smart server, dumb client) — spread-first
+    // via the shared normalizer so resistance_level / amrap / duration_seconds are never dropped.
     if (Array.isArray(se) && se.length > 0) {
-      se = se.map((exercise: any, index: number) => ({
-        id: exercise.id || `temp-${index}`,
-        name: exercise.name || '',
-        sets: Array.isArray(exercise.sets)
-          ? exercise.sets.map((set: any) => ({
-              reps: Number((set?.reps as any) ?? 0) || 0,
-              weight: Number((set?.weight as any) ?? 0) || 0,
-              rir: typeof set?.rir === 'number' ? set.rir : undefined,
-              completed: Boolean(set?.completed),
-              // D-204: preserve prefill provenance so readers can drop untouched prefills.
-              prefilled: Boolean(set?.prefilled)
-            }))
-          : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
-        reps: Number(exercise.reps || 0) || 0,
-        weight: Number(exercise.weight || 0) || 0,
-        notes: exercise.notes || '',
-        weightMode: exercise.weightMode || 'same'
-      }));
+      se = se.map((exercise: any, index: number) => normalizeCompletedStrengthExercise(exercise, index));
     }
     (detail as any).strength_exercises = se;
   } catch {}
@@ -1622,26 +1613,11 @@ Deno.serve(async (req) => {
     try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
     try {
       let se = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })();
-      // Normalize strength_exercises sets shape for client (smart server, dumb client)
+      // Normalize strength_exercises sets shape for client (smart server, dumb client) — spread-first
+      // via the shared normalizer so resistance_level / amrap / duration_seconds are never dropped.
+      // THIS is the scope=workout hydrator that wins the client's completedData merge.
       if (Array.isArray(se) && se.length > 0) {
-        se = se.map((exercise: any, index: number) => ({
-          id: exercise.id || `temp-${index}`,
-          name: exercise.name || '',
-          sets: Array.isArray(exercise.sets)
-            ? exercise.sets.map((set: any) => ({
-                reps: Number((set?.reps as any) ?? 0) || 0,
-                weight: Number((set?.weight as any) ?? 0) || 0,
-                rir: typeof set?.rir === 'number' ? set.rir : undefined,
-                completed: Boolean(set?.completed),
-                // D-204: preserve prefill provenance so readers can drop untouched prefills.
-                prefilled: Boolean(set?.prefilled)
-              }))
-            : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
-          reps: Number(exercise.reps || 0) || 0,
-          weight: Number(exercise.weight || 0) || 0,
-          notes: exercise.notes || '',
-          weightMode: exercise.weightMode || 'same'
-        }));
+        se = se.map((exercise: any, index: number) => normalizeCompletedStrengthExercise(exercise, index));
       }
       (detail as any).strength_exercises = se;
     } catch {}

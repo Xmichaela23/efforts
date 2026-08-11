@@ -11,6 +11,10 @@ import { MAX_SESSION_MINUTES, formatSessionMinutes, parseEditedMinutes } from '@
 import { canonicalize } from '@/lib/canonicalize';
 // D-370: the one rule for "is this planned row an assistance slot", shared with the server matcher.
 import { isAssistanceSlot } from '@/lib/assistance-slot';
+// The one completed-set shape, shared with the server hydrators. Spread-first so a logged field
+// (resistance_level band assist, amrap, duration_seconds) survives the reconstruction below instead
+// of being whitelisted off — the exact bug that hid band assist from Performance (2026-08-11).
+import { normalizeCompletedStrengthSet } from '@/lib/normalize-strength-set';
 
 interface StrengthPerformanceSummaryProps {
   planned: any | null;
@@ -209,29 +213,25 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         const numSets = parseInt(match[1], 10);
         const reps = parseInt(match[2], 10);
         const weight = Number(ex.weight || 0);
-        const setsArray = Array.from({ length: numSets }, () => ({
-          reps,
-          weight,
-          completed: true
-        }));
+        const setsArray = Array.from({ length: numSets }, () =>
+          normalizeCompletedStrengthSet({ reps, weight, completed: true }));
         return { name: ex.name, setsArray };
       }
     }
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       // `substituted_for` rides through so the table can pair a DECLARED swap with the slot it
       // replaced instead of drawing it as a miss plus an unplanned extra (Q-181).
-      return { name: ex.name, setsArray: ex.sets, ...(ex.substituted_for ? { substituted_for: ex.substituted_for } : {}) };
+      // Sets go through the shared normalizer — spread-first, so resistance_level / amrap /
+      // duration_seconds reach the compare table's fmt() instead of being dropped.
+      return { name: ex.name, setsArray: ex.sets.map(normalizeCompletedStrengthSet), ...(ex.substituted_for ? { substituted_for: ex.substituted_for } : {}) };
     }
     // Legacy compact shape: sets = set count, reps & weight on exercise (same as workout-detail fallback)
     if (typeof ex.sets === 'number' && ex.sets > 0) {
       const reps = Number(ex.reps ?? 0) || 0;
       const weight = Number(ex.weight ?? 0) || 0;
       if (reps > 0 || weight > 0) {
-        const setsArray = Array.from({ length: ex.sets }, () => ({
-          reps,
-          weight,
-          completed: true as boolean,
-        }));
+        const setsArray = Array.from({ length: ex.sets }, () =>
+          normalizeCompletedStrengthSet({ reps, weight, completed: true }));
         return { name: ex.name, setsArray };
       }
     }

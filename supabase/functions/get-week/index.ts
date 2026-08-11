@@ -21,6 +21,10 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // duplicate-session bug it fixes was invisible until a device showed it. See that file's header.
 import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+// ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11) — shared with workout-detail and the
+// client so a logged field (resistance_level band assist, amrap, duration_seconds) can't be dropped
+// by a hand-listed rebuild on any one path. See the file header.
+import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-strength-set.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -848,27 +852,9 @@ Deno.serve(async (req)=>{
           } catch  {}
         }
         if (se && se.length) {
-          // Normalize sets shape for client (smart server, dumb client)
-          executed.strength_exercises = se.map((exercise, index) => ({
-            id: exercise.id || `temp-${index}`,
-            name: exercise.name || '',
-            sets: Array.isArray(exercise.sets)
-              ? exercise.sets.map((set) => ({
-                  reps: Number(set?.reps ?? 0) || 0,
-                  weight: Number(set?.weight ?? 0) || 0,
-                  rir: typeof set?.rir === 'number' ? set.rir : undefined,
-                  completed: Boolean(set?.completed),
-                  // Band assist (help lb) — on dips/chins the band IS the load and the progression
-                  // (D-351). This server normalizer was silently dropping it, so Performance showed
-                  // "10 reps" with no assist no matter what the client did (2026-08-11).
-                  ...(set?.resistance_level != null ? { resistance_level: set.resistance_level } : {})
-                }))
-              : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
-            reps: Number(exercise.reps || 0) || 0,
-            weight: Number(exercise.weight || 0) || 0,
-            notes: exercise.notes || '',
-            weightMode: exercise.weightMode || 'same'
-          }));
+          // Normalize sets shape for client (smart server, dumb client) — spread-first via the shared
+          // normalizer so resistance_level (band assist, D-351) / amrap / duration_seconds survive.
+          executed.strength_exercises = se.map((exercise, index) => normalizeCompletedStrengthExercise(exercise, index));
         }
         const rawME = w?.mobility_exercises;
         let me = [];

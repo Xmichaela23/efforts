@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase, getStoredUserId } from "@/lib/supabase";
 import { safeParseJSONB } from "@/utils/jsonb";
+// The one completed-set/exercise shape, shared with the server hydrators (2026-08-11).
+import { normalizeCompletedStrengthExercise } from "@/lib/normalize-strength-set";
 
 /** Fire-and-forget full pipeline for completed workouts (see `recompute-workout` edge). */
 function fireRecomputeWorkout(workoutId: string) {
@@ -697,24 +699,10 @@ export const useWorkouts = () => {
                   : w.strength_exercises;
                 
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                  // Transform to sets shape; server (workout-detail, get-week) may already normalize
-                  return parsed.map((exercise: any, index) => ({
-                    id: exercise.id || `temp-${index}`,
-                    name: exercise.name || '',
-                    // Normalize to sets array for completed view compatibility
-                    sets: Array.isArray(exercise.sets)
-                      ? exercise.sets.map((set: any) => ({
-                          reps: Number((set?.reps as any) ?? 0) || 0,
-                          weight: Number((set?.weight as any) ?? 0) || 0,
-                          rir: typeof set?.rir === 'number' ? set.rir : undefined,
-                          completed: Boolean(set?.completed)
-                        }))
-                      : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
-                    reps: Number(exercise.reps || 0) || 0,
-                    weight: Number(exercise.weight || 0) || 0,
-                    notes: exercise.notes || '',
-                    weightMode: exercise.weightMode || 'same' as const
-                  }));
+                  // Transform to sets shape via the shared normalizer (server workout-detail / get-week
+                  // route through the same one) — spread-first so resistance_level / amrap /
+                  // duration_seconds / prefilled survive instead of being whitelisted off.
+                  return parsed.map((exercise: any, index) => normalizeCompletedStrengthExercise(exercise, index));
                 }
               } catch {
                 /* strength_exercises JSON invalid — skip field */
