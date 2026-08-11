@@ -35,8 +35,8 @@ surface-by-surface. **But the engine acceptance run — log a real session, read
 a block — still has not happened.** Do not start new work. If Michael opens with a new request, say
 this first.
 
-⚠️ **AND THE PATTERN IN TODAY'S BUGS IS THE ARGUMENT FOR IT.** Of the nine defects fixed today, **six
-were invisible to every test in the repo** — a collapsed flex child, a floating chip row, a dead
+⚠️ **AND THE PATTERN IN THE 2026-08-10 BUGS IS THE ARGUMENT FOR IT.** Of the nine defects fixed that
+day, **six were invisible to every test in the repo** — a collapsed flex child, a floating chip row, a dead
 Continue button, a running clock with no off switch, a banner in the way, a missing space. Fixtures
 caught none of them and could not have. **A device pass is not bookkeeping on this screen; it is the
 only instrument that works.**
