@@ -1482,3 +1482,68 @@ next-week's Monday but the content is now-anchored and correct, no divergence. `
 `asOf` is a rolling window; a few hours' tz shift never blanks it. The one tz-sensitive spot was the
 ACWR `asOf`, fixed above. **Residual, filed not fixed:** a Sunday-evening live compute still *labels*
 its snapshot row with the UTC Monday; harmless today (reader agrees), localizable later with the now-stored tz.
+
+### D-416 — Load stays objective, readiness sits beside it: one soft signal stops cascading into three red flags (2026-08-11, **PUSHED `70b46755` + DEPLOYED coach + generate-overall-context; AWAITING DEVICE**)
+
+**The report (Michael, on the State screen).** "'A bit high' for load doesn't track to the work done, and
+'a bit harder than usual' feels like a heavy red flag." Both were right, and they were the **same** signal.
+
+**The trace.** A single +0.7 RPE reading (4.6 vs 3.9 typical) set raw `readinessState` to `'fatigued'`
+via the catch-all `if (bodySignalsConcerning) return 'fatigued'` (`coach:3119`, one concerning signal is
+enough). That one raw value then cascaded three ways:
+- **Load verdict** — the reconciler's readiness floor (`load-status-reconcile.ts:303`) raised load to
+  `elevated` → "a bit high", even though **ACWR 1.1 bands to `optimal`** on its own (`acwr-state.ts:69`,
+  ≤1.3). So the verdict came from the soft signal, not the work.
+- **The over-reach accent** — "Load is running 1.1× while readiness reads strained — needs absorbing
+  before more load" (`week-accent.ts:103`, fed raw readiness).
+- **The BODY RPE row** — rendered **red**, because the color escalation was inverted (see below).
+
+D-232 had already *noticed* the catch-all "over-fires on a single signal" and added a refinement — but
+only for the **display chip** (`coach:5821`, → "EFFORT UP"). The load reconciler and the accent still ate
+the raw `fatigued`. The label got calm; the verdict never did.
+
+**The decision.** Load is measured from the work; readiness sits beside it and never rewrites the load
+label. **Verified against Garmin / TrainingPeaks / Strava** (their own docs + the ACWR literature): all
+three keep objective load (ratio / CTL-ATL-TSB) separate from subjective readiness, and none lets a lone
+RPE reading relabel the load number. Closest in shape to Garmin (readiness reads *downstream* of load).
+ACWR 1.1 sits in the injury-risk sweet spot (0.8–1.3); "high" begins ~1.5.
+
+**What shipped.**
+1. **One pure rule** — `readinessForLoadVerdict(readinessState, fatigueLabel)`
+   (`_shared/response-model/loaded-legs.ts`): a non-systemic `fatigued` (refined label EFFORT UP /
+   LEGS LOADED / LEGS SORE) → `'normal'`; only **systemic** `FATIGUED` (elevated ACWR or ≥2 declining
+   signals) or `'overreached'` carry into the load path.
+2. **Fed into all four fatigue consumers** in `coach/index.ts`: the load reconciler (D-260 sole
+   authority), the over-reach accent, and **both Adjust-tab suggestions** (deload / add-recovery). The
+   **safety floor** (`computeSafetyFloor`) and the honest `readiness_state` payload stay on the **raw**
+   value — this is verdict-only, safety is untouched.
+3. **Adjust-tab suggestions made plan-aware** — they now skip any week the plan is already easing
+   (recovery / taper / **planned deload**); a deload week used to fall through and could suggest a deload
+   mid-deload.
+4. **Un-inverted the BODY RPE tone** (`rpeFeelTone`, `weekly.ts`): "a bit harder" (0.5–1.0) → amber; red
+   reserved for "noticeably harder" (≥1.0). Reverses the D-232-era color mapping (which had it backwards).
+5. `COACH_PAYLOAD_VERSION` 163 → 164 so cached rows re-source the moved `load_status.status` +
+   `visible_signals[].trend_tone`. Client floor **not** moved (raising it early blanked the section
+   2026-08-02).
+
+**Why the reconciler itself was NOT touched.** It is the sole verdict authority (D-260); the fix is
+UPSTREAM — deciding which readiness string it is fed. Downgrading a non-systemic `fatigued` to `normal`
+is coherent across every branch that reads the arg (they all then treat the body as fine, which is what
+"not systemic" means), and genuinely systemic fatigue (ACWR ≥1.2 or ≥2 signals) keeps `FATIGUED` and
+still raises.
+
+**Fixtures (permanent regressions).** Three D-416 cases in `load-status-reconcile.test.ts` pin the
+cascade at the seam (raw `fatigued` @ ACWR 1.1 → `elevated` = the bug; refined → `on_target` = fixed;
+systemic FATIGUED → still `elevated`), `readinessForLoadVerdict` cases in `loaded-legs.test.ts`, and the
+un-inverted tone cases in `weekly-rpe-verdict.test.ts`. 70 + 87 tests green; touched shared files
+typecheck clean.
+
+**Back-annotated:** D-232 (archive) — the glass-box standard stands; its RPE color mapping and its
+single-signal-`fatigued` cascade are what D-416 reverses/narrows.
+
+**AWAITING DEVICE:** on an ACWR-1.1 week the load should read **balanced** (not "a bit high"), the
+"needs absorbing" line gone, "a bit harder" **amber not red**, and no deload prompt on the Adjust tab.
+
+**Side note (filed, not fixed):** the `caution_ramping_fast` OR-branch on the add-recovery suggestion is
+still a load-ramp signal, but it remains gated by `bodyConfirmed` (signals_concerning > 0), so it can't
+fire on load alone.

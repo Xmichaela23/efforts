@@ -4705,6 +4705,19 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-232 — Glass-box verdict language: every athlete-facing verdict is a plain sentence citing its evidence
 
+> ⚠️ **PARTLY SUPERSEDED by D-416 (2026-08-11, DECISIONS-LOG-2.md).** The glass-box STANDARD stands —
+> D-416 keeps the receipt ("you rated 4.6 avg vs 3.9 typical"). Two *mechanisms* this entry set up were
+> reversed/narrowed:
+> 1. **The RPE color escalation was inverted.** This entry's "tone escalates with the number" shipped in
+>    code (`weekly.ts rpeFeelTone`) as: harder 0.5–1.0 → **danger (red)**, harder ≥1.0 → **warning
+>    (amber)** — the *milder* bucket wore the *harsher* color, so a +0.7 read as a heavy red flag. D-416
+>    swaps them: 0.5–1.0 → amber, red reserved for ≥1.0.
+> 2. **The single-signal `fatigued` catch-all no longer reaches the LOAD verdict.** This entry (Extension,
+>    tier 2) tried to make the one-RPE-signal `FATIGUED` catch-all *legible* via disclosure; it still let
+>    that lone signal cascade into the load reconciler + accent → "a bit high" / "needs absorbing" on an
+>    optimal ACWR week. D-416 feeds the load path the *refined* readiness (systemic-only), so a lone
+>    effort-up discloses but never relabels load. Everything below is history.
+
 - **Date:** 2026-07-02
 - **Decision (standard, applies to ALL current + future State/athlete-facing rows):** no athlete-facing surface renders a **raw engine value or a bare delta**. Every verdict is a **plain-language sentence that cites its own evidence** — the "My Record" / bench-row pattern: **what we measured, versus what, and what it means.**
   - Not `125 → 115 lbs` → **`Working ~125 vs your 150 baseline — suggest 115 this week`** (D-231, shipped).
