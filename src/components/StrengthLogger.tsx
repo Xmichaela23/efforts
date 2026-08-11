@@ -10,6 +10,7 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, R
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
+import { estimate1RM } from '@/lib/estimate-1rm';
 import {
   getExerciseConfig,
   normalizeLiftKey,
@@ -506,6 +507,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
   const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
+  // The athlete's recorded 1RM for the four main lifts (mirrors the seeding resolver `oneRmOf`).
+  // Feeds the AMRAP PR badge: an AMRAP whose estimated 1RM beats the recorded number is a new best —
+  // Wendler's "keep breaking rep records and the 1RM goes up." The record itself is computed
+  // downstream (compute-facts → exercise_log → State/Performance); this is only the in-logger badge.
+  const recordedOneRmFor = (name: string): number | undefined => {
+    const t = String(name || '').toLowerCase();
+    const pn: any = performanceNumbers;
+    if (!pn) return undefined;
+    if (t.includes('deadlift')) return typeof pn.deadlift === 'number' ? pn.deadlift : undefined;
+    if (t.includes('bench')) return typeof pn.bench === 'number' ? pn.bench : undefined;
+    if (t.includes('overhead') || t.includes('ohp')) return typeof pn.overhead === 'number' ? pn.overhead : (typeof pn.overheadPress1RM === 'number' ? pn.overheadPress1RM : undefined);
+    if (t.includes('squat')) return typeof pn.squat === 'number' ? pn.squat : undefined;
+    return undefined;
+  };
   // D-322 line 12: per-lift MEASURED 1RMs from `learned_fitness.strength_1rms`, keyed snake_case
   // ('hip_thrust', 'barbell_row'). Read only by the added-exercise weight chain.
   const [learnedStrength1rms, setLearnedStrength1rms] = useState<Record<string, any>>({});
@@ -5186,6 +5201,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const showAddWarmupButton = exIsBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
                         const result = baselineTestResults[exercise.id];
                         const done = set.completed === true;
+                        // AMRAP PR — the top set's estimated 1RM beats the recorded 1RM for this lift.
+                        // Only the four main lifts have a recorded number; everything else returns false.
+                        const amrapE1rm = (set.amrap && done && Number(set.weight) > 0 && Number(set.reps) > 0)
+                          ? Math.round(estimate1RM(Number(set.weight), Number(set.reps)))
+                          : null;
+                        const recordedOneRm = set.amrap && done ? recordedOneRmFor(exercise.name) : undefined;
+                        const isAmrapPR = amrapE1rm != null && recordedOneRm != null && amrapE1rm > recordedOneRm;
 
                         const numCls = `w-full bg-transparent border-0 border-b-[1.5px] pb-1 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
                         const numStyle: React.CSSProperties = { fontSize: '17px', fontFamily: 'Inter, sans-serif' };
@@ -5457,6 +5479,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               // its own px-1.5 and no container). Same vertical line as "SET".
                               <div className="pt-0.5 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
+                              </div>
+                            )}
+
+                            {/* AMRAP PR — the top set's estimated 1RM beat the recorded number for this
+                                lift. The record itself lands on State/Performance; this is the badge in
+                                the moment it's hit (Michael 2026-08-11). */}
+                            {isAmrapPR && (
+                              <div className="pb-2 flex items-center gap-2" role="status" aria-label={`Personal record — estimated 1RM ${amrapE1rm} pounds`}>
+                                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-400/25 border border-amber-300/70 text-amber-50">PR</span>
+                                <span className="text-[11px] font-medium text-amber-200/85">new best — est. 1RM {amrapE1rm} lb</span>
                               </div>
                             )}
 
