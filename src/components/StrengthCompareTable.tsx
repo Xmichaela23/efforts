@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 // THE app's exercise vocabulary. Rows pair on this so the table cannot disagree with the count
 // above it, or with the trend on State, about what a lift is called.
 import { canonicalize } from '@/lib/canonicalize';
+import { isBandAssistedMovement } from '@/lib/band-assistance';
 
 export interface StrengthSet {
   reps?: number;
@@ -146,7 +147,7 @@ function formatPrevDate(dateStr: string | null | undefined): string | null {
 export default function StrengthCompareTable({ planned, completed, completedWorkoutRaw, planId: initialPlanId, plannedWorkoutId, rirSummary, previousByExercise, workoutId, strengthVolume, substitutions, onAdjustmentSaved }: StrengthCompareTableProps){
   // editingSet: { exerciseName, setIndex } — which completed set is being edited inline
   const [editingSet, setEditingSet] = useState<{ exerciseName: string; setIndex: number } | null>(null);
-  const [editFields, setEditFields] = useState<{ reps: string; weight: string; rir: string }>({ reps: '', weight: '', rir: '' });
+  const [editFields, setEditFields] = useState<{ reps: string; weight: string; rir: string; resistance: string }>({ reps: '', weight: '', rir: '', resistance: '' });
   const [savingSet, setSavingSet] = useState(false);
 
   const startEditSet = (exerciseName: string, setIndex: number, set: StrengthSet) => {
@@ -155,12 +156,13 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       reps: set.reps != null ? String(set.reps) : '',
       weight: set.weight != null ? String(set.weight) : '',
       rir: set.rir != null ? String(set.rir) : '',
+      resistance: (set as any).resistance_level != null ? String((set as any).resistance_level) : '',
     });
   };
 
   const cancelEditSet = () => {
     setEditingSet(null);
-    setEditFields({ reps: '', weight: '', rir: '' });
+    setEditFields({ reps: '', weight: '', rir: '', resistance: '' });
   };
 
   const saveEditSet = async () => {
@@ -193,6 +195,8 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       if (editFields.reps !== '') updated.reps = parseInt(editFields.reps, 10);
       if (editFields.weight !== '') updated.weight = parseFloat(editFields.weight);
       if (editFields.rir !== '') updated.rir = parseFloat(editFields.rir);
+      // Band assist (help lb) — editable on assist-capable moves so a mis-logged band is correctable.
+      if (editFields.resistance !== '') updated.resistance_level = parseFloat(editFields.resistance);
       sets[setIdx] = updated;
 
       const updatedExercises = exercises.map((e: any, i: number) =>
@@ -656,9 +660,18 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     if (typeof s.weight === 'number' && s.weight > 0) return ` @ ${Math.round(s.weight)} lb`;
                     return '';
                   })();
+                  // Assist clause — band-assisted moves (dips / chin-ups / pull-ups) store the band's
+                  // help in `resistance_level`. On these the assist IS the load and the progression
+                  // (walk the band down to get stronger, D-351), so it must show in Performance, not
+                  // just in the logger (Michael 2026-08-11). Help is assistance, shown negative.
+                  const assistClause = (() => {
+                    const a = (s as any).resistance_level;
+                    const n = a != null && String(a).trim() !== '' && Number.isFinite(Number(a)) ? Number(a) : NaN;
+                    return n > 0 ? ` · −${Math.round(n)} lb assist` : '';
+                  })();
                   // Duration-based exercises (planks, carries) — duration goes first.
                   if (s.duration_seconds && s.duration_seconds > 0) {
-                    return `${formatSeconds(s.duration_seconds)}${weightClause}${rirTxt}`;
+                    return `${formatSeconds(s.duration_seconds)}${weightClause}${assistClause}${rirTxt}`;
                   }
                   // Rep-based exercises.
                   // ⛔ THE ALL-OUT SET SAYS SO. "5+" is 5/3/1's own notation for "at least five, then
@@ -667,7 +680,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                   // matters look like every other set, and made a 9-rep effort read as +4 over plan
                   // rather than as the reading it is.
                   const repsTxt = (s as any).amrap ? `${s.reps || 0}+ reps` : `${s.reps || 0} reps`;
-                  return `${repsTxt}${weightClause}${rirTxt}`;
+                  return `${repsTxt}${weightClause}${assistClause}${rirTxt}`;
                 };
                 const isEditing = editingSet?.exerciseName === r.name && editingSet?.setIndex === idx;
                 return (
@@ -693,6 +706,17 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                                 type="number" inputMode="decimal"
                                 value={editFields.weight}
                                 onChange={e => setEditFields(f => ({ ...f, weight: e.target.value }))}
+                                className="w-16 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm text-center focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                          )}
+                          {isBandAssistedMovement(r.name) && (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-white/40 uppercase">Assist (lb)</span>
+                              <input
+                                type="number" inputMode="decimal"
+                                value={editFields.resistance}
+                                onChange={e => setEditFields(f => ({ ...f, resistance: e.target.value }))}
                                 className="w-16 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm text-center focus:outline-none focus:border-amber-500"
                               />
                             </div>
