@@ -4642,9 +4642,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div
             className={`backdrop-blur-xl border-2 ${themeColors.border} rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(${themeColors.rgb},0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}
             style={{
-              // Darker, richer ground (2026-08-10) — warm bleed off the top over near-black, not a
-              // flat orange wash. Matches the approved mockup: top-down, warm → black.
-              background: `linear-gradient(180deg, rgba(${themeColors.rgb},0.16) 0%, rgba(${themeColors.rgb},0.05) 42%, rgba(8,6,5,0.55) 100%), #0f0b09`
+              // Black ground, amber as LIGHT (2026-08-10) — the accent reads as a light source
+              // glowing off the top edge, not a flat wash. A focused radial from top-center fades
+              // fast to near-pure black, so the card is black with the amber bleeding in like lighting.
+              background: `radial-gradient(140% 78% at 50% -14%, rgba(${themeColors.rgb},0.24) 0%, rgba(${themeColors.rgb},0.05) 34%, transparent 62%), #060506`
             }}
           >
             {/* Core Work/Circuit exercises use the CoreTimer component */}
@@ -5419,7 +5420,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   <button
                                     type="button"
                                     onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                    className={`text-[10px] font-semibold uppercase tracking-wide transition-colors ${platesOpen ? 'text-amber-200' : 'text-amber-300/70 hover:text-amber-200'}`}
+                                    className={`text-[10px] font-medium leading-none px-1.5 py-0.5 rounded-md border transition-colors ${platesOpen ? 'text-amber-100 border-amber-400/50 bg-amber-500/[0.16]' : 'text-amber-300/80 border-amber-400/30 hover:text-amber-200 hover:border-amber-400/50'}`}
                                     aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
                                     aria-expanded={platesOpen ? true : false}
                                   >
