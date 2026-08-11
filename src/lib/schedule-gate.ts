@@ -122,19 +122,30 @@ export function scheduleBlockedReason(i: ScheduleGateInput): string | null {
    * athlete; a silent server-side 2 is answering for them with the answer hidden. The pills stay
    * unlit and the row reads "Pick one" — the principle is enforced here, not abandoned.
    */
-  if (i.runShown && i.runDays < 2) return 'Runs a week has no number yet.';
-  if (i.rideShown && i.rideDays < 1) return 'Rides a week has no number yet.';
-  if (i.runShown && longDayCalledFor(i, 'run') && !i.longRunDay) return 'The long run has no day yet.';
-  if (i.rideShown && longDayCalledFor(i, 'bike') && !i.longRideDay) return 'The long ride has no day yet.';
-  // ⛔ THE HARD DAY IS OPTIONAL (D-327 permits one; it never required one), so only a HALF-answer
-  // blocks. A discipline with no day leaves an anchor the solver cannot place; declining the whole
-  // question is a complete answer and passes.
+  // ⛔ ONE-AT-A-TIME BY CONTRACT — the FIRST blocker in row order. The pinned sequence tests assert
+  // this stays first-only. The full list lives in `scheduleBlockedReasons` below (single source); this
+  // singular is just its head, so the two can never disagree.
+  return scheduleBlockedReasons(i)[0] ?? null;
+}
+
+// ⛔ EVERY blocker at once, in row order (runs, rides, long run, long ride, hard). The gate is STILL
+// one-at-a-time for the BOOLEAN (`scheduleCanContinue` reads `=== null` on the singular), but a card
+// can show every unanswered required field together instead of making the athlete clear them one by
+// one and meet the next — friction-free entry. This is the single source; the singular reads [0].
+export function scheduleBlockedReasons(i: ScheduleGateInput): string[] {
+  const out: string[] = [];
+  if (i.runShown && i.runDays < 2) out.push('Runs a week has no number yet.');
+  if (i.rideShown && i.rideDays < 1) out.push('Rides a week has no number yet.');
+  if (i.runShown && longDayCalledFor(i, 'run') && !i.longRunDay) out.push('The long run has no day yet.');
+  if (i.rideShown && longDayCalledFor(i, 'bike') && !i.longRideDay) out.push('The long ride has no day yet.');
+  // Hard day is OPTIONAL (D-327 permits one; never required one), so only a HALF-answer blocks: a
+  // discipline chosen with no day leaves an anchor the solver cannot place. Declining passes.
   for (const d of ['run', 'bike']) {
     if (d in i.qualityDays && !i.qualityDays[d]) {
-      return 'The hard day has a discipline but no day. Tapping the discipline again drops it.';
+      out.push('The hard day has a discipline but no day. Tapping the discipline again drops it.');
     }
   }
-  return null;
+  return out;
 }
 
 /** Sugar for the caller — the button is enabled exactly when there is no sentence to show. */

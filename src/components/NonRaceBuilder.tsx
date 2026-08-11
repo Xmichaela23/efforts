@@ -19,6 +19,7 @@ import { anchorDaysTaken } from '@/lib/anchor-days';
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
 import {
   scheduleBlockedReason as scheduleGateReason,
+  scheduleBlockedReasons as scheduleGateReasons,
   SCHEDULE_OPTIONAL_ROWS,
   SCHEDULE_ROW_ORDER,
 } from '@/lib/schedule-gate';
@@ -319,16 +320,17 @@ function WeekDayRow({
   const skin: Record<DayRole, string> = {
     R: 'bg-white/[0.04] border-white/25 text-white/65',
     E: 'bg-white/[0.10] border-white/20 text-white/90',
-    LR: 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] border-[rgb(var(--wiz-accent-rgb,236,233,227))] text-white',
+    LR: 'bg-white/[0.14] border-white/60 text-white',
     C: 'bg-amber-400/20 border-amber-400/50 text-amber-100',
-    // ⛔ THE STRONG FOCUS ANCHORS (2026-08-09). Both are pinned days like `LR`, so both take the
-    // accent — the row's language is "the accent means an anchor you placed", and inventing a third
-    // and fourth colour for it would say they differ in kind when they do not. The LETTER separates
-    // them, and the answer card directly above spells each one out in words.
-    // ⚠️ `H` is amber, not accent: it is the one day that is hard rather than long, and amber is
-    // already this file's mark for a day carrying intensity (the club night above).
+    // ⛔ THE ANCHOR FILL IS NEUTRAL WHITE, NOT THE ACCENT (2026-08-11). The wizard's accent is the
+    // FOCUS sport's colour (Get-Strong sets `--wiz-accent-rgb` to strength orange), so painting a
+    // picked long-RUN or long-RIDE day in it coded that day as strength — a run day glowing the
+    // strength hue. The sport cue now lives on the open ROW's box (gold run / green ride); the day
+    // chip only says "this is the one", in plain white. The LETTER (LR/LB) still separates them.
+    // ⚠️ `H`/`C` stay amber: that is this file's mark for an intensity day (hard/club), not a sport,
+    // so it does not miscode — leave it.
     H: 'bg-amber-400/20 border-amber-400/50 text-amber-100',
-    LB: 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] border-[rgb(var(--wiz-accent-rgb,236,233,227))] text-white',
+    LB: 'bg-white/[0.14] border-white/60 text-white',
   };
   return (
     <div className="grid grid-cols-7 gap-1 min-w-0">
@@ -348,9 +350,9 @@ function WeekDayRow({
             aria-label={heldBy
               ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
               : (active ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-lg text-[11px] min-w-0 border ${
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl text-[11px] min-w-0 border ${
               off ? 'bg-transparent border-white/5 text-white/15' : skin[role]
-            } ${active && !off ? 'ring-2 ring-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)]' : ''}`}
+            } ${active && !off ? 'ring-2 ring-white/60' : ''}`}
           >
             <span className="leading-none font-medium">{DAY_SHORT[d]}</span>
             {/* Named, not just greyed — an inert square is a puzzle; "long run" is an answer. */}
@@ -402,7 +404,7 @@ function DayPicker({ value, onChange, allowed, taken }: {
             aria-label={heldBy
               ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
               : (value === d ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
-            className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-lg text-xs ${
+            className={`${allowed ? 'flex-1 ' : ''}py-2 rounded-xl text-xs ${
               heldBy
                 ? 'bg-white/[0.02] text-white/25 border border-white/[0.06] cursor-not-allowed'
                 : value === d
@@ -1704,6 +1706,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const runCanContinue = true;
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
 
+  // "How much" (volume) gate — mirror the schedule gate's "require only what the card renders" rule:
+  // the running field shows on posturePresent('run'), the riding field on bike === 'maintain'. Require
+  // a number for each field that is actually shown; a strength-only athlete (neither shown) is not blocked.
+  const volumeCanContinue =
+    (!posturePresent('run') || Number(state.targetMiles) > 0) &&
+    (state.posture?.bike !== 'maintain' || Number(state.rideHours) > 0);
+  // Reason shown at the Continue key when blocked — fact-statement, matching the schedule gate's
+  // "Runs a week has no number yet" voice (not an imperative).
+  const volumeMissing: string[] = [];
+  if (posturePresent('run') && !(Number(state.targetMiles) > 0)) volumeMissing.push('running');
+  if (state.posture?.bike === 'maintain' && !(Number(state.rideHours) > 0)) volumeMissing.push('riding');
+  const volumeBlockedReason =
+    volumeMissing.length === 0 ? undefined
+    : volumeMissing.length === 1 ? `Weekly ${volumeMissing[0]} has no number yet.`
+    : 'Weekly running and riding have no number yet.';
+
+  // A blocker reason that NAMES a discipline gets that discipline's colour (run gold / ride green) —
+  // the same wayfinding as the rows. Without this the line renders in the wizard accent, which is the
+  // FOCUS sport's colour (strength orange), so "Runs a week has no number yet" read as strength.
+  // Mixed / hard-day / non-discipline reasons fall through to the neutral accent.
+  const reasonSportColor = (reason?: string | null): string | undefined =>
+    !reason ? undefined
+    : /^(Runs|The long run|Weekly running)/.test(reason) ? `rgb(${getDisciplineColorRgb('run')})`
+    : /^(Rides|The long ride|Weekly riding)/.test(reason) ? `rgb(${getDisciplineColorRgb('bike')})`
+    : undefined;
+  const tintedReason = (reason?: string | null) =>
+    reason ? <span style={{ color: reasonSportColor(reason) }}>{reason}</span> : undefined;
+
   /**
    * ⛔ THE SCHEDULER GATE (2026-07-29). Michael: *"all that needs to be gated."*
    *
@@ -1767,6 +1797,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   };
   const scheduleBlockedReason = scheduleGateReason(scheduleGateInput);
   const scheduleCanContinue = scheduleBlockedReason === null;
+  // Surface EVERY missing required field at once (runs AND rides, not just the first), each in its
+  // own discipline colour — so the athlete sees the whole ask, not one-then-the-next.
+  const scheduleAllReasons = scheduleGateReasons(scheduleGateInput);
+  const scheduleReasonNode = scheduleAllReasons.length === 0
+    ? undefined
+    : scheduleAllReasons.length === 1
+      ? tintedReason(scheduleAllReasons[0])
+      : (
+        <span className="flex flex-col gap-0.5">
+          {scheduleAllReasons.map((r, idx) => (
+            <span key={idx} style={{ color: reasonSportColor(r) }}>{r}</span>
+          ))}
+        </span>
+      );
   // ⛔ ONE HARD AEROBIC DAY — D-327, enforced by the SHAPE of the "Hard day" row (one slot).
   //
   // History, so nobody re-derives it: this was TWO hard days, priced-not-refused, with a one-shot
@@ -2144,7 +2188,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   <button
                     key={d} type="button"
                     onClick={() => setState((s) => ({ ...s, raceDistance: d }))}
-                    className={`py-2 rounded-lg text-sm ${state.raceDistance === d ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    className={`py-2 rounded-xl text-sm ${state.raceDistance === d ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                   >{d}</button>
                 ))}
               </div>
@@ -2221,7 +2265,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     ...s, raceElevation: e.target.value === '' ? '' : Number(e.target.value),
                   }))}
                   placeholder={unit === 'km' ? 'e.g. 340' : 'e.g. 1100'}
-                  className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                  className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
                   style={{ fontSize: '16px' }}
                 />
                 <span className="text-white/75 text-sm">{unit === 'km' ? 'm' : 'ft'} of gain</span>
@@ -2326,7 +2370,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     {[4, 5, 6, 7].map((n) => (
                       <button
                         key={n} type="button" onClick={() => setState((st) => ({ ...st, daysPerWeek: n }))}
-                        className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                        className={`py-2 rounded-xl text-sm ${state.daysPerWeek === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                       >{n}</button>
                     ))}
                   </div>
@@ -2340,7 +2384,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       onChange={(e) => setState((st) => ({
                         ...st, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true,
                       }))}
-                      className="w-24 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                      className="w-24 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
                       style={{ fontSize: '16px' }}
                     />
                     <span className="text-white/75 text-sm">{unit}/wk</span>
@@ -2361,7 +2405,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       onChange={(e) => setState((st) => ({
                         ...st, longRunMiles: e.target.value === '' ? '' : Number(e.target.value),
                       }))}
-                      className="w-24 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                      className="w-24 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
                       style={{ fontSize: '16px' }}
                     />
                     <span className="text-white/75 text-sm">{unit}</span>
@@ -2480,7 +2524,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       type="text" inputMode="numeric" placeholder="3:45"
                       value={state.targetTime}
                       onChange={(e) => setState((st) => ({ ...st, targetTime: e.target.value }))}
-                      className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm text-center"
+                      className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm text-center"
                       style={{ fontSize: '16px' }}
                     />
                     <span className="text-white/60 text-sm">h:mm</span>
@@ -2616,7 +2660,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       return (
                         <button
                           key={p} type="button" disabled={disabled} onClick={() => setPosture(d, p)}
-                          className={`px-2 py-2 rounded-lg text-sm border ${active ? 'border-transparent text-zinc-950 font-semibold' : 'border-white/12 text-white/85'} ${disabled ? 'opacity-30' : ''}`}
+                          className={`px-2 py-2 rounded-xl text-sm border ${active ? 'border-transparent text-zinc-950 font-semibold' : 'border-white/12 text-white/85'} ${disabled ? 'opacity-30' : ''}`}
                           style={active ? { background: color } : undefined}
                         >
                           {p === 'develop' ? 'Develop' : p === 'maintain' ? 'Maintain' : 'Out'}
@@ -2632,7 +2676,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           <button
                             key={sp.id} type="button"
                             onClick={() => setState((s) => ({ ...s, strengthProtocol: sp.id }))}
-                            className={`px-2 py-2 rounded-lg text-xs border ${state.strengthProtocol === sp.id ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
+                            className={`px-2 py-2 rounded-xl text-xs border ${state.strengthProtocol === sp.id ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
                           >
                             {sp.label}
                           </button>
@@ -2756,7 +2800,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 setClubSport(v);
                                 setState((st) => { const q = { ...st.qualityDays }; if (v === 'run') delete q.bike; else delete q.run; return { ...st, qualityDays: q }; });
                               }}
-                              className="px-3 py-1 rounded-md text-xs border"
+                              className="px-3 py-1 rounded-xl text-xs border"
                               style={clubSport === v
                                 ? { borderColor: `rgb(${getDisciplineColorRgb(v)})`, backgroundColor: `rgba(${getDisciplineColorRgb(v)},0.16)`, color: '#fff' }
                                 : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}
@@ -2844,7 +2888,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       <button
                         key={k} type="button"
                         onClick={() => setState((st) => ({ ...st, runClubIntensity: k }))}
-                        className={`py-2 rounded-lg text-sm border ${state.runClubIntensity === k ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
+                        className={`py-2 rounded-xl text-sm border ${state.runClubIntensity === k ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
                       >{label}</button>
                     ))}
                   </div>
@@ -2867,7 +2911,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 {[4, 5, 6, 7].map((n) => (
                   <button
                     key={n} type="button" onClick={() => setState((s2) => ({ ...s2, daysPerWeek: n }))}
-                    className={`py-2 rounded-lg text-sm ${state.daysPerWeek === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    className={`py-2 rounded-xl text-sm ${state.daysPerWeek === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                   >{n}</button>
                 ))}
               </div>
@@ -3140,7 +3184,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         ...st,
                         assistancePicks: { ...st.assistancePicks, [menu.slot]: e.target.value },
                       }))}
-                      className="w-full py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                      className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
                       style={{ fontSize: '16px' }}
                       aria-label={`${menu.label} exercise`}
                     >
@@ -3165,7 +3209,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         <StepLayout
           step={stepNo('volume')} totalSteps={steps.length} title="How much"
           subtitle="Your holding dose while strength leads. All of it conversational."
-          onBack={back} onContinue={next} canContinue
+          onBack={back} onContinue={next} canContinue={volumeCanContinue} blockedReason={tintedReason(volumeBlockedReason)}
         >
           <div className="space-y-4">
             {/* ⛔ NO ARGUMENT ON THIS CARD AT ALL — IT LEADS STRAIGHT INTO THE INPUTS (2026-08-10).
@@ -3209,10 +3253,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     type="number" inputMode="numeric" min={0} placeholder={unit === 'km' ? 'e.g. 22' : 'e.g. 14'}
                     value={state.targetMiles === '' ? '' : String(state.targetMiles)}
                     onChange={(e) => setState((st) => ({ ...st, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
-                    className="w-28 py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white"
+                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white"
                     style={{ fontSize: '16px' }}
                   />
-                  <span className="px-2.5 py-1 rounded-md bg-white/[0.08] text-white/85 text-sm font-medium">
+                  <span className="px-2.5 py-1 rounded-xl text-sm font-medium" style={{ backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.16)`, color: `rgb(${getDisciplineColorRgb('run')})` }}>
                     {unit === 'km' ? 'km' : 'miles'} / week
                   </span>
                 </div>
@@ -3249,10 +3293,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     type="number" inputMode="numeric" min={0} placeholder="e.g. 3"
                     value={state.rideHours === '' ? '' : String(state.rideHours)}
                     onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
-                    className="w-28 py-2 px-3 rounded-lg text-sm bg-white/[0.06] border border-white/12 text-white"
+                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white"
                     style={{ fontSize: '16px' }}
                   />
-                  <span className="px-2.5 py-1 rounded-md bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.20)] text-[rgba(var(--wiz-accent-rgb,236,233,227),0.85)] text-sm font-medium">
+                  <span className="px-2.5 py-1 rounded-xl text-sm font-medium" style={{ backgroundColor: `rgba(${getDisciplineColorRgb('bike')},0.16)`, color: `rgb(${getDisciplineColorRgb('bike')})` }}>
                     hours / week
                   </span>
                 </div>
@@ -3306,7 +3350,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         <StepLayout
           step={stepNo('schedule')} totalSteps={steps.length} title="Your week"
           subtitle="Your days. The lifting is placed around them."
-          onBack={back} onContinue={next} canContinue={scheduleCanContinue}
+          onBack={back} onContinue={next} canContinue={scheduleCanContinue} blockedReason={scheduleReasonNode}
         >
           {/* ⛔ ONE CARD, ONE OPEN QUESTION — A DISCLOSURE LIST (2026-08-10).
               ═══════════════════════════════════════════════════════════════════════════════════
@@ -3346,12 +3390,39 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             <div className="rounded-xl border border-white/10 overflow-hidden">
               {scheduleRows.map((row, i) => {
                 const active = scheduleAsk === row.key;
+                // Only the per-week COUNTS block Continue (a kept discipline with no session count —
+                // the "half-answer" the gate refuses). Long-run/ride days are optional anchors and do
+                // NOT block, so they are NOT flagged — matching what Continue actually requires, or the
+                // accent would cry wolf on a row you can skip.
+                const needsAnswer = (row.key === 'runs' || row.key === 'rides') && row.answer === 'Pick one';
+                // Sport-code every discipline row in the app's wayfinding colours (run gold, ride
+                // green) — the "Pick one", the open chooser/day-picker box, and its tap cue. Run rows
+                // (long run + runs a week) go gold, ride rows (long ride + rides a week) green; the
+                // Hard day borrows whichever discipline is currently toggled, and stays neutral until
+                // one is. The count chips and day chips inside already sport-colour on select.
+                const rowSport =
+                  row.key === 'runs' || row.key === 'long' ? 'run'
+                  : row.key === 'rides' || row.key === 'ride' ? 'bike'
+                  : row.key === 'hard' ? (hardDaySport || null)
+                  : null;
+                const rowSportRgb = rowSport ? getDisciplineColorRgb(rowSport) : null;
                 const border = i > 0 ? 'border-t border-white/8' : '';
-                const activeSkin = active
+                const activeSkin = active && !rowSportRgb
                   ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] border-l-2 border-l-[rgb(var(--wiz-accent-rgb,236,233,227))]'
-                  : '';
+                  : active ? 'border-l-2' : '';
+                const activeSportStyle = active && rowSportRgb
+                  ? { backgroundColor: `rgba(${rowSportRgb},0.10)`, borderLeftColor: `rgb(${rowSportRgb})` }
+                  : undefined;
+                // Colour the "Pick one" of EVERY discipline row (long run/ride + the counts) in its
+                // sport hue — wayfinding by discipline. Answered rows recede to muted grey; `needsAnswer`
+                // (counts only) still adds weight below to mark the ones that actually block Continue.
+                const unanswered = row.answer === 'Pick one';
+                const answerColor =
+                  rowSportRgb && (active || unanswered) ? `rgb(${rowSportRgb})`
+                  : active ? 'rgb(var(--wiz-accent-rgb,236,233,227))'
+                  : 'rgba(255,255,255,0.4)';
                 return (
-                  <div key={row.key} className={`${border} ${activeSkin}`}>
+                  <div key={row.key} className={`${border} ${activeSkin}`} style={activeSportStyle}>
                     {/* THE HEADER LINE — label + answer, tappable, always one line high.
                         ⚠️ The Hard day's Run/Ride toggle rides in the header when that row is open,
                         because it QUALIFIES the question rather than answering it, and a div (not a
@@ -3399,7 +3470,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 // is identity, not a cost signal: the §5 note against implying a
                                 // hard ride is "cheaper" than a hard run is about COPY, and no
                                 // number here claims one.
-                                className="px-3 py-1 rounded-md text-xs border"
+                                className="px-3 py-1 rounded-xl text-xs border"
                                 style={on
                                   ? { borderColor: `rgb(${getDisciplineColorRgb(d)})`, backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.16)`, color: '#fff' }
                                   : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}
@@ -3425,7 +3496,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <span className="text-[10px] uppercase tracking-wide text-white/35">Optional</span>
                           )}
                         </span>
-                        <span className={`text-sm text-right ${active ? 'text-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'text-white/40'}`}>{row.answer}</span>
+                        <span className={`text-sm text-right ${needsAnswer || (active && rowSportRgb) ? 'font-medium' : ''}`} style={{ color: answerColor }}>{row.answer}</span>
                       </button>
                     )}
 
@@ -3435,7 +3506,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         {row.kind === 'day' ? (
                           <>
                             {/* Tap-to-pick cue, contextual to the open question. */}
-                            <p className="text-[rgba(var(--wiz-accent-rgb,236,233,227),0.85)] text-xs">
+                            <p className="text-xs" style={{ color: rowSportRgb ? `rgba(${rowSportRgb},0.85)` : 'rgba(var(--wiz-accent-rgb,236,233,227),0.85)' }}>
                               {row.key === 'hard'
                                 ? (hardDaySport ? 'Tap a day for your hard session' : 'Choose run or ride, then tap a day')
                                 : row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
@@ -3484,7 +3555,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 <button
                                   key={n} type="button"
                                   onClick={() => setState((st) => (row.key === 'runs' ? { ...st, runDays: n } : { ...st, rideDays: n }))}
-                                  className="w-10 py-1.5 rounded-lg text-sm border"
+                                  className="w-10 py-1.5 rounded-xl text-sm border"
                                   style={on
                                     ? { borderColor: `rgb(${getDisciplineColorRgb(sport)})`, backgroundColor: `rgba(${getDisciplineColorRgb(sport)},0.16)`, color: '#fff' }
                                     : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
@@ -3608,7 +3679,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     <button
                                       key={opt.id} type="button"
                                       onClick={() => setState((st) => ({ ...st, qualityRunTerrain: opt.id }))}
-                                      className={`w-full text-left px-3 py-2 rounded-lg border ${
+                                      className={`w-full text-left px-3 py-2 rounded-xl border ${
                                         state.qualityRunTerrain === opt.id
                                           ? 'border-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]'
                                           : 'border-white/12 bg-white/[0.04]'
@@ -3649,14 +3720,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               })}
             </div>
 
-            {/* ⛔ THE GATE STATES ITSELF. A disabled Continue that says nothing is indistinguishable
-                from a broken one — the race card learned that on 2026-08-06 and this card never did,
-                which is how an athlete ended up looking at a fully built six-day week beside a dead
-                button. One sentence, from the same expression that disables it, so the button and
-                the reason cannot disagree. */}
-            {scheduleBlockedReason && (
-              <p className="text-white/60 text-xs leading-relaxed">{scheduleBlockedReason}</p>
-            )}
+            {/* ⛔ THE GATE STATES ITSELF — a disabled Continue that says nothing is indistinguishable
+                from a broken one (the race card learned that 2026-08-06). The reason NOW renders in
+                the footer right above the Continue key (StepLayout `blockedReason`), not here below
+                the rows where it scrolled off-screen while the dead button stayed visible — the exact
+                disconnect that let an athlete miss the "Runs a week" count. One sentence, one place,
+                at the button. */}
 
             {/* ⛔ THE WEEK, NOW BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY.
                 It led this card on the reasoning that the answer must stay on screen while they tap
@@ -3754,7 +3823,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       targetTouched: true,
                     }))}
                     placeholder="e.g. 30"
-                    className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                    className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
                     style={{ fontSize: '16px' }}
                   />
                   <span className="text-white/75 text-sm">{unit}/wk</span>
@@ -3846,7 +3915,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     return { ...st, usualMiles: usual, targetMiles: !st.targetTouched && dose ? dose : st.targetMiles };
                   })}
                   placeholder="e.g. 20"
-                  className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                  className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
                   style={{ fontSize: '16px' }}
                 />
                 <span className="text-white/75 text-sm">{unit}/wk</span>
@@ -3874,7 +3943,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   value={state.targetMiles === '' ? '' : state.targetMiles}
                   onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
                   placeholder={`e.g. ${Math.max(4, capDisplay - 4)}`}
-                  className="w-24 py-2 px-3 rounded-lg bg-white/[0.04] text-white border border-white/12 text-sm"
+                  className="w-24 py-2 px-3 rounded-xl bg-white/[0.04] text-white border border-white/12 text-sm"
                 />
                 <span className="text-white/60 text-sm">{unit}/wk</span>
               </div>
@@ -3904,7 +3973,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 {[2, 3, 4].map((n) => (
                   <button
                     key={n} type="button" onClick={() => setState((s) => ({ ...s, runDays: n }))}
-                    className={`py-2 rounded-lg text-sm ${state.runDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    className={`py-2 rounded-xl text-sm ${state.runDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                   >{n}</button>
                 ))}
               </div>
@@ -3936,7 +4005,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   value={state.rideHours === '' ? '' : state.rideHours}
                   onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
                   placeholder="e.g. 4"
-                  className="w-28 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/12 text-white text-sm"
+                  className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
                   style={{ fontSize: '16px' }}
                 />
                 <span className="text-white/75 text-sm">h/wk</span>
@@ -3955,7 +4024,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 {[1, 2, 3].map((n) => (
                   <button
                     key={n} type="button" onClick={() => setState((s) => ({ ...s, rideDays: n }))}
-                    className={`py-2 rounded-lg text-sm ${state.rideDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
+                    className={`py-2 rounded-xl text-sm ${state.rideDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}
                   >{n}</button>
                 ))}
               </div>
@@ -4019,7 +4088,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               {[1, 2, 3].map((n) => (
                 <button
                   key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
-                  className={`flex-1 py-2 rounded-lg text-sm border ${state.swimDays === n ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
+                  className={`flex-1 py-2 rounded-xl text-sm border ${state.swimDays === n ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
                 >{n}</button>
               ))}
             </div>

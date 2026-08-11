@@ -271,7 +271,7 @@ function StrengthPreferencesPanel({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleIntentChange('performance')}
-                className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                className={`text-left rounded-xl px-3 py-2 border transition-colors disabled:opacity-50 ${
                   strengthIntent === 'performance'
                     ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
                     : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
@@ -287,7 +287,7 @@ function StrengthPreferencesPanel({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleIntentChange('support')}
-                className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                className={`text-left rounded-xl px-3 py-2 border transition-colors disabled:opacity-50 ${
                   strengthIntent === 'support'
                     ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
                     : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
@@ -314,7 +314,7 @@ function StrengthPreferencesPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => void handleOrderingChange('endurance_first')}
-                  className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                  className={`text-left rounded-xl px-3 py-2 border transition-colors disabled:opacity-50 ${
                     orderingPreference === 'endurance_first'
                       ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
                       : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
@@ -329,7 +329,7 @@ function StrengthPreferencesPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => void handleOrderingChange('strength_first')}
-                  className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                  className={`text-left rounded-xl px-3 py-2 border transition-colors disabled:opacity-50 ${
                     orderingPreference === 'strength_first'
                       ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
                       : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
@@ -1690,7 +1690,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 )}
                 <button
                   type="button"
-                  className="flex w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] sm:inline-flex sm:w-auto sm:py-2"
+                  className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] sm:inline-flex sm:w-auto sm:py-2"
                   onClick={() => onSelectPlan?.(linkedPlan.id)}
                 >
                   <span className="min-w-0">
@@ -1752,7 +1752,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     </button>
                     <button
                       type="button"
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                       disabled={buildingGoalId === goal.id || seasonBuilding}
                       onClick={() => handleBuildPlan(goal)}
                     >
@@ -1796,7 +1796,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   </label>
                   <button
                     type="button"
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={buildingGoalId === goal.id || seasonBuilding}
                     onClick={() => handleBuildPlan(goal)}
                   >
@@ -1894,11 +1894,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <>
             <StrengthPreferencesPanel goal={goal} updateGoal={updateGoal} />
             <div className="mt-3 ml-[44px] flex items-center gap-2 pt-3 border-t border-white/[0.06]">
-              <button onClick={() => handleTogglePause(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:bg-white/[0.06] hover:text-white/70 transition-all">
+              <button onClick={() => handleTogglePause(goal)} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-white/50 hover:bg-white/[0.06] hover:text-white/70 transition-all">
                 {goal.status === 'paused' ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
                 {goal.status === 'paused' ? 'Resume' : 'Pause'}
               </button>
-              <button onClick={() => handleDeleteGoal(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-400/60 hover:bg-red-400/10 hover:text-red-400/80 transition-all">
+              <button onClick={() => handleDeleteGoal(goal)} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-red-400/60 hover:bg-red-400/10 hover:text-red-400/80 transition-all">
                 <Trash2 className="h-3.5 w-3.5" />Delete
               </button>
             </div>
@@ -2278,7 +2278,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   onSelectPlan?.(arcPlanReady.planId!);
                   setArcPlanReady(null);
                 }}
-                className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 py-3 text-sm font-medium text-emerald-100/95 hover:bg-emerald-500/25 transition-all"
+                className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/15 py-3 text-sm font-medium text-emerald-100/95 hover:bg-emerald-500/25 transition-all"
               >
                 <Calendar className="h-4 w-4 opacity-90" />
                 View training calendar
@@ -2308,7 +2308,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   type="button"
                   disabled={arcSetupFollowUp.disabled}
                   onClick={arcSetupFollowUp.onClick}
-                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/35 bg-teal-500/15 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-teal-500/35 bg-teal-500/15 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {arcSetupFollowUp.disabled ? <Loader2 className="h-4 w-4 animate-spin opacity-90" /> : <Calendar className="h-4 w-4 opacity-90" />}
                   {arcSetupFollowUp.label}
@@ -2344,7 +2344,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     <button
                       type="button"
                       onClick={() => onSelectPlan?.(seasonPlan.id)}
-                      className="mt-3 w-full flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] transition-all"
+                      className="mt-3 w-full flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] transition-all"
                     >
                       <span className="min-w-0 truncate">{seasonPlan.name}{seasonPlan.currentWeek != null && <span className="text-white/45"> · Week {seasonPlan.currentWeek}</span>}</span>
                       <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
@@ -2372,7 +2372,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       type="button"
                       onClick={() => void handleBuildSeasonPlan(null)}
                       disabled={seasonBuilding}
-                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/40 bg-teal-900/30 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-900/45 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-teal-500/40 bg-teal-900/30 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-900/45 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {seasonBuilding ? (
                         <>
@@ -2595,7 +2595,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 <p className="text-xs font-medium text-white/60">Connect Strava to personalize this</p>
                 <p className="text-xs text-white/30 mt-0.5">We'll auto-fill your training level and suggest the right plan</p>
               </div>
-              <button onClick={() => { resetForms(); navigate('/connections'); }} className="shrink-0 rounded-lg bg-orange-500/20 px-3 py-1.5 text-xs font-medium text-orange-400 hover:bg-orange-500/30 transition-colors">Connect</button>
+              <button onClick={() => { resetForms(); navigate('/connections'); }} className="shrink-0 rounded-xl bg-orange-500/20 px-3 py-1.5 text-xs font-medium text-orange-400 hover:bg-orange-500/30 transition-colors">Connect</button>
             </div>
           )}
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Name</span>

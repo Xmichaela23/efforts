@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -4463,25 +4464,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 </div>
                 {/* A running clock the athlete cannot turn off is the bug this shipped with. Stop
                     ends the timer and nothing else — every logged set stays exactly where it is. */}
-                <button
+                <GalaxyButton
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={stopSession}
-                  className="px-2.5 py-1 rounded-full bg-white/[0.08] border border-white/20 text-[11px] font-medium text-white/60 hover:bg-white/[0.14] hover:text-white/90 transition-all"
+                  className="px-2.5 py-1 text-[11px] text-white/60"
                   aria-label="Stop the session timer"
                 >
                   Stop
-                </button>
+                </GalaxyButton>
               </div>
             ) : (
-              <button
+              <GalaxyButton
                 type="button"
+                variant="primary"
+                size="sm"
                 onClick={beginSession}
-                className="shrink-0 ml-auto mt-0.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/[0.14] backdrop-blur-md border-2 border-white/35 text-sm font-medium text-white/95 hover:bg-white/[0.20] hover:border-white/50 transition-all"
+                className="shrink-0 ml-auto mt-0.5 px-4 py-1.5"
                 aria-label="Start the session timer"
               >
                 <span aria-hidden="true" className="text-[13px] leading-none">▸</span>
                 Start session
-              </button>
+              </GalaxyButton>
             ))}
           </div>
           {/* Row 2: controls — date + Pick planned get their own row, full room, no
@@ -4498,11 +4503,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               name="performed-date"
               value={performedDate || ''}
               onChange={(e) => setPerformedDate(e.target.value)}
-              className="h-8 px-2 py-1 text-xs text-white/90 bg-white/[0.08] border-2 border-white/20 rounded-full hover:bg-white/[0.12] hover:border-white/30 focus:bg-white/[0.12] focus:border-white/35 transition-all duration-300"
+              className="h-8 px-2 py-1 text-xs text-white/90 bg-white/[0.08] border-2 border-white/20 rounded-xl hover:bg-white/[0.12] hover:border-white/30 focus:bg-white/[0.12] focus:border-white/35 transition-all duration-300"
               style={{ fontFamily: 'Inter, sans-serif' }}
             />
             <div className="relative">
-              <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
+              <GalaxyButton variant="secondary" size="sm" onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</GalaxyButton>
               {showPlannedMenu && (
                 <div className="absolute right-0 mt-1.5 w-72 bg-[#1a1a2e] backdrop-blur-xl border-2 border-white/30 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_4px_16px_rgba(0,0,0,0.5)] z-[100] p-2">
                   <div className="flex items-center justify-between mb-1.5">
@@ -4924,12 +4929,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         <button
                           type="button"
                           onClick={() => setSwapRestOfPlan(false)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/55 hover:text-white/80'}`}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/55 hover:text-white/80'}`}
                         >Just today</button>
                         <button
                           type="button"
                           onClick={() => setSwapRestOfPlan(true)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/55 hover:text-white/80'}`}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/55 hover:text-white/80'}`}
                         >Rest of plan</button>
                       </div>
                     )}
@@ -5015,11 +5020,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         setSwapFor(null);
                       };
                       const chip = (a: AlternativeOption) => (
-                        <button
+                        <GalaxyButton
                           key={a.name}
+                          variant="secondary"
+                          size="sm"
                           onClick={() => applySwap(a.name)}
-                          className="px-2.5 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.10] hover:text-white transition-colors"
-                        >{a.name}</button>
+                          className="px-2.5 py-1.5 text-[12px]"
+                        >{a.name}</GalaxyButton>
                       );
                       const direct = alts.filter((a) => a.tier === 'direct');
                       const lighter = alts.filter((a) => a.tier === 'lighter');
@@ -5063,11 +5070,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => { void persistPlanAdd(exercise); setAddToPlanFor(null); }}
-                      className="px-3 py-1.5 rounded-lg text-[12px] border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
+                      className="px-3 py-1.5 rounded-xl text-[12px] border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
                     >Add to plan</button>
                     <button
                       onClick={() => setAddToPlanFor(null)}
-                      className="px-3 py-1.5 rounded-lg text-[12px] border border-white/15 bg-white/[0.04] text-white/60 hover:text-white/85 transition-colors"
+                      className="px-3 py-1.5 rounded-xl text-[12px] border border-white/15 bg-white/[0.04] text-white/60 hover:text-white/85 transition-colors"
                     >Cancel</button>
                   </div>
                 </div>
@@ -5780,29 +5787,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {/* Baseline test save button (after all sets) */}
                 {isBaselineTestWorkout(scheduledWorkout || {}) && Object.keys(baselineTestResults).length > 0 && (
                   <div className="mt-3 ml-8">
-                    <button
+                    <GalaxyButton
+                      variant="primary"
+                      size="md"
                       onClick={saveBaselineResults}
                       disabled={savingBaseline}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {savingBaseline ? 'Saving...' : 'Save as baseline'}
-                    </button>
+                    </GalaxyButton>
                   </div>
                 )}
                 
-                <button 
+                <GalaxyButton
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     addSet(exercise.id);
                   }}
-                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 flex items-center justify-center gap-2 mt-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
+                  className="h-8 text-xs px-3 py-1.5 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
                   type="button"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Set
-                </button>
+                </GalaxyButton>
                 
                 {/* Notes section - collapsible, shown when exercise is expanded */}
                 {(() => {
@@ -5995,7 +6006,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <>
                     <button onClick={()=>setShowNotesModal(false)} className="text-sm text-white/70 hover:text-white/90">Cancel</button>
                     <button onClick={()=>{ finalizeSave(); }} className="text-sm text-white/70 hover:text-white/90">Skip</button>
-                    <button onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className={`text-sm text-white ${themeColors.hoverText} rounded-full px-3 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300`} style={{ fontFamily: 'Inter, sans-serif' }}>Save</button>
+                    <GalaxyButton variant="primary" size="sm" onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className={`text-sm ${themeColors.hoverText} px-3 py-1.5`} style={{ fontFamily: 'Inter, sans-serif' }}>Save</GalaxyButton>
                   </>
                 )}
               </div>
@@ -6258,20 +6269,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 </div>
                 
                 <div className="flex gap-3">
-                  <button
+                  <GalaxyButton
+                    variant="secondary"
+                    size="lg"
                     onClick={handleSessionRPESkip}
-                    className="flex-1 py-4 rounded-full bg-white/[0.08] border-2 border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
+                    className="flex-1 py-4"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Skip
-                  </button>
-                  <button
+                  </GalaxyButton>
+                  <GalaxyButton
+                    variant="primary"
+                    size="lg"
                     onClick={() => handleSessionRPESubmit(sessionRPE)}
-                    className="flex-1 py-4 rounded-full bg-white/[0.12] border-2 border-white/35 text-white hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300 font-medium"
+                    className="flex-1 py-4"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Submit & Finish
-                  </button>
+                  </GalaxyButton>
                 </div>
               </>
             )}
@@ -6288,7 +6303,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       >
         <button
           onClick={saveWorkout}
-          className={`w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-full backdrop-blur-lg border-2 ${themeColors.saveBg} ${themeColors.saveBorder} ${themeColors.saveHoverBg} ${themeColors.saveHoverBorder} ${themeColors.saveShadow}`}
+          className={`w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-xl backdrop-blur-lg border-2 ${themeColors.saveBg} ${themeColors.saveBorder} ${themeColors.saveHoverBg} ${themeColors.saveHoverBorder} ${themeColors.saveShadow}`}
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save Workout

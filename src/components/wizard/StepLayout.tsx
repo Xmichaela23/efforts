@@ -9,7 +9,7 @@ import { getDisciplineColorRgb } from '@/lib/context-utils';
 const UNIVERSAL_RGB = '236, 233, 227';
 
 export function StepLayout({
-  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false, accent,
+  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false, accent, blockedReason,
 }: {
   // ⚠️ `title` widened string → ReactNode (2026-08-05) so the Focus screens can set the eye mark
   // beside their heading. Every existing caller passes a plain string and is unaffected.
@@ -25,6 +25,10 @@ export function StepLayout({
    *  screen cannot stand behind, and this wizard has shipped that bug once already. A bar with
    *  nothing to measure is better absent than wrong. */
   hideProgress?: boolean;
+  /** One short line naming what's still missing, shown right above a disabled Continue key so the
+   *  reason and the dead button are one glance — never a silently-disabled control with the cause
+   *  scrolled off-screen. Only renders while Continue is disabled (canContinue false, not saving). */
+  blockedReason?: React.ReactNode;
   /** Sport that tints the chrome — a Discipline ('run'|'bike'|'swim'|'strength') resolves to its
    *  SPORT_COLORS hue; omit (or 'universal') for the sport-agnostic warm-bone chrome. The progress
    *  bar and the Continue key take this color; content inside a step tints itself. */
@@ -96,6 +100,11 @@ export function StepLayout({
       {/* Continue — instrument key, backlit by the accent; the final (commit) step also shimmers */}
       {!hideContinue && (
       <div className="shrink-0 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-zinc-950">
+        {!canContinue && !saving && blockedReason && (
+          <p className="mb-2 text-xs leading-relaxed text-[rgba(var(--wiz-accent-rgb,236,233,227),0.85)]">
+            {blockedReason}
+          </p>
+        )}
         <button
           type="button"
           onClick={onContinue}

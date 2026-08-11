@@ -239,7 +239,7 @@ export default function EnduranceIntervalTable({
                   <button
                     type="button"
                     onClick={() => setShowAllIntervals((v) => !v)}
-                    className="text-[11px] px-1.5 py-0.5 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15"
+                    className="text-[11px] px-1.5 py-0.5 rounded-xl bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15"
                   >
                     {showAllIntervals ? 'Hide strides' : 'Show strides'}
                   </button>

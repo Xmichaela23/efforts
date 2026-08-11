@@ -1,4 +1,5 @@
 import React from 'react';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { RouteDoorway } from './RouteDoorway';
 
 // NOTE: the per-session TrendSparkline (raw-pace / pace-at-HR direction, D-050/Q-025) was RETIRED —
@@ -257,14 +258,16 @@ export default function SessionNarrative({
           </div>
         )}
         <div className="flex items-center justify-end">
-          <button
+          <GalaxyButton
+            variant="secondary"
+            size="sm"
             onClick={onRecompute}
             disabled={recomputing || recomputeDisabled}
-            className="text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
+            className="text-xs"
             title="Generate analysis for this workout"
           >
             {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </button>
+          </GalaxyButton>
         </div>
         {recomputeError && (
           <p className="text-sm text-red-400 mb-1">{recomputeError}</p>
@@ -313,14 +316,16 @@ export default function SessionNarrative({
         }
         if (tDisplay) parts.push(tDisplay);
         const recomputeBtn = (
-          <button
+          <GalaxyButton
+            variant="secondary"
+            size="sm"
             onClick={onRecompute}
             disabled={recomputing || recomputeDisabled}
-            className="shrink-0 text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
+            className="shrink-0 text-xs"
             title="Re-run analysis for this workout"
           >
             {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </button>
+          </GalaxyButton>
         );
         return parts.length > 0
           ? (

@@ -1773,7 +1773,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 const tabBase =
                   'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl tabbar-button';
                 const tabChrome =
-                  'border-2 rounded-2xl bg-white/[0.07] text-white/75 hover:bg-white/[0.09] hover:text-white/90 border-white/30 hover:border-white/45';
+                  'border-2 rounded-xl bg-white/[0.07] text-white/75 hover:bg-white/[0.09] hover:text-white/90 border-white/30 hover:border-white/45';
                 const tabActive =
                   'bg-white/[0.10] text-white border-white/55';
                 const tabStyle: React.CSSProperties = {

@@ -14,6 +14,7 @@ import {
   SCHEDULE_OPTIONAL_ROWS,
   SCHEDULE_ROW_ORDER,
   scheduleBlockedReason,
+  scheduleBlockedReasons,
   scheduleCanContinue,
   type ScheduleGateInput,
 } from './schedule-gate.ts';
@@ -176,6 +177,20 @@ Deno.test('⛔ ONE RIDE A WEEK NEEDS NO LONG-RIDE DAY, and that threshold is the
   assertEquals(scheduleBlockedReason({ ...base, rideDays: 2, rideHours: '' }), null, 'no hours typed');
   assertEquals(longDayCalledFor({ ...base, rideDays: 1, rideHours: 3 }, 'bike'), false);
   assertEquals(longDayCalledFor({ ...base, rideDays: 2, rideHours: 3 }, 'bike'), true);
+});
+
+Deno.test('scheduleBlockedReasons surfaces ALL missing at once, in row order; singular is its head', () => {
+  // The card shows every unanswered required field together rather than one-then-the-next, so a
+  // both-counts-empty week names runs AND rides — not just runs. The singular stays first-only.
+  const bothCounts = complete({ runDays: 0, rideDays: 0 });
+  assertEquals(scheduleBlockedReasons(bothCounts), [
+    'Runs a week has no number yet.',
+    'Rides a week has no number yet.',
+  ]);
+  assertEquals(scheduleBlockedReason(bothCounts), 'Runs a week has no number yet.', 'singular = [0]');
+  // A complete week has nothing to list, and the singular is null — the two never disagree.
+  assertEquals(scheduleBlockedReasons(complete()), []);
+  assertEquals(scheduleBlockedReason(complete()), null);
 });
 
 Deno.test('the run is reported before the ride when both are missing', () => {

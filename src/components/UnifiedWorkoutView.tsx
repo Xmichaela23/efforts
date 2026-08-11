@@ -946,7 +946,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               <button
                 onClick={()=>setAssocOpen(true)}
                 title={unmatchedPrompt(sameDayPlannedRows as never)}
-                className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                className="px-4 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
                 style={{
                   borderColor: `rgba(${sportRgb}, 0.32)`,
                   boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.10)`,
@@ -987,7 +987,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     console.warn('[UnifiedWorkoutView] unattach handler failed:', e);
                   }
                 }}
-                className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                className="px-4 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
                 style={{
                   borderColor: `rgba(${sportRgb}, 0.30)`,
                   boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.08)`,

@@ -787,7 +787,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                   <button
                     type="button"
                     onClick={handleGarminExport}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                   >Send to Garmin</button>
                 </div>
               )}
@@ -795,7 +795,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                 <button
                   type="button"
                   onClick={handleCopyFormGoggles}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                 >
                   <Copy className="h-3.5 w-3.5 opacity-80" aria-hidden />
                   Copy for FORM Goggles
@@ -805,7 +805,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                     type="button"
                     disabled={sendingToWatch}
                     onClick={handleSendToWatch}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer disabled:opacity-50"
                   >
                     {sendingToWatch ? 'Sending…' : 'Send to Apple Watch'}
                   </button>
@@ -885,7 +885,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                     <button
                       type="button"
                       onClick={handleGarminExport}
-                      className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
                     >Send to Garmin</button>
                   </div>
                 )}

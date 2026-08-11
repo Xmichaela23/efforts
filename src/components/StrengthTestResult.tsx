@@ -97,7 +97,7 @@ export function StrengthTestResult({
         <button
           onClick={onRecompute}
           disabled={recomputing}
-          className="w-full h-9 text-xs rounded-full bg-white/[0.06] border-2 border-white/20 text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all disabled:opacity-50"
+          className="w-full h-9 text-xs rounded-xl bg-white/[0.06] border-2 border-white/20 text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all disabled:opacity-50"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           {recomputing ? 'Recomputing…' : 'Recompute analysis'}

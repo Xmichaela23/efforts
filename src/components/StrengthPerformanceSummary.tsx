@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { Pencil } from 'lucide-react';
 import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
@@ -492,13 +493,15 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           cannot be the last thing on the screen. */}
       {onRecompute && (
         <div className="flex justify-end -mt-1 mb-2">
-          <button
+          <GalaxyButton
+            variant="secondary"
+            size="sm"
             onClick={onRecompute}
             disabled={recomputing}
-            className="px-3 py-1.5 text-xs text-white/45 border border-white/12 rounded-full hover:bg-white/5 hover:text-white/70 transition-colors disabled:opacity-40"
+            className="text-xs"
           >
             {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </button>
+          </GalaxyButton>
         </div>
       )}
       {recomputeError && (
