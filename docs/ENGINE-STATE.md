@@ -23,13 +23,17 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-10 — the strength logger's session clock + the whole Strong Focus intake reworked. **12 commits, 2 edge deploys, ZERO device-verified.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-11 — an app-wide button-shape design system + Strong Focus intake FLOW polish landed on top of the still-unrun acceptance pass. Pushed, on Michael's phone via Xcode.)
 
-### ⛔ YOUR JOB: THE ACCEPTANCE RUN. IT IS NOW TWO SESSIONS OVERDUE.
+### ⛔ YOUR JOB: THE ACCEPTANCE RUN. IT IS NOW THREE SESSIONS OVERDUE.
 
-The 2026-08-09 banner said the same thing and the run did not happen — then a full day of screenshot-
-driven UI work landed on top of it. **Everything below is pushed and live and none of it has been seen
-working.** Do not start new work. If Michael opens with a new request, say this first.
+The 2026-08-09 and -08-10 banners said the same thing and the run did not happen — then two more full
+days of screenshot-driven UI work landed on top. 2026-08-11 added an app-wide button-shape design
+system and a round of Strong Focus intake FLOW fixes (see the 2026-08-11 block below), and Michael put
+a build on his phone via Xcode — so the intake's LOOK and its gate copy got real device eyes,
+surface-by-surface. **But the engine acceptance run — log a real session, read the durations, backdate
+a block — still has not happened.** Do not start new work. If Michael opens with a new request, say
+this first.
 
 ⚠️ **AND THE PATTERN IN TODAY'S BUGS IS THE ARGUMENT FOR IT.** Of the nine defects fixed today, **six
 were invisible to every test in the repo** — a collapsed flex child, a floating chip row, a dead
@@ -37,7 +41,33 @@ Continue button, a running clock with no off switch, a banner in the way, a miss
 caught none of them and could not have. **A device pass is not bookkeeping on this screen; it is the
 only instrument that works.**
 
-### WHAT SHIPPED — all PUSHED, client live via Netlify, 2 edge functions DEPLOYED
+### WHAT SHIPPED 2026-08-11 — button-shape design system + intake flow (PUSHED `9d72b244`, `1a4da5b5`; client live; on phone). DO NOT RE-LITIGATE.
+
+**One button shape, enforced.** Radii were set ad-hoc per element and drifted (Home rounded-xl, nav
+rounded-2xl, logger rounded-full stadium). Now `src/components/ui/galaxy-button.tsx` (`GalaxyButton`)
+is the single tappable-action primitive — rounded-xl buttons, rounded-full chips, variant-based
+hierarchy (primary/secondary/ghost/danger). Migrated: logger, bottom nav (was rounded-2xl),
+Performance summaries, Goals, workout-detail (Unattach/Recompute), Planned view, Get-Strong wizard,
+Training Baselines. True circles (FAB, steppers, close-X) left alone. A lint guard
+(`efforts/consistent-button-shape`, **warn**) catches raw off-standard `<button>`s; **~144
+pre-existing remain** — ratchet the rule to **error** when that hits zero. Full rule + rationale +
+sport-colour-as-wayfinding: **`docs/DESIGN-button-shape.md`** — that doc is the record, no D-entries.
+
+**Strong Focus intake FLOW.** The "How much" step now gates Continue on miles/hours (posture-aware; a
+strength-only athlete isn't blocked). Every disabled Continue names its blocker AT the button
+(new `StepLayout.blockedReason`) — not below the rows where it scrolled off and Michael missed it. All
+discipline rows sport-colour their "Pick one" (run gold / ride green); the day-pick highlight stays
+**neutral** on purpose — the wizard accent IS the strength colour, so a coloured highlight was
+mis-coding a run day as strength. The gate now surfaces **every** missing field at once, each in its
+colour: `scheduleBlockedReasons` in `src/lib/schedule-gate.ts` is the single source, the singular
+(`scheduleBlockedReason`) is its head; +1 regression test (13 green). Client-only — no edge deploy.
+
+⚠️ **HOW FAR THIS IS VERIFIED:** Michael drove these surfaces one-by-one on the dev server and
+on-device today — shapes, colours, gate copy all seen working. NOT verified as one end-to-end run
+(build a Strong Focus plan through the whole intake → log a session → check durations). That is the
+acceptance run above, still owed.
+
+### WHAT SHIPPED 2026-08-10 — all PUSHED, client live via Netlify, 2 edge functions DEPLOYED
 
 **The strength logger's session clock** — `0ddd07dd`, `9be42ee1`, `06018cef`, and **D-410**.
 - Start was `useState<Date>(new Date())`: every remount restamped it while the draft restored, so an
