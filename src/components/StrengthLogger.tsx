@@ -4328,7 +4328,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     <div 
       className="fixed inset-0 flex flex-col"
       style={{
-        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)'
+        // Match the Home screen: near-pure black instrument with a soft amber bleed from the top
+        // (the digital-galaxy "light from above"), not a grey top-to-black wash (2026-08-11).
+        background: 'radial-gradient(130% 55% at 50% 0%, rgba(240,150,60,0.10) 0%, transparent 50%), #050506'
       }}
     >
     <div 
