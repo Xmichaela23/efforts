@@ -75,7 +75,12 @@ interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
   duration_seconds?: number;  // Optional - used for duration-based exercises (planks, holds, carries)
   weight: number;
-  resistance_level?: string;  // Optional - used for band exercises: "Light", "Medium", "Heavy", "Extra Heavy"
+  // ⛔ INTENTIONALLY TWO-IN-ONE — a WORD or a NUMBER — AND BOTH STAY (D-415). Born holding band-tension
+  // words ("Light"/"Medium"/"Heavy"/"Extra Heavy"); D-351 also uses it for the band's pull in POUNDS
+  // ("75"). Legacy sets carry the words, newer ones carry pounds. DO NOT collapse the words away —
+  // every reader already checks "is it a number?" before doing math (pricing, display), so they don't
+  // interfere, and a set of assisted reps would misprice as band-only work if the words were removed.
+  resistance_level?: string;  // band exercises: tension word OR band load in lb (see D-415)
   rir?: number;
   /** D-203/provenance: true when `rir` is a non-observed suggestion — the
    *  auto-saved target RIR (Done with no manual entry) or a value prefilled from

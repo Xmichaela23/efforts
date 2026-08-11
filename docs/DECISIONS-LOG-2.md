@@ -1447,6 +1447,35 @@ round-trip). **The only live LA literals left are race-*weather* defaults** (`fe
 **No-tz fallback = UTC, decided (Michael, *"no defaults to me"*).** Neutral, self-correcting on the
 next authenticated load.
 
+### D-415 — One shared completed-set normalizer; and `resistance_level` is INTENTIONALLY two-in-one — do not collapse it (2026-08-11, **PUSHED `d8520ff2` + DEPLOYED get-week + workout-detail + VERIFIED (Aug-10 Dips shows "−75 lb assist" on device)**)
+
+**The bug.** Band assist (`resistance_level`) was saved on every dip/chin/pull-up set but never rendered
+in mobile strength Performance. Five separate layers each rebuilt a completed set by HAND-LISTING
+fields — `{reps, weight, rir, completed, prefilled}` — and every one dropped anything off that list.
+The object that WINS the client's `completedData` merge (the `workout-detail` scope=workout hydrator,
+overriding the get-week row) was one of them, which is why three earlier point-fixes to other layers
+changed nothing on the phone.
+
+**The fix.** One shared `src/lib/normalize-strength-set.ts` — **spread-first, then coerce the known
+fields** — so any logged field (`resistance_level`, `amrap`, `duration_seconds`, `difficulty`) survives
+by default; a reader has to go out of its way to LOSE data, not to keep it. Routed through it:
+`get-week`, `workout-detail` (×2), `useWorkouts`, `StrengthPerformanceSummary`, `StrengthCompletedView`.
+The D-204 "untouched prefill" rule got its own single home (`isUntouchedPrefill`) — shape and filtering
+are separate questions on purpose (the server hydrators carry `prefilled` through and let the client
+decide). Deno fixtures pin the band-assist regression (`normalize-strength-set.test.ts`).
+
+**⛔ `resistance_level` IS DELIBERATELY OVERLOADED — a word OR a number — AND BOTH STAY (Michael,
+2026-08-11: *"lets not kill that… as long as they dont interfere"*).** The field was born holding
+band-TENSION WORDS ("Light"/"Medium"/"Heavy"/"Extra Heavy", `StrengthLogger` `LoggedSet:78`); D-351
+repurposed it to also hold the band's pull in POUNDS (a number). Old logged sets carry the words, newer
+ones carry pounds — two eras in one box, kept on purpose. **They do not interfere because every reader
+checks "is it a number?" before doing math:** pricing (`workload.ts` `priceSet`) prices a word-form set
+without trying to subtract a poundage it doesn't have; display (`StrengthCompareTable.fmt`) shows the
+"−N lb assist" line only when the value is a finite number, and nothing for a word. The only thing a
+word CAN'T do is get subtracted as exact assist load — inherent to it being a word, not a conflict.
+**DO NOT "normalize the words away" — legacy sets depend on them, and a set of assisted reps would
+start mispricing as band-only work.** Same guard already lives in `canonicalize.ts` (`bandMeansAssistance`).
+
 **Stage 3 (audit the other UTC callers) — done, no code change.** `compute-snapshot:311` (writer) and
 `coach:2331` (reader) both key off `mondayOfToday()`, so they **agree** — post-seam they label the row
 next-week's Monday but the content is now-anchored and correct, no divergence. `compute-snapshot:698`
