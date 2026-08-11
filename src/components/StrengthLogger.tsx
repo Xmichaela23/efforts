@@ -4444,7 +4444,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <button
                 type="button"
                 onClick={beginSession}
-                className="shrink-0 ml-auto mt-0.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-2xl bg-white/[0.14] backdrop-blur-md border-2 border-white/35 text-sm font-medium text-white/95 hover:bg-white/[0.20] hover:border-white/50 transition-all"
+                className="shrink-0 ml-auto mt-0.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/[0.14] backdrop-blur-md border-2 border-white/35 text-sm font-medium text-white/95 hover:bg-white/[0.20] hover:border-white/50 transition-all"
                 aria-label="Start the session timer"
               >
                 <span aria-hidden="true" className="text-[13px] leading-none">▸</span>
@@ -5747,7 +5747,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     e.stopPropagation();
                     addSet(exercise.id);
                   }}
-                  className="w-full h-8 text-xs px-3 py-1.5 rounded-2xl bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 flex items-center justify-center gap-2 mt-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
+                  className="w-full h-8 text-xs px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/35 transition-all duration-300 flex items-center justify-center gap-2 mt-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
                   type="button"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
