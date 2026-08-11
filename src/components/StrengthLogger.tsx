@@ -507,18 +507,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
   const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
-  // The athlete's recorded 1RM for the four main lifts (mirrors the seeding resolver `oneRmOf`).
-  // Feeds the AMRAP PR badge: an AMRAP whose estimated 1RM beats the recorded number is a new best —
-  // Wendler's "keep breaking rep records and the 1RM goes up." The record itself is computed
-  // downstream (compute-facts → exercise_log → State/Performance); this is only the in-logger badge.
-  const recordedOneRmFor = (name: string): number | undefined => {
+  // The 1RM an AMRAP has to beat to be a PR — YOUR BEST MEASURED 1RM, learned from your logged AMRAP
+  // history (`learned_fitness.strength_1rms`, ratcheted up-only, D-223). Loaded at mount, so it holds
+  // your PRIOR sessions — this AMRAP isn't in it yet. Falls back to the typed number only when you've
+  // never logged this lift. Wendler p10: keep breaking rep records and the 1RM goes up.
+  const bestMeasuredOneRmFor = (name: string): number | undefined => {
     const t = String(name || '').toLowerCase();
-    const pn: any = performanceNumbers;
-    if (!pn) return undefined;
-    if (t.includes('deadlift')) return typeof pn.deadlift === 'number' ? pn.deadlift : undefined;
-    if (t.includes('bench')) return typeof pn.bench === 'number' ? pn.bench : undefined;
-    if (t.includes('overhead') || t.includes('ohp')) return typeof pn.overhead === 'number' ? pn.overhead : (typeof pn.overheadPress1RM === 'number' ? pn.overheadPress1RM : undefined);
-    if (t.includes('squat')) return typeof pn.squat === 'number' ? pn.squat : undefined;
+    const learned: any = learnedStrength1rms || {};
+    const pn: any = performanceNumbers || {};
+    // strength_1rms entries are objects ({ value, last_logged, sample_count }); older shapes may be bare.
+    const learnedVal = (k: string): number | undefined => {
+      const e = learned?.[k];
+      if (typeof e === 'number') return e;
+      return typeof e?.value === 'number' ? e.value : undefined;
+    };
+    const pick = (learnedKey: string, ...pnKeys: string[]): number | undefined => {
+      const lv = learnedVal(learnedKey);
+      if (typeof lv === 'number') return lv;
+      for (const k of pnKeys) if (typeof pn?.[k] === 'number') return pn[k];
+      return undefined;
+    };
+    if (t.includes('deadlift')) return pick('deadlift', 'deadlift');
+    if (t.includes('bench')) return pick('bench', 'bench');
+    if (t.includes('overhead') || t.includes('ohp')) return pick('overhead_press', 'overhead', 'overheadPress1RM');
+    if (t.includes('squat')) return pick('squat', 'squat');
     return undefined;
   };
   // D-322 line 12: per-lift MEASURED 1RMs from `learned_fitness.strength_1rms`, keyed snake_case
@@ -5206,8 +5218,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const amrapE1rm = (set.amrap && done && Number(set.weight) > 0 && Number(set.reps) > 0)
                           ? Math.round(estimate1RM(Number(set.weight), Number(set.reps)))
                           : null;
-                        const recordedOneRm = set.amrap && done ? recordedOneRmFor(exercise.name) : undefined;
-                        const isAmrapPR = amrapE1rm != null && recordedOneRm != null && amrapE1rm > recordedOneRm;
+                        const bestPriorOneRm = set.amrap && done ? bestMeasuredOneRmFor(exercise.name) : undefined;
+                        const isAmrapPR = amrapE1rm != null && bestPriorOneRm != null && amrapE1rm > bestPriorOneRm;
 
                         const numCls = `w-full bg-transparent border-0 border-b-[1.5px] pb-1 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
                         const numStyle: React.CSSProperties = { fontSize: '17px', fontFamily: 'Inter, sans-serif' };
