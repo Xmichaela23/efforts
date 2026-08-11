@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, CheckCircle, Pencil, Repeat } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, Repeat } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
@@ -4210,10 +4210,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         text: 'text-purple-400',
         hoverText: 'hover:text-purple-400',
         rgb: '168,85,247',
-        // Done button completed state
-        doneBg: 'bg-purple-600/20',
-        doneBorder: 'border-purple-500/40',
-        doneText: 'text-purple-400',
         // Save button
         saveBg: 'bg-purple-700/80',
         saveBorder: 'border-purple-500/40',
@@ -4226,16 +4222,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         text: 'text-orange-400',
         hoverText: 'hover:text-orange-400',
         rgb: '249,115,22',
-        // Done button completed state
-        doneBg: 'bg-orange-600/20',
-        doneBorder: 'border-orange-500/40',
-        doneText: 'text-orange-400',
         // Save button
         saveBg: 'bg-orange-700/80',
         saveBorder: 'border-orange-500/40',
         saveHoverBg: 'hover:bg-orange-700/90',
         saveHoverBorder: 'hover:border-orange-500/50',
         saveShadow: 'shadow-[0_0_0_1px_rgba(249,115,22,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
+      };
+
+  // Row-per-set accent (2026-08-10). A completed set tints the row, turns its number underlines,
+  // and fills its check. Kept beside `themeColors` and split the same way, so mobility stays purple
+  // rather than inheriting strength's amber — the two modes have never shared an accent.
+  const rowAccent = isMobilityMode
+    ? {
+        rowBg: 'bg-purple-500/[0.10]',
+        underline: 'border-purple-300/75',
+        num: 'text-purple-50',
+        checkOn: 'bg-purple-400 border-purple-300 text-purple-950',
+      }
+    : {
+        rowBg: 'bg-amber-500/[0.10]',
+        underline: 'border-amber-300/75',
+        num: 'text-amber-50',
+        checkOn: 'bg-amber-400 border-amber-300 text-amber-950',
       };
 
   // Don't render until properly initialized
@@ -4985,156 +4994,466 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </div>
 
             {(expandedExercises[exercise.id] !== false) && (
-              <div className="px-3 py-1.5">
-                {exercise.sets.map((set, setIndex) => {
-                  const isDurationBased = set.duration_seconds !== undefined;
-                  const durationTimerKey = `${exercise.id}-set-${setIndex}`;
-                  const restTimerKey = `${exercise.id}-${setIndex}`;
-                  const durationTimer = timers[durationTimerKey];
-                  const restTimer = timers[restTimerKey];
-                  const isDurationRunning = durationTimer?.running || false;
-                  const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
-                  
-                  // Rest is an OPT-IN courtesy (D-121, reverts the D-120 auto-start
-                  // experiment): the rest row appears on every set EXCEPT the last (no
-                  // rest after the final set), shows the duration idle, and does NOT
-                  // auto-count. The user taps Start to launch it, Pause/Resume to control,
-                  // Skip to dismiss + hide the row. No completed gate, no auto-trigger.
-                  const isLastSet = setIndex >= exercise.sets.length - 1;
-                  const showRestTimer = !isDurationBased && !isLastSet && !restDismissed.has(restTimerKey);
-                  // Idle rest duration (shown until the user launches it). Toggle label:
-                  // never-started → Start, running → Pause, paused mid-count → Resume.
-                  const restCalcSeconds = set.reps && set.reps > 0 && set.duration_seconds === undefined
-                    ? calculateRestTime(exercise.name, set.reps)
-                    : 90;
-                  const restToggleLabel = restTimer?.running
-                    ? 'Pause'
-                    : (restTimer && restTimer.seconds < restCalcSeconds ? 'Resume' : 'Start');
-                  
-                  const isBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
-                  const isWarmup = set.setType === 'warmup';
-                  const isWorking = set.setType === 'working';
-                  const workingSetIndex = exercise.sets.findIndex(s => s.setType === 'working');
-                  const showAddWarmupButton = isBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
-                  const result = baselineTestResults[exercise.id];
+              <div className="px-2 pb-1">
+                {(() => {
+                  /* ── ROW-PER-SET (2026-08-10) ─────────────────────────────────────────────────
+                     Replaces the tall card-per-set (big centred reps number, `target`, `last:`,
+                     ±1 nudges, Done/✕, one metric visible at a time) with a table: one line per
+                     set, weight and reps side by side, previous inline, a check to complete. Same
+                     information, laid across instead of stacked — the shape Strong and Hevy use,
+                     which is the "feels familiar to lifters" bar this surface is held to.
 
-                  // Weight steppers apply to loaded barbell/dumbbell/goblet lifts only
-                  // (not band/bodyweight/duration).
-                  const exType = equipmentForExercise(exercise.name);
-                  const showStepper = !isDurationBased && !isBodyweightMove(exercise.name)
-                    && ['barbell', 'dumbbell', 'goblet'].includes(exType);
+                     ⛔ THE COLUMN SET IS GATED, NOT FIXED, AND THAT IS THE POINT. A 5/3/1 main
+                     lift renders NO RIR column (`rir_tracked === false` — D-162/D-324: the weight
+                     and the reps are fixed in advance and nothing in the engine reads a reserve
+                     estimate, so an auto-filled one would only corrupt the e1RM). A bodyweight or
+                     plyo lift renders no load column. A rep-max test renders neither. Omitting the
+                     column is how the row says "this protocol does not use this" — the same
+                     statement the tall card made by omitting the cell.
 
-                  // No collapse/expand — every set renders fully expanded, always.
+                     ⛔ DE-BOXED NUMBERS, ONE BOX. Weight/reps/RIR are the bare number over a
+                     1.5px underline; the CHECK is the only boxed element on the row, because it is
+                     the only action. One container per exercise, not a box inside a box.
+
+                     The grid is declared ONCE here and shared by the label header and every row,
+                     so a column cannot drift between the two. */
+                  const exEquip = equipmentForExercise(exercise.name);
+                  const exIsAssistCapable = isAssistCapableMove(exercise.name);
+                  const exIsBodyweight = isBodyweightMove(exercise.name);
+                  const exIsPlyo = exEquip === 'plyo' || isPlyometric(exercise.name);
+                  const exIsBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
+                  const exLoggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
+                  const priorSetsForEx = previousSessionByName[normalizeExerciseName(exercise.name)];
+
+                  // The LOAD column. An assist-capable movement always has one — the band IS the
+                  // load (D-351) — so it survives the bodyweight test that would otherwise hide it.
+                  const exShowWeight = exIsAssistCapable || !(exIsBodyweight || exIsPlyo);
+                  const exWeightLabel = exIsAssistCapable ? 'Assist / +'
+                    : exEquip === 'band' ? 'Band lb'
+                    : exEquip === 'dumbbell' ? 'Lb/hand'
+                    : 'Lb';
+
+                  // The RIR column — the SAME gate the tall card's RIR cell carried, unchanged.
+                  // ⚠️ The card's ±1 nudge strip carried one EXTRA gate (`!sourcePlannedId`, the
+                  // D-338 freestyle rule). That strip is what this layout replaces, so its gate
+                  // goes with it; the CELL — the display and the keypad input, which is what
+                  // survives here — never had it and behaves exactly as it did before.
+                  const exShowRir = exLoggerMode !== 'mobility'
+                    && !exIsBaselineTest
+                    && exercise.rir_tracked !== false
+                    && !exIsPlyo
+                    && exercise.sets.some((s) => s.duration_seconds === undefined);
+
+                  // 375pt (iPhone mini) is the FLOOR, not the target. When RIR is present the gaps
+                  // tighten and `previous` gives up width, rather than letting a number column
+                  // collapse — a squeezed weight cell is a mis-logged set.
+                  // ⚠️ An assist-capable movement puts TWO values in the load column (help and
+                  // added), so it takes 1.6fr and squeezes `previous` further. At the 375pt floor
+                  // with RIR also present, an even 1fr leaves each half ~21px and "-60" clips.
+                  const gridTemplate = [
+                    '22px',
+                    exShowRir ? (exIsAssistCapable ? '56px' : '68px') : '84px',
+                    exShowWeight ? (exIsAssistCapable ? 'minmax(0,1.6fr)' : 'minmax(0,1fr)') : null,
+                    'minmax(0,1fr)',
+                    exShowRir ? '34px' : null,
+                    '34px',
+                    '16px',
+                  ].filter(Boolean).join(' ');
+                  const gridStyle: React.CSSProperties = {
+                    display: 'grid',
+                    gridTemplateColumns: gridTemplate,
+                    columnGap: exShowRir ? '8px' : '10px',
+                    alignItems: 'center',
+                  };
+                  // Readable, not the .38 the first pass used — these are labels the athlete reads
+                  // mid-set with a bar in their hands.
+                  const labelCls = 'text-[9px] font-semibold uppercase tracking-[0.08em] text-white/[0.78] leading-none';
+
                   return (
-                    <div key={setIndex} className="bg-white/[0.03] backdrop-blur-lg border-2 border-white/15 rounded-xl p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] mb-2">
-                      {/* Baseline test set type label and hint */}
-                      {isBaselineTest && (
-                        <div className="mb-1 ml-8">
-                          {isWarmup && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-blue-600">Warmup</span>
-                              {set.setHint && (
-                                <span className="text-xs text-gray-500 italic">{set.setHint}</span>
+                    <>
+                      <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
+                        <span className={labelCls}>Set</span>
+                        <span className={labelCls}>Previous</span>
+                        {exShowWeight && <span className={`${labelCls} text-center`}>{exWeightLabel}</span>}
+                        <span className={`${labelCls} text-center`}>Reps</span>
+                        {exShowRir && <span className={`${labelCls} text-center`}>RIR</span>}
+                        <span aria-hidden="true" />
+                        <span aria-hidden="true" />
+                      </div>
+
+                      {exercise.sets.map((set, setIndex) => {
+                        const isDurationBased = set.duration_seconds !== undefined;
+                        const durationTimerKey = `${exercise.id}-set-${setIndex}`;
+                        const durationTimer = timers[durationTimerKey];
+                        const isDurationRunning = durationTimer?.running || false;
+                        const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
+
+                        const isWarmup = set.setType === 'warmup';
+                        const isWorking = set.setType === 'working';
+                        const workingSetIndex = exercise.sets.findIndex((s) => s.setType === 'working');
+                        const showAddWarmupButton = exIsBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
+                        const result = baselineTestResults[exercise.id];
+                        const done = set.completed === true;
+
+                        const numCls = `w-full bg-transparent border-0 border-b-[1.5px] pb-1 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
+                        const numStyle: React.CSSProperties = { fontSize: '17px', fontFamily: 'Inter, sans-serif' };
+                        // D-097 / D-406: a value that came from the previous session or from the
+                        // composer's suggestion is a STARTING POINT, greyed so it can never be
+                        // mistaken for something the athlete logged.
+                        const ghostCls = 'text-white/35';
+
+                        // D-122 anchor, compacted into its own column. Reuses `formatLastSet`
+                        // rather than re-deriving the string, so the D-324 rule (no RIR on a
+                        // protocol that killed RIR) cannot drift between the two renders.
+                        // No anchor on a TEST — prior data is from a different context (Q-097/Q-102).
+                        const prior = exIsBaselineTest ? undefined : priorSetsForEx?.[setIndex];
+                        const priorTxt = prior ? (formatLastSet(prior, exercise.rir_tracked) || '').replace(/^last:\s*/, '') : '';
+                        // Tap Previous to reuse it. Goes through `updateSet`, so provenance clears
+                        // exactly as it does for any other athlete edit (from_previous, prefilled,
+                        // and — since this writes no `rir` — the rir_autofilled flag is untouched).
+                        const fillFromPrior = () => {
+                          if (!prior) return;
+                          const patch: Partial<LoggedSet> = {};
+                          if (typeof prior.weight === 'number' && prior.weight > 0) patch.weight = prior.weight;
+                          if (typeof prior.reps === 'number' && prior.reps > 0) patch.reps = prior.reps;
+                          if (typeof prior.duration_seconds === 'number' && prior.duration_seconds > 0) patch.duration_seconds = prior.duration_seconds;
+                          if (prior.resistance_level != null) patch.resistance_level = prior.resistance_level;
+                          if (Object.keys(patch).length > 0) updateSet(exercise.id, setIndex, patch);
+                        };
+
+                        const renderWeightCell = () => {
+                          if (!exShowWeight) return null;
+                          // ⛔ ASSIST-CAPABLE (dips, chin-ups, pull-ups): band help and added weight
+                          // are mutually exclusive by construction — nobody assists AND loads the
+                          // same set — but BOTH slots stay visible. "A slot you have to discover is
+                          // a slot that does not exist." The clearing lives in commitKeypad.
+                          if (exIsAssistCapable) {
+                            const assistRaw = set.resistance_level;
+                            const assistNum = assistRaw != null && String(assistRaw).trim() !== ''
+                              && Number.isFinite(Number(assistRaw)) && Number(assistRaw) > 0
+                                ? Number(assistRaw) : null;
+                            const added = typeof set.weight === 'number' && set.weight > 0 ? set.weight : null;
+                            return (
+                              <div className="flex items-end gap-1.5 min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => openKeypadForSet({
+                                    exerciseId: exercise.id, setIndex, field: 'band', title: 'Assist (lb)',
+                                    initialValue: assistNum == null ? '' : String(assistNum),
+                                    allowDecimal: true,
+                                    hint: 'Pounds of help from the band or machine. Leave blank if none.',
+                                  })}
+                                  className={`${numCls} flex-1 min-w-0`}
+                                  style={{ ...numStyle, fontSize: '15px' }}
+                                  aria-label="Assist in pounds"
+                                >
+                                  {assistNum == null ? <span className="text-white/25">−</span> : `-${assistNum}`}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openKeypadForSet({
+                                    exerciseId: exercise.id, setIndex, field: 'weight', title: 'Added weight',
+                                    initialValue: added == null ? '' : String(added), allowDecimal: true,
+                                  })}
+                                  className={`${numCls} flex-1 min-w-0`}
+                                  style={{ ...numStyle, fontSize: '15px' }}
+                                  aria-label="Added weight"
+                                >
+                                  {added == null ? <span className="text-white/25">+</span> : `+${added}`}
+                                </button>
+                              </div>
+                            );
+                          }
+                          // D-351: a band's load is a NUMBER the athlete types, not a colour. Blank
+                          // is allowed and still earns the work token — it just isn't a measurement.
+                          if (exEquip === 'band') {
+                            const bandNum = set.resistance_level != null && String(set.resistance_level).trim() !== ''
+                              && Number.isFinite(Number(set.resistance_level)) && Number(set.resistance_level) > 0
+                                ? Number(set.resistance_level) : null;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => openKeypadForSet({
+                                  exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
+                                  initialValue: bandNum == null ? '' : String(bandNum),
+                                  allowDecimal: true, hint: BAND_LB_HINT,
+                                })}
+                                className={numCls}
+                                style={numStyle}
+                                aria-label="Band pounds"
+                              >
+                                {bandNum == null ? <span className="text-white/25">—</span> : String(bandNum)}
+                              </button>
+                            );
+                          }
+                          // Q-180: an UNLOADED duration hold has no load cell; a LOADED carry does —
+                          // the load IS the exercise, and the athlete's entry is its only record.
+                          if (isDurationBased && !isLoadedDurationExercise(exercise.name)) {
+                            return <span aria-hidden="true" />;
+                          }
+                          const ghost = suggestedGhostWeight(exercise, set);
+                          const shownW = ghost ?? (set.weight === 0 ? '' : (set.weight ?? '—'));
+                          const platesOpen = expandedPlates[`${exercise.id}-${setIndex}`];
+                          return (
+                            <div className="relative min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => openKeypadForSet({
+                                  exerciseId: exercise.id,
+                                  setIndex,
+                                  field: 'weight',
+                                  title: exEquip === 'dumbbell' ? 'Weight (per hand)' : 'Weight',
+                                  initialValue: String(ghost ?? (set.weight === 0 ? '' : (set.weight ?? ''))),
+                                  allowDecimal: true,
+                                })}
+                                className={numCls}
+                                style={numStyle}
+                                aria-label="Weight"
+                              >
+                                <span className={(set.from_previous && !done) || ghost != null ? ghostCls : undefined}>
+                                  {shownW}
+                                </span>
+                              </button>
+                              {/* Plate math, reachable from the weight cell rather than from a
+                                  second row of controls. Sibling of the number button, not nested
+                                  inside it — a button inside a button is invalid and swallows taps. */}
+                              {exEquip === 'barbell' && (
+                                <button
+                                  type="button"
+                                  onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                                  className={`absolute -top-1 right-0 h-4 px-0.5 flex items-center text-[8px] uppercase tracking-wide transition-colors ${platesOpen ? 'text-white/75' : 'text-white/30 hover:text-white/60'}`}
+                                  aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
+                                  aria-expanded={platesOpen ? true : false}
+                                >
+                                  plates
+                                </button>
                               )}
                             </div>
-                          )}
-                          {isWorking && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-orange-600">Working Set - Add when ready</span>
-                              {set.setHint && (
-                                <span className="text-xs text-gray-500 italic">{set.setHint}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Add warmup set button (before working set) */}
-                      {showAddWarmupButton && (
-                        <div className="mb-2 ml-8">
-                          <button
-                            onClick={() => addWarmupSet(exercise.id, setIndex)}
-                            className="text-xs px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 flex items-center gap-1"
-                          >
-                            <Plus className="h-3 w-3" />
-                            Add warmup set
-                          </button>
-                        </div>
-                      )}
-                      
-                      {/* EXPANDED set — controls stacked vertically (not one horizontal
-                          line) so nothing exceeds the card width on a 380px viewport. */}
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start gap-2">
-                        {/* Set# in a proper w-9 leader slot — aligns as the left column above the
-                            Reps/Wt/RIR row labels below, rather than floating far-left (Q-043). */}
-                        <div className="w-9 shrink-0 text-xs text-white/60 pt-2">{setIndex + 1}</div>
-                        {/* Q-043: 3 cells in a flex-1 group with gap-4 so the boxes breathe at the
-                            same rate as the circle rows below; set#→group stays gap-2 so box1 still
-                            aligns with circle1. */}
-                        <div className="flex-1 flex items-start gap-4">
-                        {/* Duration-based exercises show timer input, rep-based show reps input */}
-                        {isDurationBased ? (
-                          // DURATION-BASED EXERCISE - Simple timer display matching reps input style
-                          // D-131: weighted flex-[2] to match the reps column slot.
-                          <div className="flex-[2] flex flex-col items-center gap-0.5 relative">
+                          );
+                        };
+
+                        const renderRepsCell = () => {
+                          if (isDurationBased) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cur = set.duration_seconds || 60;
+                                  const prefill = cur >= 60 ? `${Math.floor(cur / 60)}:${String(cur % 60).padStart(2, '0')}` : `:${String(cur).padStart(2, '0')}`;
+                                  setEditingTimerKey(durationTimerKey);
+                                  setEditingTimerValue(prefill);
+                                }}
+                                className={`${numCls} ${isDurationRunning ? `${rowAccent.underline} ${rowAccent.num}` : ''}`}
+                                style={numStyle}
+                                aria-label="Duration"
+                              >
+                                {currentDurationSeconds >= 60
+                                  ? formatSeconds(currentDurationSeconds)
+                                  : `:${String(currentDurationSeconds).padStart(2, '0')}`}
+                              </button>
+                            );
+                          }
+                          // An "until" pattern prescribes no reps and gets no cell. ⛔ EXCEPTION
+                          // (Q-097/D-224): an AMRAP or rep-max set has reps:undefined BY DESIGN —
+                          // the open count IS the measurement — so it keeps an editable, empty
+                          // field, or the test has nowhere to record and saves "0 reps".
+                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest) {
+                            return <span aria-hidden="true" />;
+                          }
+                          const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest) ? '' : '—'));
+                          return (
                             <button
-                              onClick={() => {
-                                const cur = set.duration_seconds || 60;
-                                const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : `:${String(cur).padStart(2,'0')}`;
-                                setEditingTimerKey(durationTimerKey);
-                                setEditingTimerValue(prefill);
-                              }}
-                              className={`h-9 px-2 text-sm rounded-md border-2 flex-1 text-center transition-all duration-300 ${isDurationRunning ? `${themeColors.text} ${themeColors.doneBorder} bg-white/[0.12]` : 'text-white border-white/25 bg-white/[0.08] backdrop-blur-md'}`}
-                              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                              type="button"
+                              onClick={() => openKeypadForSet({
+                                exerciseId: exercise.id,
+                                setIndex,
+                                field: 'reps',
+                                title: 'Reps',
+                                initialValue: set.reps === 0 ? '' : String(set.reps ?? ''),
+                                allowDecimal: false,
+                              })}
+                              className={numCls}
+                              style={numStyle}
+                              aria-label="Reps"
                             >
-                              {currentDurationSeconds >= 60 
-                                ? formatSeconds(currentDurationSeconds)
-                                : `:${String(currentDurationSeconds).padStart(2,'0')}`}
+                              <span className={set.from_previous && !done ? ghostCls : undefined}>
+                                {/* An open set and a set someone forgot to fill in looked
+                                    identical, and the session was logged wrong because of it. The
+                                    placeholder sits where the eyes already are. */}
+                                {shown === '' && set.amrap && !done
+                                  ? <span className="text-amber-300/55 text-[11px] tracking-wide">AMRAP</span>
+                                  : shown}
+                              </span>
                             </button>
-                            {!isDurationRunning ? (
-                              <button
-                                onClick={() => {
-                                  // Q-TIMER: RESUME from what is left, don't RESET. This read
-                                  // `set.duration_seconds` unconditionally, so pausing a 40s carry at 20s
-                                  // and pressing Start again jumped back to 40 — a reset wearing a resume's
-                                  // clothes. Fall back to the prescribed duration only when there is nothing
-                                  // to resume.
-                                  const remaining = timers[durationTimerKey]?.seconds;
-                                  const seconds = (typeof remaining === 'number' && remaining > 0)
-                                    ? remaining
-                                    : (set.duration_seconds || 60);
-                                  setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds, running: true } }));
-                                  // Arm the wall-clock deadline: this is what survives iOS suspending the
-                                  // JS tick when the screen locks mid-carry.
-                                  persistTimer(durationTimerKey, seconds);
-                                }}
-                                className="h-9 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] transition-all duration-300"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                              >
-                                Start
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
-                                  // Q-TIMER: a PAUSED timer has no deadline. Drop it, or the next foreground
-                                  // reconcile would "catch it up" against a clock that never stopped and
-                                  // silently eat the paused time. And cancel its notification — nothing is
-                                  // going to end.
-                                  clearPersistedTimer(durationTimerKey);
-                                  void cancelRestNotification(durationTimerKey);
-                                }}
-                                className="h-9 px-2 text-xs rounded-md border-2 border-white/25 bg-white/[0.08] backdrop-blur-md text-white hover:bg-white/[0.12] transition-all duration-300"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                              >
-                                Pause
-                              </button>
+                          );
+                        };
+
+                        const renderRirCell = () => {
+                          if (!exShowRir) return null;
+                          if (isDurationBased) return <span aria-hidden="true" />;
+                          const targetRir = exercise.target_rir;
+                          const hasValue = set.rir !== undefined && set.rir !== null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => openKeypadForSet({
+                                exerciseId: exercise.id,
+                                setIndex,
+                                field: 'rir',
+                                title: 'RIR (reps in reserve)',
+                                initialValue: (set.rir === undefined || set.rir === null) ? '' : String(set.rir),
+                                allowDecimal: false,
+                              })}
+                              className={numCls}
+                              style={{ ...numStyle, fontSize: '15px' }}
+                              aria-label="RIR"
+                            >
+                              {hasValue
+                                ? <span className={set.from_previous && !done ? ghostCls : undefined}>{set.rir >= 5 ? '5+' : set.rir}</span>
+                                : <span className={targetRir != null ? 'text-amber-300/80 font-medium' : 'text-white/30'}>{formatRirTarget(targetRir)}</span>}
+                            </button>
+                          );
+                        };
+
+                        // ⛔ THE TARGET IS PER SET, NOT PER EXERCISE. `exercise.target_reps` is one
+                        // string for the whole lift; on 5/3/1 that string is "5+", so every set used
+                        // to print "target 5+" and nothing said which one was the all-out set. Only
+                        // the flagged set is open-ended, and it is the one whose count moves the
+                        // training max (D-338), so it gets its own words.
+                        const targetHint = set.amrap
+                          ? `AMRAP · ${exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum`
+                          : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null);
+                        const cue = barSpeedCueFor(exercise, set);
+                        const platesOpen = !isDurationBased && !exIsBodyweight && exEquip === 'barbell'
+                          && expandedPlates[`${exercise.id}-${setIndex}`];
+
+                        return (
+                          <div
+                            key={setIndex}
+                            className={`relative px-1.5 py-2 border-b border-white/[0.06] last:border-b-0 transition-colors ${done ? rowAccent.rowBg : ''}`}
+                          >
+                            {/* Baseline test set-type label + hint */}
+                            {exIsBaselineTest && (isWarmup || isWorking) && (
+                              <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-amber-300/85'}`}>
+                                  {isWarmup ? 'Warmup' : 'Working set — add when ready'}
+                                </span>
+                                {set.setHint && <span className="text-[10px] text-white/45 italic">{set.setHint}</span>}
+                              </div>
                             )}
-                            
-                            {/* Duration timer editor modal */}
+
+                            {showAddWarmupButton && (
+                              <div className="mb-1.5 pl-[30px]">
+                                <button
+                                  onClick={() => addWarmupSet(exercise.id, setIndex)}
+                                  className="text-[11px] px-2.5 py-1 rounded-md border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors flex items-center gap-1"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Add warmup set
+                                </button>
+                              </div>
+                            )}
+
+                            <div style={gridStyle}>
+                              <span className={`text-[13px] tabular-nums leading-none ${done ? rowAccent.num : 'text-white/70'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
+                                {setIndex + 1}
+                              </span>
+
+                              {priorTxt ? (
+                                <button
+                                  type="button"
+                                  onClick={fillFromPrior}
+                                  className="text-[11px] text-left text-white/[0.9] tabular-nums leading-none whitespace-nowrap overflow-hidden text-ellipsis hover:text-white transition-colors"
+                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                  aria-label={`Use previous: ${priorTxt}`}
+                                >
+                                  {priorTxt}
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-white/25 leading-none">—</span>
+                              )}
+
+                              {renderWeightCell()}
+                              {renderRepsCell()}
+                              {renderRirCell()}
+
+                              {/* The ONLY boxed element on the row — it is the action. */}
+                              <button
+                                type="button"
+                                onClick={() => handleSetComplete(exercise.id, setIndex)}
+                                className={`h-8 w-8 rounded-lg border-2 flex items-center justify-center transition-colors ${done ? rowAccent.checkOn : 'border-white/25 bg-white/[0.04] hover:border-white/45'}`}
+                                aria-label={done ? `Mark set ${setIndex + 1} not done` : `Mark set ${setIndex + 1} done`}
+                                aria-pressed={done}
+                              >
+                                {done && <Check className="h-4 w-4" strokeWidth={3} />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => deleteSet(exercise.id, setIndex)}
+                                className="h-7 w-4 flex items-center justify-center text-white/25 hover:text-red-400 transition-colors"
+                                aria-label={`Delete set ${setIndex + 1}`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+
+                            {/* One hint line under the row: the per-set target, the bar-speed cue
+                                (D-326 — a QUALITY check on a prescribed set, a STOP RULE on an
+                                AMRAP; `barSpeedLineFor` keys on the set so the two can't swap), and
+                                the duration control for timed work. */}
+                            {(targetHint || cue || isDurationBased) && (
+                              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-[30px] pr-1 pt-1.5">
+                                {targetHint && (
+                                  <span className={`text-[10px] font-medium leading-none ${set.amrap ? 'text-amber-300/70' : 'text-white/45'}`}>
+                                    {targetHint}
+                                  </span>
+                                )}
+                                {cue && <span className="text-[10px] font-medium text-white/55 leading-snug">{cue}</span>}
+                                {isDurationBased && (
+                                  !isDurationRunning ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        // Q-TIMER: RESUME from what is left, don't RESET.
+                                        const remaining = timers[durationTimerKey]?.seconds;
+                                        const seconds = (typeof remaining === 'number' && remaining > 0)
+                                          ? remaining
+                                          : (set.duration_seconds || 60);
+                                        setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds, running: true } }));
+                                        // The wall-clock deadline is what survives iOS suspending
+                                        // the JS tick when the screen locks mid-carry.
+                                        persistTimer(durationTimerKey, seconds);
+                                      }}
+                                      className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    >
+                                      Start
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
+                                        // A PAUSED timer has no deadline — drop it, or the next
+                                        // foreground reconcile catches it up against a clock that
+                                        // never stopped and silently eats the paused time.
+                                        clearPersistedTimer(durationTimerKey);
+                                        void cancelRestNotification(durationTimerKey);
+                                      }}
+                                      className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    >
+                                      Pause
+                                    </button>
+                                  )
+                                )}
+                              </div>
+                            )}
+
+                            {/* Duration editor popover — anchored to this set's container. */}
                             {editingTimerKey === durationTimerKey && (
-                              <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
+                              <div className="absolute top-full left-8 z-50 mt-1 w-64 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3">
                                 <input
                                   type="text"
                                   inputMode="numeric"
@@ -5149,7 +5468,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   readOnly={timerEditReadOnly}
                                   onFocus={() => setTimerEditReadOnly(false)}
                                   value={editingTimerValue}
-                                  onChange={(e)=>setEditingTimerValue(e.target.value)}
+                                  onChange={(e) => setEditingTimerValue(e.target.value)}
                                   placeholder=":60 or 1:00"
                                   className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
                                 />
@@ -5176,709 +5495,114 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 </div>
                               </div>
                             )}
-                          </div>
-                        ) : (
-                        // REP-BASED EXERCISE (e.g., Squat, Bench Press)
-                        // Hide reps input if no reps are prescribed (for "until" patterns).
-                        // EXCEPTION (Q-097): an AMRAP working set has reps:undefined BY DESIGN
-                        // (open reps — the athlete's actual rep count IS the measurement). It must
-                        // still show an editable, empty-by-default reps field, or the 1RM test has
-                        // nowhere to record the reps and saves "0 reps" → e1RM never computes. (D-224)
-                        (set.reps === undefined && !set.amrap && !set.repMaxTest && !isBaselineTestWorkout(scheduledWorkout || {})) ? null : (
-                          // D-131: weighted flex-[2] (reps) so the cell shares the strip's reps column.
-                          <div className="flex-[2] flex flex-col items-center gap-0.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openKeypadForSet({
-                                  exerciseId: exercise.id,
-                                  setIndex,
-                                  field: 'reps',
-                                  title: 'Reps',
-                                  initialValue: set.reps === 0 ? '' : String(set.reps ?? ''),
-                                  allowDecimal: false,
-                                })
-                              }
-                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-full focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
-                              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                            >
-                              {/* D-097: muted text when value came from previous-session autofill */}
-                              <span className={set.from_previous && !set.completed ? 'text-white/35' : ''}>
-                                {/* Q-097: AMRAP starts empty (open reps), not "—" — the athlete types the count.
-                                    ⛔ BUT EMPTY SAID NOTHING. An open set and a set someone forgot to fill in
-                                    looked identical, and Michael — who built this — did the session wrong
-                                    because of it, logging 0 reps on the one set that measures. The box now
-                                    carries a greyed "all out" placeholder: the signal sits where his eyes
-                                    already are (the number he is about to type), not in a label underneath. */}
-                                {(() => {
-                                  const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || isBaselineTestWorkout(scheduledWorkout || {})) ? '' : '—'));
-                                  if (shown === '' && set.amrap && !set.completed) {
-                                    return <span className="text-amber-300/45 text-[11px] tracking-wide">AMRAP</span>;
-                                  }
-                                  return shown;
-                                })()}
-                              </span>
-                              {/* Q-042: subtle tap-to-type affordance */}
-                              <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                            </button>
-                            <span className="text-[9px] text-white/50 font-medium">Reps</span>
-                            {/* ⛔ THE TARGET IS PER SET, NOT PER EXERCISE. `exercise.target_reps` is
-                                one string for the whole lift — on 5/3/1 that string is "5+", so every
-                                set printed "target 5+" and the athlete could not tell which one was
-                                the all-out set. Michael, 2026-07-30: "so its 3- 5 + ? thats confusing
-                                we need to make it cleaer ... is it the third one?" It was, and nothing
-                                on the set said so.
-                                Sets 1-2 are straight fives. Only the flagged set is open-ended, and it
-                                is the one whose count moves the training max (D-338), so it gets its
-                                own words rather than a shared string with a "+" on the end. */}
-                            {set.amrap ? (
-                              <span className="text-[9px] font-medium text-amber-300/70 leading-none">AMRAP · {exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum</span>
-                            ) : exercise.target_reps ? (
-                              <span className="text-[9px] font-medium text-white/45 leading-none">target {String(exercise.target_reps).replace(/\+$/, '')}</span>
-                            ) : null}
-                          </div>
-                        )
-                      )}
-                      
-                      {(() => {
-                        // Duration-based BODYWEIGHT work (plank, wall sit, dead bug, hollow hold) needs no
-                        // weight input. But a LOADED carry is duration-based AND loaded — the load IS the
-                        // exercise, and because the accessory rotations prescribe loading qualitatively on
-                        // purpose ("Heavy — you judge it"), the athlete's entry is the ONLY record of it.
-                        // Hiding the box here meant the work was done and then thrown away. (Q-180.)
-                        if (isDurationBased && !isLoadedDurationExercise(exercise.name)) {
-                          return null;
-                        }
 
-                        // ⛔ ASSIST-CAPABLE BODYWEIGHT: the band IS the load, so the row cannot be blank.
-                        //
-                        // Dips, chin-ups and pull-ups are bodyweight movements most people cannot do
-                        // unassisted for the prescribed total — Michael, reading his own plan: "25 chin
-                        // ups? lol i can do 5." Wendler's own answer is explicit: if you can't get the
-                        // reps, use band or machine assistance and work the tension DOWN over the block.
-                        // So assistance is the progression, and a row with nowhere to record it throws
-                        // away the only thing that changes.
-                        //
-                        // ⛔ A NUMBER, NOT A LEVEL (D-351, 2026-08-01) — THIS REVERSES THE PARAGRAPH THAT
-                        // STOOD HERE, and the reversal turns on one word.
-                        //
-                        // The old note argued: band colours are not standardised across manufacturers, so
-                        // record the HELP as three levels instead. The premise is true and the conclusion
-                        // does not follow. Non-standardisation is exactly why no major tracker ships a
-                        // colour→pounds table — and their answer is not a level, it is a NUMBER THE
-                        // ATHLETE TYPES. Hevy prices an assisted set at `(bodyweight − assisted weight)
-                        // × reps` off a user-entered figure; Strong is the same. A level cannot be
-                        // subtracted from a body weight without us inventing the pounds, which is the one
-                        // thing the pricing rule refuses to do — so three levels could only ever be
-                        // recorded, never counted, and a band-assisted chin-up kept scoring as if it were
-                        // unassisted (Q-233, now closed).
-                        //
-                        // ⚠️ THE INVERSION THE OLD NOTE WARNED ABOUT IS HANDLED BY THE UNIT, not by
-                        // wording: "60 lb of help" cannot be misread as a harder set the way "heavy band"
-                        // could. The label says Assist and the value is pounds of help.
-                        //
-                        // Still stored on `resistance_level` rather than a new field: a band on a pull-up
-                        // is only ever assistance, so the exercise already disambiguates it, the column is
-                        // persisted end to end, and adding a second band field would leave the app with
-                        // two vocabularies for one fact. The word-era rows keep their words and keep
-                        // pricing as bodyweight — history is deliberately not migrated (D-351).
-                        if (isAssistCapableMove(exercise.name)) {
-                          // The band load in POUNDS, or null when blank / a legacy word. A word-era row
-                          // renders an empty box rather than a number it cannot mean — the athlete
-                          // retypes it as pounds the next time they log, and nothing is rewritten behind
-                          // them.
-                          const assistRaw = set.resistance_level;
-                          const assistNum = assistRaw != null && String(assistRaw).trim() !== ''
-                            && Number.isFinite(Number(assistRaw)) && Number(assistRaw) > 0
-                              ? Number(assistRaw) : null;
-                          const added = typeof set.weight === 'number' && set.weight > 0 ? set.weight : null;
-                          return (
-                            // ⛔ BOTH DIRECTIONS ON ONE DIAL, and they are mutually exclusive by construction.
-                            // A dip can be band-assisted OR loaded; nobody does both in the same set. So
-                            // choosing help clears the added weight and entering weight clears the help —
-                            // otherwise the row can record a state that did not happen.
-                            // ⛔ BOTH SLOTS VISIBLE. The first build hid the weight behind an "add weight"
-                            // link and swapped the control — Michael: "we should have a weight slot for
-                            // dips and chin ups." A slot you have to discover is a slot that does not
-                            // exist. Band and weight both sit on the row; the athlete uses whichever
-                            // applies and leaves the other alone.
-                            <>
-                              <div className="flex-[4] flex flex-col items-center gap-0.5">
-                                <button
-                                  type="button"
-                                  // Mutually exclusive by construction: nobody assists AND loads the same
-                                  // set, so entering help clears the added weight and vice versa (the
-                                  // clearing lives in commitKeypad). Otherwise the row can record a set
-                                  // that did not happen.
-                                  onClick={() => openKeypadForSet({
-                                    exerciseId: exercise.id, setIndex, field: 'band', title: 'Assist (lb)',
-                                    initialValue: assistNum == null ? '' : String(assistNum),
-                                    allowDecimal: true,
-                                    hint: 'Pounds of help from the band or machine. Leave blank if none.',
-                                  })}
-                                  className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
-                                  style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                >
-                                  <span>{assistNum == null ? '' : `-${assistNum}`}</span>
-                                  <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                                </button>
-                                <span className="text-[9px] text-white/50 font-medium">Assist (lb)</span>
+                            {/* Plate math + bar type, opened from the weight cell. */}
+                            {platesOpen && (
+                              <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-white/10 bg-white/[0.03] p-2">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Plates</span>
+                                  <Select
+                                    value={set.barType || 'standard'}
+                                    onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
+                                  >
+                                    <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
+                                      <SelectItem value="standard" className="hover:bg-white/[0.15]">Barbell (45lb)</SelectItem>
+                                      <SelectItem value="womens" className="hover:bg-white/[0.15]">Women's (33lb)</SelectItem>
+                                      <SelectItem value="safety" className="hover:bg-white/[0.15]">Safety Squat (45lb)</SelectItem>
+                                      <SelectItem value="ez" className="hover:bg-white/[0.15]">EZ Curl (25lb)</SelectItem>
+                                      <SelectItem value="trap" className="hover:bg-white/[0.15]">Trap/Hex (60lb)</SelectItem>
+                                      <SelectItem value="cambered" className="hover:bg-white/[0.15]">Cambered (55lb)</SelectItem>
+                                      <SelectItem value="swiss" className="hover:bg-white/[0.15]">Swiss/Football (35lb)</SelectItem>
+                                      <SelectItem value="technique" className="hover:bg-white/[0.15]">Technique (15lb)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <PlateMath weight={set.weight} barType={set.barType || 'standard'} useImperial={true} />
                               </div>
-                              <div className="flex-[4] flex flex-col items-center gap-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => openKeypadForSet({
-                                    exerciseId: exercise.id, setIndex, field: 'weight', title: 'Added weight',
-                                    initialValue: added == null ? '' : String(added), allowDecimal: true,
-                                  })}
-                                  className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
-                                  style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                >
-                                  <span>{added == null ? '' : `+${added}`}</span>
-                                  <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                                </button>
-                                <span className="text-[9px] text-white/50 font-medium">Added</span>
-                              </div>
-                            </>
-                          );
-                        }
+                            )}
 
-                        // Bodyweight exercises don't need weight input (e.g., Nordic Curls, push-ups)
-                        if (isBodyweightMove(exercise.name)) {
-                          return null;
-                        }
-                        
-                        const exerciseType = equipmentForExercise(exercise.name);
-                        
-                        // ⛔ A PLYO HAS NO LOAD COLUMN AT ALL (2026-08-01). A box jump is reps; there is
-                        // no bar, no plate, no band and no belt to record. Checked before every other
-                        // shape so a jump can never inherit one of their inputs.
-                        if (exerciseType === 'plyo') return null;
-
-                        // ⛔ BAND AS THE LOAD: POUNDS, NOT A LEVEL (D-351, 2026-08-01). Same reversal as
-                        // the assist field above and the same reason — a level cannot be multiplied by
-                        // reps, so four levels priced every band set at one flat token regardless of what
-                        // the athlete actually pulled against. A number prices like any weighted set.
-                        // ⚠️ Blank is allowed and keeps the token: an athlete who does not know their
-                        // band's rating still gets credit for the work, just not a measurement of it.
-                        if (exerciseType === 'band') {
-                          const bandNum = set.resistance_level != null && String(set.resistance_level).trim() !== ''
-                            && Number.isFinite(Number(set.resistance_level)) && Number(set.resistance_level) > 0
-                              ? Number(set.resistance_level) : null;
-                          return (
-                            <div className="flex-[4] flex flex-col items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() => openKeypadForSet({
-                                  exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
-                                  initialValue: bandNum == null ? '' : String(bandNum),
-                                  allowDecimal: true,
-                                  hint: BAND_LB_HINT,
-                                })}
-                                className="relative h-9 w-full text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
-                                style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              >
-                                <span>{bandNum == null ? '' : String(bandNum)}</span>
-                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                              </button>
-                              <span className="text-[9px] text-white/50 font-medium">Band (lb)</span>
-                            </div>
-                          );
-                        }
-                        
-                        // Dumbbell exercises: Show weight input with /hand label
-                        if (exerciseType === 'dumbbell') {
-                          return (
-                            // D-131: weighted flex-[4] (weight) — shares the strip's 4-button column.
-                            <div className="flex-[4] flex flex-col items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openKeypadForSet({
-                                    exerciseId: exercise.id,
-                                    setIndex,
-                                    field: 'weight',
-                                    title: 'Weight',
-                                    initialValue: String(
-                                    suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '')),
-                                  ),
-                                    allowDecimal: true,
-                                  })
-                                }
-                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-full tabular-nums"
-                                style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              >
-                                <span className={(set.from_previous && !set.completed) || suggestedGhostWeight(exercise, set) != null ? 'text-white/35' : ''}>
-                                  {suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '—'))}
-                                </span>
-                                {/* Q-042: subtle tap-to-type affordance */}
-                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                              </button>
-                              <span className="text-[9px] text-white/50 font-medium">lb/hand</span>                            </div>
-                          );
-                        }
-                        
-                        // Goblet exercises (lateral lunges, goblet squat): Single weight, no /hand
-                        if (exerciseType === 'goblet') {
-                          return (
-                            // D-131: weighted flex-[4] (weight).
-                            <div className="flex-[4] flex flex-col items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openKeypadForSet({
-                                    exerciseId: exercise.id,
-                                    setIndex,
-                                    field: 'weight',
-                                    title: 'Weight',
-                                    initialValue: String(
-                                    suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '')),
-                                  ),
-                                    allowDecimal: true,
-                                  })
-                                }
-                                className="relative h-9 text-center text-sm border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/40 focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] w-full tabular-nums"
-                                style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                              >
-                                <span className={(set.from_previous && !set.completed) || suggestedGhostWeight(exercise, set) != null ? 'text-white/35' : ''}>
-                                  {suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '—'))}
-                                </span>
-                                {/* Q-042: subtle tap-to-type affordance */}
-                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                              </button>
-                              <span className="text-[9px] text-white/50 font-medium">Weight</span>                            </div>
-                          );
-                        }
-                        
-                        // Barbell exercises: Standard weight input
-                        return (
-                          // D-131: weighted flex-[4] (weight).
-                          <div className="flex-[4] flex flex-col items-center gap-0.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openKeypadForSet({
-                                  exerciseId: exercise.id,
-                                  setIndex,
-                                  field: 'weight',
-                                  title: 'Weight',
-                                  initialValue: String(
-                                    suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '')),
-                                  ),
-                                  allowDecimal: true,
-                                })
-                              }
-                              className="relative h-9 text-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white placeholder:text-white/40 w-full focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] tabular-nums"
-                              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                            >
-                              <span className={(set.from_previous && !set.completed) || suggestedGhostWeight(exercise, set) != null ? 'text-white/35' : ''}>
-                                {suggestedGhostWeight(exercise, set) ?? (set.weight === 0 ? '' : (set.weight ?? '—'))}
-                              </span>
-                              {/* Q-042: subtle tap-to-type affordance */}
-                              <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                            </button>
-                            <span className="text-[9px] text-white/50 font-medium">Weight</span>                          </div>
-                        );
-                      })()}
-                        {/* RIR cell — value display in the Reps/Weight row: shows the logged
-                            set.rir, or the prescribed target as dimmed ghost text when unset.
-                            The always-visible pill row directly below is the input. */}
-                        {(() => {
-                          const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-                          if (loggerMode === 'mobility' || isDurationBased || isPlyometric(exercise.name)) return null;
-                          // A DETERMINISTIC protocol has no RIR at all — Strength Focus (5/3/1) fixes the
-                          // weight and the reps in advance, so weight loaded and reps completed are the
-                          // only two numbers the engine reads. Same reasoning as the test case below.
-                          if (exercise.rir_tracked === false) return null;
-                          // A 1RM/baseline TEST has no RIR — the AMRAP protocol is the signal, not RIR. Hide
-                          // the RIR cell entirely on a test (reps + weight only). (Q-097/Q-102)
-                          if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
-                          const targetRir = exercise.target_rir;
-                          const hasValue = set.rir !== undefined && set.rir !== null;
-                          return (
-                            // D-131: weighted flex-[2] (rir) — shares the strip's RIR column.
-                            <div className="flex-[2] flex flex-col items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openKeypadForSet({
-                                    exerciseId: exercise.id,
-                                    setIndex,
-                                    field: 'rir',
-                                    title: 'RIR (reps in reserve)',
-                                    initialValue: (set.rir === undefined || set.rir === null) ? '' : String(set.rir),
-                                    allowDecimal: false,
-                                  })
-                                }
-                                className="relative h-9 w-full flex items-center justify-center text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl tabular-nums shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] focus-visible:ring-0 focus-visible:border-white/30 focus-visible:bg-white/[0.12]"
-                                style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
-                                aria-label="RIR"
-                              >
-                                {hasValue
-                                  ? <span className={set.from_previous && !set.completed ? 'text-white/35' : 'text-white'}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                  : <span className={targetRir != null ? "text-amber-300/80 font-medium" : "text-white/30"}>{formatRirTarget(targetRir)}</span>}
-                                {/* Q-042: subtle tap-to-type affordance */}
-                                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
-                              </button>
-                              <span className="text-[9px] text-white/50 font-medium">RIR</span>
-                              {targetRir ? (
-                                <span className="text-[9px] font-medium text-amber-400/70 leading-none">suggested {targetRir >= 5 ? '5+' : targetRir}</span>
-                              ) : null}
-                            </div>
-                          );
-                        })()}
-                        </div>
-                        </div>
-                      {/* D-122: persistent "last:" anchor — the prior session's actuals for THIS
-                          set index (weight × reps @ RIR). Blank on an overflow set index (no real
-                          prior set) and absent entirely for a history-less exercise — never a false
-                          or placeholder anchor. Indented to the set-number leader; stays put
-                          regardless of edits (unlike the from_previous prefill, which clears). */}
-                      {(() => {
-                        // Q-097/Q-102: no "last:" anchor on a TEST. Prior data is from a different context
-                        // (a training session, or a broken 0-rep attempt) and it re-introduces RIR language on
-                        // the clean, feel-based test cards. Tests don't anchor to training history mid-test.
-                        if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
-                        const priorSets = previousSessionByName[normalizeExerciseName(exercise.name)];
-                        const txt = priorSets ? formatLastSet(priorSets[setIndex], exercise.rir_tracked) : null;
-                        if (!txt) return null;
-                        return (
-                          <div className="flex items-start gap-2 mt-1">
-                            <span className="w-9 shrink-0" aria-hidden="true" />
-                            <span className="text-[10px] font-medium text-white/40 leading-none tabular-nums">{txt}</span>
-                          </div>
-                        );
-                      })()}
-                      {/* ⛔ THE BAR-SPEED CUE, FINALLY RENDERED. Written and pinned 2026-07-27,
-                          reachable only from its own test until 2026-08-01 — the line existed, was
-                          correct, and had never once reached a screen. Placed exactly like the
-                          "last:" anchor above it (same indent to the set-number leader, same
-                          weight) because it answers the same question: what is this set FOR.
-                          ⚠️ Speed on a prescribed set is a QUALITY CHECK; speed on an AMRAP is a
-                          STOP RULE. `barSpeedLineFor` keys on the set, never the week, so the two
-                          can't be swapped — and a prescribed set can never receive
-                          "slow rep = last rep". */}
-                      {(() => {
-                        const cue = barSpeedCueFor(exercise, set);
-                        if (!cue) return null;
-                        return (
-                          <div className="flex items-start gap-2 mt-1">
-                            <span className="w-9 shrink-0" aria-hidden="true" />
-                            {/* One step up from the "last:" anchor above (11px / white-55 vs 10px /
-                                white-40). At 10px/35 it read as disabled text rather than as a cue —
-                                it is an instruction for the set about to be performed, so it outranks
-                                the historical anchor it sits under. */}
-                            <span className="text-[11px] font-medium text-white/55 leading-snug">{cue}</span>
-                          </div>
-                        );
-                      })()}
-                      {/* D-125: ONE thin quick-adjust strip replaces the two circle rows + the 2×2
-                          weight stepper. The pre-filled keypad cells above are the primary input
-                          (tap = keypad, Q-042 pencil signals it); this strip just nudges off the
-                          prescription when reality differed. NO inline labels — reps-left /
-                          wt-center / rir-right mirrors the cell order above. reps ±1 (clamp ≥1,
-                          D-117), wt −5/−2.5/+2.5/+5, rir ±1 (clamp 0–5, D-116). Each group renders
-                          only when its field applies; the whole strip is hidden if none do. */}
-                      {(() => {
-                        const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-                        const exType = equipmentForExercise(exercise.name);
-                        // A 1RM/baseline TEST has no RIR (the AMRAP protocol is the signal) — hide the rir ±1 nudges too. (Q-097/Q-102)
-                        const isTestWorkout = isBaselineTestWorkout(scheduledWorkout || {});
-                        const showReps = !isDurationBased && set.reps !== undefined;
-                        const showWeight = !isDurationBased && !isBodyweightMove(exercise.name) && exType !== 'band';
-                        // `rir_tracked === false` → a deterministic protocol (5/3/1). Weight loaded and
-                        // reps completed are the only two numbers that mean anything there, so the RIR
-                        // column comes off entirely rather than sitting empty. Every other protocol is
-                        // unaffected — the flag is absent on all of them.
-                        // ⛔ D-338 — A FREESTYLE SESSION GETS THE WORDS, NOT RIR.
-                        // RIR only means something against a TARGET: the plan says "8 reps, leave 2
-                        // in the tank" and reports whether you picked the right weight. With no plan
-                        // there is no target, so the number has nothing to be measured against — and
-                        // the app would be speaking two languages depending on whether you happened
-                        // to open a planned session.
-                        // ⚠️ GATED ON `sourcePlannedId`, NOT on `rir_tracked === undefined`. A plan
-                        // authored before that flag existed also has it undefined, and keying on the
-                        // absent flag would silently strip RIR from every one of those. "Did this
-                        // session come from a plan" is the question actually being asked.
-                        // ⚠️ AGAINST COMMON PRACTICE, DELIBERATELY: Hevy and Trainerize do offer RIR
-                        // on freestyle logging. See D-338 — this is the one recommendation there that
-                        // departs from the field, and it should stay labelled as such.
-                        const isFreestyleSession = !sourcePlannedId;
-                        const showRir = exercise.rir_tracked !== false && !isFreestyleSession && !isTestWorkout && loggerMode !== 'mobility' && !isDurationBased && !isPlyometric(exercise.name);
-                        if (!showReps && !showWeight && !showRir) return null;
-                        // D-129: buttons are `flex-1` (basis-0) so they GROW to fill the real row
-                        // width — comfortable thumb targets on 390–430px phones — while still
-                        // summing to ≤ the row, so they never overflow at the 380px floor (380px is
-                        // the floor, not the target). `h-10` (40px) is the tap-height. min-w-0 lets
-                        // them shrink if a narrow device demands it.
-                        const nudgeCls = 'flex-1 min-w-0 h-10 rounded-md border border-white/15 bg-white/[0.04] text-white/70 text-xs hover:bg-white/[0.10] hover:text-white/90 active:bg-white/[0.16] tabular-nums leading-none transition-colors';
-                        // RIR nudges carry the app's "RIR = amber" tint so the rir ±1 pair reads
-                        // instantly distinct from the (identical-looking) reps ±1 pair (D-128/D-123).
-                        const nudgeClsRir = 'flex-1 min-w-0 h-10 rounded-md border border-amber-400/30 bg-amber-500/[0.06] text-amber-300/75 text-xs hover:bg-amber-500/15 hover:text-amber-200 active:bg-amber-500/25 tabular-nums leading-none transition-colors';
-                        const adjReps = (d: number) => updateSet(exercise.id, setIndex, { reps: Math.max(1, (typeof set.reps === 'number' ? set.reps : 0) + d) });
-                        const adjWeight = (d: number) => updateSet(exercise.id, setIndex, { weight: Math.max(0, Math.round(((set.weight || 0) + d) * 2) / 2) });
-                        const adjRir = (d: number) => updateSet(exercise.id, setIndex, { rir: Math.max(0, Math.min(5, (set.rir ?? rirLoggedSeed(exercise.target_rir) ?? 0) + d)) });
-                        // Groups are weighted by button count (reps 2 / wt 4 / rir 2) so every button
-                        // ends up ~the same width as the row grows. Hidden groups are omitted and the
-                        // weights redistribute (reps stays left, rir stays right).
-                        return (
-                          // D-131: mirror the top-cells container exactly — `[w-9 set-# leader][gap-2]
-                          // [flex-1 weighted 2:4:2 with gap-4]` — so each nudge group sits in the SAME
-                          // column band as its keypad cell above → each cell centers over its group.
-                          // Keeps D-130's gap-1 within / gap-4 between. (Reclaims the leader D-129 had
-                          // dropped; alignment is worth the ~6px of button width here.)
-                          <div className="flex items-start gap-2 mt-2">
-                            <span className="w-9 shrink-0" aria-hidden="true" />
-                            <div className="flex-1 min-w-0 flex items-center gap-4">
-                              {showReps && (
-                                <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust reps">
-                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(-1)} aria-label="Reps minus 1">−1</button>
-                                  <button type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjReps(1)} aria-label="Reps plus 1">+1</button>
-                                </div>
-                              )}
-                              {showWeight && (
-                                <div className="flex-[4] flex items-center gap-1" role="group" aria-label="Adjust weight">
-                                  {[-5, -2.5, 2.5, 5].map((d) => (
-                                    <button key={d} type="button" className={nudgeCls} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjWeight(d)} aria-label={`${d > 0 ? 'Add' : 'Subtract'} ${Math.abs(d)} pounds`}>{d > 0 ? `+${d}` : d}</button>
-                                  ))}
-                                </div>
-                              )}
-                              {showRir && (
-                                <div className="flex-[2] flex items-center gap-1" role="group" aria-label="Adjust RIR">
-                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(-1)} aria-label="RIR minus 1">−1</button>
-                                  <button type="button" className={nudgeClsRir} style={{ fontFamily: 'Inter, sans-serif' }} onClick={() => adjRir(1)} aria-label="RIR plus 1">+1</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    {/* ⛔ THE THREE WORDS ARE GONE (2026-07-30, Michael: *"lets kill it, i dont
-                        want any useless buttons"*). They shipped ONE DAY EARLIER as D-338's
-                        replacement for RIR, and they were right to replace it — but the verdict that
-                        moves the bar reads the REP COUNT, not the word. Wendler p30: you keep adding
-                        weight until you cannot hit the prescribed sets and reps, and the miss is the
-                        signal. Nothing on that path ever read `difficulty`.
-
-                        So it was a question asked every session whose answer changed nothing — the
-                        exact disease the rest of this day was spent clearing (a built reader with no
-                        input, or here, an input with no reader). Gating the weight on how it felt
-                        would be autoregulation, which belongs to a different programme: Boostcamp
-                        only exposes RPE/RIR on *Beyond 5/3/1* templates, not on core 5/3/1.
-
-                        ⚠️ The plain Done button always finished the set; this only offered a second
-                        way. Removing it takes nothing away.
-                        ⚠️ Sessions that already recorded a word still display it — the data is real,
-                        and deleting the render would erase what was honestly logged. */}
-                    {(() => {
-                      // Duration-based exercises don't need equipment selection (bodyweight)
-                      if (isDurationBased) {
-                        return null;
-                      }
-                      // Bodyweight exercises don't need equipment selection (e.g., Nordic Curls, pull-ups, push-ups)
-                      if (isBodyweightMove(exercise.name)) {
-                        return null;
-                      }
-                      const exerciseType = equipmentForExercise(exercise.name);
-                      // A plyo has no equipment to choose — no bar, no plates, no band.
-                      if (exerciseType === 'plyo') return null;
-                      // D-351: the equipment strip's band control, in pounds — the same field and the
-                      // same rule as the set row above. Two controls wrote this value in words; both
-                      // now write a number, or nothing.
-                      if (exerciseType === 'band') {
-                        const bandNum = set.resistance_level != null && String(set.resistance_level).trim() !== ''
-                          && Number.isFinite(Number(set.resistance_level)) && Number(set.resistance_level) > 0
-                            ? Number(set.resistance_level) : null;
-                        return (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-amber-400/80">Band</span>
-                            <button
-                              type="button"
-                              onClick={() => openKeypadForSet({
-                                exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
-                                initialValue: bandNum == null ? '' : String(bandNum),
-                                allowDecimal: true,
-                                hint: BAND_LB_HINT,
-                              })}
-                              className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 tabular-nums"
-                            >
-                              {bandNum == null ? 'set lb' : `${bandNum} lb`}
-                            </button>
-                          </div>
-                        );
-                      }
-                      // Bodyweight exercises - no equipment UI
-                      if (exerciseType === 'bodyweight') {
-                        return null;
-                      }
-                      // Only show Plates/Barbell UI for barbell exercises
-                      if (exerciseType === 'barbell') {
-                        return (
-                          <div className="flex items-center justify-between">
-                            <button
-                              onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                              className="text-xs text-white/70 flex items-center gap-1 hover:text-white/90 transition-colors"
-                            >
-                              Plates
-                              {expandedPlates[`${exercise.id}-${setIndex}`] ? (
-                                <ChevronUp className="h-3 w-3" />
-                              ) : (
-                                <ChevronDown className="h-3 w-3" />
-                              )}
-                            </button>
-                            <Select
-                              value={set.barType || 'standard'}
-                              onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
-                            >
-                              <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
-                                <SelectItem value="standard" className="hover:bg-white/[0.15]">Barbell (45lb)</SelectItem>
-                                <SelectItem value="womens" className="hover:bg-white/[0.15]">Women's (33lb)</SelectItem>
-                                <SelectItem value="safety" className="hover:bg-white/[0.15]">Safety Squat (45lb)</SelectItem>
-                                <SelectItem value="ez" className="hover:bg-white/[0.15]">EZ Curl (25lb)</SelectItem>
-                                <SelectItem value="trap" className="hover:bg-white/[0.15]">Trap/Hex (60lb)</SelectItem>
-                                <SelectItem value="cambered" className="hover:bg-white/[0.15]">Cambered (55lb)</SelectItem>
-                                <SelectItem value="swiss" className="hover:bg-white/[0.15]">Swiss/Football (35lb)</SelectItem>
-                                <SelectItem value="technique" className="hover:bg-white/[0.15]">Technique (15lb)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        );
-                      }
-                      // For dumbbells and bands: no equipment UI
-                      return null;
-                    })()}
-                    {(() => {
-                      // Duration-based exercises don't need plate math (bodyweight)
-                      if (isDurationBased) {
-                        return null;
-                      }
-                      // Bodyweight exercises don't need plate math (e.g., Nordic Curls, pull-ups, push-ups)
-                      if (isBodyweightMove(exercise.name)) {
-                        return null;
-                      }
-                      const exerciseType = equipmentForExercise(exercise.name);
-                      // Only show PlateMath for barbell exercises
-                      if (exerciseType === 'barbell' && expandedPlates[`${exercise.id}-${setIndex}`]) {
-                        return (
-                          <div>
-                            <PlateMath
-                              weight={set.weight}
-                              barType={set.barType || 'standard'}
-                              useImperial={true}
-                            />
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                    
-                    {/* ⛔ THE LIVE ESTIMATE IS GONE, AND ITS ABSENCE IS THE POINT (2026-07-30).
-                        This line read "Estimated 1RM: X lbs → We'll use Y lbs" as you typed, off a
-                        formula running on the phone. The number it showed was the number it then wrote.
-                        The server owns that number now, so the set is CONFIRMED here and the result is
-                        shown after the save — one number, computed once, from the machine that stores it.
-                        Showing a phone-computed preview beside a server-computed truth is how two
-                        answers to one question get born. */}
-                    {/* What the SERVER computed and stored, shown after the save. The live preview that
-                        used to sit here was the phone's own arithmetic; this is the number that was
-                        actually written (D-342). */}
-                    {isBaselineTest && isWorking && baselineServerResults.length > 0 && (() => {
-                      const srv = baselineServerResults.find(
-                        (r) => r.lift.toLowerCase() === exercise.name.trim().toLowerCase(),
-                      );
-                      if (!srv) return null;
-                      return (
-                        <div className="mt-2 ml-8 p-3 bg-emerald-500/[0.06] border border-emerald-400/20 rounded-md">
-                          <div className="text-sm text-emerald-200/90">
-                            Saved: {srv.estimated1RM} lb
-                            <span className="text-white/45"> — from {srv.weight > 0 ? `${srv.weight} lb × ` : ''}{srv.reps} reps</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {isBaselineTest && isWorking && result && (
-                      <div className="mt-2 ml-8 p-3 bg-white/[0.04] border border-white/15 rounded-md">
-                        <div className="text-sm text-white/70">
-                          Test set recorded: {result.weight > 0 ? `${result.weight} lb × ` : ''}{result.reps} reps
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Non-blocking RIR ADJUST strip. The set is ALREADY saved with the suggested RIR
-                        (default) and rest is already running — this only lets the athlete tap a different
-                        number if it actually felt different. "keep" dismisses (keeps the suggested).
-                        Friction-free + keeps RIR honest, with no forced "hit the number" step. */}
-                    {rirConfirm && rirConfirm.exerciseId === exercise.id && rirConfirm.setIndex === setIndex && (() => {
-                      const targetRir = exercise.target_rir;
-                      return (
-                        <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300/90">RIR — tap to change</span>
-                            <button
-                              type="button"
-                              onClick={() => setRirConfirm(null)}
-                              className="text-[10px] text-white/45 hover:text-white/75 px-1"
-                              style={{ fontFamily: 'Inter, sans-serif' }}
-                              aria-label="Keep the suggested RIR"
-                            >
-                              keep
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            {[0, 1, 2, 3, 4, 5].map((r) => {
-                              const isCap = r === 5;  // 5 = "5+"
-                              const isSuggested = targetRir != null && (rirSuggestedIntegers(targetRir).includes(r) || (targetRir >= 5 && isCap));
-                              return (
-                                <button
-                                  key={r}
-                                  type="button"
-                                  onClick={() => confirmRirAndComplete(exercise.id, setIndex, r)}
-                                  className={`h-9 w-9 rounded-full border-2 text-sm tabular-nums leading-none transition-colors ${
-                                    isSuggested
-                                      ? 'bg-amber-500/30 border-amber-300 text-amber-100 font-semibold ring-2 ring-amber-300/50'
-                                      : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-amber-500/15 hover:border-amber-400/40'
-                                  }`}
-                                  style={{ fontFamily: 'Inter, sans-serif' }}
-                                  aria-label={`RIR ${isCap ? '5 or more' : r}${isSuggested ? ' (suggested — tap to confirm)' : ''}`}
-                                >
-                                  {isCap ? '5+' : r}
-                                </button>
+                            {/* What the SERVER computed and stored, shown after the save (D-342).
+                                The live phone-side preview that used to sit here is deliberately
+                                gone — one number, computed once, by the machine that stores it. */}
+                            {exIsBaselineTest && isWorking && baselineServerResults.length > 0 && (() => {
+                              const srv = baselineServerResults.find(
+                                (r) => r.lift.toLowerCase() === exercise.name.trim().toLowerCase(),
                               );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                              if (!srv) return null;
+                              return (
+                                <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-emerald-500/[0.06] border border-emerald-400/20 rounded-lg">
+                                  <div className="text-[13px] text-emerald-200/90">
+                                    Saved: {srv.estimated1RM} lb
+                                    <span className="text-white/45"> — from {srv.weight > 0 ? `${srv.weight} lb × ` : ''}{srv.reps} reps</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                            {exIsBaselineTest && isWorking && result && (
+                              <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-white/[0.04] border border-white/15 rounded-lg">
+                                <div className="text-[13px] text-white/70">
+                                  Test set recorded: {result.weight > 0 ? `${result.weight} lb × ` : ''}{result.reps} reps
+                                </div>
+                              </div>
+                            )}
 
-                    {/* Footer row — Rest/Start (left) shares ONE line with Done/✕ (right).
-                        Kills the floating Rest row and the dead space above the footer. */}
-                    {/* D-139: footer is now just Done + delete-✕ (right-aligned). The in-row rest
-                        block was removed — rest auto-starts on Done and lives only in the top pill. */}
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleSetComplete(exercise.id, setIndex)}
-                          className={`text-xs px-3 py-1 rounded-full h-9 transition-all duration-300 ${set.completed ? `${themeColors.doneBg} border-2 ${themeColors.doneBorder} ${themeColors.doneText}` : 'bg-white/[0.08] backdrop-blur-md border-2 border-white/25 text-white hover:bg-white/[0.12] hover:border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_2px_8px_rgba(0,0,0,0.2)]'}`}
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        >
-                          {set.completed ? '✓ Done' : 'Done'}
-                        </button>
-                        <button
-                          onClick={() => deleteSet(exercise.id, setIndex)}
-                          className="rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/60 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 h-9 w-9 flex items-center justify-center flex-shrink-0 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                          aria-label="Delete set"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                      </div>
-                  </div>
+                            {/* D-134 confirm-on-Done, non-blocking. The set is ALREADY saved with
+                                the suggested RIR and rest is already running; this only lets the
+                                athlete tap a different number if it actually felt different.
+                                ⛔ Tapping one clears `rir_autofilled` (in updateSet), which is what
+                                lets the value into e1RM / RIR-adherence / execution. Leaving it
+                                alone keeps the flag, and the auto-filled number stays EXCLUDED —
+                                otherwise the prescription reads back as observed effort. */}
+                            {rirConfirm && rirConfirm.exerciseId === exercise.id && rirConfirm.setIndex === setIndex && (() => {
+                              const targetRir = exercise.target_rir;
+                              return (
+                                <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-amber-400/40 bg-amber-500/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300/90">RIR — tap to change</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRirConfirm(null)}
+                                      className="text-[10px] text-white/45 hover:text-white/75 px-1"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                      aria-label="Keep the suggested RIR"
+                                    >
+                                      keep
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    {[0, 1, 2, 3, 4, 5].map((r) => {
+                                      const isCap = r === 5;  // 5 = "5+"
+                                      const isSuggested = targetRir != null && (rirSuggestedIntegers(targetRir).includes(r) || (targetRir >= 5 && isCap));
+                                      return (
+                                        <button
+                                          key={r}
+                                          type="button"
+                                          onClick={() => confirmRirAndComplete(exercise.id, setIndex, r)}
+                                          className={`h-9 w-9 rounded-full border-2 text-sm tabular-nums leading-none transition-colors ${
+                                            isSuggested
+                                              ? 'bg-amber-500/30 border-amber-300 text-amber-100 font-semibold ring-2 ring-amber-300/50'
+                                              : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-amber-500/15 hover:border-amber-400/40'
+                                          }`}
+                                          style={{ fontFamily: 'Inter, sans-serif' }}
+                                          aria-label={`RIR ${isCap ? '5 or more' : r}${isSuggested ? ' (suggested — tap to confirm)' : ''}`}
+                                        >
+                                          {isCap ? '5+' : r}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
                 
                 {/* Baseline test save button (after all sets) */}
                 {isBaselineTestWorkout(scheduledWorkout || {}) && Object.keys(baselineTestResults).length > 0 && (
