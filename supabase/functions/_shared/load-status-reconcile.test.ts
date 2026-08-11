@@ -18,6 +18,7 @@
  */
 import { assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { reconcileLoadStatus, computeSafetyFloor, computeDecliningSignals, computePrimaryAdherence, type ReconcileLoadInput, type TrendInfo, type BodyTrends } from './load-status-reconcile.ts';
+import { readinessForLoadVerdict } from './response-model/loaded-legs.ts';
 
 // ── Fixture builders (defaults = quiet body, no decline) ──────────────────
 const trend = (t: string, n: number): TrendInfo => ({ trend: t, based_on_sessions: n });
@@ -89,6 +90,34 @@ function run(overrides: {
     overrides.driftUsable ?? true, // default true = HR drift always counts (pre-D-318)
   );
 }
+
+// ── D-416: the flagged cascade — a lone RPE bump must not print "a bit high" ─────────────────────────
+// Michael, WK3 Strong Focus (2026-08-11): ACWR ~1.1 (squarely optimal, 0.8–1.3), body quiet, but a
+// single +0.7 RPE reading set raw readiness 'fatigued' → the readiness floor raised load to 'elevated'
+// → "a bit high" on screen, plus the "needs absorbing" accent. The reconciler is UNCHANGED; the fix
+// feeds it the REFINED readiness (readinessForLoadVerdict) so a non-systemic reading never floors load.
+// Both tests below share identical inputs except the readiness value — isolating the cascade.
+const CASCADE = {
+  raw: { status: 'on_target' as const, running_acwr: 1.1, actual_vs_planned_pct: null },
+  unweightedAcwr: 1.1,
+  bodyTrends: QUIET_TRENDS,
+  unplannedLoad: { count: 0, totalLoad: 0, plannedWeekLoad: 100 },
+  planPosition: { weekIntent: 'build' },
+};
+Deno.test('D-416: raw fatigued (single soft signal) @ ACWR 1.1 → WOULD elevate (the bug)', () => {
+  const r = run({ ...CASCADE, readiness: 'fatigued' });
+  assertEquals(r.status, 'elevated');
+});
+Deno.test('D-416: refined readiness (EFFORT UP → normal) @ ACWR 1.1 → stays on_target (fixed)', () => {
+  const readiness = readinessForLoadVerdict('fatigued', 'EFFORT UP'); // = 'normal'
+  const r = run({ ...CASCADE, readiness });
+  assertEquals(r.status, 'on_target');
+});
+Deno.test('D-416: systemic FATIGUED still elevates @ ACWR 1.1 (real fatigue is untouched)', () => {
+  const readiness = readinessForLoadVerdict('fatigued', 'FATIGUED'); // = 'fatigued'
+  const r = run({ ...CASCADE, readiness });
+  assertEquals(r.status, 'elevated');
+});
 
 // ── build × cross-training-swap → Gate 2 pulls it to optimal ──────────────
 Deno.test('build + cross-training swap @ ACWR 1.4 → on_target (Gate 2)', () => {

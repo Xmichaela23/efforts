@@ -582,16 +582,20 @@ export function rpeProvenance(currentAvg: number | null, baselineAvg: number | n
   return `Last 7 days you've rated effort ${currentAvg.toFixed(1)} on average, vs your 28-day typical of ${baselineAvg.toFixed(1)} — across all disciplines (a hard lift moves this number too).`;
 }
 
-// D-232 color escalation for the "How hard it feels" row (Michael 2026-07-02): magnitude drives tone,
-// but only HARDER escalates — feeling easier never alarms.
-//   |Δ| < 0.5 → neutral · harder 0.5–1.0 → the current default (danger) · harder ≥1.0 → amber (warning)
+// Color escalation for the "How hard it feels" row: magnitude drives tone, but only HARDER escalates —
+// feeling easier never alarms.
+//   |Δ| < 0.5 → neutral · harder 0.5–1.0 → amber (warning) · harder ≥1.0 → red (danger)
 //   easier (any magnitude) → positive (recovering well), never a warning.
+// ⛔ D-416 (2026-08-11) REVERSES the D-232 escalation, which was inverted: "a bit harder" (0.5–1.0) rendered
+// RED (danger) while "noticeably harder" (≥1.0) rendered AMBER (warning) — the milder reading wore the
+// harsher color, so a +0.7 RPE bump read as a heavy red flag. Red is now reserved for the ≥1.0 reading;
+// a mild "a bit harder" is amber. (The D-232 comment that used to sit here has been replaced.)
 export function rpeFeelTone(delta: number | null): VisibleSignal['trend_tone'] {
   if (delta == null) return 'neutral';
   const abs = Math.abs(delta);
   if (abs < 0.5) return 'neutral';
   if (delta < 0) return 'positive';               // easier — don't alarm on easy weeks
-  return abs >= 1.0 ? 'warning' : 'danger';        // harder: ≥1.0 amber, 0.5–1.0 current default
+  return abs >= 1.0 ? 'danger' : 'warning';        // harder: ≥1.0 red, 0.5–1.0 amber (D-416, reversed from D-232)
 }
 
 /** Days from today to a YYYY-MM-DD; positive = future, negative = past. Null when invalid. */

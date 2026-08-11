@@ -6,7 +6,7 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildLoadedLegsDiagnosis, classifyFatigueLabel } from './loaded-legs.ts';
+import { buildLoadedLegsDiagnosis, classifyFatigueLabel, readinessForLoadVerdict } from './loaded-legs.ts';
 
 const LL = { label: 'LEGS LOADED' as const, why: '', suggestion: '' };
 const SORE = { label: 'LEGS SORE' as const, why: '', suggestion: '' };
@@ -23,6 +23,32 @@ Deno.test('label: systemic (no attribution) → FATIGUED', () => {
 });
 Deno.test('label[case 6]: unattributed effort-up, balanced load → EFFORT UP (never FATIGUED)', () => {
   assertEquals(classifyFatigueLabel({ loadedLegs: null, systemic: false }), 'EFFORT UP');
+});
+
+// ── D-416: readiness the LOAD path consumes — a non-systemic `fatigued` never relabels the load ──────
+// The flagged cascade: one +0.7 RPE bump → raw readiness 'fatigued' (single signal) → chip refines to
+// EFFORT UP, but the raw value used to reach the reconciler + accent and print "a bit high" / "needs
+// absorbing". The load path now reads this refined value, so those never fire off a lone soft signal.
+Deno.test('load-readiness: EFFORT UP (single signal) → downgraded to normal — the flagged case', () => {
+  assertEquals(readinessForLoadVerdict('fatigued', 'EFFORT UP'), 'normal');
+});
+Deno.test('load-readiness: LEGS LOADED (localized) → normal (not systemic)', () => {
+  assertEquals(readinessForLoadVerdict('fatigued', 'LEGS LOADED'), 'normal');
+});
+Deno.test('load-readiness: LEGS SORE (declared, localized) → normal (soreness lives on BODY, not LOAD)', () => {
+  assertEquals(readinessForLoadVerdict('fatigued', 'LEGS SORE'), 'normal');
+});
+Deno.test('load-readiness: systemic FATIGUED → stays fatigued (still raises load)', () => {
+  assertEquals(readinessForLoadVerdict('fatigued', 'FATIGUED'), 'fatigued');
+});
+Deno.test('load-readiness: overreached → untouched (genuine threshold, still raises)', () => {
+  assertEquals(readinessForLoadVerdict('overreached', null), 'overreached');
+});
+Deno.test('load-readiness: normal/fresh/adapting/detrained → untouched', () => {
+  assertEquals(readinessForLoadVerdict('normal', null), 'normal');
+  assertEquals(readinessForLoadVerdict('fresh', null), 'fresh');
+  assertEquals(readinessForLoadVerdict('adapting', null), 'adapting');
+  assertEquals(readinessForLoadVerdict('detrained', null), 'detrained');
 });
 
 const BASE = {

@@ -90,3 +90,25 @@ export function classifyFatigueLabel(args: { loadedLegs: LoadedLegsDiagnosis | n
   if (args.systemic) return 'FATIGUED';
   return 'EFFORT UP';
 }
+
+/**
+ * D-416 (2026-08-11): the readiness value the LOAD path should consume — objective load, readiness beside it.
+ *
+ * The raw `fatigued` catch-all over-fires on a single unattributed signal (D-232 already noted this and
+ * fixed it for the DISPLAY chip only). A lone effort-up ('EFFORT UP') or a localized leg-load
+ * ('LEGS LOADED'/'LEGS SORE') is NOT systemic fatigue and must not relabel the objective load verdict —
+ * so for the load reconciler (D-260 sole authority) and the over-reach accent it is downgraded to
+ * 'normal'. Only the systemic 'FATIGUED' label (elevated ACWR or ≥2 declining signals) — and
+ * 'overreached', which never becomes a fatigue label — carries into the load path. `fatigueLabel` is the
+ * refined chip label when readinessState is 'fatigued', else null. Matches Garmin/TP/Strava in principle:
+ * the load number is measured from the work; how-you-feel never rewrites the load label.
+ *
+ * SAFETY floor + the honest readiness_state payload stay on the RAW value — this is display/verdict only.
+ */
+export function readinessForLoadVerdict(
+  readinessState: string,
+  fatigueLabel: FatigueDisplayLabel | null,
+): string {
+  if (readinessState === 'fatigued' && fatigueLabel !== 'FATIGUED') return 'normal';
+  return readinessState;
+}

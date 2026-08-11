@@ -60,10 +60,13 @@ Deno.test('missing data → "steady"', () => {
 });
 
 // ── color escalation (harder escalates; easier never alarms) ────────────────────────────────────
+// D-416 (2026-08-11): tone reversed from D-232 — the mild bucket must NOT wear the harsher color.
+// Regression: a +0.7/+0.9 "a bit harder" reading is amber, never red; red is reserved for ≥1.0.
 Deno.test('tone: harder <0.5 → neutral', () => assertEquals(rpeFeelTone(0.3), 'neutral'));
-Deno.test('tone: harder 0.5–1.0 → danger (current default)', () => assertEquals(rpeFeelTone(0.9), 'danger'));
-Deno.test('tone: harder ≥1.0 → warning (amber)', () => assertEquals(rpeFeelTone(1.3), 'warning'));
-Deno.test('tone: harder boundary 1.0 → warning', () => assertEquals(rpeFeelTone(1.0), 'warning'));
+Deno.test('tone: harder 0.5–1.0 → warning (amber, not red) [D-416]', () => assertEquals(rpeFeelTone(0.9), 'warning'));
+Deno.test('tone: harder 0.7 "a bit harder" → warning (the flagged case) [D-416]', () => assertEquals(rpeFeelTone(0.7), 'warning'));
+Deno.test('tone: harder ≥1.0 → danger (red) [D-416]', () => assertEquals(rpeFeelTone(1.3), 'danger'));
+Deno.test('tone: harder boundary 1.0 → danger [D-416]', () => assertEquals(rpeFeelTone(1.0), 'danger'));
 Deno.test('tone: easier 0.5–1.0 → positive (no alarm)', () => assertEquals(rpeFeelTone(-0.7), 'positive'));
 Deno.test('tone: easier ≥1.0 → positive (never warning/danger)', () => assertEquals(rpeFeelTone(-1.3), 'positive'));
 Deno.test('tone: easier <0.5 → neutral', () => assertEquals(rpeFeelTone(-0.3), 'neutral'));
