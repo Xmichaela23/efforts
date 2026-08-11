@@ -4218,16 +4218,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         saveShadow: 'shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
       }
     : {
-        border: 'border-orange-500/30',
-        text: 'text-orange-400',
-        hoverText: 'hover:text-orange-400',
-        rgb: '249,115,22',
+        // Strength = amber, not orange (2026-08-10) — richer, deeper, matches the approved mockup.
+        border: 'border-amber-500/35',
+        text: 'text-amber-400',
+        hoverText: 'hover:text-amber-400',
+        rgb: '240,150,60',
         // Save button
-        saveBg: 'bg-orange-700/80',
-        saveBorder: 'border-orange-500/40',
-        saveHoverBg: 'hover:bg-orange-700/90',
-        saveHoverBorder: 'hover:border-orange-500/50',
-        saveShadow: 'shadow-[0_0_0_1px_rgba(249,115,22,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
+        saveBg: 'bg-amber-700/80',
+        saveBorder: 'border-amber-500/40',
+        saveHoverBg: 'hover:bg-amber-700/90',
+        saveHoverBorder: 'hover:border-amber-500/50',
+        saveShadow: 'shadow-[0_0_0_1px_rgba(240,150,60,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
       };
 
   // Row-per-set accent (2026-08-10). A completed set tints the row, turns its number underlines,
@@ -4638,10 +4639,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {ACCESSORY_SET_CUE}
             </p>
           )}
-          <div 
+          <div
             className={`backdrop-blur-xl border-2 ${themeColors.border} rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(${themeColors.rgb},0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}
             style={{
-              background: `linear-gradient(135deg, rgba(${themeColors.rgb},0.15) 0%, rgba(${themeColors.rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`
+              // Darker, richer ground (2026-08-10) — warm bleed off the top over near-black, not a
+              // flat orange wash. Matches the approved mockup: top-down, warm → black.
+              background: `linear-gradient(180deg, rgba(${themeColors.rgb},0.16) 0%, rgba(${themeColors.rgb},0.05) 42%, rgba(8,6,5,0.55) 100%), #0f0b09`
             }}
           >
             {/* Core Work/Circuit exercises use the CoreTimer component */}
@@ -5221,7 +5224,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 <button
                                   type="button"
                                   onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                  className={`absolute -top-1 right-0 h-4 px-0.5 flex items-center text-[8px] uppercase tracking-wide transition-colors ${platesOpen ? 'text-white/75' : 'text-white/30 hover:text-white/60'}`}
+                                  className={`absolute -top-1.5 right-0 h-4 px-1 flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-wide transition-colors ${platesOpen ? 'text-amber-200' : 'text-amber-300/70 hover:text-amber-200'}`}
                                   aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
                                   aria-expanded={platesOpen ? true : false}
                                 >
