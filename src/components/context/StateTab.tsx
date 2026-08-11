@@ -1342,7 +1342,10 @@ export default function StateTab({
   // confident per-lift line can't read as a second, competing "STRENGTH" top-line when the spine
   // trend says needs-data. All state/handlers stay here; only the rendered node is passed down.
   const strengthPerLiftDetail: React.ReactNode = perLiftMain.length > 0 ? (
-    <div className="mt-1.5 ml-[84px] pl-3 border-l border-white/[0.07] space-y-2">
+    // Layout 2026-08-11 (Michael): reclaim the horizontal space — the list used to indent 84px to align
+    // under the parent label column, leaving each lift cramped in ~68% width. It now runs near-full-width
+    // (a light border-l keeps the nesting cue) so the sets read clean, like Strong's exercise detail.
+    <div className="mt-2 ml-1 pl-3 border-l border-white/[0.07] space-y-3.5">
       {/* Collapsed by default — the e1RM dot above is the read; this list is drill-down. */}
       <button
         type="button"
@@ -1433,13 +1436,13 @@ export default function StateTab({
                 on two screens. The set line carries its own date because this is frequently a
                 measurement from an earlier week (no all-out set on a leader cycle or a deload). */}
             {allOutText && (
-              <div className="mt-1 space-y-0.5">
-                <div className="text-[12px] text-white/70 tabular-nums">{allOutText.set_line}</div>
-                <div className={`text-[12px] ${allOut?.is_rep_record === true ? 'text-emerald-300' : 'text-white/50'}`}>
-                  {allOutText.record_line}
-                </div>
+              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <span className="text-[12px] text-white/70 tabular-nums">{allOutText.set_line}</span>
                 {allOutText.estimate_line && (
-                  <div className="text-[12px] text-white/45 tabular-nums">{allOutText.estimate_line}</div>
+                  <span className="text-[12px] text-white/45 tabular-nums">{allOutText.estimate_line}</span>
+                )}
+                {allOutText.record_line && (
+                  <span className="text-[12px] text-emerald-300 font-medium">{allOutText.record_line}</span>
                 )}
               </div>
             )}

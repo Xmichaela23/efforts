@@ -13,10 +13,10 @@ Deno.test('the rep record LEADS and the estimate follows', () => {
     estimated_1rm: 270, estimate_trusted: false, estimate_trusted_max_reps: 5,
   }, 'Jul 28');
   assertEquals(t?.set_line, 'All-out set 225 lb × 6 · Jul 28');
-  assertEquals(t?.record_line, 'Rep record at this weight — your best was 5.');
-  // ⚠️ REWRITTEN 2026-08-03 — the old hedge ("rough — over 5 reps no formula holds up") described
-  // the arithmetic instead of the lift and was not understood on sight. It now uses HIS rep count.
-  assertEquals(t?.estimate_line, 'Estimated max 270 lb — a guess from 6 reps. Estimates hold to about 5.');
+  // 2026-08-11 (Strong/Hevy-clean): a rep record is a "Rep PR" badge, no "your best was N" prose.
+  assertEquals(t?.record_line, 'Rep PR');
+  // 2026-08-11: no reliability hedge — the estimate shows clean, like Strong (math is unchanged upstream).
+  assertEquals(t?.estimate_line, 'Estimated max 270 lb');
 });
 
 Deno.test('⛔ a null prior says so plainly — it never implies a first-time PR', () => {
@@ -25,16 +25,27 @@ Deno.test('⛔ a null prior says so plainly — it never implies a first-time PR
     prior_best_reps_at_weight: null, is_rep_record: false,
     estimated_1rm: 270, estimate_trusted: true, estimate_trusted_max_reps: 8,
   }, 'Jul 28');
-  assertEquals(t?.record_line, 'First time at this weight.');
-  assertEquals(t?.estimate_line, 'Estimated max 270 lb', 'inside the ceiling, no hedge');
+  // 2026-08-11: a non-record set narrates nothing — no "first time" / "your best is N" line.
+  assertEquals(t?.record_line, '');
+  assertEquals(t?.estimate_line, 'Estimated max 270 lb', 'clean, no hedge');
 });
 
-Deno.test('a prior you did not beat is stated, not hidden', () => {
+Deno.test('a non-record set gets no record line (Strong/Hevy-clean, 2026-08-11)', () => {
   const t = composeAllOutRowText({
     weight: 225, reps: 4, prior_best_reps_at_weight: 6, is_rep_record: false,
     estimated_1rm: 255, estimate_trusted: true, estimate_trusted_max_reps: 5,
   }, 'Jul 28');
-  assertEquals(t?.record_line, 'Your best at this weight is 6.');
+  assertEquals(t?.record_line, '');
+});
+
+Deno.test('a high-rep set shows the estimate CLEAN — no "a guess from N reps" hedge (2026-08-11)', () => {
+  // The deadlift-from-25-reps case Michael flagged: honest number, presented like Strong.
+  const t = composeAllOutRowText({
+    weight: 110, reps: 25, prior_best_reps_at_weight: 8, is_rep_record: true,
+    estimated_1rm: 200, estimate_trusted: false, estimate_trusted_max_reps: 5,
+  }, 'Aug 7');
+  assertEquals(t?.record_line, 'Rep PR');
+  assertEquals(t?.estimate_line, 'Estimated max 200 lb');
 });
 
 Deno.test('⛔ NO MEASUREMENT, NO LINES — and never a fallback', () => {

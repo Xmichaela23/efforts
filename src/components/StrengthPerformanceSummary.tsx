@@ -540,36 +540,20 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
                 <span className="text-white/60">{a.name}</span>{' '}
                 <span className="tabular-nums font-semibold">{a.weight} lb × {a.reps}</span>
               </div>
-              {/* The record line. ⚠️ A null prior is NOT a record — nothing to beat is not the same
-                  as beating something, so it says so plainly instead of implying a first-time PR. */}
-              <div className="text-[13px] mt-0.5">
-                {a.is_rep_record ? (
-                  <span className="text-emerald-300">
-                    Rep record at this weight — your best was {a.prior_best_reps_at_weight}.
-                  </span>
-                ) : a.prior_best_reps_at_weight != null ? (
-                  <span className="text-white/55">
-                    Your best at this weight is {a.prior_best_reps_at_weight}.
-                  </span>
-                ) : (
-                  <span className="text-white/45">First time at this weight.</span>
-                )}
-              </div>
-              {/* The estimate, second. ⚠️ Above the rep ceiling it is labelled rather than hidden or
-                  capped — a capped rep count would report a 15-rep set as a 10-rep one (D-339). */}
-              {/* ⛔ THE HEDGE REWRITTEN (2026-08-03). Was `rough — over N reps no formula holds up`,
-                  which Michael read and did not understand: it described OUR ARITHMETIC rather than
-                  his lift, and quoted the generic ceiling instead of his own rep count. See
-                  `composeAllOutRowText` in `src/lib/strength-row-text.ts` for the full reasoning —
-                  ⚠️ THAT FUNCTION COMPOSES THE SAME SENTENCE FOR THE STATE SCREEN. The two must be
-                  changed together or one reading gets two wordings on two screens. */}
+              {/* ⛔ STRONG/HEVY-CLEAN (2026-08-11) — a rep record is a "Rep PR" badge and nothing else;
+                  a non-record set narrates nothing. Kept in lockstep with `composeAllOutRowText`
+                  (src/lib/strength-row-text.ts), the State screen's composer, so one reading never gets
+                  two wordings on two screens. */}
+              {a.is_rep_record && (
+                <div className="text-[13px] mt-0.5">
+                  <span className="text-emerald-300 font-medium">Rep PR</span>
+                </div>
+              )}
+              {/* The estimate, clean — no reliability hedge. It stays computed honestly and un-capped
+                  upstream (estimate-1rm.ts, D-339); we just present it like Strong and let "Estimated"
+                  carry the caveat. */}
               <div className="text-[12px] text-white/50 mt-1 tabular-nums">
                 Estimated max {a.estimated_1rm} lb
-                {!a.estimate_trusted && (
-                  <span className="text-white/40">
-                    {' '}— a guess from {a.reps} reps. Estimates hold to about {a.estimate_trusted_max_reps}.
-                  </span>
-                )}
               </div>
             </div>
           ))}

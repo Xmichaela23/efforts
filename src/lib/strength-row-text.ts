@@ -131,9 +131,9 @@ export function composePerLiftRowText(
 export interface AllOutRowText {
   /** "All-out set 225 lb x 6 · Jul 28" — the measurement and WHEN it was measured. */
   set_line: string;
-  /** The rep record against this lift's own history. Leads, because it is exact. */
+  /** "Rep PR" when this set beat the lift's own rep record at that weight, else '' (no line). */
   record_line: string;
-  /** The estimate, quieter, carrying its own hedge when the reps run past the trust ceiling. */
+  /** "Estimated max N lb" — clean, no reliability hedge (2026-08-11). '' when there is no estimate. */
   estimate_line: string;
 }
 
@@ -170,33 +170,22 @@ export function composeAllOutRowText(
   // that went well (Q-254 Gap 1). The server does not send that number here and this must not invent it.
   if (!(weight > 0) || !(reps > 0)) return null;
 
-  const prior = allOut?.prior_best_reps_at_weight;
-  const hasPrior = typeof prior === 'number' && Number.isFinite(prior);
-  const record_line = allOut?.is_rep_record === true && hasPrior
-    // ⚠️ A null prior is NOT a record — nothing to beat is not the same as beating something.
-    ? `Rep record at this weight — your best was ${prior}.`
-    : hasPrior
-      ? `Your best at this weight is ${prior}.`
-      : 'First time at this weight.';
+  // ⛔ STRONG/HEVY-CLEAN (2026-08-11, Michael: *"just want to follow what the other apps do"*). Strong
+  // and Hevy show the number, the trend, and a PR badge — no per-set prose. So a rep record surfaces as
+  // a clean "Rep PR" and nothing else; a non-record set narrates nothing (the set line + estimate carry
+  // it). The old "your best was N" / "Your best at this weight is N" / "First time at this weight" lines
+  // are retired — three sentences the apps never write. The rep-PR CONCEPT stays (Strong flags it too);
+  // only the wording is trimmed to a badge.
+  const record_line = allOut?.is_rep_record === true ? 'Rep PR' : '';
 
+  // ⛔ NO HEDGE (2026-08-11, same source). Strong shows "Estimated 1RM" from any set and lets the word
+  // "Estimated" carry the caveat — it does NOT caption each set with "a guess from N reps / holds to
+  // about M". Per Strong's own docs a 1RM estimate is only reliable to ~10 reps, but they present it
+  // clean and move on, so we do the same. ⚠️ THE ESTIMATE IS STILL COMPUTED HONESTLY AND UN-CAPPED
+  // UPSTREAM (`estimate-1rm.ts`, D-339) — this change only stops NARRATING its reliability, it does not
+  // touch the math. `estimate_trusted` / `estimate_trusted_max_reps` stay on the payload, just unused here.
   const est = Number(allOut?.estimated_1rm) || 0;
-  const trustedMax = Number(allOut?.estimate_trusted_max_reps) || 0;
-  // ⛔ THE HEDGE REWRITTEN (2026-08-03, Michael: *"what does over 8 reps no formula hold up mean?
-  // cause i didnt know what it mean"*). The old line was `rough — over N reps no formula holds up`,
-  // which described OUR ARITHMETIC instead of his lift and broke two rules of COPY-VOICE.md: it was
-  // abstract where a plain word exists (rule 9 — an athlete does not care that a formula exists),
-  // and it quoted the generic ceiling instead of HIS rep count (rule 5 — quantify).
-  //
-  // ⚠️ IT SAYS "UNRELIABLE", NOT "TOO HIGH", AND THAT RESTRAINT IS DELIBERATE. The obvious rewrite is
-  // "so it reads high" — and that is a claim this app cannot source. `estimate-1rm.ts` records that
-  // the direction of error flips by equation and by lift, and that LeSuer et al. (1997) found every
-  // tested equation UNDERestimates a deadlift 1RM. What IS sourced is the ceiling itself
-  // (`trustedMaxRepsFor`, 8 reps and 5 on deadlift). So the copy states the ceiling and stops.
-  const estimate_line = est > 0
-    ? (allOut?.estimate_trusted === false && trustedMax > 0
-        ? `Estimated max ${est} lb — a guess from ${reps} reps. Estimates hold to about ${trustedMax}.`
-        : `Estimated max ${est} lb`)
-    : '';
+  const estimate_line = est > 0 ? `Estimated max ${est} lb` : '';
 
   const set_line = dateLabel
     ? `All-out set ${weight} lb × ${reps} · ${dateLabel}`
