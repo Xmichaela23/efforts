@@ -5360,6 +5360,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               </div>
                             )}
 
+                            {/* AMRAP's instruction sits ABOVE its set — mirroring how the bar-speed
+                                cue sits above the exercise (Michael 2026-08-11). */}
+                            {set.amrap && (targetHint || cue) && (
+                              <div className="pl-[30px] pr-1 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
+                                {[targetHint, cue].filter(Boolean).join(' — ')}
+                              </div>
+                            )}
+
                             <div style={gridStyle}>
                               <span className={`text-[13px] tabular-nums leading-none ${done ? rowAccent.num : 'text-white/70'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
                                 {setIndex + 1}
@@ -5408,70 +5416,69 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 (D-326 — a QUALITY check on a prescribed set, a STOP RULE on an
                                 AMRAP; `barSpeedLineFor` keys on the set so the two can't swap), and
                                 the duration control for timed work. */}
-                            {((targetHint && (set.amrap || exercise.rir_tracked !== false)) || (set.amrap && cue) || (!isDurationBased && !exIsBodyweight && exEquip === 'barbell') || isDurationBased) && (
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[30px] pr-1 pt-2">
-                                {/* Left group = the set's own instruction, above-left. DROPPED for a
-                                    fixed 5/3/1 main (Michael 2026-08-11: "what's the point of target?"
-                                    — the reps ghost already shows the prescribed number and the single
-                                    target string is unreliable, D-338). KEPT for the AMRAP top set and
-                                    for accessories chasing a rep total ("target 50 total"). The AMRAP
-                                    stop-rule sits right beside its target, same place as the others. */}
-                                {targetHint && (set.amrap || exercise.rir_tracked !== false) && (
-                                  <span className={`text-[11px] font-medium leading-snug ${set.amrap ? 'text-amber-300/85' : 'text-white/55'}`}>
+                            {/* Under-row line, COLUMN-ALIGNED to the row grid so plate math sits
+                                directly under the LB cell (Michael 2026-08-11). Accessory rep-total
+                                target on the left; plates centered under the weight; timed-work control
+                                under weight/reps. AMRAP's own instruction renders ABOVE the row. */}
+                            {((targetHint && !set.amrap && exercise.rir_tracked !== false) || (!isDurationBased && !exIsBodyweight && exEquip === 'barbell') || isDurationBased) && (
+                              <div style={gridStyle} className="pt-1.5 pb-0.5">
+                                {targetHint && !set.amrap && exercise.rir_tracked !== false && (
+                                  <span style={{ gridColumn: '1 / 4' }} className="text-[11px] font-medium text-white/55 leading-snug">
                                     {targetHint}
                                   </span>
                                 )}
-                                {set.amrap && cue && <span className="text-[11px] font-medium text-amber-300/80 leading-snug">{cue}</span>}
-                                {/* Plate math — SAME spot under every barbell set (pushed to the right),
-                                    bigger tap target, off the weight number. */}
                                 {!isDurationBased && !exIsBodyweight && exEquip === 'barbell' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                    className={`ml-auto text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors ${platesOpen ? 'text-amber-100 border-amber-400/55 bg-amber-500/[0.18]' : 'text-amber-300/85 border-amber-400/35 hover:text-amber-200 hover:border-amber-400/55'}`}
-                                    aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
-                                    aria-expanded={platesOpen ? true : false}
-                                  >
-                                    plates
-                                  </button>
+                                  <div style={{ gridColumn: 3, justifySelf: 'center' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                                      className={`text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors ${platesOpen ? 'text-amber-100 border-amber-400/55 bg-amber-500/[0.18]' : 'text-amber-300/85 border-amber-400/35 hover:text-amber-200 hover:border-amber-400/55'}`}
+                                      aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
+                                      aria-expanded={platesOpen ? true : false}
+                                    >
+                                      plates
+                                    </button>
+                                  </div>
                                 )}
                                 {isDurationBased && (
-                                  !isDurationRunning ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        // Q-TIMER: RESUME from what is left, don't RESET.
-                                        const remaining = timers[durationTimerKey]?.seconds;
-                                        const seconds = (typeof remaining === 'number' && remaining > 0)
-                                          ? remaining
-                                          : (set.duration_seconds || 60);
-                                        setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds, running: true } }));
-                                        // The wall-clock deadline is what survives iOS suspending
-                                        // the JS tick when the screen locks mid-carry.
-                                        persistTimer(durationTimerKey, seconds);
-                                      }}
-                                      className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                    >
-                                      Start
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
-                                        // A PAUSED timer has no deadline — drop it, or the next
-                                        // foreground reconcile catches it up against a clock that
-                                        // never stopped and silently eats the paused time.
-                                        clearPersistedTimer(durationTimerKey);
-                                        void cancelRestNotification(durationTimerKey);
-                                      }}
-                                      className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                    >
-                                      Pause
-                                    </button>
-                                  )
+                                  <div style={{ gridColumn: '3 / 5', justifySelf: 'center' }}>
+                                    {!isDurationRunning ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          // Q-TIMER: RESUME from what is left, don't RESET.
+                                          const remaining = timers[durationTimerKey]?.seconds;
+                                          const seconds = (typeof remaining === 'number' && remaining > 0)
+                                            ? remaining
+                                            : (set.duration_seconds || 60);
+                                          setTimers(prev => ({ ...prev, [durationTimerKey]: { seconds, running: true } }));
+                                          // The wall-clock deadline is what survives iOS suspending
+                                          // the JS tick when the screen locks mid-carry.
+                                          persistTimer(durationTimerKey, seconds);
+                                        }}
+                                        className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
+                                        style={{ fontFamily: 'Inter, sans-serif' }}
+                                      >
+                                        Start
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setTimers(prev => ({ ...prev, [durationTimerKey]: { ...prev[durationTimerKey], running: false } }));
+                                          // A PAUSED timer has no deadline — drop it, or the next
+                                          // foreground reconcile catches it up against a clock that
+                                          // never stopped and silently eats the paused time.
+                                          clearPersistedTimer(durationTimerKey);
+                                          void cancelRestNotification(durationTimerKey);
+                                        }}
+                                        className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
+                                        style={{ fontFamily: 'Inter, sans-serif' }}
+                                      >
+                                        Pause
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             )}
