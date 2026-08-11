@@ -197,7 +197,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             weight: Number((s?.weight as any) ?? 0) || 0,
             rir: typeof s?.rir === 'number' ? s.rir : undefined,
             completed: Boolean(s?.completed),
-            prefilled: Boolean(s?.prefilled)
+            prefilled: Boolean(s?.prefilled),
+            // Carry the band assist through — on dips/chins it IS the load, and this reconstruction
+            // was silently dropping it, so Performance showed "10 reps" with no assist (2026-08-11).
+            ...(s?.resistance_level != null ? { resistance_level: s.resistance_level } : {}),
           }))
       : [];
     return { ...ex, name: cleanName, sets: safeSets };
