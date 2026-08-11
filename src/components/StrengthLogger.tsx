@@ -5408,28 +5408,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 (D-326 — a QUALITY check on a prescribed set, a STOP RULE on an
                                 AMRAP; `barSpeedLineFor` keys on the set so the two can't swap), and
                                 the duration control for timed work. */}
-                            {(targetHint || (set.amrap && cue) || (!isDurationBased && !exIsBodyweight && exEquip === 'barbell') || isDurationBased) && (
-                              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-[30px] pr-1 pt-1.5">
-                                {targetHint && (
-                                  <span className={`text-[10px] font-medium leading-none ${set.amrap ? 'text-amber-300/70' : 'text-white/45'}`}>
+                            {((targetHint && (set.amrap || exercise.rir_tracked !== false)) || (set.amrap && cue) || (!isDurationBased && !exIsBodyweight && exEquip === 'barbell') || isDurationBased) && (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[30px] pr-1 pt-2">
+                                {/* Left group = the set's own instruction, above-left. DROPPED for a
+                                    fixed 5/3/1 main (Michael 2026-08-11: "what's the point of target?"
+                                    — the reps ghost already shows the prescribed number and the single
+                                    target string is unreliable, D-338). KEPT for the AMRAP top set and
+                                    for accessories chasing a rep total ("target 50 total"). The AMRAP
+                                    stop-rule sits right beside its target, same place as the others. */}
+                                {targetHint && (set.amrap || exercise.rir_tracked !== false) && (
+                                  <span className={`text-[11px] font-medium leading-snug ${set.amrap ? 'text-amber-300/85' : 'text-white/55'}`}>
                                     {targetHint}
                                   </span>
                                 )}
-                                {/* Plate math lives on this line now — off the weight number (Michael 2026-08-10). */}
+                                {set.amrap && cue && <span className="text-[11px] font-medium text-amber-300/80 leading-snug">{cue}</span>}
+                                {/* Plate math — SAME spot under every barbell set (pushed to the right),
+                                    bigger tap target, off the weight number. */}
                                 {!isDurationBased && !exIsBodyweight && exEquip === 'barbell' && (
                                   <button
                                     type="button"
                                     onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                    className={`text-[10px] font-medium leading-none px-1.5 py-0.5 rounded-md border transition-colors ${platesOpen ? 'text-amber-100 border-amber-400/50 bg-amber-500/[0.16]' : 'text-amber-300/80 border-amber-400/30 hover:text-amber-200 hover:border-amber-400/50'}`}
+                                    className={`ml-auto text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors ${platesOpen ? 'text-amber-100 border-amber-400/55 bg-amber-500/[0.18]' : 'text-amber-300/85 border-amber-400/35 hover:text-amber-200 hover:border-amber-400/55'}`}
                                     aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
                                     aria-expanded={platesOpen ? true : false}
                                   >
                                     plates
                                   </button>
                                 )}
-                                {/* AMRAP keeps its stop-rule on its own row; the working-set bar-speed
-                                    cue moved to ONE line under the exercise title. */}
-                                {set.amrap && cue && <span className="text-[10px] font-medium text-amber-300/70 leading-snug">{cue}</span>}
                                 {isDurationBased && (
                                   !isDurationRunning ? (
                                     <button
