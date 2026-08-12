@@ -56,22 +56,41 @@
 export const WENDLER_EPLEY_COEFF = 0.0333;
 
 /**
- * Estimated 1RM from a completed set.
+ * Estimated 1RM from a completed set — PURE: weight and the reps that go into the estimate, nothing else.
+ *
+ * ⛔ NO RIR HERE, EVER. Reps-in-reserve is a property of the PROTOCOL, not of this formula. A protocol
+ * that stops short of failure converts its reserve to an effective rep count with `effectiveRepsForReserve`
+ * and passes THAT in. The estimator never sees a reserve, so it can never silently inflate a set that was
+ * taken to failure — which is 5/3/1's whole shape, and it no longer depends on a suppression flag to be
+ * safe: there is simply no argument through which a reserve could reach the formula. See that helper.
  *
  * @param weight  load on the bar
- * @param reps    reps actually completed
- * @param rirOffset reps left in reserve, when the protocol collects it. Treats leftover capacity as
- *   completed work so a non-failure set still estimates. ⚠️ Zero on any protocol that does not collect
- *   RIR (5/3/1) — there, a phantom offset would inflate every sub-maximal week. See `protocolUsesRir`.
+ * @param reps    reps that go into the estimate — actual reps, or effective reps for an auto-regulated set
  * @returns the estimate, UNROUNDED. Callers round for their own surface; rounding is presentation,
  *   the formula is the claim.
  */
-export function estimate1RM(weight: number, reps: number, rirOffset = 0): number {
+export function estimate1RM(weight: number, reps: number): number {
   if (!Number.isFinite(weight) || weight <= 0) return 0;
-  const effectiveReps = Math.max(1, Math.round((Number(reps) || 0) + (Number(rirOffset) || 0)));
+  const r = Math.max(1, Math.round(Number(reps) || 0));
   // A true single IS the max — no equation needed, and every equation adds a few pounds to one rep.
-  if (effectiveReps === 1) return weight;
-  return weight * effectiveReps * WENDLER_EPLEY_COEFF + weight;
+  if (r === 1) return weight;
+  return weight * r * WENDLER_EPLEY_COEFF + weight;
+}
+
+/**
+ * Effective rep count for a set stopped SHORT of failure — the ONLY place reps-in-reserve touches the
+ * 1RM path, and it lives OUTSIDE the estimator on purpose. A set of `reps` with `rir` left in the tank
+ * estimates like a set of `reps + rir` taken to failure, so its e1RM is
+ * `estimate1RM(weight, effectiveRepsForReserve(reps, rir))`.
+ *
+ * ⛔ THIS IS FOR THE AUTO-REGULATED PROTOCOLS THAT WILL EXIST, NOT FOR 5/3/1. 5/3/1 and any protocol
+ * whose measuring set is taken to failure pass ACTUAL reps straight to `estimate1RM` and never call this.
+ * A protocol opts IN by calling it — gate on `protocolUsesRir` / `protocolEffortRead` first. Because the
+ * estimator is pure, forgetting to call this can only ever UNDERSTATE a reserve set, never inflate a
+ * failure set — the safe direction, and the reverse of the old default.
+ */
+export function effectiveRepsForReserve(reps: number, rir: number): number {
+  return Math.max(1, Math.round((Number(reps) || 0) + (Number(rir) || 0)));
 }
 
 /**
@@ -99,8 +118,8 @@ export function weightForReps(oneRM: number, reps: number, rir = 0): number {
 }
 
 /** The stored/displayed form: nearest 5 lb, matching how plates actually load. */
-export function estimate1RMRounded(weight: number, reps: number, rirOffset = 0): number {
-  const raw = estimate1RM(weight, reps, rirOffset);
+export function estimate1RMRounded(weight: number, reps: number): number {
+  const raw = estimate1RM(weight, reps);
   if (raw <= 0) return 0;
   return Math.round(raw / 5) * 5;
 }

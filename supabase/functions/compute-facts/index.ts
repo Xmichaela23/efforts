@@ -32,7 +32,7 @@ import {
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
 // ⛔ ONE FORMULA FOR THE WHOLE APP (D-339). The client's baseline test imports this same module, so
 // the number that SETS the working weights and the number that JUDGES the work now agree.
-import { estimate1RMRounded } from "../../../src/lib/estimate-1rm.ts";
+import { estimate1RMRounded, effectiveRepsForReserve } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
 // [Step 5] One shared gate for band-as-assistance; see src/lib/band-assistance.ts.
 import { isBandAssistedMovement } from "../../../src/lib/band-assistance.ts";
@@ -137,16 +137,18 @@ function distanceMeters(w: WorkoutRow): number {
  * all answer the question the same way — they used to give three different answers. The full reasoning,
  * including why the old "DO NOT SWITCH" note's premise inverts above ten reps, is in that file.
  *
- * ⚠️ THE RIR OFFSET SURVIVES THE MOVE and still matters for the protocols that collect it. On a
- * protocol that does not (5/3/1), `avgRir` is null and the offset is zero — see `protocolUsesRir`.
+ * ⚠️ RIR IS NOT IN THE FORMULA. The estimator is pure (weight, reps). Auto-regulated protocols that
+ * stop short of failure fold their reserve into an effective rep count at the CALL SITE via
+ * `effectiveRepsForReserve`; 5/3/1 collects no reserve (`avgRir` null) and passes actual reps, so no
+ * reserve can reach the estimate through any argument — see `protocolUsesRir`.
  *
  * ⚠️ NO REP CAP ANY MORE. The old one existed because Brzycki divides by `37 − reps` and blows up;
  * Wendler's is linear and cannot. Reliability above ~10 reps is handled as PROVENANCE
  * (`trustedMaxRepsFor` / `advance_untrusted`), never by quietly rewriting the rep count.
  */
-function estimated1RM(weight: number, reps: number, rir: number): number {
+function estimated1RM(weight: number, reps: number): number {
   if (weight <= 0) return 0;
-  return estimate1RMRounded(weight, reps, rir);
+  return estimate1RMRounded(weight, reps);
 }
 
 function isRunDiscipline(type: string | null | undefined): boolean {
@@ -1438,8 +1440,11 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null, bodyweigh
       ? Math.round((rirValues.reduce((a, b) => a + b, 0) / rirValues.length) * 10) / 10
       : null;
 
+    // Auto-regulated protocols (reserve collected) fold RIR into effective reps HERE, outside the
+    // estimator; 5/3/1 has avgRir=null and estimates off actual reps. The formula never sees a reserve.
+    const estimateReps = avgRir != null ? effectiveRepsForReserve(bestReps, avgRir) : bestReps;
     const est1rm = bestWeight > 0 && bestReps > 0
-      ? estimated1RM(bestWeight, bestReps, avgRir ?? 0)
+      ? estimated1RM(bestWeight, estimateReps)
       : 0;
 
     // ── The three words + the measuring set (D-338) ─────────────────────────────────────────────

@@ -88,10 +88,9 @@ export function amrapTrainingMaxCatchUp(
     const reps = Number(s?.reps);
     if (!Number.isFinite(weight) || weight <= 0) continue;
     if (!Number.isFinite(reps) || reps < 1) continue;
-    // ⚠️ NO RIR OFFSET. 5/3/1 does not collect reps-in-reserve and an AMRAP is taken to a hard stop
-    // by definition; a phantom offset would inflate every estimate. Same rule `estimate1RM`'s own
-    // doc states for this protocol.
-    const e1rm = estimate1RM(weight, reps, 0);
+    // ⚠️ NO RIR. 5/3/1 collects no reps-in-reserve and an AMRAP is a hard stop by definition, so the
+    // estimate is off actual reps — the estimator is pure and has no reserve argument to inflate it.
+    const e1rm = estimate1RM(weight, reps);
     const prior = best.get(s.lift);
     if (!prior || e1rm > prior.e1rm) best.set(s.lift, { set: { ...s, weight, reps }, e1rm });
   }

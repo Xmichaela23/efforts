@@ -1,5 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { estimate1RM, estimate1RMRounded, isRepRecord, WENDLER_EPLEY_COEFF } from './estimate-1rm.ts';
+import { estimate1RM, estimate1RMRounded, effectiveRepsForReserve, isRepRecord, WENDLER_EPLEY_COEFF } from './estimate-1rm.ts';
 
 /**
  * D-339 — ONE 1RM FORMULA, AND IT IS THE ONE THE ATHLETE'S PROGRAM IS WRITTEN IN.
@@ -74,13 +74,17 @@ Deno.test('no rep cap, and that is deliberate', () => {
   assertEquals(Number.isFinite(estimate1RM(100, 100)), true);
 });
 
-Deno.test('the RIR offset still works for the protocols that collect it', () => {
-  // 5 reps with 2 in reserve reads as a 7-rep set.
-  assertEquals(round(estimate1RM(100, 5, 2)), round(estimate1RM(100, 7)));
-  // ⚠️ And a protocol that does not collect RIR passes zero, so nothing is inflated. On 5/3/1 eight
-  // of twelve weeks are deliberately sub-maximal; a phantom offset there would read every one of them
-  // as heavier work than it was.
-  assertEquals(estimate1RM(100, 5, 0), estimate1RM(100, 5));
+Deno.test('reps-in-reserve is folded OUTSIDE the estimator, for the protocols that collect it', () => {
+  // The estimator is PURE — reserve never enters the formula. An auto-regulated protocol converts its
+  // reserve to an effective rep count FIRST: 5 reps with 2 in reserve estimates like a 7-rep set.
+  assertEquals(effectiveRepsForReserve(5, 2), 7);
+  assertEquals(round(estimate1RM(100, effectiveRepsForReserve(5, 2))), round(estimate1RM(100, 7)));
+  // ⛔ 5/3/1 REGRESSION GUARD. 5/3/1 collects no reserve and takes its measuring set to failure, so it
+  // passes ACTUAL reps and its e1RM cannot be inflated by a reserve — there is no offset argument on the
+  // estimator, and no reserve fold happens for a null RIR. Eight of twelve 5/3/1 weeks are sub-maximal;
+  // this is the guarantee that a future protocol rename can never silently turn a reserve back on here.
+  assertEquals(effectiveRepsForReserve(5, 0), 5);
+  assertEquals(estimate1RM(100, 5), 100 * 5 * WENDLER_EPLEY_COEFF + 100);
 });
 
 Deno.test('garbage in stays zero, never NaN', () => {
