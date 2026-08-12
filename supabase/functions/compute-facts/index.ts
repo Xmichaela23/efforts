@@ -1429,11 +1429,16 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null, bodyweigh
       exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad });
       if (w > bestWeight) { bestWeight = w; bestReps = r; }
       if (w === bestWeight && r > bestReps) { bestReps = r; }
-      // D-203/provenance: exclude auto-filled RIR (the suggested target echoed back by
-      // the logger, or a value prefilled from a prior session) — it's the prescription,
-      // not observed effort, and would silently bias e1RM. Legacy rows lack the flag and
-      // are treated as observed.
-      if (typeof s.rir === "number" && s.rir >= 0 && !s.rir_autofilled) rirValues.push(s.rir);
+      // ⛔ POSITIVE PROTOCOL GATE (2026-08-12). Fold a set's reserve into e1RM ONLY when the exercise's
+      // protocol positively tracks reserve (`rir_tracked === true`). Default is DON'T fold — the same
+      // safe default the estimator now carries. Why this is the fix: reserve has no business in a 1RM
+      // estimate for a protocol that doesn't collect it, and the OLD rule ("fold any reserve not flagged
+      // auto-filled") inflated every legacy 5/3/1 session — those were logged before 5/3/1 stamped
+      // `rir_tracked:false`, so their sets carry a reserve with no flag, and the fold read a deliberately
+      // sub-maximal opener back as a heavier lift. 5/3/1 (`rir_tracked:false`) and legacy (no flag) now
+      // both ignore any stored reserve; only a protocol that declares it tracks reserve, and only on a
+      // set the athlete actually rated (not an auto-filled suggestion), reaches the estimate.
+      if (ex.rir_tracked === true && typeof s.rir === "number" && s.rir >= 0 && !s.rir_autofilled) rirValues.push(s.rir);
     }
 
     const avgRir = rirValues.length > 0
