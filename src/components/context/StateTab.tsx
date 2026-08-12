@@ -14,8 +14,6 @@ import { useExerciseLog } from '@/hooks/useExerciseLog';
 // `isMain531Lift` gave — asked as a capability, from the table that also says what to render
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
-import { composeAllOutRowText, composePerLiftRowText, type AllOutRowInput } from '@/lib/strength-row-text';
-import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
@@ -75,15 +73,6 @@ function trendColor(dir: string, tone?: string): string {
   if (dir === 'improving') return 'text-emerald-400/85';
   if (dir === 'declining') return 'text-amber-400/85';
   return 'text-white/55';
-}
-
-
-function verdictToneToColor(tone: string): string {
-  if (tone === 'action')   return 'text-amber-400/90';
-  if (tone === 'caution')  return 'text-red-400/90';
-  if (tone === 'positive') return 'text-emerald-400/85';
-  if (tone === 'muted')    return 'text-sky-400/75';
-  return 'text-white/60';
 }
 
 
@@ -747,7 +736,6 @@ export default function StateTab({
   const { liftTrends } = useExerciseLog(8);
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
-  const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
   const [stateLens, setStateLens] = useState<StateLens>('status'); // State-as-hub: Status / Adjust / Schedule (D-316)
   // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
   // the per-lift "from your logged sets" list is drill-down, folded until tapped.
@@ -1045,10 +1033,7 @@ export default function StateTab({
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<{ label: string; category?: string; trend: string; trend_icon?: string; trend_tone: string; detail: string; samples: number; provenance?: string | null; soreness_flag?: string | null }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
-    // ⚠️ `all_out` (Q-254 slice 1) is OPTIONAL on purpose: `coach_cache` serves the last good payload,
-    // so any row written before COACH_PAYLOAD_VERSION 162 simply has no all-out lines. Absent renders
-    // nothing — it must never fall back to the working weight.
-    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null; all_out?: AllOutRowInput | null }> };
+    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
     assessment: { label: string; signals_concerning: number };
   } | undefined;
@@ -1272,8 +1257,6 @@ export default function StateTab({
     .filter((l: { canonical_name?: string | null }) =>
       capabilitiesForExercise(String(l?.canonical_name ?? '')).coached)
     .slice(0, 5);
-  // Still use liftTrends only for pre-filling the adjustment modal (best_weight)
-  const liftWeightMap = new Map(liftTrends.map(lt => [lt.canonical, lt.entries[lt.entries.length - 1]?.best_weight ?? 0]));
 
   // ── "How your sessions went" — REBUILT (docs/STATE-WEEK-EXECUTION.md). The old per-discipline
   //    execution-row builders (run/ride/strength/swim `efficiency_label` chips) lived here and were
@@ -1358,108 +1341,44 @@ export default function StateTab({
         <span className="text-white/45 normal-case tracking-normal">· {perLiftMain.length} {perLiftMain.length === 1 ? 'lift' : 'lifts'}</span>
       </button>
       {strengthDetailOpen && perLiftMain.map((lt: any) => {
-        // ⛔ [Step 2] THE ROW TEXT IS COMPOSED IN ONE PLACE, `strength-row-text.ts`, AND THE HARNESS
-        // READS THE SAME FUNCTION. It was inline here, which is why nothing could print this screen
-        // for a synthetic athlete — GAME-PLAN's method note, and the D-259 precedent.
-        //
-        // ⛔ AND IT DECIDES "IS THIS COACHED" FROM THE TYPE TABLE, NOT FROM AN EMPTY LABEL. The old
-        // line asked the server's sentinel (`verdict_label !== ''`). `coach_cache` renders the last
-        // good contract, so a row cached before [D-373] still carries a command on an accessory and
-        // the sentinel test would render it. The type axis cannot be stale.
-        const row = composePerLiftRowText(lt, liftWeightMap.get(lt.canonical_name) ?? null);
-        // ── THE ALL-OUT SET (Q-254 slice 1) ─────────────────────────────────────────────────────
-        //
-        // ⛔ THE MEASUREMENT THE SCREEN WAS MISSING. Every line above this reads the WORKING weight
-        // against a TYPED baseline — so Deadlift said "Working ~120 vs your 150 baseline" on a light
-        // 5/3/1 week while the logged e1RM was already ~225. In 5/3/1 the working weight is the
-        // PRESCRIPTION; the AMRAP top set is the measurement, and this is it.
-        //
-        // ⛔ SERVER-COMPUTED, RENDERED VERBATIM — and it is the SAME object, from the SAME function,
-        // that the Performance screen's ALL-OUT SET card renders. Neither screen re-derives, so they
-        // cannot report different numbers or a different record for one session (Law 4).
-        //
-        // ⚠️ ABSENT IS COMMON AND HONEST: a leader cycle and every deload week prescribe no all-out
-        // set. When there is none in the window these lines simply do not render. There is NO
-        // fallback to the working weight or to `best_reps` — see `composeAllOutRowText`.
-        const allOut: AllOutRowInput | null = (lt as { all_out?: AllOutRowInput | null }).all_out ?? null;
-        const allOutDateLabel = allOut?.date
-          ? new Date(String(allOut.date) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          : '';
-        const allOutText = composeAllOutRowText(allOut, allOutDateLabel);
-        const verdictLabel: string = lt.verdict_label ?? '—';
-        const verdictColor = verdictToneToColor(row.tone);
-        const suggestedWeight: number | null = lt.suggested_weight ?? null;
-        const bestWeight: number | null = lt.best_weight ?? liftWeightMap.get(lt.canonical_name) ?? null;
-        const hasWeightSuggestion = row.tappable;
-        const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
-          ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
-          : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
-          ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
-          : null;
-        // The composed text and every rule behind it — D-231 / Q-107 H1's "My Record" shape, the
-        // anchor clause, the fact-only decline — now live in `composePerLiftRowText`.
-        const rowText: string = row.text;
+        // A SET HISTORY, LIKE STRONG/HEVY (2026-08-11, Michael: *"it should offer what the other apps
+        // do"*). This section is titled "from your logged sets" — so it now shows exactly that: each main
+        // lift's recent sessions (weight × reps · date · estimated 1RM), newest first. The old "Working
+        // vs baseline" coaching line and the tap-to-adjust are GONE from here. Adjusting weight is a
+        // Training-Max / baseline control (one number, weekly weights recalc from it — how 5/3/1 apps do
+        // it, verified against Strong/Hevy/531 apps), and it lives on the Adjust tab (StateAdjustLens),
+        // not as a per-row tweak buried in a read-only history. Data is `useExerciseLog`'s liftTrends —
+        // already fetched above, no new query and no server change.
+        const trend = liftTrends.find((t) => t.canonical === lt.canonical_name);
+        const entries = trend?.entries ?? [];
+        if (entries.length === 0) return null;
+        const recent = [...entries].reverse().slice(0, 5); // newest first, most-recent handful
+        // Mark the single best-estimate session in the shown window — an honest in-window "best", NOT an
+        // all-time PR claim (the lift's all-time PR badge already lives on the summary row above this).
+        const bestIdx = recent.reduce(
+          (bi, e, i, arr) => (Number(e.estimated_1rm) || 0) > (Number(arr[bi].estimated_1rm) || 0) ? i : bi,
+          0,
+        );
         return (
-          <div key={lt.canonical_name} className="space-y-1">
-            <div className="flex items-start justify-between gap-3">
-              <span className="text-[13px] text-white/80 shrink-0">{lt.display_name}</span>
-              <span className="relative max-w-[68%]">
-                {hasWeightSuggestion ? (
-                  <button
-                    onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
-                    className={`text-[13px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80 text-right`}
-                  >{rowText}</button>
-                ) : (
-                  <span className={`text-[13px] ${verdictColor} text-right`}>{rowText}</span>
-                )}
-                {adjustingLift === lt.canonical_name && (
-                  <StrengthAdjustmentModal
-                    exerciseName={lt.display_name}
-                    currentWeight={bestWeight ?? 0}
-                    nextPlannedWeight={suggestedWeight ?? bestWeight ?? 0}
-                    targetRir={(lt as any).rir_target ?? undefined}
-                    actualRir={lt.rir_current ?? undefined}
-                    planId={wsv.plan.plan_id ?? undefined}
-                    isBodyweight={false}
-                    hasPlannedWeight={(bestWeight ?? 0) > 0}
-                    onClose={() => setAdjustingLift(null)}
-                    onSaved={() => { setAdjustingLift(null); refresh(); }}
-                  />
-                )}
-              </span>
+          <div key={lt.canonical_name} className="space-y-1.5">
+            <div className="text-[13px] text-white/80">{lt.display_name}</div>
+            <div className="space-y-1">
+              {recent.map((e, i) => {
+                const dateLabel = e.date
+                  ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : '';
+                const est = Number(e.estimated_1rm) || 0;
+                const isBest = i === bestIdx && est > 0;
+                return (
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
+                    <span className="text-white/75 tabular-nums">{e.best_weight} lb × {e.best_reps}</span>
+                    {dateLabel && <span className="text-white/40">{dateLabel}</span>}
+                    {est > 0 && <span className="text-white/45 tabular-nums">est. 1RM {est} lb</span>}
+                    {isBest && <span className="text-emerald-300 font-medium">best</span>}
+                  </div>
+                );
+              })}
             </div>
-            {lt.last_session_date && (
-              <div className="text-[12px] text-white/45">as of {new Date(lt.last_session_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-            )}
-            {/* ⛔ THE RECORD LEADS, THE ESTIMATE FOLLOWS AND SITS QUIETER — the shipped Performance
-                hierarchy, kept identical here so one reading does not get two orders of importance
-                on two screens. The set line carries its own date because this is frequently a
-                measurement from an earlier week (no all-out set on a leader cycle or a deload). */}
-            {allOutText && (
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="text-[12px] text-white/70 tabular-nums">{allOutText.set_line}</span>
-                {allOutText.estimate_line && (
-                  <span className="text-[12px] text-white/45 tabular-nums">{allOutText.estimate_line}</span>
-                )}
-                {allOutText.record_line && (
-                  <span className="text-[12px] text-emerald-300 font-medium">{allOutText.record_line}</span>
-                )}
-              </div>
-            )}
-            {e1rmPct != null && (
-              <div className="h-[3px] w-full rounded-full bg-white/[0.06]">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${e1rmPct}%`,
-                    backgroundColor: verdictLabel === 'add weight' ? 'rgba(251,191,36,0.5)' :
-                      verdictLabel === 'back off weight' ? 'rgba(248,113,113,0.4)' :
-                      verdictLabel === 'getting stronger' ? 'rgba(52,211,153,0.4)' :
-                      'rgba(255,255,255,0.15)',
-                  }}
-                />
-              </div>
-            )}
           </div>
         );
       })}
