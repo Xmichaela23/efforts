@@ -50,6 +50,7 @@ import {
   cycleForWeek,
   cyclesForBlock,
   setsForWeek,
+  warmupSetsForWeek,
   weightForSet,
   WEEKS_PER_CYCLE,
   type WendlerSet,
@@ -264,7 +265,7 @@ export type StrengthPrimaryArgs = {
 
 /** ONE prescribed set. `weight` is absolute lb — resolved at authoring off the stored working
  *  number, never a percentage the athlete's moving 1RM could re-resolve later. */
-type PlannedSet = { weight: number; reps: number; amrap?: boolean };
+type PlannedSet = { weight: number; reps: number; amrap?: boolean; warmup?: boolean };
 
 type StrengthExercise = {
   name: string;
@@ -574,7 +575,10 @@ function setLabel(s: PlannedSet): string {
 }
 
 function exerciseLabel(e: StrengthExercise): string {
-  if (e.set_plan?.length) return `${e.name} ${e.set_plan.map(setLabel).join(', ')}`;
+  // The summary line names the WORK, not the ramp. Warm-ups live in the set list for the logger;
+  // printing them here would read "40×5, 50×5, 60×3, 55×5, …" and bury the prescription.
+  const shown = e.set_plan?.filter((s) => !s.warmup);
+  if (shown?.length) return `${e.name} ${shown.map(setLabel).join(', ')}`;
   // An assistance row is a rep TOTAL, not a set prescription — "1×25" would read as one set of 25,
   // which is the opposite of the instruction. Say the total and let the athlete split it.
   if (e.load_prescribed === false) return `${e.name} ${e.reps} reps`;
@@ -597,11 +601,17 @@ function mainLiftRow(
     weight: weightForSet(workingNumber, s.pct),
     reps: s.reps,
     ...(s.amrap ? { amrap: true } : null),
+    ...(s.warmup ? { warmup: true } : null),
   }));
-  const top = set_plan[set_plan.length - 1];
+  // ⛔ THE TOP SET IS THE LAST WORK SET, NOT THE LAST ROW. Warm-ups are prepended, so reading the
+  // literal last element still works today — but the block is measured on the work set, so name it
+  // that way and it cannot drift if the ordering ever changes.
+  const workSets = set_plan.filter((s) => !s.warmup);
+  const top = workSets[workSets.length - 1];
   return {
     name: lift.name,
-    sets: set_plan.length,
+    // The count the athlete reads as "the work" — warm-ups are a ramp in front, not part of the 3×.
+    sets: workSets.length,
     reps: top.amrap ? `${top.reps}+` : top.reps,
     weight: top.weight,
     // The percentage OF THE REAL MAX — not of the working number. This is what the effort chart
@@ -2259,7 +2269,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           });
         }
       }
-      const main = mainLiftRow(lift, wn, oneRepMaxes[lift.ref], setsForWeek(slot.kind, weekInCycle));
+      // Warm-up ramp in front of the work sets (Wendler p.31); empty on the deload — see
+      // `warmupSetsForWeek`. Prepended so `set_plan` reads warm-ups → work sets, top → bottom.
+      const main = mainLiftRow(
+        lift,
+        wn,
+        oneRepMaxes[lift.ref],
+        [...warmupSetsForWeek(weekInCycle), ...setsForWeek(slot.kind, weekInCycle)],
+      );
       // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].
       // ⛔ JUMPS ARE LOWER-BODY WORK AND ONLY GO ON LOWER DAYS. Fixed 2026-07-27.

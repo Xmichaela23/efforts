@@ -30,6 +30,7 @@ import { requireUser } from '../_shared/require-user.ts';
 import {
   cyclesForBlock,
   setsForWeek,
+  warmupSetsForWeek,
   weightForSet,
   workingNumberForCycles,
   WEEKS_PER_CYCLE,
@@ -193,16 +194,23 @@ Deno.serve(async (req) => {
         if (!(Number(wn) > 0)) return ex;
         // ⛔ THE SAME FUNCTIONS THE COMPOSER USED. Percentages come from `setsForWeek`, not from a
         // second table — a rewrite that invented its own ramp would be a different programme.
-        const spec = setsForWeek(cyc.kind, weekInCycle);
+        // ⛔ SAME SHAPE THE COMPOSER WRITES — warm-up ramp in front, then the work sets. A rewrite
+        // that emitted work sets alone would STRIP the ramp the composer authored (Wendler p.31), so
+        // the first progression would silently undo it. `warmupSetsForWeek` is empty on a deload.
+        const spec = [...warmupSetsForWeek(weekInCycle), ...setsForWeek(cyc.kind, weekInCycle)];
         const oldPlan = Array.isArray(ex?.set_plan) ? ex.set_plan : [];
-        const newPlan = spec.map((s, i) => ({
-          ...(oldPlan[i] ?? {}),
+        const newPlan = spec.map((s) => ({
           weight: weightForSet(wn, s.pct),
           reps: s.reps,
-          amrap: s.amrap,
+          ...(s.amrap ? { amrap: true } : null),
+          ...(s.warmup ? { warmup: true } : null),
         }));
-        const topOld = Number(oldPlan[oldPlan.length - 1]?.weight) || Number(ex?.weight) || 0;
-        const topNew = Number(newPlan[newPlan.length - 1]?.weight) || 0;
+        // The top set is the last WORK set, not the last row — warm-ups are prepended. Compare on it,
+        // so the progression verdict reads the measured set, never a warm-up.
+        const workOld = oldPlan.filter((s: any) => !s?.warmup);
+        const workNew = newPlan.filter((s: any) => !s.warmup);
+        const topOld = Number(workOld[workOld.length - 1]?.weight) || Number(ex?.weight) || 0;
+        const topNew = Number(workNew[workNew.length - 1]?.weight) || 0;
         if (topOld === topNew) return ex;
         touched = true;
         changes.push({

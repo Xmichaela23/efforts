@@ -2048,6 +2048,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       weight: Number.isFinite(Number(p?.weight)) && Number(p?.weight) > 0 ? Number(p.weight) : undefined,
       reps: Number.isFinite(Number(p?.reps)) && Number(p?.reps) > 0 ? Math.round(Number(p.reps)) : undefined,
       amrap: p?.amrap === true,
+      warmup: p?.warmup === true,
     }));
   };
 
@@ -2159,6 +2160,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Per-set prescription when the row carries one; otherwise the row's single weight on every
         // set, exactly as before.
         const planned = plannedSetsFor(s);
+        // A 5/3/1 main lift on a working week carries a warm-up ramp in front of the work sets
+        // (Wendler p.31). Only then do we stamp setType, so the logger can section it — a deload lift
+        // or an assistance row (no ramp) stays untyped and renders exactly as before.
+        const hasWarmupRamp = Array.isArray(planned) && planned.some((p: any) => p.warmup);
         // A rep total opens as ONE blank set — the athlete taps Add Set per chunk. Any prescribed
         // set count on an assistance row is the composer's arithmetic for reaching the total, not
         // an instruction about how to break it up.
@@ -2180,6 +2185,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             rir: null,
             amrap: setAmrap,
             prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
+            // Section the logger into Warm-up vs Working when the plan authored a ramp. `p.warmup`
+            // is the composer's tag (carried through materialize); absent → untyped, unchanged.
+            ...(hasWarmupRamp ? { setType: p?.warmup ? 'warmup' : 'working' } : {}),
           };
 
           if (isDurationExercise) {
@@ -5222,6 +5230,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const isWarmup = set.setType === 'warmup';
                         const isWorking = set.setType === 'working';
                         const workingSetIndex = exercise.sets.findIndex((s) => s.setType === 'working');
+                        const firstWarmupIndex = exercise.sets.findIndex((s) => s.setType === 'warmup');
+                        const exHasWarmupRamp = firstWarmupIndex >= 0;
                         const showAddWarmupButton = exIsBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
                         const result = baselineTestResults[exercise.id];
                         const done = set.completed === true;
@@ -5480,6 +5490,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   {isWarmup ? 'Warmup' : 'Working set — add when ready'}
                                 </span>
                                 {set.setHint && <span className="text-[10px] text-white/45 italic">{set.setHint}</span>}
+                              </div>
+                            )}
+
+                            {/* 5/3/1 warm-up ramp (Wendler p.31): one section marker at the first warm-up
+                                and the first work set, so the ramp reads as prep and the work sets as
+                                the prescription. Only when the plan authored a ramp — see parseFromComputed. */}
+                            {!exIsBaselineTest && exHasWarmupRamp && ((isWarmup && setIndex === firstWarmupIndex) || (isWorking && setIndex === workingSetIndex)) && (
+                              <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-amber-300/85'}`}>
+                                  {isWarmup ? 'Warm-up' : 'Working sets'}
+                                </span>
                               </div>
                             )}
 

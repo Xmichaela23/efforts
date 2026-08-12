@@ -20,6 +20,9 @@ export type WendlerSet = {
   reps: number;
   /** True = "as many clean reps as you can". Only ever the last set, only in an anchor. */
   amrap: boolean;
+  /** True = a warm-up ramp set (Wendler 2nd ed. p.31), not measured work. Excluded from the AMRAP,
+   *  the e1RM and workload — it only preps the bar. Absent/false = a work set. */
+  warmup?: boolean;
 };
 
 // ── The week table ───────────────────────────────────────────────────────────
@@ -60,6 +63,25 @@ export function setsForWeek(kind: CycleKind, weekInCycle: number): WendlerSet[] 
     // Never on a deload, never in a leader, and only the last set.
     amrap: kind === 'anchor' && !isDeload && i === 2,
   }));
+}
+
+// ── Warm-up ramp (Wendler 2nd ed. p.31) ──────────────────────────────────────
+// 1×5 @ 40%, 1×5 @ 50%, 1×3 @ 60% of the working number, before the work sets. Every working week.
+//
+// ⛔ NONE ON DELOAD. Week 4's work sets are already 40/50/60, so they ARE the ramp — a second
+// 40/50/60 in front would run the same three weights twice, then top out at 60% either way. The book
+// is silent on it; the deload sets equalling the ramp is the reason (Michael, 2026-08-12).
+//
+// ⚠️ SEPARATE FROM `setsForWeek` BY DESIGN. The work-set generator and its pin tests stay untouched;
+// warm-ups are a distinct list the composer prepends, tagged `warmup`, so nothing downstream that
+// counts sets (AMRAP index, e1RM, workload) has to change shape to keep them out.
+const WARMUP_PCTS: readonly [number, number, number] = [0.40, 0.50, 0.60];
+const WARMUP_REPS: readonly [number, number, number] = [5, 5, 3];
+
+export function warmupSetsForWeek(weekInCycle: number): WendlerSet[] {
+  if (weekInCycle < 1 || weekInCycle > 4) throw new Error(`weekInCycle must be 1-4, got ${weekInCycle}`);
+  if (weekInCycle === 4) return []; // deload — the work sets are the ramp
+  return WARMUP_PCTS.map((pct, i) => ({ pct, reps: WARMUP_REPS[i], amrap: false, warmup: true }));
 }
 
 // ── The working number ───────────────────────────────────────────────────────

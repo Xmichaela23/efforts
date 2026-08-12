@@ -248,15 +248,28 @@ export function getInSlotAlternatives(
   // option stands, which is the behaviour before this rule existed.
   const planPeers = opts?.assistanceRow ? assistancePeersFor(plannedName, opts?.mainLift) : null;
   if (planPeers) {
+    // ⛔ TIER ON WENDLER'S OWN ASSISTANCE LINE — supersedes the original "every peer is a DIRECT swap,
+    // there is no second tier" (2026-07-30). That held for a single-pattern slot but was FALSE for the
+    // leg pool, which carries both of the book's leg camps by design (leg_match answers for both lower
+    // days). It labelled a Front Squat a DIRECT swap for a Romanian Deadlift.
+    //
+    // The grouping is the BOOK's, not a heuristic: 5/3/1 2nd ed., Periodization Bible (p.50-51) splits
+    // leg assistance into POSTERIOR (Hamstrings — Leg Curl, GHR; Low Back — Back Raise, Good Morning,
+    // Reverse Hyper) vs QUADS (Leg Press, Lunges, Hack Squat, and Front Squat on p.53). `hip_dominant`
+    // IS that posterior camp and `knee_dominant` IS Quads, so the movement pattern reproduces Wendler's
+    // own line exactly. (Hamstrings and Low Back are two book categories, but the book places the same
+    // hip-hinge in both — Good Morning is "Low Back" yet is the stock RDL swap — so posterior-together
+    // is the finest split the book actually supports.) The slot still governs WHAT is offered (nothing
+    // is dropped); the camp only sorts it: same camp as the planned move → direct, other camp → lighter.
+    const selfPattern = getExerciseConfig(plannedName)?.pattern ?? null;
     return planPeers.map((name) => {
       const c = getExerciseConfig(name);
+      const samePattern = selfPattern != null && (c?.pattern ?? null) === selfPattern;
       return {
         name,
         same_pattern: true as const,
         equipment: c ? equipmentOf(c) : 'unknown',
-        // Every peer is a DIRECT swap: they are interchangeable by construction, which is exactly
-        // what made them one slot. There is no second tier to sort into.
-        tier: 'direct' as const,
+        tier: samePattern ? ('direct' as const) : ('lighter' as const),
       };
     });
   }

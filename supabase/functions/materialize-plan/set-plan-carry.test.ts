@@ -48,3 +48,25 @@ Deno.test('a stripped weight (bodyweight guard) leaves the ramp alone rather tha
   assertEquals(carrySetPlan({ set_plan: RAMP }, undefined)!.map((s: any) => s.weight), [120, 140, 160]);
   assertEquals(carrySetPlan({ set_plan: RAMP }, 0)!.map((s: any) => s.weight), [120, 140, 160]);
 });
+
+Deno.test('the warm-up tag survives the carry and scales with the ramp', () => {
+  // Weeks 1-3 prepend a warm-up ramp (Wendler p.31). The tag must reach the logger so it can section
+  // Warm-up vs Working; without it the athlete opens six unlabelled sets.
+  const withWarmup = [
+    { weight: 75, reps: 5, warmup: true },
+    { weight: 95, reps: 5, warmup: true },
+    { weight: 110, reps: 3, warmup: true },
+    { weight: 120, reps: 5 },
+    { weight: 140, reps: 5 },
+    { weight: 160, reps: 5, amrap: true },
+  ];
+  // Top set unmoved: tags verbatim, warm-ups flagged, work sets not.
+  const out = carrySetPlan({ set_plan: withWarmup }, 160)!;
+  assertEquals(out.map((s: any) => s.warmup === true), [true, true, true, false, false, false]);
+  // The all-out set is the LAST set, so the scale anchor is the top WORK set, not a warm-up.
+  assertEquals(out[5].amrap, true);
+  // A moved top set (160 → 140, ×0.875) rescales warm-ups too, keeping the ramp in proportion.
+  const moved = carrySetPlan({ set_plan: withWarmup }, 140)!;
+  assertEquals(moved.map((s: any) => s.weight), [65, 80, 95, 105, 120, 140]);
+  assertEquals(moved.filter((s: any) => s.warmup).length, 3);
+});

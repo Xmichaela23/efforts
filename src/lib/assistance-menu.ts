@@ -652,12 +652,16 @@ const ROLE_FALLBACK: Record<AssistanceRole, string[]> = {
   single_leg: ['Reverse Lunge', 'Bulgarian Split Squat', 'Single Leg Hip Thrust', 'Front Squat'],
   push: ['Push Up', 'Dips', 'Dumbbell Bench Press', 'Incline Bench Press'],
   pull: ['Inverted Row', 'Dumbbell Row', 'Face Pull', 'Chin Up'],
-  // ⛔ BOTH FAMILIES, HIP FIRST WITHIN EACH. `fitsRole` filters this list by the day's wanted
-  // family, so it must be able to answer for a knee day AND a hip day — a single-family list would
-  // silently strand one of the two lower days. Every entry resolves exactly and is on Wendler's
-  // lower-body assistance lists (p.51 "low back / hamstrings / quads", p.87).
-  leg_match: ['Romanian Deadlift', 'Good Morning', 'Back Extension', 'Reverse Lunge',
-    'Bulgarian Split Squat', 'Front Squat', 'Leg Curl', 'Hip Thrust'],
+  // ⛔ BOTH FAMILIES, and within the HIP family the NON-HINGE leads. `fitsRole` filters this list by
+  // the day's wanted family, so it must answer for a knee day AND a hip day — a single-family list
+  // would silently strand one of the two lower days. The hip entries only ever fire on DEADLIFT day
+  // (squat day's leg_match wants a knee move), and the deadlift IS the hinge — so the book's
+  // deadlift-day Hamstrings work is Leg Curl / Glute-Ham Raise (p.50), NOT a second loaded hinge.
+  // Leg Curl therefore leads; a loaded hinge (RDL, Good Morning) is only reached if it cannot resolve.
+  // Equipment is handled downstream: materialize-plan's substituteExerciseForEquipment turns Leg Curl
+  // into Nordic / Band Leg Curls when there is no machine, so leading with it strands no one.
+  leg_match: ['Leg Curl', 'Romanian Deadlift', 'Good Morning', 'Back Extension', 'Hip Thrust',
+    'Reverse Lunge', 'Bulgarian Split Squat', 'Front Squat'],
   // Bodyweight first, same rule as `core` — the arm slot is reached on EVERY upper day, so its
   // fallback must never need a cable stack. All four are on p.50's triceps list.
   // ⛔ TRICEPS FIRST — THE ORDER IS THE DEFAULT. `resolveRole` takes the first entry that fits, so an

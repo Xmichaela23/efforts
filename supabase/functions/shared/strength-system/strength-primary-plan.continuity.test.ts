@@ -92,14 +92,17 @@ Deno.test('⛔ THE WORKING NUMBER STILL CLIMBS ONCE PER CYCLE, NOT ONCE PER WEEK
   // The diagnosis three sessions have now got wrong, pinned under the new shape. Within a cycle the
   // working number HOLDS and the top set climbs because the PERCENTAGE climbs 85→90→95. Across
   // cycles the working number itself advances.
-  const w1 = (liftRow(1, 'Bench Press')?.set_plan ?? []) as any[];
-  const w3 = (liftRow(3, 'Bench Press')?.set_plan ?? []) as any[];
+  // WORK sets only — a warm-up ramp (40/50/60) sits in front on working weeks, and its opener is a
+  // flat 40% every cycle, which is not what "the opener climbs" is about (Wendler p.31).
+  const work = (week: number) => ((liftRow(week, 'Bench Press')?.set_plan ?? []) as any[]).filter((s) => !s.warmup);
+  const w1 = work(1);
+  const w3 = work(3);
   assert(w3.at(-1).weight > w1.at(-1).weight, 'the top set climbs within the cycle');
 
-  // And cycle 2's opening set is heavier than cycle 1's, at the same 85% — that is the advance.
-  const c1 = ((liftRow(1, 'Bench Press')?.set_plan ?? []) as any[])[0].weight;
-  const c2 = ((liftRow(5, 'Bench Press')?.set_plan ?? []) as any[])[0].weight;
-  const c3 = ((liftRow(9, 'Bench Press')?.set_plan ?? []) as any[])[0].weight;
+  // And cycle 2's opening WORK set is heavier than cycle 1's, at the same 65% — that is the advance.
+  const c1 = work(1)[0].weight;
+  const c2 = work(5)[0].weight;
+  const c3 = work(9)[0].weight;
   assert(c2 > c1 && c3 > c2, `opening sets should climb per cycle: ${c1} → ${c2} → ${c3}`);
 });
 

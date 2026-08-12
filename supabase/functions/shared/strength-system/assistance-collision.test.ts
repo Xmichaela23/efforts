@@ -190,6 +190,17 @@ Deno.test('REGRESSION §0.3 — squat day and deadlift day do not run the same l
   assertEquals(getMovementFamily(dead), 'knee', 'deadlift day should bend the knee');
 });
 
+Deno.test('deadlift day\'s hamstring slot is a NON-HINGE, not a second deadlift', () => {
+  // p.50 — deadlift-day Hamstrings work is Leg Curl / Glute-Ham Raise, NOT a loaded hinge. The
+  // deadlift IS the hinge; stacking an RDL or Good Morning on top just runs the main lift twice.
+  // Equipment is adapted downstream (materialize turns Leg Curl into Nordic / Band Leg Curls).
+  const dead = nameFor('Deadlift', 'pull');
+  assertEquals(dead, 'Leg Curl', `deadlift day hamstring slot ran ${dead}`);
+  for (const hinge of ['Romanian Deadlift', 'Good Morning']) {
+    assertEquals(dead === hinge, false, `deadlift day stacked a second hinge: ${hinge}`);
+  }
+});
+
 Deno.test('§3 — a lower day is LEG · LEG · core, carries no pressing and NO PULL', () => {
   // ⛔ THE PULL ASSERTION INVERTED ON 2026-08-09 (D-405). It read `includes('pull') === true`, on the
   // reasoning that none of the four main lifts pulls so the volume had to live somewhere. True of the

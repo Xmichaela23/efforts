@@ -1067,7 +1067,7 @@ export function carrySetPlan(ex: any, finalWeight: number | null | undefined): a
     const scaled = Number.isFinite(w) && w > 0
       ? (scale === 1 ? w : Math.max(5, Math.floor((w * scale) / 5) * 5))
       : w;
-    return { weight: scaled, reps: s?.reps, ...(s?.amrap ? { amrap: true } : null) };
+    return { weight: scaled, reps: s?.reps, ...(s?.amrap ? { amrap: true } : null), ...(s?.warmup ? { warmup: true } : null) };
   });
 }
 

@@ -34,8 +34,11 @@ const liftRow = (week: number, lift: string) => {
   const s = sessionsFor(week).find((x) => x.type === 'strength' && x.name.includes(lift));
   return s?.strength_exercises?.find((e: any) => e.name === lift);
 };
+// The WORK sets only — the warm-up ramp is a separate list in front (see the warm-up test below).
 const ramp = (week: number, lift: string) =>
-  ((liftRow(week, lift)?.set_plan ?? []) as any[]).map((p) => `${p.weight}x${p.reps}${p.amrap ? '+' : ''}`).join(' ');
+  ((liftRow(week, lift)?.set_plan ?? []) as any[]).filter((p) => !p.warmup).map((p) => `${p.weight}x${p.reps}${p.amrap ? '+' : ''}`).join(' ');
+const warmupRamp = (week: number, lift: string) =>
+  ((liftRow(week, lift)?.set_plan ?? []) as any[]).filter((p) => p.warmup).map((p) => `${p.weight}x${p.reps}`).join(' ');
 
 // ── The working number ──────────────────────────────────────────────────────
 
@@ -94,14 +97,31 @@ Deno.test('the block ends on a deload, and week 12 has no all-out set', () => {
 
 // ── The per-set prescription ────────────────────────────────────────────────
 
-Deno.test('every main lift carries THREE sets at THREE weights, and they ascend', () => {
+Deno.test('every main lift carries THREE WORK sets at THREE weights, and they ascend', () => {
   for (let week = 1; week <= 12; week++) {
     for (const lift of ['Bench Press', 'Back Squat', 'Overhead Press', 'Deadlift']) {
-      const plan = liftRow(week, lift)?.set_plan as any[] | undefined;
+      const plan = (liftRow(week, lift)?.set_plan as any[] | undefined)?.filter((p) => !p.warmup);
       assert(plan != null && plan.length === 3, `wk${week} ${lift} has no per-set prescription`);
       assert(plan[0].weight < plan[1].weight && plan[1].weight < plan[2].weight,
         `wk${week} ${lift} ramp does not ascend: ${JSON.stringify(plan)}`);
       for (const p of plan) assertEquals(p.weight % 5, 0, `wk${week} ${lift} weight off the 5 lb grid`);
+    }
+  }
+});
+
+Deno.test('warm-up ramp: 40/50/60 (reps 5/5/3) precedes the work sets on working weeks, NONE on deload', () => {
+  // Bench working number wk1 = 190. 40/50/60% → 76/95/114 → 75/95/110 (round down to 5).
+  assertEquals(warmupRamp(1, 'Bench Press'), '75x5 95x5 110x3');
+  for (const lift of ['Bench Press', 'Back Squat', 'Overhead Press', 'Deadlift']) {
+    for (const week of [1, 2, 3, 5, 6, 7, 9, 10, 11]) {
+      const warm = (liftRow(week, lift)!.set_plan as any[]).filter((p) => p.warmup);
+      assertEquals(warm.length, 3, `wk${week} ${lift} should ramp before the work sets`);
+      assertEquals(warm.map((p) => p.reps), [5, 5, 3], `wk${week} ${lift} warm-up reps`);
+      assertEquals(warm.some((p) => p.amrap), false, `wk${week} ${lift} a warm-up is never all-out`);
+    }
+    // Deload weeks carry no ramp — the work sets are already 40/50/60.
+    for (const week of [4, 8, 12]) {
+      assertEquals((liftRow(week, lift)!.set_plan as any[]).some((p) => p.warmup), false, `wk${week} ${lift} deload has no ramp`);
     }
   }
 });

@@ -328,3 +328,23 @@ Deno.test('⛔ the assistance rows Michael actually saw, on his own block', () =
   // Deadlift, Kettlebell Swing… — the hip-hinge pattern, including the same movement twice under
   // two names.
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-08-11 — AN ASSISTANCE SWAP IS TIERED BY MOVEMENT PATTERN, NOT ALL 'direct'
+// Michael saw a FRONT SQUAT offered as a DIRECT swap for a ROMANIAN DEADLIFT — a knee-dominant move
+// as a direct swap for a hinge. The leg pool carries hip- AND knee-dominant moves by design, so
+// stamping the whole pool 'direct' lied. Pattern now sorts it: same pattern → direct, same slot but
+// different pattern → alternative. Nothing is dropped; the label just stops lying.
+// ─────────────────────────────────────────────────────────────────────────────
+Deno.test('⛔ a knee move is NOT a direct swap for a hinge assistance row (Front Squat / RDL)', () => {
+  const alts = getInSlotAlternatives('Romanian Deadlift', FULL_GYM, { assistanceRow: true, mainLift: 'Conventional Deadlift' });
+  const tier = (n: string) => alts.find((a) => a.name.toLowerCase() === n.toLowerCase())?.tier ?? null;
+  // Same movement pattern as the RDL (hip-dominant) → a true direct swap.
+  assertEquals(tier('Good Morning'), 'direct');
+  assertEquals(tier('Back Extension'), 'direct');
+  assertEquals(tier('Leg Curl'), 'direct');
+  // Different pattern (knee-dominant) — still OFFERED (slot framework intact) but as an alternative.
+  assertEquals(tier('Front Squat'), 'lighter');
+  assertEquals(tier('Bulgarian Split Squat'), 'lighter');
+  assertEquals(tier('Reverse Lunge'), 'lighter');
+});
