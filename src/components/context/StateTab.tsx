@@ -1377,7 +1377,7 @@ export default function StateTab({
                   <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
                     <span className="text-white/75 tabular-nums">{e.best_weight} lb × {e.best_reps}</span>
                     {dateLabel && <span className="text-white/40">{dateLabel}</span>}
-                    {est > 0 && <span className="text-white/45 tabular-nums">e1RM {est} lb</span>}
+                    {est > 0 && isTrusted(e) && <span className="text-white/45 tabular-nums">e1RM {est} lb</span>}
                     {isBest && <span className="text-emerald-300 font-medium">best</span>}
                   </div>
                 );
