@@ -120,6 +120,111 @@ export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string, op
   return corroboratedDecline || readinessHardFloor;
 }
 
+// ── THE ONE OVERLOAD MINT (Slice 1, 2026-08-12) ──────────────────────────────
+//
+// "Are you overloaded" is decided HERE and nowhere else. Before this there were six places that
+// could reach that conclusion independently (the reconciler, computeAssessment's 'overreaching',
+// the raw readiness tree, buildVerdict's ACWR bands, weekly.ts's inline acwr_status, and
+// body-response's computeTotalLoadStatus) — so one payload could say `glance on_track` and
+// "Signs of overreaching — consider backing off" in the same breath.
+//
+// ⛔ THE YARDSTICK (Michael, 2026-08-12): *a plan you followed can't be "too much" — the plan IS
+// the intended load. Flag on what the body reports, never on the numbers the app handed you.*
+//
+// So the verdict is fed by THREE athlete-owned signals and nothing else:
+//   1. RPE — the athlete's own report of how hard it felt (internal load).
+//   2. Measured body metrics — HR drift, cardiac efficiency, execution (what the body did).
+//   3. Actual-vs-PLANNED load — did the athlete do MORE than the plan asked (external load).
+//
+// And it is BLIND to, by construction:
+//   • absolute ACWR — a ratio the plan itself produces. A build week is SUPPOSED to ramp; a 1.4
+//     an athlete was prescribed is the plan working, not the athlete overreaching. ACWR stays a
+//     descriptive gauge (the number still renders) and never a verdict input here.
+//   • prescribed load — the app cannot hand you a week and then blame you for completing it.
+//   • strength e1RM — a 5/3/1 weight wave dips e1RM BY DESIGN in weeks 2-3 and on the deload.
+//     That is a protocol artifact, not strain. (The honest strength gauge is Slice 2.)
+//
+// Field-standard backing: the two-key structure (internal RPE + external load) is the standard
+// monitoring pair — Foster's session-RPE work, and the Gabbett load-ratio literature's own caveat
+// that a ratio without symptom corroboration is descriptive. It is the same "the ratio DESCRIBES,
+// the body PRESCRIBES" law D-260/D-266 already put in the reconciler, applied one level up.
+
+/** Actual load must exceed planned load by more than this (%) to count as "you did more than the
+ *  plan asked". 25% matches the reconciler's long-standing unplanned-load escalation step, so the
+ *  exceed threshold is one number, not two. Below it, a week is normal execution noise. */
+export const EXCEED_PLAN_PCT = 25;
+
+export interface OverloadVerdict {
+  /** THE verdict. Every lane reads this and none re-derives it. */
+  overloaded: boolean;
+  /** 'watch' = the body reported something but nothing corroborates it — describe, never prescribe. */
+  level: 'none' | 'watch' | 'overload';
+  /** Did the athlete do MORE than the plan asked (the only load input that can escalate)? */
+  exceeded_plan: boolean;
+  exceeded_plan_pct: number | null;
+  /** The athlete-reported / measured signals that are declining (never includes strength e1RM). */
+  strain_signals: string[];
+  /** One-line receipt so a surface can show WHY without re-deciding. */
+  basis: string;
+}
+
+/** The neutral verdict, for callers with no signal at all (cold start / no plan). */
+export const NO_OVERLOAD: OverloadVerdict = {
+  overloaded: false,
+  level: 'none',
+  exceeded_plan: false,
+  exceeded_plan_pct: null,
+  strain_signals: [],
+  basis: 'no overload signal',
+};
+
+/**
+ * Mint the overload verdict. Pure; no ACWR, no prescribed load, no e1RM — see the block above.
+ *
+ * Two ways to be overloaded, both athlete-owned:
+ *   (A) you did MORE than the plan asked AND the body reports at least one declining signal;
+ *   (B) the body reports TWICE — ≥2 declining signals WITH RPE among them — regardless of load.
+ *       RPE is required because it is the one signal the athlete states directly; the measured
+ *       markers are confoundable (heat, hills, sleep) and two confounded markers are not a witness.
+ *       This mirrors computeSafetyFloor's D-266 rule, so the floor and the mint cannot disagree.
+ *
+ * Anything less that still has a declining signal is 'watch': it SHOWS, it never prescribes.
+ */
+export function mintOverloadVerdict(args: {
+  /** Declining measured/reported signals, already de-run-brained and e1RM-free. */
+  strainSignals: string[];
+  /** Is RPE (the athlete's own report) one of them? */
+  rpeDeclining: boolean;
+  /** (actual − planned) / planned × 100 for the week to date. Null = no plan to compare against. */
+  actualVsPlannedPct: number | null;
+  /** Unplanned (off-plan) load as a % of the planned week — training added ON TOP of the plan. */
+  unplannedShareOfPlannedPct: number | null;
+}): OverloadVerdict {
+  const signals = (args.strainSignals ?? []).filter(Boolean);
+  const overPlan = args.actualVsPlannedPct != null && args.actualVsPlannedPct > EXCEED_PLAN_PCT;
+  const overUnplanned = args.unplannedShareOfPlannedPct != null && args.unplannedShareOfPlannedPct > EXCEED_PLAN_PCT;
+  const exceeded_plan = overPlan || overUnplanned;
+
+  const keyA = exceeded_plan && signals.length >= 1;
+  const keyB = signals.length >= 2 && args.rpeDeclining;
+  const overloaded = keyA || keyB;
+
+  const level: OverloadVerdict['level'] = overloaded ? 'overload' : signals.length >= 1 ? 'watch' : 'none';
+
+  const planTxt = args.actualVsPlannedPct != null
+    ? `${args.actualVsPlannedPct > 0 ? '+' : ''}${Math.round(args.actualVsPlannedPct)}% vs plan`
+    : 'no plan comparison';
+  const sigTxt = signals.length ? signals.join(' + ') : 'no declining signals';
+  const basis = overloaded
+    ? (keyA ? `did more than planned (${planTxt}) with ${sigTxt} declining`
+            : `${sigTxt} declining together (reported effort among them)`)
+    : level === 'watch'
+      ? `${sigTxt} declining, ${planTxt} — worth watching, not overload`
+      : `${sigTxt}, ${planTxt}`;
+
+  return { overloaded, level, exceeded_plan, exceeded_plan_pct: args.actualVsPlannedPct, strain_signals: signals, basis };
+}
+
 // ── D-267: plan-primary discipline + primary-discipline adherence ────────────
 // The load verdict must read the plan's PRIMARY discipline, not hardcoded running. For a
 // strength-primary plan a run-only 'under' is NOT under-training when strength is on plan. Pure
@@ -233,6 +338,11 @@ export function reconcileLoadStatus(
    *  (no valid steady session to read it from). Default true = pre-D-318. Fed into computeDecliningSignals
    *  alongside planPrimary so the escalation and the safety floor read the SAME de-run-brained signal set. */
   driftUsable: boolean = true,
+  /** Slice 1 (2026-08-12): THE overload verdict (mintOverloadVerdict), minted once upstream and read
+   *  here. When supplied, NO body/readiness path may escalate unless the verdict says overloaded, and
+   *  the absolute-ACWR escalators are off — the ratio describes, it never prescribes. Omitted/null ⇒
+   *  byte-identical pre-slice behavior (same fail-safe pattern as corroboratedStrain / driftUsable). */
+  overload: OverloadVerdict | null = null,
 ): { status: LoadStatusLevel; interpretation: string; acwrProvisional: boolean } {
   const reasons: string[] = [];
 
@@ -275,8 +385,18 @@ export function reconcileLoadStatus(
     }
   };
 
+  // Slice 1: the ONE verdict gates every escalation below. `mayEscalate` false ⇒ the body/readiness
+  // paths can still DESCRIBE (the interpretation still names what's declining) but cannot raise the
+  // load word. `loadCorroborates` replaces the old absolute-ACWR corroborator: what makes a single
+  // declining signal serious is that the athlete did MORE than the plan asked — not that a ratio the
+  // plan itself produced sits above 1.2.
+  const mayEscalate = overload == null || overload.overloaded;
+  const loadCorroborates = overload != null
+    ? overload.exceeded_plan
+    : (unweightedAcwr != null && unweightedAcwr >= 1.2); // legacy path (no verdict supplied)
+
   // Body signal escalation (plan-position-aware)
-  if (!isPlanTransition) {
+  if (!isPlanTransition && mayEscalate) {
     if (isRaceProximity) {
       if (nDeclining >= 2) raise('high', `${decliningSignals.join(' and ')} declining ${weeksOut}w from race`);
       else if (nDeclining === 1) raise('elevated', `${decliningSignals[0]} declining ${weeksOut}w from race`);
@@ -285,11 +405,11 @@ export function reconcileLoadStatus(
       else if (nDeclining === 1) raise('elevated', `${decliningSignals[0]} declining on ${weekIntent} week`);
     } else if (isBuildWeek) {
       if (nDeclining >= 2) raise('elevated', `${decliningSignals.join(' and ')} declining during build`);
-      else if (nDeclining === 1 && unweightedAcwr != null && unweightedAcwr >= 1.2)
-        raise('elevated', `${decliningSignals[0]} declining with ACWR ${unweightedAcwr.toFixed(2)}`);
+      else if (nDeclining === 1 && loadCorroborates)
+        raise('elevated', `${decliningSignals[0]} declining while over planned load`);
     } else {
       if (nDeclining >= 2) {
-        const target = (unweightedAcwr != null && unweightedAcwr >= 1.2) ? 'high' : 'elevated';
+        const target = loadCorroborates ? 'high' : 'elevated';
         raise(target as 'elevated' | 'high', `${decliningSignals.join(' and ')} declining`);
       } else if (nDeclining === 1) {
         raise('elevated', `${decliningSignals[0]} trending down`);
@@ -298,16 +418,20 @@ export function reconcileLoadStatus(
   }
 
   // Readiness-state floor (failsafe) — bypasses both gates (D-259 carve-out).
-  if (readiness === 'overreached') {
-    raise('high', 'body signals indicate overreaching');
-  } else if (readiness === 'fatigued') {
-    if (!isEasyWeek || (unweightedAcwr != null && unweightedAcwr >= 1.0)) {
-      raise('elevated', 'fatigue markers elevated');
+  // Slice 1: gated by the one verdict. Readiness is itself minted from that verdict upstream, so this
+  // is belt-and-braces for callers that pass a readiness computed some other way.
+  if (mayEscalate) {
+    if (readiness === 'overreached') {
+      raise('high', 'body signals indicate overreaching');
+    } else if (readiness === 'fatigued') {
+      if (!isEasyWeek || (unweightedAcwr != null && unweightedAcwr >= 1.0)) {
+        raise('elevated', 'fatigue markers elevated');
+      }
     }
   }
 
   // Upcoming work: protect key sessions
-  if (nDeclining >= 1 && keySessionsNext48h.length > 0 && !isPlanTransition) {
+  if (nDeclining >= 1 && keySessionsNext48h.length > 0 && !isPlanTransition && mayEscalate) {
     raise('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
   }
 
@@ -316,7 +440,11 @@ export function reconcileLoadStatus(
   const crossTrainingEstablished = discProfiles
     ? discProfiles.some(p => p.discipline !== 'run' && p.maturity !== 'building' && p.acwr != null && p.acwr > 1.3)
     : true;
-  if (unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1) && crossTrainingEstablished) {
+  // Slice 1: this block was a pure ABSOLUTE-ACWR escalator — a planned cross-training block pushed the
+  // total ratio past 1.3 and the athlete got told their load was high for following the plan. It now
+  // only speaks when the cross-training was added ON TOP of the plan (exceeded_plan).
+  const crossTrainingOverPlan = overload == null || overload.exceeded_plan;
+  if (crossTrainingOverPlan && unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1) && crossTrainingEstablished) {
     if (unweightedAcwr > 1.5) {
       raise('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
     } else if (unweightedAcwr > 1.3) {
@@ -398,7 +526,11 @@ export function reconcileLoadStatus(
   // ACWR actually earns. Fails SAFE: only build/baseline; 'unknown'/other keep
   // the strict general bands (Q-136 — 'unknown' is currently the live path).
   const isBuildPhase = weekIntent === 'build' || weekIntent === 'baseline';
-  const bodyDrivenHigh = nDeclining >= 2 || readiness === 'overreached' || readiness === 'fatigued';
+  // Slice 1: the carve-out that skips the build tolerance is the ONE verdict, not a raw signal count —
+  // otherwise two uncorroborated markers keep a build week pinned "high" for doing exactly the plan.
+  const bodyDrivenHigh = overload != null
+    ? overload.overloaded
+    : (nDeclining >= 2 || readiness === 'overreached' || readiness === 'fatigued');
   if (isBuildPhase && !bodyDrivenHigh && unweightedAcwr != null && (status === 'high' || status === 'elevated')) {
     const buildBand: LoadStatusLevel =
       unweightedAcwr <= ACWR_RATIO_THRESHOLDS.build_optimal_max ? 'on_target' :
@@ -469,11 +601,17 @@ export function reconcileLoadStatus(
   // was already downgraded to 'under' above, so 'productive' can't fire off an unreliable ratio.
   // …AND requires good readiness (fresh/adapting/normal): a fatigued athlete on a flat-effort week is NOT
   // "productive", so that path still caps to 'elevated' via the else-if.
-  const bodyGenuinelyFine = (readiness === 'fresh' || readiness === 'adapting' || readiness === 'normal') && nDeclining < 2;
-  if ((status === 'high' || status === 'elevated') && !corroboratedStrain && bodyGenuinelyFine) {
+  // Slice 1: when the one verdict is present it IS the second key — a raw 'high' that came from the
+  // absolute-ACWR bands upstream (computeTotalLoadStatus) can no longer wear an overload word just
+  // because no one refuted it. Verdict says no overload ⇒ the elevation is real but absorbed.
+  const strainCorroborated = overload != null ? overload.overloaded : corroboratedStrain;
+  const bodyGenuinelyFine = overload != null
+    ? !overload.overloaded
+    : ((readiness === 'fresh' || readiness === 'adapting' || readiness === 'normal') && nDeclining < 2);
+  if ((status === 'high' || status === 'elevated') && !strainCorroborated && bodyGenuinelyFine) {
     status = 'productive';
     reasons.push(`load elevated (ACWR ${unweightedAcwr != null ? unweightedAcwr.toFixed(2) : 'n/a'}) and the body's absorbing it — productive`);
-  } else if (status === 'high' && !corroboratedStrain) {
+  } else if (status === 'high' && !strainCorroborated) {
     status = 'elevated';
     reasons.push('load high but body absorbing — no corroborated strain (two-key)');
   }

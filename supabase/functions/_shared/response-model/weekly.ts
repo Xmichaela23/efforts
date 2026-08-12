@@ -31,6 +31,10 @@ import {
   type ArcInputsForResponse,
 } from './types.ts';
 import { computeCrossDomain } from './cross-domain.ts';
+// Slice 1 (2026-08-12): "are you overloaded" is minted in ONE place — the load authority's own file —
+// and this model READS it. It used to decide overreaching itself, off `load.acwr_status`, i.e. off a
+// ratio the plan produced. See the mint's header block for the law and why ACWR is not an input.
+import { mintOverloadVerdict, type OverloadVerdict } from '../load-status-reconcile.ts';
 import { VERDICT_DEVIATION } from '../strength-profiles.ts';
 // Q-254 slice 2b — the BOOK'S rule for what an all-out set means, already written and fixtured.
 // ⛔ Imported rather than re-derived: a second answer to "did the top set pass" is how the working
@@ -442,17 +446,26 @@ function computeAssessment(
   strength: StrengthResponse,
   load: LoadContext,
   planContext: WeeklyResponseState['plan_context'],
+  overload: OverloadVerdict,
 ): Assessment {
-  const signals: Array<{ name: string; trend: TrendDirection; sufficient: boolean }> = [];
+  // `strain: false` = this signal REPORTS but never counts as the body reporting strain.
+  const signals: Array<{ name: string; trend: TrendDirection; sufficient: boolean; strain?: boolean }> = [];
 
   if (endurance.hr_drift.sufficient) signals.push({ name: 'HR drift', trend: endurance.hr_drift.trend, sufficient: true });
   if (endurance.execution.sufficient) signals.push({ name: 'Execution', trend: endurance.execution.trend, sufficient: true });
   if (endurance.rpe.sufficient) signals.push({ name: 'RPE', trend: endurance.rpe.trend, sufficient: true });
   if (endurance.cardiac_efficiency.sufficient) signals.push({ name: 'Cardiac efficiency', trend: endurance.cardiac_efficiency.trend, sufficient: true });
-  if (strength.overall.trend !== 'insufficient_data') signals.push({ name: 'Strength', trend: strength.overall.trend === 'gaining' ? 'improving' : strength.overall.trend === 'declining' ? 'declining' : 'stable', sufficient: true });
+  // ⛔ STRENGTH e1RM IS NOT A STRAIN SIGNAL (Slice 1, 2026-08-12). It still COUNTS as an available
+  // signal (the model knows it has strength data, and a gaining lift still reads as responding), but a
+  // DECLINING e1RM can no longer make the athlete look overloaded. A 5/3/1 wave drops the top-set
+  // weight in weeks 2-3 and again on the deload BY DESIGN, so the e1RM estimate dips on schedule —
+  // that is the protocol running correctly, and it was reading as "signs of overreaching". The honest
+  // protocol-declared strength gauge is Slice 2; nothing here touches the trend algorithm itself.
+  if (strength.overall.trend !== 'insufficient_data') signals.push({ name: 'Strength', trend: strength.overall.trend === 'gaining' ? 'improving' : strength.overall.trend === 'declining' ? 'declining' : 'stable', sufficient: true, strain: false });
 
+  const strainSignals = signals.filter((s) => s.strain !== false);
   const available = signals.length;
-  const concerning = signals.filter((s) => s.trend === 'declining').length;
+  const concerning = strainSignals.filter((s) => s.trend === 'declining').length;
   const improving = signals.filter((s) => s.trend === 'improving').length;
 
   const make = (label: Assessment['label'], primary_driver: string | null, confidence: ConfidenceLevel, explain: string): Assessment => ({
@@ -474,11 +487,13 @@ function computeAssessment(
     return make('responding', null, 'low', 'Early in a new plan — baseline data is still catching up. Signals may not reflect this plan yet.');
   }
 
-  const decliningSignals = signals.filter((s) => s.trend === 'declining').map((s) => s.name);
+  const decliningSignals = strainSignals.filter((s) => s.trend === 'declining').map((s) => s.name);
   const improvingSignals = signals.filter((s) => s.trend === 'improving').map((s) => s.name);
 
   if (concerning >= 2) {
-    const isLoadHigh = load.acwr_status === 'elevated' || load.acwr_status === 'high_risk';
+    // Slice 1: reads THE verdict (mintOverloadVerdict) — was `load.acwr_status`, a fourth ACWR
+    // classifier judging the athlete on a ratio the plan handed them.
+    const isLoadHigh = overload.overloaded;
     // ⛔ THE "BACK OFF" WORD NEEDS LOAD CORROBORATION (2026-08-12). This was a SECOND, parallel
     // overreaching authority beside the reconciler (D-260) — it labeled 'overreaching' from body-signal
     // trend COUNTS alone, readiness-blind and plan-blind, and that label then set raw readiness
@@ -491,11 +506,13 @@ function computeAssessment(
     // readiness→load cascade unless load actually corroborates. Genuine overreaching (declining markers
     // WITH elevated load) is unchanged.
     if (isLoadHigh) {
+      // The receipt names what the athlete did, not a ratio: either they went over the plan, or the
+      // body reported twice on its own.
       return make('overreaching', decliningSignals[0] || null, available >= 3 ? 'high' : 'medium',
-        `Multiple signals declining (${decliningSignals.join(', ')}) with elevated load. Consider backing off.`);
+        `Multiple signals declining (${decliningSignals.join(', ')}) — ${overload.basis}. Consider backing off.`);
     }
     return make('stagnating', decliningSignals[0] || null, available >= 3 ? 'medium' : 'low',
-      `Multiple response markers trending down (${decliningSignals.join(', ')}), but load is in range — worth watching, not backing off.`);
+      `Multiple response markers trending down (${decliningSignals.join(', ')}), but you're inside the plan's load — worth watching, not backing off.`);
   }
 
   if (concerning === 1 && improving === 0 && available >= 3) {
@@ -755,6 +772,7 @@ function computeWeekHeadline(
   planContext: WeeklyResponseState['plan_context'],
   load: LoadContext,
   goalSummary: GoalSummary | null,
+  overload: OverloadVerdict,
 ): WeekHeadline {
   const parts: string[] = [];
 
@@ -787,11 +805,17 @@ function computeWeekHeadline(
   if (goalSummary?.primary_race && planContext) {
     subparts.push(`${goalSummary.primary_race.weeks_out} weeks to ${goalSummary.primary_race.name}.`);
   }
-  if (load.acwr_status === 'elevated' || load.acwr_status === 'high_risk') {
+  // Slice 1: was `load.acwr_status` — the inline 4th ACWR classifier. "Load is elevated" is an overload
+  // claim and now comes from the one verdict, so it can't contradict the load word on the same screen.
+  if (overload.overloaded) {
     subparts.push('Load is elevated.');
   }
+  // Slice 1: the day-count is a FACT and still shows. "rest soon" is a prescription and only survives
+  // when the verdict says overloaded — a 6-day streak the plan asked for is the plan, not a warning.
   if (load.consecutive_training_days >= 5) {
-    subparts.push(`${load.consecutive_training_days} days straight — rest soon.`);
+    subparts.push(overload.overloaded
+      ? `${load.consecutive_training_days} days straight — rest soon.`
+      : `${load.consecutive_training_days} days straight.`);
   }
 
   return {
@@ -862,6 +886,12 @@ export function computeWeeklyResponse(opts: {
   crossDomainPairs: CrossDomainPair[];
   acwr: number | null;
   weekVsPlanPct: number | null;
+  /** Slice 1: (actual − planned) / planned × 100, WTD, UNCLAMPED — the only load input that can
+   *  escalate a verdict. Distinct from `weekVsPlanPct`, which is the completion ratio and is clamped
+   *  at 100 (adherence-plan.ts), so it can never express "did more than the plan asked". */
+  actualVsPlannedPct?: number | null;
+  /** Slice 1: off-plan (unplanned) load as a % of the planned week — training added ON TOP of the plan. */
+  unplannedShareOfPlannedPct?: number | null;
   consecutiveTrainingDays: number;
   acute7Load: number | null;
   chronic28Load: number | null;
@@ -884,8 +914,26 @@ export function computeWeeklyResponse(opts: {
   const load = computeLoad(opts.acwr, opts.weekVsPlanPct, opts.consecutiveTrainingDays, opts.acute7Load, opts.chronic28Load);
   const pc = opts.planContext ?? null;
   const gs = opts.goalSummary ?? null;
-  const assessment = computeAssessment(endurance, strength, load, pc);
-  const headline = computeWeekHeadline(assessment, pc, load, gs);
+
+  // ── THE ONE MINT (Slice 1) ────────────────────────────────────────────────────────────────────
+  // This is the earliest point where both halves exist: the athlete's own signals (RPE + measured
+  // body metrics, computed just above) and actual-vs-planned load (passed in). Every downstream lane
+  // — assessment, headline, readiness, the load reconciler, the week accent, training_state — reads
+  // THIS object and none of them re-derives it. Strength e1RM is deliberately absent (Slice 2).
+  const strainSignals: string[] = [];
+  if (endurance.rpe.sufficient && endurance.rpe.trend === 'declining') strainSignals.push('RPE');
+  if (endurance.hr_drift.sufficient && endurance.hr_drift.trend === 'declining') strainSignals.push('HR drift');
+  if (endurance.cardiac_efficiency.sufficient && endurance.cardiac_efficiency.trend === 'declining') strainSignals.push('cardiac efficiency');
+  if (endurance.execution.sufficient && endurance.execution.trend === 'declining') strainSignals.push('execution');
+  const overload = mintOverloadVerdict({
+    strainSignals,
+    rpeDeclining: endurance.rpe.sufficient && endurance.rpe.trend === 'declining',
+    actualVsPlannedPct: opts.actualVsPlannedPct ?? null,
+    unplannedShareOfPlannedPct: opts.unplannedShareOfPlannedPct ?? null,
+  });
+
+  const assessment = computeAssessment(endurance, strength, load, pc, overload);
+  const headline = computeWeekHeadline(assessment, pc, load, gs, overload);
   const visible_signals = computeVisibleSignals(endurance, strength);
   const disciplineMix = opts.discipline_mix ?? { runs: 0, rides: 0, strength: 0, swims: 0 };
   const arc = opts.arc ?? null;
@@ -915,6 +963,7 @@ export function computeWeeklyResponse(opts: {
     strength,
     cross_domain,
     load,
+    overload,
     assessment,
     headline,
     visible_signals,

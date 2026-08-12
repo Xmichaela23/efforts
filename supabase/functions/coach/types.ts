@@ -488,6 +488,10 @@ export type CoachWeekContextResponseV1 = {
       cycling_acwr: number | null;
       /** D-263: per-domain load slices (strength / hard_cardio / easy_cardio). */
       per_domain?: import('../_shared/per-domain-load.ts').PerDomainLoad | null;
+      /** Slice 1 (2026-08-12): THE overload verdict every lane reads — plan-aware, fed only by RPE,
+       *  measured body metrics and actual-vs-planned load. Carries its own `basis` receipt. Surfaces
+       *  render it; none of them re-decides "are you overloaded". */
+      overload?: import('../_shared/load-status-reconcile.ts').OverloadVerdict | null;
       /** Banister fitness/fatigue/form — SIBLING signal, evaluation-only, drives no verdict (2026-07-09). */
       fitness_fatigue?: import('../_shared/fitness-fatigue.ts').FitnessFatigue | null;
       run_only_week_load: number | null;

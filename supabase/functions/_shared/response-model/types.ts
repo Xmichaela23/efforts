@@ -5,6 +5,11 @@
 // Consumed by both week (7d) and block (28d) views.
 // =============================================================================
 
+// Slice 1: the overload verdict's type lives with the authority that mints it, not with the surface
+// that renders it — re-exported here so response-model consumers have one import.
+import type { OverloadVerdict } from '../load-status-reconcile.ts';
+export type { OverloadVerdict };
+
 export const MIN_SAMPLES_FOR_SIGNAL = 3;
 export const MIN_SAMPLES_FOR_TREND = 2; // per-lift minimum for strength trends
 export const BASELINE_WINDOW_DAYS = 28;
@@ -254,6 +259,9 @@ export type WeeklyResponseState = {
   strength: StrengthResponse;
   cross_domain: CrossDomainResponse;
   load: LoadContext;
+  /** Slice 1 (2026-08-12): THE overload verdict — minted once (mintOverloadVerdict, load-status-
+   *  reconcile.ts) and read by every lane. Surfaces render it; nothing re-decides it. */
+  overload: OverloadVerdict;
   assessment: Assessment;
   // Server-computed presentation — client renders verbatim
   headline: WeekHeadline;

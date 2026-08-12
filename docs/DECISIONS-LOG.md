@@ -149,6 +149,15 @@ The segment (fixed-route) model is correct but **narrow** — it only fires when
 
 ### D-260 — THE LAW: the reconciled classifier is the SOLE authority that mints a load verdict or prescription (2026-07-08, architectural; binds all load-system-extension work)
 
+> **⛔ REINFORCED AND NARROWED BY [D-418] (2026-08-12, `docs/DECISIONS-LOG-2.md`).** THE LAW held for the
+> load *word* and was violated everywhere else: five other sites minted "you are overloaded" beside the
+> reconciler (the weekly assessment label, the raw readiness tree, `buildVerdict`'s ACWR bands, the
+> inline `acwr_status`, and `computeTotalLoadStatus`). D-418 mints that verdict once
+> (`mintOverloadVerdict`, `_shared/load-status-reconcile.ts`) and every lane — including the reconciler
+> — reads it. **The reconciler is still the sole authority on the load STATUS**; it is no longer the
+> only thing that decided overload. Also: the reconciler's own absolute-ACWR escalators are gone, per
+> the yardstick *a plan you followed can't be "too much"*. Everything below stands.
+
 `_shared/load-status-reconcile.ts` is the ONLY place a verdict or prescription WORD is minted. Every other layer — raw ACWR, the per-domain ratios (Item 2), the TRIMP cross-check (Item 1), the gauge — is an **input** to it or a **display of a number**, never a source of advice. Gauges show numbers + band words ("load reading"); only the reconciler speaks. **Literature basis (the split, on the record — this is a defensible corrective, not a house quirk):** ACWR is scientifically CONTESTED, not settled. The IOC 2016 consensus endorsed it; a 2025 meta-analysis across 22 cohorts recommends using it with caution; a Bayesian re-analysis found sRPE-ACWR no better than a random-denominator control and argues against using it in isolation. Our stance threads that split — **keep the ratio as an honest descriptive number, strip its authority to prescribe, and require body-response corroboration before any cautionary verdict** (Item 3's two-key rule). This is why no gauge/label path may issue advice, why Q-137 (the `'rest now'` redline speaking over the reconciler) is closed by this law + Item 2, and why the design deliberately has **NO single grand number** ("Efforts Score"): a collapsed score can't be decomposed, so it forces trust — the glass box (witnesses + receipts + the ⓘ, Item 4) only exists because we refuse to collapse. **Vocabulary (locked):** WITNESSES = the inputs (load, HR/pace decoupling, effort-vs-typical, muscular ledger, TRIMP); LOAD READING = the LOAD row (number + band word, Item 2); RESPONSE = the BODY row (a state, not a score, Item 3 key-2); THE RECONCILER = the sole authority (off-screen). "ACWR" is internal-only — never a user-facing label again. Full spec: `docs/DESIGN-load-system-extension.md`. Consequence: any new load signal is wired as a reconciler INPUT carrying its own source + uncertainty provenance, never as a parallel verdict surface.
 
 ### D-261 — Single plan-phase resolver: fixes Q-136 Drop A (Gate 2 inert for all multi-sport AND strength plans) + Q-138 (dead `plan_phase` stub), one lineage (2026-07-08, `_shared/plan-phase.ts`)

@@ -1485,6 +1485,15 @@ its snapshot row with the UTC Monday; harmless today (reader agrees), localizabl
 
 ### D-416 — Load stays objective, readiness sits beside it: one soft signal stops cascading into three red flags (2026-08-11, **PUSHED `70b46755` + DEPLOYED coach + generate-overall-context; AWAITING DEVICE**)
 
+> **⛔ EXTENDED BY [D-418] (2026-08-12) — this fix was necessary and NOT sufficient.** D-416 corrected the
+> readiness string *fed to* the load reconciler, but five other places could still mint "overloaded"
+> on their own (the assessment label, the raw readiness tree, `buildVerdict`'s ACWR bands, the inline
+> `acwr_status`, and `computeTotalLoadStatus`), so the same soft-signal cascade reappeared on the
+> other lanes at ACWR 1.1. D-418 mints the verdict ONCE (`mintOverloadVerdict`,
+> `_shared/load-status-reconcile.ts`) and every lane reads it. **`readinessForLoadVerdict` is still
+> live and still correct** — it now refines a readiness that is itself gated by the one verdict.
+> Everything below stands as history and as the still-valid load-vs-readiness separation.
+
 **The report (Michael, on the State screen).** "'A bit high' for load doesn't track to the work done, and
 'a bit harder than usual' feels like a heavy red flag." Both were right, and they were the **same** signal.
 
@@ -1547,3 +1556,107 @@ single-signal-`fatigued` cascade are what D-416 reverses/narrows.
 **Side note (filed, not fixed):** the `caution_ramping_fast` OR-branch on the add-recovery suggestion is
 still a load-ramp signal, but it remains gated by `bodyConfirmed` (signals_concerning > 0), so it can't
 fire on load alone.
+
+---
+
+### D-418 — One overload source: "are you overloaded" is minted once, plan-aware, from the athlete's own signals (2026-08-12, **PUSHED pending; fixtures green (18 new, 1636 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — supersedes the parallel-authority half of [D-416], closes the Slice-1 contract
+
+**The report.** One payload contradicting itself six ways. `glance.verdict_code = on_track` beside
+`response_model.headline = "Signs of overreaching — consider backing off"`, `load_status = elevated`
+("a bit high"), the "needs absorbing" accent, and `training_state.code = overstrained` — on an
+**ACWR 1.1, on-plan, week 1 of 12 build week**. Two soft, collinear readings drove all of it: ONE
+harder-than-usual RPE (4.8 vs 3.9) and one "lift trending down" (a 5/3/1 weight wave, not a loss).
+
+**Michael's yardstick, which is the whole decision:** *a plan you followed can't be "too much" — the
+plan IS the intended load. Flag on what the body reports, never on the numbers the app handed you.*
+
+**The trace — there were SIX overload authorities, not one.** D-416 fixed the *readiness input* to the
+reconciler and left every other minting site standing, which is why the alarm survived it:
+
+| authority | where | what it minted from |
+|---|---|---|
+| `reconcileLoadStatus` | `_shared/load-status-reconcile.ts:200` | the D-260 sole authority — **kept as THE one** |
+| `computeAssessment` 'overreaching' | `_shared/response-model/weekly.ts:440` | body-signal COUNT; gated on `acwr_status` by `7809cc12` — still absolute ACWR |
+| raw readiness tree | `coach/index.ts:3075-3122` | a bare `signals_concerning > 0` → `'fatigued'` |
+| `buildVerdict` | `coach/index.ts:789 / 826` | **pure absolute ACWR** → `recover_overreaching` / `caution_ramping_fast`, which then set readiness AND `training_state` |
+| inline `acwr_status` | `weekly.ts:403` | a 4th ACWR classifier → "Load is elevated." subtext |
+| `computeTotalLoadStatus` | `_shared/athlete-snapshot/body-response.ts:40` | a 5th — absolute-ACWR bands set the RAW status the reconciler starts from |
+
+**The decision.** The overload verdict is minted in exactly ONE function and every lane reads it.
+It is fed by three athlete-owned signals and nothing else:
+1. **RPE** — what the athlete reported (internal load).
+2. **Measured body metrics** — HR drift, cardiac efficiency, execution (what the body did).
+3. **Actual-vs-PLANNED load** — did they do MORE than the plan asked (external load).
+
+It is blind, by construction, to **absolute ACWR** (a ratio the plan itself produces — a build week is
+*supposed* to ramp), to **prescribed load** (the app cannot hand you a week and then blame you for
+completing it), and to **strength e1RM** (a 5/3/1 wave dips it on schedule in weeks 2-3 and on the
+deload; that is the protocol working).
+
+**Two ways to be overloaded, both athlete-owned:**
+- **Key A** — exceeded the plan (>25% over planned load, or >25% of the planned week added off-plan)
+  **AND** ≥1 declining body signal.
+- **Key B** — the body reported **twice**: ≥2 declining signals **with RPE among them**, regardless of
+  load. RPE is required because it is the one signal the athlete states directly; the measured markers
+  are confoundable (heat, hills, sleep) and two confounded markers are not a witness. This mirrors
+  `computeSafetyFloor`'s D-266 rule, so the floor and the mint cannot disagree.
+
+Anything less that still has a declining signal is **`watch`**: it shows, it never prescribes.
+
+**Field-standard backing.** The internal-RPE + external-load pair is the standard monitoring structure
+(Foster's session-RPE work), and the load-ratio literature's own caveat is that a ratio without symptom
+corroboration is descriptive. It is the same "the ratio DESCRIBES, the body PRESCRIBES" law D-260/D-266
+already put inside the reconciler — applied one level up, to every lane at once.
+
+**What shipped.**
+1. **The mint** — `mintOverloadVerdict()` + `OverloadVerdict` in `_shared/load-status-reconcile.ts`
+   (the existing authority's own file — **no new authority**, Law 5). Returns
+   `{ overloaded, level, exceeded_plan, exceeded_plan_pct, strain_signals, basis }`. `basis` is a
+   receipt, so a surface can show WHY without re-deciding (Law 4).
+2. **Minted ONCE**, inside `computeWeeklyResponse` — the earliest point where the athlete's signals and
+   the actual-vs-planned load both exist. Exposed as `WeeklyResponseState.overload` and on the payload
+   as `load.overload`.
+3. **Every lane reads it**: the assessment label (was `acwr_status`), the week headline's "Load is
+   elevated." + the "rest soon" prescription, the readiness state, the load reconciler, the over-reach
+   accent (downstream of load+readiness), and `training_state`.
+4. **Strength e1RM dropped from the strain set** (`weekly.ts` `computeAssessment`). It still counts as
+   an *available* signal — a gaining lift still reads as responding — but a declining e1RM can no
+   longer make the athlete look overloaded. **The trend algorithm itself is untouched** (Slice 2).
+5. **The readiness tree extracted** to `_shared/response-model/readiness-state.ts`
+   (`computeReadinessState`). It was ~45 lines buried in the ~6k-line `@ts-nocheck` coach file, so it
+   could not be unit-run — and it was the seam that kept the cascade alive after `7809cc12`. Branch
+   ORDER is unchanged; three branches now require the verdict (the bare count, the ACWR corroborator,
+   and `buildVerdict`'s codes reaching in to set the BODY state). The `adapting` and `detrained`
+   branches are **unchanged** — neither is an overload claim, so ACWR stays a fair input to both.
+6. **The reconciler's absolute-ACWR escalators removed**: the cross-training-ACWR block now requires
+   `exceeded_plan`, and the `ACWR ≥ 1.2` corroborator on a single declining signal is replaced by "did
+   more than planned". The verdict also acts as the second key on the two-key cap, so a raw `high`
+   inherited from `computeTotalLoadStatus`'s ACWR bands can no longer wear an overload word unrefuted.
+7. **One computation of actual-vs-planned** — `loadVsPlanPct` hoisted in `coach/index.ts` and reused by
+   both the mint and `buildBodyResponse` (it was a duplicated inline arithmetic).
+   ⚠️ **NOT `wtd_completion_ratio`**: that ratio is clamped to [0,1] (`_shared/adherence-plan.ts:84`),
+   so it can never express "did more than the plan asked" — the exact fact this needs.
+8. `COACH_PAYLOAD_VERSION` 165 → **166** (verdict values move for any athlete inside their plan's load).
+
+**The fixtures (Law 6) — `_shared/load-continuity-overload.test.ts`, 18 tests.**
+- **Fixture A is the bug case and is PERMANENT.** On-plan build week, ACWR 1.1, one RPE bump, a real
+  5/3/1-wave e1RM decline → NO overload on any lane; glance stays `on_track`. Includes a
+  **non-vacuity proof** that replays the same inputs down the pre-slice path (verdict withheld) and
+  asserts it still produces `fatigued` + `elevated` + "needs absorbing" — if that test ever goes
+  quiet, the legacy path moved and Fixture A stopped proving anything.
+- **Fixture B**: exceeded plan + corroborated measured strain → fires on every lane together. Plus a
+  control that changes only the plan-exceed half and watches every lane go quiet.
+- Deterministic path (no LLM), so the ≥3-recompute rule does not apply here.
+
+**What was deliberately NOT touched.**
+- **The strength trend algorithm** — Slice 2 (protocol-declared gauge: 5/3/1 → all-out rep record).
+- **The goal `glance` lane** — `buildVerdict` still reports its ACWR-derived code exactly as before. It
+  simply no longer diagnoses the BODY. ⚠️ **It remains a live absolute-ACWR authority for its own
+  lane** — an athlete whose PLAN prescribes a hard ramp will still read "Recover" on the glance while
+  every other lane says fine. That is the next fracture in this campaign, and it is filed, not fixed.
+- **The e1RM formula** (done 2026-08-12), and `computeTotalLoadStatus`'s bands (now capped by the
+  verdict rather than rewritten — a smaller blast radius for the same outcome).
+
+**The fail-safe pattern.** Every gate added here is on an OPTIONAL `overload` parameter that defaults
+to null ⇒ byte-identical pre-slice behavior. That is the same shape `corroboratedStrain` (D-265) and
+`driftUsable` (D-318) use, and it is why all 34 pre-existing reconciler fixtures pass untouched.
