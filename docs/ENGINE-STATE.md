@@ -23,9 +23,19 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-11 — an app-wide button-shape design system + Strong Focus intake FLOW polish landed on top of the still-unrun acceptance pass. Pushed, on Michael's phone via Xcode.)
+## 🧭 NEXT SESSION — START HERE (2026-08-12 — 5/3/1 WARM-UP RAMP shipped into the plan + logger, floored at the empty bar. Pushed + edge-deployed; ramp + section headers VERIFIED on Michael's screen. Acceptance run STILL not done.)
 
-### ⛔ YOUR JOB: THE ACCEPTANCE RUN. IT IS NOW THREE SESSIONS OVERDUE.
+### 2026-08-12 — WHAT SHIPPED (do not re-litigate)
+- **5/3/1 warm-up ramp** — Wendler p.31 (40/50/60%, reps 5/5/3) authored into the plan on working weeks, **none on deload** (deload work sets ARE already 40/50/60, so they are the ramp). Source of the ramp: `loading/wendler-531.ts` `warmupSetsForWeek`. Written by BOTH set-writers: composer `strength-primary-plan.ts` `mainLiftRow` AND `rematerialize-strength-block` (the progression rewriter — it would otherwise strip the ramp). Carried through materialize via `carrySetPlan`. Rendered in the logger as **Warm-up / Working sets** sections (`StrengthLogger.tsx` — `setType` off the `warmup` flag). Excluded from AMRAP/e1RM/workload by construction (warm-ups carry no `amrap` flag).
+- **Warm-up weights floor at the empty bar** — `BAR_LB = 45` (`wendler-531.ts`). A light lift's 40/50/60% is un-loadable (an 80 lb press → 32/40/48). Warm-ups clamp; **work sets do NOT** — a sub-bar work set means the training max itself is near-empty-bar, surfaced not masked. NOTE: the bar floor is field-standard (empty-bar warm-ups), **not** in Wendler's text — the book gives only the percentages.
+- **Deadlift-day hamstring → Leg Curl** (Wendler p.50 deadlift-day Hamstrings = Leg Curl/GHR), not a second hinge (RDL). `assistance-menu.ts` `ROLE_FALLBACK.leg_match` leads with Leg Curl on the hip slot; existing `materialize-plan` equipment substitution turns it into Nordic/Band curls with no machine.
+- **Swap sheet tiers by movement pattern** — `exercise-alternatives.ts` `getInSlotAlternatives`: an assistance row's slot menu is tiered, so a Front Squat is no longer offered as a "direct swap" for a Romanian Deadlift.
+- **STATE:** PUSHED (`21c41596` ramp+Leg Curl+swaps, `748811c9` bar floor) + EDGE-DEPLOYED (`generate-strength-plan`, `create-goal-and-materialize-plan`, `materialize-plan`, `rematerialize-strength-block`, `coach`) + client on Netlify. **VERIFIED on device:** the ramp + the Warm-up/Working headers (Michael's screenshot). **UNVERIFIED:** the bar floor (he hasn't regenerated to see OHP → 45/45/45), the swap-sheet tiering (not visually checked).
+- **Untouched, on purpose:** (1) sub-bar WORK sets for a near-empty-bar max — a training-max/data issue, "fuck em" per Michael; (2) OHP warm-ups collapse to 45/45/45 for a light presser — correct, dedupe is optional polish; (3) 7 failing `triathlon_performance.conformance.test.ts` tests — a SEPARATE protocol's stale name-matcher (it doesn't recognize "Lat Pull Down" as a vertical pull), being fixed by a spawned background task, not touched here. Test-only, no runtime impact.
+
+
+
+### ⛔ YOUR JOB: THE ACCEPTANCE RUN. IT IS NOW FOUR SESSIONS OVERDUE.
 
 The 2026-08-09 and -08-10 banners said the same thing and the run did not happen — then two more full
 days of screenshot-driven UI work landed on top. 2026-08-11 added an app-wide button-shape design
