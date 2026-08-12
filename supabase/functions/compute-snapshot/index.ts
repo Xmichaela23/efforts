@@ -40,6 +40,12 @@ import {
   type PerDisciplinePosture,
 } from "../_shared/state-trend/index.ts";
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
+// Slice 2 (2026-08-12): the strength progress direction reads the PROTOCOL'S declared gauge. The
+// protocol id comes from the one resolver (block-identity), the gauge from the one profile table,
+// and the all-out sets from the one capture (`_shared/strength/all-out-set.ts`) — no new answers.
+import { resolveProtocolId } from "../_shared/block-identity.ts";
+import { resolveProfile, protocolEffortRead, type EffortReadMode } from "../_shared/strength-profiles.ts";
+import { allOutSeriesByLift, REP_RECORD_WINDOW_SESSIONS } from "../_shared/strength/all-out-set.ts";
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
 // D-338: the date → plan-week resolver, so a phase can be resolved for any dated point in the
 // series. Same module the coach uses; honours the plan's own week_start rather than assuming Monday.
@@ -907,6 +913,9 @@ serve(async (req: Request) => {
         // unattached session on a deload week is still a deload week.
         let phaseByDate: Record<string, string> | null = null;
         let measuredDates: string[] = [];
+        // Slice 2: what the block says it READS. 'amrap' (5/3/1) puts waved main lifts on the
+        // all-out-set gauge; anything else keeps the e1RM read, byte for byte.
+        let strengthEffortRead: EffortReadMode | null = null;
         try {
           const { data: activePlanRow } = await supabase
             .from("plans").select("config,duration_weeks")
@@ -914,6 +923,8 @@ serve(async (req: Request) => {
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           const cfg = (activePlanRow as any)?.config ?? null;
           if (cfg) {
+            const protocolId = resolveProtocolId(cfg);
+            strengthEffortRead = protocolId ? protocolEffortRead(resolveProfile(protocolId)) : null;
             const dur = Number((activePlanRow as any)?.duration_weeks) || null;
             const dates = new Set<string>([
               ...exerciseRows.map((r: any) => String(r.date)),
@@ -939,6 +950,68 @@ serve(async (req: Request) => {
             .filter((f: any) => f?.strength_facts?.measured === true)
             .map((f: any) => String(f.date));
         } catch { measuredDates = []; }
+
+        // ── Slice 2: EVERY all-out set per lift — the 5/3/1 progress gauge (Wendler p10) ──────────
+        //
+        // ⛔ SAME QUERY SHAPE THE COACH ALREADY RUNS (`coach/index.ts:~2415`), and the SAME builder,
+        // so State's spine and the Performance screen cannot disagree about whether a set was a rep
+        // record. `strength_facts.amrap_reps` (D-338) records the REPS but not the all-out set's own
+        // WEIGHT — `best_weight` is the heaviest set of the session, which is a different set the
+        // moment a heavy single follows the AMRAP (`all-out-set.ts` documents that trap). The rep
+        // record is "reps AT a weight", so the weight has to be exact, and only the logged set is.
+        let allOutByLift: Record<string, Array<{ date: string; weight: number; reps: number; estimated_1rm: number }>> | null = null;
+        try {
+          const { data: strengthRows } = await supabase
+            .from("workouts")
+            .select("date,planned_id,strength_exercises")
+            .eq("user_id", userId)
+            .in("type", ["strength", "weight_training", "weights", "mobility"])
+            .lte("date", asOf)
+            .order("date", { ascending: false })
+            .limit(REP_RECORD_WINDOW_SESSIONS);
+          const rows = Array.isArray(strengthRows) ? strengthRows : [];
+          if (rows.length > 0) {
+            // The planned rows behind those sessions — `set_plan[].amrap` is the fallback when the
+            // logged set carries no flag (a session logged from a stale bundle or edited by hand).
+            const plannedIds = Array.from(new Set(
+              rows.map((r: any) => r?.planned_id).filter((v: unknown): v is string => typeof v === "string" && v.length > 0),
+            ));
+            const plannedById = new Map<string, any[]>();
+            if (plannedIds.length > 0) {
+              const { data: plannedRows } = await supabase
+                .from("planned_workouts").select("id,strength_exercises").in("id", plannedIds);
+              for (const p of (Array.isArray(plannedRows) ? plannedRows : [])) {
+                const ex = (p as any)?.strength_exercises;
+                if (Array.isArray(ex)) plannedById.set(String((p as any).id), ex);
+              }
+            }
+            // ⚠️ OLDEST FIRST — the rep-record history is built as it walks; reversed input judges
+            // every set against the future.
+            const sessions = rows
+              .slice()
+              .sort((a: any, b: any) => String(a?.date || "").localeCompare(String(b?.date || "")))
+              .map((r: any) => {
+                const raw = r?.strength_exercises;
+                const exercises = Array.isArray(raw)
+                  ? raw
+                  : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+                const pid = typeof r?.planned_id === "string" ? r.planned_id : null;
+                return {
+                  date: String(r?.date || "").slice(0, 10),
+                  exercises,
+                  plannedExercises: pid ? (plannedById.get(pid) ?? null) : null,
+                };
+              })
+              .filter((s: any) => s.date.length === 10);
+            const built = allOutSeriesByLift(sessions);
+            allOutByLift = Object.keys(built).length ? built : null;
+            console.log(`[compute-snapshot] slice2 all-out sets: ${Object.keys(built).length} lift(s), effortRead=${strengthEffortRead ?? "null"}`);
+          }
+        } catch (e: any) {
+          // Non-fatal: no all-out series → waved main lifts read needs_data rather than a false
+          // decline, and every other lift is unchanged.
+          console.log("[compute-snapshot] slice2 all-out read failed (non-fatal):", e?.message || e);
+        }
 
         // State v3: baseline 1RMs so the strength dot reads current e1RM ÷ baseline (not a 12wk range
         // that pegs right in a build). Typed first, learned fills gaps. Non-fatal → hedged fallback.
@@ -1056,7 +1129,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates, allOutByLift, strengthEffortRead });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

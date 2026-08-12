@@ -10,6 +10,8 @@ import { classifyTrend } from './classify.ts';
 import { resolveThresholds } from './thresholds.ts';
 import { isDeloadWeek } from './deload.ts';
 import { positionInRange, type RangePosition } from './position-in-range.ts';
+import type { EffortReadMode } from '../strength-profiles.ts';
+import { capabilitiesForExercise } from '../../../../src/lib/exercise-role.ts';
 
 /** Per-lift dated e1RM series. value = estimated_1rm; meta.name carries the workout name (deload detect). */
 export interface LiftSeries {
@@ -23,6 +25,11 @@ export interface LiftVerdict {
   displayName: string;
   isPrimary: boolean;
   trend: TrendResult;
+  /** Slice 2: WHICH measure the direction was read from. Travels to the surface so a screen can say
+   *  what it is showing instead of implying every lift is judged the same way. */
+  gauge?: StrengthGauge;
+  /** One-line receipt for the gauge (Law 3 — confidence/basis travels with the claim). */
+  gaugeBasis?: string;
 }
 
 export interface StrengthState {
@@ -111,7 +118,13 @@ export interface StrengthPerLift {
   canonical: string;
   displayName: string;
   isPrimary: boolean;
-  direction: TrendVerdict;     // the lift's e1RM trend — the spine's owned fact
+  direction: TrendVerdict;     // the lift's PROGRESS trend — the spine's owned fact
+  /** Slice 2: which measure `direction` was read from — 'amrap' (the all-out set, for a waved main
+   *  lift on a 5/3/1 block) or 'e1rm' (logged working sets, everything else). Absent on rows written
+   *  before the slice; a reader must treat absent as 'e1rm'. */
+  directionGauge?: StrengthGauge;
+  /** Why — e.g. "all-out set — 4 readings over 12 weeks". Renderable, never re-derived. */
+  directionBasis?: string;
   pctChange: number | null;
   latestE1rm: number | null;   // most-recent estimated_1rm point (the number the direction is OF)
   bestE1rm: number | null;     // best estimated_1rm in the TRACKED WINDOW (6wk) — the band frame, NOT the PR frame
@@ -218,14 +231,167 @@ export interface StrengthFitness {
 // live on real data: a squat reading "sliding" −2.5% on σ=4.1% scatter — noise wearing a verdict.
 const E1RM_NOISE_GUARD_STDEV = 1.0;
 
-export function computeStrengthState(series: LiftSeries[], asOf: string, sessionsPerWeek: number): StrengthState {
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE PROTOCOL'S OWN GAUGE (Slice 2, 2026-08-12) — 5/3/1 progress is the ALL-OUT SET, not the
+// waved working-set e1RM.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// ⛔ THE FRACTURE. The direction above reads the e1RM series, which D-417 correctly gates to trusted
+// low-rep sets. On a 5/3/1 block that leaves ONLY the fixed working sets — whose weight the PROGRAM
+// waves by design (65/75/85 → 70/80/90 → 75/85/95, then a new cycle re-bases). So a lighter
+// prescribed week read as "1 lift trending down" on a week the athlete executed perfectly. The one
+// set Wendler actually measures by — the all-out set, which runs long — is excluded from e1RM by
+// construction, so the gauge was throwing away the measurement and trending the prescription.
+//
+// ⛔ WHAT THE BOOK SAYS (2nd ed., verified verbatim — do NOT paraphrase these into a new rule):
+//   p9   — "This program allows you to break a wide variety of rep records throughout the entire year."
+//   p10  — "If your squat goes from 225x6 to 225x9, you've gotten stronger. If you keep setting and
+//          breaking rep records, you'll get stronger. Don't get stuck just trying to increase your one
+//          rep max… There's also a simple way of comparing rep maxes that I'll explain later."
+//   p26  — "This program requires that you push yourself on the last set. This often entails
+//          performing 10 or more reps." (Why the trusted-rep e1RM gate can never see it.)
+//   p28  — the training max goes up 5 lb upper / 10 lb lower PER CYCLE, so the all-out set's WEIGHT
+//          moves between cycles. This is why a rep count alone cannot be the whole comparison.
+//   p32  — "Weight x Reps x .0333 + Weight = Estimated 1RM"… "This formula is not necessarily an
+//          accurate predictor of your 1RM, but it affords you a good general way to gauge your
+//          progress." ⚠️ HIS OWN CAVEAT — it is the CROSS-WEIGHT COMPARATOR, nothing more.
+//   p66  — "95%x1+ (all out set)" — the prescription that makes it the measurement.
+//   p100 — "Do I go for max reps on each set or just the last set? Just the last set of the day for
+//          the big exercise." AND "Do I go for max reps during my deload week? No."
+//   p24  — "in the 4th week (your deload week), you should NOT be going for max reps."
+//   pp.123-129 — his own logbook carries a **Rep Records** box per lift per cycle.
+//
+// ⛔ SO THE GAUGE IS: the all-out set's Wendler p32 estimate, trended. At a FIXED weight that
+// estimate is a strictly increasing function of reps — so it IS the rep record (p10), exactly. When
+// the weight steps up between cycles (p28) it is his own comparator doing the bridging (p32). One
+// value, both cases, and no threshold invented here.
+//
+// ⚠️ THE TRUSTED-REP CAP DOES NOT APPLY. D-417 caps what may mint an *e1RM*; this is a rep count on
+// a known weight compared against itself. Capping it would report a 20-rep set as an 8-rep one.
+
+/** Which measure a lift's progress direction was read from. Travels to the surface (Law 2/3). */
+export type StrengthGauge = 'amrap' | 'e1rm';
+
+/** One dated all-out set, as the spine consumes it. Mirrors `_shared/strength/all-out-set.ts`. */
+export interface AllOutTrendInput {
+  date: string;
+  weight: number;
+  reps: number;
+  /** Wendler's p32 estimate for this set, computed once at capture. */
+  estimated_1rm: number;
+}
+
+/**
+ * ⛔ 12 WEEKS, NOT 6 — AND THE REASON IS CADENCE, NOT PREFERENCE. The e1RM window (42d) is tuned to
+ * a per-SESSION signal. An all-out set is a per-CYCLE measurement: this app prescribes it on the
+ * anchor cycle's third working set only (`wendler-531.ts:64` — `kind === 'anchor' && !isDeload`), so
+ * a 6-week window can hold as few as three, and a leader cycle holds none at all. 84 days spans a
+ * leader + anchor pair, which is the span a rep record actually lives across — the same reasoning
+ * (and roughly the same span) as `REP_RECORD_WINDOW_SESSIONS = 40` in `_shared/strength/all-out-set.ts`,
+ * and the same 84d window the per-lift sparkline already uses.
+ */
+export const ALL_OUT_WINDOW_DAYS = 84;
+
+/**
+ * ⛔ THREE READINGS, EXPLICITLY — not `resolveThresholds`' cadence-scaled floor, which climbs to 5
+ * for a 4x/week lifter. That scaling is right for a per-session series and wrong here: no amount of
+ * training frequency produces more than about one all-out set per lift per week, so a floor of 5
+ * would silence the gauge for exactly the athletes training hardest. Three is the shared primitive's
+ * own lower clamp (`thresholds.ts:54`), i.e. the floor the trend layer already considers minimal.
+ */
+const ALL_OUT_MIN_SESSIONS = 3;
+
+/**
+ * ⛔ FRESHNESS SCALES TO THE MEASUREMENT'S OWN CADENCE — 56 days, and the number is the BOOK's, not
+ * a preference. A 5/3/1 cycle is four weeks (p26/p28 lay out Week I-IV, then the maxes step up and it
+ * repeats), and this app prescribes the all-out set on the anchor cycle only, so two consecutive
+ * readings can legitimately sit a leader cycle apart. Two cycles = 56 days is therefore the point at
+ * which "this is your current direction" stops being true.
+ *
+ * ⚠️ WITHOUT THIS THE GAUGE IS DEAD ON ARRIVAL, and it fails INVISIBLY: `resolveThresholds` scales
+ * freshness to SESSION cadence — 7 days for a 3x/week lifter — so an all-out set performed 8 days ago
+ * decayed to `needs_data` and the row went blank. Measured, not theorised: it is what this fixture
+ * caught on the first run.
+ */
+const ALL_OUT_FRESHNESS_DAYS = 56;
+
+/** Is this lift's working weight WAVED off a training max — i.e. is it "the big exercise" (p100)?
+ *  `coached` is true on exactly the `barbell_main` row (D-373): the main-lift slots and their
+ *  variants (Front Squat, Close Grip Bench, Push Press…). An accessory is not waved and not measured
+ *  by an all-out set, so it keeps the e1RM read. */
+function isWavedMainLift(canonical: string): boolean {
+  try { return capabilitiesForExercise(canonical).coached === true; } catch { return false; }
+}
+
+/** All-out sets → trend points. value = the p32 estimate; `meta.phase` carries the deload exclusion. */
+export function allOutToPoints(
+  points: readonly AllOutTrendInput[] | null | undefined,
+  phaseByDate?: Record<string, string> | null,
+): TrendPoint[] {
+  if (!Array.isArray(points)) return [];
+  return points
+    .filter((p) => p?.date && Number.isFinite(p.estimated_1rm) && p.estimated_1rm > 0)
+    .map((p) => {
+      const phase = phaseByDate?.[p.date] ?? null;
+      const base = { date: p.date, value: p.estimated_1rm };
+      return phase ? { ...base, meta: { phase } } : base;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export interface StrengthStateOpts {
+  /** Every all-out set per canonical lift, oldest first (`allOutSeriesByLift`). */
+  allOutByLift?: Record<string, AllOutTrendInput[]> | null;
+  /** What the athlete's block declares it reads (`protocolEffortRead`). Absent/'rir'/'none' ⇒ the
+   *  e1RM gauge, byte-identical to pre-slice behaviour for every existing protocol. */
+  effortRead?: EffortReadMode | null;
+  /** Plan phase per date, so a deload all-out set is excluded (p24 / p100). */
+  phaseByDate?: Record<string, string> | null;
+}
+
+export function computeStrengthState(
+  series: LiftSeries[],
+  asOf: string,
+  sessionsPerWeek: number,
+  opts: StrengthStateOpts = {},
+): StrengthState {
   const thresholds = resolveThresholds('strength', sessionsPerWeek); // per-lift cadence (Q-052)
-  const lifts: LiftVerdict[] = series.map((s) => ({
-    canonical: s.canonical,
-    displayName: s.displayName,
-    isPrimary: PRIMARY_LIFTS.has(s.canonical),
-    trend: classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV }),
-  }));
+  const readsAmrap = opts.effortRead === 'amrap';
+
+  const lifts: LiftVerdict[] = series.map((s) => {
+    const e1rmTrend = classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV });
+
+    // Only a WAVED main lift on an 'amrap' protocol changes gauge. Accessories and every 'rir' /
+    // 'none' protocol keep the e1RM read exactly as before.
+    if (!readsAmrap || !isWavedMainLift(s.canonical)) {
+      return {
+        canonical: s.canonical, displayName: s.displayName, isPrimary: PRIMARY_LIFTS.has(s.canonical),
+        trend: e1rmTrend, gauge: 'e1rm' as StrengthGauge,
+        gaugeBasis: readsAmrap ? 'assistance lift — read from logged sets' : 'read from logged sets',
+      };
+    }
+
+    const allOutPoints = allOutToPoints(opts.allOutByLift?.[s.canonical], opts.phaseByDate);
+    const trend = classifyTrend(
+      allOutPoints,
+      { ...thresholds, windowDays: ALL_OUT_WINDOW_DAYS, minSessions: ALL_OUT_MIN_SESSIONS, freshnessDays: ALL_OUT_FRESHNESS_DAYS },
+      asOf,
+      { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV },
+    );
+
+    // ⛔ NO FALL-BACK TO e1RM WHEN THE ALL-OUT SERIES IS THIN, AND THAT IS DELIBERATE. Falling back
+    // would restore the exact bug this slice closes: on a leader cycle (no all-out set prescribed at
+    // all) the only thing left to trend is the waved working weight, which is the PROGRAM moving, not
+    // the athlete. "Not enough all-out sets yet" is honest; "trending down" would not be. The e1RM
+    // number itself still renders as a per-session receipt — only the arrow goes quiet.
+    return {
+      canonical: s.canonical, displayName: s.displayName, isPrimary: PRIMARY_LIFTS.has(s.canonical),
+      trend, gauge: 'amrap' as StrengthGauge,
+      gaugeBasis: trend.verdict === 'needs_data'
+        ? `all-out set — ${allOutPoints.length} in ${ALL_OUT_WINDOW_DAYS / 7} weeks, needs ${ALL_OUT_MIN_SESSIONS}`
+        : `all-out set — ${trend.sampleCount} readings over ${ALL_OUT_WINDOW_DAYS / 7} weeks`,
+    };
+  });
 
   const { overall, overallPctChange } = rollUp(lifts);
   return { lifts, overall, overallPctChange };

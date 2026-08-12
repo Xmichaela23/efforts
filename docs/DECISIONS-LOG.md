@@ -218,6 +218,15 @@ The north star, made explicit and written to `docs/TARGET-ARCHITECTURE.md` (+ CL
 
 ## D-270 — Strength convergence (TRUTH-MAP fracture #1) (ratified 2026-07-10, commit `bdab1874`, coach v74 — **folded into the log 2026-07-31** from `docs/archive/DESIGN-strength-convergence.md`)
 
+> **⛔ THE DIRECTION IS STILL SPINE-OWNED, BUT WHAT IT IS READ FROM NOW DEPENDS ON THE PROTOCOL —
+> [D-419] (2026-08-12, `docs/DECISIONS-LOG-2.md`).** D-270's architecture is unchanged and was the
+> thing that made this a one-place fix: the spine owns `per_lift[].direction` and every surface reads
+> it. What changed is the SUBSTRATE for a **waved main lift on a 5/3/1 block** — its direction now
+> comes from the ALL-OUT SET (Wendler p10 rep records), not the working-set e1RM the program itself
+> waves, which was reading a programmed-lighter week as "trending down". Assistance lifts and every
+> non-'amrap' protocol are byte-identical. Two new fields, `directionGauge` + `directionBasis`, say
+> which measure a given row was read from. Everything below stands.
+
 > ⛔ **WRITTEN 21 DAYS LATE.** This entry was owed from 2026-07-10 (see the doc-debt note in D-271) and
 > was the only gap in the D-sequence — while five code sites cited it as law. Filed 2026-07-31 by
 > Michael; substance from the ratified design doc, not reconstructed from the diff.

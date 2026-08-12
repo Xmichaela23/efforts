@@ -210,6 +210,35 @@ export type AllOutSessionInput = {
   plannedExercises: PlannedExerciseLike[] | null | undefined;
 };
 
+/** One dated all-out set. Same read as `AllOutSetReadKeyed`, plus the day it happened. */
+export type AllOutPoint = AllOutSetReadKeyed & { date: string };
+
+/**
+ * ⛔ EVERY all-out set per lift, oldest first — the substrate for the PROGRESS DIRECTION (Slice 2).
+ *
+ * `lastAllOutByLift` answers "what is the current reading"; this answers "which way is it going",
+ * which is the question Wendler actually programs against: *"If you keep setting and breaking rep
+ * records, you'll get stronger"* (p10), and his own logbook carries a **Rep Records** column per
+ * lift per cycle (pp.123-129). One walk, one history — `lastAllOutByLift` is now derived from this
+ * so the two reads cannot disagree about whether a given set was a record.
+ *
+ * ⚠️ Sessions MUST arrive oldest-first (see `lastAllOutByLift`).
+ */
+export function allOutSeriesByLift(sessionsOldestFirst: readonly AllOutSessionInput[]): Record<string, AllOutPoint[]> {
+  const history: BestRepsAtWeight = {};
+  const out: Record<string, AllOutPoint[]> = {};
+  for (const s of sessionsOldestFirst) {
+    const reads = readAllOutSets({
+      exercises: s.exercises,
+      plannedExercises: s.plannedExercises,
+      bestRepsAtWeight: history,
+    });
+    for (const r of reads) (out[r.canonical] ??= []).push({ ...r, date: s.date });
+    accumulateBestRepsAtWeight(history, s.exercises);
+  }
+  return out;
+}
+
 /**
  * Walk a series of sessions OLDEST FIRST and return the most recent all-out set for each lift.
  *
@@ -221,16 +250,10 @@ export type AllOutSessionInput = {
  * future and returns records that are not records.
  */
 export function lastAllOutByLift(sessionsOldestFirst: readonly AllOutSessionInput[]): LastAllOutByLift {
-  const history: BestRepsAtWeight = {};
+  const series = allOutSeriesByLift(sessionsOldestFirst);
   const out: LastAllOutByLift = {};
-  for (const s of sessionsOldestFirst) {
-    const reads = readAllOutSets({
-      exercises: s.exercises,
-      plannedExercises: s.plannedExercises,
-      bestRepsAtWeight: history,
-    });
-    for (const r of reads) out[r.canonical] = { ...r, date: s.date };
-    accumulateBestRepsAtWeight(history, s.exercises);
+  for (const [canon, points] of Object.entries(series)) {
+    if (points.length) out[canon] = points[points.length - 1];
   }
   return out;
 }

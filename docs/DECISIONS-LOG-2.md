@@ -1660,3 +1660,114 @@ already put inside the reconciler — applied one level up, to every lane at onc
 **The fail-safe pattern.** Every gate added here is on an OPTIONAL `overload` parameter that defaults
 to null ⇒ byte-identical pre-slice behavior. That is the same shape `corroboratedStrain` (D-265) and
 `driftUsable` (D-318) use, and it is why all 34 pre-existing reconciler fixtures pass untouched.
+
+---
+
+### D-419 — Strength progress reads the protocol's own gauge: 5/3/1 is the all-out set, not the waved working-set e1RM (2026-08-12, **PUSHED pending; fixtures green (14 new, 1650 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — closes the Slice-2 contract, extends [D-417] and [D-270]
+
+**The report.** State read *"1 lift trending down"* on Michael's bench while he was executing his
+5/3/1 block exactly as printed. The working sets went 120×5 → a new-cycle 105×5 — which is the
+PROGRAM re-basing the wave, not a strength loss.
+
+**The trace.** `state-trend/strength.ts` classified the e1RM series, and D-417 (correctly) gates that
+series to trusted low-rep sets. On a 5/3/1 block that leaves **only the fixed working sets**, whose
+weight the program waves 65/75/85 → 70/80/90 → 75/85/95 → re-base. Meanwhile the one set Wendler
+actually measures by — the all-out set — runs long (p26: *"often entails performing 10 or more
+reps"*) and is therefore excluded from e1RM **by construction**. So the gauge was trending the
+prescription and throwing away the measurement. D-417 was right; it just left the measurement homeless.
+
+**What the book says — verified verbatim in the 2nd edition, not paraphrased.**
+- **p9** — *"This program allows you to break a wide variety of rep records throughout the entire year."*
+- **p10** — *"If your squat goes from 225x6 to 225x9, you've gotten stronger. If you keep setting and
+  breaking rep records, you'll get stronger. Don't get stuck just trying to increase your one rep
+  max… There's also a simple way of comparing rep maxes that I'll explain later."*
+- **p24** — *"in the 4th week (your deload week), you should NOT be going for max reps."*
+- **p26** — *"during deload weeks, you'll only be doing the reps listed. Don't go for max reps."*
+- **p28** — the training max rises **5 lb upper / 10 lb lower per cycle**, so the all-out set's WEIGHT
+  moves between cycles — which is exactly why a raw rep count cannot be the whole comparison.
+- **p32** — *"Weight x Reps x .0333 + Weight = Estimated 1RM"* … *"This formula is not necessarily an
+  accurate predictor of your 1RM, but it affords you a good general way to gauge your progress."*
+  ⚠️ **His own caveat.** It is the CROSS-WEIGHT comparator and nothing else.
+- **p66** — *"95%x1+ (all out set)"*.
+- **p100** — *"Do I go for max reps on each set or just the last set? **Just the last set of the day
+  for the big exercise.**"* and *"Do I go for max reps during my deload week? **No.**"*
+- **pp.123-129** — his own logbook carries a **Rep Records** box per lift per cycle.
+
+⚠️ **THREE CITATIONS IN THE SLICE CONTRACT WERE WRONG AND ARE CORRECTED HERE** (they were close, and
+two were attached to the right rule on the wrong page): the deload rule is **p24 + p26 + p100**, not
+p24/p99 (p99 is the chains/bands FAQ, which does carry the formula again); the *"keep track of the
+weight and the reps on the last set"* line attributed to p26 is not on p26 — p26's actual load-bearing
+sentence is the 10+ reps one; and p28 is the **TM increment table**, not *"always trying to hit more
+reps."* Every rule shipped is sourced to a page whose text is quoted above.
+
+**The decision.** The progress direction is read the way the athlete's **protocol declares** it reads
+effort — `protocolEffortRead(profile)` (`strength-profiles.ts:489`), which already returns
+`'rir' | 'amrap' | 'none'` and already says `strength_primary → 'amrap'`. Nothing is hardcoded to
+"AMRAP" and no new capture was built.
+
+**The gauge = the all-out set's p32 estimate, trended.** At a FIXED weight that estimate is a strictly
+increasing function of reps, so it **is** the rep record (p10) exactly; when the weight steps up
+between cycles (p28) it is Wendler's own comparator doing the bridging (p32). One value, both cases,
+**zero thresholds invented**. It runs through `classifyTrend` — the same shared primitive every other
+discipline uses (Law 5: no second classifier).
+
+**Scope — who moves.** Only a **waved main lift** on an `'amrap'` block:
+`capabilitiesForExercise(canonical).coached`, true on exactly the `barbell_main` row (D-373) — the
+main-lift slots and their variants. That is p100's *"the big exercise."* **Assistance lifts keep the
+e1RM read** (they are not waved off a training max and carry no all-out set), and every `'rir'` /
+`'none'` protocol is byte-identical — pinned by a fixture that compares verdict, pctChange AND gauge
+against the no-options call.
+
+**Three numbers, each derived not chosen.**
+1. **Window 84 days** (vs 42 for e1RM). An all-out set is a per-CYCLE measurement — this app
+   prescribes it on the anchor cycle's third working set only (`wendler-531.ts:64`) — so a 6-week
+   window can hold as few as three and a leader cycle holds none. 84d spans a leader+anchor pair, the
+   same span `REP_RECORD_WINDOW_SESSIONS = 40` was widened to for the same reason.
+2. **minSessions 3**, explicitly, instead of `resolveThresholds`' cadence scaling (which climbs to 5
+   for a 4x/week lifter). That scaling is right for a per-session series and wrong here: no training
+   frequency produces more than ~one all-out set per lift per week, so a floor of 5 would silence the
+   gauge for the athletes training hardest. 3 is the shared primitive's own lower clamp.
+3. **Freshness 56 days** = two four-week cycles (p26/p28). ⚠️ **This one is not cosmetic and the
+   fixture caught it:** `resolveThresholds` scales freshness to SESSION cadence — **7 days** for a
+   3x/week lifter — so an all-out set performed 8 days ago decayed to `needs_data` and the row went
+   blank. The gauge was dead on arrival until this was matched to the measurement's own cadence.
+
+**⛔ NO FALL-BACK TO e1RM WHEN THE ALL-OUT SERIES IS THIN, AND THAT IS THE POINT.** On a leader cycle
+(no all-out set prescribed at all) the only thing left to trend is the waved working weight — i.e. the
+bug. A waved main lift with fewer than 3 in-window all-out sets reads **`needs_data`** carrying
+`directionBasis: "all-out set — N in 12 weeks, needs 3"`. The e1RM number itself still renders as a
+per-session receipt; only the arrow goes quiet. **This is a visible product consequence: an athlete
+mid-leader-cycle sees no strength arrow until their next anchor.** Honest beats confident (Law 2).
+
+**What shipped.**
+1. `allOutSeriesByLift()` in `_shared/strength/all-out-set.ts` — every all-out set per lift, oldest
+   first. `lastAllOutByLift` is now **derived from it**, so the "current reading" and the "direction"
+   cannot disagree about whether a set was a rep record. Same walk, same history.
+2. `computeStrengthState(series, asOf, spw, opts)` — new optional `{ allOutByLift, effortRead,
+   phaseByDate }`. Omitted ⇒ byte-identical pre-slice behaviour (the D-265/D-318 fail-safe pattern).
+3. Per-lift `directionGauge` (`'amrap' | 'e1rm'`) + `directionBasis` on `StrengthPerLift`, serialized
+   to `state_trends_v1` — a surface can now say what it is reading instead of implying every lift is
+   judged the same way (Law 3). **Nothing renders them yet; the fields ride the payload.**
+4. `compute-snapshot` builds the all-out series from the **same 40-session capture the coach already
+   runs** (workouts + their planned rows, for the `set_plan[].amrap` fallback) and resolves the block's
+   gauge via `resolveProtocolId` (now exported from `block-identity.ts` — one rule, one place) →
+   `resolveProfile` → `protocolEffortRead`.
+5. `COACH_PAYLOAD_VERSION` 166 → **167**. ⚠️ The coach only FORWARDS the spine's direction, so this
+   change **requires a compute-snapshot recompute** to be visible.
+
+**Why the all-out WEIGHT comes from the logged set, not `strength_facts`.** D-338 records
+`amrap_reps` but not the all-out set's own weight; `best_weight` is the session's heaviest set, which
+is a *different set* the moment a heavy single follows the AMRAP (the trap `all-out-set.ts` documents
+in full). A rep record is "reps AT a weight", so the weight has to be exact.
+
+**The fixtures — `_shared/state-trend/strength-gauge.test.ts`, 14 tests.**
+Fixture A (the bug case, **permanent**) with a **non-vacuity proof** that the same working-set series
+still reads `sliding` on the old gauge; real progress at the same weight (p10's own 225x6 → 225x9) and
+at a heavier weight (p28 step); a real decline still firing; the byte-identical `'rir'`/`'none'`
+comparison; assistance-lift scope; the deload exclusion; the trusted-rep cap NOT applying to a long
+all-out set; and three capture tests including "the all-out set is found by its flag, never by
+`best_weight`". Deterministic — no LLM path, so the ≥3-recompute rule does not apply.
+
+**Not touched:** `mintOverloadVerdict` (D-418 — strength is already out of the overload alarm, which
+is what made this a display-accuracy fix with a low blast radius), the e1RM formula and its reserve
+gate, the D-417 trusted-rep gate itself, and the goal glance lane.

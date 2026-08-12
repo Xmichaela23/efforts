@@ -262,6 +262,14 @@ export interface StateTrendInputs {
   /** D-338: the days an all-out set was actually performed (`strength_facts.measured`). The one
    *  distinction the series has never had — a test week vs an ordinary Tuesday. */
   measuredDates?: string[] | null;
+  /** Slice 2: EVERY all-out set per canonical lift, oldest first (`allOutSeriesByLift`,
+   *  `_shared/strength/all-out-set.ts`). The substrate for the 5/3/1 progress direction — the rep
+   *  record, not the waved working weight. Absent → every lift keeps the e1RM gauge. */
+  allOutByLift?: Record<string, Array<{ date: string; weight: number; reps: number; estimated_1rm: number }>> | null;
+  /** Slice 2: what the athlete's strength block declares it READS (`protocolEffortRead` off the
+   *  plan's protocol). 'amrap' switches waved main lifts onto the all-out gauge; 'rir' / 'none' /
+   *  absent keep today's behaviour exactly. */
+  strengthEffortRead?: import('../strength-profiles.ts').EffortReadMode | null;
   /** Active auto/manual fitness baselines (fitness_baselines table), keyed by discipline (run/bike/swim).
    *  Presence → ANCHORED mode + the tick. Absent → the discipline falls to trend_only / facts_only. */
   fitnessBaselines?: Record<string, ActiveFitnessBaseline> | null;
@@ -558,7 +566,14 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     phaseByDate: inp.phaseByDate,
     measuredDates: inp.measuredDates,
   });
-  const strength = computeStrengthState(liftSeries, asOf, spw.strength);
+  // Slice 2: the protocol's own gauge. For a 5/3/1 block (`readsEffortAs: 'amrap'`) a waved main
+  // lift's direction reads the ALL-OUT SET, not the working-set e1RM the program itself waves.
+  // Absent inputs ⇒ 'e1rm' everywhere ⇒ byte-identical pre-slice behaviour.
+  const strength = computeStrengthState(liftSeries, asOf, spw.strength, {
+    allOutByLift: inp.allOutByLift,
+    effortRead: inp.strengthEffortRead,
+    phaseByDate: inp.phaseByDate,
+  });
   const strengthVolTrend = computeStrengthVolumeState(strengthVolumeToSeries(inp.strengthVolumeRows, inp.phaseByDate), asOf, spw.strength);
   // Per-lift direction the aggregate rolls up FROM — persisted so the coach reads one direction (D-270).
   // points are sorted ascending by date (liftSeriesFromExerciseLog), so the last point is the latest e1RM.
@@ -588,6 +603,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     displayName: l.displayName,
     isPrimary: l.isPrimary,
     direction: l.trend.verdict,
+    directionGauge: l.gauge ?? 'e1rm',
+    directionBasis: l.gaugeBasis,
     pctChange: l.trend.pctChange,
     latestE1rm: liftLatest.get(l.canonical) ?? null,
     bestE1rm: liftBest.get(l.canonical) ?? null,

@@ -223,7 +223,10 @@ export type BlockIdentityInput = {
 // ---------------------------------------------------------------------------
 
 /** The plan's own statement of which protocol it is on. */
-function resolveProtocolId(config: any): string | null {
+/** ⛔ EXPORTED for Slice 2 (2026-08-12): the spine needs the block's protocol to know which gauge it
+ *  declares (`protocolEffortRead`), and this is the ONE place that rule lives. Exporting it beats a
+ *  second copy of the `strength_protocol` / `config.source` precedence in compute-snapshot. */
+export function resolveProtocolId(config: any): string | null {
   const stamped = String(config?.strength_protocol ?? '').trim();
   if (stamped && stamped !== 'none') return stamped;
   // A strength-primary plan is not produced by the run/tri protocol selector, so it never writes
