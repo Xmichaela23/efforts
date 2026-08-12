@@ -28,6 +28,7 @@ import {
   assembleStateTrends,
   toStateTrendsV1,
   buildStrengthBaselines,
+  buildAllTimeBestByLift,
   deriveProvisionalBaselines,
   reconcileBaseline,
   disciplineOf,
@@ -858,18 +859,19 @@ serve(async (req: Request) => {
 
         // REAL PR frame (2026-07-21) — the best estimated 1RM across ALL logged history per lift, NOT
         // the 6wk window. A PR must be a genuine new all-time high (a new 1RM), not "best of 6 weeks".
-        // One extra lightweight query (2 cols, all history); reduced to a per-lift {best,count} in code.
-        const allTimeBestByLift: Record<string, { best: number; count: number }> = {};
+        //
+        // ⛔ `best_reps` IS IN THIS SELECT BECAUSE THE RECORD IS TRUST-GATED (D-417, applied 2026-08-12).
+        // It was not, and the reduce lived inline here — so the record could not apply the ceiling the
+        // SERIES twenty lines above already applies, and the screen showed a deadlift "best" of 225 lb
+        // (a 105 × 35 set) above its own 120-150 trusted range. The reduce now lives next to the series
+        // builder (`buildAllTimeBestByLift`, state-trend/assemble.ts) so the two reads of this table
+        // share one visible gate instead of drifting apart again.
+        let allTimeBestByLift: Record<string, { best: number; count: number }> = {};
         try {
           const { data: allHist } = await supabase.from("exercise_log")
-            .select("canonical_name,estimated_1rm")
+            .select("canonical_name,estimated_1rm,best_reps")
             .eq("user_id", userId).not("estimated_1rm", "is", null);
-          for (const e of (allHist ?? []) as any[]) {
-            const k = e.canonical_name; const v = Number(e.estimated_1rm);
-            if (!k || !Number.isFinite(v) || v <= 0) continue;
-            const cur = allTimeBestByLift[k];
-            allTimeBestByLift[k] = cur ? { best: Math.max(cur.best, v), count: cur.count + 1 } : { best: v, count: 1 };
-          }
+          allTimeBestByLift = buildAllTimeBestByLift((allHist ?? []) as any[]);
         } catch (e: any) { console.warn('[compute-snapshot] all-time-best e1RM query failed (non-fatal):', e?.message ?? e); }
 
         const strengthVolumeRows = (strengthVolR.data ?? []).map((f: any) => ({ date: f.date, total_volume_lbs: f.strength_facts?.total_volume_lbs ?? null }));

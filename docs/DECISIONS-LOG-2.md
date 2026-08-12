@@ -1897,6 +1897,28 @@ SELECTION is still pinned; only its direction assertions moved).
 `COACH_PAYLOAD_VERSION` 167 → **168**. ⚠️ The coach forwards the spine's per-lift block, so this needs a
 **compute-snapshot recompute** to be visible.
 
+### ➕ FOLLOW-ON, same day (slice 3b): the RECORD obeys the trusted-rep ceiling
+
+Pillar 1 shipped reading an **ungated** number. The "best NNN lb" this entry put on the strength row is
+`allTimeBestE1rm`, and that was built by a separate inline reduce in `compute-snapshot` whose query
+selected `canonical_name, estimated_1rm` and **no `best_reps`** — so it could not apply D-417's ceiling,
+which the *series* twenty lines above has applied since D-417. On screen: deadlift best **225** (the
+105 × 35 set — the exact number D-417 was written to kill), above the 120-150 trusted range printed
+beside it. Squat 125 vs 100, bench 170, overhead 110 — every "best" above its own range, which is the tell.
+
+**Fixed by moving the reduce next to the series builder** (`buildAllTimeBestByLift`,
+`state-trend/assemble.ts`) and adding `best_reps` to the query, so the two reads of `exercise_log` share
+one visible gate (`estimateIsTrusted` — not re-derived). Unknown reps **fail open**, exactly as the series
+does, so both read the same population. `count` is gated too — it is the confidence gate behind `isPr`,
+and a record shouldn't be backed by history that can never produce a max; **consequence: a lift with
+fewer than 3 trusted readings loses its PR badge**, which is the honest read.
+
+**Untouched:** the rep-PR path (105 × 35 is still a rep PR — its correct home), the series gate, the
+formula, and the record's all-time (not 6-week) scope. Fixtures: 6 added to
+`state-trend/strength-trust-gate.test.ts`, including "Michael's deadlift best is 140, not 225" and the
+invariant the screen violated — **the record can never exceed the top of the gated series**.
+`COACH_PAYLOAD_VERSION` 168 → **169** (record values move; still needs a compute-snapshot recompute).
+
 **Grounding + evidence:** `docs/SCIENCE-strength-e1rm-trust.md` §6 (with sources); Wendler 5/3/1 2nd ed.
 p10 (rep records) + p32 ("Comparing Rep Maxes", the estimate is "best used for motivation"); Strong /
 Hevy performance-tracking docs. Not tuned to Michael — the record+PR+chart method and the whole-cycle

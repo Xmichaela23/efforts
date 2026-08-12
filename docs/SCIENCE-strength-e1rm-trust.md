@@ -78,7 +78,17 @@ record. That is exactly what we did.
 | **The trend/summary/sparkline** | The per-lift e1RM *series* excludes sets past the ceiling, so records, the top number and the graph read only real low-rep strength. | `liftSeriesFromExerciseLog` gate in `state-trend/assemble.ts`; reps fed from `compute-snapshot`. |
 | **The "best" tag** | Marks the strongest *trusted* set; a high-rep set can't win it. No trusted set → no "best". | `StateTab.tsx` dropdown. |
 | **The per-set estimate in the history** | Shown only on trusted sets; a high-rep row shows just the set (`80 lb × 17`), no e1RM. | `StateTab.tsx` dropdown. |
-| **Rep records stay** | A high-rep set still surfaces as a "Rep PR" — the honest record for that effort. | `strength-row-text.ts` (`composeAllOutRowText`). |
+| **Rep records stay** | A high-rep set still surfaces as a "Rep PR" — the honest record for that effort. | `strength-row-text.ts` (`composeAllOutRowText`); on State via `per_lift[].lastAllOut` (D-420). |
+| **The all-time e1RM RECORD** *(added 2026-08-12)* | The "best NNN lb" on the strength row reads trusted sets only — the same ceiling as the series. | `buildAllTimeBestByLift` in `state-trend/assemble.ts`, beside the series builder. |
+
+⚠️ **THE RECORD WAS MISSED IN THE ORIGINAL PASS AND SHIPPED UNGATED FOR A DAY.** §4 gated the series; the
+**all-time best** was built by a separate inline reduce in `compute-snapshot` whose query selected
+`canonical_name, estimated_1rm` and **no `best_reps`** — so it structurally could not apply this rule. When
+D-420 put a "best NNN lb" on the strength row, it rendered the ungated number: Michael's deadlift read
+**225** (the 105 × 35 set — the exact number this document was written about), sitting above the 120-150
+trusted range printed beside it. Every lift's "best" was above its own range; that mismatch is the tell.
+**The lesson worth keeping: a rule applied to one read of a table and not the other will rot at the seam.**
+The two builders now sit side by side in one file for exactly that reason.
 
 **Result, verified end-to-end** (called the live server, 2026-08-11):
 

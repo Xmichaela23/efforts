@@ -17,7 +17,7 @@ import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 // emitted series and the drawn sparkline cannot disagree about which four. Path precedent:
 // `_shared/response-model/weekly.ts` imports `src/lib/` the same way (bundled at deploy time).
 import { isTrackedMaxLift } from '../../../../src/lib/tracked-max-lifts.ts';
-import { trustedMaxReps } from '../../../../src/lib/estimate-1rm.ts';
+import { trustedMaxReps, estimateIsTrusted } from '../../../../src/lib/estimate-1rm.ts';
 import { CROWN_MIN_DECOUPLING } from './baseline-derive.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
@@ -185,6 +185,48 @@ export interface LiftSeriesContext {
   phaseByDate?: Record<string, string> | null;
   measuredDates?: string[] | null;
 }
+/**
+ * ⛔ THE ALL-TIME e1RM RECORD — per lift, TRUSTED SETS ONLY (D-417, applied here 2026-08-12).
+ *
+ * ⚠️ WHY THIS LIVES BESIDE `liftSeriesFromExerciseLog` AND NOT IN THE CALLER. These are the two reads
+ * of `exercise_log` that produce a strength NUMBER, and they must gate identically. They did not: D-417
+ * gated the SERIES and left the RECORD ungated, in an inline reduce inside `compute-snapshot` whose
+ * query did not even select `best_reps` — so it structurally could not apply the rule. The result was on
+ * screen: Michael's deadlift "best" read **225**, the 105 lb × 35 set — the exact number D-417 was
+ * written to kill — sitting above the 120-150 trusted range printed beside it. Side by side, the shared
+ * gate is visible; split across files, one of them silently rotted.
+ *
+ * THE RULE, unchanged and NOT re-derived: a set's estimate is a strength reading only at or under the
+ * lift's rep ceiling (`estimateIsTrusted` — deadlift 5, else 8; provenance in `estimate-1rm.ts`).
+ *
+ * ⚠️ UNKNOWN REPS FAIL OPEN, exactly as the series does — an older row written before `best_reps` was
+ * threaded is KEPT rather than blanking a real record. The two reads therefore see the same population.
+ *
+ * ⚠️ `count` IS GATED TOO, and that is deliberate. It is the confidence gate on the PR claim
+ * (`isPr` needs ≥3 all-history readings behind the best); counting sets that can never produce a max
+ * would let a lift with twenty rep-out sets and one real set claim a record on "history" it doesn't
+ * have. Consequence, stated: a lift whose trusted history is thinner than 3 loses its PR badge — which
+ * is the honest read, not a regression.
+ *
+ * ⛔ THE HIGH-REP SET IS NOT DISCARDED — it is a REP PR (`lastAllOut` / `isRepRecord`, D-420 pillar 2),
+ * which is its correct home. Only the e1RM record stops reading it.
+ */
+export function buildAllTimeBestByLift(
+  rows: Array<{ canonical_name?: string | null; estimated_1rm?: number | null; best_reps?: number | null }>,
+): Record<string, { best: number; count: number }> {
+  const out: Record<string, { best: number; count: number }> = {};
+  for (const e of Array.isArray(rows) ? rows : []) {
+    const k = e?.canonical_name;
+    const v = Number(e?.estimated_1rm);
+    if (!k || !Number.isFinite(v) || v <= 0) continue;
+    // Fail-open on unknown reps (mirrors the series gate at `liftSeriesFromExerciseLog`).
+    if (e.best_reps != null && !estimateIsTrusted(k, e.best_reps)) continue;
+    const cur = out[k];
+    out[k] = cur ? { best: Math.max(cur.best, v), count: cur.count + 1 } : { best: v, count: 1 };
+  }
+  return out;
+}
+
 export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSeriesContext): LiftSeries[] {
   const byCanonical = new Map<string, ExerciseLogLite[]>();
   for (const e of rows) {
