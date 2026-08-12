@@ -3,6 +3,22 @@
 **Status:** DECISION (approved to write 2026-07-09; engine changes gated on review of this doc).
 **Extends:** D-259 (swap-recognition), D-260 (THE LAW — reconciler is sole verdict authority), D-264 (single source). **Does not supersede.**
 
+> ## ⛔ AMENDMENT 3 / "FIX 1" — THE e1RM-DECLINING VETO — WAS DELETED ON 2026-08-12 ([D-420])
+>
+> **Everything this document says about a veto is HISTORY.** `computePrimaryAdherence` no longer takes
+> any strength signal into `met`: `met = sessionsMet`, full stop. The affected passages are §"the veto
+> source", the `e1rmVeto` line in the code sketch (§7), the worked examples' "e1RM not declining" clause,
+> and the "**Veto (§8)**" fixture — that fixture is replaced by one asserting the opposite (no value of
+> `e1rmDirection`, including `'declining'`, can veto a session-met athlete).
+>
+> **Why:** Strong and Hevy have no "you're declining" adherence gate — adherence is whether you did the
+> work — and [D-420] retired the weekly strength direction verdict, so nothing can produce the input.
+> Deleted rather than left dormant so a restored direction upstream cannot silently re-enable it.
+>
+> **EVERYTHING ELSE HERE IS STILL BINDING:** plan-primary resolution, the WTD-prorated session count,
+> the tolerance, and the §5 INVARIANT (`met === true` ⟹ a raw 'under' never survives).
+> `e1rmDirection` survives as a parameter but is now DESCRIPTIVE ONLY — it appends a clause to `note`.
+
 ---
 
 ## 1. Problem (grounded in the primary user's REAL data, sourced 2026-07-09)

@@ -55,54 +55,59 @@ Deno.test('per_lift carries allTimeBestE1rm/allTimeCount; PR = latest is a new a
   assertEquals(bp3.allTimeCount, 0);
 });
 
-Deno.test('D-270: per_lift carries each lift direction + latest e1RM, keyed by canonical', () => {
+// ⛔ REWRITTEN FOR [D-420] (2026-08-12). The three tests that stood here pinned D-270's per-lift
+// DIRECTION and the aggregate it rolled up to ("improving bench survives", "aggregate agrees").
+// D-420 retires that verdict entirely — no commercial app computes a weekly strength direction, and on
+// a 5/3/1 wave it reads the program's own light week as a decline (SCIENCE §6). What D-270 got RIGHT
+// survives and is what these now pin: the spine owns the per-lift facts, the list keeps its
+// granularity, and every arm reads that one list instead of re-deriving anything.
+//
+// ⚠️ THE INPUT SERIES ARE UNCHANGED ON PURPOSE — a clearly-rising bench and a clearly-falling squat.
+// If a direction verdict is ever re-introduced, these are the two lifts that would light up first.
+Deno.test('⛔ D-420: a clearly rising and a clearly falling lift BOTH state no direction', () => {
   const rows = [
     ...lift('bench_press', 'Bench Press', [200, 208, 216, 224, 232, 240, 248, 256, 264]), // clearly rising
     ...lift('squat', 'Squat', [320, 312, 304, 296, 288, 280, 272, 264, 256]),            // clearly falling
   ];
   const v1 = toStateTrendsV1(assembleStateTrends(inputs(rows)), AS_OF);
-
   const byLift = new Map(v1.strength.per_lift.map((l) => [l.canonical, l]));
-  const bench = byLift.get('bench_press')!;
-  const squat = byLift.get('squat')!;
 
-  assert(bench, 'bench present in per_lift');
-  assertEquals(bench.direction, 'improving');
-  assertEquals(bench.latestE1rm, 264); // last point
-  assertEquals(bench.isPrimary, true);
-
-  assertEquals(squat.direction, 'sliding');
-  assertEquals(squat.latestE1rm, 256);
+  for (const canon of ['bench_press', 'squat']) {
+    const l = byLift.get(canon)!;
+    assert(l, `${canon} present in per_lift`);
+    assertEquals(l.direction, 'needs_data');
+    assertEquals(l.pctChange, null);
+  }
+  // The aggregate is a no-claim too, and it carries no magnitude to render ("sliding −8.2%").
+  assertEquals(v1.strength.e1rm?.verdict ?? 'needs_data', 'needs_data');
+  assertEquals(v1.strength.e1rm?.pctChange ?? null, null);
 });
 
-Deno.test('D-270: per_lift retains granularity the aggregate rolls away (the fracture-#1 loss)', () => {
-  // bench improving + squat sliding → aggregate rollUp = "holding" (conflicting mix → conservative).
-  // Before D-270 the improving bench was INVISIBLE downstream; now it survives on the spine.
+Deno.test('D-270 SURVIVES: per_lift keeps the granularity the aggregate used to roll away', () => {
   const rows = [
     ...lift('bench_press', 'Bench Press', [200, 208, 216, 224, 232, 240, 248, 256, 264]),
     ...lift('squat', 'Squat', [320, 312, 304, 296, 288, 280, 272, 264, 256]),
   ];
   const v1 = toStateTrendsV1(assembleStateTrends(inputs(rows)), AS_OF);
+  const byLift = new Map(v1.strength.per_lift.map((l) => [l.canonical, l]));
 
-  // aggregate hides the split...
-  assertEquals(v1.strength.e1rm?.verdict, 'holding');
-  // ...but per_lift keeps both directions legible — this is what the coach now reads.
-  const dirs = new Set(v1.strength.per_lift.map((l) => l.direction));
-  assert(dirs.has('improving'), 'improving bench survives the aggregate');
-  assert(dirs.has('sliding'), 'sliding squat survives the aggregate');
+  // What the row actually shows now: the reading, the record, the receipts — per lift, not collapsed.
+  assertEquals(byLift.get('bench_press')!.latestE1rm, 264);
+  assertEquals(byLift.get('bench_press')!.isPrimary, true);
+  assertEquals(byLift.get('squat')!.latestE1rm, 256);
+  assert(byLift.get('bench_press')!.sampleCount > 0, 'sample count is a receipt and survives');
 });
 
-Deno.test('D-270: per_lift primaries roll up to the SAME aggregate (one substrate, no divergence)', () => {
-  // both primaries improving → aggregate must also be improving. The per_lift list and the aggregate
-  // cannot disagree because they are the same computation (rollUp of these very lifts).
+Deno.test('⛔ D-420: the emitted strength contract contains no direction WORD at all', () => {
+  // The whole-subtree assertion — the one that catches a direction leaking back in through a field
+  // nobody thought to check. Michael's own case is the fixture in `strength-progress-record.test.ts`.
   const rows = [
     ...lift('bench_press', 'Bench Press', [200, 208, 216, 224, 232, 240, 248, 256, 264]),
-    ...lift('deadlift', 'Deadlift', [300, 312, 324, 336, 348, 360, 372, 384, 396]),
+    ...lift('squat', 'Squat', [320, 312, 304, 296, 288, 280, 272, 264, 256]),
   ];
   const v1 = toStateTrendsV1(assembleStateTrends(inputs(rows)), AS_OF);
-
-  const primaries = v1.strength.per_lift.filter((l) => l.isPrimary && l.direction !== 'needs_data');
-  assert(primaries.length >= 2, 'both primaries have a verdict');
-  assert(primaries.every((l) => l.direction === 'improving'), 'both primaries improving');
-  assertEquals(v1.strength.e1rm?.verdict, 'improving'); // aggregate agrees — single substrate
+  const json = JSON.stringify(v1.strength);
+  for (const word of ['improving', 'sliding', 'trending', 'holding']) {
+    assertEquals(json.includes(word), false, `strength contract must not contain "${word}": ${json.slice(0, 400)}`);
+  }
 });

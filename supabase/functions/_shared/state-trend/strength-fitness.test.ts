@@ -21,22 +21,37 @@ const squat = (values: number[]): LiftSeries[] => {
   return [{ canonical: 'squat', displayName: 'Back Squat', points: values.map((v, i) => ({ date: use[i], value: v })) }];
 };
 
-Deno.test('e1RM guard: a slide SMALLER than the scatter reads holding (not sliding)', () => {
-  // endpoints avg 200 → 195 (−2.5%, past the −2.0 slide band) but SD ≈ 7.4 > the 5-unit shift.
-  const s = computeStrengthState(squat([202, 198, 210, 188, 200, 190]), AS_OF, 1.2);
-  assertEquals(s.overall, 'holding');
+// ⛔ REWRITTEN FOR [D-420] (2026-08-12). These three pinned the e1RM NOISE GUARD through the strength
+// direction verdict — "a −2.5% slide on 4% scatter must read holding". **That verdict no longer
+// exists**, so there is no strength-shaped assertion left to make about it. Two things keep this from
+// being a coverage loss: the guard itself is still pinned generically in
+// `classify-noise-guard.test.ts` (it is a property of `classifyTrend`, not of strength), and what
+// these inputs must now produce — NO direction, in any shape — is asserted here instead. Keeping the
+// same three input series on purpose: if the retirement is ever undone, these fire first.
+const NO_DIRECTION_INPUTS: number[][] = [
+  [202, 198, 210, 188, 200, 190], // was "holding" (slide buried in scatter)
+  [212, 208, 196, 194],           // was "sliding" (clean slide)
+  [188, 192, 206, 210],           // was "improving" (clean gain)
+];
+
+Deno.test('⛔ D-420: no strength input produces a direction verdict — rising, falling or flat', () => {
+  for (const values of NO_DIRECTION_INPUTS) {
+    const s = computeStrengthState(squat(values), AS_OF, 1.2);
+    assertEquals(s.overall, 'needs_data');
+    assertEquals(s.overallPctChange, null);
+    assertEquals(s.lifts[0].trend.verdict, 'needs_data');
+    assertEquals(s.lifts[0].trend.pctChange, null);
+  }
 });
 
-Deno.test('e1RM guard: a clean slide BIGGER than the scatter stays sliding', () => {
-  // endpoints 210 → 195 (−7.1%), low scatter (SD ≈ 7.7 < the 15-unit shift) → real, keep it.
+Deno.test('D-420: the RECEIPTS survive the retirement — the row still knows what it read', () => {
+  // Sample count, recency and the points themselves are facts and are still published; only the
+  // judgement is gone. The record + rep PRs + chart are built from exactly these.
   const s = computeStrengthState(squat([212, 208, 196, 194]), AS_OF, 1.2);
-  assertEquals(s.overall, 'sliding');
-});
-
-Deno.test('e1RM guard: a clean improvement BIGGER than the scatter stays improving', () => {
-  // endpoints 190 → 208 (+9.5%), scatter well under the shift → genuine gain, unguarded.
-  const s = computeStrengthState(squat([188, 192, 206, 210]), AS_OF, 1.2);
-  assertEquals(s.overall, 'improving');
+  const t = s.lifts[0].trend;
+  assertEquals(t.sampleCount, 4);
+  assert(t.newestAgeDays != null);
+  assertEquals(t.points.length, 4);
 });
 
 Deno.test('strengthVolumeToSeries: drops zero/invalid volume', () => {

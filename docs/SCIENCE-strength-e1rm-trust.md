@@ -133,9 +133,12 @@ range (§2) — so their estimate slides across the wave too.
 If a direction word is ever stated, it may only be computed over a window that **spans whole cycles**
 (≥2 waves), so the wave sits inside the window instead of splitting it.
 
-**Pending build:** retire the weekly direction verdict from the strength row; keep e1RM record + rep PRs
-+ the chart. This reverses the *direction* half of D-419 — the protocol-declared gauge infrastructure
-(`readsEffortAs`) stays; the weekly *verdict* it fed goes.
+**BUILT 2026-08-12** (D-420, slice 3): the weekly direction verdict is retired at the spine source
+(`computeStrengthState` — per-lift `direction` and the aggregate are both no-claims, `perfByDisc.strength`
+is null) and at the weekly headline (`computeStrength` — it states the record). The record, rep PRs
+(`per_lift[].lastAllOut`) and the chart all render. The protocol-declared gauge infrastructure
+(`readsEffortAs`, the all-out capture) stays and now feeds those three instead of a verdict.
+Fixtures: `_shared/state-trend/strength-progress-record.test.ts`.
 
 ---
 

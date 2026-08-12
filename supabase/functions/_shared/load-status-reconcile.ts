@@ -66,8 +66,9 @@ export interface BodyTrends {
 export interface DecliningSignalOpts {
   /** The plan's primary discipline. For a strength-primary plan, declining RIR is the training
    *  INTENT (pushing closer to failure across a build), NOT strain — so it stops counting as a
-   *  declining body signal. The genuine strength-strain signal (e1RM declining) still flows through
-   *  computePrimaryAdherence, exactly as computePrimaryAdherence's Fix 1 already reasons. */
+   *  declining body signal. ⚠️ The onward claim that "the genuine strength-strain signal (e1RM
+   *  declining) still flows through computePrimaryAdherence" is DEAD as of D-420: that veto is
+   *  deleted, and no weekly strength direction is computed at all. Strength reaches no verdict. */
   planPrimary?: PlanPrimary;
   /** The absorption engine's steady-aerobic gate (absorption.signals.drift.available). When there is
    *  no valid steady session to read HR drift from, the absorption engine excludes drift ("no steady
@@ -283,8 +284,9 @@ export function computePrimaryAdherence(args: {
   planPrimary: PlanPrimary;
   strengthSessionsCompleted: number;
   strengthFrequency: number;
-  /** Fix 1: e1RM-derived strength-progression direction (weeklyResponseModel.strength.overall.trend),
-   *  NOT the RIR-direction trend. Only 'declining' vetoes; null/'insufficient_data'/'gaining'/'maintaining' → no veto. */
+  /** e1RM-derived strength-progression direction (`weeklyResponseModel.strength.overall.trend`).
+   *  ⛔ DESCRIPTIVE ONLY since [D-420] — it appends a clause to `note` and DECIDES NOTHING. See the
+   *  deletion notice on the veto below. Null / unrecognised → no clause. */
   e1rmDirection: string | null;
   dayIndex: number;
 }): PrimaryAdherence | null {
@@ -292,9 +294,27 @@ export function computePrimaryAdherence(args: {
   const elapsedFrac = Math.min(1, (args.dayIndex + 1) / 7);
   const expectedByNow = args.strengthFrequency * elapsedFrac;
   const sessionsMet = args.strengthSessionsCompleted >= expectedByNow - STRENGTH_ADHERENCE_TOLERANCE;
-  // Fix 1: veto ONLY on a GENUINE strength decline (e1RM direction) — never the RIR-direction trend,
-  // which reads 'declining' when RIR drops (pushing harder in a Base/Power phase) and wrongly vetoed.
-  const met = sessionsMet && args.e1rmDirection !== 'declining';
+  // ⛔ THE D-267 "FIX 1" e1RM-DECLINING VETO IS DELETED (D-420, 2026-08-12). DO NOT REINSTATE IT.
+  //
+  // It read `met = sessionsMet && e1rmDirection !== 'declining'` — an athlete who did every prescribed
+  // strength session was still marked as not meeting their primary discipline if a weekly e1RM
+  // direction said "declining."
+  //
+  // TWO INDEPENDENT REASONS, either sufficient:
+  //   1. **THE FIELD DOESN'T DO THIS.** Strong and Hevy have no "you're declining" gate anywhere —
+  //      adherence is whether you did the work, and a max is tracked as a record beside it. Michael's
+  //      call, and it matches `docs/SCIENCE-strength-e1rm-trust.md` §3.
+  //   2. **NOTHING CAN PRODUCE THE INPUT.** D-420 retired the weekly strength direction verdict, so
+  //      `strength.overall.trend` is now always 'insufficient_data'. The branch was unreachable.
+  //
+  // ⚠️ DELETED, NOT LEFT DORMANT, AND THAT IS THE POINT. A dead gate that still reads a live field is
+  // how a retired verdict grows back: restore any direction upstream and this silently starts vetoing
+  // again, from a line nobody remembers is here.
+  //
+  // ⚠️ EVERYTHING ELSE IN D-267 SURVIVES UNCHANGED — the WTD-prorated session count, the tolerance, and
+  // the plan-primary INVARIANT it feeds (§5: `met === true` ⟹ a raw 'under' never survives). Only the
+  // strength-decline veto is gone, so `met` is now exactly "did you do the sessions".
+  const met = sessionsMet;
   const note = `strength ${args.strengthSessionsCompleted}/${args.strengthFrequency} sessions`
              + (args.e1rmDirection === 'gaining' ? ' · e1RM improving'
                 : args.e1rmDirection === 'declining' ? ' · e1RM declining'
@@ -580,8 +600,9 @@ export function reconcileLoadStatus(
         ? `${adh}; endurance load carried by cross-training (total ACWR ${acwrTxt})`
         : `${adh}; you have headroom to add endurance`);
     } else if (!totalGenuinelyLow) {
-      // strength behind plan OR e1RM declining, BUT total load maintained → attention, not a deficit;
-      // never 'under'. The note carries the reason (sessions shortfall or 'e1RM declining').
+      // strength behind plan, BUT total load maintained → attention, not a deficit; never 'under'.
+      // The note carries the reason (the sessions shortfall). ⚠️ "OR e1RM declining" was the other way
+      // in here until D-420 deleted that veto — `met` is now purely the session count.
       status = 'on_target';
       reasons.push(`${adh} — attention, not under-training (total load maintained)`);
     } else {

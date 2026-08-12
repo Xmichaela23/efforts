@@ -196,6 +196,19 @@ The "do some research" report (2026-07-09, adversarially fact-checked) overturne
 
 ### D-267 — The load verdict reads the plan's PRIMARY discipline, not hardcoded running (2026-07-09, `_shared/load-status-reconcile.ts` + `coach/index.ts`; full design + all amendments: `docs/DESIGN-D267-plan-primary-load-verdict.md`)
 
+> **⛔ "FIX 1" (the e1RM-declining VETO) WAS DELETED BY [D-420] (2026-08-12, `docs/DECISIONS-LOG-2.md`).**
+> That veto made `met = sessionsMet && e1rmDirection !== 'declining'`, so an athlete who completed every
+> prescribed strength session was still marked as not meeting their primary discipline when a weekly
+> e1RM direction read "declining". It is gone for two independent reasons: Strong and Hevy have no
+> "you're declining" adherence gate (adherence is whether you did the work), and D-420 retired the
+> weekly strength direction verdict entirely, so nothing can produce the input. **Deleted, not left
+> dormant** — a dead gate reading a live field is how a retired verdict grows back.
+>
+> ⚠️ **THE REST OF D-267 IS UNTOUCHED AND STILL BINDING** — the plan-primary resolution, the WTD-prorated
+> session count, the tolerance, and the §5 INVARIANT (`primaryAdherence.met === true` ⟹ a raw 'under'
+> never survives). All seven of this entry's fixtures pass unchanged. `met` is now precisely "did you do
+> the sessions". Everything below stands.
+
 **Root cause (live-verified on the primary user's real "Get stronger" plan):** the load verdict was hardcoded run-first — `body-response.ts:461` "Primary signal: run-only load vs run plan". A strength-primary athlete (`config.source === 'strength_primary'`) maintaining strength and swapping runs for rides/swims (total ACWR 1.3, `volume_state: above`) was told to **"build more"** because running fell below its sub-plan. The verdict never received, and never read, the plan's primary discipline. The mirror of D-259's false "back off": D-259 taught the engine "a swap isn't overload"; nothing taught it "a swap isn't under-training", and nothing told it running is not the primary.
 
 **Fix (reconciler stays sole authority — D-260; `body-response.ts` UNCHANGED, its run-only status is a raw input):** `resolvePlanPrimary(planConfig)` (from `config.source`/`plan_version` → strength/endurance/hybrid/unknown) + `computePrimaryAdherence` (WTD-prorated) thread `planPrimary` + `primaryAdherence` INTO the reconciler via `planPosition`. **INVARIANT (§5):** `planPrimary==='strength'` AND `primaryAdherence.met` ⟹ a raw `under` NEVER survives — covered (ACWR ≥ `ENDURANCE_COVERED_ACWR_MIN` 1.0) → `on_target` + cross-training evidence; uncovered → `on_target` + headroom evidence. `under` requires `met=false` AND ACWR < `UNDER_TOTAL_ACWR_MAX` 0.8. Endurance/hybrid/unknown: byte-identical current behavior. **Fix 1 (live-verified bug):** adherence `met` is SESSION-based; the veto is a genuine performance-decline signal — `e1rmDirection === 'declining'` (from `weeklyResponseModel.strength.overall.trend`, e1RM-derived) — NOT `bodyTrends.strength.trend` (RIR-direction, reads 'declining' when RIR drops / pushing harder, which wrongly vetoed a met athlete). Constants `STRENGTH_ADHERENCE_TOLERANCE=1`, `ENDURANCE_COVERED_ACWR_MIN=1.0`, `UNDER_TOTAL_ACWR_MAX=0.8` named in the reconciler. Shipped + live-confirmed (coach v290/v291): the primary user's Wk1 flips from "build more" to "balanced" with evidence "strength 3/4 sessions · e1RM steady; endurance load carried by cross-training (total ACWR 1.27)". 37 fixtures green. **Cache lesson:** a value-changing coach edit REQUIRES a `COACH_PAYLOAD_VERSION` bump or cached rows serve stale (learned when the first Fix-1 deploy didn't show).

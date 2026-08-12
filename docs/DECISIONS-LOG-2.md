@@ -1665,6 +1665,16 @@ to null ⇒ byte-identical pre-slice behavior. That is the same shape `corrobora
 
 ### D-419 — Strength progress reads the protocol's own gauge: 5/3/1 is the all-out set, not the waved working-set e1RM (2026-08-12, **PUSHED pending; fixtures green (14 new, 1650 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — closes the Slice-2 contract, extends [D-417] and [D-270]
 
+> **⛔ THE DIRECTION HALF OF THIS ENTRY IS REVERSED BY [D-420] (2026-08-12, built the same day).** The
+> substrate call below was right and still stands — a 5/3/1 lift's readings come from the all-out set,
+> not from working sets the program itself waves. The OBJECT was wrong: there should be no weekly
+> direction verdict at all. Michael's all-out sets run 20-35 reps, above the reliable estimate range
+> (D-417 §2), so their estimate slides across the wave too and the "sliding" survived this fix.
+> **WHAT SURVIVES:** `readsEffortAs`, `allOutSeriesByLift`, the gauge selection, the 84d/56d windows —
+> all of it, now feeding the RECORD, the REP PRs and the CHART instead of a verdict. **WHAT IS GONE:**
+> the improving/sliding/needs_data word this entry computed. Everything below stands as history and as
+> the still-valid substrate reasoning.
+
 > ⛔ **SUPERSEDED IN PART by [D-420] (2026-08-12, same day).** The DIRECTION half of this entry —
 > trending the all-out set to produce a weekly improving/sliding verdict — is retired. No commercial app
 > computes a weekly strength direction, and Michael's 20–35-rep all-out sets slide across the 5/3/1 wave,
@@ -1780,7 +1790,7 @@ all-out set; and three capture tests including "the all-out set is found by its 
 is what made this a display-accuracy fix with a low blast radius), the e1RM formula and its reserve
 gate, the D-417 trusted-rep gate itself, and the goal glance lane.
 
-### D-420 — Strength progress is a record + rep PRs + a chart, NOT a weekly direction verdict (2026-08-12, DECISION captured; build pending) — supersedes the *direction* half of [D-419], extends [D-417]
+### D-420 — Strength progress is a record + rep PRs + a chart, NOT a weekly direction verdict (2026-08-12, **BUILT — fixtures green (9 new, 1658 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — supersedes the *direction* half of [D-419], extends [D-417]
 
 **The realization.** Chasing "1 lift trending down" / "sliding −8.2%" to its root: the weekly per-lift
 DIRECTION verdict is a construct **no commercial app** (Strong, Hevy, Boostcamp) computes, and on a
@@ -1801,9 +1811,91 @@ Any *stated* direction word may only be computed over a window spanning **whole 
 the wave is inside the window, not split across it.
 
 **Reverses:** the direction half of [D-419]. The protocol-declared gauge infrastructure (`readsEffortAs`
-on the strength profile) survives; the weekly improving/sliding verdict it fed is retired. **Build
-pending** — until it lands, the strength row still shows D-419's live "sliding" on Michael's account
-(deployed 2026-08-12).
+on the strength profile, and slice 2's all-out capture) survives; the weekly improving/sliding verdict
+it fed is retired.
+
+---
+
+## ✅ BUILT (2026-08-12, slice 3). What landed, and every ripple.
+
+**Killed at the source, in two places** — because there were two independent minting sites, and leaving
+either would have let the verdict grow back:
+1. **The spine** — `computeStrengthState` (`_shared/state-trend/strength.ts`). A `retireDirection()`
+   helper strips the CLAIM off each computed trend and keeps every RECEIPT on it: per-lift `direction`
+   is always `'needs_data'`, `pctChange` always `null`, the aggregate is a no-claim. `sampleCount`,
+   `newestAgeDays`, the points, and the D-338 deload exclusion that shapes them all survive — they feed
+   the record, the rep PRs and the chart.
+2. **The weekly response model** — `computeStrength` (`_shared/response-model/weekly.ts`). The
+   "N lifts trending up/down" / "Strength stable" headline is gone; it now states the RECORD
+   (`Best estimated max NNN lb`). `overall.trend` is `'insufficient_data'`.
+
+**And the path that actually printed "sliding −8.2%":** `perfByDisc.strength` is now **null** — strength
+has no performance verdict at all — so `resolveDisciplineCard` gives the card no `headlineVerdict` and
+`synthesizeHeadline` has nothing to say about it. Adherence leads the strength card; the row itself
+renders the three pillars.
+
+**The dot is NOT the direction and it stays.** `strengthFitness.e1rm` used to be gated on the verdict
+existing, so retiring the verdict would have blanked the dot too. It is now emitted whenever there is a
+band: `{ verdict: 'needs_data', pctChange: null, range }`. A dot is a POSITION claim (current e1RM ÷
+your own baseline), which D-420 never questioned.
+
+**The three pillars, on screen.** Pillars 1 and 3 already rendered. Pillar 2 did not — rep PRs existed
+only on the Performance screen's all-out card. The spine now carries `per_lift[].lastAllOut`
+(`{date, weight, reps, isRepRecord, priorBestRepsAtWeight}`), built from **slice 2's `allOutSeriesByLift`
+walk** — the same walk that card uses, so the two screens cannot disagree about whether a set was a
+record. `StrengthFitnessRow` renders `all-out 115 lb × 20` + a `rep PR` badge, and shows `best NNN lb`
+when the record is above the latest reading.
+
+⛔ **This is the ONLY home for a long all-out set.** 105 lb × 35 can never mint an e1RM — D-417's
+trusted-rep ceiling refuses it, correctly — and it is unambiguously a rep record. Before this, that
+measurement had nowhere to land on State.
+
+**RIPPLES — stated, not discovered later.** All three are consequences of removing the verdict, and all
+three are correct under D-418/D-420, but none is a no-op:
+- **Strength drops out of `computeAssessment`'s available-signal count** (`overall.trend` is now
+  `'insufficient_data'`). An athlete with exactly one endurance signal + strength used to reach the
+  two-signal floor and now does not, so their weekly assessment reads "not enough data" instead.
+- **The D-267 e1RM-declining adherence veto is DELETED** (`computePrimaryAdherence`,
+  `_shared/load-status-reconcile.ts`) — not left dormant. It read
+  `met = sessionsMet && e1rmDirection !== 'declining'`, so an athlete who did every prescribed session
+  was still marked as not meeting their primary discipline if a weekly e1RM direction said "declining".
+  Two reasons, either sufficient: **Strong and Hevy have no "you're declining" adherence gate at all**
+  (SCIENCE §3 — adherence is whether you did the work; a max is a record beside it), and **nothing can
+  produce the input** now that the weekly direction is retired. ⚠️ **Deleted rather than left quiet on
+  purpose:** a dead gate that still reads a live field is exactly how a retired verdict grows back — the
+  moment any direction is restored upstream it would silently start vetoing again, from a line nobody
+  remembers is there. `met` is now precisely "did you do the sessions". **Everything else in D-267
+  survives byte-for-byte**: the WTD-prorated count, the tolerance, and the plan-primary invariant (§5,
+  `met === true` ⟹ a raw 'under' never survives) — all seven existing D-267 fixtures pass unchanged, and
+  a new one asserts no value of `e1rmDirection` (including 'declining') can veto a session-met athlete.
+- **The per-lift "· provisional" hedge disappears** (`isProvisionalTrend` returns false for
+  `needs_data`). It hedged the confidence of a direction that no longer exists.
+
+**Untouched on purpose:** `mintOverloadVerdict` (D-418), the e1RM formula + reserve gate (D-339), the
+D-417 trusted-rep ceiling, the `readsEffortAs` gauge infrastructure (D-419 — it still selects WHICH
+measure a lift's readings come from), and the goal glance lane. Also left alone and now doubly dead:
+the coach's `str_prog_*` Adjust suggestion (`coach/index.ts:3644`), gated on both an `'improving'`
+trend and a `previous_e1rm` delta that has always been null.
+
+**Fixtures — `_shared/state-trend/strength-progress-record.test.ts` (9), Law 6.**
+Fixture A is Michael's deadlift cycle (105×35 → 110×25 → 115×20) over a *falling* working-set e1RM
+series, asserting: no direction on any lane; **no direction WORD anywhere in the emitted strength
+subtree** (a `JSON.stringify` scan of both the spine contract and the display block — the assertion that
+catches a verdict leaking back through a field nobody thought to check); no card verdict; the headline
+states the record; the record HOLDS at 238 while the latest reading is 215; and the high-rep sets land
+in the rep-PR lane. Plus a real cross-cycle record gain (record ticks up, `isPr` true), a rep PR judged
+by the real capture walk (225×6 → 225×9, Wendler's own example), and the chart still emitting.
+Deterministic — no LLM path.
+
+⚠️ **SIX EXISTING TESTS WERE REWRITTEN, NOT DELETED**, each with a note saying what it used to assert
+and why that subject is gone: the three e1RM noise-guard tests (`strength-fitness.test.ts` — the guard
+itself is still pinned generically in `classify-noise-guard.test.ts`), the D-338 deload test (now pinned
+on the **substrate**: 6 points → 5 once the phase is known — the exclusion is still live), the D-270
+per-lift tests (now pin the granularity D-270 got right), and slice 2's gauge fixtures (the gauge
+SELECTION is still pinned; only its direction assertions moved).
+
+`COACH_PAYLOAD_VERSION` 167 → **168**. ⚠️ The coach forwards the spine's per-lift block, so this needs a
+**compute-snapshot recompute** to be visible.
 
 **Grounding + evidence:** `docs/SCIENCE-strength-e1rm-trust.md` §6 (with sources); Wendler 5/3/1 2nd ed.
 p10 (rep records) + p32 ("Comparing Rep Maxes", the estimate is "best used for motivation"); Strong /

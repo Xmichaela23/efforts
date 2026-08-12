@@ -365,21 +365,33 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
   const declining = sufficientLifts.filter((l) => l.e1rm_trend === 'declining').length;
   const maintaining = sufficientLifts.filter((l) => l.e1rm_trend === 'stable').length;
 
-  let overallTrend: StrengthResponse['overall']['trend'] = 'insufficient_data';
-  let headline = 'Not enough strength data yet';
-
-  if (sufficientLifts.length > 0) {
-    if (gaining > declining) {
-      overallTrend = 'gaining';
-      headline = `${gaining} lift${gaining > 1 ? 's' : ''} trending up`;
-    } else if (declining > gaining) {
-      overallTrend = 'declining';
-      headline = `${declining} lift${declining > 1 ? 's' : ''} trending down`;
-    } else {
-      overallTrend = 'maintaining';
-      headline = 'Strength stable';
-    }
-  }
+  // ⛔ THE WEEKLY STRENGTH DIRECTION HEADLINE IS RETIRED (D-420, 2026-08-12). DO NOT REBUILD IT.
+  //
+  // This printed "N lifts trending down" / "N lifts trending up" / "Strength stable" off a weekly
+  // per-lift direction — the construct D-420 retires. WHY, once, not re-derived here: no commercial
+  // app computes a weekly strength direction, and on a 5/3/1 wave a first-to-last read calls the
+  // program's own light week a decline (docs/SCIENCE-strength-e1rm-trust.md §6). The spine stopped
+  // emitting the direction (`state-trend/strength.ts`); this is the second, independent place that
+  // could still mint one, so it is closed here too rather than left to inherit the fix.
+  //
+  // WHAT IT SAYS INSTEAD: the RECORD — the best trusted e1RM the athlete holds right now, a fact with
+  // no direction in it. No "up"/"down"/"trending"/"stable" word can be produced by this function.
+  //
+  // ⚠️ `overall.trend` is 'insufficient_data' — the union's existing no-claim value, so every reader
+  // already handles it. RIPPLE, stated: it drops strength from `computeAssessment`'s available-signal
+  // count, and it silences the D-267 `computePrimaryAdherence` e1RM-declining veto. Both are correct
+  // under D-420/D-418 — a waved week is not a decline and strength is already out of the overload
+  // alarm — but they are behaviour changes, not no-ops.
+  const bestE1rm = sufficientLifts.reduce<number | null>(
+    (best, l) => (l.e1rm_current != null && (best == null || l.e1rm_current > best) ? l.e1rm_current : best),
+    null,
+  );
+  const overallTrend: StrengthResponse['overall']['trend'] = 'insufficient_data';
+  const headline = sufficientLifts.length === 0
+    ? 'Not enough strength data yet'
+    : bestE1rm != null
+      ? `Best estimated max ${Math.round(bestE1rm)} lb`
+      : `${sufficientLifts.length} lift${sufficientLifts.length > 1 ? 's' : ''} logged`;
 
   return {
     per_lift,

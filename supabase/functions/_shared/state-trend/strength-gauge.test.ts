@@ -1,6 +1,14 @@
 /**
  * SLICE 2 — STRENGTH PROGRESS READS THE PROTOCOL'S OWN GAUGE. Permanent regression.
  *
+ * ⛔ AMENDED BY [D-420] (2026-08-12, slice 3). The gauge SELECTION shipped here is still live and
+ * still correct — a 5/3/1 lift's readings come from the all-out set, an assistance lift's from the
+ * logged working sets. What is gone is the DIRECTION VERDICT that selection used to feed: pointing it
+ * at the all-out set was the right substrate and the wrong object, because those sets run 20-35 reps,
+ * above the reliable estimate range, so their estimate slides across the wave too. Every assertion
+ * below that read "improving"/"sliding" now asserts the retirement instead; the capture, the scope and
+ * the deload rules are unchanged and still pinned.
+ *
  * ⛔ FIXTURE A IS THE BUG CASE AND IT NEVER GETS DELETED (Constitution Law 6). Michael's bench,
  * 2026-08-12: the working sets went 120×5 → a new-cycle 105×5 — which is the PROGRAM waving the
  * weight (65/75/85 → a re-based cycle), not a loss — and State read "1 lift trending down". The one
@@ -74,17 +82,21 @@ Deno.test('FIXTURE A (permanent): 5/3/1 — waved working sets fall, all-out rec
   });
   const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
   assertEquals(bench.gauge, 'amrap');
-  assert(bench.trend.verdict !== 'sliding', `expected not sliding, got ${bench.trend.verdict}`);
-  assertEquals(r.overall === 'sliding', false);
+  // D-420: not "not sliding" — no direction at all, per lift or overall.
+  assertEquals(bench.trend.verdict, 'needs_data');
+  assertEquals(bench.trend.pctChange, null);
+  assertEquals(r.overall, 'needs_data');
 });
 
-Deno.test('FIXTURE A: NON-VACUITY — the same working-set series DOES read sliding on the old e1RM gauge', () => {
-  // Withhold the protocol's gauge (pre-slice behaviour) and the bug reproduces. If this ever goes
-  // quiet, Fixture A has stopped proving anything.
+Deno.test('FIXTURE A: withholding the protocol gauge changes nothing now — no path states a direction (D-420)', () => {
+  // ⚠️ This test USED to be the non-vacuity proof: the same waved series read "sliding" on the e1RM
+  // gauge, which is what made slice 2's fix meaningful. D-420 removed the verdict from BOTH gauges, so
+  // the proof moved down a level — `retireDirection` is what is pinned now, and the live-data
+  // reproduction lives in `strength-progress-record.test.ts` (Michael's deadlift).
   const r = computeStrengthState(wavedWorkingSets(), ASOF, SPW);
   const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
   assertEquals(bench.gauge, 'e1rm');
-  assertEquals(bench.trend.verdict, 'sliding');
+  assertEquals(bench.trend.verdict, 'needs_data');
 });
 
 Deno.test('FIXTURE A: the gauge is stated, with its basis (Law 3 — the receipt travels)', () => {
@@ -92,7 +104,8 @@ Deno.test('FIXTURE A: the gauge is stated, with its basis (Law 3 — the receipt
     allOutByLift: { bench_press: ALL_OUT_HOLDING }, effortRead: 'amrap',
   });
   const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
-  assert(String(bench.gaugeBasis).includes('all-out set'), bench.gaugeBasis);
+  // D-420: the basis now states the retirement rather than describing a direction's window.
+  assert(String(bench.gaugeBasis).includes('D-420'), bench.gaugeBasis);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -109,10 +122,15 @@ Deno.test('FIXTURE B: rep record rises at the same weight → improving (the p10
     },
     effortRead: 'amrap',
   });
-  assertEquals(r.lifts.find((l) => l.canonical === 'bench_press')!.trend.verdict, 'improving');
+  // D-420: real progress no longer earns a WORD — it shows as the record ticking up and a rep PR.
+  // What is pinned here is that the all-out set is still the substrate this lift is read from.
+  const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
+  assertEquals(bench.gauge, 'amrap');
+  assertEquals(bench.trend.verdict, 'needs_data');
+  assertEquals(bench.trend.sampleCount, 3); // the three all-out sets, not the six working sets
 });
 
-Deno.test('FIXTURE B: same reps at a HEAVIER weight is progress too (p28 TM step, bridged by p32)', () => {
+Deno.test('FIXTURE B: same reps at a HEAVIER weight is read from the all-out set (p28 TM step)', () => {
   const r = computeStrengthState(wavedWorkingSets(), ASOF, SPW, {
     allOutByLift: {
       bench_press: [
@@ -123,13 +141,16 @@ Deno.test('FIXTURE B: same reps at a HEAVIER weight is progress too (p28 TM step
     },
     effortRead: 'amrap',
   });
-  assertEquals(r.lifts.find((l) => l.canonical === 'bench_press')!.trend.verdict, 'improving');
+  const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
+  assertEquals(bench.gauge, 'amrap');
+  assertEquals(bench.trend.sampleCount, 3);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// FIXTURE C — REAL DECLINE still fires. Fewer reps at the same weight, cycle over cycle.
+// FIXTURE C — a genuine cycle-over-cycle DECLINE. Under D-420 it does not earn a word either: the
+// record simply stops moving and the chart shows the shape. The human reads it.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-Deno.test('FIXTURE C: rep record genuinely falls at the same weight → still sliding', () => {
+Deno.test('FIXTURE C: a genuine decline states no direction either — the record and the chart carry it', () => {
   const r = computeStrengthState(wavedWorkingSets(), ASOF, SPW, {
     allOutByLift: {
       bench_press: [
@@ -140,7 +161,9 @@ Deno.test('FIXTURE C: rep record genuinely falls at the same weight → still sl
     },
     effortRead: 'amrap',
   });
-  assertEquals(r.lifts.find((l) => l.canonical === 'bench_press')!.trend.verdict, 'sliding');
+  const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
+  assertEquals(bench.trend.verdict, 'needs_data');
+  assertEquals(bench.trend.pctChange, null);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -177,8 +200,8 @@ Deno.test('SCOPE: an ASSISTANCE lift keeps the e1RM gauge even on a 5/3/1 block 
   }];
   const r = computeStrengthState(series, ASOF, SPW, { allOutByLift: {}, effortRead: 'amrap' });
   const row = r.lifts[0];
-  assertEquals(row.gauge, 'e1rm');
-  assertEquals(row.trend.verdict, 'improving');
+  assertEquals(row.gauge, 'e1rm'); // the scope rule is what this pins, and it is unchanged
+  assertEquals(row.trend.verdict, 'needs_data'); // D-420: no direction for any lift
 });
 
 Deno.test('SCOPE: a waved main lift with NO all-out set reads needs_data — never a false decline off the wave', () => {
@@ -187,8 +210,8 @@ Deno.test('SCOPE: a waved main lift with NO all-out set reads needs_data — nev
   const r = computeStrengthState(wavedWorkingSets(), ASOF, SPW, { allOutByLift: {}, effortRead: 'amrap' });
   const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
   assertEquals(bench.trend.verdict, 'needs_data');
-  assertEquals(bench.gauge, 'amrap');
-  assert(String(bench.gaugeBasis).includes('needs 3'), bench.gaugeBasis);
+  assertEquals(bench.gauge, 'amrap'); // still selected onto the all-out gauge; it just has no readings
+  assertEquals(bench.trend.sampleCount, 0);
 });
 
 Deno.test('SCOPE: a DELOAD all-out set is excluded (p24 "you should NOT be going for max reps"; p100 "No.")', () => {
@@ -222,8 +245,8 @@ Deno.test('SCOPE: the trusted-rep cap does NOT apply — a long all-out set is a
     effortRead: 'amrap',
   });
   const bench = r.lifts.find((l) => l.canonical === 'bench_press')!;
-  assertEquals(bench.trend.sampleCount, 3);
-  assertEquals(bench.trend.verdict, 'improving');
+  assertEquals(bench.trend.sampleCount, 3); // all three long sets are IN the substrate (uncapped)
+  assertEquals(bench.trend.verdict, 'needs_data');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

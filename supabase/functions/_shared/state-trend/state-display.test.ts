@@ -44,8 +44,11 @@ Deno.test('S2: display.strengthFitness carries the per-lift breakdown (D-270) fo
   const v1 = toStateTrendsV1(assembleStateTrends(inputs()), AS_OF);
   const perLift = v1.display!.strengthFitness.perLift;
   assert(perLift.length >= 2, 'per-lift present in the cached display contract');
-  assert(perLift.some((l) => l.canonical === 'bench_press' && l.direction === 'improving'));
-  assert(perLift.some((l) => l.canonical === 'squat' && l.direction === 'sliding'));
+  // ⛔ D-420: the per-lift DIRECTION is retired — what the client needs from this contract is the
+  // per-lift granularity (which lift, its readings), not a weekly verdict. Both lifts still arrive.
+  assert(perLift.some((l) => l.canonical === 'bench_press' && l.latestE1rm != null));
+  assert(perLift.some((l) => l.canonical === 'squat' && l.latestE1rm != null));
+  assertEquals(new Set(perLift.map((l) => l.direction)), new Set(['needs_data']));
 });
 
 Deno.test('S2: the reduced spine verdicts still sit alongside the display block (both cached)', () => {

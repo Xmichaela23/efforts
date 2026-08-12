@@ -86,17 +86,23 @@ const AFTER_DELOAD = [
 ];
 const AFTER_DELOAD_PHASES = { ...PHASES, '2026-06-22': 'leader', '2026-07-06': 'deload' };
 
-Deno.test('⛔ D-338 THE BUG: the week after a deload reads "sliding" — and must not', () => {
+Deno.test('⛔ D-338: the deload point is EXCLUDED from what the strength row reads (the verdict half is retired by D-420)', () => {
+  // ⚠️ REWRITTEN FOR [D-420] (2026-08-12). This used to assert the bug and its fix in verdict terms
+  // — "reads sliding" → "no longer sliding". There is no strength direction verdict any more, so the
+  // verdict half of the assertion has no subject. **The exclusion itself is still live and still
+  // matters**: it shapes the receipts (sampleCount, the sparkline window) and the VOLUME trend, so
+  // it is pinned here on the substrate instead of on the retired word.
   const before = computeStrengthState(liftSeriesFromExerciseLog(AFTER_DELOAD), AS_OF, 1.2);
   const liftBefore = before.lifts.find((l) => l.canonical === 'squat')!;
-  // This is the lie, reproduced: a ~-14% drop and a sliding verdict off a week he followed exactly.
-  assertEquals(liftBefore.trend.verdict, 'sliding');
-  assertEquals(liftBefore.trend.pctChange! < -10, true);
+  assertEquals(liftBefore.trend.sampleCount, 6); // the deload day is in the substrate
 
   const after = computeStrengthState(liftSeriesFromExerciseLog(AFTER_DELOAD, { phaseByDate: AFTER_DELOAD_PHASES }), AS_OF, 1.2);
   const liftAfter = after.lifts.find((l) => l.canonical === 'squat')!;
-  assertEquals(liftAfter.trend.verdict === 'sliding', false);
-  assertEquals(liftAfter.trend.sampleCount, 5);
+  assertEquals(liftAfter.trend.sampleCount, 5); // …and out of it once the phase is known
+
+  // D-420: neither reads a direction, before or after — that is the point of the retirement.
+  assertEquals(liftBefore.trend.verdict, 'needs_data');
+  assertEquals(liftAfter.trend.verdict, 'needs_data');
 });
 
 Deno.test('D-338: a MID-cycle deload leaves the endpoints alone but stops poisoning the scatter', () => {

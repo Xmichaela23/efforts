@@ -118,13 +118,18 @@ export interface StrengthPerLift {
   canonical: string;
   displayName: string;
   isPrimary: boolean;
-  direction: TrendVerdict;     // the lift's PROGRESS trend — the spine's owned fact
-  /** Slice 2: which measure `direction` was read from — 'amrap' (the all-out set, for a waved main
-   *  lift on a 5/3/1 block) or 'e1rm' (logged working sets, everything else). Absent on rows written
-   *  before the slice; a reader must treat absent as 'e1rm'. */
+  /** ⛔ RETIRED (D-420) — always `'needs_data'`. The weekly strength direction is not computed; see
+   *  the block above `computeStrengthState`. The field stays so existing readers don't break, and
+   *  because `'needs_data'` is the value every one of them already treats as "no claim". A reader
+   *  must NOT interpret it as "not enough data" — `directionBasis` says what it really means. */
+  direction: TrendVerdict;
+  /** Which measure this lift's readings come from — 'amrap' (the all-out set, for a waved main lift
+   *  on a 5/3/1 block) or 'e1rm' (logged working sets). D-419 infrastructure; it survives D-420 and
+   *  now describes the RECEIPTS rather than a direction. */
   directionGauge?: StrengthGauge;
-  /** Why — e.g. "all-out set — 4 readings over 12 weeks". Renderable, never re-derived. */
+  /** Since D-420, the retirement note itself — renderable, never re-derived. */
   directionBasis?: string;
+  /** ⛔ RETIRED (D-420) — always null. Was the direction's magnitude ("sliding −8.2%"). */
   pctChange: number | null;
   latestE1rm: number | null;   // most-recent estimated_1rm point (the number the direction is OF)
   bestE1rm: number | null;     // best estimated_1rm in the TRACKED WINDOW (6wk) — the band frame, NOT the PR frame
@@ -144,6 +149,17 @@ export interface StrengthPerLift {
    * ⚠️ FALSE WHENEVER THE ALL-HISTORY READ IS MISSING. No data is not a record.
    */
   isPr: boolean;
+  /**
+   * ⛔ THE REP PR (D-420 pillar 2) — the last all-out set for this lift, and whether it beat the most
+   * reps ever done at that weight. Wendler p10: *"If your squat goes from 225x6 to 225x9, you've
+   * gotten stronger."* This is the home for the high-rep all-out sets the trusted-rep e1RM gate
+   * (D-417) correctly refuses — 105×35 can never mint an e1RM, but it is absolutely a rep record.
+   *
+   * ⚠️ Decided on the spine, from the SAME walk the Performance screen's card uses
+   * (`allOutSeriesByLift`), so the two screens cannot disagree about whether a set was a record.
+   * Null = no all-out set in the window, which is honest and common (a leader cycle prescribes none).
+   */
+  lastAllOut?: { date: string; weight: number; reps: number; isRepRecord: boolean; priorBestRepsAtWeight: number | null } | null;
   sampleCount: number;
   newestAgeDays: number | null;
   provisional: boolean;
@@ -349,6 +365,43 @@ export interface StrengthStateOpts {
   phaseByDate?: Record<string, string> | null;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ THE WEEKLY STRENGTH DIRECTION VERDICT IS RETIRED (D-420, 2026-08-12). DO NOT BRING IT BACK.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// The WHY is written down and is not re-derived here: `docs/SCIENCE-strength-e1rm-trust.md` §6 and
+// D-420. In one line: **no commercial app computes a weekly per-lift strength direction**, and on a
+// 5/3/1 wave a first-to-last direction reads the WITHIN-CYCLE weight-wave as a trend. It printed
+// "1 lift trending down" and an overall "sliding −8.2%" on a deadlift that was simply running the
+// program — 105×35 → 110×25 → 115×20, one cycle's three weeks.
+//
+// ⚠️ AND THE PREVIOUS FIX DID NOT SAVE IT. D-419 pointed the direction at the all-out set instead of
+// the working sets. That was the right substrate and still the wrong OBJECT: all-out sets run 20-35
+// reps, above the reliable estimate range (SCIENCE §2), so their estimate slides across the wave too.
+// The verdict itself was the mistake. **This retires the direction half of D-419; the protocol-declared
+// gauge infrastructure (`readsEffortAs`, `allOutByLift`) SURVIVES** and still selects which measure the
+// receipts describe.
+//
+// WHAT REPLACES IT — the universal method (Strong / Hevy / Boostcamp) and Wendler's own:
+//   1. the e1RM RECORD (best trusted e1RM to date, per lift — monotonic, a max not an average),
+//   2. REP PRs (most reps at a weight, Wendler p10 — honest at any rep count), and
+//   3. the e1RM CHART over the block; the human reads the slope.
+// All three already existed. This slice removes the fourth thing, which was lying.
+//
+// ⛔ IF A DIRECTION IS EVER STATED AGAIN it may only be computed over a window spanning WHOLE CYCLES
+// (≥2 waves), so the wave sits inside the window instead of splitting it. Default: don't state one.
+//
+// ⚠️ THE CLASSIFIER STILL RUNS, DELIBERATELY. Its RECEIPTS are facts and are still published —
+// `sampleCount`, `newestAgeDays`, provisional-ness, and the deload exclusion that shapes them
+// (D-338). Only the VERDICT is suppressed, in this one place, so no arm can render it (Law 1).
+const DIRECTION_RETIRED_BASIS =
+  'direction not tracked — strength progress reads the record, rep PRs and the chart (D-420)';
+
+/** Strip the direction CLAIM off a computed trend, keeping every receipt on it. */
+function retireDirection(t: TrendResult): TrendResult {
+  return { ...t, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null };
+}
+
 export function computeStrengthState(
   series: LiftSeries[],
   asOf: string,
@@ -366,8 +419,9 @@ export function computeStrengthState(
     if (!readsAmrap || !isWavedMainLift(s.canonical)) {
       return {
         canonical: s.canonical, displayName: s.displayName, isPrimary: PRIMARY_LIFTS.has(s.canonical),
-        trend: e1rmTrend, gauge: 'e1rm' as StrengthGauge,
-        gaugeBasis: readsAmrap ? 'assistance lift — read from logged sets' : 'read from logged sets',
+        // D-420: the receipts survive, the verdict does not.
+        trend: retireDirection(e1rmTrend), gauge: 'e1rm' as StrengthGauge,
+        gaugeBasis: DIRECTION_RETIRED_BASIS,
       };
     }
 
@@ -379,22 +433,22 @@ export function computeStrengthState(
       { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV },
     );
 
-    // ⛔ NO FALL-BACK TO e1RM WHEN THE ALL-OUT SERIES IS THIN, AND THAT IS DELIBERATE. Falling back
-    // would restore the exact bug this slice closes: on a leader cycle (no all-out set prescribed at
-    // all) the only thing left to trend is the waved working weight, which is the PROGRAM moving, not
-    // the athlete. "Not enough all-out sets yet" is honest; "trending down" would not be. The e1RM
-    // number itself still renders as a per-session receipt — only the arrow goes quiet.
+    // D-420: the all-out set is still the RIGHT substrate for a 5/3/1 lift — it is what the record and
+    // the rep PRs are read from — but no DIRECTION is claimed off it. D-419's gauge selection survives
+    // and now describes which measure the receipts came from; the verdict it fed is retired.
     return {
       canonical: s.canonical, displayName: s.displayName, isPrimary: PRIMARY_LIFTS.has(s.canonical),
-      trend, gauge: 'amrap' as StrengthGauge,
-      gaugeBasis: trend.verdict === 'needs_data'
-        ? `all-out set — ${allOutPoints.length} in ${ALL_OUT_WINDOW_DAYS / 7} weeks, needs ${ALL_OUT_MIN_SESSIONS}`
-        : `all-out set — ${trend.sampleCount} readings over ${ALL_OUT_WINDOW_DAYS / 7} weeks`,
+      trend: retireDirection(trend), gauge: 'amrap' as StrengthGauge,
+      gaugeBasis: DIRECTION_RETIRED_BASIS,
     };
   });
 
-  const { overall, overallPctChange } = rollUp(lifts);
-  return { lifts, overall, overallPctChange };
+  // ⛔ NO ROLL-UP VERDICT (D-420). `rollUp` collapsed the per-lift directions into one
+  // improving/holding/sliding word — the "sliding −8.2%" on the strength row. With no per-lift
+  // direction there is nothing to roll up, and the aggregate is a no-claim. `rollUp` itself is kept
+  // (unused for strength) only because it is the documented extension point for a richer roll-up; if
+  // it is ever called again it must obey the whole-cycle window rule above.
+  return { lifts, overall: 'needs_data', overallPctChange: null };
 }
 
 /** Simple v1: the overall verdict follows the PRIMARY lifts that have data. */

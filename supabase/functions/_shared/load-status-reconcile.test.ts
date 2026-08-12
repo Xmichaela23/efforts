@@ -350,15 +350,34 @@ Deno.test('D-267 LIVE-CASE: 3/4 sessions, dayIndex 3, e1RM gaining (RIR-declinin
   assertStringIncludes(r.interpretation, 'cross-training'); // endurance-carried named (case a)
 });
 
-// VETO (Fix 1) — sessions met but e1RM GENUINELY declining → met=false → attention branch (total load
-// fine → on_target, never under), evidence names the strength decline.
-Deno.test('D-267 VETO: sessions met but e1RM declining → met=false; attention branch names the decline', () => {
+// ⛔ THE D-267 "FIX 1" VETO IS DELETED — [D-420], 2026-08-12. This test asserted the opposite: sessions
+// met but e1RM "declining" → met=false. Two reasons it went, either sufficient: Strong and Hevy have no
+// "you're declining" adherence gate (SCIENCE §3, Michael's call), and D-420 retired the weekly strength
+// direction so nothing can produce the input. Deleted rather than left dormant — a dead gate reading a
+// live field is how a retired verdict grows back.
+Deno.test('⛔ D-420: an athlete who DID the sessions is never vetoed by a strength signal — no path to it', () => {
+  // Every value `e1rmDirection` could ever hold, including the one that used to veto.
+  for (const dir of ['declining', 'gaining', 'maintaining', 'insufficient_data', null]) {
+    const adh = computePrimaryAdherence({
+      planPrimary: 'strength', strengthSessionsCompleted: 4, strengthFrequency: 4,
+      e1rmDirection: dir as string | null, dayIndex: 6,
+    });
+    assertEquals(adh?.met, true, `sessions met must stand for e1rmDirection=${dir}`);
+  }
+
+  // …and the INVARIANT it feeds is intact: met === true ⟹ a raw 'under' never survives (D-267 §5).
   const adh = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 4, strengthFrequency: 4, e1rmDirection: 'declining', dayIndex: 6 });
-  assertEquals(adh?.met, false);   // sessions met, but e1RM declining → veto
   const r = run({ ...D267_BASE, unweightedAcwr: 1.2,
     planPosition: { weekIntent: 'baseline', planPrimary: 'strength', primaryAdherence: adh } });
-  assertEquals(r.status, 'on_target');                       // total load fine → not under, attention only
-  assertStringIncludes(r.interpretation, 'e1RM declining');  // evidence names the strength decline
+  assertEquals(r.status, 'on_target');
+  assertEquals(r.interpretation.includes('attention, not under-training'), false); // not the shortfall branch
+});
+
+Deno.test('D-420: the session count STILL decides met — a genuine shortfall is untouched', () => {
+  // The deletion removes one input, not the gate. Behind on sessions is still behind on sessions.
+  const behind = computePrimaryAdherence({ planPrimary: 'strength', strengthSessionsCompleted: 1, strengthFrequency: 4, e1rmDirection: 'gaining', dayIndex: 6 });
+  assertEquals(behind?.met, false);
+  assertStringIncludes(behind!.note, '1/4 sessions');
 });
 
 // NEG-1 — genuine under still fires: strength NOT met AND total load genuinely low (ACWR 0.6) → under.

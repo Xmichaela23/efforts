@@ -38,6 +38,7 @@ type Lanes = {
   trainingStateOverstrained: boolean;
   glanceVerdictCode: string;
   strengthTrend: string;
+  perLiftTrend: string | null;
   signalsConcerning: number;
   overload: OverloadVerdict;
 };
@@ -162,6 +163,7 @@ function runWeek(input: {
     trainingStateOverstrained: rm.assessment.label === 'overreaching' || input.verdictCode === 'recover_overreaching',
     glanceVerdictCode: input.verdictCode,
     strengthTrend: rm.strength.overall.trend,
+    perLiftTrend: rm.strength.per_lift[0]?.e1rm_trend ?? null,
     signalsConcerning: rm.assessment.signals_concerning,
     overload,
   };
@@ -215,8 +217,10 @@ Deno.test('FIXTURE A: the headline says neither "Load is elevated" nor "rest soo
 
 Deno.test('FIXTURE A: a 5/3/1-wave e1RM dip is not strain — it never reaches the verdict', () => {
   const l = runWeek({ ...ON_PLAN_BUILD });
-  // Guard against a vacuous fixture: the lift really IS reading declining, it just can't count as strain.
-  assertEquals(l.strengthTrend, 'declining');
+  // Guard against a vacuous fixture: the lift really IS reading declining, it just can't count as
+  // strain. ⚠️ Read PER-LIFT since [D-420] retired the weekly strength roll-up — the spine's per-lift
+  // e1RM read still reaches the response model, it simply no longer rolls up to a verdict.
+  assertEquals(l.perLiftTrend, 'declining');
   assertEquals(l.overload.strain_signals.includes('Strength'), false);
   // Only the RPE bump is a strain signal, and one signal alone is a WATCH.
   assertEquals(l.overload.strain_signals, ['RPE']);

@@ -34,11 +34,14 @@ Deno.test('D-270: spine "improving" → "getting stronger" verdict (the dead bra
   assertEquals(b.verdict_tone, 'positive');
 });
 
-Deno.test('D-270: spine "declining" surfaces as a declining trend (was impossible before)', () => {
+Deno.test('D-270: spine "declining" reaches the PER-LIFT read; D-420: it no longer rolls up to a verdict', () => {
   const res = computeStrength([bench('declining')], 'build');
+  // D-270 still holds where it was right: the spine's per-lift fact reaches the per-lift row.
   assertEquals(res.per_lift[0].e1rm_trend, 'declining');
-  // overall rollup sees the decline
-  assert(res.overall.trend === 'declining' || res.overall.trend === 'maintaining');
+  // ⛔ D-420: the WEEKLY ROLL-UP is retired. It used to print "1 lift trending down" off exactly this.
+  // The overall object now states no direction, whatever the per-lift reads say.
+  assertEquals(res.overall.trend, 'insufficient_data');
+  assertEquals(/trending|stable|up|down/i.test(res.overall.headline_delta), false);
 });
 
 Deno.test('D-270: no spine direction (null) → falls back to old behavior (stable, no invented direction)', () => {

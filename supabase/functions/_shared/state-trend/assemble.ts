@@ -265,7 +265,11 @@ export interface StateTrendInputs {
   /** Slice 2: EVERY all-out set per canonical lift, oldest first (`allOutSeriesByLift`,
    *  `_shared/strength/all-out-set.ts`). The substrate for the 5/3/1 progress direction — the rep
    *  record, not the waved working weight. Absent → every lift keeps the e1RM gauge. */
-  allOutByLift?: Record<string, Array<{ date: string; weight: number; reps: number; estimated_1rm: number }>> | null;
+  allOutByLift?: Record<string, Array<{
+    date: string; weight: number; reps: number; estimated_1rm: number;
+    /** D-420: the rep-PR verdict, decided in `allOutSeriesByLift` against the sessions BEFORE it. */
+    is_rep_record?: boolean; prior_best_reps_at_weight?: number | null;
+  }>> | null;
   /** Slice 2: what the athlete's strength block declares it READS (`protocolEffortRead` off the
    *  plan's protocol). 'amrap' switches waved main lifts onto the all-out gauge; 'rir' / 'none' /
    *  absent keep today's behaviour exactly. */
@@ -602,10 +606,23 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     canonical: l.canonical,
     displayName: l.displayName,
     isPrimary: l.isPrimary,
+    // D-420: `computeStrengthState` already retired these two — kept in the contract, always
+    // no-claim/null. Nothing downstream may render a strength direction.
     direction: l.trend.verdict,
     directionGauge: l.gauge ?? 'e1rm',
     directionBasis: l.gaugeBasis,
     pctChange: l.trend.pctChange,
+    // D-420 pillar 2: the rep PR. Same walk the Performance card reads (slice 2's `allOutByLift`).
+    lastAllOut: (() => {
+      const pts = inp.allOutByLift?.[l.canonical];
+      if (!Array.isArray(pts) || pts.length === 0) return null;
+      const last = pts[pts.length - 1] as any;
+      return {
+        date: String(last.date), weight: Number(last.weight), reps: Number(last.reps),
+        isRepRecord: last.is_rep_record === true,
+        priorBestRepsAtWeight: last.prior_best_reps_at_weight ?? null,
+      };
+    })(),
     latestE1rm: liftLatest.get(l.canonical) ?? null,
     bestE1rm: liftBest.get(l.canonical) ?? null,
     // REAL PR frame — all-history best (not 6wk). Null when the all-history read wasn't supplied.
@@ -637,7 +654,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       sampleCount: strengthVolTrend.sampleCount, newestAgeDays: strengthVolTrend.newestAgeDays,
       provisional: isProvisionalTrend(strengthVolTrend),
     },
-    e1rm: strength.overall !== 'needs_data' ? { verdict: strength.overall, pctChange: strength.overallPctChange, range: strengthE1rmBand } : null,
+    // ⛔ D-420: the VERDICT is retired, the DOT is not. `range` is a POSITION claim (current e1RM ÷
+    // your own baseline) — "where you sit", not "which way you're going" — and D-420 retires only the
+    // direction. So this object is emitted whenever there is a band to show, carrying a no-claim
+    // verdict. Previously it was gated on the verdict existing, which would now blank the dot too.
+    e1rm: strengthE1rmBand ? { verdict: 'needs_data' as const, pctChange: null, range: strengthE1rmBand } : null,
     perLift: strengthPerLift,
     sessionsThisWeek: inp.doneBy['strength'] || 0,
     unplanned: Math.max(0, (inp.doneBy['strength'] || 0) - (inp.plannedBy['strength'] || 0)),
@@ -679,7 +700,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   }
 
   const perfByDisc: Record<string, PerfSummary | null> = {
-    strength: { verdict: strength.overall, pctChange: strength.overallPctChange },
+    // ⛔ D-420: STRENGTH HAS NO PERFORMANCE VERDICT. This fed `resolveDisciplineCard` (→ the card's
+    // headlineVerdict) and `synthesizeHeadline`, which is how "sliding −8.2%" reached the screen and
+    // the State headline. `null` is already a supported value here and means exactly the right thing:
+    // there is no direction verdict for this discipline, so adherence leads the card. Strength's own
+    // row renders the record + rep PRs + the chart instead (StrengthFitnessRow).
+    strength: null,
     bike,
     run,
     swim,

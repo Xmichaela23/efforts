@@ -563,9 +563,44 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                       "e1RM" in the logged-sets list below (2026-08-11, Michael — one word, not "~" + "est."). */}
                   <span className="text-white/85 text-[14px] text-right tabular-nums">e1RM {Math.round(l.latestE1rm as number)} lb</span>
                 </span>
+                {/* ⛔ THE RECORD (D-420 pillar 1). Progress on a lift is the best estimated max you
+                    HOLD — a maximum, so a programmed-lighter week can never drag it down. Shown only
+                    when the latest reading is not itself the record (when it is, the PR tag above
+                    already says so and repeating the number would read as two different facts). */}
+                {(() => {
+                  const best = (l as any).allTimeBestE1rm as number | null;
+                  const latest = l.latestE1rm as number;
+                  if (best == null || !(best > latest + 0.5)) return null;
+                  return (
+                    <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 -mt-0.5">
+                      <span className="text-white/45 text-[11px]">best</span>
+                      <span className="text-white/60 text-[11px] text-right tabular-nums">{Math.round(best)} lb</span>
+                    </span>
+                  );
+                })()}
                 <span className="basis-full text-white/50 text-[11px] -mt-0.5">
                   {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
                 </span>
+                {/* ⛔ THE REP PR (D-420 pillar 2). Wendler p10: 225x6 → 225x9 IS the progress. This is
+                    also the ONLY home for a long all-out set — 105 lb × 35 can never mint an e1RM
+                    (D-417's trusted-rep ceiling refuses it, correctly), and it is still a record.
+                    ⚠️ Read from the spine, never re-derived: `is_rep_record` was decided in
+                    `allOutSeriesByLift` against the sessions BEFORE it — the same walk the Performance
+                    screen's all-out card uses, so the two screens cannot disagree. */}
+                {(() => {
+                  const ao = (l as any).lastAllOut as
+                    | { date: string; weight: number; reps: number; isRepRecord: boolean }
+                    | null | undefined;
+                  if (!ao || !(ao.weight > 0) || !(ao.reps > 0)) return null;
+                  return (
+                    <span className="basis-full text-white/50 text-[11px] -mt-0.5 inline-flex items-baseline gap-1.5">
+                      <span className="tabular-nums">all-out {Math.round(ao.weight)} lb × {ao.reps}</span>
+                      {ao.isRepRecord && (
+                        <span className="text-emerald-300 text-[10px] uppercase tracking-wide font-semibold">rep PR</span>
+                      )}
+                    </span>
+                  );
+                })()}
                 {/* THE LONG VIEW per lift — 12-week e1RM sparkline (big-4 only, Michael 2026-07-23). Same
                     component as the run row; server sends the recent-6wk slice in the strength color. */}
                 {isTrackedMaxLift(l.canonical) && (
