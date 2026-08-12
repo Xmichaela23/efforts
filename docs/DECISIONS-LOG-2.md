@@ -1665,6 +1665,14 @@ to null ⇒ byte-identical pre-slice behavior. That is the same shape `corrobora
 
 ### D-419 — Strength progress reads the protocol's own gauge: 5/3/1 is the all-out set, not the waved working-set e1RM (2026-08-12, **PUSHED pending; fixtures green (14 new, 1650 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — closes the Slice-2 contract, extends [D-417] and [D-270]
 
+> ⛔ **SUPERSEDED IN PART by [D-420] (2026-08-12, same day).** The DIRECTION half of this entry —
+> trending the all-out set to produce a weekly improving/sliding verdict — is retired. No commercial app
+> computes a weekly strength direction, and Michael's 20–35-rep all-out sets slide across the 5/3/1 wave,
+> so this approach still misread (live "sliding −8.2%" on his deadlift after deploy). Progress is now the
+> e1RM **record** + **rep PRs** + the **chart** (D-420; `SCIENCE-strength-e1rm-trust.md` §6). The
+> protocol-declared gauge infrastructure (`readsEffortAs`) below **survives**; the weekly verdict it fed
+> does not. Everything below is history.
+
 **The report.** State read *"1 lift trending down"* on Michael's bench while he was executing his
 5/3/1 block exactly as printed. The working sets went 120×5 → a new-cycle 105×5 — which is the
 PROGRAM re-basing the wave, not a strength loss.
@@ -1771,3 +1779,33 @@ all-out set; and three capture tests including "the all-out set is found by its 
 **Not touched:** `mintOverloadVerdict` (D-418 — strength is already out of the overload alarm, which
 is what made this a display-accuracy fix with a low blast radius), the e1RM formula and its reserve
 gate, the D-417 trusted-rep gate itself, and the goal glance lane.
+
+### D-420 — Strength progress is a record + rep PRs + a chart, NOT a weekly direction verdict (2026-08-12, DECISION captured; build pending) — supersedes the *direction* half of [D-419], extends [D-417]
+
+**The realization.** Chasing "1 lift trending down" / "sliding −8.2%" to its root: the weekly per-lift
+DIRECTION verdict is a construct **no commercial app** (Strong, Hevy, Boostcamp) computes, and on a
+5/3/1 wave it reads the within-cycle weight-wave as a trend. Trending the all-out set (D-419) doesn't
+save it — Michael's all-out sets are 20–35 reps, above the reliable estimate range (D-417 §2), so they
+slide across the wave too. This was a whole-session chase; the answer was that the *verdict itself* is
+the wrong object.
+
+**The decision.** Strength progress is shown as three things, matching the universal app method and
+Wendler's own:
+1. **e1RM RECORD** — best trusted e1RM to date, per lift. Monotonic — never dragged down by a lighter
+   programmed week (a max, not an average).
+2. **Rep PRs** — most reps at a weight (Wendler p10). Honest at any rep count; the home for the high-rep
+   all-out sets the trusted-rep gate excludes from e1RM.
+3. **The e1RM chart** over the block — the human reads the slope.
+
+Any *stated* direction word may only be computed over a window spanning **whole cycles (≥2 waves)**, so
+the wave is inside the window, not split across it.
+
+**Reverses:** the direction half of [D-419]. The protocol-declared gauge infrastructure (`readsEffortAs`
+on the strength profile) survives; the weekly improving/sliding verdict it fed is retired. **Build
+pending** — until it lands, the strength row still shows D-419's live "sliding" on Michael's account
+(deployed 2026-08-12).
+
+**Grounding + evidence:** `docs/SCIENCE-strength-e1rm-trust.md` §6 (with sources); Wendler 5/3/1 2nd ed.
+p10 (rep records) + p32 ("Comparing Rep Maxes", the estimate is "best used for motivation"); Strong /
+Hevy performance-tracking docs. Not tuned to Michael — the record+PR+chart method and the whole-cycle
+window apply to any athlete and any protocol.

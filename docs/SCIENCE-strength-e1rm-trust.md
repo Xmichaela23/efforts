@@ -1,4 +1,4 @@
-# The math behind the strength maxes (e1RM trust) — D-417
+# The math behind the strength maxes (e1RM trust) — D-417, D-420
 
 **Written 2026-08-11.** This is the evidence file for one decision: *an estimated 1-rep max only counts when
 it comes from a low-rep set.* It exists because the call rests on training science and commercial-app
@@ -107,6 +107,35 @@ weight, the way a lifter reads them.
 **One known edge, left as a follow-up:** an athlete whose *only* recent sets are high-rep would have no trusted
 reading, so the lift falls to the existing "needs data" state. A dedicated "log a heavier set to read your
 max" message would be clearer. Michael has low-rep sets, so this doesn't affect him today.
+
+---
+
+## 6. Progress is a record + a chart, not a weekly verdict (2026-08-12, D-420)
+
+§4 fixed the *number*. A subtler mistake sat on top of it: a weekly per-lift **direction verdict** —
+"improving / sliding / needs_data." No commercial app computes that, and on a 5/3/1 wave it lies.
+
+5/3/1 waves the weight by design (light/high-rep → heavy/low-rep) and progresses wave-over-wave. A
+first-to-last direction on a short window reads the *within-cycle* wave as a trend. On Michael's live
+data it printed "1 lift trending down" and an overall "sliding −8.2%" on a deadlift that was simply
+running the program — 105×35 → 110×25 → 115×20, one cycle's three weeks. The first fix (D-419) trended
+the all-out set instead; it did not help, because his all-out sets are 20–35 reps — above the reliable
+range (§2) — so their estimate slides across the wave too.
+
+**The universal method (§3) has no weekly verdict.** Progress is three things:
+- **The e1RM record** — best trusted e1RM to date, per lift. Monotonic: it ticks up when you beat it,
+  never slides from a lighter week (a max can't be dragged down by an average).
+- **Rep PRs** — most reps at a weight (Wendler p10); honest at any rep count, and the home for the
+  high-rep all-out sets the e1RM record can't use.
+- **The chart** — the e1RM line over the block; the human reads the slope. This is the lifter-with-the-
+  book-and-a-spreadsheet's actual method.
+
+If a direction word is ever stated, it may only be computed over a window that **spans whole cycles**
+(≥2 waves), so the wave sits inside the window instead of splitting it.
+
+**Pending build:** retire the weekly direction verdict from the strength row; keep e1RM record + rep PRs
++ the chart. This reverses the *direction* half of D-419 — the protocol-declared gauge infrastructure
+(`readsEffortAs`) stays; the weekly *verdict* it fed goes.
 
 ---
 
