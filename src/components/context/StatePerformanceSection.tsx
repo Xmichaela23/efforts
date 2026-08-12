@@ -556,10 +556,12 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                 <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
                   <span className="text-white/85 text-[14px] truncate inline-flex items-baseline gap-1.5">
                     {l.displayName}
-                    {/* "~" marks it as an ESTIMATE, not a tested max — a projection off your logged sets. */}
                     {isPR(l) && <span className="text-emerald-300 text-[10px] uppercase tracking-wide font-semibold">PR</span>}
                   </span>
-                  <span className="text-white/85 text-[14px] text-right">~{Math.round(l.latestE1rm as number)} lb</span>
+                  {/* "e1RM" (estimated 1-rep max) labels the number as an ESTIMATE, not a tested max —
+                      the section header defines the term, the row uses the compact form. Matches the
+                      "e1RM" in the logged-sets list below (2026-08-11, Michael — one word, not "~" + "est."). */}
+                  <span className="text-white/85 text-[14px] text-right tabular-nums">e1RM {Math.round(l.latestE1rm as number)} lb</span>
                 </span>
                 <span className="basis-full text-white/50 text-[11px] -mt-0.5">
                   {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
