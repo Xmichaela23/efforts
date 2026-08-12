@@ -479,10 +479,23 @@ function computeAssessment(
 
   if (concerning >= 2) {
     const isLoadHigh = load.acwr_status === 'elevated' || load.acwr_status === 'high_risk';
-    return make('overreaching', decliningSignals[0] || null, available >= 3 ? 'high' : 'medium',
-      isLoadHigh
-        ? `Multiple signals declining (${decliningSignals.join(', ')}) with elevated load. Consider backing off.`
-        : `Multiple signals declining (${decliningSignals.join(', ')}). Your body may need more recovery.`);
+    // ⛔ THE "BACK OFF" WORD NEEDS LOAD CORROBORATION (2026-08-12). This was a SECOND, parallel
+    // overreaching authority beside the reconciler (D-260) — it labeled 'overreaching' from body-signal
+    // trend COUNTS alone, readiness-blind and plan-blind, and that label then set raw readiness
+    // 'overreached' (coach/index.ts), which pushed the load verdict to 'a bit high' and fired the
+    // over-reach accent. So two soft, sometimes-collinear markers (a single harder-than-usual RPE
+    // reading; a lift's e1RM dipping across a 5/3/1 weight-wave) cascaded into "consider backing off"
+    // on an in-range, on-plan week — the exact soft-signal cascade D-416 narrowed for the load verdict
+    // but left standing here. Declining markers WITHOUT elevated load are a WATCH, not an alarm: report
+    // them honestly ('stagnating') so they still show, but never emit the back-off word or trip the
+    // readiness→load cascade unless load actually corroborates. Genuine overreaching (declining markers
+    // WITH elevated load) is unchanged.
+    if (isLoadHigh) {
+      return make('overreaching', decliningSignals[0] || null, available >= 3 ? 'high' : 'medium',
+        `Multiple signals declining (${decliningSignals.join(', ')}) with elevated load. Consider backing off.`);
+    }
+    return make('stagnating', decliningSignals[0] || null, available >= 3 ? 'medium' : 'low',
+      `Multiple response markers trending down (${decliningSignals.join(', ')}), but load is in range — worth watching, not backing off.`);
   }
 
   if (concerning === 1 && improving === 0 && available >= 3) {
