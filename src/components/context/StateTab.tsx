@@ -14,6 +14,7 @@ import { useExerciseLog } from '@/hooks/useExerciseLog';
 // `isMain531Lift` gave — asked as a capability, from the table that also says what to render
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
+import { trustedMaxReps } from '@/lib/estimate-1rm';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
@@ -1353,11 +1354,14 @@ export default function StateTab({
         const entries = trend?.entries ?? [];
         if (entries.length === 0) return null;
         const recent = [...entries].reverse().slice(0, 5); // newest first, most-recent handful
-        // Mark the single best-estimate session in the shown window — an honest in-window "best", NOT an
-        // all-time PR claim (the lift's all-time PR badge already lives on the summary row above this).
+        // D-417: "best" is the strongest TRUSTED reading in the window — a high-rep set inflates its
+        // estimate, so it can't be your best (that would rank by reps, not weight). Untrusted sets still
+        // show in the list, they just can't win the tag. No trusted set → no "best" (bestIdx stays -1).
+        const isTrusted = (e: { best_reps?: number | null }) =>
+          Number(e.best_reps) > 0 && Number(e.best_reps) <= trustedMaxReps(lt.canonical_name);
         const bestIdx = recent.reduce(
-          (bi, e, i, arr) => (Number(e.estimated_1rm) || 0) > (Number(arr[bi].estimated_1rm) || 0) ? i : bi,
-          0,
+          (bi, e, i) => (isTrusted(e) && (bi < 0 || (Number(e.estimated_1rm) || 0) > (Number(recent[bi].estimated_1rm) || 0))) ? i : bi,
+          -1,
         );
         return (
           <div key={lt.canonical_name} className="space-y-1.5">
@@ -1368,7 +1372,7 @@ export default function StateTab({
                   ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                   : '';
                 const est = Number(e.estimated_1rm) || 0;
-                const isBest = i === bestIdx && est > 0;
+                const isBest = i === bestIdx; // bestIdx is -1 when no trusted set exists (D-417)
                 return (
                   <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
                     <span className="text-white/75 tabular-nums">{e.best_weight} lb × {e.best_reps}</span>

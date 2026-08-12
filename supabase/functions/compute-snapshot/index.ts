@@ -699,7 +699,7 @@ serve(async (req: Request) => {
         const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
 
         const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([
-          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm")
+          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm,best_reps")
             .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
@@ -847,6 +847,7 @@ serve(async (req: Request) => {
 
         const exerciseRows = (exR.data ?? []).map((e: any) => ({
           date: e.date, canonical_name: e.canonical_name, exercise_name: e.exercise_name, estimated_1rm: e.estimated_1rm,
+          reps: e.best_reps, // D-417: trust gate — a high-rep set can't mint the e1RM series (records/trend/sparkline)
         }));
 
         // REAL PR frame (2026-07-21) — the best estimated 1RM across ALL logged history per lift, NOT

@@ -106,6 +106,27 @@ export function estimate1RMRounded(weight: number, reps: number, rirOffset = 0):
 }
 
 /**
+ * The rep ceiling under which a set's estimated 1RM is trustworthy. Above it the estimate inflates with
+ * reps (the formulas are validated to ~10 reps, best 2–6; a 25-rep set does not describe a 1RM), so any
+ * RECORD or TREND built on it is really a rep count in disguise — which is why "best"/summary/sparkline
+ * read only sets AT OR UNDER this ceiling. The estimate is still COMPUTED and shown per set (D-339, never
+ * capped); this only decides what counts as a strength reading.
+ *
+ * ⚠️ SINGLE-VALUE SOURCE, MIRRORED: `wendler-531.ts`'s `trustedMaxRepsFor` carries the science provenance
+ * (LeSuer et al. 1997 — deadlift estimates run systematically low, so its ceiling is tighter). Same
+ * numbers (deadlift 5, else 8); keep the two in sync, or unify by having wendler delegate here.
+ */
+export function trustedMaxReps(liftName?: string | null): number {
+  return /deadlift/i.test(String(liftName ?? '')) ? 5 : 8;
+}
+
+/** Is this set's estimated 1RM trustworthy for a record/trend (reps within the ceiling for the lift)? */
+export function estimateIsTrusted(liftName: string | null | undefined, reps: number | null | undefined): boolean {
+  const r = Number(reps);
+  return Number.isFinite(r) && r > 0 && r <= trustedMaxReps(liftName);
+}
+
+/**
  * ⛔ THE OTHER HALF OF WENDLER'S POINT, AND THE ONE HE ACTUALLY CARES ABOUT (p10).
  *
  * *"If your squat goes from 225x6 to 225x9, you've gotten stronger. Don't get stuck just trying to

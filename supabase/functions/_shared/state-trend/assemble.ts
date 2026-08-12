@@ -17,6 +17,7 @@ import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 // emitted series and the drawn sparkline cannot disagree about which four. Path precedent:
 // `_shared/response-model/weekly.ts` imports `src/lib/` the same way (bundled at deploy time).
 import { isTrackedMaxLift } from '../../../../src/lib/tracked-max-lifts.ts';
+import { trustedMaxReps } from '../../../../src/lib/estimate-1rm.ts';
 import { CROWN_MIN_DECOUPLING } from './baseline-derive.ts';
 import { computeSwimState, swimPaceToSeries, computeSwimRestState, swimRestToSeries } from './swim.ts';
 import { computeAdherenceState } from './adherence.ts';
@@ -175,7 +176,7 @@ export const disciplineOf = (t: unknown): string | null => {
 
 // Lift series from raw exercise_log rows — mirrors useExerciseLog's liftTrends derivation exactly
 // (filter e1RM>0, group by canonical, ≥2 sessions, sort by date). Same columns both runtimes read.
-export interface ExerciseLogLite { date: string; canonical_name: string; exercise_name?: string | null; estimated_1rm: number | null }
+export interface ExerciseLogLite { date: string; canonical_name: string; exercise_name?: string | null; estimated_1rm: number | null; reps?: number | null }
 /** D-338 — what the PLAN was asking for on each dated point, resolved once by the caller off the
  *  single plan-phase resolver. `phaseByDate` carries the raw phase name lowercased ('deload',
  *  'leader', 'anchor', 'build'…); `measuredDates` are the days an all-out set was actually
@@ -188,6 +189,12 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
   const byCanonical = new Map<string, ExerciseLogLite[]>();
   for (const e of rows) {
     if ((e.estimated_1rm ?? 0) <= 0) continue;
+    // D-417: a set past the trusted rep ceiling (8 reps, 5 on deadlift) inflates its estimate — the
+    // formula only holds to ~10 reps — so it does NOT count toward the e1RM series that feeds the
+    // records / trend / summary number / sparkline. The set still shows per-set in the "logged sets"
+    // history; it just cannot mint a max. reps unknown (rows written before the column was threaded) →
+    // kept, so we never blank real data. Matches the strength-world rule: a 1RM comes from a low-rep set.
+    if (e.reps != null && e.reps > trustedMaxReps(e.canonical_name)) continue;
     const arr = byCanonical.get(e.canonical_name) ?? [];
     arr.push(e);
     byCanonical.set(e.canonical_name, arr);
