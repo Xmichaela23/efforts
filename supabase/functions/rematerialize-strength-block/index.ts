@@ -33,6 +33,7 @@ import {
   warmupSetsForWeek,
   weightForSet,
   workingNumberForCycles,
+  BAR_LB,
   WEEKS_PER_CYCLE,
   type CycleKind,
   type WorkingNumberVerdict,
@@ -199,12 +200,16 @@ Deno.serve(async (req) => {
         // the first progression would silently undo it. `warmupSetsForWeek` is empty on a deload.
         const spec = [...warmupSetsForWeek(weekInCycle), ...setsForWeek(cyc.kind, weekInCycle)];
         const oldPlan = Array.isArray(ex?.set_plan) ? ex.set_plan : [];
-        const newPlan = spec.map((s) => ({
-          weight: weightForSet(wn, s.pct),
-          reps: s.reps,
-          ...(s.amrap ? { amrap: true } : null),
-          ...(s.warmup ? { warmup: true } : null),
-        }));
+        const newPlan = spec.map((s) => {
+          const raw = weightForSet(wn, s.pct);
+          return {
+            // Warm-ups floor at the empty bar — same rule as the composer (mainLiftRow).
+            weight: s.warmup ? Math.max(BAR_LB, raw) : raw,
+            reps: s.reps,
+            ...(s.amrap ? { amrap: true } : null),
+            ...(s.warmup ? { warmup: true } : null),
+          };
+        });
         // The top set is the last WORK set, not the last row — warm-ups are prepended. Compare on it,
         // so the progression verdict reads the measured set, never a warm-up.
         const workOld = oldPlan.filter((s: any) => !s?.warmup);

@@ -52,6 +52,7 @@ import {
   setsForWeek,
   warmupSetsForWeek,
   weightForSet,
+  BAR_LB,
   WEEKS_PER_CYCLE,
   type WendlerSet,
   TM_CEILING_PCT_OF_1RM,
@@ -597,12 +598,20 @@ function mainLiftRow(
   oneRM: number,
   sets: WendlerSet[],
 ): StrengthExercise {
-  const set_plan: PlannedSet[] = sets.map((s) => ({
-    weight: weightForSet(workingNumber, s.pct),
-    reps: s.reps,
-    ...(s.amrap ? { amrap: true } : null),
-    ...(s.warmup ? { warmup: true } : null),
-  }));
+  const set_plan: PlannedSet[] = sets.map((s) => {
+    const raw = weightForSet(workingNumber, s.pct);
+    // ⛔ A WARM-UP FLOORS AT THE EMPTY BAR. 40/50/60% of a light working number resolves below 45 lb
+    // (e.g. a 80 lb press → 32/40/48), which is un-loadable — the athlete presses the bar. Work sets
+    // are not floored: a work set below the bar means the training max itself is near-empty-bar, which
+    // the athlete would see and correct, not something to silently mask.
+    const weight = s.warmup ? Math.max(BAR_LB, raw) : raw;
+    return {
+      weight,
+      reps: s.reps,
+      ...(s.amrap ? { amrap: true } : null),
+      ...(s.warmup ? { warmup: true } : null),
+    };
+  });
   // ⛔ THE TOP SET IS THE LAST WORK SET, NOT THE LAST ROW. Warm-ups are prepended, so reading the
   // literal last element still works today — but the block is measured on the work set, so name it
   // that way and it cannot drift if the ordering ever changes.

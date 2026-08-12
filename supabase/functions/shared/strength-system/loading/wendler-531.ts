@@ -89,6 +89,11 @@ export function warmupSetsForWeek(weekInCycle: number): WendlerSet[] {
 /** Barbell plates load in 5 lb pairs. Round DOWN — see roundDownToIncrement. */
 const INCREMENT_LB = 5;
 
+/** The empty Olympic barbell. Nothing on a barbell lift can be prescribed below it — a warm-up that
+ *  computes to 30 lb is un-loadable, so it clamps here (the athlete presses the empty bar). Standard
+ *  men's bar; a lighter bar (women's 35, technique bars) is an equipment refinement, not handled yet. */
+export const BAR_LB = 45;
+
 /**
  * ROUND DOWN, never to nearest. Overshoot writes a set the athlete cannot complete;
  * an undershoot is absorbed. The error is not symmetric. On a 5 lb grid the difference is

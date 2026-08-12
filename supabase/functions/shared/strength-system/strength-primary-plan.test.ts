@@ -109,6 +109,24 @@ Deno.test('every main lift carries THREE WORK sets at THREE weights, and they as
   }
 });
 
+Deno.test('warm-up weights floor at the empty bar (45 lb) — a light lift never prescribes a sub-bar warm-up', () => {
+  // OHP 1RM 65 → working number ~55; 40/50/60% is 22/28/33, all un-loadable. They must clamp to 45.
+  const light = composeStrengthPrimaryPlan({
+    durationWeeks: 12,
+    oneRepMaxes: { bench: 95, squat: 135, deadlift: 155, overheadPress: 65 },
+    enduranceSport: 'run',
+    enduranceFrequency: 3,
+  });
+  for (const s of ((light as any).sessions_by_week['1'] as any[])) {
+    if (s.type !== 'strength') continue;
+    const m = (s.strength_exercises ?? []).find((e: any) => Array.isArray(e.set_plan));
+    if (!m) continue;
+    for (const p of m.set_plan.filter((x: any) => x.warmup)) {
+      assert(p.weight >= 45, `${m.name} warm-up ${p.weight} lb is below the 45 lb bar`);
+    }
+  }
+});
+
 Deno.test('warm-up ramp: 40/50/60 (reps 5/5/3) precedes the work sets on working weeks, NONE on deload', () => {
   // Bench working number wk1 = 190. 40/50/60% → 76/95/114 → 75/95/110 (round down to 5).
   assertEquals(warmupRamp(1, 'Bench Press'), '75x5 95x5 110x3');
