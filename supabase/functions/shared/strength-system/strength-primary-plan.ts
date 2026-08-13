@@ -1270,6 +1270,32 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * the seed's stated purpose is exactly what it fails at: it contradicts the plan it describes.
    */
   strength_days?: string[];
+  /**
+   * ⛔ THE CEILING, AS A SIGNAL RATHER THAN A SHRUG (slice 4a, 2026-08-12).
+   *
+   * When a lift's training max reaches 90% of the max ON FILE, the block stops advancing it — and
+   * with a 5 lb plate grid a light lift can pin in cycle 2 and print byte-identical weeks for the
+   * rest of the block. That fact was computed here, spoken once in prose inside `description`, and
+   * then **thrown away**: nothing structured left this function, and `plans.config` never stored it.
+   * So the one surface that could act on it — a retest/raise offer — had nothing to read.
+   *
+   * ⚠️ THIS IS NOT A WARNING, IT IS AN INPUT. A pinned lift means the number the block is measuring
+   * against has stopped being true, which is a CALIBRATION question ("is 100 lb still your press
+   * max?"), not a training one. The prose note stays for today's renderer; this is the machine-
+   * readable half that the calibration offer consumes.
+   *
+   * Absent = no lift pinned. Never empty-by-silence: an absent array means nothing pinned, not that
+   * nobody looked.
+   */
+  strength_calibration?: Array<{
+    lift: string;
+    reason: 'ceiling';
+    /** The cycle the lift pins in — from here to the end of the block its weights do not move. */
+    at_cycle: number;
+    total_cycles: number;
+    /** The max on file the ceiling was computed against — the number a retest would replace. */
+    one_rm: number;
+  }>;
 } {
   const { enduranceSport, oneRepMaxes } = args;
   const weeks = blockWeeks(args.durationWeeks);
@@ -2791,6 +2817,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // ⚠️ SORTED BY DAY, not by lift. `strengthDays` is built in MAIN_LIFTS order (bench, squat, OHP,
     // deadlift), so it printed "monday, wednesday, tuesday, friday" — correct data in an order that
     // reads like a mistake.
+    // ⛔ SLICE 4a: the ceiling leaves this function as DATA, not only as a sentence. See the field's
+    // docblock. Built from the same `ceilingHits` the prose note is built from, so the two cannot
+    // disagree about which lift pinned or when.
+    strength_calibration: ceilingHits.length
+      ? ceilingHits.map((h) => ({
+          lift: h.name,
+          reason: 'ceiling' as const,
+          at_cycle: h.cycle,
+          total_cycles: cycles.length,
+          one_rm: h.oneRM,
+        }))
+      : undefined,
     strength_days: [...strengthDays]
       .sort((a, b) => PLACEMENT_DAYS.indexOf(a as DayName) - PLACEMENT_DAYS.indexOf(b as DayName))
       .map((d) => String(d).toLowerCase()),

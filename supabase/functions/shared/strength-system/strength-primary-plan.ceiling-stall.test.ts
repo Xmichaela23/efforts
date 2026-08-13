@@ -85,3 +85,76 @@ Deno.test('⛔ THE PLAN MUST SAY SO — a flat lift with no stated reason breaks
   assert(/Overhead Press/.test(text), `no ceiling note for the stalled press — got: ${text}`);
   assert(!/Bench Press/.test(text), `bench advanced and must not carry a ceiling note: ${text}`);
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// SLICE 4a (2026-08-12) — THE CEILING LEAVES THE BUILDER AS DATA, NOT ONLY AS A SENTENCE.
+//
+// ⛔ THE HALF OF THE STALL THAT WAS ACTUALLY FIXABLE TODAY. The three tests above pin the defect and
+// its prose note, and that note was ALL there was: `placement_compromises` never reaches the database
+// (`generate-strength-plan/index.ts` writes `plans.config` and did not carry it), so the ceiling fact
+// was computed at build time, spoken once inside `description`, and thrown away. Nothing downstream
+// could act on it.
+//
+// ⚠️ A PINNED LIFT IS A CALIBRATION QUESTION, NOT A TRAINING ONE — "is 100 lb still your press max?"
+// The signal below is what the retest/raise offer reads. The prose stays for today's renderer.
+//
+// ⛔ WHAT THIS DOES *NOT* DO, AND THE REASON IS EQUIPMENT, NOT EFFORT: it does not make the pinned
+// lift climb. That needs a finer step than 5 lb, which Wendler blesses (p29: *"a 2.5 pound increase
+// for the bench and military press… provided you have access to 1.25 pound plates"*) and which this
+// app cannot know — plate inventory is not captured anywhere, and was explicitly abandoned
+// (`docs/BUILD-ORDER-strength-spine.md:292`). Squats cannot be helped by granularity at all: p29's
+// finer LOWER-body step is 5 lb, which the increment cap already produces.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ SLICE 4a: every pinned lift leaves the builder as a structured calibration signal', () => {
+  const cal = (PLAN as any).strength_calibration as Array<{
+    lift: string; reason: string; at_cycle: number; total_cycles: number; one_rm: number;
+  }> | undefined;
+
+  assert(Array.isArray(cal) && cal.length > 0, 'the ceiling must leave the builder as data');
+  const byLift = new Map(cal!.map((c) => [c.lift, c]));
+
+  // Both lifts that go flat are named — including the SQUAT, which no increment change can rescue.
+  for (const lift of ['Back Squat', 'Overhead Press']) {
+    const c = byLift.get(lift);
+    assert(c, `${lift} pinned and must carry a calibration signal`);
+    assertEquals(c!.reason, 'ceiling');
+    assert(c!.at_cycle >= 2 && c!.at_cycle <= c!.total_cycles, `${lift} cycle ${c!.at_cycle} of ${c!.total_cycles}`);
+  }
+  // The max on file is carried, because it is the number a retest would replace.
+  assertEquals(byLift.get('Overhead Press')!.one_rm, LIGHT.overheadPress);
+  assertEquals(byLift.get('Back Squat')!.one_rm, LIGHT.squat);
+
+  // A lift with headroom is NOT a calibration case — the signal must not fire on a healthy lift.
+  assertEquals(byLift.has('Bench Press'), false);
+  assertEquals(byLift.has('Deadlift'), false);
+});
+
+Deno.test('SLICE 4a: the structured signal and the prose note cannot disagree about who pinned', () => {
+  // Both are built from the same `ceilingHits`; this pins that they stay in step, because the note is
+  // what the athlete reads and the signal is what the offer acts on.
+  const cal = ((PLAN as any).strength_calibration ?? []) as Array<{ lift: string }>;
+  const notes = ((PLAN as any).placement_compromises ?? []) as Array<{ kind?: string; text?: string }>;
+  const ceilingText = notes.filter((n) => n?.kind === 'ceiling').map((n) => n?.text ?? '').join(' | ');
+  for (const c of cal) {
+    assert(ceilingText.includes(c.lift), `${c.lift} has a signal but is missing from the note: ${ceilingText}`);
+  }
+});
+
+Deno.test('SLICE 4a: a block where nothing pins carries NO signal (absent, never an empty array)', () => {
+  // ⛔ NOTE WHAT IT TAKES TO GET HERE, BECAUSE IT IS THE REAL FINDING. The growth band is 5% of the
+  // max (85% → 90%) and the upper-body step is 5 lb, so clearing two steps needs a band of 10 lb —
+  // i.e. **an overhead press max of 200 lb or more**. Below that the press pins by cycle 3 for
+  // EVERY athlete, not just a light one: a 165 lb press (Wendler's own book lifter presses 165)
+  // still goes flat. The press below is 220 purely to produce a no-pin block for this assertion.
+  const heavy = composeStrengthPrimaryPlan({
+    durationWeeks: 12,
+    oneRepMaxes: { bench: 250, squat: 350, deadlift: 400, overheadPress: 220 },
+    enduranceSport: 'run',
+    enduranceFrequency: 3,
+    targetWeeklyMiles: 13,
+    easyPaceMinPerMile: 9,
+    blockShape: { continuity: { weeksSince: 2, logs: 40 }, strengthPosture: 'develop' },
+  });
+  assertEquals((heavy as any).strength_calibration, undefined);
+});

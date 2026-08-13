@@ -1923,3 +1923,90 @@ invariant the screen violated — **the record can never exceed the top of the g
 p10 (rep records) + p32 ("Comparing Rep Maxes", the estimate is "best used for motivation"); Strong /
 Hevy performance-tracking docs. Not tuned to Michael — the record+PR+chart method and the whole-cycle
 window apply to any athlete and any protocol.
+
+---
+
+### D-421 — A pinned lift is a calibration signal, not a stall to engineer away (2026-08-12, **BUILT — fixtures green (3 new, 1987 pass / 1 pre-existing unrelated failure); NOT deployed, NOT device-verified**) — closes slice 4a; the finer-increment premise was REJECTED, see the decision
+
+**The defect.** When a lift's training max reaches 90% of the max on file, the block stops advancing it
+and prints byte-identical weeks for the rest of the block. That was already known and already noted in
+prose (`strength-primary-plan.ceiling-stall.test.ts`, 2026-07-28). What was NOT known: **the fact never
+left the builder.** `placement_compromises` is returned in memory and folded into `description`;
+`generate-strength-plan/index.ts` writes `plans.config` and did not carry it. So the one surface that
+could act on a pinned lift — a retest/raise offer — had nothing to read.
+
+**⛔ THE REFRAME, AND IT IS THE WHOLE DECISION (Michael, 2026-08-12).** *"The pinning isn't actually a
+bug to engineer away."* The 90% ceiling is a **safety bound**: it says *you have climbed to 90% of your
+recorded max; before going heavier, confirm that max is real.* When the recorded max is too low it
+fires early and says **retest** — which is correct. **So the pin is the system working. The only defect
+was that it did it SILENTLY, with no way to act on it.** That reframes the whole slice: nothing needs to
+climb further; the signal needs to escape and something needs to answer it.
+
+**The decision.** A pinned lift is a **calibration** question ("is 100 lb still your press max?"), not a
+training one, so the builder now emits it as data: `strength_calibration: [{ lift, reason: 'ceiling',
+at_cycle, total_cycles, one_rm }]`, persisted to `plans.config.strength_calibration`. The prose note
+stays for today's renderer; both are built from the same `ceilingHits`, and a fixture pins that they
+cannot disagree about which lift pinned. Absent = nothing pinned; never `[]` for "nobody looked".
+
+**⛔ THE FINDING THAT MATTERS MORE THAN THE FIX — THIS IS NOT A LIGHT-LIFTER EDGE CASE.**
+The growth band is 5% of the max (85% → 90%) and the upper-body step is 5 lb, so clearing two cycle
+steps needs a 10 lb band — **an overhead press max of 200 lb or more.** Below that the press pins by
+cycle 3 for *every* athlete. Measured on the real functions:
+
+| lift | max | base → c2 → c3 | pins? |
+|---|---|---|---|
+| Overhead press | 100 | 85 → 90 → **90** | yes, cycle 3 |
+| Overhead press | 165 *(Wendler's own book lifter presses 165)* | 140 → 145 → **145** | yes, cycle 3 |
+| Back squat | 125 | 105 → 110 → **110** | yes, cycle 3 |
+| Bench | 150 | 125 → 130 → 135 | no |
+| Deadlift | 150 | 125 → 130 → 135 | no |
+
+**Grounding (5/3/1 2nd ed., verified verbatim).** p29, *"Even Smaller Increments?"*: *"A 5 pound
+increase in the lower body lifts, for example, or a 2.5 pound increase for the bench and military
+press. I haven't done this, but I'd assume it would work well, **provided you have access to 1.25 pound
+plates for your upper body movements.** If you'd like to do this, by all means have at it."* Wendler
+blesses the finer step and states its equipment condition in the same sentence.
+*(Also on p29, and worth recording because slice 2's contract attributed it to p28: "you're always
+trying to hit more reps on your last set of each workout.")*
+
+**⛔ WHY THE FINER-INCREMENT PREMISE WAS REJECTED. Three findings, any one of which blocks it.**
+
+1. **The equipment gate does not exist, and it was explicitly abandoned.** Plate inventory is captured
+   nowhere: `user_baselines.equipment.strength` is a chip list of nine capability labels
+   (`"Barbell + plates"`, `"Dumbbells"`, `"Squat rack / Power cage"`…), plus a `home_gym`/`commercial_gym`
+   location and a derived three-value tier — none of which says which plates exist. And
+   `docs/BUILD-ORDER-strength-spine.md:292`: *"`5 lb` on the barbell grid (Michael, 2026-07-24 —
+   plate-inventory tracking is explicitly abandoned; every barbell app assumes 2.5s exist and that is a
+   hardware problem, not a software one)."* Gating on micro plates reverses a standing decision.
+2. **The finer TM step barely moves the bar anyway, because SET weights round to 5.** Measured: at TM 85
+   the anchor sets are 60 / 70 / 80; at TM 87.5 they are 65 / 70 / 80. **The top set — the all-out set
+   that IS the measurement (p66) — does not move at all.** To deliver the intent, the set grid must go
+   to 2.5 too, in both writers (`strength-primary-plan.ts:602` and
+   `rematerialize-strength-block/index.ts:204`) — which is squarely the plate-inventory territory of (1).
+3. **It cannot fix a squat.** p29's finer LOWER-body step is 5 lb, which the 6% increment cap already
+   produces. Michael's squat (max 125, band 105→110) is unreachable by granularity at any equipment
+   level; it is a calibration case only.
+
+**So the honest scope: the finer increment fixes the press for athletes with micro plates, and nothing
+else.** Every other pinned lift — including his squat, and every press under 200 — needs the max on
+file to move, which is the calibration offer, not this slice.
+
+**⛔ DECIDED (Michael, 2026-08-12): leave the grid at 5 lb; CALIBRATION carries every pinned lift.**
+The 4a remainder is deleted rather than deferred — there is nothing left to build there.
+
+Two alternatives were considered and rejected on the record, so neither gets re-proposed:
+- **Add a micro-plate intake question and take the +2.5 step.** Rejected: it reverses the 2026-07-24
+  plate-inventory call, it barely moves the bar (finding 2 — the measuring set does not move at all),
+  and it cannot fix a squat. *"Bad trade."*
+- **Revisit the 85% → 90% band.** Rejected: the ceiling is defensible **as a safety limit**, and once
+  calibration closes the loop it stops being a dead end. Not worth reopening a heavily-decided
+  invariant to solve a problem that is no longer a dead end.
+
+⚠️ **THIS ENTRY IS ONLY HALF A LOOP UNTIL THE CALIBRATION OFFER EXISTS.** The signal now escapes the
+builder and is stored; nothing yet reads it. A pinned lift is still, from the athlete's side, a lift
+that stops moving with a sentence attached. **Slice 4b (the retest/raise offer) is what makes this
+whole** — it is the consumer this field was shaped for, and it covers every pinned lift including the
+squat, which no increment change could reach.
+
+**Untouched:** the 90% ceiling invariant, `INCREMENT_LB`, the e1RM formula and reserve gate, the max on
+file. No athlete-facing weight changes in this entry — it adds a field and persists it.

@@ -265,6 +265,13 @@ Deno.serve(async (req: Request) => {
           swim_days: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
           volume_notes: plan.volume_notes ?? null, // pace-estimate disclosure only (cap logic retired)
           volume_state: plan.volume_state ?? null, // above|below|in_band → client renders the tradeoff copy
+          // ⛔ SLICE 4a — THE CEILING SURVIVES THE INSERT. Which lifts pin at 90% of their max on
+          // file, and when. It was computed at build time and thrown away here: the fact reached the
+          // athlete only as a sentence inside `description`, and nothing structured was ever stored,
+          // so no later surface could act on it. A pinned lift is a CALIBRATION question about a max
+          // that has stopped being true — this is the row the retest/raise offer reads.
+          // ⚠️ Absent = nothing pinned. Never write `[]` for "we didn't look".
+          strength_calibration: plan.strength_calibration ?? null,
           user_selected_start_date: start_date ?? null,
         },
         sessions_by_week: plan.sessions_by_week,
