@@ -601,6 +601,25 @@ function assistanceRows(
       (dose.assistedOnRamp
         ? ' Band-assisted reps are logged separately, so they never count as clean ones.'
         : '') +
+      // ⛔ THE ARMS FOCUS IS SUBSUMED, NOT DROPPED — and the line exists because the athlete would
+      // otherwise read a silent contradiction. They asked for Arms; the app books no curls.
+      //
+      // ⚠️ AND IT IS TRUE ONLY OF THE BICEPS HALF. Verified against the resolver rather than assumed:
+      // with the progression off, an Arms focus books `Dumbbell Curl` on the bench and deadlift days;
+      // with it on, both become chins, while the triceps half (Dips, Close-Grip Bench, Triceps
+      // Extension) is untouched on all four. The sentence says exactly that and no more.
+      //
+      // ⛔ IT IS A NOTE, NOT A MOVEMENT CHANGE. Nothing is added or removed by this branch. Booking
+      // curls ON TOP of the chin volume is what the note explains away: a chin is elbow flexion under
+      // load, the dose is stated in the same sentence, and stacking isolation on top of it would add
+      // fatigue against a by-feel, deliberately low-volume design (D-406).
+      // ⚠️ THE DOSE IS NOT RESTATED HERE. `pullupDoseNote` already opened the paragraph with the
+      // weekly number two sentences earlier, and saying "100 chins a week" twice in one description
+      // reads as two different facts.
+      (prefs.focus.includes('arms')
+        ? ' Arms focus: the chins are the biceps volume, so no curls are booked on top — ' +
+          'the triceps work is unchanged.'
+        : '') +
       (gripIndex === WEIGHTED_DAY_INDEX && !dose.assistedOnRamp
         ? ` Add weight for sets of ${WEIGHTED_DAY_REPS} on this day — by feel, as always.`
         : '')

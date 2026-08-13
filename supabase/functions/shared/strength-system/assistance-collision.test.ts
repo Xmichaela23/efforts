@@ -461,6 +461,79 @@ Deno.test('the main-lift name maps to the athlete\'s day, and an unknown lift de
   assertEquals(resolveDayAssistance(prefs, 'press', 50).length, 3);
 });
 
+// ── THE ARMS FOCUS IS SUBSUMED BY THE CHIN PROGRESSION ───────────────────────────────────────────
+
+const descriptionsOf = (plan: any) =>
+  (Object.values(plan.sessions_by_week).flat() as any[])
+    .filter((s: any) => s.type === 'strength')
+    .map((s: any) => String(s.description ?? ''));
+
+const weekWith = (focus: string[], perf?: string) => ({
+  version: 2,
+  by_day: normalizeAssistancePrefs(null).by_day,
+  focus,
+  ...(perf ? { performance_focus: perf } : {}),
+});
+
+Deno.test('⛔ BOTH ON → the note says the biceps are already covered, and no curls are booked', () => {
+  const plan = composeStrengthPrimaryPlan({
+    ...base, pullupMaxReps: 12, assistancePicks: weekWith(['arms'], 'pullups'),
+  } as any);
+  const withNote = descriptionsOf(plan).filter((d) => d.includes('Arms focus:'));
+  assertEquals(withNote.length > 0, true, 'the subsumed-arms note never appeared');
+  for (const d of withNote) {
+    assertEquals(d.includes('the chins are the biceps volume'), true, d);
+    assertEquals(d.includes('no curls are booked on top'), true, d);
+    // ⚠️ THE WEEKLY DOSE IS STATED ONCE, by `pullupDoseNote` — not repeated by this line.
+    assertEquals((d.match(/chins a week/g) ?? []).length, 1, `the dose was stated twice: ${d}`);
+    assertEquals(d.includes('the triceps work is unchanged'), true, d);
+  }
+  // ⛔ IT IS A NOTE, NOT A MOVEMENT CHANGE. The rows are identical to the same block without it.
+  const rows = assistanceRowsOf(plan).map((r: any) => r.name);
+  const withoutFocus = assistanceRowsOf(composeStrengthPrimaryPlan({
+    ...base, pullupMaxReps: 12, assistancePicks: weekWith([], 'pullups'),
+  } as any)).map((r: any) => r.name);
+  assertEquals(rows.length, withoutFocus.length, 'the note changed how many rows were authored');
+});
+
+Deno.test('the note appears ONLY when both are on', () => {
+  const cases: Array<[string, any]> = [
+    ['arms focus, no progression', weekWith(['arms'])],
+    ['progression, no arms focus', weekWith(['chest'], 'pullups')],
+    ['neither', weekWith([])],
+  ];
+  for (const [label, picks] of cases) {
+    const plan = composeStrengthPrimaryPlan({ ...base, pullupMaxReps: 12, assistancePicks: picks } as any);
+    for (const d of descriptionsOf(plan)) {
+      assertEquals(d.includes('Arms focus:'), false, `${label}: the note leaked`);
+    }
+  }
+});
+
+Deno.test('⛔ THE CLAIM IS TRUE — the progression really does replace the booked curls', () => {
+  // The note asserts a fact about the block, so the fact is asserted too. With an Arms focus and no
+  // progression the resolver books `Dumbbell Curl`; with the progression it books chins, and the
+  // triceps half survives either way.
+  const HOME = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage',
+    'Bench (flat/adjustable)', 'Pull-up bar'];
+  const armsWeek = buildDefaultWeek(['arms'], HOME);
+  const off = normalizeAssistancePrefs({ version: 2, by_day: armsWeek, focus: ['arms'] });
+  const on = normalizeAssistancePrefs({ version: 2, by_day: armsWeek, focus: ['arms'], performance_focus: 'pullups' });
+
+  const pullsOff = LIFT_DAYS.map((d) => resolveDayAssistance(off, d, 50, null)
+    .find((r) => r.category === 'pull')!.name);
+  assertEquals(pullsOff.includes('Dumbbell Curl'), true, 'the arms focus stopped booking curls');
+
+  const pullsOn = LIFT_DAYS.map((d) => resolveDayAssistance(on, d, 50, { movement: 'Chin-Up', totalReps: 25 })
+    .find((r) => r.category === 'pull')!.name);
+  assertEquals(pullsOn.includes('Dumbbell Curl'), false, 'a curl survived the progression');
+  // The triceps half is untouched — the note says "unchanged" and this is what makes that true.
+  const pushesOn = LIFT_DAYS.map((d) => resolveDayAssistance(on, d, 50, { movement: 'Chin-Up', totalReps: 25 })
+    .find((r) => r.category === 'push')!.name);
+  assertEquals(pushesOn.every((n) => ['Dips', 'Close-Grip Bench Press', 'Triceps Extension',
+    'Triceps Pushdown'].includes(n)), true, pushesOn.join(', '));
+});
+
 Deno.test('⛔ NO SUBSTITUTION NOTE IS EVER PRINTED — there is nothing left to apologise for', () => {
   const plan = composeStrengthPrimaryPlan({
     ...base,
