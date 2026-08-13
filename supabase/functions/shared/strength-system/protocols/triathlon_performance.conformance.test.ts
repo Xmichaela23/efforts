@@ -125,7 +125,7 @@ Deno.test('S-003 (base upper): every Hypertrophy upper has horizontal push + hor
     );
     // Vertical pull: Pull-ups / Lat Pull-Down / Band Pull-Down.
     assert(
-      findByName(upper, /Pull-?ups|Pull-?Down/i),
+      findByName(upper, /Pull[-\s]?ups|Pull[-\s]?Down/i),
       `base wip=${wip}: missing vertical pull (Pull-ups/Pull-Down) — got [${exerciseNames(upper)}]`,
     );
   }
@@ -147,7 +147,7 @@ Deno.test('S-003 (build upper): every Build upper has horizontal push + horizont
       `build wip=${wip}: missing vertical push (OHP) — got [${exerciseNames(upper)}]`,
     );
     assert(
-      findByName(upper, /Pull-?ups|Pull-?Down/i),
+      findByName(upper, /Pull[-\s]?ups|Pull[-\s]?Down/i),
       `build wip=${wip}: missing vertical pull (Pull-ups/Pull-Down) — got [${exerciseNames(upper)}]`,
     );
   }
@@ -159,7 +159,7 @@ Deno.test('S-004 (base upper): includes Band Face Pulls and Band Pull-Aparts', (
   for (const wip of [1, 2, 3, 4]) {
     const upper = upperOf(triathlonPerformanceProtocol.createWeekSessions(ctxWithPhase('base', wip)));
     assert(findByName(upper, /Face Pulls/i), `base wip=${wip}: missing Face Pulls — got [${exerciseNames(upper)}]`);
-    assert(findByName(upper, /Pull-Aparts/i), `base wip=${wip}: missing Band Pull-Aparts — got [${exerciseNames(upper)}]`);
+    assert(findByName(upper, /Pull[-\s]?Aparts/i), `base wip=${wip}: missing Band Pull-Aparts — got [${exerciseNames(upper)}]`);
   }
 });
 
@@ -167,7 +167,7 @@ Deno.test('S-004 (build upper): includes Band Face Pulls and Band Pull-Aparts', 
   for (const wip of [1, 2, 3, 4]) {
     const upper = upperOf(triathlonPerformanceProtocol.createWeekSessions(ctxWithPhase('build', wip)));
     assert(findByName(upper, /Face Pulls/i), `build wip=${wip}: missing Face Pulls — got [${exerciseNames(upper)}]`);
-    assert(findByName(upper, /Pull-Aparts/i), `build wip=${wip}: missing Band Pull-Aparts — got [${exerciseNames(upper)}]`);
+    assert(findByName(upper, /Pull[-\s]?Aparts/i), `build wip=${wip}: missing Band Pull-Aparts — got [${exerciseNames(upper)}]`);
   }
 });
 
@@ -239,7 +239,7 @@ Deno.test('W-001 (base): hypertrophy upper covers all four patterns within the s
     horizontal_push: findByName(upper, /Bench Press|Floor Press/i),
     horizontal_pull: findByName(upper, /\bRow\b/i),
     vertical_push: findByName(upper, /Overhead Press|Shoulder Press/i),
-    vertical_pull: findByName(upper, /Pull-?ups|Pull-?Down/i),
+    vertical_pull: findByName(upper, /Pull[-\s]?ups|Pull[-\s]?Down/i),
   };
   for (const [k, v] of Object.entries(patterns)) {
     assert(v, `base upper missing pattern ${k} — got [${exerciseNames(upper)}]`);
@@ -252,7 +252,7 @@ Deno.test('W-001 (build): build upper covers all four patterns within the single
     horizontal_push: findByName(upper, /Bench Press|Floor Press/i),
     horizontal_pull: findByName(upper, /\bRow\b/i),
     vertical_push: findByName(upper, /Overhead Press|Shoulder Press/i),
-    vertical_pull: findByName(upper, /Pull-?ups|Pull-?Down/i),
+    vertical_pull: findByName(upper, /Pull[-\s]?ups|Pull[-\s]?Down/i),
   };
   for (const [k, v] of Object.entries(patterns)) {
     assert(v, `build upper missing pattern ${k} — got [${exerciseNames(upper)}]`);
@@ -355,7 +355,7 @@ Deno.test('W-002: deload cuts accessories — no Hip Thrusts, no Face Pulls, no 
   for (const s of sessions) {
     assert(!findByName(s, /Hip Thrust|Glute Bridge/i), `${s.name}: deload should not have Hip Thrusts — got [${exerciseNames(s)}]`);
     assert(!findByName(s, /Face Pulls/i), `${s.name}: deload should not have Face Pulls — got [${exerciseNames(s)}]`);
-    assert(!findByName(s, /Pull-Aparts/i), `${s.name}: deload should not have Pull-Aparts — got [${exerciseNames(s)}]`);
+    assert(!findByName(s, /Pull[-\s]?Aparts/i), `${s.name}: deload should not have Pull-Aparts — got [${exerciseNames(s)}]`);
     assert(!findByName(s, /Dead Bug|Pallof|Copenhagen/i), `${s.name}: deload should not have core finisher — got [${exerciseNames(s)}]`);
   }
 });
@@ -376,7 +376,7 @@ Deno.test('S-003 deload carveout: Hypertrophy Deload Upper emits 2 patterns (Ben
     `deload upper should NOT include OHP (§3.3 carveout) — got [${exerciseNames(upper)}]`,
   );
   assert(
-    !findByName(upper, /Pull-?ups|Pull-?Down/i),
+    !findByName(upper, /Pull[-\s]?ups|Pull[-\s]?Down/i),
     `deload upper should NOT include Pull-ups (§3.3 carveout) — got [${exerciseNames(upper)}]`,
   );
 });
@@ -406,7 +406,7 @@ Deno.test('P-005: rebuild upper covers all four upper patterns (S-003 single-ses
   assert(findByName(upper, /Bench Press|Floor Press/i), `rebuild upper missing horizontal push — got [${exerciseNames(upper)}]`);
   assert(findByName(upper, /\bRow\b/i), `rebuild upper missing horizontal pull — got [${exerciseNames(upper)}]`);
   assert(findByName(upper, /Overhead Press|Shoulder Press/i), `rebuild upper missing vertical push — got [${exerciseNames(upper)}]`);
-  assert(findByName(upper, /Pull-?ups|Pull-?Down/i), `rebuild upper missing vertical pull — got [${exerciseNames(upper)}]`);
+  assert(findByName(upper, /Pull[-\s]?ups|Pull[-\s]?Down/i), `rebuild upper missing vertical pull — got [${exerciseNames(upper)}]`);
 });
 
 Deno.test('P-005: rebuild lower includes Hip Thrusts (S-005 still applies to rebuild)', () => {

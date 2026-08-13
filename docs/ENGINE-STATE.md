@@ -23,28 +23,21 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-12 PM — strength REASONING rebuilt end to end; the last piece, the max-calibration offer, is the next job)
+## 🧭 NEXT SESSION — START HERE (2026-08-13 — the press/squat freeze is FIXED. The invented 90% ceiling AND the light-lifter step-shrink are DELETED; the engine is now pure book-strict Wendler. Slice a = D-422, PUSHED + DEPLOYED, device-acceptance still open.)
 
 ### ⛔ YOUR JOB
-Build **Slice 4b** (the max-calibration offer), then push + deploy **D-421**. 4b is the only piece that fixes the *user-visible* defect — two lifts stall mid-block. Everything else this session cleaned up how strength is READ, not what the plan DOES.
+1. **Acceptance run (Michael-driven), now a LIVE check** — slice a is deployed. Regenerate a strength block and confirm the press/squat cycles CLIMB instead of repeating: week 7 ≠ week 11; squat steps 90→100→110, press by 5; no lift frozen for two cycles.
+2. **Then build Slice b** — `docs/SLICE-strength-b-auto-recalibrate-2026-08-12.md`. Auto-apply the reset(down)/bump(up), ANNOUNCE plainly + UNDO, per the field norm (StrongLifts/Juggernaut/Fitbod auto — the deleted silent auto-progression's sin was *silence*, not auto). It **replaces** the old consent-first `SLICE-strength-max-calibration-4b.md` (delete that on ship) and reads the `strength_calibration` wire (kept, re-scoped off the retired ceiling).
 
-1. **REWRITE the 4b slice first** (`docs/SLICE-strength-max-calibration-4b.md`). Michael corrected its framing: it is NOT a notification/celebration. Core action = **correct the training max → re-lay-out the rest of the plan around it** (the infra exists: `rematerialize-strength-block`; write on the athlete's tap via the existing Adjust flow, `StateAdjustLens`). One spine signal, fires UP (reps beat target) or DOWN (repeated stall — Wendler p31; NEVER one bad day, p33). Consent-first, never auto-writes. Surfaces: logger celebrates only (already built), **State offers + acts**, Performance echoes. It READS the `strength_calibration` signal D-421 already persists to `plans.config`.
-2. **Then push + deploy D-421** — `generate-strength-plan` only. Committed `33a6093f`, **not pushed / not deployed** until this session's doc push. It is the wire 4b reads; invisible until 4b.
-
-### WHAT SHIPPED THIS SESSION — do not re-litigate. All PUSHED + DEPLOYED + VERIFIED on Michael's device.
-- **e1RM estimator is PURE** (weight × reps; no RIR term) + reserve moved to an opt-in `effectiveRepsForReserve` helper. `compute-facts` folds reserve only on a positive protocol declaration. Reserve no longer inflates the estimate; Michael's 12 legacy 5/3/1 sessions recomputed clean.
-- **D-418** — ONE overload verdict (`mintOverloadVerdict`, `_shared/load-status-reconcile.ts`), fed only by RPE + measured metrics + actual-vs-plan. The false "a bit high / needs absorbing / back off" cascade is gone. Strength dropped as a strain signal.
-- **D-420** — the weekly strength DIRECTION verdict ("sliding") is RETIRED; strength reads as **record + rep PRs + chart** (the Strong/Hevy shape; no app computes a weekly strength direction). The dead D-267 e1RM-declining veto was deleted.
-- **3b** (folded into D-420) — the e1RM RECORD obeys the trusted-rep ceiling; deadlift best is 170 not 225; rep-PR badges render on the strength row.
-- **D-419** — protocol-declared strength gauge (`readsEffortAs`). Its *direction* half is superseded by D-420; the gauge infra survives.
-
-### COMMITTED, NOT LIVE
-- **D-421** (`33a6093f`) — a pinned lift leaves the builder as a `strength_calibration` signal in `plans.config`. **Half a loop: the signal is stored, nothing reads it yet — 4b does.**
-
-### ⚠️ STILL BROKEN FOR THE USER (this is what 4b fixes)
-- **The press/squat stall is NOT fixed.** Michael's OHP (max on file 100) and squat (110) hit the 90% ceiling by cycle 2 and REPEAT in cycle 3 — week 7 == week 11, identical top sets. Root: low max on file × the percentage band (85%→90%) against a fixed 5-lb step. 4b fixes it by correcting the max and re-laying-out; nothing else does. The 90% ceiling itself is CORRECT (a safety limit forcing a retest) — the defect was only that it stalled silently, which D-421 (signal) + 4b (offer) close.
-- **REJECTED — do not re-propose** (reasons on record in D-421 + the deleted 4a remainder): the **2.5-lb increment** route — reverses the abandoned plate-inventory decision (`BUILD-ORDER-strength-spine.md:292`), doesn't move the top set (set grid rounds to 5), can't fix squat; and the % band vs absolute step pins ANY sub-200-lb press (even Wendler's own book lifter), so it is structural, not a light-lift edge.
-- **Grounding for 4b:** `docs/SCIENCE-strength-e1rm-trust.md` §6 + D-420; Wendler 5/3/1 2nd ed. p31 (stall → reset ~10%), p33 (one bad day is not a reset), p10 (rep records). NOT tuned to Michael — every rule keys on reps-vs-plan for any athlete.
+### WHAT SHIPPED THIS SESSION — Slice a (D-422). Do not re-litigate.
+- **The 90%-of-1RM ceiling is DELETED.** ⛔ This REVERSES the prior banner, which said "the 90% ceiling is CORRECT (a safety limit)." **It was not correct** — it froze any light/mid lift (the cap sat one plate-step above the 85% start) and was reshaping STANDARD blocks, not just light ones (a 315-squat lifter's week-9 set moved 180→185; Wendler's own book lifter squats in that range). Wendler has no such cap (p30: climb until you can't hit the reps). The circularity the cap guarded is handled elsewhere: nothing writes a strength AMRAP back to `performance_numbers` (traced — only swim CSS + the athlete's typed number), and the e1RM record already obeys the trusted-rep ceiling (D-417).
+- **The light-lifter step-shrink is DELETED too.** Fixed +5 upper / +10 lower for EVERYONE — Wendler gives beginners and intermediates the same jump (p90 "just do the program as is, regardless of training age"; p107). Both of our inventions are gone; the engine is now pure book.
+- **Book-strict advance:** 1+ reps at 95% ADVANCES (p23 "95% × 1 or more reps"; p24 "doing the prescribed reps shows you're strong enough for the workout"; p30). ⛔ The apps' "only climb if you BEAT the target" (hold-at-minimum) was built then REJECTED the same day — recorded in 3 places (`wendler-531.ts` union + `verdictFrom95Set` + `wendler-531.test.ts`). Do not re-add.
+- **Hold-then-drop reset (p31 + p33):** a genuine miss (0 reps at 95%) HOLDS the weight the first time (p33 — one bad day is not a reset), a second consecutive miss DROPS it 10% and rebuilds, that lift only (p31). `STALL_CONFIRM_SESSIONS = 2`. A skipped cycle neither counts nor clears; making the weight clears.
+- **This is the INTERMEDIATE plan.** A true beginner is a SEPARATE future offering — Wendler's p90 full-body 3×/week variant (spec captured in memory). Do NOT bend this plan to protect a novice.
+- **Fixtures:** 2014/0 in strength-system + _shared. Permanent regression: `strength-primary-plan.cycle-climb.test.ts` (week 7 ≠ week 11; squat 90→100→110). It replaces `ceiling-stall.test.ts` + `ceiling-dedup.test.ts` (both deleted — the first pinned the freeze as correct). Full repo 3476/12 — the 12 are pre-existing (verified on a clean tree); type errors 7, pre-existing.
+- **Back-annotated:** D-421 (re-scoped, ceiling-pin trigger retired, `strength_calibration` wire kept for slice b), Q-256, Q-217.
+- **STATE:** PUSHED (`bf4aaa61`) + EDGE-DEPLOYED (`generate-strength-plan`, `create-goal-and-materialize-plan`, `materialize-plan`, `rematerialize-strength-block`, `coach`). **UNVERIFIED:** the device acceptance run (the climb on a real regenerated plan). Dead-on-purpose for slice b to retire: `kind:'ceiling'` in the compromise union + `ceilingLifts` in `src/lib/strength-focus-copy.ts` (client-side).
 
 ---
 

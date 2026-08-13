@@ -154,7 +154,11 @@ Deno.serve(async (req: Request) => {
         // silently discarded, and a discarded verdict falls to `unknownMeans: 'advance'`. The bar
         // would still have climbed, so nothing would look broken; the provenance flag on the estimate
         // is what would have gone missing.
-        const ok = new Set(['advance', 'advance_untrusted', 'reset', 'hold']);
+        // ⛔ `miss` ADDED 2026-08-12 (slice a) FOR THE SAME REASON. It is the verdict a shortfall now
+        // carries before it has been confirmed as a stall. Unlisted, a real MISS would be discarded
+        // here and fall to `unknownMeans: 'advance'`: the bar would climb off a failed set and
+        // nothing would look broken. Keep this in step with the union in `wendler-531.ts`.
+        const ok = new Set(['advance', 'advance_untrusted', 'reset', 'hold', 'miss']);
         const out: Record<string, string[]> = {};
         for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
           if (!Array.isArray(v)) continue;

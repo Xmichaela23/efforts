@@ -129,102 +129,40 @@ export function cycleIncrementLb(isLowerBody: boolean): number {
 }
 
 /**
- * ⛔ THE INCREMENT IS CAPPED IN PERCENTAGE TERMS. Michael, 2026-07-27.
+ * ⛔⛔ SUPERSEDED 2026-08-12 — BOTH THINGS THAT USED TO STAND HERE ARE GONE, AND THEY WERE OURS, NOT
+ * WENDLER'S. Slice a; `docs/SLICE-strength-a-wendler-reset-2026-08-12.md`, folding into D-422.
  *
- * Wendler's +5/+10 is calibrated to a barbell where 10 lb is roughly 3% of the training max — a
- * squat in the 300s. It is not wrong; it is OUT OF RANGE below that. On a 90 lb training max, +10 is
- * **11.1% per cycle**, and three cycles walk the training max from 90 to 110 against an entered 1RM
- * of 106. The bar passes the athlete's own max and the anchor AMRAP then measures it and writes it
- * back as the new max.
+ * What was here, and is now deleted:
  *
- * So the step is the SMALLER of Wendler's absolute number and `MAX_CYCLE_STEP_PCT` of the current
- * working number, rounded down to plate granularity, floored at one increment of the bar.
+ * 1. **`cappedCycleIncrementLb` / `MAX_CYCLE_STEP_PCT` (6%) / `MIN_PLATE_STEP_LB`** — a percentage
+ *    cap that shrank Wendler's +5/+10 for a light bar (2026-07-27/28). **Wendler gives every lifter
+ *    the same fixed jump.** p90, "5/3/1 for Beginners": *"Generally, I tell everyone to just do the
+ *    program as is, regardless of training age."* p107 FAQ: used with *"both beginning and advanced
+ *    lifters. Steady, slow progression will never go out of fashion."* The shrink was a patch for a
+ *    brakeless system — a light training max walking past the 1RM with an AMRAP writing it back —
+ *    and that writeback is dead (`adapt-plan`'s auto-progression was deleted; nothing takes a
+ *    strength AMRAP and writes it back as the 1RM).
  *
- * ⚠️ NOT TUNED TO ANYONE'S NUMBERS. The cap is relative by construction, so it is a no-op for the
- * athlete Wendler wrote for (at TM 340, 4% is 13.6 — the +10 wins) and it binds exactly where the
- * absolute number stops being proportionate.
+ * 2. **`TM_CEILING_PCT_OF_1RM` (90%) / `tmCeilingLb`** — a hard bound of the training max at 90% of
+ *    the 1RM ON FILE (2026-07-27/28), with the breaching step truncated onto it. **Wendler has no
+ *    such ceiling.** p30: *"You keep on increasing the max you're working from every four weeks
+ *    until you can no longer hit the prescribed sets and reps."* The brake is a MISS, not a number
+ *    on file.
+ *
+ * ⛔ AND THE CEILING WAS NOT MERELY UN-BOOKISH — IT FROZE BLOCKS. Whenever ONE plate step covered the
+ * 5-percentage-point gap between the 85% start and the 90% bound, cycles 2 and 3 came out
+ * byte-identical: an OHP max ≲ 100 or a squat max ≲ 110 printed the same week 7 and week 11. That is
+ * structural, not a light-lifter edge case, and it is the bug this slice kills.
+ *
+ * ⚠️ THE CIRCULARITY THE CEILING GUARDED IS GUARDED ELSEWHERE. The displayed e1RM record obeys the
+ * trusted-rep ceiling (D-417, `trustedMaxRepsFor`), and the only writes to
+ * `user_baselines.performance_numbers` for strength are the athlete's own typed number and
+ * `save-baseline-test`. The cap was a door on a bricked-up wall.
+ *
+ * ⚠️ WHAT REPLACES BOTH: the hold-then-drop brake below (`STALL_CONFIRM_SESSIONS`). The number stops
+ * rising the instant the athlete stops beating the target, and comes down 10% only on a CONFIRMED
+ * stall. Everything above is history — do not reinstate a ratio guard without reading it.
  */
-/**
- * ⛔ 6%, AND IT IS DERIVED RATHER THAN PICKED. Michael, 2026-07-27.
- *
- * It is the largest relative step Wendler's own absolute increments produce inside the range he
- * wrote for: +10 on a 170 lb training max (a ~200 lb squat, his lightest realistic case) is 5.9%.
- * So the cap bounds **only what he never anticipated** — a bar small enough that +10 is a double-digit
- * percentage — and is a no-op for every load he did.
- *
- * ⚠️ A FIRST DRAFT USED 4% AND OVERREACHED. With 5 lb plate granularity, 4% only reaches +10 at a
- * 250 training max, so every lower-body max from 125 to 249 stepped +5 where Wendler says +10 — a
- * 235 lb squat included. The intent was to bound the out-of-range case, not to slow the lifters the
- * absolute numbers were written for.
- */
-export const MAX_CYCLE_STEP_PCT = 0.06;
-export const MIN_PLATE_STEP_LB = 5;
-
-export function cappedCycleIncrementLb(workingNumber: number, isLowerBody: boolean): number {
-  const absolute = cycleIncrementLb(isLowerBody);
-  if (!Number.isFinite(workingNumber) || workingNumber <= 0) return absolute;
-  const relative = roundDownToIncrement(workingNumber * MAX_CYCLE_STEP_PCT);
-  return Math.max(MIN_PLATE_STEP_LB, Math.min(absolute, relative));
-}
-
-/**
- * ⛔ THE INVARIANT THE INCREMENT CAP DOES NOT GIVE YOU: THE TRAINING MAX MAY NEVER EXCEED 90% OF THE
- * CURRENT 1RM. Michael, 2026-07-27: *"the increment cap slows drift, the ceiling bounds it."*
- *
- * The working number starts at 85% of the 1RM precisely so the last set of the anchor is worth
- * measuring. Nothing in the system knew that a training max above the max is impossible — three
- * clean advances walked straight past it. This is the hard stop, checked every cycle **regardless of
- * verdict**.
- *
- * ⚠️ A BREACH TRUNCATES THE STEP; ONLY A STEP TRUNCATED TO NOTHING IS A GATED FATE (§5.2b's family).
- * An advance that would cross the ceiling lands ON the ceiling instead — the athlete still progresses,
- * by less. When even that is no movement, the working number holds and the reason is reported: the
- * training max has caught up with the max on file and the block needs a new one.
- */
-/**
- * ⛔ 90%, AND THE STEP IS TRUNCATED RATHER THAN SKIPPED. Michael, 2026-07-28.
- *
- * ⛔ THIS SUPERSEDES THE 100%-AND-HOLD DECISION OF 2026-07-27, WHICH IS TWENTY-FOUR HOURS OLD.
- * Everything in the block comment above about 100% is history; read this instead.
- *
- * **What changed is the evidence, not the taste.** The 100% ceiling was chosen because 90% "bound in
- * cycle 3 for every athlete" — a 315 lb squat HELD at 275 instead of reaching 285. That objection was
- * correct about *holding* and wrong about *the ceiling*. Truncating dissolves it: the squat reaches
- * 280 rather than being frozen at 275, so the block still advances in its measuring cycle and the
- * invariant still holds. The rejected thing was the stall, not the number.
- *
- * ⛔ AND THE 6% CAP TURNED OUT TO BE THE ASYMPTOTE, NOT THE RAIL. Michael, 2026-07-28: *"It doesn't
- * protect the ratio — it DEFINES the worst case."* Two advances of +6% off an 85% start is
- * `0.85 × 1.06 × 1.06 = 95.5%`, and **any lifter light enough for the cap to bind converges on exactly
- * that regardless of their numbers.** Measured on the composer before this change: a 200 lb squat
- * reached **94.7%** of 1RM by cycle 3, a 315 lb squat **90.2%**. Heavy lifters drift less only because
- * +10 is a smaller fraction of a big training max. Nothing in the system was aiming at the ratio —
- * the constraint sat on step SIZE, which we now know does not control it.
- *
- * ⚠️ WHY 90% AND NOT SOMETHING DERIVED. It is the top of 5/3/1's own stated training-max band
- * (85-90% of true max) — the band that makes the AMRAP a MEASUREMENT rather than a max attempt. The
- * block starts at 85% deliberately; 90% is the published edge of the same range, so the ceiling and
- * the starting point come from one source instead of two.
- *
- * ⚠️ THE DRIFT WAS ALREADY SELF-CORRECTING, so this is a bound and not a rescue. `verdictFrom95Set`
- * resets the working number 10% on a missed 95% set, so an athlete who drifts too high fails the gate
- * and comes down — they oscillate rather than park. The guard exists so the correction does not have
- * to be purchased with a failed near-max attempt.
- *
- * ⛔ THE ONE THIS DOES NOT FIX, AND IT IS UPSTREAM OF ALL OF IT: `oneRM` IS A SIGNUP NUMBER THAT NEVER
- * UPDATES. Every ratio here is computed against a value the athlete typed once and may never have
- * tested. If it was aspirational the real ratio is worse than this ceiling believes, and **the
- * assertions still pass** — they are measuring against the same stale number. Michael raised it
- * 2026-07-28; it is not addressed here, and a guard on a number nobody verified is a guard with a
- * hypothesis inside it. `exercise_log`'s e1RM trend is the obvious candidate for a tested max and is
- * NOT wired to this.
- */
-export const TM_CEILING_PCT_OF_1RM = 0.90;
-
-export function tmCeilingLb(oneRM: number): number {
-  if (!Number.isFinite(oneRM) || oneRM <= 0) return Number.POSITIVE_INFINITY;
-  return roundDownToIncrement(oneRM * TM_CEILING_PCT_OF_1RM);
-}
 
 /**
  * The working number for a given cycle. Cycle 1 uses the base; every cycle after adds one
@@ -457,7 +395,38 @@ export function trustedMaxRepsFor(liftName?: string | null): number {
  * NOT a member of `advance` — a `verdict === 'advance'` check will now silently miss these sets.
  * Search the union before adding a fourth.
  */
-export type WorkingNumberVerdict = 'advance' | 'advance_untrusted' | 'reset' | 'hold';
+/**
+ * ⛔ ONE MEMBER ADDED 2026-08-12 (slice a) — `miss`, which splits what `reset` used to conflate.
+ *
+ * - **`miss`** — the prescription was not met at the measured set. **One `miss` holds. It is
+ *   `workingNumberForCycles` that turns a CONFIRMED run of them into a reset** (p33: one bad day is
+ *   not a reset), so a single miss can never drop the bar no matter which caller passes it.
+ *
+ * `reset` survives as the EXPLICIT instruction — "drop 10% now" — which a caller may still pass and
+ * which the stall counter produces internally. Nothing derives it from one session any more.
+ *
+ * ⚠️ `hold` AND `miss` ARE DIFFERENT FACTS AND MUST NOT BE COLLAPSED BACK. `hold` = no evidence
+ * (skipped) · `miss` = evidence of failure. They move the bar identically THIS cycle and diverge
+ * entirely across cycles: only a `miss` counts toward a stall.
+ *
+ * ⛔ A THIRD MEMBER, `hold_at_target`, WAS BUILT AND THEN REJECTED THE SAME DAY. It held the number
+ * when the athlete hit the prescribed rep without beating it — "only climb when you beat the target",
+ * on field precedent (Juggernaut, StrongLifts). **Michael's call: do what Wendler says, do not
+ * interpret.** p24: *"Doing the prescribed reps shows you and your body that you're strong enough for
+ * the workout. The extra reps are your way of dominating the workout."* Hitting the minimum is a PASS.
+ * p30 makes advancement the default until you *"can no longer hit the prescribed sets and reps."*
+ * Do not re-add it: 1 rep at 95% advances.
+ *
+ * ⚠️ EVERY ALLOWLIST OVER THIS UNION MUST BE WIDENED WITH IT — `generate-strength-plan/index.ts`
+ * validates incoming verdicts against a `Set` and silently DISCARDS unlisted values, which would
+ * turn a real miss into the forecast's `advance`.
+ */
+export type WorkingNumberVerdict =
+  | 'advance'
+  | 'advance_untrusted'
+  | 'reset'
+  | 'hold'
+  | 'miss';
 
 /**
  * What happens to the working number, given the reps achieved on the 95% set.
@@ -465,18 +434,32 @@ export type WorkingNumberVerdict = 'advance' | 'advance_untrusted' | 'reset' | '
  * | reps | verdict | why |
  * |---|---|---|
  * | `null` | `hold` | the session was not done — no evidence either way (§0h) |
- * | `0` | `reset` | logged, and the prescribed single was NOT completed. This is the book's trigger |
- * | `1`–`8` | `advance` | p23 prescribes `95% x 1 or more`. One rep IS the prescription met |
+ * | `0` | `miss` | logged, and the prescribed single was NOT completed. **One miss HOLDS**; the reset needs a confirmed pattern (p33) |
+ * | `1`–`8` | `advance` | p23 prescribes `95% x 1 or more reps`. One rep IS the prescription met, and meeting it is a pass |
  * | `> 8` | `advance_untrusted` | the prescription is met and then some — the bar still climbs. What is not trusted is the e1RM off this set, which sits above the range where Brzycki holds |
  *
- * ⛔ The middle band is gone deliberately. It used to reset everything under five, which cut the
- * working number 10% for a session the book calls a pass.
+ * ⛔ THE `1` ROW IS THE BOOK'S, NOT A PRODUCT CALL — AND A "BEAT THE TARGET TO CLIMB" RULE WAS BUILT
+ * AND REJECTED HERE ON 2026-08-12. That rule made a bare-minimum single hold the number
+ * (`hold_at_target`), reasoning from field precedent rather than from Wendler. Michael's call: do
+ * what the book says.
+ *   p23 — week three's top set is `95% x 1 or more reps`.
+ *   p24 — *"Doing the prescribed reps shows you and your body that you're strong enough for the
+ *         workout. The extra reps are your way of dominating the workout."* The minimum is a PASS;
+ *         the bonus reps are dominance, not the entry fee.
+ *   p30 — *"you keep on increasing the max you're working from every four weeks until you can no
+ *         longer hit the prescribed sets and reps."* Advancement is the default. Only a genuine miss
+ *         stops it — which is what `miss` is for.
  *
- * ⛔ AND THE TOP BAND DOES NOT WITHHOLD ANYTHING. An earlier draft of this rule was going to flag a
- * big set INSTEAD of advancing — Michael caught it: *"A 12-rep set at 95% means the athlete is
- * genuinely much stronger than the TM says. Withholding the advance punishes them for it."* The
- * measurement concern and the training concern are separate questions with opposite answers, and
- * only the measurement one is in doubt. See `ESTIMATE_TRUSTED_MAX_REPS`.
+ * ⛔ AND `0` NO LONGER RESETS BY ITSELF. p33 ("Having a Less Than Stellar Day"): the answer to a bad
+ * day is *"getting your prescribed weights and leaving"* — not a recalculation. The 10% drop is
+ * p31's STALL, which is a pattern; `workingNumberForCycles` confirms it across
+ * `STALL_CONFIRM_SESSIONS` measured points before it fires.
+ *
+ * ⛔ THE TOP BAND STILL WITHHOLDS NOTHING. An earlier draft was going to flag a big set INSTEAD of
+ * advancing — Michael caught it: *"A 12-rep set at 95% means the athlete is genuinely much stronger
+ * than the TM says. Withholding the advance punishes them for it."* The measurement concern and the
+ * training concern are separate questions with opposite answers, and only the measurement one is in
+ * doubt. See `ESTIMATE_TRUSTED_MAX_REPS`.
  */
 export function verdictFrom95Set(
   repsAchieved: number | null | undefined,
@@ -484,43 +467,73 @@ export function verdictFrom95Set(
   liftName?: string | null,
 ): WorkingNumberVerdict {
   if (repsAchieved == null || !Number.isFinite(repsAchieved)) return 'hold';
-  if (repsAchieved < VALIDITY_CHECK_MIN_REPS) return 'reset';
+  if (repsAchieved < VALIDITY_CHECK_MIN_REPS) return 'miss';
   return repsAchieved > trustedMaxRepsFor(liftName) ? 'advance_untrusted' : 'advance';
 }
 
-/** A reset drops the working number 10% — the same mechanism as a stall. */
+/**
+ * A reset drops the working number 10% and rebuilds from there — Wendler's own number.
+ *
+ * p31: *"I simply take 90% of my max … and start all over again … This is a matter of taking three
+ * steps forward and one step back."* Per lift: *"You may stall out with one lift before you do with
+ * the others. When this happens, you only need to decrease the one stalled lift."*
+ */
 export const RESET_FRACTION = 0.10;
 
+/**
+ * ⛔ HOW MANY CONSECUTIVE MEASURED MISSES CONFIRM A STALL. Slice a, 2026-08-12. **Two.**
+ *
+ * It is a locked product decision behind a name, not a magic number, because it is the entire
+ * distance between p33 and p31:
+ *
+ * - **p33, one bad day** — *"you're not always going to have great training days … go into the weight
+ *   room with one purpose: getting your prescribed weights and leaving."* A single miss is a bad day.
+ *   It must cost the athlete NOTHING: the weight repeats, which is the free re-try.
+ * - **p31, the stall** — *"You'll eventually come to a point where you can't make any more progress
+ *   on a lift. You won't be able to hit the sets and reps you're supposed to hit."* A pattern. THAT
+ *   is what earns the 10%.
+ *
+ * ⚠️ THE MEASURED POINT IN THIS ENGINE IS THE WEEK-3 95% SET — ONE PER CYCLE. So two consecutive
+ * misses means two consecutive CYCLES failing the prescription at the same weight (the first miss
+ * held it), which is roughly two months. Field precedent sits either side of that and both hold
+ * first: StrongLifts deloads 10% after three consecutive failed SESSIONS; Juggernaut resets after
+ * barely-hitting across more than one cycle. Widening the signal beyond the 95% set would make this
+ * fire sooner and is deliberately out of scope here.
+ *
+ * ⚠️ AN UNLOGGED CYCLE IS NOT A MISS AND DOES NOT BREAK THE RUN. A skipped session is no evidence
+ * either way, so it neither counts toward a stall nor clears one — the two misses stay consecutive
+ * *measured* points. A cycle where the athlete MET the prescription clears the count outright.
+ */
+export const STALL_CONFIRM_SESSIONS = 2;
+
+/**
+ * One cycle's step. Pure and stateless: it applies the verdict it is handed and nothing else.
+ *
+ * ⛔ IT CANNOT RESET ON A `miss` AND THAT IS THE POINT — a stall is a PATTERN, and a function that
+ * sees one cycle cannot see a pattern. `workingNumberForCycles` owns the counting and hands this
+ * function an explicit `reset` once the run is confirmed. Do not "fix" `miss` to reset here.
+ *
+ * ⚠️ RETURNS A BARE NUMBER as of 2026-08-12. It used to return `{ workingNumber, ceilingHit }`
+ * because the 90% ceiling had to travel with the number; there is no ceiling now.
+ */
 export function applyVerdict(
   workingNumber: number,
   verdict: WorkingNumberVerdict,
   isLowerBody: boolean,
-  /** The athlete's 1RM for this lift. Omitted → no ceiling is enforced (legacy callers). */
-  oneRM?: number,
-): { workingNumber: number; ceilingHit: boolean } {
-  if (verdict === 'reset') {
-    return { workingNumber: roundDownToIncrement(workingNumber * (1 - RESET_FRACTION)), ceilingHit: false };
-  }
+): number {
+  if (verdict === 'reset') return roundDownToIncrement(workingNumber * (1 - RESET_FRACTION));
   // ⛔ `advance_untrusted` ADVANCES. This guard used to be `verdict !== 'advance'`, which would have
   // silently swallowed the new verdict and held the bar — the exact behaviour the verdict exists to
   // avoid. The distrust is about the ESTIMATE, never about the load: a set that beats the
   // prescription earns its step whether or not we believe the number computed off it.
-  if (verdict !== 'advance' && verdict !== 'advance_untrusted') {
-    return { workingNumber, ceilingHit: false };
-  }
-
-  const stepped = workingNumber + cappedCycleIncrementLb(workingNumber, isLowerBody);
-  const ceiling = oneRM == null ? Number.POSITIVE_INFINITY : tmCeilingLb(oneRM);
-  if (stepped <= ceiling) return { workingNumber: stepped, ceilingHit: false };
-
-  // ⛔ TRUNCATE TO THE CEILING RATHER THAN SKIP THE STEP (2026-07-28, superseding hold-at-the-ceiling).
-  // Holding made the ceiling a stall, which is the entire reason a 90% bound was rejected a day
-  // earlier. Landing ON it keeps the block advancing while the invariant binds.
   //
-  // ⚠️ Only when the truncated step is NO MOVEMENT is this a fate worth reporting — then the athlete
-  // is genuinely stuck against a max on file that has stopped being true.
-  if (ceiling > workingNumber) return { workingNumber: ceiling, ceilingHit: false };
-  return { workingNumber, ceilingHit: true };
+  // ⚠️ `hold` and `miss` both land here and both leave the number ALONE. They are different facts
+  // with the same one-cycle consequence; the difference lives in the walker.
+  if (verdict !== 'advance' && verdict !== 'advance_untrusted') return workingNumber;
+
+  // ⛔ WENDLER'S FIXED STEP, FOR EVERY ATHLETE. +5 upper / +10 lower, no percentage shrink for a
+  // light bar (p90, p107 — see the superseded block at the top of this file).
+  return workingNumber + cycleIncrementLb(isLowerBody);
 }
 
 /**
@@ -532,9 +545,15 @@ export function applyVerdict(
  * homework (D-326 layer 2).
  *
  * This walks the cycles instead, applying each cycle's verdict to decide what the NEXT one carries:
- *   advance → +5 / +10 (Wendler's step, and what an absent verdict means)
- *   reset   → −10%, the same mechanism as a stall
+ *   advance → +5 / +10 (Wendler's step, and what a FORECAST's absent verdict means)
+ *   miss    → unchanged the first time; −10% once `STALL_CONFIRM_SESSIONS` in a row confirm it
+ *   reset   → −10% now, explicitly
  *   hold    → unchanged; the session was not done, so there is no evidence to advance on
+ *
+ * ⛔ THE STALL COUNT LIVES HERE, NOT IN `applyVerdict`, AND NOT IN THE READER. It is the only layer
+ * that sees more than one cycle. Consequence worth knowing: the count is derived fresh from the
+ * verdict array on every call, so nothing is persisted and two calls with the same inputs give the
+ * same answer — the purity `q223-block-advance.test.ts` asserts.
  *
  * ⚠️ `verdicts[i]` is the verdict EARNED IN CYCLE i+1, deciding what cycle i+2 gets. A 12-week block
  * has three cycles and therefore at most two verdicts that matter — the third cycle's is the next
@@ -549,8 +568,6 @@ export function workingNumberForCycles(
   isLowerBody: boolean,
   verdicts?: readonly WorkingNumberVerdict[],
   opts?: {
-    /** The athlete's 1RM, so the ceiling can be enforced. Omitted → no ceiling. */
-    oneRM?: number;
     /**
      * ⛔ WHAT A MISSING VERDICT MEANS, AND IT DEFAULTS TO `hold`. Michael, 2026-07-27:
      * *"A missing signal is not evidence of progress."*
@@ -567,14 +584,41 @@ export function workingNumberForCycles(
      */
     unknownMeans?: WorkingNumberVerdict;
   },
-): { workingNumber: number; ceilingHitAtCycle: number | null } {
+): { workingNumber: number; resetAtCycle: number | null } {
   const unknown = opts?.unknownMeans ?? 'hold';
   let wn = baseWorkingNumber;
-  let ceilingHitAtCycle: number | null = null;
+  let consecutiveMisses = 0;
+  let resetAtCycle: number | null = null;
+
   for (let step = 0; step < Math.max(0, cycleIndex - 1); step += 1) {
-    const r = applyVerdict(wn, verdicts?.[step] ?? unknown, isLowerBody, opts?.oneRM);
-    wn = r.workingNumber;
-    if (r.ceilingHit && ceilingHitAtCycle === null) ceilingHitAtCycle = step + 2;
+    const verdict = verdicts?.[step] ?? unknown;
+
+    // ⛔ HOLD FIRST, DROP ON THE CONFIRMED SECOND. A `miss` becomes an actual reset only when it is
+    // the `STALL_CONFIRM_SESSIONS`th in a row; until then it is a hold, and the athlete repeats the
+    // same weight with no penalty (p33).
+    let effective: WorkingNumberVerdict = verdict;
+    if (verdict === 'miss') {
+      consecutiveMisses += 1;
+      effective = consecutiveMisses >= STALL_CONFIRM_SESSIONS ? 'reset' : 'hold';
+    } else if (verdict !== 'hold') {
+      // Evidence that the prescription was met — `advance` / `advance_untrusted`, or an explicit
+      // `reset` that already banked the drop — clears the run.
+      // ⚠️ A bare `hold` does NOT: no evidence must not launder a stall into a fresh start.
+      consecutiveMisses = 0;
+    }
+
+    if (effective === 'reset') {
+      // The rebuild starts clean: after a drop the athlete is working off a new number, so the next
+      // miss is a first miss against it, not the third of an old run.
+      consecutiveMisses = 0;
+      if (resetAtCycle === null) resetAtCycle = step + 2;
+    }
+
+    wn = applyVerdict(wn, effective, isLowerBody);
   }
-  return { workingNumber: wn, ceilingHitAtCycle };
+
+  // ⚠️ `resetAtCycle` IS THE SEAM SLICE b READS AND NOTHING CONSUMES IT TODAY. It replaces
+  // `ceilingHitAtCycle` in the same position: the cycle a confirmed stall dropped this lift's number,
+  // which is the calibration event that used to be reported as "pinned at the ceiling".
+  return { workingNumber: wn, resetAtCycle };
 }

@@ -32,8 +32,11 @@ const LIFTS = [
   { ref: 'overheadPress', name: 'Overhead Press', lower: false, tm: 85, oneRM: 100 },
 ] as const;
 
+// ⚠️ NO `oneRM` ARGUMENT AS OF 2026-08-12 (slice a). It fed the 90%-of-1RM ceiling, which is deleted.
+// The `oneRM` column above is kept on the fixture because it is what the freeze test below measures
+// against — it is data about the athlete, not an input to the ladder any more.
 const wnAtCycle = (l: typeof LIFTS[number], cycle: number, verdicts: WorkingNumberVerdict[]) =>
-  workingNumberForCycles(l.tm, cycle, l.lower, verdicts, { oneRM: l.oneRM, unknownMeans: 'hold' }).workingNumber;
+  workingNumberForCycles(l.tm, cycle, l.lower, verdicts, { unknownMeans: 'hold' }).workingNumber;
 
 /** A logged session carrying an all-out set at the given reps. */
 const session = (weekInCycle: number, liftName: string, reps: number) => ({
@@ -59,7 +62,8 @@ Deno.test('⛔ A CYCLE IS READ ONLY ONCE IT HAS FINISHED — week 5, not week 3'
   const missed = [[session(3, 'Back Squat', 0)]];
   assertEquals(verdictsForBlock(CYCLES, missed, 'Back Squat', 4)[0], 'advance',
     'even a logged MISS is invisible while the cycle is unfinished');
-  assertEquals(verdictsForBlock(CYCLES, missed, 'Back Squat', 5)[0], 'reset',
+  // ⚠️ `miss`, not `reset` (slice a) — the reader reports the session; one miss holds the weight.
+  assertEquals(verdictsForBlock(CYCLES, missed, 'Back Squat', 5)[0], 'miss',
     'week 5: the cycle is finished and the evidence is read');
 });
 
@@ -78,20 +82,30 @@ Deno.test('⛔ CRUSHING THE SET PRODUCES NO PROPOSAL — the advance was already
   }
 });
 
-Deno.test('⛔ A MISS MOVES THE NUMBER DOWN, AND THAT IS THE PROPOSAL', () => {
-  // reset = −10%, rounded down to plate granularity. These are the numbers the sheet would show.
+Deno.test('⛔ ONE MISS HOLDS THE NUMBER — the free re-try, and there is no proposal to make', () => {
+  // ⛔ REWRITTEN 2026-08-12 (slice a). This test used to assert that a single missed 95% set dropped
+  // the number 10% and that the drop WAS the consent sheet. p33 says otherwise: a less than stellar
+  // day means *"getting your prescribed weights and leaving."* One miss repeats the weight.
+  for (const l of LIFTS) {
+    assertEquals(wnAtCycle(l, 2, ['miss', 'miss']), l.tm, `${l.name}: cycle 2 repeats cycle 1`);
+  }
+});
+
+Deno.test('⛔ THE SECOND CONSECUTIVE MISS MOVES THE NUMBER DOWN, AND THAT IS THE PROPOSAL', () => {
+  // reset = −10%, rounded down to plate granularity. These are the numbers the sheet would show,
+  // now at cycle 3 rather than cycle 2 — the athlete got a whole cycle to re-try the weight first.
   const expected: Record<string, [number, number]> = {
-    // lift: [forecast at cycle 2, after a reset]
-    'Back Squat': [95, 80],
-    'Deadlift': [130, 110],
-    'Bench Press': [130, 110],
-    'Overhead Press': [90, 75],
+    // lift: [forecast at cycle 3 (two clean advances), after a confirmed stall]
+    'Back Squat': [110, 80],
+    'Deadlift': [145, 110],
+    'Bench Press': [135, 110],
+    'Overhead Press': [95, 75],
   };
   for (const l of LIFTS) {
     const [fc, rs] = expected[l.name];
-    assertEquals(wnAtCycle(l, 2, ['advance', 'advance']), fc, `${l.name} forecast`);
-    assertEquals(wnAtCycle(l, 2, ['reset', 'reset']), rs, `${l.name} after a reset`);
-    assert(rs < fc, `${l.name}: a reset must be a step DOWN`);
+    assertEquals(wnAtCycle(l, 3, ['advance', 'advance']), fc, `${l.name} forecast`);
+    assertEquals(wnAtCycle(l, 3, ['miss', 'miss']), rs, `${l.name} after a confirmed stall`);
+    assert(rs < fc, `${l.name}: a confirmed stall must be a step DOWN`);
   }
 });
 
@@ -104,26 +118,26 @@ Deno.test('an unlogged cycle HOLDS — it does not advance and it does not punis
 
 // ── THE CEILING ───────────────────────────────────────────────────────────────────────────────
 
-Deno.test('⛔ THE 90% CEILING STALLS TWO OF THE FOUR LIFTS BY CYCLE 3', () => {
-  // The training max may never exceed 90% of the 1RM ON FILE. On this block that 1RM is a build-time
-  // number, and for the squat (110) and press (100) the ceiling is reached after ONE advance — so
-  // cycles 2 and 3 carry the same weight even on a perfect block.
-  //
-  // ⚠️ THIS IS THE CEILING WORKING, NOT A BUG — but it is invisible to the athlete, who sees a
-  // number that simply stops moving. `wendler-531.ts` names the cause: "`oneRM` IS A SIGNUP NUMBER
-  // THAT NEVER UPDATES … a guard on a number nobody verified is a guard with a hypothesis inside it."
+Deno.test('⛔ EVERY LIFT CLIMBS ON A PERFECT BLOCK — the 90% ceiling stalled two of four', () => {
+  // ⛔ THIS IS THE INVERSION, AND THIS BLOCK IS THE ATHLETE IT WAS REPORTED ON. It asserted that a
+  // 110 lb squat and a 100 lb press could not exceed 90% of their max on file, so cycles 2 and 3
+  // carried the same weight EVEN ON A PERFECT BLOCK — the athlete saw a number that simply stopped
+  // moving. The ceiling is deleted (p30: the brake is a missed prescription, not a record), so a
+  // perfect block must now climb on all four.
   const perfect: WorkingNumberVerdict[] = ['advance', 'advance'];
   for (const l of LIFTS) {
     const c2 = wnAtCycle(l, 2, perfect);
     const c3 = wnAtCycle(l, 3, perfect);
-    const ceiling = Math.floor((l.oneRM * 0.9) / 5) * 5;
-    if (l.name === 'Back Squat' || l.name === 'Overhead Press') {
-      assertEquals(c3, c2, `${l.name}: stalls — cycle 3 cannot exceed the ceiling`);
-      assertEquals(c3, ceiling, `${l.name}: parked exactly on the ceiling`);
-    } else {
-      assert(c3 > c2, `${l.name}: still has room under the ceiling`);
-    }
+    assert(c2 > l.tm, `${l.name}: cycle 2 did not move off the base`);
+    assert(c3 > c2, `${l.name}: cycle 3 repeats cycle 2 — the freeze is back`);
+    // Wendler's fixed step, for the light bars too (p90, p107). No percentage shrink.
+    assertEquals(c3 - c2, l.lower ? 10 : 5, `${l.name}: wrong step size`);
   }
+  // ⚠️ AND THE SQUAT'S CYCLE-3 NUMBER (110) NOW EQUALS ITS MAX ON FILE (110). Allowed on purpose:
+  // that max is a signup number nothing has tested. If it is real the athlete misses the 95% set,
+  // holds, misses again and comes down 10% — the correction is earned, not pre-empted.
+  const squat = LIFTS.find((l) => l.name === 'Back Squat')!;
+  assertEquals(wnAtCycle(squat, 3, perfect), squat.oneRM);
 });
 
 // ── SCOPE ─────────────────────────────────────────────────────────────────────────────────────
@@ -131,7 +145,7 @@ Deno.test('⛔ THE 90% CEILING STALLS TWO OF THE FOUR LIFTS BY CYCLE 3', () => {
 Deno.test('⛔ ONE LIFT\'S VERDICT NEVER TOUCHES ANOTHER LIFT', () => {
   // Verdicts are read per lift name. A missed squat must not drag the bench down with it.
   const grouped = [[session(3, 'Back Squat', 0)]];   // squat missed; nothing logged for bench
-  assertEquals(verdictsForBlock(CYCLES, grouped, 'Back Squat', 5)[0], 'reset');
+  assertEquals(verdictsForBlock(CYCLES, grouped, 'Back Squat', 5)[0], 'miss');
   assertEquals(verdictsForBlock(CYCLES, grouped, 'Bench Press', 5)[0], 'hold',
     'the bench saw no evidence of its own and holds');
 });

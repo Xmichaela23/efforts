@@ -68,18 +68,19 @@ Deno.test('deload is week 4 of every cycle: 40/50/60%, no jumps, no assistance',
   assertEquals(PLAN.phaseStructure.recovery_weeks, [4, 8, 12]);
 });
 
-Deno.test('the working number steps BETWEEN cycles, never inside one — capped, and under the ceiling', () => {
-  // Bench (1RM 225): TM 190 → 195 → 200. Ceiling is 90% of 225 = 200, so cycle 3 lands exactly on it.
+Deno.test('the working number steps BETWEEN cycles, never inside one — Wendler\'s fixed increment', () => {
+  // Bench (1RM 225): TM 190 → 195 → 200.
   assertEquals(ramp(5, 'Bench Press'), '125x5 145x5 165x5');
   assertEquals(ramp(9, 'Bench Press'), '130x5 150x5 170x5+');
-  // ⛔ THE SQUAT IS WHERE THE 90% CEILING BINDS, AND TRUNCATION IS WHY THAT IS FINE (2026-07-28).
-  // Squat 1RM 315: TM 265 → 275 → wants 285, ceiling is 90% of 315 = 283.5 → 280, so cycle 3 lands
-  // ON 280 rather than being frozen at 275. 65% of 280 = 182 → 180.
+  // ⛔ THE SQUAT'S THIRD CYCLE IS THE ONE NUMBER SLICE a MOVED IN A STANDARD BLOCK (2026-08-12).
+  // Squat 1RM 315: TM 265 → 275 → 285. The deleted 90% ceiling (90% of 315 = 283.5 → 280) used to
+  // TRUNCATE that third step onto 280, so the opening set read 180 (65% of 280) instead of 185.
   //
-  // ⚠️ THIS NUMBER MOVED FROM 185, and the move is the point. Under the superseded 100% ceiling the
-  // third cycle reached 285 — 90.5% of the athlete's true max, outside 5/3/1's own 85-90% training-max
-  // band, which is what makes the anchor AMRAP a measurement rather than a max attempt.
-  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '180x5');
+  // ⚠️ 285 IS 90.5% OF THE MAX ON FILE AND THAT IS NOW ALLOWED. The old note argued it sat outside
+  // 5/3/1's 85-90% training-max band; the band is a starting-point recommendation, not a running
+  // bound — p30 says keep increasing until you can no longer hit the prescribed reps. If 315 is real,
+  // the athlete misses the 95% set, holds, misses again and comes down 10%.
+  assertEquals(ramp(9, 'Back Squat').split(' ')[0], '185x5');
 });
 
 Deno.test('ANCHOR cycle: 5/3/1 proper, and the all-out set is the LAST set only', () => {

@@ -357,6 +357,14 @@ computation, the storage and the assembly all exist. Nothing renders it.
 
 ## Q-256 — ⛔ THE 5/3/1 TRAINING-MAX CEILING READS A STALE SIGNUP 1RM, so lifts stall after one cycle (2026-08-03, Michael) — **THE ONE REAL STRENGTH ITEM LEFT. Not urgent (first stall ~Aug 24), but real.**
 
+> ⛔ **CLOSED 2026-08-12 BY SLICE a — BY A THIRD OPTION NEITHER (a) NOR (b): THE CEILING IS DELETED.**
+>
+> This entry framed the ceiling as *"the RIGHT kind of safety"* whose only fault was reading a frozen reference, and asked Michael to rule between (a) feed it a learned max, or (b) a periodic recalibration. **The premise did not survive the book.** Wendler has no training-max ceiling — p30: increase every four weeks *"until you can no longer hit the prescribed sets and reps."* The brake is a missed prescription. And the stall this entry describes is **structural, not stale-data**: whenever ONE plate step covers the five points between the 85% start and a 90% bound, cycles come out byte-identical — a press max ≲ 100 or a squat ≲ 110 freezes for **every** athlete, however fresh their number is. Feeding it a better 1RM would have moved the freeze, not removed it.
+>
+> **In code:** `TM_CEILING_PCT_OF_1RM` / `tmCeilingLb` and the percentage step-shrink are deleted (`wendler-531.ts`, superseded banner at the top). The brake is now hold-then-drop: `STALL_CONFIRM_SESSIONS = 2` — one miss holds the weight (p33), a second consecutive miss drops it 10% and rebuilds (p31). Regression: `strength-primary-plan.cycle-climb.test.ts`. See the back-annotation on [D-421].
+>
+> ⚠️ **THE ONE TRUE OBSERVATION IN HERE OUTLIVES THE ENTRY:** `one_rep_maxes_at_build` is a signup number nothing updates. It no longer gates anything, but it is still what a calibration offer would replace — slice b's job.
+
 Found while auditing the progression finale ([Q-223]). The 5/3/1 training max advances +5/+10 per cycle
 (Wendler, correct), but `tmCeilingLb` (`wendler-531.ts:197`) caps the TM at **90% of `one_rep_maxes_at_build`**
 — the athlete's **signup 1RM, which never updates.** So on a perfect block:

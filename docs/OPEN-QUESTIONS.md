@@ -1990,6 +1990,12 @@ The session note nevertheless reads *"leave 6h before the run"* as a flat instru
 
 ## Q-217 — The ceiling paragraph is written as an exception and fires as a rule (2026-07-28, DESIGN, measured across four athletes)
 
+> ⛔ **CLOSED 2026-08-12 BY SLICE a — THE PARAGRAPH IS DELETED, ALONG WITH THE CEILING IT DESCRIBED.**
+>
+> This entry was right and was righter than it knew: it observed that the "reaches 90% of the max on file and stops climbing" note was written as an edge case and fired for almost everybody. **It fired for almost everybody because the ceiling itself was structural** — one plate step covers the five points between the 85% start and a 90% bound for any press max ≲ 100 or squat ≲ 110. Wendler has no such ceiling (p30), so both the bound and its paragraph are gone: `TM_CEILING_PCT_OF_1RM` / `tmCeilingLb` deleted from `wendler-531.ts`, the `kind: 'ceiling'` compromise no longer emitted from `strength-primary-plan.ts`. The brake is now hold-then-drop (`STALL_CONFIRM_SESSIONS`). See the back-annotation on [D-421] and [Q-256].
+>
+> ⚠️ The related entry named at the bottom of this file — *"an invented guard standing in for the book's own performance test"* — was the correct diagnosis a fortnight early.
+
 **Found by generating four DIFFERENT athlete profiles rather than one.** Michael: *"That's the coverage gap I flagged earlier — every decision calibrated against one profile with unusual numbers."*
 
 | athlete | maxes | lifts pinned |

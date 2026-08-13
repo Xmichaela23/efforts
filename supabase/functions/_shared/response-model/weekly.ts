@@ -174,7 +174,12 @@ function labelFromAllOut(reps: number, canonical: string): { label: string; tone
   const verdict = verdictFrom95Set(reps, canonical);
   // `hold` = no evidence. Fall through to the existing trend words rather than inventing a status.
   if (verdict === 'hold') return null;
-  if (verdict === 'reset') return { label: 'top set missed', tone: 'caution' };
+  // ⛔ `miss` ADDED 2026-08-12 (slice a) AND IT KEEPS THIS LINE HONEST. `verdictFrom95Set` used to
+  // return `reset` for a shortfall; it now returns `miss`, because ONE shortfall no longer drops the
+  // number (p33) — the reset needs a confirmed pattern. Without this arm a zero-rep top set would
+  // have fallen through to "top set met", printing a pass over a failure. The WORDS are unchanged:
+  // this labels what the athlete DID at the set, not what the engine did to the bar afterwards.
+  if (verdict === 'reset' || verdict === 'miss') return { label: 'top set missed', tone: 'caution' };
   return { label: 'top set met', tone: 'positive' };
 }
 

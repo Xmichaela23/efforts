@@ -1928,6 +1928,22 @@ window apply to any athlete and any protocol.
 
 ### D-421 — A pinned lift is a calibration signal, not a stall to engineer away (2026-08-12, **BUILT — fixtures green (3 new, 1987 pass / 1 pre-existing unrelated failure); NOT deployed, NOT device-verified**) — closes slice 4a; the finer-increment premise was REJECTED, see the decision
 
+> ⛔ **RE-SCOPED THE SAME DAY (2026-08-12 PM) BY SLICE a — ITS TRIGGER NO LONGER EXISTS. The signal lives; the ceiling that produced it is deleted.**
+>
+> **What changed:** this entry's premise was *"the 90% ceiling is a safety bound and the pin is the system working; the only defect was that it did it silently."* That premise was **wrong on the book.** Wendler has no training-max ceiling — p30: *"You keep on increasing the max you're working from every four weeks **until you can no longer hit the prescribed sets and reps**."* The brake is a missed prescription, not a number on file. And the ceiling was not merely un-bookish: it **froze blocks structurally**, whenever one plate step covered the five points between the 85% start and the 90% bound (any press max ≲ 100, any squat ≲ 110 — week 7 and week 11 identical, before the athlete lifted anything).
+>
+> **In code:** `TM_CEILING_PCT_OF_1RM` / `tmCeilingLb` deleted, along with the percentage step-shrink (`cappedCycleIncrementLb` / `MAX_CYCLE_STEP_PCT`) — see the superseded banner at the top of `supabase/functions/shared/strength-system/loading/wendler-531.ts`. The ceiling emission at `strength-primary-plan.ts` is gone with them, so **`reason: 'ceiling'` is now unreachable and nothing writes `strength_calibration`.**
+>
+> **What SURVIVES, deliberately:** the `strength_calibration` field, its type, and its `plans.config` plumbing through `generate-strength-plan`. **Slice b repopulates it from the RESET/BUMP events instead** — the input is `workingNumberForCycles(...).resetAtCycle`, which replaced `ceilingHitAtCycle` in the same position. So this entry's *architecture* stands and its *trigger* changed.
+>
+> **What replaced the ceiling as the brake:** hold-then-drop. Hit the prescribed reps at 95% → step up; miss them → hold at the same weight, no penalty; miss that same held weight again → −10% and rebuild. `STALL_CONFIRM_SESSIONS = 2`, `wendler-531.ts`. Grounded in p33 (one bad day is not a reset) and p31 (the stall is a pattern).
+>
+> ⚠️ **A STRICTER "ONLY CLIMB WHEN YOU BEAT THE TARGET" RULE WAS BUILT AND REJECTED THE SAME DAY (Michael: do what Wendler says, don't interpret).** It added a `hold_at_target` verdict so a bare-minimum single held the number, reasoning from field precedent (Juggernaut, StrongLifts) rather than the book. **One rep at 95% advances.** p23 — the top set is `95% x 1 or more reps`. p24 — *"Doing the prescribed reps shows you and your body that you're strong enough for the workout. The extra reps are your way of dominating the workout."* p30 — advancement is the default *"until you can no longer hit the prescribed sets and reps."* The verdict union is `advance` / `advance_untrusted` / `miss` / `hold` / `reset`; do not re-add a fourth band. Fixtures: `strength-primary-plan.cycle-climb.test.ts` (the permanent regression — week 7 ≠ week 11 for a 100 lb press), which **replaced** `strength-primary-plan.ceiling-stall.test.ts` and `ceiling-dedup.test.ts`, both deleted.
+>
+> **Also retired with it:** the ceiling prose paragraph and its `kind: 'ceiling'` compromise, so **Q-217 dies** (its complaint was that the note's *"the record is usually out of date"* was untrue for a never-tested lift). And **[Q-256]** — "the ceiling reads a stale signup 1RM" — is answered by a third option neither of its two proposed: remove the ceiling.
+>
+> Everything below is history. Read it for WHY a calibration signal exists, not for what fires it.
+
 **The defect.** When a lift's training max reaches 90% of the max on file, the block stops advancing it
 and prints byte-identical weeks for the rest of the block. That was already known and already noted in
 prose (`strength-primary-plan.ceiling-stall.test.ts`, 2026-07-28). What was NOT known: **the fact never
@@ -2010,3 +2026,25 @@ squat, which no increment change could reach.
 
 **Untouched:** the 90% ceiling invariant, `INCREMENT_LB`, the e1RM formula and reserve gate, the max on
 file. No athlete-facing weight changes in this entry — it adds a field and persists it.
+
+---
+
+### D-422 — The press/squat freeze is fixed by DELETING our two inventions (the 90%-of-1RM ceiling and the light-lifter step-shrink); the engine is now pure book-strict Wendler (2026-08-13, PUSHED + DEPLOYED, device-acceptance open)
+
+⛔ **Supersedes the 2026-07-27/28 ceiling decision** — it had no D-number, it lived as block comments at `wendler-531.ts:172-229`, now deleted — and the increment step-cap of the same dates. ⛔ **This also reverses the 2026-08-12 PM ENGINE-STATE banner's claim that the 90% ceiling "is CORRECT."** It was not.
+
+**The bug.** A lift froze mid-block — week 7 == week 11, identical top sets — because the training max hit the invented 90%-of-1RM ceiling one plate-step above the 85% start, then truncated to nowhere. Verified structural, NOT a light-lift edge: it reshaped a 315-lb squat too (week-9 opening set 180→185), and Wendler's own book lifter squats in that range. Root = OUR two additions on top of 5/3/1, neither of which Wendler wrote.
+
+**The fix = remove both, do what the book says.**
+1. **No ceiling.** The training max climbs every cycle, unbounded by the 1RM on file (p30: "you keep on increasing the max you're working from every four weeks until you can no longer hit the prescribed sets and reps"). The circularity the cap guarded is already handled: nothing writes a strength AMRAP back to `performance_numbers` (traced — only swim CSS + the athlete's typed number), and the displayed e1RM record obeys the trusted-rep ceiling (D-417).
+2. **No step-shrink.** Fixed +5 upper / +10 lower for everyone, beginner or intermediate — p90 ("just do the program as is, regardless of training age"), p107.
+3. **Book-strict advance.** 1+ reps at 95% advances (p23 "95% × 1 or more reps"; p24 "doing the prescribed reps shows you and your body that you're strong enough for the workout"; p30). ⛔ The apps' "only climb if you BEAT the target" (hold-at-minimum) was built and REJECTED the same day — recorded in `wendler-531.ts` (union docblock + `verdictFrom95Set` table, with p23/p24/p30) and `wendler-531.test.ts`. Do not re-add.
+4. **Hold-then-drop reset (p31 + p33).** A genuine miss (0 reps at 95%) HOLDS the weight the first time (p33 — one bad day is not a reset), a second consecutive miss DROPS it 10% and rebuilds, that lift only (p31). `STALL_CONFIRM_SESSIONS = 2`. A skipped cycle neither counts nor clears the run; making the weight clears it. `resetAtCycle` is exposed for slice b.
+
+**Positioning.** This is the INTERMEDIATE plan. A true beginner is a separate future offering — Wendler's p90 full-body 3×/week variant (two main lifts per day; the second is a straight 3×5 at 55/65/75% of the TM, not 5/3/1, except deadlift-day presses). Do not bend the intermediate plan to protect a novice.
+
+**Reach beyond the named files.** Widening the verdict union (adding `miss`) forced two silent-failure fixes: `generate-strength-plan/index.ts:157` (validated verdicts against a Set that would have dropped `miss` → the forecast advancing off a failed set) and `_shared/response-model/weekly.ts:177` (mapped reset→"top set missed"; a zero-rep set would otherwise read "top set met").
+
+**Back-annotated:** D-421 (re-scoped — the ceiling-pin trigger is retired; the `strength_calibration` field + `plans.config` wire are KEPT for slice b to repopulate off the reset/bump events), Q-256 (closed by a third option — remove the ceiling, not feed it a better max), Q-217.
+
+**State.** PUSHED (`bf4aaa61`) + EDGE-DEPLOYED (`generate-strength-plan`, `create-goal-and-materialize-plan`, `materialize-plan`, `rematerialize-strength-block`, `coach`, + importers of the touched shared files). Fixtures 2014/0 in strength-system + _shared; permanent regression `strength-primary-plan.cycle-climb.test.ts`. **NOT yet device-verified** — the acceptance run (regenerate, watch the cycles climb) is open. Slice b (auto-apply + announce + undo) is next.

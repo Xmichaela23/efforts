@@ -55,7 +55,6 @@ import {
   BAR_LB,
   WEEKS_PER_CYCLE,
   type WendlerSet,
-  TM_CEILING_PCT_OF_1RM,
   workingNumberForCycles,
   workingNumberFrom1RM,
   type WorkingNumberVerdict,
@@ -1271,6 +1270,15 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    */
   strength_days?: string[];
   /**
+   * ⛔⛔ RE-SCOPED 2026-08-12 (slice a) — THE FIELD LIVES, ITS ONE PRODUCER DIED. D-421 built this to
+   * carry a CEILING pin; the ceiling has been removed (see the superseded block at the top of
+   * `loading/wendler-531.ts`), so `reason: 'ceiling'` is now unreachable and nothing writes this.
+   *
+   * ⚠️ IT IS DELIBERATELY NOT DELETED. The `plans.config` plumbing (`generate-strength-plan`) is the
+   * wire slice b reads; slice b repopulates the field from the RESET/BUMP events instead, widening
+   * `reason` at that point. Everything below is the original rationale and still describes WHY a
+   * calibration signal exists — only its trigger changed.
+   *
    * ⛔ THE CEILING, AS A SIGNAL RATHER THAN A SHRUG (slice 4a, 2026-08-12).
    *
    * When a lift's training max reaches 90% of the max ON FILE, the block stops advancing it — and
@@ -1874,19 +1882,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const strengthDays = MAIN_LIFTS.map(liftDay);
   // ⛔ Surfaced, never swallowed. `place-week` states which clearance it had to break; the plan
   // carries those words to the athlete verbatim.
-  /** Lifts pinned at the ceiling — named in the block header so the flat weeks have a stated reason. */
-  const ceilingLifts = new Set<string>();
   /**
-   * ⛔ ONE LINE FOR ALL CEILING LIFTS, NOT ONE PER LIFT (2026-07-29). Michael, reading a real block:
-   * *"its dense i cant read it."* Two lifts at the ceiling produced two paragraphs that differed
-   * only in a name and a number — 60 words to say a thing worth 30. The athlete read the same
-   * sentence twice and learned nothing the second time.
+   * ⛔ THE CEILING ACCUMULATORS ARE GONE — 2026-08-12, slice a. There is no 90%-of-1RM ceiling any
+   * more, so no lift can pin against one and there is nothing to name in the block header. What
+   * stood here: a `ceilingLifts` set feeding `strengthFocusDescription`, and a `ceilingHits` array
+   * feeding both the `kind: 'ceiling'` compromise note and the `strength_calibration` signal.
    *
-   * ⚠️ THE CONTENT IS UNCHANGED AND STILL FULLY COMPUTED — same lifts, same cycle, same maxes off
-   * their own file. This groups the REPORT; it does not soften or drop a single fact. Collected
-   * here and emitted once after the session loop, because the loop cannot know it is the last lift.
+   * ⚠️ The `'ceiling'` KIND SURVIVES IN THE UNION BELOW AND NOTHING EMITS IT. Left deliberately:
+   * `src/lib/strength-focus-copy.ts` still filters on it, and removing the member is a client change
+   * this engine-only slice does not make. Slice b retires the pair together.
    */
-  const ceilingHits: Array<{ name: string; cycle: number; oneRM: number }> = [];
   const placementCompromises: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }> = [
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
@@ -2275,9 +2280,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const wnResult = workingNumberForCycles(
         training_max[lift.ref], slot.index, lift.isLower, args.cycleVerdicts?.[lift.ref],
         {
-          // ⛔ THE CEILING NEEDS THE REAL MAX. Without it a training max can pass the 1RM it was
-          // derived from, and the anchor AMRAP then measures that bar and writes it back.
-          oneRM: oneRepMaxes[lift.ref],
+          // ⛔ NO `oneRM` ANY MORE (2026-08-12, slice a). The 90%-of-1RM ceiling it fed is deleted:
+          // Wendler's brake is a missed prescription, not a number on file (p30), and that ceiling
+          // was what froze a light lift into byte-identical cycles. The brake is now
+          // `STALL_CONFIRM_SESSIONS` — hold on the first miss, drop 10% on the confirmed second.
           // ⛔ FORECAST, AND THIS IS THE ONLY PLACE ALLOWED TO SAY SO. Building a block projects
           // three cycles into weeks that have not happened, so no verdict CAN exist for them and
           // `hold` would show identical weights in cycles 1, 2 and 3. Regeneration and adaptation
@@ -2286,24 +2292,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         },
       );
       const wn = wnResult.workingNumber;
-      // ⛔ A CEILING HIT IS REPORTED, NOT ABSORBED. The training max caught up with the 1RM on file,
-      // so the block stops advancing that lift — the athlete needs to know why rather than watch a
-      // number quietly stop moving.
-      if (wnResult.ceilingHitAtCycle !== null) {
-        ceilingLifts.add(lift.name);
-        // ⛔ REFRAMED 2026-07-28: THE CEILING IS EVIDENCE OF A STALE MAX, NOT A LIMIT REACHED.
-        // The old wording — "a training max above the max it came from cannot be tested" — is true
-        // and reads as *you have maxed out*. The 1RM it measures against is a signup number nothing
-        // updates, so hitting the ceiling almost always means the RECORD is out of date.
-        // The same lift hits its ceiling once per cycle it is authored in, so record it once.
-        if (!ceilingHits.some((h) => h.name === lift.name)) {
-          ceilingHits.push({
-            name: lift.name,
-            cycle: wnResult.ceilingHitAtCycle,
-            oneRM: oneRepMaxes[lift.ref],
-          });
-        }
-      }
+      // ⚠️ `wnResult.resetAtCycle` IS NOT READ HERE, AND THAT IS CORRECT FOR A FRESH BLOCK: every
+      // verdict in a forecast is `advance`, so no confirmed stall can exist at build time. It is
+      // slice b's input, off the REBUILD path where real verdicts arrive.
       // Warm-up ramp in front of the work sets (Wendler p.31); empty on the deload — see
       // `warmupSetsForWeek`. Prepended so `set_plan` reads warm-ups → work sets, top → bottom.
       const main = mainLiftRow(
@@ -2729,51 +2720,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     ? ` ${enduranceSport === 'bike' ? 'Riding' : 'Running'} keeps ticking over, all easy — strength is what this stretch develops.`
     : '';
 
-  // ⛔ THE CEILING, SAID ONCE. Every lift that pinned, in one sentence, with its own number.
+  // ⛔ THE CEILING PARAGRAPH IS GONE — 2026-08-12, slice a. It said "<lift> (N lb) reaches 90% of the
+  // max on file at cycle N and stops climbing. That usually means the record is out of date." There
+  // is no ceiling to reach now, so the sentence would be false in every block.
   //
-  // ⚠️ CYCLE IS ONLY STATED WHEN THE LIFTS AGREE. Two lifts pinning at different cycles cannot share
-  // one "at cycle N" clause without lying about one of them, so that case names the lifts and drops
-  // the cycle rather than picking a number that is wrong for somebody. §0f — lose the detail at the
-  // output boundary, never the fact.
-  if (ceilingHits.length > 0) {
-    const pct = Math.round(TM_CEILING_PCT_OF_1RM * 100);
-    const named = ceilingHits.map((h) => `${h.name} (${h.oneRM} lb)`);
-    const list = named.length === 1
-      ? named[0]
-      : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
-    const sameCycle = ceilingHits.every((h) => h.cycle === ceilingHits[0].cycle);
-    const when = sameCycle ? ` at cycle ${ceilingHits[0].cycle}` : '';
-    placementCompromises.push({
-      // ⛔ `ceiling`, NOT `cost`, AND THE REASON IS A REGRESSION I SHIPPED TODAY (2026-07-29).
-      //
-      // `strengthFocusDescription` drops this entry because the plan's own "One thing before you
-      // start" paragraph already says it — and it identified the entry by REGEX ON THE PROSE:
-      // `/training max|working number reaches/`. Tightening this sentence earlier today removed the
-      // words "working number reaches", so the filter stopped matching and a real block printed the
-      // ceiling fact TWICE in different words. Michael caught it in the markdown export.
-      //
-      // ⚠️ THE BUG IS THE COUPLING, NOT THE WORDING. Prose-matching means any future copy edit can
-      // silently re-break a dedup two files away, with nothing failing. A `kind` cannot be
-      // paraphrased. Filter on this, never on the text.
-      kind: 'ceiling',
-      // ⛔ TIGHTENED 2026-07-29. Michael, on the confirm screen: *"a bit dense and cofusing."* This was
-      // the longest block on it at 53 words, and two of its clauses were doing no work: *"the working
-      // number reaches N% of the max on file AND HOLDS THERE"* restates "stop climbing", and *"rather
-      // than a limit"* argues against a reading the athlete has not made yet.
-      //
-      // ⚠️ THE 1RM IS STILL NAMED per lift, because it is the number they would go and re-test and it
-      // is the reason the sentence exists. What went is the padding around it.
-      //
-      // ⚠️ Q-217 IS UNCHANGED AND STILL OPEN: *"usually out of date"* is untrue for an athlete who
-      // never TESTED that lift, where the number was never in date. Shorter, not yet correct.
-      // ⚠️ ORDERED SO THE TWO "at" CLAUSES CANNOT COLLIDE. Shortening it to `stop climbing${when} at
-      // ${pct}%` produced *"stop climbing at cycle 3 at 90% of the max on file"* — `when` already
-      // carries an "at". The percentage leads now, and the cycle rides inside the same clause.
-      text:
-        `${list} reach ${pct}% of the max on file${when} and stop climbing. ` +
-        `That usually means the record is out of date — a fresh test lets ${named.length === 1 ? 'it' : 'them'} keep going.`,
-    });
-  }
+  // ⚠️ AND THE THING IT WAS TELLING THE ATHLETE IS NO LONGER TRUE EITHER: the lift does not stop
+  // climbing. It climbs by Wendler's fixed step until a confirmed stall brings it down 10%. Q-217
+  // (the note's "usually out of date" claim was untrue for a never-tested lift) dies with it.
 
   return {
     name: args.goalName?.trim() || `Strength Focus — ${weeks} Weeks`,
@@ -2788,7 +2741,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         anchorStartWeek: anchorStart,
         anchorCycles: cycles.length - leaders,
         enduranceNote,
-        ceilingLifts: [...ceilingLifts],
+        // ⛔ ALWAYS EMPTY AS OF 2026-08-12 (slice a) — no lift can pin, because there is no ceiling.
+        // The argument is left in place rather than removed from the copy helper's signature: that
+        // helper is a client file and this slice is engine-only. Slice b retires the pair.
+        ceilingLifts: [],
         compromises: placementCompromises,
       }),
     duration_weeks: weeks,
@@ -2817,18 +2773,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // ⚠️ SORTED BY DAY, not by lift. `strengthDays` is built in MAIN_LIFTS order (bench, squat, OHP,
     // deadlift), so it printed "monday, wednesday, tuesday, friday" — correct data in an order that
     // reads like a mistake.
-    // ⛔ SLICE 4a: the ceiling leaves this function as DATA, not only as a sentence. See the field's
-    // docblock. Built from the same `ceilingHits` the prose note is built from, so the two cannot
-    // disagree about which lift pinned or when.
-    strength_calibration: ceilingHits.length
-      ? ceilingHits.map((h) => ({
-          lift: h.name,
-          reason: 'ceiling' as const,
-          at_cycle: h.cycle,
-          total_cycles: cycles.length,
-          one_rm: h.oneRM,
-        }))
-      : undefined,
+    // ⛔ NOT EMITTED HERE ANY MORE — 2026-08-12, slice a. The only producer was the ceiling, and the
+    // ceiling is deleted, so a fresh block has nothing to say: a forecast's verdicts are all
+    // `advance`, and a confirmed stall needs LOGGED cycles this composer cannot have.
+    //
+    // ⚠️ THE FIELD, ITS TYPE AND ITS `plans.config` PLUMBING ALL STAY (`generate-strength-plan`
+    // writes it). Slice b repopulates it from the reset/bump events off the rebuild path, where
+    // `workingNumberForCycles(...).resetAtCycle` is the input. Deleting the wire and re-laying it
+    // in two days is the churn this note exists to prevent.
     strength_days: [...strengthDays]
       .sort((a, b) => PLACEMENT_DAYS.indexOf(a as DayName) - PLACEMENT_DAYS.indexOf(b as DayName))
       .map((d) => String(d).toLowerCase()),

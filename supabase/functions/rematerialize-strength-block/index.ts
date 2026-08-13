@@ -9,10 +9,13 @@
 // own homework (D-326 layer 2 / Q-223).
 //
 // ⛔ NOTHING HERE IS NEW MATH. Every piece has been built, tested and unreachable:
-//   `verdictFrom95Set`        — five reps at 95% and the number goes up; miss and it comes down 10%.
+//   `verdictFrom95Set`        — beat the prescribed reps at 95% and the number goes up; only just
+//                               make it and it holds; fall short and it holds too (a free re-try).
 //   `groupSessionsByCycle`    — logged sessions → the cycle they belong to.
 //   `verdictsForBlock`        — finished cycles read evidence; future cycles stay a forecast.
-//   `workingNumberForCycles`  — walks the cycles applying each verdict, with the 90% ceiling.
+//   `workingNumberForCycles`  — walks the cycles applying each verdict, and owns the stall count:
+//                               a SECOND consecutive miss is what drops the number 10% (p31/p33).
+//                               ⚠️ The 90%-of-1RM ceiling this used to enforce was removed 2026-08-12.
 //   `setsForWeek` / `weightForSet` — the same functions the composer wrote the block with.
 // This function is the wire between them. The reader could never live in the composer: it authors all
 // twelve weeks up front, so no verdict CAN exist for weeks that have not happened. Something had to
@@ -126,7 +129,9 @@ Deno.serve(async (req) => {
     // ⛔ THE STORED WORKING NUMBERS, never recomputed from `performance_numbers`. The composer's own
     // note: recomputing would let the write-back drag them and the controlled progression would be gone.
     const baseWn = (config?.training_max ?? {}) as Record<string, number>;
-    const oneRms = (config?.one_rep_maxes_at_build ?? {}) as Record<string, number>;
+    // ⛔ `one_rep_maxes_at_build` IS NO LONGER READ HERE — 2026-08-12, slice a. It existed only to
+    // feed the 90%-of-1RM ceiling, which is deleted. It is still WRITTEN at build time and is still
+    // the number a calibration offer would replace, so nothing about the stored config changes.
 
     const today = asOf ?? new Date().toISOString().slice(0, 10);
     const currentWeek = resolvePlanWeekIndex(config, today, weeks) ?? 1;
@@ -166,8 +171,10 @@ Deno.serve(async (req) => {
       const byCycle = cycles.map((c) => ({
         cycle: c.index,
         kind: c.kind,
+        // ⛔ NO `oneRM` AS OF 2026-08-12 (slice a) — the 90%-of-1RM ceiling is deleted. The brake on
+        // this path is the confirmed stall: one missed 95% set HOLDS the weight, a second consecutive
+        // one drops it 10% (`STALL_CONFIRM_SESSIONS`, Wendler p31/p33).
         workingNumber: workingNumberForCycles(base, c.index, lift.lower, verdicts, {
-          oneRM: Number(oneRms[lift.ref]) || undefined,
           unknownMeans: 'hold',
         }).workingNumber,
       }));

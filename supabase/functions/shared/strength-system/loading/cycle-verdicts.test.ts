@@ -47,7 +47,11 @@ Deno.test('the AMRAP is found by its flag wherever it sits in the set list', () 
   ]);
   assertEquals(amrapRepsForLift(w, 'Bench Press'), 0);
   // ⛔ Q-220: was "three reps at 95% is a miss" — it is not, p23 prescribes 1+. A logged ZERO is.
-  assertEquals(verdictForCycle([wk3(w)], 'Bench Press'), 'reset', 'zero reps at 95% is the miss');
+  // ⛔ SLICE a (2026-08-12): the verdict is now `miss`, not `reset`. A logged zero is still the
+  // failure — what changed is that ONE of them holds the weight (p33) and only a confirmed pattern
+  // resets it. The rename is the whole point: this function reports the SESSION, the walker decides
+  // the consequence.
+  assertEquals(verdictForCycle([wk3(w)], 'Bench Press'), 'miss', 'zero reps at 95% is the miss');
 });
 
 Deno.test('a session with no AMRAP flag at all yields no reps, not the top set', () => {
@@ -66,11 +70,11 @@ Deno.test('⛔ NOTHING LOGGED IS `hold`, NOT `reset` — a skipped session must 
   assertEquals(amrapRepsForLift({ strength_exercises: null }, 'Back Squat'), null);
 });
 
-Deno.test('⛔ A LOGGED ZERO IS STILL A RESET — the distinction runs both ways', () => {
+Deno.test('⛔ A LOGGED ZERO IS STILL A MISS — the distinction runs both ways', () => {
   // Absent must not become 0, and a real 0 must not become absent. It is evidence of a miss.
   const w = session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]);
   assertEquals(amrapRepsForLift(w, 'Back Squat'), 0);
-  assertEquals(verdictForCycle([wk3(w)], 'Back Squat'), 'reset');
+  assertEquals(verdictForCycle([wk3(w)], 'Back Squat'), 'miss');
 });
 
 Deno.test('⛔ A PREFILLED AMRAP IS THE PRESCRIPTION, NOT A RESULT (D-204)', () => {
@@ -117,7 +121,7 @@ Deno.test('a repeated 95% session is the only place recency decides', () => {
 Deno.test('verdicts come back one per cycle, in order', () => {
   const hit = wk3(session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]));
   const miss = wk3(session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]));   // Q-220: a logged zero
-  assertEquals(verdictsForCycles([[hit], [miss], []], 'Back Squat'), ['advance', 'reset', 'hold']);
+  assertEquals(verdictsForCycles([[hit], [miss], []], 'Back Squat'), ['advance', 'miss', 'hold']);
 });
 
 // ── Cycle grouping: the plan's week number, never the date ──────────────────
@@ -164,7 +168,7 @@ Deno.test('⛔ THE JOIN GROUPS BY PLAN WEEK, and drops what it cannot place', ()
   // And the week-1 session must not be mistaken for the validity check.
   assertEquals(verdictForCycle(grouped[0], 'Back Squat'), 'advance', 'six reps at the 95% week');
   // ⛔ Q-220: was "two reps at the 95% week", which p23 calls a pass. A logged ZERO is the miss.
-  assertEquals(verdictForCycle(grouped[1], 'Back Squat'), 'reset', 'zero reps at the 95% week');
+  assertEquals(verdictForCycle(grouped[1], 'Back Squat'), 'miss', 'zero reps at the 95% week');
 });
 
 // ── The regime boundary ─────────────────────────────────────────────────────
@@ -188,11 +192,13 @@ Deno.test('⛔ ONE REGENERATION SPANS BOTH REGIMES — finished cycles read evid
   assertEquals(verdictsForBlock(cycles, [hit, nothing, nothing], 'Back Squat', 9),
     ['advance', 'hold']);
 
-  // And a finished cycle with a real miss resets rather than holding.
+  // And a finished cycle with a real miss reports the miss rather than holding.
   // ⛔ Q-220: the miss is a logged ZERO. Two reps at 95% is twice the prescribed minimum (p23).
   const miss = [{ weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 0, amrap: true }]) }];
+  // ⚠️ `miss`, NOT `reset` — and the block does not come down for it. The 10% drop needs a second
+  // consecutive missed cycle (`STALL_CONFIRM_SESSIONS`), which `workingNumberForCycles` counts.
   assertEquals(verdictsForBlock(cycles, [miss, nothing, nothing], 'Back Squat', 9),
-    ['reset', 'hold']);
+    ['miss', 'hold']);
 });
 
 Deno.test('the last cycle never yields a verdict — it belongs to the next block', () => {

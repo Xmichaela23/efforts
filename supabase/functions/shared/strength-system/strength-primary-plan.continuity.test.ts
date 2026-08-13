@@ -126,51 +126,46 @@ const tmRatio = (plan: any, week: number, lift: string, oneRM: number) => {
   return (sets.at(-1)!.weight / 0.95) / oneRM;
 };
 
-Deno.test('⛔ THE 90% CEILING BOUNDS THE AAA DRIFT — the band is closed, not just narrower', () => {
-  // ⚠️ THE ADVANCE IS FIXED IN SIZE AND GATED IN OCCURRENCE. `workingNumberForCycle` documents it:
-  // *"Do NOT recompute this from an AMRAP result … the reps are FEEDBACK, not an input."* The step is
-  // +5/+10 capped at 6%. What the AMRAP decides is WHETHER it happens, not how big it is.
+Deno.test('⛔ THE AAA DRIFT IS BOUNDED BY THE MISS, NOT BY A RATIO — three anchors, three brakes', () => {
+  // ⛔⛔ SUPERSEDES 'THE 90% CEILING BOUNDS THE AAA DRIFT' (2026-07-28). That test asserted the
+  // training max could never pass 90% of the max ON FILE, on either a heavy or a light block. Both
+  // assertions are deliberately gone: the ceiling was an app invention that FROZE light blocks into
+  // byte-identical cycles, and Wendler's brake is a missed prescription (p30), not a record.
   //
-  // In a forecast — which is what a freshly generated block is, since no cycle has been logged — every
-  // verdict is `advance`. So a generated AAA block shows two advances taken on no evidence.
+  // ⚠️ THE ADVANCE IS FIXED IN SIZE AND GATED IN OCCURRENCE. `workingNumberForCycle`: *"Do NOT
+  // recompute this from an AMRAP result … the reps are FEEDBACK, not an input."* The step is +5/+10
+  // for every athlete now — the 6% percentage shrink went with the ceiling (p90, p107). What the
+  // all-out set decides is WHETHER the step happens, not how big it is.
+  //
+  // In a forecast — which is what a freshly generated block is — every verdict is `advance`, so a
+  // generated AAA block shows two advances taken on no evidence. That is the forecast's job.
 
-  // ⛔ AND THE 6% CAP WAS THE ASYMPTOTE, NOT THE RAIL. Michael, 2026-07-28: *"It doesn't protect the
-  // ratio — it DEFINES the worst case."* Two advances of +6% off an 85% start is
-  // 0.85 × 1.06 × 1.06 = 95.5%, and ANY lifter light enough for the cap to bind converges on exactly
-  // that whatever their numbers are. Measured before the ceiling change: 200 lb squat → 94.7%,
-  // 315 lb squat → 90.2%. The constraint sat on step SIZE, which does not control the ratio.
+  // The heavy athlete: TM 265 → 275 → 285 against a 315 max. 90.5%, which the ceiling used to
+  // truncate to 88.9%. Both are inside the range where the 95% set is still a rep-out.
   const heavy = tmRatio(PLAN, 11, 'Back Squat', MAXES.squat)!;
-  assert(heavy <= 0.90, `heavy squat TM reached ${(heavy * 100).toFixed(1)}% of 1RM`);
+  assert(heavy > 0.90 && heavy < 0.92, `heavy squat TM reached ${(heavy * 100).toFixed(1)}% of 1RM`);
 
-  // ⛔ A LIGHT LIFTER IS THE CASE THAT BINDS, and it is worse. The 6% relative cap never engages on a
-  // small bar, so +10 on a 170 lb training max is a 5.9% step — twice — and the 100% ceiling never
-  // fires because the number never reaches the 1RM.
+  // ⛔ THE LIGHT LIFTER IS THE CASE THAT USED TO FREEZE, AND THE ONLY THING THAT MATTERS ABOUT THE
+  // RATIO NOW IS THAT THE NUMBER MOVED. A 200 lb squat: TM 170 → 180 → 190.
   const light = composeStrengthPrimaryPlan({
     ...base,
     oneRepMaxes: { bench: 155, squat: 200, deadlift: 245, overheadPress: 95 },
     blockShape: CONTINUOUS,
   });
-  const lightRatio = tmRatio(light, 11, 'Back Squat', 200)!;
+  const c2 = tmRatio(light, 7, 'Back Squat', 200)!;
+  const c3 = tmRatio(light, 11, 'Back Squat', 200)!;
+  assert(c3 > c2, `light squat froze: cycle 2 and cycle 3 are both ${(c3 * 100).toFixed(1)}% of 1RM`);
 
-  // ⛔ THE LIGHT LIFTER IS NOW BOUNDED AT THE SAME PLACE AS THE HEAVY ONE. This was 94.7% before the
-  // ceiling moved to 90% with truncation — the whole band 90-95.5% collapsed onto its own top edge.
-  assert(
-    lightRatio <= 0.90,
-    `light squat TM reached ${(lightRatio * 100).toFixed(1)}% of 1RM in cycle 3 — the ceiling should bind`,
-  );
+  // ⛔ AND WHAT REPLACED THE BOUND, SAID PLAINLY BECAUSE IT IS THE WHOLE ARGUMENT. Nothing stops the
+  // ratio climbing except the athlete failing to beat the prescription: at that point the number
+  // holds, and a second consecutive failure drops it 10%. A drifting-too-high training max is
+  // self-correcting on the way down, which is Wendler's own mechanism (p31).
 
-  // ⚠️ AND THE CONSEQUENCE THAT MOTIVATED IT: the "95% × 1+" set is now ~85% of the athlete's TRUE
-  // max rather than ~90%. Wendler asks for 1+ there so either was completable, but
-  // `verdictFrom95Set` wants FIVE reps to ADVANCE — and five at 90% of a true max is a max attempt,
-  // not a rep-out. At 85% it is a rep-out again, which is what makes the gate a measurement.
-  const light95 = tmRatio(light, 11, 'Back Squat', 200)! * 0.95;
-  assert(light95 <= 0.86, `the 95% set is ${(light95 * 100).toFixed(1)}% of true max`);
-
-  // ⛔ THE ONE THIS DOES NOT CLOSE. Every ratio above is computed against `oneRM` — a signup number
-  // the athlete typed once and that never updates. If it was aspirational the true ratio is worse
-  // than this assertion believes, AND THIS TEST STILL PASSES, because it measures against the same
-  // stale number. Michael, 2026-07-28. Not addressed here; `exercise_log`'s e1RM trend is the
-  // candidate for a tested max and is not wired to this.
+  // ⛔ THE ONE THIS DOES NOT CLOSE, AND IT IS WHY THE CEILING WAS NEVER A REAL GUARD ANYWAY. Every
+  // ratio above is computed against `oneRM` — a signup number the athlete typed once and that never
+  // updates. If it was aspirational the true ratio is worse than any assertion here believes, AND
+  // THIS TEST STILL PASSES, because it measures against the same stale number. Michael, 2026-07-28.
+  // `exercise_log`'s e1RM trend is the candidate for a tested max and is not wired to this.
 });
 
 Deno.test('AAA measures three times where LLA measures once — the offsetting half', () => {

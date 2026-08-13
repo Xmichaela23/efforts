@@ -14,32 +14,39 @@ import {
  * miss does, and — most important — that a block with nothing logged does not move.
  */
 
-Deno.test('the rule: five at 95% advances, short of it resets', () => {
+Deno.test('the rule: the prescribed rep advances, short of it is a miss', () => {
+  // ⛔ RE-CUT 2026-08-12 (slice a): a logged zero is a `miss`, not a `reset` — one bad day never
+  // drops the bar (p33). One rep at 95% still ADVANCES: it IS the prescription met (p23), and p24
+  // calls the extra reps dominance rather than the entry fee.
   assertEquals(verdictFrom95Set(5, 'Back Squat'), 'advance');
-  assertEquals(verdictFrom95Set(1, 'Back Squat'), 'advance');   // one rep IS the prescription met (p23)
-  assertEquals(verdictFrom95Set(0, 'Back Squat'), 'reset');
+  assertEquals(verdictFrom95Set(1, 'Back Squat'), 'advance');
+  assertEquals(verdictFrom95Set(0, 'Back Squat'), 'miss');
   assertEquals(verdictFrom95Set(15, 'Back Squat'), 'advance_untrusted'); // earns the step; estimate is soft
   assertEquals(verdictFrom95Set(null), 'hold');                 // nothing logged is not a miss
 });
 
 Deno.test('a HIT walks the bar up the way Wendler says', () => {
-  // Lower body, +10 a cycle, capped at 6% of the working number.
+  // Lower body, +10 a cycle. ⛔ THE 6% PERCENTAGE CAP IS GONE (2026-08-12) — Wendler gives every
+  // lifter the same fixed jump regardless of training age (p90, p107).
   const wn1 = workingNumberForCycles(90, 1, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber;
   const wn2 = workingNumberForCycles(90, 2, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber;
   const wn3 = workingNumberForCycles(90, 3, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber;
   assertEquals(wn1, 90);
   assertEquals(wn2 > wn1, true);
   assertEquals(wn3 > wn2, true);
-  // ⚠️ On a 90 lb bar Wendler's +10 is 11% a cycle, out of the range he wrote for, so the 6% cap binds.
-  assertEquals(wn2, 95);
+  // ⚠️ 100, NOT 95. The cap used to shrink this light bar's step to +5; it takes the full +10 now.
+  assertEquals(wn2, 100);
 });
 
-Deno.test('⛔ a MISS brings it down, and the next cycle starts from there', () => {
+Deno.test('⛔ a CONFIRMED STALL brings it down, and the next cycle starts from there', () => {
   const hit = workingNumberForCycles(90, 2, true, ['advance'], { unknownMeans: 'hold' }).workingNumber;
-  const miss = workingNumberForCycles(90, 2, true, ['reset'], { unknownMeans: 'hold' }).workingNumber;
-  assertEquals(hit, 95);
-  assertEquals(miss, 80);   // −10%, rounded down to plate granularity
-  assertEquals(miss < 90, true);
+  assertEquals(hit, 100);
+  // ⛔ ONE MISS HOLDS (p33) — this is the half the athlete feels, and it used to drop them 10%.
+  assertEquals(workingNumberForCycles(90, 2, true, ['miss'], { unknownMeans: 'hold' }).workingNumber, 90);
+  // The SECOND consecutive miss is the stall (p31), and the rebuild starts from the lower number.
+  const stalled = workingNumberForCycles(90, 3, true, ['miss', 'miss'], { unknownMeans: 'hold' }).workingNumber;
+  assertEquals(stalled, 80);   // −10%, rounded down to plate granularity
+  assertEquals(stalled < 90, true);
 });
 
 Deno.test('⛔ NOTHING LOGGED MEANS NOTHING MOVES — this is the one that must not be wrong', () => {
@@ -57,12 +64,16 @@ Deno.test('the FORECAST exception belongs to a fresh block, not to this one', ()
   assertEquals(workingNumberForCycles(90, 3, true, undefined, { unknownMeans: 'advance' }).workingNumber > 90, true);
 });
 
-Deno.test('the ceiling binds — the bar cannot walk past 90% of the max on file', () => {
-  // Working number 90 against a 106 lb max: the ceiling is 90% of 106 = 95.
-  const capped = workingNumberForCycles(90, 3, true, ['advance', 'advance'], { oneRM: 106, unknownMeans: 'hold' }).workingNumber;
-  assertEquals(capped, 95);
-  // ⚠️ Without the ceiling the same input keeps climbing.
-  assertEquals(workingNumberForCycles(90, 3, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber, 100);
+Deno.test('⛔ THERE IS NO CEILING — the bar walks past 90% of the max on file, and must', () => {
+  // ⛔ INVERTS 'the ceiling binds' (2026-07-28). A working number of 90 against a 106 lb max was
+  // clamped to 95 — one +5 step and then nothing, which is exactly the freeze. Wendler's brake is a
+  // missed prescription (p30), not the record, so two clean advances now reach 110.
+  assertEquals(
+    workingNumberForCycles(90, 3, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber,
+    110,
+  );
+  // ⚠️ AND THE `oneRM` OPTION IS GONE FROM THE SIGNATURE, not merely ignored — passing it is a type
+  // error, so no caller can quietly re-enable a bound that no longer exists.
 });
 
 Deno.test('the rewritten weights are the composer\'s own arithmetic', () => {
