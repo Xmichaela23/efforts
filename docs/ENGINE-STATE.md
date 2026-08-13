@@ -23,7 +23,24 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-13 — the press/squat freeze is FIXED. The invented 90% ceiling AND the light-lifter step-shrink are DELETED; the engine is now pure book-strict Wendler. Slice a = D-422, PUSHED + DEPLOYED, device-acceptance still open.)
+## 🧭 NEXT SESSION — START HERE (2026-08-13 PM — the per-day ASSISTANCE PICKER (Wendler Forever) shipped end-to-end: pushed + edge-deployed + VERIFIED in a real generated plan. One line left to eyeball. A second, OLDER job is still open — see "ALSO OPEN" below.)
+
+### ⛔ WHAT SHIPPED (do NOT re-litigate — it is live, and a generated "Strong Focus" plan confirmed it)
+The block-wide 3-pick assistance model is GONE. The athlete now makes per-day picks on Wendler's **Forever** push/pull/single-leg-core, one movement per category per day, **by feel** (D-406 intact). All PUSHED + edge-DEPLOYED (prod timestamps 2026-08-13 17:26 + 17:50 UTC) + client on Netlify + iOS synced. Confirmed in the plan Michael generated: barbell hip thrust leads glutes, close-grip bench leads triceps (**zero cable/band pushdown across 12 weeks**), pull-up progression = 100 grip-varied chins/week with the 50-in-10-min standard named.
+- **D-423** — 12 picks (4 days × 3 categories), athlete picks, engine no longer re-roles. Supersedes D-385/404/405 (re-roling retired).
+- **D-424 → D-425** — equipment-gated on both surfaces, then SIMPLIFIED: niche chips cut (GHD / dip-bars / rings / decline / leg-curl / plyo-box), gate only on commonly-declarable gear, **bands are last-resort** (loadable-first pick-order). A test walks `BALANCED_WEEK` and fails naming anything a normal home gym can't do.
+- **D-426** — opt-in **pull-up/chin-up progression** (Wendler's protocol: pins the pull slot to chins every day, grip rotates, 100/week, tracked off `pullupMaxReps` vs the 50-in-10 standard), surfaced on the State strength row, band-assisted counted separately. Fixed a **LIVE bug**: band-assisted rep-max tests were inflating tested pull-up capacity at 3 write sites.
+- **D-427** — **Hip Thrust** added to the Glutes pool (barbell leads, single-leg fallback) — the ONE deliberate movement outside Forever (his catalog has no true glute move; hip thrust postdates it), pinned by a test to exactly those two entries. Close-Grip Bench added to triceps (his own). When pull-up progression + Arms are both ON, the composer **NOTES** biceps is covered by the chins rather than adding curls.
+
+### ⛔ THE ONE THING LEFT ON THIS
+Regenerate a strength block with **pull-up progression + Arms both ON** and confirm the "biceps covered by the chin progression" line reads right — it deployed (`9a0895e2`, `generate-strength-plan` at 17:50) AFTER the verified plan was generated, so it is the only piece no human has eyeballed.
+
+### Scaffolding removed
+`docs/WORKORDER-assistance-week-picker-2026-08-12.md` deleted on ship — its substance is in D-423–D-427, per the spec lifecycle in `CLAUDE.md`.
+
+---
+
+## 🧭 ALSO OPEN — STRENGTH-FREEZE ACCEPTANCE RUN + SLICE b (2026-08-13 — the press/squat freeze is FIXED. The invented 90% ceiling AND the light-lifter step-shrink are DELETED; the engine is now pure book-strict Wendler. Slice a = D-422, PUSHED + DEPLOYED, device-acceptance still open. UNRELATED to the assistance picker above — do not conflate.)
 
 ### ⛔ YOUR JOB
 1. **Acceptance run (Michael-driven), now a LIVE check** — slice a is deployed. Regenerate a strength block and confirm the press/squat cycles CLIMB instead of repeating: week 7 ≠ week 11; squat steps 90→100→110, press by 5; no lift frozen for two cycles.

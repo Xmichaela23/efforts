@@ -1589,7 +1589,7 @@ fire on load alone.
 
 ---
 
-### D-418 — One overload source: "are you overloaded" is minted once, plan-aware, from the athlete's own signals (2026-08-12, **PUSHED pending; fixtures green (18 new, 1636 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — supersedes the parallel-authority half of [D-416], closes the Slice-1 contract
+### D-418 — One overload source: "are you overloaded" is minted once, plan-aware, from the athlete's own signals (2026-08-12, **PUSHED pending; fixtures green (18 new, 1636 `_shared` total, 0 fail); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — supersedes the parallel-authority half of [D-416], closes the Slice-1 contract
 
 **The report.** One payload contradicting itself six ways. `glance.verdict_code = on_track` beside
 `response_model.headline = "Signs of overreaching — consider backing off"`, `load_status = elevated`
@@ -1693,7 +1693,7 @@ to null ⇒ byte-identical pre-slice behavior. That is the same shape `corrobora
 
 ---
 
-### D-419 — Strength progress reads the protocol's own gauge: 5/3/1 is the all-out set, not the waved working-set e1RM (2026-08-12, **PUSHED pending; fixtures green (14 new, 1650 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — closes the Slice-2 contract, extends [D-417] and [D-270]
+### D-419 — Strength progress reads the protocol's own gauge: 5/3/1 is the all-out set, not the waved working-set e1RM (2026-08-12, **PUSHED pending; fixtures green (14 new, 1650 `_shared` total, 0 fail); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — closes the Slice-2 contract, extends [D-417] and [D-270]
 
 > **⛔ THE DIRECTION HALF OF THIS ENTRY IS REVERSED BY [D-420] (2026-08-12, built the same day).** The
 > substrate call below was right and still stands — a 5/3/1 lift's readings come from the all-out set,
@@ -1820,7 +1820,7 @@ all-out set; and three capture tests including "the all-out set is found by its 
 is what made this a display-accuracy fix with a low blast radius), the e1RM formula and its reserve
 gate, the D-417 trusted-rep gate itself, and the goal glance lane.
 
-### D-420 — Strength progress is a record + rep PRs + a chart, NOT a weekly direction verdict (2026-08-12, **BUILT — fixtures green (9 new, 1658 `_shared` total, 0 fail); NOT deployed, NOT device-verified**) — supersedes the *direction* half of [D-419], extends [D-417]
+### D-420 — Strength progress is a record + rep PRs + a chart, NOT a weekly direction verdict (2026-08-12, **BUILT — fixtures green (9 new, 1658 `_shared` total, 0 fail); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — supersedes the *direction* half of [D-419], extends [D-417]
 
 **The realization.** Chasing "1 lift trending down" / "sliding −8.2%" to its root: the weekly per-lift
 DIRECTION verdict is a construct **no commercial app** (Strong, Hevy, Boostcamp) computes, and on a
@@ -1956,7 +1956,7 @@ window apply to any athlete and any protocol.
 
 ---
 
-### D-421 — A pinned lift is a calibration signal, not a stall to engineer away (2026-08-12, **BUILT — fixtures green (3 new, 1987 pass / 1 pre-existing unrelated failure); NOT deployed, NOT device-verified**) — closes slice 4a; the finer-increment premise was REJECTED, see the decision
+### D-421 — A pinned lift is a calibration signal, not a stall to engineer away (2026-08-12, **BUILT — fixtures green (3 new, 1987 pass / 1 pre-existing unrelated failure); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — closes slice 4a; the finer-increment premise was REJECTED, see the decision
 
 > ⛔ **RE-SCOPED THE SAME DAY (2026-08-12 PM) BY SLICE a — ITS TRIGGER NO LONGER EXISTS. The signal lives; the ceiling that produced it is deleted.**
 >
@@ -2081,7 +2081,7 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 
 ---
 
-### D-423 — Assistance is TWELVE picks the athlete makes, not three the engine re-roles (2026-08-13, **BUILT — fixtures green (3491 pass / 6 pre-existing unrelated failures); NOT deployed, NOT device-verified**) — **supersedes [D-385], [D-404], [D-405]**; [D-406] and [D-322] intact
+### D-423 — Assistance is TWELVE picks the athlete makes, not three the engine re-roles (2026-08-13, **BUILT — fixtures green (3491 pass / 6 pre-existing unrelated failures); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — **supersedes [D-385], [D-404], [D-405]**; [D-406] and [D-322] intact
 
 **The decision.** Wendler 5/3/1 *Forever* p.24: four lifting days, each carrying **push · pull · single-leg/core**, one movement per category. The athlete picks all twelve. The engine re-roles nothing, substitutes nothing, and prints no note explaining why they got something other than what they chose.
 
@@ -2108,7 +2108,7 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 
 ---
 
-### D-424 — The assistance picker is EQUIPMENT-GATED, on both surfaces, through one map (2026-08-13, **BUILT — fixtures green; NOT deployed, NOT device-verified**) — **reverses the deliberate ungated call** (F-5, `docs/BUILDER-SWEEP-FINDINGS.md`)
+### D-424 — The assistance picker is EQUIPMENT-GATED, on both surfaces, through one map (2026-08-13, **BUILT — fixtures green; DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — **reverses the deliberate ungated call** (F-5, `docs/BUILDER-SWEEP-FINDINGS.md`)
 
 > ⛔ **PARTIALLY REVERSED 2026-08-13 BY [D-425] — the NICHE ITEMIZATION IS CUT, the gate is not.**
 > Both surfaces still gate through one `canPerform`, and that half stands. What went is the
@@ -2141,7 +2141,7 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 
 ---
 
-### D-425 — Gate only on gear that is BOTH required AND commonly declarable (2026-08-13, **BUILT — fixtures green (3513 pass / 6 pre-existing unrelated failures); NOT deployed, NOT device-verified**) — **partially reverses [D-424]**
+### D-425 — Gate only on gear that is BOTH required AND commonly declarable (2026-08-13, **BUILT — fixtures green (3513 pass / 6 pre-existing unrelated failures); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — **partially reverses [D-424]**
 
 **The decision.** The equipment picker drops its niche itemization — Decline bench, Dip bars, Leg curl machine, Glute-ham developer, Gymnastic rings, Plyo box — and keeps the ten items an athlete recognises. Routes loosen to match: **a movement is gated only when the gear it needs is both genuinely required and something the athlete can actually declare.** Everything else is `substituteExerciseForEquipment`'s job.
 
@@ -2161,3 +2161,23 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 **Guardrail, now asserted rather than described:** a normal home gym (barbell / dumbbells / rack / bench / pull-up bar) performs the **entire default block** with nothing swapped. A test walks `BALANCED_WEEK` and fails naming anything it cannot do.
 
 **Back-annotated:** [D-424].
+
+---
+
+### D-426 — Pull-up/chin-up progression, an opt-in performance axis on the assistance picker (2026-08-13, **PUSHED + DEPLOYED; VERIFIED in a generated plan except the Arms-note interaction**)
+
+A focus DISTINCT from the body-part chips: those bias which movement fills a category; this **progresses a number**. Opt-in (`performance_focus: 'pullups'` on `AssistanceWeekPrefs`), never a seventh chip. When on it pins the pull category to chins on all four days, rotates the grip (Forever p.26), doses off `pullupMaxReps`, and names Wendler's standard — **50 reps in 10 minutes, a SESSION measure that must never be merged with a max-clean-rep figure** (`pullup-progression.ts`; `SESSION_STANDARD_REPS`/`_MINUTES`). Below 8 clean reps the dose scales; 0 reps triggers the band on-ramp (Forever 2nd-ed p.36) at half dose, band-assisted counted separately (`countPullupWork` → `{clean, assisted, bestCleanSet}`, only `bestCleanSet` moves a capacity). Surfaced on the State strength row **only** when the goal is on (Constitution Law 2), fed from raw logged sets (resistance_level intact), never the aggregate.
+
+⛔ **Fixed a live capacity-inflation bug in the same slice.** `Number(null)` is 0 and 0 is a valid rep count (Q-102): band-assisted rep-max tests were writing the ASSISTED count into `performance_numbers.pullupMaxReps` at all three write sites (`StrengthLogger` repMaxTest, `analyze-strength-workout buildStrengthTestResult`, `save-baseline-test`) — inflating the tested capacity that scales assistance volume, resolves bodyweight RIR, and shows on the State row as a number the athlete cannot do. Now null-checked and resistance-gated, server-side.
+
+**Deploy set for the State surfacing was 20** (compute-snapshot + everything sharing `state-trend`). **Verified:** a generated Strong Focus plan shows the progression (100 grip-varied chins/week, standard named). **Unverified:** the row on a device with real logged chins.
+
+---
+
+### D-427 — Hip Thrust is the ONE deliberate movement outside Wendler's Forever catalog (2026-08-13, **PUSHED + DEPLOYED; hip thrust + close-grip VERIFIED in a generated plan; the Arms-note NOT yet eyeballed**)
+
+Forever's assistance chapter has **no true glute movement** — its glute/posterior work (Glute-Ham Raise, Back Raise, Reverse Hyper) is all hamstring-leaning (p.29 lists glutes third), and the hip thrust postdates his framework. Nothing in the field targets glutes like a hip thrust (direct hip extension against load), so the Glutes pool gains **Barbell Hip Thrust** (route `[['barbell','bench']]`, leads on a loadable kit) + **Single-Leg Hip Thrust** (`ALWAYS`, bodyweight fallback). ⛔ This is the **sole** departure from strict Wendler, flagged at the entries themselves and pinned by a test to **exactly those two** (both `not Wendler`, both `glutes`); every other catalog entry must cite a page or named template, so a second exception cannot arrive quietly. Justified by his own p.24 — *"it is the work that matters."* Catalog is now 28, of which 26 are his.
+
+**Close-Grip Bench** added to the triceps pool (no exception — it is Wendler's own Simplest-Strength big assistance lift) and **leads** the meaty/loadable order; the band-only pushdown sorts last (`equipmentFitRank`, D-425's loadable-first rule).
+
+**The pull-up-progression × Arms interaction is NAMED, not fixed.** When `performance_focus==='pullups'` AND the focus picks include `arms`, the progression pins the pull slot to chins, so the biceps half of Arms is subsumed. The composer surfaces ONE line saying so — 100 weighted chins/week is heavy biceps volume, and stacking curls on top would fight the by-feel low-volume design. A NOTE, not a movement change (`strength-primary-plan.ts`, commit `9a0895e2`). **This line deployed after the verified plan was generated — not yet eyeballed.**
