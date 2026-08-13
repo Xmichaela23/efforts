@@ -23,7 +23,32 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-13 PM — the per-day ASSISTANCE PICKER (Wendler Forever) shipped end-to-end: pushed + edge-deployed + VERIFIED in a real generated plan. One line left to eyeball. A second, OLDER job is still open — see "ALSO OPEN" below.)
+## 🧭 NEXT SESSION — START HERE (2026-08-13 EVENING — the "a finished build does not land on the WEEKLY PLANNER" bug is STILL LIVE. It has survived MULTIPLE chats. This session attempted it again and it is UNVERIFIED — the user reports it still lands wrong. The real blocker is plan-build PATH FRAGMENTATION: it is too easy to fix a dead/wrong path, which is exactly what happened here.)
+
+### ⛔ THE JOB: a finished build must land on the new plan's WEEKLY PLANNER at week 1 — verified on device.
+This keeps getting "fixed" and coming back because the plan-build system has many overlapping entry points and generators, and a fix repeatedly lands on the WRONG one. **Do not assume the path. Trace the LIVE Strong Focus build→land chain on device (with logging) BEFORE editing.**
+
+**What this session changed — PUSHED, NOT device-verified, user reports STILL not landing:**
+- `85c0402b` — GoalsScreen **form + season** builds → `onOpenBuiltPlan` (weekly planner @ wk1); plus the admin re-associate dropdown fix (`WorkloadAdmin.tsx`: was gated on a perpetually-null `user`).
+- `c1dc3cce` — the **intake/wizard** hand-off: `useArcSetupComplete.complete()` navigates `/goals` with `announcePlanReady:false, builtPlanId` → `GoalsScreen` landing effect (~line 487) → `onOpenBuiltPlan(builtPlanId)` → `AppLayout` (~1573) `navigate('/', {state:{openPlans:true, focusPlanId, focusWeek:1}})` → AppLayout `openPlans` effect (~711) opens `AllPlansInterface` at week 1.
+- ⚠️ **Strong Focus builds via `NonRaceBuilder` → `useArcSetupComplete`, NOT the GoalsScreen form.** An earlier edit this session hit the form path by mistake — the exact "fixing the wrong plan path" trap the user is describing.
+
+**⛔ WHY IT MAY STILL FAIL — check these in order, do not guess:**
+1. **Phone on an OLD bundle** — needs reinstall from Xcode after `npm run ios` (Xcode was left open; unclear if reinstalled).
+2. `builtPlanId` is **null** in the nav state for this build mode → falls back to `onGoToSchedule` (Home calendar), not the planner. Verify `data.plan_id` is actually returned for the wizard `build_existing` mode.
+3. **Strong Focus takes a path not yet traced** — fragmentation: 4 generators (`generate-combined-plan` / `generate-run-plan` / `generate-triathlon-plan` / `generate-plan`) + entry points (GoalsScreen form, season, Arc/wizard). Confirm which combination fires.
+4. AppLayout's `/goals` deep-link effect racing the `openPlans` route-state effect.
+
+**Read-only DB look (this session, NO writes):** 7 plans across 3 logins. Strong Focus on `45d122e7` (main); Humboldt marathon on a DIFFERENT login `9c313043`; **no 70.3 exists in the DB**. A "lost plan" is often the wrong login, not a bug — confirm which account/plan is live before testing.
+
+**Doc rot found, NOT yet fixed:** the POLISH-PUNCH-LIST "Strong Focus acceptance run (2026-08-09)" checklist and the GAME-PLAN 2026-08-09 banner still describe the **pre-D-423** assistance model (arms-on-press-days, no chin on leg days). D-423 (2026-08-13) replaced it with Forever (push/pull/single-leg-core every day; chins every day via D-426). Reconcile them.
+
+**85% training max:** ratified this session as the OWNED rule (concurrent buffer for the endurance athlete, unconditional — no pure-strength user). `WORKING_NUMBER_PCT_OF_1RM = 0.85`, `wendler-531.ts:119`. No D-entry owns it yet; the copy "starts at 85% of your max" is engine-accurate.
+
+**Still open from prior handoffs (unchanged, see below):** the biceps "covered by chins" note eyeball (D-427); the strength-freeze acceptance run + slice b (D-422).
+
+---
+## 🧭 Prior handoff (2026-08-13 PM) — the per-day ASSISTANCE PICKER (Wendler Forever) shipped end-to-end: pushed + edge-deployed + VERIFIED in a real generated plan. One line left to eyeball (the biceps note). Superseded as START-HERE by the banner above; content still valid.
 
 ### ⛔ WHAT SHIPPED (do NOT re-litigate — it is live, and a generated "Strong Focus" plan confirmed it)
 The block-wide 3-pick assistance model is GONE. The athlete now makes per-day picks on Wendler's **Forever** push/pull/single-leg-core, one movement per category per day, **by feel** (D-406 intact). All PUSHED + edge-DEPLOYED (prod timestamps 2026-08-13 17:26 + 17:50 UTC) + client on Netlify + iOS synced. Confirmed in the plan Michael generated: barbell hip thrust leads glutes, close-grip bench leads triceps (**zero cable/band pushdown across 12 weeks**), pull-up progression = 100 grip-varied chins/week with the 50-in-10-min standard named.
