@@ -109,7 +109,7 @@ side should price accessories at all, or whether planned-vs-actual should simply
 for them (it is already dropped from the session screen's Planned COLUMN per [D-370] — State did not
 get the memo). See also [Q-233] (deliberate bodyweight imprecisions) and [D-351].
 
-## Q-252 — ⛔ THE STATE TRENDS VANISH EVERY SUNDAY AT 5PM PACIFIC. A UTC WEEK BOUNDARY DECIDES THE ATHLETE'S WEEK IS HISTORY (2026-08-02) — **ROOT-CAUSED, REPRODUCED, NOT FIXED**
+## Q-252 — The State trends vanished every Sunday at 5pm Pacific — UTC week-boundary gate (2026-08-02) — **✅ CLOSED 2026-08-10, [D-413]/[D-414], verified on device**
 
 > ✅ **CLOSED 2026-08-10 — all three stages shipped. See [D-413] (the timezone-free gate — fixes the
 > blackout) and [D-414] (stored athlete timezone, LA default killed, Stage 3 UTC-caller audit).**
