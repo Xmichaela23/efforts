@@ -237,7 +237,10 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'triceps pushdown': [['cable'], ['bands']],
   'tricep extension': [['dumbbells'], ['barbell'], ['bands']],
   'triceps extension': [['dumbbells'], ['barbell'], ['bands']],
-  'close grip bench press': [['barbell', 'bench']],
+  // ⛔ RACK INCLUDED, unlike the plain bench press entry's history: this is a heavy pressing lift
+  // taken out of uprights, and setting up without them is how people get pinned. It is the one
+  // triceps option that loads, which is why it leads that pool wherever a rack exists.
+  'close grip bench press': [['barbell', 'rack', 'bench']],
 
   // ── PULL ────────────────────────────────────────────────────────────────────────────────────────
   'pull up': [['pull_up_bar']],
@@ -273,6 +276,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // the floor, and MINIMUM TO PERFORM is the question this table answers.
   'front squat': [['barbell']],
   'hip thrust': [['bench']],
+  // ⛔ THE LOADED VERSION NEEDS BOTH — a bar to sit across the hips and a bench to set the shoulders
+  // on. Distinct from the bare `hip thrust` above, which is the bodyweight/DB version.
+  'barbell hip thrust': [['barbell', 'bench']],
   'romanian deadlift': [['barbell'], ['dumbbells']],
   'good morning': [['barbell']],
   // ⛔ UNGATED, AND THE BACKSTOP IS WHY. A leg-curl machine is required and NOT commonly declarable,

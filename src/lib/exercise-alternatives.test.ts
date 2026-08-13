@@ -248,13 +248,17 @@ const asAssistance = (n: string) =>
 Deno.test('an assistance row offers the OTHER movements in its own CATEGORY', () => {
   // ⚠️ NO `Ab Wheel Rollout` — and that is the slice-4 gate, not an omission. `FULL_GYM` is a
   // commercial gym, and a commercial gym is NOT assumed to stock a ten-dollar ab wheel (`hasAbWheel`).
+  // ⚠️ The two hip thrusts joined this category with the Glutes-focus work — the swap sheet reads the
+  // catalog back, so it gains them automatically. That is the property under test.
   assertEquals(asAssistance('Bulgarian Split Squat'), [
-    'Reverse Lunge', 'Front Squat', 'Glute-Ham Raise', 'Back Extension', 'Reverse Hyper',
-    'Hanging Leg Raise', 'Weighted Sit-Up', 'DB Side Bend',
+    'Reverse Lunge', 'Front Squat', 'Barbell Hip Thrust', 'Single-Leg Hip Thrust', 'Glute-Ham Raise',
+    'Back Extension', 'Reverse Hyper', 'Hanging Leg Raise', 'Weighted Sit-Up', 'DB Side Bend',
   ]);
+  // ⚠️ `Close-Grip Bench Press` sits with the compounds, not in p.24-26 page order — it is the meaty
+  // triceps option and catalog order is what puts a loaded press ahead of an isolation movement.
   assertEquals(asAssistance('Push-Up'), [
-    'Dips', 'DB Bench Press', 'DB Incline Press', 'DB Shoulder Press', 'Plate Raise',
-    'Triceps Pushdown', 'Triceps Extension',
+    'Dips', 'Close-Grip Bench Press', 'DB Bench Press', 'DB Incline Press', 'DB Shoulder Press',
+    'Plate Raise', 'Triceps Pushdown', 'Triceps Extension',
   ]);
   // ⛔ These are exactly the lists the build flow offers. Nothing new is invented — the catalog is
   // read back, so the swap sheet and the picker cannot drift apart.

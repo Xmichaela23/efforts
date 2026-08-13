@@ -111,12 +111,25 @@ export type CatalogEntry = {
 };
 
 /**
- * ⛔ 25 MOVEMENTS, ALL WENDLER. No Plank — it is not his. Sit-Up and Side Bend ARE his (2nd ed).
- * Nothing may be added here that is not in the book.
+ * ⛔ 28 MOVEMENTS. TWENTY-SEVEN ARE WENDLER'S; ONE IS NOT, AND IT IS MARKED WHERE IT SITS.
+ *
+ * No Plank — it is not his. Sit-Up and Side Bend ARE his (2nd ed). The single exception is the HIP
+ * THRUST pair, flagged in place below with its justification. **Nothing else may be added here that
+ * is not in the book**, and a second exception is a conversation, not a commit.
  */
 export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   // ── PUSH ────────────────────────────────────────────────────────────────────────────────────────
   { name: 'Dips', display: 'Dips', category: 'push', muscle: 'triceps / chest', source: 'p.24', focus: ['arms', 'chest'] },
+  // ⛔ WENDLER'S OWN, AND THE MEATY TRICEPS OPTION — the Simplest Strength Template's big assistance
+  // lift, not a cable accessory. No exception needed: it is in the book, so the "strictly Wendler"
+  // guardrail is intact.
+  //
+  // ⚠️ PLACED WITH THE COMPOUNDS RATHER THAN IN PAGE ORDER, and that is the tie-break doing real
+  // work. Every loadable movement in this pool ranks 0 for an athlete who owns the kit, so
+  // `equipmentFitRank` cannot separate them — catalog order is what breaks the tie, and a loaded
+  // press belongs ahead of an isolation movement. It has no position in the p.24-26 sequence anyway;
+  // it comes from a different template.
+  { name: 'Close-Grip Bench Press', display: 'Close-Grip Bench', category: 'push', muscle: 'triceps', source: 'Simplest Strength', focus: ['arms'] },
   { name: 'Push-Up', display: 'Push-Up', category: 'push', muscle: 'chest', source: 'p.25', focus: ['chest'] },
   { name: 'DB Bench Press', display: 'DB Bench Press', category: 'push', muscle: 'chest', source: 'p.25', focus: ['chest'] },
   { name: 'DB Incline Press', display: 'DB Incline Press', category: 'push', muscle: 'chest', source: 'p.25', focus: ['chest'] },
@@ -139,6 +152,23 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   { name: 'Reverse Lunge', display: 'Reverse Lunge', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] },
   { name: 'Bulgarian Split Squat', display: 'Bulgarian Split Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] },
   { name: 'Front Squat', display: 'Front Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] },
+  // ⛔ THE ONE DELIBERATE DEPARTURE FROM WENDLER'S LIST, AND IT IS HERE RATHER THAN IN A CHANGELOG SO
+  // NOBODY "CORRECTS" IT BACK OUT.
+  //
+  // Forever's assistance chapter has NO TRUE GLUTE MOVEMENT. The Glutes focus was therefore served by
+  // a hamstring raise, a back raise and a reverse hyper — posterior chain, all three, and none of
+  // them what an athlete means when they ask for glutes. A focus chip that cannot answer its own name
+  // is worse than no chip.
+  //
+  // ⚠️ THE WARRANT IS HIS, EVEN THOUGH THE MOVEMENT IS NOT: p.24 — *"it is the work that matters."*
+  // The book is explicit that the assistance list is a menu, not a boundary. This is the only place
+  // that licence is spent, and spending it twice needs a better reason than this one.
+  //
+  // ⚠️ BARBELL LEADS ON PURPOSE. The loaded version is the movement; the single-leg version is the
+  // answer for someone with no barbell, and it ranks itself there automatically (ALWAYS route) rather
+  // than by being listed first.
+  { name: 'Barbell Hip Thrust', display: 'Barbell Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] },
+  { name: 'Single-Leg Hip Thrust', display: 'Single-Leg Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] },
   { name: 'Glute-Ham Raise', display: 'Glute-Ham Raise', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] },
   { name: 'Back Extension', display: 'Back Raise', category: 'single_leg_core', muscle: 'lower back / glutes', source: 'p.29', focus: ['glutes'] },
   { name: 'Reverse Hyper', display: 'Reverse Hyper', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] },

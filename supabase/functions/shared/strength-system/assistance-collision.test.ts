@@ -284,6 +284,64 @@ Deno.test('⛔ THE ROTATION NEVER SURFACES A BAND-ONLY MOVEMENT WHEN A LOADABLE 
   }
 });
 
+// ── THE GLUTES POOL, AND THE ONE MOVEMENT THAT IS NOT WENDLER'S ─────────────────────────────────
+
+Deno.test('⛔ THE GLUTES FOCUS ANSWERS ITS OWN NAME — a hip thrust, not three posterior-chain moves', () => {
+  // Forever's assistance chapter has NO true glute movement, so this focus was served by a hamstring
+  // raise, a back raise and a reverse hyper. A chip that cannot answer its own name is worse than no
+  // chip. The warrant for adding one is his: p.24, "it is the work that matters".
+  const HOME = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage',
+    'Bench (flat/adjustable)', 'Pull-up bar'];
+  const pool = focusPool('glutes', 'single_leg_core', HOME)
+    .filter((e) => canPerformCat(e.name, HOME)).map((e) => e.name);
+  // ⛔ THE BARBELL VERSION LEADS. The loaded lift is the movement; the single-leg one is the answer
+  // for an athlete with no barbell.
+  assertEquals(pool[0], 'Barbell Hip Thrust');
+  assertEquals(pool[1], 'Single-Leg Hip Thrust');
+  assertEquals(buildDefaultWeek(['glutes'], HOME).press.single_leg_core, 'Barbell Hip Thrust');
+});
+
+Deno.test('the bodyweight hip thrust carries the glutes focus when there is no barbell', () => {
+  // ⛔ THE POOL MUST NOT GO EMPTY on a kit that can obviously train glutes. Before the pair was
+  // added, a dumbbells+bands athlete asking for Glutes got NOTHING — every option needed a barbell
+  // or a bench — and the focus silently fell through to the balanced default.
+  const DB = ['Dumbbells', 'Resistance bands'];
+  const pool = focusPool('glutes', 'single_leg_core', DB)
+    .filter((e) => canPerformCat(e.name, DB)).map((e) => e.name);
+  assertEquals(pool, ['Single-Leg Hip Thrust']);
+  assertEquals(buildDefaultWeek(['glutes'], DB).squat.single_leg_core, 'Single-Leg Hip Thrust');
+  // The barbell version is correctly off the menu, not silently substituted.
+  assertEquals(canPerformCat('Barbell Hip Thrust', DB), false);
+});
+
+Deno.test('⛔ EXACTLY ONE MOVEMENT IN THE CATALOG IS NOT WENDLER\'S, and it is labelled', () => {
+  // The guardrail is "stay strictly Wendler for movements". This pins the size of the exception, so
+  // a second one cannot arrive quietly: the count is the test.
+  const nonWendler = ASSISTANCE_CATALOG.filter((e) => e.source.includes('not Wendler'));
+  assertEquals(nonWendler.map((e) => e.name).sort(), ['Barbell Hip Thrust', 'Single-Leg Hip Thrust']);
+  for (const e of nonWendler) assertEquals(e.muscle, 'glutes');
+  // Everything else cites a page or a named template.
+  for (const e of ASSISTANCE_CATALOG) {
+    if (e.source.includes('not Wendler')) continue;
+    assertEquals(/p\.\d+|Simplest Strength|2nd ed/.test(e.source), true, `${e.name}: unsourced (${e.source})`);
+  }
+});
+
+Deno.test('⛔ CLOSE-GRIP BENCH IS THE MEATY TRICEPS OPTION, and it is Wendler\'s own', () => {
+  const HOME = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage',
+    'Bench (flat/adjustable)', 'Pull-up bar'];
+  const arms = focusPool('arms', 'push', HOME).filter((e) => canPerformCat(e.name, HOME)).map((e) => e.name);
+  // Ahead of the isolation movements — a loaded press beats a triceps extension when it can be
+  // loaded. `equipmentFitRank` ties them all at 0, so catalog order is what carries this.
+  assertEquals(arms.indexOf('Close-Grip Bench Press') < arms.indexOf('Triceps Extension'), true);
+  // ⛔ IT NEEDS THE RACK. Setting up a heavy close-grip press without uprights is how people get
+  // pinned, so a bench-and-bar-only kit does not get it.
+  assertEquals(canPerformCat('Close-Grip Bench Press', HOME), true);
+  assertEquals(canPerformCat('Close-Grip Bench Press', ['Barbell + plates', 'Bench (flat/adjustable)']), false);
+  // No exception needed — it is in the book.
+  assertEquals(catalogEntry('Close-Grip Bench Press')!.source.includes('not Wendler'), false);
+});
+
 Deno.test('⛔ A BANDS-ONLY KIT IS NOT STRANDED — the whole pool rotates as before', () => {
   const bandsOnly = ['Resistance bands'];
   const week = buildDefaultWeek(['arms'], bandsOnly);
