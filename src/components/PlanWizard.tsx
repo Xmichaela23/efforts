@@ -516,11 +516,12 @@ export default function PlanWizard() {
             // Auto-set equipment type based on saved preferences
             if (equipment?.length) {
               const hasCommercialGym = equipment.includes('Commercial gym');
-              // ⚠️ "Do they own gym FURNITURE" — the two bench chips added 2026-08-13 answer yes, an
-              // "Ab wheel" does not (a ten-dollar accessory is not a home gym) and is left out.
+              // ⚠️ "Do they own gym FURNITURE" — the incline bench answers yes, an "Ab wheel" does not
+              // (a ten-dollar accessory is not a home gym) and is left out. The niche chips this once
+              // listed (Decline bench, Dip bars, Leg curl machine, GHD) were cut in Slice 7.
               const hasHomeGymEquipment = equipment.some(e =>
                 ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
-                 'Incline bench', 'Decline bench', 'Dip bars', 'Leg curl machine', 'Glute-ham developer (GHD)'].includes(e)
+                 'Incline bench'].includes(e)
               );
               if (hasCommercialGym) {
                 setState(prev => ({ ...prev, equipmentType: 'commercial_gym' }));

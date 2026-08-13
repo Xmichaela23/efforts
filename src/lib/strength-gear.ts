@@ -46,18 +46,18 @@ export type GearKey =
   | 'rack'
   | 'bench'
   | 'incline_bench'
-  | 'decline_bench'
   | 'dumbbells'
   | 'kettlebell'
   | 'cable'
   | 'pull_up_bar'
-  | 'dip_bars'
-  | 'box'
-  | 'rings'
   | 'ab_wheel'
-  | 'ghd'
-  | 'leg_curl_machine'
-  | 'bands';
+  | 'bands'
+  // ⚠️ MENTION-ONLY KEYS. `box` and `rings` name gear on a session card's Equipment line and are
+  // deliberately absent from every GATE route — see the two-maps note in the header. Nothing an
+  // athlete can declare produces them, and after Slice 7 nothing needs to: a key that gates must be
+  // commonly declarable, a key that merely INFORMS need not be.
+  | 'box'
+  | 'rings';
 
 /** Athlete-facing label per key. Also the vocabulary's roster — a key absent here does not exist. */
 export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
@@ -65,18 +65,14 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   rack: 'Rack',
   bench: 'Bench',
   incline_bench: 'Incline Bench',
-  decline_bench: 'Decline Bench',
   dumbbells: 'Dumbbells',
   kettlebell: 'Kettlebell',
   cable: 'Cable',
   pull_up_bar: 'Pull-up Bar',
-  dip_bars: 'Dip Bars',
+  ab_wheel: 'Ab Wheel',
+  bands: 'Bands',
   box: 'Box',
   rings: 'Rings',
-  ab_wheel: 'Ab Wheel',
-  ghd: 'Glute-ham developer',
-  leg_curl_machine: 'Leg Curl Machine',
-  bands: 'Bands',
 };
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -174,13 +170,10 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
     if (s.includes('box') || s.includes('plyo box')) out.add('box');
     if (s.includes('ring')) out.add('rings');
     if (s.includes('incline bench')) out.add('incline_bench');
-    if (s.includes('decline bench')) out.add('decline_bench');
     if (s.includes('ab wheel') || s.includes('ab roller')) out.add('ab_wheel');
-    // A power tower is the one home setup that genuinely carries dip bars, and `hasPullUpBar`
-    // already recognises the phrase.
-    if (s.includes('dip') || s.includes('parallel bar') || s.includes('power tower')) out.add('dip_bars');
-    if (s.includes('ghd') || s.includes('glute ham') || s.includes('nordic bench')) out.add('ghd');
-    if (s.includes('leg curl')) out.add('leg_curl_machine');
+    // ⚠️ THE `dip_bars` / `ghd` / `leg_curl_machine` / `decline_bench` CLAUSES ARE GONE WITH THEIR
+    // CHIPS (Slice 7). Nothing routes on them any more, so a clause here would map a chip nobody can
+    // tick onto a key nothing reads.
     // Commercial gym implies most fixed equipment is on hand.
     if (s.includes('commercial gym')) {
       out.add('barbell');
@@ -189,15 +182,8 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       out.add('dumbbells');
       out.add('cable');
       out.add('pull_up_bar');
-      // Adjustable benches are what a commercial gym HAS. ⛔ An ab wheel is not — see `hasAbWheel`.
+      // An adjustable bench is what a commercial gym HAS. ⛔ An ab wheel is not — see `hasAbWheel`.
       out.add('incline_bench');
-      out.add('decline_bench');
-      // A dip station and a leg-curl machine are fixtures; a GHD is NOT — plenty of gyms have none,
-      // which is the stance `hasGHD` has always taken and this must not quietly reverse.
-      out.add('dip_bars');
-      out.add('leg_curl_machine');
-      // ⛔ RINGS ARE NOT A GYM FIXTURE EITHER. A commercial gym may have a rig with rings or none at
-      // all; the athlete ticks the chip if they have them.
     }
   }
   return out;
@@ -206,7 +192,7 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
 /**
  * What it takes to perform a movement: **a list of ALTERNATIVE routes, each a set of keys that must
  * ALL be present.** OR of ANDs. `[['dumbbells', 'incline_bench']]` is one route needing both;
- * `[['ghd'], ['decline_bench'], ['barbell']]` is three ways to do the same movement.
+ * `[['rack'], ['bench']]` is two ways to set up the same movement.
  *
  * ⛔ A SINGLE FLAT LIST CANNOT SAY THIS, and the alternatives are the point — a Nordic Curl on a GHD,
  * on a decline bench's ankle rollers, or with the feet under a loaded barbell is the same movement
@@ -225,11 +211,15 @@ export const ALWAYS: GearRoutes = [[]];
  */
 export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ── PUSH ────────────────────────────────────────────────────────────────────────────────────────
-  // Wendler's dips are parallel bars (Forever p.24). ⚠️ The old advisory tag said `'bar'` — the SAME
-  // token it gave a pull-up bar, a squat bar and a low bar for inverted rows. Four pieces of
-  // equipment, one word: that is what "incomplete" meant.
-  'dips': [['dip_bars'], ['rings']],
-  'tricep dips': [['dip_bars'], ['rings']],
+  // ⛔ DIPS ARE THE MOVEMENT SLICE 7 EXISTS FOR. The route was `[['dip_bars'], ['rings']]` — precise,
+  // sourced (Wendler's dips are parallel bars, Forever p.24), and it gated a normal home gym OUT of a
+  // movement it can obviously do. Dips "worked" until Slice 3/4 invented that gate.
+  //
+  // ⚠️ ANYTHING TO DIP ON COUNTS: rack safety-arms, a dip attachment on the rack, two benches. Both
+  // routes are gear the athlete can actually declare, which is the whole rule now — gate on what is
+  // BOTH required AND commonly declarable, and let substitution handle the rest.
+  'dips': [['rack'], ['bench']],
+  'tricep dips': [['rack'], ['bench']],
   'push up': ALWAYS,
   'diamond push up': ALWAYS,
   'dumbbell bench press': [['dumbbells', 'bench']],
@@ -256,7 +246,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // returns [] for inverted rows because the athlete rows under whatever they have — a bar in a rack,
   // rings, a table edge. Gating it would be an over-reach the gear line already declined to make.
   'inverted row': ALWAYS,
-  'inverted ring row': [['rings']],
+  // ⚠️ UNGATED like the plain inverted row above it. Rings are no longer declarable, and "row under
+  // whatever you have" is the same F-6 reasoning the gear line already applies.
+  'inverted ring row': ALWAYS,
   // Dumbbells only. The bench is a brace, not a prerequisite — see the header.
   'dumbbell row': [['dumbbells']],
   'db row': [['dumbbells']],
@@ -283,28 +275,32 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'hip thrust': [['bench']],
   'romanian deadlift': [['barbell'], ['dumbbells']],
   'good morning': [['barbell']],
-  // ⛔ SLICE 5 MIGRATION RISK, AND IT IS WHY THIS ENTRY IS ANNOTATED: Leg Curl reaches an athlete only
-  // through the OLD `ROLE_FALLBACK.leg_match` pool. The new catalog carries it (see
-  // `ASSISTANCE_CATALOG`) and `substituteExerciseForEquipment` keeps the Nordic/band swap, so
-  // Wendler's hamstring-via-curl route survives. Do not drop either half.
-  'leg curl': [['leg_curl_machine']],
-  'leg curls': [['leg_curl_machine']],
+  // ⛔ UNGATED, AND THE BACKSTOP IS WHY. A leg-curl machine is required and NOT commonly declarable,
+  // which is exactly the case Slice 7 says to leave to substitution:
+  // `substituteExerciseForEquipment` already turns Leg Curl into Nordic Curls / Band Leg Curls for
+  // anyone without gym access. Gating it here would have deleted the movement instead of swapping it,
+  // which is the worse of the two failures — a swap keeps Wendler's hamstring work, a gate loses it.
+  'leg curl': ALWAYS,
+  'leg curls': ALWAYS,
   'band leg curls': [['bands']],
-  // ⛔ THE DECLINE BENCH IS AN ANKLE ANCHOR, AND THAT IS WHY IT COUNTS HERE (decided 2026-08-13).
-  // A decline bench's rollers hook the feet, which is the standard home substitute for a GHD on the
-  // whole kneel-and-lower family: Nordic curl, glute-ham raise, back raise. Feet under a loaded
-  // barbell is the third route, and it is what most people actually do.
-  // ⚠️ INCLINE DOES NOT SUBSTITUTE. It is the ankle hook that qualifies, not the angle — an
-  // incline-only bench unlocks none of these.
-  'nordic curl': [['ghd'], ['decline_bench'], ['barbell']],
-  'nordic curls': [['ghd'], ['decline_bench'], ['barbell']],
-  'nordic hamstring curl': [['ghd'], ['decline_bench'], ['barbell']],
-  'glute ham raise': [['ghd'], ['decline_bench'], ['barbell']],
-  'back extension': [['ghd'], ['decline_bench'], ['barbell']],
+  // ⛔ THE KNEEL-AND-LOWER FAMILY NOW ROUTES ON THE BARBELL ALONE (Slice 7), and that is the route
+  // most people actually use: feet hooked under a loaded bar.
+  //
+  // ⚠️ THE `ghd` AND `decline_bench` ROUTES ARE GONE WITH THEIR CHIPS. Slice 3 gave the decline bench
+  // this consumer deliberately — its ankle rollers ARE the standard home GHD substitute, and that
+  // remains true of the world. It is not true of the PICKER any more: neither piece of gear was
+  // recognisable enough to keep asking about, so neither can be declared, so neither can gate.
+  // ⛔ Do not re-add them without re-adding the chips; a route nobody can satisfy is a movement
+  // nobody is offered.
+  'nordic curl': [['barbell']],
+  'nordic curls': [['barbell']],
+  'nordic hamstring curl': [['barbell']],
+  'glute ham raise': [['barbell']],
+  'back extension': [['barbell']],
   // Hips on the pad, legs swinging — any bench does it. ⚠️ `athleteEquipmentToKeys` adds `bench` for
-  // ANY chip containing the word, so the incline and decline chips satisfy this too.
-  'reverse hyper': [['bench'], ['ghd']],
-  'reverse hyperextension': [['bench'], ['ghd']],
+  // ANY chip containing the word, so the incline chip satisfies this too.
+  'reverse hyper': [['bench']],
+  'reverse hyperextension': [['bench']],
   'hanging leg raise': [['pull_up_bar']],
   'hanging knee raise': [['pull_up_bar']],
   'ab wheel rollout': [['ab_wheel']],

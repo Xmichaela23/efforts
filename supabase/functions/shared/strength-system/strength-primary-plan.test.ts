@@ -229,7 +229,10 @@ Deno.test('a work session is jumps → main lift → 50 reps each of leg / pull 
   // DEFAULT WEEK, which is Wendler's own pairing for that day (Periodization Bible p.51: squat day →
   // low back). If this line needs updating again it should be because the DEFAULT changed, not
   // because a rule about squat days did.
-  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push-Up', 'Lat Pulldown', 'Back Extension']);
+  // ⚠️ `Inverted Row`, not `Lat Pulldown` (Slice 7). The default block has to be performable by a
+  // normal home gym with nothing swapped, and a pulldown needs a cable stack. The pulldown is still
+  // on the pull menu for anyone who has one; it is no longer what the app hands you by default.
+  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push-Up', 'Inverted Row', 'Back Extension']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
   assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);

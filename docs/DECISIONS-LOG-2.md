@@ -2110,6 +2110,17 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 
 ### D-424 — The assistance picker is EQUIPMENT-GATED, on both surfaces, through one map (2026-08-13, **BUILT — fixtures green; NOT deployed, NOT device-verified**) — **reverses the deliberate ungated call** (F-5, `docs/BUILDER-SWEEP-FINDINGS.md`)
 
+> ⛔ **PARTIALLY REVERSED 2026-08-13 BY [D-425] — the NICHE ITEMIZATION IS CUT, the gate is not.**
+> Both surfaces still gate through one `canPerform`, and that half stands. What went is the
+> granularity: six chips nobody could identify (Decline bench, Dip bars, Leg curl machine, GHD,
+> Gymnastic rings, Plyo box) and the routes that depended on them. The tell was Dips — this entry's
+> own `[['dip_bars'], ['rings']]` gated a normal home gym out of a movement it can obviously do.
+> ⚠️ **THE "add chips, no ungate workaround" CALL BELOW IS THE PART THAT REVERSED.** It was the right
+> answer to the question as posed; D-425 changed the question to *"is this gear commonly declarable
+> at all?"* — and for those six, no. Everything below is history except the one-gate-two-surfaces
+> rule and the two-maps distinction, both of which survive intact.
+
+
 **The decision.** The picker offers only movements the athlete can actually set up, and so does the in-session swap sheet. `substituteExerciseForEquipment` drops from primary fix to **backstop**.
 
 **⛔ THIS REVERSES A CALL THAT WAS MADE ON PURPOSE.** The menu was ungated because (a) bands had no flag to gate on and (b) gating resolution while the menu stayed ungated was "a half-rule". Both objections are now answered rather than overruled: bands are a real key, and BOTH surfaces gate through the same function.
@@ -2127,3 +2138,26 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 **Files.** `src/lib/strength-gear.ts` (new — the vocabulary, both maps, `canPerform`; `_shared/strength-equipment-tier.ts` re-exports it so every edge importer is unchanged), `exercise-alternatives.ts:canSetUp`, `assistance-catalog.ts:optionsFor`, `TrainingBaselines.tsx`, `PlanWizard.tsx`, `materialize-plan/index.ts`.
 
 **Back-annotated:** F-5 in `docs/BUILDER-SWEEP-FINDINGS.md`.
+
+---
+
+### D-425 — Gate only on gear that is BOTH required AND commonly declarable (2026-08-13, **BUILT — fixtures green (3513 pass / 6 pre-existing unrelated failures); NOT deployed, NOT device-verified**) — **partially reverses [D-424]**
+
+**The decision.** The equipment picker drops its niche itemization — Decline bench, Dip bars, Leg curl machine, Glute-ham developer, Gymnastic rings, Plyo box — and keeps the ten items an athlete recognises. Routes loosen to match: **a movement is gated only when the gear it needs is both genuinely required and something the athlete can actually declare.** Everything else is `substituteExerciseForEquipment`'s job.
+
+**⛔ THE SYMPTOM THAT FORCED IT.** `gearRoutesFor('Dips') = [['dip_bars'], ['rings']]` — precise, sourced (Wendler's dips are parallel bars, Forever p.24), and it gated a **barbell/rack/bench home gym out of Dips**, which the composer then swapped to a Push-Up. Dips worked until D-424 invented that gate. The precision was real and the answer was wrong.
+
+**⚠️ AND THE ITEMIZATION FAILED ON ITS OWN TERMS.** Michael, reading his own picker: *"I wouldn't know what that is."* A chip nobody can identify is not a more precise input — it is an unanswered question wearing a checkbox. Fitbod and Jefit use presets + common items + per-exercise substitution; we were more granular than the leaders and worse for it.
+
+**What changed:**
+- **Dips** → `[['rack'], ['bench']]` — rack safety-arms, a dip attachment, or two benches. Still a gate (bands alone cannot dip), but on gear that exists on the picker.
+- **The kneel-and-lower family** (Nordic Curl, Glute-Ham Raise, Back Extension) → `[['barbell']]`. Feet under a loaded bar, which is what most people use anyway. ⚠️ D-424's decline-bench reasoning — its ankle rollers ARE the standard home GHD substitute — **is still true of the world and no longer true of the picker.** The chip went, so the route went; re-adding one without the other offers a movement nobody can satisfy.
+- **Leg Curl** → ungated. A leg-curl machine is required and not declarable, which is precisely the case that belongs to substitution: the swap to Nordic / Band Leg Curls **keeps** Wendler's hamstring work, where a gate would have deleted it. ⛔ Both halves are load-bearing — do not weaken the substitution now that the gate is gone.
+- **`dip_bars`, `ghd`, `leg_curl_machine`, `decline_bench` deleted from `GearKey`.** `box` and `rings` survive as **mention-only** keys: they still name real gear on a session card's Equipment line for box jumps and ring rows, and naming gear the athlete has not declared is informative, not a gate.
+- **The default block changed one movement.** Squat day's pull was `Lat Pulldown`, which needs a cable stack a home gym does not have — so the app's own default violated the guardrail below. It is now `Inverted Row` (Forever p.26). The pulldown stays on the menu for anyone who has the stack.
+
+**The contract test's scope moved with the rule.** "Every key comes from a chip" now applies to **keys that appear in a gate route**, not to every label. That is the same distinction as the two maps: a key deciding whether a movement is OFFERED must be declarable; a key that merely appears on a card need not be.
+
+**Guardrail, now asserted rather than described:** a normal home gym (barbell / dumbbells / rack / bench / pull-up bar) performs the **entire default block** with nothing swapped. A test walks `BALANCED_WEEK` and fails naming anything it cannot do.
+
+**Back-annotated:** [D-424].

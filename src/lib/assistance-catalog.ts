@@ -220,7 +220,11 @@ export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
 export const BALANCED_WEEK: Record<LiftDay, Record<AssistanceCategory, string>> = {
   press: { push: 'Dips', pull: 'Chin-Up', single_leg_core: 'Hanging Leg Raise' },
   bench: { push: 'DB Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Reverse Lunge' },
-  squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Back Extension' },
+  // ⛔ INVERTED ROW, NOT LAT PULLDOWN (Slice 7). The default block must be performable BY A NORMAL
+  // HOME GYM with nothing swapped — that is Slice 7's guardrail — and a lat pulldown needs a cable
+  // stack or a band, which barbell/rack/bench/pull-up-bar does not include. It is still on the pull
+  // menu for anyone who has the stack; it is no longer what the app hands someone by default.
+  squat: { push: 'Push-Up', pull: 'Inverted Row', single_leg_core: 'Back Extension' },
   deadlift: { push: 'DB Shoulder Press', pull: 'Barbell Row', single_leg_core: 'Glute-Ham Raise' },
 };
 

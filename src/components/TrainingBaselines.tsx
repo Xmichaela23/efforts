@@ -972,38 +972,44 @@ const disciplineOptions = [
   // The last three were added 2026-08-13 for the Wendler Forever assistance catalog.
   // ⚠️ "Incline bench" is a SEPARATE chip from "Bench (flat/adjustable)" on purpose: that label is an
   // OR, so it cannot be read as incline capability. An athlete with an adjustable bench ticks both.
+  /**
+   * ⛔ THE RECOGNIZABLE ITEMS ONLY (Slice 7, 2026-08-13) — this list was CUT, not grown.
+   *
+   * Slices 2 and 4 itemized niche gear (Decline bench, Dip bars, Leg curl machine, Glute-ham
+   * developer, Gymnastic rings, Plyo box) so the gate could read a precise answer. It read a precise
+   * answer to a question the athlete could not follow — Michael, on his own picker: *"I wouldn't know
+   * what that is."* And the granularity had a cost beyond confusion: a normal home gym was gated OUT
+   * of Dips, a movement it can obviously perform, because the only routes were `dip_bars` and
+   * `rings`.
+   *
+   * ⚠️ THE FIELD IS LESS GRANULAR THAN WE WERE. Fitbod and Jefit use presets + common items +
+   * per-exercise substitution, not an itemized checklist. We were more precise than the leaders and
+   * worse for it.
+   *
+   * ⛔ THE RULE THAT REPLACES THE ITEMIZATION: **gate only on gear that is BOTH required AND commonly
+   * declarable.** Everything else is the substitution backstop's job
+   * (`substituteExerciseForEquipment`). Do not re-add a chip here to make a gate more precise — that
+   * trade was made once and reversed.
+   *
+   * ⛔ THESE STRINGS ARE MATCHED BY SUBSTRING in `src/lib/strength-gear.ts` and exactly by
+   * `substituteExerciseForEquipment`. Renaming one silently removes the capability from every athlete
+   * who ticked it.
+   * ⚠️ "Incline bench" stays a SEPARATE chip from "Bench (flat/adjustable)": that label is an OR, so
+   * it cannot be read as incline capability. An athlete with an adjustable bench ticks both.
+   */
   const homeGymEquipmentOptions = [
     "Barbell + plates",
     "Dumbbells",
     "Squat rack / Power cage",
     "Bench (flat/adjustable)",
     "Incline bench",
-    "Decline bench",
     "Pull-up bar",
     "Kettlebells",
     "Cable machine",
     "Resistance bands",
-    "Ab wheel",
-    // ⛔ ADDED 2026-08-13 (slice 4) BECAUSE THE MENU IS NOW GATED. Before gating, a gear key with no
-    // chip behind it was merely untidy; after it, a home-gym athlete who owns a dip station or a GHD
-    // has no way to say so, and the movements that need one vanish from their picker with no
-    // explanation. The alternative on the table was "treat an unownable movement as ungated", which
-    // is a rule that lies in the other direction. Chips, not a workaround.
-    // ⚠️ THE STRINGS ARE MATCHED BY SUBSTRING in `athleteEquipmentToKeys` — "Dip bars" → `dip`,
-    // "Leg curl machine" → `leg curl`, "GHD" → `ghd`, "Gymnastic rings" → `ring`. Renaming one
-    // silently removes the capability from everyone who ticked it.
-    // ⚠️ "GHD" CARRIES NO "bench" IN ITS LABEL ON PURPOSE — `hasBench` matches any chip containing the
-    // word, and a glute-ham developer is not a flat bench to press on.
-    "Dip bars",
-    "Leg curl machine",
-    "Glute-ham developer (GHD)",
-    "Gymnastic rings",
-    // ⚠️ `box` WAS A FIFTH UNREACHABLE KEY and the contract test found it on the same run. It is not
-    // an assistance key — Box Jumps live in the performance protocol — but it had exactly the same
-    // hole: `hasBox` grants it to commercial gyms and no home chip produced it, so a home athlete
-    // with a box could not say so. Closed here rather than left as the one exception.
-    "Plyo box"
+    "Ab wheel"
   ];
+
   
   // Helper to check if user has commercial gym access
   const hasCommercialGym = (data.equipment.strength || []).includes('Commercial gym');

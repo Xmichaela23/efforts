@@ -171,17 +171,12 @@ export function hasInclineBench(strengthEquipment: string[]): boolean {
 }
 
 /**
- * Detect a DECLINE-capable bench. Same rule as incline.
- *
- * ⚠️ NOTHING CONSUMES THIS YET, and that is stated rather than hidden. No movement on the Forever
- * assistance catalog requires a decline bench; it is in the inventory so the athlete can DECLARE it
- * and so slice 3's `requires` tagging has a real key to point at. If nothing ever claims it, delete
- * the chip rather than leave it as scenery.
+ * ⛔ `hasDeclineBench` IS DELETED (Slice 7, 2026-08-13). The chip went with the rest of the niche
+ * itemization, so nothing can answer it and nothing asks. Its consumer — the ankle-anchor route on
+ * the Nordic / glute-ham / back-raise family — now routes on the barbell alone. The reasoning that
+ * earned it (a decline bench's rollers ARE the standard home GHD substitute) is still true of the
+ * world; it stopped being true of the picker.
  */
-export function hasDeclineBench(strengthEquipment: string[]): boolean {
-  const n = normStrengthEquipmentStrings(strengthEquipment);
-  return n.some((s) => s.includes('decline bench') || s.includes('commercial gym'));
-}
 
 /**
  * Detect an ab wheel. Forever p.30 lists the rollout on the abs menu.

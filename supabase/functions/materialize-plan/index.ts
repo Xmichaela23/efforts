@@ -1102,10 +1102,11 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   // `_shared/strength-equipment-tier.ts`, which is the detector these strings feed.
   const hasInclineBench = hasGymAccess || equipment.includes('Incline bench');
   const hasAbWheel = equipment.includes('Ab wheel');
-  // ⛔ THE CHIP MUST BEAT THE SUBSTITUTION (slice 4). A home athlete who owns a leg-curl attachment
-  // now has a chip to say so, and rewriting their Leg Curl to a Nordic anyway would make the chip a
-  // decoration. `hasGymAccess` alone was the only signal before the chip existed.
-  const hasLegCurlMachine = hasGymAccess || equipment.includes('Leg curl machine');
+  // ⚠️ BACK TO `hasGymAccess` ALONE (Slice 7). The "Leg curl machine" chip was cut with the rest of
+  // the niche itemization, so gym access is the only signal again — and this substitution is now the
+  // ONLY thing standing between a home athlete and a machine they do not own, since the gate on
+  // `Leg Curl` was removed for the same reason. Do not weaken both halves.
+  const hasLegCurlMachine = hasGymAccess;
   const hasPullUpBar = hasGymAccess || equipment.includes('Pull-up bar');
   const hasCable = hasGymAccess || equipment.includes('Cable machine/functional trainer') || equipment.includes('Cable machine');
   const hasKettlebells = hasGymAccess || equipment.includes('Kettlebells');

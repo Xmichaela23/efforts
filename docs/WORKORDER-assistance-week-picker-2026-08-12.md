@@ -323,7 +323,22 @@ tracker must keep assisted and unassisted counts **separate** or the number infl
 lies. The logger already records band assist (`resistance_level`), so build on that, don't add a
 parallel field.
 
-## Slice 7 — Simplify equipment gating (approved 2026-08-13; partially reverses Slice 2/4)
+## Slice 7 — Simplify equipment gating ✅ DONE 2026-08-13 (working tree; not committed)
+
+**Shipped as D-425.** Six niche chips cut; Dips route loosened to `[['rack'], ['bench']]`; the
+kneel-and-lower family routes on the barbell alone; Leg Curl ungated and left to substitution;
+`dip_bars` / `ghd` / `leg_curl_machine` / `decline_bench` deleted from `GearKey`; `box` and `rings`
+kept as MENTION-only keys. The contract test's "every key comes from a chip" invariant is now scoped
+to keys that GATE, which is the distinction the two maps already drew.
+
+⚠️ **ONE THING THE GUARDRAIL CAUGHT THAT THE BRIEF DID NOT LIST:** the balanced default's squat-day
+pull was `Lat Pulldown`, which needs a cable stack — so the app's own default block failed the
+"normal home gym, nothing swapped" rule. Changed to `Inverted Row` (Forever p.26). The guardrail is
+now a test that walks `BALANCED_WEEK`, not a sentence.
+
+---
+
+### (original brief)
 
 **Why:** the niche-equipment itemization + strict gear routing over-complicated the picker and gated
 COMMON movements out of a normal home gym. Concrete symptom: `gearRoutesFor('Dips') = [['dip_bars'],
