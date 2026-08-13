@@ -312,7 +312,16 @@ Surfaced during Michael's device acceptance of the strength-language work. All t
 `estimated_1rm = 0` (no valid weight+reps pair, `compute-facts:1434`), so it never updated the learned max
 and left `last_logged` at Jul 23. A logging-capture gap, not an AMRAP-reasoning problem — track separately.
 
-## Q-255 — ⛔ THE BIKE ROW GOES SILENT WHILE A GOOD CYCLING FITNESS NUMBER SITS ONE FIELD AWAY (2026-08-02, Michael) — **CTL/ATL/TSB are computed, populated, and unread by State**
+## Q-255 — The bike row went silent while CTL/ATL/TSB sat computed and unread (2026-08-02, Michael) — **BUILT 2026-08-13 night: pushed + deployed, NOT device-verified**
+
+> **2026-08-13:** the load floor shipped — `_shared/state-trend/load-floor.ts` (verdict words over
+> the CTL/TSB the app already computes; Friel/intervals.icu bands, sources in the module header),
+> fed by compute-snapshot, rendered by the bike row's silent state ("Bike load building · fresh ·
+> fitness 42 · form +8"). Deployed: compute-snapshot, coach, workout-detail, analyze-cycling-workout,
+> analyze-running-workout, compute-facts. **Verify:** Michael's bike row after the next snapshot
+> recompute (next ride ingest). Residual, filed deliberately: ride stress is POWER-only — an HR-only
+> ride contributes zero (Strava/TP both fall back to HR); that fallback is its own future slice.
+> Run/swim adoption of the floor: one line each, when wanted.
 
 Michael, looking at the row the night after it was "finished": *"i thought we fixed this"* … *"isnt there
 another metric for cycling beyond aerbic effeciency that could read here"*. **There is, and it is
