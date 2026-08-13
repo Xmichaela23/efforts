@@ -754,7 +754,11 @@ Deployed to all **7 strength bundlers** (the `_shared` trap): `create-goal-and-m
 
 ---
 
-### D-401 — Placement is the OPTIMIZER's, in every generator; the count stays the caller's (2026-08-07, **IN WORKING TREE — not committed, not pushed, not deployed**)
+### D-401 — Placement is the OPTIMIZER's, in every generator; the count stays the caller's (2026-08-07)
+
+> **Header was stale:** this DID commit the same day (`6a2b576d`, "combined-plan placement: kill the
+> hardcoded Thursday easy run") and deployed with the 2026-08-07 batch. The "in working tree" warning
+> below is history. (Annotated 2026-08-13.)
 
 Task 2 of `HANDOFF-placement-unification-2026-08-07.md`. The handoff asked for
 `strength-system/placement` (`simplePlacementPolicy`) to be adopted inside `generate-combined-plan`.
@@ -2066,6 +2070,11 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 ---
 
 ### D-422 — The press/squat freeze is fixed by DELETING our two inventions (the 90%-of-1RM ceiling and the light-lifter step-shrink); the engine is now pure book-strict Wendler (2026-08-13, PUSHED + DEPLOYED, device-acceptance open)
+
+> ✅ **ACCEPTANCE CLOSED 2026-08-13 night.** The climb verified on a real generated-plan export:
+> squat TM 90→100→110, press +5/cycle, DL +10/cycle, bench +5/cycle, week 7 ≠ week 11 on every
+> lift; warm-ups floored at the bar. Slice b is unblocked.
+
 
 ⛔ **Supersedes the 2026-07-27/28 ceiling decision** — it had no D-number, it lived as block comments at `wendler-531.ts:172-229`, now deleted — and the increment step-cap of the same dates. ⛔ **This also reverses the 2026-08-12 PM ENGINE-STATE banner's claim that the 90% ceiling "is CORRECT."** It was not.
 

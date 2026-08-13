@@ -39,7 +39,7 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 ### Context that saved time this session (keep)
 - A "lost plan" is often the WRONG LOGIN, not a bug: 7 plans across 3 logins; Strong Focus on `45d122e7` (main), Humboldt marathon on `9c313043`, no 70.3 in the DB.
 
-**Still open from prior handoffs (unchanged, see below):** the biceps "covered by chins" note eyeball (D-427); the strength-freeze acceptance run + slice b (D-422).
+**Still open from prior handoffs:** the biceps "covered by chins" note eyeball (D-427 — a fresh plan export from 2026-08-13 does NOT show the line, but that plan predates the 17:50 UTC deploy of `9a0895e2`, so it proves nothing; check on the next regeneration). ⛔ **CLOSED 2026-08-13 night: the D-422 climb acceptance** — verified on a real generated-plan export (squat TM 90→100→110 exactly; DL +10/cycle 115→125→135; bench +5 115→120→125; press +5 80→85→90; week 7 ≠ week 11 on every lift; warm-ups floored at the bar incl. 45×5 on a light press; deloads 40/50/60 no ramp, 35 min). **Slice b (`SLICE-strength-b-auto-recalibrate-2026-08-12.md`) is now UNBLOCKED.**
 ---
 ## 🧭 Prior handoff (2026-08-13 PM) — the per-day ASSISTANCE PICKER (Wendler Forever) shipped end-to-end: pushed + edge-deployed + VERIFIED in a real generated plan. One line left to eyeball (the biceps note). Superseded as START-HERE by the banner above; content still valid.
 
@@ -61,7 +61,7 @@ Regenerate a strength block with **pull-up progression + Arms both ON** and conf
 ## 🧭 ALSO OPEN — STRENGTH-FREEZE ACCEPTANCE RUN + SLICE b (2026-08-13 — the press/squat freeze is FIXED. The invented 90% ceiling AND the light-lifter step-shrink are DELETED; the engine is now pure book-strict Wendler. Slice a = D-422, PUSHED + DEPLOYED, device-acceptance still open. UNRELATED to the assistance picker above — do not conflate.)
 
 ### ⛔ YOUR JOB
-1. **Acceptance run (Michael-driven), now a LIVE check** — slice a is deployed. Regenerate a strength block and confirm the press/squat cycles CLIMB instead of repeating: week 7 ≠ week 11; squat steps 90→100→110, press by 5; no lift frozen for two cycles.
+1. ✅ **DONE 2026-08-13 night — the climb is VERIFIED on a real generated-plan export** (Michael's regenerated Strong Focus): squat TM 90→100→110 exactly as specified, press +5/cycle, DL +10/cycle, bench +5/cycle, week 7 ≠ week 11 on every lift. The bar-floor warm-ups (45×5 on the light press) were seen in the same artifact.
 2. **Then build Slice b** — `docs/SLICE-strength-b-auto-recalibrate-2026-08-12.md`. Auto-apply the reset(down)/bump(up), ANNOUNCE plainly + UNDO, per the field norm (StrongLifts/Juggernaut/Fitbod auto — the deleted silent auto-progression's sin was *silence*, not auto). It **replaces** the old consent-first `SLICE-strength-max-calibration-4b.md` (delete that on ship) and reads the `strength_calibration` wire (kept, re-scoped off the retired ceiling).
 
 ### WHAT SHIPPED THIS SESSION — Slice a (D-422). Do not re-litigate.
