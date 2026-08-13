@@ -23,7 +23,34 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-12 — 5/3/1 WARM-UP RAMP shipped into the plan + logger, floored at the empty bar. Pushed + edge-deployed; ramp + section headers VERIFIED on Michael's screen. Acceptance run STILL not done.)
+## 🧭 NEXT SESSION — START HERE (2026-08-12 PM — strength REASONING rebuilt end to end; the last piece, the max-calibration offer, is the next job)
+
+### ⛔ YOUR JOB
+Build **Slice 4b** (the max-calibration offer), then push + deploy **D-421**. 4b is the only piece that fixes the *user-visible* defect — two lifts stall mid-block. Everything else this session cleaned up how strength is READ, not what the plan DOES.
+
+1. **REWRITE the 4b slice first** (`docs/SLICE-strength-max-calibration-4b.md`). Michael corrected its framing: it is NOT a notification/celebration. Core action = **correct the training max → re-lay-out the rest of the plan around it** (the infra exists: `rematerialize-strength-block`; write on the athlete's tap via the existing Adjust flow, `StateAdjustLens`). One spine signal, fires UP (reps beat target) or DOWN (repeated stall — Wendler p31; NEVER one bad day, p33). Consent-first, never auto-writes. Surfaces: logger celebrates only (already built), **State offers + acts**, Performance echoes. It READS the `strength_calibration` signal D-421 already persists to `plans.config`.
+2. **Then push + deploy D-421** — `generate-strength-plan` only. Committed `33a6093f`, **not pushed / not deployed** until this session's doc push. It is the wire 4b reads; invisible until 4b.
+
+### WHAT SHIPPED THIS SESSION — do not re-litigate. All PUSHED + DEPLOYED + VERIFIED on Michael's device.
+- **e1RM estimator is PURE** (weight × reps; no RIR term) + reserve moved to an opt-in `effectiveRepsForReserve` helper. `compute-facts` folds reserve only on a positive protocol declaration. Reserve no longer inflates the estimate; Michael's 12 legacy 5/3/1 sessions recomputed clean.
+- **D-418** — ONE overload verdict (`mintOverloadVerdict`, `_shared/load-status-reconcile.ts`), fed only by RPE + measured metrics + actual-vs-plan. The false "a bit high / needs absorbing / back off" cascade is gone. Strength dropped as a strain signal.
+- **D-420** — the weekly strength DIRECTION verdict ("sliding") is RETIRED; strength reads as **record + rep PRs + chart** (the Strong/Hevy shape; no app computes a weekly strength direction). The dead D-267 e1RM-declining veto was deleted.
+- **3b** (folded into D-420) — the e1RM RECORD obeys the trusted-rep ceiling; deadlift best is 170 not 225; rep-PR badges render on the strength row.
+- **D-419** — protocol-declared strength gauge (`readsEffortAs`). Its *direction* half is superseded by D-420; the gauge infra survives.
+
+### COMMITTED, NOT LIVE
+- **D-421** (`33a6093f`) — a pinned lift leaves the builder as a `strength_calibration` signal in `plans.config`. **Half a loop: the signal is stored, nothing reads it yet — 4b does.**
+
+### ⚠️ STILL BROKEN FOR THE USER (this is what 4b fixes)
+- **The press/squat stall is NOT fixed.** Michael's OHP (max on file 100) and squat (110) hit the 90% ceiling by cycle 2 and REPEAT in cycle 3 — week 7 == week 11, identical top sets. Root: low max on file × the percentage band (85%→90%) against a fixed 5-lb step. 4b fixes it by correcting the max and re-laying-out; nothing else does. The 90% ceiling itself is CORRECT (a safety limit forcing a retest) — the defect was only that it stalled silently, which D-421 (signal) + 4b (offer) close.
+- **REJECTED — do not re-propose** (reasons on record in D-421 + the deleted 4a remainder): the **2.5-lb increment** route — reverses the abandoned plate-inventory decision (`BUILD-ORDER-strength-spine.md:292`), doesn't move the top set (set grid rounds to 5), can't fix squat; and the % band vs absolute step pins ANY sub-200-lb press (even Wendler's own book lifter), so it is structural, not a light-lift edge.
+- **Grounding for 4b:** `docs/SCIENCE-strength-e1rm-trust.md` §6 + D-420; Wendler 5/3/1 2nd ed. p31 (stall → reset ~10%), p33 (one bad day is not a reset), p10 (rep records). NOT tuned to Michael — every rule keys on reps-vs-plan for any athlete.
+
+---
+
+> **⬇ PRIOR SESSIONS BELOW — history, superseded by the banner above. The 2026-08-12 warm-up-ramp shipment (next line) is still valid; the "acceptance run" job note remains as reference.**
+
+## 🧭 PRIOR — (2026-08-12 — 5/3/1 WARM-UP RAMP shipped into the plan + logger, floored at the empty bar. Pushed + edge-deployed; ramp + section headers VERIFIED on Michael's screen. Acceptance run STILL not done.)
 
 ### 2026-08-12 — WHAT SHIPPED (do not re-litigate)
 - **5/3/1 warm-up ramp** — Wendler p.31 (40/50/60%, reps 5/5/3) authored into the plan on working weeks, **none on deload** (deload work sets ARE already 40/50/60, so they are the ramp). Source of the ramp: `loading/wendler-531.ts` `warmupSetsForWeek`. Written by BOTH set-writers: composer `strength-primary-plan.ts` `mainLiftRow` AND `rematerialize-strength-block` (the progression rewriter — it would otherwise strip the ramp). Carried through materialize via `carrySetPlan`. Rendered in the logger as **Warm-up / Working sets** sections (`StrengthLogger.tsx` — `setType` off the `warmup` flag). Excluded from AMRAP/e1RM/workload by construction (warm-ups carry no `amrap` flag).
