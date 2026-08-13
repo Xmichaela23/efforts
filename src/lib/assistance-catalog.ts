@@ -28,7 +28,7 @@
  * Dumbbell Curl his "Curls", Ab Wheel Rollout his "Ab Wheel". A display alias, never a second token.
  */
 
-import { canPerform, equipmentFitRank } from './strength-gear.ts';
+import { canPerform, equipmentFitRank, hasLoadableFit } from './strength-gear.ts';
 
 /** Wendler's three categories. One movement each, every lifting day. Forever p.24. */
 export type AssistanceCategory = 'push' | 'pull' | 'single_leg_core';
@@ -253,6 +253,10 @@ export function focusPool(
    * while **Triceps Extension** is a dumbbell movement the athlete owns outright. Both passed
    * `canPerform`; only one of them is what the athlete would actually reach for. Same shape on a
    * bands-only **Back** focus, which led with Lat Pulldown over Inverted Row.
+   *
+   * ⛔ AND A BAND SORTS BELOW EVERY LOADABLE IMPLEMENT, not merely below its own movement's better
+   * route — see `equipmentFitRank`. Leading the pool correctly was not enough on its own: the
+   * ROTATION below still walked the whole pool, so a band-only movement surfaced on day two anyway.
    */
   athleteEquipment?: string[] | null,
 ): CatalogEntry[] {
@@ -451,7 +455,18 @@ export function buildDefaultWeek(
     for (const category of ASSISTANCE_CATEGORIES) {
       const pool = pools[category];
       if (pool && pool.length > 0) {
-        picks[category] = pool[dayIndex % pool.length].name;
+        // ⛔ THE ROTATION WALKS THE LOADABLE MOVEMENTS ONLY, WHEN THERE ARE ANY. Ranking the pool
+        // fixes which movement LEADS; it does not stop the rotation reaching a band-only movement on
+        // day two or three, which is the same wrong answer arriving a day later. A dumbbells+bands
+        // gym asking for Arms must get Triceps Extension on every day it can, never a banded
+        // pushdown on the rotation's second turn.
+        //
+        // ⚠️ AND IT MUST NOT STRAND A BANDS-ONLY KIT. If nothing in the pool is reachable without a
+        // band, the whole pool rotates exactly as before — a band is a real route and the athlete
+        // who has only bands keeps every movement they can do.
+        const loadable = pool.filter((e) => hasLoadableFit(e.name, athleteEquipment));
+        const rotation = loadable.length > 0 ? loadable : pool;
+        picks[category] = rotation[dayIndex % rotation.length].name;
       } else {
         const fallback = BALANCED_WEEK[day][category];
         // ⚠️ THE REPLACEMENT IS RANKED TOO. When the balanced default is un-performable the app is

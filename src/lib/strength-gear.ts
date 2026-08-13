@@ -348,16 +348,50 @@ export function gearRoutesFor(exerciseName: string): GearRoutes {
  * which is the same §0h rule `resolveAssistance` follows for an unknown main lift.
  */
 /**
+ * ⛔ A BAND IS A LAST RESORT, NOT AN IMPLEMENT. This is the one gear judgement in the file, so it is
+ * stated once, here, rather than inferred at three call sites.
+ *
+ * Every other key names something you can LOAD or PROGRESS: a barbell and dumbbells add weight, a
+ * cable stack and a machine add pins, a rack or a bench lets bodyweight work be leaned into, and
+ * bodyweight itself progresses by reps (Push-Up, Inverted Row, Reverse Lunge — Wendler's own 50-rep
+ * prescription is exactly that progression). A band adds tension that FALLS as the movement
+ * shortens, cannot be measured, and cannot be stepped in any repeatable way.
+ *
+ * ⚠️ IT IS STILL A REAL ROUTE. Nothing here excludes a band — `canPerform` is untouched, and an
+ * athlete with nothing else keeps every movement a band can reach. This decides ORDER, and only when
+ * there is something loadable to put in front.
+ */
+const LAST_RESORT_KEYS: ReadonlySet<string> = new Set(['bands']);
+
+/**
+ * The rank boundary. A fit at or above this is BAND-ONLY for this athlete: every route they can
+ * satisfy runs through a band. Below it, something loadable reaches the movement.
+ */
+export const LAST_RESORT_RANK_FLOOR = 100;
+
+/** Does this route depend on a last-resort implement? */
+function isLastResortRoute(route: readonly string[]): boolean {
+  return route.some((k) => LAST_RESORT_KEYS.has(k));
+}
+
+/**
  * ⛔ HOW WELL DOES THE ATHLETE'S KIT FIT THIS MOVEMENT? Lower is better; `null` = cannot perform.
  *
- * The answer is the INDEX OF THE FIRST SATISFIED ROUTE, and that works because {@link ASSISTANCE_GEAR}
- * already lists routes natural-first: `'triceps pushdown': [['cable'], ['bands']]` says a pushdown is
- * a cable movement that a band can stand in for, and `'tricep extension': [['dumbbells'], ['barbell'],
- * ['bands']]` says the same of a dumbbell. So route 0 means "this is what the movement IS", and route
- * 2 means "this is a workaround the athlete happens to own".
+ * TWO TIERS, then the route order inside each:
  *
- * ⚠️ THE ORDERING OF THE ROUTES IS THEREFORE LOAD-BEARING, not cosmetic. A movement whose backup
- * route is listed first will start leading pools it should not. Put the natural implement first.
+ *   `0 … 99`    a LOADABLE route is satisfied — barbell, dumbbells, cable, machine, rack/bench, or
+ *               progressable bodyweight. The number is the route's own index.
+ *   `100 …`     only a BAND route is satisfied. Sorts below every loadable movement in the pool.
+ *   `null`      nothing is satisfied — the athlete cannot perform it at all.
+ *
+ * ⚠️ THE ROUTE INDEX ALONE WAS NOT ENOUGH, and the case that proved it is the one this rank exists
+ * for. `'triceps pushdown': [['cable'], ['bands']]` and `'tricep extension': [['dumbbells'], …]` both
+ * have the athlete's kit satisfied at *some* index, and on a dumbbells+bands gym the pushdown's band
+ * route (index 1) beat nothing — it simply sat first in the catalog. Comparing indices across
+ * movements compares two different questions; comparing IMPLEMENT QUALITY first is the real one.
+ *
+ * ⚠️ THE ORDERING OF ROUTES WITHIN A MOVEMENT IS STILL LOAD-BEARING — {@link ASSISTANCE_GEAR} lists
+ * them natural-first, and that is what breaks ties inside a tier. Put the natural implement first.
  *
  * ⛔ THIS IS NOT A SECOND GATE. `canPerform` decides IF; this decides WHICH FIRST, among movements
  * that already passed. Anything performable has a rank; nothing is excluded by it.
@@ -372,10 +406,23 @@ export function equipmentFitRank(
   // degrades to UNCHANGED (catalog order), never to a guessed ranking.
   if (chips.length === 0) return 0;
   const owned = athleteEquipmentToKeys(chips);
+  let lastResort: number | null = null;
   for (let i = 0; i < routes.length; i++) {
-    if (routes[i].every((k) => owned.has(k))) return i;
+    if (!routes[i].every((k) => owned.has(k))) continue;
+    // A loadable route wins outright — no later route can beat it, so return immediately.
+    if (!isLastResortRoute(routes[i])) return i;
+    if (lastResort == null) lastResort = LAST_RESORT_RANK_FLOOR + i;
   }
-  return null;
+  return lastResort;
+}
+
+/** True when the athlete reaches this movement WITHOUT a band. */
+export function hasLoadableFit(
+  exerciseName: string,
+  athleteEquipment: string[] | null | undefined,
+): boolean {
+  const r = equipmentFitRank(exerciseName, athleteEquipment);
+  return r != null && r < LAST_RESORT_RANK_FLOOR;
 }
 
 export function canPerform(exerciseName: string, athleteEquipment: string[] | null | undefined): boolean {

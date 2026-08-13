@@ -52,6 +52,12 @@ import {
   splitRepsForAbs,
 } from '../../../../src/lib/assistance-catalog.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
+import {
+  canPerform as canPerformCat,
+  equipmentFitRank,
+  hasLoadableFit,
+  LAST_RESORT_RANK_FLOOR,
+} from '../../../../src/lib/strength-gear.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
 const MAXES = { bench: 150, squat: 200, deadlift: 225, overheadPress: 95 };
@@ -217,6 +223,11 @@ Deno.test('⛔ THE MOVEMENT THAT MATCHES THE ATHLETE\'S OWN KIT LEADS THE POOL',
   // gate; only one is what the athlete would reach for.
   const bandsAndDb = ['Resistance bands', 'Dumbbells'];
   assertEquals(focusPool('arms', 'push', bandsAndDb)[0].name, 'Triceps Extension');
+  // ⛔ AND THE BAND SORTS LAST OUTRIGHT, not merely second — see the tier test below.
+  assertEquals(
+    focusPool('arms', 'push', bandsAndDb).filter((e) => canPerformCat(e.name, bandsAndDb)).map((e) => e.name),
+    ['Triceps Extension', 'Triceps Pushdown'],
+  );
   // Same shape one pool over: bands-only Back led with Lat Pulldown (band = backup) over Inverted
   // Row (needs nothing).
   assertEquals(focusPool('back', 'pull', ['Resistance bands'])[0].name, 'Inverted Row');
@@ -245,6 +256,43 @@ Deno.test('the built week takes the best-fit movement, not the first catalog ent
   for (const name of pushes) {
     assertEquals(catalogEntry(name)?.focus.includes('arms'), true, `${name} is not an arms movement`);
   }
+});
+
+// ── ⛔ A BAND IS A LAST RESORT, NOT AN IMPLEMENT ──────────────────────────────────────────────────
+
+Deno.test('⛔ A BAND-ONLY MOVEMENT RANKS BELOW EVERY LOADABLE ONE', () => {
+  const dbBands = ['Dumbbells', 'Resistance bands'];
+  // Extension reaches via dumbbells (loadable); the pushdown only via a band.
+  assertEquals(hasLoadableFit('Triceps Extension', dbBands), true);
+  assertEquals(hasLoadableFit('Triceps Pushdown', dbBands), false);
+  assertEquals(equipmentFitRank('Triceps Extension', dbBands)! < LAST_RESORT_RANK_FLOOR, true);
+  assertEquals(equipmentFitRank('Triceps Pushdown', dbBands)! >= LAST_RESORT_RANK_FLOOR, true);
+  // ⚠️ STILL PERFORMABLE. This is an ORDER, not a gate — nothing was excluded.
+  assertEquals(canPerformCat('Triceps Pushdown', dbBands), true);
+});
+
+Deno.test('⛔ THE ROTATION NEVER SURFACES A BAND-ONLY MOVEMENT WHEN A LOADABLE ONE EXISTS', () => {
+  // Ranking the pool fixes which movement LEADS. It does NOT stop the rotation reaching the band
+  // movement on day two — the same wrong answer arriving a day later, which is what this pins.
+  const kit = ['Dumbbells', 'Resistance bands', 'Bench (flat/adjustable)'];
+  const week = buildDefaultWeek(['arms'], kit);
+  const pushes = LIFT_DAYS.map((d) => week[d].push);
+  assertEquals(pushes.includes('Triceps Pushdown'), false, 'the banded pushdown surfaced on rotation');
+  // Concrete: Triceps Extension / Dips, never the banded pushdown.
+  for (const name of pushes) {
+    assertEquals(['Triceps Extension', 'Dips'].includes(name), true, `${name} is not a loadable arms movement`);
+  }
+});
+
+Deno.test('⛔ A BANDS-ONLY KIT IS NOT STRANDED — the whole pool rotates as before', () => {
+  const bandsOnly = ['Resistance bands'];
+  const week = buildDefaultWeek(['arms'], bandsOnly);
+  const pushes = LIFT_DAYS.map((d) => week[d].push);
+  // Nothing here is reachable without a band, so the band movements are the pool and all of it runs.
+  assertEquals(pushes.every((n) => !!catalogEntry(n)), true);
+  assertEquals(new Set(pushes).size > 1, true, 'a bands-only kit collapsed to one movement');
+  // The band-native movement leads for the athlete whose only implement IS a band.
+  assertEquals(pushes[0], 'Triceps Pushdown');
 });
 
 Deno.test('⛔ THE FOCUS NEVER OFFERS KIT THE ATHLETE DOES NOT HAVE', () => {
