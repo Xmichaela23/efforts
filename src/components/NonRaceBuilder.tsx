@@ -33,6 +33,8 @@ import {
   normalizeAssistancePrefs,
   optionsFor,
 } from '@/lib/assistance-catalog';
+// Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
+import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
@@ -1188,6 +1190,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     () => ((((arc as { equipment?: { strength?: unknown } } | null)?.equipment?.strength) as string[] | undefined) ?? []),
     [arc],
   );
+  /**
+   * The athlete's tested pull-up capacity, for the progression's dose copy. ⛔ 0 IS A REAL VALUE
+   * ("goal: your first pull-up", Q-102) and must not be coerced to absent — 0 is precisely what
+   * triggers the band on-ramp. `null` means untested, which takes the full dose (§0h).
+   */
+  const pullupMaxReps = useMemo<number | null>(() => {
+    const raw = (arc as { performance_numbers?: { pullupMaxReps?: unknown } } | null)?.performance_numbers?.pullupMaxReps;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }, [arc]);
   // The same (i) mechanic on "How much" — the volume rationale that used to sit between the two
   // inputs and push the second one off the screen.
   const [showVolumeWhy, setShowVolumeWhy] = useState(false);
@@ -3241,6 +3253,60 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   );
                 })}
               </div>
+            </div>
+
+            {/* ── THE PULL-UP PROGRESSION ───────────────────────────────────────────────────────
+                ⛔ A DIFFERENT AXIS FROM THE FOCUS CHIPS, AND IT IS SEPARATED ON THE SCREEN FOR THAT
+                REASON. A chip biases which movement fills a category; this is a PROGRAMME — it pins
+                the pull category to chins on all four days, sets the volume off Wendler's own
+                prescription, and tracks a number that climbs. Rendering it as a seventh chip would
+                teach the athlete it is the same kind of choice, and it is not.
+                ⚠️ THE COPY NAMES THE DOSE AND THE STANDARD SEPARATELY. 50 reps in 10 minutes is a
+                SESSION measure; a max-clean-rep figure is not the same measurement, and the two must
+                never be merged into "progress toward 50". */}
+            <div
+              className="rounded-lg border transition"
+              style={state.assistancePicks.performance_focus === 'pullups'
+                ? { borderColor: `${getDisciplineColor('strength')}66`, backgroundColor: `${getDisciplineColor('strength')}14` }
+                : { borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.02)' }}
+            >
+              <button
+                type="button"
+                onClick={() => setState((st) => ({
+                  ...st,
+                  assistancePicks: {
+                    ...st.assistancePicks,
+                    performance_focus: st.assistancePicks.performance_focus === 'pullups' ? null : 'pullups',
+                  },
+                }))}
+                className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="text-white/80 text-sm">Pull-up progression</p>
+                  <p className="text-white/45 text-xs mt-0.5">Build your chin-up number up — chins every day, tracked.</p>
+                </div>
+                <span
+                  className="shrink-0 w-[18px] h-[18px] rounded-full border-2 grid place-items-center transition"
+                  style={{
+                    borderColor: state.assistancePicks.performance_focus === 'pullups' ? getDisciplineColor('strength') : 'rgba(255,255,255,0.25)',
+                    backgroundColor: state.assistancePicks.performance_focus === 'pullups' ? getDisciplineColor('strength') : 'transparent',
+                  }}
+                >
+                  {state.assistancePicks.performance_focus === 'pullups' && (
+                    <span className="text-[9px] text-black font-bold leading-none">✓</span>
+                  )}
+                </span>
+              </button>
+              {state.assistancePicks.performance_focus === 'pullups' && (
+                <p className="text-white/65 text-xs px-3 pb-3 -mt-0.5 leading-relaxed">
+                  Chins every lifting day, grip varying, tracked to Wendler's {SESSION_STANDARD_REPS}-in-{SESSION_STANDARD_MINUTES} standard.
+                  {' '}{pullupDoseNote(weeklyVolumeFor(pullupMaxReps, 4), pullupMaxReps)}
+                  {' '}It replaces your pull pick on all four days while it is on.
+                  {weeklyVolumeFor(pullupMaxReps, 4).assistedOnRamp
+                    ? ' Band-assisted reps are logged separately, so they never count as clean ones.'
+                    : ''}
+                </p>
+              )}
             </div>
 
             {/* ── THE FOUR DAY CARDS ────────────────────────────────────────────────────────────

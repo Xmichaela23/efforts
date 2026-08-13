@@ -229,12 +229,53 @@ export function computeE1rmBand(series: LiftSeries[], baselineByCanonical?: Reco
   return { low: 0, high: 1, current: avgPct, positionPct: avgPct, confident: false };
 }
 
+/**
+ * ⛔ THE PULL-UP PROGRESSION'S ROW. Present ONLY when the athlete turned the goal on — a number
+ * nobody asked to be tracked is a number on a screen for no reason.
+ *
+ * ── TWO MEASUREMENTS, NAMED SEPARATELY, NEVER CONVERTED INTO EACH OTHER ──────────────────────────
+ *
+ * `cleanMaxReps` is a MAX CLEAN REPS figure: one set, no band, to failure. Wendler's standard
+ * (`standardReps` inside `standardMinutes`, Forever p.33) is a SESSION measure — many sets against a
+ * clock. **They are different measurements and neither converts into the other**, so this carries
+ * both, labelled, and the surface must render them as two facts rather than a percentage of one
+ * toward the other. "12 of 50" would be an invented metric.
+ *
+ * ── ⛔ AND THERE IS NO LEARNED e1RM HERE, BY CONSTRUCTION ────────────────────────────────────────
+ *
+ * `capacity-resolver.ts` maps `pullupMaxReps → TYPED_TO_LEARNED: null` (D-229): a pull-up is a rep
+ * count, not a load, so there is no `learned_fitness.strength_1rms` entry to cross-check a typed
+ * value against and no drift suggestion to make. Every other lift on this row can say "your logs
+ * suggest X"; this one cannot, and inventing an equivalent — an e1RM off bodyweight, a "pull-up
+ * score" — would be minting a number the athlete could not verify. **What is shown is what was
+ * logged.**
+ */
+export interface PullupProgress {
+  /** Best CLEAN single set in the window. ⛔ Band-assisted reps are excluded by construction. */
+  cleanMaxReps: number | null;
+  /** Clean reps performed in the window — the volume actually earned at bodyweight. */
+  cleanReps: number;
+  /**
+   * ⛔ COUNTED, NEVER MERGED. Assisted reps are real work and the on-ramp is Wendler's own (2nd ed
+   * p.36) — but folding them into the clean count makes the number climb while the athlete gets no
+   * stronger. Walking the band down shows up as this falling while `cleanReps` rises.
+   */
+  assistedReps: number;
+  /** Wendler's standard, stated as itself: `standardReps` reps inside `standardMinutes` minutes. */
+  standardReps: number;
+  standardMinutes: number;
+  /** Sessions in the window that carried any chin/pull-up work. Provenance for the two counts. */
+  sessions: number;
+}
+
 export interface StrengthFitness {
   volume: { verdict: TrendVerdict; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; provisional: boolean; range?: import('./position-in-range.ts').RangePosition | null };
   e1rm: { verdict: TrendVerdict; pctChange: number | null; range?: RangePosition | null } | null;
   perLift: StrengthPerLift[];
   sessionsThisWeek: number;
   unplanned: number;
+  /** Present only when `performance_focus === 'pullups'`. See {@link PullupProgress}. */
+  pullups?: PullupProgress | null;
 }
 
 // SIGNAL-VS-NOISE guard for e1RM (2026-07-19). e1RM off working sets scatters ~4-8% session to

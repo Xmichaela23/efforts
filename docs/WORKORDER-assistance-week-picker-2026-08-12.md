@@ -301,6 +301,62 @@ to look.**
   is why it missed both above. **Add substitution outputs as a 7th corpus source** so emitted names are
   checked.
 
+## Slice 6 — Pull-up / chin-up tracked progression (FOLLOW-UP, not started)
+
+A new feature on top of the picker: a **performance focus** to drive the pull-up/chin-up number up.
+Distinct axis from the body-part chips — those bias toward a muscle; this progresses a number.
+
+Wendler's protocol, packaged (all sourced — nothing invented):
+- **Volume:** 100+ chins/week (2nd ed p.35), chins between every pressing set.
+- **Variety:** vary grips every set/session (Forever p.26).
+- **Strength:** some low-rep weighted work, not just high-rep (Forever p.26).
+- **Target:** his standard is 50 reps in 10 min (Forever p.33) — the number to climb toward.
+
+Mechanism: pins the Pull slot to pull-ups/chin-ups across the week and pushes the volume; **it
+PROGRESSES** (the number climbs over the block, measured against a target) — that's what makes it a
+feature, not another chip. Hang it on `pullupMaxReps` (already the input/output). Own spec when it comes up.
+
+**Band-assisted is the on-ramp (Wendler's own).** "If you can't do chins, use a Jump Stretch band"
+(2nd ed p.36). Without it the progression only serves athletes who already have pull-ups; with it a
+0-rep athlete starts and works down the assistance. ⚠️ A band-assisted rep is NOT a full rep — the
+tracker must keep assisted and unassisted counts **separate** or the number inflates and the progress
+lies. The logger already records band assist (`resistance_level`), so build on that, don't add a
+parallel field.
+
+## Slice 7 — Simplify equipment gating (approved 2026-08-13; partially reverses Slice 2/4)
+
+**Why:** the niche-equipment itemization + strict gear routing over-complicated the picker and gated
+COMMON movements out of a normal home gym. Concrete symptom: `gearRoutesFor('Dips') = [['dip_bars'],
+['rings']]`, so a home gym (barbell/rack/bench) gets Dips swapped to Push-Up — dips "worked before"
+Slice 3/4 invented that gate. Research (Fitbod/Jefit): the best apps use **presets + common items +
+per-exercise substitution**, NOT an itemized niche checklist. Ours is more granular than the leaders,
+and that granularity is the confusion (Michael, on the GHD/dip-bar chips: "I wouldn't know what that is").
+
+**Do:**
+1. **Cut the niche chips** from the picker (`TrainingBaselines.tsx`, `PlanWizard.tsx`): Decline bench,
+   Dip bars, Leg curl machine, Glute-ham developer (GHD), Gymnastic rings, Plyo box. **Keep the
+   recognizable ones:** Barbell + plates, Dumbbells, Squat rack / Power cage, Bench, Incline bench,
+   Pull-up bar, Kettlebells, Cable machine, Resistance bands, Ab wheel.
+2. **Loosen the routes so a normal home gym is never gated out of a common movement.** Dips = anything
+   to dip on (rack safety-arms / dip attachment / two benches), so add `rack` and `bench`. Nordic /
+   glute-ham already route to `barbell` — fine. The principle: gate only on gear that is BOTH required
+   AND commonly declarable; let substitution handle the rest.
+3. **Resolve the orphaned keys** left by the cut chips (`ghd`, `dip_bars`, `rings`, `decline_bench`,
+   `leg_curl_machine`, `box`) so the engine stays coherent — either drop them from the routes (replace
+   with a common route) or from `GearKey` entirely. The contract test "every key comes from a chip"
+   must still hold.
+4. **Update engine + tests + contract together.** ⚠️ Several tests ENFORCE the strict gating and their
+   thesis changes — e.g. `strength-equipment-tier.test.ts:152` pins the dips route and `:208` asserts a
+   home gym CANNOT do Dips. Rewrite them to the new intent (home gym CAN dip); pick a genuinely-gated
+   movement as the gate's example instead.
+
+**Guardrail:** substitution stays the backstop; a normal home gym (barbell/dumbbells/rack/bench/pull-up
+bar) must be able to perform the entire default block with nothing swapped to a worse movement.
+
+⚠️ Working tree already carries this session's edits (keep them): the pull-up card compressed to a
+check-off row (`NonRaceBuilder.tsx`), and the GHD chip renamed to "Glute-ham developer (GHD)" — which
+Slice 7 then removes entirely. Michael reverted an ad-hoc dips-route patch; Slice 7 does it properly.
+
 ## Guardrails (do not violate)
 - No load on assistance, ever (D-406). Output is movement + rep total, "by feel."
 - Stay strictly Wendler for movements + muscle words. No Plank (not his). Sit-Up/Side Bend are his (2nd ed).

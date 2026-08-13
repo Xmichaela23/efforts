@@ -520,7 +520,7 @@ export default function PlanWizard() {
               // "Ab wheel" does not (a ten-dollar accessory is not a home gym) and is left out.
               const hasHomeGymEquipment = equipment.some(e =>
                 ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
-                 'Incline bench', 'Decline bench', 'Dip bars', 'Leg curl machine', 'GHD'].includes(e)
+                 'Incline bench', 'Decline bench', 'Dip bars', 'Leg curl machine', 'Glute-ham developer (GHD)'].includes(e)
               );
               if (hasCommercialGym) {
                 setState(prev => ({ ...prev, equipmentType: 'commercial_gym' }));

@@ -19,6 +19,7 @@ export {
   type LiftVerdict,
   type StrengthState,
   type StrengthFitness,
+  type PullupProgress,
   type StrengthVolumeRow,
 } from './strength.ts';
 export { computeBikeState, pwr20ToSeries, pickBestPwr20, type BikeState, type Pwr20Series } from './bike.ts';

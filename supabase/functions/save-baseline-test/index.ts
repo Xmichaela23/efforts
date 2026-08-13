@@ -70,6 +70,25 @@ function isRepCountLift(key: string): boolean {
   return key === 'pullupMaxReps';
 }
 
+/**
+ * ⛔ AND A BAND-ASSISTED REP COUNT IS NOT A CAPACITY. Added 2026-08-13.
+ *
+ * A rep-count lift is stored verbatim — no formula, no rounding — which is right, and it is exactly
+ * why an assisted count is dangerous here: it lands in `performance_numbers.pullupMaxReps` unaltered
+ * and becomes the athlete's tested max. The client now refuses to send one, and this is the server's
+ * own guard rather than trust in the caller: a payload is a claim, not a measurement.
+ *
+ * ⚠️ READS THE SET'S `resistance_level`, the same overloaded field the logger writes and
+ * `band-assistance.ts` disambiguates. Absent → not assisted, which is the honest default for every
+ * historical payload that predates the field being sent.
+ */
+function isAssistedRepCount(lift: Record<string, unknown>): boolean {
+  const raw = (lift as { resistance_level?: unknown })?.resistance_level;
+  if (raw == null || String(raw).trim() === '') return false;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n > 0 : true;
+}
+
 Deno.serve(async (req) => {
   const cors = {
     'Access-Control-Allow-Origin': '*',
@@ -124,6 +143,10 @@ Deno.serve(async (req) => {
 
       let next: number;
       if (isRepCountLift(key)) {
+        // ⛔ SKIP AN ASSISTED COUNT ENTIRELY — no write, no `computed` echo, no "kept" outcome. It is
+        // not a lower result to decide about; it is not a measurement of this capacity at all, and
+        // offering the athlete a keep/update choice about it would imply it was.
+        if (isAssistedRepCount(l)) continue;
         // The rep count IS the value. Zero is legal and meaningful here.
         if (!Number.isFinite(reps) || reps < 0) continue;
         next = Math.round(reps);

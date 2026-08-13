@@ -996,7 +996,7 @@ const disciplineOptions = [
     // word, and a glute-ham developer is not a flat bench to press on.
     "Dip bars",
     "Leg curl machine",
-    "GHD",
+    "Glute-ham developer (GHD)",
     "Gymnastic rings",
     // ⚠️ `box` WAS A FIFTH UNREACHABLE KEY and the contract test found it on the same run. It is not
     // an assistance key — Box Jumps live in the performance protocol — but it had exactly the same

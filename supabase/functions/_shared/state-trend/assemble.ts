@@ -9,7 +9,7 @@
 
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
-import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
+import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type PullupProgress, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
@@ -297,6 +297,19 @@ export interface StateTrendInputs {
    *  the client cannot flag a PR (we don't invent records from 6 weeks). */
   allTimeBestByLift?: Record<string, { best: number; count: number }> | null;
   strengthBaselines?: Record<string, number> | null;
+  /**
+   * ⛔ THE PULL-UP PROGRESSION'S COUNTS, ALREADY SPLIT CLEAN-VS-ASSISTED BY THE CALLER.
+   *
+   * ⚠️ IT CANNOT BE DERIVED HERE, AND THAT IS THE WHOLE REASON IT IS AN INPUT. This function reads
+   * `exercise_log` (`ExerciseLogLite`), whose columns are `best_reps` / `best_weight` /
+   * `total_volume` — the aggregate has ALREADY THROWN THE ASSIST AWAY. There is no
+   * `resistance_level` on that table, so a pull-up count taken from it cannot tell a clean rep from
+   * a banded one, and reading it would reintroduce the exact inflation the progression exists to
+   * prevent. The caller computes it from the RAW logged sets it already fetches.
+   *
+   * Absent/null → the row is simply not rendered. Opt-in, and no goal means no number.
+   */
+  pullupProgress?: PullupProgress | null;
   /** D-338: what the PLAN asked for on each dated point (raw phase name, lowercased), so a deload
    *  week can be excluded from the strength trend. Resolved by the caller off `plan-phase.ts`.
    *  Absent → no point carries a phase → nothing is excluded → today's behaviour exactly. */
@@ -704,6 +717,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     perLift: strengthPerLift,
     sessionsThisWeek: inp.doneBy['strength'] || 0,
     unplanned: Math.max(0, (inp.doneBy['strength'] || 0) - (inp.plannedBy['strength'] || 0)),
+    // Passed straight through — this row states what was logged and derives nothing. ⚠️ Absent when
+    // the athlete has not turned the progression on, which is most athletes.
+    pullups: inp.pullupProgress ?? null,
   };
 
   // SLICE 1 — THREE-MODE ANCHORING (Michael 2026-07-16). A DOT is a "where am I in my range" POSITION

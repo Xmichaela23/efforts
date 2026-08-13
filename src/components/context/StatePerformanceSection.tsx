@@ -621,6 +621,53 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
           })}
         </>
       )}
+      {/* ── THE PULL-UP PROGRESSION (Slice 6) ─────────────────────────────────────────────────────
+          ⛔ RENDERED ONLY WHEN THE ATHLETE TURNED THE GOAL ON. The spine sends `pullups` only for
+          `performance_focus === 'pullups'`, so the absence here IS the gate — this screen decides
+          nothing (Constitution Law 2: surfaces render, never re-decide).
+
+          ⛔ TWO MEASUREMENTS, SHOWN AS TWO FACTS. The clean max is one set to failure; Wendler's
+          standard is 50 reps inside 10 minutes, which is a SESSION measure. Neither converts into
+          the other, so the copy never says "12 of 50" or draws a progress bar between them — that
+          would be an invented metric, and this row has been caught minting verdicts before.
+
+          ⛔ NO LEARNED NUMBER, AND THE ROW IS HONEST ABOUT IT. Every other lift here can offer "your
+          logs suggest X" off `learned_fitness.strength_1rms`; a pull-up cannot — `capacity-resolver`
+          maps it to `TYPED_TO_LEARNED: null` (D-229) because a rep count is not a load. What is
+          shown is what was logged, and nothing is estimated. */}
+      {fitness.pullups && (
+        <>
+          <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider mt-2">pull-ups</span>
+          <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
+            <span className="text-white/85 text-[14px]">best clean set</span>
+            <span className="text-white/85 text-[14px] text-right tabular-nums">
+              {/* ⚠️ null is NOT zero. No clean set logged means unmeasured — printing 0 would read as
+                  "we tested you and you cannot do one", which is a different and untrue claim. */}
+              {fitness.pullups.cleanMaxReps == null ? '—' : `${fitness.pullups.cleanMaxReps} reps`}
+            </span>
+          </span>
+          <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 -mt-0.5">
+            <span className="text-white/45 text-[11px]">Wendler's standard</span>
+            <span className="text-white/60 text-[11px] text-right tabular-nums">
+              {fitness.pullups.standardReps} reps in {fitness.pullups.standardMinutes} min
+            </span>
+          </span>
+          {/* ⛔ ASSISTED REPS GET THEIR OWN LINE, ALWAYS SEPARATE. They are real work and the band
+              on-ramp is Wendler's own (2nd ed p.36) — but folded into the clean count the number
+              climbs while the athlete gets no stronger. Walking the band down shows up here as this
+              falling while the clean count rises, which is the actual thing happening. */}
+          <span className="basis-full text-white/50 text-[11px] -mt-0.5">
+            {fitness.pullups.cleanReps} clean rep{fitness.pullups.cleanReps === 1 ? '' : 's'}
+            {fitness.pullups.assistedReps > 0
+              ? ` · ${fitness.pullups.assistedReps} band-assisted, counted separately`
+              : ''}
+            {fitness.pullups.sessions > 0
+              ? ` · ${fitness.pullups.sessions} session${fitness.pullups.sessions === 1 ? '' : 's'}`
+              : ''}
+          </span>
+        </>
+      )}
+
       {/* AUTOREGULATION read — the FATIGUE axis, distinct from the e1RM numbers above (D-302 slice 2). Grinding
           shows as RIR below prescription BEFORE it shows in e1RM. Sourced from the spine's
           `strength_rir_below_prescription` — rendered here, NOT recomputed, pulled from the nudge list so it
@@ -1289,7 +1336,12 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   const runHasSubstance = !!runFitness && (runFitness.decoupling.verdict !== 'needs_data' || runFitness.decoupling.stale || runFitness.efficiency.verdict !== 'needs_data');
   // Strength shows the Volume · e1RM · sessions composite when volume trends or e1RM has a verdict;
   // else the adherence card. Volume gives the row a real verdict so it stops falling to the shrug.
-  const strengthHasSubstance = !!strengthFitness && (strengthFitness.volume.verdict !== 'needs_data' || strengthFitness.e1rm != null || strengthFitness.sessionsThisWeek > 0);
+  // ⚠️ THE PULL-UP PROGRESSION IS SUBSTANCE ON ITS OWN (Slice 6). An athlete who opted into it and
+  // has logged chins — but no barbell lift with an e1RM yet, which is exactly the beginner the band
+  // on-ramp exists for — would otherwise have the whole strength row hidden, and with it the only
+  // number their goal produces. The spine sends `pullups` only when the goal is on, so this cannot
+  // widen the row for anyone else.
+  const strengthHasSubstance = !!strengthFitness && (strengthFitness.volume.verdict !== 'needs_data' || strengthFitness.e1rm != null || strengthFitness.sessionsThisWeek > 0 || !!strengthFitness.pullups);
 
   // GOAL-LED order (2026-07-21): the athlete's PRIMARY discipline leads — strength leads a strength
   // block, the race's sport leads a race plan. `primaryDiscipline` was already passed in from the

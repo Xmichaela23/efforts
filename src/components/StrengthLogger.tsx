@@ -35,6 +35,7 @@ import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
 import { equipmentForExercise, isDurationLogged } from '@/lib/strength-logging-mode';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
+import { canWritePullupCapacity } from '@/lib/pullup-progression';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
 import { calculateRestTime, isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
@@ -3618,7 +3619,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if ((updatedSet as any).repMaxTest === true && updatedSet.setType === 'working' && updatedSet.completed
             && typeof updatedSet.reps === 'number' && updatedSet.reps >= 0) {
           const baselineKey = getBaselineKeyForExercise(exercise.name);
-          if (baselineKey) {
+          // ⛔ A BAND-ASSISTED REP-MAX IS NOT A REP-MAX. Added 2026-08-13 with the pull-up
+          // progression, and it is a BUG FIX: this write had no assist check at all, so a test taken
+          // on a band wrote the assisted count into `performance_numbers.pullupMaxReps` — where it
+          // becomes the athlete's tested capacity, scales their assistance volume, resolves their
+          // bodyweight RIR in materialize-plan, and shows on the State strength row as a number they
+          // cannot actually do. The LOAD path has known about band assist since D-351; the CAPACITY
+          // path never did. Reads the same `resistance_level` the logger already writes.
+          if (baselineKey && canWritePullupCapacity(exercise.name, updatedSet)) {
             setBaselineTestResults(prev => ({
               ...prev,
               [exerciseId]: {

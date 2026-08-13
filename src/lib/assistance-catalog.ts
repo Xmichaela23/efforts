@@ -265,7 +265,20 @@ export type AssistanceWeekPrefs = {
   version: 2;
   by_day: Record<LiftDay, DayPicks>;
   focus: FocusChip[];
+  /**
+   * ⛔ A PERFORMANCE GOAL, AND IT IS A DIFFERENT AXIS FROM `focus` — do not fold the two together.
+   * A focus chip biases WHICH movement fills a category. This PINS the pull category to chins across
+   * the week, pushes the volume to Wendler's prescription, and tracks a number that climbs. One is a
+   * preference, the other is a programme. See `src/lib/pullup-progression.ts`.
+   *
+   * ⚠️ Absent/null is the norm — this is opt-in, and the balanced week is unaffected by it.
+   */
+  performance_focus?: PerformanceFocus | null;
 };
+
+/** The tracked performance goals. One today; the type exists so a second cannot be bolted on as a
+ *  boolean and quietly become a second vocabulary. */
+export type PerformanceFocus = 'pullups';
 
 /**
  * ⛔ LEGACY PICKS THE OLD MENU OFFERED THAT THE CATALOG DOES NOT. Mapped to their nearest catalog
@@ -354,7 +367,12 @@ export function normalizeAssistancePrefs(raw: unknown): AssistanceWeekPrefs {
     };
   }
 
-  return { version: 2, by_day, focus: focusOf(obj?.focus) };
+  // ⚠️ ONLY A RECOGNISED GOAL SURVIVES THE READ. An unknown string is dropped rather than stored, so
+  // a stale or hand-edited value cannot pin the pull category to a movement that does not exist.
+  const pf = obj?.performance_focus;
+  const performance_focus: PerformanceFocus | null = pf === 'pullups' ? 'pullups' : null;
+
+  return { version: 2, by_day, focus: focusOf(obj?.focus), performance_focus };
 }
 
 /**
@@ -446,6 +464,15 @@ export function resolveDayAssistance(
   prefs: AssistanceWeekPrefs,
   day: LiftDay,
   totalReps: number,
+  /**
+   * ⛔ THE PULL-UP PROGRESSION OVERRIDES THE PULL PICK, AND THAT IS THE ONE PLACE D-423's "the
+   * athlete's pick is what appears" bends. It is not the old re-roling coming back: the athlete opted
+   * INTO a programme whose whole content is "chins, on every lifting day, at this volume". Honouring
+   * a Barbell Row pick inside a pull-up progression would be honouring the letter of a preference
+   * against the thing they actually asked for. It is opt-in, reversible by turning the goal off, and
+   * the copy names it.
+   */
+  pullup?: { movement: string; totalReps: number } | null,
 ): ResolvedAssistanceRow[] {
   const picks: DayPicks = prefs.by_day[day] ?? { ...BALANCED_WEEK[day], abs: null };
   const row = (category: AssistanceCategory, name: string, reps: number): ResolvedAssistanceRow => ({
@@ -461,7 +488,9 @@ export function resolveDayAssistance(
 
   const rows = [
     row('push', picks.push || BALANCED_WEEK[day].push, totalReps),
-    row('pull', picks.pull || BALANCED_WEEK[day].pull, totalReps),
+    pullup
+      ? row('pull', pullup.movement, pullup.totalReps)
+      : row('pull', picks.pull || BALANCED_WEEK[day].pull, totalReps),
     row('single_leg_core', legName, legReps),
   ];
   if (absName) {

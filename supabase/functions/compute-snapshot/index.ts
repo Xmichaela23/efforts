@@ -39,7 +39,11 @@ import {
   declaredSessionsPerWeek,
   type StateTrendsV1,
   type PerDisciplinePosture,
+  type PullupProgress,
 } from "../_shared/state-trend/index.ts";
+// Slice 6 — the pull-up progression's clean/assisted split. ⛔ Read from the RAW logged sets; the
+// `exercise_log` aggregate has no `resistance_level` and cannot answer this.
+import { countPullupWork, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS } from '../../../src/lib/pullup-progression.ts';
 import { computeAcwr, type LoadRow } from "../_shared/acwr.ts";
 // Slice 2 (2026-08-12): the strength progress direction reads the PROTOCOL'S declared gauge. The
 // protocol id comes from the one resolver (block-identity), the gauge from the one profile table,
@@ -885,6 +889,7 @@ serve(async (req: Request) => {
         // behaviour, byte for byte.
         let posture: PerDisciplinePosture | null = null;
         let declaredSpw: Partial<Record<string, number>> | null = null;
+        let pullupFocusOn = false;
         try {
           const { data: activeGoal } = await supabase
             .from("goals").select("training_prefs")
@@ -893,6 +898,10 @@ serve(async (req: Request) => {
           const tp = (activeGoal as any)?.training_prefs ?? null;
           posture = sanitizePosture(tp?.per_discipline_posture);
           declaredSpw = declaredSessionsPerWeek(tp);
+          // ⛔ THE PULL-UP PROGRESSION IS OPT-IN, so the row is gated on the athlete's own goal, not
+          // on whether they happen to have logged a chin. Same read, one field over.
+          pullupFocusOn = (tp?.assistance_picks as { performance_focus?: unknown } | null)
+            ?.performance_focus === 'pullups';
           if (posture) console.log("[compute-snapshot] Q-179 posture:", JSON.stringify(posture), "declared/wk:", JSON.stringify(declaredSpw));
         } catch (e: any) {
           console.log("[compute-snapshot] posture read failed (non-fatal):", e?.message || e);
@@ -962,6 +971,7 @@ serve(async (req: Request) => {
         // moment a heavy single follows the AMRAP (`all-out-set.ts` documents that trap). The rep
         // record is "reps AT a weight", so the weight has to be exact, and only the logged set is.
         let allOutByLift: Record<string, Array<{ date: string; weight: number; reps: number; estimated_1rm: number }>> | null = null;
+        let pullupProgress: PullupProgress | null = null;
         try {
           const { data: strengthRows } = await supabase
             .from("workouts")
@@ -1007,6 +1017,45 @@ serve(async (req: Request) => {
               .filter((s: any) => s.date.length === 10);
             const built = allOutSeriesByLift(sessions);
             allOutByLift = Object.keys(built).length ? built : null;
+
+            // ── THE PULL-UP PROGRESSION'S COUNTS ────────────────────────────────────────────────
+            //
+            // ⛔ COMPUTED FROM THE RAW LOGGED SETS, AND IT HAS TO BE. `exercise_log` — what the
+            // strength row otherwise reads — stores `best_reps` / `best_weight` / `total_volume` and
+            // NO `resistance_level`. The aggregate has already discarded whether a band was on the
+            // bar, so a pull-up count taken from it cannot tell a clean rep from an assisted one.
+            // These `sessions` are the raw `workouts.strength_exercises` rows, fetched just above
+            // for the rep-record window, and they still carry the field. No new query, no new column.
+            //
+            // ⚠️ THE WINDOW IS THE REP-RECORD WINDOW (`REP_RECORD_WINDOW_SESSIONS`), reused rather
+            // than invented — one window for "recent lifting", not two that drift apart.
+            if (pullupFocusOn) {
+              let cleanReps = 0;
+              let assistedReps = 0;
+              let cleanMax = 0;
+              let sessionsWithChins = 0;
+              for (const sess of sessions) {
+                const c = countPullupWork((sess as any).exercises);
+                if (c.clean === 0 && c.assisted === 0) continue;
+                sessionsWithChins += 1;
+                cleanReps += c.clean;
+                assistedReps += c.assisted;
+                if (c.bestCleanSet > cleanMax) cleanMax = c.bestCleanSet;
+              }
+              pullupProgress = {
+                // ⚠️ null, NOT 0, when nothing clean was logged. 0 would read as a measured zero —
+                // "we tested you and you cannot do one" — when the truth is that no clean set exists
+                // in the window. An unmeasured thing is absent, never a number.
+                cleanMaxReps: cleanMax > 0 ? cleanMax : null,
+                cleanReps,
+                assistedReps,
+                standardReps: SESSION_STANDARD_REPS,
+                standardMinutes: SESSION_STANDARD_MINUTES,
+                sessions: sessionsWithChins,
+              };
+              console.log(`[compute-snapshot] pull-up progression: clean max ${cleanMax || 'none'}, ` +
+                `${cleanReps} clean / ${assistedReps} assisted over ${sessionsWithChins} session(s)`);
+            }
             console.log(`[compute-snapshot] slice2 all-out sets: ${Object.keys(built).length} lift(s), effortRead=${strengthEffortRead ?? "null"}`);
           }
         } catch (e: any) {
@@ -1131,7 +1180,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates, allOutByLift, strengthEffortRead });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

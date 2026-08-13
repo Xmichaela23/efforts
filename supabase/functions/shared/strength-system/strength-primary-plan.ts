@@ -51,6 +51,20 @@ import {
   normalizeAssistancePrefs,
   resolveDayAssistance,
 } from '../../../../src/lib/assistance-catalog.ts';
+// The tracked pull-up progression (Wendler 2nd ed p.35 / Forever pp.26,33). Opt-in, and it pins the
+// pull category across the week — see `resolveDayAssistance`'s `pullup` argument.
+import {
+  GRIP_LABEL,
+  GRIP_ROTATION,
+  LIFT_DAY_ORDER_FOR_GRIP,
+  movementForGrip,
+  pullupDoseNote,
+  SESSION_STANDARD_MINUTES,
+  SESSION_STANDARD_REPS,
+  WEIGHTED_DAY_INDEX,
+  WEIGHTED_DAY_REPS,
+  weeklyVolumeFor,
+} from '../../../../src/lib/pullup-progression.ts';
 import {
   type BlockShapeInputs,
   cycleForWeek,
@@ -516,13 +530,32 @@ function assistanceRows(
 ): { rows: StrengthExercise[]; note: string | null } {
   const prefs: AssistanceWeekPrefs = normalizeAssistancePrefs(picks);
   const day = liftDayForMainLift(mainLiftName) ?? 'press';
+
+  // ⛔ THE PULL-UP PROGRESSION, WHEN THE ATHLETE OPTED IN. It pins the pull category to a chin/pull-up
+  // on every lifting day, at Wendler's own weekly dose, with the grip rotating day to day (Forever
+  // p.26). ⚠️ `pullupMaxReps` is the SCALER, not a target — see `weeklyVolumeFor` for why a 2-rep
+  // athlete is not handed 100 chins a week.
+  const dose = prefs.performance_focus === 'pullups'
+    ? weeklyVolumeFor(scale?.pullupMaxReps, 4)
+    : null;
+  const gripIndex = LIFT_DAY_ORDER_FOR_GRIP.indexOf(day);
+  const grip = GRIP_ROTATION[(gripIndex < 0 ? 0 : gripIndex) % GRIP_ROTATION.length];
+  const pullup = dose
+    ? { movement: movementForGrip(grip), totalReps: dose.perDay }
+    : null;
   // ⚠️ ONE SLOT BUDGET FOR THE DAY. `assistanceTotalReps` is per-slot and the pull slot is the only
   // one with a tested capacity, so it is asked per category and each row carries its own total.
-  const rows = resolveDayAssistance(prefs, day, assistanceTotalReps('push', scale).totalReps)
+  const rows = resolveDayAssistance(prefs, day, assistanceTotalReps('push', scale).totalReps, pullup)
     .map((a) => {
+      // ⛔ THE PROGRESSION'S DOSE WINS OVER THE SLOT SCALER ON THE PULL ROW. Both answer "how many
+      // reps", and running them both would double-count: `assistanceTotalReps` sizes a maintenance
+      // slot off tested capacity, `weeklyVolumeFor` sizes a PROGRAMME off the same capacity. When the
+      // athlete opted into the programme, the programme's number is the prescription.
       const totalReps = a.isAbsAddOn
         ? a.totalReps
-        : (a.category === 'pull' ? assistanceTotalReps('pull', scale).totalReps : a.totalReps);
+        : (a.category === 'pull'
+            ? (pullup ? pullup.totalReps : assistanceTotalReps('pull', scale).totalReps)
+            : a.totalReps);
       return {
         name: a.name,
         // ⛔ `sets: 1` RENDERED AS "1×25" AND THAT IS A LIE ABOUT THE PRESCRIPTION.
@@ -557,7 +590,22 @@ function assistanceRows(
   // sentence — *"You picked Push Up — squat days finish on the trunk…"* — which existed because the
   // engine overrode the athlete's pick. Under D-407 nothing is overridden, so there is nothing to
   // explain. The shape stays so the one call site is untouched; delete both together or neither.
-  return { rows, note: null };
+  // ⛔ `note` WAS ALWAYS NULL AFTER D-423 AND NOW HAS ONE JOB: naming the progression when it is on.
+  // It is not a substitution apology — nothing was overridden against the athlete's wishes; they
+  // opted in, and the line states the dose, the grip and the standard they are climbing toward.
+  // ⚠️ THE STANDARD IS STATED AS A SESSION MEASURE, never as "progress toward 50". 50 reps in 10
+  // minutes and a max-clean-rep figure are different measurements and the copy must not merge them.
+  const note = dose
+    ? `${pullupDoseNote(dose, scale?.pullupMaxReps ?? null)} ${GRIP_LABEL[grip]} this day. ` +
+      `Wendler's standard is ${SESSION_STANDARD_REPS} reps inside ${SESSION_STANDARD_MINUTES} minutes.` +
+      (dose.assistedOnRamp
+        ? ' Band-assisted reps are logged separately, so they never count as clean ones.'
+        : '') +
+      (gripIndex === WEIGHTED_DAY_INDEX && !dose.assistedOnRamp
+        ? ` Add weight for sets of ${WEIGHTED_DAY_REPS} on this day — by feel, as always.`
+        : '')
+    : null;
+  return { rows, note };
 }
 
 

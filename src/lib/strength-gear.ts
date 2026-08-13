@@ -74,7 +74,7 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   box: 'Box',
   rings: 'Rings',
   ab_wheel: 'Ab Wheel',
-  ghd: 'GHD',
+  ghd: 'Glute-ham developer',
   leg_curl_machine: 'Leg Curl Machine',
   bands: 'Bands',
 };

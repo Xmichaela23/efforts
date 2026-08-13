@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
 import { energyLevel, sorenessLevel, sleepQuality, overallReadinessLabel } from '../_shared/readiness-scale.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 // ⛔ SEVEN IMPORTS DELETED WITH THE NARRATIVE LLM (2026-08-02): `getArcContext`,
@@ -774,6 +775,18 @@ function buildStrengthTestResult(executedExercises: any[], e1rmTrend: any[], per
     const reps = Number(working.reps);
     const weight = Number(working.weight);
     const isPullup = key === 'pullupMaxReps';
+    // ⛔ A BAND-ASSISTED SET IS NOT A PULL-UP TEST. Added 2026-08-13 with the pull-up progression.
+    // For a rep-count lift `e1rm` IS the rep count, so an assisted set was reported as a new or
+    // updated baseline — the number climbing while the athlete walked the band down more slowly.
+    // Reads `resistance_level`, the field the logger already writes; `band-assistance.ts` documents
+    // why the movement has to be tested first (on a band pull-apart the same field is the LOAD).
+    if (isPullup && isBandAssistedMovement(ex?.name || '')) {
+      const rl = (working as { resistance_level?: unknown })?.resistance_level;
+      const assistNum = Number(rl);
+      const assisted = rl != null && String(rl).trim() !== ''
+        && (Number.isFinite(assistNum) ? assistNum > 0 : true);
+      if (assisted) continue;
+    }
     const zeroRep = !(reps > 0);
     const trendRow = (Array.isArray(e1rmTrend) ? e1rmTrend : []).find((e: any) =>
       strengthTestKey(String(e?.canonical || e?.exercise || '')) === key);
