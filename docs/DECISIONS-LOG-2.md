@@ -345,6 +345,16 @@ Commits `9baa35fb`, `d4eda969`, `dca84dda`, `8a0efcd7`.
 
 ### D-385 — Accessory selection is day-type roles, not family collision (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
 
+> ⛔ **SUPERSEDED 2026-08-13 BY [D-423] — the block-wide 3-pick model and ALL of its re-roling are
+> retired.** The athlete now picks twelve movements (push · pull · single-leg/core, on each of the
+> four lifting days) and nothing is re-roled, substituted or annotated. `ROLE_BY_DAY`, `resolveRole`,
+> `fitsRole`, `ROLE_FALLBACK`, `orderForDay`, `AssistanceTemplate` and `assistanceSubstitutionNote`
+> are DELETED (`src/lib/assistance-menu.ts` → `src/lib/assistance-catalog.ts`).
+> ⚠️ **THIS ENTRY WAS NOT WRONG.** Its sourcing stands; the model it served asked the engine to infer
+> nine of twelve slots, and D-423 stops asking. Do not cite this to re-litigate the page readings.
+> Everything below is history.
+
+
 > ↩ **PARTIALLY SUPERSEDED by D-404 (2026-08-09).** Two of this entry's calls are reversed, both by one
 > premise change and neither on the merits: **(1)** the upper-day third slot is **arms, not core** —
 > `ROLE_BY_DAY.upper.single_leg_core: 'arm'`; **(2)** the pull slot **no longer crosses the plane** by
@@ -936,6 +946,16 @@ Everything else is client and ships with the Netlify build.
 
 ### D-404 — A strength-purpose block runs the STANDARD assistance templates, not the concurrent chapter (2026-08-09, **SHIPPED — `eee1a86c`**)
 
+> ⛔ **SUPERSEDED 2026-08-13 BY [D-423] — the block-wide 3-pick model and ALL of its re-roling are
+> retired.** The athlete now picks twelve movements (push · pull · single-leg/core, on each of the
+> four lifting days) and nothing is re-roled, substituted or annotated. `ROLE_BY_DAY`, `resolveRole`,
+> `fitsRole`, `ROLE_FALLBACK`, `orderForDay`, `AssistanceTemplate` and `assistanceSubstitutionNote`
+> are DELETED (`src/lib/assistance-menu.ts` → `src/lib/assistance-catalog.ts`).
+> ⚠️ **THIS ENTRY WAS NOT WRONG.** Its sourcing stands; the model it served asked the engine to infer
+> nine of twelve slots, and D-423 stops asking. Do not cite this to re-litigate the page readings.
+> Everything below is history.
+
+
 > ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log` (`eee1a86c`). It claimed uncommitted for a day after it shipped.
 
 **Supersedes the assistance-template half of D-385 and the pull-slot half of D-328. Both are back-annotated.**
@@ -1053,6 +1073,16 @@ function importing `assistance-menu.ts` or `exercise-config.ts` must be redeploy
 ---
 
 ### D-405 — Leg days are LEG · LEG · ABS. No pull. (2026-08-09, **SHIPPED — `09796193`**)
+
+> ⛔ **SUPERSEDED 2026-08-13 BY [D-423] — the block-wide 3-pick model and ALL of its re-roling are
+> retired.** The athlete now picks twelve movements (push · pull · single-leg/core, on each of the
+> four lifting days) and nothing is re-roled, substituted or annotated. `ROLE_BY_DAY`, `resolveRole`,
+> `fitsRole`, `ROLE_FALLBACK`, `orderForDay`, `AssistanceTemplate` and `assistanceSubstitutionNote`
+> are DELETED (`src/lib/assistance-menu.ts` → `src/lib/assistance-catalog.ts`).
+> ⚠️ **THIS ENTRY WAS NOT WRONG.** Its sourcing stands; the model it served asked the engine to infer
+> nine of twelve slots, and D-423 stops asking. Do not cite this to re-litigate the page readings.
+> Everything below is history.
+
 
 > ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log` (`09796193`, "D-405..408").
 
@@ -2048,3 +2078,52 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 **Back-annotated:** D-421 (re-scoped — the ceiling-pin trigger is retired; the `strength_calibration` field + `plans.config` wire are KEPT for slice b to repopulate off the reset/bump events), Q-256 (closed by a third option — remove the ceiling, not feed it a better max), Q-217.
 
 **State.** PUSHED (`bf4aaa61`) + EDGE-DEPLOYED (`generate-strength-plan`, `create-goal-and-materialize-plan`, `materialize-plan`, `rematerialize-strength-block`, `coach`, + importers of the touched shared files). Fixtures 2014/0 in strength-system + _shared; permanent regression `strength-primary-plan.cycle-climb.test.ts`. **NOT yet device-verified** — the acceptance run (regenerate, watch the cycles climb) is open. Slice b (auto-apply + announce + undo) is next.
+
+---
+
+### D-423 — Assistance is TWELVE picks the athlete makes, not three the engine re-roles (2026-08-13, **BUILT — fixtures green (3491 pass / 6 pre-existing unrelated failures); NOT deployed, NOT device-verified**) — **supersedes [D-385], [D-404], [D-405]**; [D-406] and [D-322] intact
+
+**The decision.** Wendler 5/3/1 *Forever* p.24: four lifting days, each carrying **push · pull · single-leg/core**, one movement per category. The athlete picks all twelve. The engine re-roles nothing, substitutes nothing, and prints no note explaining why they got something other than what they chose.
+
+**What it replaces.** The athlete made THREE block-wide picks and `resolveAssistance` distributed them across the week: `ROLE_BY_DAY` mapped each storage key to a different ROLE per day-type, `fitsRole`/`resolveRole` replaced a pick that did not fit, `ROLE_FALLBACK` supplied a movement when the slot's own menu could not answer, and `assistanceSubstitutionNote` printed *"You picked Push Up — squat days finish on the trunk, not more pressing."*
+
+**⛔ NONE OF THAT WAS WRONG, AND THAT IS THE POINT OF THIS ENTRY.** Every rule was sourced page by page — Triumvirate p.48, Periodization Bible pp.50-51, Bodyweight p.52, concurrent pp.86-88 — and two of them (D-404, D-405) reversed *earlier* readings on the merits as the sourcing improved. The apparatus existed because **three picks had to cover twelve slots, so nine were inferred.** Ask for twelve and the inference, its fallback pools, its plane-complement rule and its apology all become answers to a question nobody is asking. This is a *scope* reversal, not a correctness one: do not re-litigate p.87-vs-p.51 to justify or attack it.
+
+**What survived, deliberately:**
+- **[D-406] is untouched.** `weight: 'By feel'`, `load_prescribed: false`, no `percent_1rm`, `weight_suggested` still greyed and overwritable. No load on assistance, ever.
+- **The capacity rep scaling.** `assistanceTotalReps` — floor 50, ceiling 75 off `pullupMaxReps`, anchor cycles hold the floor. ⚠️ **The mock showed a flat 50 and the scaling was kept anyway**: dropping a sourced behaviour to match a mock is how an engine loses its reasoning quietly.
+- **[D-322].** Every stored name resolves `exact` or `folded`, asserted by test. The catalog stores the config's canonical name and DISPLAYS Wendler's word where they differ — Back Extension → "Back Raise", Dumbbell Curl → "Curls", Ab Wheel Rollout → "Ab Wheel". A display alias, never a second token.
+
+**Add-abs.** Forever p.32 allows "one or two exercises per category", so a day may carry a second single-leg/core movement. ⛔ **It SHARES that slot's rep budget (50 → 25/25), never stacks a fresh one, and is never a fourth category** — a fourth 50 is added fatigue charged against the endurance budget, which is what this whole model is arranged to protect.
+
+**⛔ The default week is ALL-COMPOUND, and arms are already covered.** Michael, 2026-08-13: **Dips are triceps, a Chin-Up is biceps**, so the balanced week trains both arms without an isolation movement — which is also the book's own default (Triumvirate p.48 pairs the press day with Dips + Chin-Ups and prescribes no isolation). The mock's Curls / Triceps Pushdown stay **available through the Arms focus, never in the default**. Opt-in isolation is the design; putting it in the default spends rep budget the compounds already cover. Do not "fix" this.
+
+**Focus chips.** Balanced + Arms · Chest · Shoulders · Back · Glutes · Abs, multi-select, **capped at 3**. A focus re-points movement choice *inside* a category and rotates across the four days rather than putting one movement on all of them — 200 reps a week of one movement is the complaint [D-328] fixed. No Legs/Quads chip (the athlete runs); Glutes covers hamstrings (p.29).
+
+**Storage + migration.** `goals.training_prefs.assistance_picks` now holds `{ version: 2, by_day: {press|bench|squat|deadlift: {push, pull, single_leg_core, abs?}}, focus: [] }`. `normalizeAssistancePrefs` reads the current shape, the old flat `{push, pull, single_leg_core}` on every pre-2026-08-13 goal (its three picks become every day's three), and nothing at all. **Fallback is per slot and per day**, so one unrecognised key cannot wipe an athlete's other eleven choices. Legacy names map where an honest equivalent exists (`Pull Up`→Chin-Up, `Dumbbell Bench Press`→DB Bench Press); `Single Leg Hip Thrust` deliberately does not — it is not in Forever's assistance chapter and mapping it to a lunge would be inventing a preference.
+
+**Files.** `src/lib/assistance-catalog.ts` (new — catalog, focus pools, balanced default, storage + migration, resolution, peers); `src/lib/assistance-menu.ts` (gutted to the rep scaling + `ASSISTANCE_GUIDANCE`); `strength-primary-plan.ts:assistanceRows`; `NonRaceBuilder.tsx` (the per-day card); `exercise-alternatives.ts` (peers by category).
+
+**Back-annotated:** [D-385], [D-404], [D-405].
+
+---
+
+### D-424 — The assistance picker is EQUIPMENT-GATED, on both surfaces, through one map (2026-08-13, **BUILT — fixtures green; NOT deployed, NOT device-verified**) — **reverses the deliberate ungated call** (F-5, `docs/BUILDER-SWEEP-FINDINGS.md`)
+
+**The decision.** The picker offers only movements the athlete can actually set up, and so does the in-session swap sheet. `substituteExerciseForEquipment` drops from primary fix to **backstop**.
+
+**⛔ THIS REVERSES A CALL THAT WAS MADE ON PURPOSE.** The menu was ungated because (a) bands had no flag to gate on and (b) gating resolution while the menu stayed ungated was "a half-rule". Both objections are now answered rather than overruled: bands are a real key, and BOTH surfaces gate through the same function.
+
+**Two questions, two maps — do not reconcile them.** `exerciseRequiredGearKeys` answers *"what should the session card's Equipment line MENTION"* and is generous (it names the bench beside a DB row). `ASSISTANCE_GEAR` answers *"what is the MINIMUM to perform this"* and is what the gate reads (a DB row needs dumbbells; the bench is a brace). **Gating on the generous map would delete the row from every athlete who owns dumbbells and no bench.** Same data, two questions, two accessors — the `MovementGroup`/`MovementPattern` shape one axis over.
+
+**The routes are OR-of-ANDs.** `[['ghd'], ['decline_bench'], ['barbell']]` is three ways to do a Nordic curl / glute-ham raise / back raise; a flat AND-list would gate out two of them. ⚠️ **The decline bench qualifies because its rollers are an ANKLE ANCHOR** — an incline-only bench unlocks none of them.
+
+**⛔ NO "UNGATE IF UNOWNABLE" WORKAROUND — chips were added instead.** Slice 3 found four gear keys no chip could produce (`dip_bars`, `ghd`, `leg_curl_machine`, `rings`) and a contract test then found a fifth (`box`). Gating naively would have deleted Dips and Leg Curl from every home-gym menu. `TrainingBaselines.tsx` now offers **Dip bars · Leg curl machine · GHD · Gymnastic rings · Plyo box**, and a test asserts in BOTH directions: every chip produces a key, every key comes from a chip.
+
+**Unknown degrades to UNGATED.** An empty `equipment.strength` means "we have not asked", not "owns nothing" — a strict reading would hand every new athlete four days of push-ups. Same §0h rule the composer follows for an unknown main lift.
+
+**Side effects, all deliberate:** `hasGHD`'s docblock said *"no current equipment UI option produces this — so Nordics will not fire"*; a GHD chip exists now, so they can. `substituteExerciseForEquipment` no longer rewrites Leg Curl for an athlete who ticked the leg-curl chip. `PlanWizard`'s home-gym DEFAULT set deliberately does **not** claim the new gear — that list is written to the athlete's inventory as a claim of ownership.
+
+**Files.** `src/lib/strength-gear.ts` (new — the vocabulary, both maps, `canPerform`; `_shared/strength-equipment-tier.ts` re-exports it so every edge importer is unchanged), `exercise-alternatives.ts:canSetUp`, `assistance-catalog.ts:optionsFor`, `TrainingBaselines.tsx`, `PlanWizard.tsx`, `materialize-plan/index.ts`.
+
+**Back-annotated:** F-5 in `docs/BUILDER-SWEEP-FINDINGS.md`.

@@ -419,6 +419,15 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'cable curl': 'loaded_accessory',
   'tricep extension': 'loaded_accessory',
   'tricep pushdown': 'loaded_accessory',
+  // Wendler's own plurals + the DB shorthands the catalog stores (2026-08-13).
+  'triceps pushdown': 'loaded_accessory',
+  'triceps extension': 'loaded_accessory',
+  'db incline press': 'loaded_accessory',
+  'plate raise': 'loaded_accessory',
+  'db side bend': 'loaded_accessory',
+  'dumbbell side bend': 'loaded_accessory',
+  'bent over reverse flye': 'loaded_accessory',
+  'bent over reverse flyes': 'loaded_accessory',
   'cable crossover': 'loaded_accessory',
   'cable crunch': 'loaded_accessory',
   'ab machine crunch': 'loaded_accessory',
@@ -524,6 +533,29 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'soleus raise': 'bodyweight',
   'tibialis raise': 'bodyweight',
 
+  // ── WENDLER FOREVER ASSISTANCE CATALOG + the equipment-substitution outputs (2026-08-13).
+  // ⛔ THE DEFAULT WOULD HAVE BEEN 'loaded_accessory' — "counts as load, says nothing" — AND THAT IS
+  // WRONG FOR EVERY BODYWEIGHT ENTRY BELOW. A glute-ham raise counting as external load is a silent
+  // over-count in the logger and the language layer, and the coverage test is what caught it rather
+  // than a screenshot months later.
+  'glute ham raise': 'bodyweight',
+  'reverse hyper': 'bodyweight',
+  'weighted sit up': 'bodyweight',
+  'bodyweight lunges': 'bodyweight',
+  'bodyweight lunge': 'bodyweight',
+  // The three the substitution emits when the athlete owns nothing — bodyweight by construction.
+  // ⚠️ BOTH SPELLINGS, AND THE SECOND ONE IS THE SERVER'S. `canonicalize()` emits
+  // `reverse_flyes_bodyweight` / `scaption_bodyweight_shoulder_raises` — underscores, parentheses
+  // stripped — and those keys reach `per_lift.canonical_name` and the State row. The lookup folds
+  // underscores to spaces, so the table needs the FOLDED form, not the underscored one.
+  // ⚠️ FOLDED FORMS ONLY — the lookup strips parentheses before matching, so a key spelled
+  // `reverse flyes (bodyweight)` here is unreachable and the name falls to the default anyway. Both
+  // the athlete-facing name and `canonicalize()`'s `reverse_flyes_bodyweight` fold to these.
+  'reverse flyes bodyweight': 'bodyweight',
+  'scaption': 'bodyweight',
+  'scaption bodyweight shoulder raise': 'bodyweight',
+  'scaption bodyweight shoulder raises': 'bodyweight',
+
   // ── PLYO: reps only. No external load, no bar, no bar-speed cue — the intent is maximal every
   // rep by definition, so "keep every rep at the same speed" describes a different exercise.
   // (That was the live bug on Michael's Box Jump, 2026-08-01.) ─────────────────────────────────
@@ -573,6 +605,11 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'band overhead press': 'band',
   'band lateral raise': 'band',
   'band face pull': 'band',
+  // ⛔ A BAND, NOT A MACHINE. `Band Leg Curls` is what `substituteExerciseForEquipment` writes when
+  // the athlete has no leg-curl machine, and the config gives it `displayFormat: 'band'` for the same
+  // reason. Typing it `loaded_accessory` (the silent default) would have multiplied a band by reps.
+  'band leg curl': 'band',
+  'band leg curls': 'band',
   'band pull apart': 'band',
   'band lateral walk': 'band',
   'lateral band walk': 'band',

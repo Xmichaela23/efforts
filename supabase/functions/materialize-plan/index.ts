@@ -1096,6 +1096,16 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   const hasBarbell = hasGymAccess || equipment.includes('Full barbell + plates') || equipment.includes('Barbell + plates') || equipment.includes('Squat rack or power cage') || equipment.includes('Squat rack / Power cage');
   const hasDumbbells = hasGymAccess || equipment.includes('Adjustable dumbbells') || equipment.includes('Fixed dumbbells') || equipment.includes('Dumbbells');
   const hasBench = hasGymAccess || equipment.includes('Bench (flat/adjustable)');
+  // Added 2026-08-13 with the Forever assistance catalog. ⛔ `hasAbWheel` deliberately does NOT read
+  // `hasGymAccess`: a rack and a cable stack are what a commercial gym IS, a ten-dollar ab wheel is
+  // not, and plenty of gyms stock none. Same reasoning as `hasAbWheel` in
+  // `_shared/strength-equipment-tier.ts`, which is the detector these strings feed.
+  const hasInclineBench = hasGymAccess || equipment.includes('Incline bench');
+  const hasAbWheel = equipment.includes('Ab wheel');
+  // ⛔ THE CHIP MUST BEAT THE SUBSTITUTION (slice 4). A home athlete who owns a leg-curl attachment
+  // now has a chip to say so, and rewriting their Leg Curl to a Nordic anyway would make the chip a
+  // decoration. `hasGymAccess` alone was the only signal before the chip existed.
+  const hasLegCurlMachine = hasGymAccess || equipment.includes('Leg curl machine');
   const hasPullUpBar = hasGymAccess || equipment.includes('Pull-up bar');
   const hasCable = hasGymAccess || equipment.includes('Cable machine/functional trainer') || equipment.includes('Cable machine');
   const hasKettlebells = hasGymAccess || equipment.includes('Kettlebells');
@@ -1118,7 +1128,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   }
   
   // Machine exercises - only substitute if no gym access
-  if (name.includes('leg curl') && !hasGymAccess) {
+  if (name.includes('leg curl') && !hasLegCurlMachine) {
     if (hasBarbell) {
       resultName = 'Nordic Curls';
     } else if (hasResistanceBands) {
@@ -1135,6 +1145,35 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     } else {
       resultName = 'Bodyweight Lunges';
     }
+  }
+
+  // ── Forever assistance catalog gear (added 2026-08-13) ──────────────────────────────────────────
+  // ⛔ EVERY NAME EMITTED BELOW RESOLVES EXACTLY IN `exercise-config.ts` — checked, not assumed
+  // (D-322: an unresolved name silently borrows another movement's prescription).
+  //
+  // Incline pressing without an incline bench is not harder, it is impossible. Fall to the FLAT
+  // version of the same press — same pattern, same muscles, one bench angle down — and to the floor
+  // when there is no bench at all. ⚠️ The `press` guard keeps this off "Incline Push Up" and anything
+  // else that merely says incline.
+  if (name.includes('incline') && name.includes('press') && !hasInclineBench) {
+    if (hasDumbbells && hasBench) {
+      resultName = 'Dumbbell Bench Press';
+      notes = 'No incline bench — flat dumbbell press instead';
+    } else if (hasDumbbells) {
+      resultName = 'DB Floor Press';
+      notes = 'No bench — press from the floor';
+    } else {
+      resultName = 'Push Up';
+      notes = 'No incline bench — push-ups, feet raised if you want the upper-chest angle';
+    }
+  }
+
+  // The ab wheel is the one movement on Wendler's abs list (Forever p.30) that needs a piece of kit.
+  // Fall back inside HIS OWN abs list rather than to a generic core movement: hanging leg raise when
+  // there is a bar, sit-up otherwise. Both are on p.30 / 2nd ed p.43.
+  if ((name.includes('ab wheel') || name.includes('ab rollout')) && !hasAbWheel) {
+    resultName = hasPullUpBar ? 'Hanging Leg Raise' : 'Sit Up';
+    notes = 'No ab wheel — same slot, no kit needed';
   }
   
   // Lateral Raises

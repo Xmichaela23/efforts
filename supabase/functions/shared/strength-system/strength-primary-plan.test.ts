@@ -15,7 +15,7 @@ import {
   JUMPS,
 } from './strength-primary-plan.ts';
 import { placeLiftingWeek } from './place-week.ts';
-import { ASSISTANCE_MENU } from '../../../../src/lib/assistance-menu.ts';
+import { ASSISTANCE_CATALOG } from '../../../../src/lib/assistance-catalog.ts';
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 
 const MAXES = { bench: 225, squat: 315, deadlift: 405, overheadPress: 135 };
@@ -218,21 +218,18 @@ Deno.test('a work session is jumps → main lift → 50 reps each of leg / pull 
   // full jumps → main → assistance shape only exists on a lower day.
   const rows = sessionsFor(1).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
   // Defaults, because this plan was built with no picks — skipping the card still yields a block.
-  // ⛔ UPDATED FOR Q-212, AND THE TEST WAS PINNING THE DEFECT. It asserted `Reverse Lunge` in the
-  // single-leg slot on a BACK SQUAT day — both `knee_dominant`, so the slot repeated the pattern the
-  // main lift had just loaded. The default pick collided with the default day, which is why nobody
-  // had to choose anything unusual to hit it. It now takes balancing work and the description says so.
   //
-  // ⛔ UPDATED AGAIN 2026-08-05 FOR THE DAY-TYPE ROLES, AND IT WAS PINNING A SECOND DEFECT: `Push Up`
-  // on a BACK SQUAT day. No Wendler template presses on a lower day. A lower day is now
-  // leg · pull · core (p.51, p.53, p.55, p.88), with core LAST as every template runs it.
+  // ⛔ THIS ASSERTION HAS BEEN REWRITTEN FOUR TIMES AND THE FIRST THREE WERE ALL THE SAME KIND OF
+  // CHANGE: the engine's INFERENCE about what belongs on a squat day moved, and the expectation
+  // followed it. Q-212 (the single-leg slot collided with the main lift), 2026-08-05 (no pressing on
+  // a lower day), D-405 (leg · leg · core, no pull). Each was sourced; each was the app deciding.
   //
-  // ⛔ UPDATED A THIRD TIME 2026-08-09 (D-405): the `Pull Up` in the middle is gone, and a lower day
-  // is now leg · leg · core. p.51 is two lines and neither has a pull on it — Deadlift day is
-  // hamstrings/quads/abs, Squat day is low back/quads/abs. `Single Leg Hip Thrust` (hip) is the
-  // opposite-family slot on a knee-dominant day and `Reverse Lunge` (knee) is the main lift's own
-  // family, which is exactly p.51's "low back, quads". The pull pick runs on the two press days.
-  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Single Leg Hip Thrust', 'Reverse Lunge', 'Sit Up']);
+  // ⛔ THE FOURTH IS DIFFERENT IN KIND — D-407. This is no longer an inference at all. A squat day
+  // carries push · pull · single-leg/core like every other day, and what fills them is the BALANCED
+  // DEFAULT WEEK, which is Wendler's own pairing for that day (Periodization Bible p.51: squat day →
+  // low back). If this line needs updating again it should be because the DEFAULT changed, not
+  // because a rule about squat days did.
+  assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push-Up', 'Lat Pulldown', 'Back Extension']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
   assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);
@@ -256,44 +253,28 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
     .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!.map((r: any) => r.name);
   // ⚠️ No Box Jump — bench is an upper day, and the picks still reach it.
   //
-  // ⛔ REWRITTEN 2026-08-05. THIS LINE USED TO ASSERT `Face Pull` IN THE PUSH SLOT ON A BENCH DAY,
-  // AND THAT WAS THE BUG, PINNED. The old rule read "Dips and Bench Press are both horizontal_push,
-  // so the push slot balances instead" — but the replacement it reached for was a list of four
-  // movements that were ALL PULLS, so a press day shipped two pulls and zero push. Every Wendler
-  // template that touches a pressing day keeps a push on it (p.48 Press -> Dips; pp.50-51 both press
-  // days LEAD with chest/shoulders; p.52 Bench -> Chins + Pushups), and the worked example of the
-  // very concurrent template the old rule cited has DIPS on the bench day (p.88).
+  // ⛔ THE PICKS ARRIVE IN THE OLD FLAT SHAPE ON PURPOSE — this is the MIGRATION under test, not just
+  // the wiring. Every goal created before 2026-08-13 carries `{push, pull, single_leg_core}`, and
+  // `normalizeAssistancePrefs` turns it into the same three movements on all four days. That is what
+  // the old model MEANT before its re-roling machinery moved them around.
   //
-  // So `Dips` now STANDS on a bench day. Same family as the main lift is the point, not the problem —
-  // it is the hypertrophy dose four of the five templates prescribe.
-  //
-  // ⛔ AND THE PULL SLOT NO LONGER CROSSES THE PLANE — REVERSED 2026-08-09. The paragraph this
-  // replaces read *"the pull slot STILL crosses the plane (p.86), which was always the correct half
-  // of Q-212"*, and asserted `Pull Up` here off a `Dumbbell Row` pick. The half was correct; the
-  // TEMPLATE was not. p.86-88 is the concurrent chapter, written for an athlete whose conditioning
-  // is programmed alongside. This block's purpose is strength — the athlete's endurance is their own
-  // business — so it runs the STANDARD templates (p.48 / p.50), which never cross planes.
-  //
-  // So the athlete's `Dumbbell Row` now STANDS on a bench day. Same plane as the main lift is not the
-  // problem here any more than `Dips` after a bench press was. The crossing rule still exists and is
-  // still tested — under `template: 'concurrent'`, in `assistance-collision.test.ts`.
-  //
-  // ⛔ AND THE THIRD SLOT IS ARMS, NOT ABS — D-404, 2026-08-09. This line ended `Hanging Leg Raise`
-  // until today. The athlete's core pick is a legitimate choice and it still stands on both LOWER
-  // days; on a press day p.50-51 closes on triceps, so the slot resolves to the arm fallback.
-  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Dumbbell Row', 'Diamond Push Up']);
+  // ⛔ AND NOTHING IS RE-ROLED NOW (D-407). The three lines this replaces each recorded a slot being
+  // overridden on a bench day — the push slot balanced to a Face Pull (2026-08-05, a defect), the
+  // pull slot crossed the plane to a Pull Up (2026-08-09, the wrong template), the core pick became
+  // `Diamond Push Up` because p.50-51 closes a press day on triceps (D-404). All three were the
+  // engine answering for the athlete. The athlete now answers per day, so their `Hanging Leg Raise`
+  // appears on the bench day because that is where they put it.
+  assertEquals(benchOf(picked), ['Bench Press', 'Dips', 'Dumbbell Row', 'Hanging Leg Raise']);
 
-  // A name that is no longer on the menu must not strand an existing goal.
+  // A name that is no longer offered must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Bench Press Machine', pull: '', single_leg_core: undefined },
   });
-  // ⛔ AND THIS LINE PINNED DEFECT #2 AS WELL AS #1: `Reverse Lunge` — leg work — on a BENCH day.
-  // Nothing collided with the single-leg slot on an upper day, so it passed straight through and
-  // stacked glute and hamstring load against the run legs. The slot is single-role on a press day
-  // now — arms as of D-404, abs before it, never legs either way, which is the part that matters
-  // here. `Push Up` is the push default and, being a push, is exactly what the push slot should hold.
-  assertEquals(benchOf(stale), ['Bench Press', 'Push Up', 'Pull Up', 'Diamond Push Up']);
+  // ⛔ FALLBACK IS PER SLOT AND PER DAY, so an unrecognised name costs that one slot rather than the
+  // week. All three are unusable here, so the bench day is its balanced default verbatim — which is
+  // Wendler's Triumvirate pairing for a bench day (p.48: DB Bench + DB Row).
+  assertEquals(benchOf(stale), ['Bench Press', 'DB Bench Press', 'Dumbbell Row', 'Reverse Lunge']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {
@@ -311,14 +292,15 @@ Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded op
   }
 });
 
-Deno.test('every menu option resolves in the exercise table — an unresolved name gets priced wrongly', () => {
+Deno.test('every catalog option resolves in the exercise table — an unresolved name gets priced wrongly', () => {
   // D-322: a name with no entry falls through to a legacy path and is priced off whichever 1RM the
   // fallback picks. That is how a pull-up came to be prescribed at 110 lb off the athlete's bench.
-  for (const menu of ASSISTANCE_MENU) {
-    for (const option of menu.options) {
-      assertEquals(getExerciseConfig(option.name) != null, true, `${option.name} is offered but not defined`);
-      assertEquals(option.targets.trim().length > 0, true, `${option.name} has no targeted areas`);
-    }
+  // ⚠️ `ASSISTANCE_MENU` → `ASSISTANCE_CATALOG` (D-407): the three-slot menu was retired with the
+  // block-wide picks. `targets` became `muscle`, which is Wendler's own word for what it trains.
+  for (const option of ASSISTANCE_CATALOG) {
+    assertEquals(getExerciseConfig(option.name) != null, true, `${option.name} is offered but not defined`);
+    assertEquals(option.muscle.trim().length > 0, true, `${option.name} has no muscle label`);
+    assertEquals(option.display.trim().length > 0, true, `${option.name} has no display name`);
   }
 });
 

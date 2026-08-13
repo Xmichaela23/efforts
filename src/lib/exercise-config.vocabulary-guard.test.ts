@@ -63,13 +63,27 @@ async function vocabularySources(): Promise<Source[]> {
     names: [...roleSrc.split('MAIN_531_LIFTS')[1].split(']')[0].matchAll(/'([^']+)'/g)].map((m) => m[1]),
   });
 
-  // 4. The assistance menu — the shortlist the athlete picks from at build time. ⛔ Its own header
+  // 4. The assistance catalog — the shortlist the athlete picks from at build time. ⛔ Its own header
   // makes this a hard requirement: *"Must be a name `getExerciseConfig()` resolves. An unresolved
   // name is the D-322 bug class."*
-  const menuSrc = stripComments(await read('./assistance-menu.ts'));
+  // ⚠️ MOVED 2026-08-13 (D-407): this read `assistance-menu.ts`, whose menu was retired with the
+  // block-wide 3-pick model. The names now live in `assistance-catalog.ts` — and the file also
+  // carries a `display` alias per movement, which is athlete-facing text and NOT a token, so only
+  // `name:` is swept. The balanced-default week's movement names are swept too, since a typo there
+  // reaches a session exactly as fast as a catalog entry does.
+  // ⚠️ THE DEFAULT-WEEK SWEEP IS SCOPED TO `BALANCED_WEEK`, and it has to be: the same
+  // `push: '…'` shape also spells `CATEGORY_LABEL`, whose values are UI text ("Push", "Single-leg /
+  // core"). Sweeping the whole file fed those to the resolver, where "Pull" cheerfully borrowed
+  // `face pull`. A label is not a token — the first cut of this got that wrong.
+  const catalogSrc = stripComments(await read('./assistance-catalog.ts'));
+  const balancedBlock = catalogSrc.split('BALANCED_WEEK')[1]?.split('};')[0] ?? '';
+  assert(balancedBlock.length > 100, 'BALANCED_WEEK did not load — did it move or get renamed?');
   out.push({
-    label: 'assistance-menu',
-    names: [...menuSrc.matchAll(/name:\s*'([^']+)'/g)].map((m) => m[1]),
+    label: 'assistance-catalog',
+    names: [
+      ...[...catalogSrc.matchAll(/\bname: '([^']+)'/g)].map((m) => m[1]),
+      ...[...balancedBlock.matchAll(/(?:push|pull|single_leg_core): '([^']+)'/g)].map((m) => m[1]),
+    ],
   });
 
   // 5. The add-exercise picker in the logger — what the athlete can type in. Evaluated as the array
@@ -85,6 +99,31 @@ async function vocabularySources(): Promise<Source[]> {
   const snap = JSON.parse(await read('./__fixtures__/real-exercise-vocabulary.json'));
   assert(Array.isArray(snap.names) && snap.names.length > 40, 'the real-vocabulary snapshot did not load');
   out.push({ label: 'REAL plans + logs', names: snap.names.map((n: { name: string }) => n.name) });
+
+  // 7. ⛔ WHAT THE EQUIPMENT SUBSTITUTION *EMITS* — added 2026-08-13, and it was a real blind spot.
+  //
+  // `substituteExerciseForEquipment` (materialize-plan) rewrites an exercise when the athlete lacks
+  // the kit, and the name it writes goes straight into the session. Those names appear in NO menu, NO
+  // protocol table and NO config key list — so all six sources above were blind to them, and two had
+  // been wrong for as long as they had existed: **"Band Leg Curls" borrowed `leg curls` and was priced
+  // at 0.3× the DEADLIFT as a total barbell load**, and "Bent-Over Reverse Flyes" borrowed
+  // `reverse flye`. Found by hand, from a gear map, months after shipping — which is the exact
+  // pattern this whole guard exists to end.
+  //
+  // ⚠️ LITERALS ONLY. Two substitutions build the name at runtime (`exerciseName.replace(/Dumbbell/gi,
+  // 'Band')`), so they cannot be read statically and are not covered here. That is a known hole, not
+  // an oversight — the emitted forms ("Band Lateral Raises") are covered by the config's own plural
+  // and band keys today.
+  const subSrc = await read('../../supabase/functions/materialize-plan/index.ts');
+  const subBody = subSrc.split('function substituteExerciseForEquipment')[1]?.split('\nfunction ')[0] ?? '';
+  assert(subBody.length > 500, 'substituteExerciseForEquipment body did not load — did it move or get renamed?');
+  out.push({
+    label: 'equipment substitution OUTPUTS',
+    names: [...stripComments(subBody).matchAll(/resultName\s*=\s*'([^']+)'/g)]
+      .map((m) => m[1])
+      // The two runtime-built names above land here as fragments; drop anything with a template hole.
+      .filter((n) => !n.includes('${')),
+  });
 
   return out;
 }

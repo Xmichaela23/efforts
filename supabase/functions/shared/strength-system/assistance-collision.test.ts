@@ -1,369 +1,379 @@
-// THE ASSISTANCE SELECTION INVARIANTS — day-type slot roles, from Wendler's own templates.
+// THE ASSISTANCE INVARIANTS — per-day picker (D-407, Wendler 5/3/1 Forever p.24).
 //
-// ⛔ THIS FILE WAS REWRITTEN 2026-08-05 AND ITS OLD INVARIANT WAS THE BUG.
+// ⛔ THIS FILE HAS BEEN REWRITTEN TWICE AND BOTH REWRITES ARE THE SAME LESSON. Read it before
+// adding a test here.
 //
-// It used to pin: "nothing in a session repeats the main lift's pattern", over every slot. That
-// invariant is what made a press day structurally unable to show a push — a push always shares a
-// press's family, so the push slot could never hold a push, and it resolved through a fallback list
-// whose four entries were all pulls. The test passed. The block was wrong. **A green suite proves
-// the code does what the test says, not that the test says the right thing.**
+// **2026-08-05.** It pinned "nothing in a session repeats the main lift's pattern", over every slot.
+// That invariant is what made a press day structurally unable to show a push — a push always shares
+// a press's family, so the push slot could never hold a push, and it resolved through a fallback list
+// whose four entries were all pulls. **The test passed. The block was wrong.** A green suite proves
+// the code does what the test says, not that the test says the right thing.
 //
-// The invariant that replaced it is Wendler's, verified page by page against
-// `~/Downloads/531_2nd_Edition_Hard_Copy.pdf`:
+// **2026-08-13 (this one).** The invariants that replaced it were correct, sourced page by page, and
+// pinned a MODEL that has now been retired:
 //
-//   UPPER days (Bench, OHP)     push · pull · core     p.48, pp.50-51, p.52, p.87
-//   LOWER days (Squat, Deadlift) pull · single-leg · core   p.51, p.53, p.55, p.48
+//   UPPER days (Bench, OHP)      push · pull · arm          p.48, pp.50-51, p.52, p.87
+//   LOWER days (Squat, Deadlift) leg · leg · core           p.51, p.53, p.55, p.48
+//   pull slot crosses the plane under the concurrent template only    p.86
 //
-// ⛔ AND THE PATTERN RULE SURVIVES ON THE PULL SLOT ONLY (p.86, the concurrent chapter): a
-// horizontal push is balanced by a vertical pull and vice versa. Applying it to the push slot is
-// exactly what produced defect #1. Do not generalise it back.
+// None of that was wrong. All of it existed because the athlete made THREE picks for TWELVE slots,
+// so nine had to be inferred — and every one of those tests was pinning the quality of an inference
+// nobody had asked for. Forever p.24 asks for one movement per category per day; asked directly, the
+// inference and its test suite both disappear. **The old expectations are recorded above rather than
+// deleted, because "we used to assert the opposite" is the single most useful thing a future session
+// can read here.**
 //
-// Each Deno.test below whose name starts with "REGRESSION" pins one of the four defects in
-// `docs/SPEC-assistance-fix.md` §0 and is permanent — per house method, a bug-case fixture becomes a
-// permanent regression. Deterministic: no LLM anywhere in this path, so one run is definitive.
+// ⚠️ THE D-406 TESTS BELOW ARE UNCHANGED IN SUBSTANCE and are the ones that must never go: the plan
+// prescribes no assistance load, ever. That rule outlived both rewrites and is not part of either
+// model.
+//
+// Deterministic: no LLM anywhere in this path, so one run is definitive.
 //
 // Run: ~/.deno/bin/deno test --no-check supabase/functions/shared/strength-system/assistance-collision.test.ts
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
-  resolveAssistance,
-  assistanceSubstitutionNote,
   assistanceTotalReps,
-  assistancePeersFor,
   ASSISTANCE_TOTAL_REPS_FLOOR,
   ASSISTANCE_TOTAL_REPS_CEILING,
-  ASSISTANCE_MENU,
-  ASSISTANCE_DEFAULTS,
 } from '../../../../src/lib/assistance-menu.ts';
-import { getMovementFamily, isDirectArm, EXERCISE_CONFIG } from '../../../../src/lib/exercise-config.ts';
+import {
+  ASSISTANCE_CATALOG,
+  assistancePeersFor,
+  BALANCED_WEEK,
+  buildDefaultWeek,
+  catalogEntry,
+  LIFT_DAYS,
+  liftDayForMainLift,
+  normalizeAssistancePrefs,
+  resolveDayAssistance,
+  splitRepsForAbs,
+} from '../../../../src/lib/assistance-catalog.ts';
+import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
-const PICKS = { push: 'Dips', pull: 'Chin Up', single_leg_core: 'Single Leg Hip Thrust' };
-const UPPER = ['Bench Press', 'Overhead Press'];
-const LOWER = ['Back Squat', 'Deadlift'];
-const ALL = [...UPPER, ...LOWER];
+const MAXES = { bench: 150, squat: 200, deadlift: 225, overheadPress: 95 };
+const base = { durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0 };
 
-const familiesOn = (main: string, picks: unknown = PICKS) =>
-  resolveAssistance(picks as never, main).map((r) => getMovementFamily(r.name));
-const nameFor = (main: string, slot: string, picks: unknown = PICKS) =>
-  resolveAssistance(picks as never, main).find((r) => r.slot === slot)!.name;
+const assistanceRowsOf = (plan: any) =>
+  (Object.values(plan.sessions_by_week).flat() as any[])
+    .flatMap((s: any) => (s.strength_exercises ?? []).map((e: any) => ({ ...e, session: s.name })))
+    .filter((e: any) => e.load_prescribed === false);
 
-// ── REGRESSION §0.1 — a press day structurally could not show a push ─────────────────────────────
+// ── D-322: every name the picker can store must resolve EXACTLY ───────────────────────────────────
 
-Deno.test('REGRESSION §0.1 — every press day carries a real PUSH', () => {
-  for (const main of UPPER) {
-    const fams = familiesOn(main);
-    assertEquals(
-      fams.includes('push'), true,
-      `${main} produced no push at all — ${resolveAssistance(PICKS, main).map((r) => r.name).join(', ')}`,
-    );
+Deno.test('D-322 — every catalog name has an EXACT config key, not a fuzzy borrow', () => {
+  const bad: string[] = [];
+  for (const e of ASSISTANCE_CATALOG) {
+    const r = resolveExerciseConfig(e.name);
+    if (r.via !== 'exact' && r.via !== 'folded') bad.push(`${e.name} → via=${r.via} (${r.matchedKey})`);
   }
+  assertEquals(bad, [], 'a stored name that only fuzzy-matches borrows another movement\'s prescription');
 });
 
-Deno.test('REGRESSION §0.1 — a press day is never two pulls and no push', () => {
-  for (const main of UPPER) {
-    const fams = familiesOn(main);
-    assertEquals(fams.filter((f) => f === 'pull').length <= 1, true, `${main} stacked two pulls`);
-  }
-});
-
-Deno.test('REGRESSION §0.1 — Face Pull is never the answer to a PUSH slot', () => {
-  // It is a legitimate upper-back movement (p.50, "Lats or Upper Back") and stays available in the
-  // PULL slot. It was only ever wrong as the push. ⚠️ Do not "fix" this by deleting it.
-  for (const main of ALL) assertEquals(nameFor(main, 'push') === 'Face Pull', false, `${main} push slot`);
-});
-
-// ── REGRESSION §0.2 — lower-body work was dumped on upper days ───────────────────────────────────
-
-Deno.test('REGRESSION §0.2 — no leg work on any press day, and the third slot is ARMS', () => {
-  // ⛔ THE SECOND ASSERTION FLIPPED ON 2026-08-09 (D-404 supersedes D-385): it read `'core'`, because
-  // the upper-day third slot was abs. It is triceps now — p.50-51 closes both press days on arms,
-  // and this block runs the standard templates, not the concurrent chapter that put core here.
-  // ⚠️ THE FIRST ASSERTION IS THE ACTUAL §0.2 REGRESSION and is untouched: no leg work on a press
-  // day, whatever the third slot carries. That is the defect this test exists for.
-  for (const main of UPPER) {
-    for (const row of resolveAssistance(PICKS, main)) {
-      const fam = getMovementFamily(row.name);
-      assertEquals(fam === 'knee' || fam === 'hip', false, `${row.name} is leg work on a ${main} day`);
+Deno.test('D-322 — the balanced default week only names movements that are in the catalog', () => {
+  const bad: string[] = [];
+  for (const day of LIFT_DAYS) {
+    for (const name of Object.values(BALANCED_WEEK[day])) {
+      if (!catalogEntry(name)) bad.push(`${day}: ${name}`);
     }
-    assertEquals(isDirectArm(nameFor(main, 'single_leg_core')), true, `${main} third slot`);
+  }
+  assertEquals(bad, [], 'the default week names a movement the picker cannot offer');
+});
+
+Deno.test('the DISPLAY name is an alias, never a second token', () => {
+  // Wendler's word is what the athlete reads; the config's canonical is what is stored. The three
+  // that differ are the whole reason the two fields exist.
+  assertEquals(catalogEntry('Back Extension')?.display, 'Back Raise');
+  assertEquals(catalogEntry('Dumbbell Curl')?.display, 'Curls');
+  assertEquals(catalogEntry('Ab Wheel Rollout')?.display, 'Ab Wheel');
+  // ⛔ AND THE DISPLAY NAME IS NEVER STORED. Looking one up as a stored name must find nothing.
+  for (const alias of ['Back Raise', 'Curls', 'Ab Wheel']) {
+    assertEquals(catalogEntry(alias), null, `${alias} is a label — it must not resolve as a stored name`);
   }
 });
 
-Deno.test('D-322 — every menu name has an EXACT config key, not a fuzzy borrow', () => {
-  // ⛔ `getExerciseConfig()` FUZZY-MATCHES. A name with no entry does not fail — it silently borrows
-  // another movement's entry, logs a warning nobody reads, and takes that movement's ratio and
-  // display format. That is the D-322 bug class, and "the name resolves" is NOT evidence against it:
-  // `Nonexistent Widget Press` resolves too. The only real check is an EXACT key, so that is what
-  // this asserts. Every name the athlete can pick, plus every default the engine falls back to.
-  const names = new Set([
-    ...ASSISTANCE_MENU.flatMap((m) => m.options.map((o) => o.name)),
-    ...Object.values(ASSISTANCE_DEFAULTS),
-  ]);
-  for (const name of names) {
-    assertEquals(
-      Object.prototype.hasOwnProperty.call(EXERCISE_CONFIG, name.toLowerCase()), true,
-      `"${name}" has no exact EXERCISE_CONFIG key — it will fuzzy-borrow another movement's entry`,
-    );
-  }
-});
+// ── THE FRAME: three categories, every day, one movement each ─────────────────────────────────────
 
-Deno.test('a CURL reaches the arm slot via the SWAP POOL, and survives beside the chin', () => {
-  // ⛔ REWRITTEN 2026-08-09. This used to pick a curl through `assistancePicks.single_leg_core` —
-  // the dropdown no longer offers core or arm movements, so that route is gone. The PROPERTY it was
-  // guarding is unchanged and still worth pinning: a curl and a chin-up are both elbow flexion and
-  // both family `pull`, so any rule reasoning about the pull family would read the second as
-  // redundant. Nothing does — `fitsRole('arm')` reads `isDirectArm` and nothing else, and
-  // `sharesMovementFamily` has been un-imported from this file since D-385.
-  for (const curl of ['Dumbbell Curl', 'Hammer Curl']) {
-    assertEquals(isDirectArm(curl), true, `${curl} is not flagged as arm work`);
-    for (const main of UPPER) {
-      // The swap sheet offers it on a press day — the athlete's route to it now.
-      const peers = assistancePeersFor('Diamond Push Up', main) ?? [];
-      assertEquals(peers.includes(curl), true, `${main}: the swap sheet does not offer ${curl}`);
-      // And the chin is untouched in its own slot while an arm movement sits beside it.
-      assertEquals(nameFor(main, 'pull'), 'Chin Up', `${main}: the chin was displaced`);
+Deno.test('⛔ EVERY LIFTING DAY CARRIES PUSH · PULL · SINGLE-LEG/CORE — the frame is locked', () => {
+  const prefs = normalizeAssistancePrefs(null);
+  for (const day of LIFT_DAYS) {
+    const rows = resolveDayAssistance(prefs, day, 50);
+    assertEquals(rows.map((r) => r.category), ['push', 'pull', 'single_leg_core'], `${day}`);
+    for (const r of rows) {
+      assertEquals(catalogEntry(r.name)?.category, r.category, `${day}: ${r.name} is in the wrong category`);
     }
   }
 });
 
-Deno.test('⛔ A MOVEMENT OFF THE MENU MUST STILL BE REACHABLE — no orphans', () => {
-  // ⛔ THE HAZARD THE MENU NARROWING CREATED. Core and arm options were removed from the
-  // `single_leg_core` dropdown; a movement that is on no menu AND in no `ROLE_FALLBACK` pool is
-  // unreachable — the athlete can neither pick it nor swap to it, and it silently stops existing.
-  // The curls were menu-only and would have been orphaned.
-  for (const name of ['Sit Up', 'Hanging Leg Raise', 'Ab Wheel Rollout',
-    'Diamond Push Up', 'Tricep Pushdown', 'Tricep Extension', 'Close Grip Bench Press',
-    'Dumbbell Curl', 'Hammer Curl']) {
-    const onMenu = ASSISTANCE_MENU.some((m) => m.options.some((o) => o.name === name));
-    const peers = assistancePeersFor(name, 'Bench Press');
-    assertEquals(onMenu || peers != null, true, `${name} is unreachable — no menu, no swap pool`);
+Deno.test('⛔ THE ATHLETE\'S PICK IS WHAT APPEARS — nothing is re-roled, on any day', () => {
+  // This is the whole of D-407 in one assertion. Under the old model a push pick on a squat day
+  // became a core movement and the app printed a sentence explaining why.
+  const prefs = normalizeAssistancePrefs({
+    version: 2,
+    by_day: {
+      press: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+      bench: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+      squat: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+      deadlift: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+    },
+    focus: [],
+  });
+  for (const day of LIFT_DAYS) {
+    assertEquals(resolveDayAssistance(prefs, day, 50).map((r) => r.name),
+      ['Push-Up', 'Barbell Row', 'Front Squat'], `${day} did not honour the picks`);
   }
 });
 
-Deno.test('⛔ THE ARM SLOT DEFAULTS TO TRICEPS — a curl is opt-in, never inherited', () => {
-  // The biceps options are LAST in the menu and `resolveRole` takes the first fitting option, so an
-  // athlete who never opens the card gets triceps. If the menu is ever reordered this fails, which
-  // is the point: chins already train biceps, and triceps is the arm the block does not otherwise
-  // hit directly. Pinned for the default path AND for a leg pick that has to be re-roled.
-  for (const main of UPPER) {
-    for (const picks of [null, { push: 'Push Up', pull: 'Chin Up', single_leg_core: 'Reverse Lunge' }]) {
-      const arm = resolveAssistance(picks as never, main).find((r) => r.slot === 'single_leg_core')!;
-      assertEquals(getMovementFamily(arm.name), 'push', `${main}: defaulted to a curl, not triceps`);
-      assertEquals(isDirectArm(arm.name), true, `${main}: default is not arm work at all`);
+Deno.test('the balanced default is Wendler\'s own pairings (Triumvirate p.48, Bible p.51)', () => {
+  assertEquals(BALANCED_WEEK.press.push, 'Dips');
+  assertEquals(BALANCED_WEEK.press.pull, 'Chin-Up');
+  assertEquals(BALANCED_WEEK.bench.push, 'DB Bench Press');
+  assertEquals(BALANCED_WEEK.bench.pull, 'Dumbbell Row');
+  // p.51: squat day → low back; deadlift day → hamstrings.
+  assertEquals(BALANCED_WEEK.squat.single_leg_core, 'Back Extension');
+  assertEquals(BALANCED_WEEK.deadlift.single_leg_core, 'Glute-Ham Raise');
+  // Abs land once, on the day with no lower-body main lift.
+  assertEquals(BALANCED_WEEK.press.single_leg_core, 'Hanging Leg Raise');
+});
+
+Deno.test('the four days do not run the same movement in a category', () => {
+  const prefs = normalizeAssistancePrefs(null);
+  for (const category of ['push', 'pull', 'single_leg_core'] as const) {
+    const names = LIFT_DAYS.map((d) => prefs.by_day[d][category]);
+    assertEquals(new Set(names).size, 4, `${category} repeats across the week: ${names.join(', ')}`);
+  }
+});
+
+// ── STORAGE: migrate, never strand ────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ THE OLD FLAT 3-PICK SHAPE MIGRATES — an existing goal does not strand (D-322 class)', () => {
+  // Every goal created before 2026-08-13 carries this shape. Its three picks become every day's
+  // three picks, which is what the old model MEANT before its re-roling moved them around.
+  const prefs = normalizeAssistancePrefs({
+    push: 'Dumbbell Bench Press', pull: 'Pull Up', single_leg_core: 'Bulgarian Split Squat',
+  });
+  assertEquals(prefs.version, 2);
+  for (const day of LIFT_DAYS) {
+    // Legacy aliases: the old menu's names map to their catalog equivalents rather than reverting.
+    assertEquals(prefs.by_day[day].push, 'DB Bench Press', `${day} push`);
+    assertEquals(prefs.by_day[day].pull, 'Chin-Up', `${day} pull`);
+    assertEquals(prefs.by_day[day].single_leg_core, 'Bulgarian Split Squat', `${day} leg`);
+  }
+});
+
+Deno.test('a legacy pick with NO catalog equivalent falls back per slot, not per week', () => {
+  // `Single Leg Hip Thrust` is not in Forever's assistance chapter and has no honest equivalent, so
+  // it falls to the day's balanced default — while the athlete's other two picks are kept.
+  const prefs = normalizeAssistancePrefs({
+    push: 'Dips', pull: 'Dumbbell Row', single_leg_core: 'Single Leg Hip Thrust',
+  });
+  assertEquals(prefs.by_day.squat.push, 'Dips');
+  assertEquals(prefs.by_day.squat.pull, 'Dumbbell Row');
+  assertEquals(prefs.by_day.squat.single_leg_core, BALANCED_WEEK.squat.single_leg_core);
+});
+
+Deno.test('absent, null, garbage and a wrong-category pick all produce a COMPLETE week', () => {
+  for (const raw of [null, undefined, {}, 'nonsense', 42, [], { by_day: { press: { push: 'Barbell Row' } } }]) {
+    const prefs = normalizeAssistancePrefs(raw);
+    for (const day of LIFT_DAYS) {
+      const p = prefs.by_day[day];
+      assertEquals(!!p.push && !!p.pull && !!p.single_leg_core, true, `${JSON.stringify(raw)} → ${day} incomplete`);
+      // A pull movement offered as a push pick is rejected, not accepted into the wrong slot.
+      assertEquals(catalogEntry(p.push)?.category, 'push');
     }
   }
 });
 
-Deno.test('REGRESSION §0.2 — abs did not vanish: they hold both LOWER days', () => {
-  // ⛔ THE GUARD ON D-404. Swapping the upper-day slot core → arm is only defensible because core was
-  // never only there: `lower` re-roles the push key to core, so squat day and deadlift day each
-  // close on the trunk. Twice a week, which is what p.51 prescribes. If this test ever fails, the
-  // swap has quietly deleted abs from the block and the reasoning behind it no longer holds.
-  for (const main of LOWER) {
-    assertEquals(getMovementFamily(nameFor(main, 'push')), 'core', `${main} carries no core`);
+Deno.test('the focus cap is three, and unknown chips are dropped rather than stored', () => {
+  const prefs = normalizeAssistancePrefs({
+    focus: ['chest', 'back', 'abs', 'glutes', 'legs', 42],
+  });
+  assertEquals(prefs.focus.length, 3);
+  assertEquals(prefs.focus, ['chest', 'back', 'abs']);
+});
+
+// ── FOCUS ─────────────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('a focus re-points ONLY its own category, and rotates rather than repeating', () => {
+  const week = buildDefaultWeek(['chest'], ['Commercial gym']);
+  const pushes = LIFT_DAYS.map((d) => week[d].push);
+  // Every push is a chest movement…
+  for (const name of pushes) {
+    assertEquals(catalogEntry(name)?.focus.includes('chest'), true, `${name} is not a chest movement`);
+  }
+  // …and they are not all the same one. 200 reps a week of one movement is what D-328 fixed.
+  assertEquals(new Set(pushes).size > 1, true, 'the focus put one movement on all four days');
+  // The other two categories are untouched by a chest focus.
+  assertEquals(LIFT_DAYS.map((d) => week[d].pull), LIFT_DAYS.map((d) => BALANCED_WEEK[d].pull));
+});
+
+Deno.test('⛔ THE FOCUS NEVER OFFERS KIT THE ATHLETE DOES NOT HAVE', () => {
+  // Bodyweight only: an abs focus must not hand back an Ab Wheel Rollout.
+  const week = buildDefaultWeek(['abs'], ['Resistance bands']);
+  for (const day of LIFT_DAYS) {
+    assertEquals(week[day].single_leg_core === 'Ab Wheel Rollout', false, `${day} needs a wheel`);
+    assertEquals(week[day].single_leg_core === 'Hanging Leg Raise', false, `${day} needs a bar`);
   }
 });
 
-Deno.test('REGRESSION §0.2 — the third slot resolves without equipment, on every day type', () => {
-  // The slot held exactly one core option and it needed a pull-up bar. On an upper day the slot is
-  // single-role, so a bar-less athlete had nothing to land on. Same hazard now applies to arms —
-  // a pushdown needs a cable stack — so the fallback leads with bodyweight and this pins it.
-  const barless = { push: 'Push Up', pull: 'Dumbbell Row', single_leg_core: 'Reverse Lunge' };
-  for (const main of UPPER) {
-    assertEquals(isDirectArm(nameFor(main, 'single_leg_core', barless)), true, `${main}`);
-  }
-  for (const main of LOWER) {
-    assertEquals(getMovementFamily(nameFor(main, 'push', barless)), 'core', `${main}`);
-  }
+// ── ADD-ABS: shares the slot, never stacks ────────────────────────────────────────────────────────
+
+Deno.test('⛔ ADD-ABS SHARES THE SINGLE-LEG/CORE BUDGET — it never adds a fresh total', () => {
+  const prefs = normalizeAssistancePrefs({
+    version: 2,
+    by_day: {
+      ...normalizeAssistancePrefs(null).by_day,
+      squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge', abs: 'Hanging Leg Raise' },
+    },
+    focus: [],
+  });
+  const rows = resolveDayAssistance(prefs, 'squat', 50);
+  assertEquals(rows.length, 4, 'the abs add-on did not appear');
+  // Still three CATEGORIES — the fourth row is a second single-leg/core movement, not a new axis.
+  assertEquals(new Set(rows.map((r) => r.category)).size, 3);
+  const slc = rows.filter((r) => r.category === 'single_leg_core');
+  assertEquals(slc.reduce((n, r) => n + r.totalReps, 0), 50, 'the slot budget grew');
+  assertEquals(slc.map((r) => r.totalReps), [25, 25]);
+  assertEquals(rows.find((r) => r.isAbsAddOn)?.name, 'Hanging Leg Raise');
 });
 
-// ── REGRESSION §0.3 — the same leg pattern repeated day to day ───────────────────────────────────
-
-Deno.test('REGRESSION §0.3 — squat day and deadlift day do not run the same leg pattern', () => {
-  const squat = nameFor('Back Squat', 'single_leg_core');
-  const dead = nameFor('Deadlift', 'single_leg_core');
-  assertEquals(squat === dead, false, `both lower days ran ${squat}`);
-  // Stronger than "different name": they must be opposite PATTERNS, which is what stops the glute
-  // and hamstring load stacking across consecutive days against the run legs.
-  assertEquals(getMovementFamily(squat), 'hip', 'squat day should hinge');
-  assertEquals(getMovementFamily(dead), 'knee', 'deadlift day should bend the knee');
-});
-
-Deno.test('deadlift day\'s hamstring slot is a NON-HINGE, not a second deadlift', () => {
-  // p.50 — deadlift-day Hamstrings work is Leg Curl / Glute-Ham Raise, NOT a loaded hinge. The
-  // deadlift IS the hinge; stacking an RDL or Good Morning on top just runs the main lift twice.
-  // Equipment is adapted downstream (materialize turns Leg Curl into Nordic / Band Leg Curls).
-  const dead = nameFor('Deadlift', 'pull');
-  assertEquals(dead, 'Leg Curl', `deadlift day hamstring slot ran ${dead}`);
-  for (const hinge of ['Romanian Deadlift', 'Good Morning']) {
-    assertEquals(dead === hinge, false, `deadlift day stacked a second hinge: ${hinge}`);
+Deno.test('the rep split rounds to fives and never leaves a slot empty', () => {
+  assertEquals(splitRepsForAbs(50), [25, 25]);
+  assertEquals(splitRepsForAbs(75), [40, 35]);
+  for (const total of [10, 25, 50, 55, 60, 75]) {
+    const [a, b] = splitRepsForAbs(total);
+    assertEquals(a + b, total, `${total} did not split cleanly`);
+    assertEquals(a >= 5 && b >= 5, true, `${total} produced an empty half`);
   }
 });
 
-Deno.test('§3 — a lower day is LEG · LEG · core, carries no pressing and NO PULL', () => {
-  // ⛔ THE PULL ASSERTION INVERTED ON 2026-08-09 (D-405). It read `includes('pull') === true`, on the
-  // reasoning that none of the four main lifts pulls so the volume had to live somewhere. True of the
-  // book as a whole; not of p.51, which is the template this block runs and is two explicit lines —
-  // **Deadlift day → hamstrings, quads, abs. Squat day → low back, quads, abs.** The pulling lives on
-  // the two press days (p.50, "Lats or Upper Back" on both), which is where the pick runs now.
-  for (const main of LOWER) {
-    const fams = familiesOn(main);
-    assertEquals(fams.includes('pull'), false, `${main} carried a pull; p.51 puts none on a leg day`);
-    assertEquals(fams.includes('core'), true, `${main} lost its abs`);
-    assertEquals(fams.includes('push'), false, `${main} carried a push; no Wendler template does`);
-    // ⚠️ TWO LEG MOVEMENTS, AND THEY MUST BE THE TWO FAMILIES — that is what p.51's line resolves to.
-    // One family twice would be the pattern-repeat defect §0.3 exists for, one family over.
-    const legs = fams.filter((f) => f === 'knee' || f === 'hip');
-    assertEquals(legs.length, 2, `${main} did not carry two leg movements: ${fams.join(', ')}`);
-    assertEquals(new Set(legs).size, 2, `${main} ran the same leg family twice: ${legs.join(', ')}`);
-  }
+Deno.test('an abs pick that is not an abs movement is refused', () => {
+  const prefs = normalizeAssistancePrefs({
+    version: 2,
+    by_day: { ...normalizeAssistancePrefs(null).by_day, bench: { push: 'Dips', pull: 'Chin-Up', single_leg_core: 'Reverse Lunge', abs: 'Front Squat' } },
+    focus: [],
+  });
+  assertEquals(prefs.by_day.bench.abs, null);
+  assertEquals(resolveDayAssistance(prefs, 'bench', 50).length, 3);
 });
 
-Deno.test('the pull pick runs on the two PRESS days only — 2 days, not 4', () => {
-  // ⛔ THE DOSE GUARD ON D-404 + D-405 TOGETHER, and the reason it is worth its own test. Turning off
-  // the plane swap (D-404) left the athlete's pull pick standing on all four days: the rep scaler's
-  // floor is 50 and it only scales UP, so a beginner whose chin max is six was handed **200 chins a
-  // week** of one movement. Two days halves that to 100 — the exact number D-328 was written to fix.
-  const days = [...UPPER, ...LOWER];
-  const chinDays = days.filter((m) => resolveAssistance(PICKS, m).some((r) => r.name === 'Chin Up'));
-  assertEquals(chinDays.length, 2, `Chin Up ran on ${chinDays.length} days: ${chinDays.join(', ')}`);
-  assertEquals(chinDays.sort(), [...UPPER].sort(), 'the pull pick must be on the two press days');
-});
+// ── REP SCALING: kept through D-407 ───────────────────────────────────────────────────────────────
 
-// ── REGRESSION §0.4 — reps floored at 25, half the book's floor ──────────────────────────────────
-
-Deno.test('REGRESSION §0.4 — the floor is 50 and the ceiling is 75', () => {
+Deno.test('REGRESSION — the floor is 50 and the ceiling is 75', () => {
   assertEquals(ASSISTANCE_TOTAL_REPS_FLOOR, 50);
   assertEquals(ASSISTANCE_TOTAL_REPS_CEILING, 75);
-  for (const slot of ['push', 'pull', 'single_leg_core'] as const) {
-    assertEquals(assistanceTotalReps(slot).totalReps, 50, `${slot} with no inputs`);
+  assertEquals(assistanceTotalReps('push').totalReps, 50);
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30 }).totalReps, 75);
+});
+
+Deno.test('⛔ THE CAPACITY SCALING SURVIVED THE MODEL CHANGE — the mock\'s flat 50 did not win', () => {
+  // The mock showed 50 everywhere. Flattening would have been a silent loss of sourced behaviour.
+  const plan = composeStrengthPrimaryPlan({ ...base, pullupMaxReps: 25 } as any);
+  const pulls = assistanceRowsOf(plan).filter((r: any) => catalogEntry(r.name)?.category === 'pull');
+  assertEquals(pulls.length > 0, true, 'no pull rows in the block');
+  assertEquals(pulls.some((r: any) => r.reps === '75 total'), true,
+    'a tested 25-rep capacity did not move the pull slot off the floor');
+});
+
+Deno.test('an anchor cycle holds the floor whatever the capacity says', () => {
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, cycleKind: 'anchor' }).totalReps, 50);
+});
+
+// ── THE COMPOSER ──────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('the composer gives each lifting day ITS OWN picks', () => {
+  const plan = composeStrengthPrimaryPlan({
+    ...base,
+    assistancePicks: {
+      version: 2,
+      by_day: {
+        press: { push: 'Plate Raise', pull: 'Face Pull', single_leg_core: 'Reverse Hyper' },
+        bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+        squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge' },
+        deadlift: { push: 'DB Shoulder Press', pull: 'Inverted Row', single_leg_core: 'Glute-Ham Raise' },
+      },
+      focus: [],
+    },
+  } as any);
+  const rows = assistanceRowsOf(plan);
+  const namesFor = (session: string) => rows.filter((r: any) => r.session === session).map((r: any) => r.name);
+  assertEquals(namesFor('Strength — Overhead Press').slice(0, 3), ['Plate Raise', 'Face Pull', 'Reverse Hyper']);
+  assertEquals(namesFor('Strength — Bench Press').slice(0, 3), ['Dips', 'Barbell Row', 'Front Squat']);
+  assertEquals(namesFor('Strength — Back Squat').slice(0, 3), ['Push-Up', 'Lat Pulldown', 'Reverse Lunge']);
+  assertEquals(namesFor('Strength — Deadlift').slice(0, 3), ['DB Shoulder Press', 'Inverted Row', 'Glute-Ham Raise']);
+});
+
+Deno.test('the main-lift name maps to the athlete\'s day, and an unknown lift degrades to a complete block', () => {
+  assertEquals(liftDayForMainLift('Overhead Press'), 'press');
+  assertEquals(liftDayForMainLift('Bench Press'), 'bench');
+  assertEquals(liftDayForMainLift('Back Squat'), 'squat');
+  assertEquals(liftDayForMainLift('Deadlift'), 'deadlift');
+  assertEquals(liftDayForMainLift('Trap Bar Deadlift'), 'deadlift');
+  assertEquals(liftDayForMainLift('Zercher Something'), null);
+  // §0h — unknown degrades to UNCHANGED (the press day's picks), never to an empty session.
+  const prefs = normalizeAssistancePrefs(null);
+  assertEquals(resolveDayAssistance(prefs, 'press', 50).length, 3);
+});
+
+Deno.test('⛔ NO SUBSTITUTION NOTE IS EVER PRINTED — there is nothing left to apologise for', () => {
+  const plan = composeStrengthPrimaryPlan({
+    ...base,
+    assistancePicks: { push: 'Push Up', pull: 'Pull Up', single_leg_core: 'Bulgarian Split Squat' },
+  } as any);
+  const descriptions = (Object.values(plan.sessions_by_week).flat() as any[])
+    .filter((s: any) => s.type === 'strength')
+    .map((s: any) => String(s.description ?? ''));
+  assertEquals(descriptions.length > 0, true);
+  for (const d of descriptions) {
+    assertEquals(d.includes('You picked'), false, 'the retired substitution note is still being printed');
   }
 });
 
-Deno.test('§5 — reps are FLAT across sports; only tested capacity moves them, and never past 75', () => {
-  // ⛔ NO RUNNER/CYCLIST REP SPLIT. Modality lives in `generate-combined-plan/science.ts`
-  // MAINTENANCE_FLOORS, already built. Wendler does not split accessory reps by sport.
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 8 }).totalReps, 50, 'at the anchor rep');
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 40 }).totalReps, 75, 'capped at the ceiling');
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 40, cycleKind: 'anchor' }).totalReps, 50,
-    'the anchor cycle holds the floor whatever the capacity');
+// ── THE SWAP SHEET ────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('the swap sheet offers the movement\'s own category, and never itself', () => {
+  const peers = assistancePeersFor('Dips', ['Commercial gym']);
+  assertEquals(peers !== null, true);
+  assertEquals(peers!.includes('Dips'), false);
+  for (const p of peers!) assertEquals(catalogEntry(p)?.category, 'push', `${p} is not a push`);
 });
 
-// ── The p.86 plane rule — now the CONCURRENT template's rule, and only its ───────────────────────
-
-// ⛔ THIS TEST REVERSED ON 2026-08-09 AND THE OLD ASSERTION IS KEPT DIRECTLY BELOW IT, on purpose.
-// It used to read `nameFor('Overhead Press', 'pull') === 'Inverted Row'` UNCONDITIONALLY. That was
-// correct for the rule as scoped then and is wrong now: p.86-88 is the CONCURRENT chapter, and a
-// strength-purpose block runs the STANDARD templates (p.48 / p.50), which never cross planes. The
-// rule is not deleted — it is gated — so both halves are pinned and neither can rot unobserved.
-
-Deno.test('standard template — the athlete keeps the plane they picked (p.48 / p.50)', () => {
-  // The default, and the only thing production reaches today. Chins stay on the press day; the
-  // 25-100 scaler is what makes the rep count survivable for a low-capacity athlete, NOT a swap.
-  assertEquals(nameFor('Overhead Press', 'pull'), 'Chin Up');
-  assertEquals(nameFor('Bench Press', 'pull'), 'Chin Up');
-  // ⚠️ ROLE rules are template-independent and must survive the gate — a press day still presses.
-  assertEquals(getMovementFamily(nameFor('Overhead Press', 'push')), 'push');
-});
-
-Deno.test('concurrent template — the pull slot crosses the plane, and ONLY the pull slot', () => {
-  const concurrent = (main: string, slot: string) =>
-    resolveAssistance(PICKS as never, main, 'concurrent').find((r) => r.slot === slot)!.name;
-  // Overhead Press is a vertical push, so it wants a horizontal pull.
-  assertEquals(concurrent('Overhead Press', 'pull'), 'Inverted Row');
-  // Bench Press is horizontal, so a vertical pull stands.
-  assertEquals(concurrent('Bench Press', 'pull'), 'Chin Up');
-  // ⛔ AND THE PUSH SLOT DOES NOT CROSS. Its complement is a pull; crossing here deletes the push.
-  assertEquals(getMovementFamily(concurrent('Overhead Press', 'push')), 'push');
-});
-
-// ── §0h — an unknown main lift degrades to UNCHANGED, never to a guess ───────────────────────────
-
-Deno.test('§0h — no main lift, or one with no readable pattern, leaves every pick standing', () => {
-  // ⚠️ "AN UNRECOGNISED NAME" IS NOT THE SAME AS "A NAME WITH NO PATTERN", and the first draft of
-  // this test got that wrong. `getExerciseConfig` FUZZY-MATCHES: "Nonexistent Widget Press" resolves
-  // to a real press entry (family `push`), logs a warning, and is treated as a normal upper day. So
-  // the §0h degradation is keyed on the PATTERN being unreadable, which is what the code checks —
-  // `dayTypeOf` returns null only when the family is null. Names that fuzzy-match are, correctly, not
-  // degraded. This is pre-existing `exercise-config` behaviour, not introduced here.
-  for (const main of [undefined, 'Kayak Ergometer']) {
-    const rows = resolveAssistance(PICKS, main as never);
-    assertEquals(rows.map((r) => r.name), ['Dips', 'Chin Up', 'Single Leg Hip Thrust'], String(main));
-    for (const row of rows) {
-      assertEquals(row.substitutedFor, undefined);
-      assertEquals(row.balancedFor, undefined);
-    }
-  }
-});
-
-Deno.test('a fuzzy-matched main lift is treated as the movement it matched, not as unknown', () => {
-  // Pins the behaviour above so it is a recorded fact rather than a surprise. "…Press" matches a
-  // vertical press, so this is an upper day: push · pull · arm (D-404; was core before 2026-08-09).
-  //
-  // ⚠️ THE FAMILY LIST READS `push` TWICE AND THAT IS CORRECT, not a bug in the assertion. A triceps
-  // movement's family IS `push` — the collision axis is right about that, which is exactly why the
-  // arm role reads `isDirectArm` instead. The third row is checked on the axis that distinguishes it.
-  const rows = resolveAssistance(PICKS, 'Nonexistent Widget Press');
-  assertEquals(rows.map((r) => getMovementFamily(r.name)), ['push', 'pull', 'push']);
-  assertEquals(isDirectArm(rows[2].name), true, 'the third slot is direct arm work, not a second press');
-  assertEquals(isDirectArm(rows[0].name), false, 'the push slot is a compound press, not isolation');
-});
-
-// ── The copy — it names the pick, and never invents one ──────────────────────────────────────────
-
-Deno.test('§5.2b — a replaced pick is NAMED, so the athlete sees their choice was read', () => {
-  const note = assistanceSubstitutionNote(resolveAssistance(PICKS, 'Bench Press'), 'Bench Press')!;
-  assertEquals(note.includes('Single Leg Hip Thrust'), true, 'must name the pick it moved');
-  assertEquals(note.includes('balances instead'), false, 'the old copy described the defect');
-});
-
-Deno.test('⛔ THE APP NEVER SAYS "You picked" ABOUT A DEFAULT IT CHOSE ITSELF', () => {
-  // Skipping the card fills the slots from ASSISTANCE_DEFAULTS. Annotating those produces
-  // "You picked Push Up" on a squat day for someone who never opened the picker.
-  for (const main of ALL) {
-    assertEquals(assistanceSubstitutionNote(resolveAssistance(null, main), main), null, `${main}`);
-    for (const row of resolveAssistance(null, main)) {
-      assertEquals(row.substitutedFor, undefined, `${main} ${row.slot}`);
-      assertEquals(row.balancedFor, undefined, `${main} ${row.slot}`);
-    }
-  }
-});
-
-// ── The swap sheet reads the same rule as the composer ───────────────────────────────────────────
-
-Deno.test('the swap sheet offers what the DAY accepts — never pulls for a push row', () => {
-  const peers = assistancePeersFor('Dips', 'Bench Press');
-  assertEquals(peers != null && peers.length > 0, true, 'must offer something');
-  for (const n of peers!) {
-    assertEquals(getMovementFamily(n), 'push', `${n} offered as a swap for a push row on a bench day`);
-  }
-});
-
-Deno.test('the swap sheet never hands back an empty list', () => {
-  for (const main of ALL) {
-    for (const ex of ['Dips', 'Chin Up', 'Single Leg Hip Thrust', 'Hanging Leg Raise']) {
-      const peers = assistancePeersFor(ex, main);
-      assertEquals(peers == null || peers.length > 0, true, `${ex} on ${main} returned []`);
-    }
-  }
+Deno.test('the swap sheet is EQUIPMENT-GATED — the half-rule is closed', () => {
+  // ⛔ THIS IS SLICE 4's WHOLE POINT. The builder declining to offer a movement and the in-session
+  // sheet offering it back an hour later is one rule with two answers.
+  const bodyweight = assistancePeersFor('Push-Up', ['Resistance bands']);
+  assertEquals(bodyweight!.includes('DB Bench Press'), false, 'offered a dumbbell press with no dumbbells');
+  assertEquals(bodyweight!.includes('DB Incline Press'), false, 'offered an incline press with no bench');
+  const gym = assistancePeersFor('Push-Up', ['Commercial gym']);
+  assertEquals(gym!.includes('DB Bench Press'), true, 'a commercial gym lost its dumbbells');
 });
 
 Deno.test('a movement outside the assistance framework is not ours — null, not []', () => {
-  assertEquals(assistancePeersFor('Back Squat', 'Bench Press'), null);
-  assertEquals(assistancePeersFor('', 'Bench Press'), null);
+  assertEquals(assistancePeersFor('Back Squat', ['Commercial gym']), null);
+  assertEquals(assistancePeersFor('', null), null);
 });
 
-// ── D-406 — the assistance SUGGESTION, and the four things it must never become ──────────────────
+Deno.test('⛔ THE PICKER NEVER HANDS BACK AN EMPTY LIST', () => {
+  // An athlete whose kit rules out an entire category gets the full list rather than a dead picker —
+  // the substitution backstop can still rewrite whatever they choose.
+  for (const category of ['push', 'pull', 'single_leg_core'] as const) {
+    const opts = assistancePeersFor(
+      ASSISTANCE_CATALOG.find((e) => e.category === category)!.name,
+      ['nothing at all'],
+    );
+    assertEquals((opts ?? []).length > 0, true, `${category} produced an empty swap sheet`);
+  }
+});
+
+// ── D-406: THE LOAD RULE. Outlived both rewrites; it is not part of either model. ──────────────────
 
 Deno.test('D-406 — a suggestion never becomes a prescription', () => {
-  const maxes = { bench: 150, squat: 200, deadlift: 225, overhead: 95 };
-  const rows = composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: maxes, enduranceSport: null, enduranceFrequency: 0,
-    assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Dumbbell Curl' },
-  }).sessions_by_week['1']
-    .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises!
-    .filter((e: any) => e.load_prescribed === false);
+  const rows = assistanceRowsOf(composeStrengthPrimaryPlan({
+    ...base,
+    oneRepMaxes: { bench: 150, squat: 200, deadlift: 225, overhead: 95 },
+    assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Bulgarian Split Squat' },
+  } as any));
 
   assertEquals(rows.length > 0, true, 'no assistance rows to check');
   for (const r of rows as any[]) {
@@ -383,57 +393,45 @@ Deno.test('D-406 — a suggestion never becomes a prescription', () => {
 });
 
 Deno.test('D-406 — bodyweight movements get NO suggested weight, ever', () => {
-  const maxes = { bench: 150, squat: 200, deadlift: 225, overhead: 95 };
   // ⛔ `Dips` IS THE CASE THAT MATTERS. It carries a real bench ratio (0.9) and would price happily,
   // which is exactly why it is excluded deliberately rather than by accident: for the athlete this
   // block is written for it is bodyweight work, and the athlete finds their own level.
-  const plan = composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: maxes, enduranceSport: null, enduranceFrequency: 0,
-    assistancePicks: { push: 'Dips', pull: 'Chin Up', single_leg_core: 'Diamond Push Up' },
-  });
-  const all = Object.values(plan.sessions_by_week).flat() as any[];
-  const bodyweight = all.flatMap((s: any) => s.strength_exercises ?? [])
-    .filter((e: any) => ['Dips', 'Chin Up', 'Diamond Push Up', 'Sit Up', 'Push Up'].includes(e.name));
-  assertEquals(bodyweight.length > 0, true, 'no bodyweight rows in the block');
-  for (const r of bodyweight) {
+  const rows = assistanceRowsOf(composeStrengthPrimaryPlan({
+    ...base,
+    oneRepMaxes: { bench: 150, squat: 200, deadlift: 225, overhead: 95 },
+  } as any)).filter((r: any) =>
+    ['Dips', 'Chin-Up', 'Push-Up', 'Hanging Leg Raise', 'Inverted Row'].includes(r.name));
+  assertEquals(rows.length > 0, true, 'no bodyweight rows in the block');
+  for (const r of rows as any[]) {
     assertEquals(r.weight_suggested, undefined, `${r.name} was handed a suggested weight`);
   }
 });
 
 Deno.test('D-406 — no maxes on file means no suggestion, not a guess', () => {
   // §0h, one field over: unknown degrades to ABSENT, never to a number.
-  const plan = composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: {} as any, enduranceSport: null, enduranceFrequency: 0,
-    assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Dumbbell Curl' },
-  });
-  const assistance = (Object.values(plan.sessions_by_week).flat() as any[])
-    .flatMap((s: any) => s.strength_exercises ?? [])
-    .filter((e: any) => e.load_prescribed === false);
-  assertEquals(assistance.length > 0, true, 'no assistance rows to check');
-  for (const r of assistance) {
+  const rows = assistanceRowsOf(composeStrengthPrimaryPlan({ ...base, oneRepMaxes: {} } as any));
+  assertEquals(rows.length > 0, true, 'no assistance rows to check');
+  for (const r of rows as any[]) {
     assertEquals(r.weight_suggested, undefined, `${r.name} invented a number with no maxes on file`);
   }
 });
 
-Deno.test('D-406 — every menu option resolves against the OneRepMaxes vocabulary, not primaryRef\'s', () => {
+Deno.test('D-406 — every loadable catalog option resolves against the OneRepMaxes vocabulary', () => {
   // ⛔ THE GUARD ON A SILENT MISS. `exercise-config` says `primaryRef: 'overhead'`; `OneRepMaxes` says
   // `overheadPress`. Indexing one with the other returns `undefined`, which this feature reads as
-  // "no suggestion" — a legitimate output, so nothing failed and the number was simply absent.
-  // Asserts by OUTPUT: every loadable menu option must actually produce a suggestion for an athlete
-  // with all four maxes on file.
-  const maxes = { bench: 150, squat: 200, deadlift: 225, overheadPress: 95 };
-  const loadable = ['Dumbbell Shoulder Press', 'Dumbbell Bench Press', 'Incline Bench Press',
-    'Dumbbell Row', 'Front Squat', 'Reverse Lunge', 'Bulgarian Split Squat', 'Single Leg Hip Thrust',
-    'Dumbbell Curl', 'Hammer Curl', 'Tricep Extension', 'Tricep Pushdown', 'Close Grip Bench Press'];
+  // "no suggestion" — a legitimate output, so nothing fails and the number is simply absent.
+  // Asserts by OUTPUT: every loadable option must actually produce a suggestion for an athlete with
+  // all four maxes on file.
+  const loadable = ['DB Shoulder Press', 'DB Bench Press', 'DB Incline Press', 'Dumbbell Row',
+    'Barbell Row', 'Front Squat', 'Reverse Lunge', 'Bulgarian Split Squat', 'Dumbbell Curl',
+    'Triceps Extension', 'Triceps Pushdown', 'Lat Pulldown'];
   for (const name of loadable) {
-    const plan = composeStrengthPrimaryPlan({
-      durationWeeks: 12, oneRepMaxes: maxes, enduranceSport: null, enduranceFrequency: 0,
-      assistancePicks: { push: name, pull: name, single_leg_core: name },
-    });
-    const rows = (Object.values(plan.sessions_by_week).flat() as any[])
-      .flatMap((s: any) => s.strength_exercises ?? [])
-      .filter((e: any) => e.name === name);
-    if (!rows.length) continue; // the pick was re-roled off every day; nothing to assert
+    const category = catalogEntry(name)!.category;
+    const week = normalizeAssistancePrefs(null);
+    for (const day of LIFT_DAYS) week.by_day[day][category] = name;
+    const rows = assistanceRowsOf(composeStrengthPrimaryPlan({ ...base, assistancePicks: week } as any))
+      .filter((r: any) => r.name === name);
+    assertEquals(rows.length > 0, true, `${name} never reached a session`);
     assertEquals(rows.some((r: any) => typeof r.weight_suggested === 'number' && r.weight_suggested > 0),
       true, `${name} produced no suggestion for an athlete with all four maxes on file`);
   }

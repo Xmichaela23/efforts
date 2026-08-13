@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge } from 'lucide-react';
+import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
@@ -13,7 +14,25 @@ import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY, HARD_RIDE_SHAPE
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
-import { ASSISTANCE_DEFAULTS, ASSISTANCE_GUIDANCE, ASSISTANCE_MENU, type AssistancePicks } from '@/lib/assistance-menu';
+import { ASSISTANCE_GUIDANCE } from '@/lib/assistance-menu';
+// D-407 — the per-day picker. Twelve slots inside a locked frame, not three block-wide picks.
+import {
+  ASSISTANCE_CATEGORIES,
+  type AssistanceWeekPrefs,
+  absOptions,
+  buildDefaultWeek,
+  CATEGORY_LABEL,
+  displayName,
+  FOCUS_CAP,
+  FOCUS_CHIPS,
+  FOCUS_LABEL,
+  type FocusChip,
+  LIFT_DAY_LABEL,
+  LIFT_DAYS,
+  type LiftDay,
+  normalizeAssistancePrefs,
+  optionsFor,
+} from '@/lib/assistance-catalog';
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
@@ -574,7 +593,8 @@ type NonRaceState = {
    *  bodyweight default, so skipping this is a valid answer that still yields a complete block.
    *  (Replaced `accessoryBias` — the Glutes/Hyrox add-ons move to the Adjust tab, D-323, where they
    *  REPLACE a slot rather than stacking on top of the block.) */
-  assistancePicks: AssistancePicks;
+  /** D-407: twelve slots × four days + the focus chips. Persisted whole. */
+  assistancePicks: AssistanceWeekPrefs;
   /** Swim slots per week. Booked, not coached (D-323 §5) — it exists for the triathlete who wants
    *  the time held. Only asked when swim is kept for the block. */
   swimDays: number;
@@ -1041,8 +1061,13 @@ function assemblePayload(
           ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days
           // Strength Focus: the three assistance picks. The composer validates each name against the
           // shared menu, so a stale one falls back to the default rather than reaching a session.
-          ...(state.posture?.strength === 'develop' && Object.keys(state.assistancePicks).length > 0
-            ? { assistance_picks: state.assistancePicks } : {}),
+          // ⛔ ALWAYS SENT NOW, and that is the migration working rather than a widened condition.
+          // The old shape was `{}` until the athlete touched a dropdown, so "did they choose?" was
+          // answerable by key count. The new shape is a COMPLETE twelve-slot week from the first
+          // render (the balanced default), so an emptiness test would never fire — and the composer
+          // needs the week either way, since `normalizeAssistancePrefs` produces the same default
+          // from nothing. Sending it makes the goal a record of what was actually built.
+          ...(state.posture?.strength === 'develop' ? { assistance_picks: state.assistancePicks } : {}),
           ...(state.posture?.swim === 'maintain' && state.swimDays > 0 ? { swim_days: state.swimDays } : {}),
           // Bike volume in HOURS (D-323 §6). Stored as typed; the engine turns hours into sessions —
           // it cannot turn miles into anything, having never learned a ride speed.
@@ -1150,6 +1175,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // what the athlete came to see, and an expanded science block would push it off the fold, which is
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
+  // ⛔ ONE DAY OPEN AT A TIME — the `StrengthLogger.tsx` accordion pattern (`expandedExercises`).
+  // Twelve dropdowns open at once is four phone screens of scrolling and the week loses its shape.
+  const [expandedAssistanceDay, setExpandedAssistanceDay] = useState<LiftDay | null>('press');
+  /**
+   * The athlete's declared kit, for the picker's equipment GATE (slice 4). ⛔ ARC IS THE SOURCE — the
+   * same `equipment.strength` chips `equipmentTierFromArc` reads two hundred lines up. An empty list
+   * means "we do not know", and `canPerform` treats that as ungated rather than as "owns nothing";
+   * anything else would hand a new athlete four days of push-ups.
+   */
+  const strengthEquipment = useMemo<string[]>(
+    () => ((((arc as { equipment?: { strength?: unknown } } | null)?.equipment?.strength) as string[] | undefined) ?? []),
+    [arc],
+  );
   // The same (i) mechanic on "How much" — the volume rationale that used to sit between the two
   // inputs and push the second one off the screen.
   const [showVolumeWhy, setShowVolumeWhy] = useState(false);
@@ -1206,7 +1244,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: {}, swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -3137,63 +3175,211 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 already said. The screen was paying four lines to say one thing twice, and the third
                 dropdown fell below the fold as a result. What survives is the only claim the
                 subtitle does not make: that the pick does not appear on every day. */}
-            {/* ⛔ REWRITTEN 2026-07-29 — the short version was broken twice over, and BOTH breaks
-                came from cutting the paragraph above it rather than from the cut being wrong.
-                • "that pattern" had NO ANTECEDENT. The deleted paragraph introduced the word; the
-                  survivor opened by pointing back at a sentence that was no longer on the screen.
-                • The example was FACTUALLY MUDDLED: it read "chin-ups on bench day, rows on press
-                  day" as two instances of the same behaviour. Chin-ups on bench day is the pick
-                  STANDING (`resolveAssistance`: no shared family, and vertical pull already IS the
-                  complement of a horizontal press). Only the press day substitutes. Listing them
-                  together taught the athlete the rule fires everywhere, which it does not.
-                So: one example, and one that is unambiguously a swap. Push Up on bench day collides
-                — both horizontal push — and the slot takes balancing work instead. */}
-            {/* ⛔ THE SWAP SENTENCE IS A PROMISE, AND IT WAS CHECKED BEFORE IT WAS WRITTEN.
-                The Swap sheet is D-290, SHIPPED — `StrengthLogger.tsx:4440` renders the button on
-                EVERY exercise row (accessories included, not just the main lifts), and
-                `getInSlotAlternatives` offers substitutes filtered by movement pattern + the
-                athlete's own equipment. `swapRestOfPlan` persists the choice past today.
-                ⚠️ IF THAT BUTTON EVER MOVES OR NARROWS TO MAIN LIFTS ONLY, THIS LINE BECOMES A LIE
-                on the screen where the athlete is deciding whether to care about the picks at all. */}
-            {/* ⛔ THE PLANE-SWAP SENTENCE IS GONE (2026-08-09, D-404). It read: "Where the main lift
-                already covers one — push-ups after bench press — you'll get the opposite movement
-                instead." That behaviour was the CONCURRENT template's rule (p.86-88), and a
-                strength-purpose block runs the STANDARD templates, which never cross planes. The
-                line survived the code it described by four days.
-                ⚠️ AND IT WAS TEACHING THE WRONG EXPECTATION EVEN BEFORE THAT: an athlete told their
-                pick gets replaced reads the whole card as advisory. Their picks are kept — what
-                MOVES is which day a slot's role lands on, which is a different claim and the one
-                worth making. */}
+            {/* ⛔ THE CARD NOW ASKS FOR TWELVE MOVEMENTS, NOT THREE (D-407).
+
+                What was here described the RE-ROLING: "Three slots, placed by the day. Your picks
+                are kept — on squat and deadlift days you get the leg work you chose; on bench and
+                press days those slots carry triceps…" Every clause of that was true of the code and
+                every clause of it was the app explaining an inference the athlete never asked it to
+                make. Forever p.24 asks for one movement per category per day; asked directly, there
+                is nothing to explain. */}
             <p className="text-white/70 text-sm leading-relaxed">
-              Three slots, placed by the day. Your picks are kept — on squat and deadlift days you
-              get the leg work you chose; on bench and press days those slots carry triceps and the
-              leg days carry abs, both chosen for you. Anything can be swapped in the session.</p>
-            <div className="space-y-3">
-              {ASSISTANCE_MENU.map((menu) => {
-                const picked = state.assistancePicks[menu.slot] ?? ASSISTANCE_DEFAULTS[menu.slot];
-                const targets = menu.options.find((o) => o.name === picked)?.targets ?? '';
+              Four lifting days, each with a push, a pull and a single-leg or core movement. Pick a
+              focus and the days fill in — every slot is still yours to change, and anything can be
+              swapped in the session.</p>
+
+            {/* ── FOCUS CHIPS ───────────────────────────────────────────────────────────────────
+                ⛔ A FOCUS RE-POINTS MOVEMENT CHOICE INSIDE A CATEGORY. It is not a new axis and it
+                does not add volume — the frame stays push · pull · single-leg/core on all four days.
+                Capped at three: past that every day is a focus day and the emphasis means nothing. */}
+            <div>
+              <div className="flex items-baseline justify-between gap-2 mb-2">
+                <span className="text-white/85 text-sm">Focus</span>
+                <span className="text-white/50 text-xs">{state.assistancePicks.focus.length}/{FOCUS_CAP}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <GalaxyButton
+                  shape="chip"
+                  variant={state.assistancePicks.focus.length === 0 ? 'primary' : 'secondary'}
+                  onClick={() => setState((st) => ({
+                    ...st,
+                    assistancePicks: {
+                      ...st.assistancePicks,
+                      focus: [],
+                      by_day: buildDefaultWeek([], strengthEquipment),
+                    },
+                  }))}
+                >Balanced</GalaxyButton>
+                {FOCUS_CHIPS.map((chip) => {
+                  const on = state.assistancePicks.focus.includes(chip);
+                  const atCap = !on && state.assistancePicks.focus.length >= FOCUS_CAP;
+                  return (
+                    <GalaxyButton
+                      key={chip}
+                      shape="chip"
+                      variant={on ? 'primary' : 'secondary'}
+                      disabled={atCap}
+                      onClick={() => setState((st) => {
+                        const next = on
+                          ? st.assistancePicks.focus.filter((f) => f !== chip)
+                          : [...st.assistancePicks.focus, chip].slice(0, FOCUS_CAP);
+                        // ⛔ CHANGING THE FOCUS REBUILDS THE WEEK. The alternative — keeping whatever
+                        // is in the slots and only re-pointing the untouched ones — needs a
+                        // per-slot "did they choose this" flag, and a half-applied focus is worse
+                        // than an honest one: the athlete taps Chest and reads four days that are
+                        // mostly not chest.
+                        return {
+                          ...st,
+                          assistancePicks: {
+                            ...st.assistancePicks,
+                            focus: next as FocusChip[],
+                            by_day: buildDefaultWeek(next as FocusChip[], strengthEquipment),
+                          },
+                        };
+                      })}
+                    >{FOCUS_LABEL[chip]}</GalaxyButton>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── THE FOUR DAY CARDS ────────────────────────────────────────────────────────────
+                ⛔ COLLAPSIBLE, MATCHING `StrengthLogger.tsx`'s accordion. Twelve dropdowns stacked
+                open is four screens of scrolling on a phone, and the athlete loses the shape of the
+                week entirely. First day open, the rest collapsed to their one-line summary — the
+                same pattern, so the two screens do not teach two different interactions. */}
+            <div className="space-y-2">
+              {LIFT_DAYS.map((day) => {
+                const picks = state.assistancePicks.by_day[day];
+                const open = expandedAssistanceDay === day;
+                const summary = [picks.push, picks.pull, picks.single_leg_core, picks.abs]
+                  .filter(Boolean).map((n) => displayName(n as string)).join(' · ');
                 return (
-                  <div key={menu.slot}>
-                    <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="text-white/85 text-sm">{menu.label}</span>
-                      <span className="text-white/70 text-sm tabular-nums">{menu.totalReps} reps</span>
-                    </div>
-                    <select
-                      value={picked}
-                      onChange={(e) => setState((st) => ({
-                        ...st,
-                        assistancePicks: { ...st.assistancePicks, [menu.slot]: e.target.value },
-                      }))}
-                      className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
-                      style={{ fontSize: '16px' }}
-                      aria-label={`${menu.label} exercise`}
+                  <div key={day} className="rounded-xl border border-white/12 bg-white/[0.03] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAssistanceDay(open ? null : day)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
+                      aria-expanded={open}
                     >
-                      {menu.options.map((o) => (
-                        <option key={o.name} value={o.name} className="bg-neutral-900">{o.name}</option>
-                      ))}
-                    </select>
-                    {/* The whole point of the dropdown: the athlete sees what the choice trains. */}
-                    {targets && <p className="text-white/70 text-sm mt-1">{targets}</p>}
+                      <span className="min-w-0">
+                        <span className="block text-white/85 text-sm">{LIFT_DAY_LABEL[day]}</span>
+                        {!open && <span className="block text-white/55 text-xs truncate mt-0.5">{summary}</span>}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-white/40 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    {open && (
+                      <div className="px-3 pb-3 space-y-3">
+                        {ASSISTANCE_CATEGORIES.map((category) => {
+                          const opts = optionsFor(category, strengthEquipment);
+                          const value = picks[category];
+                          const muscle = opts.find((o) => o.name === value)?.muscle ?? '';
+                          return (
+                            <div key={category}>
+                              <div className="flex items-baseline justify-between gap-2 mb-1">
+                                <span className="text-white/85 text-sm">{CATEGORY_LABEL[category]}</span>
+                                {muscle && <span className="text-white/50 text-xs">{muscle}</span>}
+                              </div>
+                              <select
+                                value={value}
+                                onChange={(e) => setState((st) => ({
+                                  ...st,
+                                  assistancePicks: {
+                                    ...st.assistancePicks,
+                                    by_day: {
+                                      ...st.assistancePicks.by_day,
+                                      [day]: { ...st.assistancePicks.by_day[day], [category]: e.target.value },
+                                    },
+                                  },
+                                }))}
+                                className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                                style={{ fontSize: '16px' }}
+                                aria-label={`${LIFT_DAY_LABEL[day]} ${CATEGORY_LABEL[category]} exercise`}
+                              >
+                                {/* ⛔ VALUE IS THE STORED NAME, LABEL IS WENDLER'S WORD. `Back
+                                    Extension` is stored so the token resolves (D-322); the athlete
+                                    reads "Back Raise", which is what the book calls it. */}
+                                {opts.map((o) => (
+                                  <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })}
+
+                        {/* ── ADD-ABS ───────────────────────────────────────────────────────────
+                            ⛔ A SECOND MOVEMENT IN THE SINGLE-LEG/CORE CATEGORY, SHARING ITS REPS —
+                            Forever p.32 ("one or two exercises per category"). It is NOT a fourth
+                            category and it must never stack a fresh rep total: that would be pure
+                            added fatigue charged against the endurance budget, which is the one
+                            thing this whole model is arranged to protect. The split happens in
+                            `resolveDayAssistance`; the copy below says so. */}
+                        {picks.abs ? (
+                          <div>
+                            <div className="flex items-baseline justify-between gap-2 mb-1">
+                              <span className="text-white/85 text-sm">Abs</span>
+                              <GalaxyButton
+                                shape="chip"
+                                variant="ghost"
+                                onClick={() => setState((st) => ({
+                                  ...st,
+                                  assistancePicks: {
+                                    ...st.assistancePicks,
+                                    by_day: {
+                                      ...st.assistancePicks.by_day,
+                                      [day]: { ...st.assistancePicks.by_day[day], abs: null },
+                                    },
+                                  },
+                                }))}
+                              >Remove</GalaxyButton>
+                            </div>
+                            <select
+                              value={picks.abs}
+                              onChange={(e) => setState((st) => ({
+                                ...st,
+                                assistancePicks: {
+                                  ...st.assistancePicks,
+                                  by_day: {
+                                    ...st.assistancePicks.by_day,
+                                    [day]: { ...st.assistancePicks.by_day[day], abs: e.target.value },
+                                  },
+                                },
+                              }))}
+                              className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                              style={{ fontSize: '16px' }}
+                              aria-label={`${LIFT_DAY_LABEL[day]} abs exercise`}
+                            >
+                              {absOptions(strengthEquipment).map((o) => (
+                                <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                              ))}
+                            </select>
+                            <p className="text-white/50 text-xs mt-1">
+                              Splits the single-leg/core reps with {displayName(picks.single_leg_core)} — it
+                              does not add to the day.</p>
+                          </div>
+                        ) : (
+                          <GalaxyButton
+                            shape="chip"
+                            variant="secondary"
+                            onClick={() => setState((st) => ({
+                              ...st,
+                              assistancePicks: {
+                                ...st.assistancePicks,
+                                by_day: {
+                                  ...st.assistancePicks.by_day,
+                                  [day]: {
+                                    ...st.assistancePicks.by_day[day],
+                                    abs: absOptions(strengthEquipment)[0]?.name ?? null,
+                                  },
+                                },
+                              },
+                            }))}
+                          >Add abs</GalaxyButton>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

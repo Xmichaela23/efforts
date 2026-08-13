@@ -966,15 +966,43 @@ const disciplineOptions = [
   };
 
   // Home gym equipment options (only shown when "Home gym" is selected)
+  // ⛔ THESE STRINGS ARE MATCHED EXACTLY by `substituteExerciseForEquipment`
+  // (materialize-plan/index.ts) and by substring in `_shared/strength-equipment-tier.ts`. Renaming a
+  // chip breaks both silently — a chip nobody detects reads as equipment the athlete does not own.
+  // The last three were added 2026-08-13 for the Wendler Forever assistance catalog.
+  // ⚠️ "Incline bench" is a SEPARATE chip from "Bench (flat/adjustable)" on purpose: that label is an
+  // OR, so it cannot be read as incline capability. An athlete with an adjustable bench ticks both.
   const homeGymEquipmentOptions = [
     "Barbell + plates",
     "Dumbbells",
     "Squat rack / Power cage",
     "Bench (flat/adjustable)",
+    "Incline bench",
+    "Decline bench",
     "Pull-up bar",
     "Kettlebells",
     "Cable machine",
-    "Resistance bands"
+    "Resistance bands",
+    "Ab wheel",
+    // ⛔ ADDED 2026-08-13 (slice 4) BECAUSE THE MENU IS NOW GATED. Before gating, a gear key with no
+    // chip behind it was merely untidy; after it, a home-gym athlete who owns a dip station or a GHD
+    // has no way to say so, and the movements that need one vanish from their picker with no
+    // explanation. The alternative on the table was "treat an unownable movement as ungated", which
+    // is a rule that lies in the other direction. Chips, not a workaround.
+    // ⚠️ THE STRINGS ARE MATCHED BY SUBSTRING in `athleteEquipmentToKeys` — "Dip bars" → `dip`,
+    // "Leg curl machine" → `leg curl`, "GHD" → `ghd`, "Gymnastic rings" → `ring`. Renaming one
+    // silently removes the capability from everyone who ticked it.
+    // ⚠️ "GHD" CARRIES NO "bench" IN ITS LABEL ON PURPOSE — `hasBench` matches any chip containing the
+    // word, and a glute-ham developer is not a flat bench to press on.
+    "Dip bars",
+    "Leg curl machine",
+    "GHD",
+    "Gymnastic rings",
+    // ⚠️ `box` WAS A FIFTH UNREACHABLE KEY and the contract test found it on the same run. It is not
+    // an assistance key — Box Jumps live in the performance protocol — but it had exactly the same
+    // hole: `hasBox` grants it to commercial gyms and no home chip produced it, so a home athlete
+    // with a box could not say so. Closed here rather than left as the one exception.
+    "Plyo box"
   ];
   
   // Helper to check if user has commercial gym access

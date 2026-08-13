@@ -59,7 +59,9 @@
  */
 import { EXERCISE_CONFIG, getExerciseConfig, type ExerciseConfig } from './exercise-config.ts';
 // The assistance framework owns its own peer list — see `assistancePeersFor`.
-import { assistancePeersFor } from './assistance-menu.ts';
+// D-407 — the assistance framework's own peers now come from the per-day catalog.
+import { assistancePeersFor } from './assistance-catalog.ts';
+import { canPerform } from './strength-gear.ts';
 // [Step 4] The ONE answer to "is this one of the four main lifts" — the same classifier the State
 // row and the logger's bar-speed cue gate on. Unioned with this file's curated families, never
 // substituted for them; see `isMainLift` for the measurement behind that.
@@ -190,7 +192,19 @@ function equipmentOf(cfg: ExerciseConfig): AlternativeOption['equipment'] {
   }
 }
 
-/** The athlete's declared equipment (user_baselines.equipment) → what they can actually load. */
+/**
+ * ⛔ THE COARSE HALF OF THE EQUIPMENT GATE — barbell / dumbbell / band, read off `displayFormat`.
+ *
+ * ⚠️ THIS IS NO LONGER THE WHOLE GATE, AND ON ITS OWN IT WAS A HALF-RULE. It knows four categories,
+ * and `bodyweight` and `unknown` both return TRUE — so an **Ab Wheel Rollout is `bodyweight`** and was
+ * offered to every athlete alive, whether or not they own a wheel. Same for a Chin-Up with no bar, a
+ * Glute-Ham Raise with no anchor, and Dips with no dip station. Four gear keys existed with no chip
+ * behind them and this function could not have seen them if they had.
+ *
+ * {@link canSetUp} is the other half and it reads the real gear map. Both run — this one still earns
+ * its place because it covers the ~300 library movements that have no gear tag, using the only signal
+ * they carry.
+ */
 export function canDo(equipment: string[] | null | undefined, need: AlternativeOption['equipment']): boolean {
   if (need === 'bodyweight' || need === 'unknown') return true;
   const have = (Array.isArray(equipment) ? equipment : []).map((e) => String(e).toLowerCase());
@@ -200,6 +214,19 @@ export function canDo(equipment: string[] | null | undefined, need: AlternativeO
   if (need === 'dumbbell') return have.some((e) => e.includes('dumbbell') || e.includes('kettlebell'));
   if (need === 'band') return have.some((e) => e.includes('band'));
   return true;
+}
+
+/**
+ * ⛔ THE SPECIFIC HALF — the same map the BUILDER's picker gates on (slice 4). One gate, two surfaces.
+ *
+ * The swap sheet and the picker disagreeing is the half-rule this slice exists to close: the builder
+ * would decline to offer a movement, and the in-session sheet would offer it back an hour later.
+ *
+ * Untagged movements return true (`gearRoutesFor`'s loud default: offer rather than hide), so this
+ * narrows the library's ~300 entries not at all and narrows the assistance catalog exactly.
+ */
+function canSetUp(name: string, equipment: string[] | null | undefined): boolean {
+  return canPerform(name, equipment);
 }
 
 function titleCase(key: string): string {
@@ -242,11 +269,14 @@ export function getInSlotAlternatives(
   // a Pull Up filling the `pull` assistance slot are the same name in two different jobs, and only the
   // ROW knows which. `load_prescribed: false` is how the composer marks an assistance row.
   //
-  // ⚠️ `assistancePeersFor` returns null when the exercise is not on the menu or in the balance pool,
-  // so an assistance row carrying something off-menu still falls through to the pattern logic below.
-  // ⚠️ `mainLift` is what makes the list day-aware — see `assistancePeersFor`. Absent → every
-  // option stands, which is the behaviour before this rule existed.
-  const planPeers = opts?.assistanceRow ? assistancePeersFor(plannedName, opts?.mainLift) : null;
+  // ⚠️ `assistancePeersFor` returns null when the exercise is not in the catalog, so an assistance row
+  // carrying something off-catalog (an equipment substitution's output) still falls through to the
+  // pattern logic below.
+  // ⛔ THE PEERS ARE THE MOVEMENT'S OWN CATEGORY, GATED BY KIT — and the day no longer narrows them
+  // (D-407). It used to: the block re-roled a slot per day, so a push row on a squat day had to be
+  // offered core movements. Nothing is re-roled now — a push row is a push row on all four days — so
+  // `mainLift` has nothing to say here and is no longer passed. The category IS the answer.
+  const planPeers = opts?.assistanceRow ? assistancePeersFor(plannedName, equipment) : null;
   if (planPeers) {
     // ⛔ TIER ON WENDLER'S OWN ASSISTANCE LINE — supersedes the original "every peer is a DIRECT swap,
     // there is no second tier" (2026-07-30). That held for a single-pattern slot but was FALSE for the
@@ -346,7 +376,8 @@ export function getInSlotAlternatives(
     // alias of it), so I stopped rather than invent one.
 
     const need = equipmentOf(c);
-    if (!canDo(equipment, need)) continue;                   // they cannot load it
+    if (!canDo(equipment, need)) continue;                   // they cannot LOAD it
+    if (!canSetUp(key, equipment)) continue;                 // they cannot SET IT UP (slice 4)
 
     // ⛔ AN ACCESSORY SLOT IS NOT OFFERED A MAIN LIFT. If the planned exercise belongs to no curated
     // family it is an accessory, and a deadlift is not a substitute for a glute bridge — same hip-hinge

@@ -38,13 +38,19 @@ import {
   volumeStateForMiles,
 } from '../../../../src/lib/maintenance-volume-band.ts';
 import {
-  type AssistancePicks,
   type AssistanceScaleInputs,
   ASSISTANCE_GUIDANCE,
   assistanceTotalReps,
-  resolveAssistance,
-  assistanceSubstitutionNote,
 } from '../../../../src/lib/assistance-menu.ts';
+// ⛔ D-407 — THE PER-DAY PICKER. `resolveAssistance` / `assistanceSubstitutionNote` are gone with the
+// re-roling model they served; the athlete now picks each day's three movements and the composer
+// simply renders them. See `src/lib/assistance-catalog.ts`.
+import {
+  type AssistanceWeekPrefs,
+  liftDayForMainLift,
+  normalizeAssistancePrefs,
+  resolveDayAssistance,
+} from '../../../../src/lib/assistance-catalog.ts';
 import {
   type BlockShapeInputs,
   cycleForWeek,
@@ -213,9 +219,16 @@ export type StrengthPrimaryArgs = {
    * under supabase/functions until this wire. Carried now so the bike pass has it to consume.
    */
   targetWeeklyRideHours?: number;
-  /** The athlete's three assistance picks. Absent → the menu's bodyweight defaults, so skipping the
-   *  card still produces a complete block. See `src/lib/assistance-menu.ts`. */
-  assistancePicks?: AssistancePicks | null;
+  /**
+   * The athlete's assistance picks — **twelve now, not three** (D-407).
+   *
+   * ⛔ ANY STORED SHAPE IS ACCEPTED. `normalizeAssistancePrefs` migrates the old flat
+   * `{push, pull, single_leg_core}` that every pre-2026-08-13 goal carries, and absent → the balanced
+   * default week, so skipping the card still produces a complete block. Typed `unknown` on purpose:
+   * this arrives straight off `goals.training_prefs.assistance_picks` and pretending it is already
+   * the current shape is how a persisted-key migration gets skipped.
+   */
+  assistancePicks?: unknown;
   /** ⛔ SWIM IS A COURTESY, NOT A PRESCRIPTION (D-323 item 5). Number of swims to BOOK per week;
    *  0 or absent → none. See `swimSessions` for what the app is and is not claiming here. */
   swimDays?: number;
@@ -477,18 +490,22 @@ const ASSISTANCE_SUGGESTION_REPS = 12;
 const ASSISTANCE_SUGGESTION_RIR = 2;
 
 function assistanceRows(
-  picks: AssistancePicks | null | undefined,
-  // ⛔ THE VOLUME IS DERIVED PER SLOT AND PER CYCLE (2026-07-28). 25 stays the floor — it is the
-  // documented bottom of Wendler's 25-50 range with a cited reason — and what is derived is the
-  // POSITION within it. Only a TESTED capacity moves a slot up; posture alone never does, because
-  // posture is evidence of intent rather than of capacity. Anchor cycles hold the floor: the main
-  // lifts are at 95% with a rep-out, and that is the week accessory volume must not compete with.
+  /** Raw, straight off the goal. Migrated here — see `normalizeAssistancePrefs`. */
+  picks: unknown,
+  // ⛔ THE VOLUME IS DERIVED PER SLOT AND PER CYCLE (2026-07-28). The floor is Wendler's own lowest
+  // number and what is derived is the POSITION within the 50-75 band. Only a TESTED capacity moves a
+  // slot up; posture alone never does, because posture is evidence of intent rather than of capacity.
+  // Anchor cycles hold the floor: the main lifts are at 95% with a rep-out, and that is the week
+  // accessory volume must not compete with.
+  // ⛔ KEPT THROUGH D-407 DELIBERATELY. The mock showed a flat 50 per slot. The capacity scaling is
+  // sourced and already shipped, and the per-day picker does not re-ask "how many reps in a slot" —
+  // so flattening it would have been a silent behaviour loss dressed as fidelity to a mock.
   scale?: AssistanceScaleInputs,
-  // ⛔ THE DAY'S MAIN LIFT MAKES THE SLOTS DAY-DEPENDENT (Q-212). The athlete's pick stands
-  // wherever it fits; on a day whose main lift already loads the same pattern it is replaced with
-  // balancing work, and the caller prints WHY. Absent → every pick stands, which is exactly the
-  // pre-Q-212 behaviour, so a caller that does not know its main lift degrades to the old shape
-  // rather than to a wrong one (§0h).
+  /**
+   * ⛔ THE DAY'S MAIN LIFT NOW SELECTS WHICH OF THE ATHLETE'S FOUR DAYS THIS IS — it no longer
+   * decides what goes in the slots (D-407). Absent, or a lift this map does not recognise, → the
+   * balanced default week, which is a complete block rather than a degraded one (§0h).
+   */
   mainLiftName?: string | null,
   /**
    * ⛔ THE ATHLETE'S MAIN-LIFT MAXES, AND THEY BUY A SUGGESTION — NEVER A PRESCRIPTION. Added
@@ -497,37 +514,52 @@ function assistanceRows(
    */
   oneRepMaxes?: Record<string, number> | null,
 ): { rows: StrengthExercise[]; note: string | null } {
-  const resolved = resolveAssistance(picks, mainLiftName);
-  const rows = resolved.map((a) => ({
-    name: a.name,
-    // ⛔ `sets: 1` RENDERED AS "1×25" AND THAT IS A LIE ABOUT THE PRESCRIPTION.
-    //
-    // 25 is a TOTAL, to be broken up however the athlete likes that day — 5×5, 2×12, whatever.
-    // `ASSISTANCE_GUIDANCE` says exactly that and rides in the session description, but the row
-    // shouted "1×25" over the top of it. Michael, reading his own plan: *"25 chin ups? lol i can
-    // do 5."* He can do five. The prescription never asked for twenty-five in a row.
-    //
-    // `sets: undefined` so no consumer can render a set count that was never prescribed, and the rep
-    // field carries the unit in words. The number is unchanged — only the claim about how it is
-    // performed. ⚠️ `reps` is typed `number | string` precisely for this kind of qualitative row.
-    sets: undefined,
-    reps: `${assistanceTotalReps(a.slot, scale).totalReps} total`,
-    // ⛔ STILL 'By feel', AND `load_prescribed` IS STILL false. Both are load-bearing and D-406 did
-    // NOT touch either. `weight` is what every surface RENDERS as the prescription, and the
-    // prescription has not changed: the plan still declines to name a load. `load_prescribed: false`
-    // is separately the one answer to "is this row assistance?" (`src/lib/assistance-slot.ts`,
-    // D-370) — flipping it would make the server matcher, the logger, the compare table and the
-    // performance summary stop recognising the row, and work the athlete did would read as a skip.
-    weight: 'By feel',
-    load_prescribed: false,
-    // ⚠️ A SEPARATE FIELD FOR A SEPARATE CLAIM. `weight_suggested` is not a quieter `weight` — it is
-    // a STARTING POINT for the logger's entry box, greyed and overwritable, and no surface may
-    // render it as what the plan asked for. Omitted entirely for bodyweight movements and wherever
-    // the maxes cannot answer, because an absent suggestion is honest and a fabricated one is not.
-    ...suggestedAssistanceWeight(a.name, oneRepMaxes),
-  }));
-  return { rows, note: mainLiftName ? assistanceSubstitutionNote(resolved, mainLiftName) : null };
+  const prefs: AssistanceWeekPrefs = normalizeAssistancePrefs(picks);
+  const day = liftDayForMainLift(mainLiftName) ?? 'press';
+  // ⚠️ ONE SLOT BUDGET FOR THE DAY. `assistanceTotalReps` is per-slot and the pull slot is the only
+  // one with a tested capacity, so it is asked per category and each row carries its own total.
+  const rows = resolveDayAssistance(prefs, day, assistanceTotalReps('push', scale).totalReps)
+    .map((a) => {
+      const totalReps = a.isAbsAddOn
+        ? a.totalReps
+        : (a.category === 'pull' ? assistanceTotalReps('pull', scale).totalReps : a.totalReps);
+      return {
+        name: a.name,
+        // ⛔ `sets: 1` RENDERED AS "1×25" AND THAT IS A LIE ABOUT THE PRESCRIPTION.
+        //
+        // The number is a TOTAL, to be broken up however the athlete likes that day — 5×5, 2×12,
+        // whatever. `ASSISTANCE_GUIDANCE` says exactly that and rides in the session description, but
+        // the row shouted "1×25" over the top of it. Michael, reading his own plan: *"25 chin ups?
+        // lol i can do 5."* He can do five. The prescription never asked for twenty-five in a row.
+        //
+        // `sets: undefined` so no consumer can render a set count that was never prescribed, and the
+        // rep field carries the unit in words.
+        sets: undefined,
+        reps: `${totalReps} total`,
+        // ⛔ STILL 'By feel', AND `load_prescribed` IS STILL false. Both are load-bearing and neither
+        // D-406 nor D-407 touched either. `weight` is what every surface RENDERS as the prescription,
+        // and the prescription has not changed: the plan still declines to name a load.
+        // `load_prescribed: false` is separately the one answer to "is this row assistance?"
+        // (`src/lib/assistance-slot.ts`, D-370) — flipping it would make the server matcher, the
+        // logger, the compare table and the performance summary stop recognising the row, and work
+        // the athlete did would read as a skip.
+        weight: 'By feel',
+        load_prescribed: false,
+        // ⚠️ A SEPARATE FIELD FOR A SEPARATE CLAIM. `weight_suggested` is not a quieter `weight` — it
+        // is a STARTING POINT for the logger's entry box, greyed and overwritable, and no surface may
+        // render it as what the plan asked for. Omitted entirely for bodyweight movements and
+        // wherever the maxes cannot answer, because an absent suggestion is honest and a fabricated
+        // one is not.
+        ...suggestedAssistanceWeight(a.name, oneRepMaxes),
+      };
+    });
+  // ⛔ `note` IS ALWAYS NULL NOW, AND THE FIELD IS KEPT ON PURPOSE. It carried the substitution
+  // sentence — *"You picked Push Up — squat days finish on the trunk…"* — which existed because the
+  // engine overrode the athlete's pick. Under D-407 nothing is overridden, so there is nothing to
+  // explain. The shape stays so the one call site is untouched; delete both together or neither.
+  return { rows, note: null };
 }
+
 
 /**
  * The block, as leader and anchor cycles with each cycle's week 4 as its own deload phase.

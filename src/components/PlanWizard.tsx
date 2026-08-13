@@ -516,8 +516,11 @@ export default function PlanWizard() {
             // Auto-set equipment type based on saved preferences
             if (equipment?.length) {
               const hasCommercialGym = equipment.includes('Commercial gym');
-              const hasHomeGymEquipment = equipment.some(e => 
-                ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)'].includes(e)
+              // ⚠️ "Do they own gym FURNITURE" — the two bench chips added 2026-08-13 answer yes, an
+              // "Ab wheel" does not (a ten-dollar accessory is not a home gym) and is left out.
+              const hasHomeGymEquipment = equipment.some(e =>
+                ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
+                 'Incline bench', 'Decline bench', 'Dip bars', 'Leg curl machine', 'GHD'].includes(e)
               );
               if (hasCommercialGym) {
                 setState(prev => ({ ...prev, equipmentType: 'commercial_gym' }));
@@ -721,8 +724,14 @@ export default function PlanWizard() {
 
       // Save equipment selection to baselines if not already saved
       if (state.strengthFrequency > 0 && state.strengthProtocol && !savedBaselines?.equipment?.length) {
-        const equipmentToSave = state.equipmentType === 'commercial_gym' 
-          ? ['Commercial gym'] 
+        // ⛔ THE THREE CHIPS ADDED 2026-08-13 ARE DELIBERATELY NOT HERE. This list is what gets WRITTEN
+        // to the athlete's inventory when they pick "home gym" in the wizard and never open the
+        // baselines picker — so every entry is a CLAIM that they own the thing. A barbell, rack, DBs
+        // and a bench are what "home gym" means; an incline bench, a decline bench and an ab wheel are
+        // not, and asserting them would let slice 4's gating offer movements the athlete cannot set up
+        // while looking like their own answer. They stay opt-in via the picker in TrainingBaselines.
+        const equipmentToSave = state.equipmentType === 'commercial_gym'
+          ? ['Commercial gym']
           : ['Home gym', 'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)'];
         
         // First check if user has existing baselines

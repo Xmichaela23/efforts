@@ -8,17 +8,40 @@
  * The legacy 2-tier `equipment_type` (`home_gym | commercial_gym`) historically conflated these;
  * `resolveStrengthEquipmentTypeForPlan` is retained for backward compat with stored data, but new
  * code should read `equipment_location` (literal) and `equipment_tier` (capability) separately.
+ *
+ * ⛔ THE GEAR VOCABULARY MOVED TO `src/lib/strength-gear.ts` ON 2026-08-13 (slice 4) AND IS
+ * RE-EXPORTED BELOW — every existing importer of this file is unchanged, and there is still exactly
+ * one definition. It had to move because the BUILDER (client) now gates on the same maps the composer
+ * (edge) does, and `src/` cannot value-import `supabase/functions/`. `src/lib/` is where anything the
+ * two sides must agree on lives — the home `exercise-config.ts` established.
+ *
+ * ⚠️ DO NOT RE-ADD A LOCAL COPY OF ANY OF THESE. Slice 3 pinned a duplicated key union with a contract
+ * test; slice 4 deleted the duplicate. A tripwire over a copy is not the same thing as one definition.
  */
+export {
+  ALWAYS,
+  ASSISTANCE_GEAR,
+  athleteEquipmentToKeys,
+  canPerform,
+  exerciseRequiredGearKeys,
+  gearRoutesFor,
+  normStrengthEquipmentStrings,
+  STRENGTH_GEAR_LABEL,
+} from '../../../src/lib/strength-gear.ts';
+export type { GearKey, GearRoutes } from '../../../src/lib/strength-gear.ts';
 
-export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
-  if (!Array.isArray(strengthEquipment)) return [];
-  return strengthEquipment.map((s) => String(s).toLowerCase());
-}
+import {
+  athleteEquipmentToKeys as _athleteEquipmentToKeys,
+  exerciseRequiredGearKeys as _exerciseRequiredGearKeys,
+  normStrengthEquipmentStrings,
+  STRENGTH_GEAR_LABEL,
+} from '../../../src/lib/strength-gear.ts';
 
 /**
  * True only when the athlete has a GHD machine, dedicated Nordic bench, or similar
  * fixed floor anchor (e.g. "ghd", "nordic bench", "glute ham raise").
- * No current equipment UI option produces this — so Nordics will not fire until one is added.
+ * ⚠️ A "GHD" chip now exists on the picker (2026-08-13, slice 4) — this used to say no UI option
+ * produced it, and Nordics could therefore never fire.
  */
 export function hasGHD(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
@@ -119,10 +142,58 @@ export function hasPullUpBar(strengthEquipment: string[]): boolean {
   );
 }
 
-/** Detect bench access. */
+/**
+ * Detect bench access.
+ *
+ * ⚠️ THIS MATCHES ANY CHIP CONTAINING "bench", AND THAT NOW INCLUDES THE TWO ADDED 2026-08-13
+ * ("Incline bench", "Decline bench"). Left deliberately wide: an athlete who owns an incline bench
+ * can press on it, and the alternative — a decline-only owner being told they have no bench — strands
+ * far more people than the reverse over-reach. The narrow questions have their own detectors below.
+ */
 export function hasBench(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
   return n.some((s) => s.includes('bench'));
+}
+
+/**
+ * Detect an INCLINE-capable bench. Forever p.25 offers DB Incline Press as a push option, and
+ * without the bench that movement is not harder — it is impossible.
+ *
+ * ⛔ "Bench (flat/adjustable)" DELIBERATELY DOES NOT COUNT, and this is the one judgement call in
+ * the slice. That chip is an OR: it is worn by flat-only owners and adjustable owners alike, so
+ * reading it as incline would hand an incline press to everyone with a flat bench. An adjustable-bench
+ * owner ticks both chips, which is one extra tap; the other direction is a prescription nobody can
+ * perform. ⚠️ Revisit if the flat chip is ever split — see the note on the picker list.
+ */
+export function hasInclineBench(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some((s) => s.includes('incline bench') || s.includes('commercial gym'));
+}
+
+/**
+ * Detect a DECLINE-capable bench. Same rule as incline.
+ *
+ * ⚠️ NOTHING CONSUMES THIS YET, and that is stated rather than hidden. No movement on the Forever
+ * assistance catalog requires a decline bench; it is in the inventory so the athlete can DECLARE it
+ * and so slice 3's `requires` tagging has a real key to point at. If nothing ever claims it, delete
+ * the chip rather than leave it as scenery.
+ */
+export function hasDeclineBench(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some((s) => s.includes('decline bench') || s.includes('commercial gym'));
+}
+
+/**
+ * Detect an ab wheel. Forever p.30 lists the rollout on the abs menu.
+ *
+ * ⛔ "commercial gym" DOES NOT IMPLY ONE, unlike every other detector in this file. A rack, a bench
+ * and a cable stack are what a commercial gym IS; an ab wheel is a ten-dollar accessory that many
+ * gyms simply do not stock. Implying it would silently prescribe a rollout to an athlete standing in
+ * a gym that has none, which is the exact failure the inventory exists to prevent.
+ */
+export function hasAbWheel(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some((s) => s.includes('ab wheel') || s.includes('ab roller'));
 }
 
 /**
@@ -209,77 +280,6 @@ export function resolveStrengthEquipmentTier3(
 // inventory for the "Optional" half. Returns null when nothing required and no
 // owned optional applies.
 
-const STRENGTH_GEAR_LABEL: Record<string, string> = {
-  barbell: 'Barbell',
-  rack: 'Rack',
-  bench: 'Bench',
-  dumbbells: 'Dumbbells',
-  kettlebell: 'Kettlebell',
-  bands: 'Bands',
-  cable: 'Cable',
-  pull_up_bar: 'Pull-up Bar',
-  box: 'Box',
-  rings: 'Rings',
-};
-
-/**
- * Map a single strength exercise name → set of canonical equipment keys it requires.
- * Order doesn't matter; the formatter de-dupes and rendering uses {@link STRENGTH_GEAR_LABEL}.
- */
-export function exerciseRequiredGearKeys(name: string): string[] {
-  const n = String(name ?? '').toLowerCase();
-  if (!n) return [];
-  // (F-6) Names that offer an equipment CHOICE ("X or Y") — the athlete picks the variant they own,
-  // so require nothing (e.g. "Box Jumps or Broad Jumps", "Inverted Ring Row or Band Row",
-  // "Goblet Squat or Bodyweight Squat"). Must precede the single-variant patterns below.
-  if (/\bor\b/.test(n)) return [];
-  // Barbell-anchored compounds — rack required for back squat / OHP / standing press. (F-6) Match the
-  // unprefixed names the protocols actually emit (5×5: "Back Squat" / "Overhead Press" / "Deadlift"),
-  // guarding against DB/band/RDL variants that have their own rules below.
-  if (/\bback\s+squat\b/.test(n)) return ['barbell', 'rack'];
-  if ((/overhead\s+press|push\s+press|\bohp\b/.test(n)) && !/\b(db|dumbbell|band)\b/.test(n)) {
-    return ['barbell', 'rack'];
-  }
-  if (/\bdeadlift\b/.test(n) && !/\b(db|dumbbell|romanian|rdl|single-leg)\b/.test(n)) return ['barbell'];
-  if (/^bench\s+press$|^bench\s+press\s+\(barbell/.test(n)) return ['barbell', 'rack', 'bench'];
-  if (/barbell\s+row/.test(n)) return ['barbell'];
-  if (/hip\s+thrusts?\b/.test(n)) {
-    // Performance protocol uses Heavy/Moderate barbell hip thrusts. DB tier uses backpack/BW.
-    return /barbell|moderate|heavy|fast\s+concentric/.test(n) ? ['barbell', 'bench'] : ['bench'];
-  }
-  // Dumbbell-anchored compounds.
-  if (/db\s+bench\s+press|dumbbell\s+bench/.test(n)) return ['dumbbells', 'bench'];
-  if (/db\s+shoulder\s+press|db\s+ohp/.test(n)) return ['dumbbells'];
-  if (/db\s+row|chest-supported\s+row/.test(n)) return ['dumbbells', 'bench'];
-  if (/db\s+romanian\s+deadlift|dumbbell\s+rdl/.test(n)) return ['dumbbells'];
-  if (/single-leg\s+rdl\s*\(heavy\s*db|single-leg\s+rdl\s*\(.*db/.test(n)) return ['dumbbells'];
-  if (/goblet\s+squat/.test(n)) return ['dumbbells']; // KB also works — counted via optional pool
-  // Cable / pulley.
-  if (/lat\s*pull[-\s]?down/.test(n)) return ['cable'];
-  // Pull-up patterns.
-  if (/^pull[-\s]?ups?\b|^pull[-\s]?ups\s+\(explosive/.test(n)) return ['pull_up_bar'];
-  if (/band[-\s]?assisted\s+pull[-\s]?up/.test(n)) return ['pull_up_bar', 'bands'];
-  if (/ring\s+rows?/.test(n)) return ['rings']; // (F-6) explicit rings only; plain "Inverted Rows" falls through to [] ("…or band row" choices handled by the top or-guard)
-  // Plyo / power.
-  if (/box\s+jumps?/.test(n)) return ['box'];
-  // Kettlebell-specific.
-  if (/^kb\s+swings?|^kettlebell\s+swings?/.test(n)) return ['kettlebell'];
-  // Bands.
-  if (/band\s+pull[-\s]?aparts?|band\s+pull[-\s]?down|band\s+lateral\s+walks|band\s+overhead\s+press|band\s+row/.test(n)) {
-    return ['bands'];
-  }
-  if (/face\s+pulls?/.test(n)) {
-    // Cable when available, band otherwise — depends on prescription text.
-    return /cable/.test(n) ? ['cable'] : ['bands'];
-  }
-  if (/external\s+rotation/.test(n)) return ['bands'];
-  // (F-6) Step-ups: any elevated surface (box / step / stair / bench) — improvisable, not a specific
-  // gear requirement → falls through to [] (was wrongly requiring a bench).
-  // Bodyweight-only patterns: push-ups, plank variants, bird dog, dead bug, glute bridges,
-  // calf raises, BW squat, single-leg RDL (BW), broad jumps, jump squats, plyo.
-  return [];
-}
-
 /** Optional gear the athlete might own that this session benefits from (without strict need). */
 function exerciseSuggestedOptionalGearKeys(name: string): string[] {
   const n = String(name ?? '').toLowerCase();
@@ -291,34 +291,6 @@ function exerciseSuggestedOptionalGearKeys(name: string): string[] {
   // Goblet squat: KB also works (DBs already required above).
   if (/goblet\s+squat/.test(n)) return ['kettlebell'];
   return [];
-}
-
-/** Athlete equipment chip → canonical key (for matching against session needs). */
-export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string> {
-  const out = new Set<string>();
-  const n = normStrengthEquipmentStrings(strengthEquipment);
-  for (const s of n) {
-    if (s.includes('barbell') || s.includes('plate')) out.add('barbell');
-    if (s.includes('rack') || s.includes('cage')) out.add('rack');
-    if (s.includes('bench')) out.add('bench');
-    if (s.includes('dumbbell') || /\bdb\b/.test(s)) out.add('dumbbells');
-    if (s.includes('kettlebell') || /\bkb\b/.test(s)) out.add('kettlebell');
-    if (s.includes('band')) out.add('bands');
-    if (s.includes('cable')) out.add('cable');
-    if (s.includes('pull-up bar') || s.includes('pull up bar') || s.includes('chin-up')) out.add('pull_up_bar');
-    if (s.includes('box') || s.includes('plyo box')) out.add('box');
-    if (s.includes('ring')) out.add('rings');
-    // Commercial gym implies most fixed equipment is on hand.
-    if (s.includes('commercial gym')) {
-      out.add('barbell');
-      out.add('rack');
-      out.add('bench');
-      out.add('dumbbells');
-      out.add('cable');
-      out.add('pull_up_bar');
-    }
-  }
-  return out;
 }
 
 export type StrengthSessionGearLineOpts = {
@@ -343,11 +315,11 @@ export function buildStrengthEquipmentLine(opts: StrengthSessionGearLineOpts): s
   const required = new Set<string>();
   const optionalPool = new Set<string>();
   for (const n of opts.exerciseNames ?? []) {
-    for (const k of exerciseRequiredGearKeys(n)) required.add(k);
+    for (const k of _exerciseRequiredGearKeys(n)) required.add(k);
     for (const k of exerciseSuggestedOptionalGearKeys(n)) optionalPool.add(k);
   }
 
-  const owned = athleteEquipmentToKeys(opts.athleteEquipment ?? []);
+  const owned = _athleteEquipmentToKeys(opts.athleteEquipment ?? []);
   const optional = new Set<string>();
   for (const k of optionalPool) {
     if (required.has(k)) continue;
@@ -356,7 +328,10 @@ export function buildStrengthEquipmentLine(opts: StrengthSessionGearLineOpts): s
   }
 
   // Render in a stable order — keeps the output deterministic and easier to test/eyeball.
-  const orderRequired = ['barbell', 'rack', 'bench', 'dumbbells', 'kettlebell', 'cable', 'pull_up_bar', 'box', 'rings', 'bands'];
+  // ⛔ A KEY MISSING FROM THIS ORDER IS SILENTLY DROPPED FROM THE LINE — the filter is the renderer.
+  // The three added 2026-08-13 sit beside their nearest relative.
+  const orderRequired = ['barbell', 'rack', 'bench', 'incline_bench', 'decline_bench', 'dumbbells',
+    'kettlebell', 'cable', 'pull_up_bar', 'box', 'rings', 'ab_wheel', 'bands'];
   const orderOptional = orderRequired;
   const reqLabels = orderRequired.filter((k) => required.has(k)).map((k) => STRENGTH_GEAR_LABEL[k]);
   const optLabels = orderOptional.filter((k) => optional.has(k)).map((k) => STRENGTH_GEAR_LABEL[k]);

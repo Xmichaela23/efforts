@@ -2746,6 +2746,214 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
   },
 
+  // ── WENDLER FOREVER ASSISTANCE CATALOG (pp.24-32). Added 2026-08-13, slice 1 of the per-day
+  // assistance picker work order. ⛔ EVERY MOVEMENT THE PICKER CAN OFFER MUST RESOLVE `exact` OR
+  // `folded` HERE — a fuzzy hit silently borrows a neighbour's prescription (D-322), and these names
+  // are persisted on the goal, so the borrow outlives the render that caused it.
+  //
+  // Three movements had NO entry at all, and five more only fuzzy-matched. The worst of the five was
+  // `DB Incline Press`, which borrowed the bare `press` key — the BARBELL OVERHEAD PRESS at ratio 1.0
+  // counted as a total. Its siblings `db bench press` and `db shoulder press` were already here; the
+  // incline one was simply missed.
+
+  // NEW — Forever p.26, the shoulder option. Two hands on one plate, so the load is a TOTAL, not
+  // per-hand: that is the one thing that differs from `front raise`, which it otherwise mirrors.
+  'plate raise': {
+    pattern: 'vertical_push',
+    primaryRef: 'overhead',
+    ratio: 0.25,
+    confidence: 'low',
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'Front raise holding one plate with both hands.',
+  },
+  // NEW — Forever p.29, the hamstring option on a deadlift day. Bodyweight, same shape as the
+  // `nordic hamstring curl` entry directly above it in intent and identical in configuration.
+  'glute ham raise': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  // NEW — 2nd ed pp.43/51, the oblique option. ⛔ `primaryRef: null` IS DELIBERATE AND IS NOT A GAP.
+  // It is loaded (a dumbbell in one hand) but there is no research ratio tying an oblique side bend
+  // to any of the four main lifts, and inventing one would put a fabricated number in front of an
+  // athlete via `suggestedAssistanceWeight`. Same call, same reason, as the carries above: honest
+  // per-hand DISPLAY, no derived prescription. Assistance is by feel anyway (D-406).
+  'db side bend': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+    notes: 'One dumbbell, one side at a time. No ratio — obliques have no main-lift reference.',
+  },
+  'dumbbell side bend': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'perHand',
+    isUnilateral: true,
+  },
+
+  // ── The catalog's DISPLAY spellings, which the fold does not reach. Byte-copies of the entry each
+  // one names; they exist so the picker's own words resolve exactly rather than fuzzily.
+  // `triceps …` (anatomically correct plural) did not even fuzzy-match — it returned NOTHING, because
+  // neither string contains the other.
+  'db incline press': {
+    pattern: 'horizontal_push',
+    primaryRef: 'bench',
+    ratio: 0.70,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+    ratioIsTotal: true,
+  },
+  'triceps pushdown': {
+    pattern: 'horizontal_push',
+    armIsolation: true,
+    primaryRef: 'bench',
+    ratio: 0.56,
+    confidence: 'low',
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'triceps extension': {
+    pattern: 'horizontal_push',
+    armIsolation: true,
+    primaryRef: 'bench',
+    ratio: 0.21,
+    confidence: 'low',
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  // Wendler's own word for the movement (p.29). Fuzzy-matched to the right entry, which is luck, not
+  // a rule — `fitsRole` and the swap sheet both read the resolved config, so it has to be exact.
+  'reverse hyper': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'weighted sit up': {
+    pattern: 'core',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+
+  // ── NAMES `substituteExerciseForEquipment` EMITS. Added 2026-08-13 after the assistance gear map
+  // surfaced them. ⛔ THESE ARE NOT HYPOTHETICAL NAMES — materialize-plan writes them into real
+  // sessions when the athlete has no cable / no leg-curl machine, and neither resolved.
+  //
+  // `Band Leg Curls` borrowed `leg curls`: **a resistance band priced at 0.3× the DEADLIFT and
+  // displayed as a total barbell load.** That is the `band overhead press → barbell max` bug from
+  // this file's own vocabulary-guard header, shipped again one movement over. A band is
+  // `displayFormat: 'band'` with no reference lift, like every other band entry here.
+  'band leg curl': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
+  'band leg curls': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
+  // Borrowed `reverse flye` — the same movement, so the prescription was right by luck. Pinned rather
+  // than left to luck, which is the rule `tricep dips` established above.
+  'bent over reverse flye': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'overhead',
+    ratio: 0.20,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+  'bent over reverse flyes': {
+    pattern: 'horizontal_pull',
+    primaryRef: 'overhead',
+    ratio: 0.20,
+    displayFormat: 'perHand',
+    isUnilateral: false,
+  },
+
+  // ⛔ THE THREE THE NEW GUARD SOURCE FOUND ON ITS FIRST RUN, and all three are the same shape: a
+  // BODYWEIGHT fallback — the thing the engine reaches for when the athlete owns nothing — borrowing
+  // a LOADED entry's prescription. `Reverse Flyes (bodyweight)` was priced per-hand off the overhead
+  // press; `Bodyweight Lunges` at 50% of the squat, per hand; `Scaption` resolved to nothing at all
+  // and fell to materialize-plan's legacy weight path, which derives a load from whatever barbell 1RM
+  // it can find. Every one of them is emitted precisely BECAUSE the athlete has no weights.
+  //
+  // ⚠️ THE PARENTHESES ARE PART OF THE KEY. `foldExerciseName` strips apostrophes, hyphens and
+  // underscores — not brackets — so the key has to be a byte-copy of what materialize-plan writes.
+  'reverse flyes (bodyweight)': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'bodyweight lunges': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+  'scaption (bodyweight shoulder raises)': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'scaption': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  // ⛔ THE PARENTHESIS-FREE FORMS, AND THEY ARE NOT REDUNDANT. `foldExerciseName` strips apostrophes,
+  // hyphens and underscores — NOT brackets — so `reverse flyes (bodyweight)` and
+  // `reverse flyes bodyweight` are two different keys to this file. The second is what the SERVER
+  // emits: `canonicalize()` drops the parentheses and returns `reverse_flyes_bodyweight`, which
+  // reaches `per_lift.canonical_name` and the State row. Both spellings, one prescription.
+  'reverse flyes bodyweight': {
+    pattern: 'horizontal_pull',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'scaption bodyweight shoulder raise': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'scaption bodyweight shoulder raises': {
+    pattern: 'vertical_push',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false,
+  },
+  'bodyweight lunge': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true,
+  },
+
 };
 
 /**
@@ -2765,7 +2973,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
  * push/pull variant in the table had the same hole; pull-ups is just the one that
  * showed up in a plan.
  */
-function foldExerciseName(raw: string): string {
+export function foldExerciseName(raw: string): string {
   return String(raw ?? '')
     .toLowerCase()
     // ⛔ THE APOSTROPHE IS DROPPED, AND Q-180 IS WHY. `"farmer's carry".includes('farmers carry')` is

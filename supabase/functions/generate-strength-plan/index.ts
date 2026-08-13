@@ -209,11 +209,12 @@ Deno.serve(async (req: Request) => {
               ? Math.min(3, Math.round(Number((bike as Record<string, unknown>).days))) : undefined,
           }
         : null,
-      // The athlete's three assistance picks. Validated inside the composer against the shared
-      // menu, so an unknown name falls back to the default rather than reaching a session.
-      assistancePicks: assistance_picks && typeof assistance_picks === 'object'
-        ? assistance_picks as Record<string, string>
-        : null,
+      // ⛔ THE ATHLETE'S ASSISTANCE PICKS — TWELVE NOW, NOT THREE (D-407). Passed through RAW and
+      // migrated inside the composer by `normalizeAssistancePrefs`, which reads the current per-day
+      // shape, the old flat `{push, pull, single_leg_core}` that every pre-2026-08-13 goal carries,
+      // and nothing at all. ⚠️ DO NOT NARROW THE CAST BACK TO `Record<string, string>` — the new
+      // shape is nested, and a cast that lies here is how a persisted-key migration gets skipped.
+      assistancePicks: assistance_picks ?? null,
       // Swim is BOOKED, not coached — the athlete says how many; the app holds the time (D-323 §5).
       swimDays: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
     });
@@ -265,7 +266,7 @@ Deno.serve(async (req: Request) => {
           // would drag them with it and the controlled progression would be gone (SPEC §1).
           training_max: plan.training_max,
           one_rep_maxes_at_build: maxes, // provenance: what the working numbers were computed from
-          assistance_picks: assistance_picks ?? null, // what the athlete chose for the three slots
+          assistance_picks: assistance_picks ?? null, // what the athlete chose, per day (D-407)
           swim_days: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
           volume_notes: plan.volume_notes ?? null, // pace-estimate disclosure only (cap logic retired)
           volume_state: plan.volume_state ?? null, // above|below|in_band → client renders the tradeoff copy

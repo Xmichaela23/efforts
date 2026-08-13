@@ -67,6 +67,16 @@ Passed directly into `ProtocolContext.userBaselines` (no DB seed needed for the 
 
 ## F-5 — Band exercises are structurally un-gateable (no `hasBands` flag)  [P2]
 
+> ⛔ **ANSWERED 2026-08-13 BY [D-424], and the "half-rule" objection is what it answered.** The
+> assistance menu was left ungated partly because bands had no flag and partly because gating
+> resolution while the menu stayed ungated would be half a rule. Both are now closed: `bands` is a
+> real key in `src/lib/strength-gear.ts`, and **BOTH** the builder's picker and the in-session swap
+> sheet gate through the same `canPerform`. `substituteExerciseForEquipment` is the backstop, not the
+> primary fix. ⚠️ The wider split-brain this entry describes (protocol layer vs materialize layer) is
+> NOT fully closed — `strength-gear.ts` is the shared authority it asked for, but the protocol
+> emitters still read `ProtocolContext.has*`. Everything below stands.
+
+
 - **Symptom:** `Band Face Pulls`, `Band Pull-Aparts`, `Band Pull-Down`, `Band Overhead Press` are prescribed by durability / neural_speed / upper_aesthetics / triathlon to **`full_barbell` and `dumbbell_based`** athletes who may own no bands.
 - **Root cause:** `ProtocolContext.userBaselines` has `hasBench/hasPullUpBar/hasBox/hasKettlebell/hasCable/hasGHD` but **no `hasBands`**. Bands are implicitly assumed universal. For the `bodyweight_bands` tier that's safe (bands definitional), but a barbell or dumbbell athlete isn't guaranteed bands.
 - **Severity P2:** bands are cheap/common, so real-world impact is modest, but it's a true ungated dependency. Decide: assume-universal (document it) or add `hasBands` + substitute (Face Pulls→cable/rear-delt DB).
