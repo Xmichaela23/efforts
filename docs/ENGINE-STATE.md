@@ -36,6 +36,12 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 - **Doc housekeeping:** DECISIONS-LOG-2 FROZEN at D-427 → `DECISIONS-LOG-3.md` live from D-428. The pre-D-423 assistance checklists in POLISH-PUNCH-LIST + the GAME-PLAN 2026-08-09 banner are back-annotated as superseded.
 - **STATE: client-only changes, committed on main.** No edge function deployed this session (`generate-overall-context` was deleted from the repo; its prod deployment is uncalled and harmless). Netlify redeploys the client on push. **VERIFIED 2026-08-13 night: the post-demolition sweep (Michael: "everything seems to work"). STILL UNVERIFIED: the planner landing itself — needs a real build, closes on the next one.**
 
+### NEXT WORK (Michael-approved sequence, 2026-08-13)
+1. **The router session** — one dedicated engineer session: refactor `create-goal-and-materialize-plan`'s ~2,000 lines of scattered routing gates into one readable decision table. SAME BEHAVIOR, pinned by fixtures asserting "this goal shape → this generator" (the §2 gate lines in `AUDIT-plan-generators-2026-08-07.md` are the spec). Pure legibility — no new features. This is Q-267's core.
+2. **Slice b** (`SLICE-strength-b-auto-recalibrate-2026-08-12.md`) — unblocked by the closed climb acceptance.
+3. Landing unification SHIPPED 2026-08-13 night: the saved-goal-card build now lands on the planner at wk 1 like every other Focus door (`GoalsScreen.tsx` `executeBuildPlan`). Verify rides with the landing fix on the next real build.
+4. Parked by Michael, closes naturally: the biceps note eyeball; the landing device check (burner or next real build).
+
 ### Context that saved time this session (keep)
 - A "lost plan" is often the WRONG LOGIN, not a bug: 7 plans across 3 logins; Strong Focus on `45d122e7` (main), Humboldt marathon on `9c313043`, no 70.3 in the DB.
 

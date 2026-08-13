@@ -1268,11 +1268,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       }
       onPlanBuilt?.();
       await refreshGoals();
-      // ⛔ UNIVERSAL: a finished build lands on the Home schedule, not on a chip on Focus. Building
-      // from a SAVED goal used to stay here and flash a 6s "plan ready" indicator on the goal card —
-      // the marathon case Michael hit, where the intake path (onGoToSchedule) already goes to the
-      // calendar. Same destination for both now.
-      onGoToSchedule?.();
+      // ⛔ ONE LANDING: a finished build opens the new plan's weekly planner at week 1 — the same
+      // landing the wizard and inline-form paths use (onOpenBuiltPlan). This used to go to the Home
+      // schedule, which was the third distinct landing for the same event. No plan id → schedule.
+      if (data?.plan_id) onOpenBuiltPlan?.(String(data.plan_id));
+      else onGoToSchedule?.();
       return { success: true };
     } catch (err: any) {
       console.error('Build plan failed:', err);
