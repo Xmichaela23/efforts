@@ -486,7 +486,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
          */
         if (st.announcePlanReady === false) {
           handedToSchedule = true;
-          onGoToSchedule?.();
+          // The intake (Strong Focus etc.) lands on the new plan's weekly planner at week 1, not the
+          // Home calendar. The load-bearing bookkeeping above (signals persisted, plans/goals
+          // refreshed, builder closed) has already run; this only changes the destination.
+          if (st.builtPlanId) onOpenBuiltPlan?.(String(st.builtPlanId));
+          else onGoToSchedule?.();
         }
       } else if (st.fromArcSetup) {
         void refreshGoals();

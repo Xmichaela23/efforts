@@ -1571,12 +1571,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 }}
                 onPlanBuilt={() => { refreshPlans(); }}
                 onOpenBuiltPlan={(planId) => {
-                  // A form build lands on the new plan's weekly planned layout, at week 1.
+                  // A finished build lands on the new plan's weekly planned layout, at week 1.
+                  // Navigate to Home with the openPlans route-state (same pattern as PlanSelect):
+                  // this LEAVES the /goals route so its deep-link effect can't re-open Focus over
+                  // the planner, and AppLayout's openPlans effect sets the plan and week 1.
                   refreshPlans();
-                  setShowGoals(false);
-                  setFocusPlanId(planId);
-                  setFocusWeek(1);
-                  setShowAllPlans(true);
+                  navigate('/', { replace: true, state: { openPlans: true, focusPlanId: planId, focusWeek: 1 } });
                 }}
                 onGoToSchedule={() => {
                   // ⛔ AFTER AN INTAKE BUILD: GO TO THE SCHEDULE. Same teardown the Home tab runs —
