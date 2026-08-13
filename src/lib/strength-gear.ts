@@ -347,6 +347,37 @@ export function gearRoutesFor(exerciseName: string): GearRoutes {
  * picker, and a strict reading would hand them four days of push-ups. Unknown degrades to UNGATED,
  * which is the same §0h rule `resolveAssistance` follows for an unknown main lift.
  */
+/**
+ * ⛔ HOW WELL DOES THE ATHLETE'S KIT FIT THIS MOVEMENT? Lower is better; `null` = cannot perform.
+ *
+ * The answer is the INDEX OF THE FIRST SATISFIED ROUTE, and that works because {@link ASSISTANCE_GEAR}
+ * already lists routes natural-first: `'triceps pushdown': [['cable'], ['bands']]` says a pushdown is
+ * a cable movement that a band can stand in for, and `'tricep extension': [['dumbbells'], ['barbell'],
+ * ['bands']]` says the same of a dumbbell. So route 0 means "this is what the movement IS", and route
+ * 2 means "this is a workaround the athlete happens to own".
+ *
+ * ⚠️ THE ORDERING OF THE ROUTES IS THEREFORE LOAD-BEARING, not cosmetic. A movement whose backup
+ * route is listed first will start leading pools it should not. Put the natural implement first.
+ *
+ * ⛔ THIS IS NOT A SECOND GATE. `canPerform` decides IF; this decides WHICH FIRST, among movements
+ * that already passed. Anything performable has a rank; nothing is excluded by it.
+ */
+export function equipmentFitRank(
+  exerciseName: string,
+  athleteEquipment: string[] | null | undefined,
+): number | null {
+  const chips = Array.isArray(athleteEquipment) ? athleteEquipment.filter((c) => String(c || '').trim()) : [];
+  const routes = gearRoutesFor(exerciseName);
+  // Unknown inventory → everything is equally plausible. Same §0h rule `canPerform` follows: unknown
+  // degrades to UNCHANGED (catalog order), never to a guessed ranking.
+  if (chips.length === 0) return 0;
+  const owned = athleteEquipmentToKeys(chips);
+  for (let i = 0; i < routes.length; i++) {
+    if (routes[i].every((k) => owned.has(k))) return i;
+  }
+  return null;
+}
+
 export function canPerform(exerciseName: string, athleteEquipment: string[] | null | undefined): boolean {
   const chips = Array.isArray(athleteEquipment) ? athleteEquipment.filter((c) => String(c || '').trim()) : [];
   if (chips.length === 0) return true;

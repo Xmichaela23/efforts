@@ -39,6 +39,8 @@ import {
 } from '../../../../src/lib/assistance-menu.ts';
 import {
   ASSISTANCE_CATALOG,
+  focusPool,
+  rankByEquipmentFit,
   assistancePeersFor,
   BALANCED_WEEK,
   buildDefaultWeek,
@@ -206,6 +208,43 @@ Deno.test('a focus re-points ONLY its own category, and rotates rather than repe
   assertEquals(new Set(pushes).size > 1, true, 'the focus put one movement on all four days');
   // The other two categories are untouched by a chest focus.
   assertEquals(LIFT_DAYS.map((d) => week[d].pull), LIFT_DAYS.map((d) => BALANCED_WEEK[d].pull));
+});
+
+Deno.test('⛔ THE MOVEMENT THAT MATCHES THE ATHLETE\'S OWN KIT LEADS THE POOL', () => {
+  // ⛔ THE ROUGH EDGE, PINNED. A bands+dumbbells home gym asking for Arms led with **Triceps
+  // Pushdown** — performable, because a band is the pushdown's BACKUP route, but it reads as a cable
+  // movement while **Triceps Extension** is a dumbbell movement they own outright. Both passed the
+  // gate; only one is what the athlete would reach for.
+  const bandsAndDb = ['Resistance bands', 'Dumbbells'];
+  assertEquals(focusPool('arms', 'push', bandsAndDb)[0].name, 'Triceps Extension');
+  // Same shape one pool over: bands-only Back led with Lat Pulldown (band = backup) over Inverted
+  // Row (needs nothing).
+  assertEquals(focusPool('back', 'pull', ['Resistance bands'])[0].name, 'Inverted Row');
+  // ⚠️ A CABLE OWNER STILL GETS THE CABLE MOVEMENT — the rule is "best fit", not "avoid cables".
+  assertEquals(focusPool('arms', 'push', ['Commercial gym'])[0].name, 'Dips');
+  assertEquals(focusPool('back', 'pull', ['Commercial gym'])[0].name, 'Chin-Up');
+});
+
+Deno.test('the ranking REORDERS, it never filters — and unknown kit leaves catalog order alone', () => {
+  const pool = focusPool('arms', 'push');
+  assertEquals(rankByEquipmentFit(pool, ['Resistance bands', 'Dumbbells']).length, pool.length);
+  // ⚠️ §0h — no inventory means "we have not asked", so the order is the catalog's, not a guess.
+  assertEquals(focusPool('arms', 'push', null).map((e) => e.name), pool.map((e) => e.name));
+  assertEquals(focusPool('arms', 'push', []).map((e) => e.name), pool.map((e) => e.name));
+  // Un-performable movements sort LAST rather than disappearing — a caller that has not filtered
+  // still sees them.
+  const ranked = rankByEquipmentFit(focusPool('chest', 'push'), ['Resistance bands']);
+  assertEquals(ranked.length, focusPool('chest', 'push').length);
+  assertEquals(ranked[0].name, 'Push-Up');
+});
+
+Deno.test('the built week takes the best-fit movement, not the first catalog entry', () => {
+  const week = buildDefaultWeek(['arms'], ['Resistance bands', 'Dumbbells']);
+  const pushes = LIFT_DAYS.map((d) => week[d].push);
+  assertEquals(pushes[0], 'Triceps Extension', 'day one did not lead with the dumbbell movement');
+  for (const name of pushes) {
+    assertEquals(catalogEntry(name)?.focus.includes('arms'), true, `${name} is not an arms movement`);
+  }
 });
 
 Deno.test('⛔ THE FOCUS NEVER OFFERS KIT THE ATHLETE DOES NOT HAVE', () => {

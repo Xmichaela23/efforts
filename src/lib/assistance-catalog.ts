@@ -28,7 +28,7 @@
  * Dumbbell Curl his "Curls", Ab Wheel Rollout his "Ab Wheel". A display alias, never a second token.
  */
 
-import { canPerform } from './strength-gear.ts';
+import { canPerform, equipmentFitRank } from './strength-gear.ts';
 
 /** Wendler's three categories. One movement each, every lifting day. Forever p.24. */
 export type AssistanceCategory = 'push' | 'pull' | 'single_leg_core';
@@ -177,6 +177,12 @@ export function absCatalog(): CatalogEntry[] {
  * an entire category, the full list is returned rather than a blank picker, because a picker with no
  * options is a dead end and the substitution backstop can still rewrite what they choose.
  */
+/**
+ * ⚠️ THE DROPDOWN STAYS IN CATALOG ORDER, DELIBERATELY. Ranking is applied where the APP picks for
+ * the athlete (focus pools, the default fallback) — not to the menu they scroll themselves. A list
+ * that reshuffles as equipment changes is harder to learn than one that is always in the same order,
+ * and here the athlete is choosing on purpose rather than being handed a default.
+ */
 export function optionsFor(
   category: AssistanceCategory,
   athleteEquipment?: string[] | null,
@@ -234,8 +240,40 @@ export const BALANCED_WEEK: Record<LiftDay, Record<AssistanceCategory, string>> 
  * ⛔ DERIVED FROM THE CATALOG'S OWN `focus` TAGS — not a second table. A chip that matched nothing
  * would silently do nothing, so `focusPool` returning empty is the tell that a tag is missing.
  */
-export function focusPool(chip: FocusChip, category: AssistanceCategory): CatalogEntry[] {
-  return catalogFor(category).filter((e) => e.focus.includes(chip));
+export function focusPool(
+  chip: FocusChip,
+  category: AssistanceCategory,
+  /**
+   * ⛔ WHEN THE ATHLETE'S KIT IS KNOWN, THE MOVEMENT THAT BEST MATCHES IT LEADS. Absent → catalog
+   * order, unchanged.
+   *
+   * ⚠️ THE ROUGH EDGE THIS FIXES, and it is worth stating because the old behaviour was not a bug in
+   * the gate: a bands+dumbbells home gym asking for an **Arms** focus led with **Triceps Pushdown**.
+   * That IS performable — the pushdown's backup route is a band — but it reads as a cable movement,
+   * while **Triceps Extension** is a dumbbell movement the athlete owns outright. Both passed
+   * `canPerform`; only one of them is what the athlete would actually reach for. Same shape on a
+   * bands-only **Back** focus, which led with Lat Pulldown over Inverted Row.
+   */
+  athleteEquipment?: string[] | null,
+): CatalogEntry[] {
+  const pool = catalogFor(category).filter((e) => e.focus.includes(chip));
+  return athleteEquipment ? rankByEquipmentFit(pool, athleteEquipment) : pool;
+}
+
+/**
+ * Stable sort by {@link equipmentFitRank} — natural-equipment movements first, catalog order kept
+ * within a tie. ⛔ NOTHING IS DROPPED: this reorders a pool, it does not filter one. Un-performable
+ * movements sort last rather than vanishing, so a caller that has not filtered still sees them.
+ */
+export function rankByEquipmentFit(
+  entries: CatalogEntry[],
+  athleteEquipment?: string[] | null,
+): CatalogEntry[] {
+  if (!athleteEquipment) return entries;
+  const rank = (e: CatalogEntry) => equipmentFitRank(e.name, athleteEquipment) ?? Number.MAX_SAFE_INTEGER;
+  // Array.prototype.sort is stable, so equal ranks keep the catalog's own order — which is Wendler's
+  // page order, and the tie-break we want.
+  return [...entries].sort((a, b) => rank(a) - rank(b));
 }
 
 /** Which category a focus chip speaks to. Arms is the one chip that reaches two. */
@@ -402,7 +440,7 @@ export function buildDefaultWeek(
   const pools: Partial<Record<AssistanceCategory, CatalogEntry[]>> = {};
   for (const chip of chips) {
     for (const category of CATEGORY_FOR_FOCUS[chip]) {
-      const pool = focusPool(chip, category).filter((e) => canPerform(e.name, athleteEquipment));
+      const pool = focusPool(chip, category, athleteEquipment).filter((e) => canPerform(e.name, athleteEquipment));
       if (pool.length === 0) continue;
       pools[category] = [...(pools[category] ?? []), ...pool.filter((e) => !(pools[category] ?? []).some((p) => p.name === e.name))];
     }
@@ -416,9 +454,12 @@ export function buildDefaultWeek(
         picks[category] = pool[dayIndex % pool.length].name;
       } else {
         const fallback = BALANCED_WEEK[day][category];
+        // ⚠️ THE REPLACEMENT IS RANKED TOO. When the balanced default is un-performable the app is
+        // PICKING for the athlete, so it should reach for the natural-equipment fit rather than
+        // whatever sits first in the catalog.
         picks[category] = canPerform(fallback, athleteEquipment)
           ? fallback
-          : (optionsFor(category, athleteEquipment)[0]?.name ?? fallback);
+          : (rankByEquipmentFit(optionsFor(category, athleteEquipment), athleteEquipment)[0]?.name ?? fallback);
       }
     }
     picks.abs = null;
