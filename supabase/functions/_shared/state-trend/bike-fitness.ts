@@ -170,6 +170,9 @@ export interface BikeFitness {
   /** Rides in the window that COULD carry a threshold read (in a power bin, with a 20-min figure).
    *  Zero is the joy-rider signature and is what separates the two silent reasons. */
   hardRideCount?: number;
+  /** Q-255: the always-on load read (CTL/TSB verdict words) under the measurement signals. Null when
+   *  the athlete has no computed ride load. Optional so cached payloads predating it render unchanged. */
+  loadFloor?: import('./load-floor.ts').LoadFloor | null;
 }
 
 /** A — terrain-binned 20-min power. Trend each bin like-for-like; surface the FRESHEST bin that

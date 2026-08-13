@@ -88,6 +88,16 @@ const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: stri
 
 // "newest today" / "newest 3d ago" — the ONE fact a count-and-window line cannot carry: whether the
 // ride you just finished is in there yet. Distinct from `asOf()`, which prints a calendar date.
+// Q-255: verdict words for the bike load floor. Bands are Friel/intervals.icu's (see the server
+// module `state-trend/load-floor.ts` for sources); these are just their on-screen words.
+const LOAD_FRESHNESS_WORDS: Record<string, string> = {
+  very_fresh: 'very fresh',
+  fresh: 'fresh',
+  neutral: 'steady',
+  working: 'carrying training fatigue',
+  heavily_fatigued: 'heavily fatigued',
+};
+
 function recencyOf(ageDays: number | null | undefined): string | null {
   if (ageDays == null || ageDays < 0) return null;
   return ageDays <= 0 ? 'newest today' : `newest ${Math.round(ageDays)}d ago`;
@@ -333,11 +343,27 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       {building ? (
         // BUILDING — say what is there and what it becomes. Never a bare "needs data": the athlete
         // cannot tell whether that means "ride more" or "the app is broken".
+        // Q-255: when the load floor is present the row LEADS with it — training load is a real read
+        // built from every ride (CTL/TSB, the same model Strava/TrainingPeaks render), so the row no
+        // longer reports its own hunger on an athlete who is riding. The measurement promise stays as
+        // the tail. Floor absent (no computed ride load) → the original copy, unchanged.
+        fitness.loadFloor ? (
+          <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
+            <span className="text-white/85">
+              {`Bike load${fitness.loadFloor.fitness_trend ? ` ${fitness.loadFloor.fitness_trend}` : ''} · ${LOAD_FRESHNESS_WORDS[fitness.loadFloor.freshness]}`}
+            </span>
+            {buildingRecency && <span className="text-white/45">{buildingRecency}</span>}
+            <span className="basis-full">
+              {`fitness ${fitness.loadFloor.ctl} · form ${fitness.loadFloor.tsb >= 0 ? `+${fitness.loadFloor.tsb}` : fitness.loadFloor.tsb} · from every ride — a few more hard rides add the power read`}
+            </span>
+          </span>
+        ) : (
         <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
           <span className="text-white/85">{rideCount === 0 ? 'No rides yet' : `${rideCount} ${rideCount === 1 ? 'ride' : 'rides'} in 8 weeks`}</span>
           {buildingRecency && <span className="text-white/45">{buildingRecency}</span>}
           <span className="basis-full">{rideCount === 0 ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
         </span>
+        )
       ) : aerobicLead ? (
         <AerobicSignal sig={fitness.efficiency} />
       ) : showDot ? (

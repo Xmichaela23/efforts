@@ -753,6 +753,37 @@ serve(async (req: Request) => {
           hr_corrupt: !!r.workout_metadata?.hr_corrupt,
         }));
 
+        // Q-255: the bike load floor's inputs. Current CTL/TSB = the newest ride's point-in-time
+        // fitness_v1 (same source the athlete_snapshot.ctl column update below uses); prior CTL for
+        // the trend = a snapshot row ~3-6 weeks back (columns may be unmigrated → non-fatal null).
+        let bikeLoad: { ctl: number; tsb: number; ctlPrior: number | null; daysBetween: number | null } | null = null;
+        try {
+          const newestFit = (bikeR.data ?? [])
+            .map((r: any) => ({ date: String(r.date), f: r.workout_analysis?.fitness_v1 }))
+            .find((x: any) => x.f && Number.isFinite(Number(x.f.ctl)) && Number.isFinite(Number(x.f.atl)));
+          if (newestFit) {
+            const c = Number(newestFit.f.ctl);
+            const a = Number(newestFit.f.atl);
+            const tRaw = Number(newestFit.f.tsb);
+            let ctlPrior: number | null = null;
+            let daysBetween: number | null = null;
+            const { data: priorRows } = await supabase
+              .from("athlete_snapshot").select("week_start, ctl")
+              .eq("user_id", userId)
+              .lt("week_start", isoMinus(21)).gte("week_start", isoMinus(42))
+              .not("ctl", "is", null)
+              .order("week_start", { ascending: false }).limit(1);
+            const prior = (priorRows ?? [])[0] as any;
+            if (prior && Number.isFinite(Number(prior.ctl))) {
+              ctlPrior = Number(prior.ctl);
+              daysBetween = Math.round(
+                (new Date(newestFit.date + "T00:00:00Z").getTime() - new Date(String(prior.week_start) + "T00:00:00Z").getTime()) / 86400000,
+              );
+            }
+            bikeLoad = { ctl: c, tsb: Number.isFinite(tRaw) ? tRaw : c - a, ctlPrior, daysBetween };
+          }
+        } catch { bikeLoad = null; }
+
         // Runs now come straight from the spine (workout_analysis is on each row). effort_adjusted_pace
         // is the ONE column route_progress_metrics owns — joined by workout_id when a route row exists,
         // null otherwise (treadmill). No rendered verdict reads it (audit), so its absence never drops
@@ -1180,7 +1211,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

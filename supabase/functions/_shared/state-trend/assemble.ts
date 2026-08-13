@@ -13,6 +13,7 @@ import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeStat
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
+import { computeLoadFloor } from './load-floor.ts';
 // [Step 7] The ONE list of lifts that carry a tracked max — shared with the client renderer so the
 // emitted series and the drawn sparkline cannot disagree about which four. Path precedent:
 // `_shared/response-model/weekly.ts` imports `src/lib/` the same way (bundled at deploy time).
@@ -274,6 +275,9 @@ export interface StateTrendInputs {
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; in_band_s?: number | null; band_hi?: number | null; band_source: string | null; hr_corrupt?: boolean }>;
+  /** Q-255: current bike CTL/TSB (+ a prior CTL for the trend) for the always-on load floor.
+   *  Optional — absent keeps today's behaviour exactly (no floor on the row). */
+  bikeLoad?: import('./load-floor.ts').LoadFloorInput | null;
   /** Every run with a grade-adjusted pace + HR, oldest first: `{date, pace_s_per_km, hr, temp_f}`.
    *  TrainingPeaks' Efficiency Factor substrate — terrain normalised by the grade adjustment rather
    *  than by matching routes. Empty → no verdict, and the old trend stands. */
@@ -382,6 +386,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
   const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike, STATE_TREND_WINDOWS.bikeDirectionMinRides);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
+  // Q-255: the always-on load floor — verdict words off CTL/TSB the app already computes per ride.
+  // Absent input → null → the row renders exactly as before.
+  bikeFitness.loadFloor = inp.bikeLoad ? computeLoadFloor(inp.bikeLoad) : null;
   // 12-week POWER chart series — the w20 points of the winning terrain bin (the one the verdict reads), so
   // chart and word agree. Mirrors run efficiency / strength e1RM. Empty when power has no verdict (needs_data
   // → basis null → the bike row shows the efficiency read and no power chart). Uses the bike verdict window.

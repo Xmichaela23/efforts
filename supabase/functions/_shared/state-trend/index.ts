@@ -144,3 +144,4 @@ export { declaredSessionsPerWeek, MAINTAIN_SHORTFALL_BAND, type PostureBehaviour
 
 // The severity cap — a rollup may never out-alarm its contributors (D-353).
 export { capRollupTone, severityOfVerdict, type Tone } from './severity.ts';
+export { computeLoadFloor, freshnessFromTsb, type LoadFloor, type LoadFloorInput, type LoadFitnessTrend, type LoadFreshness } from './load-floor.ts';
