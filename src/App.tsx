@@ -13,7 +13,6 @@ import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
 import PlansAdminImport from "./pages/PlansAdminImport";
-import PlanWizard from "./components/PlanWizard";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
 import ArcSetupPage from "./pages/ArcSetupPage";
 import TrainingBaselines from "./components/TrainingBaselines";
@@ -43,7 +42,6 @@ const App = () => (
 <Route path="/connections" element={<Connections />} />
 <Route path="/onboarding/profile" element={<OnboardingProfilePage />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
-<Route path="/plans/generate" element={<PlanWizard />} />
 <Route path="/arc-setup" element={<ArcSetupPage />} />
 <Route path="/baselines" element={<BaselinesPage />} />
 <Route path="*" element={<NotFound />} />

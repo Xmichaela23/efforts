@@ -35,7 +35,6 @@ const ROUTES = [
   ['04-connections', '/connections'],
   ['05-baselines', '/baselines'],
   ['06-onboarding-profile', '/onboarding/profile'],
-  ['11-plans-generate', '/plans/generate'],
   ['12-plans-admin', '/plans/admin'],
   ['13-arc-setup', '/arc-setup'],
   ['14-privacy', '/privacy'],
