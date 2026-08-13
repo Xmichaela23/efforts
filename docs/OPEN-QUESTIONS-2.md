@@ -206,7 +206,18 @@ problem, not the filter.
 volume trend, or nothing at all until [Q-251]'s adherence question is answered. This is a product
 call. Related: [Q-251], [D-373], [D-374].
 
-## Q-254 — ⛔ THE AMRAP IS THE MEASUREMENT IN 5/3/1, AND STATE DOES NOT READ IT (2026-08-02, Michael) — **THE NORTH STAR FOR STRENGTH FOCUS. Three gaps, one shape.**
+## Q-254 — The AMRAP is the measurement in 5/3/1 (2026-08-02, Michael) — **✅ NORTH STAR SHIPPED: State reads the AMRAP ([D-378]) and the verdict reads it the Wendler way ([D-379]), both device-verified 2026-08-03. Three residuals open — see note.**
+
+> **Status 2026-08-13:** what remains open, precisely:
+> 1. **Slice 3** — trap-bar (and variants) roll into their primary-lift slot. Ruled by Michael, small, not built.
+> 2. **Gap 1's structure** — `compute-facts` still builds the e1RM from "most reps at heaviest
+>    weight", not the `amrap_reps` it computes lines later. The RIR-inflation half was fixed
+>    2026-08-12 (positive protocol gate), and on a clean 5/3/1 session the two selections coincide —
+>    but an added heavy single after the top set would still poison the estimate.
+> 3. **Gap 3** — a running block climbs on the calendar, not evidence. That is
+>    `SLICE-strength-b-auto-recalibrate-2026-08-12.md`, unblocked 2026-08-13.
+> The 2026-08-03 additions: item 2 (RIR deprecated) shipped in [D-379]; item 1 (stale typed
+> baseline in the logged-sets rows) — verify on current StateTab before assuming open.
 
 Michael: *"we need to be using amraps for this plan to really set the growth"* → *"we need to make
 state screen read amrap as the north star for stregnth focus right?"*
