@@ -704,6 +704,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   useLayoutEffect(() => {
     const state: any = (location && location.state) || {};
     if (state.openPlans) {
+      // The /goals deep-link effect sets showGoals and nothing clears it on leave;
+      // showGoals renders BEFORE showAllPlans, so without this the Focus screen
+      // covers the planner after a build (the "doesn't land on week 1" bug).
+      setShowGoals(false);
       setShowAllPlans(true);
       if (state.focusPlanId) setFocusPlanId(state.focusPlanId);
       if (state.focusWeek) setFocusWeek(state.focusWeek);
