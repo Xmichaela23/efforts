@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { loadPlansBundle } from '@/services/plans/BundleLoader';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
-import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
@@ -139,8 +137,6 @@ interface AppContextType {
   saveUserBaselines: (data: BaselineData) => Promise<void>;
   loadUserBaselines: () => Promise<BaselineData | null>;
   hasUserBaselines: () => Promise<boolean>;
-  plansBundleReady?: boolean;
-  plansBundleError?: string | null;
   repairPlan?: (planId: string) => Promise<{ repaired: number }>;
 }
 
@@ -195,8 +191,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [detailedPlans, setDetailedPlans] = useState<any>({});
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansAuthReady, setPlansAuthReady] = useState(false);
-  const [plansBundleReady, setPlansBundleReady] = useState<boolean>(false);
-  const [plansBundleError, setPlansBundleError] = useState<string | null>(null);
 
   // Auto-request HealthKit authorization on first iOS app launch
   useEffect(() => {
@@ -234,24 +228,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ✅ FIXED: Plans get their own auth management similar to useWorkouts
   useEffect(() => {
-    // Optional: Defer plan bundle on boot unless explicitly enabled
-    const DEFER_BUNDLE = ((import.meta as any).env?.VITE_DEFER_PLAN_BUNDLE ?? 'true') !== 'false';
-    if (!DEFER_BUNDLE) {
-      (async () => {
-        try {
-          const active = (import.meta as any).env?.VITE_PLANS_ACTIVE_BUNDLE || (import.meta as any).env?.PLANS_ACTIVE_BUNDLE || 'plans.v1.0.0';
-          if (!active) throw new Error('PLANS_ACTIVE_BUNDLE not set');
-          await loadPlansBundle(active);
-          setPlansBundleReady(true);
-          setPlansBundleError(null);
-        } catch (err: any) {
-          console.error('Plan data bundle failed validation:', err);
-          setPlansBundleReady(false);
-          setPlansBundleError('Plan data bundle failed validation. Contact support.');
-        }
-      })();
-    }
-
     let mounted = true;
 
     const initializePlansAuth = async () => {
@@ -991,8 +967,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveUserBaselines,
         loadUserBaselines,
         hasUserBaselines,
-        plansBundleReady,
-        plansBundleError,
         repairPlan,
       }}
     >

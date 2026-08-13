@@ -53,10 +53,9 @@ interface WorkoutBuilderProps {
   initialDate?: string;
   sourceContext?: string;
   onNavigateToPlans?: () => void;
-  onOpenPlanBuilder?: () => void; // NEW: Add prop to open proper PlanBuilder
 }
 
-export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate, sourceContext, onNavigateToPlans, onOpenPlanBuilder }: WorkoutBuilderProps) {
+export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate, sourceContext, onNavigateToPlans }: WorkoutBuilderProps) {
   const { useImperial, toggleUnits } = useAppContext();
   const { addPlannedWorkout, updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts();
   const [showSaveOptions, setShowSaveOptions] = useState(false);
@@ -511,20 +510,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                     className="min-h-[44px] flex-1 border-gray-300"
                     style={{ fontFamily: 'Inter, sans-serif' }}
                   />
-                  <Button
-                    onClick={() => {
-                      if (onOpenPlanBuilder) {
-                        onOpenPlanBuilder();
-                      } else {
-                        console.warn('onOpenPlanBuilder not provided');
-                      }
-                    }}
-                    variant="ghost"
-                    className="flex items-center gap-2 text-gray-600 hover:text-black"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Build me a plan
-                  </Button>
                   <button
                     type="button"
                     onClick={handleTrashClick}

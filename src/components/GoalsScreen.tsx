@@ -2584,7 +2584,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           </div>
           <div className="mt-6 space-y-2">
             <button className="w-full rounded-xl px-4 py-3 text-sm text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-all text-left" onClick={() => { resetForms(); navigate('/plans/generate'); }}>Build a custom plan</button>
-            <button className="w-full rounded-xl px-4 py-3 text-sm text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-all text-left" onClick={() => { resetForms(); navigate('/plans/catalog'); }}>Browse plan library</button>
           </div>
         </div>
       </div>

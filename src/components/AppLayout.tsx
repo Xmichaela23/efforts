@@ -13,18 +13,12 @@ import PilatesYogaLogger from './PilatesYogaLogger';
 import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
-import NewEffortDropdown from './NewEffortDropdown';
-import LogEffortDropdown from './LogEffortDropdown';
-import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
 import LogFAB from './LogFAB';
 import ManualSwimEntry from './ManualSwimEntry';
-import PlansMenu from './PlansMenu';
 import GoalsScreen from './GoalsScreen';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import ScreenErrorBoundary from './ScreenErrorBoundary';
-import PlansDropdown from './PlansDropdown';
-import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
 import AthleticRecordPage from './AthleticRecordPage';
@@ -203,7 +197,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [focusWeek, setFocusWeek] = useState<number | undefined>(initialRouteState.focusWeek);
   const [showCompletedPlans, setShowCompletedPlans] = useState<boolean>(!!initialRouteState.showCompleted);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
-  const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
   const [showAthleticRecord, setShowAthleticRecord] = useState(false);
@@ -225,7 +218,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const feedbackShownIdsRef = useRef<Set<string>>(new Set()); // Track which workouts we've shown popup for (UI state only)
   const feedbackDismissedRef = useRef<Set<string>>(new Set()); // Client-side cache of dismissed IDs (server is source of truth)
   const checkingFeedbackRef = useRef(false); // Prevent concurrent checks
-  const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
   const [goalsCourseUploadNonce, setGoalsCourseUploadNonce] = useState(0);
   const [builderType, setBuilderType] = useState<string>('');
@@ -744,7 +736,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowImportPage(false);
       setShowAllPlans(false);
       setShowStrengthPlans(false);
-      setShowPlanBuilder(false);
       setShowTrainingBaselines(false);
       setShowGoals(false);
       setShowAthleticRecord(true);
@@ -841,20 +832,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   };
 
-  const handleOpenPlanBuilder = () => {
-    setShowPlanBuilder(true);
-    setShowSummary(false);
-    setDateWorkouts([]);
-    setCurrentWorkoutIndex(0);
-  };
-
   const handleHeaderBack = () => {
     // Prefer navigating back to Plans when in any plan-related view
-    if (showPlanBuilder) {
-      setShowPlanBuilder(false);
-      setShowAllPlans(true);
-      return;
-    }
     if (showStrengthPlans) {
       setShowStrengthPlans(false);
       setShowAllPlans(true);
@@ -917,7 +896,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
-    setShowPlanBuilder(false);
     setShowAthleticRecord(false);
     setShowTrainingBaselines(true);
     if (location.pathname === '/profile/athletic-record') {
@@ -939,7 +917,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
-    setShowPlanBuilder(false);
     setShowTrainingBaselines(false);
     setShowGoals(false);
     setShowAthleticRecord(true);
@@ -962,7 +939,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
-    setShowPlanBuilder(false);
     setShowGear(true);
     if (location.pathname === '/profile/athletic-record') {
       try {
@@ -990,7 +966,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowGear(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
-    setShowPlanBuilder(false);
     setShowImportPage(true);
     if (location.pathname === '/profile/athletic-record') {
       try {
@@ -1077,8 +1052,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   const handleBackToDashboard = () => {
-    const comingFromPlanBuilder = showPlanBuilder;
-    const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
+    const shouldReturnToSummary = showBuilder && selectedDate && workoutBeingEdited;
     const wasViewingWorkout = !!selectedWorkout; // Track if we were viewing a workout
 
     setShowStrengthLogger(false);
@@ -1086,7 +1060,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowBuilder(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
-    setShowPlanBuilder(false);
     setShowImportPage(false);
     setShowTrainingBaselines(false); // NEW: Reset training baselines
     setShowAthleticRecord(false);
@@ -1440,15 +1413,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowBuilder(true);
   };
 
-  const handlePlanGenerated = async (newPlan: any) => {
-    try {
-      await addPlan(newPlan);
-      setShowPlanBuilder(false);
-      setShowAllPlans(true);
-    } catch {
-      alert('Error saving plan. Please try again.');
-    }
-  };
 
   // One deletion path for both surfaces. This used to bulk-delete COMPLETED
   // workouts whose name contained "Week 1".."Week 4" — unscoped to the plan, so
@@ -1512,7 +1476,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     <div className="mobile-app-container synth-texture">
       <MobileHeader
         showBackButton={
-          (selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showImportPage || showContext) && !showSummary && !selectedWorkout
+          (selectedWorkout || showPilatesYogaLogger || showBuilder || showAllPlans || showStrengthPlans || showImportPage || showContext) && !showSummary && !selectedWorkout
         }
         onBack={handleHeaderBack}
         onLogout={onLogout}
@@ -1524,7 +1488,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       />
 
       {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
-      {selectedWorkout && !showPlanBuilder && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showAthleticRecord && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
+      {selectedWorkout && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showAthleticRecord && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
         <ScreenErrorBoundary label="Workout details" onClose={handleBackToDashboard}>
           <UnifiedWorkoutView
             workout={selectedWorkout}
@@ -1541,14 +1505,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       <main className="mobile-main-content">
         <PullToRefresh onRefresh={handleGlobalRefresh}>
         <div className="w-full flex-1 min-h-0 flex flex-col px-2">
-          {showPlanBuilder ? (
-            <div className="pt-1">
-              <PlanBuilder
-                onClose={handleBackToDashboard}
-                onPlanGenerated={handlePlanGenerated}
-              />
-            </div>
-          ) : showStrengthPlans ? (
+          {showStrengthPlans ? (
             <div className="pt-4">
               <StrengthPlansView
                 onClose={handleBackToDashboard}
@@ -1686,7 +1643,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 initialDate={selectedDate}
                 sourceContext={builderSourceContext}
                 onNavigateToPlans={handleNavigateToPlans}
-                onOpenPlanBuilder={handleOpenPlanBuilder}
               />
             </div>
           ) : selectedWorkout ? (
@@ -1747,7 +1703,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       onDateSelect={handleDateSelect}
                       selectedDate={selectedDate}
                       onSelectRoutine={handleSelectRoutine}
-                      onOpenPlanBuilder={handleOpenPlanBuilder}
                       currentPlans={currentPlans as any}
                       completedPlans={completedPlans as any}
                       workouts={workouts}
@@ -1775,8 +1730,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
               {(() => {
-                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showAthleticRecord && !showGear && !showContext;
-                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showAthleticRecord && !showGear;
+                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showSummary && !showImportPage && !showTrainingBaselines && !showAthleticRecord && !showGear && !showContext;
+                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showSummary && !showImportPage && !showTrainingBaselines && !showAthleticRecord && !showGear;
                 const goalsActive = showGoals;
                 const tabBase =
                   'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl tabbar-button';
@@ -1812,7 +1767,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showGear || showContext) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1828,7 +1783,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to context
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1844,7 +1799,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </Button>
                 <Button
                   onClick={() => {
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showGear || showContext) {
                       handleBackToDashboard();
                     }
                     setShowGoals(true);

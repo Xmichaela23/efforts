@@ -12,15 +12,10 @@ import Privacy from "./pages/Privacy";
 import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
-import PlanSelect from "./pages/PlanSelect";
 import PlansAdminImport from "./pages/PlansAdminImport";
-import PlansCatalogPage from "./pages/PlansCatalog.tsx";
-import MobilityPlanBuilderPage from "./pages/PTPlanBuilderPage";
-import PlansBuild from "./pages/PlansBuild";
 import PlanWizard from "./components/PlanWizard";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
 import ArcSetupPage from "./pages/ArcSetupPage";
-import NonRaceBuilderPage from "./pages/NonRaceBuilderPage";
 import TrainingBaselines from "./components/TrainingBaselines";
 
 const queryClient = new QueryClient();
@@ -47,14 +42,9 @@ const App = () => (
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
 <Route path="/connections" element={<Connections />} />
 <Route path="/onboarding/profile" element={<OnboardingProfilePage />} />
-<Route path="/plans/select" element={<PlanSelect />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
-<Route path="/plans/catalog" element={<PlansCatalogPage />} />
-<Route path="/plans/build" element={<PlansBuild />} />
-<Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
 <Route path="/plans/generate" element={<PlanWizard />} />
 <Route path="/arc-setup" element={<ArcSetupPage />} />
-<Route path="/goals/build" element={<NonRaceBuilderPage />} />
 <Route path="/baselines" element={<BaselinesPage />} />
 <Route path="*" element={<NotFound />} />
 </Routes>

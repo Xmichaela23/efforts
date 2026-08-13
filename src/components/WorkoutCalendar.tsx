@@ -43,7 +43,6 @@ interface WorkoutCalendarProps {
   onDateSelect: (date: string) => void;
   selectedDate?: string;
   onSelectRoutine?: (type: string) => void;
-  onOpenPlanBuilder?: () => void;
   currentPlans?: any[];
   completedPlans?: any[];
   workouts?: any[];
@@ -322,7 +321,6 @@ export default function WorkoutCalendar({
   onDateSelect,
   selectedDate,
   onSelectRoutine,
-  onOpenPlanBuilder,
   currentPlans = [],
   completedPlans = [],
   workouts = [],

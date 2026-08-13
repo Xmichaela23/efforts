@@ -22,7 +22,6 @@ import {
   Package,
   Heart
 } from 'lucide-react';
-import PlansMenu from './PlansMenu';
 import LogFAB from './LogFAB';
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -91,7 +90,6 @@ const Connections: React.FC = () => {
 
   // Placeholder state for dropdown menu (would normally come from context)
   const [currentPlans] = useState<any[]>([]);
-  const [plansMenuOpen, setPlansMenuOpen] = useState(false);
 
   // Check if we're on native iOS and if HealthKit is available
   useEffect(() => {
