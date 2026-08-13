@@ -41,6 +41,10 @@ export interface LoadFloor {
   ctl_delta_per_week: number | null;
   /** TSB band rendered as a word — always present when the floor is. */
   freshness: LoadFreshness;
+  /** Age in days of the newest ride behind the load numbers — the floor counts EVERY ride, so its
+   *  recency must not borrow the measurement signals' qualifying-rides-only stamp (which ignored a
+   *  ride from yesterday while the load line counted it). Null when the caller didn't say. */
+  newest_ride_age_days: number | null;
 }
 
 export interface LoadFloorInput {
@@ -50,6 +54,8 @@ export interface LoadFloorInput {
   ctlPrior?: number | null;
   /** Days between the prior CTL's week and now — scales the delta to per-week. */
   daysBetween?: number | null;
+  /** Age in days of the newest ride carrying the load numbers (pass-through to the floor). */
+  newestRideAgeDays?: number | null;
 }
 
 const TREND_DEADBAND_PER_WEEK = 1.0;
@@ -86,5 +92,7 @@ export function computeLoadFloor(inp: LoadFloorInput): LoadFloor | null {
     fitness_trend: trend,
     ctl_delta_per_week: deltaPerWeek,
     freshness: freshnessFromTsb(Math.round(tsb)),
+    newest_ride_age_days: inp.newestRideAgeDays == null || !Number.isFinite(Number(inp.newestRideAgeDays))
+      ? null : Math.max(0, Math.round(Number(inp.newestRideAgeDays))),
   };
 }

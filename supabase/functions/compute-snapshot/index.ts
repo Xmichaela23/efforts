@@ -780,7 +780,10 @@ serve(async (req: Request) => {
                 (new Date(newestFit.date + "T00:00:00Z").getTime() - new Date(String(prior.week_start) + "T00:00:00Z").getTime()) / 86400000,
               );
             }
-            bikeLoad = { ctl: c, tsb: Number.isFinite(tRaw) ? tRaw : c - a, ctlPrior, daysBetween };
+            const newestAgeDays = Math.max(0, Math.round(
+              (new Date(asOf + "T00:00:00Z").getTime() - new Date(newestFit.date + "T00:00:00Z").getTime()) / 86400000,
+            ));
+            bikeLoad = { ctl: c, tsb: Number.isFinite(tRaw) ? tRaw : c - a, ctlPrior, daysBetween, newestRideAgeDays: newestAgeDays };
           }
         } catch { bikeLoad = null; }
 

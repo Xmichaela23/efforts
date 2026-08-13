@@ -352,7 +352,11 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             <span className="text-white/85">
               {`Bike load${fitness.loadFloor.fitness_trend ? ` ${fitness.loadFloor.fitness_trend}` : ''} · ${LOAD_FRESHNESS_WORDS[fitness.loadFloor.freshness]}`}
             </span>
-            {buildingRecency && <span className="text-white/45">{buildingRecency}</span>}
+            {/* The floor counts EVERY ride, so its recency stamp is the newest ride overall — the
+                measurement signals' qualifying-only stamp said "6d ago" the day after a ride. */}
+            {(recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency) && (
+              <span className="text-white/45">{recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency}</span>
+            )}
             <span className="basis-full">
               {`fitness ${fitness.loadFloor.ctl} · form ${fitness.loadFloor.tsb >= 0 ? `+${fitness.loadFloor.tsb}` : fitness.loadFloor.tsb} · from every ride — a few more hard rides add the power read`}
             </span>

@@ -47,3 +47,8 @@ Deno.test('delta is scaled per-week and rounded to one decimal', () => {
   assertEquals(f.ctl_delta_per_week, 2);
   assertEquals(f.freshness, 'working');
 });
+
+Deno.test('newest-ride age passes through; absent → null', () => {
+  assertEquals(computeLoadFloor({ ctl: 12, tsb: -3, newestRideAgeDays: 1 })!.newest_ride_age_days, 1);
+  assertEquals(computeLoadFloor({ ctl: 12, tsb: -3 })!.newest_ride_age_days, null);
+});
