@@ -8,13 +8,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE LANDING FIX + THE DEMOLITION (2026-08-13 night, pushed, client auto-deploys, **NOT device-verified**)
+## ⏳ AWAITING MICHAEL — THE LANDING FIX (2026-08-13 night; demolition sweep VERIFIED, landing check open)
 
-One pass covers it ([D-429], `AUDIT-plan-navigation-2026-08-13.md`):
+[D-429], `AUDIT-plan-navigation-2026-08-13.md`:
 
-- [ ] **Build a plan through Focus → it lands on the weekly planner at week 1** (the `showGoals` fix, `AppLayout.tsx:~706`). Try it from the wizard path (Train or Race card).
-- [ ] **Sweep the app after the −11,900-line demolition:** Home, State, a workout detail, the strength logger, Baselines — all should be untouched.
-- [ ] **The add-a-goal sheet** no longer shows "Build a custom plan" or "Browse plan library" — both doors removed on purpose.
+- [x] **Sweep the app after the −11,900-line demolition** — VERIFIED 2026-08-13 night (Michael: "everything seems to work").
+- [ ] **Build a plan through Focus → it lands on the weekly planner at week 1** (the `showGoals` fix, `AppLayout.tsx:~706`). Deliberately NOT closed by the sweep — it needs a real build, and Michael won't build over his live Strong Focus block. **Closes naturally on the next real build.**
 
 ---
 
