@@ -102,6 +102,8 @@ interface GoalsScreenProps {
   onSelectPlan?: (planId: string) => void;
   onViewAllPlans?: () => void;
   onPlanBuilt?: () => void;
+  /** Opens the just-built plan's weekly planned layout at week 1 (the destination for a form build). */
+  onOpenBuiltPlan?: (planId: string) => void;
   /**
    * ⛔ WHERE AN INTAKE BUILD LANDS. The athlete finished the wizard to get a SCHEDULE, so that is
    * where they go — the Home calendar with the week on it, not this screen with a card describing
@@ -353,7 +355,7 @@ function StrengthPreferencesPanel({
 }
 
 const GoalsScreen: React.FC<GoalsScreenProps> = ({
-  onClose, onSelectPlan, onViewAllPlans, onPlanBuilt, onGoToSchedule,
+  onClose, onSelectPlan, onViewAllPlans, onPlanBuilt, onOpenBuiltPlan, onGoToSchedule,
   expandRunEventForCourseNonce = 0,
   currentPlans = [], completedPlans = [],
 }) => {
@@ -1322,10 +1324,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       }
       onPlanBuilt?.();
       await refreshGoals();
-      setPlanReadyGoalId(primary.id);
-      window.setTimeout(() => {
-        setPlanReadyGoalId((prev) => (prev === primary.id ? null : prev));
-      }, 6000);
+      // A season build lands on the combined plan's weekly planned layout at week 1, same as a form
+      // build. Falls back to the on-card "plan ready" badge only if no plan id came back.
+      if (data?.plan_id) {
+        onOpenBuiltPlan?.(String(data.plan_id));
+      } else {
+        setPlanReadyGoalId(primary.id);
+        window.setTimeout(() => {
+          setPlanReadyGoalId((prev) => (prev === primary.id ? null : prev));
+        }, 6000);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to build season plan';
       setSeasonError(message);
@@ -1467,7 +1475,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       setExistingGoalPrompt(null);
       resetForms();
       onPlanBuilt?.();
-      refreshGoals();
+      await refreshGoals();
+      // A finished form build opens the new plan's weekly planned layout at week 1 (not Goals).
+      // Falls back to nothing extra if the id is missing — old behaviour was to stay on Goals.
+      if (data?.plan_id) onOpenBuiltPlan?.(String(data.plan_id));
     } catch (err: any) {
       console.error('Goal create+build flow failed:', err);
       setGoalFlowError(err?.message || 'Unable to build and materialize plan for this goal.');

@@ -63,11 +63,11 @@ export default function WorkloadAdmin() {
     const getUser = async () => {
       setPlansLoading(true);
       const userId = getStoredUserId();
-      setUser(user);
-      console.log('👤 Admin user:', user?.id);
-      
+      setUser(userId ? { id: userId } : null);
+      console.log('👤 Admin user:', userId);
+
       // Load user's plans
-      if (user) {
+      if (userId) {
         const { data: userPlans, error } = await supabase
           .from('plans')
           .select('id, name, config, status')

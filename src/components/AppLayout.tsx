@@ -1570,6 +1570,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setShowAllPlans(true);
                 }}
                 onPlanBuilt={() => { refreshPlans(); }}
+                onOpenBuiltPlan={(planId) => {
+                  // A form build lands on the new plan's weekly planned layout, at week 1.
+                  refreshPlans();
+                  setShowGoals(false);
+                  setFocusPlanId(planId);
+                  setFocusWeek(1);
+                  setShowAllPlans(true);
+                }}
                 onGoToSchedule={() => {
                   // ⛔ AFTER AN INTAKE BUILD: GO TO THE SCHEDULE. Same teardown the Home tab runs —
                   // `handleBackToDashboard` closes the Goals stack and, because we are on `/goals`,
