@@ -312,7 +312,7 @@ Surfaced during Michael's device acceptance of the strength-language work. All t
 `estimated_1rm = 0` (no valid weight+reps pair, `compute-facts:1434`), so it never updated the learned max
 and left `last_logged` at Jul 23. A logging-capture gap, not an AMRAP-reasoning problem — track separately.
 
-## Q-255 — The bike row went silent while CTL/ATL/TSB sat computed and unread (2026-08-02, Michael) — **BUILT 2026-08-13 night: pushed + deployed, NOT device-verified**
+## Q-255 — The bike row went silent while CTL/ATL/TSB sat computed and unread (2026-08-02, Michael) — **✅ CLOSED 2026-08-13 night: pushed + deployed + VERIFIED on Michael's screen ("Bike load holding · steady · newest 1d ago · fitness 12 · form −3")**
 
 > **2026-08-13:** the load floor shipped — `_shared/state-trend/load-floor.ts` (verdict words over
 > the CTL/TSB the app already computes; Friel/intervals.icu bands, sources in the module header),
