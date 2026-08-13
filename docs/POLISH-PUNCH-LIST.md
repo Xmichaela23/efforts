@@ -8,7 +8,23 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE LANDING FIX + THE DEMOLITION (2026-08-13 night, pushed, client auto-deploys, **NOT device-verified**)
+
+One pass covers it ([D-429], `AUDIT-plan-navigation-2026-08-13.md`):
+
+- [ ] **Build a plan through Focus → it lands on the weekly planner at week 1** (the `showGoals` fix, `AppLayout.tsx:~706`). Try it from the wizard path (Train or Race card).
+- [ ] **Sweep the app after the −11,900-line demolition:** Home, State, a workout detail, the strength logger, Baselines — all should be untouched.
+- [ ] **The add-a-goal sheet** no longer shows "Build a custom plan" or "Browse plan library" — both doors removed on purpose.
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE STRONG FOCUS ACCEPTANCE RUN (2026-08-09, pushed + deployed, **NOT device-verified**)
+
+> ⛔ **2026-08-13 — the assistance lines below are STALE.** [D-423]–[D-427] replaced the template
+> assistance with per-day Forever picks (push/pull/single-leg-core daily, athlete-picked,
+> equipment-gated; chins daily when the progression is on). Week-1 expectations like "press days
+> finish on triceps" and "leg days leg · leg · abs with no chin-up" no longer describe what a new
+> plan builds. The engine checks (week-4 deload, AMRAP → training-max card) still stand.
 
 **D-404 → D-408 + Q-269. Five commits, 14 edge functions, zero device passes.** Held to the end on
 purpose so it is ONE run rather than six — the full checklist is in the `NEXT SESSION` banner at the
@@ -79,6 +95,10 @@ DEPLOYED but NOT device-verified. One pass through Focus → Race → Marathon c
 Six commits (`a0d1baec` → `a5a1f19d`), [D-385]–[D-390]. Deployed: `generate-strength-plan`,
 `materialize-plan`, `generate-run-plan`, `create-goal-and-materialize-plan`, `send-workout-to-garmin`.
 ⚠️ **Your CURRENT block is not rewritten by any of this** — it changes what new plans build.
+
+> ⛔ **2026-08-13 — the assistance items below are STALE** (same [D-423]–[D-427] supersession as
+> the top entry: per-day picks now, not templates). The Wendler-order, alternation, and naming
+> checks still stand.
 
 **Build a new Strong Focus plan and check:**
 

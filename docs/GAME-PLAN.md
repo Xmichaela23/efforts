@@ -4,6 +4,13 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> ⛔ **2026-08-13 — THE ASSISTANCE MODEL BELOW IS SUPERSEDED.** [D-423]–[D-427] replaced the
+> standard-template assistance (arms on press days, legs+abs on leg days) with Wendler **Forever**
+> per-day picks: push/pull/single-leg-core every day, athlete picks per day, equipment-gated, chins
+> every day when the pull-up progression is on. A new plan will NOT match the checklist below on
+> those points. Also 2026-08-13: the plan wasteland was demolished and the planner-landing bug
+> root-caused + fixed [D-429], `AUDIT-plan-navigation-2026-08-13.md`. Everything below is history.
+
 > **2026-08-09 — THE STRONG FOCUS WORK ORDER IS DONE, AND IT IS WAITING ON ONE DEVICE PASS.**
 > Six fixes, D-404 → D-408 + Q-269. The block now runs Wendler's **standard** assistance templates
 > rather than the concurrent chapter (arms on press days, legs+abs on leg days, no plane swap); the

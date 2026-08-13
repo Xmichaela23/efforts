@@ -1,4 +1,9 @@
-# Decisions Log — Part 2 (D-373 onward)
+# Decisions Log — Part 2 (D-373 → D-427) — ⛔ FROZEN 2026-08-13
+
+> **This file is FROZEN at D-427** (it passed the ~150KB cap). New entries go in
+> [`DECISIONS-LOG-3.md`](DECISIONS-LOG-3.md), starting at D-428. Everything here is **still
+> authoritative** — frozen does not mean dead. Grep with a glob: `docs/DECISIONS-LOG*.md`.
+
 
 Append-only record of architecture / design decisions worth preserving across sessions. Each entry
 captures **why** the call was made, what was rejected, and what tradeoff is being lived with — so the
@@ -14,7 +19,8 @@ next session doesn't re-debate (or worse, undo) settled choices.
 |---|---|---|
 | **D-001 → D-239** | [`archive/DECISIONS-LOG-archive-D001-D239.md`](archive/DECISIONS-LOG-archive-D001-D239.md) | frozen, **still authoritative** |
 | **D-240 → D-372** | [`DECISIONS-LOG.md`](DECISIONS-LOG.md) | frozen 2026-08-02, **still authoritative** |
-| **D-373 →** | **this file** | live — new entries go here |
+| **D-373 → D-427** | **this file** | frozen 2026-08-13, **still authoritative** |
+| **D-428 →** | [`DECISIONS-LOG-3.md`](DECISIONS-LOG-3.md) | live — new entries go here |
 
 ⛔ **FROZEN DOES NOT MEAN DEAD.** Every one of those entries is as binding as the ones in this file.
 They were split because a 484KB doc is ~120k tokens and stops being readable, **not** because their
