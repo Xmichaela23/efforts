@@ -754,3 +754,15 @@ a code read, not a runtime observation. **If that warning appears on a build cre
 
 ⚠️ The warn is in an edge function and is **not live until `create-goal-and-materialize-plan` is
 deployed.**
+
+## Q-271 — Assistance names don't state the implement they resolved to (2026-08-13, Michael) — **LEAD**
+
+Michael's Friday squat day prescribed "Triceps Extension" with no implement. The equipment system had
+already resolved it as the DUMBBELL movement for his kit (dumbbells owned, no cable; the band route
+buried by the last-resort rule) — but the plan/logger show only the bare name, so the athlete can't
+tell the dumbbell version from the cable/band one, and it reads as a movement he told the equipment
+chat to keep off. The principle, per Michael: no per-exercise exceptions — "use what equipment the
+user has and adjust accordingly," and the NAME should carry what it resolved to (e.g. "Triceps
+Extension (dumbbell)") wherever a movement spans implements. Scope when picked up: display-side
+naming at plan/logger surfaces, driven by the same `strength-gear.ts` route that won the pick — no
+pool or gating changes.
