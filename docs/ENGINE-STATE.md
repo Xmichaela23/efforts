@@ -23,29 +23,30 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-13 NIGHT — the planner-landing bug is ROOT-CAUSED AND FIXED IN CODE, and the plan wasteland is DEMOLISHED. One device pass owed on both.)
+## 🧭 NEXT SESSION — START HERE (2026-08-13 LATE — big cleanup + State day. The wasteland is demolished, the planner-landing bug is fixed in code, the D-422 climb acceptance CLOSED on a real plan export, and the bike row got its always-on load floor — built, deployed, and VERIFIED on Michael's screen.)
 
-### ⛔ THE JOB: Michael's device pass — one run covers everything this session shipped.
-1. **Build a plan through Focus (Strong Focus or marathon) and confirm it lands on the WEEKLY PLANNER at week 1.** The bug was never the navigation state — it was `showGoals`: the `/goals` deep-link effect sets it (`AppLayout.tsx:729`), nothing cleared it on leave, and it renders BEFORE `showAllPlans` in the screen ternary, so the Focus screen covered the fully-armed planner. Fix: `setShowGoals(false)` in the `openPlans` route-state effect (`AppLayout.tsx:~706`), covering every caller. Full mechanism + the secondary risks (null `builtPlanId` → Home fallback; one-shot auto-open): `AUDIT-plan-navigation-2026-08-13.md` §1.
-2. **Tap through Home / State / a workout detail / the strength logger / Baselines** — the demolition (below) deleted ~11,900 lines; build is green and Home+Focus were browser-verified, but no human has swept the app since.
-3. Check the add-a-goal sheet: "Build a custom plan" and "Browse plan library" are GONE on purpose (D-429).
+### ⛔ THE JOB: the ROUTER SESSION (Q-267 core — Michael-approved sequence).
+One dedicated engineer session: refactor `create-goal-and-materialize-plan`'s ~2,000 lines of scattered routing gates into ONE readable decision table. SAME behavior, pinned by fixtures asserting "this goal shape → this generator". The spec is `AUDIT-plan-generators-2026-08-07.md` §2 (gate lines) + `AUDIT-plan-navigation-2026-08-13.md` §2 (client chains). Fold in or schedule beside it: [Q-266]'s open client half (plan deletion still name-matches "Week 1–4" workouts).
 
-### WHAT SHIPPED (do NOT re-litigate)
-- **D-429 — the wasteland demolition.** The dead client-side library-plan pipeline (in-browser materializer, catalog/import, bundle loader, bake scripts), 5 dead routes, never-rendered menus, orphan hooks/components, `generate-overall-context` (zero callers), AND **PlanWizard retired** (it minted goal-less plans). One front door now: Focus builders → `create-goal-and-materialize-plan`. Census: `AUDIT-plan-navigation-2026-08-13.md` (client) + `AUDIT-plan-generators-2026-08-07.md` (server). Three files the sweep called dead were caught LIVE at cut time (StrengthAdjustmentModal, swim-source-tier, ui/popover) — re-verify-before-cut is the rule.
-- **D-428 — the 85% training max is now an owned decision** (was ratified 2026-08-12 with no entry). `wendler-531.ts:119`.
-- **Doc housekeeping:** DECISIONS-LOG-2 FROZEN at D-427 → `DECISIONS-LOG-3.md` live from D-428. The pre-D-423 assistance checklists in POLISH-PUNCH-LIST + the GAME-PLAN 2026-08-09 banner are back-annotated as superseded.
-- **STATE: client-only changes, committed on main.** No edge function deployed this session (`generate-overall-context` was deleted from the repo; its prod deployment is uncalled and harmless). Netlify redeploys the client on push. **VERIFIED 2026-08-13 night: the post-demolition sweep (Michael: "everything seems to work"). STILL UNVERIFIED: the planner landing itself — needs a real build, closes on the next one.**
+### WHAT SHIPPED TODAY (do NOT re-litigate — all pushed; deploys noted; verification stated per item)
+- **D-429 — wasteland demolition (~11,900 lines):** dead client library-plan pipeline, 5 dead routes, unrendered menus, orphan hooks, `generate-overall-context`, AND **PlanWizard retired** — one front door now (Focus builders → create-goal). Post-demolition app sweep VERIFIED by Michael on device.
+- **Planner-landing fix:** `showGoals` was never cleared and out-ranked `showAllPlans` in AppLayout's render ternary — cleared in the `openPlans` effect (~:706). Every Focus build door now lands via `onOpenBuiltPlan` → planner wk 1 (saved-goal-card path unified too). **UNVERIFIED — closes naturally on the next real build.** Secondary suspects if it still misses: null `plan_id` → Home fallback; one-shot auto-open (`AllPlansInterface:~1202`).
+- **D-422 climb acceptance CLOSED** on Michael's regenerated-plan export (squat TM 90→100→110; DL +10/cycle; bench/press +5; wk7 ≠ wk11 everywhere; bar-floor warm-ups seen). **Slice b (`SLICE-strength-b-auto-recalibrate-2026-08-12.md`) is UNBLOCKED — next strength job.**
+- **Q-255 CLOSED, fully verified:** bike load floor — `_shared/state-trend/load-floor.ts` (verdict words over the CTL/TSB `analyze-cycling-workout` already writes; Friel/intervals bands, sources in module header) + CTL chart when load leads; power sparkline now requires a REAL power verdict. Deployed to all six state-trend bundlers (compute-snapshot, coach, workout-detail, both analyzers, compute-facts), twice. Michael's row on screen: "Bike load holding · steady · fitness 12 · form −3" + fitness chart. Residual filed in Q-255: power-only stress (HR-only rides score zero — own future slice); run/swim floor adoption = one line each, when wanted.
+- **Docs:** DECISIONS-LOG-2 FROZEN at D-427 → `DECISIONS-LOG-3.md` (D-428 85% TM owned; D-429). Q-252/Q-254/Q-256 stale headers corrected (Q-254's north star had shipped as D-378/D-379). State audit refreshed: **`AUDIT-state-screen-2026-08-13.md`** — per-card status, LLM boundary (one narrative paragraph, all else deterministic), the gap list that defines "State 100%". Punch-list + GAME-PLAN pre-D-423 checklists back-annotated.
 
-### NEXT WORK (Michael-approved sequence, 2026-08-13)
-1. **The router session** — one dedicated engineer session: refactor `create-goal-and-materialize-plan`'s ~2,000 lines of scattered routing gates into one readable decision table. SAME BEHAVIOR, pinned by fixtures asserting "this goal shape → this generator" (the §2 gate lines in `AUDIT-plan-generators-2026-08-07.md` are the spec). Pure legibility — no new features. This is Q-267's core.
-2. **Slice b** (`SLICE-strength-b-auto-recalibrate-2026-08-12.md`) — unblocked by the closed climb acceptance.
-3. Landing unification SHIPPED 2026-08-13 night: the saved-goal-card build now lands on the planner at wk 1 like every other Focus door (`GoalsScreen.tsx` `executeBuildPlan`). Verify rides with the landing fix on the next real build.
-4. Parked by Michael, closes naturally: the biceps note eyeball; the landing device check (burner or next real build).
+### THE QUEUE AFTER THE ROUTER (Michael-approved order, none urgent)
+1. **Slice b** — auto-recalibrate with announce + undo (unblocked today).
+2. **State polish cluster:** [Q-253] accessories home · trap-bar → deadlift slot roll-up · the small items in the 2026-08-13 audit's gap list (as-of stamp, dead aerobic row, client-composed load headline, partial-week compare).
+3. Bike HR-fallback stress slice; load floor for run/swim (cheap).
+4. Micro, unapproved: reword the bike "Easy power is set from your estimated FTP" note (implies a second number exists — Michael flagged, never said go).
 
-### Context that saved time this session (keep)
-- A "lost plan" is often the WRONG LOGIN, not a bug: 7 plans across 3 logins; Strong Focus on `45d122e7` (main), Humboldt marathon on `9c313043`, no 70.3 in the DB.
+### PARKED BY MICHAEL (close naturally, do not push)
+The biceps "covered by chins" note eyeball (D-427 — absent from an export that predates its deploy, proves nothing) · the planner-landing device check (next real build).
 
-**Still open from prior handoffs:** the biceps "covered by chins" note eyeball (D-427 — a fresh plan export from 2026-08-13 does NOT show the line, but that plan predates the 17:50 UTC deploy of `9a0895e2`, so it proves nothing; check on the next regeneration). ⛔ **CLOSED 2026-08-13 night: the D-422 climb acceptance** — verified on a real generated-plan export (squat TM 90→100→110 exactly; DL +10/cycle 115→125→135; bench +5 115→120→125; press +5 80→85→90; week 7 ≠ week 11 on every lift; warm-ups floored at the bar incl. 45×5 on a light press; deloads 40/50/60 no ramp, 35 min). **Slice b (`SLICE-strength-b-auto-recalibrate-2026-08-12.md`) is now UNBLOCKED.**
+### Read-only prod access note
+Tonight's session had an explicit go-ahead to use the service key (snapshot recompute + coach-cache clears for the bike-row verify). That go-ahead was session-scoped — ask again next time.
+
 ---
 ## 🧭 Prior handoff (2026-08-13 PM) — the per-day ASSISTANCE PICKER (Wendler Forever) shipped end-to-end: pushed + edge-deployed + VERIFIED in a real generated plan. One line left to eyeball (the biceps note). Superseded as START-HERE by the banner above; content still valid.
 
