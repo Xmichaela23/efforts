@@ -243,6 +243,13 @@ export type StrengthPrimaryArgs = {
    * the current shape is how a persisted-key migration gets skipped.
    */
   assistancePicks?: unknown;
+  /**
+   * ⛔ THE ATHLETE'S DECLARED STRENGTH EQUIPMENT (`user_baselines.equipment.strength`), for the
+   * BUILD-TIME assistance gate (2026-08-13). Raw chip strings ("Barbell + plates", "Dumbbells" …) —
+   * `canPerform`/`athleteEquipmentToKeys` own the translation. Absent/empty degrades to ungated,
+   * the same §0h rule as everywhere else: unknown means "we have not asked", never "owns nothing".
+   */
+  athleteEquipment?: string[] | null;
   /** ⛔ SWIM IS A COURTESY, NOT A PRESCRIPTION (D-323 item 5). Number of swims to BOOK per week;
    *  0 or absent → none. See `swimSessions` for what the app is and is not claiming here. */
   swimDays?: number;
@@ -527,6 +534,8 @@ function assistanceRows(
    * exactly, so any caller that does not have maxes degrades to unchanged rather than to a guess.
    */
   oneRepMaxes?: Record<string, number> | null,
+  /** The athlete's declared kit — threaded to `resolveDayAssistance`'s build-time gate. */
+  athleteEquipment?: string[] | null,
 ): { rows: StrengthExercise[]; note: string | null } {
   const prefs: AssistanceWeekPrefs = normalizeAssistancePrefs(picks);
   const day = liftDayForMainLift(mainLiftName) ?? 'press';
@@ -545,7 +554,7 @@ function assistanceRows(
     : null;
   // ⚠️ ONE SLOT BUDGET FOR THE DAY. `assistanceTotalReps` is per-slot and the pull slot is the only
   // one with a tested capacity, so it is asked per category and each row carries its own total.
-  const rows = resolveDayAssistance(prefs, day, assistanceTotalReps('push', scale).totalReps, pullup)
+  const rows = resolveDayAssistance(prefs, day, assistanceTotalReps('push', scale).totalReps, pullup, athleteEquipment)
     .map((a) => {
       // ⛔ THE PROGRESSION'S DOSE WINS OVER THE SLOT SCALER ON THE PULL ROW. Both answer "how many
       // reps", and running them both would double-count: `assistanceTotalReps` sizes a maintenance
@@ -695,6 +704,8 @@ function mainLiftRow(
   workingNumber: number,
   oneRM: number,
   sets: WendlerSet[],
+  /** Deload week — its work sets take the warm-up's bar floor. See the comment on `weight`. */
+  isDeload = false,
 ): StrengthExercise {
   const set_plan: PlannedSet[] = sets.map((s) => {
     const raw = weightForSet(workingNumber, s.pct);
@@ -702,7 +713,14 @@ function mainLiftRow(
     // (e.g. a 80 lb press → 32/40/48), which is un-loadable — the athlete presses the bar. Work sets
     // are not floored: a work set below the bar means the training max itself is near-empty-bar, which
     // the athlete would see and correct, not something to silently mask.
-    const weight = s.warmup ? Math.max(BAR_LB, raw) : raw;
+    //
+    // ⛔ EXCEPT ON THE DELOAD (2026-08-13, Michael's week-4 OHP on device: 30×5, 40×5 with plate
+    // chips on a 45 lb bar). The no-floor reasoning above assumes work sets sit at 65%+ of the
+    // working number; week 4 prescribes 40/50/60 with no warm-up ramp in front, so any working
+    // number under ~112 lb authors sets no barbell can weigh. A deload is recovery volume — the
+    // sets ARE the ramp (`warmupSetsForWeek` returns none for exactly that reason) — so they take
+    // the same floor the ramp would have: the athlete presses the bar.
+    const weight = (s.warmup || isDeload) ? Math.max(BAR_LB, raw) : raw;
     return {
       weight,
       reps: s.reps,
@@ -2401,6 +2419,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         wn,
         oneRepMaxes[lift.ref],
         [...warmupSetsForWeek(weekInCycle), ...setsForWeek(slot.kind, weekInCycle)],
+        isDeload,
       );
       // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].
@@ -2437,7 +2456,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         pullupMaxReps: args.pullupMaxReps,
         strengthPosture: args.blockShape?.strengthPosture,
         cycleKind: slot.kind,
-      }, lift.name, args.oneRepMaxes);
+      }, lift.name, args.oneRepMaxes, args.athleteEquipment);
       const ex: StrengthExercise[] = isDeload
         ? [main]
         : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance.rows];

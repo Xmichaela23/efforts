@@ -563,6 +563,26 @@ export function resolveDayAssistance(
    * the copy names it.
    */
   pullup?: { movement: string; totalReps: number } | null,
+  /**
+   * ⛔ THE BUILD-TIME EQUIPMENT GATE (2026-08-13). Until this parameter existed, the gate ran only
+   * where picks are MADE (the wizard picker, the swap sheet — D-424/D-425) and never where the plan
+   * is BUILT — so picks stored while the arc was unloaded, equipment changed after picking, and the
+   * `BALANCED_WEEK` fallbacks all reached the plan unchecked. Michael, 2026-08-13, from a Triceps
+   * Extension on his squat day: "it's not reading users equipment."
+   *
+   * A performable pick is KEPT — even a band pick, because the athlete chose it (D-423: the
+   * athlete's pick is what appears). Only an un-performable name is replaced, and the replacement is
+   * the book's rule, not an invention: same category (Wendler lists each slot as a muscle-category
+   * menu, pp.50-51, and licenses the swap — "you can change exercises however you see fit"), best
+   * gear first, bodyweight before bands (`equipmentFitRank` ranks band routes last-resort; the
+   * Bodyweight template p.52 is the no-gear floor and bands appear nowhere in the chapter).
+   *
+   * Absent/empty → every gate here no-ops (`canPerform` returns true on unknown inventory), which
+   * is the pre-existing behaviour exactly. ⚠️ `optionsFor` is NEVER EMPTY: if the athlete's kit
+   * rules out an entire category it returns the full list, so the "replacement" can itself be
+   * un-performable — the same deliberate compromise the picker makes rather than a blank slot.
+   */
+  athleteEquipment?: string[] | null,
 ): ResolvedAssistanceRow[] {
   const picks: DayPicks = prefs.by_day[day] ?? { ...BALANCED_WEEK[day], abs: null };
   const row = (category: AssistanceCategory, name: string, reps: number): ResolvedAssistanceRow => ({
@@ -571,16 +591,31 @@ export function resolveDayAssistance(
     display: displayName(name),
     totalReps: reps,
   });
+  /** Keep a performable name; replace an un-performable one from its own category's ranked pool. */
+  const gated = (category: AssistanceCategory, name: string): string => {
+    if (canPerform(name, athleteEquipment)) return name;
+    const pool = rankByEquipmentFit(optionsFor(category, athleteEquipment), athleteEquipment);
+    return pool[0]?.name ?? name;
+  };
 
-  const legName = picks.single_leg_core || BALANCED_WEEK[day].single_leg_core;
-  const absName = picks.abs || null;
+  const legName = gated('single_leg_core', picks.single_leg_core || BALANCED_WEEK[day].single_leg_core);
+  // The abs add-on gates against the ABS pool, not the single-leg one — replacing a Weighted Sit-Up
+  // with a lunge would double the leg slot and drop the abs work the athlete added.
+  const absRaw = picks.abs || null;
+  const absName = absRaw && !canPerform(absRaw, athleteEquipment)
+    ? (rankByEquipmentFit(absOptions(athleteEquipment), athleteEquipment)[0]?.name ?? absRaw)
+    : absRaw;
   const [legReps, absReps] = absName ? splitRepsForAbs(totalReps) : [totalReps, 0];
 
   const rows = [
-    row('push', picks.push || BALANCED_WEEK[day].push, totalReps),
+    row('push', gated('push', picks.push || BALANCED_WEEK[day].push), totalReps),
+    // ⚠️ THE PULL-UP PROGRESSION ROW IS DELIBERATELY NOT GATED. It is an opt-in programme whose
+    // whole content is "chins, every lifting day" — an athlete who opted in and owns no bar is a
+    // contradiction the intake should catch, and silently rewriting the programme's movement here
+    // would be worse than showing them what they signed up for.
     pullup
       ? row('pull', pullup.movement, pullup.totalReps)
-      : row('pull', picks.pull || BALANCED_WEEK[day].pull, totalReps),
+      : row('pull', gated('pull', picks.pull || BALANCED_WEEK[day].pull), totalReps),
     row('single_leg_core', legName, legReps),
   ];
   if (absName) {

@@ -53,12 +53,21 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // ONE baselines read, serving both the maxes and the easy pace.
+    // ONE baselines read, serving the maxes, the easy pace, and the assistance equipment gate.
     const { data: ub } = await supabase
       .from('user_baselines')
-      .select('learned_fitness, performance_numbers, effort_paces')
+      .select('learned_fitness, performance_numbers, effort_paces, equipment')
       .eq('user_id', String(user_id))
       .maybeSingle();
+
+    // ⛔ THE ATHLETE'S DECLARED KIT, READ SERVER-SIDE (2026-08-13). Fetched here rather than trusted
+    // from the caller for the same reason the maxes are: the build must gate on what the athlete
+    // actually declared, not on whatever a stale client session carried. Not an array → null, which
+    // the gate treats as "we have not asked" (ungated), never as "owns nothing".
+    const equipmentStrength = (() => {
+      const eq = (ub as { equipment?: { strength?: unknown } } | null)?.equipment?.strength;
+      return Array.isArray(eq) ? eq.map((s) => String(s)) : null;
+    })();
 
     // ⛔ NO 1RM, NO ENTRY (SPEC-get-stronger §0). Read HERE rather than trusted from the caller: this
     // function is also invoked directly, and every session's weight comes off these four numbers — a
@@ -215,6 +224,9 @@ Deno.serve(async (req: Request) => {
       // and nothing at all. ⚠️ DO NOT NARROW THE CAST BACK TO `Record<string, string>` — the new
       // shape is nested, and a cast that lies here is how a persisted-key migration gets skipped.
       assistancePicks: assistance_picks ?? null,
+      // The build-time assistance gate (resolveDayAssistance): keep performable picks, replace the
+      // rest from the same category's pool, loadable gear first, bands last. See StrengthPrimaryArgs.
+      athleteEquipment: equipmentStrength,
       // Swim is BOOKED, not coached — the athlete says how many; the app holds the time (D-323 §5).
       swimDays: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
     });
