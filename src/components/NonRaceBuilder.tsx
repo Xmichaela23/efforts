@@ -130,9 +130,12 @@ const ENTRY_ORDER: EntryCardId[] = ['train', 'race', 'build'];
 const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string | null }> = {
   // Colours mirror the Goals door exactly (`GoalsScreen`) — same three cards, so the same palette.
   // Build carries none: it has no discipline until the athlete writes one.
-  train: { label: 'Train', blurb: 'Run, ride, strength, or a mix', Icon: Gauge, color: getDisciplineColor('mobility') },
-  race: { label: 'Race', blurb: 'Train for any race', Icon: Flag, color: FOCUS_RACE_COLOR },
-  build: { label: 'Build', blurb: 'Write your own, the engine does the math', Icon: Plus, color: null },
+  // ⛔ RENAMED FROM "Build" (Michael, 2026-08-13): a new user kept tapping it to get a plan — the
+  // label claimed the verb Train and Race actually perform. The card names the DIY path plainly;
+  // the blurbs on the other two name the outcome (plan) and the differentiator (race date or not).
+  train: { label: 'Train', blurb: 'A training plan — run, ride, strength, or a mix. No race needed', Icon: Gauge, color: getDisciplineColor('mobility') },
+  race: { label: 'Race', blurb: 'A plan that builds to your race date', Icon: Flag, color: FOCUS_RACE_COLOR },
+  build: { label: 'Write your own', blurb: 'You place the sessions, the engine does the math', Icon: Plus, color: null },
 };
 /**
  * Build is a CREATE action, not a pick — every catalog app separates the two, so it gets a distinct

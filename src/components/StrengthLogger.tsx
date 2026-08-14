@@ -3807,6 +3807,36 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
+    // ⛔ A BLANK SET CANNOT BE MARKED DONE (2026-08-13, Michael on device: Pull Up set 3 checked
+    // with no reps). Every completion path below assumed a count was there; none checked. Done on
+    // a rep-less working set now opens the reps keypad instead — the tap becomes the ask.
+    //
+    // What counts as blank: `undefined`/`null`, and 0 on anything except a rep-max test —
+    // commitKeypad floors a typed rep count at 1 everywhere else, so a non-test 0 can only mean
+    // "never entered" or "cleared" (and the plan's AMRAP sets deliberately OPEN at 0). A rep-max
+    // test's typed 0 is a real result ("goal: your first pull-up", Q-102) and stays completable.
+    //
+    // Exemptions, all sets whose measurement is not a rep count:
+    //   · duration work — Done records the duration (the Q-180 branch below);
+    //   · mobility mode — handled above;
+    //   · warmups — the baseline ramps prescribe reps as hint text only ("5–10 is plenty",
+    //     Q-097) and the field is empty BY DESIGN; plan warmups arrive prefilled anyway.
+    const repsBlank = set.reps === undefined || set.reps === null
+      || (set.reps === 0 && set.repMaxTest !== true);
+    if (repsBlank && set.setType !== 'warmup'
+        && set.duration_seconds === undefined && !isDurationLogged(exercise.name)) {
+      openKeypadForSet({
+        exerciseId,
+        setIndex,
+        field: 'reps',
+        title: 'Reps',
+        initialValue: '',
+        allowDecimal: false,
+        hint: 'Add the rep count to mark this set done.',
+      });
+      return;
+    }
+
     // If RIR was already entered inline, just mark complete (don't prompt again)
     if (set.rir !== undefined && set.rir !== null) {
       updateSet(exerciseId, setIndex, { completed: true });

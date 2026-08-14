@@ -2479,20 +2479,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
           {([
-          { id: 'train' as const, Icon: Gauge, label: 'Train', blurb: 'Run, ride, strength, or a mix', live: true, color: getDisciplineColor('mobility') },
-          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'Train for any race', live: true, color: FOCUS_RACE_COLOR },
-          { id: 'build' as const, Icon: Plus, label: 'Build', blurb: 'Write your own, the engine does the math', live: false, color: null },
+          { id: 'train' as const, Icon: Gauge, label: 'Train', blurb: 'A training plan — run, ride, strength, or a mix. No race needed', live: true, color: getDisciplineColor('mobility') },
+          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'A plan that builds to your race date', live: true, color: FOCUS_RACE_COLOR },
           ]).map(({ id, Icon, label, blurb, live, color }) => (
           <button
             key={id}
             type="button"
             disabled={!live}
             onClick={() => { if (live) setShowBuilder(id); }}
-            className={`w-full flex items-start gap-3.5 rounded-2xl p-5 text-left transition-all ${
-              id === 'build'
-                ? `border border-dashed ${live ? 'border-white/25 bg-transparent hover:bg-white/[0.04]' : 'border-white/12 bg-transparent cursor-default'}`
-                : 'border border-white/10 bg-white/[0.06] hover:bg-white/[0.10]'
-            }`}
+            className="w-full flex items-start gap-3.5 rounded-2xl p-5 text-left transition-all border border-white/10 bg-white/[0.06] hover:bg-white/[0.10]"
           >
             {/* The colour stays on a dimmed card, at lower opacity — "not yet" without losing which
                 discipline it belongs to. No colour (Build) falls back to the neutral white. */}
@@ -2509,6 +2504,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             </div>
           </button>
           ))}
+          {/* ⛔ "Build" IS NO LONGER A CARD (Michael, 2026-08-13: a new user kept tapping it instead
+              of Train/Race). Two reasons, both about pull: the word "Build" claims the verb the
+              other two cards actually perform, and the dashed border read as an add-tile — the
+              thing you tap to create. Demoted to the Past-goals row treatment and renamed to what
+              it is. Still NOT live (WORKORDER-build-your-own-strength, Stage 0 not started) — the
+              row is inert; wire it to `setShowBuilder('build')` the day the flow lands. */}
+          <button
+            type="button"
+            disabled
+            className="w-full flex items-center justify-center rounded-xl py-2 text-xs text-white/35 cursor-default"
+          >
+            Or write your own — the engine does the math
+          </button>
           {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
             season should be in race"*). It now lives inside the Race flow, under the race fields,
             as the way out for an athlete racing more than once — see the `race` step in
