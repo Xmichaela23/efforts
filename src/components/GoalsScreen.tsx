@@ -2479,8 +2479,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
           {([
-          { id: 'train' as const, Icon: Gauge, label: 'Train', blurb: 'A training plan — run, ride, strength, or a mix. No race needed', live: true, color: getDisciplineColor('mobility') },
-          { id: 'race' as const, Icon: Flag, label: 'Race', blurb: 'A plan that builds to your race date', live: true, color: FOCUS_RACE_COLOR },
+          { id: 'train' as const, Icon: Gauge, label: 'Build a training plan', blurb: 'Run, ride, strength, or a mix — no race needed', live: true, color: getDisciplineColor('mobility') },
+          { id: 'race' as const, Icon: Flag, label: 'Build a race plan', blurb: 'Train for any race — built to the date', live: true, color: FOCUS_RACE_COLOR },
           ]).map(({ id, Icon, label, blurb, live, color }) => (
           <button
             key={id}
@@ -2515,7 +2515,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             disabled
             className="w-full flex items-center justify-center rounded-xl py-2 text-xs text-white/35 cursor-default"
           >
-            Or write your own — the engine does the math
+            Build your own — the engine does the math
           </button>
           {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
             season should be in race"*). It now lives inside the Race flow, under the race fields,

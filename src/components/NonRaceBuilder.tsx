@@ -133,9 +133,9 @@ const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: Reac
   // ⛔ RENAMED FROM "Build" (Michael, 2026-08-13): a new user kept tapping it to get a plan — the
   // label claimed the verb Train and Race actually perform. The card names the DIY path plainly;
   // the blurbs on the other two name the outcome (plan) and the differentiator (race date or not).
-  train: { label: 'Train', blurb: 'A training plan — run, ride, strength, or a mix. No race needed', Icon: Gauge, color: getDisciplineColor('mobility') },
-  race: { label: 'Race', blurb: 'A plan that builds to your race date', Icon: Flag, color: FOCUS_RACE_COLOR },
-  build: { label: 'Write your own', blurb: 'You place the sessions, the engine does the math', Icon: Plus, color: null },
+  train: { label: 'Build a training plan', blurb: 'Run, ride, strength, or a mix — no race needed', Icon: Gauge, color: getDisciplineColor('mobility') },
+  race: { label: 'Build a race plan', blurb: 'Train for any race — built to the date', Icon: Flag, color: FOCUS_RACE_COLOR },
+  build: { label: 'Build your own', blurb: 'You place the sessions, the engine does the math', Icon: Plus, color: null },
 };
 /**
  * Build is a CREATE action, not a pick — every catalog app separates the two, so it gets a distinct
