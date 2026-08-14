@@ -96,3 +96,21 @@ Deno.test('an assisted set with no recorded body weight still prices at zero, no
     0,
   );
 });
+
+Deno.test('⛔ GHR IS ASSIST-CAPABLE (2026-08-13) — a band on a glute-ham raise is help, priced off body weight', () => {
+  // Michael: "glute ham raises needs a band assisted slot — like chin ups, pull ups and dips."
+  // Both spellings the pools carry, plus the assisted form the logger may write.
+  for (const name of ['Glute-Ham Raise', 'glute ham raise', 'Band Assisted Glute Ham Raise']) {
+    assert(isBandAssistedMovement(name), `${name} should be band-assist capable`);
+  }
+  // 3 reps with 50 lb of band help for a 180 lb athlete: (180 − 50) × 3, never 50 × 3.
+  const priced = strengthSetVolume({ weight: 0, reps: 3, resistance_level: 50 }, {
+    bodyweightLb: 180,
+    bandIsAssistance: isBandAssistedMovement('Glute-Ham Raise'),
+  });
+  assertEquals(priced, 390);
+  // The nearest names that must NOT gain an assist box: hip-dominant but not the GHR.
+  for (const name of ['Glute Bridge', 'Barbell Hip Thrust', 'Single-Leg Hip Thrust', 'Back Extension']) {
+    assertEquals(isBandAssistedMovement(name), false, `${name} must not be band-assist capable`);
+  }
+});

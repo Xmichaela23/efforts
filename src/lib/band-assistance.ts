@@ -44,10 +44,17 @@
  */
 
 /**
- * The three movements where a band is assistance. Wendler's own progression for them is band or
- * machine assistance, walked down until the athlete can do clean reps at body weight.
+ * The movements where a band is assistance. For the first three, Wendler's own progression is band
+ * or machine assistance, walked down until the athlete can do clean reps at body weight.
+ *
+ * ⛔ `gluteham` ADDED 2026-08-13 (Michael: "glute ham raises needs a band assisted slot — like
+ * chin ups, pull ups and dips"). Same shape as the others: a band anchored in front cancels part of
+ * the athlete's weight, and walking the tension down is the progression. Measured before adding,
+ * per this file's own method: over the full name pool (config + role table + assistance catalog)
+ * the stem hits exactly the two GHR spellings and nothing else. ⚠️ The pull-up progression's chin
+ * counter is unaffected — it filters on /chin|pull up/ BEFORE asking `isAssistedSet`.
  */
-export const BAND_ASSIST_STEMS = ['pullup', 'chinup', 'dip'] as const;
+export const BAND_ASSIST_STEMS = ['pullup', 'chinup', 'dip', 'gluteham'] as const;
 
 /**
  * Does a band on THIS movement mean help rather than resistance?

@@ -320,8 +320,9 @@ export type StrengthVolumeOpts = {
    *
    * ⚠️ THE COMPANION TO `bandIsAssistance`, AND THE OTHER HALF OF THE SAME QUESTION. That flag says
    * "a band here CANCELS load"; this one says "a band here IS the load". They are mutually
-   * exclusive by construction — `bandMeansAssistance` is exactly {pullup, chinup, dip}, and none of
-   * those is typed `band` — and both are asked of the EXERCISE once, never of the set.
+   * exclusive by construction — `BAND_ASSIST_STEMS` is exactly {pullup, chinup, dip, gluteham}
+   * (2026-08-13 added the GHR), and none of those is typed `band` — and both are asked of the
+   * EXERCISE once, never of the set.
    *
    * ⛔ IT EXISTS BECAUSE A BLANK BAND BOX WAS PRICED AS BODY WEIGHT. With no logged weight and no
    * band value, the final fall-through returned `bodyweight × reps` — correct for a push-up and
