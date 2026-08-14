@@ -52,3 +52,16 @@ Deno.test('newest-ride age passes through; absent → null', () => {
   assertEquals(computeLoadFloor({ ctl: 12, tsb: -3, newestRideAgeDays: 1 })!.newest_ride_age_days, 1);
   assertEquals(computeLoadFloor({ ctl: 12, tsb: -3 })!.newest_ride_age_days, null);
 });
+
+Deno.test('series: sorted, recent flag within 56d of newest, <2 points → null', () => {
+  const f = computeLoadFloor({ ctl: 12, tsb: -3, series: [
+    { date: '2026-08-12', value: 12.4 },
+    { date: '2026-05-26', value: 14.2 },
+    { date: '2026-07-01', value: 13.0 },
+  ] })!;
+  assertEquals(f.series!.map(p => p.date), ['2026-05-26', '2026-07-01', '2026-08-12']);
+  assertEquals(f.series!.map(p => p.value), [14, 13, 12]);
+  assertEquals(f.series!.map(p => p.recent), [false, true, true]);
+  assertEquals(computeLoadFloor({ ctl: 12, tsb: -3, series: [{ date: '2026-08-12', value: 12 }] })!.series, null);
+  assertEquals(computeLoadFloor({ ctl: 12, tsb: -3 })!.series, null);
+});

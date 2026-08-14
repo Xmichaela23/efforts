@@ -783,7 +783,12 @@ serve(async (req: Request) => {
             const newestAgeDays = Math.max(0, Math.round(
               (new Date(asOf + "T00:00:00Z").getTime() - new Date(newestFit.date + "T00:00:00Z").getTime()) / 86400000,
             ));
-            bikeLoad = { ctl: c, tsb: Number.isFinite(tRaw) ? tRaw : c - a, ctlPrior, daysBetween, newestRideAgeDays: newestAgeDays };
+            // The floor's chart: point-in-time CTL stamped on each analyzed ride, ascending.
+            const ctlSeries = (bikeR.data ?? [])
+              .map((r: any) => ({ date: String(r.date), v: Number(r.workout_analysis?.fitness_v1?.ctl) }))
+              .filter((x: any) => Number.isFinite(x.v))
+              .map((x: any) => ({ date: x.date, value: x.v }));
+            bikeLoad = { ctl: c, tsb: Number.isFinite(tRaw) ? tRaw : c - a, ctlPrior, daysBetween, newestRideAgeDays: newestAgeDays, series: ctlSeries };
           }
         } catch { bikeLoad = null; }
 

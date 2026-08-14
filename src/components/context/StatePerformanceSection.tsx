@@ -489,14 +489,28 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
         </span>
       )}
       {/* THE LONG VIEW — 12-week power sparkline (the cyclist's e1RM/efficiency analog, 2026-07-23). Only when
-          power LEADS (a real w20 verdict); the winning terrain bin's watts over 12 weeks, recent-8wk in color. */}
-      {leadIsPower && (
+          power LEADS with a REAL w20 verdict — `lead: 'none'` (building) used to slip through here and put a
+          sinking per-ride-effort line under "load holding", which read as fitness falling (Michael, 2026-08-13). */}
+      {!building && leadIsPower && (
         <TrendSparkline
           series={fitness.power.series}
           color={getDisciplineColor('bike')}
           dotNoun="ride"
           fmtVal={(v) => String(Math.round(v))}
           unit=" W"
+          minSpanFraction={0.15}
+          recentLabel="recent 8 wks in color"
+        />
+      )}
+      {/* Q-255: when the row leads with LOAD, the chart is the LOAD — the same 42-day fitness tally the
+          words read (Strava's fitness chart). Picture and verdict move together by construction. */}
+      {building && fitness.loadFloor?.series && (
+        <TrendSparkline
+          series={fitness.loadFloor.series}
+          color={getDisciplineColor('bike')}
+          dotNoun="ride"
+          fmtVal={(v) => String(Math.round(v))}
+          unit=" fitness"
           minSpanFraction={0.15}
           recentLabel="recent 8 wks in color"
         />

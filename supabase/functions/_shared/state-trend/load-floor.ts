@@ -45,6 +45,9 @@ export interface LoadFloor {
    *  recency must not borrow the measurement signals' qualifying-rides-only stamp (which ignored a
    *  ride from yesterday while the load line counted it). Null when the caller didn't say. */
   newest_ride_age_days: number | null;
+  /** CTL-over-time chart points, ascending, `recent` = within 56d of the newest point. Null when the
+   *  caller passed no history (chart simply absent — never a substitute series). */
+  series: Array<{ date: string; value: number; recent: boolean }> | null;
 }
 
 export interface LoadFloorInput {
@@ -56,6 +59,10 @@ export interface LoadFloorInput {
   daysBetween?: number | null;
   /** Age in days of the newest ride carrying the load numbers (pass-through to the floor). */
   newestRideAgeDays?: number | null;
+  /** Per-ride point-in-time CTL history ({date, value}) for the floor's chart — so the picture under
+   *  "load holding" is the LOAD, not per-ride effort (a sinking power line under a holding verdict
+   *  read as fitness falling — Michael, 2026-08-13). */
+  series?: Array<{ date: string; value: number }> | null;
 }
 
 const TREND_DEADBAND_PER_WEEK = 1.0;
@@ -66,6 +73,24 @@ export function freshnessFromTsb(tsb: number): LoadFreshness {
   if (tsb >= -10) return 'neutral';
   if (tsb >= -30) return 'working';
   return 'heavily_fatigued';
+}
+
+const RECENT_WINDOW_DAYS = 56;
+
+function buildLoadSeries(
+  raw: Array<{ date: string; value: number }> | null | undefined,
+): Array<{ date: string; value: number; recent: boolean }> | null {
+  if (!Array.isArray(raw)) return null;
+  const pts = raw
+    .filter((p) => p && typeof p.date === 'string' && Number.isFinite(Number(p.value)))
+    .map((p) => ({ date: p.date, value: Math.round(Number(p.value)) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (pts.length < 2) return null;
+  const newest = new Date(pts[pts.length - 1].date + 'T00:00:00Z').getTime();
+  return pts.map((p) => ({
+    ...p,
+    recent: (newest - new Date(p.date + 'T00:00:00Z').getTime()) / 86400000 <= RECENT_WINDOW_DAYS,
+  }));
 }
 
 /** Null when there is no current CTL/TSB — the floor only renders real numbers, never a guess. */
@@ -94,5 +119,6 @@ export function computeLoadFloor(inp: LoadFloorInput): LoadFloor | null {
     freshness: freshnessFromTsb(Math.round(tsb)),
     newest_ride_age_days: inp.newestRideAgeDays == null || !Number.isFinite(Number(inp.newestRideAgeDays))
       ? null : Math.max(0, Math.round(Number(inp.newestRideAgeDays))),
+    series: buildLoadSeries(inp.series),
   };
 }
