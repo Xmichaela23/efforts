@@ -8,6 +8,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ▶ FILED 2026-08-13 — NOT INVESTIGATED BEYOND THE TRACE
+
+- [ ] **Logger lets a set be checked done with empty reps** (seen on device — Pull Up set 3 checked, reps blank). `toggleSetComplete` at `StrengthLogger.tsx:~3793` never validates that reps (or weight/duration) are filled before setting `completed: true`. Decide the behavior first: block the tap, or auto-fill from the prescription. ⚠️ Touches the same tap as the open D-326 item ("Select difficulty to mark done", line further down this list) — do them together, not as two edits to one gesture.
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE LANDING FIX (2026-08-13 night; demolition sweep VERIFIED, landing check open)
 
 [D-429], `AUDIT-plan-navigation-2026-08-13.md`:

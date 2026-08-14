@@ -1,5 +1,10 @@
 # STATE SCREEN — UPDATE + INTERWEAVE MAP (2026-08-01)
 
+> **STATUS REFRESHED 2026-08-13 → [`AUDIT-state-screen-2026-08-13.md`](AUDIT-state-screen-2026-08-13.md).**
+> Both of this audit's named jobs SHIPPED (Job 1 block-identity wire; the AMRAP rebuild D-378/D-379),
+> and the bike row closed (Q-255). Read the refresh for current per-card status; this file remains the
+> reference for the INTERWEAVE (how the cards couple) — that section is still accurate.
+
 **Why this doc.** The State screen is a house of cards — many surfaces, one shared substrate, and
 pull-one-drop-three coupling. This maps the WHOLE screen before we touch any of it, so a fix on one row
 doesn't silently break a working one. It supersedes nothing; it sits on top of `STATE-SOURCE-MAP.md`
