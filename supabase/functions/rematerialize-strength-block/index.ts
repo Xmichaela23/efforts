@@ -209,9 +209,13 @@ Deno.serve(async (req) => {
         const oldPlan = Array.isArray(ex?.set_plan) ? ex.set_plan : [];
         const newPlan = spec.map((s) => {
           const raw = weightForSet(wn, s.pct);
+          const isDeload = weekInCycle === WEEKS_PER_CYCLE;
           return {
-            // Warm-ups floor at the empty bar — same rule as the composer (mainLiftRow).
-            weight: s.warmup ? Math.max(BAR_LB, raw) : raw,
+            // Warm-ups floor at the empty bar — same rule as the composer (mainLiftRow). And AS OF
+            // 2026-08-13 so do DELOAD work sets, also mirroring the composer: week 4 is 40/50/60%
+            // with no ramp, so a light working number authors sub-bar sets (Michael's OHP: 30×5 on
+            // a 45 lb bar). ⚠️ This is the composer's rule DUPLICATED — keep the two in step.
+            weight: (s.warmup || isDeload) ? Math.max(BAR_LB, raw) : raw,
             reps: s.reps,
             ...(s.amrap ? { amrap: true } : null),
             ...(s.warmup ? { warmup: true } : null),
