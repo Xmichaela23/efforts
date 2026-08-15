@@ -4352,16 +4352,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         saveShadow: 'shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
       }
     : {
-        // Strength = amber, not orange (2026-08-10) — richer, deeper, matches the approved mockup.
-        border: 'border-amber-500/35',
-        text: 'text-amber-400',
-        hoverText: 'hover:text-amber-400',
+        // Strength = ORANGE (SPORT_COLORS.strength), 2026-08-14 — Michael: "there should be no
+        // yellow on the logger, it's running color." Supersedes the 2026-08-10 amber mockup call.
+        border: 'border-orange-500/35',
+        text: 'text-orange-400',
+        hoverText: 'hover:text-orange-400',
         rgb: '240,150,60',
         // Save button
-        saveBg: 'bg-amber-700/80',
-        saveBorder: 'border-amber-500/40',
-        saveHoverBg: 'hover:bg-amber-700/90',
-        saveHoverBorder: 'hover:border-amber-500/50',
+        saveBg: 'bg-orange-700/80',
+        saveBorder: 'border-orange-500/40',
+        saveHoverBg: 'hover:bg-orange-700/90',
+        saveHoverBorder: 'hover:border-orange-500/50',
         saveShadow: 'shadow-[0_0_0_1px_rgba(240,150,60,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
       };
 
@@ -4376,10 +4377,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         checkOn: 'bg-purple-400 border-purple-300 text-purple-950',
       }
     : {
-        rowBg: 'bg-amber-500/[0.10]',
-        underline: 'border-amber-300/75',
-        num: 'text-amber-50',
-        checkOn: 'bg-amber-400 border-amber-300 text-amber-950',
+        rowBg: 'bg-orange-500/[0.10]',
+        underline: 'border-orange-300/75',
+        num: 'text-orange-50',
+        checkOn: 'bg-orange-400 border-orange-300 text-orange-950',
       };
 
   // Don't render until properly initialized
@@ -4446,8 +4447,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const total = activeTimer.seconds ?? 0;
           const display = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
           return (
-            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-100 shadow-lg backdrop-blur-md">
-              <span className="text-xs uppercase tracking-wide text-amber-300/80">Rest</span>
+            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/20 border border-orange-400/50 text-orange-100 shadow-lg backdrop-blur-md">
+              <span className="text-xs uppercase tracking-wide text-orange-300/80">Rest</span>
               <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
               <button
                 type="button"
@@ -4458,7 +4459,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   cancelRestNotification(activeKey);
                   clearPersistedTimer(activeKey); // Q-TIMER: skipped → drop its wall-clock deadline
                 }}
-                className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-amber-100 hover:text-white flex items-center justify-center text-xs font-medium"
+                className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-orange-100 hover:text-white flex items-center justify-center text-xs font-medium"
                 aria-label="Skip rest"
               >
                 Skip
@@ -4489,7 +4490,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 no structured week_type flag is plumbed to the logger. */}
             {/deload/i.test(String(scheduledWorkout?.name || '')) && (
               <span
-                className="shrink-0 mt-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300/90"
+                className="shrink-0 mt-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300/90"
                 title="This is a deload week — lighter loads are intentional recovery, not a regression."
               >
                 Deload
@@ -5234,7 +5235,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   return (
                     <>
                       {titleCue && (
-                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-amber-300/70 leading-snug">
+                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-orange-300/70 leading-snug">
                           {titleCue}
                         </div>
                       )}
@@ -5243,7 +5244,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           its own reps field; this just totals what's left and drops as sets complete. */}
                       {exRepTotal != null && (
                         <div className="flex items-center gap-2.5 px-1.5 pt-0.5 pb-2.5" aria-live="polite" aria-label={repTotalLine(exRepTotal, exRepsLeft)}>
-                          <span className={`text-[15px] font-bold tabular-nums leading-none whitespace-nowrap ${exRepsLeft <= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                          <span className={`text-[15px] font-bold tabular-nums leading-none whitespace-nowrap ${exRepsLeft <= 0 ? 'text-emerald-300' : 'text-white/85'}`}>
                             {exRepsLeft <= 0
                               ? `${exRepTotal} reps done`
                               : (<><span>{exRepsLeft}</span><span className="text-[11px] font-semibold text-white/55 ml-1">reps left</span></>)}
@@ -5473,7 +5474,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     identical, and the session was logged wrong because of it. The
                                     placeholder sits where the eyes already are. */}
                                 {shown === '' && set.amrap && !done
-                                  ? <span className="text-amber-300/55 text-[11px] tracking-wide">AMRAP</span>
+                                  ? <span className="text-orange-300/55 text-[11px] tracking-wide">AMRAP</span>
                                   : (shown === '' ? ' ' : shown)}
                               </span>
                             </button>
@@ -5502,7 +5503,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             >
                               {hasValue
                                 ? <span className={set.from_previous && !done ? ghostCls : undefined}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                : <span className={targetRir != null ? 'text-amber-300/80 font-medium' : 'text-white/30'}>{formatRirTarget(targetRir)}</span>}
+                                : <span className={targetRir != null ? 'text-orange-300/80 font-medium' : 'text-white/30'}>{formatRirTarget(targetRir)}</span>}
                             </button>
                           );
                         };
@@ -5535,7 +5536,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {/* Baseline test set-type label + hint */}
                             {exIsBaselineTest && (isWarmup || isWorking) && (
                               <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
-                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-amber-300/85'}`}>
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-orange-300/85'}`}>
                                   {isWarmup ? 'Warmup' : 'Working set — add when ready'}
                                 </span>
                                 {set.setHint && <span className="text-[10px] text-white/45 italic">{set.setHint}</span>}
@@ -5547,7 +5548,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 the prescription. Only when the plan authored a ramp — see parseFromComputed. */}
                             {!exIsBaselineTest && exHasWarmupRamp && ((isWarmup && setIndex === firstWarmupIndex) || (isWorking && setIndex === workingSetIndex)) && (
                               <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
-                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-amber-300/85'}`}>
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-orange-300/85'}`}>
                                   {isWarmup ? 'Warm-up' : 'Working sets'}
                                 </span>
                               </div>
@@ -5571,7 +5572,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               // No horizontal padding here — the set container already adds px-1.5, so
                               // this lands flush with the bar-speed cue above the exercise (which has
                               // its own px-1.5 and no container). Same vertical line as "SET".
-                              <div className="pt-0.5 pb-2 text-[11px] font-medium text-amber-300/85 leading-snug">
+                              <div className="pt-0.5 pb-2 text-[11px] font-medium text-orange-300/85 leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
                               </div>
                             )}
@@ -5581,8 +5582,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 the moment it's hit (Michael 2026-08-11). */}
                             {isAmrapPR && (
                               <div className="pb-2 flex items-center gap-2" role="status" aria-label={`Personal record — estimated 1RM ${amrapE1rm} pounds`}>
-                                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-400/25 border border-amber-300/70 text-amber-50">PR</span>
-                                <span className="text-[11px] font-medium text-amber-200/85">new best — est. 1RM {amrapE1rm} lb</span>
+                                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-400/25 border border-orange-300/70 text-orange-50">PR</span>
+                                <span className="text-[11px] font-medium text-orange-200/85">new best — est. 1RM {amrapE1rm} lb</span>
                               </div>
                             )}
 
@@ -5824,9 +5825,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {rirConfirm && rirConfirm.exerciseId === exercise.id && rirConfirm.setIndex === setIndex && (() => {
                               const targetRir = exercise.target_rir;
                               return (
-                                <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-amber-400/40 bg-amber-500/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
+                                <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-orange-400/40 bg-orange-500/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300/90">RIR — tap to change</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-orange-300/90">RIR — tap to change</span>
                                     <button
                                       type="button"
                                       onClick={() => setRirConfirm(null)}
@@ -5848,8 +5849,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                           onClick={() => confirmRirAndComplete(exercise.id, setIndex, r)}
                                           className={`h-9 w-9 rounded-full border-2 text-sm tabular-nums leading-none transition-colors ${
                                             isSuggested
-                                              ? 'bg-amber-500/30 border-amber-300 text-amber-100 font-semibold ring-2 ring-amber-300/50'
-                                              : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-amber-500/15 hover:border-amber-400/40'
+                                              ? 'bg-orange-500/30 border-orange-300 text-orange-100 font-semibold ring-2 ring-orange-300/50'
+                                              : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-orange-500/15 hover:border-orange-400/40'
                                           }`}
                                           style={{ fontFamily: 'Inter, sans-serif' }}
                                           aria-label={`RIR ${isCap ? '5 or more' : r}${isSuggested ? ' (suggested — tap to confirm)' : ''}`}
@@ -6207,7 +6208,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       <button
                         onClick={() => chooseDown(d.key, 'update')}
                         disabled={savingBaseline}
-                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-amber-500/25 border-amber-400/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
+                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-orange-500/25 border-orange-400/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Update to {d.next}
