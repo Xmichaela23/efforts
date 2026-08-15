@@ -36,7 +36,7 @@ import {
   warmupSetsForWeek,
   weightForSet,
   workingNumberForCycles,
-  BAR_LB,
+  barFloorForWorkingNumber,
   WEEKS_PER_CYCLE,
   type CycleKind,
   type WorkingNumberVerdict,
@@ -215,7 +215,9 @@ Deno.serve(async (req) => {
             // 2026-08-13 so do DELOAD work sets, also mirroring the composer: week 4 is 40/50/60%
             // with no ramp, so a light working number authors sub-bar sets (Michael's OHP: 30×5 on
             // a 45 lb bar). ⚠️ This is the composer's rule DUPLICATED — keep the two in step.
-            weight: (s.warmup || isDeload) ? Math.max(BAR_LB, raw) : raw,
+            // Per-lift floor, same rule as the composer: 45 when the lift's normal weeks clear
+            // the bar naturally, 35 for a lighter lift (its women's-bar sets are flagged at build).
+            weight: (s.warmup || isDeload) ? Math.max(barFloorForWorkingNumber(wn), raw) : raw,
             reps: s.reps,
             ...(s.amrap ? { amrap: true } : null),
             ...(s.warmup ? { warmup: true } : null),

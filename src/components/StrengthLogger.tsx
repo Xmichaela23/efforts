@@ -297,6 +297,18 @@ async function cancelRestNotification(key: string): Promise<void> {
 
 
 // Plate Math Component
+// One bar table for the plate math AND the chip label — two readers, one source.
+const BAR_TYPES: Record<string, { weight: number; name: string }> = {
+  'standard': { weight: 45, name: 'Barbell (45lb)' },
+  'womens': { weight: 33, name: 'Light (33lb)' },
+  'safety': { weight: 45, name: 'Safety Squat (45lb)' },
+  'ez': { weight: 25, name: 'EZ Curl (25lb)' },
+  'trap': { weight: 60, name: 'Trap/Hex (60lb)' },
+  'cambered': { weight: 55, name: 'Cambered (55lb)' },
+  'swiss': { weight: 35, name: 'Swiss/Football (35lb)' },
+  'technique': { weight: 15, name: 'Technique (15lb)' },
+};
+
 const PlateMath: React.FC<{ 
   weight: number; 
   barType: string;
@@ -311,19 +323,7 @@ const PlateMath: React.FC<{
     { weight: 2.5, count: 2, color: 'bg-purple-500' },
   ];
 
-  // Bar types with their weights
-  const barTypes = {
-    'standard': { weight: 45, name: 'Barbell (45lb)' },
-    'womens': { weight: 33, name: 'Women\'s (33lb)' },
-    'safety': { weight: 45, name: 'Safety Squat (45lb)' },
-    'ez': { weight: 25, name: 'EZ Curl (25lb)' },
-    'trap': { weight: 60, name: 'Trap/Hex (60lb)' },
-    'cambered': { weight: 55, name: 'Cambered (55lb)' },
-    'swiss': { weight: 35, name: 'Swiss/Football (35lb)' },
-    'technique': { weight: 15, name: 'Technique (15lb)' }
-  };
-
-  const currentBar = barTypes[barType as keyof typeof barTypes] || barTypes.standard;
+  const currentBar = BAR_TYPES[barType] || BAR_TYPES.standard;
   const barWeight = currentBar.weight;
   const unit = useImperial ? 'lb' : 'kg';
 
@@ -5635,7 +5635,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   </span>
                                 )}
                                 {!isDurationBased && !exIsBodyweight && exEquip === 'barbell' && (
-                                  <div style={{ gridColumn: 3, justifySelf: 'center' }}>
+                                  <div style={{ gridColumn: '3 / 5', justifySelf: 'center' }} className="flex items-center gap-1.5">
                                     <button
                                       type="button"
                                       onClick={() => togglePlateCalc(exercise.id, setIndex)}
@@ -5645,6 +5645,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     >
                                       plates
                                     </button>
+                                    {/* The bar is its own chip (Michael, 2026-08-13: the picker was
+                                        buried in the plates popover and read as lost). Always visible
+                                        on barbell rows, always named — "45 lb bar" is one glance,
+                                        changing it is one tap. Writes the whole exercise's sets. */}
+                                    <Select
+                                      value={set.barType || 'standard'}
+                                      onValueChange={(value) => setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : ({
+                                        ...ex,
+                                        sets: ex.sets.map((st) => ({ ...st, barType: value })),
+                                      })))}
+                                    >
+                                      <SelectTrigger
+                                        aria-label="Bar type"
+                                        className="h-auto text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors text-amber-300/85 border-amber-400/35 hover:text-amber-200 hover:border-amber-400/55 bg-transparent gap-1 w-auto shadow-none focus:ring-0"
+                                      >
+                                        {`${(BAR_TYPES[set.barType || 'standard'] || BAR_TYPES.standard).weight} lb bar`}
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
+                                        <SelectItem value="standard" className="hover:bg-white/[0.15]">Barbell (45lb)</SelectItem>
+                                        <SelectItem value="womens" className="hover:bg-white/[0.15]">Light (33lb)</SelectItem>
+                                        <SelectItem value="safety" className="hover:bg-white/[0.15]">Safety Squat (45lb)</SelectItem>
+                                        <SelectItem value="ez" className="hover:bg-white/[0.15]">EZ Curl (25lb)</SelectItem>
+                                        <SelectItem value="trap" className="hover:bg-white/[0.15]">Trap/Hex (60lb)</SelectItem>
+                                        <SelectItem value="cambered" className="hover:bg-white/[0.15]">Cambered (55lb)</SelectItem>
+                                        <SelectItem value="swiss" className="hover:bg-white/[0.15]">Swiss/Football (35lb)</SelectItem>
+                                        <SelectItem value="technique" className="hover:bg-white/[0.15]">Technique (15lb)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                 )}
                                 {isDurationBased && (
@@ -5740,24 +5768,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-white/10 bg-white/[0.03] p-2">
                                 <div className="flex items-center justify-between mb-1.5">
                                   <span className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Plates</span>
-                                  <Select
-                                    value={set.barType || 'standard'}
-                                    onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
-                                  >
-                                    <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-white/70 hover:text-white/90 gap-1 w-auto border-none">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
-                                      <SelectItem value="standard" className="hover:bg-white/[0.15]">Barbell (45lb)</SelectItem>
-                                      <SelectItem value="womens" className="hover:bg-white/[0.15]">Women's (33lb)</SelectItem>
-                                      <SelectItem value="safety" className="hover:bg-white/[0.15]">Safety Squat (45lb)</SelectItem>
-                                      <SelectItem value="ez" className="hover:bg-white/[0.15]">EZ Curl (25lb)</SelectItem>
-                                      <SelectItem value="trap" className="hover:bg-white/[0.15]">Trap/Hex (60lb)</SelectItem>
-                                      <SelectItem value="cambered" className="hover:bg-white/[0.15]">Cambered (55lb)</SelectItem>
-                                      <SelectItem value="swiss" className="hover:bg-white/[0.15]">Swiss/Football (35lb)</SelectItem>
-                                      <SelectItem value="technique" className="hover:bg-white/[0.15]">Technique (15lb)</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  
                                 </div>
                                 <PlateMath weight={set.weight} barType={set.barType || 'standard'} useImperial={true} />
                               </div>

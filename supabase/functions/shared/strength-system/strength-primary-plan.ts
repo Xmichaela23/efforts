@@ -73,6 +73,8 @@ import {
   warmupSetsForWeek,
   weightForSet,
   BAR_LB,
+  BAR_LB_LIGHT,
+  barFloorForWorkingNumber,
   WEEKS_PER_CYCLE,
   type WendlerSet,
   workingNumberForCycles,
@@ -706,6 +708,8 @@ function mainLiftRow(
   sets: WendlerSet[],
   /** Deload week — its work sets take the warm-up's bar floor. See the comment on `weight`. */
   isDeload = false,
+  /** The lightest bar this athlete can assume — 45, or 35 on a commercial gym (2026-08-13). */
+  barFloorLb: number = BAR_LB,
 ): StrengthExercise {
   const set_plan: PlannedSet[] = sets.map((s) => {
     const raw = weightForSet(workingNumber, s.pct);
@@ -720,7 +724,7 @@ function mainLiftRow(
     // number under ~112 lb authors sets no barbell can weigh. A deload is recovery volume — the
     // sets ARE the ramp (`warmupSetsForWeek` returns none for exactly that reason) — so they take
     // the same floor the ramp would have: the athlete presses the bar.
-    const weight = (s.warmup || isDeload) ? Math.max(BAR_LB, raw) : raw;
+    const weight = (s.warmup || isDeload) ? Math.max(barFloorLb, raw) : raw;
     return {
       weight,
       reps: s.reps,
@@ -2420,6 +2424,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         oneRepMaxes[lift.ref],
         [...warmupSetsForWeek(weekInCycle), ...setsForWeek(slot.kind, weekInCycle)],
         isDeload,
+        // Per lift: 45 when the lift's normal weeks clear the bar naturally, 35 for a lighter lift
+        // — whose sub-45 sets the plan description flags as women's-bar work (2026-08-13).
+        barFloorForWorkingNumber(wn),
       );
       // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
       // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].
@@ -2863,6 +2870,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // The argument is left in place rather than removed from the copy helper's signature: that
         // helper is a client file and this slice is engine-only. Slice b retires the pair.
         ceilingLifts: [],
+        // The lifts light enough to floor at the 35 lb bar — the flag that replaced the hard 85
+        // gate (2026-08-13): the plan says which sets assume a women's bar instead of refusing.
+        lightBarLifts: MAIN_LIFTS
+          .filter((l) => barFloorForWorkingNumber(training_max[l.ref]) === BAR_LB_LIGHT)
+          .map((l) => l.name),
         compromises: placementCompromises,
       }),
     duration_weeks: weeks,

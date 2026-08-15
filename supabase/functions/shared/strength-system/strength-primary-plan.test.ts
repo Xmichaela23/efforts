@@ -110,8 +110,12 @@ Deno.test('every main lift carries THREE WORK sets at THREE weights, and they as
   }
 });
 
-Deno.test('warm-up weights floor at the empty bar (45 lb) — a light lift never prescribes a sub-bar warm-up', () => {
-  // OHP 1RM 65 → working number ~55; 40/50/60% is 22/28/33, all un-loadable. They must clamp to 45.
+Deno.test('warm-up weights floor at the lift\'s own bar — 45 normally, 35 on a women\'s-bar lift', () => {
+  // ⛔ UPDATED 2026-08-13 (the flag model). This pinned "warm-ups clamp to 45" when 45 was the only
+  // bar. A lift in the 65-84 band now runs on the 35 lb women's bar (`barFloorForWorkingNumber`),
+  // so ITS warm-ups floor at 35 — clamping them to a bar the athlete isn't using would be wrong.
+  // OHP 1RM 65 → working number ~55; 40/50/60% is 22/27/33, un-loadable on any bar → clamp to 35.
+  // Bench 95 / squat 135 / deadlift 155 all clear 85, so their warm-ups still floor at 45.
   const light = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { bench: 95, squat: 135, deadlift: 155, overheadPress: 65 },
@@ -122,8 +126,9 @@ Deno.test('warm-up weights floor at the empty bar (45 lb) — a light lift never
     if (s.type !== 'strength') continue;
     const m = (s.strength_exercises ?? []).find((e: any) => Array.isArray(e.set_plan));
     if (!m) continue;
+    const floor = m.name === 'Overhead Press' ? 35 : 45;
     for (const p of m.set_plan.filter((x: any) => x.warmup)) {
-      assert(p.weight >= 45, `${m.name} warm-up ${p.weight} lb is below the 45 lb bar`);
+      assert(p.weight >= floor, `${m.name} warm-up ${p.weight} lb is below its ${floor} lb bar`);
     }
   }
 });

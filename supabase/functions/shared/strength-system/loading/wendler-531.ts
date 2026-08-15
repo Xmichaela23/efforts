@@ -90,9 +90,25 @@ export function warmupSetsForWeek(weekInCycle: number): WendlerSet[] {
 const INCREMENT_LB = 5;
 
 /** The empty Olympic barbell. Nothing on a barbell lift can be prescribed below it — a warm-up that
- *  computes to 30 lb is un-loadable, so it clamps here (the athlete presses the empty bar). Standard
- *  men's bar; a lighter bar (women's 35, technique bars) is an equipment refinement, not handled yet. */
+ *  computes to 30 lb is un-loadable, so it clamps here (the athlete presses the empty bar). */
 export const BAR_LB = 45;
+
+/** The 35 lb (women's-class) bar — the floor for a lift not yet strong enough to live above 45. */
+export const BAR_LB_LIGHT = 35;
+
+/**
+ * ⛔ THE PER-LIFT BAR FLOOR (2026-08-13, Michael: "we just flag people under 85 needed a women's
+ * bar"). A lift whose lightest normal-week set (65% of the working number) clears the 45 lb bar
+ * floors at 45 — only its deload ever clamps, and clamping UP to 45 is correct for that athlete.
+ * A lighter lift floors at the 35 lb bar instead, and the PLAN'S COPY flags that those sets assume
+ * a women's bar — a flag, not a locked door. The entry gate below 65 lb 1RM (35 / 0.5525) is where
+ * the door actually closes, because under that even the light bar cannot be prescribed.
+ * ⚠️ Derived from the WORKING NUMBER so both writers (composer, rematerializer) can ask it without
+ * a 1RM in hand, and so the answer tracks the number the block actually runs on.
+ */
+export function barFloorForWorkingNumber(workingNumber: number): number {
+  return weightForSet(workingNumber, 0.65) >= BAR_LB ? BAR_LB : BAR_LB_LIGHT;
+}
 
 /**
  * ROUND DOWN, never to nearest. Overshoot writes a set the athlete cannot complete;

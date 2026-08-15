@@ -11,7 +11,7 @@
 // ============================================================================
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-primary-plan.ts';
-import { LIFT_LABEL, missingBarbellLifts, readBarbellMaxes } from '../shared/strength-system/barbell-maxes.ts';
+import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 
 const corsHeaders = {
@@ -82,6 +82,20 @@ Deno.serve(async (req: Request) => {
       return json({
         success: false,
         error: `Missing ${named}. Every session in this plan loads off your maxes, so it cannot be built without them.`,
+      }, 409);
+    }
+
+    // ⛔ THE 65 LB ENTRY MINIMUM, per lift (2026-08-13). Mirrors the gate in
+    // `create-goal-and-materialize-plan` because this function is also invoked directly — same
+    // shared reader and threshold (`barbell-maxes.ts`), so the two cannot drift apart. Under 65,
+    // even the 35 lb women's bar cannot carry the lightest set; 65-84 is admitted and flagged.
+    const low = liftsBelowEntryMinimum(maxes).map((l) => `${LIFT_LABEL[l]} (${maxes[l]} lb)`);
+    if (low.length > 0) {
+      const named = low.length === 1 ? low[0] : `${low.slice(0, -1).join(', ')} and ${low[low.length - 1]}`;
+      console.error(`[strength-plan] refused: below entry minimum — ${named}`);
+      return json({
+        success: false,
+        error: `This plan needs a 1RM of at least ${STRENGTH_ENTRY_MIN_1RM_LB} lb on each of the four lifts — below that, even a 35 lb bar can't carry its lightest sets. Your ${named} ${low.length > 1 ? 'are' : 'is'} under that line.`,
       }, 409);
     }
 

@@ -195,6 +195,12 @@ export function strengthFocusDescription(opts: {
   /** Lifts whose working number hits its ceiling inside this block. Empty → the line is omitted. */
   ceilingLifts?: readonly string[];
   /**
+   * Lifts light enough that some prescribed sets sit below the 45 lb bar (they floor at 35 —
+   * `barFloorForWorkingNumber`). Named here so the athlete hears it at build time, in the plan's
+   * own voice: a women's bar is the equipment for those sets. Empty → the line is omitted.
+   */
+  lightBarLifts?: readonly string[];
+  /**
    * ⛔ THE COMPROMISES THE SOLVER MADE, RENDERED (2026-07-28). `placement_compromises` was written on
    * every plan and read by nothing — the second correctness-relevant message in this block found
    * being composed and discarded. A cost the athlete is paying and cannot see is not a cost that was
@@ -206,6 +212,9 @@ export function strengthFocusDescription(opts: {
   const body = sections.slice(0, 3).map((s) => `${s.heading}. ${s.body}`).join('\n\n');
   const whatsNext = sections[3];
   const ceiling = strengthFocusCeilingLine(opts.ceilingLifts ?? []);
+  const lightBar = (opts.lightBarLifts ?? []).length > 0
+    ? `Some ${(opts.lightBarLifts ?? []).join(' and ')} sets sit below the 45 lb bar — those are written for a 35 lb bar.`
+    : '';
   // ⛔ DROPPED BY `kind`, NEVER BY REGEX ON THE PROSE (fixed 2026-07-29).
   //
   // The ceiling paragraph above already states this fact, so the compromise entry is dropped here to
@@ -224,6 +233,7 @@ export function strengthFocusDescription(opts: {
     body,
     strengthFocusBufferLine(opts.enduranceNote ?? '', opts.anchorCycles ?? 1),
     ceiling,
+    lightBar,
     rest.length ? `What this week costs. ${rest.join(' ')}` : '',
     `${whatsNext.heading}. ${whatsNext.body}`,
   ].filter(Boolean);

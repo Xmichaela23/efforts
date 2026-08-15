@@ -174,10 +174,11 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
   ride: { label: 'Ride Focus', blurb: 'FTP and endurance', Icon: Bike, color: getDisciplineColor('ride') },
   strength: {
     label: 'Strength Focus',
-    // Michael's wording. It names the trade the block actually makes: the lifting leads, and the
-    // aerobic base is HELD rather than dropped — which is the whole reason this is a hybrid block
-    // and not a powerlifting programme.
-    blurb: 'Get stronger, bigger, more defined while holding aerobic base',
+    // Michael's wording, 2026-08-13 — who it's for, no number. The gate (65, barbell-maxes.ts)
+    // refuses the true beginners with its own copy; the 65-84 band builds with the women's-bar
+    // flag in the plan description. The card stopped carrying the threshold when the threshold
+    // stopped being the whole story.
+    blurb: 'Barbell compounds on Wendler\'s 5/3/1 — for strong beginners and intermediates who know the lifts.',
     Icon: Dumbbell,
     color: getDisciplineColor('strength'),
   },

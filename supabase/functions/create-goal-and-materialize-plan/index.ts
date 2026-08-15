@@ -24,7 +24,7 @@ import {
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
-import { LIFT_LABEL, missingBarbellLifts, readBarbellMaxes } from '../shared/strength-system/barbell-maxes.ts';
+import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB, type BarbellLift } from '../shared/strength-system/barbell-maxes.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 // ⛔ THE INTAKE'S OWN SEED TABLE, read here to tell an ANSWER from a PREFILL. See the precedence
 // note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
@@ -2484,6 +2484,24 @@ Deno.serve(async (req: Request) => {
               throw new AppError(
                 'missing_strength_baseline',
                 `Before this plan can be built we need your ${list} number${gsMissing.length > 1 ? 's' : ''}. Log a baseline test in Training Baselines.`,
+                409,
+              );
+            }
+            // ⛔ THE 85 LB ENTRY MINIMUM, per lift (2026-08-13) — same shared reader, same reason
+            // as the missing-lift gate above: every session's weight comes off these numbers, and
+            // under 85 the program writes weights a 45 lb bar cannot be. See
+            // `STRENGTH_ENTRY_MIN_1RM_LB` in `barbell-maxes.ts` for the derivation.
+            // Under 65, even the 35 lb women's bar cannot carry the program's lightest set —
+            // that athlete needs a beginner program, not a lighter 5/3/1. The 65-84 band is
+            // ADMITTED: those lifts floor at 35 and the plan copy names the women's-bar sets.
+            const gsLow = liftsBelowEntryMinimum(gsMaxes).map((l) => `${LIFT_LABEL[l]} (${gsMaxes[l as BarbellLift]} lb)`);
+            if (gsLow.length > 0) {
+              const list = gsLow.length === 1
+                ? gsLow[0]
+                : `${gsLow.slice(0, -1).join(', ')} and ${gsLow[gsLow.length - 1]}`;
+              throw new AppError(
+                'strength_below_minimum',
+                `This plan needs a 1RM of at least ${STRENGTH_ENTRY_MIN_1RM_LB} lb on each of the four lifts — below that, even a 35 lb bar can't carry its lightest sets. Your ${list} ${gsLow.length > 1 ? 'are' : 'is'} under that line.`,
                 409,
               );
             }

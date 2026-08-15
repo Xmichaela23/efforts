@@ -55,3 +55,26 @@ export function readBarbellMaxes(performanceNumbers: Record<string, unknown> | n
 export function missingBarbellLifts(maxes: BarbellMaxes): BarbellLift[] {
   return BARBELL_LIFTS.filter((l) => !(maxes[l] > 0));
 }
+
+/**
+ * ⛔ THE ENTRY MINIMUM — 65 lb 1RM on EACH of the four lifts (Michael, 2026-08-13: the hard 85
+ * line became "flag people under 85 they need a women's bar", so the DOOR sits at the lighter
+ * bar's line and the 65–84 band is admitted with a flag instead of refused).
+ *
+ * Why 65: the lightest set a normal week prescribes is 65% of the training max, ~55% of the
+ * entered 1RM — and it must clear a bar that exists. The lightest bar the program will write for
+ * is the 35 lb women's-class bar (35 / 0.5525 ≈ 64, rounded up to the increment; ⚠️ 35, not the
+ * 33 lb women's Olympic spec, because prescriptions round in 5 lb steps and every step off a 35
+ * bar is plate-loadable where a 33 bar makes half of them impossible). Under 65 even that bar
+ * cannot be prescribed — Wendler's own answer there is a different program, not a lighter 5/3/1,
+ * and that athlete belongs to the (future) beginner tier.
+ *
+ * A lift in the 65–84 band builds fine: it floors at 35 (`barFloorForWorkingNumber`,
+ * wendler-531.ts) and the plan description names the women's-bar sets. 85+ never sees any of it.
+ */
+export const STRENGTH_ENTRY_MIN_1RM_LB = 65;
+
+/** Lifts with a number on file that sits UNDER the entry minimum. Missing lifts are the other gate. */
+export function liftsBelowEntryMinimum(maxes: BarbellMaxes, minLb: number = STRENGTH_ENTRY_MIN_1RM_LB): BarbellLift[] {
+  return BARBELL_LIFTS.filter((l) => maxes[l] > 0 && maxes[l] < minLb);
+}
