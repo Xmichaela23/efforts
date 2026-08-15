@@ -297,6 +297,17 @@ async function cancelRestNotification(key: string): Promise<void> {
 
 
 // Plate Math Component
+// Chip palette for the under-row controls (plates, bar) — STRENGTH's discipline orange
+// (SPORT_COLORS.strength #FF8C42), not amber: amber reads as run gold (Michael, 2026-08-14 on
+// device: "our colors are wrong — they are run yellow").
+const STRENGTH_CHIP = {
+  text: 'rgba(255,140,66,0.9)',
+  border: 'rgba(255,140,66,0.4)',
+  borderOpen: 'rgba(255,140,66,0.6)',
+  bgOpen: 'rgba(255,140,66,0.16)',
+  textOpen: '#FFD9BD',
+};
+
 // One bar table for the plate math AND the chip label — two readers, one source.
 const BAR_TYPES: Record<string, { weight: number; name: string }> = {
   'standard': { weight: 45, name: 'Barbell (45lb)' },
@@ -5639,7 +5650,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     <button
                                       type="button"
                                       onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                      className={`text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors ${platesOpen ? 'text-amber-100 border-amber-400/55 bg-amber-500/[0.18]' : 'text-amber-300/85 border-amber-400/35 hover:text-amber-200 hover:border-amber-400/55'}`}
+                                      className="text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors"
+                                      style={platesOpen
+                                        ? { color: STRENGTH_CHIP.textOpen, borderColor: STRENGTH_CHIP.borderOpen, background: STRENGTH_CHIP.bgOpen }
+                                        : { color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
                                       aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
                                       aria-expanded={platesOpen ? true : false}
                                     >
@@ -5658,7 +5672,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     >
                                       <SelectTrigger
                                         aria-label="Bar type"
-                                        className="h-auto text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors text-amber-300/85 border-amber-400/35 hover:text-amber-200 hover:border-amber-400/55 bg-transparent gap-1 w-auto shadow-none focus:ring-0"
+                                        className="h-auto text-[11px] font-medium leading-none px-2 py-1 rounded-md border transition-colors bg-transparent gap-1 w-auto shadow-none focus:ring-0"
+                                        style={{ color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
                                       >
                                         {`${(BAR_TYPES[set.barType || 'standard'] || BAR_TYPES.standard).weight} lb bar`}
                                       </SelectTrigger>
