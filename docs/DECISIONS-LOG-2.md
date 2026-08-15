@@ -2125,6 +2125,11 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 
 ### D-424 — The assistance picker is EQUIPMENT-GATED, on both surfaces, through one map (2026-08-13, **BUILT — fixtures green; DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — **reverses the deliberate ungated call** (F-5, `docs/BUILDER-SWEEP-FINDINGS.md`)
 
+> ⛔ **EXTENDED 2026-08-13 NIGHT BY [D-430] (DECISIONS-LOG-3) — "both surfaces" became THREE.**
+> The gate now also runs at PLAN BUILD: `resolveDayAssistance` gates stored picks and the
+> `BALANCED_WEEK` fallbacks against `user_baselines.equipment.strength`, band routes ranked last.
+> This entry's picker/swap-sheet halves are unchanged.
+
 > ⛔ **PARTIALLY REVERSED 2026-08-13 BY [D-425] — the NICHE ITEMIZATION IS CUT, the gate is not.**
 > Both surfaces still gate through one `canPerform`, and that half stands. What went is the
 > granularity: six chips nobody could identify (Decline bench, Dip bars, Leg curl machine, GHD,

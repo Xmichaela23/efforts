@@ -23,7 +23,15 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-13 LATE — big cleanup + State day. The wasteland is demolished, the planner-landing bug is fixed in code, the D-422 climb acceptance CLOSED on a real plan export, and the bike row got its always-on load floor — built, deployed, and VERIFIED on Michael's screen.)
+## 🧭 NEXT SESSION — START HERE (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
+
+### SHIPPED 2026-08-13 NIGHT (do NOT re-litigate — D-430/D-431 in DECISIONS-LOG-3 carry the why)
+- **[D-431] the entry model:** 65 lb 1RM per lift at both entry doors; 65–84 lifts build floored at the 35 lb bar with the plan description naming those sets; 85+ untouched at 45; deloads floored (Michael's 30-lb OHP deload was the trigger); same rule in composer AND rematerialize-strength-block. Focus card copy carries no number. ⚠️ Athlete-facing copy never says "women's bar" — "35 lb bar" / "Light (33lb)".
+- **[D-430] build-time assistance equipment gate:** picks + fallbacks gated against declared equipment at plan build, band routes last. (The Triceps Extension screenshot was the lead; his own pick was legal — the gap was architectural.)
+- **Logger:** the done-tap on a rep-less working set opens the reps keypad instead of completing (covers AMRAP sets opening at 0); the bar picker is its own chip beside "plates", exercise-wide. GHR joined the band-assist movements (authored in the parallel session, committed here).
+- **Focus doors:** cards read "Build a training plan / Build a race plan / Build your own"; Strength Focus card names who it's for.
+- **⚠️ DEVICE CHECKS PENDING:** bar chip on a barbell row · empty-set tap → keypad · sub-65 refusal + 35-lb flag line (needs a low-max test account; do NOT build over Michael's live block) · Michael's live block keeps 30/40/50 deloads unless week-3 AMRAPs move weights (frozen-plan rule).
+- **Filed, untraced:** Hill Repeats detail renders "3:00 @ 9–14 W" — WATTS on a run (punch list has the token + suspects; materialize `expandRunToken` or session-detail build). Weighted Sit-Up classified bodyweight (config reclassify). Two small logger notes.
 
 ### ⛔ THE JOB: the ROUTER SESSION (Q-267 core — Michael-approved sequence).
 One dedicated engineer session: refactor `create-goal-and-materialize-plan`'s ~2,000 lines of scattered routing gates into ONE readable decision table. SAME behavior, pinned by fixtures asserting "this goal shape → this generator". The spec is `AUDIT-plan-generators-2026-08-07.md` §2 (gate lines) + `AUDIT-plan-navigation-2026-08-13.md` §2 (client chains). Fold in or schedule beside it: [Q-266]'s open client half (plan deletion still name-matches "Week 1–4" workouts).
