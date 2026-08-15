@@ -13,7 +13,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 import { formatPace } from '@/utils/workoutFormatting';
-import { getDisciplineColor } from '@/lib/context-utils';
+import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
+import { readoutPlateStyle } from '@/lib/readout-plate';
 // [Step 7] Shared with the server emitter — see tracked-max-lifts.ts.
 import { isTrackedMaxLift } from '@/lib/tracked-max-lifts';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
@@ -589,9 +590,23 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
               and a window label sitting over numbers that no longer carry a trend is the stale-label
               fault this screen has already been caught on three times. */}
           <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider">estimated 1-rep max</span>
-          {lifts.map((l) => {
+          {lifts.map((l, liftIdx) => {
             return (
-              <React.Fragment key={l.canonical}>
+              /* Each LIFT is its own lit card (2026-08-15, Michael: "give each strength exercise its
+                 own lighting… like nebula") — the logger's `.galaxy-card` (index.css), strength
+                 orange as the light, dimmer than a logger exercise card because four of them stack
+                 inside one plate. `basis-full` keeps the card full-width inside Row's flex-wrap; the
+                 inner flex re-creates Row's wrap context so the spans inside stack as before.
+                 Star field shifts per lift so the stack doesn't tile. */
+              <div
+                key={l.canonical}
+                className="galaxy-card basis-full rounded-xl border border-strength/20 px-2.5 pt-2 pb-1.5 flex flex-wrap gap-x-3 gap-y-1"
+                style={{
+                  ['--card-accent-rgb' as any]: '255,140,66',
+                  ['--card-accent-a' as any]: '0.16',
+                  ['--card-star-x' as any]: `${(liftIdx % 4) * 4}%`,
+                }}
+              >
                 {/* 2-column grid: name (fills) | e1RM value (right-aligned number column) — the third
                     column held the direction chip and went with it, so the lb column now carries the
                     right edge on its own (tabular-nums keeps the digits equal-width).
@@ -600,7 +615,8 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                 <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
                   <span className="text-white/85 text-[14px] truncate inline-flex items-baseline gap-1.5">
                     {l.displayName}
-                    {isPR(l) && <span className="text-emerald-300 text-[10px] uppercase tracking-wide font-semibold">PR</span>}
+                    {/* PR tags wear the sport colour, not green — green means bike (Michael 2026-08-15). */}
+                    {isPR(l) && <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">PR</span>}
                   </span>
                   {/* "e1RM" (estimated 1-rep max) labels the number as an ESTIMATE, not a tested max —
                       the section header defines the term, the row uses the compact form. Matches the
@@ -640,7 +656,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                     <span className="basis-full text-white/50 text-[11px] -mt-0.5 inline-flex items-baseline gap-1.5">
                       <span className="tabular-nums">all-out {Math.round(ao.weight)} lb × {ao.reps}</span>
                       {ao.isRepRecord && (
-                        <span className="text-emerald-300 text-[10px] uppercase tracking-wide font-semibold">rep PR</span>
+                        <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">rep PR</span>
                       )}
                     </span>
                   );
@@ -660,7 +676,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                     buildingLabel={(w) => `${w} ${w === 1 ? 'week' : 'weeks'} of readings`}
                   />
                 )}
-              </React.Fragment>
+              </div>
             );
           })}
         </>
@@ -1403,10 +1419,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   const sortedCards = [...cards].sort((a, b) => orderIdx(a.discipline) - orderIdx(b.discipline));
 
   return (
-    <div className="px-3 py-3">
+    <div className="py-3">
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
-      <div className="mb-2.5 flex items-baseline gap-2">
+      <div className="mb-2.5 px-1 flex items-baseline gap-2">
         {/* Named "Fitness" (not "Performance") so it can't be confused with the per-workout Performance
             tab that grades a single session. This card is the multi-week fitness TREND. */}
         <span className="text-[12px] font-semibold tracking-[0.12em] text-white/65 uppercase">Fitness</span>
@@ -1428,7 +1444,15 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
           })();
-          return <React.Fragment key={card.discipline}>{inner}</React.Fragment>;
+          // Each discipline's card wears its own READOUT PLATE keyed to its sport (2026-08-15,
+          // shared recipe in src/lib/readout-plate.ts) — this is the one place on State where a
+          // card belongs to exactly one discipline, so it is the one place the plate takes a
+          // colour. Everything multi-sport above and below sits on the neutral plate in StateTab.
+          return (
+            <div key={card.discipline} className="galaxy-card rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb(card.discipline), { galaxy: true })}>
+              {inner}
+            </div>
+          );
         };
 
         // No "Building/Holding" labels — the athlete knows their focus, and "HOLDING" collides with the
@@ -1451,8 +1475,13 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
           </>
         );
       })()}
-      {/* defensive: if there's no strength trend card at all, still surface the per-lift detail */}
-      {strengthDetail && !cards.some((c) => c.discipline === 'strength') && strengthDetail}
+      {/* defensive: if there's no strength trend card at all, still surface the per-lift detail —
+          on the strength plate, since the detail is single-discipline content */}
+      {strengthDetail && !cards.some((c) => c.discipline === 'strength') && (
+        <div className="galaxy-card rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb('strength'), { galaxy: true })}>
+          {strengthDetail}
+        </div>
+      )}
     </div>
   );
 }

@@ -32,6 +32,7 @@ import StatePerformanceSection from '@/components/context/StatePerformanceSectio
 import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs';
 import StateAdjustLens from '@/components/context/StateAdjustLens';
 import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
+import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
 
@@ -1378,7 +1379,8 @@ export default function StateTab({
                     <span className="text-white/75 tabular-nums">{e.best_weight} lb × {e.best_reps}</span>
                     {dateLabel && <span className="text-white/40">{dateLabel}</span>}
                     {est > 0 && isTrusted(e) && <span className="text-white/45 tabular-nums">e1RM {est} lb</span>}
-                    {isBest && <span className="text-emerald-300 font-medium">best</span>}
+                    {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
+                    {isBest && <span className="text-strength font-medium">best</span>}
                   </div>
                 );
               })}
@@ -1486,7 +1488,14 @@ export default function StateTab({
           Named once here; per-row specifics (WTD pts, RPE receipt) inherit it. */}
       <div className="px-1 mb-1 text-[12px] text-white/50 lowercase">load · rolling last 7 days vs your typical week</div>
 
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
+      {/* READOUT PLATES (2026-08-15) — State wears the workout Details tab's card language
+          (`readoutPlateStyle`, shared from src/lib/readout-plate.ts). The law from the logger
+          palette applies: a discipline colour only ever means its discipline. These top sections
+          (LOAD / BODY / the week mix) are MULTI-SPORT, so their plate is NEUTRAL — the sport
+          colours inside them are data (bars, legend chips), never the card's own chrome. The
+          per-discipline plates live in <StatePerformanceSection>, where a card belongs to one
+          sport and may wear it. */}
+      <div className="galaxy-card rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* LOAD — full-width gauge + sparkline */}
         <LoadBar load={load} loadStatus={loadStatus} weekIntent={week.intent} />
@@ -1679,12 +1688,18 @@ export default function StateTab({
           );
         })()}
 
-        {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
-        {/* ⛔ `block` is the block-identity card the coach payload has carried since v150 — protocol,
-            goal, week-in-cycle, deload, the plain phase word. The fitness rows below RENDER it; they
-            do not re-derive any of it (Law 4). `planWeek` is the server's already-gated week number
-            (null before a plan starts and after it ends), so the two always agree. */}
-        <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} />
+      </div>
+
+      {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
+      {/* ⛔ `block` is the block-identity card the coach payload has carried since v150 — protocol,
+          goal, week-in-cycle, deload, the plain phase word. The fitness rows below RENDER it; they
+          do not re-derive any of it (Law 4). `planWeek` is the server's already-gated week number
+          (null before a plan starts and after it ends), so the two always agree.
+          Sits OUTSIDE the neutral plates: its rows are per-discipline, and each wears its own
+          sport-keyed plate inside the section. */}
+      <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} />
+
+      <div className="mt-2 galaxy-card rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

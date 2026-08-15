@@ -18,6 +18,7 @@ import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase, getStoredUserId } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
+import { readoutPlateStyle as readoutPlate, readoutValueStyle } from '@/lib/readout-plate';
 import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
 import { useWorkoutData } from '@/hooks/useWorkoutData';
@@ -150,29 +151,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   const accentCore = getDisciplinePhosphorCore(resolvedWorkoutType);
   const plateGlow = getDisciplineGlowStyle(resolvedWorkoutType, 'week')?.boxShadow as string | undefined;
 
-  const readoutPlateStyle: React.CSSProperties = {
-    borderRadius: 16,
-    border: `1px solid rgba(${accentRgb}, 0.18)`,
-    backgroundColor: 'rgba(0,0,0,0.30)',
-    backgroundImage: `
-      radial-gradient(900px 220px at 50% 0%, rgba(${accentRgb}, 0.14) 0%, rgba(0,0,0,0) 68%),
-      radial-gradient(600px 220px at 10% 10%, rgba(255, 215, 0, 0.06) 0%, rgba(0,0,0,0) 65%),
-      radial-gradient(600px 220px at 90% 12%, rgba(74, 158, 255, 0.05) 0%, rgba(0,0,0,0) 65%),
-      linear-gradient(to bottom, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 18%, rgba(0,0,0,0.0) 100%)
-    `,
-    boxShadow: [
-      '0 0 0 1px rgba(255,255,255,0.06) inset',
-      '0 1px 0 rgba(255,255,255,0.06) inset',
-      plateGlow || '',
-      '0 10px 28px rgba(0,0,0,0.35)',
-    ].filter(Boolean).join(', '),
-  };
+  // The plate recipe moved to `src/lib/readout-plate.ts` (2026-08-15) when State adopted this
+  // card language — one definition, shared. This file keeps only the workout-keyed inputs.
+  const readoutPlateStyle = readoutPlate(accentRgb, { glow: plateGlow });
 
-  const metricValueBaseStyle: React.CSSProperties = {
-    color: 'rgba(255,255,255,0.92)',
-    textShadow: `0 0 14px rgba(${accentRgb}, 0.18), 0 0 2px rgba(${accentRgb}, 0.22)`,
-    fontVariantNumeric: 'tabular-nums lining-nums',
-  };
+  const metricValueBaseStyle = readoutValueStyle(accentRgb);
 
   const metricLabelStyle: React.CSSProperties = {
     color: `rgba(${accentRgb}, 0.58)`,
