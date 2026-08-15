@@ -296,15 +296,71 @@ async function cancelRestNotification(key: string): Promise<void> {
 // Rest length: `src/lib/strength-rest-timer.ts` (extracted 2026-08-03 so it can be fixtured).
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// THE LOGGER'S PALETTE — ONE HUE, FOUR INTENSITIES (2026-08-14)
+//
+// Michael, on device, after two hours of piecemeal colour swaps made it worse:
+// *"every choice communicates something specific, and we only use the strength orange when we
+// use orange."* This block is that rule made mechanical. Read it before adding any colour here.
+//
+// THE HUE is SPORT_COLORS.strength (#FF8C42) and nothing else on this screen carries colour.
+// Three separate leaks were removed to get there, and each was the SAME defect — a colour that
+// belongs to another discipline being spent on a meaning it does not own:
+//   · Tailwind `orange-300`/`orange-200` — NOT this hue. A pale peach (#FDBA74) that desaturates
+//     to tan-gold over black. This is what read as "run yellow" on the section headers, the AMRAP
+//     line and the PR text. Run gold is #FFD700; the eye does not care that the hex differed.
+//   · `sky-300` on warm-up labels — a blue on a strength surface. Swim is #4A9EFF.
+//   · `emerald`/#5fd08a for "done" — bike green is #50C878. Effectively the same colour.
+//
+// INTENSITY IS THE MEANING. LED doctrine (SPORT_COLORS header): always softly on, brighter when
+// active or completed, never flat, never neon.
+//   BANKED    solid    the set is done — the work is in the bank. The brightest thing on screen.
+//   LIVE      ~90%     a prescription asking for a decision RIGHT NOW (AMRAP, PR, reps owed).
+//   STRUCTURE ~55%     "this is a strength surface." ONE per card — never per row.
+//   WARMUP    ~65%     lower-intensity work reads as a dimmer light, so the ramp reads as a ramp.
+//                      ⚠️ This was 40% and had to come UP once the card background was lit much
+//                      more strongly (Michael: "is there a reason warm up is faded?"). The rung
+//                      spacing on this ladder is only meaningful against the ground it sits on —
+//                      if the card lighting changes again, re-check the dim end for contrast.
+//   neutral   white    static metadata that never changes state (chips, numbers, labels).
+//
+// ⛔ DO NOT ADD A FIFTH COLOUR. Add an intensity. If a thing needs to stand out and none of these
+// fit, the question is what it MEANS, not which hue is free.
+//
+// The one deliberate exception is `PlateMath`'s plate colours below (blue 45 / yellow 35 /
+// green 25 …): those are real-world plate coding — a literal picture of the loaded bar, not
+// chrome. Recolouring them to orange would make the screen say LESS.
+const STRENGTH_RGB = '255,140,66'; // = SPORT_COLORS.strength (src/lib/context-utils.ts)
+const STRENGTH = {
+  // BANKED
+  banked: `rgb(${STRENGTH_RGB})`,
+  bankedRow: `rgba(${STRENGTH_RGB},0.10)`,
+  bankedLine: `rgba(${STRENGTH_RGB},0.75)`,
+  onBanked: '#2A1206', // text ON a solid fill — dark enough to read at any size
+  numDone: '#FFE6D5',
+  // LIVE
+  live: `rgba(${STRENGTH_RGB},0.92)`,
+  liveSoft: `rgba(${STRENGTH_RGB},0.78)`,
+  liveFill: `rgba(${STRENGTH_RGB},0.22)`,
+  // STRUCTURE
+  structure: `rgba(${STRENGTH_RGB},0.55)`,
+  border: `rgba(${STRENGTH_RGB},0.35)`,
+  fill: `rgba(${STRENGTH_RGB},0.10)`,
+  // WARM-UP
+  warmup: `rgba(${STRENGTH_RGB},0.40)`,
+} as const;
+
 // Plate Math Component
-// Chip palette for the under-row controls (plates, bar) — STRENGTH's discipline orange
-// (SPORT_COLORS.strength #FF8C42), not amber: amber reads as run gold (Michael, 2026-08-14 on
-// device: "our colors are wrong — they are run yellow").
+// Chip palette for the under-row controls (plates, bar). CLOSED = NEUTRAL, and that is the point:
+// "plates" and "45 lb bar" are static metadata, identical under every set, and they were the
+// loudest thing on the screen — four accented chip pairs stacked before the eye reached any actual
+// work. When the accent is spent on what never changes, it stops meaning anything. The chip earns
+// the accent only while its plate view is OPEN, which is the one thing about it that is state.
 const STRENGTH_CHIP = {
-  text: 'rgba(255,140,66,0.9)',
-  border: 'rgba(255,140,66,0.4)',
-  borderOpen: 'rgba(255,140,66,0.6)',
-  bgOpen: 'rgba(255,140,66,0.16)',
+  text: 'rgba(255,255,255,0.70)',
+  border: 'rgba(255,255,255,0.14)',
+  borderOpen: `rgba(${STRENGTH_RGB},0.60)`,
+  bgOpen: `rgba(${STRENGTH_RGB},0.16)`,
   textOpen: '#FFD9BD',
 };
 
@@ -4352,18 +4408,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         saveShadow: 'shadow-[0_0_0_1px_rgba(168,85,247,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
       }
     : {
-        // Strength = ORANGE (SPORT_COLORS.strength), 2026-08-14 — Michael: "there should be no
-        // yellow on the logger, it's running color." Supersedes the 2026-08-10 amber mockup call.
-        border: 'border-orange-500/35',
-        text: 'text-orange-400',
-        hoverText: 'hover:text-orange-400',
-        rgb: '240,150,60',
-        // Save button
-        saveBg: 'bg-orange-700/80',
-        saveBorder: 'border-orange-500/40',
-        saveHoverBg: 'hover:bg-orange-700/90',
-        saveHoverBorder: 'hover:border-orange-500/50',
-        saveShadow: 'shadow-[0_0_0_1px_rgba(240,150,60,0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
+        // Strength = the sport colour itself (`strength` in tailwind.config.ts = #FF8C42), at the
+        // STRUCTURE intensity. Was `orange-500/400` — a different hue that never matched the chips
+        // sitting inside these same cards. See the palette block at the top of this file.
+        border: 'border-strength/35',
+        text: 'text-strength/90',
+        hoverText: 'hover:text-strength',
+        rgb: STRENGTH_RGB,
+        // Save button — the commit action, so it wears BANKED weight, not structure.
+        saveBg: 'bg-strength/25',
+        saveBorder: 'border-strength/50',
+        saveHoverBg: 'hover:bg-strength/35',
+        saveHoverBorder: 'hover:border-strength/70',
+        // ⚠️ Tailwind's JIT only sees class strings it can read LITERALLY in the source. The old
+        // value interpolated `themeColors.rgb` into an arbitrary `shadow-[…]`, so no CSS was ever
+        // generated for it and the inset never rendered. Kept literal here; the card's own shadow
+        // (which had the same defect) is an inline style now.
+        saveShadow: 'shadow-[0_0_0_1px_rgba(255,140,66,0.10)_inset,0_4px_12px_rgba(0,0,0,0.2)]',
       };
 
   // Row-per-set accent (2026-08-10). A completed set tints the row, turns its number underlines,
@@ -4377,10 +4438,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         checkOn: 'bg-purple-400 border-purple-300 text-purple-950',
       }
     : {
-        rowBg: 'bg-orange-500/[0.10]',
-        underline: 'border-orange-300/75',
-        num: 'text-orange-50',
-        checkOn: 'bg-orange-400 border-orange-300 text-orange-950',
+        // BANKED — the loudest state on the screen, because "I did this" is the thing you scan for.
+        rowBg: 'bg-strength/[0.10]',
+        underline: 'border-strength/75',
+        num: 'text-[#FFE6D5]',
+        checkOn: 'bg-strength border-strength text-[#2A1206]',
       };
 
   // Don't render until properly initialized
@@ -4419,9 +4481,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     <div 
       className="fixed inset-0 flex flex-col"
       style={{
-        // Match the Home screen: near-pure black instrument with a soft amber bleed from the top
+        // Match the Home screen: near-pure black instrument with a soft orange bleed from the top
         // (the digital-galaxy "light from above"), not a grey top-to-black wash (2026-08-11).
-        background: 'radial-gradient(130% 55% at 50% 0%, rgba(240,150,60,0.10) 0%, transparent 50%), #050506'
+        // 2026-08-14: the hue here was `240,150,60` — close to the sport colour and not it, so the
+        // room light and everything lit by it were two different oranges. And ONE light at the top
+        // left the whole lower half of a scrolling list in dead flat black; a second, wider, much
+        // fainter source low-left keeps the space feeling lit all the way down.
+        background: `radial-gradient(130% 55% at 50% 0%, rgba(${STRENGTH_RGB},0.14) 0%, transparent 50%), radial-gradient(120% 70% at 15% 100%, rgba(${STRENGTH_RGB},0.05) 0%, transparent 55%), #050506`
       }}
     >
     <div 
@@ -4447,8 +4513,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const total = activeTimer.seconds ?? 0;
           const display = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
           return (
-            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/20 border border-orange-400/50 text-orange-100 shadow-lg backdrop-blur-md">
-              <span className="text-xs uppercase tracking-wide text-orange-300/80">Rest</span>
+            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-strength/20 border border-strength/50 text-[#FFE6D5] shadow-lg backdrop-blur-md">
+              <span className="text-xs uppercase tracking-wide text-strength/80">Rest</span>
               <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
               <button
                 type="button"
@@ -4459,7 +4525,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   cancelRestNotification(activeKey);
                   clearPersistedTimer(activeKey); // Q-TIMER: skipped → drop its wall-clock deadline
                 }}
-                className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-orange-100 hover:text-white flex items-center justify-center text-xs font-medium"
+                className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-white/80 hover:text-white flex items-center justify-center text-xs font-medium"
                 aria-label="Skip rest"
               >
                 Skip
@@ -4490,7 +4556,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 no structured week_type flag is plumbed to the logger. */}
             {/deload/i.test(String(scheduledWorkout?.name || '')) && (
               <span
-                className="shrink-0 mt-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300/90"
+                className="shrink-0 mt-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-strength/15 border border-strength/40 text-strength/90"
                 title="This is a deload week — lighter loads are intentional recovery, not a regression."
               >
                 Deload
@@ -4758,7 +4824,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </div>
           </div>
         )}
-        {exercises.map((exercise, exerciseIndex) => (
+        {exercises.map((exercise, exerciseIndex) => {
+          // Card chrome = "is this the prescription?" — see the long note above the card below.
+          const isMainLiftCard = !isMobilityMode && isMain531Lift(exercise?.name || '');
+          // ⛔ THE LIGHT IS ALWAYS THE SPORT COLOUR — only its BRIGHTNESS says what the card is
+          // (2026-08-14, Michael on the assistance block: "can we add more orange space lighting
+          // effect in there"). The first cut lit assistance cards in WHITE, which read as a
+          // different material rather than a quieter one, and left the lower half of the screen
+          // dead. Orange everywhere, dimmer on assistance: the hierarchy survives as intensity,
+          // which is what the rest of this palette already uses. The neutral RIM is what still
+          // says "not the prescription" — see the note on the card.
+          const cardRgb = isMobilityMode ? themeColors.rgb : STRENGTH_RGB;
+          const cardGlow = isMainLiftCard || isMobilityMode ? [0.40, 0.05] : [0.22, 0.035];
+          return (
           <React.Fragment key={exercise.id}>
           {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE FOR THE WHOLE BLOCK, above the first
               assistance card. It is a section note, not a property of any one exercise.
@@ -4780,13 +4858,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {ACCESSORY_SET_CUE}
             </p>
           )}
+          {/* ⛔ THE ACCENT MEANS "THIS IS THE PRESCRIPTION" (2026-08-14, Michael: "we keep big lift
+              orange, accessories white?"). The main lift is the thing the programme drives — a
+              percentage of a training max, a rep target, a set that decides the next cycle.
+              Assistance is explicitly by feel (2nd ed. p.24/p.102). Painting both the same colour
+              spent the accent on the part of the screen that has no prescription to carry.
+              So the CARD's colour is main-lift-only.
+              ⚠️ STATE stays orange on EVERY card, deliberately — a completed set is a completed set
+              whether it is a squat or a chin-up, and the accessory blocks are exactly where you
+              scan "how many have I banked". Chrome answers "what kind of work is this"; the check
+              and the row tint answer "did I do it". Two questions, two jobs, one hue.
+              The gate is `isMain531Lift` — an explicit curated list that MISSES TO FALSE — and not
+              `!isAssistanceRow`, for the same reason the bar-speed cue uses it: a prescribed Box
+              Jump is not assistance and is not a main lift either, and it should not claim the
+              accent by default. */}
           <div
-            className={`backdrop-blur-xl border-2 ${themeColors.border} rounded-2xl mx-3 mb-2 shadow-[0_0_0_1px_rgba(${themeColors.rgb},0.1)_inset,0_4px_12px_rgba(0,0,0,0.2)]`}
+            className={`galaxy-card backdrop-blur-xl border-2 rounded-2xl mx-3 mb-2 ${isMainLiftCard || isMobilityMode ? themeColors.border : 'border-white/[0.12]'}`}
             style={{
-              // Black ground, amber as LIGHT (2026-08-10) — the accent reads as a light source
-              // glowing off the top edge, not a flat wash. A focused radial from top-center fades
-              // fast to near-pure black, so the card is black with the amber bleeding in like lighting.
-              background: `radial-gradient(140% 78% at 50% -14%, rgba(${themeColors.rgb},0.24) 0%, rgba(${themeColors.rgb},0.05) 34%, transparent 62%), #060506`
+              // The deep-space treatment now comes from `.galaxy-card` in index.css — the wizard's
+              // own nebula/stars/grain recipe, not a second hand-rolled gradient. The card supplies
+              // only the two knobs: WHICH light and HOW BRIGHT.
+              ['--card-accent-rgb' as any]: cardRgb,
+              ['--card-accent-a' as any]: String(cardGlow[0]),
+              // Shifts this card's star field so a stack of them doesn't tile the same five stars.
+              ['--card-star-x' as any]: `${(exerciseIndex % 4) * 4}%`,
+              // Moved out of `className` (2026-08-14): it was an arbitrary `shadow-[…]` built by
+              // string interpolation, which Tailwind's JIT cannot see, so this inset rim has never
+              // rendered since it was written. Inline, it does.
+              boxShadow: `0 0 0 1px rgba(${cardRgb},0.10) inset, 0 4px 12px rgba(0,0,0,0.2)`,
             }}
           >
             {/* Core Work/Circuit exercises use the CoreTimer component */}
@@ -5235,7 +5334,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   return (
                     <>
                       {titleCue && (
-                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-orange-300/70 leading-snug">
+                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-strength/75 leading-snug">
                           {titleCue}
                         </div>
                       )}
@@ -5244,7 +5343,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           its own reps field; this just totals what's left and drops as sets complete. */}
                       {exRepTotal != null && (
                         <div className="flex items-center gap-2.5 px-1.5 pt-0.5 pb-2.5" aria-live="polite" aria-label={repTotalLine(exRepTotal, exRepsLeft)}>
-                          <span className={`text-[15px] font-bold tabular-nums leading-none whitespace-nowrap ${exRepsLeft <= 0 ? 'text-emerald-300' : 'text-white/85'}`}>
+                          {/* Reps owed is LIVE (it asks for a decision) and reps DONE is BANKED —
+                              same hue, one step brighter. It used to go emerald on completion,
+                              which is bike green on a strength screen. */}
+                          <span
+                            className="text-[15px] font-bold tabular-nums leading-none whitespace-nowrap"
+                            style={{ color: exRepsLeft <= 0 ? STRENGTH.banked : 'rgba(255,255,255,0.85)' }}
+                          >
                             {exRepsLeft <= 0
                               ? `${exRepTotal} reps done`
                               : (<><span>{exRepsLeft}</span><span className="text-[11px] font-semibold text-white/55 ml-1">reps left</span></>)}
@@ -5254,7 +5359,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               className="block h-full rounded-full transition-all duration-300"
                               style={{
                                 width: `${Math.max(0, Math.min(1, (exRepTotal - exRepsLeft) / exRepTotal)) * 100}%`,
-                                background: exRepsLeft <= 0 ? '#5fd08a' : 'linear-gradient(90deg,#c9772a,#f2953b)',
+                                // Was a hand-picked two-stop gradient (#c9772a→#f2953b) that matched
+                                // nothing else on the screen, going green at 100%. One hue now: it
+                                // fills at LIVE and brightens to BANKED when the total is met.
+                                background: exRepsLeft <= 0 ? STRENGTH.banked : STRENGTH.liveSoft,
                               }}
                             />
                           </span>
@@ -5474,7 +5582,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     identical, and the session was logged wrong because of it. The
                                     placeholder sits where the eyes already are. */}
                                 {shown === '' && set.amrap && !done
-                                  ? <span className="text-orange-300/55 text-[11px] tracking-wide">AMRAP</span>
+                                  ? <span className="text-strength/60 text-[11px] tracking-wide">AMRAP</span>
                                   : (shown === '' ? ' ' : shown)}
                               </span>
                             </button>
@@ -5503,7 +5611,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             >
                               {hasValue
                                 ? <span className={set.from_previous && !done ? ghostCls : undefined}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                : <span className={targetRir != null ? 'text-orange-300/80 font-medium' : 'text-white/30'}>{formatRirTarget(targetRir)}</span>}
+                                : <span className={targetRir != null ? 'text-strength/85 font-medium' : 'text-white/30'}>{formatRirTarget(targetRir)}</span>}
                             </button>
                           );
                         };
@@ -5536,7 +5644,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {/* Baseline test set-type label + hint */}
                             {exIsBaselineTest && (isWarmup || isWorking) && (
                               <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
-                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-orange-300/85'}`}>
+                                {/* Warm-up vs working set is an INTENSITY difference, so it is drawn
+                                    as one. Warm-up was sky blue — a swim colour doing a strength
+                                    job; the ramp now literally reads as a dimmer light that comes
+                                    up when the work starts. */}
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-strength/65' : 'text-strength/95'}`}>
                                   {isWarmup ? 'Warmup' : 'Working set — add when ready'}
                                 </span>
                                 {set.setHint && <span className="text-[10px] text-white/45 italic">{set.setHint}</span>}
@@ -5548,7 +5660,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 the prescription. Only when the plan authored a ramp — see parseFromComputed. */}
                             {!exIsBaselineTest && exHasWarmupRamp && ((isWarmup && setIndex === firstWarmupIndex) || (isWorking && setIndex === workingSetIndex)) && (
                               <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
-                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-sky-300/80' : 'text-orange-300/85'}`}>
+                                {/* Warm-up vs working set is an INTENSITY difference, so it is drawn
+                                    as one. Warm-up was sky blue — a swim colour doing a strength
+                                    job; the ramp now literally reads as a dimmer light that comes
+                                    up when the work starts. */}
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-strength/65' : 'text-strength/95'}`}>
                                   {isWarmup ? 'Warm-up' : 'Working sets'}
                                 </span>
                               </div>
@@ -5572,7 +5688,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               // No horizontal padding here — the set container already adds px-1.5, so
                               // this lands flush with the bar-speed cue above the exercise (which has
                               // its own px-1.5 and no container). Same vertical line as "SET".
-                              <div className="pt-0.5 pb-2 text-[11px] font-medium text-orange-300/85 leading-snug">
+                              <div className="pt-0.5 pb-2 text-[11px] font-medium text-strength/90 leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
                               </div>
                             )}
@@ -5582,8 +5698,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 the moment it's hit (Michael 2026-08-11). */}
                             {isAmrapPR && (
                               <div className="pb-2 flex items-center gap-2" role="status" aria-label={`Personal record — estimated 1RM ${amrapE1rm} pounds`}>
-                                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-400/25 border border-orange-300/70 text-orange-50">PR</span>
-                                <span className="text-[11px] font-medium text-orange-200/85">new best — est. 1RM {amrapE1rm} lb</span>
+                                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-strength border-strength text-[#2A1206]">PR</span>
+                                <span className="text-[11px] font-medium text-strength/90">new best — est. 1RM {amrapE1rm} lb</span>
                               </div>
                             )}
 
@@ -5798,9 +5914,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 (r) => r.lift.toLowerCase() === exercise.name.trim().toLowerCase(),
                               );
                               if (!srv) return null;
+                              // A saved, server-computed 1RM is BANKED work, not a generic
+                              // "success" — emerald here was bike green (#50C878).
                               return (
-                                <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-emerald-500/[0.06] border border-emerald-400/20 rounded-lg">
-                                  <div className="text-[13px] text-emerald-200/90">
+                                <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-strength/[0.08] border border-strength/25 rounded-lg">
+                                  <div className="text-[13px] text-strength/90">
                                     Saved: {srv.estimated1RM} lb
                                     <span className="text-white/45"> — from {srv.weight > 0 ? `${srv.weight} lb × ` : ''}{srv.reps} reps</span>
                                   </div>
@@ -5825,9 +5943,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {rirConfirm && rirConfirm.exerciseId === exercise.id && rirConfirm.setIndex === setIndex && (() => {
                               const targetRir = exercise.target_rir;
                               return (
-                                <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-orange-400/40 bg-orange-500/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
+                                <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-strength/40 bg-strength/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-orange-300/90">RIR — tap to change</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-strength/90">RIR — tap to change</span>
                                     <button
                                       type="button"
                                       onClick={() => setRirConfirm(null)}
@@ -5849,8 +5967,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                           onClick={() => confirmRirAndComplete(exercise.id, setIndex, r)}
                                           className={`h-9 w-9 rounded-full border-2 text-sm tabular-nums leading-none transition-colors ${
                                             isSuggested
-                                              ? 'bg-orange-500/30 border-orange-300 text-orange-100 font-semibold ring-2 ring-orange-300/50'
-                                              : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-orange-500/15 hover:border-orange-400/40'
+                                              ? 'bg-strength/30 border-strength text-[#FFE6D5] font-semibold ring-2 ring-strength/50'
+                                              : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-strength/15 hover:border-strength/40'
                                           }`}
                                           style={{ fontFamily: 'Inter, sans-serif' }}
                                           aria-label={`RIR ${isCap ? '5 or more' : r}${isSuggested ? ' (suggested — tap to confirm)' : ''}`}
@@ -5938,7 +6056,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             )}
           </div>
           </React.Fragment>
-        ))}
+          );
+        })}
 
         {/* Add new exercise input */}
         <div className="relative mx-3 mb-2">
@@ -6127,7 +6246,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     <div key={i} className="text-sm text-white/85">
                       <span className="text-white/60">{c.lift}</span>{' '}
                       <span className="tabular-nums">{c.from_top_set} → {c.to_top_set} lb</span>
-                      <span className={`ml-2 text-[12px] ${up ? 'text-emerald-300/80' : 'text-white/45'}`}>
+                      <span className={`ml-2 text-[12px] ${up ? 'text-strength/85' : 'text-white/45'}`}>
                         {up ? 'earned the step' : 'resets, and the next cycle builds from there'}
                       </span>
                     </div>
@@ -6208,7 +6327,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       <button
                         onClick={() => chooseDown(d.key, 'update')}
                         disabled={savingBaseline}
-                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-orange-500/25 border-orange-400/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
+                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-strength/25 border-strength/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         Update to {d.next}

@@ -21,6 +21,16 @@ export default {
     },
     extend: {
       colors: {
+        // ⛔ THE DISCIPLINE COLOURS. `strength` MUST equal SPORT_COLORS.strength in
+        // src/lib/context-utils.ts — pinned by src/lib/__tests__/sport-color-parity.test.ts.
+        //
+        // Why this exists: strength surfaces were being coloured with Tailwind's own
+        // `orange-300`/`orange-400`, which are NOT this hue — orange-300 (#FDBA74) is a pale peach
+        // that desaturates to tan-gold over a black ground, and on device it read as run gold
+        // (Michael, 2026-08-14: "there's yellow in there, which is for run"). Reaching for a
+        // built-in Tailwind ramp is how the accent drifted off the sport colour four separate
+        // times in one file. Use `strength` and an opacity modifier — never `orange-*`.
+        strength: '#FF8C42',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

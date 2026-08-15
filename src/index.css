@@ -993,6 +993,49 @@ body.wizard-active { --tabbar-h: 0px; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* Galaxy CARD — the same deep-space treatment as the Strong Focus wizard, on a card.
+   (2026-08-14, Michael: "give the cards background the same space treatment as the current plan
+   wizard in Strong Focus.")
+
+   Same recipe as `.wizard-galaxy` above — nebula + stars + grain — with two deliberate changes:
+
+   1. The PRIMARY light is the SPORT COLOUR, driven by `--card-accent-rgb`, at a brightness set by
+      `--card-accent-a`. That is what keeps the logger's palette rule intact rather than breaking it:
+      the galaxy is the ROOM — shared, multi-hued, the same space every Efforts screen sits in — and
+      the sport colour is the INSTRUMENT lit inside it. Those are different layers. A main lift is
+      lit brightly; assistance is lit dimly. Hierarchy stays an intensity, as everywhere else here.
+   2. The wizard's secondary hues are pulled DOWN (roughly half), because the wizard renders one
+      full-screen backdrop while a logger screen stacks six of these. At the wizard's values a
+      column of cards reads as purple, not as black instruments in a lit room.
+
+   `border-radius: inherit` matters — without it the pseudo-element paints square corners outside
+   the card's rounded edge. `--card-star-x` shifts the star field per card so a stack of them does
+   not visibly tile the same five stars. */
+.galaxy-card { position: relative; isolation: isolate; }
+.galaxy-card::before {
+  content: ""; position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  border-radius: inherit;
+  background-color: #070718;
+  background-image:
+    radial-gradient(135% 105% at 50% -10%, rgba(var(--card-accent-rgb, 255,140,66), var(--card-accent-a, 0.30)), transparent 66%),
+    radial-gradient(82% 54% at 8% 0%, rgba(255,188,84,0.12), transparent 60%),
+    radial-gradient(76% 58% at 97% 20%, rgba(138,104,230,0.17), transparent 60%),
+    radial-gradient(80% 60% at 50% 118%, rgba(56,112,206,0.13), transparent 62%),
+    radial-gradient(44% 34% at 85% 90%, rgba(232,78,156,0.08), transparent 64%),
+    radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.5), transparent),
+    radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.4px 1.4px at calc(88% - var(--card-star-x, 0%)) 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
+}
+.galaxy-card::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.10; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 /* Logo pulse animation - slow, rhythmic heartbeat */
 @keyframes logoPulse {
   0%, 100% { opacity: 0.7; }
