@@ -17,23 +17,42 @@
 > **Also since:** the four lifts run in Wendler's p.11 order (Press · Deadlift · Bench · Squat), the
 > hill session's descent ends on the lap button **[D-390]**, and run/ride days alternate **[D-387]**.
 >
+> ⛔ **AND A FIFTH THING IS NOW WRONG, BIGGER THAN THE FOUR ABOVE — [D-432], 2026-08-15.** §1's
+> *"12 weeks = three 4-week cycles"* is superseded: **a cycle is THREE weeks and the light weeks are
+> standalone**, per 5/3/1 Forever. The 12-week block is now
+> `TM test · Leader · Leader · 7th-week deload · Anchor · TM test`, the leader weeks carry an FSL 5×5
+> supplemental, the assistance/jump volume scales UP into the anchor rather than down, and the 3-day
+> shape pairs deadlift + press. Read D-432 before any line of §1.
+>
 > ⚠️ **THE CURRENT PROTOCOL IS D-385 … D-390 IN `DECISIONS-LOG-2.md`.** This file is the V1 record and
 > is kept for §0/§4 and the citation table; **it is no longer a description of what the engine builds.**
 
 
+> # ⛔ TWO OF THE THREE OUTSTANDING ITEMS LANDED 2026-08-15 — [D-432]. ONE IS LEFT.
+>
+> **§1b — THE WEEK-12 TRANSITION — IS PAID.** The block now closes on a standalone, rested TM-test
+> week whose top set is the block-to-block gate: five reps at the training max advances it, three or
+> four holds it, two or fewer replaces it with the number computed off that set (Forever p.21).
+> `verdictFromTmTestSet` + `nextBlockTrainingMax`, wired through `create-goal-and-materialize-plan`
+> as `prior_training_max`. Pinned in `tm-test-verdict.test.ts`.
+> ⚠️ The description's *"speed and distance blocks unlock when this cycle closes"* is **still a debt**
+> — this section paid the WEIGHT half of the hand-off; neither of those two blocks exists.
+>
+> **THE 8-WEEK OPTION IS BUILT.** It is test-less at the front (test + L + deload + A + test costs
+> nine weeks), so the entry gate's 1RM stands in and the copy names only the test week it has.
+>
+> **WHAT SURVIVES UNBUILT, and is now the only reason this file exists:**
+> - **§2's opt-in quality session** — off by default, replaces an easy session.
+>
+> **Delete this file when that lands.** ⚠️ Not deleted on 2026-08-15 because D-432 is EDITS ONLY —
+> nothing is pushed or deployed yet, and the spec lifecycle says a spec dies on SHIP.
+>
+> ---
+>
 > # ✅ BUILT 2026-07-25 — §1 AND §2 ARE SHIPPED. Substance folded into **D-324**.
 >
 > **What is BUILT:** the protocol (§1), the entry gate (§0), the session shape, the endurance dose,
 > the assistance slots, the copy (§4). Pushed and deployed; **not device-seen**.
->
-> **What SURVIVES UNBUILT, and is the only reason this file still exists:**
-> - **§1b — the week-12 transition.** The 95% rule → advance / reset / hold, and the chain of blocks.
->   ⛔ The block description now PROMISES "speed and distance blocks unlock when this cycle closes."
->   That is a debt this section has to pay.
-> - **The 8-week short option** (off-ratio, labelled as such).
-> - **§2's opt-in quality session** — off by default, replaces an easy session.
->
-> **Delete this file when those three land.**
 >
 > ⚠️ Two things in here are now WRONG: the week table names fixed days (bench Monday, squat Tuesday…)
 > — the lifting is placed around the athlete's endurance absolutes, so the days vary. And §2's

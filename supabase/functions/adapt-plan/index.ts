@@ -452,7 +452,9 @@ Deno.serve(async (req) => {
       const planCfg = parseJson<any>(activePlan?.config) || {};
       const currentTm = planCfg?.training_max || null;
       const currentWeek = Number(activePlan?.current_week);
-      if (currentTm && isCatchUpBoundary(currentWeek)) {
+      // ⚠️ THE BLOCK LENGTH TRAVELS WITH THE WEEK (2026-08-15). A boundary is a STANDALONE week in the
+      // block map, not `week % 4`, so the gate cannot be answered from a week number alone.
+      if (currentTm && isCatchUpBoundary(currentWeek, Number(activePlan?.duration_weeks) || Number(planCfg?.duration_weeks))) {
         // ⚠️ THE BLOCK'S OWN WORKOUTS, not a rolling four weeks. The catch-up asks "what is the best
         // AMRAP THIS BLOCK has produced" — a window would silently drop the evidence as the block ran
         // on, and the answer would change depending on when the athlete happened to open the app.
@@ -1015,7 +1017,7 @@ async function acceptSuggestion(
 
     const { data: plans } = await supabase
       .from('plans')
-      .select('id,config,current_week')
+      .select('id,config,current_week,duration_weeks')
       .eq('user_id', userId)
       .eq('status', 'active')
       .limit(1);
@@ -1031,7 +1033,7 @@ async function acceptSuggestion(
     // arbitrary training max. The same fixtured function that produced the offer produces the value.
     // ⚠️ It also re-checks the boundary: a suggestion left on screen while the week rolled over must
     // not still apply.
-    if (!isCatchUpBoundary(Number(plan.current_week))) {
+    if (!isCatchUpBoundary(Number(plan.current_week), Number((plan as any).duration_weeks) || Number(cfg?.duration_weeks))) {
       return { applied: false, type: 'strength_training_max', detail: 'Not at a cycle boundary any more — nothing was changed' };
     }
     const { data: strengthWorkouts } = await supabase

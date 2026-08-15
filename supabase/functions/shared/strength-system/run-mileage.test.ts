@@ -14,6 +14,10 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
+// ⛔ WEEK 2, NOT WEEK 1 (2026-08-15, work order §1c). Week 1 of a Strong Focus block is now a
+// standalone TM-TEST week — light band, no hard endurance session, trimmed easy volume — so it is
+// no longer the representative working week these assertions want. Week 2 is cycle 1's first
+// leader week and is the shape week 1 used to be.
 const PACE = 10;   // min/mi, so minutes ÷ 10 = miles
 const built = (miles: number, runDays: number) => {
   const p = composeStrengthPrimaryPlan({
@@ -22,7 +26,7 @@ const built = (miles: number, runDays: number) => {
     longRunDay: 'sunday', hardDay: { day: 'tuesday', discipline: 'run' },
     easyPaceMinPerMile: PACE,
   } as never);
-  const runs = (p.sessions_by_week['1'] as any[]).filter((s) => s.type === 'run');
+  const runs = (p.sessions_by_week['2'] as any[]).filter((s) => s.type === 'run');
   return { runs, miles: runs.reduce((a, s) => a + s.duration, 0) / PACE };
 };
 

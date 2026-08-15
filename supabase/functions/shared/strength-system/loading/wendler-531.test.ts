@@ -7,6 +7,13 @@ import {
   roundDownToIncrement,
   cyclesForBlock,
   cycleForWeek,
+  blockWeeks,
+  blockWeekFor,
+  buildWeekMap,
+  deloadSingleSets,
+  tmTestSets,
+  WEEKS_PER_CYCLE,
+  TM_TEST_PASS_REPS,
   verdictFrom95Set,
   cycleIncrementLb,
   workingNumberForCycles,
@@ -22,7 +29,8 @@ import {
 // =============================================================================
 
 Deno.test('leader: every set is five reps, and there is NO all-out set', () => {
-  for (const wk of [1, 2, 3, 4]) {
+  // ⛔ 1-3, NOT 1-4 (2026-08-15, §1c). A Forever cycle is three weeks; the light week is standalone.
+  for (const wk of [1, 2, 3]) {
     const sets = setsForWeek('leader', wk);
     assertEquals(sets.map((s) => s.reps), [5, 5, 5], `leader week ${wk} reps`);
     assertEquals(sets.some((s) => s.amrap), false, `leader week ${wk} must have no AMRAP`);
@@ -33,10 +41,15 @@ Deno.test('leader: the percentages are the standard ones — only the reps diffe
   assertEquals(setsForWeek('leader', 1).map((s) => s.pct), [0.65, 0.75, 0.85]);
   assertEquals(setsForWeek('leader', 2).map((s) => s.pct), [0.70, 0.80, 0.90]);
   assertEquals(setsForWeek('leader', 3).map((s) => s.pct), [0.75, 0.85, 0.95]);
-  assertEquals(setsForWeek('leader', 4).map((s) => s.pct), [0.40, 0.50, 0.60]);
+  // ⛔ THERE IS NO WEEK 4. The old `4: [0.40, 0.50, 0.60]` deload row left the table — that shape is
+  // now `deloadSingleSets()`, a STANDALONE week, and asking for a fourth week in a cycle is an error
+  // rather than a silent fallback.
+  let threw = false;
+  try { setsForWeek('leader', 4); } catch { threw = true; }
+  assertEquals(threw, true, 'weekInCycle 4 must be rejected, not answered');
 });
 
-Deno.test('anchor: 5/3/1 proper, and only the LAST set of a non-deload week is open', () => {
+Deno.test('anchor: 5/3/1 proper, and only the LAST set of each week is open', () => {
   assertEquals(setsForWeek('anchor', 1).map((s) => s.reps), [5, 5, 5]);
   assertEquals(setsForWeek('anchor', 2).map((s) => s.reps), [3, 3, 3]);
   assertEquals(setsForWeek('anchor', 3).map((s) => s.reps), [5, 3, 1]);
@@ -44,8 +57,25 @@ Deno.test('anchor: 5/3/1 proper, and only the LAST set of a non-deload week is o
   for (const wk of [1, 2, 3]) {
     assertEquals(setsForWeek('anchor', wk).map((s) => s.amrap), [false, false, true], `anchor wk ${wk}`);
   }
-  // A deload is never an all-out week — that would defeat the point of it.
-  assertEquals(setsForWeek('anchor', 4).some((s) => s.amrap), false);
+});
+
+// ── THE TWO STANDALONE WEEKS (Forever pp.20-23) ─────────────────────────────────────────────────
+
+Deno.test('⛔ THE TM-TEST WEEK: 70/80/90 × 5, then the training max, open', () => {
+  const sets = tmTestSets();
+  assertEquals(sets.map((s) => s.pct), [0.70, 0.80, 0.90, 1.00]);
+  // ⛔ THE PRESCRIBED MINIMUM IS THE PASS BAR, NOT THE BOOK'S LOWER BOUND. His range is 3-5; writing
+  // 3 on the card and grading 3 as a HOLD is the stop-short trap the anchor's AMRAP note names.
+  assertEquals(sets.map((s) => s.reps), [5, 5, 5, TM_TEST_PASS_REPS]);
+  assertEquals(sets.map((s) => s.amrap), [false, false, false, true]);
+  assertEquals(TM_TEST_PASS_REPS, 5, '85% training max ⇒ his 5-rep bar, not his 3-rep one (p.20-21)');
+});
+
+Deno.test('⛔ THE 7TH-WEEK DELOAD: 70×5 · 80×3 · 90×1 · TM×1, and NOTHING is open', () => {
+  const sets = deloadSingleSets();
+  assertEquals(sets.map((s) => s.pct), [0.70, 0.80, 0.90, 1.00]);
+  assertEquals(sets.map((s) => s.reps), [5, 3, 1, 1]);
+  assertEquals(sets.some((s) => s.amrap), false, 'a deload single is a prescribed single, not a rep-out');
 });
 
 Deno.test('the 95% validity set sits at week 3 of EVERY cycle', () => {
@@ -82,33 +112,97 @@ Deno.test('increments: +5 upper, +10 lower, per cycle', () => {
   assertEquals([1, 2, 3].map((c) => workingNumberForCycle(190, c, true)), [190, 200, 210]);
 });
 
-Deno.test('12 weeks is leader, leader, anchor — Wendler\'s 2:1, and the anchor is LAST', () => {
+// ── THE BLOCK MAP (work order §0's target, pinned week by week) ─────────────────────────────────
+
+/** A compact rendering of a week map: one token per week. */
+const mapOf = (weeks: number, inputs?: any) => buildWeekMap(weeks, inputs).map((w) =>
+  w.kind === 'cycle' ? `${w.cycleKind![0].toUpperCase()}${w.weekInCycle}` : (w.kind === 'tm_test' ? 'TEST' : 'DL'));
+
+Deno.test('⛔ THE 12-WEEK MAP IS §0 EXACTLY — test · L · L · deload · A · test', () => {
+  assertEquals(mapOf(12), [
+    'TEST',
+    'L1', 'L2', 'L3',
+    'L1', 'L2', 'L3',
+    'DL',
+    'A1', 'A2', 'A3',
+    'TEST',
+  ]);
+  assertEquals(blockWeeks(12), 12);
+});
+
+Deno.test('⛔ THE 16-WEEK MAP IS 2 LEADERS AND 2 ANCHORS — his p.17 second model', () => {
+  // ⛔ CHANGED 2026-08-15. It used to be `['leader','leader','leader','anchor']` — 3:1, which is NOT
+  // one of the three models Forever p.17 publishes (3:2, 2:2, 2:1). The spare week the layout frees
+  // becomes the second deload, after the first anchor (p.21's "after any cycle" licence).
+  assertEquals(mapOf(16), [
+    'TEST',
+    'L1', 'L2', 'L3',
+    'L1', 'L2', 'L3',
+    'DL',
+    'A1', 'A2', 'A3',
+    'DL',
+    'A1', 'A2', 'A3',
+    'TEST',
+  ]);
+  assertEquals(blockWeeks(16), 16);
+});
+
+Deno.test('⛔ THE 8-WEEK BLOCK DROPS THE OPENING TEST WEEK — it is the only piece that yields', () => {
+  // test + L + deload + A + test costs 9. The entry gate's 1RM stands in for the opening test, which
+  // the plan copy states rather than leaving implied.
+  assertEquals(mapOf(8), ['L1', 'L2', 'L3', 'DL', 'A1', 'A2', 'A3', 'TEST']);
+  assertEquals(blockWeeks(8), 8);
+});
+
+Deno.test('cyclesForBlock is a VIEW over the map — three-week ranges, no deload inside', () => {
   const c = cyclesForBlock(12);
   assertEquals(c.map((x) => x.kind), ['leader', 'leader', 'anchor']);
-  assertEquals(c.map((x) => [x.startWeek, x.endWeek]), [[1, 4], [5, 8], [9, 12]]);
+  assertEquals(c.map((x) => [x.startWeek, x.endWeek]), [[2, 4], [5, 7], [9, 11]]);
+  assertEquals(WEEKS_PER_CYCLE, 3);
+  // ⛔ A STANDALONE WEEK BELONGS TO NO CYCLE, and `cycleForWeek` says so with a null.
+  for (const wk of [1, 8, 12]) assertEquals(cycleForWeek(12, wk), null, `week ${wk} is standalone`);
+  assertEquals(blockWeekFor(12, 1)!.kind, 'tm_test');
+  assertEquals(blockWeekFor(12, 8)!.kind, 'deload_single');
+  assertEquals(blockWeekFor(12, 12)!.kind, 'tm_test');
 });
 
-Deno.test('8 weeks is 1:1 (off-ratio, the short option); 16 weeks is 2:2', () => {
-  assertEquals(cyclesForBlock(8).map((x) => x.kind), ['leader', 'anchor']);
-  assertEquals(cyclesForBlock(16).map((x) => x.kind), ['leader', 'leader', 'leader', 'anchor']);
+Deno.test('⛔ A STANDALONE WEEK RUNS ON THE CYCLE BEFORE IT — and the opening test on cycle 1', () => {
+  const m = buildWeekMap(12);
+  assertEquals(m[0].workingNumberCycle, 1, 'the opening test validates the number cycle 1 will use');
+  assertEquals(m[7].workingNumberCycle, 2, 'the mid-block deload unloads the number just used');
+  assertEquals(m[11].workingNumberCycle, 3, 'the closing test measures the number the block reached');
 });
 
-Deno.test('the measurement weeks of a 12-week block are 9, 10 and 11 — never 1-8', () => {
+Deno.test('blockWeeks snaps DOWN to a length the layout fills exactly', () => {
+  // ⚠️ NO LONGER MULTIPLES OF FOUR. A cycle costs three and the standalone weeks are the odd ones.
+  assertEquals(blockWeeks(12), 12);
+  assertEquals(blockWeeks(16), 16);
+  assertEquals(blockWeeks(10), 9);
+  assertEquals(blockWeeks(13), 12);
+  assertEquals(blockWeeks(3), 4);   // the floor: one anchor cycle plus its test week
+});
+
+Deno.test('the measurement weeks of a 12-week block are the anchor, plus the two test weeks', () => {
   const measured: number[] = [];
-  for (let wk = 1; wk <= 12; wk++) {
-    const c = cycleForWeek(12, wk)!;
-    if (setsForWeek(c.slot.kind, c.weekInCycle).some((s) => s.amrap)) measured.push(wk);
+  for (const w of buildWeekMap(12)) {
+    const sets = w.kind === 'cycle'
+      ? setsForWeek(w.cycleKind!, w.weekInCycle!)
+      : (w.kind === 'tm_test' ? tmTestSets() : deloadSingleSets());
+    if (sets.some((s) => s.amrap)) measured.push(w.week);
   }
-  assertEquals(measured, [9, 10, 11]);
+  // ⛔ WEEK 1 AND WEEK 12 ARE NEW MEASUREMENTS (§1c/§1d): the rested TM-test weeks. Weeks 9-11 are
+  // the anchor's open sets, unchanged. Weeks 2-8 carry no open set — the leaders and the deload.
+  assertEquals(measured, [1, 9, 10, 11, 12]);
 });
 
-Deno.test('worked example — squat 225, week 1 and the week 11 gate', () => {
+Deno.test('worked example — squat 225, week 2 and the week 11 gate', () => {
   const base = workingNumberFrom1RM(225); // 190
-  // Week 1 = cycle 1 (leader), week 1 of that cycle.
-  const wk1 = cycleForWeek(12, 1)!;
-  const wn1 = workingNumberForCycle(base, wk1.slot.index, true);
+  // ⚠️ WEEK 2, NOT WEEK 1 — week 1 is the TM-test week now. Week 2 is cycle 1's opening leader week
+  // and its three weights are unchanged from before the restructure.
+  const wk2 = cycleForWeek(12, 2)!;
+  const wn1 = workingNumberForCycle(base, wk2.slot.index, true);
   assertEquals(
-    setsForWeek(wk1.slot.kind, wk1.weekInCycle).map((s) => weightForSet(wn1, s.pct)),
+    setsForWeek(wk2.slot.kind, wk2.weekInCycle).map((s) => weightForSet(wn1, s.pct)),
     [120, 140, 160],
   );
 

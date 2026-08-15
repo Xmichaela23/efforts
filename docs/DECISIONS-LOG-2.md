@@ -351,6 +351,18 @@ Commits `9baa35fb`, `d4eda969`, `dca84dda`, `8a0efcd7`.
 
 ### D-385 — Accessory selection is day-type roles, not family collision (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
 
+> ⛔ **THE VOLUME HALF WAS REVERSED 2026-08-15 BY [D-432] — the direction of this entry's rep scaling
+> was BACKWARDS.** This entry established the 50-floor / 75-ceiling band with the ANCHOR pinned at
+> the floor: *"volume comes down when the bar goes up."* **5/3/1 Forever p.18 scales it the other
+> way** — a leader is the easier month and carries LESS assistance; an anchor carries more. The band
+> is now per phase: leaders and light weeks 25-50, anchors 50-75 (his ceiling is 100; 75 is ours, for
+> a concurrent athlete, and is stated as such). `assistanceTotalReps` in `src/lib/assistance-menu.ts`.
+>
+> ⚠️ **THE 2ND-EDITION PAGE READINGS IN THIS ENTRY ARE NOT RETRACTED.** The Triumvirate (p.48) runs
+> 50-75 and Bodyweight (p.52) says "no less than 75 per exercise" — those are ANCHOR-shaped templates
+> (standard 5/3/1 with an all-out top set). Forever's 25-50 is the LEADER, a week of programmed fives
+> with a supplemental behind it. Two different weeks, two different numbers; neither reading is wrong.
+>
 > ⛔ **SUPERSEDED 2026-08-13 BY [D-423] — the block-wide 3-pick model and ALL of its re-roling are
 > retired.** The athlete now picks twelve movements (push · pull · single-leg/core, on each of the
 > four lifting days) and nothing is re-roled, substituted or annotated. `ROLE_BY_DAY`, `resolveRole`,
@@ -429,6 +441,24 @@ Four defects, all confirmed in code, all fixed against the 2nd edition rather th
 ---
 
 ### D-387 — Three days means three days, and the rest day yields instead of dropping a session (2026-08-05, **PUSHED + DEPLOYED, NOT DEVICE-VERIFIED**)
+
+> ⛔ **TWO THINGS HERE CHANGED 2026-08-15 — [D-432]. Everything below is history on those two points
+> and stands on the rest.**
+>
+> **1. THE 3-DAY PAIRING IS DEADLIFT + PRESS, NOT BENCH + PRESS.** Wendler's own 3-day table (Forever
+> p.22) pairs the deadlift with the press and gives squat and bench their own days. The bench+press
+> pairing was OURS — it fell out of "the two upper lifts are the ones that can share", which is
+> reasonable and is not his. The pair-ordering rule below survives unchanged (heaviest first within
+> the shared day → deadlift now leads); the shared day is a heavy LOWER day now, and `pairedIsLower`
+> is derived from the pair rather than asserted. The lower-day count is unchanged, so no clearance in
+> the scheduling law moved.
+>
+> **2. A TEST WEEK IS BACK, IN A DIFFERENT FORM, AND THIS ENTRY DID NOT UNDO THAT.** The split this
+> entry deleted was a WEEK-3 four-day split inside a cycle — a fatigued lift being read on a fresh
+> day — and deleting it was right for the reason given. What §1c/§1d added is not that: it is
+> Wendler's own STANDALONE, RESTED TM-test week (Forever pp.20-21), which is a whole week of its own
+> with no cycle around it. ⚠️ The `pairNoteFor` copy in this entry promised *"Week 3 splits them onto
+> their own days"* and outlived the split by ten days — that sentence is deleted.
 
 **THE WEEK-3 TEST SPLIT IS DELETED.** Week 3 of every cycle broke the 3-day shape onto **four** days so each 95% set was read fresh. ⛔ **The premise does not survive the trace:** `applyVerdict` steps the working number by a **fixed** increment (`cappedCycleIncrementLb`, +5/+10) and `verdictFrom95Set` reads only whether the prescribed single at 95% was completed. **The next weight is never computed from an estimated max off that set** — the e1RM touches the ceiling and a trust label, nothing else. A fatigued lift can miss the rep target, which is the book's own reset trigger on any day, but it **cannot bias the weight**. The split bought nothing and cost a "3-day" plan that quietly ran four days every third week.
 

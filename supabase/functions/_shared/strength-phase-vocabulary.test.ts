@@ -10,7 +10,8 @@
  * ended up prescribing a TIGHTER target than the weeks it was meant to recover from (D-322), and
  * how `five_by_five` ran a whole block on the wrong profile (Q-192, found twice).
  *
- * The 5/3/1 composer emits Leader / Anchor / Deload. This test fails if any of them stops resolving.
+ * The 5/3/1 composer emits Leader / Anchor / Deload / **TM Test**. This test fails if any of them
+ * stops resolving. ⚠️ `TM Test` joined the list 2026-08-15 with the standalone-week restructure.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildBlockPhases } from '../shared/strength-system/strength-primary-plan.ts';
@@ -52,9 +53,25 @@ Deno.test('a real plan config resolves every one of its twelve weeks', () => {
     assertEquals(phase !== null, true, `week ${week} placed nowhere`);
     assertEquals(normalizePhaseKey(phase) !== null, true, `week ${week} → "${phase}" does not resolve`);
   }
-  // Spot-check the placement itself rather than trusting the loop: week 3 is still a leader, week 4
-  // is the deload, week 11 is the anchor's measured week.
-  assertEquals(resolvePlanPhase(config, 3), 'Leader');
-  assertEquals(resolvePlanPhase(config, 4), 'Deload');
+  // Spot-check the placement itself rather than trusting the loop. ⛔ THE WEEKS MOVED (§1c): week 1
+  // is the TM test, weeks 2-7 are the two leader cycles, week 8 is the standalone deload, weeks 9-11
+  // the anchor, week 12 the closing test.
+  assertEquals(resolvePlanPhase(config, 1), 'TM Test');
+  assertEquals(resolvePlanPhase(config, 4), 'Leader');
+  assertEquals(resolvePlanPhase(config, 8), 'Deload');
   assertEquals(resolvePlanPhase(config, 11), 'Anchor');
+  assertEquals(resolvePlanPhase(config, 12), 'TM Test');
+});
+
+Deno.test('⛔ A TEST WEEK TAPERS AND A DELOAD RECOVERS — different postures, on purpose', () => {
+  // Both weeks are light and they are light for different reasons: a deload UNLOADS, a test week
+  // arrives rested in order to measure. Collapsing them would grade a measured set as recovery work.
+  assertEquals(normalizePhaseKey('TM Test'), 'taper');
+  assertEquals(normalizePhaseKey('Deload'), 'recovery');
+  assertEquals(phaseNameToWeekIntent('TM Test'), 'taper');
+  // ⛔ NEITHER MAY TIGHTEN THE TARGET relative to a working week — that is the D-322 direction check.
+  const test = PHASE_RULES[normalizePhaseKey('TM Test')!];
+  const anchor = PHASE_RULES[normalizePhaseKey('Anchor')!];
+  assertEquals(test.targetRirOffset > anchor.targetRirOffset, true);
+  assertEquals(test.allowProgress, false, 'a test week never auto-progresses load');
 });

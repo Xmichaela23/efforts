@@ -65,19 +65,22 @@ Deno.test('⛔ NO SENTENCE IS GLUED TO THE NEXT — every week, every session', 
   }
 });
 
-Deno.test('⛔ THE DELOAD WEEKS ARE THE REGRESSION — 4, 8 and 12 carry the note, spaced', () => {
-  // The deload note only appears three times in a block, which is exactly why it survived unnoticed.
-  const withNote = everySession().filter((s) => s.description.includes('Deload week'));
-  assert(withNote.length > 0, 'no deload narration found — the composer stopped emitting it');
+Deno.test('⛔ THE LIGHT WEEKS ARE THE REGRESSION — 1, 8 and 12 carry the note, spaced', () => {
+  // ⛔ THE WEEKS AND THE WORDING BOTH MOVED 2026-08-15 (§1c). The light weeks of a 12-week block are
+  // now 1 (TM test), 8 (7th-week deload) and 12 (TM test) — and the run note names which of the two
+  // it is, because "the hard session comes off" has a different reason on a test week.
+  // The note appears three times in a block, which is exactly why the glued-sentence bug survived.
+  const MARK = /(Light week|Test week) — the hard session comes off/;
+  const withNote = everySession().filter((s) => MARK.test(s.description));
+  assert(withNote.length > 0, 'no light-week narration found — the composer stopped emitting it');
   for (const s of withNote) {
     assert(
-      s.description.includes('. Deload week'),
-      `week ${s.week}: the deload note is not preceded by ". " — ${s.description}`,
+      /\. (Light week|Test week) — the hard session comes off/.test(s.description),
+      `week ${s.week}: the light-week note is not preceded by ". " — ${s.description}`,
     );
-    assert(!s.description.includes('.Deload week'), `week ${s.week}: the reported bug is back`);
+    assert(!/\.(Light week|Test week)/.test(s.description), `week ${s.week}: the reported bug is back`);
   }
-  // The weeks it lands on are the deload weeks of a 12-week block.
-  assertEquals([...new Set(withNote.map((s) => s.week))].sort(), ['12', '4', '8'].sort());
+  assertEquals([...new Set(withNote.map((s) => s.week))].sort(), ['1', '12', '8'].sort());
 });
 
 Deno.test('the descriptions this file guards are in voice', () => {

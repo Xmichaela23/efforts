@@ -181,12 +181,34 @@ Deno.serve(async (req: Request) => {
         // carries before it has been confirmed as a stall. Unlisted, a real MISS would be discarded
         // here and fall to `unknownMeans: 'advance'`: the bar would climb off a failed set and
         // nothing would look broken. Keep this in step with the union in `wendler-531.ts`.
-        const ok = new Set(['advance', 'advance_untrusted', 'reset', 'hold', 'miss']);
+        // ⛔ `recalibrate` ADDED 2026-08-15 (§1d), SAME REASON AGAIN. It is the verdict a TM-test
+        // week produces when the training max itself is wrong. Unlisted, it would be discarded here
+        // and fall to `unknownMeans: 'advance'` — the bar would climb off a set the athlete could
+        // not complete twice. Keep this in step with the union in `wendler-531.ts`.
+        const ok = new Set(['advance', 'advance_untrusted', 'reset', 'hold', 'miss', 'recalibrate']);
         const out: Record<string, string[]> = {};
         for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
           if (!Array.isArray(v)) continue;
           const clean = v.filter((x) => typeof x === 'string' && ok.has(x)) as string[];
           if (clean.length === v.length) out[k] = clean;
+        }
+        return Object.keys(out).length > 0 ? (out as any) : undefined;
+      })(),
+      // ⛔ WHERE THE PREVIOUS BLOCK ENDED, per lift, absolute lb — the transition gate's output
+      // (§1d). Present only on a rebuild that had a closing TM-test week to read. Validated rather
+      // than trusted for the same reason the verdicts are: this number IS the block's loading, and a
+      // posted junk value would set every weight in twelve weeks.
+      // ⚠️ ABSENT → the composer derives from the 1RM on file, which is what every block did before
+      // this wire existed. A supplier that cannot read must not reset anyone's bar.
+      priorTrainingMax: (() => {
+        const raw = (body as Record<string, unknown>).prior_training_max;
+        if (!raw || typeof raw !== 'object') return undefined;
+        const keys = ['bench', 'squat', 'deadlift', 'overheadPress'] as const;
+        const out: Record<string, number> = {};
+        for (const k of keys) {
+          const v = Number((raw as Record<string, unknown>)[k]);
+          // A training max under the empty bar is not a training max; it is a malformed payload.
+          if (Number.isFinite(v) && v >= 45) out[k] = Math.round(v);
         }
         return Object.keys(out).length > 0 ? (out as any) : undefined;
       })(),

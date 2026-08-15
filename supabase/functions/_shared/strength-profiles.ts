@@ -445,7 +445,12 @@ export function normalizePhaseKey(phaseTag: string | null | undefined): PlanPhas
   // Planned unloading — must LOOSEN the target, never tighten it.
   if (raw === 'deload' || raw === 'unload' || raw === 'restoration' || raw === 'rest') return 'recovery';
   // Fresh-for-a-number weeks. A retest is a test: arrive rested, do not grind into it.
-  if (raw === 'retest' || raw === 'test' || raw === 'race' || raw === 'race_week' || raw === 'peak_taper') return 'taper';
+  // ⛔ `tm test` / `tm_test` REGISTERED 2026-08-15 — the standalone training-max test week the 5/3/1
+  // composer now emits (Forever pp.20-21). It is exactly this category: low volume, one measured set,
+  // and the target must not tighten into it. Registered in the same change that started emitting it,
+  // because an unrecognised name resolves to the default silently — Q-192's whole failure mode.
+  if (raw === 'retest' || raw === 'test' || raw === 'tm test' || raw === 'tm_test'
+    || raw === 'race' || raw === 'race_week' || raw === 'peak_taper') return 'taper';
   return null;
 }
 

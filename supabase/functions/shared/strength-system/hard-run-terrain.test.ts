@@ -29,6 +29,10 @@ import {
 } from './strength-primary-plan.ts';
 import { expandRunToken } from '../../materialize-plan/index.ts';
 
+// ⛔ WEEK 2, NOT WEEK 1 (2026-08-15, work order §1c). Week 1 of a Strong Focus block is now a
+// standalone TM-TEST week — light band, no hard endurance session, trimmed easy volume — so it is
+// no longer the representative working week these assertions want. Week 2 is cycle 1's first
+// leader week and is the shape week 1 used to be.
 const PACE = 10; // min/mi, so minutes ÷ 10 = miles
 const BASE: any = { easyPace: '9:00/mi', fiveK_pace: '7:00/mi' };
 
@@ -45,7 +49,7 @@ const week = (terrain?: string, discipline: 'run' | 'bike' = 'run') => {
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
     hardDay: { day: 'tuesday', discipline, ...(terrain ? { terrain } : {}) },
   } as never);
-  return (p.sessions_by_week['1'] as any[]);
+  return (p.sessions_by_week['2'] as any[]);
 };
 
 const hardRun = (terrain?: string) =>
@@ -105,7 +109,7 @@ Deno.test('⚠️ THE RIDE HAS NO TERRAIN — a turbo, a chaingang and a climb a
     bike: { hours: 4, days: 2 },
     hardDay: { day: 'tuesday', discipline: 'bike', terrain: 'flat' },
   } as never);
-  const sessions = (p.sessions_by_week['1'] as any[]);
+  const sessions = (p.sessions_by_week['2'] as any[]);
   const ride = sessions.find((s) => s.type === 'ride' && /Interval/.test(s.name))!;
   assertEquals(ride.name, 'Bike Intervals');
   assertEquals(ride.steps_preset[0], 'bike_vo2_4x4min_R4min', 'terrain leaked into the ride');
@@ -269,7 +273,7 @@ Deno.test('⛔ FLAT PREFERS 48h FROM HEAVY LEGS — the other three keep the mat
       const r = Math.abs(DAYS.indexOf(a.toLowerCase()) - DAYS.indexOf(b.toLowerCase()));
       return Math.min(r, 7 - r) * 24;
     };
-    const lowers = (p.sessions_by_week['1'] as any[])
+    const lowers = (p.sessions_by_week['2'] as any[])
       .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));
     return Math.min(...lowers.map((l: any) => gap(String(l.day), 'friday')));
   };
@@ -296,7 +300,7 @@ Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week s
           longRunDay, easyPaceMinPerMile: PACE, liftingDays,
           hardDay: { day, discipline: 'run', terrain: 'flat' },
         } as never);
-        const hard = (p.sessions_by_week['1'] as any[])
+        const hard = (p.sessions_by_week['2'] as any[])
           .find((s) => s.type === 'run' && /Flat Intervals/.test(String(s.name)));
         assertEquals(
           !!hard, true,
@@ -357,7 +361,7 @@ Deno.test('⛔ THE MATRIX FLOOR SURVIVES THE TRADE — heavy legs stay 48h apart
         longRunDay, easyPaceMinPerMile: PACE, liftingDays: 4,
         hardDay: { day, discipline: 'run', terrain: 'flat' },
       } as never);
-      const lowers = (p.sessions_by_week['1'] as any[])
+      const lowers = (p.sessions_by_week['2'] as any[])
         .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));
       for (let i = 0; i < lowers.length; i++) {
         for (let j = i + 1; j < lowers.length; j++) {
@@ -387,7 +391,7 @@ Deno.test('⚠️ TAKEN WHEN THE WEEK HAS ROOM, DECLINED SILENTLY WHEN IT DOES N
       longRunDay, easyPaceMinPerMile: PACE, liftingDays,
       hardDay: { day, discipline: 'run', terrain },
     } as never);
-    const lowers = (p.sessions_by_week['1'] as any[])
+    const lowers = (p.sessions_by_week['2'] as any[])
       .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));
     return Math.min(...lowers.map((l: any) => gapH(String(l.day), day)));
   };

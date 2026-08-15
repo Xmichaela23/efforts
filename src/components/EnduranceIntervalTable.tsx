@@ -232,7 +232,7 @@ export default function EnduranceIntervalTable({
         </colgroup>
         <thead>
           <tr className="border-b border-white/10">
-            <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">
+            <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">
               <div className="flex items-center gap-2">
                 <span>{leftColHeader}</span>
                 {canToggleStrides && (
@@ -246,12 +246,12 @@ export default function EnduranceIntervalTable({
                 )}
               </div>
             </th>
-            <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">
+            <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">
               {isRide ? 'Watts' : (isSwim ? '/100 (pref)' : 'Pace')}
             </th>
-            <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Dist</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Time</th>
-            <th className="px-1 py-2 pr-2 text-right font-medium text-gray-400 whitespace-nowrap">BPM</th>
+            <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">Dist</th>
+            <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">Time</th>
+            <th className="readout-label px-1 py-2 pr-2 text-right font-medium whitespace-nowrap">BPM</th>
           </tr>
         </thead>
         <tbody>
@@ -417,11 +417,11 @@ function CompletedTotalsSegmentTable({
       </colgroup>
       <thead>
         <tr className="border-b border-white/10">
-          <th className="px-2 py-2 text-left font-medium text-gray-400">Segment</th>
-          <th className="px-2 py-2 text-left font-medium text-gray-400">{isRide ? 'Watts' : 'Pace'}</th>
-          <th className="px-2 py-2 text-left font-medium text-gray-400">Dist</th>
-          <th className="px-2 py-2 text-left font-medium text-gray-400">Time</th>
-          <th className="px-1 py-2 pr-2 text-right font-medium text-gray-400">BPM</th>
+          <th className="readout-label px-2 py-2 text-left font-medium">Segment</th>
+          <th className="readout-label px-2 py-2 text-left font-medium">{isRide ? 'Watts' : 'Pace'}</th>
+          <th className="readout-label px-2 py-2 text-left font-medium">Dist</th>
+          <th className="readout-label px-2 py-2 text-left font-medium">Time</th>
+          <th className="readout-label px-1 py-2 pr-2 text-right font-medium">BPM</th>
         </tr>
       </thead>
       <tbody>
@@ -486,7 +486,11 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   const finsUsed = !!swimExtras?.finsUsed;
 
   // Muted blue-tinted label — matches the Details READOUTS card so both tabs read as one design system.
-  const labelStyle: React.CSSProperties = { color: 'rgba(120, 170, 255, 0.55)' };
+  // Was a hardcoded blue (rgba(120,170,255,.55)) meant to "match the Details READOUTS card" — but
+  // Details tints its labels by the WORKOUT's discipline, so this was a fixed near-swim blue sitting
+  // on run and ride screens alike. Now it reads the plate accent like every other readout label
+  // (2026-08-15). The class does the work; this object stays for the inline callers.
+  const labelStyle: React.CSSProperties = { color: 'rgba(var(--card-accent-rgb, 236, 233, 227), 0.75)' };
   const tnum: React.CSSProperties = { fontFeatureSettings: '"tnum"' };
 
   // D-166: Pace/HR/Pool/Lengths share ONE metrics grid alongside the distance/duration headline —
@@ -543,7 +547,7 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="galaxy-card rounded-xl border border-white/10 p-4" style={{ ['--card-accent-a' as any]: '0.16' }}>
       {weekLabel && (
         <div className="text-center text-[11px] uppercase tracking-wide mb-2" style={labelStyle}>{weekLabel}</div>
       )}

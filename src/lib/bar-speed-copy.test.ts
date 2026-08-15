@@ -1,7 +1,9 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { barSpeedLineFor, BAR_SPEED_COPY, BAR_SPEED_AMRAP_AFTER, topSetIndex } from './strength-focus-copy.ts';
 import {
+  deloadSingleSets,
   setsForWeek,
+  tmTestSets,
   WEEKS_PER_CYCLE,
   VALIDITY_CHECK_PCT,
 } from '../../supabase/functions/shared/strength-system/loading/wendler-531.ts';
@@ -44,16 +46,28 @@ Deno.test('bar speed — the 95% gate outranks the deload, so it can never be si
 });
 
 /**
- * And the structural fact the precedence is defending against: TODAY they cannot meet. Derived from
- * `setsForWeek` rather than asserted in prose, so a change to the cycle shape speaks here instead of
- * failing silently on a phone.
+ * And the structural fact the precedence is defending against.
+ *
+ * ⛔ REWRITTEN 2026-08-15 (§1c), AND THE ANSWER FLIPPED. This asserted that a deload set can never
+ * reach 95%, derived from `setsForWeek('leader', WEEKS_PER_CYCLE)` — which was week 4, the old
+ * 40/50/60 deload. A cycle is three weeks now, so that expression IS the 95% week, and the light
+ * weeks are standalone shapes that go all the way to the training max.
+ *
+ * **So the collision is no longer structurally impossible, and the precedence is now load-bearing
+ * rather than defensive.** What keeps the deload honest is a different fact: its top set carries no
+ * `amrap` flag, so nothing in it is a validity set to begin with.
  */
-Deno.test('bar speed — no deload set is a 95% set (the collision is structurally impossible today)', () => {
-  const deload = setsForWeek('leader', WEEKS_PER_CYCLE);
-  assertEquals(deload.some((s) => s.pct >= VALIDITY_CHECK_PCT), false);
-  // ...and week 3 genuinely carries it, so the gate has a real home.
-  const wk3 = setsForWeek('leader', 3);
+Deno.test('bar speed — a light week reaches the training max, and none of it is an open set', () => {
+  const deload = deloadSingleSets();
+  assertEquals(deload.some((s) => s.pct >= VALIDITY_CHECK_PCT), true, 'the TM single is at 100%');
+  assertEquals(deload.some((s) => s.amrap), false, 'and none of it is measured');
+  // Week 3 of a cycle still carries the 95% set, so the gate has its real home.
+  const wk3 = setsForWeek('leader', WEEKS_PER_CYCLE);
   assertEquals(wk3[wk3.length - 1].pct, VALIDITY_CHECK_PCT);
+  // ⛔ AND THE TEST WEEK IS A SECOND REAL HOME FOR IT (§1d): an open set AT the training max.
+  const test = tmTestSets();
+  assertEquals(test.at(-1)!.amrap, true);
+  assertEquals(test.at(-1)!.pct >= VALIDITY_CHECK_PCT, true);
 });
 
 Deno.test('bar speed — warm-up outranks the work-set default but not the deload', () => {

@@ -118,6 +118,8 @@ interface SessionNarrativeProps {
   /** When true, the NEXT/up-next block is NOT rendered inline — the caller renders <NextUp> elsewhere
    *  (strength Performance tab moves it to the bottom, below the compare table). */
   hideNextUp?: boolean;
+  /** "R, G, B" for this workout's discipline — drives the readout label tint. Omit for off-white. */
+  accentRgb?: string;
 }
 
 export function NextUp({ session }: { session: NextSession }) {
@@ -133,7 +135,7 @@ export function NextUp({ session }: { session: NextSession }) {
     // (flex) left the "NEXT" label orphaned at the top-left of a multi-line prescription and read as
     // off-centered (Michael 2026-08-11).
     <div>
-      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Next</span>
+      <span className="readout-label text-xs font-medium uppercase tracking-wide">Next</span>
       <p className="text-sm text-gray-300 mt-1 leading-snug">
         {dayName && <span className="text-gray-400">{dayName} </span>}
         {session.name}
@@ -164,7 +166,7 @@ function RaceReadinessBlock({ rr }: { rr: NonNullable<SessionNarrativeProps['ses
       )}
       {!!String(rr.tactical_instruction || '').trim() && (
         <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
-          <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Race day</span>
+          <span className="readout-label text-[10px] font-medium uppercase tracking-wide">Race day</span>
           <p className="text-sm text-gray-100 mt-0.5 leading-snug">{rr.tactical_instruction}</p>
         </div>
       )}
@@ -197,6 +199,7 @@ export default function SessionNarrative({
   onRecompute,
   recomputeDisabled,
   hideNextUp,
+  accentRgb,
 }: SessionNarrativeProps) {
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
@@ -282,7 +285,18 @@ export default function SessionNarrative({
   }
 
   return (
-    <div className="mt-4 px-3 pb-4 space-y-3">
+    // `--card-accent-rgb` scopes the readout typography below to THIS workout's discipline
+    // (2026-08-15, Michael: "apply to the performance screens using each discipline's colour"), the
+    // same variable the State plates and the logger cards read. Section labels then tint to the
+    // sport with no prop threading. Falls back to the app's off-white when the caller sends none.
+    <div
+      className="galaxy-card mt-4 mx-1 px-3 py-4 rounded-2xl space-y-3"
+      style={{
+        ...(accentRgb ? { ['--card-accent-rgb' as any]: accentRgb } : {}),
+        ['--card-accent-a' as any]: '0.22',
+        border: `1px solid rgba(${accentRgb || '236, 233, 227'}, 0.18)`,
+      }}
+    >
       {noPlannedCompare && (
         <div className="text-xs text-gray-500 italic">
           {planLinkNote ?? 'No planned session to compare.'}
@@ -342,7 +356,7 @@ export default function SessionNarrative({
           {raceDebriefSections ? (
             raceDebriefSections.map(({ label, text }) => (
               <div key={label}>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                <span className="readout-label text-xs font-medium uppercase tracking-wide">
                   {label}
                 </span>
                 <p className="text-sm text-gray-300 leading-relaxed mt-1">{text}</p>
@@ -350,7 +364,7 @@ export default function SessionNarrative({
             ))
           ) : (
             <div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+              <span className="readout-label text-xs font-medium uppercase tracking-wide">
                 Race debrief
               </span>
               <p className="text-sm text-gray-300 leading-relaxed mt-1">{raceDebriefText}</p>
@@ -360,7 +374,7 @@ export default function SessionNarrative({
       )}
       {sd?.forward_context && (sd.forward_context.headline || sd.forward_context.body) && (
         <div>
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+          <span className="readout-label text-xs font-medium uppercase tracking-wide">
             {sd.forward_context.eyebrow || 'What this means for future races'}
           </span>
           <p className="text-sm font-semibold text-gray-100 leading-snug mt-1">
@@ -380,7 +394,7 @@ export default function SessionNarrative({
       )}
       {hasNarrative && (
         <div>
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+          <span className="readout-label text-xs font-medium uppercase tracking-wide">
             Insights
           </span>
           <p className="text-sm text-gray-300 leading-relaxed mt-1">{narrativeText}</p>
@@ -388,7 +402,7 @@ export default function SessionNarrative({
       )}
       {!hasNarrative && hasSummaryBullets && (
         <div>
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+          <span className="readout-label text-xs font-medium uppercase tracking-wide">
             {summaryTitle}
           </span>
           <div className="mt-1 space-y-1.5">
@@ -430,7 +444,7 @@ export default function SessionNarrative({
             const label = isTerrainData ? 'TERRAIN' : rawLabel;
             return (
               <div key={i}>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
+                <span className="readout-label text-xs font-medium uppercase tracking-wide">{label}</span>
                 <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{value}</p>
               </div>
             );
@@ -452,7 +466,7 @@ export default function SessionNarrative({
                 const label = isTerrainData ? 'TERRAIN' : rawLabel;
                 return (
                 <div key={i}>
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
+                  <span className="readout-label text-xs font-medium uppercase tracking-wide">{label}</span>
                   <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{value}</p>
                 </div>
                 );
@@ -461,7 +475,7 @@ export default function SessionNarrative({
           )}
           {hasPlanImpactForRender && (
             <div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+              <span className="readout-label text-xs font-medium uppercase tracking-wide">
                 {planImpactLabel}
               </span>
               <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{planImpactText}</p>

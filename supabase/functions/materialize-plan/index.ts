@@ -2310,7 +2310,23 @@ function expandTokensForRow(
             // ⚠️ GUARDED ON A FINITE POSITIVE. Absent means "no suggestion"; a zero would render as a
             // prescribed nothing, which is the shape of the bug this field exists to avoid.
             ...(Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
-              ? { weight_suggested: (ex as any).weight_suggested } : {}) } as any;
+              ? { weight_suggested: (ex as any).weight_suggested } : {}),
+            // ⛔ AND CARRY THE SUPPLEMENTAL MARKER (2026-08-15, §1e) — THE SAME WHITELIST, THE THIRD
+            // TIME. An FSL row shares its main lift's NAME on purpose, so this flag is the only thing
+            // that tells the logger it is a second block of the same movement rather than a duplicate
+            // row. Unlisted, the athlete would see "Bench Press" twice with nothing to distinguish
+            // them, which reads as a bug in the plan.
+            ...(((ex as any)?.supplemental === true) ? { supplemental: true } : {}),
+          } as any;
+          // ⛔ THE AUTHORED LABEL SURVIVES WHEN NOTHING WAS SUBSTITUTED. `notes` above is
+          // `equipmentNotes` — the substitution sentence — and it is `undefined` on every row nothing
+          // was swapped on. That would silently erase the composer's own "First Set Last" label, so
+          // the authored note fills the gap rather than competing with it.
+          // ⚠️ EQUIPMENT NOTES WIN when both exist: a substitution is a change to what the athlete is
+          // doing, and the label is a description of what it already was.
+          if (!(strength as any).notes && typeof (ex as any)?.notes === 'string' && String((ex as any).notes).trim()) {
+            (strength as any).notes = String((ex as any).notes).trim();
+          }
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -2607,7 +2623,23 @@ function expandTokensForRow(
             // ⚠️ GUARDED ON A FINITE POSITIVE. Absent means "no suggestion"; a zero would render as a
             // prescribed nothing, which is the shape of the bug this field exists to avoid.
             ...(Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
-              ? { weight_suggested: (ex as any).weight_suggested } : {}) } as any;
+              ? { weight_suggested: (ex as any).weight_suggested } : {}),
+            // ⛔ AND CARRY THE SUPPLEMENTAL MARKER (2026-08-15, §1e) — THE SAME WHITELIST, THE THIRD
+            // TIME. An FSL row shares its main lift's NAME on purpose, so this flag is the only thing
+            // that tells the logger it is a second block of the same movement rather than a duplicate
+            // row. Unlisted, the athlete would see "Bench Press" twice with nothing to distinguish
+            // them, which reads as a bug in the plan.
+            ...(((ex as any)?.supplemental === true) ? { supplemental: true } : {}),
+          } as any;
+          // ⛔ THE AUTHORED LABEL SURVIVES WHEN NOTHING WAS SUBSTITUTED. `notes` above is
+          // `equipmentNotes` — the substitution sentence — and it is `undefined` on every row nothing
+          // was swapped on. That would silently erase the composer's own "First Set Last" label, so
+          // the authored note fills the gap rather than competing with it.
+          // ⚠️ EQUIPMENT NOTES WIN when both exist: a substitution is a change to what the athlete is
+          // doing, and the label is a description of what it already was.
+          if (!(strength as any).notes && typeof (ex as any)?.notes === 'string' && String((ex as any).notes).trim()) {
+            (strength as any).notes = String((ex as any).notes).trim();
+          }
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

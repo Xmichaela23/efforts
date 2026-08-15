@@ -1,14 +1,16 @@
 /**
- * THE CONTINUOUS ATHLETE — the AAA block, generated end to end.
+ * THE CONTINUOUS ATHLETE — the anchor-weighted block, generated end to end.
  *
- * ⛔ WHY THIS FILE EXISTS. `continuous` → three anchor cycles is the only configuration the composer
- * could not previously produce. Every block before 2026-07-28 ended in exactly one anchor, so three
- * anchors is a shape that has never run: three 95%-and-rep-out weeks, three advancement gates, and
- * the accessory floor holding in every cycle rather than only the last.
+ * ⛔ REWRITTEN 2026-08-15 (work order §1b). **This file used to pin an ALL-ANCHOR block (`AAA`) as
+ * correct, and it was not one of Wendler's shapes.** Forever p.17 lists three leader:anchor models
+ * and only three — 3/2, 2/2, 2/1 — and every one of them carries at least one leader. `leaderCount`
+ * returned 0 for the `continuous` tier; it now floors at 1, so the most anchor-weighted block the
+ * engine can build is **L-A-A**.
  *
- * Michael, 2026-07-28: *"the only config that didn't exist before and the only one that can put
- * someone under three anchor cycles. Worth generating one deliberately rather than waiting for a
- * user to find it."* So this generates one, and reads the rows.
+ * ⚠️ WHAT THE FILE IS STILL FOR, and the reason it survived rather than being deleted: `continuous`
+ * is the only tier that can put an athlete under MORE THAN ONE anchor cycle. Two 95%-and-rep-out
+ * cycles, two advancement gates, and the anchor's heavier assistance band twice. That shape has
+ * never run in production, so it is generated deliberately here rather than waiting for a user.
  *
  * ⚠️ FIXTURE, NOT PRODUCTION. Nothing here touches a database or an athlete's numbers — the maxes
  * below are round and invented, per the standing rule that no decision is gated on Michael's own.
@@ -41,52 +43,78 @@ const liftRow = (week: number, lift: string) => {
 
 // ── The shape ───────────────────────────────────────────────────────────────
 
-Deno.test('⛔ CONTINUOUS RESOLVES TO THREE ANCHORS — the config that did not exist before', () => {
+Deno.test('⛔ CONTINUOUS RESOLVES TO ONE LEADER AND TWO ANCHORS — never zero leaders', () => {
+  // ⛔ SUPERSEDES 'CONTINUOUS RESOLVES TO THREE ANCHORS'. Zero leaders is not a Wendler shape (p.17).
   assertEquals(continuityTier(CONTINUOUS.continuity), 'continuous');
-  assertEquals(leaderCount(3, 12, CONTINUOUS), 0);
-  assertEquals(cyclesForBlock(12, CONTINUOUS).map((c) => c.kind), ['anchor', 'anchor', 'anchor']);
+  assertEquals(leaderCount(3, 12, CONTINUOUS), 1);
+  assertEquals(cyclesForBlock(12, CONTINUOUS).map((c) => c.kind), ['leader', 'anchor', 'anchor']);
 });
 
-Deno.test('every cycle carries a 95% rep-out — three advancement gates, not one', () => {
-  // Weeks 3, 7 and 11 are each a cycle's third week: the 95% set, and the validity check.
-  for (const week of [3, 7, 11]) {
+// ⛔ THE MAP FOR THIS SHAPE (§1c): L(1-3) · deload(4) · A(5-7) · deload(8) · A(9-11) · TM test(12).
+// ⚠️ NO OPENING TEST WEEK — L-A-A plus its two deloads plus the closing test costs exactly 12, and
+// the opening test is the one piece the layout drops when the budget is short (the entry gate's 1RM
+// stands in for it, which the plan copy states).
+
+Deno.test('two cycles carry a 95% rep-out — two advancement gates, not one and not three', () => {
+  // Weeks 7 and 11 are the anchors' third weeks: the 95% set, and the validity check.
+  for (const week of [7, 11]) {
     const plan = (liftRow(week, 'Bench Press')?.set_plan ?? []) as any[];
     assert(plan.length > 0, `week ${week} has no bench ramp`);
     assertEquals(plan.at(-1)?.amrap, true, `week ${week} top set must be the rep-out`);
   }
 });
 
-Deno.test('the leader weeks are gone — no 5s-PRO week survives an AAA block', () => {
-  // A leader's signature is three fives with no all-out set. In this block every non-deload week's
-  // top set is an AMRAP, so nothing here is a leader.
-  for (const week of [1, 2, 3, 5, 6, 7, 9, 10, 11]) {
+Deno.test('the leader cycle survives — weeks 1-3 are 5s PRO, no all-out set', () => {
+  // A leader's signature is three fives with no all-out set. The floor at one leader is what keeps
+  // a building cycle in front of the measuring ones.
+  for (const week of [1, 2, 3]) {
+    const plan = (liftRow(week, 'Bench Press')?.set_plan ?? []) as any[];
+    assertEquals(plan.at(-1)?.amrap, undefined, `week ${week} should be leader-shaped`);
+  }
+  for (const week of [5, 6, 7, 9, 10, 11]) {
     const plan = (liftRow(week, 'Bench Press')?.set_plan ?? []) as any[];
     assertEquals(plan.at(-1)?.amrap, true, `week ${week} should be anchor-shaped`);
   }
 });
 
-// ── The accessory floor, under the shape that stresses it most ──────────────
+// ── The assistance band, per phase ──────────────────────────────────────────
 
-Deno.test('⛔ THE FLOOR HOLDS IN ALL THREE CYCLES, INCLUDING FOR A TESTED 12-REP PULL', () => {
-  // A 12-rep pull max would earn 50 + (12-8)*3 = 62 → 60 in a LEADER cycle. There are no leaders
-  // here, so the tested capacity is deliberately NOT spent: the main lifts are at 95% with a rep-out
-  // in every cycle, and that is the week accessory volume must not compete with.
+Deno.test('⛔ THE ANCHOR CARRIES MORE ASSISTANCE THAN THE LEADER — Forever p.18', () => {
+  // ⛔⛔ SUPERSEDES 'THE FLOOR HOLDS IN ALL THREE CYCLES'. That test pinned the anchor at the band's
+  // floor and let leaders climb — the exact inversion the work order's §1a fixes. Leaders are the
+  // easier month; anchors are where the volume goes.
   //
-  // ⚠️ THE NUMBER MOVED 25 → 50 ON 2026-08-05 AND THE PROPERTY DID NOT. The floor is now Wendler's
-  // real one — his lowest figure anywhere is 50 (Triumvirate p.48 runs 50-75; Bodyweight p.52 says
-  // "no less than 75 per exercise"), and the old 25 rested on a "25-50 range" that is not in the
-  // book. What this test pins is that an ANCHOR cycle holds whatever the floor is, against a tested
-  // capacity that would otherwise buy more.
-  for (const week of [1, 5, 9]) {
+  // A tested 12-rep pull max earns floor + (12-8)×3 = +12 → +10 after rounding, inside its band.
+  //   leader week: 50 floor → 60        anchor week: 75 floor → 85
+  // ⛔ THE ANCHOR IS NO LONGER FLAT AT 75. The concurrent-athlete clamp was removed 2026-08-15
+  // (Michael: "whatever Wendler says"), so the anchor runs his own 75-100 band and scales with
+  // tested capacity like every other band.
+  const totals = (week: number) => {
     const s = sessionsFor(week).find((x) => x.type === 'strength');
     const rows = (s?.strength_exercises ?? []) as any[];
-    const acc = rows.filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'));
-    assert(acc.length > 0, `week ${week} has no assistance rows`);
-    for (const r of acc) assertEquals(r.reps, '50 total', `week ${week}: ${r.name}`);
-  }
+    return rows.filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'))
+      .map((r) => String(r.reps));
+  };
+  const leader = totals(1);
+  const anchor = totals(5);
+  assert(leader.length > 0 && anchor.length > 0, 'a week is missing its assistance rows');
+  for (const t of leader) assert(t === '50 total' || t === '60 total', `leader week 1 got ${t}`);
+  for (const t of anchor) assert(t === '75 total' || t === '85 total', `anchor week 5 got ${t}`);
+  // The direction itself, not just the numbers: every anchor slot is ≥ every leader slot.
+  assert(Math.min(...anchor.map((t) => parseInt(t, 10))) >= Math.max(...leader.map((t) => parseInt(t, 10))),
+    `anchor ${anchor} did not clear leader ${leader}`);
 });
 
-// ── The progression across three gates ──────────────────────────────────────
+Deno.test('⛔ THE JUMPS SCALE THE SAME DIRECTION — 2×5 in a leader, 3×5 in an anchor', () => {
+  const jumpOn = (week: number) => {
+    const s = sessionsFor(week).find((x) => x.type === 'strength' && x.name.includes('Squat'));
+    return (s?.strength_exercises ?? []).find((e: any) => e.name === 'Box Jump') as any;
+  };
+  assertEquals(jumpOn(1)?.sets, 2, 'leader week should carry the lighter jump dose');
+  assertEquals(jumpOn(5)?.sets, 3, 'anchor week should carry the heavier jump dose');
+});
+
+// ── The progression across the gates ────────────────────────────────────────
 
 Deno.test('⛔ THE WORKING NUMBER STILL CLIMBS ONCE PER CYCLE, NOT ONCE PER WEEK', () => {
   // The diagnosis three sessions have now got wrong, pinned under the new shape. Within a cycle the
@@ -126,7 +154,7 @@ const tmRatio = (plan: any, week: number, lift: string, oneRM: number) => {
   return (sets.at(-1)!.weight / 0.95) / oneRM;
 };
 
-Deno.test('⛔ THE AAA DRIFT IS BOUNDED BY THE MISS, NOT BY A RATIO — three anchors, three brakes', () => {
+Deno.test('⛔ THE DRIFT IS BOUNDED BY THE MISS, NOT BY A RATIO — two anchors, two brakes', () => {
   // ⛔⛔ SUPERSEDES 'THE 90% CEILING BOUNDS THE AAA DRIFT' (2026-07-28). That test asserted the
   // training max could never pass 90% of the max ON FILE, on either a heavy or a light block. Both
   // assertions are deliberately gone: the ceiling was an app invention that FROZE light blocks into
@@ -138,7 +166,7 @@ Deno.test('⛔ THE AAA DRIFT IS BOUNDED BY THE MISS, NOT BY A RATIO — three an
   // all-out set decides is WHETHER the step happens, not how big it is.
   //
   // In a forecast — which is what a freshly generated block is — every verdict is `advance`, so a
-  // generated AAA block shows two advances taken on no evidence. That is the forecast's job.
+  // generated block shows two advances taken on no evidence. That is the forecast's job.
 
   // The heavy athlete: TM 265 → 275 → 285 against a 315 max. 90.5%, which the ceiling used to
   // truncate to 88.9%. Both are inside the range where the 95% set is still a rep-out.
@@ -168,32 +196,42 @@ Deno.test('⛔ THE AAA DRIFT IS BOUNDED BY THE MISS, NOT BY A RATIO — three an
   // `exercise_log`'s e1RM trend is the candidate for a tested max and is not wired to this.
 });
 
-Deno.test('AAA measures three times where LLA measures once — the offsetting half', () => {
-  // The reason this drift is not simply a defect. A leader has NO all-out set, so an LLA block
-  // contains exactly ONE measurement in twelve weeks. AAA contains three. Fixed steps with three
+Deno.test('L-A-A measures twice where L-L-A measures once — the offsetting half', () => {
+  // The reason this drift is not simply a defect. A leader has NO all-out set, so an L-L-A block
+  // contains exactly ONE measuring CYCLE in twelve weeks. L-A-A contains two. Fixed steps with two
   // gates self-correct sooner than fixed steps with one, even though each individual step is blind.
-  const countGates = (plan: any) =>
-    [1, 2, 3, 5, 6, 7, 9, 10, 11].filter((w) =>
+  // ⚠️ CYCLE WEEKS ONLY. Both shapes also carry TM-test weeks, and those measure too (§1d) — but
+  // they are the same count in both, so counting them here would flatten the difference under test.
+  const cycleGates = (plan: any, weeks: number[]) =>
+    weeks.filter((w) =>
       ((plan.sessions_by_week[String(w)] ?? [])
         .find((x: any) => x.type === 'strength' && x.name.includes('Bench Press'))
         ?.strength_exercises?.find((e: any) => e.name === 'Bench Press')?.set_plan as any[] | undefined)
         ?.some((p) => p.amrap)
     ).length;
   const lla = composeStrengthPrimaryPlan({ ...base, blockShape: { continuity: { weeksSince: null, logs: 0 } } });
-  assertEquals(countGates(lla), 3, 'LLA: one anchor, three AMRAP weeks in it');
-  assertEquals(countGates(PLAN), 9, 'AAA: three anchors');
+  // L-L-A map: test(1) · L(2-4) · L(5-7) · deload(8) · A(9-11) · test(12).
+  assertEquals(cycleGates(lla, [2, 3, 4, 5, 6, 7, 9, 10, 11]), 3, 'L-L-A: one anchor, three AMRAP weeks in it');
+  // L-A-A map: L(1-3) · deload(4) · A(5-7) · deload(8) · A(9-11) · test(12).
+  assertEquals(cycleGates(PLAN, [1, 2, 3, 5, 6, 7, 9, 10, 11]), 6, 'L-A-A: two anchors');
 });
 
-Deno.test('each of the three cycles still ends in its own deload', () => {
-  // The deload is per cycle, not per block — losing it in an AAA shape would be three anchors back
-  // to back with no unload between them.
-  for (const week of [4, 8, 12]) {
+Deno.test('⛔ EVERY CYCLE IS FOLLOWED BY A LIGHT WEEK — no two cycles run back to back', () => {
+  // ⛔ SUPERSEDES 'each of the three cycles still ends in its own deload'. The unload is no longer
+  // INSIDE the cycle; it is a standalone week between cycles (Forever p.21, "always used between
+  // your Leader and Anchor template"). What must stay true is that two measuring cycles never run
+  // back to back — which is the property the old per-cycle deload was really protecting.
+  for (const week of [4, 8]) {
     const s = sessionsFor(week).find((x) => x.type === 'strength');
     assert(s, `week ${week} has no strength session`);
     const rows = (s!.strength_exercises ?? []) as any[];
-    assertEquals(rows.length, 1, `week ${week} deload should be the main lift alone, got ${rows.length} rows`);
-    for (const p of (rows[0].set_plan ?? []) as any[]) assertEquals(p.amrap, undefined, `week ${week} deload`);
+    const mainRow = rows.find((r) => Array.isArray(r.set_plan));
+    for (const p of (mainRow?.set_plan ?? []) as any[]) assertEquals(p.amrap, undefined, `week ${week} deload`);
+    assertEquals(mainRow.set_plan.map((p: any) => p.reps), [5, 3, 1, 1], `week ${week} is the 7th-week shape`);
   }
+  // And the block closes on a TM test, whose top set IS open — the transition gate.
+  const wk12 = (liftRow(12, 'Bench Press')?.set_plan ?? []) as any[];
+  assertEquals(wk12.at(-1)?.amrap, true, 'week 12 is the closing TM test');
 });
 
 // ── The regression that matters most: everyone else is unchanged ────────────
@@ -226,9 +264,11 @@ Deno.test('maintain posture and a long block both refuse the anchor-weighted sha
     cyclesForBlock(12, { ...CONTINUOUS, strengthPosture: 'maintain' }).map((c) => c.kind),
     ['leader', 'leader', 'anchor'],
   );
+  // ⛔ 2 LEADERS AND 2 ANCHORS AT 16 WEEKS — his p.17 second model. It was 3:1, which he does not
+  // publish; `publishedFallback` caps the leader count at ceil(cycles / 2) (§1c).
   assertEquals(
     cyclesForBlock(16, CONTINUOUS).map((c) => c.kind),
-    ['leader', 'leader', 'leader', 'anchor'],
+    ['leader', 'leader', 'anchor', 'anchor'],
   );
   assertEquals(
     cyclesForBlock(12, { ...CONTINUOUS, highAerobicLoad: true }).map((c) => c.kind),

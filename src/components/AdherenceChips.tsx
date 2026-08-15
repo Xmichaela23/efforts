@@ -164,9 +164,9 @@ export default function AdherenceChips({
       if (!value) return null;
       return (
         <div className="flex flex-col items-center px-2 min-w-0">
-          <div className="text-sm font-semibold text-gray-100 whitespace-nowrap">{value}</div>
-          <div className="text-[12px] text-gray-300 text-center">{label}</div>
-          <div className="text-[12px] text-gray-400 text-center leading-snug">{text}</div>
+          <div className="readout-num text-xl whitespace-nowrap">{value}</div>
+          <div className="readout-label text-[11px] uppercase text-center">{label}</div>
+          <div className="text-[11px] text-white/40 text-center leading-snug">{text}</div>
         </div>
       );
     };
@@ -281,7 +281,7 @@ export default function AdherenceChips({
 
       return (
         <div className="w-full pt-1 pb-2">
-          {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
+          {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
             <div className="flex items-start gap-3">
               {chipText('Workload', loadValue, loadSubtitle)}
@@ -297,7 +297,7 @@ export default function AdherenceChips({
     if (isRide) {
       return (
         <div className="w-full pt-1 pb-2">
-          {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
+          {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
             <div className="flex items-start gap-3">
               {chipText('Workload', loadValue, loadSubtitle)}
@@ -323,7 +323,7 @@ export default function AdherenceChips({
 
     return (
       <div className="w-full pt-1 pb-2">
-        {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
+        {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
         <div className="flex items-center justify-center gap-6 text-center mb-3">
           <div className="flex items-start gap-3">
             {chipText('Workload', loadValue, loadSubtitle)}

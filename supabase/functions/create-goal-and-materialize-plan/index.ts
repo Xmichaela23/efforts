@@ -2,10 +2,14 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // D-326 layer 2 — the verdict supplier. Pure grouping + selection; the query in the strength branch
 // is the only database part.
 import {
+  cyclesFromStoredPhases,
   groupSessionsByCycle,
+  nextBlockTrainingMax,
+  testWeeksFromStoredPhases,
+  tmTestResultFor,
   verdictsForBlock,
 } from '../shared/strength-system/loading/cycle-verdicts.ts';
-import { cyclesForBlock } from '../shared/strength-system/loading/wendler-531.ts';
+import { workingNumberForCycles } from '../shared/strength-system/loading/wendler-531.ts';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import {
   getLatestAthleteMemory,
@@ -2543,9 +2547,27 @@ Deno.serve(async (req: Request) => {
             // read must not silently reset anyone's bar.
             const gsPriorPlanId = replace_plan_id ?? null;
             let gsVerdicts: Record<string, string[]> | undefined;
+            // ⛔ THE BLOCK-TO-BLOCK TRANSITION GATE (§1d) — SPEC §1b's debt, paid 2026-08-15. The
+            // CLOSING TM-test week of the finished block decides where the next one starts: five
+            // reps at the training max advances it a step, three or four holds it, two or fewer
+            // replaces it with the number computed off that set (Forever p.21). Absent → the
+            // composer derives from the 1RM on file, which is the pre-2026-08-15 behaviour exactly.
+            let gsPriorTrainingMax: Record<string, number> | undefined;
             if (gsPriorPlanId) {
               try {
                 const gsWeeks = Number((resolvedGoal as any)?.target_weeks) || 12;
+                // ⛔ THE PRIOR BLOCK'S OWN STRUCTURE, NOT A FRESH DERIVATION (2026-08-15, §1c).
+                // `cyclesForBlock(gsWeeks)` re-derived the map from the DEFAULT tier, and since the
+                // restructure the cycle ranges moved (2-4 / 5-7 / 9-11, with weeks 1, 8 and 12
+                // standalone). Grouping a block that was built with a different shape against those
+                // ranges files its 95% week as an ordinary week, and the verdict comes back `hold`
+                // for a cycle the athlete actually passed — evidence loss with no error anywhere.
+                const { data: gsPriorPlan } = await supabase
+                  .from('plans')
+                  .select('config')
+                  .eq('id', gsPriorPlanId)
+                  .eq('user_id', user_id)
+                  .maybeSingle();
                 const { data: plannedRows } = await supabase
                   .from('planned_workouts')
                   .select('id, week_number, date')
@@ -2573,7 +2595,7 @@ Deno.serve(async (req: Request) => {
                     week_number: weekById.get(String(w?.planned_id)) ?? null,
                     strength_exercises: w?.strength_exercises ?? null,
                   }));
-                  const cycles = cyclesForBlock(gsWeeks);
+                  const cycles = cyclesFromStoredPhases((gsPriorPlan as any)?.config ?? null, gsWeeks);
                   const grouped = groupSessionsByCycle(joined, cycles);
                   gsVerdicts = {};
                   for (const [ref, name] of Object.entries(STRENGTH_LIFT_NAMES)) {
@@ -2583,12 +2605,47 @@ Deno.serve(async (req: Request) => {
                     `[create-goal] verdicts from ${joined.length} logged sessions, current week ${currentWeek}:`,
                     JSON.stringify(gsVerdicts),
                   );
+
+                  // ── THE TRANSITION GATE ────────────────────────────────────────────────────
+                  //
+                  // ⚠️ THE CLOSING TEST WEEK ONLY. A block has two (weeks 1 and 12 of twelve); the
+                  // opening one validated the number this block ran on and is already history. It is
+                  // the LAST one that decides the next block, which is why it is the last element.
+                  const gsTestWeeks = testWeeksFromStoredPhases((gsPriorPlan as any)?.config ?? null);
+                  const gsClosingTest = gsTestWeeks.length > 0 ? gsTestWeeks[gsTestWeeks.length - 1] : null;
+                  const gsStoredTm = ((gsPriorPlan as any)?.config?.training_max ?? {}) as Record<string, number>;
+                  if (gsClosingTest != null && gsClosingTest <= currentWeek) {
+                    const out: Record<string, number> = {};
+                    for (const [ref, name] of Object.entries(STRENGTH_LIFT_NAMES)) {
+                      const storedBase = Number(gsStoredTm[ref]);
+                      if (!(storedBase > 0)) continue;
+                      const isLower = ref === 'squat' || ref === 'deadlift';
+                      // Where the finished block ENDED. `plans.config.training_max` stores the START,
+                      // so the cycle progression is replayed with the verdicts just computed — the
+                      // same function the block itself used, so the two cannot drift.
+                      const endWn = workingNumberForCycles(
+                        storedBase, cycles.length, isLower,
+                        gsVerdicts[ref] as any,
+                        { unknownMeans: 'hold' },
+                      ).workingNumber;
+                      const next = nextBlockTrainingMax(
+                        endWn, isLower, tmTestResultFor(joined, gsClosingTest, name),
+                      );
+                      if (next > 0) out[ref] = next;
+                    }
+                    if (Object.keys(out).length > 0) gsPriorTrainingMax = out;
+                    console.log(
+                      `[create-goal] transition gate at week ${gsClosingTest}:`,
+                      JSON.stringify(gsPriorTrainingMax ?? null),
+                    );
+                  }
                 }
               } catch (e) {
                 // ⛔ LOUD, AND NON-FATAL. A supplier that cannot read falls back to the forecast —
                 // it must never quietly hand back `hold` for everything and flatten the block.
                 console.warn('[create-goal] verdict supplier failed; falling back to forecast:', e);
                 gsVerdicts = undefined;
+                gsPriorTrainingMax = undefined;
               }
             }
 
@@ -2698,6 +2755,9 @@ Deno.serve(async (req: Request) => {
               ...(gsRideHours ? { target_weekly_ride_hours: gsRideHours } : {}),
               ...(plan_start_date ? { start_date: plan_start_date } : {}),
               ...(gsVerdicts ? { cycle_verdicts: gsVerdicts } : {}),
+              // ⛔ WHERE THE NEXT BLOCK STARTS, per lift, absolute lb. Absent → the composer derives
+              // from the 1RM on file, unchanged. See the transition-gate block above.
+              ...(gsPriorTrainingMax ? { prior_training_max: gsPriorTrainingMax } : {}),
               // The posture the block was built under — `develop` is the only one that earns an
               // anchor-weighted shape (2026-07-28).
               ...(gsPosture?.strength ? { strength_posture: gsPosture.strength } : {}),

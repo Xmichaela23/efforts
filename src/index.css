@@ -1036,6 +1036,33 @@ body.wizard-active { --tabbar-h: 0px; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* READOUT typography (2026-08-15, Michael: "need to feel readout more") — the two text treatments
+   that make the Details tab read as an instrument, as utilities that inherit the plate's own accent
+   (`--card-accent-rgb`, set by readoutPlateStyle). On a sport plate labels tint toward the sport and
+   numbers glow in it; on a neutral plate both fall back to the app's off-white. One definition —
+   the inline versions in CompletedTab (metricLabelStyle / readoutValueStyle) share the same idea.
+
+   ⚠️ Pushed up 2026-08-15 ("need to feel it more"): the Details tab's original values were tuned
+   for a page where EVERY number is a readout, so the effect accumulated. On State the readouts are
+   sparser and the same alphas read as nothing — labels 0.58 → 0.80, and the number glow roughly
+   doubled with a third wide layer so the phosphor bloom is actually visible on a dark plate.
+
+   ⚠️ The fallback is the app's off-white (236,233,227 — the wizard's UNIVERSAL_RGB), NEVER pure
+   white. A white accent makes both rules invisible: a white label on a dark plate is just the old
+   white label, and a white glow behind white numerals renders nothing at all. */
+.readout-label {
+  color: rgba(var(--card-accent-rgb, 236, 233, 227), 0.80) !important;
+  letter-spacing: 0.08em;
+}
+.readout-num {
+  color: rgba(255, 255, 255, 0.96) !important;
+  text-shadow:
+    0 0 22px rgba(var(--card-accent-rgb, 236, 233, 227), 0.30),
+    0 0 8px rgba(var(--card-accent-rgb, 236, 233, 227), 0.28),
+    0 0 2px rgba(var(--card-accent-rgb, 236, 233, 227), 0.40);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
 /* Logo pulse animation - slow, rhythmic heartbeat */
 @keyframes logoPulse {
   0%, 100% { opacity: 0.7; }

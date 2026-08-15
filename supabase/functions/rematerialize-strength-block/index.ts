@@ -31,8 +31,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 import {
-  cyclesForBlock,
+  deloadSingleSets,
   setsForWeek,
+  tmTestSets,
   warmupSetsForWeek,
   weightForSet,
   workingNumberForCycles,
@@ -42,6 +43,9 @@ import {
   type WorkingNumberVerdict,
 } from '../shared/strength-system/loading/wendler-531.ts';
 import {
+  // ⛔ ONE COPY OF THE STORED-SHAPE READER (2026-08-15). It lived here and `create-goal` did not have
+  // it, so the two disagreed about where a block's cycles are; both read this now.
+  cyclesFromStoredPhases,
   groupSessionsByCycle,
   verdictsForBlock,
 } from '../shared/strength-system/loading/cycle-verdicts.ts';
@@ -56,37 +60,50 @@ const LIFTS = [
 ] as const;
 
 /**
- * ⛔ THE CYCLES THE BUILDER ACTUALLY WROTE, not a fresh guess at them.
+ * ⛔ WHAT SHAPE IS THIS WEEK, ACCORDING TO WHAT THE BUILDER STORED. Added 2026-08-15 (§1c).
  *
- * `cyclesForBlock(weeks, shape)` needs the shape inputs (continuity, posture, aerobic load) that were
- * true AT BUILD TIME. Re-deriving them now can produce a different leader/anchor split than the block
- * on the athlete's calendar, which would rewrite weights against a structure that does not exist.
- * `config.phase_structure` is what the composer stored; read it. Falls back to the default split only
- * when a plan predates that field.
+ * The block now contains weeks that belong to no cycle — the 7th-week deload and the TM-test weeks —
+ * and each has its own set list. This reads them off `config.phase_structure` for the same reason
+ * `cyclesFromStoredPhases` does: re-deriving the shape now could produce a different layout than the
+ * one on the athlete's calendar, and the rewrite would then be against a block that does not exist.
+ *
+ * ⛔ **A BLOCK BUILT BEFORE THIS CHANGE IS LEFT ALONE ON ITS LIGHT WEEKS** (`legacy_deload`). Those
+ * blocks carry a 40/50/60% deload welded to the end of each four-week cycle. Rewriting one as a
+ * Forever 7th week (70/80/90/100%) would silently switch protocol mid-block on weeks the athlete has
+ * already seen the shape of. The cycle weeks still get their new working numbers; the old deload
+ * keeps its prescription, which is the smallest-consequence week in the block. Detected by the
+ * absence of any `TM Test` phase entry — a new block always has at least the closing one.
  */
-function cyclesFromStoredPhases(config: any, weeks: number):
-  Array<{ index: number; kind: CycleKind; startWeek: number; endWeek: number }> | null {
+function weekShapeFromStored(config: any, week: number):
+  { kind: 'cycle' | 'tm_test' | 'deload_single' | 'legacy_deload'; cycleIndex: number } | null {
   const phases = config?.phase_structure?.phases;
-  if (!Array.isArray(phases) || phases.length === 0) return null;
-  const work = phases
-    .filter((p: any) => {
-      const n = String(p?.name ?? '').toLowerCase();
-      return n === 'leader' || n === 'anchor';
-    })
-    .map((p: any) => ({
-      kind: String(p.name).toLowerCase() as CycleKind,
-      startWeek: Number(p.start_week),
-    }))
-    .filter((p: any) => Number.isFinite(p.startWeek))
-    .sort((a: any, b: any) => a.startWeek - b.startWeek);
-  if (work.length === 0) return null;
-  return work.map((p: any, i: number) => ({
-    index: i + 1,
-    kind: p.kind,
-    startWeek: p.startWeek,
-    // A cycle is four weeks: three work weeks and its deload.
-    endWeek: Math.min(p.startWeek + WEEKS_PER_CYCLE - 1, weeks),
-  }));
+  if (!Array.isArray(phases)) return null;
+  const sorted = [...phases]
+    .filter((p: any) => Number.isFinite(Number(p?.start_week)))
+    .map((p: any) => ({ name: String(p?.name ?? '').trim().toLowerCase(), start: Number(p.start_week) }))
+    .sort((a, b) => a.start - b.start);
+  const isForeverShape = sorted.some((p) => p.name === 'tm test' || p.name === 'tm_test');
+
+  let cycleIndex = 0;
+  let matched: { name: string; start: number } | null = null;
+  for (const p of sorted) {
+    if (p.start > week) break;
+    if (p.name === 'leader' || p.name === 'anchor') cycleIndex += 1;
+    matched = p;
+  }
+  if (!matched) return null;
+  if (matched.name === 'leader' || matched.name === 'anchor') {
+    return { kind: 'cycle', cycleIndex: Math.max(1, cycleIndex) };
+  }
+  // ⚠️ The opening test week runs on cycle 1's number — it validates what the leaders are about to
+  // use (Forever p.21). `Math.max(1, …)` is what makes that true when no cycle has started yet.
+  if (matched.name === 'tm test' || matched.name === 'tm_test') {
+    return { kind: 'tm_test', cycleIndex: Math.max(1, cycleIndex) };
+  }
+  if (matched.name === 'deload' || matched.name === 'recovery') {
+    return { kind: isForeverShape ? 'deload_single' : 'legacy_deload', cycleIndex: Math.max(1, cycleIndex) };
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -125,7 +142,7 @@ Deno.serve(async (req) => {
     if (!isStrengthPrimary) return json({ success: false, reason: 'not_a_strength_block' }, 400);
 
     const weeks = Number(plan.duration_weeks) || Number(config?.duration_weeks) || 12;
-    const cycles = cyclesFromStoredPhases(config, weeks) ?? cyclesForBlock(weeks).map((c) => ({ ...c }));
+    const cycles = cyclesFromStoredPhases(config, weeks);
     // ⛔ THE STORED WORKING NUMBERS, never recomputed from `performance_numbers`. The composer's own
     // note: recomputing would let the write-back drag them and the controlled progression would be gone.
     const baseWn = (config?.training_max ?? {}) as Record<string, number>;
@@ -187,10 +204,15 @@ Deno.serve(async (req) => {
     for (const row of plannedRows ?? []) {
       const wk = Number(row?.week_number);
       if (!Number.isFinite(wk) || wk <= currentWeek) continue;   // history and the live week stand
-      const cyc = cycles.find((c) => wk >= c.startWeek && wk <= c.endWeek);
+      // ⛔ THE WEEK'S SHAPE FIRST, THEN ITS CYCLE (2026-08-15, §1c). A standalone week is in no cycle,
+      // so the old `cycles.find(...)` returned nothing for it and its rows were silently skipped —
+      // which for a TM-test week would leave the block's own gate running on a stale weight.
+      const shape = weekShapeFromStored(config, wk);
+      if (!shape || shape.kind === 'legacy_deload') continue;    // see `weekShapeFromStored`
+      const cyc = cycles.find((c) => c.index === shape.cycleIndex);
       if (!cyc) continue;
-      const weekInCycle = wk - cyc.startWeek + 1;
-      if (!(weekInCycle >= 1 && weekInCycle <= WEEKS_PER_CYCLE)) continue;
+      const weekInCycle = shape.kind === 'cycle' ? wk - cyc.startWeek + 1 : 0;
+      if (shape.kind === 'cycle' && !(weekInCycle >= 1 && weekInCycle <= WEEKS_PER_CYCLE)) continue;
       const exs = Array.isArray(row?.strength_exercises) ? row.strength_exercises : null;
       if (!exs) continue;
 
@@ -204,17 +226,24 @@ Deno.serve(async (req) => {
         // second table — a rewrite that invented its own ramp would be a different programme.
         // ⛔ SAME SHAPE THE COMPOSER WRITES — warm-up ramp in front, then the work sets. A rewrite
         // that emitted work sets alone would STRIP the ramp the composer authored (Wendler p.31), so
-        // the first progression would silently undo it. `warmupSetsForWeek` is empty on a deload.
-        const spec = [...warmupSetsForWeek(weekInCycle), ...setsForWeek(cyc.kind, weekInCycle)];
+        // the first progression would silently undo it. ⚠️ A STANDALONE WEEK GETS NO RAMP: its own
+        // sets open at 70% and climb, which is the same reason the old deload carve-out existed.
+        const isStandalone = shape.kind !== 'cycle';
+        const spec = shape.kind === 'tm_test'
+          ? tmTestSets()
+          : shape.kind === 'deload_single'
+            ? deloadSingleSets()
+            : [...warmupSetsForWeek(weekInCycle), ...setsForWeek(cyc.kind, weekInCycle)];
         const oldPlan = Array.isArray(ex?.set_plan) ? ex.set_plan : [];
         const newPlan = spec.map((s) => {
           const raw = weightForSet(wn, s.pct);
-          const isDeload = weekInCycle === WEEKS_PER_CYCLE;
+          const isDeload = isStandalone;
           return {
             // Warm-ups floor at the empty bar — same rule as the composer (mainLiftRow). And AS OF
-            // 2026-08-13 so do DELOAD work sets, also mirroring the composer: week 4 is 40/50/60%
-            // with no ramp, so a light working number authors sub-bar sets (Michael's OHP: 30×5 on
-            // a 45 lb bar). ⚠️ This is the composer's rule DUPLICATED — keep the two in step.
+            // 2026-08-13 so do the work sets of a light week, also mirroring the composer: a
+            // standalone week has no ramp in front, so a light working number authors sub-bar sets
+            // (Michael's OHP: 30×5 on a 45 lb bar).
+            // ⚠️ This is the composer's rule DUPLICATED — keep the two in step.
             // Per-lift floor, same rule as the composer: 45 when the lift's normal weeks clear
             // the bar naturally, 35 for a lighter lift (its women's-bar sets are flagged at build).
             weight: (s.warmup || isDeload) ? Math.max(barFloorForWorkingNumber(wn), raw) : raw,

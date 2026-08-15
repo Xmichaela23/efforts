@@ -17,8 +17,10 @@ import { readStrengthProtocol, protocolExpectsE1rmToDip } from './insights/stren
  * gained a field and a reader, and every existing protocol still behaves exactly as it did.
  */
 
-// A twelve-week strength-primary block as the builder actually stores it: every cycle an anchor,
-// each cycle written as a work phase (weeks 1-3) plus its deload (week 4). This is Michael's block.
+// A twelve-week strength-primary block as the builder actually stores it. ⚠️ THE SHAPE HERE IS THE
+// PRE-2026-08-15 ONE ON PURPOSE — three anchor cycles, each written as a work phase (weeks 1-3) plus
+// its own deload (week 4). **Every block already on an athlete's calendar looks like this**, and the
+// card must keep reading them correctly after the restructure. The new shape is pinned below.
 const ALL_ANCHOR_12 = {
   source: 'strength_primary',
   user_selected_start_date: '2026-07-27', // a Monday
@@ -33,6 +35,24 @@ const ALL_ANCHOR_12 = {
       { name: 'Deload', start_week: 12, end_week: 12, weeks_in_phase: 1 },
     ],
     recovery_weeks: [4, 8, 12],
+  },
+};
+
+/** The post-2026-08-15 shape: test · leader · leader · deload · anchor · test (work order §0). */
+const FOREVER_12 = {
+  source: 'strength_primary',
+  user_selected_start_date: '2026-07-27',
+  duration_weeks: 12,
+  phase_structure: {
+    phases: [
+      { name: 'TM Test', start_week: 1, end_week: 1, weeks_in_phase: 1 },
+      { name: 'Leader', start_week: 2, end_week: 4, weeks_in_phase: 3 },
+      { name: 'Leader', start_week: 5, end_week: 7, weeks_in_phase: 3 },
+      { name: 'Deload', start_week: 8, end_week: 8, weeks_in_phase: 1 },
+      { name: 'Anchor', start_week: 9, end_week: 11, weeks_in_phase: 3 },
+      { name: 'TM Test', start_week: 12, end_week: 12, weeks_in_phase: 1 },
+    ],
+    recovery_weeks: [8],
   },
 };
 
@@ -99,7 +119,7 @@ Deno.test('effort: a plan with no strength at all says nothing', () => {
 Deno.test('cycle: week 1 opens at 85% — an all-out set, but NOT the reading', () => {
   const c = card(ALL_ANCHOR_12, '2026-07-29'); // Wed of week 1
   assertEquals(c.weekIndex, 1);
-  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 1, isDeload: false });
+  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 1, isDeload: false, isTest: false });
   assertEquals(c.topSetPct, 0.85);
   // ⛔ THE DISTINCTION THIS TEST EXISTS FOR, and the first draft of the card got it wrong.
   // EVERY non-deload anchor week ends on an open set, so weeks 1, 2 and 3 all produce a rep count.
@@ -111,7 +131,7 @@ Deno.test('cycle: week 1 opens at 85% — an all-out set, but NOT the reading', 
 
 Deno.test('cycle: week 2 is the same — open set at 90%, still not the reading', () => {
   const c = card(ALL_ANCHOR_12, '2026-08-05');
-  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 2, isDeload: false });
+  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 2, isDeload: false, isTest: false });
   assertEquals(c.topSetPct, 0.90);
   assertEquals(c.hasAllOutSet, true);
   assertEquals(c.isMeasurementWeek, false);
@@ -120,7 +140,7 @@ Deno.test('cycle: week 2 is the same — open set at 90%, still not the reading'
 Deno.test('cycle: week 3 is THE reading — the all-out set at 95%', () => {
   const c = card(ALL_ANCHOR_12, '2026-08-12'); // week 3
   assertEquals(c.weekIndex, 3);
-  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 3, isDeload: false });
+  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 3, isDeload: false, isTest: false });
   assertEquals(c.hasAllOutSet, true);
   assertEquals(c.isMeasurementWeek, true);
   assertEquals(c.topSetPct, 0.95);
@@ -128,22 +148,54 @@ Deno.test('cycle: week 3 is THE reading — the all-out set at 95%', () => {
   // remembered backwards more than once.
 });
 
-Deno.test('cycle: week 4 is the deload — 60%, no open set, nothing to read', () => {
+Deno.test('cycle: week 4 is the deload — no open set, nothing to read', () => {
   const c = card(ALL_ANCHOR_12, '2026-08-19'); // week 4
   assertEquals(c.weekIndex, 4);
-  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 4, isDeload: true });
+  // ⛔ `weekInCycle: 0` — a light week is inside no cycle (§1c). It used to report 4, which was the
+  // deload's position in the old four-week cycle; there is no week 4 any more, and an OLD stored
+  // block's deload entry is read the same way a new standalone one is.
+  assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 0, isDeload: true, isTest: false });
   assertEquals(c.hasAllOutSet, false);
   assertEquals(c.isMeasurementWeek, false);
-  assertEquals(c.topSetPct, 0.60);
+  // ⚠️ 1.00, NOT 0.60. The 7th-week deload's last set is a single AT the training max (Forever p.21);
+  // the old 40/50/60 deload topped out at 60% of it. The set is one rep either way.
+  assertEquals(c.topSetPct, 1.00);
   // ⛔ This is the fact audit F2/F4 needed: an e1RM that drops in week 5 dropped because week 4 was
   // prescribed at 40-60%, not because the athlete is sliding. A reader with this card cannot make
   // that mistake — and cannot tell him to ease off his running because of it.
 });
 
 Deno.test('cycle: the second cycle keeps counting — week 7 measures, week 8 deloads', () => {
-  assertEquals(card(ALL_ANCHOR_12, '2026-09-09').cycle, { kind: 'anchor', weekInCycle: 3, isDeload: false });
+  assertEquals(card(ALL_ANCHOR_12, '2026-09-09').cycle, { kind: 'anchor', weekInCycle: 3, isDeload: false, isTest: false });
   assertEquals(card(ALL_ANCHOR_12, '2026-09-09').isMeasurementWeek, true);
-  assertEquals(card(ALL_ANCHOR_12, '2026-09-16').cycle, { kind: 'anchor', weekInCycle: 4, isDeload: true });
+  assertEquals(card(ALL_ANCHOR_12, '2026-09-16').cycle, { kind: 'anchor', weekInCycle: 0, isDeload: true, isTest: false });
+});
+
+// ── The post-2026-08-15 shape ───────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ A TM-TEST WEEK IS READ AS A TEST, AND ITS TOP SET IS THE GATE', () => {
+  // Week 1 of the new shape. It carries an open set at the TRAINING MAX — that rep count is what
+  // decides the next block's number (§1d), so a card reporting "no all-out set" would hide it.
+  const c = card(FOREVER_12, '2026-07-29');
+  assertEquals(c.weekIndex, 1);
+  assertEquals(c.cycle, { kind: 'leader', weekInCycle: 0, isDeload: false, isTest: true });
+  assertEquals(c.hasAllOutSet, true);
+  assertEquals(c.isMeasurementWeek, true, 'the TM single is at 100% — past the 95% validity mark');
+  assertEquals(c.topSetPct, 1.00);
+  assertEquals(c.phase, 'TM Test');
+  assertEquals(c.phaseWord, 'taper', 'a test week is arrived at rested, not unloaded');
+});
+
+Deno.test('⛔ THE NEW MAP\u2019S CYCLE WEEKS STILL RESOLVE — including week 3 of a cycle', () => {
+  // ⛔ THE REGRESSION THIS PINS. `resolveCycle`'s bound was `weekInCycle < WEEKS_PER_CYCLE`, correct
+  // for a four-week cycle and silently excluding the 95% week once the constant became 3.
+  assertEquals(card(FOREVER_12, '2026-08-05').cycle, { kind: 'leader', weekInCycle: 1, isDeload: false, isTest: false });
+  assertEquals(card(FOREVER_12, '2026-08-19').cycle, { kind: 'leader', weekInCycle: 3, isDeload: false, isTest: false });
+  // Week 11 — the anchor's 95% week, the one the whole card exists to identify.
+  assertEquals(card(FOREVER_12, '2026-10-07').cycle, { kind: 'anchor', weekInCycle: 3, isDeload: false, isTest: false });
+  assertEquals(card(FOREVER_12, '2026-10-07').isMeasurementWeek, true);
+  // Week 8 — the standalone 7th-week deload, between the leaders and the anchor.
+  assertEquals(card(FOREVER_12, '2026-09-16').cycle, { kind: 'leader', weekInCycle: 0, isDeload: true, isTest: false });
 });
 
 Deno.test('cycle: a LEADER cycle never measures, at any week', () => {
@@ -157,7 +209,7 @@ Deno.test('cycle: a LEADER cycle never measures, at any week', () => {
       recovery_weeks: [4],
     },
   };
-  assertEquals(card(leaderFirst, '2026-08-12').cycle, { kind: 'leader', weekInCycle: 3, isDeload: false });
+  assertEquals(card(leaderFirst, '2026-08-12').cycle, { kind: 'leader', weekInCycle: 3, isDeload: false, isTest: false });
   assertEquals(card(leaderFirst, '2026-08-12').hasAllOutSet, false);
   assertEquals(card(leaderFirst, '2026-08-12').isMeasurementWeek, false);
   assertEquals(card(leaderFirst, '2026-08-12').topSetPct, 0.95); // the weight is the same; the open set is not there

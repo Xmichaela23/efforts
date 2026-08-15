@@ -14,7 +14,66 @@
 // stamps it at :2474), and that is the only place the question can be answered honestly.
 // ============================================================================
 
-import { type WorkingNumberVerdict, verdictFrom95Set } from './wendler-531.ts';
+import {
+  type CycleKind,
+  type WorkingNumberVerdict,
+  cycleIncrementLb,
+  cyclesForBlock,
+  verdictFrom95Set,
+  verdictFromTmTestSet,
+  WEEKS_PER_CYCLE,
+} from './wendler-531.ts';
+// ⛔ ONE PLACE FOR "a set → a training max" (§1d). See `trainingMaxFromSet`'s own header: writing
+// `estimate1RM(w, r) * 0.85` a second time here is precisely the 85%-vs-90% trap it exists to stop.
+import { trainingMaxFromSet } from '../amrap-catch-up.ts';
+
+export type StoredCycle = { index: number; kind: CycleKind; startWeek: number; endWeek: number };
+
+/**
+ * ⛔ THE CYCLES THE BUILDER ACTUALLY WROTE, not a fresh guess at them. **ONE COPY, 2026-08-15.**
+ *
+ * `cyclesForBlock(weeks, shape)` needs the shape inputs (continuity, posture, aerobic load) that were
+ * true AT BUILD TIME. Re-deriving them now can produce a different leader/anchor split — and, since
+ * §1c, a different WEEK MAP — than the block on the athlete's calendar. Grouping logged sessions
+ * against a structure that does not exist silently files the 95% week as an ordinary week, and the
+ * verdict comes back `hold` for a cycle the athlete actually passed. That is evidence loss with no
+ * error anywhere.
+ *
+ * ⚠️ THIS LIVED IN `rematerialize-strength-block` AND `create-goal-and-materialize-plan` DID NOT HAVE
+ * IT — the second caller re-derived, which is the bug above. Moved here so both read one rule.
+ *
+ * Falls back to `cyclesForBlock` only when a plan predates `phase_structure`.
+ */
+export function cyclesFromStoredPhases(config: any, weeks: number): StoredCycle[] {
+  const phases = config?.phase_structure?.phases;
+  const work = Array.isArray(phases)
+    ? phases
+        .filter((p: any) => {
+          const n = String(p?.name ?? '').trim().toLowerCase();
+          return n === 'leader' || n === 'anchor';
+        })
+        .map((p: any) => ({
+          kind: String(p.name).trim().toLowerCase() as CycleKind,
+          startWeek: Number(p.start_week),
+          endWeek: Number(p.end_week),
+        }))
+        .filter((p: any) => Number.isFinite(p.startWeek))
+        .sort((a: any, b: any) => a.startWeek - b.startWeek)
+    : [];
+  if (work.length === 0) return cyclesForBlock(weeks).map((c) => ({ ...c }));
+  return work.map((p: any, i: number) => ({
+    index: i + 1,
+    kind: p.kind,
+    startWeek: p.startWeek,
+    // ⚠️ THE STORED `end_week` WINS. An old four-week-cycle block wrote its work phase as weeks 1-3
+    // with the deload as a separate entry, and a new one writes 2-4 — both are three weeks and both
+    // are stated. Deriving from `WEEKS_PER_CYCLE` is the fallback for a phase entry missing its end.
+    endWeek: Math.min(
+      Number.isFinite(p.endWeek) && p.endWeek >= p.startWeek ? p.endWeek : p.startWeek + WEEKS_PER_CYCLE - 1,
+      weeks,
+    ),
+  }));
+}
 
 /** The shape this reads. Deliberately minimal — it is the saved-workout JSON, not a DB row type. */
 export type LoggedSet = {
@@ -206,6 +265,131 @@ export function verdictsForBlock(
     // Not finished → forecast. Finished → the evidence, and `hold` when there is none.
     return finished ? verdictForCycle(sessionsByCycle[i] ?? [], liftName) : 'advance';
   });
+}
+
+// ── THE TM-TEST WEEK (§1d) ───────────────────────────────────────────────────
+//
+// ⛔ THE MEASURED EVENT MOVED TO THE RESTED WEEKS ON 2026-08-15, AND THE TWO READINGS ARE NOT THE
+// SAME QUESTION. Read this before wiring anything else to either:
+//
+//   `verdictForCycle`      week 3 of a cycle · a set at **95%** of the training max · minimum ONE rep
+//                          (2nd ed. p.23) · answers "did the prescription hold this cycle"
+//   `tmTestResultFor`      a standalone test week · a set at **100%** of it · bar of FIVE
+//                          (Forever pp.20-21) · answers "is the training max still the right number"
+//
+// Running either rule over the other's set resets an athlete for completing the session as written.
+// They are kept in separate functions with separate verdict tables for exactly that reason.
+//
+// ⚠️ THE ANCHOR'S AMRAPs ARE STILL MEASURED, and they still produce a cycle verdict — what they no
+// longer do is carry the block-to-block transition alone. The stall counter
+// (`STALL_CONFIRM_SESSIONS`) now applies to those in-cycle prescription failures only.
+
+/** The plan weeks the builder wrote as TM-test weeks. Empty on a block built before 2026-08-15. */
+export function testWeeksFromStoredPhases(config: any): number[] {
+  const phases = config?.phase_structure?.phases;
+  if (!Array.isArray(phases)) return [];
+  return phases
+    .filter((p: any) => {
+      const n = String(p?.name ?? '').trim().toLowerCase();
+      return n === 'tm test' || n === 'tm_test';
+    })
+    .map((p: any) => Number(p?.start_week))
+    .filter((w: number) => Number.isFinite(w) && w >= 1)
+    .sort((a: number, b: number) => a - b);
+}
+
+export type TmTestResult = {
+  /** The plan week the test was logged in. */
+  week: number;
+  verdict: WorkingNumberVerdict;
+  /**
+   * ⛔ PRESENT ONLY ON `recalibrate` — the absolute new training max, computed off the set that was
+   * actually performed (Forever p.21). Absent on every other verdict, because every other verdict is
+   * a delta the walker already knows how to apply.
+   */
+  trainingMax?: number;
+};
+
+/**
+ * The result of ONE test week for ONE lift, from the rows already fetched for the block.
+ *
+ * ⛔ RETURNS `null` FOR "NOT LOGGED", NEVER A `hold` WITH A NUMBER. A skipped test week is no
+ * evidence — the caller holds — and manufacturing a result for it is how a missed session becomes a
+ * verdict about the athlete.
+ *
+ * ⚠️ Repeated logs of the same week: the LAST performed AMRAP wins, the same tiebreak
+ * `verdictForCycle` uses. A genuine redo is evidence; the earlier attempt is superseded.
+ */
+export function tmTestResultFor(
+  rows: readonly JoinedStrengthRow[],
+  testWeek: number,
+  liftName: string,
+): TmTestResult | null {
+  let hit: { weight: number; reps: number } | null = null;
+  for (const r of rows ?? []) {
+    if (Number(r?.week_number) !== testWeek) continue;
+    const set = amrapSetForLift({ strength_exercises: r?.strength_exercises }, liftName);
+    if (set) hit = set;
+  }
+  if (!hit) return null;
+  const verdict = verdictFromTmTestSet(hit.reps, liftName);
+  return verdict === 'recalibrate'
+    ? { week: testWeek, verdict, trainingMax: trainingMaxFromSet(hit.weight, hit.reps) }
+    : { week: testWeek, verdict };
+}
+
+/**
+ * The performed AMRAP set for a lift — weight AND reps, where `amrapRepsForLift` returns reps alone.
+ * ⚠️ The weight is what `recalibrate` needs; a rep count on its own cannot produce a training max.
+ */
+function amrapSetForLift(
+  workout: LoggedStrengthWorkout | null | undefined,
+  liftName: string,
+): { weight: number; reps: number } | null {
+  const rows = workout?.strength_exercises;
+  if (!Array.isArray(rows)) return null;
+  const want = String(liftName).trim().toLowerCase();
+  for (const ex of rows) {
+    if (String(ex?.name ?? '').trim().toLowerCase() !== want) continue;
+    const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+    const amrap = sets.find((s) => s?.amrap === true && isPerformed(s));
+    if (!amrap) continue;
+    const weight = Number(amrap.weight);
+    const reps = Number(amrap.reps);
+    if (!Number.isFinite(weight) || weight <= 0) return null;
+    if (!Number.isFinite(reps) || reps < 0) return null;
+    return { weight, reps };
+  }
+  return null;
+}
+
+/**
+ * ⛔ THE BLOCK-TO-BLOCK TRANSITION GATE — SPEC §1b's outstanding debt, paid 2026-08-15.
+ *
+ * Given where a finished block ENDED (its last cycle's working number) and what its CLOSING test week
+ * showed, this is the number the next block starts on:
+ *
+ *   `advance` / `advance_untrusted` → one step up (+5 upper / +10 lower). The bar was met.
+ *   `hold`                          → unchanged. Short of the bar, or the test was not done.
+ *   `recalibrate`                   → the number computed off the set itself, whatever that is.
+ *
+ * ⚠️ IT NEVER RETURNS A NUMBER BELOW THE RECALIBRATION. That is the point of the `recalibrate` path:
+ * a training max the athlete cannot hit five times is replaced by one derived from what they DID
+ * hit, rather than walked down 10% at a time over the next two months.
+ */
+export function nextBlockTrainingMax(
+  endOfBlockWorkingNumber: number,
+  isLowerBody: boolean,
+  result: TmTestResult | null | undefined,
+): number {
+  const base = Number(endOfBlockWorkingNumber);
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  if (!result) return base;                                  // no test logged → hold (§0h)
+  if (result.verdict === 'recalibrate') return result.trainingMax && result.trainingMax > 0 ? result.trainingMax : base;
+  if (result.verdict === 'advance' || result.verdict === 'advance_untrusted') {
+    return base + cycleIncrementLb(isLowerBody);
+  }
+  return base;
 }
 
 export function cycleSessionFor(

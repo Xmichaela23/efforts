@@ -54,7 +54,9 @@ import {
   type StrengthProtocolId,
 } from './strength-profiles.ts';
 import {
+  deloadSingleSets,
   setsForWeek,
+  tmTestSets,
   WEEKS_PER_CYCLE,
   VALIDITY_CHECK_PCT,
   type CycleKind,
@@ -129,10 +131,24 @@ export type BlockGoal =
  * `weekInCycle` for one would be a fabricated fact travelling as a measured one (Law 2).
  */
 export type BlockCycle = {
+  /**
+   * Leader or anchor. ⚠️ On a STANDALONE week (see `weekInCycle`) this is the kind of the cycle the
+   * week follows — the template it is unloading from or testing after — because a light week belongs
+   * to neither template and reporting a bare `anchor` for all of them was a small lie that only
+   * stayed harmless while the deload lived inside a cycle.
+   */
   kind: CycleKind;
-  /** 1-based week within the four-week cycle. Week 4 is always the deload. */
+  /**
+   * 1-based week within the three-week cycle.
+   *
+   * ⛔ **`0` MEANS A STANDALONE WEEK** — a 7th-week deload or a TM-test week, which sit BETWEEN
+   * cycles and are inside none (2026-08-15, §1c). It used to be 1-4 with week 4 always the deload;
+   * there is no week 4 any more.
+   */
   weekInCycle: number;
   isDeload: boolean;
+  /** True on a standalone TM-test week (Forever pp.20-21). Mutually exclusive with `isDeload`. */
+  isTest: boolean;
 };
 
 export type BlockIdentity = {
@@ -305,23 +321,49 @@ function storedCycleEntry(config: any, weekIndex: number): { name: string; start
 /**
  * Turn the stored phase entry into a cycle position.
  *
- * The builder writes each four-week cycle as TWO entries — the work phase ('Leader' or 'Anchor',
- * weeks 1-3) and its 'Deload' (week 4) — so the position is readable off the entry we landed in
- * without re-running the shape decision. A deload is week 4 by construction (`buildBlockPhases`).
+ * ⛔ REWRITTEN 2026-08-15 (§1c). The builder used to write each FOUR-week cycle as two entries — the
+ * work phase (weeks 1-3) and its 'Deload' (week 4). It now writes each THREE-week cycle as one entry
+ * and the light weeks as their own one-week entries ('Deload', 'TM Test') between them.
+ *
+ * ⚠️ THE OLD BOUND WAS THE BUG WAITING TO HAPPEN. It read `weekInCycle < WEEKS_PER_CYCLE`, which was
+ * "1-3 of a four-week cycle". With the constant at 3 that silently excluded week 3 — the 95% week,
+ * the one week the whole card exists to identify. It is `<=` now, and reads the phase entry's own
+ * span rather than assuming one.
  */
 function resolveCycle(config: any, weekIndex: number): BlockCycle | null {
   const entry = storedCycleEntry(config, weekIndex);
   if (!entry) return null;
   const name = entry.name.toLowerCase();
 
-  if (name === 'deload' || name === 'recovery') {
-    return { kind: 'anchor', weekInCycle: WEEKS_PER_CYCLE, isDeload: true };
+  const isDeload = name === 'deload' || name === 'recovery';
+  const isTest = name === 'tm test' || name === 'tm_test' || name === 'retest';
+  if (isDeload || isTest) {
+    // ⛔ A STANDALONE WEEK IS IN NO CYCLE — `weekInCycle: 0` says so rather than reporting a
+    // fabricated position. The `kind` reported is the template it follows, found by walking back.
+    return { kind: precedingCycleKind(config, weekIndex), weekInCycle: 0, isDeload, isTest };
   }
   if (name !== 'leader' && name !== 'anchor') return null; // not a cycle-structured block
 
   const weekInCycle = weekIndex - entry.start_week + 1;
-  if (!(weekInCycle >= 1 && weekInCycle < WEEKS_PER_CYCLE)) return null;
-  return { kind: name as CycleKind, weekInCycle, isDeload: false };
+  if (!(weekInCycle >= 1 && weekInCycle <= WEEKS_PER_CYCLE)) return null;
+  return { kind: name as CycleKind, weekInCycle, isDeload: false, isTest: false };
+}
+
+/**
+ * The kind of the last leader/anchor phase at or before `weekIndex`. ⚠️ An opening TM-test week has
+ * nothing before it and reports `leader` — the template it is testing FOR, which is what p.21 asks a
+ * test week to validate.
+ */
+function precedingCycleKind(config: any, weekIndex: number): CycleKind {
+  const phases = config?.phase_structure?.phases;
+  if (!Array.isArray(phases)) return 'leader';
+  let found: CycleKind | null = null;
+  for (const p of [...phases].sort((a: any, b: any) => Number(a?.start_week) - Number(b?.start_week))) {
+    if (Number(p?.start_week) > weekIndex) break;
+    const n = String(p?.name ?? '').trim().toLowerCase();
+    if (n === 'leader' || n === 'anchor') found = n as CycleKind;
+  }
+  return found ?? 'leader';
 }
 
 /**
@@ -357,7 +399,13 @@ export function resolveBlockIdentity(input: BlockIdentityInput): BlockIdentity {
   let isMeasurementWeek: boolean | null = null;
   let topSetPct: number | null = null;
   if (cycle) {
-    const sets = setsForWeek(cycle.kind, cycle.weekInCycle);
+    // ⛔ THE STANDALONE WEEKS HAVE THEIR OWN SET LISTS. `setsForWeek` only answers for a cycle week,
+    // and a TM-test week DOES carry an all-out set — at the training max, which is the block-to-block
+    // transition gate (§1d). Reporting `hasAllOutSet: false` for it would hide the one set in the
+    // week that decides the next block's number.
+    const sets = cycle.weekInCycle === 0
+      ? (cycle.isTest ? tmTestSets() : deloadSingleSets())
+      : setsForWeek(cycle.kind, cycle.weekInCycle);
     hasAllOutSet = sets.some((s) => s.amrap);
     isMeasurementWeek = sets.some((s) => s.amrap && s.pct >= VALIDITY_CHECK_PCT);
     topSetPct = sets.length ? sets[sets.length - 1].pct : null;

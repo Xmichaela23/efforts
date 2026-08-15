@@ -12,7 +12,7 @@ import {
   composeStrengthPrimaryPlan,
   descentIsJogged,
   isBodyweightName,
-  JUMPS,
+  jumpsFor,
 } from './strength-primary-plan.ts';
 import { placeLiftingWeek } from './place-week.ts';
 import { ASSISTANCE_CATALOG } from '../../../../src/lib/assistance-catalog.ts';
@@ -50,26 +50,90 @@ Deno.test('working number is 85% of the real max, rounded DOWN to 5 lb', () => {
 // ── The week tables (SPEC §1) ───────────────────────────────────────────────
 
 Deno.test('LEADER cycle: every set is five, top set climbs 85→90→95%, no all-out set', () => {
+  // ⛔ WEEKS 2-4, NOT 1-3 (2026-08-15, §1c). Week 1 is the standalone TM-test week; cycle 1 starts
+  // at week 2. **The three prescriptions themselves are byte-identical to before the restructure.**
   // Bench working number 190. 65/75/85 → 123.5/142.5/161.5 → 120/140/160 (round down).
-  assertEquals(ramp(1, 'Bench Press'), '120x5 140x5 160x5');
-  assertEquals(ramp(2, 'Bench Press'), '130x5 150x5 170x5');
-  assertEquals(ramp(3, 'Bench Press'), '140x5 160x5 180x5');
+  assertEquals(ramp(2, 'Bench Press'), '120x5 140x5 160x5');
+  assertEquals(ramp(3, 'Bench Press'), '130x5 150x5 170x5');
+  assertEquals(ramp(4, 'Bench Press'), '140x5 160x5 180x5');
   // ⛔ A leader has NO all-out set. Dropping it is half of what makes the lowered working number
   // lower-fatigue; keeping it is the accidental hybrid SPEC §1 exists to correct.
-  for (const week of [1, 2, 3]) {
+  for (const week of [2, 3, 4]) {
     for (const p of liftRow(week, 'Bench Press')!.set_plan as any[]) assertEquals(p.amrap, undefined);
   }
 });
 
-Deno.test('deload is week 4 of every cycle: 40/50/60%, no jumps, no assistance', () => {
-  assertEquals(ramp(4, 'Bench Press'), '75x5 95x5 110x5');
-  const rows = sessionsFor(4).find((s) => s.type === 'strength')!.strength_exercises!;
-  assertEquals(rows.length, 1, 'a deload is a volume cut — the main lift only');
-  assertEquals(PLAN.phaseStructure.recovery_weeks, [4, 8, 12]);
+Deno.test('⛔ THE TM-TEST WEEK: 70/80/90 × 5 then the training max, open, and it is week 1', () => {
+  // ⛔ SUPERSEDES 'deload is week 4 of every cycle: 40/50/60%'. The cycle-internal deload is gone;
+  // the block's light weeks are standalone (Forever pp.20-23). Bench TM 190 → 70/80/90/100% =
+  // 133/152/171/190 → 130/150/170/190 on the 5 lb grid.
+  assertEquals(ramp(1, 'Bench Press'), '130x5 150x5 170x5 190x5+');
+  assertEquals(ramp(12, 'Bench Press'), '140x5 160x5 180x5 200x5+');   // TM 200 by the last cycle
+  // ⛔ ONLY THE DELOAD IS A `recovery_week`. A test week is light for a different reason — it arrives
+  // rested in order to MEASURE — and `normalizePhaseKey('TM Test')` resolves it to `taper` instead.
+  // Filing it as both would give one week two contradictory postures.
+  assertEquals(PLAN.phaseStructure.recovery_weeks, [8]);
+});
+
+Deno.test('⛔ THE 7TH-WEEK DELOAD: 70×5 · 80×3 · 90×1 · TM×1, week 8, nothing open', () => {
+  // Bench TM 195 in cycle 2 → 136/156/175/195 → 135/155/175/195.
+  assertEquals(ramp(8, 'Bench Press'), '135x5 155x3 175x1 195x1');
+  assertEquals((liftRow(8, 'Bench Press')!.set_plan as any[]).some((p) => p.amrap), false);
+});
+
+Deno.test('⛔ FIRST SET LAST — 5×5 AT THE WEEK\u2019S OPENING WEIGHT, LEADER WEEKS ONLY (§1e)', () => {
+  // Forever p.40 / p.45. The supplemental uses the lift's OWN training max at the week's first-set
+  // percentage — no new maxes, no new equipment, no second movement to pick.
+  const fslOn = (week: number) => {
+    const s = sessionsFor(week).find((x) => x.name === 'Strength — Bench Press');
+    return ((s?.strength_exercises ?? []) as any[]).find((e) => e.supplemental);
+  };
+  // Bench TM 190 in cycle 1. Week 2 opens at 65% = 123.5 → 120; week 3 at 70% = 133 → 130.
+  assertEquals([fslOn(2).name, fslOn(2).sets, fslOn(2).reps, fslOn(2).weight], ['Bench Press', 5, 5, 120]);
+  assertEquals(fslOn(3).weight, 130);
+  assertEquals(fslOn(4).weight, 140);          // 75% of 190 = 142.5 → 140
+  assertEquals(fslOn(5).weight, 125);          // cycle 2, TM 195 → 65% = 126.75 → 125
+  assertEquals((fslOn(2).set_plan as any[]).length, 5);
+  assertEquals((fslOn(2).set_plan as any[]).every((p: any) => p.weight === 120 && p.reps === 5), true);
+
+  // ⛔ NEVER ON AN ANCHOR OR A STANDALONE WEEK. An anchor's top set is already a rep-out at 95%, and
+  // a standalone week is the block's recovery — adding 25 reps to either is the accidental hybrid
+  // the leader/anchor split exists to avoid.
+  for (const week of [1, 8, 9, 10, 11, 12]) {
+    assertEquals(fslOn(week), undefined, `week ${week} must carry no supplemental`);
+  }
+
+  // ⛔ IT IS PRESCRIBED BARBELL WORK, NOT AN ACCESSORY. `load_prescribed: false` would make the
+  // server matcher, the logger and the compare table read it as assistance (D-370) and the logged
+  // sets would come back as an unplanned extra.
+  assertEquals(fslOn(2).load_prescribed, undefined);
+  assertEquals(typeof fslOn(2).weight, 'number');
+
+  // The session names it, and the row order is main lift → supplemental → assistance.
+  const rows = sessionsFor(2).find((s) => s.name === 'Strength — Bench Press')!.strength_exercises!;
+  assertEquals(rows.map((r: any) => r.name)[0], 'Bench Press');
+  assertEquals((rows[1] as any).supplemental, true);
+  const desc = sessionsFor(2).find((s) => s.name === 'Strength — Bench Press')!.description;
+  assertEquals(/First Set Last — 5×5 @ 120/.test(desc), true, desc);
+  assertEquals(/same lift at its opening weight/.test(desc), true, desc);
+});
+
+Deno.test('⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE, at the light band', () => {
+  // ⛔ SUPERSEDES 'a deload is a volume cut — the main lift only'. Forever p.22 puts 10 jumps on the
+  // 7th week and p.23 puts 25-50 reps per assistance slot on it. The cut is in the main lift and in
+  // the band, not in the session's structure.
+  for (const week of [1, 8, 12]) {
+    const squat = sessionsFor(week).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
+    assertEquals(squat[0].name, 'Box Jump', `week ${week} lost its primer`);
+    assertEquals(squat[0].sets, 2, `week ${week} should carry the light jump dose`);
+    const acc = (squat as any[]).filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'));
+    assertEquals(acc.length, 3, `week ${week} should carry three assistance slots`);
+    for (const r of acc) assertEquals(r.reps, '25 total', `week ${week}: ${r.name}`);
+  }
 });
 
 Deno.test('the working number steps BETWEEN cycles, never inside one — Wendler\'s fixed increment', () => {
-  // Bench (1RM 225): TM 190 → 195 → 200.
+  // Bench (1RM 225): TM 190 → 195 → 200. Cycles now open on weeks 2, 5 and 9.
   assertEquals(ramp(5, 'Bench Press'), '125x5 145x5 165x5');
   assertEquals(ramp(9, 'Bench Press'), '130x5 150x5 170x5+');
   // ⛔ THE SQUAT'S THIRD CYCLE IS THE ONE NUMBER SLICE a MOVED IN A STANDARD BLOCK (2026-08-12).
@@ -92,19 +156,31 @@ Deno.test('ANCHOR cycle: 5/3/1 proper, and the all-out set is the LAST set only'
   assertEquals(wk11[wk11.length - 1].amrap, true);
 });
 
-Deno.test('the block ends on a deload, and week 12 has no all-out set', () => {
-  assertEquals((liftRow(12, 'Bench Press')!.set_plan as any[]).some((p) => p.amrap), false);
+Deno.test('⛔ THE BLOCK ENDS ON A TM-TEST WEEK, AND ITS TOP SET IS THE TRANSITION GATE', () => {
+  // ⛔ SUPERSEDES 'the block ends on a deload, and week 12 has no all-out set' (§1c/§1d). Week 12 is
+  // now the closing test week: it DOES carry an open set, at the training max, and the reps on it
+  // are what decide the next block's number. That is SPEC §1b's outstanding debt being paid.
+  const wk12 = liftRow(12, 'Bench Press')!.set_plan as any[];
+  assertEquals(wk12.filter((p) => p.amrap).length, 1);
+  assertEquals(wk12[wk12.length - 1].amrap, true);
+  assertEquals(wk12[wk12.length - 1].weight, 200, 'the test is at the training max the block reached');
 });
 
 // ── The per-set prescription ────────────────────────────────────────────────
 
-Deno.test('every main lift carries THREE WORK sets at THREE weights, and they ascend', () => {
+Deno.test('every main lift carries an ASCENDING per-set prescription on the 5 lb grid', () => {
+  // ⚠️ THREE WORK SETS ON A CYCLE WEEK, FOUR ON A STANDALONE ONE (§1c) — the standalone shapes add
+  // the set at the training max itself. The invariant under test is the ascent and the grid.
+  const STANDALONE = new Set([1, 8, 12]);
   for (let week = 1; week <= 12; week++) {
     for (const lift of ['Bench Press', 'Back Squat', 'Overhead Press', 'Deadlift']) {
       const plan = (liftRow(week, lift)?.set_plan as any[] | undefined)?.filter((p) => !p.warmup);
-      assert(plan != null && plan.length === 3, `wk${week} ${lift} has no per-set prescription`);
-      assert(plan[0].weight < plan[1].weight && plan[1].weight < plan[2].weight,
-        `wk${week} ${lift} ramp does not ascend: ${JSON.stringify(plan)}`);
+      const want = STANDALONE.has(week) ? 4 : 3;
+      assert(plan != null && plan.length === want, `wk${week} ${lift} has ${plan?.length} work sets, want ${want}`);
+      for (let i = 1; i < plan.length; i++) {
+        assert(plan[i].weight > plan[i - 1].weight,
+          `wk${week} ${lift} ramp does not ascend: ${JSON.stringify(plan)}`);
+      }
       for (const p of plan) assertEquals(p.weight % 5, 0, `wk${week} ${lift} weight off the 5 lb grid`);
     }
   }
@@ -122,7 +198,8 @@ Deno.test('warm-up weights floor at the lift\'s own bar — 45 normally, 35 on a
     enduranceSport: 'run',
     enduranceFrequency: 3,
   });
-  for (const s of ((light as any).sessions_by_week['1'] as any[])) {
+  // ⚠️ WEEK 2 — week 1 is the TM-test week and carries no warm-up ramp of its own.
+  for (const s of ((light as any).sessions_by_week['2'] as any[])) {
     if (s.type !== 'strength') continue;
     const m = (s.strength_exercises ?? []).find((e: any) => Array.isArray(e.set_plan));
     if (!m) continue;
@@ -133,19 +210,19 @@ Deno.test('warm-up weights floor at the lift\'s own bar — 45 normally, 35 on a
   }
 });
 
-Deno.test('warm-up ramp: 40/50/60 (reps 5/5/3) precedes the work sets on working weeks, NONE on deload', () => {
-  // Bench working number wk1 = 190. 40/50/60% → 76/95/114 → 75/95/110 (round down to 5).
-  assertEquals(warmupRamp(1, 'Bench Press'), '75x5 95x5 110x3');
+Deno.test('warm-up ramp: 40/50/60 (reps 5/5/3) on CYCLE weeks, NONE on a standalone week', () => {
+  // Bench working number in cycle 1 = 190. 40/50/60% → 76/95/114 → 75/95/110 (round down to 5).
+  assertEquals(warmupRamp(2, 'Bench Press'), '75x5 95x5 110x3');
   for (const lift of ['Bench Press', 'Back Squat', 'Overhead Press', 'Deadlift']) {
-    for (const week of [1, 2, 3, 5, 6, 7, 9, 10, 11]) {
+    for (const week of [2, 3, 4, 5, 6, 7, 9, 10, 11]) {
       const warm = (liftRow(week, lift)!.set_plan as any[]).filter((p) => p.warmup);
       assertEquals(warm.length, 3, `wk${week} ${lift} should ramp before the work sets`);
       assertEquals(warm.map((p) => p.reps), [5, 5, 3], `wk${week} ${lift} warm-up reps`);
       assertEquals(warm.some((p) => p.amrap), false, `wk${week} ${lift} a warm-up is never all-out`);
     }
-    // Deload weeks carry no ramp — the work sets are already 40/50/60.
-    for (const week of [4, 8, 12]) {
-      assertEquals((liftRow(week, lift)!.set_plan as any[]).some((p) => p.warmup), false, `wk${week} ${lift} deload has no ramp`);
+    // Standalone weeks carry no ramp — their own sets open at 70% and climb.
+    for (const week of [1, 8, 12]) {
+      assertEquals((liftRow(week, lift)!.set_plan as any[]).some((p) => p.warmup), false, `wk${week} ${lift} standalone has no ramp`);
     }
   }
 });
@@ -160,8 +237,13 @@ Deno.test('the row-level weight/reps carry the TOP set, so pre-existing consumer
 Deno.test('percent_1rm is the fraction of the REAL max, and stays buffered by the working number', () => {
   // The hardest set in the block is week 11's 95%-of-working top set: 190 / 225 = 0.844.
   assertEquals(liftRow(11, 'Bench Press')!.percent_1rm, 0.844);
-  // Week one sits well inside the athlete — 160/225 = 0.711. Conservative loading, not an on-ramp.
-  assertEquals(liftRow(1, 'Bench Press')!.percent_1rm, 0.711);
+  // The first LIFTING week sits well inside the athlete — 160/225 = 0.711. Conservative loading,
+  // not an on-ramp. ⚠️ Week 2 now: week 1 is the test week, whose top set is at the training max.
+  assertEquals(liftRow(2, 'Bench Press')!.percent_1rm, 0.711);
+  // ⛔ AND THE TEST WEEK'S TOP SET IS THE TRAINING MAX — 190/225 = 0.844, the SAME true percentage
+  // as the anchor's 95% set. That is what makes it testable rather than a max attempt: the 85%
+  // buffer means "your training max, for reps" is ~84% of the real one.
+  assertEquals(liftRow(1, 'Bench Press')!.percent_1rm, 0.844);
 });
 
 // ── The session (SPEC §1) ───────────────────────────────────────────────────
@@ -216,7 +298,7 @@ Deno.test('⛔ JUMPS ARE ON LOWER DAYS ONLY — an upper day means legs are free
   assertEquals(lower[0].name, 'Box Jump', 'the lower day lost its primer');
 });
 
-Deno.test('a work session is jumps → main lift → 50 reps each of leg / pull / core', () => {
+Deno.test('a work session is jumps → main lift → the phase\u2019s rep total per slot', () => {
   // Was `.find(s => s.type === 'strength')` — the FIRST strength session, which assumed the grid
   // put Bench on Monday. Days are the solver's now, so name the lift instead of trusting the order.
   // ⚠️ Named off the SQUAT session now: jumps are lower-day only (see the test above), so the
@@ -239,13 +321,20 @@ Deno.test('a work session is jumps → main lift → 50 reps each of leg / pull 
   // on the pull menu for anyone who has one; it is no longer what the app hands you by default.
   assertEquals(rows.map((r: any) => r.name), ['Box Jump', 'Back Squat', 'Push-Up', 'Inverted Row', 'Back Extension']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
-  // jump row always has one — 3×5 = 15, the top of Wendler's 10–15 jumps or throws.
-  assertEquals(JUMPS.sets! * (JUMPS.reps as number), 15);
+  // jump row always has one. ⛔ THE DOSE IS PER PHASE AS OF 2026-08-15 (Forever p.18): 2×5 = 10 in a
+  // leader and on a light standalone week, 3×5 = 15 in an anchor. Week 1 of a default block is a
+  // leader, so the row above is the LEADER dose.
+  assertEquals(jumpsFor('leader').sets! * (jumpsFor('leader').reps as number), 10);
+  assertEquals(jumpsFor('seventh').sets! * (jumpsFor('seventh').reps as number), 10);
+  assertEquals(jumpsFor('anchor').sets! * (jumpsFor('anchor').reps as number), 15);
   // ⛔ A REP TOTAL, NOT A SET. Was `assertEquals(r.reps, 25)` alongside `sets: 1`, which rendered as
   // "1×25" and asserted a single set of twenty-five the prescription never asked for. The number is
   // unchanged; what is asserted now is that the row makes no claim about how it is performed.
+  // ⛔ 25, NOT 50 — WEEK 1 IS A LEADER (work order §1a, Forever p.18). The leader band is 25-50 and
+  // the anchor band is 50-75; this athlete has no tested capacity, so each slot sits at its floor.
+  // The number moved because the PHASE decides it now, not because the slot did.
   for (const r of rows.slice(2) as any[]) {
-    assertEquals(r.reps, '50 total');
+    assertEquals(r.reps, '25 total');
     assertEquals(r.sets, undefined, `${r.name} carries a set count it was never prescribed`);
     assertEquals(r.load_prescribed, false, `${r.name} must carry no prescribed load`);
   }
@@ -313,9 +402,12 @@ Deno.test('every catalog option resolves in the exercise table — an unresolved
 });
 
 Deno.test('jumps stay bodyweight and carry no percentage (D-322)', () => {
-  assertEquals(isBodyweightName(JUMPS.name), true);
-  assertEquals(JUMPS.weight, 'Bodyweight');
-  assertEquals((JUMPS as any).percent_1rm, undefined);
+  for (const phase of ['leader', 'anchor', 'seventh'] as const) {
+    const j = jumpsFor(phase);
+    assertEquals(isBodyweightName(j.name), true);
+    assertEquals(j.weight, 'Bodyweight');
+    assertEquals((j as any).percent_1rm, undefined);
+  }
 });
 
 Deno.test('no session carries a 1rm_test tag', () => {
@@ -329,27 +421,33 @@ Deno.test('no session carries a 1rm_test tag', () => {
 
 // ── Block shape ─────────────────────────────────────────────────────────────
 
-Deno.test('12 weeks is leader, leader, anchor — Wendler 2:1', () => {
+Deno.test('⛔ THE 12-WEEK PHASE STRUCTURE IS THE WORK ORDER\u2019S §0 MAP', () => {
   assertEquals(
     PLAN.phaseStructure.phases.map((p) => `${p.name} ${p.start_week}-${p.end_week}`),
-    ['Leader 1-3', 'Deload 4-4', 'Leader 5-7', 'Deload 8-8', 'Anchor 9-11', 'Deload 12-12'],
+    ['TM Test 1-1', 'Leader 2-4', 'Leader 5-7', 'Deload 8-8', 'Anchor 9-11', 'TM Test 12-12'],
   );
   // Exactly one anchor, and it is last: leaders build, the anchor expresses.
   assertEquals(PLAN.phaseStructure.phases.filter((p) => p.name === 'Anchor').length, 1);
+  // ⛔ TWO SEPARATE LEADER ENTRIES, not one six-week phase. They are different cycles running on
+  // different working numbers, and collapsing them would hide the increment between them.
+  assertEquals(PLAN.phaseStructure.phases.filter((p) => p.name === 'Leader').length, 2);
 });
 
-Deno.test('a block is a whole number of four-week cycles', () => {
+Deno.test('a block is a length the layout fills exactly — no longer multiples of four', () => {
   assertEquals(blockWeeks(12), 12);
   assertEquals(blockWeeks(8), 8);
-  assertEquals(blockWeeks(10), 8);   // a partial cycle would strand a leader with no deload
+  assertEquals(blockWeeks(16), 16);
+  assertEquals(blockWeeks(10), 9);
   assertEquals(blockWeeks(3), 4);
   const ten = composeStrengthPrimaryPlan({ durationWeeks: 10, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0 });
-  assertEquals(ten.duration_weeks, 8);
-  assertEquals(Object.keys(ten.sessions_by_week).length, 8);
+  assertEquals(ten.duration_weeks, 9);
+  assertEquals(Object.keys(ten.sessions_by_week).length, 9);
 });
 
-Deno.test('8 weeks is one leader and one anchor', () => {
-  assertEquals(buildBlockPhases(8).phases.map((p) => p.name), ['Leader', 'Deload', 'Anchor', 'Deload']);
+Deno.test('8 weeks drops the OPENING test week — the entry gate 1RM stands in for it', () => {
+  assertEquals(buildBlockPhases(8).phases.map((p) => p.name), ['Leader', 'Deload', 'Anchor', 'TM Test']);
+  assertEquals(buildBlockPhases(16).phases.map((p) => p.name),
+    ['TM Test', 'Leader', 'Leader', 'Deload', 'Anchor', 'Deload', 'Anchor', 'TM Test']);
 });
 
 // ── Endurance underneath ────────────────────────────────────────────────────

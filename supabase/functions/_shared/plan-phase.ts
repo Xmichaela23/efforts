@@ -146,6 +146,11 @@ export function phaseNameToWeekIntent(phaseName: string | null | undefined): Wee
     // coach reads a strength block's weeks as what they are.
     case 'leader':   return 'baseline';
     case 'anchor':   return 'build';
+    // ⛔ THE STANDALONE TRAINING-MAX TEST WEEK (Forever pp.20-21), registered 2026-08-15 with the
+    // change that started emitting it. It is a taper week in every way the coach cares about: the
+    // volume drops, one set is measured, and the week is arrived at rested.
+    case 'tm test':
+    case 'tm_test':  return 'taper';
     default:         return 'unknown';  // D-261/D-242: unknown phase → strict, never lenient
   }
 }

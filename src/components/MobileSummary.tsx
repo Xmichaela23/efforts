@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ ONE VOCABULARY (stage 4). See `src/lib/discipline.ts`.
 import { normalizeDiscipline } from '@/lib/discipline';
+import { getDisciplineColorRgb } from '@/lib/context-utils';
 import { supabase } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative, { NextUp } from './SessionNarrative';
@@ -156,7 +157,16 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       );
     }
     return (
-      <div className="w-full space-y-2">
+      // ⛔ THE PERFORMANCE TAB'S ACCENT, SET ONCE AT THE ROOT (2026-08-15, Michael: "apply to the
+      // performance screens using each discipline's colour"). Everything below — the adherence
+      // tiles, the interval table's column heads, the strength summary, SessionNarrative's section
+      // labels — reads `--card-accent-rgb` through the `readout-label` / `readout-num` classes in
+      // index.css. One variable, no prop threading, and the Performance tab therefore cannot
+      // disagree with the Details tab's plate about what colour this workout is.
+      <div
+        className="w-full space-y-2"
+        style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(normalizeDiscipline(type) || String(type || '')) }}
+      >
         {sessionDetailLoading && !sd && (
           <div className="text-xs text-white/50 px-0.5" aria-live="polite">
             Loading performance analysis…
@@ -381,6 +391,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         recomputing={recomputing}
         recomputeError={recomputeError}
         onRecompute={recomputeAnalysis}
+        // This workout's discipline colours the Performance tab's readout labels — the same
+        // SPORT_COLORS the Details tab's plate uses, so the two tabs of one workout agree.
+        accentRgb={getDisciplineColorRgb(normalizeDiscipline(type) || String(type || ''))}
       />
 
       {/* Swim "richer data — join the iOS beta" CTA REMOVED (2026-07-19, Michael) — a promo pitch on the

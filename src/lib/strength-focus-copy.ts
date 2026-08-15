@@ -46,12 +46,22 @@ export function strengthFocusSections(opts: {
   anchorStartWeek?: number;
   /** How many cycles carry the open set. Derived from the block, not assumed to be one. */
   anchorCycles?: number;
+  /**
+   * ⛔ THE STANDALONE TEST WEEKS, 1-based (2026-08-15, §1c). A 12-week block opens and closes on one;
+   * an 8-week block only closes on one, because the opening test does not fit and the entry gate's
+   * 1RM stands in for it. Empty → the sentence is omitted rather than guessed at.
+   */
+  testWeeks?: readonly number[];
   enduranceNote?: string;
 }): StrengthFocusSection[] {
   const weeks = opts.weeks ?? STRENGTH_FOCUS_WEEKS;
-  const leaders = opts.leaderCycles ?? Math.max(1, Math.floor(weeks / 4) - 1);
+  // ⚠️ THE FALLBACKS ARE FOR THE PRE-COMMIT CARD ONLY. The composer always passes real numbers off
+  // its own week map; these are what the build flow shows before a block exists. A cycle costs three
+  // weeks now and the light weeks are the odd ones, so `weeks / 4` is no longer the divisor.
+  const leaders = opts.leaderCycles ?? Math.max(1, Math.floor((weeks - 2) / 3) - 1);
   const anchorStart = opts.anchorStartWeek ?? weeks - 3;
-  const anchors = opts.anchorCycles ?? Math.max(1, Math.floor(weeks / 4) - leaders);
+  const anchors = opts.anchorCycles ?? 1;
+  const testWeeks = [...(opts.testWeeks ?? [])].sort((a, b) => a - b);
   return [
     {
       heading: 'The trade-off',
@@ -70,16 +80,28 @@ export function strengthFocusSections(opts: {
       // every cycle was a measuring cycle. Both halves false, and "0" as a word in prose.
       //
       // ⚠️ §0f: the block knew its own shape and the narration did not follow it.
+      // ⛔ THE STRUCTURE SENTENCE FOLLOWS THE BLOCK, and it was rewritten 2026-08-15 (§1c) because
+      // the block's shape changed underneath it. Cycles are three weeks; the light weeks stand alone
+      // between them; and a test week is a different thing from a deload, so the copy names both.
       body:
         `Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Four lifting days, placed ` +
         `around your endurance. ` +
+        // ⚠️ THE ZERO-LEADER BRANCH IS UNREACHABLE FROM THE ENGINE as of §1b (Forever p.17 has no
+        // all-anchor model) and it stays anyway: a count of zero rendered as a word in prose is the
+        // 2026-07-28 defect this whole function was rewritten for, and the guard costs one clause.
         (leaders === 0
-          ? `All ${anchors} cycles are measuring cycles, each carrying an open set and ending in a deload.`
+          ? `Every cycle measures, from week ${anchorStart}. `
           : `${leaders} building cycle${leaders === 1 ? '' : 's'}, then ` +
             (anchors === 1
               ? `one measuring cycle from week ${anchorStart}. `
-              : `${anchors} measuring cycles from week ${anchorStart}. `) +
-            `Each ends in a deload.`),
+              : `${anchors} measuring cycles from week ${anchorStart}. `)) +
+        `Each cycle runs three weeks, with a light week between them. ` +
+        (testWeeks.length === 0
+          ? ''
+          : testWeeks.length === 1
+            ? `Week ${testWeeks[0]} tests the working number, which is what sets the next block's weights.`
+            : `Weeks ${testWeeks.slice(0, -1).join(', ')} and ${testWeeks[testWeeks.length - 1]} test the ` +
+              `working number — the first sets where this block starts, the last sets where the next one does.`),
     },
     {
       heading: 'The reality check',
@@ -192,6 +214,13 @@ export function strengthFocusDescription(opts: {
   anchorStartWeek: number;
   anchorCycles?: number;
   enduranceNote?: string;
+  /** The standalone TM-test weeks, 1-based. Empty → the sentence is omitted. */
+  testWeeks?: readonly number[];
+  /**
+   * ⛔ TRUE WHEN THE LEADER WEEKS CARRY THE FSL SUPPLEMENTAL (§1e). The session gets longer, and the
+   * plan says so ONCE, flat, in its own description — not on every card. False/absent → no sentence.
+   */
+  supplemental?: boolean;
   /** Lifts whose working number hits its ceiling inside this block. Empty → the line is omitted. */
   ceilingLifts?: readonly string[];
   /**
@@ -212,6 +241,14 @@ export function strengthFocusDescription(opts: {
   const body = sections.slice(0, 3).map((s) => `${s.heading}. ${s.body}`).join('\n\n');
   const whatsNext = sections[3];
   const ceiling = strengthFocusCeilingLine(opts.ceilingLifts ?? []);
+  // ⛔ SAID ONCE, IN THE PLAN, AND NOWHERE ELSE (§1e). A cost the athlete pays and cannot see is not
+  // disclosed; a cost repeated on twelve weeks of cards is nagging. ⚠️ COPY-VOICE — states the fact
+  // and what it buys, no imperative, no apology for the length.
+  const supplementalLine = opts.supplemental
+    ? 'On the building cycles the main lift is repeated for five sets of five at its opening weight, '
+      + 'which adds about ten minutes to those sessions. It is volume at a weight already lifted that '
+      + 'day, so it builds the lift without adding load.'
+    : '';
   const lightBar = (opts.lightBarLifts ?? []).length > 0
     ? `Some ${(opts.lightBarLifts ?? []).join(' and ')} sets sit below the 45 lb bar — those are written for a 35 lb bar.`
     : '';
@@ -232,6 +269,7 @@ export function strengthFocusDescription(opts: {
   const parts = [
     body,
     strengthFocusBufferLine(opts.enduranceNote ?? '', opts.anchorCycles ?? 1),
+    supplementalLine,
     ceiling,
     lightBar,
     rest.length ? `What this week costs. ${rest.join(' ')}` : '',

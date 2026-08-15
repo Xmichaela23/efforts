@@ -15,6 +15,7 @@ import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/l
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
+import ReadoutTiles from '@/components/context/ReadoutTiles';
 // [Step 7] Shared with the server emitter — see tracked-max-lifts.ts.
 import { isTrackedMaxLift } from '@/lib/tracked-max-lifts';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
@@ -589,7 +590,10 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
           {/* ⚠️ "· last 6 weeks" is gone with the direction it described. It named the trend window,
               and a window label sitting over numbers that no longer carry a trend is the stale-label
               fault this screen has already been caught on three times. */}
-          <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider">estimated 1-rep max</span>
+          {/* readout-label / readout-num (index.css): the Details tab's instrument typography,
+              tinted by the plate's own accent. Discipline HEADER labels stay white on purpose —
+              that's the 2026-07-22 colored-icon-not-colored-text call, unreversed. */}
+          <span className="readout-label basis-full text-[11px] uppercase tracking-wider">estimated 1-rep max</span>
           {lifts.map((l, liftIdx) => {
             return (
               /* Each LIFT is its own lit card (2026-08-15, Michael: "give each strength exercise its
@@ -612,35 +616,38 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                     right edge on its own (tabular-nums keeps the digits equal-width).
                     ⚠️ PR STAYS. It is not a direction: it is an exact fact about one measured set
                     against every previous one, decided on the spine (assemble.ts), not a trend. */}
-                <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
-                  <span className="text-white/85 text-[14px] truncate inline-flex items-baseline gap-1.5">
-                    {l.displayName}
-                    {/* PR tags wear the sport colour, not green — green means bike (Michael 2026-08-15). */}
-                    {isPR(l) && <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">PR</span>}
-                  </span>
-                  {/* "e1RM" (estimated 1-rep max) labels the number as an ESTIMATE, not a tested max —
-                      the section header defines the term, the row uses the compact form. Matches the
-                      "e1RM" in the logged-sets list below (2026-08-11, Michael — one word, not "~" + "est."). */}
-                  <span className="text-white/85 text-[14px] text-right tabular-nums">e1RM {Math.round(l.latestE1rm as number)} lb</span>
+                <span className="basis-full inline-flex items-baseline gap-1.5">
+                  <span className="text-white/85 text-[14px] truncate">{l.displayName}</span>
+                  {/* PR tags wear the sport colour, not green — green means bike (Michael 2026-08-15). */}
+                  {isPR(l) && <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">PR</span>}
+                  {l.provisional && <span className="text-white/40 text-[10px]">provisional</span>}
                 </span>
-                {/* ⛔ THE RECORD (D-420 pillar 1). Progress on a lift is the best estimated max you
-                    HOLD — a maximum, so a programmed-lighter week can never drag it down. Shown only
-                    when the latest reading is not itself the record (when it is, the PR tag above
-                    already says so and repeating the number would read as two different facts). */}
+                {/* READOUT TILES (2026-08-15) — the lift's three numbers as value-over-label, the
+                    Details-tab shape. They were three label/value LINES; the facts are identical.
+                    ⛔ THE RECORD (D-420 pillar 1) keeps its rule: "best" is the best estimated max
+                    you HOLD, and it is omitted when the latest reading IS the record — the PR tag
+                    above already says so, and repeating the number reads as two different facts.
+                    "e1RM" labels the number an ESTIMATE, not a tested max (2026-08-11). */}
                 {(() => {
                   const best = (l as any).allTimeBestE1rm as number | null;
                   const latest = l.latestE1rm as number;
-                  if (best == null || !(best > latest + 0.5)) return null;
+                  const showBest = best != null && best > latest + 0.5;
                   return (
-                    <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 -mt-0.5">
-                      <span className="text-white/45 text-[11px]">best</span>
-                      <span className="text-white/60 text-[11px] text-right tabular-nums">{Math.round(best)} lb</span>
-                    </span>
+                    <ReadoutTiles
+                      size="sm"
+                      columns={3}
+                      tiles={[
+                        { value: `${Math.round(latest)} lb`, label: 'e1RM' },
+                        showBest ? { value: `${Math.round(best as number)} lb`, label: 'best' } : null,
+                        {
+                          value: String(l.sampleCount),
+                          label: l.sampleCount === 1 ? 'session' : 'sessions',
+                          note: asOf(l.newestAgeDays) || undefined,
+                        },
+                      ]}
+                    />
                   );
                 })()}
-                <span className="basis-full text-white/50 text-[11px] -mt-0.5">
-                  {l.sampleCount} session{l.sampleCount === 1 ? '' : 's'}{asOf(l.newestAgeDays) ? ` · ${asOf(l.newestAgeDays)}` : ''}{l.provisional ? ' · provisional' : ''}
-                </span>
                 {/* ⛔ THE REP PR (D-420 pillar 2). Wendler p10: 225x6 → 225x9 IS the progress. This is
                     also the ONLY home for a long all-out set — 105 lb × 35 can never mint an e1RM
                     (D-417's trusted-rep ceiling refuses it, correctly), and it is still a record.
@@ -697,21 +704,24 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
           shown is what was logged, and nothing is estimated. */}
       {fitness.pullups && (
         <>
-          <span className="basis-full text-white/50 text-[11px] uppercase tracking-wider mt-2">pull-ups</span>
-          <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
-            <span className="text-white/85 text-[14px]">best clean set</span>
-            <span className="text-white/85 text-[14px] text-right tabular-nums">
-              {/* ⚠️ null is NOT zero. No clean set logged means unmeasured — printing 0 would read as
-                  "we tested you and you cannot do one", which is a different and untrue claim. */}
-              {fitness.pullups.cleanMaxReps == null ? '—' : `${fitness.pullups.cleanMaxReps} reps`}
-            </span>
-          </span>
-          <span className="basis-full grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 -mt-0.5">
-            <span className="text-white/45 text-[11px]">Wendler's standard</span>
-            <span className="text-white/60 text-[11px] text-right tabular-nums">
-              {fitness.pullups.standardReps} reps in {fitness.pullups.standardMinutes} min
-            </span>
-          </span>
+          <span className="readout-label basis-full text-[11px] uppercase tracking-wider mt-2">pull-ups</span>
+          {/* Two tiles, side by side, NOT a progress pair — they are different measurements (one
+              set to failure vs a session standard) and the layout must never imply "X of 50". */}
+          <ReadoutTiles
+            columns={2}
+            tiles={[
+              {
+                // ⚠️ null is NOT zero. No clean set logged means unmeasured — printing 0 would read
+                // as "we tested you and you cannot do one", a different and untrue claim.
+                value: fitness.pullups.cleanMaxReps == null ? '—' : `${fitness.pullups.cleanMaxReps} reps`,
+                label: 'best clean set',
+              },
+              {
+                value: `${fitness.pullups.standardReps} in ${fitness.pullups.standardMinutes} min`,
+                label: "Wendler's standard",
+              },
+            ]}
+          />
           {/* ⛔ ASSISTED REPS GET THEIR OWN LINE, ALWAYS SEPARATE. They are real work and the band
               on-ramp is Wendler's own (2nd ed p.36) — but folded into the clean count the number
               climbs while the athlete gets no stronger. Walking the band down shows up here as this
@@ -1287,10 +1297,16 @@ function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
   }
   return (
     <Row label="swim">
-      <span className="text-white/80 text-[13px]">{vol.swims} {vol.swims === 1 ? 'swim' : 'swims'}</span>
-      <span className="text-white/60 text-[13px]">{toDisp(vol.totalDistanceM).toLocaleString()} {unit}</span>
-      <span className="text-white/60 text-[13px]">longest {toDisp(vol.longestM).toLocaleString()} {unit}</span>
-      <span className="text-white/45 text-[12px] basis-full">last {weeks}wk</span>
+      {/* Swim is DESCRIBED, not graded (no dot, no verdict) — tiles suit that: three plain facts,
+          no claim about them. */}
+      <ReadoutTiles
+        columns={3}
+        tiles={[
+          { value: String(vol.swims), label: vol.swims === 1 ? 'swim' : 'swims', note: `last ${weeks}wk` },
+          { value: `${toDisp(vol.totalDistanceM).toLocaleString()} ${unit}`, label: 'total' },
+          { value: `${toDisp(vol.longestM).toLocaleString()} ${unit}`, label: 'longest' },
+        ]}
+      />
     </Row>
   );
 }
@@ -1414,9 +1430,40 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     if (p === 'ride' || p === 'cycling') return 'bike';
     return (p === 'strength' || p === 'run' || p === 'swim' || p === 'bike') ? p : null;
   })();
-  const BLOCK_PRIORITY: Record<string, number> = { strength: 0, run: 1, swim: 2, bike: 3 };
-  const orderIdx = (d: string) => (primaryDisc && d === primaryDisc ? -1 : (BLOCK_PRIORITY[d] ?? 9));
-  const sortedCards = [...cards].sort((a, b) => orderIdx(a.discipline) - orderIdx(b.discipline));
+  // ⛔ CARD ORDER — RANKED BY WHAT THE ATHLETE ACTUALLY DOES (2026-08-15, Michael: "can they auto
+  // adjust to the most active activities?").
+  //
+  // It used to be a hardcoded list — strength, run, swim, bike — the same order for every athlete
+  // forever, so a runner who barely lifts still opened State to strength. `cadenceCounts` (the
+  // per-discipline 90-day session count) was ALREADY being fetched and destructured above and used
+  // NOWHERE; its own definition in useStateTrends.ts calls it "the stable sort key". The engine was
+  // built and starved. This feeds it.
+  //
+  // Three rules, in order:
+  //   1. The PLAN'S primary discipline pins first. What you are training for outranks what you did
+  //      most of — a marathon block's run row leads even in a week you only lifted.
+  //   2. Everything else ranks by 90-day session count, descending. 90 days (not 7) so one big week
+  //      or one missed week cannot reshuffle the screen; the order should describe a habit.
+  //   3. SWIM IS ALWAYS LAST among the ranked rows, whatever its count — not a demotion by volume
+  //      but by KIND: swim is described, never graded (see SwimVolumeRow — volume facts, no verdict,
+  //      no dot). A row that carries no verdict does not belong above rows that do. It still pins
+  //      first if it is the plan's own primary discipline, by rule 1.
+  //
+  // Below this, the existing active/resting split still drops anything dropped-and-inactive to a
+  // dimmed group at the bottom — that is a different question (are you doing it at all) and it
+  // still wins over this ranking.
+  const TIEBREAK: Record<string, number> = { strength: 0, run: 1, bike: 2, swim: 9 };
+  // Band first (0 = pinned primary, 1 = ranked, 2 = swim), then within-band. Bands are compared as
+  // integers rather than ±Infinity sentinels — `Infinity - Infinity` is NaN, and a NaN comparator
+  // makes Array.sort's result implementation-defined.
+  const bandOf = (d: string) => (primaryDisc && d === primaryDisc ? 0 : d === 'swim' ? 2 : 1);
+  const sortedCards = [...cards].sort((a, b) => {
+    const band = bandOf(a.discipline) - bandOf(b.discipline);
+    if (band !== 0) return band;
+    const byCadence = (cadenceCounts?.[b.discipline] ?? 0) - (cadenceCounts?.[a.discipline] ?? 0);
+    if (byCadence !== 0) return byCadence;
+    return (TIEBREAK[a.discipline] ?? 5) - (TIEBREAK[b.discipline] ?? 5);
+  });
 
   return (
     <div className="py-3">

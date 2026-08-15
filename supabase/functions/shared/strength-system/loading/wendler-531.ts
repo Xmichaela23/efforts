@@ -27,11 +27,20 @@ export type WendlerSet = {
 
 // ── The week table ───────────────────────────────────────────────────────────
 // Percentages are identical across leader and anchor; only the REPS differ.
+//
+// ⛔ THE DELOAD ROW LEFT THIS TABLE ON 2026-08-15 (work order §1c). It used to be week 4 —
+// `4: [0.40, 0.50, 0.60]` — because a cycle was four weeks with its own deload welded to the end.
+// **Forever's cycle is three weeks and the light week is STANDALONE** (pp.20-23): a 7th-week deload
+// or a TM-test week, sitting BETWEEN templates rather than inside one, and used "between your Leader
+// and Anchor template." Those two shapes are `deloadSingleSets` and `tmTestSets` below.
+//
+// ⚠️ WEEKS 1-3 ARE UNTOUCHED, AND THAT IS THE WHOLE POINT OF THE CHANGE BEING SAFE. Every percentage
+// and every rep count below is exactly what shipped before; what moved is the week that used to
+// follow them.
 const PCT_BY_WEEK: Record<number, [number, number, number]> = {
   1: [0.65, 0.75, 0.85],
   2: [0.70, 0.80, 0.90],
   3: [0.75, 0.85, 0.95],
-  4: [0.40, 0.50, 0.60], // deload
 };
 
 // Anchor = the standard 5/3/1 rep scheme, last set open.
@@ -39,7 +48,6 @@ const ANCHOR_REPS: Record<number, [number, number, number]> = {
   1: [5, 5, 5],
   2: [3, 3, 3],
   3: [5, 3, 1],
-  4: [5, 5, 5],
 };
 
 /**
@@ -54,23 +62,84 @@ const ANCHOR_REPS: Record<number, [number, number, number]> = {
  */
 export function setsForWeek(kind: CycleKind, weekInCycle: number): WendlerSet[] {
   const pcts = PCT_BY_WEEK[weekInCycle];
-  if (!pcts) throw new Error(`weekInCycle must be 1-4, got ${weekInCycle}`);
-  const isDeload = weekInCycle === 4;
+  if (!pcts) throw new Error(`weekInCycle must be 1-${WEEKS_PER_CYCLE}, got ${weekInCycle}`);
   const reps = kind === 'anchor' ? ANCHOR_REPS[weekInCycle] : ([5, 5, 5] as const);
   return pcts.map((pct, i) => ({
     pct,
     reps: reps[i],
-    // Never on a deload, never in a leader, and only the last set.
-    amrap: kind === 'anchor' && !isDeload && i === 2,
+    // Never in a leader, and only the last set. ⚠️ The `!isDeload` guard that used to sit here is
+    // gone with the deload row — a cycle has no deload week inside it any more.
+    amrap: kind === 'anchor' && i === 2,
   }));
 }
 
-// ── Warm-up ramp (Wendler 2nd ed. p.31) ──────────────────────────────────────
-// 1×5 @ 40%, 1×5 @ 50%, 1×3 @ 60% of the working number, before the work sets. Every working week.
+// ── The two STANDALONE weeks (5/3/1 Forever, pp.20-23) ───────────────────────
 //
-// ⛔ NONE ON DELOAD. Week 4's work sets are already 40/50/60, so they ARE the ramp — a second
-// 40/50/60 in front would run the same three weights twice, then top out at 60% either way. The book
-// is silent on it; the deload sets equalling the ramp is the reason (Michael, 2026-08-12).
+// ⛔ NEITHER IS A CYCLE WEEK, AND THAT IS WHY THEY LIVE IN THEIR OWN FUNCTIONS. A leader or anchor
+// week is `weekInCycle` 1-3 of a three-week block running off `PCT_BY_WEEK`. These are single weeks
+// the block layout drops BETWEEN cycles — Wendler's "7th week", so called because in his standard
+// 3-week-cycle counting it lands on week 7.
+//
+// ⛔ AND NEITHER TAKES A WARM-UP RAMP. The old carve-out's reasoning (`warmupSetsForWeek` returns
+// nothing on a deload — *"the deload sets ARE the ramp"*) applies to both of these unchanged: they
+// open at 70% and climb, so a 40/50/60 ramp in front would run three lighter weights and then
+// re-cover the same ground.
+//
+// ⚠️ THE PERCENTAGES ARE OF THE TRAINING MAX, like every other percentage in this file. `1.0` is the
+// training max itself — which is ~85% of the athlete's true 1RM here, so a "TM single" is not a
+// max attempt. That buffer is exactly what makes the test week testable rather than dangerous.
+
+/**
+ * **The TM-test week.** 70/80/90% × 5, then the training max for 3-5 reps.
+ *
+ * Forever pp.20-21: *"Prior to any Leader template, I recommend you perform a training max test
+ * week"* (bold in the book). His pass bar is 3 reps at a 90% TM or 5 at an 85% TM; **ours is 85%
+ * (`WORKING_NUMBER_PCT_OF_1RM`), so 5 is the bar** — see `verdictFromTmTestSet`.
+ *
+ * ⛔ THE PRESCRIBED MINIMUM IS 5, NOT 3, AND THAT IS DELIBERATE. The book's range is 3-5; writing
+ * `3+` on the card and then treating 3 as a HOLD is the trap the anchor's AMRAP note already names —
+ * *"the number before the plus is the MINIMUM, not the target"* — except here it would be worse,
+ * because the athlete who follows the card exactly gets a verdict that says they fell short. The
+ * card asks for the number that passes; the 3-4 band survives in the verdict as tolerance, not as
+ * the ask. Copy caps it at 5: five strong reps and the bar goes back on the rack.
+ */
+export function tmTestSets(): WendlerSet[] {
+  return [
+    { pct: 0.70, reps: 5, amrap: false },
+    { pct: 0.80, reps: 5, amrap: false },
+    { pct: 0.90, reps: 5, amrap: false },
+    { pct: 1.00, reps: TM_TEST_PASS_REPS, amrap: true },
+  ];
+}
+
+/**
+ * **The 7th-week deload.** 70% × 5, 80% × 3, 90% × 1, then a single at the training max.
+ *
+ * Forever p.21 — *"always used between your Leader and Anchor template."* No supplemental (p.19 says
+ * so for all three 7th-week functions), no all-out set: the TM single is a prescribed single, and the
+ * week's job is to arrive at the anchor recovered.
+ *
+ * ⚠️ **HIS SECOND SET IS 80% × 3-5 AND WE TAKE THE 3.** Bottom of his range, which is the deload
+ * direction — *"the reason to deload is so that you never have to deload"* (p.21). The pick is ours;
+ * the range is his.
+ */
+export function deloadSingleSets(): WendlerSet[] {
+  return [
+    { pct: 0.70, reps: 5, amrap: false },
+    { pct: 0.80, reps: 3, amrap: false },
+    { pct: 0.90, reps: 1, amrap: false },
+    { pct: 1.00, reps: 1, amrap: false },
+  ];
+}
+
+// ── Warm-up ramp (Wendler 2nd ed. p.31) ──────────────────────────────────────
+// 1×5 @ 40%, 1×5 @ 50%, 1×3 @ 60% of the working number, before the work sets. Every CYCLE week.
+//
+// ⛔ NONE ON A STANDALONE WEEK, and the reasoning is the old deload carve-out's, unchanged: those
+// weeks open at 70% and climb, so they ARE the ramp — a 40/50/60 in front would run three lighter
+// weights and then cover the same ground again. The book is silent on it; the sets equalling the
+// ramp is the reason (Michael, 2026-08-12). ⚠️ The carve-out USED to live inside this function as
+// `weekInCycle === 4`; there is no week 4 any more, so the standalone weeks simply never call it.
 //
 // ⚠️ SEPARATE FROM `setsForWeek` BY DESIGN. The work-set generator and its pin tests stay untouched;
 // warm-ups are a distinct list the composer prepends, tagged `warmup`, so nothing downstream that
@@ -79,8 +148,9 @@ const WARMUP_PCTS: readonly [number, number, number] = [0.40, 0.50, 0.60];
 const WARMUP_REPS: readonly [number, number, number] = [5, 5, 3];
 
 export function warmupSetsForWeek(weekInCycle: number): WendlerSet[] {
-  if (weekInCycle < 1 || weekInCycle > 4) throw new Error(`weekInCycle must be 1-4, got ${weekInCycle}`);
-  if (weekInCycle === 4) return []; // deload — the work sets are the ramp
+  if (weekInCycle < 1 || weekInCycle > WEEKS_PER_CYCLE) {
+    throw new Error(`weekInCycle must be 1-${WEEKS_PER_CYCLE}, got ${weekInCycle}`);
+  }
   return WARMUP_PCTS.map((pct, i) => ({ pct, reps: WARMUP_REPS[i], amrap: false, warmup: true }));
 }
 
@@ -206,7 +276,27 @@ export function weightForSet(workingNumber: number, pct: number): number {
 
 export type CycleSlot = { index: number; kind: CycleKind; startWeek: number; endWeek: number };
 
-export const WEEKS_PER_CYCLE = 4;
+/**
+ * ⛔ THREE, NOT FOUR — changed 2026-08-15 (work order §1c). **A Forever cycle is three weeks and its
+ * light week is standalone.** The 4 was the 2nd edition's shape (three work weeks plus a welded-on
+ * deload) and it is what every consumer of this constant assumed.
+ *
+ * ⚠️ `startWeek + WEEKS_PER_CYCLE - 1` STILL GIVES A CYCLE'S LAST WEEK, so the arithmetic that reads
+ * this constant is still correct — it just no longer covers a deload, because the deload is not in
+ * the cycle. `rematerialize-strength-block`'s `cyclesFromStoredPhases` is the one caller that relied
+ * on it spanning four; it is right by construction now.
+ */
+export const WEEKS_PER_CYCLE = 3;
+
+/**
+ * ⛔ THE PASS BAR ON A TM-TEST WEEK, AND IT IS OURS BECAUSE OUR TRAINING MAX IS.
+ *
+ * Forever pp.20-21 gives two bars for the same test: **3 reps at a 90% training max, or 5 reps at an
+ * 85% one.** `WORKING_NUMBER_PCT_OF_1RM` is 0.85, so 5 is the one that applies to this engine. An
+ * athlete hitting 3 has met his 90% bar against a number that is not 90%, which is why 3-4 HOLDS
+ * rather than advancing — see `verdictFromTmTestSet`.
+ */
+export const TM_TEST_PASS_REPS = 5;
 
 /**
  * How a block of N weeks divides into leader and anchor cycles.
@@ -268,9 +358,29 @@ export type BlockShapeInputs = {
   highAerobicLoad?: boolean;
 };
 
+/**
+ * ⛔ HIS PUBLISHED MODELS ARE THE ONLY SHAPES WE BUILD — Forever p.17, three of them and no others:
+ * **3 leaders : 2 anchors · 2 : 2 · 2 : 1**, with 2:1 named as his recommendation "for just about
+ * every lifter."
+ *
+ * `count - 1` leaders (everything but the last cycle) reproduces 2:1 at three cycles and 1:1 at two,
+ * but at FOUR cycles it produces 3:1 — which is not on his list. Capping at `ceil(count / 2)` lands
+ * every count on a published model: 2 → 1:1, 3 → 2:1, 4 → 2:2, 5 → 3:2.
+ *
+ * ⚠️ THE ONE COUNT THIS CHANGES IS FOUR, which is the 16-week block: it was 3 leaders + 1 anchor and
+ * is now 2 + 2, exactly as the work order's §0 target map specifies. 12-week and 8-week blocks are
+ * untouched.
+ */
+function publishedFallback(count: number): number {
+  return Math.min(Math.max(0, count - 1), Math.ceil(count / 2));
+}
+
 /** How many LEADER cycles a block of `count` cycles carries. */
 export function leaderCount(count: number, weeks: number, inputs?: BlockShapeInputs): number {
-  const fallback = Math.max(0, count - 1);   // today's shape: everything but the last is a leader
+  const fallback = publishedFallback(count);
+  // ⚠️ A ONE-CYCLE BLOCK HAS NO ROOM FOR A LEADER AND AN ANCHOR BOTH. It is the degenerate minimum
+  // length (`blockWeeks`'s floor) and resolves to the measuring cycle. §1b's "never zero leaders"
+  // governs blocks that can hold both, which is every length the flow actually offers.
   if (count <= 1) return 0;
   // ⛔ THE OVERRIDES COME FIRST AND THEY ARE NOT TIER-SENSITIVE. Maintain posture is not asking for a
   // heavy block; a 16-week block has room to build; high aerobic load is already spending the
@@ -280,30 +390,205 @@ export function leaderCount(count: number, weeks: number, inputs?: BlockShapeInp
   if (inputs?.highAerobicLoad) return fallback;
 
   switch (continuityTier(inputs?.continuity)) {
-    case 'continuous': return 0;               // every cycle measures
+    // ⛔ ONE LEADER IS THE FLOOR, NOT ZERO. Corrected 2026-08-15 (work order §1b). This returned 0 —
+    // an all-anchor block — and **that is not one of Wendler's shapes.** Forever p.17 lists three
+    // leader:anchor models and only three: 3/2, 2/2 and 2/1. Every one of them has at least one
+    // leader, and he names 2/1 as his recommendation "for just about every lifter."
+    //
+    // ⚠️ THE TIERS THEMSELVES ARE STILL OURS AND STILL STAND. Choosing AMONG his shapes on training
+    // continuity is a product decision (documented in the block above); choosing a shape he does not
+    // publish is not. A continuous athlete gets the most anchor-weighted model he offers, which is
+    // what this tier was reaching for.
+    case 'continuous': return Math.min(1, fallback);
     case 'returning':  return Math.min(1, fallback);
     case 'detrained':  return Math.min(2, fallback);
     case 'unknown':    return fallback;        // = today, exactly
   }
 }
 
-export function cyclesForBlock(weeks: number, inputs?: BlockShapeInputs): CycleSlot[] {
-  const count = Math.max(1, Math.floor(weeks / WEEKS_PER_CYCLE));
-  const leaders = leaderCount(count, weeks, inputs);
-  return Array.from({ length: count }, (_, i) => {
-    const index = i + 1;
-    return {
-      index,
-      // ⛔ LEADERS FIRST, ANCHORS LAST, ALWAYS. The COUNT varies; the order never does — leaders
-      // build and anchors express, so an anchor before a leader is not a different ratio, it is a
-      // different programme.
-      kind: index <= leaders ? 'leader' : 'anchor',
-      startWeek: i * WEEKS_PER_CYCLE + 1,
-      endWeek: (i + 1) * WEEKS_PER_CYCLE,
-    } as CycleSlot;
-  });
+// ── THE WEEK MAP ─────────────────────────────────────────────────────────────
+//
+// ⛔ THE BLOCK IS NO LONGER "N FOUR-WEEK CYCLES END TO END" (2026-08-15, work order §1c). It is a
+// SEQUENCE of three-week cycles with standalone light weeks placed between them, and a TM-test week
+// at each end where the budget allows. `cyclesForBlock` is now a VIEW over this map rather than the
+// thing that decides the shape.
+//
+// The order, and every piece of it is Forever's:
+//
+//   [TM test]  leader × L   [7th-week deload]   anchor   [deload]   anchor …   TM test
+//
+//   · the opening test week      — p.21, *"Prior to any Leader template, I recommend you perform a
+//                                  training max test week"* (bold in the book)
+//   · leaders before anchors     — p.18, build then express. Unchanged from before this rewrite.
+//   · the deload between them    — p.21, *"always used between your Leader and Anchor template"*
+//   · a deload between anchors   — p.21's *"may choose to use it after any cycle"* licence; two
+//                                  anchor cycles back to back with no unload is not a shape he runs
+//   · the closing test week      — the block-to-block transition gate (SPEC §1b's outstanding debt)
+//
+// ⛔ THE OPENING TEST WEEK IS THE PIECE THAT YIELDS WHEN THE BUDGET IS SHORT, and only that piece.
+// An 8-week block costs 9 with it, so it drops and the entry gate's 1RM stands in — which the plan
+// copy states rather than leaving implied. Everything else is structural.
+//
+// Worked, against the work order's §0 map:
+//   12 weeks · L-L-A → test + 3 + 3 + deload + 3 + test              = 1+3+3+1+3+1 = 12 ✓
+//   16 weeks · L-L-A-A → test + 3+3 + deload + 3 + deload + 3 + test = 1+3+3+1+3+1+3+1 = 16 ✓
+//    8 weeks · L-A → 3 + deload + 3 + test                           = 3+1+3+1 = 8 ✓ (no opening test)
+
+export type WeekKind =
+  /** A week inside a three-week leader or anchor cycle. */
+  | 'cycle'
+  /** A standalone TM-test week (Forever pp.20-21). */
+  | 'tm_test'
+  /** A standalone 7th-week deload (Forever p.21). */
+  | 'deload_single';
+
+export type BlockWeek = {
+  /** 1-based plan week. */
+  week: number;
+  kind: WeekKind;
+  /** Cycle weeks only: which cycle (1-based, counting only cycles). */
+  cycleIndex?: number;
+  cycleKind?: CycleKind;
+  /** Cycle weeks only: 1..WEEKS_PER_CYCLE. */
+  weekInCycle?: number;
+  /**
+   * ⛔ WHOSE WORKING NUMBER THIS WEEK RUNS ON — present on EVERY week, standalone ones included.
+   *
+   * A standalone week has no cycle of its own, so it takes the number of the cycle immediately
+   * BEFORE it: a 7th-week deload unloads the training max just used, and the closing TM test tests
+   * the number the block arrived at (which is what makes its verdict the next block's gate). The
+   * opening test week has nothing before it and takes cycle 1's — the number the leaders are about
+   * to run on, which is precisely what p.21 asks the test week to validate.
+   */
+  workingNumberCycle: number;
+};
+
+export type BlockLayout = {
+  cycles: number;
+  leaders: number;
+  anchors: number;
+  openingTest: boolean;
+  /** The exact number of weeks this layout occupies. */
+  weeks: number;
+};
+
+/** The most cycles any sane block carries — a bound on the search, not a product limit. */
+const MAX_CYCLES = 8;
+
+function layoutWeeks(cycles: number, leaders: number, anchors: number, openingTest: boolean): number {
+  // One deload between the leader run and the anchor run (when there are leaders), plus one between
+  // consecutive anchors. The closing TM test always costs a week.
+  const deloads = (leaders > 0 ? 1 : 0) + Math.max(0, anchors - 1);
+  return cycles * WEEKS_PER_CYCLE + deloads + 1 + (openingTest ? 1 : 0);
 }
 
+/**
+ * The largest layout that fits inside `weeks`. Prefers more cycles, then the opening test week.
+ *
+ * ⚠️ THE SHAPE DEPENDS ON `inputs` because `leaderCount` does, and the leader/anchor split changes
+ * how many deloads the block needs. Two blocks of the same LENGTH can therefore have different
+ * internal maps — which is already true of the leader/anchor split and is why the composer stores
+ * `phase_structure` rather than letting later stages re-derive it.
+ */
+export function blockLayoutFor(weeks: number, inputs?: BlockShapeInputs): BlockLayout {
+  let best: BlockLayout | null = null;
+  for (let cycles = 1; cycles <= MAX_CYCLES; cycles += 1) {
+    const leaders = leaderCount(cycles, weeks, inputs);
+    const anchors = cycles - leaders;
+    for (const openingTest of [true, false]) {
+      const cost = layoutWeeks(cycles, leaders, anchors, openingTest);
+      if (cost > weeks) continue;
+      if (!best || cost > best.weeks) best = { cycles, leaders, anchors, openingTest, weeks: cost };
+    }
+  }
+  // Nothing fits — the caller asked for fewer weeks than the shortest legal block. Return the
+  // shortest one rather than an empty map; `blockWeeks` is what stops that reaching an athlete.
+  return best ?? { cycles: 1, leaders: 0, anchors: 1, openingTest: false, weeks: layoutWeeks(1, 0, 1, false) };
+}
+
+/**
+ * ⛔ THE SHORTEST LEGAL BLOCK. One anchor cycle plus its closing test week.
+ *
+ * ⚠️ It is a floor, not an offer. The build flow ships 12 (`STRENGTH_FOCUS_WEEKS`); this exists so a
+ * malformed request degrades to a complete small block rather than to an empty one.
+ */
+export const MIN_BLOCK_WEEKS = WEEKS_PER_CYCLE + 1;
+
+/**
+ * ⛔ A BLOCK IS A LENGTH THE LAYOUT CAN FILL EXACTLY — it snaps DOWN to the nearest one.
+ *
+ * ⚠️ THE VALID LENGTHS ARE NO LONGER "MULTIPLES OF FOUR". With `leaderCount`'s default tier they are
+ * 4, 5, 8, 9, 11, 12, 14, 15, 18, 19 … — a cycle costs three weeks and the standalone weeks are the
+ * odd ones. 12 and 16 both land exactly, which is what the two lengths the product offers need.
+ */
+export function blockWeeks(requested: number, inputs?: BlockShapeInputs): number {
+  const w = Number(requested);
+  if (!Number.isFinite(w) || w < MIN_BLOCK_WEEKS) return MIN_BLOCK_WEEKS;
+  return blockLayoutFor(Math.floor(w), inputs).weeks;
+}
+
+/** The block, week by week. Length is always `blockLayoutFor(weeks, inputs).weeks`. */
+export function buildWeekMap(weeks: number, inputs?: BlockShapeInputs): BlockWeek[] {
+  const layout = blockLayoutFor(weeks, inputs);
+  const out: BlockWeek[] = [];
+  let week = 1;
+  let cycleIndex = 0;
+
+  const pushCycle = (kind: CycleKind) => {
+    cycleIndex += 1;
+    for (let w = 1; w <= WEEKS_PER_CYCLE; w += 1) {
+      out.push({ week: week++, kind: 'cycle', cycleIndex, cycleKind: kind, weekInCycle: w, workingNumberCycle: cycleIndex });
+    }
+  };
+  const pushStandalone = (kind: 'tm_test' | 'deload_single') => {
+    // A standalone week runs on the number of the cycle before it; the opening test on cycle 1's.
+    out.push({ week: week++, kind, workingNumberCycle: Math.max(1, cycleIndex) });
+  };
+
+  if (layout.openingTest) pushStandalone('tm_test');
+  for (let i = 0; i < layout.leaders; i += 1) pushCycle('leader');
+  if (layout.leaders > 0) pushStandalone('deload_single');
+  for (let j = 0; j < layout.anchors; j += 1) {
+    pushCycle('anchor');
+    if (j < layout.anchors - 1) pushStandalone('deload_single');
+  }
+  pushStandalone('tm_test');
+  return out;
+}
+
+/** One week's shape. Null when the week falls outside the block. */
+export function blockWeekFor(weeks: number, week: number, inputs?: BlockShapeInputs): BlockWeek | null {
+  return buildWeekMap(weeks, inputs).find((w) => w.week === week) ?? null;
+}
+
+/**
+ * The leader/anchor cycles, as start/end week ranges. ⛔ A VIEW OVER `buildWeekMap`, not a second
+ * shape decision — the two cannot disagree.
+ *
+ * ⚠️ `endWeek` IS THE CYCLE'S LAST WORK WEEK AND NO LONGER INCLUDES A DELOAD. Anything that used
+ * `startWeek..endWeek` to mean "this cycle including its unload" now covers three weeks, not four,
+ * and the standalone weeks between cycles belong to NO cycle. That is the correct answer — a 7th
+ * week is not part of either template — but it is a real change for anything grouping logged work.
+ */
+export function cyclesForBlock(weeks: number, inputs?: BlockShapeInputs): CycleSlot[] {
+  const byIndex = new Map<number, CycleSlot>();
+  for (const w of buildWeekMap(weeks, inputs)) {
+    if (w.kind !== 'cycle' || w.cycleIndex == null) continue;
+    const cur = byIndex.get(w.cycleIndex);
+    if (cur) cur.endWeek = w.week;
+    // ⛔ LEADERS FIRST, ANCHORS LAST, ALWAYS. The COUNT varies; the order never does — leaders
+    // build and anchors express, so an anchor before a leader is not a different ratio, it is a
+    // different programme. `buildWeekMap` emits them in that order and this preserves it.
+    else byIndex.set(w.cycleIndex, { index: w.cycleIndex, kind: w.cycleKind!, startWeek: w.week, endWeek: w.week });
+  }
+  return [...byIndex.values()].sort((a, b) => a.index - b.index);
+}
+
+/**
+ * The cycle a week belongs to. ⛔ **NULL ON A STANDALONE WEEK** — a TM-test or 7th-week deload is
+ * inside no cycle, and every caller must handle that rather than treating null as "outside the
+ * block". Use `blockWeekFor` when you need to tell the two apart.
+ */
 export function cycleForWeek(
   weeks: number,
   week: number,
@@ -437,12 +722,70 @@ export function trustedMaxRepsFor(liftName?: string | null): number {
  * validates incoming verdicts against a `Set` and silently DISCARDS unlisted values, which would
  * turn a real miss into the forecast's `advance`.
  */
+/**
+ * ⛔ A SIXTH MEMBER ADDED 2026-08-15 (§1d) — `recalibrate`, and it is the one verdict that does NOT
+ * describe a delta.
+ *
+ * A TM-test week's top set is at the training max itself. Two reps or fewer there is not a bad day
+ * and it is not a stall: **the number is simply wrong**, and Forever p.21 says what to do about it —
+ * *"use the formula … and adjust your training max to be 85-90% of that."* So the answer is an
+ * ABSOLUTE number computed off the set, not a step or a percentage off the old one.
+ *
+ * ⛔ **`applyVerdict` THEREFORE TREATS IT AS A HOLD, AND THAT IS CORRECT, NOT A GAP.** A pure
+ * function that sees one verdict cannot know what the set weighed. The absolute number travels
+ * separately, as the next block's `priorTrainingMax` (`trainingMaxFromSet`) — which is the same seam
+ * the AMRAP catch-up already uses to raise a number rather than step it.
+ *
+ * ⚠️ AND IT CLEARS THE STALL RUN rather than counting toward it. A recalibration has already banked
+ * the correction; counting it as a miss would then drop the freshly-computed number another 10%.
+ */
 export type WorkingNumberVerdict =
   | 'advance'
   | 'advance_untrusted'
   | 'reset'
   | 'hold'
-  | 'miss';
+  | 'miss'
+  | 'recalibrate';
+
+/**
+ * ⛔ THE MISS BAND ON A TM-TEST WEEK. Two reps or fewer at the training max.
+ *
+ * ⚠️ **THIS IS HIS NUMBER, NOT OURS.** Forever p.21, verbatim in
+ * `docs/REFERENCE-531-forever-pp16-45.md`: *"TM too high: only 1-2 reps at TM → lower it. Recompute
+ * estimated max (weight × reps × .0333 + weight) and set TM to 85-90% of that."* An earlier draft of
+ * this comment marked it T3/ours — it is not; the band and the remedy are both on the page.
+ *
+ * The three bands do not overlap: 5+ passes (his 85%-TM bar, p.20), 3-4 is the tolerance band that
+ * holds, and at 2 or fewer the number is wrong rather than the day.
+ */
+export const TM_TEST_MISS_MAX_REPS = 2;
+
+/**
+ * What happens to the working number, given the reps achieved on a TM-TEST week's top set.
+ *
+ * ⛔ THIS IS A DIFFERENT QUESTION FROM `verdictFrom95Set` AND MUST NOT BE COLLAPSED INTO IT. That one
+ * reads a set at **95% of the training max** with a prescribed minimum of ONE rep (2nd ed. p.23);
+ * this one reads a set at **100% of it** with a bar of five (Forever p.20-21). Same shape of answer,
+ * different prescription, different weights — running either rule over the other's set is how an
+ * athlete gets reset for completing the session as written.
+ *
+ * | reps | verdict | why |
+ * |---|---|---|
+ * | `null` | `hold` | the test was not done — no evidence either way (§0h) |
+ * | `0`–`2` | `recalibrate` | the training max is wrong, not the day. p.21's formula recomputes it |
+ * | `3`–`4` | `hold` | his 3-rep bar is for a 90% TM; ours is 85%, so this is short of the pass |
+ * | `5`+ | `advance` | the bar is met — the number carries into the next cycle a step higher |
+ * | `> trusted` | `advance_untrusted` | advances, but the e1RM off that set is outside Brzycki's range |
+ */
+export function verdictFromTmTestSet(
+  repsAchieved: number | null | undefined,
+  liftName?: string | null,
+): WorkingNumberVerdict {
+  if (repsAchieved == null || !Number.isFinite(repsAchieved)) return 'hold';
+  if (repsAchieved <= TM_TEST_MISS_MAX_REPS) return 'recalibrate';
+  if (repsAchieved < TM_TEST_PASS_REPS) return 'hold';
+  return repsAchieved > trustedMaxRepsFor(liftName) ? 'advance_untrusted' : 'advance';
+}
 
 /**
  * What happens to the working number, given the reps achieved on the 95% set.
@@ -538,6 +881,10 @@ export function applyVerdict(
   isLowerBody: boolean,
 ): number {
   if (verdict === 'reset') return roundDownToIncrement(workingNumber * (1 - RESET_FRACTION));
+  // ⛔ `recalibrate` HOLDS HERE, AND THAT IS THE DESIGN. The new number is computed off the test set
+  // itself (`trainingMaxFromSet`) and arrives as an absolute — this function has no set to read.
+  // Guessing a delta for it would be inventing a step the book does not prescribe.
+  if (verdict === 'recalibrate') return workingNumber;
   // ⛔ `advance_untrusted` ADVANCES. This guard used to be `verdict !== 'advance'`, which would have
   // silently swallowed the new verdict and held the bar — the exact behaviour the verdict exists to
   // avoid. The distrust is about the ESTIMATE, never about the load: a set that beats the
@@ -620,6 +967,8 @@ export function workingNumberForCycles(
       // Evidence that the prescription was met — `advance` / `advance_untrusted`, or an explicit
       // `reset` that already banked the drop — clears the run.
       // ⚠️ A bare `hold` does NOT: no evidence must not launder a stall into a fresh start.
+      // ⚠️ `recalibrate` CLEARS IT TOO (2026-08-15): the correction has already been banked as a new
+      // absolute number, and counting it as a miss would drop that fresh number another 10%.
       consecutiveMisses = 0;
     }
 

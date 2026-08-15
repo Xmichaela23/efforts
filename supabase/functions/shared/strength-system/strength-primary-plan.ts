@@ -38,6 +38,7 @@ import {
   volumeStateForMiles,
 } from '../../../../src/lib/maintenance-volume-band.ts';
 import {
+  type AssistancePhase,
   type AssistanceScaleInputs,
   ASSISTANCE_GUIDANCE,
   assistanceTotalReps,
@@ -67,14 +68,21 @@ import {
 } from '../../../../src/lib/pullup-progression.ts';
 import {
   type BlockShapeInputs,
-  cycleForWeek,
+  type BlockWeek,
+  type CycleKind,
+  blockLayoutFor,
+  blockWeeks,
+  buildWeekMap,
   cyclesForBlock,
+  deloadSingleSets,
   setsForWeek,
+  tmTestSets,
   warmupSetsForWeek,
   weightForSet,
   BAR_LB,
   BAR_LB_LIGHT,
   barFloorForWorkingNumber,
+  TM_TEST_PASS_REPS,
   WEEKS_PER_CYCLE,
   type WendlerSet,
   workingNumberForCycles,
@@ -330,6 +338,20 @@ type StrengthExercise = {
    *  ⚠️ ABSENT on bodyweight movements, on movements with no coefficient, and whenever the athlete's
    *  maxes cannot answer. Absent means "no suggestion", never "zero". */
   weight_suggested?: number;
+  /**
+   * ⛔ TRUE ON THE SUPPLEMENTAL ROW — the FSL block that follows the main lift on a leader week
+   * (§1e). It carries the SAME `name` as the main lift on purpose (it is the same movement), and
+   * this flag is what lets the logger group the two under one heading instead of rendering two
+   * exercises with one name. Absent/false on every other row.
+   */
+  supplemental?: boolean;
+  /**
+   * A short label the logger renders under the exercise name. ⚠️ NOT part of the identity — every
+   * name-matched read (the planned↔executed matcher, the compare table, Garmin's step builder) keys
+   * on `name` alone, which is why the supplemental keeps the main lift's name and says what it is
+   * here instead.
+   */
+  notes?: string;
   /** ⛔ THE PER-SET PRESCRIPTION. 5/3/1 is three sets at three weights; the app's one-weight-per-
    *  exercise shape cannot say that, and copying the top set onto all three prefills the phone with
    *  a weight the athlete was not asked to lift twice a session, four days a week, for twelve weeks.
@@ -402,11 +424,33 @@ const DEFAULT_ENDURANCE_SESSIONS = 2;
 const DEFAULT_LONG_DAY = 'Saturday';
 
 // ── The session (SPEC §1) ────────────────────────────────────────────────────
-// 1. 10–15 jumps or throws  2. the main lift  3. 25 reps each of push / pull / single-leg-core.
-//
-// Wendler's assistance range is 25–50 per category; the bottom of it is OURS, read off Van Hooren
-// (keep volume low or an endurance athlete builds size they don't want). SPEC §3 marks it T3.
-export const JUMPS: StrengthExercise = { name: 'Box Jump', sets: 3, reps: 5, weight: 'Bodyweight' };
+// 1. jumps or throws  2. the main lift  3. the supplemental (leaders)  4. the three assistance slots.
+
+/**
+ * ⛔ THE JUMP DOSE SCALES WITH THE PHASE, THE SAME DIRECTION AS THE ASSISTANCE — Forever p.18:
+ * *less* jumps and throws in a leader, *more* in an anchor. It was a flat `3×5` on every week.
+ *
+ * | phase | total | source |
+ * |---|---|---|
+ * | leader   | 10 | p.18 "less jumps and throws"; p.22's tables print 10 total |
+ * | anchor   | 15 | p.18 "more jumps and throws" — his anchor range is 15–20 |
+ * | 7th-week | 10 | p.22, the light standalone week |
+ *
+ * ⚠️ 15 IS THE BOTTOM OF HIS ANCHOR RANGE, AND THAT PICK IS OURS (T3). 20 landings on the same day as
+ * a 95% single and a rep-out, for an athlete running underneath the block, is the fatigue this whole
+ * configuration exists to protect. 15 is also exactly what every week carried before this change, so
+ * the anchor is unchanged and only the lighter weeks come down.
+ *
+ * ⚠️ SETS OF 5, NOT A REP TOTAL. A jump is a quality primer — the set structure is the prescription
+ * (Wendler pairs them with full recovery), unlike an assistance slot where the total is the unit.
+ */
+/** ⛔ ONE SPELLING. The 3-day merge identifies the primer row by name to keep it in front. */
+export const JUMP_NAME = 'Box Jump';
+
+export function jumpsFor(phase: AssistancePhase): StrengthExercise {
+  const sets = phase === 'anchor' ? 3 : 2;
+  return { name: JUMP_NAME, sets, reps: 5, weight: 'Bodyweight' };
+}
 
 /**
  * The three assistance rows, from the athlete's own picks (`src/lib/assistance-menu.ts`).
@@ -647,30 +691,57 @@ function assistanceRows(
  * `leader` and `anchor` alongside this change — an unrecognised name resolves to a silent default,
  * which is the shape of Q-192.
  */
+/**
+ * ⛔ THE PHASE NAMES, AND `TM Test` IS NEW (2026-08-15, §1c). Both `_shared/plan-phase.ts` and
+ * `_shared/strength-profiles.ts` were taught it in the same change — an unrecognised name resolves
+ * to a silent default, which is the shape of Q-192, and `strength-phase-vocabulary.test.ts` fails
+ * if any name this function emits stops resolving.
+ */
+export const PHASE_NAME: Record<BlockWeek['kind'], string> & Record<CycleKind, string> = {
+  cycle: 'Leader',        // overridden per cycle kind; present so the record is total
+  leader: 'Leader',
+  anchor: 'Anchor',
+  tm_test: 'TM Test',
+  deload_single: 'Deload',
+};
+
+/** The phase-structure tag a session carries: `phase:leader`, `phase:tm_test`, … */
+export function phaseTagFor(phaseName: string): string {
+  return `phase:${phaseName.toLowerCase().replace(/\s+/g, '_')}`;
+}
+
 export function buildBlockPhases(weeks: number, shape?: BlockShapeInputs): { phases: ArcPhase[]; recovery_weeks: number[] } {
   const phases: ArcPhase[] = [];
   const recovery_weeks: number[] = [];
-  for (const c of cyclesForBlock(weeks, shape)) {
-    const workEnd = c.endWeek - 1; // week 4 of every cycle is the deload
-    phases.push({
-      name: c.kind === 'anchor' ? 'Anchor' : 'Leader',
-      start_week: c.startWeek,
-      end_week: workEnd,
-      weeks_in_phase: workEnd - c.startWeek + 1,
-    });
-    phases.push({ name: 'Deload', start_week: c.endWeek, end_week: c.endWeek, weeks_in_phase: 1 });
-    recovery_weeks.push(c.endWeek);
+  // ⛔ WALKS THE WEEK MAP, not the cycle list. The deloads are no longer derivable as "the last week
+  // of each cycle" — they are their own weeks between cycles, and there are TM-test weeks too.
+  for (const w of buildWeekMap(weeks, shape)) {
+    const name = w.kind === 'cycle' ? PHASE_NAME[w.cycleKind!] : PHASE_NAME[w.kind];
+    const last = phases[phases.length - 1];
+    // Consecutive weeks of the same cycle collapse into one phase entry; a standalone week is always
+    // its own entry even when it repeats the previous name.
+    if (last && last.name === name && w.kind === 'cycle' && last.end_week === w.week - 1 && w.weekInCycle !== 1) {
+      last.end_week = w.week;
+      last.weeks_in_phase = last.end_week - last.start_week + 1;
+      continue;
+    }
+    phases.push({ name, start_week: w.week, end_week: w.week, weeks_in_phase: 1 });
+    // ⛔ ONLY THE 7TH-WEEK DELOADS ARE `recovery_weeks`, NOT THE TEST WEEKS. Both are light, and they
+    // are light for different reasons: a deload UNLOADS, a test week arrives rested in order to
+    // measure. `normalizePhaseKey('TM Test')` resolves to `taper` for exactly that distinction, and
+    // filing it as recovery here as well would give the same week two contradictory postures.
+    if (w.kind === 'deload_single') recovery_weeks.push(w.week);
   }
   return { phases, recovery_weeks };
 }
 
-/** A block is a WHOLE number of four-week cycles — 12 → 12, 10 → 8, 3 → 4. A partial cycle would
- *  leave a leader with no deload or an anchor with no measured week. */
-export function blockWeeks(requested: number): number {
-  const w = Number(requested);
-  if (!Number.isFinite(w) || w < WEEKS_PER_CYCLE) return WEEKS_PER_CYCLE;
-  return Math.floor(w / WEEKS_PER_CYCLE) * WEEKS_PER_CYCLE;
-}
+/**
+ * ⛔ MOVED TO THE LOADING MODULE (2026-08-15, §1c) — re-exported here so the one call site and the
+ * tests are unchanged. The length arithmetic belongs beside the layout that produces it: valid
+ * lengths are no longer "multiples of four" but whatever `blockLayoutFor` can fill exactly, and a
+ * second copy of that rule here would drift the first time the layout changes.
+ */
+export { blockWeeks };
 
 /** A bodyweight/band lift never carries a load or a percentage (D-322). Asserted in the tests:
  *  every assistance row this file authors must answer true here. */
@@ -685,6 +756,10 @@ function setLabel(s: PlannedSet): string {
 }
 
 function exerciseLabel(e: StrengthExercise): string {
+  // ⛔ THE SUPPLEMENTAL READS AS ONE BLOCK, NOT AS FIVE IDENTICAL SETS. Its `set_plan` is five rows at
+  // one weight, and printing them individually would give "120×5, 120×5, 120×5, 120×5, 120×5" —
+  // five facts where the prescription is one. It is named so the athlete knows what it is.
+  if (e.supplemental) return `First Set Last — ${e.sets}×${e.reps} @ ${e.weight}`;
   // The summary line names the WORK, not the ramp. Warm-ups live in the set list for the logger;
   // printing them here would read "40×5, 50×5, 60×3, 55×5, …" and bury the prescription.
   const shown = e.set_plan?.filter((s) => !s.warmup);
@@ -706,8 +781,12 @@ function mainLiftRow(
   workingNumber: number,
   oneRM: number,
   sets: WendlerSet[],
-  /** Deload week — its work sets take the warm-up's bar floor. See the comment on `weight`. */
-  isDeload = false,
+  /**
+   * A standalone week (TM test / 7th-week deload) — its work sets take the warm-up's bar floor.
+   * See the comment on `weight`. ⚠️ Was `isDeload`; renamed 2026-08-15 because the rule now covers
+   * both standalone shapes and neither of them is "week 4 of a cycle" any more.
+   */
+  floorWorkSets = false,
   /** The lightest bar this athlete can assume — 45, or 35 on a commercial gym (2026-08-13). */
   barFloorLb: number = BAR_LB,
 ): StrengthExercise {
@@ -718,13 +797,13 @@ function mainLiftRow(
     // are not floored: a work set below the bar means the training max itself is near-empty-bar, which
     // the athlete would see and correct, not something to silently mask.
     //
-    // ⛔ EXCEPT ON THE DELOAD (2026-08-13, Michael's week-4 OHP on device: 30×5, 40×5 with plate
-    // chips on a 45 lb bar). The no-floor reasoning above assumes work sets sit at 65%+ of the
-    // working number; week 4 prescribes 40/50/60 with no warm-up ramp in front, so any working
-    // number under ~112 lb authors sets no barbell can weigh. A deload is recovery volume — the
-    // sets ARE the ramp (`warmupSetsForWeek` returns none for exactly that reason) — so they take
-    // the same floor the ramp would have: the athlete presses the bar.
-    const weight = (s.warmup || isDeload) ? Math.max(barFloorLb, raw) : raw;
+    // ⛔ EXCEPT ON A STANDALONE WEEK (2026-08-13, Michael's week-4 OHP on device: 30×5, 40×5 with
+    // plate chips on a 45 lb bar). The no-floor reasoning above assumes work sets sit at 65%+ of the
+    // working number; a standalone week opens lower with no warm-up ramp in front, so a light
+    // working number authors sets no barbell can weigh. Those weeks are recovery volume — the sets
+    // ARE the ramp (`warmupSetsForWeek` is not called for them, for exactly that reason) — so they
+    // take the same floor the ramp would have: the athlete presses the bar.
+    const weight = (s.warmup || floorWorkSets) ? Math.max(barFloorLb, raw) : raw;
     return {
       weight,
       reps: s.reps,
@@ -748,6 +827,90 @@ function mainLiftRow(
     // buffered: a 95%-of-working top set is ~80% of the athlete's actual max.
     percent_1rm: oneRM > 0 ? Math.round((top.weight / oneRM) * 1000) / 1000 : undefined,
     set_plan,
+  };
+}
+
+// ── THE SUPPLEMENTAL: FIRST SET LAST (§1e) ───────────────────────────────────
+
+/**
+ * ⛔ FSL — **the same lift, 5×5 at that week's FIRST-set percentage**, straight after the main work.
+ * Leader weeks only.
+ *
+ * ⛔⛔ **WHAT IS HIS AND WHAT IS OURS, AND THE WORK ORDER'S CITATION FOR THIS WAS PARTLY WRONG.**
+ * Checked against `docs/REFERENCE-531-forever-pp16-45.md`, which is the page-pinned reading:
+ *
+ *   · **HIS:** a leader template *"increase[s] in barbell volume, usually via supplemental"* (p.18).
+ *     First Set Last is one of his four named supplemental schemes (p.15). A supplemental may use the
+ *     main lift itself; an alternate lift needs its own tested TM (p.15). And **not every 5/3/1
+ *     program has a supplemental at all** (p.17) — it is a template choice.
+ *   · **HIS, AND THE REASON THE OBVIOUS ALTERNATIVE IS ABSENT:** Boring But Big is *"not a good
+ *     option for athletes"* (p.45). It must not be added (work order §2).
+ *   · **OURS (T3): the PICK.** The work order cited p.40 for FSL-as-leader-supplemental, and p.40 is
+ *     **Beginner Prep School** — a specific novice template the reference doc explicitly marks
+ *     "do not cite as general rules". So *that a leader carries a supplemental* is his; *that it is
+ *     FSL 5×5 on this block* is our choice, and the reason is below.
+ *
+ * ⛔ WHY FSL IS THE ONE THIS BLOCK CAN CARRY: it uses the lift's own training max and nothing else.
+ * No new maxes, no new equipment, no second movement to pick — the bar is already loaded to
+ * 65/70/75% by the week's opening set, and the supplemental repeats it. Every other scheme in his
+ * list needs either a number the intake has never asked for or a bar we cannot assume.
+ *
+ * ⛔ `load_prescribed` IS TRUE, unlike every assistance row. This IS prescribed barbell work off the
+ * training max — the same class as the main lift — and marking it `false` would make the server
+ * matcher, the logger and the compare table read it as an accessory (`src/lib/assistance-slot.ts`,
+ * D-370) and the athlete's logged sets would come back as an unplanned extra.
+ *
+ * ⚠️ NEVER ON AN ANCHOR OR A STANDALONE WEEK. An anchor's top set is already a rep-out at 95%, and a
+ * standalone week is the block's recovery. Adding 25 more reps to either is the accidental hybrid
+ * this protocol's whole leader/anchor split exists to avoid.
+ *
+ * ⚠️ SESSION LENGTH: a leader lower day gains roughly ten to twelve minutes and ~25 reps at 65-75%.
+ * The plan description says so once, flatly. The Robineau 6h gap and the scheduling law are
+ * unchanged and already cover it — no placement rule moves for this.
+ *
+ * ⚠️ NOT BUILT, AND HIS: a lift running on a LOWER training max uses **Second Set Last** instead of
+ * First Set Last, same 5×5 (p.40, [BPS]). The engine runs one TM percentage for every lift, so the
+ * distinction has nothing to key on yet. Noted rather than assumed away.
+ *
+ * ⚠️ AND THE VOLUME DIAL, IF IT IS EVER TOO MUCH: p.44's stall menu goes the other way (7-10×5 FSL);
+ * cutting to 3×5 would be ours. Not in V1, and it would be an athlete-facing dial rather than an
+ * engine decision.
+ */
+const FSL_SETS = 5;
+const FSL_REPS = 5;
+
+function fslRow(
+  lift: typeof MAIN_LIFTS[number],
+  workingNumber: number,
+  oneRM: number,
+  /** The week's work sets — the FIRST of them is the percentage FSL repeats. */
+  workSets: WendlerSet[],
+  barFloorLb: number,
+): StrengthExercise | null {
+  const first = workSets.find((s) => !s.warmup);
+  if (!first) return null;
+  // ⚠️ THE BAR FLOOR APPLIES. 65% of a light working number can sit under the empty bar, and five
+  // sets of an un-loadable weight is the same defect the warm-up floor exists for.
+  const weight = Math.max(barFloorLb, weightForSet(workingNumber, first.pct));
+  return {
+    name: lift.name,
+    sets: FSL_SETS,
+    reps: FSL_REPS,
+    weight,
+    percent_1rm: oneRM > 0 ? Math.round((weight / oneRM) * 1000) / 1000 : undefined,
+    // ⛔ TAGGED SO THE LOGGER GROUPS IT UNDER THE MAIN LIFT rather than as a second exercise with the
+    // same name. `supplemental` is the flag; the name is deliberately identical, because it IS the
+    // same movement and a renamed row would break every name-matched read in the app.
+    //
+    // ⚠️ AND THE MATCHER IS SAFE WITH TWO ROWS OF ONE NAME — `matchStrengthExercises` consumes an
+    // executed row once, so two planned "Bench Press" rows take the two logged ones in order rather
+    // than both claiming the first (traced, `_shared/strength/match-exercises.ts` `consumed`).
+    supplemental: true,
+    // ⚠️ `notes` IS THE DISPLAY DIFFERENCE, not the identity. The logger renders it under the name,
+    // so the athlete sees two "Bench Press" blocks with the second marked — while every name-matched
+    // read (the matcher, the compare table, Garmin's step builder) still sees the one canonical name.
+    notes: 'First Set Last',
+    set_plan: Array.from({ length: FSL_SETS }, () => ({ weight, reps: FSL_REPS })),
   };
 }
 
@@ -1666,24 +1829,35 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * keeps the calendar. We are using his two-day trade one day up, and keeping his calendar.
    */
   const liftingDays = args.liftingDays === 3 ? 3 : 4;
-  // ⛔ HEAVIEST FIRST, AND THIS IS NO LONGER THE ARRAY'S ORDER (2026-08-05).
+  // ⛔ WHICH TWO LIFTS SHARE THE 3-DAY WEEK'S ONE DOUBLE SESSION — **DEADLIFT + PRESS AS OF
+  // 2026-08-15 (§1f), and it used to be BENCH + PRESS.**
   //
-  // `MAIN_LIFTS` now runs in Wendler's p.11 sequence — Press · Deadlift · Bench · Squat — which is
-  // the order of the WEEK. On the 3-day shape the two presses share one day, and that day's internal
-  // order is a different question with a different answer: the second lift of a session is trained
-  // fatigued, so the heavier one goes first (see `pairNoteFor`). Bench is the heavier of the two for
-  // essentially every athlete.
+  // Wendler's own 3-day table (Forever p.22) pairs the deadlift with the press and gives squat and
+  // bench their own days. The bench+press pairing was ours: it fell out of "the two upper lifts are
+  // the ones that can share", which is a reasonable rule and is not his.
+  //
+  // ⛔ THE PAIRED DAY IS NOW A HEAVY LOWER DAY, and that is a LOAD CLAIM five things read — the
+  // solver's 48h heavy↔heavy clock, the hill session's descent rule, easy-run stacking, the
+  // stack-note copy and the session tag. `pairedIsLower` is derived from the lifts in the pair
+  // rather than asserted, so the claim cannot go stale if the pair ever changes again.
+  // ⚠️ THE LOWER-DAY COUNT IS UNCHANGED: it was squat + deadlift, it is now squat + (deadlift+press).
+  // Two heavy lower days either way, so no clearance in the scheduling law moves for this.
+  //
+  // ⛔ HEAVIEST FIRST WITHIN THE SHARED DAY, AND THIS IS NO LONGER `MAIN_LIFTS`' ORDER (2026-08-05).
+  // That array runs Wendler's p.11 sequence — Press · Deadlift · Bench · Squat — which is the order
+  // of the WEEK. The shared day's internal order is a different question with a different answer:
+  // the second lift of a session is trained fatigued, so the heavier one goes first. Deadlift, here.
   //
   // ⚠️ TAKING BOTH FROM ONE ARRAY MADE THEM THE SAME DECISION, AND REORDERING TO THE BOOK SILENTLY
-  // PUT THE BENCH SECOND — trained fatigued behind the overhead press, on the only day where the
-  // order costs anything. Caught by `lifting-days.test.ts`. Two orderings, two sources.
-  const PAIRED_UPPER = ['Bench Press', 'Overhead Press']
-    .filter((n) => MAIN_LIFTS.some((l) => l.name === n && !l.isLower));
-  const pairedSlotName = PAIRED_UPPER.join(' + ');
+  // PUT THE HEAVIER LIFT SECOND once. Caught by `lifting-days.test.ts`. Two orderings, two sources.
+  const PAIRED_LIFTS = ['Deadlift', 'Overhead Press']
+    .filter((n) => MAIN_LIFTS.some((l) => l.name === n));
+  const pairedSlotName = PAIRED_LIFTS.join(' + ');
+  const pairedIsLower = MAIN_LIFTS.some((l) => PAIRED_LIFTS.includes(l.name) && l.isLower);
   const solverLifts = liftingDays === 3
     ? [
-        ...MAIN_LIFTS.filter((l) => l.isLower).map((l) => ({ name: l.name, isLower: true })),
-        { name: pairedSlotName, isLower: false },
+        ...MAIN_LIFTS.filter((l) => !PAIRED_LIFTS.includes(l.name)).map((l) => ({ name: l.name, isLower: l.isLower })),
+        { name: pairedSlotName, isLower: pairedIsLower },
       ]
     : MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower }));
   // ⛔ THE HARD DAY IS ONE OF THE RUN DAYS, NOT AN EXTRA ONE.
@@ -1931,7 +2105,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const out = new Map<string, string>();
     for (const s of slots) {
       if (s.lift === pairedSlotName) {
-        for (const n of PAIRED_UPPER) out.set(n, s.day as string);
+        for (const n of PAIRED_LIFTS) out.set(n, s.day as string);
       } else {
         out.set(s.lift, s.day as string);
       }
@@ -1969,15 +2143,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ⚠️ SILENT ON THE TEST WEEK because nothing is shared there. Stated as a fact and a consequence,
    * never as an instruction (COPY-VOICE rule 7).
    */
-  const pairNoteFor = (l: typeof MAIN_LIFTS[number], isTestWeek: boolean): string => {
-    if (liftingDays !== 3 || isTestWeek || l.isLower) return '';
-    const [first, second] = PAIRED_UPPER;
+  const pairNoteFor = (l: typeof MAIN_LIFTS[number], _isTestWeek: boolean): string => {
+    // ⚠️ THE `l.isLower` GUARD IS GONE (§1f). The pair contains the DEADLIFT now, so testing for an
+    // upper lift would have silently suppressed the note on the very lift that leads the day.
+    // Membership in the pair is the question, and it is asked directly.
+    if (liftingDays !== 3 || !PAIRED_LIFTS.includes(l.name)) return '';
+    const [first, second] = PAIRED_LIFTS;
     if (l.name === first) {
       return ` Shares the day with ${second}, and goes first — the second lift of a session is done`
         + ` fatigued, so it gives up load and reps.`;
     }
-    return ` Follows ${first} on the same day. Week 3 splits them onto their own days, so the set that`
-      + ` sets the next cycle's weight is read fresh.`;
+    // ⚠️ NO LONGER PROMISES A WEEK-3 SPLIT. That split was deleted 2026-08-05 (D-387) and this
+    // sentence outlived it, telling every 3-day athlete about a week the engine stopped building.
+    return ` Follows ${first} on the same day.`;
   };
 
   /**
@@ -2357,11 +2535,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ── The weeks ─────────────────────────────────────────────────────────────
   const sessions_by_week: Record<string, PlanSession[]> = {};
 
-  for (let week = 1; week <= weeks; week++) {
-    const placed = cycleForWeek(weeks, week, args.blockShape);
-    if (!placed) continue;
-    const { slot, weekInCycle } = placed;
-    const isDeload = weekInCycle === WEEKS_PER_CYCLE;
+  // ⛔ ONE MAP FOR THE WHOLE BLOCK (2026-08-15, §1c). The loop used to ask `cycleForWeek(week)` and
+  // derive everything from `weekInCycle === 4`; the block now contains weeks that belong to no cycle
+  // at all, so the shape is read off the map rather than computed from a week number.
+  const weekMap = buildWeekMap(weeks, args.blockShape);
+
+  for (const bw of weekMap) {
+    const week = bw.week;
+    const isTmTest = bw.kind === 'tm_test';
+    const isDeload = bw.kind === 'deload_single';
+    /** ⚠️ A STANDALONE WEEK — either shape. Light band, light jumps, no supplemental, no ramp. */
+    const isStandalone = bw.kind !== 'cycle';
+    const cycleKind: CycleKind = bw.cycleKind ?? 'leader';
+    const weekInCycle = bw.weekInCycle ?? 1;
     // ⛔ THE WEEK-3 TEST SPLIT IS GONE — REMOVED 2026-08-05, MICHAEL'S CALL. DO NOT REBUILD IT.
     //
     // Week 3 of every cycle used to break the 3-day shape onto FOUR days so each 95% set was read
@@ -2381,7 +2567,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // Week 3 of every cycle is the 95% set — Wendler's own validity check (SPEC §1). Nothing here
     // marks it: the sets themselves carry it (95% of the working number, and in the anchor the top
     // set is open). The reading of that set is the transition gate's job, not the composer's.
-    const phaseName = isDeload ? 'Deload' : (slot.kind === 'anchor' ? 'Anchor' : 'Leader');
+    const phaseName = bw.kind === 'cycle' ? PHASE_NAME[cycleKind] : PHASE_NAME[bw.kind];
+    // ⛔ WHAT THE ASSISTANCE AND THE JUMPS SCALE OFF — Forever p.18, and it is NOT the same axis as
+    // the cycle kind. A light standalone week is neither a leader nor an anchor: it takes the
+    // lightest band and the lightest jump dose. `cycleKind` still owns the MAIN LIFT's scheme.
+    const assistancePhase: AssistancePhase = isStandalone ? 'seventh' : cycleKind;
     const weekSessions: PlanSession[] = [];
 
     for (const lift of MAIN_LIFTS) {
@@ -2398,8 +2588,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // `advance`, which is exactly `workingNumberForCycle`. This is the seam (Constitution Law 6:
       // a load-bearing change ships behind a behaviour-unchanged proof), not the reader — the reader
       // needs LOGGED reps, so it cannot live in a composer that authors all twelve weeks up front.
+      // ⚠️ `bw.workingNumberCycle`, NOT A CYCLE INDEX DERIVED FROM THE WEEK. A standalone week sits
+      // between cycles and has no index of its own; the map answers which cycle's number it runs on
+      // (the one before it — a 7th week unloads the number just used, the closing test tests the
+      // number the block arrived at, the opening test tests the one cycle 1 is about to use).
       const wnResult = workingNumberForCycles(
-        training_max[lift.ref], slot.index, lift.isLower, args.cycleVerdicts?.[lift.ref],
+        training_max[lift.ref], bw.workingNumberCycle, lift.isLower, args.cycleVerdicts?.[lift.ref],
         {
           // ⛔ NO `oneRM` ANY MORE (2026-08-12, slice a). The 90%-of-1RM ceiling it fed is deleted:
           // Wendler's brake is a missed prescription, not a number on file (p30), and that ceiling
@@ -2416,14 +2610,25 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⚠️ `wnResult.resetAtCycle` IS NOT READ HERE, AND THAT IS CORRECT FOR A FRESH BLOCK: every
       // verdict in a forecast is `advance`, so no confirmed stall can exist at build time. It is
       // slice b's input, off the REBUILD path where real verdicts arrive.
-      // Warm-up ramp in front of the work sets (Wendler p.31); empty on the deload — see
-      // `warmupSetsForWeek`. Prepended so `set_plan` reads warm-ups → work sets, top → bottom.
+      // ⛔ THE WEEK'S SETS COME FROM ITS SHAPE. A cycle week is the warm-up ramp (Wendler p.31)
+      // prepended to `setsForWeek`; a standalone week is its own four-set list opening at 70%, which
+      // IS its ramp — so `warmupSetsForWeek` is not called for it (see the note on that function).
+      const weekSets: WendlerSet[] = isTmTest
+        ? tmTestSets()
+        : isDeload
+          ? deloadSingleSets()
+          : [...warmupSetsForWeek(weekInCycle), ...setsForWeek(cycleKind, weekInCycle)];
       const main = mainLiftRow(
         lift,
         wn,
         oneRepMaxes[lift.ref],
-        [...warmupSetsForWeek(weekInCycle), ...setsForWeek(slot.kind, weekInCycle)],
-        isDeload,
+        weekSets,
+        // ⚠️ THE BAR FLOOR APPLIES TO BOTH STANDALONE SHAPES, not just the old deload. The reason is
+        // the same one 2026-08-13 gave for the deload: these weeks have no warm-up ramp in front, so
+        // a light working number authors an opening set no barbell can weigh (70% of an 80 lb press
+        // is 56 — fine; 70% of a 60 lb press is 42, which is under the bar). Recovery volume takes
+        // the floor the ramp would have taken.
+        isStandalone,
         // Per lift: 45 when the lift's normal weeks clear the bar naturally, 35 for a lighter lift
         // — whose sub-45 sets the plan description flags as women's-bar work (2026-08-13).
         barFloorForWorkingNumber(wn),
@@ -2457,18 +2662,42 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // upper sessions without their primer. That is a deliberate omission, not an oversight: a
       // throw needs a medicine ball and a wall, and the intake has never asked for either. Flagged
       // rather than assumed.
-      // ⚠️ REBUILT PER CYCLE, not once per block — the anchor holds the floor while the leaders may
-      // scale. Deload still excludes assistance structurally, by not being in the array at all.
+      // ⚠️ REBUILT PER WEEK, not once per block — the phase decides the band (Forever p.18: leaders
+      // carry LESS assistance than anchors, which is the reverse of what this used to do).
       const cycleAssistance = assistanceRows(args.assistancePicks, {
         pullupMaxReps: args.pullupMaxReps,
         strengthPosture: args.blockShape?.strengthPosture,
-        cycleKind: slot.kind,
+        cycleKind: assistancePhase,
       }, lift.name, args.oneRepMaxes, args.athleteEquipment);
-      const ex: StrengthExercise[] = isDeload
-        ? [main]
-        : [...(lift.isLower ? [JUMPS] : []), main, ...cycleAssistance.rows];
+      const jumps = jumpsFor(assistancePhase);
+      // ⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE — CHANGED 2026-08-15 (§1a/§1c).
+      //
+      // The old week-4 deload was the main lift ALONE, on the reasoning that a deload is a volume cut
+      // rather than a lighter version of the same session [Bosquet 2007, Wang 2023]. **Forever's
+      // standalone weeks are not that.** p.22's tables carry 10 jumps and p.23 carries 25-50 reps per
+      // assistance slot on the 7th week — the cut is in the MAIN LIFT's volume and in the band, not
+      // in the session's structure. Cutting the accessories entirely also removed the one week where
+      // the athlete has the freshness to do them well.
+      //
+      // ⚠️ p.23 ALSO ASKS FOR LESS INTENSIVE MOVEMENTS on these weeks (his example: dips → pushdowns),
+      // AND THE ENGINE DOES NOT SWAP THEM. Overriding the athlete's own pick is the re-roling model
+      // D-407/D-423 retired, and re-introducing it for one week in six would bring back the sentence
+      // explaining why they are not getting what they chose. The guidance travels as COPY instead —
+      // see `standaloneNote`. Flagged as a deliberate deviation, not an omission.
+      // ⛔ THE SUPPLEMENTAL — FSL 5×5, LEADER WEEKS ONLY (§1e, Forever p.40/p.45). Between the main
+      // lift and the assistance, which is where Wendler puts it and where the fatigue belongs: the
+      // heavy work is already done, and the accessories come after.
+      const fsl = (!isStandalone && cycleKind === 'leader')
+        ? fslRow(lift, wn, oneRepMaxes[lift.ref], weekSets, barFloorForWorkingNumber(wn))
+        : null;
+      const ex: StrengthExercise[] = [
+        ...(lift.isLower ? [jumps] : []),
+        main,
+        ...(fsl ? [fsl] : []),
+        ...cycleAssistance.rows,
+      ];
       // What the PROSE may name: the work this stage prescribes and no later stage rewrites.
-      const prescribedLabels = isDeload ? [main] : [...(lift.isLower ? [JUMPS] : []), main];
+      const prescribedLabels = [...(lift.isLower ? [jumps] : []), main, ...(fsl ? [fsl] : [])];
         // ⛔ THE ANCHOR TOP SET IS A REP-OUT, AND THE PRESCRIPTION READS LIKE A TARGET.
       //
       // Week 11 prescribes `125×1+`. The number after the plus is the entire point — but "1+"
@@ -2481,10 +2710,37 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // is correct. What was missing is that the "+" is a floor, not a ceiling, and that the reps
       // are the measurement the cycle exists for. Same for week 10's `3+`, which only reads as
       // less than week 7's five because the plus renders as a target.
-      const amrapNote = (!isDeload && slot.kind === 'anchor')
+      const amrapNote = (!isStandalone && cycleKind === 'anchor')
         ? ` The last set is an all-out set: the number before the plus is the MINIMUM, not the target. ` +
           `Take it to a hard stop with a rep left, and log every rep — what you get here is what sets the next cycle's weights.`
         : '';
+      // ⛔ THE SUPPLEMENTAL SAYS WHAT IT IS AND WHERE THE WEIGHT CAME FROM (§1e). Five sets of five
+      // at a weight the athlete already lifted once this session reads as a mistake unless the
+      // sentence says otherwise — it is the same bar, put back on, which is the point of it.
+      // ⚠️ COPY-VOICE: states the fact and the conditional consequence, no imperative.
+      const fslNote = fsl
+        ? ` The five sets after the main work are the same lift at its opening weight — ` +
+          `building volume without adding load. Stopping short of the last set costs the volume, not the session.`
+        : '';
+      // ⛔ THE TWO STANDALONE WEEKS SAY WHAT THEY ARE, IN THE PLAN'S OWN VOICE.
+      //
+      // ⚠️ COPY-VOICE: no imperatives, conditional consequences, no jargon. "Training max" is the one
+      // term kept — it is the number the athlete sees on every card in the block, and a euphemism for
+      // it here would be a second vocabulary for the same fact.
+      //
+      // ⛔ THE TEST WEEK'S LINE CARRIES THE STOP RULE AND THE PASS BAR TOGETHER, because the athlete
+      // reads them in the same breath and a "+" with no ceiling on a set at the training max is the
+      // one place in this block where chasing reps has a real cost.
+      const standaloneNote = isTmTest
+        ? ` This week measures rather than builds. The last set is at your training max: ` +
+          `${TM_TEST_PASS_REPS} strong reps and it goes back on the rack — there is nothing to gain past ` +
+          `that, and the count is what decides the next block's number. Fewer than three and the number ` +
+          `comes down to match what the set showed.`
+        : isDeload
+          ? ` A light week between blocks. The sets come off the same training max and stop where they ` +
+            `stop — the single at the top is one rep, not an open set. Assistance movements that go ` +
+            `easier on the joints suit this week; the plan does not swap your picks for you.`
+          : '';
       weekSessions.push({
         // ⛔ The SOLVER's day, not the grid's. `liftDay()` falls back to `lift.day` only if
         // place-week omitted this lift, so a placement failure degrades to the old fixed week
@@ -2524,9 +2780,15 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // ⛔ THE CLASS IS NOT FIXED, ONLY THIS INSTANCE. The invariant is *no stage rewrites a name
         // another stage has already rendered*. Today the main lifts are safe only because none of
         // them matches that trigger list — by coincidence of the list, not by design. See Q-216.
-        description: `${prescribedLabels.map(exerciseLabel).join(' · ')}.${isDeload ? '' : ` ${ASSISTANCE_GUIDANCE}`}${
-          isDeload || !cycleAssistance.note ? '' : ` ${cycleAssistance.note}`}${amrapNote}${stackNoteFor(lift)}${pairNoteFor(lift, isTestWeek)}`,
-        duration: isDeload ? 35 : 60,
+        description: `${prescribedLabels.map(exerciseLabel).join(' · ')}. ${ASSISTANCE_GUIDANCE}${
+          cycleAssistance.note ? ` ${cycleAssistance.note}` : ''}${amrapNote}${fslNote}${standaloneNote}${stackNoteFor(lift)}${pairNoteFor(lift, isTestWeek)}`,
+        // ⚠️ 45, NOT 35, ON A STANDALONE WEEK. The old deload was the main lift alone; these carry
+        // jumps and three assistance slots at the light band, so 35 would under-book the calendar by
+        // ten minutes on every lifting day of those weeks.
+        // ⚠️ A LEADER WEEK IS LONGER NOW (§1e). Five sets of five on the main lift after the main
+        // work is roughly ten to twelve minutes; booking 60 for it would under-book every leader day
+        // in the block, which is the calendar telling the athlete a lie about their evening.
+        duration: isStandalone ? 45 : (fsl ? 72 : 60),
         strength_exercises: ex,
         // ⛔ NO `1rm_test` TAG, and that is deliberate. The tag makes the logger DISCARD the planned
         // rows and rebuild the session as a warm-up ramp plus one all-out set (`StrengthLogger.tsx`
@@ -2534,7 +2796,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // third set of an ordinary session, so a rebuild would delete the very prescription this
         // block is built on. The e1RM still lands: `set_plan[].amrap` flags the open set, and the
         // logger's write-back fires off that flag alone (`isAmrapBaseline`, ~3301).
-        tags: ['strength', lift.focus, `phase:${phaseName.toLowerCase()}`, 'protocol:strength_primary'],
+        // ⚠️ `phaseTagFor` rather than a bare `toLowerCase()`: 'TM Test' contains a space, and a tag
+        // reading `phase:tm test` would break every `startsWith('phase:')` split on whitespace.
+        tags: ['strength', lift.focus, phaseTagFor(phaseName), 'protocol:strength_primary'],
       });
     }
 
@@ -2550,7 +2814,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // for that; it fell out of the loop's shape. Wendler's stacked day is the two main lifts and
     // ONE round of assistance (p.77: "pick one or two exercises per lift" for the whole day).
     //
-    // ⚠️ HEAVIEST FIRST, and it is `PAIRED_UPPER` that says which — bench before overhead press. The
+    // ⚠️ HEAVIEST FIRST, and it is `PAIRED_LIFTS` that says which — deadlift before overhead press. The
     // second lift of a session is trained fatigued, so the order decides which lift pays. Merged in
     // that order rather than in whatever order the solver's day map produced.
     //
@@ -2566,16 +2830,36 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       for (const [, group] of byDay) {
         if (group.length < 2) continue;
         const ordered = [...group].sort((a, b) =>
-          PAIRED_UPPER.findIndex((n) => a.name.endsWith(n)) - PAIRED_UPPER.findIndex((n) => b.name.endsWith(n)));
+          PAIRED_LIFTS.findIndex((n) => a.name.endsWith(n)) - PAIRED_LIFTS.findIndex((n) => b.name.endsWith(n)));
         const [first, ...rest] = ordered;
         // Main lifts in order, then ONE assistance block — the first lift's, since both are presses.
         const mainOf = (ws: PlanSession) => (ws.strength_exercises ?? []).filter((e: StrengthExercise) =>
           MAIN_LIFTS.some((l) => l.name === e.name));
         const assistanceOf = (ws: PlanSession) => (ws.strength_exercises ?? []).filter((e: StrengthExercise) =>
           !MAIN_LIFTS.some((l) => l.name === e.name));
+        // ⛔ ONE SUPPLEMENTAL ON A SHARED DAY, NOT TWO (§1e). The per-lift loop authors an FSL block
+        // for each lift, so a stacked day would emit TEN sets of five on top of two main lifts —
+        // the same shape of dose error the eight-exercise bug above was. Wendler's stacked day is
+        // the main lifts plus ONE round of everything else (p.77), and that governs the supplemental
+        // exactly as it governs the assistance. The FIRST lift's block survives, because it is the
+        // heavier lift and the one the day is ordered around.
+        // ⚠️ AND IT GOES AFTER BOTH MAIN LIFTS, not between them. Five sets of five in front of a
+        // second heavy main lift would hand the fatigue to the lift that is already paying for
+        // going second — which is the cost the stacked-day copy discloses, and doubling it silently
+        // would make that sentence false.
+        const mains = ordered.flatMap(mainOf);
+        const supplementals = mains.filter((e: StrengthExercise) => e.supplemental);
+        // ⛔ THE JUMPS STAY IN FRONT (§1f). They are a PRIMER — Wendler opens every session with them
+        // — and the merge used to sweep them into the "assistance" bucket, which put them after the
+        // main lifts. That never showed before because the paired day was two presses and carried no
+        // jumps at all; pairing the DEADLIFT with the press made the shared day a lower day.
+        const nonMain = assistanceOf(first);
+        const primer = nonMain.filter((e: StrengthExercise) => e.name === JUMP_NAME);
         first.strength_exercises = [
-          ...ordered.flatMap(mainOf),
-          ...assistanceOf(first),
+          ...primer,
+          ...mains.filter((e: StrengthExercise) => !e.supplemental),
+          ...supplementals.slice(0, 1),
+          ...nonMain.filter((e: StrengthExercise) => e.name !== JUMP_NAME),
         ];
         first.name = `Strength — ${ordered.map((w) => w.name.replace('Strength — ', '')).join(' + ')}`;
         // ⛔ THE ORDER IS THE COST, SO IT IS STATED (§0f) — same rule as every other stacked day.
@@ -2631,7 +2915,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // or the athlete pinned a long day, and then every day of it is easy by definition.
         weekSessions.push(enduranceSession(
           'run', day, runMinutesByDay[day], note,
-          runHasLongDay && day === longRunDay ? 'long' : 'easy', isDeload,
+          runHasLongDay && day === longRunDay ? 'long' : 'easy', isStandalone,
         ));
       });
       // ⛔ THE HARD DAY GETS FILLED. Until now the pin reserved a day and nothing was authored for
@@ -2650,10 +2934,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // the week visibly loses a day and the athlete reads it as a bug. The day keeps an easy run
         // at the trimmed volume, so frequency holds (Hickson) while the intensity that drives the
         // interference goes away (Wilson 2012).
-        weekSessions.push(isDeload
+        // ⚠️ BOTH STANDALONE SHAPES TRIM IT, not just the deload (2026-08-15). A TM-test week is a
+        // RESTED week by design — its whole job is to arrive at the measured set fresh — so leaving
+        // hill repeats on it would spend exactly the freshness the test needs.
+        weekSessions.push(isStandalone
           ? enduranceSession('run', hardPin, hardRunSessionMinutes(args.hardDay?.terrain),
-            'Deload week — the hard session comes off. Easy running only, and the same rule as every '
-            + 'other easy day: conversational throughout.', 'easy', true)
+            (isTmTest
+              ? 'Test week — the hard session comes off so the lifting is measured rested. '
+              : 'Light week — the hard session comes off. ')
+            + 'Easy running only, and the same rule as every other easy day: conversational throughout.',
+            'easy', true)
           : hardRunSession(hardPin, heavyLowerDays, args.hardDay?.terrain));
       }
     } else if (enduranceSport === 'bike' && !hasBike) {
@@ -2678,7 +2968,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // bike-only athlete stopped being handed a phantom one, and the rides silently vanished.
       // These rides are requested from the solve like every other flexible session.
       solvedRideDays.forEach((day) => weekSessions.push(
-        enduranceSession('bike', day, undefined, undefined, 'easy', isDeload)));
+        enduranceSession('bike', day, undefined, undefined, 'easy', isStandalone)));
     }
 
     // ── The bike, when the athlete keeps one ────────────────────────────────────────────────────
@@ -2806,7 +3096,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             ? ` Shares the day with the lift: the lift goes first. They share no prime movers, so back to back is fine.`
             : undefined);
         weekSessions.push(enduranceSession(
-          'bike', day, mins, rideNote, isLong ? 'long' : 'easy', isDeload));
+          'bike', day, mins, rideNote, isLong ? 'long' : 'easy', isStandalone));
       });
       // ⛔ AND THE HARD DAY, IF THEY CHOSE THE BIKE FOR IT. Same fix as the run's: the pin already
       // reserved this day, so without this the week visibly loses one. D-327 makes run and bike
@@ -2865,6 +3155,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         leaderCycles: leaders,
         anchorStartWeek: anchorStart,
         anchorCycles: cycles.length - leaders,
+        // ⛔ THE TEST WEEKS COME FROM THE MAP, NOT FROM AN ASSUMPTION (2026-08-15, §1c). An 8-week
+        // block has one and a 12-week block has two, and the copy must not promise the opening one
+        // to an athlete whose block does not fit it.
+        testWeeks: weekMap.filter((w) => w.kind === 'tm_test').map((w) => w.week),
+        // ⛔ THE SESSION-LENGTH DISCLOSURE (§1e). Derived from the block, not assumed: a block with
+        // no leader cycles carries no supplemental and must not claim one.
+        supplemental: leaders > 0,
         enduranceNote,
         // ⛔ ALWAYS EMPTY AS OF 2026-08-12 (slice a) — no lift can pin, because there is no ceiling.
         // The argument is left in place rather than removed from the copy helper's signature: that

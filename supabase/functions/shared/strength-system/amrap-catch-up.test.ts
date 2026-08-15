@@ -105,13 +105,19 @@ Deno.test('proposals are ordered by how far the working number has drifted', () 
 
 // ── The boundary gate and the extractor ─────────────────────────────────────────────────────────
 
-Deno.test('the boundary is week 4 of every cycle, and week 0 is NOT one', () => {
-  for (const w of [4, 8, 12]) assertEquals(isCatchUpBoundary(w), true, `week ${w}`);
-  for (const w of [1, 2, 3, 5, 7, 11]) assertEquals(isCatchUpBoundary(w), false, `week ${w}`);
+Deno.test('⛔ THE BOUNDARY IS A STANDALONE WEEK, READ OFF THE MAP — never week % 4', () => {
+  // ⛔⛔ SUPERSEDES 'the boundary is week 4 of every cycle' (2026-08-15, §1c). A cycle is three weeks
+  // now, so the old modulo would have fired on weeks 3, 6, 9 and 12 — week 3 is mid-leader and week
+  // 9 is the anchor's OPENING week. The seams of a 12-week block are weeks 1, 8 and 12.
+  for (const w of [1, 8, 12]) assertEquals(isCatchUpBoundary(w, 12), true, `week ${w}`);
+  for (const w of [2, 3, 4, 5, 6, 7, 9, 10, 11]) assertEquals(isCatchUpBoundary(w, 12), false, `week ${w}`);
+  // ⛔ AN UNKNOWN BLOCK LENGTH IS `false`. The layout depends on the leader/anchor split, so a week
+  // number alone cannot answer — and silence costs an offer, never a wrong number.
+  assertEquals(isCatchUpBoundary(8), false, 'no block length → no boundary');
   // ⛔ `0 % 4 === 0`. An unknown current-week must not read as a boundary and offer a training-max
   // change to an athlete who has not lifted yet.
   for (const w of [0, -4, null, undefined, NaN]) {
-    assertEquals(isCatchUpBoundary(w as never), false, `week ${w}`);
+    assertEquals(isCatchUpBoundary(w as never, 12), false, `week ${w}`);
   }
 });
 
@@ -160,15 +166,15 @@ Deno.test('END TO END — stored workouts at a boundary become proposals', () =>
   ];
   const sets = extractAmrapSets(rows, liftRefForExercise);
   const tm = { bench: 130, squat: 170, deadlift: 190, overheadPress: 80 };
-  assertEquals(isCatchUpBoundary(8), true);
-  const out = amrapTrainingMaxCatchUp(sets, tm, isCatchUpBoundary(8));
+  assertEquals(isCatchUpBoundary(8, 12), true);
+  const out = amrapTrainingMaxCatchUp(sets, tm, isCatchUpBoundary(8, 12));
   // ⚠️ BENCH FIRST, and the first draft of this line had it backwards. Squat moves further in
   // absolute pounds (170 → 200) but bench has drifted further from what the athlete can actually do
   // (130 → 175, a 45 lb gap vs 30). The sort is by GAP, which is the number that says how stale the
   // working weight is — not by the size of the lift.
   assertEquals(out.map((p) => [p.lift, p.currentTm, p.proposedTm]), [['bench', 130, 175], ['squat', 170, 200]]);
   // …and the same block one week earlier offers nothing.
-  assertEquals(amrapTrainingMaxCatchUp(sets, tm, isCatchUpBoundary(7)).length, 0);
+  assertEquals(amrapTrainingMaxCatchUp(sets, tm, isCatchUpBoundary(7, 12)).length, 0);
 });
 
 // ── The WIRED path — what adapt-plan does, without adapt-plan ────────────────────────────────────
@@ -185,7 +191,7 @@ Deno.test('WIRED — the apply path recomputes and cannot be driven by a posted 
 
   const recompute = (currentWeek: number, trainingMax: typeof tm) =>
     amrapTrainingMaxCatchUp(
-      extractAmrapSets(rows, liftRefForExercise), trainingMax, isCatchUpBoundary(currentWeek),
+      extractAmrapSets(rows, liftRefForExercise), trainingMax, isCatchUpBoundary(currentWeek, 12),
     ).find((p) => p.lift === liftKey);
 
   // At the boundary the offer resolves and the config write would be this one key only.

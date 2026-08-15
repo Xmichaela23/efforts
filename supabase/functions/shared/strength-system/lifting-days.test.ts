@@ -29,6 +29,10 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
+// ⛔ WEEK 2, NOT WEEK 1 (2026-08-15, work order §1c). Week 1 of a Strong Focus block is now a
+// standalone TM-TEST week — light band, no hard endurance session, trimmed easy volume — so it is
+// no longer the representative working week these assertions want. Week 2 is cycle 1's first
+// leader week and is the shape week 1 used to be.
 const build = (liftingDays?: 3 | 4) => composeStrengthPrimaryPlan({
   durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
   enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
@@ -68,21 +72,40 @@ Deno.test('⛔ THE PAIRED DAY IS ONE SESSION, TWO MAIN LIFTS AND ONE ASSISTANCE 
   // two core. Wendler's stacked day is the mains plus one round (p.77, "one or two exercises per
   // lift" for the whole day).
   const p = build(3);
-  const wk = (p.sessions_by_week['1'] as any[]).filter((s) => s.type === 'strength');
+  const wk = (p.sessions_by_week['2'] as any[]).filter((s) => s.type === 'strength');
   const paired = wk.filter((s) => /\+/.test(s.name));
   assertEquals(paired.length, 1, 'expected exactly one paired session');
-  const ex = (paired[0].strength_exercises ?? []).map((e: any) => e.name);
-  const mains = ex.filter((n: string) => ['Bench Press', 'Overhead Press'].includes(n));
-  assertEquals(mains.length, 2, `paired day should carry both presses: ${ex.join(', ')}`);
-  // One assistance block, not two — three slots, so five rows total on a work week.
-  assertEquals(ex.length, 5, `paired day should be 2 mains + 3 assistance, got: ${ex.join(', ')}`);
+  const rows = (paired[0].strength_exercises ?? []) as any[];
+  const ex = rows.map((e: any) => e.name);
+  // ⛔ DEADLIFT + PRESS, NOT BENCH + PRESS (§1f, 2026-08-15) — Wendler's own 3-day table, Forever
+  // p.22. Squat and bench get their own days. The bench+press pairing was ours.
+  const mains = rows.filter((e: any) => !e.supplemental && ['Deadlift', 'Overhead Press'].includes(e.name));
+  assertEquals(mains.length, 2, `paired day should carry deadlift + press: ${ex.join(', ')}`);
+  // ⛔ ONE SUPPLEMENTAL ON A SHARED DAY, NOT TWO (§1e, 2026-08-15). Week 2 is a leader week, so the
+  // FSL block is present — and the per-lift loop authors one per lift, which on a stacked day would
+  // be ten sets of five on top of two main lifts. Wendler's stacked day is the mains plus ONE round
+  // of everything else (p.77), and that governs the supplemental exactly as it governs assistance.
+  const supplementals = rows.filter((e: any) => e.supplemental);
+  assertEquals(supplementals.length, 1, `paired day should carry ONE supplemental: ${ex.join(', ')}`);
+  // One assistance block, not two — three slots, so seven rows on a leader work week.
+  // ⚠️ THE JUMP ROW IS ONE OF THEM (§1f). The shared day carries the DEADLIFT now, so it is a lower
+  // day and takes the primer; the old bench+press pairing was two upper lifts and carried none.
+  assertEquals(ex.length, 7, `paired day should be jumps + 2 mains + 1 FSL + 3 assistance, got: ${ex.join(', ')}`);
+  // ⛔ AND THE PRIMER LEADS. Wendler opens every session with jumps or throws; the merge used to
+  // sweep them into the assistance bucket, which would have put fifteen landings after the deadlift.
+  assertEquals(ex[0], 'Box Jump', `the primer must lead the shared day: ${ex.join(', ')}`);
   // ⛔ HEAVIEST FIRST. The second lift is trained fatigued, so the order decides which lift pays.
-  assertEquals(ex[0], 'Bench Press', `bench is the heavier press and must lead: ${ex.join(', ')}`);
+  // ⛔ HEAVIEST FIRST. The second lift is trained fatigued, so the order decides which lift pays —
+  // and the deadlift is the heavier of the pair for essentially every athlete.
+  assertEquals(ex[1], 'Deadlift', `deadlift is the heavier of the pair and must lead the lifting: ${ex.join(', ')}`);
+  // ⛔ AND THE SUPPLEMENTAL COMES AFTER BOTH MAINS, never between them — five sets of five in front
+  // of a second heavy main lift would double the cost the stacked-day copy discloses.
+  assertEquals(rows.indexOf(supplementals[0]) >= 3, true, `the FSL block ran before a main lift: ${ex.join(', ')}`);
 });
 
 Deno.test('⛔ THE PAIRED DAY STATES ITS ORDER AND WHY A FATIGUED LIFT STILL PROGRESSES', () => {
   const p = build(3);
-  const paired = (p.sessions_by_week['1'] as any[]).find((s) => s.type === 'strength' && /\+/.test(s.name));
+  const paired = (p.sessions_by_week['2'] as any[]).find((s) => s.type === 'strength' && /\+/.test(s.name));
   const d = String(paired.description ?? '');
   assertEquals(/goes first/.test(d), true, 'the shared day never named its order');
   assertEquals(/fatigued/.test(d), true, 'the shared day never named the cost of going second');
@@ -92,7 +115,7 @@ Deno.test('⛔ THE PAIRED DAY STATES ITS ORDER AND WHY A FATIGUED LIFT STILL PRO
 Deno.test('the heavy lower lifts never share a day, at either shape', () => {
   for (const shape of [3, 4] as const) {
     const p = build(shape);
-    const lower = (p.sessions_by_week['1'] as any[])
+    const lower = (p.sessions_by_week['2'] as any[])
       .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(s.name));
     assertEquals(new Set(lower.map((s) => s.day)).size, lower.length,
       `${shape}-day: a squat and a deadlift shared a day`);

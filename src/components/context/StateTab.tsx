@@ -253,7 +253,9 @@ function goalMetaFromGoalLite(
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
+      {/* readout-label (index.css): the Details tab's instrument label, tinted by the plate's
+          accent — neutral white on these multi-sport plates. */}
+      <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
       <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
@@ -267,7 +269,8 @@ function Chip({ label, value, valueClass }: { label?: string; value: React.React
   return (
     <span className="inline-flex items-baseline gap-1">
       {label != null && <span className="text-white/60 text-[13px]">{label}</span>}
-      <span className={valueClass ?? 'text-white/80'}>{value}</span>
+      {/* Values glow in the plate accent unless the caller pinned a colour (e.g. "week complete"). */}
+      <span className={valueClass ?? 'readout-num'}>{value}</span>
     </span>
   );
 }
@@ -382,7 +385,7 @@ function RaceSection({
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+          <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
           <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · result on file</span>
         </div>
         {statedGoalDisplay != null && (
@@ -422,7 +425,7 @@ function RaceSection({
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+          <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
           <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · {postLabel}</span>
         </div>
         {statedGoalDisplay != null && (
@@ -483,7 +486,7 @@ function RaceSection({
     <div className="px-3 py-3 space-y-2.5">
       {/* Header: goal + weeks out */}
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase shrink-0">RACE</span>
+        <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
         {hasRealRace && (
           <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
         )}
@@ -1564,7 +1567,7 @@ export default function StateTab({
         {/* BODY */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+            <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5 tabular-nums">
               {/* overall_training_read "This week" fallback DELETED 2026-07-24 — the ~25-branch summary
                   duplicated the load bar above (F8 / docs/COPY-VOICE.md). When BODY has no per-metric
@@ -1728,7 +1731,7 @@ export default function StateTab({
         {showNudge && (
           <div className="px-3 py-3">
             <div className="flex items-start gap-3">
-              <span className="text-[12px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">SIGNAL</span>
+              <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase pt-0.5 w-[72px] shrink-0">SIGNAL</span>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <span className={`text-[13px] leading-snug flex-1 ${

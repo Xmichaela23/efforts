@@ -73,23 +73,43 @@ export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
 // option object held, plus what the per-day picker needs.
 
 /**
- * ⛔ THE FLOOR IS 50 AND THE CEILING IS 75. Both are read off the book. Michael, 2026-08-05.
+ * ⛔ THE BAND IS PER PHASE, AND ITS DIRECTION REVERSED ON 2026-08-15. READ THIS BEFORE CHANGING A
+ * NUMBER. Every page below is verified in `docs/REFERENCE-531-forever-pp16-45.md`.
  *
- * ⚠️ **THIS SUPERSEDES THE "25 IS THE FLOOR AND IT STAYS" CALL OF 2026-07-28**, and the reason that
- * call was made is the reason it had to go. It rested on "25 is the documented bottom of Wendler's
- * published 25-50 range." **There is no 25-50 range in the book.** Verified page by page 2026-08-05
- * against `~/Downloads/531_2nd_Edition_Hard_Copy.pdf`:
+ * ⚠️ **WHAT WAS HERE AND WAS BACKWARDS:** one 50–75 band for the whole block, with the ANCHOR pinned
+ * at the floor — *"volume comes down when the bar goes up"* — and the LEADER free to climb. That is
+ * the opposite of **Forever p.18**, which scales assistance and jumps the other way: a leader is the
+ * easier month and carries LESS assistance; an anchor is the hard month and carries MORE.
+ * (The reasoning behind the old direction was ours and it was plausible; the book is not silent on
+ * it, so the book wins.)
  *
- *   Triumvirate (p.48)          Dips 5x15 = 75 · Chin-ups 5x10 = 50 · Good Morning 5x12 = 60
- *                               DB Bench 5x15 = 75 · DB Row 5x10 = 50 · Leg Press 5x15 = 75
- *   Bodyweight (p.52)           "I recommend no less than 75 reps per exercise for each workout"
- *   Periodization Bible (p.51)  5 sets of 10-20 reps = 50-100
+ * ⛔⛔ **THESE NUMBERS DEVIATE FROM THE WORK ORDER'S §1a, DELIBERATELY, BECAUSE THE PAGE-PINNED
+ * READING SAYS OTHERWISE.** The work order specified leaders at 25–50 and anchors at 50–100. The
+ * reference doc — which is the transcription the work order was itself derived from — reads:
+ *   · **p.24: the BASE recommendation is 50–100 total reps per category per workout.**
+ *   · **p.23: 25–50 is the SEVENTH WEEK's number**, not a leader's.
+ * So 25–50 belongs to the light standalone weeks, and leader-vs-anchor is a split INSIDE 50–100.
+ * ⚠️ If Michael intended the work order's numbers over the page reading, this is the one block to
+ * change and it is three constants.
  *
- * **Wendler's lowest number anywhere is 50, and the Triumvirate — his most-used template — runs 50
- * to 75.** We were at 25, which is half his floor. The 50/75 band IS the Triumvirate's own band.
+ * ⛔ THE BANDS, AND WHAT IS HIS VERSUS OURS:
  *
- * ⚠️ THE CEILING IS ALSO WHAT MAKES THE §A TIERS POSSIBLE. At the old ceiling of 50, floor met
- * ceiling and Strong and Heavy would have been the same block wearing two names.
+ * | phase | band | source |
+ * |---|---|---|
+ * | 7th-week | 25–50 | **his** — Forever p.23, and "less intensive movements" on the same page |
+ * | leader   | 50–75 | **his floor** (p.24) + p.18's "less assistance"; the split point is ours |
+ * | anchor   | 75–100 | **his ceiling** (p.24) + p.18's "more assistance" |
+ *
+ * ⛔ **AND WE CLAMP EVERYTHING AT 75, WHICH IS OURS, NOT HIS (T3).** His anchor runs to 100. This
+ * block is written for an athlete carrying endurance training underneath it, and 100 reps per slot on
+ * top of a 95%-and-rep-out main lift spends a fatigue budget the running needs. 75 is the ceiling the
+ * engine already ran on and the top of the Triumvirate's own band (2nd ed. p.48: Dips 5×15 = 75).
+ * **Consequence, stated rather than hidden: the anchor sits at a flat 75.** A leader with a big
+ * tested capacity can reach the same number — the direction is never inverted, but the two can meet.
+ *
+ * ⚠️ THE 2ND-EDITION READING THAT SET THE OLD FLOOR STILL STANDS — Triumvirate (p.48) 50–75,
+ * Bodyweight (p.52) "no less than 75 per exercise". Those are anchor-shaped templates, and they sit
+ * inside the same 50–100 base. Nothing here retracts them.
  *
  * ⚠️ AND THE DERIVATION IS UNEVEN ON PURPOSE. `pullupMaxReps` exists on `performance_numbers`; there
  * is no push or single-leg equivalent. Rather than wait for all three, each slot scales on whatever
@@ -100,42 +120,156 @@ export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
 export const ASSISTANCE_TOTAL_REPS_FLOOR = 50;
 export const ASSISTANCE_TOTAL_REPS_CEILING = 75;
 
+/** Forever p.23 — the SEVENTH WEEK's band. Not a leader's; see the correction above. */
+export const ASSISTANCE_SEVENTH_FLOOR = 25;
+export const ASSISTANCE_SEVENTH_CEILING = 50;
+
+/**
+ * ⛔ HIS BASE RANGE TOPS OUT AT 100 (p.24) AND WE DO NOT USE IT. Kept as a named constant so the
+ * deviation is legible rather than looking like a forgotten number. See the band table above.
+ */
+export const ASSISTANCE_ANCHOR_CEILING_WENDLER = 100;
+
+/**
+ * ⛔ REMOVED 2026-08-15, MICHAEL'S CALL: *"whatever Wendler says."* A 75 clamp stood here — ours, not
+ * his (T3) — and it collapsed the anchor onto a flat 75 while a well-tested leader could reach the
+ * same number, which erased the very leader-vs-anchor direction this file had just been fixed to
+ * show. The bands are now his, unmodified: leader 50–75, anchor 75–100, seventh week 25–50 (p.24,
+ * p.23, p.18).
+ *
+ * ⚠️ THE COST IS REAL AND WAS ACCEPTED, NOT OVERLOOKED. A concurrent athlete's anchor weeks can now
+ * carry up to 100 reps per category — push, pull AND single-leg/core — on top of a 95%-and-rep-out
+ * main lift, in the three weeks of the block that already cost the most, while still running. His
+ * own guard rails are the ones that apply: p.24, with heavy squat/deadlift volume choose the easier
+ * movements for the slot (face pulls, band pull-aparts, easier ab work) rather than trimming reps —
+ * *"not everything should be 'in the red.'"* p.23, assistance that stalls or inhibits the main lifts
+ * means you are doing it wrong.
+ *
+ * ⛔ DO NOT REINSTATE A CLAMP WITHOUT ASKING. It was a deliberate removal, not an oversight.
+ */
+
+/**
+ * ⛔ THE THIRD PHASE. `seventh` is the standalone light week — the TM-test week and the 7th-week
+ * deload both (Forever pp.20–23). It is not a leader and it is not an anchor: no supplemental, the
+ * lightest assistance band, and the movements themselves are meant to be gentler (p.23).
+ */
+export type AssistancePhase = 'leader' | 'anchor' | 'seventh';
+
+/**
+ * The capacity anchor for the PULL slot: an 8-rep max sits at the band's floor. Deliberately shallow
+ * above it — this is insurance, not stimulus. The other two slots derive from it, see `CAPACITY_*`.
+ */
+const CAPACITY_ENTRY_REPS = 8;
+/** Three reps of session volume per rep of capacity above the entry point. */
+const CAPACITY_SLOPE = 3;
+
+/**
+ * ⛔ WENDLER'S OWN 10-MINUTE STANDARDS, Forever p.33 — push-ups 100, dips 75, chins 50, hanging leg
+ * raise 50. They are the REFERENCE POINT each slot's capacity is read against, so the three slots
+ * scale on one rule instead of three hand-picked coefficients (§1f).
+ *
+ * ⛔⛔ **THE MEASUREMENT MISMATCH, AND IT IS THE THING TO FIX IF A REAL NUMBER EVER ARRIVES.** His
+ * standards are a session total inside ten minutes. `pullupMaxReps` is MAX CLEAN REPS IN ONE SET.
+ * Those are different measurements, and the app already refuses to merge them elsewhere — the
+ * pull-up progression's own copy states the 50-in-10 standard as a session measure and never as
+ * "progress toward 50", precisely so the two do not blur.
+ *
+ * **What is used here is only their RATIO**, which is the part that survives the mismatch: push
+ * capacity is roughly twice chin capacity at the same level of athlete, whichever way you measure.
+ * So the pull slot keeps its shipped anchor exactly (8 reps → floor, +3 per rep) and the other two
+ * are that anchor scaled by the ratio. **Nothing here claims an athlete doing 16 push-ups has met a
+ * standard.** If a push or core capacity is ever collected as a 10-minute total rather than a set
+ * max, this block is where it has to be reconciled rather than quietly plugged in.
+ *
+ * ⚠️ DIPS ARE HIS SECOND PUSH MEASURE AND ARE NOT HERE — nothing on `performance_numbers` stores one,
+ * so the push slot reads push-ups alone. Adding dips later is one more key, not a model change.
+ */
+export const CAPACITY_STANDARD: Record<AssistanceSlot, number> = {
+  push: 100,
+  pull: 50,
+  single_leg_core: 50,
+};
+
+/** Where a slot's band starts opening, scaled off the pull slot's shipped anchor by his standards. */
+function capacityEntryFor(slot: AssistanceSlot): number {
+  return CAPACITY_ENTRY_REPS * (CAPACITY_STANDARD[slot] / CAPACITY_STANDARD.pull);
+}
+/** How much session volume a rep of capacity buys, scaled the inverse way so the bands line up. */
+function capacitySlopeFor(slot: AssistanceSlot): number {
+  return CAPACITY_SLOPE * (CAPACITY_STANDARD.pull / CAPACITY_STANDARD[slot]);
+}
+
 export type AssistanceScaleInputs = {
   /** `performance_numbers.pullupMaxReps` — clean reps, 0 is valid. Absent → the floor. */
   pullupMaxReps?: number | null;
+  /**
+   * ⛔ THE PUSH SLOT'S CAPACITY (§1f). **NOTHING WRITES THIS YET** — `performance_numbers` has no
+   * push-up key and the work order is explicit that no wizard question is being added for one. It is
+   * read if it ever arrives; until then the push slot sits at its floor and the copy says so, which
+   * is the same "cite the evidence you have, stay silent where you do not" rule the pull slot follows.
+   * ⚠️ Wired, not starved-by-accident: this is a declared seam, not a forgotten input.
+   */
+  pushupMaxReps?: number | null;
+  /** ⛔ THE CORE SLOT'S CAPACITY (§1f). Same status as `pushupMaxReps` — read if present, floor if not. */
+  hangingLegRaiseMaxReps?: number | null;
   /** `develop` earns more than `maintain`. */
   strengthPosture?: string | null;
-  /** ⛔ VOLUME COMES DOWN WHEN THE BAR GOES UP. Anchor cycles hold the floor. */
-  cycleKind?: 'leader' | 'anchor' | null;
+  /** ⛔ VOLUME GOES UP WHEN THE BAR GOES UP — Forever p.18. Anchors carry the most. */
+  cycleKind?: AssistancePhase | null;
 };
 
 /**
- * Total reps for one slot: the floor, plus whatever the evidence earns, capped at the ceiling.
+ * The tested capacity for a slot, if one exists. ⛔ Returns `null`, never 0 — absent means "we have
+ * not asked", and a zero would read as a tested inability.
+ */
+function capacityFor(slot: AssistanceSlot, inputs?: AssistanceScaleInputs): number | null {
+  const raw = slot === 'pull'
+    ? inputs?.pullupMaxReps
+    : slot === 'push'
+      ? inputs?.pushupMaxReps
+      : inputs?.hangingLegRaiseMaxReps;
+  return typeof raw === 'number' && raw > 0 ? raw : null;
+}
+
+/** The band for a phase: [floor, ceiling], AFTER our concurrent-athlete clamp. */
+function bandFor(phase: AssistancePhase | null | undefined): [number, number] {
+  if (phase === 'seventh') return [ASSISTANCE_SEVENTH_FLOOR, ASSISTANCE_SEVENTH_CEILING];
+  if (phase === 'anchor') {
+    return [ASSISTANCE_TOTAL_REPS_CEILING, ASSISTANCE_ANCHOR_CEILING_WENDLER];
+  }
+  // ⚠️ ABSENT PHASE READS AS A LEADER, and that is the conservative direction: the lighter of the two
+  // cycle bands. An unknown week is not licence to prescribe the heavy one (§0h).
+  return [ASSISTANCE_TOTAL_REPS_FLOOR, ASSISTANCE_TOTAL_REPS_CEILING];
+}
+
+/**
+ * Total reps for one slot: the phase's floor, plus whatever the tested capacity earns, capped at the
+ * phase's ceiling.
  *
  * ⚠️ ACCESSORIES ARE INSURANCE, NOT STIMULUS. This returns a FLOOR the athlete may stop at, not a
  * target to chase — the copy that ships with it says so, and nothing here should ever read as a
  * number to beat.
+ *
+ * ⛔ THE CAPACITY RULE IS UNCHANGED — ONLY THE BAND IT WALKS MOVED. Same anchor (8 reps sits at the
+ * floor), same slope (three reps of session volume per rep of capacity), same rounding. On the anchor
+ * band that is byte-identical to what shipped before this change; on a leader it now walks 25→50
+ * instead, reaching the top at the same ~16-rep capacity.
  */
 export function assistanceTotalReps(
   slot: AssistanceSlot,
   inputs?: AssistanceScaleInputs,
 ): { totalReps: number; basis: 'capacity' | 'posture' | 'floor' } {
-  // ⛔ THE ANCHOR HOLDS THE FLOOR, whatever else is true. The main lifts are at 95% with a rep-out;
-  // that is the week accessory volume must not compete with.
-  if (inputs?.cycleKind === 'anchor') return { totalReps: ASSISTANCE_TOTAL_REPS_FLOOR, basis: 'floor' };
-
+  const [floor, ceiling] = bandFor(inputs?.cycleKind);
   const developing = (inputs?.strengthPosture ?? 'develop') === 'develop';
 
-  // Pull is the one slot with a tested capacity. A 50-rep session against an 8-rep max is a
-  // different exercise from the same session against a 25-rep max.
-  if (slot === 'pull' && typeof inputs?.pullupMaxReps === 'number' && inputs.pullupMaxReps > 0) {
-    const cap = inputs.pullupMaxReps;
-    // 8 reps sits at the floor; capacity above that walks toward the ceiling, three reps of session
-    // volume per rep of capacity. Deliberately shallow — this is insurance. On the 50/75 band the
-    // ceiling is reached at a ~16-rep max, which is where Wendler's own top number sits anyway.
-    const earned = ASSISTANCE_TOTAL_REPS_FLOOR + Math.max(0, cap - 8) * 3;
-    const capped = Math.min(ASSISTANCE_TOTAL_REPS_CEILING, Math.round(earned / 5) * 5);
-    return { totalReps: developing ? capped : ASSISTANCE_TOTAL_REPS_FLOOR, basis: 'capacity' };
+  // ⛔ EVERY SLOT SCALES ON THE SAME RULE NOW (§1f) — it just has an input for one of the three. A
+  // 50-rep session against an 8-rep chin max is a different exercise from the same session against a
+  // 25-rep max, and the same is true of push and core; what differs is the reference point.
+  const cap = capacityFor(slot, inputs);
+  if (cap != null) {
+    const earned = floor + Math.max(0, cap - capacityEntryFor(slot)) * capacitySlopeFor(slot);
+    const rounded = Math.min(ceiling, Math.max(floor, Math.round(earned / 5) * 5));
+    return { totalReps: developing ? rounded : floor, basis: 'capacity' };
   }
 
   // ⛔ NO CAPACITY SIGNAL → THE FLOOR. A first draft gave `develop` posture floor+5, and that
@@ -144,9 +278,9 @@ export function assistanceTotalReps(
   // raising someone's volume on intent alone is the guess this whole model exists to remove.
   //
   // ⚠️ So posture can only ever WITHHOLD here, never add. `maintain` and `develop` both land on the
-  // floor when nothing is tested; the difference between them shows up on the slot that HAS a
+  // floor when nothing is tested; the difference between them shows up on a slot that HAS a
   // capacity, where maintain declines to spend it.
-  return { totalReps: ASSISTANCE_TOTAL_REPS_FLOOR, basis: developing ? 'posture' : 'floor' };
+  return { totalReps: floor, basis: developing ? 'posture' : 'floor' };
 }
 
 /** The sentence that names the evidence — or its absence. Never a target, always a floor. */
@@ -155,7 +289,9 @@ export function assistanceBasisNote(basis: 'capacity' | 'posture' | 'floor', cap
     return `Scaled to your tested ${cap} clean reps.`;
   }
   if (basis === 'posture') return 'No tested capacity on file for this movement, so this is the default floor.';
-  return 'The floor — the main lifts are heavy this cycle and this is here to maintain, not to add.';
+  // ⚠️ REWORDED 2026-08-15. It read "the main lifts are heavy this cycle and this is here to maintain"
+  // — which was the ANCHOR-holds-the-floor reasoning, and that reasoning is now reversed (p.18).
+  return 'The floor for this week — nothing tested to scale it from.';
 }
 
 /**

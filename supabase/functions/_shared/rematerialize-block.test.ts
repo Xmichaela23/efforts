@@ -4,6 +4,8 @@ import {
   workingNumberForCycles,
   setsForWeek,
   weightForSet,
+  deloadSingleSets,
+  tmTestSets,
 } from '../shared/strength-system/loading/wendler-531.ts';
 
 /**
@@ -85,8 +87,22 @@ Deno.test('the rewritten weights are the composer\'s own arithmetic', () => {
   // ⛔ A rewrite that invented its own ramp would be a different programme. Same functions, always.
 });
 
-Deno.test('a deload week is rewritten as a deload, not as work', () => {
-  const spec = setsForWeek('anchor', 4);
-  assertEquals(spec.map((s) => s.pct), [0.40, 0.50, 0.60]);
-  assertEquals(spec.some((s) => s.amrap), false);
+Deno.test('⛔ A LIGHT WEEK IS REWRITTEN AS ITS OWN SHAPE, NOT AS WORK', () => {
+  // ⛔ REWRITTEN 2026-08-15 (§1c). It read `setsForWeek('anchor', 4)` → 40/50/60 — a deload welded
+  // to the end of a four-week cycle. The light weeks are standalone now and have their own lists;
+  // asking `setsForWeek` for a fourth week throws rather than answering.
+  const deload = deloadSingleSets();
+  assertEquals(deload.map((s) => s.pct), [0.70, 0.80, 0.90, 1.00]);
+  assertEquals(deload.map((s) => s.reps), [5, 3, 1, 1]);
+  assertEquals(deload.some((s) => s.amrap), false, 'a deload single is never an open set');
+
+  // ⛔ AND A TEST WEEK IS REWRITTEN AS A TEST — its top set IS open, at the training max, and that
+  // rep count is the block-to-block gate. A rewrite that flattened it would delete the gate.
+  const test = tmTestSets();
+  assertEquals(test.map((s) => s.pct), [0.70, 0.80, 0.90, 1.00]);
+  assertEquals(test.at(-1)!.amrap, true);
+
+  // At a 95 lb working number both weeks land on real plate weights, floored at the bar by the
+  // caller (`barFloorForWorkingNumber`) exactly as the composer does.
+  assertEquals(deload.map((s) => weightForSet(95, s.pct)), [65, 75, 85, 95]);
 });

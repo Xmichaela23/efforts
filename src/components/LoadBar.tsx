@@ -109,7 +109,9 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
     <div className="px-3 py-3">
       {/* Verdict leads; ACWR is the demoted reference number (D-260: ACWR describes, never decides). */}
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
+        {/* readout-label/readout-num (index.css): instrument typography off the plate's accent —
+            neutral white here, since LOAD sits on the multi-sport plate. */}
+        <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
         <div className="flex items-center gap-2">
           {showVerdict && (
             <span className={`text-[15px] font-semibold tracking-tight ${loadVolumeColor(verdict)}`}>{verdict}</span>
@@ -161,11 +163,11 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
       {!compact && comp.length > 0 && total > 0 && (
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] text-white/65 uppercase tracking-[0.08em]">Where your load is going</span>
+            <span className="readout-label text-[11px] uppercase tracking-[0.08em]">Where your load is going</span>
             {/* The composition below is the ROLLING last-7-days load (daily_load_7d). Show that same
                 window's total here — NOT wtd_actual_load (week-to-date), which is a different window and
                 mislabeled this number as WTD over a 7-day bar. `total` is the sum the bar itself represents. */}
-            <span className="text-[11px] tabular-nums text-white/55">{Math.round(total)} pts · rolling 7d</span>
+            <span className="readout-num text-[11px]">{Math.round(total)} pts · rolling 7d</span>
           </div>
           <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
             {comp.map((c) => {

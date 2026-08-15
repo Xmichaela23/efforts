@@ -24,6 +24,10 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
+// ⛔ WEEK 2, NOT WEEK 1 (2026-08-15, work order §1c). Week 1 of a Strong Focus block is now a
+// standalone TM-TEST week — light band, no hard endurance session, trimmed easy volume — so it is
+// no longer the representative working week these assertions want. Week 2 is cycle 1's first
+// leader week and is the shape week 1 used to be.
 const ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
 
@@ -32,7 +36,7 @@ type S = { day: string; name: string; type: string };
 const week1 = (cfg: Record<string, unknown>): S[] =>
   ((composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, easyPaceMinPerMile: 10, ...cfg,
-  } as never) as unknown as { sessions_by_week: Record<string, S[]> }).sessions_by_week['1'] ?? []);
+  } as never) as unknown as { sessions_by_week: Record<string, S[]> }).sessions_by_week['2'] ?? []);
 
 const isLower = (s: S) => s.type === 'strength' && /Back Squat|Deadlift/.test(s.name);
 const isLongRun = (s: S) => s.type === 'run' && /Long/.test(s.name);

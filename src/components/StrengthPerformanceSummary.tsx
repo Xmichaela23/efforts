@@ -463,7 +463,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
       {plannedExercises.length > 0 && (
         <div>
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Completed</span>
+            <span className="readout-label text-xs font-medium uppercase tracking-wide">Completed</span>
             <span className="text-lg font-semibold text-white">
               {completedOfPlanned} of {plannedExercises.length}
             </span>
@@ -532,8 +532,8 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         </div>
       )}
       {Array.isArray(allOut) && allOut.length > 0 && (
-        <div className="mt-3 mb-1 rounded-xl border border-white/12 bg-white/[0.04] p-3">
-          <div className="text-[11px] uppercase tracking-wider text-white/45 mb-2">All-out set</div>
+        <div className="galaxy-card mt-3 mb-1 rounded-xl border border-strength/25 p-3" style={{ ['--card-accent-a' as any]: '0.20' }}>
+          <div className="readout-label text-[11px] uppercase tracking-wider mb-2">All-out set</div>
           {allOut.map((a: any, i: number) => (
             <div key={i} className={i > 0 ? 'mt-3 pt-3 border-t border-white/10' : ''}>
               <div className="text-sm text-white/90">
@@ -546,7 +546,8 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
                   two wordings on two screens. */}
               {a.is_rep_record && (
                 <div className="text-[13px] mt-0.5">
-                  <span className="text-emerald-300 font-medium">Rep PR</span>
+                  {/* Strength orange, not green — green means bike (Michael 2026-08-15, same sweep as State). */}
+                  <span className="text-strength font-medium">Rep PR</span>
                 </div>
               )}
               {/* The estimate, clean — no reliability hedge. It stays computed honestly and un-capped

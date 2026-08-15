@@ -21,8 +21,21 @@
 
 import type React from 'react';
 
-/** Neutral accent for multi-sport plates — white light, no discipline claim. */
-export const NEUTRAL_PLATE_RGB = '255, 255, 255';
+/**
+ * Neutral accent for multi-sport plates — no discipline claim.
+ *
+ * ⛔ NOT pure white, and that was the bug (2026-08-15, Michael: "I'm just not seeing the readout").
+ * The readout treatment tints labels and glows numbers IN THE PLATE'S ACCENT. With a white accent,
+ * a white label and a white glow behind white text are invisible by construction — the effect was
+ * correctly applied to 17 elements and did nothing on every neutral plate, which is most of State.
+ *
+ * This is the wizard's `UNIVERSAL_RGB` (StepLayout.tsx:9) — the app's EXISTING off-white for
+ * "accent, but no discipline owns this". Reused rather than inventing a hue, for the same reason
+ * FOCUS_RACE_COLOR exists: a card that isn't a sport still needs a colour that can't be mistaken
+ * for one. Warm enough to read as instrument light against pure-white numerals; far enough from
+ * run gold to never be confused with it.
+ */
+export const NEUTRAL_PLATE_RGB = '236, 233, 227';
 
 export function readoutPlateStyle(accentRgb: string = NEUTRAL_PLATE_RGB, opts?: {
   /** Extra box-shadow layers (e.g. getDisciplineGlowStyle().boxShadow) appended to the plate's own. */
@@ -56,7 +69,11 @@ export function readoutPlateStyle(accentRgb: string = NEUTRAL_PLATE_RGB, opts?: 
     return {
       ...base,
       ['--card-accent-rgb' as any]: accentRgb,
-      ['--card-accent-a' as any]: String(neutral ? 0.08 : 0.20),
+      // Raised 2026-08-15 with the readout typography ("need to feel it more") — the plate light
+      // has to carry as much as the glow on the numbers or the type floats on a dead ground.
+      // Neutral runs close to a discipline's now that it is a warm off-white rather than pure
+      // white: at pure white it had to stay low or the plate washed out to grey.
+      ['--card-accent-a' as any]: String(neutral ? 0.22 : 0.30),
     };
   }
   return {

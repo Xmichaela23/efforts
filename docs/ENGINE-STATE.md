@@ -23,7 +23,101 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
+## 🧭 NEXT SESSION — START HERE (2026-08-15 — the STRONG FOCUS block was rewritten to 5/3/1 FOREVER. Three-week cycles, standalone TM-test and 7th-week deload weeks, FSL in the leaders, the verdict moved to the rested week. **EDITS ONLY: nothing is pushed, nothing is deployed, nothing is device-verified.**)
+
+### ⛔ YOUR JOB, IN ORDER
+1. **Get D-432 onto main and onto the server, then look at it.** The work is written and the suite is
+   green; it is sitting in the working tree. Deploy list is below — it is long, because the composer
+   is a `shared/` file and every function that bundles it carries its own frozen copy.
+2. **Then the device acceptance run Michael asked for:** build a Strong Focus block and eyeball
+   **weeks 1, 4, 8, 9 and 12** — the test week, a leader week (with its FSL block), the 7th-week
+   deload, the anchor's opening week, and the closing test week.
+3. **Then the two things nobody has looked at** (listed under UNVERIFIED below).
+
+### WHAT CHANGED — D-432 in `DECISIONS-LOG-3.md` carries the full why. Do NOT re-litigate it.
+The 12-week block is now `TM test(1) · Leader(2-4) · Leader(5-7) · 7th-week deload(8) · Anchor(9-11) · TM test(12)`.
+- **`WEEKS_PER_CYCLE` is 3**, not 4. The deload row left `PCT_BY_WEEK`; the light weeks are their own
+  shapes (`tmTestSets`, `deloadSingleSets` in `loading/wendler-531.ts`). ⛔ **A standalone week belongs
+  to NO cycle** — `cycleForWeek` returns null for one. Anything that groups logged work by cycle has
+  to handle that, and two callers were fixed for it (`rematerialize-strength-block`,
+  `create-goal-and-materialize-plan`).
+- **Assistance and jumps scale UP into the anchor**, not down (Forever p.18). It ran backwards.
+  Light weeks 25 per slot, leaders 50, anchors 75 — jumps 2×5 on the light weeks and leaders, 3×5
+  on the anchor.
+  ⚠️ **THOSE BANDS DEVIATE FROM THE WORK ORDER, DELIBERATELY.** The work order said leaders 25–50 and
+  anchors 50–100; `docs/REFERENCE-531-forever-pp16-45.md` — the page-pinned transcription the work
+  order was itself derived from — reads **p.24's base as 50–100** and **p.23's 25–50 as the SEVENTH
+  WEEK's number**. The primary won. Same class of correction on the FSL citation: the work order cited
+  p.40, which is **Beginner Prep School** and explicitly not a general rule, so the FSL *pick* is
+  marked as ours. Both are flagged in code and in D-432. **If Michael wants the work order's numbers
+  instead, it is three constants in `src/lib/assistance-menu.ts` and nothing else moves.**
+- **The verdict moved to the rested weeks.** `verdictFromTmTestSet` — 5+ advances, 3-4 holds, ≤2
+  recalibrates the training max off that set. Week 12 is the block-to-block gate, which pays
+  `SPEC-get-stronger.md` §1b's outstanding debt. `prior_training_max` now travels
+  create-goal → generate-strength-plan → composer (the composer field existed and was starved).
+- **FSL 5×5 on leader weeks only.** Same lift, week's own opening percentage, `load_prescribed: true`,
+  `supplemental: true`, carried through `materialize-plan`'s whitelist.
+- **3-day pairing is deadlift + press** (his p.22), so the shared day is a heavy LOWER day now.
+- **Valid block lengths are no longer multiples of four.** 4, 5, 8, 9, 11, 12, 14, 15, 18… `blockWeeks`
+  snaps down to a length the layout fills exactly. 12 and 16 both land exactly.
+
+### ⛔ STATE — READ THIS BEFORE TELLING MICHAEL ANYTHING
+- **PUSHED: NO.** Everything is uncommitted in the working tree.
+- **DEPLOYED: NO.**
+- **VERIFIED: NO.** Not on a device, not in prod. The evidence is fixtures only.
+- **Suite:** full deno run **3594 passed / 6 failed**, and those 6 fail identically on a clean tree
+  (`d031-convergence-e2e` ×3, `non-race-goal-seeds` ×2, `club-anchor` ×1). Type errors unchanged
+  (50 pre-existing in create-goal, 2 in the materialize chain). Lint +45 `no-explicit-any` in new
+  test files, against a 6383 baseline of the same rule.
+
+### WHEN YOU DEPLOY — the `_shared` trap applies, `strength-primary-plan.ts` is a shared file
+**Every function that TRANSITIVELY imports a touched file** — computed, not guessed. `plan-phase.ts`
+and `strength-profiles.ts` are widely imported, which is why the list is this wide:
+```
+supabase functions deploy \
+  generate-strength-plan create-goal-and-materialize-plan materialize-plan \
+  rematerialize-strength-block adapt-plan coach workout-detail \
+  analyze-cycling-workout analyze-running-workout analyze-strength-workout \
+  arc-setup-chat course-detail course-strategy delete-plan \
+  generate-combined-plan generate-triathlon-plan get-arc-context \
+  import-strava-history learn-fitness-profile planning-context \
+  refresh-goal-race-projections strava-webhook \
+  --project-ref yyriamwvtvzlkumqrvpm
+```
+⚠️ **`adapt-plan` IS NOT OPTIONAL — `isCatchUpBoundary` CHANGED SIGNATURE.** It takes the block length
+now and returns `false` without one, so a stale `adapt-plan` bundle calling the new shared code would
+silently stop offering the AMRAP catch-up. Same class for `workout-detail` and `coach`, which read
+`block-identity.ts`.
+
+⚠️ **AND THE CLIENT SHIPS TOO.** `src/lib/assistance-menu.ts` and `src/lib/strength-focus-copy.ts`
+changed, so the Netlify build and an iOS sync are part of the same shipment, not a follow-up.
+
+### ⚠️ UNVERIFIED, AND WHAT WOULD SETTLE EACH
+- **The logger renders two rows named for the same lift on a leader week** — the main block and its
+  FSL block, told apart only by a `notes: 'First Set Last'` label. The planned↔executed matcher is
+  safe (traced: `match-exercises.ts` consumes an executed row once, so two planned rows take the two
+  logged ones in order). **The SCREEN has not been looked at.** A generated leader week on a phone
+  settles it.
+- **The TM-test week's AMRAP badge.** `all-out-set.ts` keys off the `amrap` flag and the test set
+  carries it, so the read is right by construction — but no human has seen the badge on that week.
+- **A block built BEFORE today keeps its old 40/50/60 deload.** `rematerialize-strength-block`
+  deliberately skips a legacy deload rather than rewriting it as a Forever 7th week. Michael's live
+  block is one of those. Deliberate, in D-432; check it still reads sensibly on his calendar.
+
+### ⛔ WHAT IS A HYPOTHESIS, NOT A FINDING
+- That the 8-week and 16-week blocks are right *for an athlete*. They are pinned to the work order's
+  §0 arithmetic and the fixtures pass; **nobody has trained one.**
+- That 75 (not his 100) is the right anchor assistance ceiling for a concurrent athlete. It is a
+  reasoned product call, stated as ours in the code and in D-432, with his number named beside it.
+
+### SCAFFOLDING
+`docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` is **still on disk** — delete it on
+ship, per the spec lifecycle. `docs/SPEC-get-stronger.md` now holds only §2's opt-in quality session
+as unbuilt; delete it when that lands.
+
+---
+
+## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 
 ### SHIPPED 2026-08-13 NIGHT (do NOT re-litigate — D-430/D-431 in DECISIONS-LOG-3 carry the why)
 - **[D-431] the entry model:** 65 lb 1RM per lift at both entry doors; 65–84 lifts build floored at the 35 lb bar with the plan description naming those sets; 85+ untouched at 45; deloads floored (Michael's 30-lb OHP deload was the trigger); same rule in composer AND rematerialize-strength-block. Focus card copy carries no number. ⚠️ Athlete-facing copy never says "women's bar" — "35 lb bar" / "Light (33lb)".

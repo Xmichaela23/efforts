@@ -33,10 +33,34 @@
  */
 
 import { estimate1RM } from '../../../../src/lib/estimate-1rm.ts';
-import { WORKING_NUMBER_PCT_OF_1RM, roundDownToIncrement, WEEKS_PER_CYCLE } from './loading/wendler-531.ts';
+import {
+  type BlockShapeInputs,
+  blockWeekFor,
+  MIN_BLOCK_WEEKS,
+  roundDownToIncrement,
+  WORKING_NUMBER_PCT_OF_1RM,
+} from './loading/wendler-531.ts';
 
 /** The four lifts, keyed as `training_max` on `plans.config` keys them. */
 export type LiftRef = 'bench' | 'squat' | 'deadlift' | 'overheadPress';
+
+/**
+ * ⛔ ONE SET → A TRAINING MAX. **THE ONE PLACE THIS ARITHMETIC LIVES** (extracted 2026-08-15, §1d).
+ *
+ * Wendler's estimator, then the app's 85% — see the 85% trap at the top of this file, which is the
+ * whole reason this is a named function rather than two lines written twice. It is used by:
+ *   · the AMRAP catch-up below, to RAISE a training max that has drifted behind the athlete
+ *   · `verdictFromTmTestSet`'s `recalibrate` path, to RECOMPUTE one that has drifted ahead of them
+ *     (Forever p.21: *"use the formula … and adjust your training max to be 85-90% of that"*)
+ *
+ * ⚠️ Returns 0 on junk input rather than throwing — a malformed log must never break a boundary.
+ */
+export function trainingMaxFromSet(weight: number, reps: number): number {
+  const w = Number(weight);
+  const r = Number(reps);
+  if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(r) || r < 1) return 0;
+  return roundDownToIncrement(estimate1RM(w, r) * WORKING_NUMBER_PCT_OF_1RM);
+}
 
 /** One completed AMRAP set, as the logger writes it back. */
 export type AmrapSet = {
@@ -100,11 +124,9 @@ export function amrapTrainingMaxCatchUp(
     const currentTm = Number(currentTrainingMax[lift]);
     if (!Number.isFinite(currentTm) || currentTm <= 0) continue;
 
-    // ⛔ THE APP'S PERCENTAGE, NOT THE BOOK'S. See the 85% trap at the top of this file.
-    // `roundDownToIncrement` for the same reason it is used when the block is built: an overshoot
-    // writes a set the athlete cannot complete, an undershoot is absorbed, and the error is not
-    // symmetric.
-    const proposedTm = roundDownToIncrement(e1rm * WORKING_NUMBER_PCT_OF_1RM);
+    // ⛔ THE APP'S PERCENTAGE, NOT THE BOOK'S. See the 85% trap at the top of this file, and
+    // `trainingMaxFromSet`, which is now the one place that arithmetic lives.
+    const proposedTm = trainingMaxFromSet(set.weight, set.reps);
 
     // ⛔ RAISES ONLY. A proposal to LOWER the training max is a different mechanism with a different
     // trigger — Wendler's reset-on-stall, which fires on FAILED reps, not on a modest AMRAP. Letting
@@ -137,18 +159,36 @@ export function catchUpReason(p: TrainingMaxProposal): string {
 }
 
 /**
- * ⛔ IS THIS WEEK A BOUNDARY? Week 4 of every cycle is the deload and the cycle's last week — the
- * place Wendler recalculates (p.30-31). Reads `WEEKS_PER_CYCLE` rather than spelling 4, so a change
- * to the cycle length cannot leave this gate firing on the wrong week.
+ * ⛔ IS THIS WEEK A BOUNDARY? **A STANDALONE WEEK IS** — the 7th-week deload between templates and
+ * the closing TM-test week. Those are the places Wendler recalculates (2nd ed. p.30-31; Forever
+ * p.21), and after the 2026-08-15 restructure they are the block's actual seams.
  *
- * ⚠️ WEEK 0 / NEGATIVE / NON-FINITE IS `false`, NOT A MODULO ACCIDENT. `0 % 4 === 0` would make an
- * unknown current-week look like a boundary and offer a training-max change to an athlete who has
+ * ⛔ THIS WAS `week % WEEKS_PER_CYCLE === 0` AND THAT IS NOW WRONG IN BOTH DIRECTIONS. A cycle is
+ * three weeks, so the modulo would fire on weeks 3, 6, 9, 12 — week 3 is the middle of a leader
+ * cycle and week 9 is the anchor's opening week. It has to read the MAP, not arithmetic.
+ *
+ * ⚠️ **THE BLOCK LENGTH IS REQUIRED, AND AN UNKNOWN LENGTH RETURNS `false`.** There is no arithmetic
+ * fallback any more — the layout depends on the leader/anchor split, so a week number alone cannot
+ * answer. Silence is the safe direction here: this path only ever OFFERS a raise, so a missed
+ * boundary costs the athlete an offer, never a wrong number.
+ *
+ * ⚠️ WEEK 0 / NEGATIVE / NON-FINITE IS `false`, NOT A MODULO ACCIDENT. `0 % 4 === 0` used to make an
+ * unknown current-week look like a boundary and offer a training-max change to an athlete who had
  * not lifted yet.
  */
-export function isCatchUpBoundary(currentWeek: number | null | undefined): boolean {
+export function isCatchUpBoundary(
+  currentWeek: number | null | undefined,
+  /** `plans.duration_weeks`. Absent → `false`. */
+  blockWeeks?: number | null,
+  /** The shape inputs the block was BUILT with, when the caller has them. */
+  inputs?: BlockShapeInputs,
+): boolean {
   const w = Number(currentWeek);
+  const total = Number(blockWeeks);
   if (!Number.isFinite(w) || w < 1) return false;
-  return Math.floor(w) % WEEKS_PER_CYCLE === 0;
+  if (!Number.isFinite(total) || total < MIN_BLOCK_WEEKS) return false;
+  const bw = blockWeekFor(Math.floor(total), Math.floor(w), inputs);
+  return !!bw && bw.kind !== 'cycle';
 }
 
 /** How a stored workout row looks to this extractor. Deliberately loose — it is DB shape, not ours. */
