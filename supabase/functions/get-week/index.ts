@@ -20,6 +20,9 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // ⛔ THE MEMBERSHIP KEY LIVES IN ITS OWN FILE so it can be unit-tested without a database — the
 // duplicate-session bug it fixes was invisible until a device showed it. See that file's header.
 import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
+// The ONE answer to "what block is this, on this date" — same function the coach payload's block
+// card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
+import { resolveBlockIdentity } from '../_shared/block-identity.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11) — shared with workout-detail and the
 // client so a logged field (resistance_level band assist, amrap, duration_seconds) can't be dropped
@@ -1291,9 +1294,49 @@ Deno.serve(async (req)=>{
                        /easy|recovery/.test(desc);
               });
               
-              // Determine focus based on session analysis
+              // ⛔ THE PHASE COMES FROM THE PLAN, NOT FROM SNIFFING ITS SESSIONS (2026-08-15).
+              //
+              // This block used to DECIDE the week's focus by regexing session names: a long ride in
+              // the week meant "Endurance Building", full stop. On Michael's screen that labelled
+              // week 3 of a STRONG FOCUS block "Week 3 · Endurance Building" while State, reading the
+              // spine, called the same week "week 3 of 12 · build". Two surfaces, one week, two
+              // different names — Constitution Law 2 (surfaces render, never re-decide), and the
+              // "doubled" disease from START-HERE.
+              //
+              // `resolveBlockIdentity` is THE one place that answers "what block is this, on this
+              // date" (block-identity.ts). It is pure — config + date in, card out — so calling it
+              // here cannot disagree with the coach payload's block card, which is built from the
+              // same function. `phaseWord` is already the plain athlete-facing word (base / build /
+              // peak / taper / recovery) via `normalizePhaseKey`, so this surface must NOT translate
+              // it — that is exactly the per-screen lookup table the accessor exists to prevent.
+              //
+              // Falls back to the old sniffed label ONLY when the plan carries no phase structure to
+              // answer with (`phaseWord` null). A null there is a real signal — this plan has no
+              // phases — not a failure, so the fallback stays descriptive rather than inventing one.
               let focus = '';
-              if (hasIntervals && hasLongRun) {
+              const phaseWordForWeek = (() => {
+                try {
+                  const startIso = String(config?.user_selected_start_date || config?.start_date || '').slice(0, 10);
+                  if (!startIso) return null;
+                  // Week keys are 1-based; the card is date-relative, so ask it on this week's Monday.
+                  const wk = parseInt(weekKey, 10);
+                  if (!Number.isFinite(wk) || wk < 1) return null;
+                  const d = new Date(`${startIso}T12:00:00Z`);
+                  d.setUTCDate(d.getUTCDate() + (wk - 1) * 7);
+                  const onDateIso = d.toISOString().slice(0, 10);
+                  return resolveBlockIdentity({
+                    planId: trainingPlanId,
+                    planName: planData?.name ?? null,
+                    planConfig: config,
+                    durationWeeks: planData?.duration_weeks ?? null,
+                    onDateIso,
+                  }).phaseWord;
+                } catch { return null; }
+              })();
+
+              if (phaseWordForWeek) {
+                focus = phaseWordForWeek.charAt(0).toUpperCase() + phaseWordForWeek.slice(1);
+              } else if (hasIntervals && hasLongRun) {
                 focus = 'Build Phase';
               } else if (hasIntervals) {
                 focus = 'Speed Development';
