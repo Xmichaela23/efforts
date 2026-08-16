@@ -23,126 +23,78 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-15 — the STRONG FOCUS block was rewritten to 5/3/1 FOREVER. Three-week cycles, standalone TM-test and 7th-week deload weeks, FSL in the leaders, the verdict moved to the rested week. **PUSHED + DEPLOYED — Forever (D-432), the slice-a freeze fix (D-422), and slice-b calibration (D-434) are all live. Only the device acceptance run remains. Banner now owned by ONE chat.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-16 — a DESIGN day. Nothing was implemented. The Strong Focus block was re-specified end to end for the concurrent athlete and the whole thing is in **`docs/WORKORDER-strong-focus-concurrent-2026-08-16.md`**. Yesterday's Forever work (D-432 / D-422 / D-434) is **pushed, and prod was verified against main today**. **Banner owned by ONE chat.**)
 
-### ALSO 2026-08-15, PARALLEL UI SESSION (do not re-litigate; device checklist = punch list "READOUT LANGUAGE" block)
-The readout design language shipped across logger/State/Home/Performance (`905dd75f`→`30d04687`):
-one colour per discipline for numbers AND labels (`readout-num`/`readout-label` off
-`--card-accent-rgb`), the header's grid texture on every data card (`.readout-texture` /
-`--spectral` / `--nova` in index.css), State cards auto-ranked by `cadenceCounts` (was
-fetched-and-never-read; swim pinned last), LOAD verdict off the discipline palette (white →
-#FF5A5F). Parity pinned by `src/lib/sport-color-parity.test.ts` (3 colour-definition sites). And
-`get-week` stopped sniffing the phase word — reads `resolveBlockIdentity`, no phase structure → NO
-label, regex ladder deleted. Final state at `7ce6f144`: the nova's sport hues moved to the card's
-BASE layer and the galaxy drifts once per app launch (`--nova-dx/dy/hue`, `src/main.tsx`).
-All browser-verified only.
+### ⛔ YOUR JOB — the terminal groundwork FIRST, then build one
+Michael is running a terminal session on the groundwork before any of the work order is built.
+Do not start §1 until those come back:
+1. **One 5K-pace resolver** (`src/lib/resolve-current-5k-pace.ts`), following
+   `resolve-current-ftp.ts` / `resolve-current-run-pace.ts`. Audited 2026-08-16: 5K pace has **no
+   owner** — eight key spellings, per-caller fallback chains in `materialize-plan:674`,
+   `course-detail:287`, `_shared/token-parser.ts:209`, `AllPlansInterface.tsx:666` and `:797`
+   (duplicated), `coach:4917`. ⚠️ `fiveK` is a race TIME, not a pace, and the fallback chain can
+   read it as one.
+2. **Trace (read-only): does anything downstream handle TWO hard endurance days?**
+   `NonRaceBuilder.tsx:1216` and `:2855` delete the other sport on switch; `:1472` collapses to
+   `qualityDays.run || qualityDays.bike`. The state shape holds both (`:572`). Unknown whether
+   `generate-strength-plan`, the composer and `week-optimizer` do. **This decides whether §1i is a
+   UI change or a pipeline change.**
+3. **Trace (read-only): does the strength intake accept a rep-set input, or only a 1RM?** (§1e).
+4. **Fix (small, standalone): the BIKE hard day never deloads.**
+   `strength-primary-plan.ts:3103-3106` pushes `bikeQualitySession(hardPin)` with no
+   `isStandalone` check while the easy rides on the same branch take one. The run branch at
+   `:2940-2946` is correct — mirror it. A bike-primary athlete currently does 4×4 VO2 intervals on
+   the deload AND the TM-test week.
 
-⚠️ **THE ONE LESSON WORTH CARRYING (it cost most of a day):** hues painted on a `mix-blend-mode:
-soft-light` overlay render almost NOTHING over a near-black card. The green/blue/gold were correct
-in the CSS for hours and invisible on screen, and every "make it stronger" pass raised alphas that
-could never show. **If a colour is in the stylesheet and not on the screen, check the blend mode
-before touching the value.** The header always worked because its hues sit on its base layer.
+Then build **§1** of the work order. **§6 (the scheduling law) and §7 (interval progression) are
+SEPARATE builds and must not be bundled into it** — Michael's call, for blast radius.
 
-### ⛔ YOUR JOB — THE DEVICE ACCEPTANCE RUN (everything is already pushed + deployed)
-Build a Strong Focus block and eyeball **weeks 1, 4, 8, 9 and 12** — the TM-test week, a leader week
-(with its FSL block), the 7th-week deload, the anchor's opening week, and the closing test week. Then
-log a session and confirm slice b: the calibration sheet applies on save and **Undo** restores. Nothing
-to deploy — Forever, the slice-a freeze fix, slice b, and `get-week` are all live (deploys this session).
+### WHAT THE WORK ORDER DECIDES — read it, do not re-derive it from scratch
+3:1 rhythm (light week after EVERY cycle) · **no opening TM-test week** · **only 8 and 12 weeks; 16
+is killed** · **the continuity/tier branch is deleted, 2 leaders : 1 anchor hardcoded** · a miss is
+the top working set of EVERY main-lift day, not one 95% set per cycle · the training max falls
+immediately mid-cycle and rises only at a boundary · **one 25–50 assistance band for the whole
+block** · jumps unchanged at 10/15 · **three lifting days always, the four-day option is deleted**
+· three accessory cards with the merged day filtered on pull and core only, push left open, pinned
+at 25 · up to two hard endurance days. §5b is the **deletion list** — what must not survive.
 
-Two decisions OWED to Michael (recorded, not urgent):
-- **Assistance bands** — the code uses the page-pinned reference (7th-week 25–50, leaders 50–75, anchors
-  75–100) over the work order's numbers. Reverting is three constants in `src/lib/assistance-menu.ts`.
-- **FSL citation** — the work order cited p.40 (Beginner Prep School); the FSL *pick* is marked as ours,
-  not Wendler's general rule.
+### ⛔ STATE, VERIFIED 2026-08-16
+- **PUSHED: YES**, everything except one docs commit (`8d2db91a`, the work order — ahead of origin
+  by 1, deliberately).
+- **DEPLOYED: YES, AND CHECKED TODAY** against `supabase functions list`. Forever `48889070`
+  deployed 56s after its commit; slice b `790cf50a` → `adapt-plan` + `rematerialize-strength-block`
+  deployed 19s after; `get-week` deployed after `90231f5a`. Slice b's new shared file
+  (`loading/calibration.ts`) is imported by **rematerialize only**, which was redeployed — **no
+  stranded importers.** The `_shared` trap did not bite.
+- **VERIFIED ON A DEVICE: NO.** ⚠️ And the acceptance run named in yesterday's banner is now partly
+  moot — §1 reshapes the block again (no opening test, light week after every cycle). **Do not
+  spend a device run on a shape that is about to change.**
+- **Suite baseline, run 2026-08-16: 3637 passed / 6 failed.** Same six as yesterday, +43 new
+  passing. ⛔ **THREE OF THE SIX ARE STRENGTH AND ARE IN THE BLAST RADIUS** —
+  `non-race-goal-seeds.test.ts:116` and `:141` (both fail because `preferred_days.strength` returns
+  `undefined` where they expect a day list; `:141` expects the **four-day arc**, the shape §1f-0
+  deletes) and `club-anchor.test.ts:89`. **Likely stale tests from when the optimizer became sole
+  placement authority — a hypothesis, not a finding.** The other three
+  (`d031-convergence-e2e` ×3) are in the combined-plan generator and unrelated.
 
-⛔ **COORDINATION LESSON (why this banner lied for a day):** two sessions shared this working tree with
-no handoff — one blanket-`git add` swept the other's in-progress files into a commit and shipped them,
-and each session rewrote this banner without knowing the other's state. Fix in force now: **ONE chat
-owns the banner and the folder at a time.** Do not run parallel sessions in `~/efforts`.
+### ⛔ CORRECTIONS TO YESTERDAY'S BANNER (it was wrong within a day — read this before trusting it elsewhere)
+- It said the assistance bands ran **7th-week 25–50, leaders 50, anchors 75 with a 75 clamp**. The
+  clamp was **removed the same day** (`src/lib/assistance-menu.ts:133`) and the shipped bands are
+  leader 50–75, anchor 75–100. §1g replaces all of it with **one 25–50 band** anyway.
+- Its "two decisions OWED to Michael" are both **answered** — the bands (§1g) and the FSL citation
+  (kept as ours).
 
-### WHAT CHANGED — D-432 in `DECISIONS-LOG-3.md` carries the full why. Do NOT re-litigate it.
-The 12-week block is now `TM test(1) · Leader(2-4) · Leader(5-7) · 7th-week deload(8) · Anchor(9-11) · TM test(12)`.
-- **`WEEKS_PER_CYCLE` is 3**, not 4. The deload row left `PCT_BY_WEEK`; the light weeks are their own
-  shapes (`tmTestSets`, `deloadSingleSets` in `loading/wendler-531.ts`). ⛔ **A standalone week belongs
-  to NO cycle** — `cycleForWeek` returns null for one. Anything that groups logged work by cycle has
-  to handle that, and two callers were fixed for it (`rematerialize-strength-block`,
-  `create-goal-and-materialize-plan`).
-- **Assistance and jumps scale UP into the anchor**, not down (Forever p.18). It ran backwards.
-  Light weeks 25 per slot, leaders 50, anchors 75 — jumps 2×5 on the light weeks and leaders, 3×5
-  on the anchor.
-  ⚠️ **THOSE BANDS DEVIATE FROM THE WORK ORDER, DELIBERATELY.** The work order said leaders 25–50 and
-  anchors 50–100; `docs/REFERENCE-531-forever-pp16-45.md` — the page-pinned transcription the work
-  order was itself derived from — reads **p.24's base as 50–100** and **p.23's 25–50 as the SEVENTH
-  WEEK's number**. The primary won. Same class of correction on the FSL citation: the work order cited
-  p.40, which is **Beginner Prep School** and explicitly not a general rule, so the FSL *pick* is
-  marked as ours. Both are flagged in code and in D-432. **If Michael wants the work order's numbers
-  instead, it is three constants in `src/lib/assistance-menu.ts` and nothing else moves.**
-- **The verdict moved to the rested weeks.** `verdictFromTmTestSet` — 5+ advances, 3-4 holds, ≤2
-  recalibrates the training max off that set. Week 12 is the block-to-block gate, which pays
-  `SPEC-get-stronger.md` §1b's outstanding debt. `prior_training_max` now travels
-  create-goal → generate-strength-plan → composer (the composer field existed and was starved).
-- **FSL 5×5 on leader weeks only.** Same lift, week's own opening percentage, `load_prescribed: true`,
-  `supplemental: true`, carried through `materialize-plan`'s whitelist.
-- **3-day pairing is deadlift + press** (his p.22), so the shared day is a heavy LOWER day now.
-- **Valid block lengths are no longer multiples of four.** 4, 5, 8, 9, 11, 12, 14, 15, 18… `blockWeeks`
-  snaps down to a length the layout fills exactly. 12 and 16 both land exactly.
-
-### ⛔ STATE — READ THIS BEFORE TELLING MICHAEL ANYTHING
-- **PUSHED: YES.** Forever `48889070` + slice-a freeze fix `bf4aaa61` (D-422) + slice-b calibration
-  `790cf50a` (D-434), all on main.
-- **DEPLOYED: YES (this session).** All strength functions (`generate-strength-plan`,
-  `create-goal-and-materialize-plan`, `materialize-plan`, `rematerialize-strength-block`, `coach`,
-  `adapt-plan`) plus `get-week` are live carrying the Forever + slice-a + slice-b bundle.
-- **VERIFIED: NO.** Not yet seen on a device. The device acceptance run above is the only open item.
-- **Suite:** full deno run **3594 passed / 6 failed**, and those 6 fail identically on a clean tree
-  (`d031-convergence-e2e` ×3, `non-race-goal-seeds` ×2, `club-anchor` ×1). Type errors unchanged
-  (50 pre-existing in create-goal, 2 in the materialize chain). Lint +45 `no-explicit-any` in new
-  test files, against a 6383 baseline of the same rule.
-
-### WHEN YOU DEPLOY — the `_shared` trap applies, `strength-primary-plan.ts` is a shared file
-**Every function that TRANSITIVELY imports a touched file** — computed, not guessed. `plan-phase.ts`
-and `strength-profiles.ts` are widely imported, which is why the list is this wide:
-```
-supabase functions deploy \
-  generate-strength-plan create-goal-and-materialize-plan materialize-plan \
-  rematerialize-strength-block adapt-plan coach workout-detail \
-  analyze-cycling-workout analyze-running-workout analyze-strength-workout \
-  arc-setup-chat course-detail course-strategy delete-plan \
-  generate-combined-plan generate-triathlon-plan get-arc-context \
-  import-strava-history learn-fitness-profile planning-context \
-  refresh-goal-race-projections strava-webhook \
-  --project-ref yyriamwvtvzlkumqrvpm
-```
-⚠️ **`adapt-plan` IS NOT OPTIONAL — `isCatchUpBoundary` CHANGED SIGNATURE.** It takes the block length
-now and returns `false` without one, so a stale `adapt-plan` bundle calling the new shared code would
-silently stop offering the AMRAP catch-up. Same class for `workout-detail` and `coach`, which read
-`block-identity.ts`.
-
-⚠️ **AND THE CLIENT SHIPS TOO.** `src/lib/assistance-menu.ts` and `src/lib/strength-focus-copy.ts`
-changed, so the Netlify build and an iOS sync are part of the same shipment, not a follow-up.
-
-### ⚠️ UNVERIFIED, AND WHAT WOULD SETTLE EACH
-- **The logger renders two rows named for the same lift on a leader week** — the main block and its
-  FSL block, told apart only by a `notes: 'First Set Last'` label. The planned↔executed matcher is
-  safe (traced: `match-exercises.ts` consumes an executed row once, so two planned rows take the two
-  logged ones in order). **The SCREEN has not been looked at.** A generated leader week on a phone
-  settles it.
-- **The TM-test week's AMRAP badge.** `all-out-set.ts` keys off the `amrap` flag and the test set
-  carries it, so the read is right by construction — but no human has seen the badge on that week.
-- **A block built BEFORE today keeps its old 40/50/60 deload.** `rematerialize-strength-block`
-  deliberately skips a legacy deload rather than rewriting it as a Forever 7th week. Michael's live
-  block is one of those. Deliberate, in D-432; check it still reads sensibly on his calendar.
-
-### ⛔ WHAT IS A HYPOTHESIS, NOT A FINDING
-- That the 8-week and 16-week blocks are right *for an athlete*. They are pinned to the work order's
-  §0 arithmetic and the fixtures pass; **nobody has trained one.**
-- That 75 (not his 100) is the right anchor assistance ceiling for a concurrent athlete. It is a
-  reasoned product call, stated as ours in the code and in D-432, with his number named beside it.
+### ⛔ COORDINATION — STILL IN FORCE
+**ONE chat owns this banner and the `~/efforts` working tree at a time.** Two parallel sessions on
+2026-08-15 produced a blanket `git add` that swept the other's in-progress files into a commit, and
+each rewrote this banner without knowing the other's state. The tree is **clean** as of
+2026-08-16 — keep it that way before handing it to a terminal session.
 
 ### SCAFFOLDING
-`docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` is **still on disk** — delete it on
-ship, per the spec lifecycle. `docs/SPEC-get-stronger.md` now holds only §2's opt-in quality session
-as unbuilt; delete it when that lands.
+`docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` (yesterday's) and
+`docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` (today's) are **both on disk** — each dies
+on ship, folded into a `D-NNN`, per the spec lifecycle. `docs/SPEC-get-stronger.md` holds only §2's
+opt-in quality session as unbuilt.
 
 ---
 
