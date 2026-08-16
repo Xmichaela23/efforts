@@ -1498,7 +1498,7 @@ export default function StateTab({
           colours inside them are data (bars, legend chips), never the card's own chrome. The
           per-discipline plates live in <StatePerformanceSection>, where a card belongs to one
           sport and may wear it. */}
-      <div className="galaxy-card rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+      <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* LOAD — full-width gauge + sparkline */}
         <LoadBar load={load} loadStatus={loadStatus} weekIntent={week.intent} />
@@ -1702,7 +1702,7 @@ export default function StateTab({
           sport-keyed plate inside the section. */}
       <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} />
 
-      <div className="mt-2 galaxy-card rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+      <div className="mt-2 galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

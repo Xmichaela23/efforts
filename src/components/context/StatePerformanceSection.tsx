@@ -631,7 +631,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                  Star field shifts per lift so the stack doesn't tile. */
               <div
                 key={l.canonical}
-                className="galaxy-card basis-full rounded-xl border border-strength/20 px-2.5 pt-2 pb-1.5 flex flex-wrap gap-x-3 gap-y-1"
+                className="galaxy-card readout-texture basis-full rounded-xl border border-strength/20 px-2.5 pt-2 pb-1.5 flex flex-wrap gap-x-3 gap-y-1"
                 style={{
                   ['--card-accent-rgb' as any]: '255,140,66',
                   ['--card-accent-a' as any]: '0.16',
@@ -1560,7 +1560,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
           // card belongs to exactly one discipline, so it is the one place the plate takes a
           // colour. Everything multi-sport above and below sits on the neutral plate in StateTab.
           return (
-            <div key={card.discipline} className="galaxy-card rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb(card.discipline), { galaxy: true })}>
+            <div key={card.discipline} className="galaxy-card readout-texture rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb(card.discipline), { galaxy: true })}>
               {inner}
             </div>
           );
@@ -1589,7 +1589,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       {/* defensive: if there's no strength trend card at all, still surface the per-lift detail —
           on the strength plate, since the detail is single-discipline content */}
       {strengthDetail && !cards.some((c) => c.discipline === 'strength') && (
-        <div className="galaxy-card rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb('strength'), { galaxy: true })}>
+        <div className="galaxy-card readout-texture rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb('strength'), { galaxy: true })}>
           {strengthDetail}
         </div>
       )}

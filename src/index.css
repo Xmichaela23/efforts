@@ -274,7 +274,7 @@
     background-image:
       radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.06) 0%, transparent 60%),
       radial-gradient(ellipse at 48% 8%, rgba(183, 148, 246, 0.11) 0%, transparent 60%),
-      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.20) 0%, transparent 60%),
       radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.08) 0%, transparent 62%),
       radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.06) 0%, transparent 64%),
       /* micro grid (subtle, but should be visible) */
@@ -465,7 +465,7 @@
     background-image:
       /* balanced spectral wash (match instrument cards) */
       radial-gradient(ellipse at 14% 18%, rgba(255, 215, 0, 0.06) 0%, transparent 62%),
-      radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.10) 0%, transparent 62%),
+      radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.18) 0%, transparent 62%),
       radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.12) 0%, transparent 62%),
       radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.07) 0%, transparent 64%),
       radial-gradient(ellipse at 32% 36%, rgba(239, 68, 68, 0.04) 0%, transparent 66%),
@@ -1029,11 +1029,96 @@ body.wizard-active { --tabbar-h: 0px; }
     radial-gradient(1.4px 1.4px at calc(88% - var(--card-star-x, 0%)) 46%, rgba(255,245,220,0.5), transparent),
     radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
 }
+/* ⛔ THE TEXTURE IS THE "THIS IS DATA" CUE (2026-08-15, Michael: "it's a cue that it's data").
+   The grain alone was atmosphere; the READOUT card in the workout Details tab reads as an
+   instrument because it carries the console's grid — dot matrix + micro grid + diamond grid, the
+   same three layers as `.mobile-header::before` (the top bar). Any card holding DATA wears it;
+   plain prose cards do not, which is what makes it a cue rather than decoration.
+   Layered into the existing grain pass so a card still uses exactly two pseudo-elements. */
 .galaxy-card::after {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   border-radius: inherit;
   opacity: 0.10; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.readout-texture { position: relative; isolation: isolate; }
+.readout-texture::after {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.95; mix-blend-mode: soft-light;
+  background-image:
+    /* very light dot-matrix (keeps "print" without shouting) */
+    radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
+    /* micro grid */
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),
+    /* diamond grid (match console language) */
+    linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255,255,255,0.16) 1px, transparent 1px);
+  background-size: 14px 14px, 9px 9px, 9px 9px, 22px 22px, 22px 22px;
+  filter: blur(0.16px) saturate(1.10) contrast(1.02);
+}
+/* SPECTRAL — for a card whose data spans EVERY discipline (State's LOAD + planned-vs-actual, the
+   Home load rows). One sport's colour would be a lie there, so it takes the top bar's own multi-hue
+   wash instead: the same five tints, in the same positions, as `.mobile-header::before`. */
+/* NOVA — the spectral wash anchored to the BOTTOM edge, light rising up (2026-08-15, Michael:
+   "light from the bottom up so the schedule looks like it's in the nova"). Same five hues as the
+   header, mirrored low, so the card reads as the glow the screen above is sitting in.
+   ⚠️ The base `.galaxy-card::before` paints ITS accent light from the TOP edge — on the first pass
+   that top light stayed on and drowned the bottom hues, so the card still read top-lit. A nova
+   card flips the base light to the bottom too. */
+.readout-texture--nova.galaxy-card::before {
+  background-image:
+    radial-gradient(135% 105% at 50% 110%, rgba(var(--card-accent-rgb, 255,140,66), var(--card-accent-a, 0.30)), transparent 66%),
+    radial-gradient(82% 54% at 8% 100%, rgba(255,188,84,0.12), transparent 60%),
+    radial-gradient(76% 58% at 97% 80%, rgba(138,104,230,0.17), transparent 60%),
+    radial-gradient(80% 60% at 50% -18%, rgba(56,112,206,0.10), transparent 62%),
+    radial-gradient(44% 34% at 85% 10%, rgba(232,78,156,0.06), transparent 64%),
+    radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.5), transparent),
+    radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.4px 1.4px at calc(88% - var(--card-star-x, 0%)) 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(ellipse at center, #14132b 0%, #0d0c20 58%, #060512 100%);
+}
+.readout-texture--nova::after {
+  background-image:
+    /* Hues placed for CONTRAST with the words that land on them (2026-08-15, Michael: "the words
+       land on areas with colors that make them pop, not blend"): Run gold + Strength orange sit
+       bottom-left, so the smoke there is cool blue/purple; Bike green sits mid-right on warm
+       orange; teal "balanced" top-right gets gold; the green patch lives top-left under the white
+       LOAD label, where nothing fights it. */
+    radial-gradient(ellipse at 12% 92%, rgba(74, 158, 255, 0.28) 0%, transparent 60%),
+    radial-gradient(ellipse at 30% 74%, rgba(183, 148, 246, 0.26) 0%, transparent 62%),
+    radial-gradient(ellipse at 60% 100%, rgba(255, 140, 66, 0.24) 0%, transparent 62%),
+    radial-gradient(ellipse at 92% 30%, rgba(255, 215, 0, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse at 8% 10%, rgba(80, 200, 120, 0.14) 0%, transparent 58%),
+    radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),
+    linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255,255,255,0.16) 1px, transparent 1px);
+  background-size: cover, cover, cover, cover, cover, 14px 14px, 9px 9px, 9px 9px, 22px 22px, 22px 22px;
+  background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light, soft-light;
+  opacity: 1;
+  filter: blur(0.16px) saturate(1.10) contrast(1.02);
+}
+.readout-texture--spectral::after {
+  background-image:
+    radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.10) 0%, transparent 62%),
+    radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.12) 0%, transparent 62%),
+    radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.16) 0%, transparent 64%),
+    radial-gradient(ellipse at 30% 40%, rgba(255, 140, 66, 0.16) 0%, transparent 64%),
+    radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),
+    linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255,255,255,0.16) 1px, transparent 1px);
+  background-size: cover, cover, cover, cover, cover, 14px 14px, 9px 9px, 9px 9px, 22px 22px, 22px 22px;
+  background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light, soft-light;
+  opacity: 0.94;
+  filter: blur(0.16px) saturate(1.10) contrast(1.02);
 }
 
 /* READOUT typography (2026-08-15, Michael: "need to feel readout more") — the two text treatments
@@ -1050,16 +1135,26 @@ body.wizard-active { --tabbar-h: 0px; }
    ⚠️ The fallback is the app's off-white (236,233,227 — the wizard's UNIVERSAL_RGB), NEVER pure
    white. A white accent makes both rules invisible: a white label on a dark plate is just the old
    white label, and a white glow behind white numerals renders nothing at all. */
+/* Label and value are the SAME colour at the SAME brightness (2026-08-15, Michael: "Run, Strength
+   and Bike same brightness as the number"). The earlier stepped-down label read as a second,
+   dimmer colour and broke the one-colour-per-discipline read. */
 .readout-label {
-  color: rgba(var(--card-accent-rgb, 236, 233, 227), 0.80) !important;
+  color: rgb(var(--card-accent-rgb, 236, 233, 227)) !important;
   letter-spacing: 0.08em;
 }
+/* ⛔ THE NUMBER IS THE DISCIPLINE'S COLOUR — NOT WHITE WITH A COLOURED HALO (2026-08-15).
+   First cut painted every value white and only glowed it in the accent. On screen that read as
+   "white numbers everywhere", which is exactly what it was: a run distance and a strength volume
+   were the same colour, and the label beside each was the only thing carrying the sport. Michael,
+   after a day of it: "these numbers need to be the same color as they are on the home screen —
+   there is one color for each."
+   One colour per discipline, on every surface that uses this class, so Home / State / the workout
+   Performance tab cannot disagree about what colour a run number is. */
 .readout-num {
-  color: rgba(255, 255, 255, 0.96) !important;
+  color: rgb(var(--card-accent-rgb, 236, 233, 227)) !important;
   text-shadow:
-    0 0 22px rgba(var(--card-accent-rgb, 236, 233, 227), 0.30),
-    0 0 8px rgba(var(--card-accent-rgb, 236, 233, 227), 0.28),
-    0 0 2px rgba(var(--card-accent-rgb, 236, 233, 227), 0.40);
+    0 0 20px rgba(var(--card-accent-rgb, 236, 233, 227), 0.35),
+    0 0 6px rgba(var(--card-accent-rgb, 236, 233, 227), 0.25);
   font-variant-numeric: tabular-nums lining-nums;
 }
 

@@ -1516,18 +1516,29 @@ export default function WorkoutCalendar({
             metrics.push({ label: 'Strength:', value: `${totalVol.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`, type: 'strength' });
 
           return (
-            <div className="pt-3 pb-4 border-t border-white/10 space-y-2">
+            // ⛔ ONE textured card holding LOAD *and* the week totals — the totals were sitting on
+            // bare black below a textured LoadBar, which is what kept reading as "no texture"
+            // (Michael 2026-08-15, third showing). The spectral grid wraps the whole data block.
+            <div className="galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] mt-3 mb-4 pb-3 space-y-2">
               {wsv && (
-                <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
-                  <LoadBar load={wsv.load} loadStatus={loadStatus} weekIntent={wsv?.week?.intent} compact />
-                </div>
+                <LoadBar load={wsv.load} loadStatus={loadStatus} weekIntent={wsv?.week?.intent} compact />
               )}
               {metrics.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 px-1">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 px-4">
+                  {/* READOUT TREATMENT, PER SPORT (2026-08-15). Each metric sets its own accent, so
+                      the label tints and the NUMBER glows in that sport's colour — the numbers were
+                      flat white while only the labels carried colour, which read as a legend rather
+                      than as instrument readouts. Same `readout-label`/`readout-num` pair State and
+                      the workout Performance tab use, so the week totals here and the discipline
+                      rows on State are one treatment. */}
                   {metrics.map((m, i) => (
-                    <div key={i} className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-light leading-tight" style={{ color: getDisciplinePhosphorCore(m.type), fontSize: '0.82rem' }}>{m.label}</span>
-                      <span className="font-light tabular-nums leading-tight truncate" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.82rem' }}>{m.value}</span>
+                    <div
+                      key={i}
+                      className="flex items-center gap-1.5 min-w-0"
+                      style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(m.type) }}
+                    >
+                      <span className="readout-label font-light leading-tight" style={{ fontSize: '0.82rem' }}>{m.label}</span>
+                      <span className="readout-num font-light leading-tight truncate" style={{ fontSize: '0.82rem' }}>{m.value}</span>
                     </div>
                   ))}
                 </div>
