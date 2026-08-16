@@ -49,7 +49,22 @@ import {
   groupSessionsByCycle,
   verdictsForBlock,
 } from '../shared/strength-system/loading/cycle-verdicts.ts';
+// ⛔ SLICE b — the calibration record. This module decides no loading; it records what moved and is
+// the ONLY thing that can make an undo stick. Read its header before touching the undo path.
+import {
+  type LiftCalibrationInput,
+  type StrengthCalibrationEvent,
+  calibrationEventsFor,
+  suppressUndone,
+  undoLatestCalibration,
+} from '../shared/strength-system/loading/calibration.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
+
+/**
+ * ⛔ ONE CLOCK, AND IT IS NOT IN THE PURE MODULES. `calibration.ts` takes an ISO string rather than
+ * reading a clock, so it stays replayable in fixtures; this is where the real time enters.
+ */
+const nowIso = () => new Date().toISOString();
 
 /** The four main lifts, by the key their working number is stored under and the name they carry. */
 const LIFTS = [
@@ -123,6 +138,12 @@ Deno.serve(async (req) => {
     const p = await req.json().catch(() => ({}));
     const apply = p?.apply === true;
     const asOf = String(p?.as_of ?? '').slice(0, 10) || null;
+    // ⛔ SLICE b — THE UNDO. `undo_lift` is a `training_max` key ('squat', 'overheadPress', …). It
+    // marks that lift's most recent un-undone calibration event as undone and then re-applies, which
+    // now suppresses the step. ⚠️ IT IS A WRITE, so it implies `apply` — an undo that only computed a
+    // diff would leave the athlete's tap doing nothing.
+    const undoLift = typeof p?.undo_lift === 'string' ? String(p.undo_lift) : null;
+    const willWrite = apply || !!undoLift;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -146,12 +167,33 @@ Deno.serve(async (req) => {
     // ⛔ THE STORED WORKING NUMBERS, never recomputed from `performance_numbers`. The composer's own
     // note: recomputing would let the write-back drag them and the controlled progression would be gone.
     const baseWn = (config?.training_max ?? {}) as Record<string, number>;
+    // ⛔ THE CALIBRATION LOG — D-421's surviving wire, repopulated by slice b off the reset/bump
+    // events instead of the retired ceiling pin. It is BOTH the announcement history and the
+    // suppression record: an event with `undone_at` set means the athlete declined that step, and it
+    // has to keep meaning that on every future recompute (see `suppressUndone`).
+    const priorEvents: StrengthCalibrationEvent[] = Array.isArray(config?.strength_calibration)
+      ? (config.strength_calibration as StrengthCalibrationEvent[])
+      : [];
+    // ⚠️ THE UNDO IS RESOLVED BEFORE ANY NUMBER IS COMPUTED, so this run already sees the suppression
+    // it just created. Marking it afterwards would write the change and reverse it on the NEXT save.
+    const undoResult = undoLift ? undoLatestCalibration(priorEvents, undoLift as never, nowIso()) : null;
+    const events: StrengthCalibrationEvent[] = undoResult ? undoResult.events : priorEvents;
     // ⛔ `one_rep_maxes_at_build` IS NO LONGER READ HERE — 2026-08-12, slice a. It existed only to
     // feed the 90%-of-1RM ceiling, which is deleted. It is still WRITTEN at build time and is still
     // the number a calibration offer would replace, so nothing about the stored config changes.
 
     const today = asOf ?? new Date().toISOString().slice(0, 10);
     const currentWeek = resolvePlanWeekIndex(config, today, weeks) ?? 1;
+    // ⛔ THE CYCLE THE ATHLETE IS IN — returned to the client (slice b) so no surface has to re-derive
+    // it from the phase structure. A second derivation is how two screens start naming different
+    // cycles for the same week. ⚠️ A standalone week (TM test / 7th-week deload) belongs to NO cycle,
+    // so this reports the cycle it FOLLOWS, which is the one the lift's number is still running on.
+    const currentCycle = (() => {
+      const shape = weekShapeFromStored(config, currentWeek);
+      if (shape) return shape.cycleIndex;
+      const c = cycles.find((x) => currentWeek >= x.startWeek && currentWeek <= x.endWeek);
+      return c?.index ?? 1;
+    })();
 
     // ── WHAT WAS LOGGED ──────────────────────────────────────────────────────
     const { data: plannedRows } = await supabase
@@ -185,17 +227,24 @@ Deno.serve(async (req) => {
       const verdicts = verdictsForBlock(cycles, grouped, lift.name, currentWeek) as WorkingNumberVerdict[];
       const base = Number(baseWn[lift.ref]) || 0;
       if (!(base > 0)) continue;
-      const byCycle = cycles.map((c) => ({
-        cycle: c.index,
-        kind: c.kind,
+      const walked = cycles.map((c) => workingNumberForCycles(base, c.index, lift.lower, verdicts, {
         // ⛔ NO `oneRM` AS OF 2026-08-12 (slice a) — the 90%-of-1RM ceiling is deleted. The brake on
         // this path is the confirmed stall: one missed 95% set HOLDS the weight, a second consecutive
         // one drops it 10% (`STALL_CONFIRM_SESSIONS`, Wendler p31/p33).
-        workingNumber: workingNumberForCycles(base, c.index, lift.lower, verdicts, {
-          unknownMeans: 'hold',
-        }).workingNumber,
+        unknownMeans: 'hold',
       }));
-      perLift[lift.ref] = { name: lift.name, verdicts, byCycle };
+      const byCycle = cycles.map((c, i) => ({
+        cycle: c.index,
+        kind: c.kind,
+        // ⛔ SLICE b — THE ATHLETE'S UNDO WINS OVER THE ENGINE'S ARITHMETIC, and this is the one line
+        // that makes it stick. The walk is pure, so it reaches the same number on every recompute
+        // forever; without this, an undo would be silently reverted by the next save.
+        workingNumber: suppressUndone(lift.ref as never, c.index, walked[i].workingNumber, events),
+      }));
+      // ⚠️ `resetAtCycle` IS SLICE a's OWN OUTPUT and is what tells a `reset` apart from a `bump`. It
+      // was exposed for exactly this and consumed by nothing until now.
+      const resetAtCycle = walked[walked.length - 1]?.resetAtCycle ?? null;
+      perLift[lift.ref] = { name: lift.name, verdicts, byCycle, resetAtCycle };
     }
 
     // ── THE DIFF, ON WEEKS THAT HAVE NOT STARTED ─────────────────────────────
@@ -261,7 +310,7 @@ Deno.serve(async (req) => {
         if (topOld === topNew) return ex;
         touched = true;
         changes.push({
-          week: wk, cycle: cyc.index, lift: lift.name,
+          week: wk, cycle: cyc.index, lift: lift.name, ref: lift.ref,
           from_top_set: topOld, to_top_set: topNew,
           date: String(row?.date ?? '').slice(0, 10),
         });
@@ -270,12 +319,41 @@ Deno.serve(async (req) => {
       if (touched) rowUpdates.push({ id: String(row.id), strength_exercises: next });
     }
 
-    if (!apply) {
-      return json({ success: true, applied: false, current_week: currentWeek, per_lift: perLift, changes });
+    // ── THE CALIBRATION EVENTS THIS RECOMPUTE PRODUCES ───────────────────────
+    //
+    // ⛔ DERIVED FROM THE ROW DIFF, NOT FROM THE VERDICTS. A verdict fires every cycle — `advance` is
+    // the default (p30) — so announcing one per verdict would make the notice furniture. What is
+    // worth telling the athlete is that the weights AHEAD OF THEM are not the weights they saw
+    // yesterday, which is exactly what `changes` already measures.
+    const changedCyclesByRef = new Map<string, Set<number>>();
+    for (const c of changes) {
+      const ref = String((c as any).ref ?? '');
+      if (!ref) continue;
+      if (!changedCyclesByRef.has(ref)) changedCyclesByRef.set(ref, new Set());
+      changedCyclesByRef.get(ref)!.add(Number((c as any).cycle));
+    }
+    const calibrationInputs: LiftCalibrationInput[] = LIFTS
+      .filter((l) => perLift[l.ref])
+      .map((l) => ({
+        ref: l.ref as never,
+        name: l.name,
+        byCycle: perLift[l.ref].byCycle,
+        resetAtCycle: perLift[l.ref].resetAtCycle ?? null,
+        changedCycles: [...(changedCyclesByRef.get(l.ref) ?? [])],
+      }));
+    const newEvents = calibrationEventsFor(calibrationInputs, cycles.length, nowIso());
+
+    if (!willWrite) {
+      // ⚠️ A DRY RUN STILL REPORTS THE EVENTS IT WOULD RECORD, so a caller can decide whether the
+      // change is worth announcing before it commits to writing anything.
+      return json({
+        success: true, applied: false, current_week: currentWeek, current_cycle: currentCycle,
+        per_lift: perLift, changes, events: newEvents, calibration: events,
+      });
     }
 
-    // ⚠️ THE ATHLETE TAPPED. Row by row, so a failure part-way leaves the rest of the block intact
-    // rather than half-rewritten under a single failed transaction we do not have.
+    // ⚠️ THE WRITE. Row by row, so a failure part-way leaves the rest of the block intact rather than
+    // half-rewritten under a single failed transaction we do not have.
     let written = 0;
     for (const u of rowUpdates) {
       const { error } = await supabase
@@ -285,8 +363,35 @@ Deno.serve(async (req) => {
         .eq('user_id', userId);
       if (!error) written += 1;
     }
-    console.log(`[rematerialize] plan=${plan.id} week=${currentWeek} rows=${written}/${rowUpdates.length} changes=${changes.length}`);
-    return json({ success: true, applied: true, rows_written: written, current_week: currentWeek, per_lift: perLift, changes });
+
+    // ⛔ THE LOG IS WRITTEN EVEN WHEN NO ROW MOVED, because an UNDO is exactly that case: the
+    // suppression already cancelled the step, so there is nothing left to rewrite — and the
+    // `undone_at` stamp is the only durable record that the athlete declined it.
+    const nextCalibration = [...events, ...newEvents];
+    const changedLog = !!undoResult || newEvents.length > 0;
+    if (changedLog) {
+      const { error: cfgErr } = await supabase
+        .from('plans')
+        .update({ config: { ...config, strength_calibration: nextCalibration } })
+        .eq('id', plan.id)
+        .eq('user_id', userId);
+      // ⚠️ A FAILED LOG WRITE IS LOUD BUT NOT FATAL — the prescriptions are already correct on the
+      // calendar. What is lost is the undo affordance, and saying so beats failing the whole call.
+      if (cfgErr) console.warn(`[rematerialize] calibration log not written: ${cfgErr.message}`);
+    }
+
+    console.log(
+      `[rematerialize] plan=${plan.id} week=${currentWeek} rows=${written}/${rowUpdates.length} ` +
+      `changes=${changes.length} events=${newEvents.length}${undoLift ? ` undo=${undoLift}` : ''}`,
+    );
+    return json({
+      success: true, applied: true, rows_written: written,
+      current_week: currentWeek, current_cycle: currentCycle,
+      per_lift: perLift, changes,
+      events: newEvents,
+      calibration: nextCalibration,
+      undone: undoResult?.undone ?? null,
+    });
   } catch (e: any) {
     return json({ success: false, reason: 'error', details: e?.message ?? String(e) }, 500);
   }

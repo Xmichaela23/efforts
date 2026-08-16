@@ -18,6 +18,11 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
 import ReadoutTiles from '@/components/context/ReadoutTiles';
 // [Step 7] Shared with the server emitter — see tracked-max-lifts.ts.
 import { isTrackedMaxLift } from '@/lib/tracked-max-lifts';
+// ⛔ SLICE b — the calibration signal. `useStrengthCalibration` is the ONE reader; State and
+// Performance both render `StrengthCalibrationNotice` off it and both route to the same undo.
+import { useStrengthCalibration, type StrengthCalibrationRead } from '@/hooks/useStrengthCalibration';
+import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
+import { liftStatusLine } from '@/lib/strength-calibration-copy';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
@@ -549,10 +554,32 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // (`src/lib/tracked-max-lifts.ts`), which is also what gates the series being emitted at all. One
 // membership test, both ends — so a name can never be drawn without being filled, or filled without
 // being drawn. See that module for why this is four while the coaching gate is sixteen.
-function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: StrengthFitness; fatigue?: boolean; planWeek?: number | null; block?: BlockCard | null }) {
+/**
+ * ⛔ THE SPINE'S CANONICAL NAME → THE `training_max` KEY (slice b). Two vocabularies for the same four
+ * lifts, and this is the one place they meet — the same shape `ONE_RM_KEY_FOR_REF` uses in the
+ * composer, and for the same reason: indexing one with the other silently returns nothing, and
+ * "nothing" is a legitimate output here, so the miss would be invisible.
+ *
+ * ⚠️ `trap_bar_deadlift` MAPS TO `deadlift`. The spine tracks it as its own lift (a real distinction
+ * for an e1RM series) and the block prescribes one deadlift training max. A trap-bar puller whose
+ * number reset must see it said.
+ */
+const CALIBRATION_REF_BY_CANONICAL: Record<string, string> = {
+  squat: 'squat',
+  bench_press: 'bench',
+  deadlift: 'deadlift',
+  trap_bar_deadlift: 'deadlift',
+  overhead_press: 'overheadPress',
+};
+
+function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: { fitness: StrengthFitness; fatigue?: boolean; planWeek?: number | null; block?: BlockCard | null; calibration?: StrengthCalibrationRead }) {
   // Main lifts with a real e1RM number; primaries lead (squat/bench/deadlift/press — the field's "main lifts").
   const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
   const blockLine = blockContextLine(planWeek, block);
+  // ⛔ SLICE b — the ambient per-lift state, by `training_max` key. Absent for any lift the current
+  // block does not prescribe (an accessory, or a lift on a plan that is not a strength block), and
+  // absent renders nothing rather than guessing at a status.
+  const calByRef = new Map((calibration?.byLift ?? []).map((c) => [c.ref, c]));
   // ⛔ THE PER-LIFT DIRECTION IS GONE, AND ITS ABSENCE IS THE FIX (D2, 2026-08-01).
   //
   // This row used to print a direction chip per lift — "↓ −4%", "→ flat", "new" — off the 6-week
@@ -622,6 +649,30 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block }: { fitness: St
                   {isPR(l) && <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">PR</span>}
                   {l.provisional && <span className="text-white/40 text-[10px]">provisional</span>}
                 </span>
+                {/* ⛔ THE AMBIENT STATUS — SLICE b, AND IT IS ALWAYS ON. climbing · holding · reset,
+                    with the training max it refers to.
+
+                    ⛔ THIS IS THE THING THE DELETED CEILING NEVER GAVE ANYBODY, and slice b names it
+                    as the original bug: *"a number that silently stopped moving with nothing on
+                    screen."* An event that confirms what the row already showed is information; an
+                    event that arrives from nowhere is an alarm.
+
+                    ⚠️ `holding` IS NOT `reset`. p33 — a missed session holds the weight and costs
+                    nothing, the free re-try. A row calling that "reset" would report a penalty the
+                    engine did not apply. The two words are kept apart in `CALIBRATION_STATUS_LABEL`.
+
+                    ⚠️ THE NUMBER IS THE TRAINING MAX, and the label says so — it and the day's top
+                    set differ by the week's percentage, and an athlete comparing the two would
+                    otherwise find two numbers for one lift with nothing telling them which is which. */}
+                {(() => {
+                  const cal = calByRef.get(CALIBRATION_REF_BY_CANONICAL[l.canonical] ?? '');
+                  if (!cal) return null;
+                  return (
+                    <span className="basis-full text-white/45 text-[11px] -mt-0.5">
+                      {liftStatusLine(l.displayName, cal.status, cal.trainingMax)}
+                    </span>
+                  );
+                })()}
                 {/* READOUT TILES (2026-08-15) — the lift's three numbers as value-over-label, the
                     Details-tab shape. They were three label/value LINES; the facts are identical.
                     ⛔ THE RECORD (D-420 pillar 1) keeps its rule: "best" is the best estimated max
@@ -1401,6 +1452,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
+  // ⛔ SLICE b — ONE READ, and it must sit ABOVE the early return or the hook order changes between
+  // renders. It self-silences on any plan that is not a strength block (`not_a_strength_block`), so
+  // calling it unconditionally costs one function invoke and buys a stable hook list.
+  const calibration = useStrengthCalibration(true);
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -1487,7 +1542,16 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} postureSentence={card.postureSentence} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
-            if (card.discipline === 'strength' && strengthHasSubstance) return <><StrengthFitnessRow fitness={strengthFitness!} fatigue={strengthFatigue} planWeek={planWeek} block={block} />{strengthDetail}</>;
+            if (card.discipline === 'strength' && strengthHasSubstance) return (
+              <>
+                <StrengthFitnessRow fitness={strengthFitness!} fatigue={strengthFatigue} planWeek={planWeek} block={block} calibration={calibration} />
+                {/* ⛔ STATE IS THE ACTOR (slice b): the reversible line lives here, under the row whose
+                    ambient status already showed the state it is confirming. Performance echoes the
+                    same component and routes to the same undo — one signal, two placements. */}
+                <StrengthCalibrationNotice lifts={calibration.byLift} undo={calibration.undo} />
+                {strengthDetail}
+              </>
+            );
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
           })();

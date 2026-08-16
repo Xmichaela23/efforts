@@ -75,8 +75,8 @@ and leaves a one-tap **undo** — never a silent write, never an up-front decisi
 ## Copy voice (enforce as templates, not vibes — `docs/COPY-VOICE.md`, D-319)
 - Fact first, then what the program did, then that it is expected. **No imperative, no "you failed,"
   no cheerleading, no emojis.** Every line traces to p30/p31/p33.
-- **Before writing the strings, pull StrongLifts's deload notice and Juggernaut's recalc notice** and
-  sit our lines next to the real examples (Michael's request 2026-08-12).
+- **Own voice — do NOT borrow other apps' wording.** Ground the lines in the book and our copy voice
+  (`docs/COPY-VOICE.md`, D-319). No franken-copy stitched from StrongLifts/Juggernaut phrasing.
 
 ## Fixtures (Law 6 — permanent regressions)
 - Confirmed stall → training max auto-writes −10%, block re-laid out; **undo restores the prior max.**

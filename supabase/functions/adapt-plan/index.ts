@@ -1286,6 +1286,30 @@ async function autoAdapt(
   //
   // ⛔ DO NOT RE-ADD AN AUTO-WRITE HERE. A weight change goes through the suggestion + the athlete's
   // tap (the accept path ~line 900, and the State adjust modal), never on ingest.
+  //
+  // ⚠️⚠️ TWO CORRECTIONS TO THE PARAGRAPHS ABOVE — 2026-08-15, [D-434]. **THE RULE STANDS; TWO OF ITS
+  // STATED REASONS DO NOT.**
+  //
+  // 1. **"the State strength row already shows the per-lift verdict + suggested weight with an adjust
+  //    modal that writes the change on the athlete's tap" IS NOT TRUE OF THE RUNNING CLIENT.** Traced:
+  //    `StrengthAdjustmentModal.tsx` has ZERO importers, `StateAdjustLens` is a v0 scaffold whose own
+  //    footnote says weight changes live in the logger, and the `strength_progression` /
+  //    `strength_deload` suggestions this file computes are **dropped on the floor** —
+  //    `useCoachWeekContext.ts` maps only `strength_relayout` and `strength_training_max`, and no
+  //    `action: 'accept'` call exists anywhere under `src/`. So "every case the auto-write caught is
+  //    surfaced as a SUGGESTION the athlete applies" describes a path that does not reach a screen.
+  //
+  // 2. **"no strength app changes your working weight without telling you" WAS READ AS "no app
+  //    changes it without ASKING", AND THAT IS THE WRONG READING.** Verified 2026-08-12: StrongLifts
+  //    auto-deloads 10% after three consecutive fails, Juggernaut recalculates the training max off
+  //    the week-3 all-out set "without requiring manual input", Fitbod and Hevy Trainer auto-adjust.
+  //    They all TELL you. **Telling is the requirement; asking first is not.**
+  //
+  // ⛔ SO THE LINE IS SILENT VS ANNOUNCED-AND-UNDOABLE, NOT AUTO VS MANUAL. Slice b (D-434) applies a
+  // training-max change automatically at SAVE — pattern-gated (p33: never on one session), announced
+  // in the logger's post-save sheet, echoed on State and Performance, and reversible per lift with a
+  // suppression that survives the next recompute. **This block stays deleted regardless**: an INGEST
+  // is not a save, the athlete is not present for it, and there is nothing on screen to undo from.
 
   // ── 3. Endurance baselines: THE APP NO LONGER OVERWRITES THE ATHLETE (D-285, SPEC-run-pace-glass-box) ──
   //

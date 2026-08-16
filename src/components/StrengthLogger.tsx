@@ -27,6 +27,14 @@ import {
   ACCESSORY_SET_CUE,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
+// ⛔ SLICE b — the calibration sentences, shared with State and Performance. One signal, three
+// surfaces, one set of strings; see that file's header for why the tense is past.
+import {
+  CALIBRATION_APPLIED_HEADING,
+  CALIBRATION_SCOPE_NOTE,
+  CALIBRATION_UNDO_LABEL,
+  calibrationLine,
+} from '@/lib/strength-calibration-copy';
 // D-208's role table — the app's one answer to "is this a main lift or assistance work".
 import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
 // [Step 3] The logger's two private classifiers, moved out of this file and beside the shared type
@@ -1138,6 +1146,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    *  self-audit, not by a test: no test can see that a value is never displayed. */
   /** The rematerializer's dry run: what the next cycles WOULD become. Null on an ordinary session. */
   const [pendingRework, setPendingRework] = useState<any | null>(null);
+  /** Lifts the athlete undid from the applied sheet — drives the struck-through line. Slice b. */
+  const [undoneLifts, setUndoneLifts] = useState<string[]>([]);
   const [applyingRework, setApplyingRework] = useState(false);
 
   /** What the server computed and wrote, echoed back for display. Empty until a save returns. */
@@ -4261,11 +4271,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // He is right that State and Performance are both places an athlete has to go looking. The moment
     // the reps are worth something is the moment they are logged.
     //
-    // ⚠️ DRY RUN. The server returns what WOULD change and writes nothing. Applying is the athlete's
-    // tap — the silent version of this was deleted for moving prescribed weight with no consent.
+    // ⛔ AUTO-APPLY, ANNOUNCE, UNDO — SLICE b, 2026-08-15. **THIS USED TO BE A DRY RUN + AN APPLY
+    // BUTTON**, and the inversion is the whole slice.
+    //
+    // ⚠️ THE OLD MODEL AND WHY IT CHANGED. The server returned what WOULD change, the sheet offered
+    // "Apply" / "Not now", and nothing moved without a tap. That was the right shape while the only
+    // alternative on the table was the SILENT auto-progression that had just been deleted. It is not
+    // what the field does: StrongLifts auto-deloads and tells you, Juggernaut recalculates the
+    // training max "without requiring manual input", Fitbod and Hevy Trainer auto-adjust. **No major
+    // app puts a decision gate in front of it.**
+    //
+    // ⛔ AND THIS IS NOT THE THING THAT WAS DELETED. That one was pulled for being *silent* — "the
+    // athlete opened the logger to a number they never agreed to". The difference is announcement +
+    // undo + pattern-gating, not consent-per-change. The gate is still there, it just moved: nothing
+    // fires on a single session (p33), and the sheet below is unmissable and reversible.
+    //
     // ⚠️ Silent on an ordinary session: no all-out set, or nothing ahead moves, and no sheet appears.
     try {
-      const { data: rm } = await supabase.functions.invoke('rematerialize-strength-block', { body: {} });
+      const { data: rm } = await supabase.functions.invoke('rematerialize-strength-block', {
+        body: { apply: true },
+      });
       if (rm?.success && Array.isArray(rm.changes) && rm.changes.length > 0) {
         // ⚠️ Carry the saved row with it — the sheet owns the close, and the navigation callback
         // needs the workout it is navigating TO. Passing null here dropped the athlete nowhere.
@@ -6231,65 +6256,99 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           from every four weeks until you can no longer hit the prescribed sets and reps."* The miss is
           the SIGNAL and the reset is the mechanism — same tone, same sheet, no softening and no
           apology. Naming it as the program working is accurate, not consolation. */}
-      {pendingRework && (
+      {pendingRework && (() => {
+        // ⛔ ONE LINE PER LIFT, and the EVENT is what carries the reason. `changes` is per week — the
+        // same step repeats across a cycle's weeks — and it knows the bar weight but not WHY it
+        // moved. `events` (slice b) knows `reset` vs `bump` and the training maxes behind it, which
+        // is what the sentence needs. The change list is the fallback when no event was recorded.
+        const events: any[] = Array.isArray(pendingRework.events) ? pendingRework.events : [];
+        const perLift = pendingRework.changes.filter(
+          (c: any, i: number, arr: any[]) => arr.findIndex((x: any) => x.lift === c.lift) === i,
+        );
+        const closeSheet = () => {
+          setPendingRework(null);
+          const done = pendingRework?._saved ?? null;
+          if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
+        };
+        return (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-[#141414] p-5 pb-8">
-            <p className="text-[11px] uppercase tracking-wider text-white/45 mb-3">Your next cycle changed</p>
-            <div className="space-y-2 mb-4">
-              {pendingRework.changes
-                .filter((c: any, i: number, arr: any[]) =>
-                  // One line per LIFT, not per week — the same step repeats across a cycle's weeks.
-                  arr.findIndex((x: any) => x.lift === c.lift) === i)
-                .map((c: any, i: number) => {
-                  const up = Number(c.to_top_set) > Number(c.from_top_set);
-                  return (
-                    <div key={i} className="text-sm text-white/85">
+            <p className="text-[11px] uppercase tracking-wider text-white/45 mb-3">
+              {CALIBRATION_APPLIED_HEADING}
+            </p>
+            <div className="space-y-3 mb-4">
+              {perLift.map((c: any, i: number) => {
+                const up = Number(c.to_top_set) > Number(c.from_top_set);
+                const ev = events.find((e: any) => e?.lift === c.lift && !e?.undone_at);
+                const undone = undoneLifts.includes(String(c.ref ?? c.lift));
+                return (
+                  <div key={i} className="text-sm text-white/85">
+                    <div>
                       <span className="text-white/60">{c.lift}</span>{' '}
-                      <span className="tabular-nums">{c.from_top_set} → {c.to_top_set} lb</span>
-                      <span className={`ml-2 text-[12px] ${up ? 'text-strength/85' : 'text-white/45'}`}>
-                        {up ? 'earned the step' : 'resets, and the next cycle builds from there'}
+                      <span className={`tabular-nums ${undone ? 'line-through text-white/35' : ''}`}>
+                        {c.from_top_set} → {c.to_top_set} lb
                       </span>
                     </div>
-                  );
-                })}
+                    {/* ⛔ THE SENTENCE, NOT A BADGE. A two-word tag ("earned the step") states the
+                        direction and nothing else; the reset in particular needs p33 beside it or a
+                        single bad session reads as having cost 10%. */}
+                    {ev && !undone && (
+                      <p className="mt-1 text-[12px] leading-snug text-white/50">
+                        {calibrationLine(ev.reason === 'reset' ? 'reset' : 'bump', {
+                          lift: c.lift,
+                          from: Number(ev.from_training_max),
+                          to: Number(ev.to_training_max),
+                        })}
+                      </p>
+                    )}
+                    {undone && (
+                      <p className="mt-1 text-[12px] leading-snug text-white/40">
+                        Put back to {Number(ev?.from_training_max) || c.from_top_set} lb.
+                      </p>
+                    )}
+                    {ev && !undone && (
+                      <button
+                        type="button"
+                        disabled={applyingRework}
+                        onClick={async () => {
+                          setApplyingRework(true);
+                          try {
+                            // ⚠️ THE UNDO IS A SERVER CALL, not a local revert. The rewrite is a pure
+                            // function of the stored max and the logged sets, so a client-side
+                            // restore would be recomputed away on the next save. The server records
+                            // the refusal and suppresses that step from then on.
+                            await supabase.functions.invoke('rematerialize-strength-block', {
+                              body: { undo_lift: String(c.ref ?? '') },
+                            });
+                            setUndoneLifts((prev) => [...prev, String(c.ref ?? c.lift)]);
+                          } catch { /* the line simply stays as applied; nothing is lost */ }
+                          setApplyingRework(false);
+                        }}
+                        className={`mt-1 text-[12px] underline underline-offset-2 disabled:opacity-50 ${up ? 'text-white/55' : 'text-white/55'}`}
+                      >
+                        {CALIBRATION_UNDO_LABEL}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-[12px] text-white/45 mb-4 leading-snug">
-              Applies to weeks that have not started. Anything you have already done stays as it was.
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={applyingRework}
-                onClick={async () => {
-                  setApplyingRework(true);
-                  try {
-                    await supabase.functions.invoke('rematerialize-strength-block', { body: { apply: true } });
-                  } catch { /* the sheet still closes; the plan is simply unchanged */ }
-                  setApplyingRework(false);
-                  setPendingRework(null);
-                  const done = pendingRework?._saved ?? null;
-                  if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium disabled:opacity-50"
-              >
-                {applyingRework ? 'Applying…' : 'Apply'}
-              </button>
-              <button
-                type="button"
-                disabled={applyingRework}
-                onClick={() => {
-                  setPendingRework(null);
-                  const done = pendingRework?._saved ?? null;
-                  if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
-                }}
-                className="flex-1 py-2.5 rounded-xl border border-white/15 text-white/70 text-sm"
-              >
-                Not now
-              </button>
-            </div>
+            <p className="text-[12px] text-white/45 mb-4 leading-snug">{CALIBRATION_SCOPE_NOTE}</p>
+            {/* ⛔ ONE BUTTON, AND IT IS NOT "APPLY". The change is already written by the time this
+                renders — a second confirmation would be the app asking permission for something it
+                has done. Dismissing is the only action left, and Undo is per lift above. */}
+            <button
+              type="button"
+              disabled={applyingRework}
+              onClick={closeSheet}
+              className="w-full py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium disabled:opacity-50"
+            >
+              {applyingRework ? 'Working…' : 'Done'}
+            </button>
           </div>
         </div>
-      )}
+        );
+      })()}
       {downWriteReview && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div

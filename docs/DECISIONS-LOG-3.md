@@ -160,3 +160,49 @@ starts from the server-side generators — not from baked client JSON.
 **Why it is not being unified.** Brzycki reads slightly LOW relative to Epley at the same reps, which is the conservative direction for anything that turns into a prescribed weight. And `compute-facts` feeds surfaces well beyond this block — changing its estimator would move numbers on screens that have nothing to do with 5/3/1, for a difference of a few pounds. **Explicitly out of scope in the work order.**
 
 **What this entry is for:** so the next session that notices the two formulas does not "fix" one of them. If they are ever unified, the direction to check first is what happens to every historical `workout_facts` row computed under the old one.
+
+---
+
+### D-434 — Slice b: a training max that moves is APPLIED, ANNOUNCED and UNDOABLE — both directions (2026-08-15, **PUSHED: no — edits only. NOT DEPLOYED. NOT DEVICE-VERIFIED**) — closes `SLICE-strength-b-auto-recalibrate-2026-08-12.md`; **supersedes and replaces `SLICE-strength-max-calibration-4b.md`** (consent-first); folds in D-421's remainder
+
+**The decision.** When a lift's number moves — down on a confirmed stall, up on the earned step — the app writes it, says plainly what it did and why, and leaves a one-tap Undo per lift. No up-front decision gate, and no silent write.
+
+**Why this shape.** The field does exactly this and none of it asks first: StrongLifts auto-deloads 10% after three consecutive fails and tells you; Juggernaut AI recalculates the training max off the week-3 all-out set "without requiring manual input"; Fitbod and Hevy Trainer auto-adjust working weights. The pure trackers (Strong, base Hevy) are manual and don't adjust at all. ⛔ **This is not the silent auto-progression that was deleted** — that one was pulled for being *silent* ("the athlete opened the logger to a number they never agreed to"). The difference is announcement + undo + pattern-gating, not consent-per-change.
+
+**⛔ THE HARD PART, AND IT IS NOT THE WRITE — IT IS THE UNDO.** `rematerialize-strength-block` is a pure function of `(stored training max, verdicts read off logged sets)`. Restore the old prescriptions and the very next save recomputes the same verdicts, reaches the same number, and re-applies the change the athlete just declined. **An undo that gets silently reverted is worse than no undo.** So an undo is a **suppression, not a restore**: the event stays in the log with `undone_at` stamped, and every future recompute consults it — a computed number matching an undone event's `to_training_max` at that event's cycle is replaced by its `from_training_max`. Matched on all three of (lift, cycle, value), so it does not freeze the lift and does not suppress a *different* step that later lands in the same cycle. `calibration.test.ts` runs three consecutive recomputes against it, because one green pass is not evidence of stickiness.
+
+**⛔⛔ ONE THING THE SLICE SPECIFIED IS REFUTED BY THE BOOK AND WAS NOT BUILT.** The brief (written 2026-08-12) asked for a Juggernaut-style up-bump: *"more reps over target → larger step, but capped."* The Forever reading of 2026-08-15 (`docs/REFERENCE-531-forever-pp16-45.md`) contradicts it, in bold:
+- **p.20** — more than five reps on the test set → *"stay the course. Do not increase more than the normal amount each cycle."*
+- **p.20-21 Q&A** — eight reps at 95%, jump more than 5/10 lb? *"The answer every single time is NO."*
+- **p.21, Krypteia** — forty athletes on an 85% TM; after three cycles half could do **15+ reps at the training max**, and the fix is still *"the basic 5-10 lb inching forward."*
+
+So the UP direction is the ordinary earned step (+5 upper / +10 lower) that slice a's engine already applies every cycle. **What slice b adds is that it is announced and reversible, not that it is bigger.** A rep-scaled jump would be an app invention on top of 5/3/1 — the exact class D-422 was written to delete. Pinned: `advance_untrusted` (a set above the D-417 trusted-rep ceiling) moves the number by exactly the same amount as an ordinary advance.
+
+**⚠️ TWO PREMISES IN THE SLICE AND IN `CLAUDE.md` ARE STALE — traced 2026-08-15, and the build does not rest on either.**
+1. *"the State strength-row adjust modal … already write[s] a new weight on tap"* — **it does not exist in the running client.** `StrengthAdjustmentModal.tsx` has **zero importers**; `StateAdjustLens` is a v0 scaffold whose own footnote reads "Swap, add, and weight changes live in the logger for now".
+2. *"`adapt-plan`'s `suggest` path (`strength_progression` / `strength_deload`) … write on tap"* — those suggestions are computed server-side and **dropped on the floor**. `useCoachWeekContext.ts:615-669` maps only `strength_relayout` and `strength_training_max`, no component reads `plan_adaptation_suggestions`, and no `action: 'accept'` call exists anywhere under `src/`.
+
+**There was no tap-to-apply on the client to convert.** The logger's post-save sheet was the only working path, so that is what was inverted. The unreachable surfaces were left alone rather than revived.
+
+**What shipped, by file:**
+- `shared/strength-system/loading/calibration.ts` (new) — the event type, `calibrationEventsFor` (one event per lift per recompute, at the earliest changed cycle), `suppressUndone`, `undoLatestCalibration`, `liftStatus`. Pure; takes an ISO string rather than a clock so it stays replayable.
+- `rematerialize-strength-block` — `undo_lift` action; the suppression applied to every computed number **before** the diff; the calibration log written to `plans.config.strength_calibration` on any write; `current_cycle` returned so no client re-derives it. ⚠️ The undo is resolved *before* any number is computed, so the run that creates it already honours it.
+- `src/lib/strength-calibration-copy.ts` (new) + test — the two sentences and the three status words, asserted against `voiceViolation()` **and** against the specific failure modes (no second person, no imperative, no consoling closer, no praise, no emoji).
+- `StrengthLogger.tsx` — the post-save sheet inverted: `apply: true` on save, per-lift Undo, one "Done" button. The old "Apply / Not now" pair is gone with the model it belonged to.
+- `src/hooks/useStrengthCalibration.ts` (new) — **one reader** for both screens; a dry run against the same function the logger calls, so the sheet and the rows cannot contradict.
+- `StrengthCalibrationNotice.tsx` (new) — State renders it as the actor, Performance echoes it (`variant="echo"` drops only the block-level scope note). Same line, same undo.
+- `StatePerformanceSection.tsx` — the **ambient per-lift status** on the strength row (climbing · holding · reset, with the training max it refers to), always visible. ⛔ This is what the deleted ceiling never gave anybody, and the slice names it as the original bug: *"a number that silently stopped moving with nothing on screen."*
+
+**⚠️ `holding` IS NOT `reset`, and the two must never collapse.** p.33 — a missed session holds the weight and costs nothing, the free re-try. A row calling that "reset" would report a penalty the engine did not apply.
+
+**Copy, and the one check still open.** Every line is fact-first, past tense (the change is already written; the reversibility lives in the Undo control, not in a hedge inside the sentence), and traces to a page — p.31 for the drop, p.33 for the free re-try, p.20 for the fixed increment. ⚠️ **Michael asked for StrongLifts's and Juggernaut's verbatim notices to be pulled and sat beside ours. That was not done** — no browsing was authorised in this session. What is recorded is the *behaviour* the slice verified from its own source list. The check is cheap and still outstanding.
+
+**Fixtures.** `calibration.test.ts` (14) — stall → reset event; earned step → bump event; one miss → nothing (p.33); on target → nothing; a big set buys the same +5; undo restores; **undo survives three recomputes**; suppression is targeted (later cycle, different value, other lift all unaffected); double-tap does not walk backwards; the two acceptance cases re-lay a real block out and put it back. `strength-calibration-copy.test.ts` (10). Full deno suite 3616 passed / 6 failed — the 6 are pre-existing on a clean tree. Type errors 313, unchanged from baseline.
+
+**Not done, and named:**
+- **No device pass**, no deploy, nothing pushed.
+- The **write itself is unfixtured** — the row loop and the `plans.config` update live in an edge function with no harness. What is pinned is the arithmetic deciding what those rows get.
+- The **verbatim field-notice comparison** above.
+- `strength-row-text.ts` is orphaned from the screen it was extracted for, and its `tappable` field describes an adjust affordance that no longer exists. Not touched; filed as a finding.
+
+**Supersedes / back-annotate on ship:** delete `SLICE-strength-max-calibration-4b.md` (consent-first, replaced) and `SLICE-strength-b-auto-recalibrate-2026-08-12.md` (this entry is its fold-in). Back-annotate D-421 (its `strength_calibration` wire is now repopulated off reset/bump, `reason: 'ceiling'` retired) and the deleted-auto-progression note in `adapt-plan` (the distinction is silent vs announced-and-undoable).

@@ -16,6 +16,10 @@ import { isAssistanceSlot } from '@/lib/assistance-slot';
 // (resistance_level band assist, amrap, duration_seconds) survives the reconstruction below instead
 // of being whitelisted off — the exact bug that hid band assist from Performance (2026-08-11).
 import { normalizeCompletedStrengthSet } from '@/lib/normalize-strength-set';
+// ⛔ SLICE b — the courtesy echo. Same hook, same component, same undo as State; see that hook's
+// header for why there is exactly one reader.
+import { useStrengthCalibration } from '@/hooks/useStrengthCalibration';
+import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 
 interface StrengthPerformanceSummaryProps {
   planned: any | null;
@@ -96,6 +100,9 @@ const extractExercisesFromComputed = (workout: any) => {
 };
 
 export default function StrengthPerformanceSummary({ planned, completed, type, sessionDetail, onRecompute, recomputing, recomputeError }: StrengthPerformanceSummaryProps) {
+  // ⛔ SLICE b — the calibration read, unconditional so the hook list is stable. It self-silences on
+  // any plan that is not a strength block, and the notice renders nothing when no event is standing.
+  const calibration = useStrengthCalibration(true);
   // ── SESSION DURATION, AND IT IS EDITABLE ─────────────────────────────────────────────────────
   //
   // Strength duration was WRITE-ONLY until now: the logger saved `workouts.duration` and no strength
@@ -564,6 +571,19 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
               This is the set that sets your next cycle's weight.
             </p>
           )}
+          {/* ⛔ THE COURTESY ECHO — SLICE b. The same line State carries, routing to the same undo.
+              **Not a second nudge**: the change was applied and announced at save time, and State is
+              the actor. What this adds is that an athlete looking at the session that CAUSED the
+              change can see it there, and reverse it without going to find another screen.
+
+              ⚠️ `variant="echo"` drops the block-level scope note only. The sentence and the Undo are
+              byte-identical — two components would be two chances for the screens to disagree about
+              what a lift did, and that disagreement is invisible until someone has both open. */}
+          <StrengthCalibrationNotice
+            lifts={calibration.byLift}
+            undo={calibration.undo}
+            variant="echo"
+          />
         </div>
       )}
       <StrengthCompareTable
