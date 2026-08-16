@@ -33,7 +33,15 @@ one colour per discipline for numbers AND labels (`readout-num`/`readout-label` 
 fetched-and-never-read; swim pinned last), LOAD verdict off the discipline palette (white →
 #FF5A5F). Parity pinned by `src/lib/sport-color-parity.test.ts` (3 colour-definition sites). And
 `get-week` stopped sniffing the phase word — reads `resolveBlockIdentity`, no phase structure → NO
-label, regex ladder deleted. All browser-verified only.
+label, regex ladder deleted. Final state at `7ce6f144`: the nova's sport hues moved to the card's
+BASE layer and the galaxy drifts once per app launch (`--nova-dx/dy/hue`, `src/main.tsx`).
+All browser-verified only.
+
+⚠️ **THE ONE LESSON WORTH CARRYING (it cost most of a day):** hues painted on a `mix-blend-mode:
+soft-light` overlay render almost NOTHING over a near-black card. The green/blue/gold were correct
+in the CSS for hours and invisible on screen, and every "make it stronger" pass raised alphas that
+could never show. **If a colour is in the stylesheet and not on the screen, check the blend mode
+before touching the value.** The header always worked because its hues sit on its base layer.
 
 ### ⛔ YOUR JOB — THE DEVICE ACCEPTANCE RUN (everything is already pushed + deployed)
 Build a Strong Focus block and eyeball **weeks 1, 4, 8, 9 and 12** — the TM-test week, a leader week
