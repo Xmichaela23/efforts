@@ -23,22 +23,24 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-15 — the STRONG FOCUS block was rewritten to 5/3/1 FOREVER. Three-week cycles, standalone TM-test and 7th-week deload weeks, FSL in the leaders, the verdict moved to the rested week. **EDITS ONLY: nothing is pushed, nothing is deployed, nothing is device-verified.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-15 — the STRONG FOCUS block was rewritten to 5/3/1 FOREVER. Three-week cycles, standalone TM-test and 7th-week deload weeks, FSL in the leaders, the verdict moved to the rested week. **PUSHED + DEPLOYED — Forever (D-432), the slice-a freeze fix (D-422), and slice-b calibration (D-434) are all live. Only the device acceptance run remains. Banner now owned by ONE chat.**)
 
-### ⛔ YOUR JOB, IN ORDER
-1. **Deploy D-432, then look at it.** It is already on main (`48889070`) — do NOT re-commit it. The
-   deploy list is below, and it is long, because the composer is a `shared/` file and every function
-   that bundles it carries its own frozen copy.
-   ⚠️ **Deploy `get-week` in the same pass** (`723b790c`, a separate UI-session fix): the calendar's
-   phase word used to be regexed off session names — a long ride printed "Endurance Building" over
-   week 3 of a Strong Focus block while State called the same week "build". It now reads
-   `resolveBlockIdentity`, the same pure config+date function the coach payload's block card uses,
-   so the two surfaces agree by construction. Fixture-verified only; nobody has seen it on a screen,
-   and it cannot be seen until `get-week` is deployed.
-2. **Then the device acceptance run Michael asked for:** build a Strong Focus block and eyeball
-   **weeks 1, 4, 8, 9 and 12** — the test week, a leader week (with its FSL block), the 7th-week
-   deload, the anchor's opening week, and the closing test week.
-3. **Then the two things nobody has looked at** (listed under UNVERIFIED below).
+### ⛔ YOUR JOB — THE DEVICE ACCEPTANCE RUN (everything is already pushed + deployed)
+Build a Strong Focus block and eyeball **weeks 1, 4, 8, 9 and 12** — the TM-test week, a leader week
+(with its FSL block), the 7th-week deload, the anchor's opening week, and the closing test week. Then
+log a session and confirm slice b: the calibration sheet applies on save and **Undo** restores. Nothing
+to deploy — Forever, the slice-a freeze fix, slice b, and `get-week` are all live (deploys this session).
+
+Two decisions OWED to Michael (recorded, not urgent):
+- **Assistance bands** — the code uses the page-pinned reference (7th-week 25–50, leaders 50–75, anchors
+  75–100) over the work order's numbers. Reverting is three constants in `src/lib/assistance-menu.ts`.
+- **FSL citation** — the work order cited p.40 (Beginner Prep School); the FSL *pick* is marked as ours,
+  not Wendler's general rule.
+
+⛔ **COORDINATION LESSON (why this banner lied for a day):** two sessions shared this working tree with
+no handoff — one blanket-`git add` swept the other's in-progress files into a commit and shipped them,
+and each session rewrote this banner without knowing the other's state. Fix in force now: **ONE chat
+owns the banner and the folder at a time.** Do not run parallel sessions in `~/efforts`.
 
 ### WHAT CHANGED — D-432 in `DECISIONS-LOG-3.md` carries the full why. Do NOT re-litigate it.
 The 12-week block is now `TM test(1) · Leader(2-4) · Leader(5-7) · 7th-week deload(8) · Anchor(9-11) · TM test(12)`.
@@ -68,12 +70,12 @@ The 12-week block is now `TM test(1) · Leader(2-4) · Leader(5-7) · 7th-week d
   snaps down to a length the layout fills exactly. 12 and 16 both land exactly.
 
 ### ⛔ STATE — READ THIS BEFORE TELLING MICHAEL ANYTHING
-- **PUSHED: YES — `48889070`, 2026-08-15.** ⚠️ This block said "NO, uncommitted" for a few hours after
-  it was written; a parallel UI session pushed and the Forever work went up with it. Corrected here
-  rather than left standing, because the next session would otherwise re-commit work already on main.
-- **DEPLOYED: NO.** The deploy list below is still owed, and it is the long one — `strength-primary-plan.ts`
-  is a `shared/` file, so every function that bundles it carries a frozen copy until redeployed.
-- **VERIFIED: NO.** Not on a device, not in prod. The evidence is fixtures only.
+- **PUSHED: YES.** Forever `48889070` + slice-a freeze fix `bf4aaa61` (D-422) + slice-b calibration
+  `790cf50a` (D-434), all on main.
+- **DEPLOYED: YES (this session).** All strength functions (`generate-strength-plan`,
+  `create-goal-and-materialize-plan`, `materialize-plan`, `rematerialize-strength-block`, `coach`,
+  `adapt-plan`) plus `get-week` are live carrying the Forever + slice-a + slice-b bundle.
+- **VERIFIED: NO.** Not yet seen on a device. The device acceptance run above is the only open item.
 - **Suite:** full deno run **3594 passed / 6 failed**, and those 6 fail identically on a clean tree
   (`d031-convergence-e2e` ×3, `non-race-goal-seeds` ×2, `club-anchor` ×1). Type errors unchanged
   (50 pre-existing in create-goal, 2 in the materialize chain). Lint +45 `no-explicit-any` in new

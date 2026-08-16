@@ -108,7 +108,7 @@ starts from the server-side generators — not from baked client JSON.
 
 ---
 
-### D-432 — Strong Focus aligns to 5/3/1 Forever: three-week cycles, standalone light weeks, the verdict on the rested week, FSL in the leaders (2026-08-15, **PUSHED: no — edits only. NOT DEPLOYED. NOT DEVICE-VERIFIED**) — supersedes the volume half of [D-385] and the pairing half of [D-387]
+### D-432 — Strong Focus aligns to 5/3/1 Forever: three-week cycles, standalone light weeks, the verdict on the rested week, FSL in the leaders (2026-08-15, **PUSHED `48889070` + DEPLOYED; NOT device-verified**) — supersedes the volume half of [D-385] and the pairing half of [D-387]
 
 **Decided by Michael 2026-08-15.** The work order was `docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` (deleted on ship, per the spec lifecycle). The 12-week container, the four lifts, days per week and endurance placement are UNTOUCHED. What changed is the internal shape.
 
@@ -163,7 +163,7 @@ starts from the server-side generators — not from baked client JSON.
 
 ---
 
-### D-434 — Slice b: a training max that moves is APPLIED, ANNOUNCED and UNDOABLE — both directions (2026-08-15, **PUSHED: no — edits only. NOT DEPLOYED. NOT DEVICE-VERIFIED**) — closes `SLICE-strength-b-auto-recalibrate-2026-08-12.md`; **supersedes and replaces `SLICE-strength-max-calibration-4b.md`** (consent-first); folds in D-421's remainder
+### D-434 — Slice b: a training max that moves is APPLIED, ANNOUNCED and UNDOABLE — both directions (2026-08-15, **PUSHED `790cf50a` + DEPLOYED; NOT device-verified**) — closes `SLICE-strength-b-auto-recalibrate-2026-08-12.md`; **supersedes and replaces `SLICE-strength-max-calibration-4b.md`** (consent-first); folds in D-421's remainder
 
 **The decision.** When a lift's number moves — down on a confirmed stall, up on the earned step — the app writes it, says plainly what it did and why, and leaves a one-tap Undo per lift. No up-front decision gate, and no silent write.
 
