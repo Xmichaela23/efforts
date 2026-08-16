@@ -149,5 +149,25 @@ window.addEventListener('orientationchange', () => setTimeout(fitAndAlign, 120))
   });
 })();
 
+/**
+ * NOVA DRIFT — the galaxy shifts a little every time the app opens (2026-08-15, Michael: "can they
+ * both morph a bit every time the app is open?").
+ *
+ * One random offset per LAUNCH, not per render: the header and the LOAD card read the same two
+ * variables, so they drift together and the screen still reads as one sky. Re-rolling on every
+ * render would make the background twitch during normal use, which is a different (bad) effect.
+ *
+ * Kept small on purpose (±6% position, ±8% hue rotation). The point is that two sessions never look
+ * quite identical, not that the app looks different — the discipline colours themselves never move,
+ * only the smoke behind them.
+ */
+(() => {
+  const r = (n: number) => (Math.random() * 2 - 1) * n;
+  const s = document.documentElement.style;
+  s.setProperty('--nova-dx', `${r(6).toFixed(2)}%`);
+  s.setProperty('--nova-dy', `${r(6).toFixed(2)}%`);
+  s.setProperty('--nova-hue', `${r(8).toFixed(1)}deg`);
+})();
+
 // Remove dark mode class addition
 createRoot(document.getElementById("root")!).render(<App />);

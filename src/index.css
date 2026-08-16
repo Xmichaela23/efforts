@@ -490,7 +490,10 @@
       soft-light,
       soft-light, soft-light,
       soft-light, soft-light, soft-light, soft-light;
-    filter: blur(0.12px) saturate(1.16) contrast(1.12);
+    /* `--nova-hue` is rolled once per app launch (main.tsx) — the header's sky shifts a little
+       every open, in step with the LOAD card's nova. Colours themselves are untouched: this
+       rotates only this texture layer, never the discipline hues drawn on top of it. */
+    filter: blur(0.12px) saturate(1.16) contrast(1.12) hue-rotate(var(--nova-hue, 0deg));
   }
 
   /* Soft bottom fade so the header “melts” into the Today panel */
@@ -1067,8 +1070,22 @@ body.wizard-active { --tabbar-h: 0px; }
    ⚠️ The base `.galaxy-card::before` paints ITS accent light from the TOP edge — on the first pass
    that top light stayed on and drowned the bottom hues, so the card still read top-lit. A nova
    card flips the base light to the bottom too. */
+/* ⛔ THE SPORT HUES LIVE ON THE BASE LAYER, NOT THE OVERLAY (2026-08-15, and this is why Michael
+   had to ask repeatedly). They were on `::after`, which blends `soft-light` — over a near-black
+   card soft-light renders almost nothing, so green/blue/gold were in the CSS and invisible on
+   screen. The header's colours show because they sit on ITS base layer at normal blend. Same here
+   now: green, blue and gold painted directly, at strength, under the grid. */
 .readout-texture--nova.galaxy-card::before {
   background-image:
+    /* `--nova-dx/dy` are rolled once per app LAUNCH in main.tsx, so the sky is never quite the same
+       twice; the header reads the same two vars and drifts with it. */
+    /* Gold LEFT, green RIGHT — mirroring the header, which runs warm on the left and cools to
+       green/teal on the right (Michael 2026-08-15: "invert the green in the left corner with the
+       yellow bubbling up from the right"). Green now rises from the bottom-right corner. */
+    radial-gradient(90% 70% at calc(10% + var(--nova-dx, 0%)) calc(14% + var(--nova-dy, 0%)), rgba(255, 215, 0, 0.30), transparent 62%),
+    radial-gradient(85% 70% at calc(6% - var(--nova-dx, 0%)) calc(92% + var(--nova-dy, 0%)), rgba(74, 158, 255, 0.36), transparent 62%),
+    radial-gradient(90% 72% at calc(94% + var(--nova-dx, 0%)) calc(96% - var(--nova-dy, 0%)), rgba(80, 200, 120, 0.36), transparent 64%),
+    radial-gradient(70% 60% at calc(38% - var(--nova-dx, 0%)) calc(78% - var(--nova-dy, 0%)), rgba(183, 148, 246, 0.26), transparent 62%),
     radial-gradient(135% 105% at 50% 110%, rgba(var(--card-accent-rgb, 255,140,66), var(--card-accent-a, 0.30)), transparent 66%),
     radial-gradient(82% 54% at 8% 100%, rgba(255,188,84,0.12), transparent 60%),
     radial-gradient(76% 58% at 97% 80%, rgba(138,104,230,0.17), transparent 60%),
@@ -1083,16 +1100,6 @@ body.wizard-active { --tabbar-h: 0px; }
 }
 .readout-texture--nova::after {
   background-image:
-    /* Hues placed for CONTRAST with the words that land on them (2026-08-15, Michael: "the words
-       land on areas with colors that make them pop, not blend"): Run gold + Strength orange sit
-       bottom-left, so the smoke there is cool blue/purple; Bike green sits mid-right on warm
-       orange; teal "balanced" top-right gets gold; the green patch lives top-left under the white
-       LOAD label, where nothing fights it. */
-    radial-gradient(ellipse at 12% 92%, rgba(74, 158, 255, 0.28) 0%, transparent 60%),
-    radial-gradient(ellipse at 30% 74%, rgba(183, 148, 246, 0.26) 0%, transparent 62%),
-    radial-gradient(ellipse at 60% 100%, rgba(255, 140, 66, 0.24) 0%, transparent 62%),
-    radial-gradient(ellipse at 92% 30%, rgba(255, 215, 0, 0.16) 0%, transparent 60%),
-    radial-gradient(ellipse at 8% 10%, rgba(80, 200, 120, 0.14) 0%, transparent 58%),
     radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
     repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),

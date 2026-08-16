@@ -1524,7 +1524,10 @@ export default function WorkoutCalendar({
                 <LoadBar load={wsv.load} loadStatus={loadStatus} weekIntent={wsv?.week?.intent} compact />
               )}
               {metrics.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 px-4">
+                // Second column starts at 58% so Bike/Swim line up with the verdict word above
+                // (Michael 2026-08-15: "move bike, not balanced"). LOAD's row is justify-between,
+                // so the verdict sits right-of-centre — a plain 50/50 grid put Bike left of it.
+                <div className="grid grid-cols-[60%_1fr] gap-x-4 gap-y-0.5 px-3">
                   {/* READOUT TREATMENT, PER SPORT (2026-08-15). Each metric sets its own accent, so
                       the label tints and the NUMBER glows in that sport's colour — the numbers were
                       flat white while only the labels carried colour, which read as a legend rather
