@@ -25,6 +25,16 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 ---
 ## 🧭 NEXT SESSION — START HERE (2026-08-15 — the STRONG FOCUS block was rewritten to 5/3/1 FOREVER. Three-week cycles, standalone TM-test and 7th-week deload weeks, FSL in the leaders, the verdict moved to the rested week. **PUSHED + DEPLOYED — Forever (D-432), the slice-a freeze fix (D-422), and slice-b calibration (D-434) are all live. Only the device acceptance run remains. Banner now owned by ONE chat.**)
 
+### ALSO 2026-08-15, PARALLEL UI SESSION (do not re-litigate; device checklist = punch list "READOUT LANGUAGE" block)
+The readout design language shipped across logger/State/Home/Performance (`905dd75f`→`30d04687`):
+one colour per discipline for numbers AND labels (`readout-num`/`readout-label` off
+`--card-accent-rgb`), the header's grid texture on every data card (`.readout-texture` /
+`--spectral` / `--nova` in index.css), State cards auto-ranked by `cadenceCounts` (was
+fetched-and-never-read; swim pinned last), LOAD verdict off the discipline palette (white →
+#FF5A5F). Parity pinned by `src/lib/sport-color-parity.test.ts` (3 colour-definition sites). And
+`get-week` stopped sniffing the phase word — reads `resolveBlockIdentity`, no phase structure → NO
+label, regex ladder deleted. All browser-verified only.
+
 ### ⛔ YOUR JOB — THE DEVICE ACCEPTANCE RUN (everything is already pushed + deployed)
 Build a Strong Focus block and eyeball **weeks 1, 4, 8, 9 and 12** — the TM-test week, a leader week
 (with its FSL block), the 7th-week deload, the anchor's opening week, and the closing test week. Then

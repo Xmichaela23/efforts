@@ -8,6 +8,21 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE READOUT LANGUAGE (2026-08-15, PUSHED `905dd75f`→`30d04687`; `get-week` DEPLOYED; client on Netlify; **not device-verified**)
+
+One day's UI campaign, driven live by Michael, all browser-verified only. What to eyeball on the phone:
+- **Logger:** one strength orange, four intensities; chips neutral until opened; main-lift card orange rim,
+  assistance neutral rim; nebula card grounds. Warm-up label dim-orange (was sky blue).
+- **State:** readout plates + nebula + the grid texture on every data card; per-lift cards; discipline
+  cards ranked by 90-day session count (swim pinned last); numbers AND labels in the discipline's colour.
+- **Home:** LOAD + week totals in one bottom-lit "nova" card, hues placed under contrasting words.
+- **LOAD verdict:** "balanced" is white now; caution/alarm escalate on #FF5A5F (non-discipline red).
+- **Week 3 label:** Home should now say "Base" (or nothing) instead of "Endurance Building" —
+  `get-week` reads `resolveBlockIdentity`, deployed. ⚠️ If it still shows the old words, the plan's
+  stored `weekly_summaries` is being trusted over the generator — report back, that's the next fix.
+- Files: `readout-plate.ts`, `ReadoutTiles.tsx`, `index.css` (`.galaxy-card`, `.readout-*`),
+  `sport-color-parity.test.ts` (pins the 3 colour-definition sites).
+
 ## ⏳ AWAITING MICHAEL — THE ENTRY GATE + BAR FLOOR + BAR CHIP (2026-08-13 night, PUSHED + DEPLOYED + Xcode-synced, **not device-verified**)
 
 The flag model, decided and shipped in one evening session (supersedes the interim hard-85 gate and the commercial-gym bar branch, which never deployed):
