@@ -26,9 +26,15 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 ## 🧭 NEXT SESSION — START HERE (2026-08-15 — the STRONG FOCUS block was rewritten to 5/3/1 FOREVER. Three-week cycles, standalone TM-test and 7th-week deload weeks, FSL in the leaders, the verdict moved to the rested week. **EDITS ONLY: nothing is pushed, nothing is deployed, nothing is device-verified.**)
 
 ### ⛔ YOUR JOB, IN ORDER
-1. **Get D-432 onto main and onto the server, then look at it.** The work is written and the suite is
-   green; it is sitting in the working tree. Deploy list is below — it is long, because the composer
-   is a `shared/` file and every function that bundles it carries its own frozen copy.
+1. **Deploy D-432, then look at it.** It is already on main (`48889070`) — do NOT re-commit it. The
+   deploy list is below, and it is long, because the composer is a `shared/` file and every function
+   that bundles it carries its own frozen copy.
+   ⚠️ **Deploy `get-week` in the same pass** (`723b790c`, a separate UI-session fix): the calendar's
+   phase word used to be regexed off session names — a long ride printed "Endurance Building" over
+   week 3 of a Strong Focus block while State called the same week "build". It now reads
+   `resolveBlockIdentity`, the same pure config+date function the coach payload's block card uses,
+   so the two surfaces agree by construction. Fixture-verified only; nobody has seen it on a screen,
+   and it cannot be seen until `get-week` is deployed.
 2. **Then the device acceptance run Michael asked for:** build a Strong Focus block and eyeball
    **weeks 1, 4, 8, 9 and 12** — the test week, a leader week (with its FSL block), the 7th-week
    deload, the anchor's opening week, and the closing test week.
@@ -62,8 +68,11 @@ The 12-week block is now `TM test(1) · Leader(2-4) · Leader(5-7) · 7th-week d
   snaps down to a length the layout fills exactly. 12 and 16 both land exactly.
 
 ### ⛔ STATE — READ THIS BEFORE TELLING MICHAEL ANYTHING
-- **PUSHED: NO.** Everything is uncommitted in the working tree.
-- **DEPLOYED: NO.**
+- **PUSHED: YES — `48889070`, 2026-08-15.** ⚠️ This block said "NO, uncommitted" for a few hours after
+  it was written; a parallel UI session pushed and the Forever work went up with it. Corrected here
+  rather than left standing, because the next session would otherwise re-commit work already on main.
+- **DEPLOYED: NO.** The deploy list below is still owed, and it is the long one — `strength-primary-plan.ts`
+  is a `shared/` file, so every function that bundles it carries a frozen copy until redeployed.
 - **VERIFIED: NO.** Not on a device, not in prod. The evidence is fixtures only.
 - **Suite:** full deno run **3594 passed / 6 failed**, and those 6 fail identically on a clean tree
   (`d031-convergence-e2e` ×3, `non-race-goal-seeds` ×2, `club-anchor` ×1). Type errors unchanged
