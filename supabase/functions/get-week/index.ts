@@ -1266,34 +1266,6 @@ Deno.serve(async (req)=>{
               const sessions = Array.isArray(sessionsByWeek[weekKey]) ? sessionsByWeek[weekKey] : [];
               if (sessions.length === 0) continue;
               
-              // Analyze sessions to determine focus
-              const hasIntervals = sessions.some((s: any) => {
-                const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
-                const tags = Array.isArray(s?.tags) ? s.tags : [];
-                const desc = String(s?.description || s?.name || '').toLowerCase();
-                return tokens.some((t: string) => /interval|vo2|5kpace|tempo|threshold/.test(String(t).toLowerCase())) ||
-                       tags.some((t: string) => /interval|vo2|tempo|threshold|hard/.test(String(t).toLowerCase())) ||
-                       /interval|vo2|tempo|threshold/.test(desc);
-              });
-              
-              const hasLongRun = sessions.some((s: any) => {
-                const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
-                const tags = Array.isArray(s?.tags) ? s.tags : [];
-                const desc = String(s?.description || s?.name || '').toLowerCase();
-                return tokens.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
-                       tags.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
-                       /long run|longrun/.test(desc);
-              });
-              
-              const hasEasy = sessions.some((s: any) => {
-                const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
-                const tags = Array.isArray(s?.tags) ? s.tags : [];
-                const desc = String(s?.description || s?.name || '').toLowerCase();
-                return tokens.some((t: string) => /easy|recovery|cooldown/.test(String(t).toLowerCase())) ||
-                       tags.some((t: string) => /easy|recovery/.test(String(t).toLowerCase())) ||
-                       /easy|recovery/.test(desc);
-              });
-              
               // ⛔ THE PHASE COMES FROM THE PLAN, NOT FROM SNIFFING ITS SESSIONS (2026-08-15).
               //
               // This block used to DECIDE the week's focus by regexing session names: a long ride in
@@ -1310,9 +1282,12 @@ Deno.serve(async (req)=>{
               // peak / taper / recovery) via `normalizePhaseKey`, so this surface must NOT translate
               // it — that is exactly the per-screen lookup table the accessor exists to prevent.
               //
-              // Falls back to the old sniffed label ONLY when the plan carries no phase structure to
-              // answer with (`phaseWord` null). A null there is a real signal — this plan has no
-              // phases — not a failure, so the fallback stays descriptive rather than inventing one.
+              // ⛔ NO PHASE WORD → NO LABEL (2026-08-15, Michael: "it should do nothing if there is
+              // no cue"). The first cut kept the sniffed ladder as a fallback; that is the same
+              // invention with a quieter failure mode — a plan with no phase structure would still
+              // get told it was in "Endurance Building" because it happened to contain a long ride.
+              // Empty means the surface says nothing about the phase, which is the same rule State
+              // already follows (`blockContextLine` returns null rather than claiming "week 1").
               let focus = '';
               const phaseWordForWeek = (() => {
                 try {
@@ -1336,16 +1311,6 @@ Deno.serve(async (req)=>{
 
               if (phaseWordForWeek) {
                 focus = phaseWordForWeek.charAt(0).toUpperCase() + phaseWordForWeek.slice(1);
-              } else if (hasIntervals && hasLongRun) {
-                focus = 'Build Phase';
-              } else if (hasIntervals) {
-                focus = 'Speed Development';
-              } else if (hasLongRun) {
-                focus = 'Endurance Building';
-              } else if (hasEasy) {
-                focus = 'Base Building';
-              } else {
-                focus = 'Training Week';
               }
               
               // Extract key workouts
