@@ -185,7 +185,12 @@ without throwing, and the suites hold their baseline.
 
 ---
 
-## Slice 4 — the chin count
+## Slice 4 — the chin count — ✅ DONE at `1d9bfe9b`
+
+> **Shipped, and the set is closed — all five slices are committed.** 100 a week builds (33·33·34),
+> grips rotate across weeks with the chin-up genuinely prescribed, and the weighted day is pinned BY
+> NAME to the squat day (Michael 2026-08-17) after the positional constant silently moved it onto
+> the merged day. Verified on built blocks. **Remaining: push + deploy, which is Michael's call.**
 
 ⛔ **SPEC'D IN FULL AT WORK ORDER §1h — READ THAT, IT IS THE INSTRUCTION.** Both fixes are decided;
 nothing here is an open question any more. Summary only:
