@@ -8,17 +8,16 @@ session** — take one, finish it, stop. Do not merge two.
 work-order section, open it — the section carries the decisions and the sourcing, and this file
 deliberately does not repeat them.
 
-⚠️ **SLICES 2 AND 4 BOTH USED TO TOUCH `NonRaceBuilder.tsx:3304-3312`.** They no longer do: the
-wizard's pull-up dose note moved wholly into **slice 2**, and slice 4 is engine and library only. Keep
-it that way — slice 2 rewrites that whole region, so a second session editing it would be working off
-line numbers that have already moved.
+⚠️ **SLICES 5 AND 4 BOTH EDIT `assistance-catalog.ts` AND `strength-primary-plan.ts`. Never run them
+in the same session.** (The earlier slice 2 / slice 4 overlap in `NonRaceBuilder.tsx` is closed —
+slice 2 is shipped and took the dose note with it.)
 
 ---
 
 ## Where the tree is
 
-`b130fb4d` — *solver: easy sessions stop clustering at three lifting days (slice 1)*. Committed,
-**not pushed, not deployed.**
+`45c59661` — *builder: the lifting-days step is gone, three accessory cards, the copy follows
+(slice 2)*. Committed, **not pushed, not deployed.**
 
 ✅ **SLICE 1 IS DONE.** The clustering is fixed and its two tests are green. It left one thing
 standing that the next sessions must not undo: **`week-solver.ts` now carries TWO flexible rankings**
@@ -32,9 +31,7 @@ them, and do not add a third.** See `SolverInput.flexibleRanking`.
 `StrengthPrimaryArgs` — not defaulted off, *deleted* — and every branch that read it is
 unconditional. Do not reintroduce it. Do not add a four-day path "for later".
 
-**Test state, and it is the baseline every slice measures against:**
-
-**⚠️ BASELINE AS OF `b130fb4d` — measure this yourself before you change anything, and do not trust
+**⚠️ BASELINE AS OF `45c59661` — measure this yourself before you change anything, and do not trust
 the numbers below if they disagree with what you see:**
 
 | command | result |
@@ -98,7 +95,12 @@ could not come up.
 
 ---
 
-## Slice 2 — the plan builder screen
+## Slice 2 — the plan builder screen — ✅ DONE at `45c59661`
+
+> **Shipped.** 8 steps, three accessory cards, `state.liftingDays` gone, and the copy names the
+> deadlift+press pairing instead of counting days. `strength-focus-copy.shape.test.ts` was pinning
+> the wrong sentence and moved with it. ⚠️ `LIFT_DAYS` was deliberately NOT narrowed — that is
+> **slice 5**. **Everything below is the brief it was built from.**
 
 Work order §1f-0 ("what goes") + all of §1f-1. **One session: every line is in two files, and
 splitting it would have two sessions editing the same lines.**
