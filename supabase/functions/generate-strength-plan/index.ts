@@ -12,7 +12,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-primary-plan.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -116,6 +118,30 @@ Deno.serve(async (req: Request) => {
         if (resolved.sec_per_mi != null) easyPaceMin = resolved.sec_per_mi / 60;   // sec/mi -> min/mi
       } catch { /* no baselines → the honest "estimated at 10:00/mi until we learn your easy pace" note fires */ }
     }
+
+    /**
+     * ⛔ THE HARD DAY'S NUMBERS — FED FROM THE RESOLVERS THAT ALREADY OWN THEM (§7, 2026-08-17).
+     *
+     * This function resolved the EASY pace and nothing else, so no FTP and no threshold pace ever
+     * reached the composer — §7's starved-input pattern, the same shape as the run-pace resolver
+     * that was written, tested and never once ran. ⛔ THREE RESOLVERS ALREADY EXIST and are the
+     * single source of truth for their fact; none of this re-derives anything:
+     *   · `resolveCurrentFtp`               — bike wattage (D-240's athlete choice honoured)
+     *   · `resolveCurrentRunThresholdPace`  — a MEASURED threshold pace, when the athlete has one
+     *   · `resolveCurrent5kPace`            — the number the run gate actually tests
+     *
+     * ⚠️ THE 5K IS THE GATE, NOT THE THRESHOLD PACE. There is no independent threshold pace on most
+     * athletes — the app derives it as 5K + 20 s/mi (`materialize-plan`'s own rule), so gating on a
+     * derived number would refuse athletes who have everything the session needs. The threshold
+     * pace is passed as well, and the session copy says which of the two it used.
+     *
+     * ⚠️ RESOLVED SERVER-SIDE FROM THE BASELINES ROW, not trusted from the caller — the same reason
+     * the maxes and the equipment are. A stale client session must not decide whether an athlete
+     * gets a progression.
+     */
+    const ftpResolved = resolveCurrentFtp(ub as never);
+    const thrResolved = resolveCurrentRunThresholdPace(ub as never);
+    const fiveKResolved = resolveCurrent5kPace(ub as never);
 
     const sport: 'run' | 'bike' | null =
       endurance_sport === 'bike' || endurance_sport === 'run' ? endurance_sport : null;
@@ -230,6 +256,14 @@ Deno.serve(async (req: Request) => {
           };
         })
         .filter((h): h is NonNullable<typeof h> => h !== null),
+      // §7 — the hard sessions' pace and wattage, and the gate that drops a hard day without one.
+      // ⚠️ `learned-low` FTP IS ACCEPTED HERE. A low-confidence estimate is still a number the
+      // session can be prescribed and progressed against, and the alternative is no hard ride at
+      // all; the quality gate exists for plan targets that are baked for twelve weeks, which this
+      // is not — the block rebuilds.
+      ftpWatts: ftpResolved.value,
+      thresholdPaceSecPerMi: thrResolved.sec_per_mi,
+      fiveKPaceSecPerMi: fiveKResolved.sec_per_mi,
       // Bike hours (D-323 §6) — hours, never miles. Used on the bike-PRIMARY path.
       targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0
         ? Number(target_weekly_ride_hours) : undefined,

@@ -35,6 +35,9 @@ import {
 } from '@/lib/assistance-catalog';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
+// §7 — the hard day's gate reads the SAME resolvers the composer prices off. Fed, never re-derived.
+import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
 /**
  * ⛔ TWO HARD ENDURANCE DAYS IS THE CEILING (§1i, 2026-08-17) — and the SCREEN enforces it, not only
@@ -1258,6 +1261,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     const raw = (arc as { performance_numbers?: { pullupMaxReps?: unknown } } | null)?.performance_numbers?.pullupMaxReps;
     const n = Number(raw);
     return Number.isFinite(n) && n >= 0 ? n : null;
+  }, [arc]);
+  /**
+   * ⛔ NO NUMBER, NO OFFER (§7, Michael 2026-08-16) — THE SCREEN HALF OF THE GATE.
+   *
+   * The engine refuses a hard day it cannot price and says so; this stops the athlete being asked
+   * for one in the first place. Both halves exist on purpose: the screen is the humane end (never
+   * offer what cannot be built) and the engine is the honest one (the wire cannot smuggle one past).
+   *
+   * ⛔ FED FROM THE RESOLVERS, NOT RE-DERIVED. `resolveCurrent5kPace` and `resolveCurrentFtp` are
+   * the single source of truth for their fact and already run client-side elsewhere
+   * (`TrainingBaselines.tsx` uses the FTP one). This asks them the same question the server will.
+   *
+   * ⚠️ THE RUN TESTS THE 5K, NOT A THRESHOLD PACE — there is no independent threshold pace on the
+   * athlete; the app derives it as 5K + 20 s/mi. Gating on the derived number would refuse athletes
+   * who have everything the session needs.
+   * ⚠️ AND THE REASON IS NOT A MISSING FIELD, IT IS A MISSING PROGRESSION. A session that cannot
+   * state a pace or a wattage cannot get faster on purpose — that is what the copy says, rather
+   * than naming a database column at someone.
+   */
+  const hardDayAvailable = useMemo<{ run: boolean; bike: boolean }>(() => {
+    const baselines = (arc ?? {}) as never;
+    return {
+      run: resolveCurrent5kPace(baselines).sec_per_mi != null,
+      bike: resolveCurrentFtp(baselines).value != null,
+    };
   }, [arc]);
   // The same (i) mechanic on "How much" — the volume rationale that used to sit between the two
   // inputs and push the second one off the screen.
@@ -3692,7 +3720,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             >{h.discipline === 'run' ? 'Run' : 'Ride'}{h.day ? ` · ${DAY_SHORT[h.day as DayName]}` : ''}</button>
                           ))}
                           {state.hardDays.length < MAX_HARD_DAY_SLOTS
-                            && (['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => (
+                            && (['run', 'bike'] as const)
+                              .filter((d) => posturePresent(d))
+                              // §7's gate: the option is not offered when the number that would
+                              // price it is missing. The reason renders under the row.
+                              .filter((d) => hardDayAvailable[d])
+                              .map((d) => (
                               <button
                                 key={`add-${d}`} type="button"
                                 aria-label={`Add a hard ${d === 'run' ? 'run' : 'ride'}`}
@@ -3861,8 +3894,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <div className="flex items-start gap-1.5 pt-0.5">
                               <p className="text-white/45 text-xs leading-snug">
                                 {hardDayCount >= 2
-                                  ? 'Two hard sessions build top-end speed. The lifting is placed to keep its distance from both.'
-                                  : 'One hard session a week holds top-end aerobic fitness. It does not build it. A run or ride club goes here.'}
+                                  ? 'Two hard sessions build top-end speed: one intervals, one sustained. '
+                                    + 'The lifting is placed to keep its distance from both.'
+                                  : 'One hard session a week holds top-end aerobic fitness. It does not build it. '
+                                    + 'A run or ride club goes here.'}
                               </p>
                               <button
                                 type="button"
@@ -3902,6 +3937,39 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 `hardday` step used. The flat option's stated cost survives the
                                 shortening — that was the condition its ruling came with, not
                                 decoration. */}
+                            {/* ⛔ NAME WHAT THE DAY BUYS, NOT WHAT IT IS MADE OF (§7, Michael
+                                2026-08-17, from the live screen). The card sold mechanics — reps,
+                                grades, protocols — and never said what the athlete gets for it.
+                                ⚠️ THE SECOND SLOT IS THE SUSTAINED ONE and the athlete should know
+                                that before they fill it, because it is the answer to a different
+                                question: intervals raise the ceiling, threshold holds pace longer.
+                                ⛔ NO §6 PROMISE. "The lifting stacks onto these days" is §6 and §6
+                                is not built — the placer still keeps lifting AWAY from hard days. */}
+                            {activeHard && (
+                              <p className="text-white/45 text-xs leading-snug pt-1">
+                                {activeHard.ownership === 'club'
+                                  ? 'We build the week around this one and keep the lifting clear of it. '
+                                    + 'We do not prescribe what you do in it.'
+                                  : hardSlotIndex === 0
+                                    ? 'Intervals — this is the day that raises your top end.'
+                                    : 'Sustained work — this is the day that lets you hold a pace for longer.'}
+                              </p>
+                            )}
+                            {/* ⛔ AND WHEN AN OPTION IS NOT OFFERED, THE SCREEN SAYS WHY (§7's gate).
+                                A chip that is simply absent reads as a bug. The reason is the
+                                PROGRESSION, not a missing database field: a session that cannot
+                                state a pace or a wattage cannot get faster on purpose. */}
+                            {(['run', 'bike'] as const)
+                              .filter((d) => posturePresent(d) && !hardDayAvailable[d])
+                              .map((d) => (
+                                <p key={`gate-${d}`} className="text-white/35 text-xs leading-snug pt-1">
+                                  {d === 'run'
+                                    ? 'A hard run needs your 5K time — without it there is no pace to prescribe, '
+                                      + 'so the session could not get faster across the block. Add it in Training Baselines.'
+                                    : 'A hard ride needs your FTP — without it there is no wattage to prescribe, '
+                                      + 'so the session could not get harder across the block. Add it in Training Baselines.'}
+                                </p>
+                              ))}
                             {/* ── WHOSE SESSION IS IT (§1i) ───────────────────────────────────
                                 ⛔ THE FLOW ASKED ONE QUESTION AND NEEDED TWO. "Which day" and "whose
                                 session" are different facts: the app can prescribe intervals into

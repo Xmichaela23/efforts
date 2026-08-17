@@ -25,7 +25,7 @@ import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
 
 const rideHoursBuilt = (args: Record<string, unknown>): number => {
-  const p: any = composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, ...args } as never);
+  const p: any = composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, ...args } as never);
   const mins = (p.sessions_by_week['2'] as any[])
     .filter((s) => s.type === 'ride').reduce((a, s) => a + s.duration, 0);
   return mins / 60;
@@ -66,7 +66,7 @@ Deno.test('⛔ THE RIDE HOURS ARE THE ASK — every shape, hard day or not', () 
 Deno.test('the hard ride does not shrink to fit — intensity is the protected variable', () => {
   const p: any = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES,
-    enduranceSport: 'bike', enduranceFrequency: 3,
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'bike', enduranceFrequency: 3,
     bike: { hours: 4, days: 3, longRideDay: 'saturday' },
     hardDays: [{ day: 'tuesday', discipline: 'bike' }],
   } as never);

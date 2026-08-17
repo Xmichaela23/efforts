@@ -26,7 +26,7 @@ import { voiceViolation } from '../../_shared/state-trend/week-accent.ts';
 const plan = composeStrengthPrimaryPlan({
   durationWeeks: 12,
   oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-  enduranceSport: 'run',
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
   enduranceFrequency: 3,
   targetWeeklyMiles: 20,
   longRunDay: 'sunday',

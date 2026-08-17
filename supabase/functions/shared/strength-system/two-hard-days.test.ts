@@ -21,12 +21,15 @@ const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
 const WEEK = '2';   // week 1 is a standalone TM-test week; week 2 is the representative working week
 
 const build = (cfg: Record<string, unknown>): any =>
-  composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, ...cfg } as never);
+  composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, ...cfg } as never);
 
 const week = (plan: any): any[] => (plan.sessions_by_week[WEEK] ?? []) as any[];
 const minutesOf = (w: any[], type: string) => w.filter((s) => s.type === type).reduce((n, s) => n + s.duration, 0);
-const isHardRun = (s: any) => s.type === 'run' && /Hill|Interval|Tempo|Repeat/i.test(s.name);
-const isHardRide = (s: any) => s.type === 'ride' && /Interval/i.test(s.name);
+// ⚠️ WIDENED FOR §7 (2026-08-17): the SECOND prescribed hard day is a THRESHOLD session, not a
+// second VO2 one — "never two VO2 days" is the rule. A matcher that only knew the interval names
+// would report the second day as missing when it is in fact the session §7 asked for.
+const isHardRun = (s: any) => s.type === 'run' && /Hill|Interval|Tempo|Repeat|Threshold/i.test(s.name);
+const isHardRide = (s: any) => s.type === 'ride' && /Interval|Threshold/i.test(s.name);
 const isClub = (s: any) => Array.isArray(s.tags) && s.tags.includes('club');
 
 const RUN_BLOCK = {
@@ -50,9 +53,11 @@ Deno.test('⛔ TWO HARD RUNS both get built, on the days the athlete pinned', ()
   const hard = w.filter(isHardRun);
   assertEquals(hard.length, 2, `built ${hard.length} hard runs: ${hard.map((s) => s.name).join(', ')}`);
   assertEquals(hard.map((s) => String(s.day)).sort(), ['Thursday', 'Tuesday']);
-  // ⚠️ EACH ONE KEEPS ITS OWN TERRAIN. A single `hardDay.terrain` read would have given both the
-  // same session, which is the shape of the bug rather than an aesthetic complaint.
+  // ⛔ ONE VO2 AND ONE THRESHOLD, NEVER TWO VO2 (§7). Before §7 this asserted only that the two
+  // sessions DIFFERED — which two hill variants also satisfy. The rule is sharper than that now.
   assertEquals(new Set(hard.map((s) => s.name)).size, 2, 'both hard runs are the same session');
+  assertEquals(hard.filter((s) => /Threshold/i.test(s.name)).length, 1, 'no threshold run was built');
+  assertEquals(hard.filter((s) => /Hill|Interval|Repeat/i.test(s.name)).length, 1, 'two VO2 runs were built');
 });
 
 Deno.test('⛔ TWO HARD RIDES both get built', () => {
@@ -60,7 +65,10 @@ Deno.test('⛔ TWO HARD RIDES both get built', () => {
     ...BIKE_BLOCK,
     hardDays: [{ day: 'tuesday', discipline: 'bike' }, { day: 'thursday', discipline: 'bike' }],
   }));
-  assertEquals(w.filter(isHardRide).length, 2);
+  const hard = w.filter(isHardRide);
+  assertEquals(hard.length, 2);
+  // §7 — one of each, never two VO2.
+  assertEquals(hard.filter((s) => /Threshold/i.test(s.name)).length, 1);
 });
 
 Deno.test('⛔ ONE OF EACH — the multisport week §1i calls the most common one', () => {

@@ -276,6 +276,28 @@ export type StrengthPrimaryArgs = {
    */
   targetWeeklyRideHours?: number;
   /**
+   * ⛔ THE NUMBERS THE HARD SESSIONS PRICE OFF (§7, 2026-08-17). **FED, NOT RE-DERIVED.** All three
+   * come from resolvers that already exist and are already the single source of truth for their
+   * fact: `resolve-current-ftp.ts`, `resolve-current-run-pace.ts` (threshold), and
+   * `resolve-current-5k-pace.ts`. `generate-strength-plan` resolved ONLY the easy pace and nothing
+   * else reached here — the starved-input pattern §7 names, the same shape as the run-pace resolver
+   * that was written, tested and never once ran. ⛔ Do not write a fourth resolver.
+   *
+   * ⚠️ THEY ARE ALSO THE GATE. A session that cannot state a pace or a wattage cannot get faster on
+   * purpose, so a hard day for a discipline whose number is missing is DROPPED with a compromise
+   * line rather than built as a prescription nobody can follow. See `hardDayGate` below.
+   */
+  ftpWatts?: number | null;
+  /** sec per MILE, from `resolveCurrentRunThresholdPace`. */
+  thresholdPaceSecPerMi?: number | null;
+  /**
+   * sec per MILE, from `resolveCurrent5kPace`. ⛔ THE RUN GATE TESTS THIS, NOT A THRESHOLD PACE —
+   * §7: *"there is no independent threshold pace on the athlete"*; the app derives it as 5K + 20
+   * s/mi when nothing measured exists (`materialize-plan`'s own rule). So the number that has to be
+   * present is the 5K, and the session copy says which of the two it used.
+   */
+  fiveKPaceSecPerMi?: number | null;
+  /**
    * The athlete's assistance picks — **twelve now, not three** (D-407).
    *
    * ⛔ ANY STORED SHAPE IS ACCEPTED. `normalizeAssistancePrefs` migrates the old flat
@@ -458,6 +480,14 @@ const DEFAULT_LONG_DAY = 'Saturday';
  * week nobody designed, so the extra entries are dropped at the door rather than honoured.
  */
 const MAX_HARD_DAYS = 2;
+
+/** A finite, positive number or null. ⚠️ Guarded BEFORE `Number()` — `Number(null)` is 0, and 0 is
+ *  not a pace or a wattage; reading it as one is the documented repeat bug in this codebase. */
+function asPositiveNumber(v: unknown): number | null {
+  if (v == null) return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 // ── The session (SPEC §1) ────────────────────────────────────────────────────
 // 1. jumps or throws  2. the main lift  3. the supplemental (leaders)  4. the three assistance slots.
@@ -1200,19 +1230,219 @@ function enduranceSession(
  *  which is exactly the defect that subtraction was added to fix. Mirrors `HILL_SESSION_MIN`. */
 const BIKE_QUALITY_MIN = 45;
 
-function bikeQualitySession(day: string): PlanSession {
+/**
+ * ⛔ THE WAVE — THE HARD DAY MOVES WITH THE BARBELL, WEEK BY WEEK (§7, 2026-08-17).
+ *
+ * Until this, `hardRunSession(day, lowerDays, terrain)` and `bikeQualitySession(day)` took NO WEEK
+ * ARGUMENT: the same session was authored in week 1 and week 11. Twelve identical sessions is a
+ * maintenance dose repeated, which is what the screen's own copy admitted — *"holds top-end aerobic
+ * fitness. It does not build it."* The lifting has waved since it shipped; the endurance did not.
+ *
+ * ⛔ INTENSITY AND DENSITY ARE THE ONLY LEVERS, because weekly endurance VOLUME is locked by the
+ * athlete's typed miles/hours. Growing total working time is not available and would not be wanted:
+ * these sessions land on the same day as heavy squats under §6, and the 12–18 min VO2 / 30–40 min
+ * threshold ceilings are exactly what keeps that day survivable. **A progression that grows working
+ * time past those defeats the stacking law**, so every step below holds working time and moves
+ * something else.
+ *
+ * ⛔ ONE LEVER PER WAVE, NOT BOTH (Michael's spec). The run's VO2 moves PACE — its recovery is the
+ * descent, which is a distance and not a duration (see `descentIsJogged`), so density is not
+ * available to it. The ride's VO2 moves DENSITY — 4 min recovery down to 3, which is Helgerud's own
+ * figure, so the progression ends AT the protocol rather than past it.
+ *
+ * ⚠️ `cycleKind` IS THE SECOND AXIS, and it mirrors the bar: leaders establish and advance, the
+ * ANCHOR is shortest and fastest — the same shape as the anchor's 95% single.
+ */
+type HardWave = { weekInCycle: number; cycleKind: CycleKind };
+
+/**
+ * ⛔ 20 MINUTES IN ZONE, HELD, WITH THE CONTINUOUS EFFORT LENGTHENING (§7, Michael's spec).
+ * 4 × 5 → 3 × 7 → 2 × 10 across the three weeks of a wave. Same time in zone, harder demand — the
+ * athlete holds the pace for twice as long by week three without doing a minute more of it.
+ *
+ * ⚠️ THE TOTALS ARE 20 · 21 · 20 MIN and that is inside the 30–40 min ceiling with room to spare.
+ * The ceiling is not a target: it is the point past which this session stops being compatible with a
+ * heavy lower day beside it.
+ */
+const THRESHOLD_WAVE: ReadonlyArray<{ reps: number; minutes: number; restMin: number }> = [
+  { reps: 4, minutes: 5, restMin: 1 },
+  { reps: 3, minutes: 7, restMin: 2 },
+  { reps: 2, minutes: 10, restMin: 3 },
+];
+
+function thresholdStep(wave: HardWave): { reps: number; minutes: number; restMin: number } {
+  const i = Math.min(Math.max(1, Math.round(wave.weekInCycle)), THRESHOLD_WAVE.length) - 1;
+  return THRESHOLD_WAVE[i];
+}
+
+/** Total working minutes of a threshold step — the number the 30–40 min ceiling is checked against. */
+function thresholdWorkingMinutes(wave: HardWave): number {
+  const st = thresholdStep(wave);
+  return st.reps * st.minutes;
+}
+
+/**
+ * ⛔ THE RUN'S THRESHOLD SESSION — THE SUSTAINED WORK THE BLOCK HAD NONE OF (§7).
+ *
+ * Both existing hard sessions are VO2 (4 × 3 hills, 4 × 4 ride). There was no comfortably-hard
+ * sustained work anywhere in the block, which is the gap this fills — and it is the session a CLUB
+ * day is mapped to, because a group run settles into exactly this rhythm.
+ *
+ * ⚠️ THE PACE IS NAMED, NOT INVENTED. The token prices off the athlete's threshold pace, which the
+ * app derives as 5K pace + 20 s/mi when no measured threshold exists (`materialize-plan`'s own
+ * rule) — and the copy says which of the two it used, because a pace target the athlete cannot
+ * trace is the number-without-provenance this codebase keeps deleting.
+ */
+function thresholdRunSession(day: string, wave: HardWave, basis: 'measured' | 'derived'): PlanSession {
+  const st = thresholdStep(wave);
+  const anchor = wave.cycleKind === 'anchor';
+  return {
+    day,
+    type: 'run',
+    name: 'Threshold Run',
+    description:
+      `${st.reps} × ${st.minutes} min at threshold, ${st.restMin} min easy between. `
+      + 'Comfortably hard — you could say a sentence, not hold a conversation. '
+      + (anchor
+        ? 'Anchor week: hold the top of the range. This is the fastest this session gets in the block. '
+        : 'The reps get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
+      + (basis === 'measured'
+        ? 'The pace comes from your measured threshold.'
+        : 'The pace is derived from your 5K — threshold sits about 20 s/mi slower.'),
+    duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
+    steps_preset: [`run_thr_${st.reps}x${st.minutes}min_r${st.restMin * 60}s`],
+    tags: ['quality', 'run', 'aerobic', 'threshold'],
+  };
+}
+
+/**
+ * ⛔ THE RIDE'S THRESHOLD SESSION — the same wave, one discipline over. Prices at 95–105% FTP
+ * through the `bike_thr_*` token family, which the expander already understands; nothing new was
+ * invented for the bike.
+ */
+function thresholdRideSession(day: string, wave: HardWave): PlanSession {
+  const st = thresholdStep(wave);
+  const anchor = wave.cycleKind === 'anchor';
+  return {
+    day,
+    type: 'ride',
+    name: 'Threshold Ride',
+    description:
+      `${st.reps} × ${st.minutes} min at threshold, ${st.restMin} min easy between. `
+      + 'Comfortably hard — you could say a sentence, not hold a conversation. '
+      + (anchor
+        ? 'Anchor week: hold the top of the range. This is the hardest this session gets in the block. '
+        : 'The efforts get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
+      + 'Spin it, do not grind it: the same cue as the interval day, and for the same reason.',
+    duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
+    steps_preset: [`bike_thr_${st.reps}x${st.minutes}min_R${st.restMin}min`],
+    tags: ['quality', 'bike', 'aerobic', 'threshold'],
+  };
+}
+
+/** Warm-up plus cool-down, the same allowance the VO2 sessions carry in their stated duration. */
+const WARMUP_COOLDOWN_MIN = 20;
+
+/**
+ * ⛔ ONE OWNER FOR THE THRESHOLD RUN'S LENGTH — the run mileage budget subtracts it before
+ * distributing easy volume, exactly as it does for the hill session (`hardRunSessionMinutes`).
+ *
+ * ⚠️ IT IS THE WAVE'S LONGEST WEEK (45 min: 3 × 7 + 2 × 2 rest + 20 warm-up/cool-down), not a mean.
+ * The budget is computed once for the block while the session's length moves 43 · 45 · 43 across a
+ * wave, so one number has to stand for three. Taking the LONGEST over-subtracts by two minutes on
+ * two weeks in three; taking the shortest would hand those minutes back as easy miles every week,
+ * which is the +3.5 mi defect this file has already fixed twice. Over-subtracting is the safe
+ * direction and it is small.
+ */
+const THRESHOLD_RUN_MIN = Math.max(
+  ...THRESHOLD_WAVE.map((st) => st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN),
+);
+
+/** The minutes a hard run costs the week's mileage budget, by the role it was assigned (§7). */
+function hardRunMinutesForRole(role: HardRole, terrain?: HardRunTerrain): number {
+  return role === 'threshold' ? THRESHOLD_RUN_MIN : hardRunSessionMinutes(terrain);
+}
+
+/**
+ * ⛔ THE RIDE'S VO2 DAY, AND IT NOW MOVES ACROSS THE WAVE (§7, 2026-08-17).
+ *
+ * Reps and working time are STATIC — 4 × 4 min, 16 min, Helgerud's protocol verbatim and inside the
+ * 12–18 min ceiling. The lever is DENSITY: the recovery comes down 4 → 3 min across the wave, so the
+ * same work is done with less rest and the session gets harder without getting longer.
+ *
+ * ⚠️ IT ENDS AT HELGERUD'S OWN NUMBER, NOT PAST IT. His protocol is 3 min active recovery; this
+ * OPENS at 4 and arrives there, so the progression finishes at the evidence rather than overshooting
+ * it. ⛔ Do not extend the wave by cutting recovery further — below 3 min this stops being the
+ * protocol the 7% VO2max figure came from.
+ *
+ * ⚠️ ONE LEVER. The pace/wattage cue is unchanged across the wave on purpose (§7: "one lever per
+ * wave, not both"); the anchor's copy asks for the top of the range, which is a CUE and not a second
+ * prescribed step.
+ */
+function bikeQualitySession(day: string, wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' }): PlanSession {
+  // 4 min in week one of a wave, 3 from week two — and 3 is where it stays.
+  const restMin = Math.max(1, Math.round(wave.weekInCycle)) <= 1 ? 4 : 3;
+  const anchor = wave.cycleKind === 'anchor';
   return {
     day,
     type: 'ride',
     name: 'Bike Intervals',
     description:
-      '4 × 4 min hard, 4 min easy between. Hard means hard — you should not be able to hold a '
+      `4 × 4 min hard, ${restMin} min easy between. Hard means hard — you should not be able to hold a `
       + 'sentence. Spin it, do not grind it: a fast, easy spin keeps this in your lungs instead of '
-      + 'your legs, which is what leaves the lifting intact.',
+      + 'your legs, which is what leaves the lifting intact.'
+      + (restMin === 3
+        ? ' The recovery is shorter than week one — same work, less rest.'
+        : '')
+      + (anchor ? ' Anchor week: hold the top of the range.' : ''),
     duration: BIKE_QUALITY_MIN,
-    steps_preset: ['bike_vo2_4x4min_R4min'],
+    steps_preset: [`bike_vo2_4x4min_R${restMin}min`],
     tags: ['quality', 'bike', 'aerobic'],
   };
+}
+
+/**
+ * ⛔ WHICH SESSION EACH HARD DAY IS (§7, 2026-08-17). One place, because the rule has three parts
+ * and every one of them is a decision somebody could quietly re-derive differently.
+ *
+ *  1. **Never two VO2 days.** Two hard days is one of each — the second VO2 session buys little that
+ *     the first does not, and it spends mechanical budget the lifting needs.
+ *  2. **A club day is ALWAYS the threshold slot** (Michael, 2026-08-17). A group ride or run club
+ *     settles into a sustained, fast rhythm at or around threshold; true VO2 work — precise
+ *     intervals, strict rest — is near-impossible in a pack. ⚠️ REASONED FROM GROUP DYNAMICS AND
+ *     VIADA'S SEPARATION OF THE TWO SYSTEMS: coaching-model evidence, not a trial. Labelled as such
+ *     here so it is not later cited as measured.
+ *  3. **One hard day → VO2**, because VO2 is the quality that decays fastest and the one ordinary
+ *     easy volume cannot hold, while threshold is better preserved by general aerobic work.
+ *     ⚠️ ALSO REASONED FROM STANDARD PRACTICE rather than from a page in either book — §7 flags it
+ *     and it is flagged again here.
+ *
+ * ⛔ AND A CLUB DAY IS NEVER GIVEN CONTENT. It occupies the threshold SLOT — which is what stops the
+ * app prescribing a VO2 session beside it — but the app writes no session for it (§1i). So one club
+ * day and nothing else means the block carries NO prescribed intervals, and the copy has to say so
+ * rather than letting the athlete discover an empty quality slot.
+ */
+type HardRole = 'vo2' | 'threshold' | 'club';
+
+function assignHardRoles(
+  days: ReadonlyArray<{ day: DayName; discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }>,
+): HardRole[] {
+  const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'vo2'));
+  // A club day already fills the threshold slot, so the app's own sessions fill what is left: the
+  // FIRST prescribed day takes VO2 and any second prescribed day takes threshold.
+  const clubHoldsThreshold = roles.includes('club');
+  let vo2Taken = false;
+  for (let i = 0; i < roles.length; i++) {
+    if (roles[i] === 'club') continue;
+    if (!vo2Taken) { roles[i] = 'vo2'; vo2Taken = true; continue; }
+    roles[i] = 'threshold';
+  }
+  // ⚠️ WITH A CLUB DAY PRESENT, A SECOND PRESCRIBED DAY IS STILL VO2 — the club is the threshold
+  // day, so the app's day is the one that has to carry the intervals (§7's two-day-one-club case).
+  if (clubHoldsThreshold) {
+    for (let i = 0; i < roles.length; i++) if (roles[i] === 'threshold') roles[i] = 'vo2';
+  }
+  return roles;
 }
 
 /**
@@ -1533,18 +1763,46 @@ export function hardRunSessionMinutes(terrain?: HardRunTerrain): number {
   }
 }
 
+/**
+ * ⛔ THE RUN'S VO2 DAY, AND IT MOVES ACROSS THE WAVE TOO (§7, 2026-08-17).
+ *
+ * ⚠️ THE LEVER IS PACE, NOT DENSITY, AND THAT IS FORCED RATHER THAN CHOSEN. The recovery on a hill
+ * session is the DESCENT — a distance, not a duration, ending on the lap button (see
+ * `descentIsJogged` and the `_rlap_` token). There is no recovery clock to shorten, so density is
+ * unavailable to this session and pace is the only lever left. §7's "one lever per wave" is
+ * satisfied by construction here rather than by a decision.
+ *
+ * ⛔ SO THE PROGRESSION LIVES IN THE PRESCRIPTION, NOT IN THE TOKEN. The reps, the grade and the
+ * descent are identical every week — the token is unchanged and the expander needs nothing new —
+ * and what escalates is the effort the athlete is asked for. ⚠️ THIS IS THE HONEST LIMIT OF IT: a
+ * hill session cannot state a pace target, because the pace on a 6% grade is not the pace on a 4%
+ * one. The cue is comparative ("faster than the last one") rather than absolute, which is what this
+ * session can actually support. The FLAT and TREADMILL variants could carry a number; they do not
+ * yet, and that is named rather than hidden.
+ */
 function hardRunSession(
   day: string,
   lowerDays: string[],
   terrain?: HardRunTerrain,
+  wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' },
 ): PlanSession {
-  switch (terrain) {
-    case 'hill_short': return shortHillSession(day, lowerDays);
-    case 'treadmill': return treadmillSession(day);
-    case 'flat': return flatSession(day);
-    case 'hill_3min':
-    default: return hillSession(day, lowerDays);
-  }
+  const base = (() => {
+    switch (terrain) {
+      case 'hill_short': return shortHillSession(day, lowerDays);
+      case 'treadmill': return treadmillSession(day);
+      case 'flat': return flatSession(day);
+      case 'hill_3min':
+      default: return hillSession(day, lowerDays);
+    }
+  })();
+  const step = Math.min(Math.max(1, Math.round(wave.weekInCycle)), 3);
+  const cue = wave.cycleKind === 'anchor'
+    ? ' Anchor week: this is the fastest this session gets in the block — hold the top of what you '
+      + 'can repeat for every rep.'
+    : step === 1
+      ? ' First week of the wave: settle on an effort you can hold for all four reps, and remember it.'
+      : ' Same reps, same hill: go a little faster than last week, and hold it for every rep.';
+  return { ...base, description: `${base.description}${cue}` };
 }
 
 /**
@@ -1806,8 +2064,44 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       ownership: raw.ownership === 'club' ? 'club' : 'prescribed',
     });
   }
-  const hardRunDays = hardDays.filter((h) => h.discipline === 'run');
-  const hardRideDays = hardDays.filter((h) => h.discipline === 'bike');
+  /**
+   * ⛔ NO NUMBER, NO HARD DAY (§7, Michael 2026-08-16) — AND THE REASON IS NOT BUREAUCRACY.
+   * A session that cannot state a pace or a wattage cannot get faster on purpose, so there is no
+   * progression to prescribe: the athlete would get the same unpriced session twelve times, which is
+   * the maintenance-dose-repeated defect §7 exists to end.
+   *
+   * ⛔ IT GATES THE HARD DAY, NOT THE PLAN. The hard day is OPTIONAL and the block is complete
+   * without it, so a missing FTP must not refuse a plan the athlete can legitimately run. A gated
+   * day is DROPPED and the week is built exactly as it is for someone who declined one — plus a
+   * compromise line, because a day the athlete pinned vanishing in silence is the absorption bug
+   * this file has fixed twice.
+   *
+   * ⚠️ THE RUN TESTS THE 5K, NOT A THRESHOLD PACE. There is no independent threshold pace on the
+   * athlete; the app derives it as 5K + 20 s/mi. A gate on a derived number would refuse athletes
+   * who have everything the session actually needs.
+   * ⚠️ A CLUB DAY IS NOT GATED. The app prescribes nothing for it, so there is no number to state —
+   * gating it would refuse to hold a day the athlete is going to train on regardless.
+   */
+  const runPaceForHard = asPositiveNumber(args.fiveKPaceSecPerMi) ?? asPositiveNumber(args.thresholdPaceSecPerMi);
+  const ftpForHard = asPositiveNumber(args.ftpWatts);
+  const hardDayGate = (h: { discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }): boolean =>
+    h.ownership === 'club'
+      || (h.discipline === 'bike' ? ftpForHard != null : runPaceForHard != null);
+  // ⚠️ COLLECTED HERE, SURFACED WHERE `placementCompromises` LIVES (below) — the gate has to run
+  // before the pins are built and that array is declared after them.
+  const hardGateNotes: string[] = hardDays.filter((h) => !hardDayGate(h)).map((h) => (
+    h.discipline === 'bike'
+      ? 'The hard ride was left out: without an FTP there is no wattage to prescribe, and no way for '
+        + 'the session to get harder on purpose. Add it in Training Baselines and rebuild.'
+      : 'The hard run was left out: without a 5K time there is no pace to prescribe, and no way for '
+        + 'the session to get faster on purpose. Add it in Training Baselines and rebuild.'
+  ));
+  const gatedHardDays = hardDays.filter(hardDayGate);
+  const hardRoles = assignHardRoles(gatedHardDays);
+  const roleOf = (day: DayName): HardRole =>
+    hardRoles[gatedHardDays.findIndex((h) => h.day === day)] ?? 'vo2';
+  const hardRunDays = gatedHardDays.filter((h) => h.discipline === 'run');
+  const hardRideDays = gatedHardDays.filter((h) => h.discipline === 'bike');
   const runSelected = enduranceSport === 'run' || askedRunMiles > 0 || !!asDay(args.longRunDay)
     || hardRunDays.length > 0;
   const bikeSelected = hasBike || enduranceSport === 'bike';
@@ -2327,9 +2621,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * `src/lib/strength-focus-copy.ts` still filters on it, and removing the member is a client change
    * this engine-only slice does not make. Slice b retires the pair together.
    */
+  // §7's gate, surfaced: a day the athlete pinned that could not be priced says so rather than
+  // vanishing. Deduped — two gated days of the same discipline is one sentence, not two.
+  const hardGateCompromises = [...new Set(hardGateNotes)]
+    .map((text) => ({ kind: 'cost' as const, text }));
   const placementCompromises: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }> = [
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
+    ...hardGateCompromises,
   ];
   // ⛔ A BLOCK-LEVEL `assistanceRows(args.assistancePicks)` STOOD HERE AND NOTHING READ IT.
   // Deleted 2026-07-28. Zero consumers, confirmed by identifier scan — the live assistance is
@@ -2623,7 +2922,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // runs it would have subtracted one session's minutes and handed the other's back as easy miles
     // — the same +3.5 mi defect the terrain fix above closed, reopened by the second slot.
     // ⚠️ EACH ONE PAYS ITS OWN TERRAIN. A hill session and a flat session are different lengths.
-    const hardRunMiles = hardRunDays.reduce((mi, h) => mi + hardRunSessionMinutes(h.terrain) / pace, 0);
+    // ⛔ EACH HARD RUN COSTS WHAT ITS OWN SESSION COSTS (§7). This summed `hardRunSessionMinutes`
+    // for every hard run — right while they were all hill sessions, and wrong the moment the second
+    // one became a THRESHOLD run, which is a different length. Under-subtracting hands the
+    // difference back as easy miles every week, silently.
+    const hardRunMiles = hardRunDays.reduce(
+      (mi, h) => mi + hardRunMinutesForRole(roleOf(h.day), h.terrain) / pace, 0);
     const easyBudget = Math.max(1, held - hardRunMiles);
     // ⛔ ABOVE THE SELF-REGULATION LINE THE ENGINE STOPS SHAPING THE WEEK (2026-07-29).
     //
@@ -3096,13 +3400,21 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             'easy', true));
           continue;
         }
-        // ⛔ A CLUB RUN IS BOOKED, NOT COACHED (§1i). The app cannot prescribe 4 × 3 min uphill into
-        // a session the athlete turns up to and runs with a group, and writing the template anyway
-        // would be a prescription for work nobody is going to do. It keeps its pin, its recovery
-        // cost and its share of the week's miles — what it does not get is a session the app made up.
-        weekSessions.push(h.ownership === 'club'
-          ? clubEnduranceSession('run', h.day, hardRunSessionMinutes(h.terrain))
-          : hardRunSession(h.day, heavyLowerDays, h.terrain));
+        // ⛔ WHICH SESSION THIS DAY IS (§7). A club run is booked, not coached (§1i) — the app cannot
+        // prescribe 4 × 3 min uphill into a session the athlete turns up to and runs with a group,
+        // and writing the template anyway would be a prescription for work nobody is going to do. It
+        // keeps its pin, its recovery cost and its share of the week's miles.
+        // ⚠️ THE THRESHOLD RUN IS THE SECOND PRESCRIBED DAY, never the first — `assignHardRoles`
+        // owns that and it is asked here rather than re-derived.
+        const role = roleOf(h.day);
+        weekSessions.push(
+          role === 'club'
+            ? clubEnduranceSession('run', h.day, hardRunSessionMinutes(h.terrain))
+            : role === 'threshold'
+              ? thresholdRunSession(h.day, { weekInCycle, cycleKind },
+                asPositiveNumber(args.thresholdPaceSecPerMi) != null ? 'measured' : 'derived')
+              : hardRunSession(h.day, heavyLowerDays, h.terrain, { weekInCycle, cycleKind }),
+        );
       }
     } else if (enduranceSport === 'bike' && !hasBike) {
       // ⛔ TWO EMITTERS WERE AUTHORING RIDES AND NOTHING SUBTRACTED (found 2026-07-29 by the combo
@@ -3222,7 +3534,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // first at its full 45 minutes and the easy hours flex around it.
       // ⛔ SUMMED ACROSS EVERY HARD RIDE (§1i) — was one session's worth off a single hard day, so a
       // second hard ride would have been built on top of the athlete's asked-for hours.
-      const hardRideMins = hardRideDays.length * BIKE_QUALITY_MIN;
+      // ⛔ AND EACH HARD RIDE COSTS ITS OWN SESSION'S MINUTES (§7) — a threshold ride is longer than
+      // the 45-minute interval session, so a flat multiple would under-subtract it.
+      const hardRideMins = hardRideDays.reduce(
+        (mins, h) => mins + (roleOf(h.day) === 'threshold' ? THRESHOLD_RUN_MIN : BIKE_QUALITY_MIN), 0);
       const totalMins = Math.max(30, Math.round(rideHours * 60) - hardRideMins);
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
       // authored number left in this block and it is marked as such: a long ride that is the same
@@ -3281,11 +3596,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             'easy', true));
           continue;
         }
-        // ⛔ A CLUB RIDE IS BOOKED, NOT COACHED (§1i) — see the run branch. The app does not write
-        // 4 × 4 into a group ride it does not control.
-        weekSessions.push(h.ownership === 'club'
-          ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_MIN)
-          : bikeQualitySession(h.day));
+        // ⛔ WHICH SESSION THIS DAY IS (§7) — same three-way as the run. A club ride is booked, not
+        // coached (§1i): the app does not write 4 × 4 into a group ride it does not control.
+        const role = roleOf(h.day);
+        weekSessions.push(
+          role === 'club'
+            ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_MIN)
+            : role === 'threshold'
+              ? thresholdRideSession(h.day, { weekInCycle, cycleKind })
+              : bikeQualitySession(h.day, { weekInCycle, cycleKind }),
+        );
       }
     }
 

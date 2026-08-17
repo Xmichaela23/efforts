@@ -23,7 +23,7 @@ const MAXES = { bench: 225, squat: 315, deadlift: 405, overheadPress: 135 };
 const PLAN = composeStrengthPrimaryPlan({
   durationWeeks: 12,
   oneRepMaxes: MAXES,
-  enduranceSport: 'run',
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
   enduranceFrequency: 3,
   targetWeeklyMiles: 20,
   easyPaceMinPerMile: 9,
@@ -197,7 +197,7 @@ Deno.test('warm-up weights floor at the lift\'s own bar — 45 normally, 35 on a
   const light = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { bench: 95, squat: 135, deadlift: 155, overheadPress: 65 },
-    enduranceSport: 'run',
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
     enduranceFrequency: 3,
   });
   // ⚠️ WEEK 1 — a cycle week, so it carries the warm-up ramp the light weeks do not.
@@ -365,7 +365,7 @@ Deno.test('a work session is jumps → main lift → the phase\u2019s rep total 
 
 Deno.test('the athlete’s picks reach the block, and an unknown name falls back rather than failing', () => {
   const picked = composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
+    durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Dips', pull: 'Dumbbell Row', single_leg_core: 'Hanging Leg Raise' },
   });
   // Named, not indexed — `[0]` assumed Bench was the first session, which was the grid's doing.
@@ -390,7 +390,7 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
 
   // A name that is no longer offered must not strand an existing goal.
   const stale = composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
+    durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Bench Press Machine', pull: '', single_leg_core: undefined },
   });
   // ⛔ FALLBACK IS PER SLOT AND PER DAY, so an unrecognised name costs that one slot rather than the
@@ -405,7 +405,7 @@ Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded op
   // off a ratio forces progression on a secondary movement and spends the fatigue budget the
   // athlete's endurance training needs. Every option on the menu, loaded or not, is by feel.
   const picked = composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0,
+    durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Bulgarian Split Squat' },
   });
   for (const row of picked.sessions_by_week['1'][0].strength_exercises!.slice(2) as any[]) {
@@ -466,7 +466,7 @@ Deno.test('a block is 8 or 12 weeks — anything else snaps DOWN to one of them'
   assertEquals(blockWeeks(16), 12);   // ⛔ 16 is not offered (2026-08-16)
   assertEquals(blockWeeks(10), 8);
   assertEquals(blockWeeks(3), 8);     // under the floor resolves UP to the shortest real block
-  const ten = composeStrengthPrimaryPlan({ durationWeeks: 10, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0 });
+  const ten = composeStrengthPrimaryPlan({ durationWeeks: 10, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0 });
   assertEquals(ten.duration_weeks, 8);
   assertEquals(Object.keys(ten.sessions_by_week).length, 8);
 });
@@ -512,7 +512,7 @@ Deno.test('a stacked lift + run day puts the lift first', () => {
   const stackedPlan = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: MAXES,
-    enduranceSport: 'run',
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
     enduranceFrequency: 4,
     targetWeeklyMiles: 25,
     easyPaceMinPerMile: 9,
@@ -540,7 +540,7 @@ Deno.test('there is exactly ONE full rest day, every week of the block', () => {
 });
 
 Deno.test('strength-only: no endurance sessions, block otherwise unchanged', () => {
-  const solo = composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0 });
+  const solo = composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0 });
   for (let week = 1; week <= 12; week++) {
     assertEquals(solo.sessions_by_week[String(week)].every((s) => s.type === 'strength'), true);
   }
@@ -631,7 +631,7 @@ Deno.test('at a maintenance dose the branch is live — one heavy day can clear'
  * future rule that consumes a free day belongs in this test.
  */
 const MIX = (over: Record<string, unknown>) => composeStrengthPrimaryPlan({
-  durationWeeks: 12, oneRepMaxes: MAXES, easyPaceMinPerMile: 9, ...over,
+  durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, easyPaceMinPerMile: 9, ...over,
 } as never);
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

@@ -35,7 +35,7 @@ Deno.test('deload work sets floor at the empty bar — a light press cannot pres
   const plan = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { squat: 110, deadlift: 150, bench: 150, overheadPress: 100 },
-    enduranceSport: 'run',
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
   });
   // ⚠️ WEEK 4 IS A REAL 7TH-WEEK DELOAD NOW (2026-08-16) — four sets, 70/80/90/100% of the training
   // max, not the three-set leader week it happened to be under the previous map.
@@ -56,7 +56,7 @@ Deno.test('a light lift keeps sub-45 sets — the room below the standard bar is
   const plan = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { squat: 110, deadlift: 150, bench: 150, overheadPress: 60 },
-    enduranceSport: 'run',
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
   });
   const week1 = ohpSetPlan(plan, '1');
   assert(week1.some((w) => w < BAR), `expected a sub-bar work set in week 1, got ${JSON.stringify(week1)}`);
@@ -86,7 +86,7 @@ Deno.test('a 70 lb press builds: sets floor at 35, none below it, and the plan c
   const plan = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { squat: 110, deadlift: 150, bench: 150, overheadPress: 70 },
-    enduranceSport: 'run',
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
   });
   for (const wk of ['1', '4']) {
     for (const w of ohpSetPlan(plan, wk)) {
@@ -102,7 +102,7 @@ Deno.test('an 85+ block keeps the 45 floor everywhere and carries no women\'s-ba
   const plan = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { squat: 110, deadlift: 150, bench: 150, overheadPress: 100 },
-    enduranceSport: 'run',
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run',
   });
   for (const w of ohpSetPlan(plan, '4')) assert(w >= 45, `deload set at ${w} lb is below the bar`);
   assert(!plan.description.includes('35 lb bar'), 'no flag when every lift clears 45');

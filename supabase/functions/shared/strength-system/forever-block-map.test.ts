@@ -33,7 +33,7 @@ const LIFTS = ['Overhead Press', 'Deadlift', 'Bench Press', 'Back Squat'] as con
 const block = (weeks: number) => composeStrengthPrimaryPlan({
   durationWeeks: weeks,
   oneRepMaxes: MAXES,
-  enduranceSport: 'run' as const,
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run' as const,
   enduranceFrequency: 3,
   targetWeeklyMiles: 20,
   easyPaceMinPerMile: 9,

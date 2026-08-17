@@ -35,7 +35,7 @@ type S = { day: string; name: string; type: string };
 
 const week1 = (cfg: Record<string, unknown>): S[] =>
   ((composeStrengthPrimaryPlan({
-    durationWeeks: 12, oneRepMaxes: MAXES, easyPaceMinPerMile: 10, ...cfg,
+    durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, easyPaceMinPerMile: 10, ...cfg,
   } as never) as unknown as { sessions_by_week: Record<string, S[]> }).sessions_by_week['2'] ?? []);
 
 const isLower = (s: S) => s.type === 'strength' && /Back Squat|Deadlift/.test(s.name);

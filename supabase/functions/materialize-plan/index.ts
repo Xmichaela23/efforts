@@ -1546,6 +1546,33 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   // `cooldown_run_10min_easy` as separate presets (`generate-combined-plan/session-factory.ts:443`
   // has done this since it shipped), and the flat session does the same. Adding bracketing here
   // would silently double the warm-up on every existing caller.
+  // ⛔ THE RUN'S THRESHOLD INTERVALS — `run_thr_{reps}x{min}min_r{sec}s` (§7, 2026-08-17).
+  //
+  // ⚠️ ADDED, NOT REBUILT, AND THE SEARCH CAME FIRST. `bike_thr_*` already existed for the ride;
+  // `tempo_Nmin_threshold` exists but is ONE continuous block with no reps; `cruise_Nx{mi}mi` is
+  // distance-based and §7's spec is in MINUTES (4 × 5 → 3 × 7 → 2 × 10). There was no time-based
+  // run threshold interval token, so this is the gap, shaped exactly like `run_vo2_*` above.
+  //
+  // ⛔ THE PACE IS THE ONE THE APP ALREADY OWNS. `secPerMiFromBaseline(_, 'threshold')` is the
+  // single reader — measured threshold if the athlete has one, otherwise 5K + 20 s/mi, which is
+  // this file's own long-standing rule. No second derivation here.
+  if (/^run_thr_\d+x\d+min(?:_r\d+s)?$/.test(lower)) {
+    const m = lower.match(/^run_thr_(\d+)x(\d+)min(?:_r(\d+)s)?$/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const work_s = parseInt(m[2], 10) * 60;
+      const rest_s = m[3] ? parseInt(m[3], 10) : 60;
+      const thr = secPerMiFromBaseline(baselines, 'threshold') ?? undefined;
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      for (let i = 0; i < reps; i++) {
+        out.push({ id: uid(), kind: 'work', duration_s: work_s, pace_sec_per_mi: thr, label: 'Threshold' });
+        if (i < reps - 1 && rest_s > 0) {
+          out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, pace_sec_per_mi: easyPace });
+        }
+      }
+      return out;
+    }
+  }
   if (/^run_vo2_\d+x\d+min(?:_r\d+s)?_z5$/.test(lower)) {
     const m = lower.match(/^run_vo2_(\d+)x(\d+)min(?:_r(\d+)s)?_z5$/);
     if (m) {

@@ -64,7 +64,7 @@ import {
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 
 const MAXES = { bench: 150, squat: 200, deadlift: 225, overheadPress: 95 };
-const base = { durationWeeks: 12, oneRepMaxes: MAXES, enduranceSport: null, enduranceFrequency: 0 };
+const base = { durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0 };
 
 const assistanceRowsOf = (plan: any) =>
   (Object.values(plan.sessions_by_week).flat() as any[])
@@ -707,7 +707,7 @@ Deno.test('D-406 — a suggestion never becomes a prescription', () => {
   const rows = assistanceRowsOf(composeStrengthPrimaryPlan({
     ...base,
     oneRepMaxes: { bench: 150, squat: 200, deadlift: 225, overhead: 95 },
-    assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Bulgarian Split Squat' },
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Bulgarian Split Squat' },
   } as any));
 
   assertEquals(rows.length > 0, true, 'no assistance rows to check');
@@ -734,7 +734,7 @@ Deno.test('D-406 — bodyweight movements get NO suggested weight, ever', () => 
   const rows = assistanceRowsOf(composeStrengthPrimaryPlan({
     ...base,
     oneRepMaxes: { bench: 150, squat: 200, deadlift: 225, overhead: 95 },
-  } as any)).filter((r: any) =>
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, } as any)).filter((r: any) =>
     ['Dips', 'Chin-Up', 'Push-Up', 'Hanging Leg Raise', 'Inverted Row'].includes(r.name));
   assertEquals(rows.length > 0, true, 'no bodyweight rows in the block');
   for (const r of rows as any[]) {

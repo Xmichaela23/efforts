@@ -20,7 +20,7 @@ import { getStepsIntensity, calculateDurationWorkload } from '../../_shared/work
 const RUN_ARGS = {
   durationWeeks: 12,
   oneRepMaxes: { bench: 225, squat: 315, deadlift: 405, overheadPress: 135 },
-  enduranceSport: 'run' as const,
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run' as const,
   enduranceFrequency: 2,
   targetWeeklyMiles: 25,
   easyPaceMinPerMile: 9,

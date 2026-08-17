@@ -46,7 +46,7 @@ import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 // leader week and is the shape week 1 used to be.
 const build = () => composeStrengthPrimaryPlan({
   durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-  enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
   longRunDay: 'sunday', hardDays: [{ day: 'tuesday', discipline: 'run' }],
   easyPaceMinPerMile: 9,
 } as never);
@@ -147,7 +147,7 @@ Deno.test('⛔ THE THREE-DAY WEEK ALTERNATES WHEN NOTHING PINS IT', () => {
   const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const p: any = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-    enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     easyPaceMinPerMile: 9,
   } as never);
   for (let w = 1; w <= 12; w++) {

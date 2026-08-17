@@ -22,7 +22,7 @@ const PACE = 10;   // min/mi, so minutes ÷ 10 = miles
 const built = (miles: number, runDays: number) => {
   const p = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-    enduranceSport: 'run', enduranceFrequency: runDays, targetWeeklyMiles: miles,
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: runDays, targetWeeklyMiles: miles,
     longRunDay: 'sunday', hardDays: [{ day: 'tuesday', discipline: 'run' }],
     easyPaceMinPerMile: PACE,
   } as never);

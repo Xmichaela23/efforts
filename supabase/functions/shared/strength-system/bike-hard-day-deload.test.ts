@@ -23,7 +23,7 @@ const WEEKS = 12;
 const BIKE_BLOCK = {
   durationWeeks: WEEKS,
   oneRepMaxes: MAXES,
-  enduranceSport: 'bike',
+  fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'bike',
   enduranceFrequency: 3,
   bike: { hours: 6, days: 3, longRideDay: 'saturday' },
   targetWeeklyRideHours: 6,
@@ -38,9 +38,15 @@ const onHardDay = (week: number): any[] =>
   ((plan.sessions_by_week[String(week)] ?? []) as any[])
     .filter((s) => String(s.day).toLowerCase() === HARD_DAY);
 
+// ⚠️ THE TOKEN'S RECOVERY MOVES ACROSS THE WAVE AS OF §7 (2026-08-17) — `bike_vo2_4x4min_R4min` in
+// week one of a cycle, `_R3min` from week two, which is the density lever. Matching the literal
+// week-one token would have read every later week as "no intervals here", which is the opposite of
+// what this file exists to pin. The PREFIX is what identifies the session; the suffix is the wave.
 const isIntervals = (s: any): boolean =>
   s.type === 'ride'
-  && (Array.isArray(s.steps_preset) ? s.steps_preset.includes('bike_vo2_4x4min_R4min') : false);
+  && (Array.isArray(s.steps_preset)
+    ? s.steps_preset.some((t: string) => /^bike_vo2_4x4min_R\d+min$/.test(t))
+    : false);
 
 Deno.test('the block under test actually has both light week shapes and some cycle weeks', () => {
   // A guard on the fixture itself: if the layout ever stops producing one of these, the assertions
@@ -108,7 +114,7 @@ Deno.test('the run branch is unchanged — a hard RUN block still deloads exactl
   // at intake (D-327), so the run's behaviour must not have moved.
   const runPlan: any = composeStrengthPrimaryPlan({
     durationWeeks: WEEKS, oneRepMaxes: MAXES,
-    enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
     easyPaceMinPerMile: 9, longRunDay: 'sunday',
     hardDays: [{ day: HARD_DAY, discipline: 'run' }],
   } as never);

@@ -45,7 +45,7 @@ const week = (terrain?: string, discipline: 'run' | 'bike' = 'run') => {
   const p = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-    enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
     hardDays: [{ day: 'tuesday', discipline, ...(terrain ? { terrain } : {}) }],
   } as never);
@@ -104,7 +104,7 @@ Deno.test('⚠️ THE RIDE HAS NO TERRAIN — a turbo, a chaingang and a climb a
   const p = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-    enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
     bike: { hours: 4, days: 2 },
     hardDays: [{ day: 'tuesday', discipline: 'bike', terrain: 'flat' }],
@@ -112,7 +112,11 @@ Deno.test('⚠️ THE RIDE HAS NO TERRAIN — a turbo, a chaingang and a climb a
   const sessions = (p.sessions_by_week['2'] as any[]);
   const ride = sessions.find((s) => s.type === 'ride' && /Interval/.test(s.name))!;
   assertEquals(ride.name, 'Bike Intervals');
-  assertEquals(ride.steps_preset[0], 'bike_vo2_4x4min_R4min', 'terrain leaked into the ride');
+  // ⚠️ THE RECOVERY MOVES ACROSS THE WAVE (§7, 2026-08-17) — week 2 of a cycle is `_R3min`. What
+  // this line is actually protecting is that TERRAIN never reaches the ride, so it asserts the
+  // token's shape rather than one week's literal.
+  assertEquals(/^bike_vo2_4x4min_R\d+min$/.test(ride.steps_preset[0]), true,
+    `terrain leaked into the ride: ${ride.steps_preset[0]}`);
   assertEquals(
     sessions.some((s) => /Hill|Treadmill|Flat/.test(String(s.name))), false,
     'a bike hard day must not also build a hard run',
@@ -263,7 +267,7 @@ Deno.test('⛔ FLAT PREFERS 48h FROM HEAVY LEGS — the other three keep the mat
     const p = composeStrengthPrimaryPlan({
       durationWeeks: 12,
       oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-      enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+      fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
       longRunDay: 'saturday', easyPaceMinPerMile: PACE,
       hardDays: [{ day: 'friday', discipline: 'run', ...(terrain ? { terrain } : {}) }],
     } as never);
@@ -297,7 +301,7 @@ Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week s
       const p = composeStrengthPrimaryPlan({
         durationWeeks: 12,
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-        enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+        fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
         hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
       } as never);
@@ -324,7 +328,7 @@ Deno.test('⛔ THE PREFERENCE NEVER BREACHES ANYTHING — least of all the long 
       const p = composeStrengthPrimaryPlan({
         durationWeeks: 12,
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-        enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+        fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
         hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
       } as never);
@@ -355,7 +359,7 @@ Deno.test('⛔ THE MATRIX FLOOR SURVIVES THE TRADE — heavy legs stay 48h apart
       const p = composeStrengthPrimaryPlan({
         durationWeeks: 12,
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-        enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+        fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
         hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
       } as never);
@@ -385,7 +389,7 @@ Deno.test('⚠️ TAKEN WHEN THE WEEK HAS ROOM, DECLINED SILENTLY WHEN IT DOES N
     const p = composeStrengthPrimaryPlan({
       durationWeeks: 12,
       oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-      enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+      fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
       longRunDay, easyPaceMinPerMile: PACE,
       hardDays: [{ day, discipline: 'run', terrain }],
     } as never);
