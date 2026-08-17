@@ -301,109 +301,62 @@ export const TM_TEST_PASS_REPS = 5;
 /**
  * How a block of N weeks divides into leader and anchor cycles.
  *
- * **12 weeks is the default: leader, leader, anchor — exactly Wendler's 2:1.** His listed
- * ratios are 2:1, 3:2 and 2:2. 16 weeks gives 2:2. **8 weeks gives 1:1, which he does not
- * list** — it is coherent (build, then express) but the pick is ours, and it ships as the
- * short, off-ratio option rather than the standard.
+ * **12 weeks is the default: leader, leader, anchor — exactly Wendler's 2:1**, which he names as his
+ * recommendation "for just about every lifter" (Forever p.17). **8 weeks gives 1:1, which he does
+ * not list** — coherent (build, then express), but the pick is ours and it ships as the short
+ * option, not the standard.
+ *
+ * ⛔ **16 WEEKS IS NOT OFFERED (2026-08-16).** Four cycles cannot be 2:1. Two anchors back to back
+ * is the configuration this block exists to avoid for a concurrent athlete; three leaders and one
+ * anchor detrains heavy expression. Rather than build a shape neither source supports, the length
+ * is refused — see `blockWeeks`.
  *
  * The anchor always comes LAST: leaders build, the anchor expresses and measures.
  */
 /**
- * ⛔ HOW MANY CYCLES BUILD BEFORE THE ONES THAT MEASURE. Decided 2026-07-28, Michael's call.
+ * ⛔⛔ SUPERSEDED 2026-08-16 — THE CONTINUITY TIERS ARE DELETED, AND THE RATIO IS FIXED AT 2:1.
  *
- * The block was always 2 leaders + 1 anchor — the LEAST heavy configuration available, on the block
- * whose stated purpose is heavy work. Nothing chose that; it was the only configuration.
+ * What stood here: `ContinuityTier` / `ContinuitySignal` / `continuityTier()` and a switch that
+ * chose the leader:anchor split from how recently the athlete had lifted (continuous → 1 leader,
+ * returning → 1, detrained → 2, unknown → 2), fed by a reader in
+ * `generate-strength-plan/index.ts` over `learned_fitness.strength_1rms`.
  *
- * The split now derives from training continuity across the four main lifts:
+ * **Two bugs lived inside it, both verified by execution 2026-08-16:**
+ *   1. `continuous` and `returning` produced **1 leader : 2 anchors** at three cycles — not one of
+ *      Forever's three published models (3:2, 2:2, 2:1 — p.17), all of which are leader-weighted.
+ *   2. That extra anchor cost a week, so the opening TM-test week was dropped for exactly those
+ *      athletes. The shape furthest from the book, handed to the athletes most likely to use it.
  *
- * | tier       | test                                  | leaders | anchors |
- * |------------|---------------------------------------|---------|---------|
- * | continuous | weeks_since ≤ 2 AND logs ≥ 24         | 0       | all     |
- * | returning  | anything between                      | 1       | rest    |
- * | detrained  | weeks_since ≥ 6 OR logs < 8           | 2       | rest    |
- * | unknown    | no `last_logged` at all               | 2       | rest    |
+ * ⛔ **AND THE WHOLE AXIS WAS WRONG FOR THIS BLOCK.** Michael, 2026-08-16: an endurance load is a
+ * permanent stressor, so this athlete never has the recovery headroom for back-to-back anchor
+ * cycles. The tiers existed to graduate a well-trained lifter toward MORE anchors, which is the
+ * wrong direction for every athlete Strong Focus serves. Deleted rather than corrected.
  *
- * ⚠️ DETRAINED IS THE **LEAST** ANCHOR-WEIGHTED, WHICH IS THE OPPOSITE OF THE FIRST DRAFT.
- * Michael: *"Leaders exist to build a base; detrained is the state where that base is missing.
- * Sending someone to two 95%-and-AMRAP cycles when their connective tissue is nine weeks behind
- * their nervous system is the one configuration that can hurt somebody."* Fewer anchors for the
- * detrained, not more.
- *
- * ⚠️ AND UNKNOWN IS NOT DETRAINED. A cold start has no `exercise_log` at all, so `sample_count: 0`
- * reads identically to "has not lifted in a year" — and those are different people. It gets its own
- * branch, and it resolves to 2+1, which is exactly today's behaviour. **So this ships as a pure
- * addition: every athlete without lifting history sees no change.**
+ * **The rule now: every cycle but the last is a leader, and there are never more than two.**
+ * 3 cycles → 2:1 (Wendler's own recommendation "for just about every lifter", p.17).
+ * 2 cycles → 1:1 (ours — he does not publish it; it ships as the short option, not the standard).
  */
-export type ContinuityTier = 'continuous' | 'returning' | 'detrained' | 'unknown';
-
-export type ContinuitySignal = {
-  /** Weeks since the most recent log across all four main lifts. Null = never logged. */
-  weeksSince: number | null;
-  /** Summed `sample_count` across the four lifts, 12-week window. */
-  logs: number;
-};
-
-export function continuityTier(sig: ContinuitySignal | null | undefined): ContinuityTier {
-  if (!sig || sig.weeksSince == null) return 'unknown';
-  if (sig.weeksSince >= 6 || sig.logs < 8) return 'detrained';
-  if (sig.weeksSince <= 2 && sig.logs >= 24) return 'continuous';
-  return 'returning';
-}
-
 export type BlockShapeInputs = {
-  continuity?: ContinuitySignal | null;
-  /** `develop` is the only posture that earns an anchor-weighted block. */
+  /**
+   * ⚠️ READ BY `assistanceTotalReps`, NOT BY THE BLOCK SHAPE. The leader/anchor ratio is fixed (see
+   * `leaderCount`) — posture cannot buy an athlete more anchor cycles.
+   */
   strengthPosture?: string | null;
-  /** ⚠️ OVERRIDES TO 2+1 REGARDLESS OF TIER: a long block, or heavy aerobic load underneath. */
-  highAerobicLoad?: boolean;
 };
 
 /**
- * ⛔ HIS PUBLISHED MODELS ARE THE ONLY SHAPES WE BUILD — Forever p.17, three of them and no others:
- * **3 leaders : 2 anchors · 2 : 2 · 2 : 1**, with 2:1 named as his recommendation "for just about
- * every lifter."
+ * How many LEADER cycles a block of `count` cycles carries.
  *
- * `count - 1` leaders (everything but the last cycle) reproduces 2:1 at three cycles and 1:1 at two,
- * but at FOUR cycles it produces 3:1 — which is not on his list. Capping at `ceil(count / 2)` lands
- * every count on a published model: 2 → 1:1, 3 → 2:1, 4 → 2:2, 5 → 3:2.
+ * ⛔ **EVERY CYCLE BUT THE LAST, CAPPED AT TWO. No inputs, no tiers, no overrides.** The anchor is
+ * always last and there is always exactly one of it: leaders build, the anchor expresses and
+ * measures. At the two lengths this block offers (§`blockWeeks`) that is 2:1 at three cycles and
+ * 1:1 at two.
  *
- * ⚠️ THE ONE COUNT THIS CHANGES IS FOUR, which is the 16-week block: it was 3 leaders + 1 anchor and
- * is now 2 + 2, exactly as the work order's §0 target map specifies. 12-week and 8-week blocks are
- * untouched.
+ * ⚠️ THE ARGUMENTS ARE GONE ON PURPOSE. `weeks` and `inputs` used to steer this; a signature that
+ * accepts inputs it ignores invites the next session to reconnect them.
  */
-function publishedFallback(count: number): number {
-  return Math.min(Math.max(0, count - 1), Math.ceil(count / 2));
-}
-
-/** How many LEADER cycles a block of `count` cycles carries. */
-export function leaderCount(count: number, weeks: number, inputs?: BlockShapeInputs): number {
-  const fallback = publishedFallback(count);
-  // ⚠️ A ONE-CYCLE BLOCK HAS NO ROOM FOR A LEADER AND AN ANCHOR BOTH. It is the degenerate minimum
-  // length (`blockWeeks`'s floor) and resolves to the measuring cycle. §1b's "never zero leaders"
-  // governs blocks that can hold both, which is every length the flow actually offers.
-  if (count <= 1) return 0;
-  // ⛔ THE OVERRIDES COME FIRST AND THEY ARE NOT TIER-SENSITIVE. Maintain posture is not asking for a
-  // heavy block; a 16-week block has room to build; high aerobic load is already spending the
-  // recovery an anchor cycle needs.
-  if ((inputs?.strengthPosture ?? 'develop') !== 'develop') return fallback;
-  if (weeks >= 16) return fallback;
-  if (inputs?.highAerobicLoad) return fallback;
-
-  switch (continuityTier(inputs?.continuity)) {
-    // ⛔ ONE LEADER IS THE FLOOR, NOT ZERO. Corrected 2026-08-15 (work order §1b). This returned 0 —
-    // an all-anchor block — and **that is not one of Wendler's shapes.** Forever p.17 lists three
-    // leader:anchor models and only three: 3/2, 2/2 and 2/1. Every one of them has at least one
-    // leader, and he names 2/1 as his recommendation "for just about every lifter."
-    //
-    // ⚠️ THE TIERS THEMSELVES ARE STILL OURS AND STILL STAND. Choosing AMONG his shapes on training
-    // continuity is a product decision (documented in the block above); choosing a shape he does not
-    // publish is not. A continuous athlete gets the most anchor-weighted model he offers, which is
-    // what this tier was reaching for.
-    case 'continuous': return Math.min(1, fallback);
-    case 'returning':  return Math.min(1, fallback);
-    case 'detrained':  return Math.min(2, fallback);
-    case 'unknown':    return fallback;        // = today, exactly
-  }
+export function leaderCount(count: number): number {
+  return Math.min(Math.max(0, count - 1), 2);
 }
 
 // ── THE WEEK MAP ─────────────────────────────────────────────────────────────
@@ -456,9 +409,7 @@ export type BlockWeek = {
    *
    * A standalone week has no cycle of its own, so it takes the number of the cycle immediately
    * BEFORE it: a 7th-week deload unloads the training max just used, and the closing TM test tests
-   * the number the block arrived at (which is what makes its verdict the next block's gate). The
-   * opening test week has nothing before it and takes cycle 1's — the number the leaders are about
-   * to run on, which is precisely what p.21 asks the test week to validate.
+   * the number the block arrived at, which is what makes its verdict the next block's gate.
    */
   workingNumberCycle: number;
 };
@@ -467,69 +418,86 @@ export type BlockLayout = {
   cycles: number;
   leaders: number;
   anchors: number;
-  openingTest: boolean;
   /** The exact number of weeks this layout occupies. */
   weeks: number;
 };
 
-/** The most cycles any sane block carries — a bound on the search, not a product limit. */
-const MAX_CYCLES = 8;
+/**
+ * ⛔ THE TWO LENGTHS THIS BLOCK OFFERS, AND THERE ARE NO OTHERS (2026-08-16).
+ *
+ * A cycle costs three weeks, every cycle but the last is followed by a light week, and the closing
+ * TM test costs one: `3c + (c − 1) + 1 = 4c`. So the shape is a multiple of four by arithmetic, and
+ * the product offers exactly two of them.
+ *
+ * ⚠️ **16 IS DELIBERATELY ABSENT.** Four cycles cannot be 2:1 — see the note on `leaderCount`.
+ * ⚠️ **4 IS DELIBERATELY ABSENT.** One cycle is a single anchor with no leader in front of it: no
+ * build phase, straight to 95% and rep-outs. That is not a block, it is a test.
+ */
+export const BLOCK_WEEKS_OFFERED: readonly number[] = [8, 12];
 
-function layoutWeeks(cycles: number, leaders: number, anchors: number, openingTest: boolean): number {
-  // One deload between the leader run and the anchor run (when there are leaders), plus one between
-  // consecutive anchors. The closing TM test always costs a week.
-  const deloads = (leaders > 0 ? 1 : 0) + Math.max(0, anchors - 1);
-  return cycles * WEEKS_PER_CYCLE + deloads + 1 + (openingTest ? 1 : 0);
+/**
+ * ⛔ THE SHORTEST BLOCK THE PRODUCT BUILDS. Two cycles — one leader, one anchor — plus the light
+ * week between them and the closing test.
+ */
+export const MIN_BLOCK_WEEKS = BLOCK_WEEKS_OFFERED[0];
+
+function cyclesForLength(weeks: number): number {
+  return Math.max(1, Math.round(weeks / (WEEKS_PER_CYCLE + 1)));
 }
 
 /**
- * The largest layout that fits inside `weeks`. Prefers more cycles, then the opening test week.
+ * The layout for a block length.
  *
- * ⚠️ THE SHAPE DEPENDS ON `inputs` because `leaderCount` does, and the leader/anchor split changes
- * how many deloads the block needs. Two blocks of the same LENGTH can therefore have different
- * internal maps — which is already true of the leader/anchor split and is why the composer stores
- * `phase_structure` rather than letting later stages re-derive it.
+ * ⚠️ **NO `inputs` ANY MORE (2026-08-16).** The shape used to depend on continuity tier, posture and
+ * aerobic load, so two blocks of the same LENGTH could have different internal maps. They cannot
+ * now: **length alone determines the map.** That is why the composer's stored `phase_structure` and
+ * any later re-derivation can no longer disagree.
  */
-export function blockLayoutFor(weeks: number, inputs?: BlockShapeInputs): BlockLayout {
-  let best: BlockLayout | null = null;
-  for (let cycles = 1; cycles <= MAX_CYCLES; cycles += 1) {
-    const leaders = leaderCount(cycles, weeks, inputs);
-    const anchors = cycles - leaders;
-    for (const openingTest of [true, false]) {
-      const cost = layoutWeeks(cycles, leaders, anchors, openingTest);
-      if (cost > weeks) continue;
-      if (!best || cost > best.weeks) best = { cycles, leaders, anchors, openingTest, weeks: cost };
-    }
-  }
-  // Nothing fits — the caller asked for fewer weeks than the shortest legal block. Return the
-  // shortest one rather than an empty map; `blockWeeks` is what stops that reaching an athlete.
-  return best ?? { cycles: 1, leaders: 0, anchors: 1, openingTest: false, weeks: layoutWeeks(1, 0, 1, false) };
+export function blockLayoutFor(weeks: number): BlockLayout {
+  const w = blockWeeks(weeks);
+  const cycles = cyclesForLength(w);
+  const leaders = leaderCount(cycles);
+  return { cycles, leaders, anchors: cycles - leaders, weeks: w };
 }
 
 /**
- * ⛔ THE SHORTEST LEGAL BLOCK. One anchor cycle plus its closing test week.
+ * ⛔ A BLOCK IS ONE OF `BLOCK_WEEKS_OFFERED` — anything else SNAPS DOWN to the nearest offered
+ * length, and anything under the minimum resolves to the minimum.
  *
- * ⚠️ It is a floor, not an offer. The build flow ships 12 (`STRENGTH_FOCUS_WEEKS`); this exists so a
- * malformed request degrades to a complete small block rather than to an empty one.
+ * ⚠️ It is not a search any more. A malformed request degrades to a complete legal block rather than
+ * to whatever arithmetic happened to fit.
  */
-export const MIN_BLOCK_WEEKS = WEEKS_PER_CYCLE + 1;
-
-/**
- * ⛔ A BLOCK IS A LENGTH THE LAYOUT CAN FILL EXACTLY — it snaps DOWN to the nearest one.
- *
- * ⚠️ THE VALID LENGTHS ARE NO LONGER "MULTIPLES OF FOUR". With `leaderCount`'s default tier they are
- * 4, 5, 8, 9, 11, 12, 14, 15, 18, 19 … — a cycle costs three weeks and the standalone weeks are the
- * odd ones. 12 and 16 both land exactly, which is what the two lengths the product offers need.
- */
-export function blockWeeks(requested: number, inputs?: BlockShapeInputs): number {
+export function blockWeeks(requested: number): number {
   const w = Number(requested);
   if (!Number.isFinite(w) || w < MIN_BLOCK_WEEKS) return MIN_BLOCK_WEEKS;
-  return blockLayoutFor(Math.floor(w), inputs).weeks;
+  const floored = Math.floor(w);
+  let best = MIN_BLOCK_WEEKS;
+  for (const offered of BLOCK_WEEKS_OFFERED) if (offered <= floored) best = offered;
+  return best;
 }
 
-/** The block, week by week. Length is always `blockLayoutFor(weeks, inputs).weeks`. */
-export function buildWeekMap(weeks: number, inputs?: BlockShapeInputs): BlockWeek[] {
-  const layout = blockLayoutFor(weeks, inputs);
+/**
+ * The block, week by week.
+ *
+ * ⛔ **THE SHAPE, AND EVERY PIECE OF IT IS FOREVER'S:**
+ * `leader ×L · [light] · anchor · [light] … · TM test`
+ *
+ * · **A light week after EVERY cycle, not only between the templates** — p.21's own licence: the
+ *   7th-week deload *"may be used as a deload after any cycle, especially older lifters and taxing
+ *   programs — this is your responsibility."* A concurrent athlete is the taxing case, and three
+ *   uninterrupted weeks is the ceiling this block runs to (2026-08-16, Michael).
+ * · **No opening TM-test week.** ⛔ **KNOWINGLY OVERRIDES p.21's bolded recommendation** to test
+ *   before any leader template. Michael, 2026-08-16: a test week is a data-collection event, not a
+ *   training stimulus, and spending a week of recovery capital to confirm a number the intake can
+ *   derive is inefficient for an athlete carrying endurance load. **Ours, not his — and the plan's
+ *   copy must say the block starts from a derived number rather than a tested one.**
+ * · **The closing TM test** is the block-to-block gate; its verdict sets the next block's number.
+ *
+ * ⚠️ THE LAST CYCLE IS FOLLOWED BY THE TEST WEEK, NOT BY A DELOAD — the test week IS a light week
+ * (it opens at 70% and carries no supplemental), so a deload in front of it would be two in a row.
+ */
+export function buildWeekMap(weeks: number): BlockWeek[] {
+  const layout = blockLayoutFor(weeks);
   const out: BlockWeek[] = [];
   let week = 1;
   let cycleIndex = 0;
@@ -541,24 +509,26 @@ export function buildWeekMap(weeks: number, inputs?: BlockShapeInputs): BlockWee
     }
   };
   const pushStandalone = (kind: 'tm_test' | 'deload_single') => {
-    // A standalone week runs on the number of the cycle before it; the opening test on cycle 1's.
+    // A standalone week runs on the number of the cycle before it.
     out.push({ week: week++, kind, workingNumberCycle: Math.max(1, cycleIndex) });
   };
 
-  if (layout.openingTest) pushStandalone('tm_test');
-  for (let i = 0; i < layout.leaders; i += 1) pushCycle('leader');
-  if (layout.leaders > 0) pushStandalone('deload_single');
-  for (let j = 0; j < layout.anchors; j += 1) {
-    pushCycle('anchor');
-    if (j < layout.anchors - 1) pushStandalone('deload_single');
-  }
+  const kinds: CycleKind[] = [
+    ...Array.from({ length: layout.leaders }, () => 'leader' as const),
+    ...Array.from({ length: layout.anchors }, () => 'anchor' as const),
+  ];
+  kinds.forEach((kind, i) => {
+    pushCycle(kind);
+    // A light week after every cycle EXCEPT the last, whose light week is the closing test.
+    if (i < kinds.length - 1) pushStandalone('deload_single');
+  });
   pushStandalone('tm_test');
   return out;
 }
 
 /** One week's shape. Null when the week falls outside the block. */
-export function blockWeekFor(weeks: number, week: number, inputs?: BlockShapeInputs): BlockWeek | null {
-  return buildWeekMap(weeks, inputs).find((w) => w.week === week) ?? null;
+export function blockWeekFor(weeks: number, week: number): BlockWeek | null {
+  return buildWeekMap(weeks).find((w) => w.week === week) ?? null;
 }
 
 /**
@@ -570,9 +540,9 @@ export function blockWeekFor(weeks: number, week: number, inputs?: BlockShapeInp
  * and the standalone weeks between cycles belong to NO cycle. That is the correct answer — a 7th
  * week is not part of either template — but it is a real change for anything grouping logged work.
  */
-export function cyclesForBlock(weeks: number, inputs?: BlockShapeInputs): CycleSlot[] {
+export function cyclesForBlock(weeks: number): CycleSlot[] {
   const byIndex = new Map<number, CycleSlot>();
-  for (const w of buildWeekMap(weeks, inputs)) {
+  for (const w of buildWeekMap(weeks)) {
     if (w.kind !== 'cycle' || w.cycleIndex == null) continue;
     const cur = byIndex.get(w.cycleIndex);
     if (cur) cur.endWeek = w.week;
@@ -592,9 +562,8 @@ export function cyclesForBlock(weeks: number, inputs?: BlockShapeInputs): CycleS
 export function cycleForWeek(
   weeks: number,
   week: number,
-  inputs?: BlockShapeInputs,
 ): { slot: CycleSlot; weekInCycle: number } | null {
-  const slot = cyclesForBlock(weeks, inputs).find((c) => week >= c.startWeek && week <= c.endWeek);
+  const slot = cyclesForBlock(weeks).find((c) => week >= c.startWeek && week <= c.endWeek);
   if (!slot) return null;
   return { slot, weekInCycle: week - slot.startWeek + 1 };
 }

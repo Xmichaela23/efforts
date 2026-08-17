@@ -10,6 +10,45 @@ training max allowed to fall fast and rise slow.
 
 ---
 
+## ⛔ WHY THIS BUILD IS DIFFERENT — read before scoping any section
+
+**Michael, 2026-08-16:** *"this is the function of numerous plans being built — me not knowing my
+head from my ass about training and landing on Wendler and Viada as the source of truth. I don't
+mind using this as an opportunity to really make this a clean build. It will be the template we
+build all the other training on, and what we lay race plans on."*
+
+**So this block is not a feature. It is the reference implementation.** Every finding in this
+document that reads as "two of something" is therefore a blocker, not a note:
+
+- **Two placement engines — ONE ENGINE, decided by Michael 2026-08-16, and the direction was already
+  written down.** ⛔ **AN EARLIER READING IN THIS DOCUMENT WAS BACKWARDS.** It said Strong Focus sits
+  on a "private engine." It does not: `docs/SPEC-week-solver.md` (2026-07-27, Michael + Claude) exists
+  precisely to **collapse the placement authorities into one solver**, its §7 build order calls that
+  collapse *"the point of the whole document,"* and **Strong Focus is the one path already migrated
+  to it.** `generate-combined-plan` and the run generators have not followed —
+  `POLISH-PUNCH-LIST.md:210` ("the solver collapse", sized **large**). So the direction is
+  **bring the others across to `week-solver`**, not bring Strong Focus back to `week-optimizer`.
+  ⚠️ **Consolidated mode's rules live in `week-optimizer` (§6) and must travel with them.**
+  ⛔ **AND THE SPEC NAMES ITS OWN FIRST BLOCKER, WHICH IS THE CELL TOUCHED TODAY** (§7 item −1,
+  §8.4): the law contradicts itself on the long ride — 48h required from heavy legs **and** same-day
+  permitted. **Nothing can be built on a rule set that disagrees with itself.** §6 rule B4/B5 settles
+  the same-day half (forbidden) and the day-after half (48h). **Close §8.4 formally as part of that.**
+- **Two vocabularies for one fact.** 5K pace had eight spellings and no owner (fixed 2026-08-16);
+  easy pace still has two resolvers; threshold pace has an owner that one caller bypasses. **Each
+  is one resolver and a deletion, and each is cheaper now than after the template is copied.**
+- **Built-but-never-run capabilities.** Consolidated mode (§6), the day-count gate, the
+  `highAerobicLoad` dial. **Wiring an existing thing is the job; building a second one is the
+  failure mode this codebase has repeatedly taken.**
+
+⛔ **THE STANDING CONSTRAINT FOR THIS BUILD: one law, one owner, one implementation.** §5b's
+deletion list is the enforcement. If a change cannot delete what it replaces, stop and say so.
+
+⚠️ **AND THE SOURCE OF TRUTH IS NAMED, WHICH IS THE POINT.** Wendler for the mechanical progression,
+Viada for the concurrent governors. Every number in the code says whose it is. **A number with no
+owner is the thing this build exists to stop reproducing.**
+
+---
+
 ## Sources, and their standing
 
 | source | standing |
@@ -58,6 +97,22 @@ this is your responsibility."* A concurrent athlete is the taxing case.
   allowlist of `{8, 12}`, not a snap-to-multiple.
 
 ---
+
+## 0b. THE BUILD SEQUENCE — locked 2026-08-16
+
+| build | what ships | what does NOT |
+|---|---|---|
+| **1 — the Wendler math** | §1 in full: 3:1 rhythm, no opening test, 8/12 only, 2:1 hardcoded, the miss on every lifting day, the asymmetric training max, one assistance band by competing stress, three lifting days, three accessory cards, the intake route to a lift number. | ⛔ **Nothing in §6 or §7.** Placement behaves exactly as today — the solver still SEPARATES hard days, because `integration_mode` is still `separated` for everyone. |
+| **2 — the Viada routing (§6)** | Consolidated mode wired and defaulted; the long-ride rules; the A5 pairing law; the other generators brought onto `week-solver`; the day-count gate audited, extended if needed, and mounted. | — |
+| **3 — the interval progression (§7)** | The threshold session (content still undesigned), the 3-week wave, pace/FTP fed to the composer. | — |
+
+⛔ **THE RECEIPT COPY BELONGS TO BUILD 2, NOT BUILD 1.** *"We broke your stack to protect your long
+ride"* cannot be written in build 1 — **there is no stacking in build 1 to break.** Writing it early
+ships a sentence that can never fire. Same for the front-door warning: the gate depends on
+`integration_mode`, which build 1 does not turn on.
+
+⚠️ **What build 1 does inherit for free:** protection already outranks attraction, because in build 1
+there is no attraction at all. The hard 48h clearances are live today and stay live.
 
 ## 1. The changes, in build order
 
@@ -132,14 +187,32 @@ change inside a live pipe, not new infrastructure.
 a tap. A downward rewrite must ride that same path — announced, applied on tap, undoable. Do not
 add a silent write; `adapt-plan`'s auto-progression was deleted for exactly that reason.
 
-### 1e. Onboarding asks for a 5-rep set, not a max
-⛔ **TRACE FIRST.** The entry gate today takes a 1RM (`performance_numbers`, `oneRepMaxes`).
-Whether it already accepts a rep-set input, and where `estimate1RM` is applied on that path, has
-**not been traced** — do that before building anything.
+### 1e. The lift number at intake — REFRAMED 2026-08-16 after the trace
+⛔ **THE PREMISE WAS WRONG. There is no field to change: the Strong Focus intake asks for no
+strength number at all.** No 1RM field, no rep-set field, nothing in `NonRaceBuilder.tsx`. The
+requirement is not even stated on that path — `:2142-2152` records that the precondition paragraph
+was deliberately removed on 2026-08-05 and its natural home (a tier screen) is *"not built,
+deliberately not guessed at."*
 
-Target: *"a weight you can move for 5 clean, fast reps right now"* → Epley (`w × r × 0.0333 + w`,
-already the app's estimator, D-432) → 85% → starting TM. Asking an endurance athlete for a 1RM
-invites a college number or an ego lift.
+**What actually happens:** the gate is server-side and fires at build time.
+`create-goal-and-materialize-plan/index.ts:2482-2493` calls `readBarbellMaxes` and refuses with
+`missing_strength_baseline` — *"Log a baseline test in Training Baselines"* — and `:2501-2510`
+refuses again below 65 lb per lift. `barbell-maxes.ts:34-40` reads scalar numbers only and its own
+comment says it *"never guesses, never derives."*
+
+⛔ **AND THE REP-SET DOOR ALREADY EXISTS — IT IS JUST SOMEWHERE ELSE.**
+`TrainingBaselines.tsx:1798-1826` offers a baseline test: one all-out set per lift after guided
+warm-ups. `save-baseline-test/index.ts:57-58` runs `estimate1RM(weight, reps)` server-side
+(D-339, Wendler's own formula) and writes the result at `:187-193`. **The capability is built and
+correct. What is missing is the route to it from the intake.**
+
+**So the work is one of:**
+- point the intake at the existing baseline test rather than letting the athlete reach a 409, or
+- add the rep-set question to the intake and write through the same server path.
+
+⚠️ **Do NOT build a second estimator or a second write path.** Michael's framing stands — *"a weight
+you can move for 5 clean, fast reps right now"* beats asking for a max — but that is a question to
+ask in front of machinery that already exists.
 
 ### 1f. Three accessory cards
 The build flow shows four accessory cards while the plan merges deadlift + press onto one day — and
@@ -193,9 +266,15 @@ need to read a setting to know how many cards to show — it is always three.
   `create-goal-and-materialize-plan/index.ts:2743`.
 
 ⚠️ **`pullup-progression.ts:130` DEFAULTS `liftingDays = 4`** and divides the weekly chin volume by
-it. With three days the same 100-a-week splits ~33 per day instead of 25. **That is a real dose
-change, not a rename** — decide whether the weekly total holds and the per-day rises, or the total
-comes down.
+it. ⛔ **DECIDED 2026-08-16: the WEEKLY TOTAL HOLDS and the per-day number rises** (~35 on three
+days, up from 25). The adaptation driver is accumulated weekly volume at sub-maximal effort, not a
+per-day figure, and the reps are split however the athlete likes anyway. The default must become 3
+or every caller must pass it.
+
+⛔ **AND THE BEGINNER ON-RAMP OWNS ITS OWN DOSE — it is not held to the 25 floor.** A band-assisted
+athlete gets ~15 a day on three days, below the assistance band's floor. That is correct: a floor
+for a movement someone cannot yet perform one clean rep of is a wall, not a floor. The progression
+is the pull slot when it is on; the band governs slot picks, not the progression.
 
 ⚠️ **Legacy four-day blocks exist** (every block before this). `rematerialize-strength-block` must
 not choke on one. Pre-launch, one athlete — small, but name it rather than discover it.
@@ -223,8 +302,31 @@ name. Fix by removing the variable, not by making the copy conditional.
 Today: light weeks 25–50, leader weeks 50–75, anchor weeks 75–100 — the page-pinned reading
 (p.23, p.24), scaled up into the anchor per p.18.
 
-New: **25–50 everywhere.** `ASSISTANCE_TOTAL_REPS_FLOOR` → 25, `ASSISTANCE_TOTAL_REPS_CEILING` → 50,
-and `bandFor` collapses to one band for all three phases.
+New: **25–50 for the whole block**, and ⛔ **REFINED 2026-08-16 — the number inside that range is set
+by COMPETING STRESS, not by the cycle phase.**
+
+| hard endurance days in the week | band |
+|---|---|
+| two | **25–30** |
+| one | **30–40** |
+| none | **40–50** |
+| the merged deadlift + press day | **25 flat**, regardless |
+
+⛔ **TWO AXES, AND THEY COMPOSE — DO NOT REPLACE ONE WITH THE OTHER.** Competing stress picks the
+BAND; the athlete's tested capacity picks WHERE IN IT they sit (the existing `assistanceTotalReps`
+scaling, unchanged in shape). Keying the number on hard-day count alone would throw away the one
+real measurement on file.
+
+⛔ **AND IT IS A REP TOTAL, NEVER A SET SCHEME.** A draft of this specified "3 sets of 8". That
+reverses the load rule at the top of `assistance-menu.ts` (D-406) and Michael's own restatement
+2026-08-16: *"it's never 25 reps in a row — accessory work including pull-ups per Wendler should be
+broken out at user ease of reps."* Confirmed against the source: Wendler prescribes a **total per
+category per session**, one or two movements, split however the athlete likes; chin-ups explicitly
+tolerate low reps per set, and his own 100-rep dip example is split in two. **The card gets a
+number, never sets × reps.**
+
+⚠️ `ASSISTANCE_SEVENTH_*` and the phase-keyed `bandFor` still go — the axis changed, not just the
+values.
 
 ⛔ **WHOSE NUMBER THIS IS.** Wendler's 50–100 base (p.24) is written for a lifter whose whole
 recovery budget goes to the barbell. Michael's call: for an athlete carrying endurance load, 100
@@ -265,19 +367,70 @@ it.
 pushes lifting away from hard days. Either the two-day copy waits for §6, or it states only what is
 true today. **Do not print a promise the placer is not keeping.**
 
-### What is actually true about the code here — traced 2026-08-16
-- ✅ **The state shape already holds two.** `qualityDays` is
-  `Partial<Record<'run' | 'bike', DayName>>` (`NonRaceBuilder.tsx:572`) — a per-sport map, not a
-  single value.
-- ⛔ **The single-hard-day limit is DELIBERATE UI, not a data limit.** `:1216` says *"Kept single:
-  switching sport drops the other,"* and `:2855` actively deletes the other sport's entry when the
-  toggle is switched. That deletion is the valve to open.
-- ⚠️ **At least one consumer collapses to a single day.** `standingDay` at `:1472` is
-  `(qualityDays.run || qualityDays.bike)` — first one wins, the second is dropped on the floor.
-- ⛔ **THE GENERATOR SIDE IS NOT TRACED.** Whether `generate-strength-plan`, the week optimizer and
-  the plan builder handle two quality days is **unknown**. *"The engine already handles two hard
-  days"* is a **hypothesis, not a finding** — trace it before scoping the work. If it turns out the
-  downstream is single-day too, this is a bigger job than a UI valve.
+### ⛔ TRACED 2026-08-16 — THIS IS A PIPELINE CHANGE, NOT A UI VALVE
+The earlier reading — *"the engine already handles two hard days, the UI just isn't letting them
+ask"* — **was wrong.** The path is single-day from the wire down. `NonRaceBuilder.tsx:572`'s
+per-sport map is the ONLY place two survive.
+
+| site | what assumes one |
+|---|---|
+| `generate-strength-plan/index.ts:46, :225-240` | destructures one `hard_day`; validates it into a single `{ day, discipline, terrain? }`. **No array exists on the path.** |
+| `strength-primary-plan.ts:232-238` | `hardDay?:` a single optional object |
+| `:1731`, `:1735-1741` | one `hardPin`, pushed once, kind derived from the one discipline |
+| `:1887`, `:1906` | `hardDayIsRun` / `hardDayIsRide` — mutually exclusive booleans |
+| `:1893`, `:1908` | the run count and the ride count each subtract 1; **both would have to fire at once** |
+| `:2485-2486`, `:3065` | two volume budgets, each keyed on the single discipline |
+| `:2931`, `:3104` | the two emitters. `:3102` states it: *"D-327 makes run and bike mutually exclusive at intake, so at most one of these two branches ever fires."* |
+| `NonRaceBuilder.tsx:1472`, `:2855` | the collapse and the sport-switch delete — **the smallest part of the job** |
+
+⛔ **AND THE BIGGER FINDING: STRONG FOCUS DOES NOT USE THE WEEK OPTIMIZER.** It places with
+`_shared/week-solver.ts` (`solve as solveWeek`, imported at `strength-primary-plan.ts:113`) plus
+`place-week.ts` (`:101`), taking only `easyRunAnchorAdjacencyPenalty` from `week-optimizer.ts`
+(`:104`). `_shared/week-optimizer.ts` — which IS two-day capable, carries `quality_run` and
+`quality_bike` as separate preferred days, and hard-blocks a quality run the day after a quality
+ride (`:577-580`, `:585-588`) — **serves `generate-combined-plan`, not this block.**
+
+⚠️ **THE TWO ENGINES DISAGREE ABOUT EXACTLY THIS PAIR.**
+`schedule-session-constraints.ts:152-159` gives `quality_bike × quality_run` **0 hours** of required
+clearance and `ADJACENCY_PENALTIES:184-196` does not list the pair, so `week-solver.ts:462-471`
+scores back-to-back hard days at a flat +1 — an arrangement `week-optimizer` refuses outright. And
+anchors are never moved once placed. **So allowing a second hard day requires deciding which
+engine's rule is right, not just widening a type.**
+
+⛔ **SETTLED 2026-08-16: ONE ENGINE, AND IT IS `week-solver`.** See the framing section at the top —
+`SPEC-week-solver.md` already owns this direction and Strong Focus is the migrated path, not the
+outlier. The disagreement above is therefore not "two theories" but the collapse being half done:
+the rules that only exist in `week-optimizer` (the consolidated-mode gate, the quality-run-after-
+quality-ride block) have to move to `week-solver` as part of §6, and the `week-optimizer` copies
+deleted. **Do not implement the same rule in both.**
+
+### ⛔ ONE SLOT IS DOING TWO JOBS — the hard day vs the club session
+**Raised by Michael 2026-08-16.** Today the hard day and the club session are **the same input, on
+purpose** — `strength-primary-plan.ts:1633`: *"the hard day IS the club day; there is no separate
+input."* The screen's own copy says *"A run or ride club goes here."*
+
+**That is correct for PLACEMENT and wrong for PRESCRIPTION**, and the difference only bites once §7
+exists:
+- **A club run or ride** — the athlete turns up and does whatever the group does. The app cannot
+  prescribe 4 × 3 min uphill into it, and cannot progress it. It still costs the same recovery, so
+  it must still be treated as a hard day by the placer.
+- **The app's own session** — the app owns the content, and §7's progression can only run here.
+
+**The flow asks one question and needs two:**
+1. Which day.
+2. **Whose session is it — mine to prescribe, or one you already attend?**
+
+**Consequences, both directions:**
+- Both answers count as a hard day for placement, the 6–8h gap, and the stacking law (§6).
+- Only "mine to prescribe" gets a session template, a pace/wattage target, and a §7 progression.
+- A club day gets placement and honest copy — the app names it as the athlete's own session and
+  does not claim to be training it. ⚠️ Same rule as swim: booked, not coached.
+- ⚠️ **§1i's two hard days can be one of each** — a prescribed VO2 session and a club ride. That is
+  probably the most common real week and the model has to hold it.
+
+⚠️ **NAMING.** "Hard day" stays the scheduling word — it is what the placer and the fatigue rules
+key on. The prescribed variant is the one that can be described as *going faster*; a club session
+cannot promise that.
 
 ### Why it matters beyond the athlete's request
 Two hard days makes §6 land cleanly: squat stacks onto hard day one, deadlift+press onto hard day
@@ -443,14 +596,22 @@ the strength composer, and it can follow either of them.
 - **The working-time caps are already met by construction.** 4 × 3 = 12 min and 4 × 4 = 16 min, both
   inside the 12–18 min VO2 ceiling.
 
-### ⛔ A REAL BUG, FOUND IN THIS TRACE — the BIKE hard day never deloads
+### ✅ FIXED 2026-08-16 (uncommitted at time of writing) — the BIKE hard day never deloaded
 `:3103-3106` pushes `bikeQualitySession(hardPin)` with **no `isStandalone` check**, while the easy
 rides on the same branch DO take one. So on a deload or TM-test week a **bike athlete keeps their
 4 × 4 VO2 session** while a run athlete gets an easy run.
 
 The light week's entire job is to arrive at the next cycle — or at the measured set — recovered, and
-for a bike-primary athlete it currently does not. **Small fix, live defect, and it can ship on its
-own.**
+for a bike-primary athlete it did not.
+
+**Fixed:** the branch now mirrors the run's. On a standalone week the pinned day carries an easy ride
+at trimmed volume with copy naming which week it is; on a cycle week the intervals are unchanged.
+**Downgraded, not deleted** — removing it hands back a blank day the athlete pinned.
+Fixture `bike-hard-day-deload.test.ts`, 6 tests, derived from `buildWeekMap` rather than hardcoded
+week numbers, with a guard so they cannot pass vacuously. Reverting the change fails 3 of 6.
+⚠️ The ride budget at `:3065` still subtracts the full 45 min before splitting easy hours, so a
+light week builds 30 min there against a 6 h ask — the same deliberate 2/3 trim every other easy
+ride takes on a light week, not a new shortfall.
 
 ### ❌ Not built at all
 1. **Any week-to-week progression.** `hardRunSession(day, lowerDays, terrain)` and
@@ -472,6 +633,11 @@ Weekly endurance volume is locked, so intensity and density are the only levers.
   **lengthening the continuous effort**: 4 × 5 min → 3 × 7 min → 2 × 10 min across the three weeks.
   Same time in zone, harder demand.
 - **Two hard days → one of each.** VO2 on one, threshold on the other. Never two VO2 days.
+- ⛔ **ONE hard day → VO2, unless the goal is distance-oriented** (decided 2026-08-16). VO2 is the
+  quality that decays fastest and the one ordinary easy volume cannot hold; threshold is better
+  preserved by general aerobic work. ⚠️ **Reasoned from standard practice, not from a page in
+  either book** — source it properly before it ships as a claim.
+- ⛔ **A CLUB SESSION CANNOT BE PROGRESSED** (§1i). §7 only owns the sessions the app prescribes.
 - **Block mapping:** leader 1 establishes the wave · leader 2 advances it (more time in zone or a
   faster pace) · **light weeks delete the intervals entirely** (already true for the run, §7's bug
   for the bike) · the anchor shortens the intervals and demands the highest pace, mirroring the
@@ -527,6 +693,52 @@ follow-up build is not reconstructed from a chat.**
 attributed to Viada from summary sources only; the book has not been read. The *decision* is
 Michael's and stands on its own; the *attribution* must stay marked until the text is checked.
 
+### ⛔ MOST OF THIS IS ALREADY BUILT — FOUND 2026-08-16. READ BEFORE SCOPING ANYTHING BELOW.
+`docs/CONSOLIDATED-MODE.md` (spec dated 2026-05-18, **"Decisions LOCKED"**) defines
+`integration_mode: 'separated' | 'consolidated'`, athlete-level, default `separated`:
+- **separated** — `lower_body_strength` keeps **≥24h in both directions** from `quality_run` /
+  `quality_bike`; same-day is rejected at placement. **This is why the app spreads hard days apart
+  today.**
+- **consolidated** — same-day quality-run/ride + heavy legs is the **preferred** placement, and a
+  separated arrangement becomes the trade-off.
+
+That is §6's rule A1, spec'd three months ago.
+
+⛔ **AND THE ORDERING IS ALREADY A SECOND, ORTHOGONAL AXIS.**
+`strength_ordering_preference: 'endurance_first' | 'strength_first'` decides AM/PM *within* a shared
+day (spec §1). **Michael's rule A2 — barbell first — is `strength_first`.** The spec is explicit
+that the two axes must not be collapsed into one question.
+
+⛔ **AND THE SMART-DEFAULT-PLUS-OVERRIDE SHAPE IS ALREADY IN THE GATE** (spec §3, LOCKED):
+```
+allowConsolidation = (isCoEq && (isPerf || strength_ordering_preference === 'strength_first'))
+                     || integration_mode === 'consolidated'
+```
+An engine-derived branch **or** an explicit athlete opt-in. That is exactly the "smart buffet"
+posture — the engine proposes, the athlete can override — and it does not need inventing.
+
+**Status per `POLISH-PUNCH-LIST.md:765-769`: BUILT, TESTED, NEVER EXECUTED ONCE.** Rules at
+`_shared/week-optimizer.ts:412-417`, same-day QR+lower at `:1215-1291`, fixtures passing
+(`week-optimizer.anchor-contract.test.ts:1057-1099`, `consolidated-trade-off.test.ts`), server
+threads the field (`_shared/combined-schedule-prefs.ts:303` →
+`reconcile-athlete-state-week-optimizer.ts:206`). **No wizard writes `integration_mode`**, so
+`create-goal-and-materialize-plan/index.ts:1921` falls through to `'separated'` for everyone. The
+punch list's stated job: **one wizard question plus the payload leg.**
+
+⚠️ **VERIFIED TO THE SPEC AND THE PUNCH LIST, NOT TO THE ENGINE.** The optimizer internals were not
+read. Confirm before leaning on it.
+
+### So what is actually NEW in §6
+1. **The long-ride buffer** (rule B5) — not part of consolidated mode. Genuinely new.
+2. **Strong Focus runs on a different placement engine** (§1i) — consolidated mode lives in
+   `week-optimizer`, which this block does not use. **Turning the setting on does nothing for Strong
+   Focus until that is resolved.** This is the decision that gates the whole section.
+3. **Wiring** — the wizard question and the payload leg, which the punch list already scopes.
+
+⚠️ **THE DEFAULT IS A PRODUCT CALL NOW.** `separated` is the spec's default. Everything decided
+today argues the concurrent athlete wants `consolidated`. Changing a LOCKED default is a decision,
+not a fix — make it explicitly.
+
 ### What it says
 The nervous system does not distinguish heavy barbell tension from high-intensity aerobic output.
 Both are the same withdrawal. So they are stacked into one hard day, which buys a genuinely clear
@@ -540,6 +752,21 @@ day afterward — rather than spread across adjacent days, which leaves no day c
    squat or deadlift takes the morning slot.
 3. **6 to 8 hours between them.** The existing gap value is the right minimum — cortisol drops,
    central fatigue partly clears, the athlete eats and refills glycogen before session two.
+
+**A5. WHICH hard session pairs with WHICH lift — the biomechanical routing (added 2026-08-16)**
+When the week carries **one hard run and one hard ride** alongside the two heavy leg days:
+- **`quality_run` → the SQUAT day.**
+- **`quality_bike` → the DEADLIFT + press day.**
+
+⛔ **The reason, and it is structural rather than systemic.** Deadlifts deeply fatigue the spinal
+erectors. Running needs those same erectors working to hold the torso upright against repeated
+impact, so a hard run on deadlift-fatigued erectors is where form breaks down. Cycling is seated and
+structurally supported — it asks almost nothing of the erectors, so it is the safe partner for a
+fatigued posterior chain.
+
+⚠️ **DEGRADES, DOES NOT BLOCK.** Two hard runs (the runner) or two hard rides (the climber) means the
+rule has nothing to choose between. It then places either way and the deadlift day's copy carries the
+form note. **Do not refuse a week over this** — it is a preference with a reason, not a clearance.
 
 **B. The long ride — `long_ride` × heavy legs**
 4. **Heavy legs are FORBIDDEN on the long ride's own day.** ⛔ **This reverses the 2026-05-12 change
@@ -643,6 +870,53 @@ is read** — the routing decision is Michael's and does not depend on it.
   long run.
 - **The trim valve** is §1f's day-level volume dial, applied to a heavy weekend rather than to a
   merged lift day. **Same control, built once.**
+
+### ⛔ THE OVERCOMMITTED ATHLETE — how the engine loses (locked 2026-08-16)
+Two clubs plus a long run plus a long ride is four fixed endurance days. With two heavy leg days
+needing 48h from both long efforts and from each other, a good pin set solves beautifully (the clubs
+BECOME the hard days) and a bad one leaves a week that is **legal and has no recovery in it** —
+lift, hard, lift, hard on consecutive days. **That is the dangerous failure, because nothing
+complains.**
+
+**Three tiers, in this order:**
+
+1. **PREVENT AT PIN TIME — the front door.** The wizard says it when the days are picked, not after
+   Build is pressed: four fixed endurance days leaves no room for the recovery the lifting needs;
+   unpin one or change focus. ⛔ **Uses the day-count gate, which is BUILT AND UNWIRED** — 260 lines,
+   30+ tests, its own spec (`DAY-COUNT-GATES.md`), **zero importers**
+   (`POLISH-PUNCH-LIST.md:771`, `GAME-PLAN.md:423`). Its stated job: mount it and write the copy.
+   ⚠️ **Its matrix keys on `integration_mode`, so it ships AFTER consolidated mode** — i.e. inside
+   build two, not before.
+   ⚠️ **UNVERIFIED: whether the gate already computes THIS check** (hard-club days + long days vs
+   lifting days) or needs its matrix extended. Extending it is still far cheaper than solver work —
+   **but confirm before scoping it as "mount it."**
+2. **PROTECT OVER STACK — the engine fallback, and it is already native.** The 48h clearance is a
+   hard law; stacking is a scored attraction. When they collide the law wins: the stack breaks, the
+   long effort keeps its window, and the heavy day goes to whatever legal square remains as an
+   **unpartnered High day** (the rule already settled above). **No new logic.**
+3. **SAY IT — the receipt.** When a stack is broken to satisfy a recovery constraint, the final plan
+   screen states it. No silent compromise, and no apology for the engine doing its job.
+
+⛔ **AND A FOURTH TIER WAS PROPOSED AND KILLED: degrading the buffer.** "Drop the day-before
+protection, keep the day-after" is the directional rule the symmetric table cannot express
+(`buildAdjacencyHours` **throws** on asymmetry — *"Hours are symmetric by design; express order in
+ADJACENCY_PENALTIES"*). Doing it would need a constraint-relaxation ladder in the solver that does
+not exist, which violates this build's standing rule. **Formally dead. Do not reintroduce it as a
+table edit.**
+
+### ⛔ WHAT IS CLINICAL AND WHAT IS A COACHING MODEL — settled 2026-08-16, and the code comments must say which
+
+| the rule | evidence level | what actually backs it |
+|---|---|---|
+| **Cap hard endurance at 1–2 sessions a week** | **clinical** | Wilson 2012 — endurance session FREQUENCY drives strength interference. ⛔ **It measured sessions per week, not how they cluster on a calendar. It justifies the CAP and says nothing about PLACEMENT.** An earlier draft used it to justify stacking; that inference does not follow and must not ship. |
+| **Cluster the stress onto fewer days (the stacking law itself)** | **coaching model** | Charlie Francis's high/low framework, and Viada's consolidation of stressors. Battle-tested periodization practice, **not a trial result.** Attribute it as a model. |
+| **Barbell AM, intervals PM** | **clinical** | Prior endurance work acutely blunts peak force and rate of force development in the resistance session that follows — glycogen depletion plus neuromuscular fatigue. **This is the strongest-supported rule in §6.** |
+| **Run pairs with squat, ride pairs with deadlift** (A5) | **mechanism, reasoned** | Erector fatigue vs. the erector demand of upright running against impact. Coherent and specific; not a trial. |
+| **48h buffer after a long effort** | **mixed** | The long RUN's 48h is eccentric-damage evidence (EIMD peaks 24–48h) and already in the table. The long RIDE's extension is **glycogen, not damage** — a different axis, ours, and it must say so. |
+
+⚠️ **Michael, 2026-08-16, and it is the standard for every line above:** *"the engine needs to know
+why, not just do."* A rule whose comment cites the wrong evidence level is worse than one with no
+citation — the next session verifies it against the paper, does not find it, and deletes the rule.
 
 ### The counterweight, stated so it reads as a choice and not an oversight
 The current rule is also sourced. Its basis is same-session interference — the code cites Wilson

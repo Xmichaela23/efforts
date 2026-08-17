@@ -37,8 +37,10 @@ Deno.test('deload work sets floor at the empty bar — a light press cannot pres
     oneRepMaxes: { squat: 110, deadlift: 150, bench: 150, overheadPress: 100 },
     enduranceSport: 'run',
   });
+  // ⚠️ WEEK 4 IS A REAL 7TH-WEEK DELOAD NOW (2026-08-16) — four sets, 70/80/90/100% of the training
+  // max, not the three-set leader week it happened to be under the previous map.
   const deload = ohpSetPlan(plan, '4');
-  assertEquals(deload.length, 3);
+  assertEquals(deload.length, 4);
   for (const w of deload) {
     assert(w >= BAR, `deload set at ${w} lb is below the ${BAR} lb bar`);
   }

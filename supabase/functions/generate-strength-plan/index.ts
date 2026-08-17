@@ -119,33 +119,17 @@ Deno.serve(async (req: Request) => {
     const sport: 'run' | 'bike' | null =
       endurance_sport === 'bike' || endurance_sport === 'run' ? endurance_sport : null;
 
-    // ⛔ CONTINUITY, FROM DATA THAT WAS ALREADY THERE. `compute-facts` writes
-    // `learned_fitness.strength_1rms[lift]` with `last_logged` and `sample_count` over a 12-week
-    // window. This function already selected `learned_fitness` — for maxes and pace — and never read
-    // either field. The block shape needed no new signal, only a reader.
-    //
-    // ⚠️ ABSENT IS NOT DETRAINED. No history at all is a COLD START, and `sample_count: 0` reads
-    // identically to "has not lifted in a year" while being a different person entirely. `weeksSince:
-    // null` routes to `unknown`, which resolves to today's 2+1 — so an athlete with no lifting
-    // history sees no change and this ships as a pure addition.
-    const lf = ((ub as any)?.learned_fitness ?? {}) as Record<string, any>;
-    const s1 = (lf.strength_1rms ?? {}) as Record<string, { last_logged?: string; sample_count?: number }>;
-    const entries = Object.values(s1).filter(Boolean);
-    let weeksSince: number | null = null;
-    let logs = 0;
-    for (const e of entries) {
-      logs += Number(e?.sample_count) || 0;
-      const t = e?.last_logged ? Date.parse(String(e.last_logged)) : NaN;
-      if (!Number.isFinite(t)) continue;
-      const w = Math.floor((Date.now() - t) / (7 * 24 * 3600 * 1000));
-      weeksSince = weeksSince == null ? w : Math.min(weeksSince, w);   // the MOST RECENT lift wins
-    }
+    // ⛔ THE CONTINUITY READER IS DELETED (2026-08-16). It computed `weeksSince` / `logs` off
+    // `learned_fitness.strength_1rms` to pick the leader:anchor ratio. **The ratio is fixed now** —
+    // every cycle but the last is a leader, capped at two (`wendler-531.ts:leaderCount`) — because
+    // an endurance load is a permanent stressor and this athlete never has the headroom for
+    // back-to-back anchor cycles. The tiers also produced 1 leader : 2 anchors, which is not one of
+    // Forever's three published models. Reader deleted with the branch it fed; do not reinstate one
+    // without reinstating a consumer first.
     const gsPosture = (body as Record<string, unknown>).strength_posture;
     const blockShape = {
-      continuity: { weeksSince, logs },
       strengthPosture: typeof gsPosture === 'string' ? gsPosture : 'develop',
     };
-    console.log(`[strength-plan] continuity: weeksSince=${weeksSince ?? 'never'} logs=${logs}`);
 
     const plan = composeStrengthPrimaryPlan({
       durationWeeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,

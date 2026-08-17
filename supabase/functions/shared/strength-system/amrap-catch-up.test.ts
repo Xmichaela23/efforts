@@ -109,8 +109,10 @@ Deno.test('⛔ THE BOUNDARY IS A STANDALONE WEEK, READ OFF THE MAP — never wee
   // ⛔⛔ SUPERSEDES 'the boundary is week 4 of every cycle' (2026-08-15, §1c). A cycle is three weeks
   // now, so the old modulo would have fired on weeks 3, 6, 9 and 12 — week 3 is mid-leader and week
   // 9 is the anchor's OPENING week. The seams of a 12-week block are weeks 1, 8 and 12.
-  for (const w of [1, 8, 12]) assertEquals(isCatchUpBoundary(w, 12), true, `week ${w}`);
-  for (const w of [2, 3, 4, 5, 6, 7, 9, 10, 11]) assertEquals(isCatchUpBoundary(w, 12), false, `week ${w}`);
+  // ⛔ THE SEAMS MOVED AGAIN 2026-08-16: a light week after EVERY cycle and no opening test, so a
+  // 12-week block's standalone weeks are 4, 8 and 12.
+  for (const w of [4, 8, 12]) assertEquals(isCatchUpBoundary(w, 12), true, `week ${w}`);
+  for (const w of [1, 2, 3, 5, 6, 7, 9, 10, 11]) assertEquals(isCatchUpBoundary(w, 12), false, `week ${w}`);
   // ⛔ AN UNKNOWN BLOCK LENGTH IS `false`. The layout depends on the leader/anchor split, so a week
   // number alone cannot answer — and silence costs an offer, never a wrong number.
   assertEquals(isCatchUpBoundary(8), false, 'no block length → no boundary');

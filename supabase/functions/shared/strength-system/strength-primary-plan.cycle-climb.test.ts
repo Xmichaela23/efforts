@@ -135,12 +135,12 @@ Deno.test('⛔ A LIFTER THE CEILING NEVER BOUND IS BYTE-IDENTICAL TO BEFORE THE 
   // never breached it and the 6% cap never bound (6% of 340 is 20), so every prescribed weight in
   // this block is the same number it was before slice a. The removal is not a global reweighting.
   const heavy = blockFor({ bench: 300, squat: 400, deadlift: 500, overheadPress: 200 });
-  // ⚠️ THE SHAPE IS L-A-A AS OF 2026-08-15 (work order §1b — zero leaders is not a Wendler shape,
-  // Forever p.17). Cycle 1 is a LEADER, so its top set is a programmed five with no open set; cycles
-  // 2 and 3 are anchors and carry the rep-out. **The WEIGHTS are untouched by that change** — which
-  // is the property this test is here for.
+  // ⚠️ THE SHAPE IS L-L-A AS OF 2026-08-16 (the continuity tiers are deleted; every block is two
+  // building cycles and one measuring cycle). Cycles 1 and 2 are LEADERS, so their top sets are
+  // programmed fives with no open set; cycle 3 is the anchor and carries the rep-out. **The WEIGHTS
+  // are untouched by that change** — which is the property this test is here for.
   assertEquals(work(heavy, 1, 'Back Squat'), '220x5 255x5 285x5');   // TM 340
-  assertEquals(work(heavy, 5, 'Back Squat'), '225x5 260x5 295x5+');  // TM 350
+  assertEquals(work(heavy, 5, 'Back Squat'), '225x5 260x5 295x5');   // TM 350
   assertEquals(work(heavy, 9, 'Back Squat'), '230x5 270x5 305x5+');  // TM 360 — exactly the old ceiling
 });
 

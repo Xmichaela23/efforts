@@ -65,10 +65,10 @@ Deno.test('⛔ NO SENTENCE IS GLUED TO THE NEXT — every week, every session', 
   }
 });
 
-Deno.test('⛔ THE LIGHT WEEKS ARE THE REGRESSION — 1, 8 and 12 carry the note, spaced', () => {
-  // ⛔ THE WEEKS AND THE WORDING BOTH MOVED 2026-08-15 (§1c). The light weeks of a 12-week block are
-  // now 1 (TM test), 8 (7th-week deload) and 12 (TM test) — and the run note names which of the two
-  // it is, because "the hard session comes off" has a different reason on a test week.
+Deno.test('⛔ THE LIGHT WEEKS ARE THE REGRESSION — 4, 8 and 12 carry the note, spaced', () => {
+  // ⛔ THE WEEKS MOVED AGAIN 2026-08-16. The light weeks of a 12-week block are now 4 and 8 (7th-week
+  // deloads, one after every cycle) and 12 (the closing TM test) — and the run note names which of
+  // the two it is, because "the hard session comes off" has a different reason on a test week.
   // The note appears three times in a block, which is exactly why the glued-sentence bug survived.
   const MARK = /(Light week|Test week) — the hard session comes off/;
   const withNote = everySession().filter((s) => MARK.test(s.description));
@@ -80,7 +80,7 @@ Deno.test('⛔ THE LIGHT WEEKS ARE THE REGRESSION — 1, 8 and 12 carry the note
     );
     assert(!/\.(Light week|Test week)/.test(s.description), `week ${s.week}: the reported bug is back`);
   }
-  assertEquals([...new Set(withNote.map((s) => s.week))].sort(), ['1', '12', '8'].sort());
+  assertEquals([...new Set(withNote.map((s) => s.week))].sort(), ['4', '12', '8'].sort());
 });
 
 Deno.test('the descriptions this file guards are in voice', () => {

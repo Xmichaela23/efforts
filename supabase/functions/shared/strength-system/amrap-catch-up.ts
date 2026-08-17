@@ -34,7 +34,6 @@
 
 import { estimate1RM } from '../../../../src/lib/estimate-1rm.ts';
 import {
-  type BlockShapeInputs,
   blockWeekFor,
   MIN_BLOCK_WEEKS,
   roundDownToIncrement,
@@ -180,14 +179,14 @@ export function isCatchUpBoundary(
   currentWeek: number | null | undefined,
   /** `plans.duration_weeks`. Absent → `false`. */
   blockWeeks?: number | null,
-  /** The shape inputs the block was BUILT with, when the caller has them. */
-  inputs?: BlockShapeInputs,
 ): boolean {
   const w = Number(currentWeek);
   const total = Number(blockWeeks);
   if (!Number.isFinite(w) || w < 1) return false;
   if (!Number.isFinite(total) || total < MIN_BLOCK_WEEKS) return false;
-  const bw = blockWeekFor(Math.floor(total), Math.floor(w), inputs);
+  // ⚠️ NO SHAPE INPUTS ANY MORE (2026-08-16). The week map is a function of LENGTH alone now, so a
+  // caller that does not know how the block was built can no longer get a different answer.
+  const bw = blockWeekFor(Math.floor(total), Math.floor(w));
   return !!bw && bw.kind !== 'cycle';
 }
 

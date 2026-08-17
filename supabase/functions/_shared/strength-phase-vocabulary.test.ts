@@ -53,11 +53,12 @@ Deno.test('a real plan config resolves every one of its twelve weeks', () => {
     assertEquals(phase !== null, true, `week ${week} placed nowhere`);
     assertEquals(normalizePhaseKey(phase) !== null, true, `week ${week} → "${phase}" does not resolve`);
   }
-  // Spot-check the placement itself rather than trusting the loop. ⛔ THE WEEKS MOVED (§1c): week 1
-  // is the TM test, weeks 2-7 are the two leader cycles, week 8 is the standalone deload, weeks 9-11
-  // the anchor, week 12 the closing test.
-  assertEquals(resolvePlanPhase(config, 1), 'TM Test');
-  assertEquals(resolvePlanPhase(config, 4), 'Leader');
+  // Spot-check the placement itself rather than trusting the loop. ⛔ THE WEEKS MOVED AGAIN
+  // (2026-08-16): weeks 1-3 and 5-7 are the two leader cycles, weeks 4 and 8 are the standalone
+  // deloads — one after every cycle — weeks 9-11 the anchor, week 12 the closing test. There is no
+  // opening TM-test week.
+  assertEquals(resolvePlanPhase(config, 1), 'Leader');
+  assertEquals(resolvePlanPhase(config, 4), 'Deload');
   assertEquals(resolvePlanPhase(config, 8), 'Deload');
   assertEquals(resolvePlanPhase(config, 11), 'Anchor');
   assertEquals(resolvePlanPhase(config, 12), 'TM Test');

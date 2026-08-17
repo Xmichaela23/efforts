@@ -73,23 +73,24 @@ Deno.test('⛔ TWELVE WEEKS, FOUR LIFTING DAYS EACH, NOTHING MISSING', () => {
 Deno.test('⛔ THE PHASE STRUCTURE IS THE §0 MAP', () => {
   assertEquals(
     PLAN.phaseStructure.phases.map((p: any) => `${p.name} ${p.start_week}-${p.end_week}`),
-    ['TM Test 1-1', 'Leader 2-4', 'Leader 5-7', 'Deload 8-8', 'Anchor 9-11', 'TM Test 12-12'],
+    // ⛔ REWRITTEN 2026-08-16: a light week after EVERY cycle (3:1), and NO opening test week.
+    ['Leader 1-3', 'Deload 4-4', 'Leader 5-7', 'Deload 8-8', 'Anchor 9-11', 'TM Test 12-12'],
   );
-  // Only the 7th week is an unload. A test week is light for a different reason and resolves to
+  // Only the 7th weeks are unloads. A test week is light for a different reason and resolves to
   // `taper` instead — one week must not carry two contradictory postures.
-  assertEquals(PLAN.phaseStructure.recovery_weeks, [8]);
+  assertEquals(PLAN.phaseStructure.recovery_weeks, [4, 8]);
 });
 
 Deno.test('⛔ EVERY WEEK’S MAIN-LIFT SHAPE, ALL FOUR LIFTS', () => {
   const EXPECTED: Record<number, string> = {
-    1:  '5/5/5/5+',   // TM test — 70/80/90 then the training max, open
-    2:  '5/5/5',      // Leader 1: 5s PRO, no open set
+    1:  '5/5/5',      // Leader 1: 5s PRO, no open set — the block opens on training, not testing
+    2:  '5/5/5',
     3:  '5/5/5',
-    4:  '5/5/5',
+    4:  '5/3/1/1',    // 7th-week deload — and NOTHING is open
     5:  '5/5/5',      // Leader 2: same scheme, one step up
     6:  '5/5/5',
     7:  '5/5/5',
-    8:  '5/3/1/1',    // 7th-week deload — and NOTHING is open
+    8:  '5/3/1/1',    // the second 7th week, before the anchor
     9:  '5/5/5+',     // Anchor: standard 5/3/1, top set open
     10: '3/3/3+',
     11: '5/3/1+',
@@ -106,24 +107,24 @@ Deno.test('⛔ A LEADER NEVER MEASURES AND A 7TH WEEK NEVER MEASURES', () => {
   // The open set is the whole difference between a building month and a measuring one. If it ever
   // appears on a leader week, the block has become the accidental hybrid SPEC §1 exists to correct:
   // lighter weights, same fatigue cost.
-  for (const week of [2, 3, 4, 5, 6, 7, 8]) {
+  for (const week of [1, 2, 3, 4, 5, 6, 7, 8]) {
     for (const lift of LIFTS) {
       assertEquals(workSets(PLAN, week, lift).some((s) => s.amrap), false, `week ${week} ${lift}`);
     }
   }
-  // And the four weeks that DO measure are the anchor's three plus the two test weeks.
+  // And the weeks that DO measure are the anchor's three plus the closing test.
   const measured: number[] = [];
   for (let week = 1; week <= 12; week++) {
     if (workSets(PLAN, week, 'Bench Press').some((s) => s.amrap)) measured.push(week);
   }
-  assertEquals(measured, [1, 9, 10, 11, 12]);
+  assertEquals(measured, [9, 10, 11, 12]);
 });
 
 // ── 3. The supplemental ─────────────────────────────────────────────────────
 
 Deno.test('⛔ FSL IS ON THE LEADER WEEKS AND NOWHERE ELSE', () => {
   const fsl = (week: number, lift: string) => rowsFor(PLAN, week, lift).find((r) => r.supplemental);
-  for (const week of [2, 3, 4, 5, 6, 7]) {
+  for (const week of [1, 2, 3, 5, 6, 7]) {
     for (const lift of LIFTS) {
       const row = fsl(week, lift);
       assert(row, `week ${week} ${lift} lost its supplemental`);
@@ -132,7 +133,7 @@ Deno.test('⛔ FSL IS ON THE LEADER WEEKS AND NOWHERE ELSE', () => {
       assertEquals(row.weight, workSets(PLAN, week, lift)[0].weight, `week ${week} ${lift} FSL weight`);
     }
   }
-  for (const week of [1, 8, 9, 10, 11, 12]) {
+  for (const week of [4, 8, 9, 10, 11, 12]) {
     for (const lift of LIFTS) {
       assertEquals(fsl(week, lift), undefined, `week ${week} ${lift} must carry no supplemental`);
     }
@@ -161,8 +162,8 @@ Deno.test('⛔ THE ASSISTANCE BAND FOLLOWS THE PHASE — leaders light, anchor h
   //   anchor              75-100 (p.24)      ...all clamped at 75 for a concurrent athlete — OURS.
   // This athlete has no tested capacity, so every slot sits at its band's floor.
   const EXPECTED: Record<number, string> = {
-    1: '25 total', 8: '25 total', 12: '25 total',                       // standalone weeks
-    2: '50 total', 3: '50 total', 4: '50 total',                        // leader 1
+    4: '25 total', 8: '25 total', 12: '25 total',                       // standalone weeks
+    1: '50 total', 2: '50 total', 3: '50 total',                        // leader 1
     5: '50 total', 6: '50 total', 7: '50 total',                        // leader 2
     9: '75 total', 10: '75 total', 11: '75 total',                      // anchor
   };
@@ -177,7 +178,7 @@ Deno.test('⛔ THE ASSISTANCE BAND FOLLOWS THE PHASE — leaders light, anchor h
 
 Deno.test('⛔ THE JUMPS FOLLOW IT TOO — 2×5 light, 3×5 on the anchor, lower days only', () => {
   const jump = (week: number, lift: string) => rowsFor(PLAN, week, lift).find((r) => r.name === 'Box Jump');
-  for (const week of [1, 2, 5, 8, 12]) {
+  for (const week of [1, 4, 5, 8, 12]) {
     assertEquals(jump(week, 'Back Squat')?.sets, 2, `week ${week} squat`);
     assertEquals(jump(week, 'Deadlift')?.sets, 2, `week ${week} deadlift`);
   }
@@ -200,14 +201,14 @@ Deno.test('⛔ THE WHOLE TWELVE WEEKS OF ONE LIFT, IN POUNDS', () => {
   // a percentage moved, and both are Wendler's.
   const line = (week: number) => workSets(PLAN, week, 'Bench Press')
     .map((s: any) => `${s.weight}x${s.reps}${s.amrap ? '+' : ''}`).join(' ');
-  assertEquals(line(1),  '130x5 150x5 170x5 190x5+');   // TM test at 190
-  assertEquals(line(2),  '120x5 140x5 160x5');          // 65/75/85 of 190
-  assertEquals(line(3),  '130x5 150x5 170x5');          // 70/80/90
-  assertEquals(line(4),  '140x5 160x5 180x5');          // 75/85/95
+  assertEquals(line(1),  '120x5 140x5 160x5');          // 65/75/85 of 190 — cycle 1 opens the block
+  assertEquals(line(2),  '130x5 150x5 170x5');          // 70/80/90
+  assertEquals(line(3),  '140x5 160x5 180x5');          // 75/85/95
+  assertEquals(line(4),  '130x5 150x3 170x1 190x1');    // the first 7th week, at cycle 1's 190
   assertEquals(line(5),  '125x5 145x5 165x5');          // TM 195
   assertEquals(line(6),  '135x5 155x5 175x5');
   assertEquals(line(7),  '145x5 165x5 185x5');
-  assertEquals(line(8),  '135x5 155x3 175x1 195x1');    // the 7th week, at 195
+  assertEquals(line(8),  '135x5 155x3 175x1 195x1');    // the second 7th week, at 195
   assertEquals(line(9),  '130x5 150x5 170x5+');         // TM 200, anchor
   assertEquals(line(10), '140x3 160x3 180x3+');
   assertEquals(line(11), '150x5 170x3 190x1+');
@@ -217,12 +218,12 @@ Deno.test('⛔ THE WHOLE TWELVE WEEKS OF ONE LIFT, IN POUNDS', () => {
 Deno.test('the warm-up ramp is on the cycle weeks and on none of the light ones', () => {
   const ramp = (week: number, lift: string) =>
     ((mainRow(PLAN, week, lift)?.set_plan ?? []) as any[]).filter((s) => s.warmup);
-  for (const week of [2, 3, 4, 5, 6, 7, 9, 10, 11]) {
+  for (const week of [1, 2, 3, 5, 6, 7, 9, 10, 11]) {
     for (const lift of LIFTS) {
       assertEquals(ramp(week, lift).map((s) => s.reps), [5, 5, 3], `week ${week} ${lift}`);
     }
   }
-  for (const week of [1, 8, 12]) {
+  for (const week of [4, 8, 12]) {
     for (const lift of LIFTS) {
       assertEquals(ramp(week, lift).length, 0, `week ${week} ${lift} should have no ramp`);
     }
@@ -231,20 +232,19 @@ Deno.test('the warm-up ramp is on the cycle weeks and on none of the light ones'
 
 // ── 6. The other two lengths ────────────────────────────────────────────────
 
-Deno.test('⛔ THE 16-WEEK BLOCK IS 2 LEADERS AND 2 ANCHORS — his p.17 second model', () => {
+Deno.test('⛔ 16 WEEKS IS NOT OFFERED — the request builds a 12-week block', () => {
+  // Four cycles cannot be 2:1, and two anchors back to back is the configuration this block exists
+  // to avoid for a concurrent athlete. The length is refused rather than built into a shape neither
+  // source supports (2026-08-16).
   const p16 = block(16);
-  assertEquals(p16.duration_weeks, 16);
+  assertEquals(p16.duration_weeks, 12);
   assertEquals(
     p16.phaseStructure.phases.map((x: any) => `${x.name} ${x.start_week}-${x.end_week}`),
-    ['TM Test 1-1', 'Leader 2-4', 'Leader 5-7', 'Deload 8-8',
-     'Anchor 9-11', 'Deload 12-12', 'Anchor 13-15', 'TM Test 16-16'],
+    ['Leader 1-3', 'Deload 4-4', 'Leader 5-7', 'Deload 8-8', 'Anchor 9-11', 'TM Test 12-12'],
   );
-  // ⚠️ THE SPARE WEEK BECAME A SECOND DELOAD, not a fourth cycle — two anchor cycles back to back
-  // with no unload between them is not a shape he runs (p.21's "after any cycle" licence).
-  assertEquals(p16.phaseStructure.recovery_weeks, [8, 12]);
 });
 
-Deno.test('⛔ THE 8-WEEK BLOCK DROPS THE OPENING TEST WEEK, AND ONLY THAT', () => {
+Deno.test('⛔ THE 8-WEEK BLOCK — one leader, one anchor, same 3:1 rhythm', () => {
   const p8 = block(8);
   assertEquals(p8.duration_weeks, 8);
   assertEquals(
@@ -263,7 +263,10 @@ Deno.test('the plan description names the shape, the test weeks and the session 
   const d = String(PLAN.description);
   assertEquals(/2 building cycles, then one measuring cycle from week 9/.test(d), true, d);
   assertEquals(/Each cycle runs three weeks, with a light week between them/.test(d), true, d);
-  assertEquals(/Weeks 1 and 12 test the working number/.test(d), true, d);
+  assertEquals(/2 building cycles/.test(d), true, d);
+  // ⛔ ONE TEST WEEK NOW, NOT TWO (2026-08-16) — the opening test was dropped, so the sentence the
+  // copy derives is the single-week one. It is derived from `testWeeks`, not written twice.
+  assertEquals(/Week 12 tests the working number/.test(d), true, d);
   // ⛔ THE SESSION-LENGTH COST IS DISCLOSED ONCE, IN THE PLAN. A cost the athlete pays and cannot see
   // is not disclosed; a cost repeated on twelve weeks of cards is nagging.
   assertEquals(/adds about ten minutes/.test(d), true, d);

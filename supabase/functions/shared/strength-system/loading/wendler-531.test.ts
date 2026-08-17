@@ -21,6 +21,7 @@ import {
   VALIDITY_CHECK_PCT,
   ESTIMATE_TRUSTED_MAX_REPS,
   STALL_CONFIRM_SESSIONS,
+  BLOCK_WEEKS_OFFERED,
 } from './wendler-531.ts';
 
 // =============================================================================
@@ -115,13 +116,17 @@ Deno.test('increments: +5 upper, +10 lower, per cycle', () => {
 // ── THE BLOCK MAP (work order §0's target, pinned week by week) ─────────────────────────────────
 
 /** A compact rendering of a week map: one token per week. */
-const mapOf = (weeks: number, inputs?: any) => buildWeekMap(weeks, inputs).map((w) =>
+const mapOf = (weeks: number) => buildWeekMap(weeks).map((w) =>
   w.kind === 'cycle' ? `${w.cycleKind![0].toUpperCase()}${w.weekInCycle}` : (w.kind === 'tm_test' ? 'TEST' : 'DL'));
 
-Deno.test('⛔ THE 12-WEEK MAP IS §0 EXACTLY — test · L · L · deload · A · test', () => {
+Deno.test('⛔ THE 12-WEEK MAP — 3:1 RHYTHM, NO OPENING TEST (2026-08-16)', () => {
+  // A light week after EVERY cycle (p.21's "after any cycle" licence, taken because a concurrent
+  // athlete is the taxing case), and NO opening test week — knowingly overriding p.21's bolded
+  // recommendation, because a test week spends recovery capital to confirm a number the intake
+  // derives. Both are Michael's calls, 2026-08-16, and both are stated as ours in the code.
   assertEquals(mapOf(12), [
-    'TEST',
     'L1', 'L2', 'L3',
+    'DL',
     'L1', 'L2', 'L3',
     'DL',
     'A1', 'A2', 'A3',
@@ -130,26 +135,15 @@ Deno.test('⛔ THE 12-WEEK MAP IS §0 EXACTLY — test · L · L · deload · A 
   assertEquals(blockWeeks(12), 12);
 });
 
-Deno.test('⛔ THE 16-WEEK MAP IS 2 LEADERS AND 2 ANCHORS — his p.17 second model', () => {
-  // ⛔ CHANGED 2026-08-15. It used to be `['leader','leader','leader','anchor']` — 3:1, which is NOT
-  // one of the three models Forever p.17 publishes (3:2, 2:2, 2:1). The spare week the layout frees
-  // becomes the second deload, after the first anchor (p.21's "after any cycle" licence).
-  assertEquals(mapOf(16), [
-    'TEST',
-    'L1', 'L2', 'L3',
-    'L1', 'L2', 'L3',
-    'DL',
-    'A1', 'A2', 'A3',
-    'DL',
-    'A1', 'A2', 'A3',
-    'TEST',
-  ]);
-  assertEquals(blockWeeks(16), 16);
+Deno.test('⛔ 16 WEEKS IS NOT OFFERED — it snaps down to 12', () => {
+  // Four cycles cannot be 2:1. Two anchors back to back is the configuration this block exists to
+  // avoid; three leaders and one anchor detrains heavy expression. The length is refused rather
+  // than built into a shape neither source supports.
+  assertEquals(blockWeeks(16), 12);
+  assertEquals(mapOf(16), mapOf(12));
 });
 
-Deno.test('⛔ THE 8-WEEK BLOCK DROPS THE OPENING TEST WEEK — it is the only piece that yields', () => {
-  // test + L + deload + A + test costs 9. The entry gate's 1RM stands in for the opening test, which
-  // the plan copy states rather than leaving implied.
+Deno.test('⛔ THE 8-WEEK BLOCK — one leader, one anchor, same rhythm', () => {
   assertEquals(mapOf(8), ['L1', 'L2', 'L3', 'DL', 'A1', 'A2', 'A3', 'TEST']);
   assertEquals(blockWeeks(8), 8);
 });
@@ -157,32 +151,35 @@ Deno.test('⛔ THE 8-WEEK BLOCK DROPS THE OPENING TEST WEEK — it is the only p
 Deno.test('cyclesForBlock is a VIEW over the map — three-week ranges, no deload inside', () => {
   const c = cyclesForBlock(12);
   assertEquals(c.map((x) => x.kind), ['leader', 'leader', 'anchor']);
-  assertEquals(c.map((x) => [x.startWeek, x.endWeek]), [[2, 4], [5, 7], [9, 11]]);
+  assertEquals(c.map((x) => [x.startWeek, x.endWeek]), [[1, 3], [5, 7], [9, 11]]);
   assertEquals(WEEKS_PER_CYCLE, 3);
   // ⛔ A STANDALONE WEEK BELONGS TO NO CYCLE, and `cycleForWeek` says so with a null.
-  for (const wk of [1, 8, 12]) assertEquals(cycleForWeek(12, wk), null, `week ${wk} is standalone`);
-  assertEquals(blockWeekFor(12, 1)!.kind, 'tm_test');
+  for (const wk of [4, 8, 12]) assertEquals(cycleForWeek(12, wk), null, `week ${wk} is standalone`);
+  assertEquals(blockWeekFor(12, 4)!.kind, 'deload_single');
   assertEquals(blockWeekFor(12, 8)!.kind, 'deload_single');
   assertEquals(blockWeekFor(12, 12)!.kind, 'tm_test');
 });
 
-Deno.test('⛔ A STANDALONE WEEK RUNS ON THE CYCLE BEFORE IT — and the opening test on cycle 1', () => {
+Deno.test('⛔ A STANDALONE WEEK RUNS ON THE CYCLE BEFORE IT', () => {
   const m = buildWeekMap(12);
-  assertEquals(m[0].workingNumberCycle, 1, 'the opening test validates the number cycle 1 will use');
-  assertEquals(m[7].workingNumberCycle, 2, 'the mid-block deload unloads the number just used');
+  assertEquals(m[3].workingNumberCycle, 1, 'week 4 unloads the number cycle 1 just used');
+  assertEquals(m[7].workingNumberCycle, 2, 'week 8 unloads the number cycle 2 just used');
   assertEquals(m[11].workingNumberCycle, 3, 'the closing test measures the number the block reached');
 });
 
-Deno.test('blockWeeks snaps DOWN to a length the layout fills exactly', () => {
-  // ⚠️ NO LONGER MULTIPLES OF FOUR. A cycle costs three and the standalone weeks are the odd ones.
+Deno.test('blockWeeks is an ALLOWLIST of 8 and 12 — anything else snaps DOWN', () => {
+  assertEquals(BLOCK_WEEKS_OFFERED, [8, 12]);
   assertEquals(blockWeeks(12), 12);
-  assertEquals(blockWeeks(16), 16);
-  assertEquals(blockWeeks(10), 9);
   assertEquals(blockWeeks(13), 12);
-  assertEquals(blockWeeks(3), 4);   // the floor: one anchor cycle plus its test week
+  assertEquals(blockWeeks(16), 12);
+  assertEquals(blockWeeks(20), 12);
+  assertEquals(blockWeeks(11), 8);
+  assertEquals(blockWeeks(8), 8);
+  assertEquals(blockWeeks(3), 8);          // under the floor resolves UP to the shortest real block
+  assertEquals(blockWeeks(NaN), 8);
 });
 
-Deno.test('the measurement weeks of a 12-week block are the anchor, plus the two test weeks', () => {
+Deno.test('the measurement weeks of a 12-week block are the anchor, plus the closing test', () => {
   const measured: number[] = [];
   for (const w of buildWeekMap(12)) {
     const sets = w.kind === 'cycle'
@@ -190,16 +187,16 @@ Deno.test('the measurement weeks of a 12-week block are the anchor, plus the two
       : (w.kind === 'tm_test' ? tmTestSets() : deloadSingleSets());
     if (sets.some((s) => s.amrap)) measured.push(w.week);
   }
-  // ⛔ WEEK 1 AND WEEK 12 ARE NEW MEASUREMENTS (§1c/§1d): the rested TM-test weeks. Weeks 9-11 are
-  // the anchor's open sets, unchanged. Weeks 2-8 carry no open set — the leaders and the deload.
-  assertEquals(measured, [1, 9, 10, 11, 12]);
+  // ⛔ WEEK 12 IS THE RESTED TM TEST; 9-11 are the anchor's open sets. Weeks 1-8 carry no open set —
+  // the leaders run 5s PRO and the two light weeks are prescribed singles.
+  assertEquals(measured, [9, 10, 11, 12]);
 });
 
 Deno.test('worked example — squat 225, week 2 and the week 11 gate', () => {
   const base = workingNumberFrom1RM(225); // 190
-  // ⚠️ WEEK 2, NOT WEEK 1 — week 1 is the TM-test week now. Week 2 is cycle 1's opening leader week
-  // and its three weights are unchanged from before the restructure.
-  const wk2 = cycleForWeek(12, 2)!;
+  // ⚠️ WEEK 1 AGAIN (2026-08-16) — the opening TM-test week is gone, so week 1 is cycle 1's opening
+  // leader week and its three weights are unchanged from before either restructure.
+  const wk2 = cycleForWeek(12, 1)!;
   const wn1 = workingNumberForCycle(base, wk2.slot.index, true);
   assertEquals(
     setsForWeek(wk2.slot.kind, wk2.weekInCycle).map((s) => weightForSet(wn1, s.pct)),

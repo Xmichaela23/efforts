@@ -127,17 +127,17 @@ Deno.test('verdicts come back one per cycle, in order', () => {
 // ── Cycle grouping: the plan's week number, never the date ──────────────────
 
 Deno.test('⛔ A SESSION FINDS ITS CYCLE BY PLAN WEEK, and week-in-cycle falls out of it', () => {
-  // ⛔ THE RANGES MOVED 2026-08-15 (§1c): cycles are 2-4, 5-7, 9-11, and weeks 1, 8 and 12 belong to
-  // NO cycle — they are the standalone TM-test and 7th-week-deload weeks.
+  // ⛔ THE RANGES MOVED AGAIN 2026-08-16: cycles are 1-3, 5-7, 9-11, and weeks 4, 8 and 12 belong to
+  // NO cycle — a light week after every cycle, and the closing TM test.
   const cycles = cyclesForBlock(12);
   const w = session('Back Squat', [{ weight: 125, reps: 6, amrap: true }]);
   assertEquals(cycleSessionFor(11, cycles, w)?.cycleIndex, 3);
   assertEquals(cycleSessionFor(11, cycles, w)?.session.weekInCycle, 3, 'week 11 is the 95% week');
-  assertEquals(cycleSessionFor(2, cycles, w)?.cycleIndex, 1);
-  assertEquals(cycleSessionFor(2, cycles, w)?.session.weekInCycle, 1);
+  assertEquals(cycleSessionFor(1, cycles, w)?.cycleIndex, 1);
+  assertEquals(cycleSessionFor(1, cycles, w)?.session.weekInCycle, 1);
   // ⛔ A STANDALONE WEEK IS NOT IN A CYCLE, and it must not be filed into the neighbouring one — a
   // TM-test rep count read as a cycle's 95% set would be a verdict off the wrong prescription.
-  for (const wk of [1, 8, 12]) assertEquals(cycleSessionFor(wk, cycles, w), null, `week ${wk}`);
+  for (const wk of [4, 8, 12]) assertEquals(cycleSessionFor(wk, cycles, w), null, `week ${wk}`);
 });
 
 Deno.test('⛔ AN UNATTACHED WORKOUT CONTRIBUTES NOTHING — no plan week, no cycle', () => {
@@ -159,9 +159,9 @@ Deno.test('⛔ THE JOIN GROUPS BY PLAN WEEK, and drops what it cannot place', ()
   const cycles = cyclesForBlock(12);
   const ex = (name: string, reps: number) => [{ name, sets: [set({ weight: 125, reps, amrap: true })] }];
   const grouped = groupSessionsByCycle([
-    { week_number: 4,  strength_exercises: ex('Back Squat', 6) },   // cycle 1 (2-4), week-in-cycle 3
+    { week_number: 3,  strength_exercises: ex('Back Squat', 6) },   // cycle 1 (1-3), week-in-cycle 3
     { week_number: 7,  strength_exercises: ex('Back Squat', 0) },   // cycle 2 (5-7), week-in-cycle 3 — a logged MISS
-    { week_number: 2,  strength_exercises: ex('Back Squat', 9) },   // cycle 1, week-in-cycle 1
+    { week_number: 1,  strength_exercises: ex('Back Squat', 9) },   // cycle 1, week-in-cycle 1
     { week_number: 8,  strength_exercises: ex('Back Squat', 9) },   // a standalone deload — dropped
     { week_number: null, strength_exercises: ex('Back Squat', 9) }, // unattached — dropped
     { week_number: 99, strength_exercises: ex('Back Squat', 9) },   // outside the block — dropped

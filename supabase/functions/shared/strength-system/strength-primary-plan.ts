@@ -715,7 +715,7 @@ export function buildBlockPhases(weeks: number, shape?: BlockShapeInputs): { pha
   const recovery_weeks: number[] = [];
   // ⛔ WALKS THE WEEK MAP, not the cycle list. The deloads are no longer derivable as "the last week
   // of each cycle" — they are their own weeks between cycles, and there are TM-test weeks too.
-  for (const w of buildWeekMap(weeks, shape)) {
+  for (const w of buildWeekMap(weeks)) {
     const name = w.kind === 'cycle' ? PHASE_NAME[w.cycleKind!] : PHASE_NAME[w.kind];
     const last = phases[phases.length - 1];
     // Consecutive weeks of the same cycle collapse into one phase entry; a standalone week is always
@@ -2538,7 +2538,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⛔ ONE MAP FOR THE WHOLE BLOCK (2026-08-15, §1c). The loop used to ask `cycleForWeek(week)` and
   // derive everything from `weekInCycle === 4`; the block now contains weeks that belong to no cycle
   // at all, so the shape is read off the map rather than computed from a week number.
-  const weekMap = buildWeekMap(weeks, args.blockShape);
+  const weekMap = buildWeekMap(weeks);
 
   for (const bw of weekMap) {
     const week = bw.week;
@@ -3101,8 +3101,24 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ AND THE HARD DAY, IF THEY CHOSE THE BIKE FOR IT. Same fix as the run's: the pin already
       // reserved this day, so without this the week visibly loses one. D-327 makes run and bike
       // mutually exclusive at intake, so at most one of these two branches ever fires.
+      //
+      // ⛔ AND IT DELOADS, LIKE THE RUN'S DOES (2026-08-16). This line pushed `bikeQualitySession`
+      // unconditionally while the easy rides two blocks up were already taking `isStandalone`, so a
+      // bike-primary athlete rode 4 × 4 VO2 intervals through every light week in the block —
+      // including the TM-test week, whose entire job is arriving rested at the measured set. The run
+      // branch (:2931-2946) has handled both standalone shapes since 2026-08-15; the bike never got
+      // the same change. Downgraded, not deleted: dropping it hands back a blank day, which
+      // `place-week` already learned is worse than dropping the pin. Frequency holds (Hickson) and
+      // the intensity that drives the interference comes off (Wilson 2012).
       if (hardPin && args.hardDay?.discipline === 'bike') {
-        weekSessions.push(bikeQualitySession(hardPin));
+        weekSessions.push(isStandalone
+          ? enduranceSession('bike', hardPin, BIKE_QUALITY_MIN,
+            (isTmTest
+              ? 'Test week — the intervals come off so the lifting is measured rested. '
+              : 'Light week — the intervals come off. ')
+            + 'Easy spinning only, and the same rule as every other easy day: conversational throughout.',
+            'easy', true)
+          : bikeQualitySession(hardPin));
       }
     }
 
@@ -3123,7 +3139,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     sessions_by_week[String(week)] = weekSessions;
   }
 
-  const cycles = cyclesForBlock(weeks, args.blockShape);
+  const cycles = cyclesForBlock(weeks);
   const leaders = cycles.filter((c) => c.kind === 'leader').length;
   const anchorStart = cycles[cycles.length - 1].startWeek;
   // ⛔ SAME REFRAME AS THE PER-SESSION LINE (~L592), and it matters more here because this one is
