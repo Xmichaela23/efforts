@@ -268,6 +268,35 @@ picks for the deadlift+press day reach the built session, and the three suites h
 
 ⚠️ **Baseline for slice 4 is measured at `a7b9b96c`: 422/0 · 2957/3 · 680/3.**
 
+## Slice 6 — up to TWO hard days, any mix, and whose session it is (§1i)
+
+**Confirmed by Michael 2026-08-17, from the live screen** — the old single-hard-day picker is what
+is deployed, and §1i is the design. ⛔ **Work order §1i IS the instruction — read all of it,
+including the trace table.** Summary only:
+
+- The athlete picks **up to two** hard days: two runs, two rides, or one of each. One or none
+  unchanged.
+- **Each hard day answers a second question: prescribed or club.** Both count as hard days for
+  placement and recovery; only a prescribed day gets a session template. A club day is booked, not
+  coached — same rule as swim, honest copy.
+- Copy changes with the count, Michael's wording in §1i. ⛔ **The two-day copy must not promise
+  "the lifting stacks onto these days" — that is §6, unbuilt. State only what is true today.**
+- ⚠️ The terrain copy on that screen is correct — do not touch it.
+
+⛔ **THIS IS A PIPELINE CHANGE, NOT A UI VALVE.** §1i's trace table lists every site that assumes
+one hard day — the wire type, the validator, `hardPin`, the mutually-exclusive run/ride booleans,
+the per-discipline volume subtractions, and the two emitters. Both branches must be able to fire in
+one week. Line numbers in the table predate slices 1–5; re-grep, do not trust them.
+
+⛔ **STAY ON `week-solver`.** Settled 2026-08-16: one engine. Do NOT pull rules from
+`week-optimizer`, do not implement any rule in both, and do not start §6 (the stacking law) — two
+hard days must land placeable under today's rules.
+
+**Done means:** the screen offers two hard-day slots each with a prescribed/club answer, a week
+with two hard runs / two hard rides / one of each builds and places legally, the count-aware copy
+prints, one-or-none behaves exactly as before, and the suites hold the `1d9bfe9b` baseline
+(422/0 · 2957/3 · 682/3).
+
 ## Order, and why
 
 1. ✅ **Slice 1** — done at `b130fb4d`.
