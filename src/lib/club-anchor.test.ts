@@ -66,8 +66,12 @@ Deno.test('a dropped discipline contributes no day — posture gates both slots'
 const SRC = await Deno.readTextFile(new URL('../components/NonRaceBuilder.tsx', import.meta.url));
 
 Deno.test('the intake routes the pin by the athlete\'s answer, not by assumption', () => {
+  // ⚠️ THE LINE GREW A SECOND SOURCE (§1i, 2026-08-17) — `qualityDays` is now a spread of the club
+  // pin AND the strength path's hard days, because that bag is sport-keyed and both feed it. What
+  // this test is actually protecting is unchanged and still asserted: the club pin is routed by the
+  // athlete's INTENSITY answer, so a social club run is never filed as the quality day.
   assert(
-    /qualityDays: state\.runClubIntensity === 'quality' \? state\.qualityDays : \{\}/.test(SRC),
+    /\.\.\.\(state\.runClubIntensity === 'quality' \? state\.qualityDays : \{\}\)/.test(SRC),
     'the club pin no longer routes on intensity — it is back to always-quality',
   );
   assert(

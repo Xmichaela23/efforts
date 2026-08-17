@@ -2705,32 +2705,40 @@ Deno.serve(async (req: Request) => {
               // stopped dead. The composer had never seen it, which is why the intake's promise that
               // "the lifting is placed around it" was true for the long run and silent for this one.
               //
-              // D-327 makes the two mutually exclusive at intake, so at most one of these is present
-              // and `quality_run` wins if both somehow arrive (defensive — the gate should prevent it).
-              // The doctrine's two pins are the long run and this; everything else moves around them.
+              // ⛔ UP TO TWO NOW, AND THEY ARE NO LONGER MUTUALLY EXCLUSIVE (§1i, 2026-08-17). D-327
+              // forced a choice between a hard run and a hard ride and this block forwarded whichever
+              // won; the athlete may now have both, or two of one. `hard_days` on the goal is the new
+              // shape and is read first; `preferred_days.quality_run` / `.quality_bike` remain the
+              // fallback so a goal written before §1i still builds exactly the block it did.
+              //
+              // ⛔ THE TERRAIN RIDES WITH A RUN AND ONLY WITH A RUN (2026-08-06). It is the athlete's
+              // answer to "which of these can you actually run" — a hill, a short hill, a treadmill.
+              // The RIDE has no terrain question: one shape (Helgerud 4 × 4), and a turbo, a chaingang
+              // and a climb are all the same session on it.
+              // ⚠️ Absent is legal and means `hill_3min`. Forwarding nothing is what every goal
+              // created before that field builds, and it must keep building it.
               ...(((): Record<string, unknown> => {
-                const pd = gsTp.preferred_days as Record<string, string> | undefined;
-                const run = pd?.quality_run;
-                const bike = pd?.quality_bike;
-                // ⛔ THE TERRAIN RIDES WITH THE RUN PIN AND ONLY WITH IT (2026-08-06). It is the
-                // athlete's answer to "which of these can you actually run" — a hill, a short hill,
-                // a treadmill — collected on the same D-327 card as the day. The RIDE has no terrain
-                // question: the bike session has one shape (Helgerud 4 × 4) and a turbo, a chaingang
-                // and a climb are all the same session on it.
-                // ⚠️ Absent is legal and means `hill_3min`. Forwarding nothing is what every goal
-                // created before this field builds, and it must keep building it.
-                const terrain = (gsTp.preferred_days as Record<string, unknown> | undefined)
-                  ?.quality_run_terrain;
-                if (run) {
-                  return {
-                    hard_day: {
-                      day: run,
-                      discipline: 'run',
-                      ...(typeof terrain === 'string' ? { terrain } : {}),
-                    },
-                  };
+                const pd = gsTp.preferred_days as Record<string, unknown> | undefined;
+                const terrain = pd?.quality_run_terrain;
+                const withTerrain = (d: Record<string, unknown>) =>
+                  (d.discipline === 'run' && typeof terrain === 'string' && !d.terrain)
+                    ? { ...d, terrain }
+                    : d;
+                // The §1i shape, written by the builder's two hard-day slots.
+                const stored = (gsTp as Record<string, unknown>).hard_days;
+                if (Array.isArray(stored) && stored.length > 0) {
+                  const days = stored
+                    .filter((h): h is Record<string, unknown> => !!h && typeof h === 'object')
+                    .filter((h) => typeof h.day === 'string' && (h.discipline === 'run' || h.discipline === 'bike'))
+                    .map(withTerrain);
+                  return days.length > 0 ? { hard_days: days } : {};
                 }
-                if (bike) return { hard_day: { day: bike, discipline: 'bike' } };
+                // ⚠️ THE PRE-§1i GOAL. One pin, run winning if both somehow arrived — the D-327 gate
+                // should have prevented that, and this is the same defensive order it always had.
+                const run = typeof pd?.quality_run === 'string' ? pd.quality_run : null;
+                const bike = typeof pd?.quality_bike === 'string' ? pd.quality_bike : null;
+                if (run) return { hard_days: [withTerrain({ day: run, discipline: 'run' })] };
+                if (bike) return { hard_days: [{ day: bike, discipline: 'bike' }] };
                 return {};
               })()),
               // ⛔ `lifting_days` IS NO LONGER FORWARDED (§1f-0, 2026-08-17). It carried the intake

@@ -76,8 +76,14 @@ export type ScheduleGateInput = {
   /** Typed on the previous step. '' = never entered. */
   targetMiles: number | '';
   rideHours: number | '';
-  /** The one hard day, keyed by sport: `{}` = declined, `{ run: '' }` = half-answered. */
+  /** The race path's club night, keyed by sport: `{}` = declined, `{ run: '' }` = half-answered. */
   qualityDays: Record<string, string>;
+  /**
+   * ⛔ THE STRONG FOCUS HARD DAYS — UP TO TWO, ANY MIX (§1i, 2026-08-17). `qualityDays` above is
+   * keyed by sport and cannot express two hard runs, so the strength path sends this instead.
+   * Absent → the gate reads only `qualityDays`, which is the pre-§1i behaviour exactly.
+   */
+  hardDays?: Array<{ discipline: string; day: string }>;
 };
 
 /**
@@ -138,12 +144,14 @@ export function scheduleBlockedReasons(i: ScheduleGateInput): string[] {
   if (i.rideShown && i.rideDays < 1) out.push('Rides a week has no number yet.');
   if (i.runShown && longDayCalledFor(i, 'run') && !i.longRunDay) out.push('The long run has no day yet.');
   if (i.rideShown && longDayCalledFor(i, 'bike') && !i.longRideDay) out.push('The long ride has no day yet.');
-  // Hard day is OPTIONAL (D-327 permits one; never required one), so only a HALF-answer blocks: a
-  // discipline chosen with no day leaves an anchor the solver cannot place. Declining passes.
-  for (const d of ['run', 'bike']) {
-    if (d in i.qualityDays && !i.qualityDays[d]) {
-      out.push('The hard day has a discipline but no day. Tapping the discipline again drops it.');
-    }
+  // Hard days are OPTIONAL (§1i permits up to two; never required one), so only a HALF-answer
+  // blocks: a discipline chosen with no day leaves an anchor the solver cannot place. Declining
+  // passes. ⚠️ ONE SENTENCE HOWEVER MANY SLOTS ARE HALF-ANSWERED — two copies of the same line is
+  // noise, and the fix for both is the same tap.
+  const halfAnswered = ['run', 'bike'].some((d) => d in i.qualityDays && !i.qualityDays[d])
+    || (i.hardDays ?? []).some((h) => !h.day);
+  if (halfAnswered) {
+    out.push('A hard session has a discipline but no day. Tapping the discipline again drops it.');
   }
   return out;
 }

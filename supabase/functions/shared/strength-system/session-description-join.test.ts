@@ -31,7 +31,7 @@ const plan = composeStrengthPrimaryPlan({
   targetWeeklyMiles: 20,
   longRunDay: 'sunday',
   easyPaceMinPerMile: 10,
-  hardDay: { day: 'thursday', discipline: 'run', terrain: 'hill_3min' },
+  hardDays: [{ day: 'thursday', discipline: 'run', terrain: 'hill_3min' }],
 } as never);
 
 const everySession = (): Array<{ week: string; name: string; description: string }> => {

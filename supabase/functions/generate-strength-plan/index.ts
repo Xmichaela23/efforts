@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
       // Added 2026-07-26 — the doctrine's second pin and the bike volume. Both were collected at
       // intake, stored on the goal, and dropped at `create-goal-and-materialize-plan` before this
       // function ever saw them.
-      hard_day, target_weekly_ride_hours,
+      hard_days, target_weekly_ride_hours,
       // The bike, travelling beside the primary sport (2026-07-27). `{ hours, long_ride_day }`.
       bike,
     } = body as Record<string, unknown>;
@@ -204,23 +204,32 @@ Deno.serve(async (req: Request) => {
       // degrades to the shipped behaviour rather than to no hard session at all.
       // ⛔ Do not add it to the allowlist without adding it to `HardRunTerrain` — an unlisted value
       // is silently discarded here, which would look like the athlete's pick being ignored.
-      hardDay: hard_day && typeof hard_day === 'object'
-        && typeof (hard_day as Record<string, unknown>).day === 'string'
-        && ((hard_day as Record<string, unknown>).discipline === 'run'
-          || (hard_day as Record<string, unknown>).discipline === 'bike')
-        ? (() => {
-            const hd = hard_day as Record<string, unknown>;
-            const terrainOk = new Set(['hill_3min', 'hill_short', 'treadmill', 'flat']);
-            const terrain = typeof hd.terrain === 'string' && terrainOk.has(hd.terrain)
-              ? hd.terrain as 'hill_3min' | 'hill_short' | 'treadmill' | 'flat'
-              : undefined;
-            return {
-              day: hd.day as string,
-              discipline: hd.discipline as 'run' | 'bike',
-              ...(terrain ? { terrain } : {}),
-            };
-          })()
-        : undefined,
+      // ⛔ UP TO TWO, ANY MIX (§1i, 2026-08-17). This was a single `hard_day` object; the field is
+      // REPLACED, not widened alongside — a singular field beside an array is how a caller keeps
+      // writing the dead one. Each entry is validated on its own: an unknown discipline drops that
+      // ENTRY, not the whole answer, so one malformed slot cannot cost the athlete the other.
+      // ⚠️ THE COMPOSER CAPS AT TWO AND DEDUPES BY DAY. Validating here and capping there is not two
+      // owners of one rule: this decides what is well-formed, that decides what the block can carry.
+      hardDays: (Array.isArray(hard_days) ? hard_days : [])
+        .map((raw) => {
+          if (!raw || typeof raw !== 'object') return null;
+          const hd = raw as Record<string, unknown>;
+          if (typeof hd.day !== 'string') return null;
+          if (hd.discipline !== 'run' && hd.discipline !== 'bike') return null;
+          const terrainOk = new Set(['hill_3min', 'hill_short', 'treadmill', 'flat']);
+          const terrain = typeof hd.terrain === 'string' && terrainOk.has(hd.terrain)
+            ? hd.terrain as 'hill_3min' | 'hill_short' | 'treadmill' | 'flat'
+            : undefined;
+          return {
+            day: hd.day,
+            discipline: hd.discipline as 'run' | 'bike',
+            ...(terrain ? { terrain } : {}),
+            // ⚠️ ABSENT OR UNRECOGNISED → `prescribed`, the shipped behaviour. A club day is the
+            // athlete telling us they already attend it; nothing may infer that on their behalf.
+            ownership: hd.ownership === 'club' ? 'club' as const : 'prescribed' as const,
+          };
+        })
+        .filter((h): h is NonNullable<typeof h> => h !== null),
       // Bike hours (D-323 §6) — hours, never miles. Used on the bike-PRIMARY path.
       targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0
         ? Number(target_weekly_ride_hours) : undefined,

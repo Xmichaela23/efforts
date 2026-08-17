@@ -77,7 +77,7 @@ const activeDays = (w: S[]) => new Set(w.map((s) => s.day)).size;
  */
 
 const CASES: Array<[string, Record<string, unknown>]> = [
-  ['run 3d · long Sun · hard Thu', { enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13, longRunDay: 'sunday', hardDay: { day: 'thursday', discipline: 'run' } }],
+  ['run 3d · long Sun · hard Thu', { enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13, longRunDay: 'sunday', hardDays: [{ day: 'thursday', discipline: 'run' }] }],
   ['run 4d · long Sun', { enduranceSport: 'run', enduranceFrequency: 4, targetWeeklyMiles: 20, longRunDay: 'sunday' }],
   ['run 3d · long Sat', { enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 15, longRunDay: 'saturday' }],
   ['run 3d · long Wed', { enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 15, longRunDay: 'wednesday' }],
@@ -167,7 +167,7 @@ Deno.test('⛔ no easy run on the morning after the long run, when the week has 
 Deno.test('⛔ the athlete\'s anchors are never moved', () => {
   const w = week1({
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13,
-    longRunDay: 'wednesday', hardDay: { day: 'saturday', discipline: 'run' },
+    longRunDay: 'wednesday', hardDays: [{ day: 'saturday', discipline: 'run' }],
     bike: { hours: 3, days: 2, longRideDay: 'monday' },
   });
   assertEquals(w.find(isLongRun)?.day, 'Wednesday', 'the long-run pin moved');
@@ -186,7 +186,7 @@ Deno.test('the session COUNTS are unchanged — the solver was given placement, 
   // 3 run days = 1 long + 2 easy; the hard day consumes one of them when it is a run.
   const a = week1({ enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 15, longRunDay: 'sunday' });
   assertEquals(a.filter((s) => s.type === 'run').length, 3);
-  const b = week1({ enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13, longRunDay: 'sunday', hardDay: { day: 'thursday', discipline: 'run' } });
+  const b = week1({ enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13, longRunDay: 'sunday', hardDays: [{ day: 'thursday', discipline: 'run' }] });
   assertEquals(b.filter((s) => s.type === 'run').length, 3);
   const c = week1({ enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13, longRunDay: 'sunday', bike: { hours: 3, days: 2 } });
   assertEquals(c.filter((s) => s.type === 'ride').length, 2);
@@ -202,7 +202,7 @@ Deno.test('⛔ a bike-primary block asks for NO easy runs', () => {
 Deno.test('⛔ Q-215 SURVIVES — a clean upper day is preferred over a heavy-leg day on a tie', () => {
   const w = week1({
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 13,
-    longRunDay: 'sunday', hardDay: { day: 'thursday', discipline: 'run' },
+    longRunDay: 'sunday', hardDays: [{ day: 'thursday', discipline: 'run' }],
   });
   const easy = w.filter(isEasyRun).map((s) => s.day);
   const heavy = w.filter(isLower).map((s) => s.day);
@@ -236,7 +236,7 @@ const isHardRide = (s: S) => s.type === 'ride' && /Interval/i.test(s.name);
 /** The athlete's verification case: 3 runs + 2 rides, hard day = run. */
 const FLOW = {
   enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 21, easyPaceMinPerMile: 9,
-  longRunDay: 'sunday', hardDay: { day: 'thursday', discipline: 'run' },
+  longRunDay: 'sunday', hardDays: [{ day: 'thursday', discipline: 'run' }],
   bike: { hours: 3, days: 2, longRideDay: 'saturday' },
 };
 
@@ -314,7 +314,7 @@ Deno.test('a sport nobody selected is never invented', () => {
 Deno.test('⛔ a hard RIDE pick is honoured too — one hard session, on the bike', () => {
   const w = week1({
     enduranceSport: 'bike', bike: { hours: 5, days: 3, longRideDay: 'saturday' },
-    hardDay: { day: 'tuesday', discipline: 'bike' },
+    hardDays: [{ day: 'tuesday', discipline: 'bike' }],
   });
   const hard = [...w.filter(isHardRun), ...w.filter(isHardRide)];
   assertEquals(hard.length, 1, `${hard.length} hard sessions on a hard-ride week`);
@@ -343,7 +343,7 @@ const RIDE_TOLERANCE_MIN = 3;   // per-session rounding only
 Deno.test('⛔ a hard RIDE is inside the typed hours, not on top of them', () => {
   const withHard = week1({
     enduranceSport: 'bike', bike: { hours: 5, days: 3, longRideDay: 'saturday' },
-    hardDay: { day: 'tuesday', discipline: 'bike' },
+    hardDays: [{ day: 'tuesday', discipline: 'bike' }],
   });
   const built = minutesOf(withHard, 'ride');
   assert(
@@ -359,7 +359,7 @@ Deno.test('⛔ a hard RIDE is inside the typed hours, not on top of them', () =>
 Deno.test('⛔ a hard RUN is inside the typed miles, not on top of them', () => {
   const withHard = week1({
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 21, easyPaceMinPerMile: 9,
-    longRunDay: 'sunday', hardDay: { day: 'thursday', discipline: 'run' },
+    longRunDay: 'sunday', hardDays: [{ day: 'thursday', discipline: 'run' }],
   });
   const built = minutesOf(withHard, 'run');
   assert(
@@ -372,7 +372,7 @@ Deno.test('⛔ adding a hard day does not grow the week\'s endurance volume', ()
   // The cleanest statement of the rule: same ask, with and without a hard day, same total.
   const base = { enduranceSport: 'bike', bike: { hours: 5, days: 3, longRideDay: 'saturday' } };
   const without = minutesOf(week1(base), 'ride');
-  const withHard = minutesOf(week1({ ...base, hardDay: { day: 'tuesday', discipline: 'bike' } }), 'ride');
+  const withHard = minutesOf(week1({ ...base, hardDays: [{ day: 'tuesday', discipline: 'bike' }] }), 'ride');
   assert(
     Math.abs(withHard - without) <= RIDE_TOLERANCE_MIN,
     `${without} min without a hard day, ${withHard} min with one — picking a hard day grew the week`,

@@ -47,7 +47,7 @@ const week = (terrain?: string, discipline: 'run' | 'bike' = 'run') => {
     oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
-    hardDay: { day: 'tuesday', discipline, ...(terrain ? { terrain } : {}) },
+    hardDays: [{ day: 'tuesday', discipline, ...(terrain ? { terrain } : {}) }],
   } as never);
   return (p.sessions_by_week['2'] as any[]);
 };
@@ -107,7 +107,7 @@ Deno.test('⚠️ THE RIDE HAS NO TERRAIN — a turbo, a chaingang and a climb a
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
     bike: { hours: 4, days: 2 },
-    hardDay: { day: 'tuesday', discipline: 'bike', terrain: 'flat' },
+    hardDays: [{ day: 'tuesday', discipline: 'bike', terrain: 'flat' }],
   } as never);
   const sessions = (p.sessions_by_week['2'] as any[]);
   const ride = sessions.find((s) => s.type === 'ride' && /Interval/.test(s.name))!;
@@ -265,7 +265,7 @@ Deno.test('⛔ FLAT PREFERS 48h FROM HEAVY LEGS — the other three keep the mat
       oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
       enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
       longRunDay: 'saturday', easyPaceMinPerMile: PACE,
-      hardDay: { day: 'friday', discipline: 'run', ...(terrain ? { terrain } : {}) },
+      hardDays: [{ day: 'friday', discipline: 'run', ...(terrain ? { terrain } : {}) }],
     } as never);
     // The stamp is not on the plan, so measure what it BUYS: the gap the solver actually left.
     const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -299,7 +299,7 @@ Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week s
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
-        hardDay: { day, discipline: 'run', terrain: 'flat' },
+        hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
       } as never);
       const hard = (p.sessions_by_week['2'] as any[])
         .find((s) => s.type === 'run' && /Flat Intervals/.test(String(s.name)));
@@ -326,7 +326,7 @@ Deno.test('⛔ THE PREFERENCE NEVER BREACHES ANYTHING — least of all the long 
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
-        hardDay: { day, discipline: 'run', terrain: 'flat' },
+        hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
       } as never);
       const breaches = ((p as any).placement_compromises ?? [])
         .filter((c: any) => c.kind === 'breach');
@@ -357,7 +357,7 @@ Deno.test('⛔ THE MATRIX FLOOR SURVIVES THE TRADE — heavy legs stay 48h apart
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
-        hardDay: { day, discipline: 'run', terrain: 'flat' },
+        hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
       } as never);
       const lowers = (p.sessions_by_week['2'] as any[])
         .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));
@@ -387,7 +387,7 @@ Deno.test('⚠️ TAKEN WHEN THE WEEK HAS ROOM, DECLINED SILENTLY WHEN IT DOES N
       oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
       enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
       longRunDay, easyPaceMinPerMile: PACE,
-      hardDay: { day, discipline: 'run', terrain },
+      hardDays: [{ day, discipline: 'run', terrain }],
     } as never);
     const lowers = (p.sessions_by_week['2'] as any[])
       .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));

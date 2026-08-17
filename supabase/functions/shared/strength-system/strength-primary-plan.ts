@@ -230,13 +230,44 @@ export type StrengthPrimaryArgs = {
    * The doctrine's two pins are this and `longRunDay`; everything else moves around them.
    * See docs/DOCTRINE-aerobic-maintenance.md §6 and ARCH-strength-spine.md §0.6.
    */
-  hardDay?: {
+  /**
+   * ⛔ UP TO TWO HARD DAYS, ANY MIX (§1i, 2026-08-17). Two runs, two rides, one of each, one, or
+   * none. This was `hardDay?: {...}` — a single optional object — and the whole path below it was
+   * built on there being at most one: one pin, mutually-exclusive `hardDayIsRun`/`hardDayIsRide`
+   * booleans, two volume budgets each keyed on the one discipline, and two emitters of which the
+   * comment said *"at most one of these two branches ever fires"*. All of that moved with this.
+   *
+   * ⛔ REPLACED, NOT WIDENED ALONGSIDE. There is no `hardDay` singular any more — the standing rule
+   * is replace = delete the old, and a one-day field beside a two-day array is how a caller keeps
+   * writing the dead one.
+   *
+   * ⚠️ CAPPED AT TWO, AND THE CAP LIVES AT THE DOOR ({@link MAX_HARD_DAYS}). Three hard days is not
+   * a shape this block's recovery model has been reasoned about for, and silently building one
+   * because a caller sent it would be the engine agreeing to something nobody designed.
+   *
+   * ⚠️ ONE PER DAY. Two hard sessions on one calendar day is not two hard days, it is a double —
+   * a different question with a different cost, and not one §1i asked for.
+   */
+  hardDays?: Array<{
     day: string;
     discipline: 'run' | 'bike';
     /** Run terrain — the athlete's pick. Absent → `hill_3min`. Ignored when `discipline` is
      *  `bike`: the ride has one shape (Helgerud `4 × 4`) and no terrain question. */
     terrain?: HardRunTerrain;
-  };
+    /**
+     * ⛔ WHOSE SESSION IS IT (§1i). `prescribed` — the app owns the content, writes the template and
+     * can progress it. `club` — the athlete already attends it and does whatever the group does.
+     *
+     * ⚠️ BOTH ARE HARD DAYS FOR PLACEMENT. A club run costs the same recovery as a prescribed one,
+     * so it takes a pin, it takes its discipline's volume out of the week, and it counts toward the
+     * competing-stress band. What it does NOT get is a session template or an interval prescription:
+     * the app cannot prescribe 4 × 3 min uphill into a group ride, and claiming to would be the
+     * "score that lies" in prescription form. Booked, not coached — the same rule as swim.
+     *
+     * Absent → `prescribed`, which is what every block built before §1i was.
+     */
+    ownership?: 'prescribed' | 'club';
+  }>;
   /**
    * Weekly bike hours from intake (D-323 §6 — hours, never miles: the engine turns hours into
    * sessions and has never learned a ride speed).
@@ -411,6 +442,22 @@ const DEFAULT_ENDURANCE_SESSIONS = 2;
 
 /** The long-run/ride day for an athlete who never named one. The anchor, not a placement rule. */
 const DEFAULT_LONG_DAY = 'Saturday';
+
+/**
+ * ⛔ TWO HARD ENDURANCE DAYS IS THE CEILING (§1i, 2026-08-17) — two runs, two rides, or one of each.
+ *
+ * It is a cap and not a target: one, or none, is unchanged and is still the common week. Two is what
+ * the athlete chasing speed can now ask for, and the copy says plainly that one HOLDS top-end
+ * fitness while two BUILDS it (Hickson: frequency and duration can fall a long way and hold; only
+ * intensity loses it — and one interval session a week sits below the improvement threshold for a
+ * trained athlete).
+ *
+ * ⚠️ THREE IS NOT "TWO PLUS ONE". This block's recovery model — the 48h heavy-leg clearances, the
+ * assistance band's competing-stress reading, the one protected rest day — has been reasoned about
+ * at zero, one and two. Building a third because a caller sent it would be the engine agreeing to a
+ * week nobody designed, so the extra entries are dropped at the door rather than honoured.
+ */
+const MAX_HARD_DAYS = 2;
 
 // ── The session (SPEC §1) ────────────────────────────────────────────────────
 // 1. jumps or throws  2. the main lift  3. the supplemental (leaders)  4. the three assistance slots.
@@ -1501,6 +1548,42 @@ function hardRunSession(
 }
 
 /**
+ * ⛔ A CLUB SESSION IS BOOKED, NOT COACHED (§1i, 2026-08-17) — the same rule as swim, one discipline
+ * over, and for the same reason.
+ *
+ * The athlete already attends this one: a Tuesday club run, a Saturday group ride. They turn up and
+ * do whatever the group does. The app cannot prescribe `4 × 3 min uphill, walk down` into it, cannot
+ * hold anyone to the rest intervals, and cannot progress it week to week — so writing the template
+ * anyway would be a prescription for work nobody is going to do. That is the "score that lies" in
+ * prescription form, and D-423's rule ("the athlete's pick is what appears") points the same way.
+ *
+ * ⚠️ IT IS STILL A HARD DAY EVERYWHERE ELSE. It takes a pin, the solver keeps heavy legs clear of
+ * it, it comes out of its discipline's volume, and it counts toward the competing-stress band that
+ * sizes the assistance. The ONLY thing it does not get is invented content.
+ *
+ * ⚠️ AND IT CARRIES NO `steps_preset`, DELIBERATELY. A token is a prescription the analysis path
+ * grades against; handing one to a session the app did not design would produce an adherence verdict
+ * on a workout nobody prescribed.
+ */
+function clubEnduranceSession(sport: 'run' | 'bike', day: string, mins: number): PlanSession {
+  const word = sport === 'bike' ? 'ride' : 'run';
+  return {
+    day,
+    type: sport === 'bike' ? 'ride' : 'run',
+    name: sport === 'bike' ? 'Club Ride' : 'Club Run',
+    description:
+      `Your own ${word} — whatever the group does. The week is built around it: it is held as a hard `
+      + `day, so the lifting keeps its distance from it and the easy ${word}s work around it. `
+      + `We book the time and do not prescribe the session.`,
+    duration: mins,
+    // ⚠️ TAGGED `quality` BECAUSE THAT IS WHAT IT COSTS. Everything downstream that reasons about
+    // recovery reads the tag, not the name, and a club run that reads as easy would let a heavy day
+    // land beside it.
+    tags: ['quality', sport === 'bike' ? 'bike' : 'run', 'aerobic', 'club'],
+  };
+}
+
+/**
  * ⛔ SWIM IS BOOKED, NOT COACHED — and the distinction is the whole feature.
  *
  * Michael, 2026-07-25: *"we keep swim, let the user add — we give a courtesy two hour-long swims we
@@ -1696,8 +1779,37 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * selection invents a sport nobody asked for.
    */
   const askedRunMiles = Number(args.targetWeeklyMiles) > 0 ? Number(args.targetWeeklyMiles) : 0;
+  /**
+   * ⛔ THE WEEK'S HARD DAYS, RESOLVED ONCE (§1i, 2026-08-17). Every site below reads THIS, not
+   * `args.hardDays` — the raw input is athlete-supplied and the guarantees the rest of the file
+   * leans on (a real day, a known discipline, at most two, one per calendar day) are established
+   * here and nowhere else. Before §1i there was one optional object and each site re-derived from
+   * it; that is exactly how `hardDayIsRun` and `hardDayIsRide` came to be mutually exclusive.
+   *
+   * ⚠️ ORDER IS THE ATHLETE'S. The first slot they filled is the first here, and `dedupe by day`
+   * keeps the earlier one — a later entry on the same calendar day is a mistake, not a promotion.
+   */
+  const hardDays: Array<{ day: DayName; discipline: 'run' | 'bike'; terrain?: HardRunTerrain; ownership: 'prescribed' | 'club' }> = [];
+  for (const raw of Array.isArray(args.hardDays) ? args.hardDays : []) {
+    if (hardDays.length >= MAX_HARD_DAYS) break;
+    const day = asDay(raw?.day);
+    if (!day) continue;
+    if (raw?.discipline !== 'run' && raw?.discipline !== 'bike') continue;
+    if (hardDays.some((h) => h.day === day)) continue;
+    hardDays.push({
+      day,
+      discipline: raw.discipline,
+      ...(raw.terrain ? { terrain: raw.terrain } : {}),
+      // ⚠️ ABSENT → PRESCRIBED, which is what every block before §1i was. An unrecognised value is
+      // treated as absent for the same reason the terrain allowlist is: a value the engine cannot
+      // act on must degrade to the shipped behaviour, not to no session at all.
+      ownership: raw.ownership === 'club' ? 'club' : 'prescribed',
+    });
+  }
+  const hardRunDays = hardDays.filter((h) => h.discipline === 'run');
+  const hardRideDays = hardDays.filter((h) => h.discipline === 'bike');
   const runSelected = enduranceSport === 'run' || askedRunMiles > 0 || !!asDay(args.longRunDay)
-    || (args.hardDay?.discipline === 'run' && !!asDay(args.hardDay?.day));
+    || hardRunDays.length > 0;
   const bikeSelected = hasBike || enduranceSport === 'bike';
 
   const longRunPin = runSelected ? asDay(args.longRunDay) : null;
@@ -1743,15 +1855,23 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   if (!longRunPin && runSelected && !pins.some((p) => p.day === DEFAULT_LONG_DAY)) {
     pins.push({ day: DEFAULT_LONG_DAY as DayName, kind: 'long_run', label: 'your long run' });
   }
-  const hardPin = asDay(args.hardDay?.day);
   // ⛔ GUARD REMOVED (2026-08-09) — same absorption. The hard day was LAST in this order, so it lost
   // every collision: an athlete who put their club night on their long-run day simply had no hard
   // session in the block, with nothing said anywhere.
-  if (hardPin) {
+  //
+  // ⛔ AND THERE MAY BE TWO OF THEM NOW (§1i). Each takes its own pin, kind and label, so the solver
+  // sees both as anchors and refuses a collision properly rather than the composer hiding one.
+  // ⚠️ A CLUB DAY PINS EXACTLY LIKE A PRESCRIBED ONE. It costs the same recovery; the difference is
+  // whether the app writes the session, not whether the day is spoken for.
+  // ⚠️ THE LABEL NUMBERS THEM WHEN THERE ARE TWO, because "your hard run" twice in a compromise line
+  // names neither. With one, the wording is unchanged from before §1i.
+  for (const h of hardDays) {
+    const sameDiscipline = (h.discipline === 'run' ? hardRunDays : hardRideDays);
+    const nth = sameDiscipline.length > 1 ? ` ${sameDiscipline.indexOf(h) + 1}` : '';
     pins.push({
-      day: hardPin,
-      kind: args.hardDay!.discipline === 'bike' ? 'quality_bike' : 'quality_run',
-      label: args.hardDay!.discipline === 'bike' ? 'your hard ride' : 'your hard run',
+      day: h.day,
+      kind: h.discipline === 'bike' ? 'quality_bike' : 'quality_run',
+      label: h.discipline === 'bike' ? `your hard ride${nth}` : `your hard run${nth}`,
     });
   }
 
@@ -1797,12 +1917,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * that is the entire argument of doctrine §2 — so the hill and treadmill options are not paying
    * this cost and must not be made to.
    */
-  const flatHardRun = args.hardDay?.discipline === 'run' && args.hardDay?.terrain === 'flat';
+  // ⛔ PER DAY, NOT PER BLOCK (§1i). This was one boolean off the single hard day; with two, one may
+  // be a flat run and the other a hill, and charging the flat clearance to both would move a lift
+  // for a session that is not paying for it. Keyed on the DAY so each anchor answers for itself.
+  const flatHardRunDays = new Set(
+    hardRunDays.filter((h) => h.terrain === 'flat').map((h) => h.day as string),
+  );
   const solverAnchors: SolverAnchor[] = pins.map((p) => ({
     day: p.day.toLowerCase() as SolverDay,
     kind: p.kind,
     label: p.label,
-    ...(flatHardRun && p.kind === 'quality_run'
+    ...(flatHardRunDays.has(p.day) && p.kind === 'quality_run'
       ? {
           preferredClearance: {
             against: 'lower_body_strength' as const,
@@ -1874,14 +1999,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const askedRunDays = runSelected
     ? Math.max(DEFAULT_ENDURANCE_SESSIONS, Math.min(4, Math.round(Number(args.enduranceFrequency) || DEFAULT_ENDURANCE_SESSIONS)))
     : 0;
-  const hardDayIsRun = !!args.hardDay && args.hardDay.discipline === 'run';
   /**
-   * ⛔ THE HARD SESSION IS ONE OF THE DAYS THEY PICKED, NOT AN EXTRA ONE. Three run days with the
-   * hard day on a run means one hard run and two easy — never three easy plus a hill session on
-   * top, which is the +27% overage this file already fixed once for the miles.
+   * ⛔ THE HARD SESSIONS ARE DAYS THEY PICKED, NOT EXTRA ONES. Three run days with one hard run
+   * means one hard and two easy — never three easy plus a hill session on top, which is the +27%
+   * overage this file already fixed once for the miles.
+   *
+   * ⛔ AND IT SUBTRACTS THE COUNT NOW, NOT A BOOLEAN (§1i). `hardDayIsRun` was `true`/`false` and
+   * this subtracted exactly 1; two hard runs would have booked one of them on top of the athlete's
+   * asked-for count — the same overage, arriving through the door that was just widened.
+   * ⚠️ FLOORED AT 1 so a 2-run week with two hard runs still leaves a run to be long.
    */
-  const runFreq = hardDayIsRun && runSelected
-    ? Math.max(1, askedRunDays - 1)
+  const runFreq = runSelected
+    ? Math.max(1, askedRunDays - hardRunDays.length)
     : askedRunDays;
   /** A selected run block has a long day: the one they pinned, or the engine's default when absent. */
   const runHasLongDay = runSelected;
@@ -1893,9 +2022,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * The long ride is a pin/anchor, so only the EASY rides are flexible — and when the hard day is a
    * RIDE it is one of the picked ride days too, exactly as the hard run is one of the run days.
    */
-  const hardDayIsRide = !!args.hardDay && args.hardDay.discipline === 'bike';
+  // ⛔ THE COUNT, NOT A BOOLEAN (§1i) — same fix as the runs above, one discipline over.
   const ridesWanted = bikeSelected
-    ? Math.max(0, askedRideDays - (longRidePin ? 1 : 0) - (hardDayIsRide && hardPin ? 1 : 0))
+    ? Math.max(0, askedRideDays - (longRidePin ? 1 : 0) - hardRideDays.length)
     : 0;
 
   /**
@@ -2383,7 +2512,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⚠️ The bug was always here; it needed a week where an upper lift and the hard pin shared a day
   // to become reachable, and `place-week` never produced one because it stacked onto the earliest
   // legal day instead of the smallest.
-  const hardPinDay = hardPin ? String(hardPin) : null;
+  // ⛔ EVERY HARD DAY, NOT THE HARD DAY (§1i). Was a single `hardPinDay` string.
+  const hardPinDays = new Set<string>(hardDays.map((h) => String(h.day)));
 
   // ⛔ EVERY LIFT DAY IS A CANDIDATE, NOT ONLY THE UPPER ONES. Changed 2026-07-28, Michael's call.
   //
@@ -2489,9 +2619,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // options are 35, 37 and 39 minutes; subtracting a flat 35 for all of them hands the difference
     // back as easy miles every week, which is the +3.5 mi bug above in miniature. One owner:
     // `hardRunSessionMinutes`.
-    const hardRunMiles = hardDayIsRun && hardPinDay
-      ? hardRunSessionMinutes(args.hardDay?.terrain) / pace
-      : 0;
+    // ⛔ SUMMED ACROSS EVERY HARD RUN (§1i). This read one terrain off one hard day; with two hard
+    // runs it would have subtracted one session's minutes and handed the other's back as easy miles
+    // — the same +3.5 mi defect the terrain fix above closed, reopened by the second slot.
+    // ⚠️ EACH ONE PAYS ITS OWN TERRAIN. A hill session and a flat session are different lengths.
+    const hardRunMiles = hardRunDays.reduce((mi, h) => mi + hardRunSessionMinutes(h.terrain) / pace, 0);
     const easyBudget = Math.max(1, held - hardRunMiles);
     // ⛔ ABOVE THE SELF-REGULATION LINE THE ENGINE STOPS SHAPING THE WEEK (2026-07-29).
     //
@@ -2676,8 +2808,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         strengthPosture: args.blockShape?.strengthPosture,
         // ⛔ COMPETING STRESS, NOT THE CYCLE PHASE (2026-08-16, §1g). The band is set by how much
         // hard endurance the week carries; the phase no longer touches the assistance total.
-        // ⚠️ ONE hard day is the most this block can carry today — a second is §1i, not built.
-        hardEnduranceDays: hardPin ? 1 : 0,
+        // ⛔ THE REAL COUNT (§1i). This was `hardPin ? 1 : 0` with the note "ONE hard day is the most
+        // this block can carry today — a second is §1i, not built". It is built; the band reads two.
+        hardEnduranceDays: hardDays.length,
       }, lift.name, args.oneRepMaxes, args.athleteEquipment);
       const jumps = jumpsFor(assistancePhase);
       // ⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE — CHANGED 2026-08-15 (§1a/§1c).
@@ -2943,7 +3076,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // so a bike-equipped athlete currently gets no hard session at all rather than the wrong one.
       // ⛔ Do NOT emit hills as a substitute for the ride: that spends mechanical budget the
       // doctrine spent the whole day protecting.
-      if (hardPin && args.hardDay?.discipline === 'run') {
+      // ⛔ EVERY HARD RUN GETS FILLED, NOT "THE" HARD RUN (§1i). One loop, so two hard runs each get
+      // their own session rather than the first winning and the second leaving a blank pinned day.
+      for (const h of hardRunDays) {
         // ⛔ ON A DELOAD WEEK THE HARD SESSION IS DOWNGRADED, NOT DELETED (D-407). Dropping it would
         // hand back a blank day, which `place-week` already learned is worse than dropping the pin —
         // the week visibly loses a day and the athlete reads it as a bug. The day keeps an easy run
@@ -2952,14 +3087,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // ⚠️ BOTH STANDALONE SHAPES TRIM IT, not just the deload (2026-08-15). A TM-test week is a
         // RESTED week by design — its whole job is to arrive at the measured set fresh — so leaving
         // hill repeats on it would spend exactly the freshness the test needs.
-        weekSessions.push(isStandalone
-          ? enduranceSession('run', hardPin, hardRunSessionMinutes(args.hardDay?.terrain),
+        if (isStandalone) {
+          weekSessions.push(enduranceSession('run', h.day, hardRunSessionMinutes(h.terrain),
             (isTmTest
               ? 'Test week — the hard session comes off so the lifting is measured rested. '
               : 'Light week — the hard session comes off. ')
             + 'Easy running only, and the same rule as every other easy day: conversational throughout.',
-            'easy', true)
-          : hardRunSession(hardPin, heavyLowerDays, args.hardDay?.terrain));
+            'easy', true));
+          continue;
+        }
+        // ⛔ A CLUB RUN IS BOOKED, NOT COACHED (§1i). The app cannot prescribe 4 × 3 min uphill into
+        // a session the athlete turns up to and runs with a group, and writing the template anyway
+        // would be a prescription for work nobody is going to do. It keeps its pin, its recovery
+        // cost and its share of the week's miles — what it does not get is a session the app made up.
+        weekSessions.push(h.ownership === 'club'
+          ? clubEnduranceSession('run', h.day, hardRunSessionMinutes(h.terrain))
+          : hardRunSession(h.day, heavyLowerDays, h.terrain));
       }
     } else if (enduranceSport === 'bike' && !hasBike) {
       // ⛔ TWO EMITTERS WERE AUTHORING RIDES AND NOTHING SUBTRACTED (found 2026-07-29 by the combo
@@ -3077,7 +3220,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ AND THE INTERVALS DO NOT SHRINK TO FIT — same yield order the run uses. Hickson: intensity
       // holds top-end fitness and duration is the expendable variable, so the hard session is paid
       // first at its full 45 minutes and the easy hours flex around it.
-      const hardRideMins = hardPin && args.hardDay?.discipline === 'bike' ? BIKE_QUALITY_MIN : 0;
+      // ⛔ SUMMED ACROSS EVERY HARD RIDE (§1i) — was one session's worth off a single hard day, so a
+      // second hard ride would have been built on top of the athlete's asked-for hours.
+      const hardRideMins = hardRideDays.length * BIKE_QUALITY_MIN;
       const totalMins = Math.max(30, Math.round(rideHours * 60) - hardRideMins);
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
       // authored number left in this block and it is marked as such: a long ride that is the same
@@ -3125,15 +3270,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // the same change. Downgraded, not deleted: dropping it hands back a blank day, which
       // `place-week` already learned is worse than dropping the pin. Frequency holds (Hickson) and
       // the intensity that drives the interference comes off (Wilson 2012).
-      if (hardPin && args.hardDay?.discipline === 'bike') {
-        weekSessions.push(isStandalone
-          ? enduranceSession('bike', hardPin, BIKE_QUALITY_MIN,
+      // ⛔ EVERY HARD RIDE, NOT "THE" HARD RIDE (§1i) — same loop as the runs, one discipline over.
+      for (const h of hardRideDays) {
+        if (isStandalone) {
+          weekSessions.push(enduranceSession('bike', h.day, BIKE_QUALITY_MIN,
             (isTmTest
               ? 'Test week — the intervals come off so the lifting is measured rested. '
               : 'Light week — the intervals come off. ')
             + 'Easy spinning only, and the same rule as every other easy day: conversational throughout.',
-            'easy', true)
-          : bikeQualitySession(hardPin));
+            'easy', true));
+          continue;
+        }
+        // ⛔ A CLUB RIDE IS BOOKED, NOT COACHED (§1i) — see the run branch. The app does not write
+        // 4 × 4 into a group ride it does not control.
+        weekSessions.push(h.ownership === 'club'
+          ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_MIN)
+          : bikeQualitySession(h.day));
       }
     }
 

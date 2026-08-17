@@ -47,7 +47,7 @@ import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 const build = () => composeStrengthPrimaryPlan({
   durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
   enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-  longRunDay: 'sunday', hardDay: { day: 'tuesday', discipline: 'run' },
+  longRunDay: 'sunday', hardDays: [{ day: 'tuesday', discipline: 'run' }],
   easyPaceMinPerMile: 9,
 } as never);
 

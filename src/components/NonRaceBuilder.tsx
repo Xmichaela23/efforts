@@ -36,6 +36,18 @@ import {
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
 
+/**
+ * ⛔ TWO HARD ENDURANCE DAYS IS THE CEILING (§1i, 2026-08-17) — and the SCREEN enforces it, not only
+ * the engine. `strength-primary-plan.ts` caps at two and drops the rest at the door; a third chip
+ * here that silently did nothing would be worse than no third chip, because the athlete would have
+ * answered a question the plan then ignored.
+ *
+ * ⚠️ MIRRORS `MAX_HARD_DAYS` in the composer. Two owners of one number is a drift risk and it is
+ * accepted deliberately: importing an edge-function constant into the wizard would pull the whole
+ * strength chassis into the client bundle. If one moves, move both.
+ */
+const MAX_HARD_DAY_SLOTS = 2;
+
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
@@ -572,6 +584,20 @@ type NonRaceState = {
   // `d in qualityDays`; `!!qualityDays[d]` is false for a chosen discipline awaiting its day.
   qualityDays: Partial<Record<'run' | 'bike', DayName | ''>>;
   /**
+   * ⛔ UP TO TWO HARD DAYS, ANY MIX (§1i, 2026-08-17). Two runs, two rides, one of each, one, or
+   * none. `qualityDays` above is keyed BY SPORT and so can only ever hold one of each — it stays as
+   * the race path's club-night input, which is a different question; this is the Strong Focus
+   * hard-day answer and it is a LIST because two hard runs is now a legal week.
+   *
+   * ⚠️ EACH SLOT CARRIES ITS OWN OWNERSHIP. "Whose session is it — mine to prescribe, or one you
+   * already attend?" Both count as hard days for placement and recovery; only `prescribed` gets a
+   * session template. The app cannot write 4 × 3 min uphill into a club run and must not pretend to.
+   *
+   * ⚠️ A SLOT MAY HAVE A DISCIPLINE AND NO DAY YET — the same rule `qualityDays` documents. Presence
+   * in this list means the discipline is chosen; the day arrives after.
+   */
+  hardDays: Array<{ discipline: 'run' | 'bike'; day: DayName | ''; ownership: 'prescribed' | 'club' }>;
+  /**
    * ⛔ WHICH GROUND THE HARD RUN HAPPENS ON. The one fact about this session the app cannot derive —
    * whether there is a climb outside their door they can run hard for three minutes. Not in posture,
    * not in history, not in their sport.
@@ -1027,7 +1053,17 @@ function assemblePayload(
           preferred_days: buildPreferredDays(state.posture, {
             trainingDays: state.trainingDays,
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
-            qualityDays: state.runClubIntensity === 'quality' ? state.qualityDays : {},
+            // ⚠️ THE STRONG FOCUS HARD DAYS FEED THIS TOO (§1i) — one per sport, which is all this
+            // sport-keyed bag can express. It is the pre-§1i pin and the combined-plan path reads it;
+            // `hard_days` below carries the full answer. First slot of each discipline wins here.
+            qualityDays: {
+              ...(state.runClubIntensity === 'quality' ? state.qualityDays : {}),
+              ...Object.fromEntries(
+                (['run', 'bike'] as const)
+                  .map((d) => [d, state.hardDays.find((h) => h.discipline === d && !!h.day)?.day])
+                  .filter(([, day]) => !!day),
+              ),
+            },
             easyDays: state.runClubIntensity === 'easy' ? state.qualityDays : {},
             // ⚠️ RIDES ALONG WITH THE HARD-RUN PIN AND DIES WITH IT. `buildPreferredDays` writes it
             // only when `qualityDays.run` survives the gate above — so a club run the athlete
@@ -1036,6 +1072,25 @@ function assemblePayload(
             // session that does not exist.
             qualityRunTerrain: state.qualityRunTerrain,
           }),
+          // ⛔ THE TWO HARD DAYS, IN THE §1i SHAPE (2026-08-17). `preferred_days.quality_run` /
+          // `.quality_bike` above are keyed BY SPORT and can hold one of each at most — they stay,
+          // because `generate-combined-plan` and the pre-§1i fallback in `create-goal` both read
+          // them, and a Strong Focus goal with one hard day still writes the same pin it always did.
+          // This is the list that can express two runs, two rides, and whose session each one is.
+          // ⚠️ ONLY DAYS THAT ARE FILLED. A slot with a discipline and no day yet is an unanswered
+          // question, not a pin, and forwarding it would book a session on no day.
+          ...(state.hardDays.some((h) => !!h.day)
+            ? {
+                hard_days: state.hardDays
+                  .filter((h) => !!h.day)
+                  .map((h) => ({
+                    day: h.day,
+                    discipline: h.discipline,
+                    ownership: h.ownership,
+                    ...(h.discipline === 'run' ? { terrain: state.qualityRunTerrain } : {}),
+                  })),
+              }
+            : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
           // and `create-goal` writes the real ones back once the plan exists.
@@ -1215,6 +1270,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // The standing session can be a run club or a ride club — this picks which, and the day pins to
   // qualityDays.run (gold) or qualityDays.bike (green). Kept single: switching sport drops the other.
   const [clubSport, setClubSport] = useState<'run' | 'bike'>('run');
+  /** Which hard-day slot the shared day row is currently filling (§1i). Card-local, like `clubSport`. */
+  const [activeHardSlot, setActiveHardSlot] = useState(0);
   const [state, setState] = useState<NonRaceState>({
     // Deep-linked from the Goals door. ⚠️ `goal` IS SEEDED HERE FOR RACE, DELIBERATELY: `getSteps`
     // branches on it, so leaving it null for one render would flash the posture screen before the
@@ -1258,7 +1315,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, rideHours: '', rideDays: 0, startDate: planWeekStartISO(),
+    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, rideHours: '', rideDays: 0, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -1483,9 +1540,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * that gate, and it is `d in qualityDays` rather than truthiness because the discipline is picked
    * first and the day arrives after.
    */
-  const hardDaySport: 'run' | 'bike' | null =
-    'run' in state.qualityDays ? 'run' : 'bike' in state.qualityDays ? 'bike' : null;
-  const hardDayValue = hardDaySport ? (state.qualityDays[hardDaySport] || '') : '';
+  /**
+   * ⛔ WHICH HARD SLOT THE DAY ROW IS ANSWERING (§1i, 2026-08-17). There are up to two now, so "the"
+   * hard day is no longer a thing — the row answers ONE slot at a time and this says which.
+   * ⚠️ Clamped to the list on every render: dropping a slot must not leave the row writing into an
+   * index that no longer exists, which is the same class of bug `scheduleAsk` guards against above.
+   */
+  const hardSlotIndex = Math.min(activeHardSlot, Math.max(0, state.hardDays.length - 1));
+  const activeHard = state.hardDays[hardSlotIndex] ?? null;
+  const hardDaySport: 'run' | 'bike' | null = activeHard?.discipline ?? null;
+  const hardDayValue = activeHard?.day || '';
+  /** Every day already spoken for by a hard slot — a second slot may not take the first one's day. */
+  const hardDaysTaken = state.hardDays.map((h) => h.day).filter(Boolean) as DayName[];
+  /** ⛔ THE COUNT DRIVES THE COPY (§1i). One HOLDS top-end fitness; two BUILDS it. */
+  const hardDayCount = state.hardDays.filter((h) => !!h.day).length;
   /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Long run and long ride are posture-gated
    * rows, and posture is editable on an earlier step — so walking Back, dropping the bike, and
@@ -1573,19 +1641,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     },
     {
       /**
-       * ⛔ LAST, AND OPTIONAL. D-327 allows ONE hard aerobic day and never required it — the block
-       * is strength-led, and an athlete with no club night and no appetite for intervals is having
-       * a normal week, not an incomplete one. The gate lets this pass empty; the chip is the screen
-       * admitting it, and the closed answer is "None" rather than "None yet".
+       * ⛔ LAST, AND OPTIONAL. §1i allows UP TO TWO hard aerobic days and never required either — the
+       * block is strength-led, and an athlete with no club night and no appetite for intervals is
+       * having a normal week, not an incomplete one. The gate lets this pass empty; the chip is the
+       * screen admitting it, and the closed answer is "None" rather than "None yet".
+       *
+       * ⚠️ THE ANSWER SUMMARISES BOTH SLOTS. It was one sport and one day; with two it has to say
+       * which two, or the closed row hides half of what was chosen.
        */
       key: 'hard' as const,
       kind: 'day' as const,
-      label: 'Hard day',
-      answer: !hardDaySport
+      label: state.hardDays.length > 1 ? 'Hard days' : 'Hard day',
+      answer: state.hardDays.length === 0
         ? 'None'
-        : hardDayValue
-          ? `${hardDaySport === 'run' ? 'Run' : 'Ride'} · ${DAY_SHORT[hardDayValue as DayName]}`
-          : `${hardDaySport === 'run' ? 'Run' : 'Ride'} · pick a day`,
+        : state.hardDays
+          .map((h) => {
+            const sport = h.discipline === 'run' ? 'Run' : 'Ride';
+            return h.day ? `${sport} · ${DAY_SHORT[h.day as DayName]}` : `${sport} · pick a day`;
+          })
+          .join('  ·  '),
       shown: true,
     },
   ])
@@ -1846,6 +1920,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     targetMiles: state.targetMiles,
     rideHours: state.rideHours,
     qualityDays: state.qualityDays,
+    // §1i — the strength path's hard days, so a slot with no day still blocks Continue.
+    hardDays: state.hardDays,
   };
   const scheduleBlockedReason = scheduleGateReason(scheduleGateInput);
   const scheduleCanContinue = scheduleBlockedReason === null;
@@ -1969,7 +2045,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
-      state.qualityDays, state.targetMiles, state.rideHours]);
+      state.qualityDays, state.hardDays, state.targetMiles, state.rideHours]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -3574,48 +3650,63 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <span className="text-[10px] uppercase tracking-wide text-white/35 font-normal">Optional</span>
                           )}
                         </span>
-                        {/* ⛔ RUN OR RIDE — ONE, NEVER BOTH (2026-08-10). This was a plain per-button
-                            toggle, so both could be lit at once, and on the device they were.
-                            THREE THINGS BROKE AT ONCE when they were:
-                              · D-327 allows exactly ONE hard aerobic day. Two selected disciplines is
-                                a state the doctrine has no answer for.
-                              · `hardDaySport` resolves run-first, so the day row wrote only to `run`
-                                and left `bike` holding '' — and `scheduleCanContinue` requires every
-                                selected discipline to have a day, so Continue died with no way to see
-                                why. A dead button with an invisible cause is the worst of the three.
-                              · the terrain menu is gated on `'run' in qualityDays`, so an athlete who
-                                had just tapped Ride was reading "What you can run it on".
-                            A RADIO IS THE RIGHT CONTROL for one-of-n and this is now one: picking a
-                            discipline REPLACES whatever was there. Tapping the lit one still clears
-                            it, because the whole row is optional and opting back out has to be as
-                            easy as opting in. */}
-                        <div className="flex gap-1" role="radiogroup" aria-label="Hard session discipline">
-                          {/* ⚠️ `d in qualityDays`, NOT `!!qualityDays[d]` — the discipline is chosen
-                              the moment it is tapped and its day arrives after. Truthiness would
-                              unlight the button the athlete just pressed. */}
-                          {(['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => {
-                            const on = d in state.qualityDays;
-                            return (
+                        {/* ⛔ RUN OR RIDE, PER SLOT — AND THERE ARE UP TO TWO NOW (§1i, 2026-08-17).
+                            This was a one-of-n radio over `qualityDays`, which is keyed BY SPORT and
+                            therefore cannot hold two hard runs. It is now one chip per slot: tap Run
+                            or Ride to ADD a slot, tap a slot to make it the one the day row is
+                            filling, tap the lit one again to remove it.
+
+                            ⛔ WHAT THE OLD RADIO WAS PROTECTING, AND WHY IT NO LONGER APPLIES. Its
+                            comment lists three things that broke when both disciplines were lit at
+                            once: D-327 allowed exactly one hard day; `hardDaySport` resolved
+                            run-first and left the other holding ''; and the terrain menu was gated on
+                            the sport rather than on the slot. §1i retires the first outright, and the
+                            other two are fixed at the root here — the day row writes into an INDEX,
+                            and the slot list is what every gate reads.
+
+                            ⚠️ THE CAP IS TWO AND THE SCREEN ENFORCES IT, not just the engine. A third
+                            chip that silently did nothing would be worse than one that is not there.
+
+                            ⚠️ SPORT COLOUR, NOT THE BLOCK ACCENT — this is a discipline SELECTOR and
+                            speaks the app's wayfinding language (run gold, ride green). It is
+                            identity, not a cost signal: the §5 note against implying a hard ride is
+                            "cheaper" than a hard run is about COPY, and no number here claims one. */}
+                        <div className="flex items-center gap-1" role="group" aria-label="Hard sessions">
+                          {state.hardDays.map((h, i) => (
+                            <button
+                              key={`slot-${i}`} type="button"
+                              aria-label={`Hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
+                              aria-pressed={i === hardSlotIndex}
+                              onClick={() => {
+                                // Tapping the ACTIVE slot removes it; tapping another selects it.
+                                if (i !== hardSlotIndex) { setActiveHardSlot(i); return; }
+                                setState((st) => ({ ...st, hardDays: st.hardDays.filter((_, j) => j !== i) }));
+                                setActiveHardSlot(0);
+                              }}
+                              className={`px-3 py-1 rounded-xl text-xs border ${i === hardSlotIndex ? 'ring-1 ring-white/40' : ''}`}
+                              style={{
+                                borderColor: `rgb(${getDisciplineColorRgb(h.discipline)})`,
+                                backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline)},0.16)`,
+                                color: '#fff',
+                              }}
+                            >{h.discipline === 'run' ? 'Run' : 'Ride'}{h.day ? ` · ${DAY_SHORT[h.day as DayName]}` : ''}</button>
+                          ))}
+                          {state.hardDays.length < MAX_HARD_DAY_SLOTS
+                            && (['run', 'bike'] as const).filter((d) => posturePresent(d)).map((d) => (
                               <button
-                                key={d} type="button" role="radio" aria-checked={on}
-                                onClick={() => setState((st) => ({
-                                  // REPLACE, never merge — the other discipline's key goes with it.
-                                  ...st,
-                                  qualityDays: on ? {} : { [d]: '' },
-                                }))}
-                                // Sport colour, not the block's accent — this is a discipline
-                                // SELECTOR, so it speaks the app's wayfinding language (run gold,
-                                // ride green), the same treatment the marathon club toggle uses. It
-                                // is identity, not a cost signal: the §5 note against implying a
-                                // hard ride is "cheaper" than a hard run is about COPY, and no
-                                // number here claims one.
-                                className="px-3 py-1 rounded-xl text-xs border"
-                                style={on
-                                  ? { borderColor: `rgb(${getDisciplineColorRgb(d)})`, backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.16)`, color: '#fff' }
-                                  : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}
-                              >{d === 'run' ? 'Run' : 'Ride'}</button>
-                            );
-                          })}
+                                key={`add-${d}`} type="button"
+                                aria-label={`Add a hard ${d === 'run' ? 'run' : 'ride'}`}
+                                onClick={() => {
+                                  setState((st) => (st.hardDays.length >= MAX_HARD_DAY_SLOTS ? st : {
+                                    ...st,
+                                    hardDays: [...st.hardDays, { discipline: d, day: '' as const, ownership: 'prescribed' as const }],
+                                  }));
+                                  setActiveHardSlot(state.hardDays.length);
+                                }}
+                                className="px-3 py-1 rounded-xl text-xs border border-dashed"
+                                style={{ borderColor: 'rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.6)' }}
+                              >+ {d === 'run' ? 'Run' : 'Ride'}</button>
+                            ))}
                         </div>
                       </div>
                     ) : (
@@ -3663,18 +3754,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               // sport, so there is no slot to write a day into before Run or Ride is
                               // tapped. The cue line above says which choice unlocks it — a dead row
                               // with no reason is worse than one that explains itself.
-                              disabled={row.key === 'hard' && !hardDaySport ? DAYS : []}
+                              // ⚠️ AND THE OTHER SLOT'S DAY IS LOCKED (§1i) — two hard sessions on one
+                              // calendar day is a double, not two hard days, and the composer would
+                              // drop the duplicate silently. Locked in the row so it cannot be entered.
+                              disabled={row.key === 'hard'
+                                ? (!activeHard
+                                    ? DAYS
+                                    : DAYS.filter((d) => hardDaysTaken.includes(d) && d !== activeHard.day))
+                                : []}
                               onTap={(d) => {
                                 // ⛔ TAP YOUR OWN DAY TO RELEASE IT — every question toggles, so no
                                 // pick is ever stuck and the athlete never hunts for a control to
                                 // undo one. Days the other anchors hold are locked in the row, so a
                                 // plain toggle is safe here.
                                 if (row.key === 'hard') {
-                                  if (!hardDaySport) return;
+                                  // ⛔ WRITES INTO THE ACTIVE SLOT (§1i). It used to write into
+                                  // `qualityDays[sport]`, which is keyed by sport and therefore
+                                  // cannot hold two hard runs. The slot index is what the day row is
+                                  // answering; a slot with no discipline yet has nothing to write to.
+                                  if (!activeHard) return;
                                   setState((st) => {
-                                    const q = { ...st.qualityDays };
-                                    q[hardDaySport] = q[hardDaySport] === d ? '' : d;
-                                    return { ...st, qualityDays: q };
+                                    const next = [...st.hardDays];
+                                    const cur = next[hardSlotIndex];
+                                    if (!cur) return st;
+                                    next[hardSlotIndex] = { ...cur, day: cur.day === d ? '' : d };
+                                    return { ...st, hardDays: next };
                                   });
                                 } else if (row.key === 'long') {
                                   setState((st) => ({ ...st, longRunDay: st.longRunDay === d ? '' : d }));
@@ -3743,10 +3847,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 away in `HARD_DAY_WHY`, where the Hickson years, the once-a-week
                                 threshold and the reasons two other claims were CUT are written down.
                                 Same pattern as `TrainingBaselines.tsx:1581`. */}
+                            {/* ⛔ THE COPY FOLLOWS THE COUNT (§1i, Michael's wording). One HOLDS
+                                top-end aerobic fitness; two BUILDS it — Hickson is that frequency
+                                and duration can fall a long way and hold, and only the intensity cut
+                                loses it, while ONE interval session a week sits below the
+                                improvement threshold for a trained athlete.
+
+                                ⛔ AND THE TWO-DAY LINE STOPS THERE. §1i's own wording continues "the
+                                lifting stacks onto these days" — that is §6, and §6 is NOT BUILT: the
+                                placer still pushes lifting AWAY from hard days. Printing it would be
+                                a promise the engine is not keeping, which the work order forbids by
+                                name. The sentence says only what is true today. */}
                             <div className="flex items-start gap-1.5 pt-0.5">
                               <p className="text-white/45 text-xs leading-snug">
-                                One hard session a week holds top-end aerobic fitness. It does not build
-                                it. A run or ride club goes here.
+                                {hardDayCount >= 2
+                                  ? 'Two hard sessions build top-end speed. The lifting is placed to keep its distance from both.'
+                                  : 'One hard session a week holds top-end aerobic fitness. It does not build it. A run or ride club goes here.'}
                               </p>
                               <button
                                 type="button"
@@ -3786,7 +3902,65 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 `hardday` step used. The flat option's stated cost survives the
                                 shortening — that was the condition its ruling came with, not
                                 decoration. */}
-                            {'run' in state.qualityDays && (
+                            {/* ── WHOSE SESSION IS IT (§1i) ───────────────────────────────────
+                                ⛔ THE FLOW ASKED ONE QUESTION AND NEEDED TWO. "Which day" and "whose
+                                session" are different facts: the app can prescribe intervals into
+                                its own session and cannot prescribe anything into a club run the
+                                athlete turns up to. Today the hard day IS the club day — one input
+                                doing two jobs — which is right for PLACEMENT and wrong for
+                                PRESCRIPTION.
+
+                                ⚠️ BOTH ANSWERS ARE HARD DAYS. The club option does not make the day
+                                cheaper: it keeps its pin, its recovery cost and its share of the
+                                week's volume. What changes is whether the app writes the session.
+                                ⚠️ Same rule as swim — booked, not coached. */}
+                            {activeHard && (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-white/85 text-sm">Whose session is it</span>
+                                <div className="space-y-1">
+                                  {([
+                                    {
+                                      id: 'prescribed' as const,
+                                      title: 'Ours to write',
+                                      body: activeHard.discipline === 'run'
+                                        ? 'We prescribe the session and it progresses across the block.'
+                                        : 'We prescribe the intervals and they progress across the block.',
+                                    },
+                                    {
+                                      id: 'club' as const,
+                                      title: 'A club session you already attend',
+                                      body: 'We hold the day and build the week around it — the lifting keeps its distance. We do not prescribe what you do in it.',
+                                    },
+                                  ]).map((opt) => (
+                                    <button
+                                      key={opt.id} type="button"
+                                      onClick={() => setState((st) => {
+                                        const next = [...st.hardDays];
+                                        const cur = next[hardSlotIndex];
+                                        if (!cur) return st;
+                                        next[hardSlotIndex] = { ...cur, ownership: opt.id };
+                                        return { ...st, hardDays: next };
+                                      })}
+                                      className={`w-full text-left px-3 py-2 rounded-xl border ${
+                                        activeHard.ownership === opt.id
+                                          ? 'border-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]'
+                                          : 'border-white/12 bg-white/[0.04]'
+                                      }`}
+                                    >
+                                      <span className="block text-white/90 text-sm">{opt.title}</span>
+                                      <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* ⚠️ THE TERRAIN MENU IS GATED ON THE ACTIVE SLOT NOW, not on
+                                `'run' in qualityDays` — with two slots the sport-keyed test cannot
+                                say WHICH hard run is being answered. It is also hidden for a CLUB
+                                run: the terrain question exists to shape a session the app writes,
+                                and the app is not writing this one. ⛔ The copy inside is unchanged
+                                and must stay so — §2.0's ruling on the flat option depends on it. */}
+                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed' && (
                               <div className="space-y-1.5 pt-1">
                                 <span className="text-white/85 text-sm">What you can run it on</span>
                                 <div className="space-y-1">
@@ -3844,7 +4018,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 interval is the same work wherever it happens. The ride gets the one
                                 thing the run branch actually gives, which is knowing what was agreed
                                 to. Copy + citation in `HARD_RIDE_SHAPE`. */}
-                            {'bike' in state.qualityDays && (
+                            {activeHard?.discipline === 'bike' && activeHard.ownership === 'prescribed' && (
                               <div className="space-y-1 pt-1">
                                 <span className="text-white/85 text-sm">What the hard ride is</span>
                                 <p className="text-white/45 text-xs leading-snug">{HARD_RIDE_SHAPE}</p>

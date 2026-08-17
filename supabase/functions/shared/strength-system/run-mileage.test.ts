@@ -23,7 +23,7 @@ const built = (miles: number, runDays: number) => {
   const p = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
     enduranceSport: 'run', enduranceFrequency: runDays, targetWeeklyMiles: miles,
-    longRunDay: 'sunday', hardDay: { day: 'tuesday', discipline: 'run' },
+    longRunDay: 'sunday', hardDays: [{ day: 'tuesday', discipline: 'run' }],
     easyPaceMinPerMile: PACE,
   } as never);
   const runs = (p.sessions_by_week['2'] as any[]).filter((s) => s.type === 'run');

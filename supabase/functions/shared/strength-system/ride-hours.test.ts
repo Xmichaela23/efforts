@@ -40,19 +40,19 @@ Deno.test('⛔ THE RIDE HOURS ARE THE ASK — every shape, hard day or not', () 
       ['bike primary + bike{} + hard ride', {
         enduranceSport: 'bike', enduranceFrequency: 3,
         bike: { hours, days: 3, longRideDay: 'saturday' }, targetWeeklyRideHours: hours,
-        hardDay: { day: 'tuesday', discipline: 'bike' } }],
+        hardDays: [{ day: 'tuesday', discipline: 'bike' }] }],
       ['bike primary + bike{}, no hard day', {
         enduranceSport: 'bike', enduranceFrequency: 3,
         bike: { hours, days: 3, longRideDay: 'saturday' } }],
       // ⛔ THE HOURS-ONLY PATH: no `bike{}` object at all. This is the one that built 1.5h.
       ['bike primary, hours only', {
         enduranceSport: 'bike', enduranceFrequency: 3, targetWeeklyRideHours: hours,
-        hardDay: { day: 'tuesday', discipline: 'bike' } }],
+        hardDays: [{ day: 'tuesday', discipline: 'bike' }] }],
       ['run primary + bike alongside', {
         enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
         easyPaceMinPerMile: 9, longRunDay: 'sunday',
         bike: { hours, days: 2, longRideDay: 'thursday' },
-        hardDay: { day: 'tuesday', discipline: 'run' } }],
+        hardDays: [{ day: 'tuesday', discipline: 'run' }] }],
     ];
     for (const [label, args] of shapes) {
       const built = rideHoursBuilt(args);
@@ -68,7 +68,7 @@ Deno.test('the hard ride does not shrink to fit — intensity is the protected v
     durationWeeks: 12, oneRepMaxes: MAXES,
     enduranceSport: 'bike', enduranceFrequency: 3,
     bike: { hours: 4, days: 3, longRideDay: 'saturday' },
-    hardDay: { day: 'tuesday', discipline: 'bike' },
+    hardDays: [{ day: 'tuesday', discipline: 'bike' }],
   } as never);
   const hard = (p.sessions_by_week['2'] as any[]).find((s) => /Intervals/.test(s.name));
   assertEquals(hard.duration, 45, 'the intervals were trimmed to make the hours fit');

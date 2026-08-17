@@ -147,9 +147,35 @@ Deno.test('declining the hard day entirely is a COMPLETE answer', () => {
 Deno.test('a HALF-answered hard day blocks, and names itself', () => {
   // A discipline with no day leaves an anchor the solver cannot place. This is the one hard-day
   // state that should stop the flow, and the sentence has to say how to get out of it BOTH ways.
+  // ⚠️ "A hard session", not "The hard day" — §1i allows TWO, so the definite article named a slot
+  // that may not be the one they left half-answered.
   const reason = scheduleBlockedReason(complete({ qualityDays: { run: '' } }));
-  assertEquals(reason, 'The hard day has a discipline but no day. Tapping the discipline again drops it.');
+  assertEquals(reason, 'A hard session has a discipline but no day. Tapping the discipline again drops it.');
   assertEquals(scheduleBlockedReason(complete({ qualityDays: { bike: '' } })), reason, 'same for a ride');
+});
+
+// ── §1i: THE STRENGTH PATH SENDS A LIST, AND THE GATE READS IT ───────────────────────────────────
+Deno.test('§1i — a half-answered hard SLOT blocks, and two complete ones pass', () => {
+  // The strength path's hard days are a list (two runs is legal), not the sport-keyed bag. A slot
+  // with a discipline and no day is the same half-answer and must stop the flow the same way.
+  assertEquals(scheduleCanContinue(complete({ hardDays: [{ discipline: 'run', day: 'tuesday' }] })), true);
+  assertEquals(
+    scheduleCanContinue(complete({
+      hardDays: [{ discipline: 'run', day: 'tuesday' }, { discipline: 'run', day: 'thursday' }],
+    })),
+    true,
+    'two hard runs is a legal week as of §1i',
+  );
+  assertEquals(
+    scheduleCanContinue(complete({
+      hardDays: [{ discipline: 'run', day: 'tuesday' }, { discipline: 'bike', day: '' }],
+    })),
+    false,
+    'the SECOND slot being half-answered must block too',
+  );
+  // ⛔ ABSENT IS THE PRE-§1i SHAPE AND MUST PASS UNTOUCHED.
+  assertEquals(scheduleCanContinue(complete({ hardDays: [] })), true);
+  assertEquals(scheduleCanContinue(complete({})), true);
 });
 
 // ── THE LONG DAYS ────────────────────────────────────────────────────────────────────────────────
