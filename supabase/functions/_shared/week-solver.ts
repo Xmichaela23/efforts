@@ -181,6 +181,31 @@ export type SolverInput = {
    */
   flexiblePreferred?: Record<string, SolverDay>;
   /**
+   * ⛔ WHERE `selfAdjacent` SITS IN THE FLEXIBLE RANKING, AND THE TWO CALLERS GENUINELY DISAGREE.
+   *
+   * `'shape-first'` (the DEFAULT, and byte-identical to before this field existed) ranks
+   * `streak` → `gaps` → `avoided` → `afterLong` above `selfAdjacent`. That order is not a
+   * preference, it was forced by tests: `base-week-spread.test.ts` caught an earlier draft resting
+   * Friday — spending the day before AND the day after the long run — to keep two easy runs off
+   * consecutive days, and `assign-days-parity.test.ts` pins the marathon week's two recovery days.
+   * `generate-run-plan/generators/assign-days-solver.ts` places runs among runs, and there those
+   * recovery rules are the whole point.
+   *
+   * `'separation-first'` ranks `selfAdjacent` immediately under the competing-share term, above
+   * `shared`, `streak` and `gaps`. `strength-primary-plan.ts` places two or three easy endurance
+   * sessions among LIFTS — a different modality — where the athlete's complaint is bunching and the
+   * recovery terms are mostly inert (no long run to sit beside on a bike block at all).
+   *
+   * ⚠️ THIS IS A FORK AND IT IS FLAGGED AS ONE. The two orders were proved contradictory, not
+   * merely untuned: the run path needs `streak`/`gaps`/`avoided` ABOVE `selfAdjacent`, the strength
+   * path needs `selfAdjacent` ABOVE `shared` ABOVE `streak`, and `shared` above `streak` is what
+   * stops a free stack compressing the week. Composed, that is a cycle — every one of thirteen
+   * candidate orderings was measured and none satisfies both suites. Collapsing it back to one
+   * ranking means deciding which of the two owns the disagreement; that is a product call, not a
+   * tuning exercise.
+   */
+  flexibleRanking?: 'shape-first' | 'separation-first';
+  /**
    * ⛔ §4.2 — PREFERRED DAYS ARE SCORED, NOT HARD, AND ANCHORS OUTRANK THEM.
    *
    * Found by the `week-optimizer` inventory (§6b-5): that module has
@@ -696,6 +721,13 @@ function chooseSpreadDays(
   kind: MatrixSessionKind,
   legalDays: readonly number[],
   occupiedBefore: ReadonlySet<number>,
+  /**
+   * ⛔ THE DAYS WHERE STACKING ACTUALLY COSTS SOMETHING — a strict subset of `occupiedBefore`, and
+   * the difference between the two is half of the 2026-08-16 fix. See `competingShared` in the score.
+   */
+  competingBefore: ReadonlySet<number>,
+  /** Where `selfAdjacent` sits in the ranking. See `SolverInput.flexibleRanking`. */
+  ranking: 'shape-first' | 'separation-first',
   /** Anchor day indices by kind, for the one owned preference term. */
   anchorPlacements: readonly Placement[],
   /** Caller-owned discouraged days (§4.1a — owner and reason live on the input). */
@@ -760,6 +792,7 @@ function chooseSpreadDays(
   type Scored = {
     days: number[];
     restShortfall: number;
+    competingShared: number;
     shared: number;
     streak: number;
     gaps: number[];
@@ -777,8 +810,34 @@ function chooseSpreadDays(
       days,
       // Mirrors the lift score's element 1: ONE full rest day protected, not rest maximised.
       restShortfall: Math.max(0, 1 - (7 - occupied.size)),
-      // Prefer each session its own day; sharing is legal (easy_run × strength = ✓) and is what
-      // protects the rest day on a full week, so it is ranked BELOW `restShortfall`, never above.
+      /**
+       * ⛔ SHARING A DAY THAT ACTUALLY COMPETES — the expensive half of what used to be one blind
+       * `shared` count, and the half that still outranks shape.
+       *
+       * The old term counted every day holding anything at all, which is modality-blind in a scorer
+       * whose whole job is modality. An easy ride on a BENCH PRESS day shares no prime movers with
+       * it (`SESSION_PRIME_MOVER`: 'leg' vs 'upper'), needs no gap (`stackNeedsRecoveryGap` is
+       * false), and the same-day matrix rates the pair ✓ — yet it was priced exactly like a second
+       * leg session on a squat day.
+       *
+       * ⚠️ AND IT WAS DECIDING WEEKS, ONLY AT THREE LIFTING DAYS. With a spare day in the week a
+       * zero-share arrangement becomes reachable, so the old term settled the week before any shape
+       * term was read. Measured, bike-only 3d: Wed+Thu+Sat (share 0, `streak: 6`, two rides back to
+       * back) beat Mon+Wed+Sat (share 1, `streak: 3`, nothing touching) — and that Monday is the
+       * bench day, where the stack is free. The run case was the same shape one discipline over:
+       * Sat+Sun clustered with Thursday left empty. At FOUR lifting days no unshared arrangement
+       * existed, the term tied across the field, and spread decided underneath it — which is why
+       * this was invisible until three became the only block shape.
+       */
+      competingShared: days.filter((d) => competingBefore.has(d)).length,
+      /**
+       * The cheap half: a day that is busy but does not compete. Still a real preference — elbow
+       * room, and it is what protects the rest day on a full week, which is why the count as a whole
+       * was ranked BELOW `restShortfall` and still is.
+       *
+       * ⚠️ A free stack may break a tie between equally-shaped weeks; whether it may also buy a
+       * shorter week is what `flexibleRanking` decides, and the two callers answer differently.
+       */
       shared: days.filter((d) => occupiedBefore.has(d)).length,
       streak: shape.streak,
       gaps: shape.gaps,
@@ -817,6 +876,42 @@ function chooseSpreadDays(
     const s = score(combo);
     if (best === null) { best = s; continue; }
     if (s.restShortfall !== best.restShortfall) { if (s.restShortfall < best.restShortfall) best = s; continue; }
+    /**
+     * ⛔ THE ONE FORK IN THIS COMPARATOR, AND IT IS THE 2026-08-16 SLICE.
+     *
+     * `separation-first` reads three terms here that the default reads later or not at all:
+     *   1. `competingShared` — a share that costs something, which is the only kind worth ranking
+     *      above shape. A free stack onto a bench-press day is not a cost and must not be priced
+     *      as one.
+     *   2. `selfAdjacent` — the athlete's actual complaint, above `streak`/`gaps` rather than
+     *      below them.
+     *   3. `shared` — the free stack, demoted to a tie-break under (2).
+     * That order is forced, not chosen. Minimising `streak` COMPRESSES the week — fewer active days
+     * is a shorter streak — so once free stacking is priced correctly the solver stacks onto lift
+     * days and hands back a shorter week; `shared` above `streak` is what holds that back, and
+     * `shared` above `selfAdjacent` is what clusters. Only `selfAdjacent` above both settles it,
+     * in the term that names the thing being prevented.
+     *
+     * ⛔ THE DEFAULT ARM IS UNTOUCHED, BYTE FOR BYTE, AND THAT IS DELIBERATE — including keeping
+     * the blind `shared` here rather than the split. `week-solver-flexible.test.ts:487` runs FOUR
+     * lifts, two of them upper, so on that path `competingShared` and `shared` genuinely differ and
+     * consulting the split would move the marathon answer too. The split is a strength-path claim;
+     * it does not get to leak.
+     *
+     * See `SolverInput.flexibleRanking` for why the two orders cannot be collapsed without a
+     * product decision.
+     */
+    if (ranking === 'separation-first') {
+      if (s.competingShared !== best.competingShared) { if (s.competingShared < best.competingShared) best = s; continue; }
+      // ⛔ THE TWO RECOVERY RULES STILL OUTRANK `selfAdjacent`, ON THIS ARM TOO. Lifting it above
+      // them was tried and it works — every strength test passes — and it is still wrong: it put an
+      // easy run on the morning after the long run to buy a gap elsewhere, which is the exact trade
+      // `base-week-spread.test.ts` caught on the other path. Nothing in the strength suite covers
+      // it, so this ordering is held by reasoning rather than by a red test. Do not "simplify" it.
+      if (s.avoided !== best.avoided) { if (s.avoided < best.avoided) best = s; continue; }
+      if (s.afterLong !== best.afterLong) { if (s.afterLong < best.afterLong) best = s; continue; }
+      if (s.selfAdjacent !== best.selfAdjacent) { if (s.selfAdjacent < best.selfAdjacent) best = s; continue; }
+    }
     if (s.shared !== best.shared) { if (s.shared < best.shared) best = s; continue; }
     if (s.streak !== best.streak) { if (s.streak < best.streak) best = s; continue; }
     const g = moreSpread(s.gaps, best.gaps);
@@ -838,6 +933,7 @@ function chooseSpreadDays(
      */
     if (s.avoided !== best.avoided) { if (s.avoided < best.avoided) best = s; continue; }
     if (s.afterLong !== best.afterLong) { if (s.afterLong < best.afterLong) best = s; continue; }
+    // Already consulted above under `separation-first`; re-reading it here is a no-op, not a bug.
     if (s.selfAdjacent !== best.selfAdjacent) { if (s.selfAdjacent < best.selfAdjacent) best = s; continue; }
     // ⚠️ BELOW `selfAdjacent` — this is the LIGHT half of the recovery preference (see
     // `dayAfterLongRide`). A long ride costs duration, not tissue, so it may break a tie and may not
@@ -1075,6 +1171,14 @@ export function solve(input: SolverInput): SolverResult {
             legalDays.push(d);
           }
           const occupiedBefore = new Set<number>(placedSoFar.map((p) => p.dayIndex));
+          // The days where landing THIS kind would actually cost something: the law's own question
+          // (`stackNeedsRecoveryGap` — do the two share prime movers), asked per occupant. A day
+          // holding only an upper lift or a swim is free to stack on, and the share term must not
+          // price it like a squat day. On the run path every occupant is leg-loaded, so this set
+          // equals `occupiedBefore` and nothing changes — by construction, not by luck.
+          const competingBefore = new Set<number>(
+            placedSoFar.filter((p) => stackNeedsRecoveryGap(kind, p.kind)).map((p) => p.dayIndex),
+          );
           const avoid = new Set<number>(
             (input.flexibleAvoid?.days ?? []).map((d) => SOLVER_DAYS.indexOf(d)).filter((i) => i >= 0),
           );
@@ -1088,7 +1192,9 @@ export function solve(input: SolverInput): SolverResult {
               .filter((i) => i >= 0 && legalDays.includes(i)),
           );
           const chosen = chooseSpreadDays(
-            sessions.length, kind, legalDays, occupiedBefore, anchorPlacements, avoid, preferred,
+            sessions.length, kind, legalDays, occupiedBefore, competingBefore,
+            input.flexibleRanking ?? 'shape-first',
+            anchorPlacements, avoid, preferred,
           );
           if (chosen === null) {
             // ⛔ §5.2b — NEVER SUBTRACT. Not enough legal days is a refusal that states the

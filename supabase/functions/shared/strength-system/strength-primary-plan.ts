@@ -1988,7 +1988,24 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     for (let n = flexibleWanted.length; n >= 0; n--) {
       const flexible = flexibleWanted.slice(0, n);
       if (flexible.length === 0) return liftOnlySolve;
-      const base = { anchors: solverAnchors, lifts: solverLifts, flexible };
+      /**
+       * ⛔ `separation-first` — THIS BLOCK PLACES EASY ENDURANCE AMONG LIFTS, NOT AMONG RUNS
+       * (2026-08-16). The solver's default ranking reads `streak`/`gaps` and the two recovery rules
+       * before it asks whether two easy sessions are touching, which is right for
+       * `assign-days-solver` (runs among runs, where those recovery days are the whole point) and
+       * wrong here: at three lifting days the week has a spare day, and the default order spent it
+       * on elbow room rather than on spread — Sat+Sun easy runs with Thursday empty, Wed+Thu easy
+       * rides with Sunday empty. Both rebuilt identically on the pre-§1f-0 engine with
+       * `liftingDays: 3`, so this is not a four-day artefact; four days simply crowded the week
+       * enough that the question never arose.
+       *
+       * ⚠️ THE TWO ORDERS ARE CONTRADICTORY, NOT UNTUNED — see `SolverInput.flexibleRanking`. Every
+       * candidate single ordering was measured and none satisfies both suites.
+       */
+      const base = {
+        anchors: solverAnchors, lifts: solverLifts, flexible,
+        flexibleRanking: 'separation-first' as const,
+      };
       const plain = solveWeek(base);
       if (heavyLegDaysForAvoid.length === 0) {
         if (plain.status !== 'unsolvable') return plain;
