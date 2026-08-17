@@ -218,7 +218,14 @@ across a block with underhand among them, the wizard's dose note matches what th
 
 ---
 
-## Slice 5 — the accessory picks are keyed by LIFT, not by DAY
+## Slice 5 — the accessory picks are keyed by LIFT, not by DAY — ✅ DONE at `a7b9b96c`
+
+> **Shipped.** Three keys by day, press bucket deleted, picks verified reaching the merged day on a
+> built plan. Two exposed crashes fixed (the unguarded `BALANCED_WEEK[day]`, the `?? 'press'`
+> fallback). ⚠️ **For slice 4:** the grip rotation now indexes four grips by three days — `wide` is
+> unreachable, and the chin-up returning is a side effect of the narrowing, NOT §1h done. Line
+> numbers in `pullup-progression.ts` and `strength-primary-plan.ts` have moved. The default week
+> carries no abs movement — pinned by test, content call deliberately left to Michael.
 
 **Decided by Michael 2026-08-16, on reading slice 2's report.** The store is called `by_day` and it
 is keyed by lift: `LIFT_DAYS = ['press','bench','squat','deadlift']`
@@ -254,8 +261,7 @@ fallback, a shim, or a read-path that tolerates the old shape.**
 **Done means:** three keys everywhere, no `press` key in the type or the stored shape, an athlete's
 picks for the deadlift+press day reach the built session, and the three suites hold their baseline.
 
-⚠️ **Baseline for slices 5 and 4 is measured at `3dc2c0d1`** — same numbers as the table above:
-421/0, 2956/3, 680/3.
+⚠️ **Baseline for slice 4 is measured at `a7b9b96c`: 422/0 · 2957/3 · 680/3.**
 
 ## Order, and why
 
