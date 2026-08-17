@@ -1,4 +1,4 @@
-# HANDOFF — finishing §1f, in four slices (2026-08-16)
+# HANDOFF — finishing §1f, in five slices (2026-08-16)
 
 **Parent:** `docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` §1f / §1f-0 / §1f-1 / **§1h**.
 **Roles:** Michael is the architect. The chat holds this plan. **Each slice below is one terminal
@@ -207,12 +207,53 @@ across a block with underhand among them, the wizard's dose note matches what th
 
 ---
 
+## Slice 5 — the accessory picks are keyed by LIFT, not by DAY
+
+**Decided by Michael 2026-08-16, on reading slice 2's report.** The store is called `by_day` and it
+is keyed by lift: `LIFT_DAYS = ['press','bench','squat','deadlift']`
+(`src/lib/assistance-catalog.ts:49`). That was only ever correct while four lifts meant four days.
+There are three days now, so **the press key is a bucket nothing can ever read** — the merged day
+takes the deadlift's block (§1e), and an athlete's press-day picks are discarded in silence.
+
+**The fix: three keys, one per day.** Squat · Bench · **Deadlift + Press**. ⛔ **The press key is
+DELETED, not kept.**
+
+⛔ **THERE IS NOTHING TO MIGRATE AND NO COMPATIBILITY TO HOLD. Pre-launch, one athlete, no external
+users.** An earlier draft of this slice proposed keeping the fourth key so existing blocks would
+still load — that is exactly what the work order's standing constraint forbids: *"one law, one owner,
+one implementation… if a change cannot delete what it replaces, stop and say so."* **Do not write a
+fallback, a shim, or a read-path that tolerates the old shape.**
+
+**Where it reaches** (this is why it is its own session, not a rider on slice 2 or 4):
+
+- `src/lib/assistance-catalog.ts` — `LIFT_DAYS:49`, the `LiftDay` type, `by_day` on the prefs type
+  `:342`, `normalizeAssistancePrefs`'s loop `:415-451`, `BALANCED_WEEK` / `buildDefaultWeek` `:483`,
+  `resolveDayAssistance` `:587`. ⚠️ The comment at `:404` says *"all four days"* and becomes true as
+  "three" only after this lands — it moves **with** this slice, not before it.
+- `src/lib/exercise-alternatives.ts:277` and `exercise-alternatives.test.ts:236` — same sentence,
+  same timing.
+- `liftDayForMainLift` — `'Overhead Press' → 'press'` has to resolve to the merged day now.
+- The engine: `strength-primary-plan.ts` reads the picks per lift and then merges. ⚠️ **The merge's
+  "assistance comes from the first lift's resolution" step may become unnecessary** once the day owns
+  one block — check before deleting it; §1e's *one round per stacked day* rule must still hold.
+- `assistance-collision.test.ts` — "the composer gives each lifting day ITS OWN picks" currently
+  pins that press-day picks reach nothing. **That assertion inverts here**: there is no press key to
+  choose from, so the test should pin three keys and no fourth.
+
+**Done means:** three keys everywhere, no `press` key in the type or the stored shape, an athlete's
+picks for the deadlift+press day reach the built session, and the three suites hold their baseline.
+
 ## Order, and why
 
-1. **Slice 1 first** — riskiest, and its "done" is already written as two red tests. Keep it clear
-   of screen edits so a scheduling change is not tangled with a UI change.
-2. **Slice 2** — the most visible, and self-contained in two files.
-3. **Slices 3 and 4** — either order.
+1. ✅ **Slice 1** — done at `b130fb4d`.
+2. ✅ **Slice 2** — done at `45c59661`.
+3. **Slice 3 next** — small, server-only, and it clears the last `lifting_days` references. Nothing
+   depends on it, so it is the cheap one to get out of the way.
+4. **Then slice 5, then slice 4.** ⚠️ **Both edit the engine and the same library neighbourhood —
+   run them in separate sessions, never together.** Slice 5 changes the shape the picks are stored
+   in; slice 4 stops keying grips by day at all. Neither depends on the other, but two sessions in
+   `assistance-catalog.ts` and `strength-primary-plan.ts` at once is how the file:line references in
+   this document stop being true.
 
 ## Do not
 
