@@ -268,7 +268,12 @@ picks for the deadlift+press day reach the built session, and the three suites h
 
 ⚠️ **Baseline for slice 4 is measured at `a7b9b96c`: 422/0 · 2957/3 · 680/3.**
 
-## Slice 6 — up to TWO hard days, any mix, and whose session it is (§1i)
+## Slice 6 — up to TWO hard days, any mix, and whose session it is (§1i) — ✅ DONE at `011c2172`
+
+> **Shipped.** Two slots, prescribed-or-club per slot, the whole pipeline moved to `hardDays[]`, and
+> the two-day copy stops where the engine stops (§6's stacking promise is NOT printed). Deferred to
+> §6, knowingly: back-to-back quality ride → quality run is accepted, because that rule still lives
+> only in `week-optimizer`. Baseline after: **434/0 · 2969/3 · 683/3.**
 
 **Confirmed by Michael 2026-08-17, from the live screen** — the old single-hard-day picker is what
 is deployed, and §1i is the design. ⛔ **Work order §1i IS the instruction — read all of it,
