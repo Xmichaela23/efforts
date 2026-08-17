@@ -17,8 +17,15 @@ line numbers that have already moved.
 
 ## Where the tree is
 
-`198dd774` — *strength: the lifting week is three days in the tests too (§1f-0)*. Committed, **not
-pushed, not deployed.**
+`b130fb4d` — *solver: easy sessions stop clustering at three lifting days (slice 1)*. Committed,
+**not pushed, not deployed.**
+
+✅ **SLICE 1 IS DONE.** The clustering is fixed and its two tests are green. It left one thing
+standing that the next sessions must not undo: **`week-solver.ts` now carries TWO flexible rankings**
+(`shape-first`, the untouched default, and `separation-first`, which the strength composer opts
+into). They were proved contradictory — no single ordering satisfies both the marathon and the
+strength suites — so this is a deliberate fork, not a half-finished refactor. ⛔ **Do not collapse
+them, and do not add a third.** See `SolverInput.flexibleRanking`.
 
 **The engine half of §1f-0 is DONE and committed.** Every Strong Focus block is three lifting days:
 **Squat · Bench · Deadlift + Press.** The `liftingDays` argument is deleted from
@@ -27,17 +34,26 @@ unconditional. Do not reintroduce it. Do not add a four-day path "for later".
 
 **Test state, and it is the baseline every slice measures against:**
 
+**⚠️ BASELINE AS OF `b130fb4d` — measure this yourself before you change anything, and do not trust
+the numbers below if they disagree with what you see:**
+
 | command | result |
 |---|---|
-| `deno test --allow-all --no-check supabase/functions/shared/strength-system/` | 418 passed, **2 failed** (slice 1) |
-| `deno test --allow-all --no-check supabase/functions` | 2953 passed, **5 failed** = 3 standing d031-convergence + slice 1's 2 |
+| `deno test --allow-all --no-check supabase/functions/shared/strength-system/` | **421 passed, 0 failed** |
+| `deno test --allow-all --no-check supabase/functions` | 2956 passed, **3 failed** — the standing d031-convergence |
 | `deno test --allow-all --no-check src` | 680 passed, **3 failed** — standing (non-race-goal-seeds ×2, club-anchor ×1) |
 
-⚠️ **The 6 standing failures fail on a clean tree.** Anything beyond them is yours.
+⚠️ **Those 6 standing failures fail on a clean tree.** Anything beyond them is yours.
 
 ---
 
-## Slice 1 — the easy sessions bunch up
+## Slice 1 — the easy sessions bunch up — ✅ DONE at `b130fb4d`
+
+> **Shipped.** `competingShared` now asks the law whether a stack actually competes, and the ranking
+> is caller-scoped through `SolverInput.flexibleRanking`. `easy-session-spread.test.ts` gained a
+> guard for the one ordering that no test held — verified by re-introducing the regression, which
+> failed that test alone while the other 420 passed. **Everything below is the brief it was built
+> from, kept for the reasoning.**
 
 **⛔ THIS IS THE ONE THAT IS NOT IN THE WORK ORDER.** It surfaced during §1f-0's test surgery and it
 is a real, live defect, not a four-day artefact.
