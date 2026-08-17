@@ -57,13 +57,13 @@ import {
 // pull category across the week — see `resolveDayAssistance`'s `pullup` argument.
 import {
   GRIP_LABEL,
-  GRIP_ROTATION,
-  LIFT_DAY_ORDER_FOR_GRIP,
+  CHIN_SESSIONS_PER_WEEK,
+  gripForSession,
   movementForGrip,
   pullupDoseNote,
   SESSION_STANDARD_MINUTES,
   SESSION_STANDARD_REPS,
-  WEIGHTED_DAY_INDEX,
+  WEIGHTED_DAY,
   WEIGHTED_DAY_REPS,
   weeklyVolumeFor,
 } from '../../../../src/lib/pullup-progression.ts';
@@ -548,6 +548,14 @@ const ASSISTANCE_SUGGESTION_RIR = 2;
 function assistanceRows(
   /** Raw, straight off the goal. Migrated here — see `normalizeAssistancePrefs`. */
   picks: unknown,
+  /**
+   * ⛔ THE BLOCK WEEK, 1-BASED — AND IT SITS SECOND SO IT CAN BE REQUIRED (§1h, 2026-08-17). The grip
+   * rotates ACROSS weeks now, so "which grip is this session" can no longer be answered from the day
+   * alone. Every parameter after this one is optional, and an optional `week` defaulting to 1 would
+   * rebuild week 1's grips for the entire block — the static-map bug wearing different clothes. So
+   * it is required, and the type checker is what enforces that a new caller supplies it.
+   */
+  week: number,
   // ⛔ THE VOLUME IS DERIVED PER SLOT AND PER CYCLE (2026-07-28). The floor is Wendler's own lowest
   // number and what is derived is the POSITION within the 50-75 band. Only a TESTED capacity moves a
   // slot up; posture alone never does, because posture is evidence of intent rather than of capacity.
@@ -583,13 +591,24 @@ function assistanceRows(
   // on every lifting day, at Wendler's own weekly dose, with the grip rotating day to day (Forever
   // p.26). ⚠️ `pullupMaxReps` is the SCALER, not a target — see `weeklyVolumeFor` for why a 2-rep
   // athlete is not handed 100 chins a week.
+  // ⛔ NO DIVISOR ARGUMENT ANY MORE (§1h). This passed a literal `4` while the block builds THREE
+  // days, so a 100-rep weekly prescription reached the athlete as 75 and nothing said so. The
+  // library owns the split now and hits the weekly anchor exactly: 33 · 33 · 34.
   const dose = prefs.performance_focus === 'pullups'
-    ? weeklyVolumeFor(scale?.pullupMaxReps, 4)
+    ? weeklyVolumeFor(scale?.pullupMaxReps)
     : null;
-  const gripIndex = LIFT_DAY_ORDER_FOR_GRIP.indexOf(day);
-  const grip = GRIP_ROTATION[(gripIndex < 0 ? 0 : gripIndex) % GRIP_ROTATION.length];
+  /**
+   * ⛔ THE DAY'S POSITION IN THE WEEK — one index, now serving TWO different questions, and they are
+   * kept apart on purpose (§1h). It feeds the grip rotation (with the week) and, separately, the
+   * weighted-day check below. They used to be the same lookup into `LIFT_DAY_ORDER_FOR_GRIP`, which
+   * is why the work order says the weighted day must NOT be swept into the grip change.
+   */
+  const dayPosition = Math.max(0, LIFT_DAYS.indexOf(day));
+  const grip = gripForSession(week, dayPosition, CHIN_SESSIONS_PER_WEEK);
   const pullup = dose
-    ? { movement: movementForGrip(grip), totalReps: dose.perDay }
+    // ⚠️ THIS DAY'S SHARE, not the week's and not an average — `perDay` is the exact split and the
+    // last day carries the remainder.
+    ? { movement: movementForGrip(grip), totalReps: dose.perDay[dayPosition] ?? dose.perDay[0] }
     : null;
   // ⚠️ ONE SLOT BUDGET FOR THE DAY. `assistanceTotalReps` is per-slot and the pull slot is the only
   // one with a tested capacity, so it is asked per category and each row carries its own total.
@@ -668,7 +687,10 @@ function assistanceRows(
         ? ' Arms focus: the chins are the biceps volume, so no curls are booked on top — ' +
           'the triceps work is unchanged.'
         : '') +
-      (gripIndex === WEIGHTED_DAY_INDEX && !dose.assistedOnRamp
+      // ⛔ BY NAME, NOT POSITION (2026-08-17, Michael) — the positional constant silently moved the
+      // weighted work onto the deadlift+press day when slice 5 shortened the day list. See
+      // `WEIGHTED_DAY` in pullup-progression.ts.
+      (day === WEIGHTED_DAY && !dose.assistedOnRamp
         ? ` Add weight for sets of ${WEIGHTED_DAY_REPS} on this day — by feel, as always.`
         : '')
     : null;
@@ -2649,7 +2671,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // rather than assumed.
       // ⚠️ REBUILT PER WEEK, not once per block — the phase decides the band (Forever p.18: leaders
       // carry LESS assistance than anchors, which is the reverse of what this used to do).
-      const cycleAssistance = assistanceRows(args.assistancePicks, {
+      const cycleAssistance = assistanceRows(args.assistancePicks, week, {
         pullupMaxReps: args.pullupMaxReps,
         strengthPosture: args.blockShape?.strengthPosture,
         // ⛔ COMPETING STRESS, NOT THE CYCLE PHASE (2026-08-16, §1g). The band is set by how much

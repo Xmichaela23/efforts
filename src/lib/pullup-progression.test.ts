@@ -13,9 +13,10 @@ import {
   canWritePullupCapacity,
   countPullupWork,
   FULL_DOSE_CAPACITY,
+  GRIP_LABEL,
   GRIP_ROTATION,
   isAssistedSet,
-  LIFT_DAY_ORDER_FOR_GRIP,
+  gripForSession,
   movementForGrip,
   SESSION_STANDARD_MINUTES,
   SESSION_STANDARD_REPS,
@@ -41,27 +42,54 @@ Deno.test('⛔ THE GRIP MOVEMENTS RESOLVE EXACTLY — a "Wide Grip Pull Up" toke
   }
 });
 
-Deno.test('the grip rotation has four distinct grips, and the day map mirrors LIFT_DAYS', () => {
+Deno.test('⛔ ALL FOUR GRIPS ARE REACHED ACROSS A BLOCK — the assertion slice 5 said would invert', () => {
   assertEquals(GRIP_ROTATION.length, 4);
   assertEquals(new Set(GRIP_ROTATION).size, 4);
-  // ⚠️ MIRRORS `LIFT_DAYS`. If the catalog's day list changes and this does not, the rotation
-  // silently collapses onto one grip.
-  assertEquals([...LIFT_DAY_ORDER_FOR_GRIP], [...LIFT_DAYS]);
-  // ⛔ FOUR GRIPS, THREE DAYS — SO ONE GRIP IS UNREACHABLE, AND THAT IS §1h / SLICE 4's BUG, PINNED
-  // HERE RATHER THAN LEFT TO BE REDISCOVERED. Slice 5 narrowed the day list (2026-08-17); the
-  // rotation still indexes by day, so `GRIP_ROTATION[3]` is never selected. §1h's fix rotates across
-  // WEEKS and deletes this map. ⚠️ When that lands, this assertion INVERTS — flip it to "all four
-  // grips appear across a block" rather than deleting it.
-  assertEquals(LIFT_DAY_ORDER_FOR_GRIP.length < GRIP_ROTATION.length, true,
-    'if the day list ever reaches four again, §1h\'s premise changed — re-read it before adjusting');
+  // ⛔ THE STATIC DAY MAP IS GONE (§1h, 2026-08-17). It mapped four grips onto four days, and when
+  // §1f-0 merged the press into the deadlift one grip was orphaned — underhand first, then `wide`
+  // once slice 5 narrowed the list. Rotating across WEEKS reaches all four with no new state.
+  const seen = new Set<string>();
+  for (let week = 1; week <= 12; week++) {
+    for (let day = 0; day < LIFT_DAYS.length; day++) {
+      seen.add(gripForSession(week, day, LIFT_DAYS.length));
+    }
+  }
+  assertEquals(seen.size, 4, `only ${[...seen].join(', ')} appear across a 12-week block`);
+  // ⛔ AND UNDERHAND IS AMONG THEM, which is the headline: `movementForGrip` returns `Chin-Up` only
+  // for `chin`, so a rotation that never reaches it is a chin-up progression with no chin-up in it.
+  assertEquals(seen.has('chin'), true, 'the chin-up progression still prescribes no chin-up');
+});
+
+Deno.test('⛔ THE ROTATION IS §1h\'s WORKED EXAMPLE, WEEK FOR WEEK', () => {
+  // Getting `GRIP_ROTATION`'s order backwards opens the block on underhand instead of closing week 2
+  // with it — the work order calls that out by name, so the three weeks are pinned literally.
+  const weekOf = (w: number) => [0, 1, 2].map((d) => GRIP_LABEL[gripForSession(w, d, 3)]);
+  assertEquals(weekOf(1), ['overhand', 'neutral grip', 'wide grip']);
+  assertEquals(weekOf(2), ['underhand', 'overhand', 'neutral grip']);
+  assertEquals(weekOf(3), ['wide grip', 'underhand', 'overhand']);
+});
+
+Deno.test('the grip is derivable from (week, day position) alone — no running counter', () => {
+  // A hard constraint, not a preference: the composer builds each lifting day independently and holds
+  // no memory of the others. Same inputs, same answer, in any order, any number of times.
+  for (const [w, d] of [[1, 0], [7, 2], [12, 1], [3, 0]] as const) {
+    assertEquals(gripForSession(w, d, 3), gripForSession(w, d, 3));
+  }
+  // §0h — nonsense degrades to the first session rather than throwing or returning undefined.
+  assertEquals(gripForSession(0, -1, 0), GRIP_ROTATION[0]);
+  assertEquals(gripForSession(NaN, NaN, NaN), GRIP_ROTATION[0]);
 });
 
 // ── The dose ──────────────────────────────────────────────────────────────────────────────────────
 
 Deno.test('an athlete who can already pull gets the book\'s full dose', () => {
-  const dose = weeklyVolumeFor(12, 4);
+  const dose = weeklyVolumeFor(12);
   assertEquals(dose.weeklyVolume, 100);
-  assertEquals(dose.perDay, 25);
+  // ⛔ 33 · 33 · 34 — THE WEEKLY ANCHOR IS HIT EXACTLY (§1h, 2026-08-17). It was a flat `25`, from a
+  // divisor of FOUR against a block that builds THREE days: the athlete received 75 of the 100
+  // Wendler prescribes and nothing reported the shortfall.
+  assertEquals(dose.perDay, [33, 33, 34]);
+  assertEquals(dose.perDay.reduce((a, b) => a + b, 0), dose.weeklyVolume);
   assertEquals(dose.basis, 'full_dose');
   assertEquals(dose.assistedOnRamp, false);
 });
@@ -69,7 +97,7 @@ Deno.test('an athlete who can already pull gets the book\'s full dose', () => {
 Deno.test('⛔ A 2-REP ATHLETE IS NOT HANDED 100 CHINS A WEEK', () => {
   // Wendler's protocol addressed to someone who cannot perform it is not his protocol. The dose
   // scales and the basis SAYS SO, so the copy can name the evidence instead of a bare number.
-  const dose = weeklyVolumeFor(2, 4);
+  const dose = weeklyVolumeFor(2);
   assertEquals(dose.basis, 'scaled_to_capacity');
   assertEquals(dose.weeklyVolume < WEEKLY_CHIN_VOLUME_TARGET, true);
   assertEquals(dose.weeklyVolume, 25);
@@ -79,7 +107,7 @@ Deno.test('⛔ A 2-REP ATHLETE IS NOT HANDED 100 CHINS A WEEK', () => {
 Deno.test('⛔ ZERO REPS IS THE ON-RAMP, NOT AN EXCLUSION (2nd ed p.36)', () => {
   // 0 is a valid tested value (Q-102) and it is exactly the athlete the band on-ramp exists for.
   // Prescribing nothing here would be the feature declining to serve its own entry case.
-  const dose = weeklyVolumeFor(0, 4);
+  const dose = weeklyVolumeFor(0);
   assertEquals(dose.assistedOnRamp, true);
   assertEquals(dose.basis, 'on_ramp');
   assertEquals(dose.weeklyVolume > 0, true);
@@ -87,17 +115,23 @@ Deno.test('⛔ ZERO REPS IS THE ON-RAMP, NOT AN EXCLUSION (2nd ed p.36)', () => 
 
 Deno.test('§0h — an untested athlete gets the protocol as written, never a guessed smaller dose', () => {
   for (const raw of [null, undefined, NaN]) {
-    const dose = weeklyVolumeFor(raw as number | null | undefined, 4);
+    const dose = weeklyVolumeFor(raw as number | null | undefined);
     assertEquals(dose.basis, 'full_dose', String(raw));
     assertEquals(dose.weeklyVolume, 100);
   }
 });
 
-Deno.test('the per-day split lands on fives and never collapses to zero', () => {
-  for (const cap of [0, 1, 2, 5, 8, 20]) {
-    const dose = weeklyVolumeFor(cap, 4);
-    assertEquals(dose.perDay % 5, 0, `cap ${cap}`);
-    assertEquals(dose.perDay >= 5, true, `cap ${cap}`);
+Deno.test('⛔ THE SPLIT ALWAYS SUMS TO THE WEEKLY TOTAL, AT EVERY CAPACITY', () => {
+  // ⚠️ THIS REPLACES "the per-day split lands on fives". Rounding each day to a lifter's number is
+  // exactly what lost the anchor — 100/3 rounds to 35 and the week becomes 105 (§1h says so
+  // explicitly). The weekly figure still rounds; the SPLIT of it does not.
+  for (const cap of [0, 1, 2, 5, 8, 20, null, undefined]) {
+    const dose = weeklyVolumeFor(cap as number | null | undefined);
+    assertEquals(dose.perDay.length, 3, `cap ${cap}: one entry per lifting day`);
+    assertEquals(dose.perDay.reduce((a, b) => a + b, 0), dose.weeklyVolume, `cap ${cap}: split lost reps`);
+    for (const n of dose.perDay) assertEquals(n >= 1, true, `cap ${cap}: a day collapsed to ${n}`);
+    // The remainder rides on the LAST day, so the days never differ by more than one rep.
+    assertEquals(Math.max(...dose.perDay) - Math.min(...dose.perDay) <= 1, true, `cap ${cap}`);
   }
 });
 

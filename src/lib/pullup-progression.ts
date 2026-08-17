@@ -61,38 +61,53 @@ export type GripVariant = 'chin' | 'pull' | 'neutral' | 'wide';
 
 /**
  * ⛔ THE GRIP ROTATION IS THE PRESCRIPTION, NOT DECORATION (Forever p.26: vary the grip every set or
- * session). Four days, four grips, so a block never runs the same grip twice in a week.
+ * session). Four grips, rotated so a block never runs the same grip twice in a row.
+ *
+ * ⛔ THE ORDER CHANGED WITH §1h (2026-08-17) AND IT IS LOAD-BEARING. It was
+ * `['chin','pull','neutral','wide']`, read by a static day map; it is now walked by
+ * {@link gripForSession} across the whole block, and this order is what makes week 1 open on
+ * OVERHAND and week 2 close on the wide grip. Reversing it opens the block on underhand instead.
  *
  * ⚠️ THESE ARE DISPLAY QUALIFIERS ON ONE STORED MOVEMENT, NOT FOUR MOVEMENTS. The row still stores
  * `Chin-Up` or `Pull Up` — names that resolve exactly in `exercise-config.ts` (D-322). A "Wide Grip
  * Pull Up" token would fuzzy-match and borrow another entry's prescription, which is the bug class
  * this codebase has shipped three times.
  */
-export const GRIP_ROTATION: GripVariant[] = ['chin', 'pull', 'neutral', 'wide'];
+export const GRIP_ROTATION: GripVariant[] = ['pull', 'neutral', 'wide', 'chin'];
 
 /**
- * ⛔ WHICH DAY GETS WHICH GRIP. A fixed order so the rotation is deterministic — the composer builds
- * each lifting day independently and has no memory of the others, so "the next grip" has to be
- * derivable from the day alone.
+ * ⛔ THE GRIP ROTATES ACROSS WEEKS, NOT WITHIN ONE (§1h, 2026-08-17). THIS IS THE FIX FOR "THE
+ * CHIN-UP PROGRESSION PRESCRIBES NO CHIN-UP".
  *
- * ⚠️ MIRRORS `LIFT_DAYS` in `assistance-catalog.ts` and must keep mirroring it. It is not imported
- * because this module is the pull-up programme and the catalog is the picker; a one-way import here
- * would make the picker depend on the programme rather than the other way round.
+ * WHAT IT REPLACES. A static `LIFT_DAY_ORDER_FOR_GRIP` mapped four grips onto four lift days, and
+ * **underhand was mapped to the press day**. §1f-0 merged the press into the deadlift, so there were
+ * three days for four grips and the fourth was orphaned — and `movementForGrip` returns `Chin-Up`
+ * for `chin` and `Pull Up` for everything else, so the feature named after the chin-up stopped
+ * building one. Narrowing the day map (slice 5) moved the orphan from `chin` to `wide` and made the
+ * chin-up reappear; that was a side effect of the array getting shorter, not a fix — one grip was
+ * still unreachable. Walking the index across the block reaches all four and needs no new state.
  *
- * ⛔⛔ THE FOURTH GRIP IS NOW UNREACHABLE, AND FIXING THAT IS **§1h / SLICE 4**, NOT THIS CHANGE.
- * Slice 5 narrowed `LIFT_DAYS` to three days, so this array follows it to three — and with four
- * grips indexed by a three-day list, the last entry of {@link GRIP_ROTATION} is never selected. With
- * the rotation as `['chin','pull','neutral','wide']` that orphans **`wide`**; before this change the
- * orphaned one was nothing, because four days consumed all four grips.
+ *   Week 1: overhand · neutral · wide
+ *   Week 2: underhand · overhand · neutral
+ *   Week 3: wide · underhand · overhand
  *
- * ⚠️ `chin` IS STILL REACHED HERE — it is index 0, which the squat day now takes. That matters
- * because §1h's headline bug was *"the chin-up progression never prescribes a chin-up"*, and that
- * bug was caused by `press` (index 0) losing its day. Narrowing the array moved index 0 onto a day
- * that exists, so the chin-up is built again — **as a side effect, not as the fix.** §1h's real fix
- * is rotating across WEEKS (`grips[absoluteSessionIndex % 4]`), which reaches all four grips and
- * deletes this map entirely. Do not treat the chin-up's return as §1h being done.
+ * ⚠️ DERIVABLE FROM (week, day position) ALONE, AND THAT IS A HARD CONSTRAINT, not a preference.
+ * The composer builds each lifting day independently and holds no memory of the others, so a running
+ * counter threaded through it would not survive — any day must be able to answer "which grip" from
+ * what it already knows. `(week - 1) * daysPerWeek + dayPosition` satisfies that exactly.
+ *
+ * ⚠️ `daysPerWeek` IS THE CALLER'S, not a constant here. The programme does not own how many lifting
+ * days a block has; the block does. Passing it keeps this module from re-deciding the block's shape.
+ *
+ * @param week 1-based week number within the block.
+ * @param dayPosition 0-based position of this lifting day within the week.
  */
-export const LIFT_DAY_ORDER_FOR_GRIP = ['squat', 'bench', 'deadlift'] as const;
+export function gripForSession(week: number, dayPosition: number, daysPerWeek: number): GripVariant {
+  const w = Number.isFinite(week) && week >= 1 ? Math.floor(week) : 1;
+  const d = Number.isFinite(dayPosition) && dayPosition >= 0 ? Math.floor(dayPosition) : 0;
+  const perWeek = Number.isFinite(daysPerWeek) && daysPerWeek >= 1 ? Math.floor(daysPerWeek) : 1;
+  return GRIP_ROTATION[((w - 1) * perWeek + d) % GRIP_ROTATION.length];
+}
 
 export const GRIP_LABEL: Record<GripVariant, string> = {
   chin: 'underhand',
@@ -107,21 +122,77 @@ export function movementForGrip(grip: GripVariant): string {
 }
 
 /**
- * ⛔ WENDLER PRESCRIBES *SOME* LOW-REP WEIGHTED WORK, NOT A PERCENTAGE (Forever p.26). One day of the
- * four carries it, and it is still `weight: 'By feel'` — D-406 is not suspended for this feature.
- * The athlete adds what they can hold for the stated low reps; the app names no load.
+ * ⛔ WENDLER PRESCRIBES *SOME* LOW-REP WEIGHTED WORK, NOT A PERCENTAGE (Forever p.26). ONE lifting
+ * day a week carries it, and it is still `weight: 'By feel'` — D-406 is not suspended for this
+ * feature. The athlete adds what they can hold for the stated low reps; the app names no load.
  *
  * ⚠️ GATED ON CAPACITY. Adding weight to an athlete who cannot yet do a clean rep is not a harder
  * version of the same session, it is an impossible one.
+ *
+ * ⛔ NOT RE-POINTED AT THE GRIP ROTATION (§1h says so explicitly), and it is now indexed against
+ * `LIFT_DAYS` rather than against the deleted grip map — one day a week carries weight, and which
+ * GRIP that day uses is a separate question as of §1h. Value untouched at 2.
+ *
+ * ⛔ PINNED BY NAME — THE SQUAT DAY. Decided by Michael 2026-08-17, after the positional version
+ * drifted: this was `WEIGHTED_DAY_INDEX = 2`, a POSITION, and the day list changed length underneath
+ * it. Index 2 of `['press','bench','squat','deadlift']` was the squat day; slice 5 narrowed the list
+ * to `['squat','bench','deadlift']` and index 2 silently became the DEADLIFT + PRESS day — the
+ * heaviest session of the week picked up the weighted chin work with nobody choosing it. A name
+ * cannot drift when the list changes again.
+ *
+ * Squat day on the merits, not just by restoration: the weighted low-rep work belongs on a day that
+ * is NOT already carrying two main lifts, and of the two single-lift days the squat day's upper body
+ * is fresh.
  */
-export const WEIGHTED_DAY_INDEX = 2;
+// Typed as the literal rather than importing `LiftDay` — this module must not depend on the
+// catalog (see the one-way-import note at the grip rotation).
+export const WEIGHTED_DAY: 'squat' | 'bench' | 'deadlift' = 'squat';
 export const WEIGHTED_DAY_REPS = 5;
+
+/**
+ * ⛔ HOW MANY CHIN SESSIONS A WEEK CARRIES — three, because a Strong Focus block is three lifting
+ * days (§1f-0: Squat · Bench · Deadlift + Press) and the progression puts chins on every one.
+ *
+ * ⚠️ IT IS A CONSTANT HERE AND IT USED TO BE A PARAMETER, defaulting to 4. That default is the whole
+ * of §1h's first bug: fixing it alone would have changed nothing, because the callers passed a
+ * literal `4` past it. A divisor nobody can override cannot silently disagree with the block again.
+ */
+export const CHIN_SESSIONS_PER_WEEK = 3;
+
+/**
+ * ⛔ THE WEEKLY TOTAL IS THE ANCHOR AND IT IS HIT EXACTLY (2nd ed p.35 — "100 or more chins a week").
+ * 100 does not divide by 3, so the days are 33 · 33 · 34 and the remainder goes to the LAST day.
+ *
+ * ⚠️ THIS DELIBERATELY OVERRIDES THE ROUND-TO-FIVES RULE. `round5` exists so a dose "reads like a
+ * lifter's number", and applied here it turns 100/3 into 35 and the week into 105 — a rounder daily
+ * figure bought by missing the biological anchor. Hitting 100 wins. The rounding still governs the
+ * WEEKLY number (see `weeklyVolumeFor`); it just does not govern the split.
+ */
+function splitAcrossDays(weekly: number, days: number = CHIN_SESSIONS_PER_WEEK): number[] {
+  const n = Math.max(1, Math.floor(days));
+  const base = Math.floor(weekly / n);
+  const remainder = weekly - base * n;
+  // ⚠️ THE REMAINDER IS SPREAD ACROSS THE LAST DAYS, ONE REP EACH — NOT DUMPED ON THE LAST ONE.
+  // Dumping it works for 100 (`33·33·34`, remainder 1) and fails the moment the remainder is 2: the
+  // band on-ramp's 50 would come out `16·16·18`, an 18-rep day beside two 16s for no reason. Spread,
+  // it is `16·17·17` — same weekly total, and no two days ever differ by more than a single rep.
+  return Array.from({ length: n }, (_, i) => base + (i >= n - remainder ? 1 : 0));
+}
 
 export type PullupDose = {
   /** Total chin/pull reps prescribed across the block week. */
   weeklyVolume: number;
-  /** Per lifting day, from `weeklyVolume`. Rounded to fives so it reads like a lifter's number. */
-  perDay: number;
+  /**
+   * ⛔ THE EXACT PER-DAY SPLIT, ONE ENTRY PER LIFTING DAY, SUMMING TO `weeklyVolume` (§1h,
+   * 2026-08-17). It was a single rounded number and that is what lost 25 reps a week: the engine
+   * divided by FOUR while §1f-0 built THREE days, so a 100-rep prescription was delivered as 75 and
+   * nothing reported the shortfall.
+   *
+   * ⚠️ AN ARRAY, NOT A SCALAR, BECAUSE THE DAYS ARE NOT EQUAL. 100 does not divide by 3, so the
+   * split is 33 · 33 · 34 and the remainder lands on the last day. A scalar could only be one of
+   * those, and rounding it to a lifter's number is what turned 100/3 into 35 → 105.
+   */
+  perDay: number[];
   /** True when the athlete has no clean rep yet and the band on-ramp is the prescription (p.36). */
   assistedOnRamp: boolean;
   /** Why this dose — named, never a bare number. */
@@ -140,21 +211,20 @@ export type PullupDose = {
  * counted separately from clean reps so the progression cannot inflate. Prescribing nothing to the
  * athlete the on-ramp exists for would be the feature declining to serve its own entry case.
  */
-export function weeklyVolumeFor(pullupMaxReps: number | null | undefined, liftingDays = 4): PullupDose {
+export function weeklyVolumeFor(pullupMaxReps: number | null | undefined): PullupDose {
   // ⛔ `Number(null)` IS 0, AND ON THIS FIELD 0 IS A REAL ANSWER — so the null check has to come
   // FIRST or every untested athlete is read as a 0-rep athlete and put on the band on-ramp. This is
   // Q-102's trap ("0 is valid") biting from the other side, and the test that caught it stays.
   const cap = pullupMaxReps == null || !Number.isFinite(Number(pullupMaxReps))
     ? null
     : Math.max(0, Math.round(Number(pullupMaxReps)));
-  const days = Math.max(1, liftingDays);
   const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
 
   // No clean rep on file → the band on-ramp. Half the full dose: it is assisted work, and assisted
   // reps are cheaper per rep than clean ones.
   if (cap === 0) {
     const weekly = round5(WEEKLY_CHIN_VOLUME_TARGET / 2);
-    return { weeklyVolume: weekly, perDay: round5(weekly / days), assistedOnRamp: true, basis: 'on_ramp' };
+    return { weeklyVolume: weekly, perDay: splitAcrossDays(weekly), assistedOnRamp: true, basis: 'on_ramp' };
   }
 
   // Unknown capacity → the full dose. ⚠️ §0h: unknown degrades to UNCHANGED (the book's own number),
@@ -163,7 +233,7 @@ export function weeklyVolumeFor(pullupMaxReps: number | null | undefined, liftin
   if (cap == null || cap >= FULL_DOSE_CAPACITY) {
     return {
       weeklyVolume: WEEKLY_CHIN_VOLUME_TARGET,
-      perDay: round5(WEEKLY_CHIN_VOLUME_TARGET / days),
+      perDay: splitAcrossDays(WEEKLY_CHIN_VOLUME_TARGET),
       assistedOnRamp: false,
       basis: 'full_dose',
     };
@@ -171,7 +241,7 @@ export function weeklyVolumeFor(pullupMaxReps: number | null | undefined, liftin
 
   // 1..7 clean reps — scale linearly off capacity against the full-dose anchor.
   const weekly = round5((WEEKLY_CHIN_VOLUME_TARGET * cap) / FULL_DOSE_CAPACITY);
-  return { weeklyVolume: weekly, perDay: round5(weekly / days), assistedOnRamp: false, basis: 'scaled_to_capacity' };
+  return { weeklyVolume: weekly, perDay: splitAcrossDays(weekly), assistedOnRamp: false, basis: 'scaled_to_capacity' };
 }
 
 /** The sentence that names the evidence. Fact-first, no imperative, never a target to beat. */
