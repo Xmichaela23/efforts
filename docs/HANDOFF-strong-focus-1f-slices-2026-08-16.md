@@ -302,6 +302,47 @@ with two hard runs / two hard rides / one of each builds and places legally, the
 prints, one-or-none behaves exactly as before, and the suites hold the `1d9bfe9b` baseline
 (422/0 · 2957/3 · 682/3).
 
+## Slice 7 — the hard days become real training: threshold, assignment, progression (§7)
+
+**Decided by Michael 2026-08-17.** ⛔ **Work order §7 IS the instruction — read all of it, including
+the club-as-threshold block added 2026-08-17.** This is the largest slice so far. Summary:
+
+**1. The threshold session — does not exist in any form.** Both existing hard sessions are VO2
+(4×3 hills / flat run variants; 4×4 ride). Build the sustained one: 4×5 → 3×7 → 2×10 across each
+3-week wave, ~20 min in zone capped 30–40, run and ride variants.
+
+**2. The assignment.** 1 hard day → VO2 (the standing distance-oriented exception in §7 applies).
+2 days → one VO2 + one threshold, **never two VO2**. **Club days are ALWAYS the threshold slot:**
+2 days with one club → the app's day is VO2; 1 day and it is a club → the app prescribes NO
+intervals that block and the copy says what was traded; two clubs → no VO2, said honestly.
+
+**3. The progression.** Mirror the barbell's 3-week wave. VO2: reps static, progress pace OR
+density, one lever per wave. Threshold: lengthen the continuous effort. Light weeks delete the
+intervals (the run already does; the bike was fixed 2026-08-16). Anchor: shortest, fastest.
+⚠️ Neither session function takes a `week` argument today — same wiring job slice 4 did for grips.
+
+**4. The inputs — FEED, DO NOT REBUILD (§7 names this as the starved-input pattern).** Resolvers
+exist: `resolve-current-ftp.ts`, `resolve-current-run-pace.ts` (easy + threshold), `resolve-current-5k-pace.ts`
+— all in `src/lib`. `generate-strength-plan` currently resolves ONLY the easy pace. Plumb FTP and
+threshold pace through to the composer. ⛔ Do not write a new resolver.
+
+**5. The gate (Michael, 2026-08-16): no number, no offer.** An athlete without a baseline for the
+discipline is not shown the hard-day option for it — base miles instead. Screen-side gate plus an
+engine-side refusal, so the wire cannot smuggle one past the screen.
+
+**6. The screen cleanup (Michael, 2026-08-17, from the live screen).** The card stops selling
+mechanics and names what each day buys — the VO2 day as top-end speed, the threshold day as holding
+pace longer, the club day as "we build the week around it". Count-aware copy per §1i, and ⛔ still
+no §6 stacking promise.
+
+⛔ **OUT OF SCOPE: §6.** The stacking law, the engine collapse, week-optimizer rules. Hard days
+still keep their distance from lifting in this slice.
+
+**Done means:** a two-day athlete gets one VO2 and one threshold session that change across the
+wave, a club day gets placement and honest copy but no content, the gate hides the option when the
+number is missing, the screen names the benefit, and the suites hold the `011c2172` baseline
+(434/0 · 2969/3 · 683/3) plus whatever the new fixtures add.
+
 ## Order, and why
 
 1. ✅ **Slice 1** — done at `b130fb4d`.
