@@ -130,7 +130,7 @@ Deno.test('⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE, at the ligh
     assertEquals(squat[0].sets, 2, `week ${week} should carry the light jump dose`);
     const acc = (squat as any[]).filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'));
     assertEquals(acc.length, 3, `week ${week} should carry three assistance slots`);
-    for (const r of acc) assertEquals(r.reps, '25 total', `week ${week}: ${r.name}`);
+    for (const r of acc) assertEquals(r.reps, '40 total', `week ${week}: ${r.name}`);
   }
 });
 
@@ -337,13 +337,10 @@ Deno.test('a work session is jumps → main lift → the phase\u2019s rep total 
   // ⛔ A REP TOTAL, NOT A SET. Was `assertEquals(r.reps, 25)` alongside `sets: 1`, which rendered as
   // "1×25" and asserted a single set of twenty-five the prescription never asked for. The number is
   // unchanged; what is asserted now is that the row makes no claim about how it is performed.
-  // ⛔ 50 — WEEK 1 IS A LEADER WEEK AGAIN (2026-08-16: the opening TM-test week was dropped, so the
-  // block opens on cycle 1). The leader band is 50-75 and the anchor band is 75-100; this athlete
-  // has no tested capacity, so each slot sits at its band's floor.
-  // ⚠️ §1g of the 2026-08-16 work order narrows every band to 25-50 keyed on COMPETING STRESS
-  // rather than on the cycle phase. Not built yet — when it lands, this number moves again.
+  // ⛔ 40 — THE BAND IS SET BY COMPETING STRESS (§1g, 2026-08-16). This plan carries no hard
+  // endurance day, so it takes the 40-50 band, and with no tested capacity every slot sits at 40.
   for (const r of rows.slice(3) as any[]) {
-    assertEquals(r.reps, '50 total');
+    assertEquals(r.reps, '40 total');
     assertEquals(r.sets, undefined, `${r.name} carries a set count it was never prescribed`);
     assertEquals(r.load_prescribed, false, `${r.name} must carry no prescribed load`);
   }

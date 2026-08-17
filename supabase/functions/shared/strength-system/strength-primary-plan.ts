@@ -2667,7 +2667,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const cycleAssistance = assistanceRows(args.assistancePicks, {
         pullupMaxReps: args.pullupMaxReps,
         strengthPosture: args.blockShape?.strengthPosture,
-        cycleKind: assistancePhase,
+        // ⛔ COMPETING STRESS, NOT THE CYCLE PHASE (2026-08-16, §1g). The band is set by how much
+        // hard endurance the week carries; the phase no longer touches the assistance total.
+        // ⚠️ ONE hard day is the most this block can carry today — a second is §1i, not built.
+        hardEnduranceDays: hardPin ? 1 : 0,
       }, lift.name, args.oneRepMaxes, args.athleteEquipment);
       const jumps = jumpsFor(assistancePhase);
       // ⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE — CHANGED 2026-08-15 (§1a/§1c).

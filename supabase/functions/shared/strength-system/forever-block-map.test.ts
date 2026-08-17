@@ -157,16 +157,14 @@ Deno.test('⛔ THE ASSISTANCE BAND FOLLOWS THE PHASE — leaders light, anchor h
   const totals = (week: number, lift: string) => rowsFor(PLAN, week, lift)
     .filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'))
     .map((r) => String(r.reps));
-  // ⛔ THE THREE BANDS, and every page is verified in `REFERENCE-531-forever-pp16-45.md`:
-  //   7th week / TM test  25-50  (p.23)      leader  50-75  (p.24 floor, p.18 "less")
-  //   anchor              75-100 (p.24)      ...all clamped at 75 for a concurrent athlete — OURS.
-  // This athlete has no tested capacity, so every slot sits at its band's floor.
-  const EXPECTED: Record<number, string> = {
-    4: '25 total', 8: '25 total', 12: '25 total',                       // standalone weeks
-    1: '50 total', 2: '50 total', 3: '50 total',                        // leader 1
-    5: '50 total', 6: '50 total', 7: '50 total',                        // leader 2
-    9: '75 total', 10: '75 total', 11: '75 total',                      // anchor
-  };
+  // ⛔ REWRITTEN 2026-08-16 (§1g): THE BAND IS SET BY COMPETING STRESS, NOT BY THE CYCLE PHASE.
+  //   0 hard endurance days → 40-50 · 1 → 30-40 · 2 → 25-30. Whole block capped at 50, which is
+  //   OURS and a deliberate step below Wendler's 50-100 base (p.24) for a concurrent athlete.
+  // This plan carries no hard day and no tested capacity, so every slot sits at 40 all block.
+  const FLAT = '40 total';
+  const EXPECTED: Record<number, string> = Object.fromEntries(
+    Array.from({ length: 12 }, (_, i) => [i + 1, FLAT]),
+  );
   for (let week = 1; week <= 12; week++) {
     for (const lift of LIFTS) {
       const t = totals(week, lift);

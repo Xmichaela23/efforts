@@ -73,62 +73,59 @@ export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
 // option object held, plus what the per-day picker needs.
 
 /**
- * ⛔ THE BAND IS PER PHASE, AND ITS DIRECTION REVERSED ON 2026-08-15. READ THIS BEFORE CHANGING A
- * NUMBER. Every page below is verified in `docs/REFERENCE-531-forever-pp16-45.md`.
+ * ⛔⛔ REWRITTEN 2026-08-16 — THE BAND IS SET BY COMPETING STRESS, NOT BY THE CYCLE PHASE.
  *
- * ⚠️ **WHAT WAS HERE AND WAS BACKWARDS:** one 50–75 band for the whole block, with the ANCHOR pinned
- * at the floor — *"volume comes down when the bar goes up"* — and the LEADER free to climb. That is
- * the opposite of **Forever p.18**, which scales assistance and jumps the other way: a leader is the
- * easier month and carries LESS assistance; an anchor is the hard month and carries MORE.
- * (The reasoning behind the old direction was ours and it was plausible; the book is not silent on
- * it, so the book wins.)
+ * **What stood here and is gone:** three phase-keyed bands (7th week 25-50, leader 50-75, anchor
+ * 75-100), scaled UP into the anchor per Forever p.18. Correct for a lifter whose whole recovery
+ * budget goes to the barbell; wrong for this athlete.
  *
- * ⛔⛔ **THESE NUMBERS DEVIATE FROM THE WORK ORDER'S §1a, DELIBERATELY, BECAUSE THE PAGE-PINNED
- * READING SAYS OTHERWISE.** The work order specified leaders at 25–50 and anchors at 50–100. The
- * reference doc — which is the transcription the work order was itself derived from — reads:
- *   · **p.24: the BASE recommendation is 50–100 total reps per category per workout.**
- *   · **p.23: 25–50 is the SEVENTH WEEK's number**, not a leader's.
- * So 25–50 belongs to the light standalone weeks, and leader-vs-anchor is a split INSIDE 50–100.
- * ⚠️ If Michael intended the work order's numbers over the page reading, this is the one block to
- * change and it is three constants.
+ * ⛔ **MICHAEL'S CALL, 2026-08-16, AND IT IS A DELIBERATE STEP BELOW WENDLER.** His base is 50-100
+ * per category per session (p.24). *"For an athlete carrying an endurance load, pushing 100 reps of
+ * accessory volume will fry their central nervous system. Cap it at 50, even in the easier months."*
+ * **Cite 25-50 as OURS.** On the page, 25-50 is the seventh week's number (p.23), not a general one.
  *
- * ⛔ THE BANDS, AND WHAT IS HIS VERSUS OURS:
+ * ⛔ **AND THE AXIS CHANGED, NOT JUST THE NUMBERS.** What decides the band is how much hard
+ * endurance the week carries — the thing actually competing for recovery:
  *
- * | phase | band | source |
- * |---|---|---|
- * | 7th-week | 25–50 | **his** — Forever p.23, and "less intensive movements" on the same page |
- * | leader   | 50–75 | **his floor** (p.24) + p.18's "less assistance"; the split point is ours |
- * | anchor   | 75–100 | **his ceiling** (p.24) + p.18's "more assistance" |
+ * | hard endurance days | band  |
+ * |---------------------|-------|
+ * | 2                   | 25-30 |
+ * | 1                   | 30-40 |
+ * | 0                   | 40-50 |
  *
- * ⛔ **AND WE CLAMP EVERYTHING AT 75, WHICH IS OURS, NOT HIS (T3).** His anchor runs to 100. This
- * block is written for an athlete carrying endurance training underneath it, and 100 reps per slot on
- * top of a 95%-and-rep-out main lift spends a fatigue budget the running needs. 75 is the ceiling the
- * engine already ran on and the top of the Triumvirate's own band (2nd ed. p.48: Dips 5×15 = 75).
- * **Consequence, stated rather than hidden: the anchor sits at a flat 75.** A leader with a big
- * tested capacity can reach the same number — the direction is never inverted, but the two can meet.
+ * ⚠️ **TWO AXES, AND THEY COMPOSE.** Competing stress picks the BAND; the athlete's tested capacity
+ * picks where in it they sit (`assistanceTotalReps`, unchanged in shape). Keying the number on the
+ * hard-day count ALONE would throw away the one real measurement on file.
  *
- * ⚠️ THE 2ND-EDITION READING THAT SET THE OLD FLOOR STILL STANDS — Triumvirate (p.48) 50–75,
- * Bodyweight (p.52) "no less than 75 per exercise". Those are anchor-shaped templates, and they sit
- * inside the same 50–100 base. Nothing here retracts them.
+ * ⚠️ **CONSEQUENCE, STATED RATHER THAN HIDDEN: the leader-vs-anchor direction is GONE, not
+ * reversed.** It was fixed on 2026-08-15 (p.18) after running backwards, and one flat band removes
+ * it entirely. That is the defensible answer for a capped band, but D-432 must be back-annotated or
+ * it reads as the fix regressing.
  *
- * ⚠️ AND THE DERIVATION IS UNEVEN ON PURPOSE. `pullupMaxReps` exists on `performance_numbers`; there
- * is no push or single-leg equivalent. Rather than wait for all three, each slot scales on whatever
- * it actually has and **the copy says which** — "scaled to your tested N reps" versus "the default
- * floor, no capacity on file". Same rule as everywhere else: cite the evidence you have, stay silent
- * where you do not. Adding a push capacity later upgrades one slot without touching the model.
+ * ⛔ **AND IT IS A REP TOTAL, NEVER A SET SCHEME.** Michael, 2026-08-16: *"it's never 25 reps in a
+ * row — accessory work including pull-ups per Wendler should be broken out at user ease of reps."*
+ * Confirmed against the source: a total per category per session, one or two movements, split
+ * however the athlete likes; chins explicitly tolerate low reps per set, and his own 100-rep dip
+ * example is split in two. The card gets a number, never sets x reps.
  */
-export const ASSISTANCE_TOTAL_REPS_FLOOR = 50;
-export const ASSISTANCE_TOTAL_REPS_CEILING = 75;
+export const ASSISTANCE_BAND_BY_HARD_DAYS: Readonly<Record<number, readonly [number, number]>> = {
+  0: [40, 50],
+  1: [30, 40],
+  2: [25, 30],
+};
 
-/** Forever p.23 — the SEVENTH WEEK's band. Not a leader's; see the correction above. */
-export const ASSISTANCE_SEVENTH_FLOOR = 25;
-export const ASSISTANCE_SEVENTH_CEILING = 50;
+/** The floor of the lightest band and the ceiling of the heaviest — the whole block lives in here. */
+export const ASSISTANCE_TOTAL_REPS_FLOOR = 25;
+export const ASSISTANCE_TOTAL_REPS_CEILING = 50;
 
 /**
- * ⛔ HIS BASE RANGE TOPS OUT AT 100 (p.24) AND WE DO NOT USE IT. Kept as a named constant so the
- * deviation is legible rather than looking like a forgotten number. See the band table above.
+ * ⛔ THE MERGED DEADLIFT + PRESS DAY SITS AT 25, whatever the week's band. Two main lifts on one day
+ * is the heaviest session in the block; the floor is what makes an open push slot safe there.
+ * ⚠️ Not wired until the three-card picker lands (§1f) — the composer has nowhere to say "this is
+ * the merged day" yet.
  */
-export const ASSISTANCE_ANCHOR_CEILING_WENDLER = 100;
+export const ASSISTANCE_MERGED_DAY_REPS = 25;
+
 
 /**
  * ⛔ REMOVED 2026-08-15, MICHAEL'S CALL: *"whatever Wendler says."* A 75 clamp stood here — ours, not
@@ -214,8 +211,12 @@ export type AssistanceScaleInputs = {
   hangingLegRaiseMaxReps?: number | null;
   /** `develop` earns more than `maintain`. */
   strengthPosture?: string | null;
-  /** ⛔ VOLUME GOES UP WHEN THE BAR GOES UP — Forever p.18. Anchors carry the most. */
-  cycleKind?: AssistancePhase | null;
+  /**
+   * ⛔ HOW MANY HARD ENDURANCE DAYS THE WEEK CARRIES — 0, 1 or 2. This is what picks the band
+   * (2026-08-16). Absent reads as 1, the middle band: an unknown week is not licence to prescribe
+   * the heaviest one, and treating it as 0 would hand a busy athlete the ceiling.
+   */
+  hardEnduranceDays?: number | null;
 };
 
 /**
@@ -231,15 +232,14 @@ function capacityFor(slot: AssistanceSlot, inputs?: AssistanceScaleInputs): numb
   return typeof raw === 'number' && raw > 0 ? raw : null;
 }
 
-/** The band for a phase: [floor, ceiling], AFTER our concurrent-athlete clamp. */
-function bandFor(phase: AssistancePhase | null | undefined): [number, number] {
-  if (phase === 'seventh') return [ASSISTANCE_SEVENTH_FLOOR, ASSISTANCE_SEVENTH_CEILING];
-  if (phase === 'anchor') {
-    return [ASSISTANCE_TOTAL_REPS_CEILING, ASSISTANCE_ANCHOR_CEILING_WENDLER];
-  }
-  // ⚠️ ABSENT PHASE READS AS A LEADER, and that is the conservative direction: the lighter of the two
-  // cycle bands. An unknown week is not licence to prescribe the heavy one (§0h).
-  return [ASSISTANCE_TOTAL_REPS_FLOOR, ASSISTANCE_TOTAL_REPS_CEILING];
+/** The band for a week: [floor, ceiling], picked by how much hard endurance competes with it. */
+function bandFor(hardEnduranceDays: number | null | undefined): readonly [number, number] {
+  const n = Number(hardEnduranceDays);
+  // ⚠️ ABSENT READS AS ONE, the middle band. Unknown is not licence to prescribe the heaviest, and
+  // reading it as zero would hand the busiest athlete the ceiling (§0h).
+  if (!Number.isFinite(n)) return ASSISTANCE_BAND_BY_HARD_DAYS[1];
+  const clamped = Math.max(0, Math.min(2, Math.round(n)));
+  return ASSISTANCE_BAND_BY_HARD_DAYS[clamped];
 }
 
 /**
@@ -259,7 +259,7 @@ export function assistanceTotalReps(
   slot: AssistanceSlot,
   inputs?: AssistanceScaleInputs,
 ): { totalReps: number; basis: 'capacity' | 'posture' | 'floor' } {
-  const [floor, ceiling] = bandFor(inputs?.cycleKind);
+  const [floor, ceiling] = bandFor(inputs?.hardEnduranceDays);
   const developing = (inputs?.strengthPosture ?? 'develop') === 'develop';
 
   // ⛔ EVERY SLOT SCALES ON THE SAME RULE NOW (§1f) — it just has an input for one of the three. A

@@ -36,9 +36,7 @@ import {
   assistanceTotalReps,
   ASSISTANCE_TOTAL_REPS_FLOOR,
   ASSISTANCE_TOTAL_REPS_CEILING,
-  ASSISTANCE_SEVENTH_FLOOR,
-  ASSISTANCE_SEVENTH_CEILING,
-  ASSISTANCE_ANCHOR_CEILING_WENDLER,
+  ASSISTANCE_BAND_BY_HARD_DAYS,
   assistanceBasisNote,
   CAPACITY_STANDARD,
 } from '../../../../src/lib/assistance-menu.ts';
@@ -410,35 +408,32 @@ Deno.test('an abs pick that is not an abs movement is refused', () => {
 
 // ── REP SCALING: kept through D-407 ───────────────────────────────────────────────────────────────
 
-Deno.test('REGRESSION \u2014 the bands are Wendler\u2019s, unclamped', () => {
-  // ⛔ THE CLAMP IS GONE (2026-08-15, Michael: "whatever Wendler says"). It was ours, it collapsed the
-  // anchor onto a flat 75, and a well-tested leader could reach the same number — erasing the very
-  // leader-vs-anchor direction this file had just been fixed to show.
-  assertEquals(ASSISTANCE_TOTAL_REPS_FLOOR, 50);            // Forever p.24, his base floor
-  assertEquals(ASSISTANCE_TOTAL_REPS_CEILING, 75);          // the leader/anchor split point, ours
-  assertEquals(ASSISTANCE_ANCHOR_CEILING_WENDLER, 100);     // Forever p.24, his base ceiling
-  assertEquals(ASSISTANCE_SEVENTH_FLOOR, 25);               // Forever p.23, the 7th week
-  assertEquals(ASSISTANCE_SEVENTH_CEILING, 50);
+Deno.test('REGRESSION \u2014 the whole block lives inside 25-50, and it is OURS', () => {
+  // ⛔ REWRITTEN 2026-08-16 (§1g). The phase-keyed bands are gone. Michael: *"for an athlete carrying
+  // an endurance load, pushing 100 reps of accessory volume will fry their CNS. Cap it at 50, even in
+  // the easier months."* His base is 50-100 (p.24); 25-50 is p.23's SEVENTH-WEEK number. So the whole
+  // range is a deliberate step below him and must be cited as ours.
+  assertEquals(ASSISTANCE_TOTAL_REPS_FLOOR, 25);
+  assertEquals(ASSISTANCE_TOTAL_REPS_CEILING, 50);
+  assertEquals(ASSISTANCE_BAND_BY_HARD_DAYS[0], [40, 50]);
+  assertEquals(ASSISTANCE_BAND_BY_HARD_DAYS[1], [30, 40]);
+  assertEquals(ASSISTANCE_BAND_BY_HARD_DAYS[2], [25, 30]);
 });
 
-Deno.test('⛔ THE DIRECTION IS ANCHOR-HEAVY, NOT LEADER-HEAVY — Forever p.18', () => {
-  // ⛔ THIS TEST REPLACES "an anchor cycle holds the floor whatever the capacity says", which pinned
-  // the OPPOSITE and was the bug. Leaders are the easier month and carry LESS.
-  //
-  // ⛔ AND THE BANDS ARE THE PAGE-PINNED READING, NOT THE WORK ORDER'S §1a. The work order said
-  // leaders 25-50; `REFERENCE-531-forever-pp16-45.md` reads p.24's BASE as 50-100 and p.23's 25-50 as
-  // the SEVENTH WEEK's number. So 25-50 is the light standalone week and leader-vs-anchor splits
-  // 50-100 — UNCLAMPED, his numbers (2026-08-15, Michael: "whatever Wendler says").
-  assertEquals(assistanceTotalReps('push', { cycleKind: 'seventh' }).totalReps, 25);
-  assertEquals(assistanceTotalReps('push', { cycleKind: 'leader' }).totalReps, 50);
-  assertEquals(assistanceTotalReps('push', { cycleKind: 'anchor' }).totalReps, 75);
-  // ⛔ THE BANDS CAN NO LONGER MEET, AND THAT IS THE POINT OF REMOVING THE CLAMP. A maxed-out leader
-  // tops out at 75 — the anchor's FLOOR — so the anchor is always ≥ the leader and a well-tested
-  // athlete still sees the direction. Under the old 75 clamp both of these read 75.
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, cycleKind: 'leader' }).totalReps, 75);
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, cycleKind: 'anchor' }).totalReps, 100);
-  // An unknown phase reads as the LIGHTER cycle band — unknown is never licence to prescribe heavy.
-  assertEquals(assistanceTotalReps('push').totalReps, 50);
+Deno.test('⛔ THE BAND IS SET BY COMPETING STRESS, NOT BY THE CYCLE PHASE (§1g)', () => {
+  // ⛔ THIS REPLACES "the direction is anchor-heavy" (p.18), which replaced "the anchor holds the
+  // floor". Both were arguments about the CYCLE. The axis is now what actually competes for
+  // recovery — how much hard endurance the week carries — and the cycle phase no longer touches the
+  // assistance total at all. The p.18 direction is GONE, not reversed; D-432 needs back-annotating.
+  assertEquals(assistanceTotalReps('push', { hardEnduranceDays: 0 }).totalReps, 40);
+  assertEquals(assistanceTotalReps('push', { hardEnduranceDays: 1 }).totalReps, 30);
+  assertEquals(assistanceTotalReps('push', { hardEnduranceDays: 2 }).totalReps, 25);
+  // Tested capacity still moves the athlete WITHIN their band — two axes, composing.
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, hardEnduranceDays: 0 }).totalReps, 50);
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, hardEnduranceDays: 2 }).totalReps, 30);
+  // An unknown week reads as ONE hard day — the middle band. Unknown is never licence to prescribe
+  // the heaviest, and reading it as zero would hand the busiest athlete the ceiling.
+  assertEquals(assistanceTotalReps('push').totalReps, 30);
 });
 
 Deno.test('⛔ EVERY SLOT SCALES ON ONE RULE, off Wendler\u2019s own standards (§1f)', () => {
@@ -449,24 +444,26 @@ Deno.test('⛔ EVERY SLOT SCALES ON ONE RULE, off Wendler\u2019s own standards (
   assertEquals(CAPACITY_STANDARD.pull, 50);
   assertEquals(CAPACITY_STANDARD.single_leg_core, 50);
 
-  // ⛔ THE PULL SLOT IS BYTE-IDENTICAL TO BEFORE §1f. That is the behaviour-unchanged proof.
-  // ⚠️ READ ON A LEADER WEEK, because the anchor is flat at our 75 clamp and has no room to show a
-  // curve. The rule is the same on every band; only the band moves.
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 8, cycleKind: 'leader' }).totalReps, 50);
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 12, cycleKind: 'leader' }).totalReps, 60);
-  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, cycleKind: 'leader' }).totalReps, 75);
+  // ⛔ THE RULE IS UNCHANGED; THE BAND IT WALKS IS NARROWER (§1g, 2026-08-16). Same anchor (8 reps
+  // sits at the floor), same slope (three reps of volume per rep of capacity), same rounding — but
+  // the widest band is now 40-50, so the curve reaches its ceiling almost immediately.
+  // ⚠️ CONSEQUENCE, STATED: capacity buys far less than it used to. On the 40-50 band a 12-rep chin
+  // max already tops the slot out. That is the price of the cap, not a bug in the scaling.
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 8, hardEnduranceDays: 0 }).totalReps, 40);
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 12, hardEnduranceDays: 0 }).totalReps, 50);
+  assertEquals(assistanceTotalReps('pull', { pullupMaxReps: 30, hardEnduranceDays: 0 }).totalReps, 50);
 
   // Push reads twice the standard, so it needs twice the reps to buy the same volume.
-  assertEquals(assistanceTotalReps('push', { pushupMaxReps: 16, cycleKind: 'leader' }).totalReps, 50);
-  assertEquals(assistanceTotalReps('push', { pushupMaxReps: 24, cycleKind: 'leader' }).totalReps, 60);
+  assertEquals(assistanceTotalReps('push', { pushupMaxReps: 16, hardEnduranceDays: 0 }).totalReps, 40);
+  assertEquals(assistanceTotalReps('push', { pushupMaxReps: 24, hardEnduranceDays: 0 }).totalReps, 50);
 
   // Core shares the chin's standard, so it shares the chin's curve.
-  assertEquals(assistanceTotalReps('single_leg_core', { hangingLegRaiseMaxReps: 12, cycleKind: 'leader' }).totalReps, 60);
+  assertEquals(assistanceTotalReps('single_leg_core', { hangingLegRaiseMaxReps: 12, hardEnduranceDays: 0 }).totalReps, 50);
 
   // ⛔ ABSENT IS THE FLOOR AND THE COPY SAYS WHICH — nothing writes push or core capacity today, and
   // that must read as "we have not asked", never as a tested zero.
-  assertEquals(assistanceTotalReps('push', { cycleKind: 'leader' }).basis, 'posture');
-  assertEquals(assistanceTotalReps('push', { pushupMaxReps: 0, cycleKind: 'leader' }).totalReps, 50);
+  assertEquals(assistanceTotalReps('push', { hardEnduranceDays: 0 }).basis, 'posture');
+  assertEquals(assistanceTotalReps('push', { pushupMaxReps: 0, hardEnduranceDays: 0 }).totalReps, 40);
   assertEquals(assistanceBasisNote('posture'), 'No tested capacity on file for this movement, so this is the default floor.');
 });
 
@@ -475,12 +472,13 @@ Deno.test('⛔ THE CAPACITY SCALING SURVIVED THE MODEL CHANGE — the mock\'s fl
   const plan = composeStrengthPrimaryPlan({ ...base, pullupMaxReps: 25 } as any);
   const pulls = assistanceRowsOf(plan).filter((r: any) => catalogEntry(r.name)?.category === 'pull');
   assertEquals(pulls.length > 0, true, 'no pull rows in the block');
-  assertEquals(pulls.some((r: any) => r.reps === '75 total'), true,
-    'a tested 25-rep capacity did not move the pull slot to its ceiling');
-  // ⚠️ AND THE LIGHT WEEKS ARE STILL LOWER — a 25-rep capacity tops their 25-50 band out at 50,
-  // which is the anchor's FLOOR. Direction preserved, and the capacity is spent on both.
+  // ⚠️ 50, NOT 75 (§1g, 2026-08-16): this plan carries no hard endurance day, so the band is 40-50
+  // and a tested 25-rep capacity tops the slot out at 50 rather than climbing to the old 75.
   assertEquals(pulls.some((r: any) => r.reps === '50 total'), true,
-    'the light standalone weeks should top out at their own ceiling, below the anchor');
+    'a tested 25-rep capacity did not move the pull slot to its band ceiling');
+  // ⛔ AND EVERY WEEK READS THE SAME NOW. The cycle phase no longer touches the assistance total, so
+  // there is no light-week/anchor difference left to assert — competing stress is the only axis.
+  assertEquals(new Set(pulls.map((r: any) => r.reps)), new Set(['50 total']));
 });
 
 // ── THE COMPOSER ──────────────────────────────────────────────────────────────────────────────────
