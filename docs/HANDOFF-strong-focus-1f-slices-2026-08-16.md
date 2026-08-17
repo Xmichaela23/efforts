@@ -343,6 +343,40 @@ wave, a club day gets placement and honest copy but no content, the gate hides t
 number is missing, the screen names the benefit, and the suites hold the `011c2172` baseline
 (434/0 · 2969/3 · 683/3) plus whatever the new fixtures add.
 
+## Slice 8 — the engine proposes the hard days; the athlete moves them (§1i placement model)
+
+**Decided by Michael 2026-08-17, from the live screen** — recorded in the work order under §1i
+("PRESCRIBED HARD DAYS ARE PLACED BY THE ENGINE, NOT ASSEMBLED"). Read that block first.
+
+**The model.** Prescribed hard days arrive pre-placed: the screen renders the week with the
+engine's proposed day(s) already lit, and a tap moves one to another legal day. Nothing is
+assembled from parts, so the half-configured error state ("a hard session has a discipline but no
+day") is deleted, not re-worded. A club day keeps the current ask — sport + day from the athlete —
+because only they know when the club meets.
+
+**Where the proposal comes from.** The engine already places a pinned hard day legally; the
+proposal is the same machinery asked forward: "given this week's anchors and lifts, which day(s)
+would you put the hard sessions on?" ⛔ Do NOT invent a second placement scorer for the proposal —
+ask `place-week`/`week-solver` the question the composer already answers, and surface its answer.
+⚠️ Trace first: the wire currently carries athlete-chosen days (`hard_days[].day`). The proposal
+flow means the client needs the engine's suggestion BEFORE plan generation — decide whether that is
+a light preview call to the existing solver or a client-side read of the same rule, and say which
+in the report. Smart-server/dumb-client leans preview call.
+
+**The gate (§7) composes:** a sport with no number offers no hard-day proposal at all.
+
+**Defaults per count:** engine proposes per §7's assignment — 1 day → the VO2 day; athlete adds a
+second → threshold appears with it. Removing both is two taps. One-or-none must stay exactly as
+easy to reach as it is today.
+
+⛔ **OUT OF SCOPE: §6.** The proposal uses today's keep-distance placement. When §6 ships, the
+proposal's preferred days change to the heavy leg days with NO screen change — that is the point of
+the model.
+
+**Done means:** a new athlete reaching the schedule screen sees hard days already placed (or a
+clean empty state when gated), can move each with one tap, can mark one as a club with sport + day,
+the error line is gone, and the suites hold the `a9d3f0da` baseline (452/0 · 2987/3 · 683/3).
+
 ## Order, and why
 
 1. ✅ **Slice 1** — done at `b130fb4d`.

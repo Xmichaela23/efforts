@@ -458,6 +458,20 @@ the rules that only exist in `week-optimizer` (the consolidated-mode gate, the q
 quality-ride block) have to move to `week-solver` as part of §6, and the `week-optimizer` copies
 deleted. **Do not implement the same rule in both.**
 
+### ⛔ PRESCRIBED HARD DAYS ARE PLACED BY THE ENGINE, NOT ASSEMBLED — decided by Michael 2026-08-17
+Seen on the live §1i screen: the athlete assembles a hard day from parts (sport, then day, then
+ownership), and a half-assembled state produces an error line under the Continue button. Wrong
+model. The split:
+
+- **Ours to write → ours to place.** The engine proposes the hard days — the screen shows the week
+  with them already lit, and a tap MOVES one, never builds one from nothing. A default is never
+  half-finished, so the "has a discipline but no day" state stops existing.
+- **A club session stays a question** — only the athlete knows when the club meets. Day + sport are
+  their answer; everything else about it is ours (it is the threshold slot, per §7).
+- Same pattern as strength: engine-designed default, athlete adjusts after. And it pre-wires §6 —
+  when stacking ships, "where the engine prefers" becomes the heavy leg days, and an athlete who
+  never touches the defaults gets the best arrangement automatically.
+
 ### ⛔ ONE SLOT IS DOING TWO JOBS — the hard day vs the club session
 **Raised by Michael 2026-08-16.** Today the hard day and the club session are **the same input, on
 purpose** — `strength-primary-plan.ts:1633`: *"the hard day IS the club day; there is no separate
