@@ -1,8 +1,17 @@
 # HANDOFF — finishing §1f, in four slices (2026-08-16)
 
-**Parent:** `docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` §1f / §1f-0 / §1f-1.
+**Parent:** `docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` §1f / §1f-0 / §1f-1 / **§1h**.
 **Roles:** Michael is the architect. The chat holds this plan. **Each slice below is one terminal
 session** — take one, finish it, stop. Do not merge two.
+
+⛔ **THE WORK ORDER IS THE INSTRUCTION; THIS FILE IS THE ORDER AND THE STATE.** Where a slice names a
+work-order section, open it — the section carries the decisions and the sourcing, and this file
+deliberately does not repeat them.
+
+⚠️ **SLICES 2 AND 4 BOTH USED TO TOUCH `NonRaceBuilder.tsx:3304-3312`.** They no longer do: the
+wizard's pull-up dose note moved wholly into **slice 2**, and slice 4 is engine and library only. Keep
+it that way — slice 2 rewrites that whole region, so a second session editing it would be working off
+line numbers that have already moved.
 
 ---
 
@@ -115,9 +124,16 @@ itself**, the work order's guess that it would was wrong; every one needs a hand
 ⚠️ `src/lib/strength-focus-copy.shape.test.ts:42` **pins the wrong sentence**, so the test currently
 enforces the error. It changes with the copy.
 
+**And the wizard's pull-up dose note, which is §1h's but lives in this file.**
+`NonRaceBuilder.tsx:3307` and `:3309` call `weeklyVolumeFor(pullupMaxReps, 4)` with a hardcoded 4.
+Drop the argument so the note reads whatever the library now splits three ways. ⚠️ **This is here and
+NOT in slice 4 on purpose** — it sits at `:3304-3312`, inside the block this slice rewrites, and two
+sessions editing the same lines is how the line numbers in this document stop being true. Slice 4
+owns the library and the engine; this slice owns every line of `NonRaceBuilder.tsx`.
+
 **Done means:** the wizard is 8 steps, three accessory cards, no "four lifting days" or "all four
-days" anywhere in `src`, the deadlift+press pairing named correctly, and `src` back to its 3
-standing failures.
+days" anywhere in `src`, the deadlift+press pairing named correctly, the dose note passing no
+hardcoded 4, and `src` back to its 3 standing failures.
 
 ---
 
@@ -150,8 +166,12 @@ nothing here is an open question any more. Summary only:
 **The divisor.** 100 a week ÷ 4 days, with only 3 days built → the athlete gets **75**. Verified, not
 suspected. Weekly 100 holds; the split becomes **33 · 33 · 34**, and that overrides the round-to-fives
 rule at `pullup-progression.ts:138` on purpose. Fixing the default at `:130` alone changes nothing —
-**three callers pass a literal `4`**: `strength-primary-plan.ts:582` (the engine),
-`NonRaceBuilder.tsx:3307` and `:3309`, plus `pullup-progression.test.ts:55, 65, 75, 83, 91`.
+callers pass a literal `4`: `strength-primary-plan.ts:582` (**the engine**) and
+`pullup-progression.test.ts:55, 65, 75, 83, 91`.
+
+⚠️ **`NonRaceBuilder.tsx:3307` and `:3309` PASS THE SAME LITERAL `4` AND ARE SLICE 2'S**, not yours —
+they sit inside the block slice 2 rewrites. If slice 2 has already run, confirm they were done; if it
+has not, leave them.
 
 **The grip.** Underhand was mapped to the press day, which no longer exists, so three days build
 overhand · neutral · wide and **the chin-up progression never prescribes a chin-up.** Fix is
