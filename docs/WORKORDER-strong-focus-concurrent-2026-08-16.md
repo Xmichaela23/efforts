@@ -276,8 +276,8 @@ athlete gets ~15 a day on three days, below the assistance band's floor. That is
 for a movement someone cannot yet perform one clean rep of is a wall, not a floor. The progression
 is the pull slot when it is on; the band governs slot picks, not the progression.
 
-⚠️ **Legacy four-day blocks exist** (every block before this). `rematerialize-strength-block` must
-not choke on one. Pre-launch, one athlete — small, but name it rather than discover it.
+> ⛔ **DROPPED 2026-08-17, Michael:** no legacy tolerance. Three days is the only shape offered;
+> the one existing four-day block (his own) is deleted and rebuilt, not protected.
 
 ### 1f-1. The stale copy, which is live and wrong TODAY
 Independent of everything else in this work order — these are wrong right now, since yesterday's

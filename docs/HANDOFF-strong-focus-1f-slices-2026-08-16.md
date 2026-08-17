@@ -163,9 +163,10 @@ hardcoded 4, and `src` back to its 3 standing failures.
 `supabase/functions/create-goal-and-materialize-plan/index.ts:2743-2744` (the conditional
 `lifting_days: 3` write).
 
-⚠️ **LEGACY FOUR-DAY BLOCKS EXIST** — every block built before today. `rematerialize-strength-block`
-must not choke on one. Pre-launch with one athlete this is small, but **name it rather than discover
-it.**
+⛔ **NO LEGACY SUPPORT — decided by Michael 2026-08-17.** The work order's line about
+`rematerialize-strength-block` tolerating old four-day blocks is DROPPED. Three days is the only
+shape offered; Michael's own four-day block gets deleted and rebuilt, not protected. **Do not write
+a tolerance path, and if one exists, do not extend it.**
 
 ⛔ **THE `_shared` DEPLOY TRAP APPLIES.** See `CLAUDE.md`. Editing a shared file changes nothing in
 production until every function importing it is redeployed. Find them with
