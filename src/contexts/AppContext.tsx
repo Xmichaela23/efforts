@@ -4,6 +4,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
+import { deriveFiveKPaceFromRaceTime } from '@/lib/resolve-current-5k-pace';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
@@ -312,21 +313,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const userId = getStoredUserId();
       if (!userId) throw new Error('User must be authenticated to save baselines');
-      // Ensure performance_numbers contains explicit fiveK_pace if only 5K race time was entered
+      // Derive `fiveK_pace` from the 5K race TIME the athlete typed. `fiveK` is a race clock ("22:30");
+      // `fiveK_pace` is the pace every plan generator, the coach and the workout card actually read.
       const perf = { ...(data.performanceNumbers || {}) } as any;
       const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';
-      if (!perf.fiveK_pace && typeof perf.fiveK === 'string') {
-        const mmss = perf.fiveK.match(/^(\d{1,2}):(\d{2})$/);
-        if (mmss) {
-          const mins = parseInt(mmss[1], 10);
-          const secs = parseInt(mmss[2], 10);
-          const total = mins * 60 + secs;
-          const paceSec = Math.round(total / 3.10686); // 5k miles
-          const pm = Math.floor(paceSec / 60);
-          const ps = paceSec % 60;
-          perf.fiveK_pace = `${pm}:${String(ps).padStart(2, '0')}${unitsSuffix}`;
-        }
-      }
+      // ⛔ RECOMPUTED ON EVERY SAVE, NOT JUST WHEN BLANK. The guard was `!perf.fiveK_pace`, so this only
+      // ever filled a hole: re-typing the 5K — or tapping "Yes" on the nudge at TrainingBaselines.tsx:459
+      // — moved the time and left the pace stale, and since `resolveCurrent5kPace` prefers a typed pace
+      // over the race time, the stale pace then WON over the fresh time.
+      //
+      // ⚠️ Nothing the athlete typed is being clobbered: this is the only line in the app that writes
+      // `fiveK_pace` and no input binds to it, so a directly-typed 5K pace does not exist and cannot be
+      // told apart from a derived one. Add a provenance flag here first if a 5K PACE field is ever added.
+      //
+      // Units live in the resolver — /5 for a metric athlete, /3.106856 miles for an imperial one. The
+      // copy that sat here divided by miles either way and appended the athlete's suffix, so a metric
+      // athlete stored seconds per MILE under a per-KM label.
+      const derivedFiveKPace = deriveFiveKPaceFromRaceTime(perf.fiveK, data.units === 'metric');
+      if (derivedFiveKPace) perf.fiveK_pace = derivedFiveKPace;
       // Coerce unitless paces to the user's unit preference so normalizer always has a unit
       if (typeof perf.fiveK_pace === 'string' && !/\/(mi|km)$/i.test(perf.fiveK_pace)) {
         const m = perf.fiveK_pace.match(/^(\d{1,2}):(\d{2})$/);
