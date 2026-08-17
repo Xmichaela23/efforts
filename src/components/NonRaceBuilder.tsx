@@ -3333,6 +3333,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           const opts = optionsFor(category, strengthEquipment);
                           const value = picks[category];
                           const muscle = opts.find((o) => o.name === value)?.muscle ?? '';
+                          // ⛔ THE PULL PICKER GOES QUIET WHILE THE PROGRESSION OWNS THE SLOT
+                          // (2026-08-17, Michael, from the screen). The engine replaces the pull
+                          // pick on every day when the progression is on — a live-looking picker
+                          // beside that toggle reads as "you get both". The chins do not double;
+                          // now the screen says so instead of leaving it to be asked.
+                          const pulledByProgression = category === 'pull'
+                            && state.assistancePicks.performance_focus === 'pullups';
+                          if (pulledByProgression) {
+                            return (
+                              <div key={category} className="opacity-50">
+                                <div className="flex items-baseline justify-between gap-2 mb-1">
+                                  <span className="text-white/85 text-sm">{CATEGORY_LABEL[category]}</span>
+                                  <span className="text-white/50 text-xs">pull-up progression</span>
+                                </div>
+                                <div className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.03] border border-white/8 text-white/60">
+                                  Chins — set by the progression while it is on
+                                </div>
+                              </div>
+                            );
+                          }
                           return (
                             <div key={category}>
                               <div className="flex items-baseline justify-between gap-2 mb-1">
