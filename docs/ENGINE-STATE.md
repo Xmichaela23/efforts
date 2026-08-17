@@ -23,78 +23,82 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-16 — a DESIGN day. Nothing was implemented. The Strong Focus block was re-specified end to end for the concurrent athlete and the whole thing is in **`docs/WORKORDER-strong-focus-concurrent-2026-08-16.md`**. Yesterday's Forever work (D-432 / D-422 / D-434) is **pushed, and prod was verified against main today**. **Banner owned by ONE chat.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-16 PM — **build one of `docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` is 2/6 DONE AND COMMITTED, and a 3rd is HALF-DONE AND UNCOMMITTED.** Read the work order before touching anything: it is the spec, it is complete, and every decision in it is Michael's from that day. **Banner owned by ONE chat.**)
 
-### ⛔ YOUR JOB — the terminal groundwork FIRST, then build one
-Michael is running a terminal session on the groundwork before any of the work order is built.
-Do not start §1 until those come back:
-1. **One 5K-pace resolver** (`src/lib/resolve-current-5k-pace.ts`), following
-   `resolve-current-ftp.ts` / `resolve-current-run-pace.ts`. Audited 2026-08-16: 5K pace has **no
-   owner** — eight key spellings, per-caller fallback chains in `materialize-plan:674`,
-   `course-detail:287`, `_shared/token-parser.ts:209`, `AllPlansInterface.tsx:666` and `:797`
-   (duplicated), `coach:4917`. ⚠️ `fiveK` is a race TIME, not a pace, and the fallback chain can
-   read it as one.
-2. **Trace (read-only): does anything downstream handle TWO hard endurance days?**
-   `NonRaceBuilder.tsx:1216` and `:2855` delete the other sport on switch; `:1472` collapses to
-   `qualityDays.run || qualityDays.bike`. The state shape holds both (`:572`). Unknown whether
-   `generate-strength-plan`, the composer and `week-optimizer` do. **This decides whether §1i is a
-   UI change or a pipeline change.**
-3. **Trace (read-only): does the strength intake accept a rep-set input, or only a 1RM?** (§1e).
-4. **Fix (small, standalone): the BIKE hard day never deloads.**
-   `strength-primary-plan.ts:3103-3106` pushes `bikeQualitySession(hardPin)` with no
-   `isStandalone` check while the easy rides on the same branch take one. The run branch at
-   `:2940-2946` is correct — mirror it. A bike-primary athlete currently does 4×4 VO2 intervals on
-   the deload AND the TM-test week.
+### ⛔ THE TREE IS NOT CLEAN — read this first
+Three files are modified and uncommitted, all the same in-flight change (§1f-0, the three-day week):
+`strength-primary-plan.ts` (the engine change, **done**), `forever-block-map.test.ts` and
+`strength-primary-plan.test.ts` (**partly updated**). HEAD is `8e330c0f`.
 
-Then build **§1** of the work order. **§6 (the scheduling law) and §7 (interval progression) are
-SEPARATE builds and must not be bundled into it** — Michael's call, for blast radius.
+**8 tests still expect four lifting days.** They are the whole remaining job for that slice:
+`assistance-collision:486` · `easy-session-spread:93,98` · `forever-block-map:130,182` ·
+`strength-primary-plan:257,291,482`.
 
-### WHAT THE WORK ORDER DECIDES — read it, do not re-derive it from scratch
-3:1 rhythm (light week after EVERY cycle) · **no opening TM-test week** · **only 8 and 12 weeks; 16
-is killed** · **the continuity/tier branch is deleted, 2 leaders : 1 anchor hardcoded** · a miss is
-the top working set of EVERY main-lift day, not one 95% set per cycle · the training max falls
-immediately mid-cycle and rises only at a boundary · **one 25–50 assistance band for the whole
-block** · jumps unchanged at 10/15 · **three lifting days always, the four-day option is deleted**
-· three accessory cards with the merged day filtered on pull and core only, push left open, pinned
-at 25 · up to two hard endurance days. §5b is the **deletion list** — what must not survive.
+Two causes, both mechanical: (1) three strength sessions a week now, not four; (2) the shared day is
+titled `Strength — Deadlift + Overhead Press`, so any helper matching `s.name === 'Strength — '+lift`
+loses two lifts. `forever-block-map.test.ts`'s `sessionFor` already carries the fix to copy — match
+on `String(s.name).includes(lift)`.
 
-### ⛔ STATE, VERIFIED 2026-08-16
-- **PUSHED: YES**, everything except one docs commit (`8d2db91a`, the work order — ahead of origin
-  by 1, deliberately).
-- **DEPLOYED: YES, AND CHECKED TODAY** against `supabase functions list`. Forever `48889070`
-  deployed 56s after its commit; slice b `790cf50a` → `adapt-plan` + `rematerialize-strength-block`
-  deployed 19s after; `get-week` deployed after `90231f5a`. Slice b's new shared file
-  (`loading/calibration.ts`) is imported by **rematerialize only**, which was redeployed — **no
-  stranded importers.** The `_shared` trap did not bite.
-- **VERIFIED ON A DEVICE: NO.** ⚠️ And the acceptance run named in yesterday's banner is now partly
-  moot — §1 reshapes the block again (no opening test, light week after every cycle). **Do not
-  spend a device run on a shape that is about to change.**
-- **Suite baseline, run 2026-08-16: 3637 passed / 6 failed.** Same six as yesterday, +43 new
-  passing. ⛔ **THREE OF THE SIX ARE STRENGTH AND ARE IN THE BLAST RADIUS** —
-  `non-race-goal-seeds.test.ts:116` and `:141` (both fail because `preferred_days.strength` returns
-  `undefined` where they expect a day list; `:141` expects the **four-day arc**, the shape §1f-0
-  deletes) and `club-anchor.test.ts:89`. **Likely stale tests from when the optimizer became sole
-  placement authority — a hypothesis, not a finding.** The other three
-  (`d031-convergence-e2e` ×3) are in the combined-plan generator and unrelated.
+### ✅ COMMITTED THIS SESSION — do NOT re-litigate
+- `feee083c` **The 3:1 block.** `leader · light · leader · light · anchor · TM test`. A light week
+  after EVERY cycle (p.21's "after any cycle" licence — a concurrent athlete is the taxing case it
+  names). **No opening TM-test week** — knowingly overrides p.21's bolded advice, stated as ours.
+  **The continuity tiers are DELETED** with their supplier in `generate-strength-plan`: they produced
+  1 leader : 2 anchors, not one of Forever's three models. Ratio is now every cycle but the last,
+  capped at two. **16 weeks is not offered**; `blockWeeks` is an allowlist of `{8, 12}`. The week map
+  takes no shape inputs at all — length alone decides it.
+- `8e330c0f` **The assistance band is set by COMPETING STRESS, not the cycle phase.** 0 hard
+  endurance days → 40-50 · 1 → 30-40 · 2 → 25-30, whole block capped at 50. **Cite 25-50 as OURS** —
+  his base is p.24's 50-100; 25-50 is p.23's seventh-week number. Capacity still moves the athlete
+  within their band. ⚠️ **The p.18 leader-vs-anchor direction is GONE, not reversed** — back-annotate
+  D-432 or it reads as the 2026-08-15 fix regressing.
+- `0fa83eea` + `d707da6c` **One 5K-pace resolver**, five hand-rolled fallback chains deleted, and the
+  two write-path bugs behind it (metric paces were per-mile numbers labelled /km; the backfill only
+  ever filled a blank, so accepting the "training data suggests…" nudge changed no workout target).
+- Also in `feee083c`: the **bike hard day never deloaded** — 4×4 VO2 intervals ran through every
+  light week including the TM test. Mirrors the run branch now.
 
-### ⛔ CORRECTIONS TO YESTERDAY'S BANNER (it was wrong within a day — read this before trusting it elsewhere)
-- It said the assistance bands ran **7th-week 25–50, leaders 50, anchors 75 with a 75 clamp**. The
-  clamp was **removed the same day** (`src/lib/assistance-menu.ts:133`) and the shipped bands are
-  leader 50–75, anchor 75–100. §1g replaces all of it with **one 25–50 band** anyway.
-- Its "two decisions OWED to Michael" are both **answered** — the bands (§1g) and the FSL citation
-  (kept as ours).
+### ⛔ STILL TO DO IN BUILD ONE — in this order
+1. **Finish §1f-0** (the 8 tests above), then its follow-ons: the stale "four lifting days" copy
+   (`NonRaceBuilder.tsx:3203,3209,3265,3308`, `strength-focus-copy.ts:87,136`, and the shape test at
+   `strength-focus-copy.shape.test.ts:42` that pins the wrong string), the **"Lifting days" wizard
+   step** (step 5 of 9) and the `lifting_days` plumbing, and `pullup-progression.ts:130`'s
+   `liftingDays = 4` default (**decided: the weekly total holds, per-day rises to ~35**).
+2. **§1c — a miss is the top working set of EVERY main-lift day**, not one 95% set per cycle.
+   ⛔ **This is the risky one and it was deliberately not started.** The prescribed rep count is NOT
+   on the logged set (`LoggedSet` has no such field, and the logger prefills), so it has to come from
+   the plan — `setsForWeek(kind, weekInCycle)`'s last work set. Leaders carry no `amrap` flag, so
+   `amrapRepsForLift` cannot answer for them; prefer the flagged set where it exists and fall back to
+   the heaviest performed set. **And the stall clock moves from once a cycle to once a week**, which
+   changes the shape of the training-max walk. Five surfaces describe the old rule and must change in
+   the same pass — see §5b of the work order, which names them.
+3. **§1d** the training max falls immediately mid-cycle, rises only at a boundary. Must ride the
+   existing consent sheet (`useStrengthCalibration.ts`), never a silent write.
+4. **§1e** the intake asks for no lift number at all — the gate is a 409 at build time pointing at
+   Training Baselines. The rep-set door already exists there (`save-baseline-test`). Route to it.
+5. **§1f** three accessory cards, merged card filtered on pull and core only, push open, day at 25.
 
-### ⛔ COORDINATION — STILL IN FORCE
-**ONE chat owns this banner and the `~/efforts` working tree at a time.** Two parallel sessions on
-2026-08-15 produced a blanket `git add` that swept the other's in-progress files into a commit, and
-each rewrote this banner without knowing the other's state. The tree is **clean** as of
-2026-08-16 — keep it that way before handing it to a terminal session.
+### ⛔ SUITE BASELINE — six failures are PRE-EXISTING
+`3637 passed / 6 failed` on a clean tree: `d031-convergence-e2e` ×3, `non-race-goal-seeds` ×2,
+`club-anchor` ×1. Two of those three strength ones assert `preferred_days.strength` returns a day
+list where it now returns `undefined` — **likely stale from when the optimizer became sole placement
+authority. A hypothesis, not a finding.** Anything failing beyond those six is new.
 
-### SCAFFOLDING
-`docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` (yesterday's) and
-`docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` (today's) are **both on disk** — each dies
-on ship, folded into a `D-NNN`, per the spec lifecycle. `docs/SPEC-get-stronger.md` holds only §2's
-opt-in quality session as unbuilt.
+### ⛔ STATE
+- **PUSHED: NO.** Six commits sit on `main` unpushed (`e8c7394b`…`8e330c0f`).
+- **DEPLOYED: NO.** ⚠️ When it goes: `strength-primary-plan.ts` and `src/lib/assistance-menu.ts` are
+  both SHARED — the `_shared` trap applies, and the client ships too.
+- **VERIFIED: NO.** Nothing seen on a device.
+- Prod was checked against main earlier today and matched; that predates these commits.
+
+### ⛔ §6 AND §7 ARE SEPARATE BUILDS — do not fold them in
+§6 is the scheduling law and **most of it already exists**: `docs/CONSOLIDATED-MODE.md` (2026-05-18,
+"Decisions LOCKED") defines `integration_mode: separated | consolidated` — the same-day stacking rule
+— **built, tested, and never executed because no wizard writes the field**
+(`POLISH-PUNCH-LIST.md:765-769`). The one real blocker: it lives in `week-optimizer`, and Strong
+Focus places with `week-solver` + `place-week`. **`docs/SPEC-week-solver.md` already owns the
+direction — collapse onto `week-solver`; Strong Focus is the migrated path, not the outlier.**
+§7 is the interval progression, and nothing exists for a threshold session.
 
 ---
 
