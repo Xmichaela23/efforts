@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
 import { supabase } from '@/lib/supabase';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { resolveCurrent5kPace, formatFiveKPace } from '@/lib/resolve-current-5k-pace';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -663,8 +664,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const byWeek: Record<number, any[]> = {};
           // Baseline helpers
           const pn = bl?.performanceNumbers || {};
-          const candidate5k = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
-          const fiveK: string | null = (candidate5k ? String(candidate5k) : null) as any;
+          // ⛔ 5K PACE HAS ONE OWNER: `@/lib/resolve-current-5k-pace`. The chain here ended in `|| pn.fiveK`,
+          // which is the 5K race TIME — so an athlete whose row carries the time without the derived pace
+          // had "22:30" substituted into `{5k_pace}` and rendered as their interval pace. Rendered back in
+          // the athlete's own units, which is what the raw string used to carry.
+          const fiveK: string | null = formatFiveKPace(
+            resolveCurrent5kPace({ performance_numbers: pn as any }).sec_per_mi,
+            bl?.units === 'metric',
+          );
           const easyPace: string | null = (pn.easyPace ? String(pn.easyPace) : null) as any;
           // FTP fracture #2: resolver-first (learned when confident) so displayed watts match the baked watts.
           const ftp: number | null = (resolveCurrentFtp({ learned_fitness: (bl as any)?.learned_fitness, performance_numbers: bl?.performanceNumbers } as any).value ?? null) as any;
@@ -794,8 +801,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const rawDesc = s.description || '';
               // Baseline helpers (reuse same computation as above)
               const pn2 = bl?.performanceNumbers || {};
-              const candidate5k2 = pn2.fiveK_pace || pn2.fiveKPace || pn2.fiveK || null;
-              const fiveK: string | null = (candidate5k2 ? String(candidate5k2) : null) as any;
+              // Same resolver as the materialized-week branch above — this block was a copy of it, and the
+              // copy is how the two could ever have shown different 5K paces for one plan.
+              const fiveK: string | null = formatFiveKPace(
+                resolveCurrent5kPace({ performance_numbers: pn2 as any }).sec_per_mi,
+                bl?.units === 'metric',
+              );
               const easyPace: string | null = (pn2.easyPace ? String(pn2.easyPace) : null) as any;
               // FTP fracture #2: resolver-first (learned when confident) so displayed watts match the baked watts.
           const ftp: number | null = (resolveCurrentFtp({ learned_fitness: (bl as any)?.learned_fitness, performance_numbers: bl?.performanceNumbers } as any).value ?? null) as any;

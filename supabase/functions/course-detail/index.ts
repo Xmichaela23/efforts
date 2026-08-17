@@ -22,6 +22,7 @@ import {
 } from '../_shared/resolve-server-predicted-finish.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -281,10 +282,17 @@ Deno.serve(async (req) => {
       : pfc?.easy?.sec_per_km != null
         ? Math.round(pfc.easy.sec_per_km * KM_TO_MI)
         : pnEasy;
+  // The 5K tail of this chain now goes through the ONE 5K resolver (`src/lib/resolve-current-5k-pace.ts`):
+  // it reads every spelling rather than just `fiveK_pace`, and it will not read the race TIME in
+  // `performance_numbers.fiveK` as a pace — which is what a raw read of these keys was one `??` away from.
+  // The three THRESHOLD spellings above it are left as-is on purpose: threshold pace already has its own
+  // owner (`resolveCurrentRunThresholdPace`), and routing them there is a separate change with its own
+  // precedence question against `pfc` — not something to fold in silently here.
+  const fiveKSec = resolveCurrent5kPace({ performance_numbers: pn as any }).sec_per_mi;
   const threshSec: number | null =
     pfc?.threshold?.sec_per_km != null
       ? Math.round(pfc.threshold.sec_per_km * KM_TO_MI)
-      : parsePaceToSecPerMi(pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi ?? pn.fiveK_pace);
+      : (parsePaceToSecPerMi(pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi) ?? fiveKSec);
   const maxHr = Number(pn.max_heart_rate ?? pn.maxHeartRate ?? 0) || null;
 
   // HR zones not yet in ArcContext — read separately.

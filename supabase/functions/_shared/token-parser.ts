@@ -8,6 +8,8 @@
 // PACE REFERENCE: 5kpace, easypace, 10kpace, marathon_pace → UserBaselines
 // =============================================================================
 
+import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
+
 export interface ParsedRunStructure {
   segments: RunSegment[];
 }
@@ -25,7 +27,9 @@ export interface RunSegment {
   reps?: number;            // For intervals
 }
 
+/** In practice this is `user_baselines.performance_numbers` verbatim — see the callers. */
 export interface UserBaselines {
+  /** ⚠ one of eight 5K spellings; read it through `resolveCurrent5kPace`, never directly. */
   fiveK_pace?: number;      // seconds per mile
   easyPace?: number;        // seconds per mile
   tenK_pace?: number;       // seconds per mile
@@ -204,13 +208,22 @@ function parseEasyRunToken(token: string, baselines: UserBaselines): RunSegment 
   return { type: 'work', duration, ...(target_pace ? { target_pace } : {}) };
 }
 
+// `baselines` here IS `user_baselines.performance_numbers`, flat (analyze-running-workout/index.ts:298),
+// so it is handed to the 5K resolver as exactly that.
+//
+// ⛔ 5K PACE HAS ONE OWNER: `src/lib/resolve-current-5k-pace.ts`. The local read was `fiveK_pace` alone,
+// which is one of eight spellings — a workout graded here against a token like `interval_6x800m_5kpace`
+// silently lost its pace target whenever the athlete's 5K lived under any other key. The resolver also
+// refuses to read `performance_numbers.fiveK` (a race CLOCK) as a pace; `parsePaceString` below would
+// have read "22:30" as a 22:30/mi target if that key had ever reached it.
 function getPaceFromReference(paceRef: string, baselines: UserBaselines): number | null {
+  const fiveK = resolveCurrent5kPace({ performance_numbers: baselines as any }).sec_per_mi;
   switch (paceRef) {
-    case '5kpace': return parsePaceString(baselines.fiveK_pace) ?? null;
+    case '5kpace': return fiveK;
     case 'easypace': return parsePaceString(baselines.easyPace) ?? null;
     case '10kpace': return parsePaceString(baselines.tenK_pace) ?? null;
     case 'marathon_pace': return parsePaceString(baselines.marathon_pace) ?? null;
-    default: return typeof baselines.fiveK_pace === 'number' ? baselines.fiveK_pace : null;
+    default: return fiveK;
   }
 }
 

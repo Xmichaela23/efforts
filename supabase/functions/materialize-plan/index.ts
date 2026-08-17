@@ -29,6 +29,7 @@ import {
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -642,12 +643,25 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
     }
   }
 
+  // §1c — 5K PACE via the ONE resolver (`src/lib/resolve-current-5k-pace.ts`), the third of the family
+  // after FTP and easy/threshold (D-287). It owns every key spelling, the sec/mi unit, and the
+  // distinction this file used to get wrong: `performance_numbers.fiveK` is a race CLOCK ("22:30"), and
+  // the chain below read it straight into `parsePaceToSecPerMi` as a 22:30/mi pace — which the threshold
+  // branch then prescribed at +20s/mi. It sits BELOW the snapshot pin (§1 — a plan freezes its paces for
+  // its lifetime, unchanged) and REPLACES both the `effort_paces.power` tier and the legacy chain.
+  //
+  // ⚠ ORDER CHANGE, deliberate: `effort_paces.power` used to be read BEFORE the athlete's typed 5K. The
+  // resolver puts a typed value above a wizard/VDOT inference, the same inversion audit 2026-07-17 #6
+  // fixed in the coach's threshold read. An athlete carrying both now gets their own number.
+  if (which === 'fivek') {
+    const r = resolveCurrent5kPace({ performance_numbers: b as any, effort_paces: b.effort_paces as any });
+    if (r.sec_per_mi != null) console.log(`[Paces] Using RESOLVED 5K: ${r.sec_per_mi}s/mi (source=${r.source})`);
+    else console.log('[Paces] No 5K pace on file — segments ship without a pace target (D-285)');
+    return r.sec_per_mi;
+  }
+
   // §2 PREFER effort_paces from PlanWizard (already in seconds per mile)
   if (b.effort_paces) {
-    if (which === 'fivek' && b.effort_paces.power) {
-      console.log(`[Paces] Using effort_paces.power for 5K: ${b.effort_paces.power}s/mi`);
-      return b.effort_paces.power;
-    }
     if (which === 'easy' && b.effort_paces.base) {
       const paceSec = b.effort_paces.base;
       const min = Math.floor(paceSec / 60);
@@ -668,11 +682,9 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
     }
   }
   
-  // FALLBACK to legacy performance_numbers
+  // FALLBACK to legacy performance_numbers ('fivek' returned at §1c above — it has an owner now)
   let raw: any;
-  if (which === 'fivek') {
-    raw = b.fiveK_pace ?? b.fiveKPace ?? b.fiveK;
-  } else if (which === 'marathon') {
+  if (which === 'marathon') {
     raw = b.marathonPace ?? b.marathon_pace;
     // If no marathon pace, estimate from easy pace (+30sec slower)
     if (raw == null && (b.easyPace || b.easy_pace)) {

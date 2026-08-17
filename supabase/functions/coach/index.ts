@@ -34,6 +34,7 @@ import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
 import { offPlanAdherenceBanner, offPlanAdherenceResult } from '../_shared/off-plan-banner.ts';
 // D-306: the deterministic week narrative. Replaces the LLM `coaching.narrative` on State.
@@ -4914,8 +4915,21 @@ Deno.serve(async (req) => {
           const _tm = Math.floor(threshSec / 60), _ts = Math.round(threshSec % 60);
           baselineLines.push(`Run threshold pace: ${_tm}:${String(_ts).padStart(2, '0')} min/${isImperial ? 'mi' : 'km'}`);
         }
-        const fiveKPace = effortPaces?.five_k || perfNums?.five_k_pace_min_per_mi || null;
-        if (fiveKPace) baselineLines.push(`5K pace: ${fiveKPace} min/${isImperial ? 'mi' : 'km'}`);
+        // 5K pace via the ONE resolver, exactly as threshold above it. Two bugs die here: the local chain
+        // read only `effort_paces.five_k` (nothing writes that key) and `five_k_pace_min_per_mi` (nothing
+        // writes that one either), so this line was ~always blank for an athlete who HAS a 5K pace; and it
+        // printed the raw value under a `min/km` label for metric athletes without converting anything.
+        const fiveKResolved = resolveCurrent5kPace({ performance_numbers: perfNums, effort_paces: effortPaces } as any);
+        const fiveKSec = fiveKResolved.sec_per_mi == null
+          ? null
+          : (isImperial ? fiveKResolved.sec_per_mi : Math.round(fiveKResolved.sec_per_mi / 1.609344));
+        if (fiveKSec != null) {
+          const _fm = Math.floor(fiveKSec / 60), _fs = Math.round(fiveKSec % 60);
+          baselineLines.push(
+            `5K pace: ${_fm}:${String(_fs).padStart(2, '0')} min/${isImperial ? 'mi' : 'km'}`
+            + (fiveKResolved.is_estimate ? ' (estimated)' : ''),
+          );
+        }
         if (baselineLines.length > 0) {
           narrativeFacts.push(
             `ATHLETE PERFORMANCE BASELINES: ${baselineLines.join('. ')}. ` +
