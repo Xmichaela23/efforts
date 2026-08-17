@@ -16,8 +16,9 @@ slice 2 is shipped and took the dose note with it.)
 
 ## Where the tree is
 
-`45c59661` — *builder: the lifting-days step is gone, three accessory cards, the copy follows
-(slice 2)*. Committed, **not pushed, not deployed.**
+`3dc2c0d1`. Committed, **not pushed, not deployed.** Deploy list so far when the day ends:
+`generate-strength-plan` + `create-goal-and-materialize-plan` (slice 3), plus every importer of the
+touched `_shared`/strength-system files from slice 1 — resolve with the grep in CLAUDE.md.
 
 ✅ **SLICE 1 IS DONE.** The clustering is fixed and its two tests are green. It left one thing
 standing that the next sessions must not undo: **`week-solver.ts` now carries TWO flexible rankings**
@@ -155,7 +156,14 @@ hardcoded 4, and `src` back to its 3 standing failures.
 
 ---
 
-## Slice 3 — the setting's plumbing, and old plans
+## Slice 3 — the setting's plumbing — ✅ DONE at `5b4c7e12`
+
+> **Shipped.** Four lines, two files; the wire is dead at both ends and grep finds only comments. No
+> tolerance path, per 2026-08-17. The flagged test residue (dead `liftingDays` passed to the
+> composer) was cleaned at `3dc2c0d1`. The stale "old four-day block rematerializes" done-line below
+> is history — the 2026-08-17 decision replaced it.
+
+## The original slice 3 brief — the setting's plumbing, and old plans
 
 **Strip `lifting_days` from the server side.** `supabase/functions/generate-strength-plan/index.ts`
 `:34` (the comment block), `:49` (destructure), `:150` (`liftingDays: Number(lifting_days) === 3 ? 3
@@ -245,6 +253,9 @@ fallback, a shim, or a read-path that tolerates the old shape.**
 
 **Done means:** three keys everywhere, no `press` key in the type or the stored shape, an athlete's
 picks for the deadlift+press day reach the built session, and the three suites hold their baseline.
+
+⚠️ **Baseline for slices 5 and 4 is measured at `3dc2c0d1`** — same numbers as the table above:
+421/0, 2956/3, 680/3.
 
 ## Order, and why
 
