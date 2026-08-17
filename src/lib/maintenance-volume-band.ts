@@ -49,7 +49,7 @@ export type VolumeState = 'above' | 'below' | 'in_band';
  * The starting dose is the band's own FLOOR, not a new number: ~2 sessions a week is the maintenance
  * dose the aerobic base holds on [Hickson 1981, Spiering 2021]. Starting there means the worst case
  * is that an experienced athlete is under-asked for a few weeks and raises it — never that a
- * beginner is handed a volume they cannot carry alongside four lifting days.
+ * beginner is handed a volume they cannot carry alongside three lifting days.
  */
 export function startLightMiles(easyPaceMinPerMile = FALLBACK_EASY_MIN_PER_MILE): number {
   const pace = Number(easyPaceMinPerMile) > 0 ? Number(easyPaceMinPerMile) : FALLBACK_EASY_MIN_PER_MILE;

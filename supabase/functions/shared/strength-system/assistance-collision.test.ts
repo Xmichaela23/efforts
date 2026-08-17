@@ -507,10 +507,14 @@ Deno.test('the composer gives each lifting day ITS OWN picks', () => {
   assertEquals(namesFor('Strength — Deadlift + Overhead Press').slice(0, 3),
     ['DB Shoulder Press', 'Inverted Row', 'Glute-Ham Raise']);
   // ⚠️ SO THE PRESS-DAY PICKS REACH NOTHING, AND THAT IS ASSERTED RATHER THAN LEFT UNSAID. `by_day.press`
-  // is now a stored preference the engine can never honour: the press has no day of its own to carry
-  // it. The wizard still offers a fourth card to fill it (`NonRaceBuilder.tsx`, §1f-1) — until that
-  // pass lands, an athlete can choose three movements that are silently discarded. This test is what
-  // makes that visible instead of it reading as a lost pick.
+  // is a stored preference the engine can never honour: the press has no day of its own to carry it.
+  //
+  // ✅ THE WIZARD NO LONGER ASKS FOR THEM (§1f-0, 2026-08-16). `NonRaceBuilder.tsx` shows THREE
+  // accessory cards — Squat · Bench · Deadlift + Press — so nothing an athlete types can land in
+  // this slot any more. ⛔ THE ASSERTIONS BELOW STAY REGARDLESS: the key still exists in the stored
+  // shape, every block built before today carries one, and `normalizeAssistancePrefs` will keep
+  // seeding it. What this test pins is that a value in that slot is INERT — if it ever starts
+  // surfacing, an old block's dead pick would appear in a new week with no one having chosen it.
   assertEquals(namesFor('Strength — Overhead Press'), []);
   const everyName = rows.map((r: any) => r.name);
   for (const pick of ['Plate Raise', 'Face Pull', 'Reverse Hyper']) {

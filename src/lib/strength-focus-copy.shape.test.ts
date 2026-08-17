@@ -39,8 +39,13 @@ Deno.test('⛔ THE STRUCTURE SENTENCE FOLLOWS THE BLOCK — cycles, light weeks,
   // cycles, and the test weeks named by number.
   assertEquals(
     architecture(2, 1),
-    "Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Four lifting days, placed " +
-      'around your endurance. 2 building cycles, then one measuring cycle from week 9. ' +
+    // ⛔ THE STRING MOVED WITH THE BLOCK (§1f-0 / §1f-1, 2026-08-16). This test PINNED "Four lifting
+    // days" — so while the engine built three, the suite was enforcing the wrong sentence and would
+    // have gone red on the fix. A test that holds copy in place has to move when the copy is the
+    // thing that was wrong.
+    "Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Three lifting days — squat, " +
+      'bench, and deadlift with the overhead press — placed around your endurance. ' +
+      '2 building cycles, then one measuring cycle from week 9. ' +
       'Each cycle runs three weeks, with a light week between them. ' +
       "Weeks 1 and 12 test the working number — the first sets where this block starts, " +
       "the last sets where the next one does.",

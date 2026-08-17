@@ -70,7 +70,7 @@ export function strengthFocusSections(opts: {
     {
       heading: 'The architecture',
       // ⛔ NO DAY NAMES. This used to read "bench Monday, squat Tuesday, overhead press Thursday,
-      // deadlift Friday" — the hardcoded grid the rebuild replaced. The four lifting days are now
+      // deadlift Friday" — the hardcoded grid the rebuild replaced. The three lifting days are now
       // placed around the athlete's endurance absolutes (`place-week.ts`), so the days differ per
       // athlete and naming them here would promise a week the engine may not build.
       // ⛔ THE SHAPE IS DERIVED, NOT ASSUMED (2026-07-28). This sentence hardcoded "N building
@@ -84,8 +84,12 @@ export function strengthFocusSections(opts: {
       // the block's shape changed underneath it. Cycles are three weeks; the light weeks stand alone
       // between them; and a test week is a different thing from a deload, so the copy names both.
       body:
-        `Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Four lifting days, placed ` +
-        `around your endurance. ` +
+        // ⛔ THREE LIFTING DAYS, AND THE PAIRING IS NAMED (§1f-0 / §1f-1, 2026-08-16). This said
+        // a FOUR-day count to EVERY athlete, three-day athletes included, and it is the plan's
+        // own description — the sentence an athlete reads to find out what they signed up for. The
+        // pair is deadlift + press, not bench + press; the wizard said the wrong one too.
+        `Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Three lifting days — squat, ` +
+        `bench, and deadlift with the overhead press — placed around your endurance. ` +
         // ⚠️ THE ZERO-LEADER BRANCH IS UNREACHABLE FROM THE ENGINE as of §1b (Forever p.17 has no
         // all-anchor model) and it stays anyway: a count of zero rendered as a word in prose is the
         // 2026-07-28 defect this whole function was rewritten for, and the guard costs one clause.
@@ -133,7 +137,7 @@ export function strengthFocusSections(opts: {
 export function strengthFocusBrief(opts: { weeks?: number } = {}): string {
   const weeks = opts.weeks ?? STRENGTH_FOCUS_WEEKS;
   return (
-    `Strength leads for ${weeks} weeks. Four lifting days, placed around the endurance you keep — ` +
+    `Strength leads for ${weeks} weeks. Three lifting days, placed around the endurance you keep — ` +
     `held easy, enough to hold your base. Speed and distance blocks unlock when this one closes.`
   );
 }

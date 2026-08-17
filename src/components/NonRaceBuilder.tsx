@@ -28,13 +28,38 @@ import {
   FOCUS_LABEL,
   type FocusChip,
   LIFT_DAY_LABEL,
-  LIFT_DAYS,
   type LiftDay,
   normalizeAssistancePrefs,
   optionsFor,
 } from '@/lib/assistance-catalog';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
+
+/**
+ * ⛔ THE THREE CARDS THE ACCESSORY PICKER OFFERS, AND WHY THIS IS NOT `LIFT_DAYS` (§1f-0, 2026-08-16).
+ *
+ * `assistance-catalog.LIFT_DAYS` is `['press','bench','squat','deadlift']` — the four KEYS the
+ * stored `by_day` map is shaped by, and the engine still reads all four. This is the list of days
+ * the athlete is ASKED about, and there are three of them: the press has no day of its own, and the
+ * shared day takes the DEADLIFT's block (Wendler's stacked day is the mains plus ONE round, p.77 —
+ * `strength-primary-plan.ts:2856-2863`).
+ *
+ * ⚠️ SO THE FOURTH CARD WAS NOT COSMETIC — IT ATE PICKS. An athlete filling the press card had all
+ * three movements silently discarded; `assistance-collision.test.ts` asserts exactly that they reach
+ * nothing. Asking for twelve movements and building nine is the defect, and it is fixed by not
+ * asking, not by pretending the engine honours it.
+ *
+ * ⛔ DO NOT "TIDY" THIS BY NARROWING `LIFT_DAYS` ITSELF. That constant is the catalog's key set —
+ * `BALANCED_WEEK`, `buildDefaultWeek`, `resolveDayAssistance` and the grip rotation are all shaped
+ * by it, and `by_day.press` still has to round-trip for every block already on file. This is a
+ * SCREEN decision about what to ask; the library's shape is slice 4's question, not this one's.
+ */
+const ACCESSORY_CARD_DAYS: LiftDay[] = ['squat', 'bench', 'deadlift'];
+/** The shared day says so on its own card — the athlete is picking for both lifts at once. */
+const ACCESSORY_CARD_LABEL: Record<LiftDay, string> = {
+  ...LIFT_DAY_LABEL,
+  deadlift: 'Deadlift + Press',
+};
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
@@ -583,8 +608,6 @@ type NonRaceState = {
    * Helgerud 4 × 4 on any terrain, and "None" means there is no hard session to give ground to.
    */
   qualityRunTerrain: 'hill_3min' | 'hill_short' | 'treadmill' | 'flat';
-  /** 4 (Wendler's own shape) or 3 (the two upper lifts share a day; the test week still runs four). */
-  liftingDays: 3 | 4;
   /** What they NORMALLY run, in their display unit. The band is a fraction of THIS — an absolute
    *  band tells a 40-mile runner and a 10-mile runner the same thing, and it is only true for one. */
   usualMiles: number | '';
@@ -599,7 +622,8 @@ type NonRaceState = {
    *  bodyweight default, so skipping this is a valid answer that still yields a complete block.
    *  (Replaced `accessoryBias` — the Glutes/Hyrox add-ons move to the Adjust tab, D-323, where they
    *  REPLACE a slot rather than stacking on top of the block.) */
-  /** D-407: twelve slots × four days + the focus chips. Persisted whole. */
+  /** D-407: twelve slots × four day KEYS + the focus chips. Persisted whole. ⚠️ Still four keys —
+   *  the wizard asks about three (§1f-0), and `by_day.press` round-trips for blocks already on file. */
   assistancePicks: AssistanceWeekPrefs;
   /** Swim slots per week. Booked, not coached (D-323 §5) — it exists for the triathlete who wants
    *  the time held. Only asked when swim is kept for the block. */
@@ -691,18 +715,17 @@ type StepKey =
   // (`weekQuestion`) before tapping days. `weekStage` — the Next-tap version — is gone too. [D-398]
   // ⛔ THE SCHEDULER — one screen, rebuilt 2026-07-28, replacing `run` + `bike` + `hardday` on the
   // strength path. Those three asked the same question in three places and none of them could show
-  // the answer: how many endurance sessions fit around four lifting days, and where the one that
+  // the answer: how many endurance sessions fit around the lifting days, and where the one that
   // does not fit lands. Michael: *"this is a rebuild, one simple scheduler."*
   //
   // ⚠️ VOLUME STAYS SEPARATE. Miles and hours are HOW MUCH; this card is WHEN. Deciding the second
   // while looking at the first is what made the old run card scroll past the fold.
   | 'schedule' | 'volume'
-  // ⛔ THE BLOCK SHAPE — four lifting days or three (2026-07-29). Its own card because it is not a
-  // scheduling preference, it is which programme the athlete is running: at four, every lift is
-  // trained first and every top set is a clean measurement; at three, two lifts share a day and one
-  // of them is read under fatigue on the weeks that are not the test week. That trade has to be
-  // stated, not buried in a stepper. Michael: *"its its own card and it explains the structure."*
-  | 'lifting'
+  // ⛔ THE 'lifting' STEP IS DELETED (§1f-0, 2026-08-16). It asked four days or three, and there is
+  // no longer a choice to make: every Strong Focus block is three — Squat · Bench · Deadlift + Press.
+  // Do not reintroduce it, and do not keep a four-day branch "for later" — the option is gone from
+  // the engine (`StrengthPrimaryArgs` has no `liftingDays`), so a card offering it would be a screen
+  // asking a question nothing downstream can answer.
   | 'confirm';
 
 // ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
@@ -719,12 +742,10 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
   const kept = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
   const strengthDevelop = state.posture?.strength === 'develop';
   const out: StepKey[] = [];
-  // ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol and the endurance days
-  // are typed per discipline, so a total would only contradict both. *"how many days is redundant."*
+  // ⛔ NOT ON THE STRENGTH PATH. Lifting is three days fixed by the protocol (§1f-0) and the
+  // endurance days are typed per discipline, so a total would only contradict both.
+  // *"how many days is redundant."*
   if (!isStrengthFocus) out.push('days');
-  // ⛔ THE SHAPE BEFORE THE SCHEDULE. How many days the lifting occupies decides the week the
-  // scheduler then draws, so asking it after would mean drawing a week and immediately redrawing it.
-  if (strengthDevelop) out.push('lifting');
   if (strengthDevelop) out.push('accessory');
   // ⛔ ONE SCHEDULER ON THE STRENGTH PATH. Every other goal keeps the per-discipline cards, because
   // there the endurance IS the plan and there is no lifting frequency to fit it around.
@@ -749,7 +770,7 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
 
 function getSteps(state: NonRaceState): StepKey[] {
   // ⛔ STRENGTH FOCUS SKIPS "What can you sustain?". That step converts a Light/Moderate/Committed
-  // tier into `weekly_hours_available` — and on this path nothing reads it. The lifting is four days,
+  // tier into `weekly_hours_available` — and on this path nothing reads it. The lifting is three days,
   // fixed by the protocol; the endurance volume is TYPED two screens later (run miles, run days,
   // swims). So the tier decides nothing and its only effect was a stale "≈ 6 h/wk" on the confirm
   // screen. Michael, 2026-07-25: *"not necessary, user enters these."* Every other goal keeps it —
@@ -982,7 +1003,7 @@ function assemblePayload(
           // ⛔ NOT SENT ON THE STRENGTH PATH — because they are never ASKED on it.
           //
           // `getSteps` skips both the `days` and `commitment` screens for Strength Focus (the lifting
-          // is four days fixed by the protocol; the endurance volume is typed per discipline). But
+          // is three days fixed by the protocol; the endurance volume is typed per discipline). But
           // this payload sent them anyway, so they went out as INITIAL STATE: `daysPerWeek: 5` and
           // `commitment: 'light'` → 6 hours.
           //
@@ -1017,11 +1038,10 @@ function assemblePayload(
           // ⚠️ ZERO IS ALREADY THE LANGUAGE FOR THIS — the same writer maps `freq === 0` to
           // `strength_protocol: 'none'`. The path existed; nothing could reach it.
           strength_frequency: strengthFrequencyForPosture(state.posture?.strength),
-          // ⛔ THE BLOCK SHAPE, and it is a SEPARATE FIELD from `strength_frequency` above on purpose
-          // (2026-07-29). That one is the retired D-323 dial and branches downstream still clamp it
-          // to 2; this one says how many DAYS the four lifts occupy. Sent only when the athlete picks
-          // 3, so an untouched flow is byte-identical to yesterday's.
-          ...(state.liftingDays === 3 ? { lifting_days: 3 } : {}),
+          // ⛔ `lifting_days` IS NO LONGER SENT (§1f-0, 2026-08-16). It carried the athlete's
+          // four-or-three answer, and there is no answer any more: every block is three days. The
+          // server-side reader is slice 3's to remove; sending nothing is already correct, because
+          // the composer no longer accepts the field at all.
           per_discipline_posture: state.posture,
           // ⛔ THE CLUB NIGHT GOES IN THE SLOT ITS INTENSITY NAMES. A social club run filed as
           // `quality_run` tells the engine to put the week's intervals on the one evening the
@@ -1182,13 +1202,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // the trade this card has lost twice already.
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
   // ⛔ ONE DAY OPEN AT A TIME — the `StrengthLogger.tsx` accordion pattern (`expandedExercises`).
-  // Twelve dropdowns open at once is four phone screens of scrolling and the week loses its shape.
-  const [expandedAssistanceDay, setExpandedAssistanceDay] = useState<LiftDay | null>('press');
+  // Nine dropdowns open at once is three phone screens of scrolling and the week loses its shape.
+  // ⚠️ SEEDED FROM THE CARD LIST, NOT A LITERAL. This was `'press'`, which is no longer a card
+  // (§1f-0) — leaving it would have opened the screen with every card collapsed and no way to tell
+  // that was a bug rather than the design.
+  const [expandedAssistanceDay, setExpandedAssistanceDay] = useState<LiftDay | null>(ACCESSORY_CARD_DAYS[0]);
   /**
    * The athlete's declared kit, for the picker's equipment GATE (slice 4). ⛔ ARC IS THE SOURCE — the
    * same `equipment.strength` chips `equipmentTierFromArc` reads two hundred lines up. An empty list
    * means "we do not know", and `canPerform` treats that as ungated rather than as "owns nothing";
-   * anything else would hand a new athlete four days of push-ups.
+   * anything else would hand a new athlete three days of push-ups.
    */
   const strengthEquipment = useMemo<string[]>(
     () => ((((arc as { equipment?: { strength?: unknown } } | null)?.equipment?.strength) as string[] | undefined) ?? []),
@@ -1240,11 +1263,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // builder at :359 sends `run_days` only when `runDays >= 2`, and :370 sends `ride_days` only
     // when `rideDays > 0`. Never picking one omits the field and the engine keeps its own default,
     // rather than being handed a number the athlete never chose.
-    // ⚠️ 4 IS SEEDED AND THAT IS DELIBERATE, against the no-prefill rule one field up. This is not a
-    // blank question — it is the block's default shape, and 4 is what every block built before today
-    // ran. An unlit pair here would read as "the app has no opinion", and the app does: four days is
-    // Wendler's own, and it is the only shape where every lift is trained first and every top set is
-    // a clean measurement. The card states that rather than hiding it behind an empty control.
+    // ⛔ THE `liftingDays: 4` SEED IS GONE WITH THE CARD THAT READ IT (§1f-0, 2026-08-16). It was a
+    // deliberate exception to the no-prefill rule — the block's default shape, preselected — and
+    // there is no shape question left to answer: every block is three days.
     // ⚠️ `hill_3min` IS THE SEED AND IT IS NOT AN ARBITRARY ONE — it is the session this block has
     // built since it shipped, and the doctrine's default (§2.0: hill is the recommendation, and the
     // default position carries that rather than the word "recommended"). An athlete who never looks
@@ -1260,7 +1281,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, rideHours: '', rideDays: 0, liftingDays: 4, startDate: planWeekStartISO(),
+    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, rideHours: '', rideDays: 0, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -1908,8 +1929,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   /**
    * ⛔ SHOW THE WEEK BEFORE IT IS ACCEPTED, AND SHOW WHAT IT COULD NOT HONOUR.
    *
-   * The athlete answers four lifting days (fixed by the protocol), three run days and two ride days
-   * and never sees that it adds to seven days with no rest — because nobody adds it up in front of
+   * The athlete answers three lifting days (fixed by the protocol), three run days and two ride days
+   * and never sees that it adds to more days than the week holds — because nobody adds it up in front of
    * them. Michael: *"we still don't see a general week before it's accepted."*
    *
    * ⚠️ `placement_compromises` is the part that matters. `place-week` has always named every
@@ -2805,7 +2826,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         );
       })()}
 
-      {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is four days fixed by the protocol, and the endurance
+      {/* ⛔ NOT ON THE STRENGTH PATH. Lifting is three days fixed by the protocol (§1f-0), and the endurance
           days are typed per discipline. A total that contradicts both is a number the engine cannot
           honour. Michael, 2026-07-25: *"how many days is redundant."* */}
       {/* ⛔ THE ATHLETE SEES THEIR WEEK. Seven rows, what is on each day, one tap to change it.
@@ -3029,128 +3050,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         </StepLayout>
       )}
 
-      {/* ⛔ THE BLOCK SHAPE — and the card's job is to state a TRADE, not to offer a preference.
-          Michael: *"its its own card and it explains the structure."*
-
-          ── What each line is sourced to ────────────────────────────────────────────────────────
-          - *"Four days is Wendler's own"* — his standard template is one main lift per day.
-          - *"Three days still builds strength"* — the volume-equated meta-analysis (Grgic et al.,
-            Sports Medicine Open) found NO significant effect of training frequency on strength gain;
-            one day a week and three-plus produce similar results when weekly volume matches. So the
-            three-day option is not a lesser programme, and the card must not imply it is.
-          - *"the second lift gives up load and reps"* — exercise-order effects: the movement done
-            first is the one that adapts most, and later lifts lose weight and reps to fatigue.
-          - *"week 3 splits them"* — muscular fatigue status is a named standardisation variable in
-            the 1RM-testing literature, and %1RM prescriptions rest on testing done in a fatigue-free
-            state. Test-retest reliability is good-to-excellent (ICC ≥ 0.90) CONDITIONAL on
-            standardisation — which is why every test week is four days rather than some of them.
-
-          ⚠️ WHAT IS OURS AND SAYS SO: nobody has trialled "train three, test on a fourth." The parts
-          are measured; the join is reasoned, and it is a scheduling choice made to protect a
-          measurement rather than a claim about the body. Wendler does not write it either — at three
-          days HE rotates the four lifts and lets the cycle run past four weeks; at two days he stacks
-          two lifts per session and keeps the calendar. This is his two-day trade one day up.
-
-          ⚠️ FOUR IS PRESELECTED, against the no-prefill rule the day fields now follow. That was a
-          deliberate exception: this is not a blank question, it is the block's default shape and the
-          one every previous block ran. See the `liftingDays: 4` seed. */}
-      {currentStep === 'lifting' && (
-        <StepLayout
-          step={stepNo('lifting')} totalSteps={steps.length} title="Lifting days"
-          subtitle="Four lifts either way. This is how many days they sit on."
-          onBack={back} onContinue={next} canContinue
-        >
-          <div className="space-y-3">
-            <button
-              type="button" onClick={() => setState((s) => ({ ...s, liftingDays: 4 }))}
-              className={optBtn(state.liftingDays === 4)}
-            >
-              {/* ⛔ THE TWO CARDS ARE ONE COMPARISON AND MUST USE ONE AXIS. Michael's framing, fourth
-                  pass: *"a 4 day week favors staying fresh for every lift, a 3 day week may result in
-                  fatigue in executing the second lift."* So four days says FRESH and three days says
-                  MAY BE FATIGUED — the same variable, once as the upside and once as the risk.
-
-                  ⚠️ "MAY", deliberately. The previous line asserted flatly that the second lift "is
-                  done tired and gives up some load." The direction is sourced (the first movement in a
-                  session adapts most) but the MAGNITUDE for any given athlete is not, and an endurance
-                  athlete's bench and press are not the heaviest thing in their week. Stating a
-                  certainty we do not have is the same fault as citing a paper that says something
-                  else. */}
-              <span className="block text-white/90 text-sm">Four days</span>
-              <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                One lift a day. Favours staying fresh for every lift, so every top set is a clean read
-                of what that lift can do. This is Wendler's own shape.
-              </span>
-            </button>
-            <button
-              type="button" onClick={() => setState((s) => ({ ...s, liftingDays: 3 }))}
-              className={optBtn(state.liftingDays === 3)}
-            >
-              {/* ⛔ THE OPTION HAS TO CARRY THE TRADE AND THE TEST WEEK (2026-07-29, second pass).
-                  Michael, on the screen: *"3 day copy is a little unlcear should map tradeoffs and
-                  that 1 week willbe 4 to test 1rm."*
-
-                  The first draft read *"same weekly work — with volume matched, strength gain does not
-                  track how many days it is spread over."* That is the volume-equated meta-analysis
-                  paraphrased, and it fails twice on this card: it argues a POSITION instead of naming
-                  what the athlete gives up, and volume is NOT in fact fully matched here — the second
-                  upper lift is trained fatigued, which is the whole reason the pair was chosen. So the
-                  line was defending the option with a study while omitting its cost.
-
-                  ⚠️ AND THE FOUR-DAY WEEK CANNOT BE A SURPRISE. An athlete picks three days because
-                  three is what their week holds; finding out later that one week in four needs a
-                  fourth is exactly the kind of thing that has to be said before they choose, not in a
-                  panel underneath after they have. */}
-              <span className="block text-white/90 text-sm">Three days</span>
-              {/* ⛔ SAY THE PURPOSE IN THE FIRST FIVE WORDS. Michael, third pass on this card:
-                  *"CAN YOU JUST SAY CLEARLY THE PURPOSE? TO test your 1rm."* The previous line
-                  described the mechanism — shares a day, done tired, back to four days — and left the
-                  athlete to work out what the fourth day was FOR. "That is the week your next weights
-                  are set from" is a consequence, not a purpose, and it reads as scheduling admin.
-                  It is a MAX TEST. Name it. */}
-              {/* ⛔ THE "ONE WEEK IN FOUR GOES BACK TO FOUR DAYS" PROMISE IS GONE (2026-08-05).
-                  It described the week-3 test split, which has been removed. That split existed to
-                  protect a fresh AMRAP, and the trace killed its premise: `applyVerdict` steps the
-                  working number by a FIXED increment (+5 / +10) and `verdictFrom95Set` reads only
-                  whether the prescribed single at 95% was completed. The next weight is never
-                  computed off an estimated max from that set, so a fatigued lift cannot bias it.
-                  ⚠️ A card promising a fourth day the engine no longer builds is the worst kind of
-                  stale copy — an athlete picks three BECAUSE three is what their week holds. */}
-              <span className="block text-white/60 text-sm mt-0.5 leading-relaxed">
-                Bench and press share a day, which may leave the second lift fatigued. Three days every
-                week — nothing switches to four.
-              </span>
-            </button>
-
-            {state.liftingDays === 3 && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2.5">
-                <div>
-                  <p className="text-white/70 text-xs font-medium mb-1">Most weeks</p>
-                  <p className="text-white/50 text-xs leading-relaxed">
-                    Squat · Deadlift · Bench + Press
-                  </p>
-                </div>
-                {/* ⛔ THE MAX-TEST WEEK PANEL IS GONE with the split it described. What replaces it is
-                    the TRADE, sourced to Wendler rather than to us — Michael's wording, 2026-08-05.
-                    Checked against `docs/COPY-VOICE.md` and `voiceViolation()`: all three sentences
-                    clean. ⚠️ The previous version ended by crediting the fourth day to "how strength
-                    tests are standardised, not the book" — an honest sentence about a thing that no
-                    longer happens, which is exactly how a screen starts lying. */}
-                <p className="text-white/45 text-xs leading-snug">
-                  The four-day plan gives each lift its own day. On three, two lifts share a day and the
-                  second is trained fatigued — that is Wendler's own three-day design, not a shortcut.
-                  Because 5/3/1 adds weight for hitting a rep target rather than a fresh max, a fatigued
-                  lift still progresses.
-                </p>
-                <p className="text-white/35 text-xs leading-snug">
-                  Bench goes first on the shared day — the heavier lift leads, so the one that gives up
-                  load and reps is the lighter of the two.
-                </p>
-              </div>
-            )}
-          </div>
-        </StepLayout>
-      )}
 
       {/* THE ACCESSORY SLOTS — and the screen has to say why they exist. Endurance pounds the body in
           one plane and leaves the same imbalances behind it; the main lifts do not saturate the joints
@@ -3200,13 +3099,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 make. Forever p.24 asks for one movement per category per day; asked directly, there
                 is nothing to explain. */}
             <p className="text-white/70 text-sm leading-relaxed">
-              Four lifting days, each with a push, a pull and a single-leg or core movement. Pick a
+              Three lifting days, each with a push, a pull and a single-leg or core movement. Pick a
               focus and the days fill in — every slot is still yours to change, and anything can be
               swapped in the session.</p>
 
             {/* ── FOCUS CHIPS ───────────────────────────────────────────────────────────────────
                 ⛔ A FOCUS RE-POINTS MOVEMENT CHOICE INSIDE A CATEGORY. It is not a new axis and it
-                does not add volume — the frame stays push · pull · single-leg/core on all four days.
+                does not add volume — the frame stays push · pull · single-leg/core on all three days.
                 Capped at three: past that every day is a focus day and the emphasis means nothing. */}
             <div>
               <div className="flex items-baseline justify-between gap-2 mb-2">
@@ -3242,7 +3141,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         // ⛔ CHANGING THE FOCUS REBUILDS THE WEEK. The alternative — keeping whatever
                         // is in the slots and only re-pointing the untouched ones — needs a
                         // per-slot "did they choose this" flag, and a half-applied focus is worse
-                        // than an honest one: the athlete taps Chest and reads four days that are
+                        // than an honest one: the athlete taps Chest and reads three days that are
                         // mostly not chest.
                         return {
                           ...st,
@@ -3262,7 +3161,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {/* ── THE PULL-UP PROGRESSION ───────────────────────────────────────────────────────
                 ⛔ A DIFFERENT AXIS FROM THE FOCUS CHIPS, AND IT IS SEPARATED ON THE SCREEN FOR THAT
                 REASON. A chip biases which movement fills a category; this is a PROGRAMME — it pins
-                the pull category to chins on all four days, sets the volume off Wendler's own
+                the pull category to chins on all three days, sets the volume off Wendler's own
                 prescription, and tracks a number that climbs. Rendering it as a seventh chip would
                 teach the athlete it is the same kind of choice, and it is not.
                 ⚠️ THE COPY NAMES THE DOSE AND THE STANDARD SEPARATELY. 50 reps in 10 minutes is a
@@ -3304,9 +3203,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               {state.assistancePicks.performance_focus === 'pullups' && (
                 <p className="text-white/65 text-xs px-3 pb-3 -mt-0.5 leading-relaxed">
                   Chins every lifting day, grip varying, tracked to Wendler's {SESSION_STANDARD_REPS}-in-{SESSION_STANDARD_MINUTES} standard.
-                  {' '}{pullupDoseNote(weeklyVolumeFor(pullupMaxReps, 4), pullupMaxReps)}
-                  {' '}It replaces your pull pick on all four days while it is on.
-                  {weeklyVolumeFor(pullupMaxReps, 4).assistedOnRamp
+                  {/* ⛔ NO HARDCODED DIVISOR (§1h, 2026-08-16). These two calls passed a literal `4`,
+                      so the note would keep quoting a four-way split however the library divided —
+                      the screen and the engine disagreeing about the dose, which is the defect this
+                      whole pass exists to close. The count comes from `weeklyVolumeFor`'s own
+                      default; slice 4 moves that default to 3 and the note follows it with no edit
+                      here. ⚠️ Until slice 4 lands this still reads the old number — it is now WRONG
+                      IN ONE PLACE instead of two, and that place is the library. */}
+                  {' '}{pullupDoseNote(weeklyVolumeFor(pullupMaxReps), pullupMaxReps)}
+                  {' '}It replaces your pull pick on all three days while it is on.
+                  {weeklyVolumeFor(pullupMaxReps).assistedOnRamp
                     ? ' Band-assisted reps are logged separately, so they never count as clean ones.'
                     : ''}
                 </p>
@@ -3319,7 +3225,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 week entirely. First day open, the rest collapsed to their one-line summary — the
                 same pattern, so the two screens do not teach two different interactions. */}
             <div className="space-y-2">
-              {LIFT_DAYS.map((day) => {
+              {ACCESSORY_CARD_DAYS.map((day) => {
                 const picks = state.assistancePicks.by_day[day];
                 const open = expandedAssistanceDay === day;
                 const summary = [picks.push, picks.pull, picks.single_leg_core, picks.abs]
@@ -3333,7 +3239,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       aria-expanded={open}
                     >
                       <span className="min-w-0">
-                        <span className="block text-white/85 text-sm">{LIFT_DAY_LABEL[day]}</span>
+                        <span className="block text-white/85 text-sm">{ACCESSORY_CARD_LABEL[day]}</span>
                         {!open && <span className="block text-white/55 text-xs truncate mt-0.5">{summary}</span>}
                       </span>
                       <ChevronDown
@@ -3366,7 +3272,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 }))}
                                 className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
                                 style={{ fontSize: '16px' }}
-                                aria-label={`${LIFT_DAY_LABEL[day]} ${CATEGORY_LABEL[category]} exercise`}
+                                aria-label={`${ACCESSORY_CARD_LABEL[day]} ${CATEGORY_LABEL[category]} exercise`}
                               >
                                 {/* ⛔ VALUE IS THE STORED NAME, LABEL IS WENDLER'S WORD. `Back
                                     Extension` is stored so the token resolves (D-322); the athlete
@@ -3419,7 +3325,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               }))}
                               className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
                               style={{ fontSize: '16px' }}
-                              aria-label={`${LIFT_DAY_LABEL[day]} abs exercise`}
+                              aria-label={`${ACCESSORY_CARD_LABEL[day]} abs exercise`}
                             >
                               {absOptions(strengthEquipment).map((o) => (
                                 <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
@@ -4180,7 +4086,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     start at the band's floor — the ~2-sessions-a-week maintenance dose, not a new
                     number — and the app learns them from what they log. Worst case an
                     experienced athlete is under-asked for a few weeks and raises it; never that
-                    someone is handed a volume they cannot carry with four lifting days. */}
+                    someone is handed a volume they cannot carry with three lifting days. */}
                 <button
                   type="button"
                   onClick={() => setState((st) => ({ ...st, usualMiles: '', targetMiles: startLightMiles() }))}
