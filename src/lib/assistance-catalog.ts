@@ -9,9 +9,12 @@
  * those rules was sourced and defensible, and the whole arrangement existed to answer a question the
  * athlete is better placed to answer themselves.
  *
- * The new model is Forever p.24: **four lift days, each carrying push · pull · single-leg/core, one
- * movement per category, chosen by the athlete.** No re-roling, no substitution notes, nothing to
- * apologise for — the frame is locked and the movement inside it is theirs.
+ * The new model is Forever p.24: **each lift day carries push · pull · single-leg/core, one movement
+ * per category, chosen by the athlete.** No re-roling, no substitution notes, nothing to apologise
+ * for — the frame is locked and the movement inside it is theirs.
+ *
+ * ⚠️ THERE ARE THREE DAYS, NOT FOUR (slice 5, 2026-08-17) — Squat · Bench · Deadlift + Press. The
+ * per-day frame is unchanged; what changed is how many days there are to frame. See {@link LIFT_DAYS}.
  *
  * ── WHAT DOES NOT CHANGE ──────────────────────────────────────────────────────────────────────────
  *
@@ -42,27 +45,49 @@ export const CATEGORY_LABEL: Record<AssistanceCategory, string> = {
 };
 
 /**
- * The four lift days. ⛔ THESE KEYS ARE STORAGE — they are persisted on
- * `goals.training_prefs.assistance_picks` and renaming one strands every goal that carries it.
+ * ⛔ THE THREE LIFT DAYS — ONE KEY PER DAY, NOT ONE PER LIFT (§1f-0 / slice 5, 2026-08-17).
+ *
+ * This was four keys, one per main lift, and that was only ever correct while four lifts meant four
+ * days. Every Strong Focus block is three days now: **Squat · Bench · Deadlift + Press**. The press
+ * has no day of its own — it stacks onto the deadlift's — so a `press` key was a bucket nothing
+ * could read: the merge takes the heavier lift's block (`strength-primary-plan.ts`, §1e — Wendler's
+ * stacked day is the mains plus ONE round, p.77), and an athlete's press-day picks were discarded in
+ * silence. Asking for twelve movements and building nine.
+ *
+ * ⛔ THE `press` KEY IS DELETED, NOT KEPT, AND THERE IS NO READ-PATH FOR IT. Pre-launch, one
+ * athlete, no external users — a stored `by_day.press` from an older goal is simply not read, and
+ * `normalizeAssistancePrefs` returns the current shape from any input, so nothing strands. Do not
+ * add a fallback, a shim, or a tolerance branch: *"if a change cannot delete what it replaces, stop
+ * and say so."*
+ *
+ * ⚠️ THESE KEYS ARE STORAGE — they are persisted on `goals.training_prefs.assistance_picks`.
+ * ⚠️ THE ORDER IS THE ORDER THE ATHLETE SEES (work order §1f: "Picker shows three cards: Squat ·
+ * Bench · Deadlift + Press"), and it is load-bearing beyond display — `buildDefaultWeek` rotates a
+ * focus pool by day INDEX, so reordering this array reassigns which movement lands on which day.
  */
-export type LiftDay = 'press' | 'bench' | 'squat' | 'deadlift';
-export const LIFT_DAYS: LiftDay[] = ['press', 'bench', 'squat', 'deadlift'];
+export type LiftDay = 'squat' | 'bench' | 'deadlift';
+export const LIFT_DAYS: LiftDay[] = ['squat', 'bench', 'deadlift'];
+/** ⛔ ONE OWNER FOR THE DAY'S NAME. The shared day says so — the athlete picks for both lifts at once. */
 export const LIFT_DAY_LABEL: Record<LiftDay, string> = {
-  press: 'Press',
-  bench: 'Bench',
   squat: 'Squat',
-  deadlift: 'Deadlift',
+  bench: 'Bench',
+  deadlift: 'Deadlift + Press',
 };
 
 /**
  * Main-lift name → day key. ⛔ THE NAMES ARE `MAIN_LIFTS` IN `strength-primary-plan.ts` VERBATIM
  * ("Overhead Press", "Bench Press", "Back Squat", "Deadlift"). If that table is renamed this map
  * must move with it, or the composer silently falls back to the balanced default for every day.
+ *
+ * ⛔ THE OVERHEAD PRESS RESOLVES TO THE DEADLIFT'S DAY, because that is the day it is trained on.
+ * It used to return its own `'press'` key, and the composer then authored a full assistance block
+ * for a session the merge threw away. Pointing it at the merged day is what makes an athlete's picks
+ * for "Deadlift + Press" actually reach the built session.
  */
 export function liftDayForMainLift(mainLiftName: string | null | undefined): LiftDay | null {
   const n = String(mainLiftName ?? '').trim().toLowerCase();
   if (!n) return null;
-  if (n.includes('overhead press') || n === 'press' || n === 'ohp') return 'press';
+  if (n.includes('overhead press') || n === 'press' || n === 'ohp') return 'deadlift';
   if (n.includes('bench')) return 'bench';
   if (n.includes('squat')) return 'squat';
   if (n.includes('deadlift')) return 'deadlift';
@@ -233,7 +258,6 @@ export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
 /**
  * ⛔ WENDLER'S OWN PAIRINGS, NOT A ROTATION SOMEONE INVENTED.
  *
- *   Press    → Dips + Chin-Ups            Triumvirate p.48, verbatim
  *   Bench    → DB Bench + DB Row          Triumvirate p.48, verbatim
  *   Squat    → low back                   Periodization Bible p.51 ("Squat day → low back, quads, abs")
  *   Deadlift → hamstrings                 Periodization Bible p.51 ("Deadlift day → hamstrings, quads, abs")
@@ -248,13 +272,20 @@ export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
  * is for. Do not "fix" this by adding Curls or a Pushdown to the default; opt-in isolation is the
  * design, and putting it in the default spends rep budget the compounds already cover.
  *
- * ⚠️ ABS LAND ON PRESS DAY, ONCE. The three categories are fixed, so the abs movement occupies the
- * single-leg/core slot on the day where leg work is least useful — the press day, which carries no
- * lower-body main lift. An athlete who wants more taps "+ abs" on any day; that is an ADD-ON sharing
- * the slot's rep budget, never a fourth category.
+ * ⛔ THE PRESS ROW IS DELETED WITH ITS DAY (slice 5, 2026-08-17). It was Dips + Chin-Up + Hanging
+ * Leg Raise — Triumvirate p.48's press pairing, verbatim — and it is gone because the day is gone,
+ * not because the pairing was wrong. The press is trained on the deadlift's day now and that day
+ * keeps ITS block (§1e: one round per stacked day).
+ *
+ * ⚠️ AND THE DEFAULT WEEK NO LONGER CARRIES AN ABS MOVEMENT. The old note read *"abs land on press
+ * day, once"* — the single-leg/core slot on the one day with no lower-body main lift. There is no
+ * such day left: bench is the only upper day and its slot is Reverse Lunge. **This is a real content
+ * consequence of the merge, not an oversight** — an athlete who wants abs taps "+ abs" on any day
+ * (an ADD-ON sharing the slot's rep budget, never a fourth category), and the Abs focus chip still
+ * re-points the category. ⛔ Do not quietly swap the bench day's Reverse Lunge for a leg raise to
+ * restore it: that is a default-content decision, and it belongs to whoever owns §1f's card copy.
  */
 export const BALANCED_WEEK: Record<LiftDay, Record<AssistanceCategory, string>> = {
-  press: { push: 'Dips', pull: 'Chin-Up', single_leg_core: 'Hanging Leg Raise' },
   bench: { push: 'DB Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Reverse Lunge' },
   // ⛔ INVERTED ROW, NOT LAT PULLDOWN (Slice 7). The default block must be performable BY A NORMAL
   // HOME GYM with nothing swapped — that is Slice 7's guardrail — and a lat pulldown needs a cable
@@ -401,7 +432,7 @@ function isFocusChip(v: unknown): v is FocusChip {
  * Three inputs it must survive, because all three exist in the wild:
  *   · **absent / null** — the athlete skipped the card. → the balanced default.
  *   · **v1, the flat 3-pick shape** `{push, pull, single_leg_core}` — every goal created before
- *     2026-08-13. → the same three picks applied to all four days, which is exactly what the old
+ *     2026-08-13. → the same three picks applied to every day, which is exactly what the old
  *     model MEANT before its re-roling machinery moved them around. A pick with no catalog
  *     equivalent falls back to that day's balanced default rather than stranding the goal.
  *   · **v2** — validated per day; anything unrecognised falls back per slot, not per week, so one
@@ -455,7 +486,7 @@ export function normalizeAssistancePrefs(raw: unknown): AssistanceWeekPrefs {
  * Build a week from the focus chips — the "set it once" answer the picker opens on.
  *
  * ⛔ A FOCUS REPLACES ONLY THE CATEGORY IT SPEAKS TO, and it rotates through that category's pool
- * across the four days rather than putting the same movement on all of them. 200 reps a week of one
+ * across the days rather than putting the same movement on all of them. 200 reps a week of one
  * movement is the complaint D-328 was written to solve and it is not being reintroduced through the
  * focus door.
  *
@@ -584,7 +615,19 @@ export function resolveDayAssistance(
    */
   athleteEquipment?: string[] | null,
 ): ResolvedAssistanceRow[] {
-  const picks: DayPicks = prefs.by_day[day] ?? { ...BALANCED_WEEK[day], abs: null };
+  /**
+   * ⛔ §0h — AN UNRECOGNISED DAY DEGRADES TO A COMPLETE BLOCK, NEVER TO A THROW. This resolved
+   * `BALANCED_WEEK[day]` in two places and neither was guarded; while every `LiftDay` was a key of
+   * that table it could not misfire. Slice 5 deleted the `press` key (2026-08-17), so an unknown
+   * key is now genuinely reachable — a stale caller, an older stored shape, a main lift the map does
+   * not recognise — and the second dereference threw `undefined.single_leg_core` mid-build.
+   *
+   * ⚠️ THE FALLBACK IS A REAL DAY'S BLOCK, NOT AN EMPTY ONE. `LIFT_DAYS[0]` is a complete, sourced
+   * set of three picks, which is what §0h asks for: unknown means "we have not been told", never
+   * "this athlete trains nothing".
+   */
+  const dayDefaults = BALANCED_WEEK[day] ?? BALANCED_WEEK[LIFT_DAYS[0]];
+  const picks: DayPicks = prefs.by_day[day] ?? { ...dayDefaults, abs: null };
   const row = (category: AssistanceCategory, name: string, reps: number): ResolvedAssistanceRow => ({
     category,
     name,
@@ -598,7 +641,7 @@ export function resolveDayAssistance(
     return pool[0]?.name ?? name;
   };
 
-  const legName = gated('single_leg_core', picks.single_leg_core || BALANCED_WEEK[day].single_leg_core);
+  const legName = gated('single_leg_core', picks.single_leg_core || dayDefaults.single_leg_core);
   // The abs add-on gates against the ABS pool, not the single-leg one — replacing a Weighted Sit-Up
   // with a lunge would double the leg slot and drop the abs work the athlete added.
   const absRaw = picks.abs || null;
@@ -608,14 +651,14 @@ export function resolveDayAssistance(
   const [legReps, absReps] = absName ? splitRepsForAbs(totalReps) : [totalReps, 0];
 
   const rows = [
-    row('push', gated('push', picks.push || BALANCED_WEEK[day].push), totalReps),
+    row('push', gated('push', picks.push || dayDefaults.push), totalReps),
     // ⚠️ THE PULL-UP PROGRESSION ROW IS DELIBERATELY NOT GATED. It is an opt-in programme whose
     // whole content is "chins, every lifting day" — an athlete who opted in and owns no bar is a
     // contradiction the intake should catch, and silently rewriting the programme's movement here
     // would be worse than showing them what they signed up for.
     pullup
       ? row('pull', pullup.movement, pullup.totalReps)
-      : row('pull', gated('pull', picks.pull || BALANCED_WEEK[day].pull), totalReps),
+      : row('pull', gated('pull', picks.pull || dayDefaults.pull), totalReps),
     row('single_leg_core', legName, legReps),
   ];
   if (absName) {

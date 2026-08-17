@@ -274,7 +274,7 @@ export function getInSlotAlternatives(
   // pattern logic below.
   // ⛔ THE PEERS ARE THE MOVEMENT'S OWN CATEGORY, GATED BY KIT — and the day no longer narrows them
   // (D-407). It used to: the block re-roled a slot per day, so a push row on a squat day had to be
-  // offered core movements. Nothing is re-roled now — a push row is a push row on all four days — so
+  // offered core movements. Nothing is re-roled now — a push row is a push row on every day — so
   // `mainLift` has nothing to say here and is no longer passed. The category IS the answer.
   const planPeers = opts?.assistanceRow ? assistancePeersFor(plannedName, equipment) : null;
   if (planPeers) {

@@ -48,6 +48,7 @@ import {
 // simply renders them. See `src/lib/assistance-catalog.ts`.
 import {
   type AssistanceWeekPrefs,
+  LIFT_DAYS,
   liftDayForMainLift,
   normalizeAssistancePrefs,
   resolveDayAssistance,
@@ -557,9 +558,9 @@ function assistanceRows(
   // so flattening it would have been a silent behaviour loss dressed as fidelity to a mock.
   scale?: AssistanceScaleInputs,
   /**
-   * ⛔ THE DAY'S MAIN LIFT NOW SELECTS WHICH OF THE ATHLETE'S FOUR DAYS THIS IS — it no longer
-   * decides what goes in the slots (D-407). Absent, or a lift this map does not recognise, → the
-   * balanced default week, which is a complete block rather than a degraded one (§0h).
+   * ⛔ THE DAY'S MAIN LIFT SELECTS WHICH OF THE ATHLETE'S THREE DAYS THIS IS — it no longer decides
+   * what goes in the slots (D-407). Absent, or a lift this map does not recognise, → the balanced
+   * default week, which is a complete block rather than a degraded one (§0h).
    */
   mainLiftName?: string | null,
   /**
@@ -572,7 +573,11 @@ function assistanceRows(
   athleteEquipment?: string[] | null,
 ): { rows: StrengthExercise[]; note: string | null } {
   const prefs: AssistanceWeekPrefs = normalizeAssistancePrefs(picks);
-  const day = liftDayForMainLift(mainLiftName) ?? 'press';
+  // ⛔ THE FALLBACK IS A REAL DAY. It was `?? 'press'`, which slice 5 deleted (2026-08-17) — an
+  // unrecognised main lift would have handed `resolveDayAssistance` a key that is no longer a
+  // `LiftDay`. §0h says unknown degrades to a COMPLETE block, so it degrades to the first day's,
+  // read off the list rather than named, so it cannot rot the next time the order changes.
+  const day = liftDayForMainLift(mainLiftName) ?? LIFT_DAYS[0];
 
   // ⛔ THE PULL-UP PROGRESSION, WHEN THE ATHLETE OPTED IN. It pins the pull category to a chin/pull-up
   // on every lifting day, at Wendler's own weekly dose, with the grip rotating day to day (Forever
@@ -2801,9 +2806,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // second lift of a session is trained fatigued, so the order decides which lift pays. Merged in
     // that order rather than in whatever order the solver's day map produced.
     //
-    // ⚠️ ASSISTANCE COMES FROM THE FIRST LIFT'S RESOLUTION and that is not a shortcut: both lifts on
-    // this day are presses, so `resolveAssistance` gives them the same day-type roles (push · pull ·
-    // core). Taking the heavier lift's block is the same three slots either way.
+    // ⚠️ ASSISTANCE COMES FROM THE FIRST LIFT'S RESOLUTION, AND IT IS STILL LOAD-BEARING (checked
+    // 2026-08-17 under slice 5). Both lifts on this day now resolve the SAME day key — the overhead
+    // press maps to `'deadlift'`, because that is the day it is trained on — so the two per-lift
+    // blocks are byte-identical rather than merely equivalent. Taking one is what keeps the stacked
+    // day at ONE round of assistance (§1e, p.77); deleting this step would emit both and put six
+    // assistance rows on the day, which is the dose error the eight-exercise bug above already was.
+    // ⛔ So: not redundant, and not to be "simplified" now that the keys agree — the agreement is
+    // exactly why one of them has to be dropped.
     {
       const byDay = new Map<string, PlanSession[]>();
       for (const ws of weekSessions) {
@@ -2815,7 +2825,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         const ordered = [...group].sort((a, b) =>
           PAIRED_LIFTS.findIndex((n) => a.name.endsWith(n)) - PAIRED_LIFTS.findIndex((n) => b.name.endsWith(n)));
         const [first, ...rest] = ordered;
-        // Main lifts in order, then ONE assistance block — the first lift's, since both are presses.
+        // Main lifts in order, then ONE assistance block — the first lift's; both resolve the same day.
         const mainOf = (ws: PlanSession) => (ws.strength_exercises ?? []).filter((e: StrengthExercise) =>
           MAIN_LIFTS.some((l) => l.name === e.name));
         const assistanceOf = (ws: PlanSession) => (ws.strength_exercises ?? []).filter((e: StrengthExercise) =>

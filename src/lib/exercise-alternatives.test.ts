@@ -233,7 +233,7 @@ Deno.test('the shorthand aliases are main lifts too', () => {
 //
 // Every one of those pinned the swap sheet REPRODUCING THE COMPOSER'S INFERENCE about the day. The
 // composer no longer infers: the athlete picks each day's three movements, so a push row is a push
-// row on all four days and the sheet's answer is simply the rest of its category. `mainLift` stopped
+// row on every lifting day and the sheet's answer is simply the rest of its category. `mainLift` stopped
 // being an input — it is not passed any more, and there is nothing left for it to narrow.
 //
 // ⚠️ WHAT REPLACED IT IS A GATE, NOT A ROLE RULE: the sheet is filtered by the athlete's EQUIPMENT,

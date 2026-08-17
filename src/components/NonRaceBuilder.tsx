@@ -28,6 +28,7 @@ import {
   FOCUS_LABEL,
   type FocusChip,
   LIFT_DAY_LABEL,
+  LIFT_DAYS,
   type LiftDay,
   normalizeAssistancePrefs,
   optionsFor,
@@ -35,31 +36,6 @@ import {
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
 
-/**
- * ⛔ THE THREE CARDS THE ACCESSORY PICKER OFFERS, AND WHY THIS IS NOT `LIFT_DAYS` (§1f-0, 2026-08-16).
- *
- * `assistance-catalog.LIFT_DAYS` is `['press','bench','squat','deadlift']` — the four KEYS the
- * stored `by_day` map is shaped by, and the engine still reads all four. This is the list of days
- * the athlete is ASKED about, and there are three of them: the press has no day of its own, and the
- * shared day takes the DEADLIFT's block (Wendler's stacked day is the mains plus ONE round, p.77 —
- * `strength-primary-plan.ts:2856-2863`).
- *
- * ⚠️ SO THE FOURTH CARD WAS NOT COSMETIC — IT ATE PICKS. An athlete filling the press card had all
- * three movements silently discarded; `assistance-collision.test.ts` asserts exactly that they reach
- * nothing. Asking for twelve movements and building nine is the defect, and it is fixed by not
- * asking, not by pretending the engine honours it.
- *
- * ⛔ DO NOT "TIDY" THIS BY NARROWING `LIFT_DAYS` ITSELF. That constant is the catalog's key set —
- * `BALANCED_WEEK`, `buildDefaultWeek`, `resolveDayAssistance` and the grip rotation are all shaped
- * by it, and `by_day.press` still has to round-trip for every block already on file. This is a
- * SCREEN decision about what to ask; the library's shape is slice 4's question, not this one's.
- */
-const ACCESSORY_CARD_DAYS: LiftDay[] = ['squat', 'bench', 'deadlift'];
-/** The shared day says so on its own card — the athlete is picking for both lifts at once. */
-const ACCESSORY_CARD_LABEL: Record<LiftDay, string> = {
-  ...LIFT_DAY_LABEL,
-  deadlift: 'Deadlift + Press',
-};
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
@@ -622,8 +598,9 @@ type NonRaceState = {
    *  bodyweight default, so skipping this is a valid answer that still yields a complete block.
    *  (Replaced `accessoryBias` — the Glutes/Hyrox add-ons move to the Adjust tab, D-323, where they
    *  REPLACE a slot rather than stacking on top of the block.) */
-  /** D-407: twelve slots × four day KEYS + the focus chips. Persisted whole. ⚠️ Still four keys —
-   *  the wizard asks about three (§1f-0), and `by_day.press` round-trips for blocks already on file. */
+  /** D-407: nine slots × three day keys + the focus chips. Persisted whole. ⚠️ Three keys as of
+   *  slice 5 — the press key is deleted, not stored; `normalizeAssistancePrefs` returns the current
+   *  shape whatever an older goal carries. */
   assistancePicks: AssistanceWeekPrefs;
   /** Swim slots per week. Booked, not coached (D-323 §5) — it exists for the triathlete who wants
    *  the time held. Only asked when swim is kept for the block. */
@@ -1203,10 +1180,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [showHardDayWhy, setShowHardDayWhy] = useState(false);
   // ⛔ ONE DAY OPEN AT A TIME — the `StrengthLogger.tsx` accordion pattern (`expandedExercises`).
   // Nine dropdowns open at once is three phone screens of scrolling and the week loses its shape.
-  // ⚠️ SEEDED FROM THE CARD LIST, NOT A LITERAL. This was `'press'`, which is no longer a card
-  // (§1f-0) — leaving it would have opened the screen with every card collapsed and no way to tell
+  // ⚠️ SEEDED FROM THE DAY LIST, NOT A LITERAL. This was `'press'`, which is no longer a day at all
+  // (slice 5) — leaving it would have opened the screen with every card collapsed and no way to tell
   // that was a bug rather than the design.
-  const [expandedAssistanceDay, setExpandedAssistanceDay] = useState<LiftDay | null>(ACCESSORY_CARD_DAYS[0]);
+  const [expandedAssistanceDay, setExpandedAssistanceDay] = useState<LiftDay | null>(LIFT_DAYS[0]);
   /**
    * The athlete's declared kit, for the picker's equipment GATE (slice 4). ⛔ ARC IS THE SOURCE — the
    * same `equipment.strength` chips `equipmentTierFromArc` reads two hundred lines up. An empty list
@@ -3225,7 +3202,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 week entirely. First day open, the rest collapsed to their one-line summary — the
                 same pattern, so the two screens do not teach two different interactions. */}
             <div className="space-y-2">
-              {ACCESSORY_CARD_DAYS.map((day) => {
+              {LIFT_DAYS.map((day) => {
                 const picks = state.assistancePicks.by_day[day];
                 const open = expandedAssistanceDay === day;
                 const summary = [picks.push, picks.pull, picks.single_leg_core, picks.abs]
@@ -3239,7 +3216,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       aria-expanded={open}
                     >
                       <span className="min-w-0">
-                        <span className="block text-white/85 text-sm">{ACCESSORY_CARD_LABEL[day]}</span>
+                        <span className="block text-white/85 text-sm">{LIFT_DAY_LABEL[day]}</span>
                         {!open && <span className="block text-white/55 text-xs truncate mt-0.5">{summary}</span>}
                       </span>
                       <ChevronDown
@@ -3272,7 +3249,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 }))}
                                 className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
                                 style={{ fontSize: '16px' }}
-                                aria-label={`${ACCESSORY_CARD_LABEL[day]} ${CATEGORY_LABEL[category]} exercise`}
+                                aria-label={`${LIFT_DAY_LABEL[day]} ${CATEGORY_LABEL[category]} exercise`}
                               >
                                 {/* ⛔ VALUE IS THE STORED NAME, LABEL IS WENDLER'S WORD. `Back
                                     Extension` is stored so the token resolves (D-322); the athlete
@@ -3325,7 +3302,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               }))}
                               className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
                               style={{ fontSize: '16px' }}
-                              aria-label={`${ACCESSORY_CARD_LABEL[day]} abs exercise`}
+                              aria-label={`${LIFT_DAY_LABEL[day]} abs exercise`}
                             >
                               {absOptions(strengthEquipment).map((o) => (
                                 <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>

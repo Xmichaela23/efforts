@@ -137,22 +137,31 @@ Deno.test('⛔ THE ATHLETE\'S PICK IS WHAT APPEARS — nothing is re-roled, on a
 });
 
 Deno.test('the balanced default is Wendler\'s own pairings (Triumvirate p.48, Bible p.51)', () => {
-  assertEquals(BALANCED_WEEK.press.push, 'Dips');
-  assertEquals(BALANCED_WEEK.press.pull, 'Chin-Up');
+  // ⛔ THE PRESS ROW IS GONE WITH ITS DAY (slice 5, 2026-08-17). It pinned Triumvirate p.48's press
+  // pairing — Dips + Chin-Up — and there is no press day to carry it: the press is trained on the
+  // deadlift's day, which keeps its own block (§1e, one round per stacked day).
   assertEquals(BALANCED_WEEK.bench.push, 'DB Bench Press');
   assertEquals(BALANCED_WEEK.bench.pull, 'Dumbbell Row');
   // p.51: squat day → low back; deadlift day → hamstrings.
   assertEquals(BALANCED_WEEK.squat.single_leg_core, 'Back Extension');
   assertEquals(BALANCED_WEEK.deadlift.single_leg_core, 'Glute-Ham Raise');
-  // Abs land once, on the day with no lower-body main lift.
-  assertEquals(BALANCED_WEEK.press.single_leg_core, 'Hanging Leg Raise');
+  // ⚠️ AND THE DEFAULT WEEK NOW CARRIES NO ABS MOVEMENT. It used to land once, on the press day —
+  // the only day with no lower-body main lift. That day is gone, so it is asserted as ABSENT rather
+  // than left unsaid: an athlete reaches abs through "+ abs" or the Abs focus chip. This is a
+  // content consequence of the merge, and pinning it is what stops it being rediscovered as a bug.
+  assertEquals(
+    Object.values(BALANCED_WEEK).some((d) => d.single_leg_core === 'Hanging Leg Raise'), false,
+    'the balanced week grew an abs default back without a decision',
+  );
+  assertEquals(Object.keys(BALANCED_WEEK).sort(), ['bench', 'deadlift', 'squat']);
 });
 
-Deno.test('the four days do not run the same movement in a category', () => {
+Deno.test('the days do not run the same movement in a category', () => {
   const prefs = normalizeAssistancePrefs(null);
   for (const category of ['push', 'pull', 'single_leg_core'] as const) {
     const names = LIFT_DAYS.map((d) => prefs.by_day[d][category]);
-    assertEquals(new Set(names).size, 4, `${category} repeats across the week: ${names.join(', ')}`);
+    assertEquals(new Set(names).size, LIFT_DAYS.length,
+      `${category} repeats across the week: ${names.join(', ')}`);
   }
 });
 
@@ -301,7 +310,11 @@ Deno.test('⛔ THE GLUTES FOCUS ANSWERS ITS OWN NAME — a hip thrust, not three
   // for an athlete with no barbell.
   assertEquals(pool[0], 'Barbell Hip Thrust');
   assertEquals(pool[1], 'Single-Leg Hip Thrust');
-  assertEquals(buildDefaultWeek(['glutes'], HOME).press.single_leg_core, 'Barbell Hip Thrust');
+  // ⚠️ THE ROTATION'S FIRST DAY, NOT THE PRESS DAY. `buildDefaultWeek` walks the pool by day INDEX,
+  // and the press key is deleted (slice 5) — so the leading movement lands on `LIFT_DAYS[0]`, which
+  // is the squat day. Read off the list rather than naming a day, so this cannot silently re-point
+  // again if the order changes.
+  assertEquals(buildDefaultWeek(['glutes'], HOME)[LIFT_DAYS[0]].single_leg_core, 'Barbell Hip Thrust');
 });
 
 Deno.test('the bodyweight hip thrust carries the glutes focus when there is no barbell', () => {
@@ -488,8 +501,10 @@ Deno.test('the composer gives each lifting day ITS OWN picks', () => {
     ...base,
     assistancePicks: {
       version: 2,
+      // ⛔ THREE KEYS, AND THERE IS NO FOURTH TO PASS (slice 5, 2026-08-17). This fixture used to
+      // carry a `press` block whose only job was to be discarded. The press has no key now: it is
+      // trained on the deadlift's day and reads that day's picks.
       by_day: {
-        press: { push: 'Plate Raise', pull: 'Face Pull', single_leg_core: 'Reverse Hyper' },
         bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
         squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge' },
         deadlift: { push: 'DB Shoulder Press', pull: 'Inverted Row', single_leg_core: 'Glute-Ham Raise' },
@@ -501,38 +516,66 @@ Deno.test('the composer gives each lifting day ITS OWN picks', () => {
   const namesFor = (session: string) => rows.filter((r: any) => r.session === session).map((r: any) => r.name);
   assertEquals(namesFor('Strength — Bench Press').slice(0, 3), ['Dips', 'Barbell Row', 'Front Squat']);
   assertEquals(namesFor('Strength — Back Squat').slice(0, 3), ['Push-Up', 'Lat Pulldown', 'Reverse Lunge']);
-  // ⛔ THREE LIFTING DAYS, SO THERE ARE THREE BLOCKS OF PICKS, NOT FOUR (2026-08-16, §1f-0). The
-  // shared day takes the FIRST lift's block — the deadlift's — because Wendler's stacked day is the
-  // main lifts plus ONE round of everything else (p.77). Two rounds is the eight-exercise dose error.
+  // ⛔ THE SHARED DAY BUILDS THE ATHLETE'S DEADLIFT+PRESS PICKS, AND THIS IS THE INVERSION SLICE 5
+  // EXISTS FOR. The old assertion here was that a fourth block of picks reached NOTHING — twelve
+  // movements asked for, nine built, three discarded in silence. There is no fourth block to
+  // discard now, and the three that are stored are the three that appear. ONE round, not two
+  // (§1e, p.77).
   assertEquals(namesFor('Strength — Deadlift + Overhead Press').slice(0, 3),
     ['DB Shoulder Press', 'Inverted Row', 'Glute-Ham Raise']);
-  // ⚠️ SO THE PRESS-DAY PICKS REACH NOTHING, AND THAT IS ASSERTED RATHER THAN LEFT UNSAID. `by_day.press`
-  // is a stored preference the engine can never honour: the press has no day of its own to carry it.
-  //
-  // ✅ THE WIZARD NO LONGER ASKS FOR THEM (§1f-0, 2026-08-16). `NonRaceBuilder.tsx` shows THREE
-  // accessory cards — Squat · Bench · Deadlift + Press — so nothing an athlete types can land in
-  // this slot any more. ⛔ THE ASSERTIONS BELOW STAY REGARDLESS: the key still exists in the stored
-  // shape, every block built before today carries one, and `normalizeAssistancePrefs` will keep
-  // seeding it. What this test pins is that a value in that slot is INERT — if it ever starts
-  // surfacing, an old block's dead pick would appear in a new week with no one having chosen it.
+  // ⛔ ONE ROUND PER WEEK, NOT TWO. `assistanceRowsOf` spans the whole block, so this counts the
+  // stacked day's rows in ONE week — three, never six. A second round is what deleting the merge's
+  // de-duplication would produce, and it is invisible in a `.slice(0, 3)` assertion.
+  const stackedWeek2 = ((plan as any).sessions_by_week['2'] as any[])
+    .filter((x: any) => x.name === 'Strength — Deadlift + Overhead Press')
+    .flatMap((x: any) => (x.strength_exercises ?? []))
+    .filter((e: any) => e.load_prescribed === false && e.name !== 'Box Jump');
+  assertEquals(stackedWeek2.length, 3,
+    `the stacked day emitted ${stackedWeek2.length} assistance rows: ${stackedWeek2.map((e: any) => e.name).join(', ')}`);
+  // ⛔ AND THERE IS NO STANDALONE PRESS SESSION TO CARRY A BLOCK OF ITS OWN.
   assertEquals(namesFor('Strength — Overhead Press'), []);
-  const everyName = rows.map((r: any) => r.name);
-  for (const pick of ['Plate Raise', 'Face Pull', 'Reverse Hyper']) {
-    assertEquals(everyName.includes(pick), false,
-      `${pick} was a press-day pick and the press has no day — it must not surface elsewhere`);
+});
+
+Deno.test('⛔ A STORED `press` KEY FROM AN OLDER GOAL IS DROPPED, NOT READ', () => {
+  // Pre-launch, one athlete, no migration (slice 5's standing constraint). An older goal's stored
+  // shape carries a fourth key; the normalizer returns the CURRENT shape from any input, so the key
+  // does not survive the read and its picks cannot surface on a day nobody assigned them to.
+  const prefs = normalizeAssistancePrefs({
+    version: 2,
+    by_day: {
+      press: { push: 'Plate Raise', pull: 'Face Pull', single_leg_core: 'Reverse Hyper' },
+      bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+      squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge' },
+      deadlift: { push: 'DB Shoulder Press', pull: 'Inverted Row', single_leg_core: 'Glute-Ham Raise' },
+    },
+    focus: [],
+  });
+  assertEquals(Object.keys(prefs.by_day).sort(), ['bench', 'deadlift', 'squat']);
+  const everyPick = LIFT_DAYS.flatMap((d) => [
+    prefs.by_day[d].push, prefs.by_day[d].pull, prefs.by_day[d].single_leg_core,
+  ]);
+  for (const orphan of ['Plate Raise', 'Face Pull', 'Reverse Hyper']) {
+    assertEquals(everyPick.includes(orphan), false,
+      `${orphan} came from the deleted press key and must not resurface on another day`);
   }
 });
 
 Deno.test('the main-lift name maps to the athlete\'s day, and an unknown lift degrades to a complete block', () => {
-  assertEquals(liftDayForMainLift('Overhead Press'), 'press');
+  // ⛔ THE OVERHEAD PRESS RESOLVES TO THE DEADLIFT'S DAY (slice 5, 2026-08-17), because that is the
+  // day it is trained on. It used to return its own `'press'` key and the composer authored a full
+  // assistance block for a session the merge then threw away — twelve movements asked for, nine
+  // built. This assertion IS the fix: an athlete's picks for "Deadlift + Press" now reach the
+  // session that exists.
+  assertEquals(liftDayForMainLift('Overhead Press'), 'deadlift');
   assertEquals(liftDayForMainLift('Bench Press'), 'bench');
   assertEquals(liftDayForMainLift('Back Squat'), 'squat');
   assertEquals(liftDayForMainLift('Deadlift'), 'deadlift');
   assertEquals(liftDayForMainLift('Trap Bar Deadlift'), 'deadlift');
   assertEquals(liftDayForMainLift('Zercher Something'), null);
-  // §0h — unknown degrades to UNCHANGED (the press day's picks), never to an empty session.
+  // §0h — an unrecognised day key degrades to a COMPLETE block, never to an empty session. `'press'`
+  // is now exactly such a key: it is not a `LiftDay` any more, and asking for it must still answer.
   const prefs = normalizeAssistancePrefs(null);
-  assertEquals(resolveDayAssistance(prefs, 'press', 50).length, 3);
+  assertEquals(resolveDayAssistance(prefs, 'press' as never, 50).length, 3);
 });
 
 // ── THE ARMS FOCUS IS SUBSUMED BY THE CHIN PROGRESSION ───────────────────────────────────────────

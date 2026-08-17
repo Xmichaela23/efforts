@@ -78,8 +78,21 @@ export const GRIP_ROTATION: GripVariant[] = ['chin', 'pull', 'neutral', 'wide'];
  * ⚠️ MIRRORS `LIFT_DAYS` in `assistance-catalog.ts` and must keep mirroring it. It is not imported
  * because this module is the pull-up programme and the catalog is the picker; a one-way import here
  * would make the picker depend on the programme rather than the other way round.
+ *
+ * ⛔⛔ THE FOURTH GRIP IS NOW UNREACHABLE, AND FIXING THAT IS **§1h / SLICE 4**, NOT THIS CHANGE.
+ * Slice 5 narrowed `LIFT_DAYS` to three days, so this array follows it to three — and with four
+ * grips indexed by a three-day list, the last entry of {@link GRIP_ROTATION} is never selected. With
+ * the rotation as `['chin','pull','neutral','wide']` that orphans **`wide`**; before this change the
+ * orphaned one was nothing, because four days consumed all four grips.
+ *
+ * ⚠️ `chin` IS STILL REACHED HERE — it is index 0, which the squat day now takes. That matters
+ * because §1h's headline bug was *"the chin-up progression never prescribes a chin-up"*, and that
+ * bug was caused by `press` (index 0) losing its day. Narrowing the array moved index 0 onto a day
+ * that exists, so the chin-up is built again — **as a side effect, not as the fix.** §1h's real fix
+ * is rotating across WEEKS (`grips[absoluteSessionIndex % 4]`), which reaches all four grips and
+ * deletes this map entirely. Do not treat the chin-up's return as §1h being done.
  */
-export const LIFT_DAY_ORDER_FOR_GRIP = ['press', 'bench', 'squat', 'deadlift'] as const;
+export const LIFT_DAY_ORDER_FOR_GRIP = ['squat', 'bench', 'deadlift'] as const;
 
 export const GRIP_LABEL: Record<GripVariant, string> = {
   chin: 'underhand',

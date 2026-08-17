@@ -23,7 +23,7 @@ import {
   weeklyVolumeFor,
 } from './pullup-progression.ts';
 import { resolveExerciseConfig } from './exercise-config.ts';
-import { LIFT_DAYS, normalizeAssistancePrefs, resolveDayAssistance } from './assistance-catalog.ts';
+import { BALANCED_WEEK, LIFT_DAYS, normalizeAssistancePrefs, resolveDayAssistance } from './assistance-catalog.ts';
 
 // ── The sourced numbers ───────────────────────────────────────────────────────────────────────────
 
@@ -41,12 +41,19 @@ Deno.test('⛔ THE GRIP MOVEMENTS RESOLVE EXACTLY — a "Wide Grip Pull Up" toke
   }
 });
 
-Deno.test('the grip rotation covers four days without repeating', () => {
+Deno.test('the grip rotation has four distinct grips, and the day map mirrors LIFT_DAYS', () => {
   assertEquals(GRIP_ROTATION.length, 4);
   assertEquals(new Set(GRIP_ROTATION).size, 4);
   // ⚠️ MIRRORS `LIFT_DAYS`. If the catalog's day list changes and this does not, the rotation
   // silently collapses onto one grip.
   assertEquals([...LIFT_DAY_ORDER_FOR_GRIP], [...LIFT_DAYS]);
+  // ⛔ FOUR GRIPS, THREE DAYS — SO ONE GRIP IS UNREACHABLE, AND THAT IS §1h / SLICE 4's BUG, PINNED
+  // HERE RATHER THAN LEFT TO BE REDISCOVERED. Slice 5 narrowed the day list (2026-08-17); the
+  // rotation still indexes by day, so `GRIP_ROTATION[3]` is never selected. §1h's fix rotates across
+  // WEEKS and deletes this map. ⚠️ When that lands, this assertion INVERTS — flip it to "all four
+  // grips appear across a block" rather than deleting it.
+  assertEquals(LIFT_DAY_ORDER_FOR_GRIP.length < GRIP_ROTATION.length, true,
+    'if the day list ever reaches four again, §1h\'s premise changed — re-read it before adjusting');
 });
 
 // ── The dose ──────────────────────────────────────────────────────────────────────────────────────
@@ -173,9 +180,13 @@ Deno.test('⛔ THE PROGRESSION PINS THE PULL CATEGORY ON EVERY DAY, and rotates 
     assertEquals(p.totalReps, 25, 'the programme dose did not reach the row');
   }
   // The push and single-leg/core picks are untouched — this pins ONE category.
-  const press = resolveDayAssistance(prefs, 'press', 50, { movement: 'Chin-Up', totalReps: 25 });
-  assertEquals(press.find((r) => r.category === 'push')!.name, 'Dips');
-  assertEquals(press.length, 3);
+  // ⚠️ WAS THE PRESS DAY (`'press'`, push → Dips). That key is deleted with its day (slice 5,
+  // 2026-08-17) — the press is trained on the deadlift's day now — so this reads the bench day's own
+  // balanced push instead. The assertion is the same one: the progression moves the PULL row and
+  // leaves the other two exactly as the athlete's week had them.
+  const bench = resolveDayAssistance(prefs, 'bench', 50, { movement: 'Chin-Up', totalReps: 25 });
+  assertEquals(bench.find((r) => r.category === 'push')!.name, BALANCED_WEEK.bench.push);
+  assertEquals(bench.length, 3);
 });
 
 Deno.test('the progression OFF leaves the athlete\'s pull pick exactly as it was', () => {

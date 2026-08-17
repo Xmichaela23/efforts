@@ -20,6 +20,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   catalogEntry,
+  LIFT_DAYS,
   normalizeAssistancePrefs,
   resolveDayAssistance,
 } from '../../../../src/lib/assistance-catalog.ts';
@@ -72,8 +73,11 @@ Deno.test('the replacement prefers loadable gear over a band variant when both e
 
 Deno.test('a performable pick is NEVER touched — even one reached through a band route', () => {
   // Lat Pulldown via bands is performable on the full home gym: the athlete picked it, it stays.
-  const prefs = prefsWith('press', { push: 'Dips', pull: 'Lat Pulldown', single_leg_core: 'Ab Wheel Rollout' });
-  const rows = resolveDayAssistance(prefs, 'press', 50, null, HOME_GYM);
+  // ⚠️ WAS THE PRESS DAY. `'press'` is not a `LiftDay` as of slice 5 (2026-08-17), so storing picks
+  // under it means `normalizeAssistancePrefs` never keeps them and the row falls to a default — the
+  // test would pass or fail for the wrong reason. Any real day exercises the same rule.
+  const prefs = prefsWith('squat', { push: 'Dips', pull: 'Lat Pulldown', single_leg_core: 'Ab Wheel Rollout' });
+  const rows = resolveDayAssistance(prefs, 'squat', 50, null, HOME_GYM);
   assertEquals(rows.find((r) => r.category === 'pull')!.name, 'Lat Pulldown');
 });
 
@@ -90,7 +94,7 @@ Deno.test('the BALANCED_WEEK fallbacks pass the gate on a normal home gym untouc
   // D-425's guardrail restated at the resolver: an athlete with the standard home gym and NO stored
   // picks gets the default week with nothing swapped.
   const prefs = normalizeAssistancePrefs(null);
-  for (const day of ['press', 'deadlift', 'bench', 'squat'] as const) {
+  for (const day of LIFT_DAYS) {
     const rows = resolveDayAssistance(prefs, day, 50, null, HOME_GYM);
     for (const r of rows) {
       assert(canPerform(r.name, HOME_GYM), `default ${r.name} must be performable on a home gym`);
@@ -100,7 +104,7 @@ Deno.test('the BALANCED_WEEK fallbacks pass the gate on a normal home gym untouc
 
 Deno.test('the pull-up progression row is NOT gated — the opt-in programme shows what was signed up for', () => {
   const noBar = ['Dumbbells'];
-  const prefs = prefsWith('press', { push: 'Push-Up', pull: 'Dumbbell Row', single_leg_core: 'Lunge' });
-  const rows = resolveDayAssistance(prefs, 'press', 50, { movement: 'Chin-Up', totalReps: 25 }, noBar);
+  const prefs = prefsWith('squat', { push: 'Push-Up', pull: 'Dumbbell Row', single_leg_core: 'Lunge' });
+  const rows = resolveDayAssistance(prefs, 'squat', 50, { movement: 'Chin-Up', totalReps: 25 }, noBar);
   assertEquals(rows.find((r) => r.category === 'pull')!.name, 'Chin-Up');
 });
