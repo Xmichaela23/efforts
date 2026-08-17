@@ -28,7 +28,6 @@ const BIKE_BLOCK = {
   bike: { hours: 6, days: 3, longRideDay: 'saturday' },
   targetWeeklyRideHours: 6,
   hardDay: { day: HARD_DAY, discipline: 'bike' },
-  liftingDays: 4,
 } as const;
 
 const plan: any = composeStrengthPrimaryPlan(BIKE_BLOCK as never);
@@ -111,7 +110,7 @@ Deno.test('the run branch is unchanged — a hard RUN block still deloads exactl
     durationWeeks: WEEKS, oneRepMaxes: MAXES,
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
     easyPaceMinPerMile: 9, longRunDay: 'sunday',
-    hardDay: { day: HARD_DAY, discipline: 'run' }, liftingDays: 4,
+    hardDay: { day: HARD_DAY, discipline: 'run' },
   } as never);
   for (const bw of weekMap) {
     const runs = ((runPlan.sessions_by_week[String(bw.week)] ?? []) as any[])

@@ -264,7 +264,7 @@ Deno.test('⛔ FLAT PREFERS 48h FROM HEAVY LEGS — the other three keep the mat
       durationWeeks: 12,
       oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
       enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-      longRunDay: 'saturday', easyPaceMinPerMile: PACE, liftingDays: 4,
+      longRunDay: 'saturday', easyPaceMinPerMile: PACE,
       hardDay: { day: 'friday', discipline: 'run', ...(terrain ? { terrain } : {}) },
     } as never);
     // The stamp is not on the plan, so measure what it BUYS: the gap the solver actually left.
@@ -287,26 +287,26 @@ Deno.test('⛔ FLAT PREFERS 48h FROM HEAVY LEGS — the other three keep the mat
 Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week still builds one', () => {
   // The tighter clearance makes some weeks unsatisfiable. The rule is that they DEGRADE AND REPORT,
   // never that the session disappears. Swept across every legal shape: both long-run days × every
-  // other day as the hard day × 3 and 4 lifting days.
+  // other day as the hard day.
+  // ⚠️ The `for (const liftingDays of [3, 4])` sweep is gone (§1f-0, 2026-08-17) — the argument was
+  // deleted from `StrengthPrimaryArgs`, so the loop ran every case twice, identically.
   const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  for (const liftingDays of [3, 4]) {
-    for (const longRunDay of ['saturday', 'sunday']) {
-      for (const day of DAYS) {
-        if (day === longRunDay) continue;
-        const p = composeStrengthPrimaryPlan({
-          durationWeeks: 12,
-          oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-          enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-          longRunDay, easyPaceMinPerMile: PACE, liftingDays,
-          hardDay: { day, discipline: 'run', terrain: 'flat' },
-        } as never);
-        const hard = (p.sessions_by_week['2'] as any[])
-          .find((s) => s.type === 'run' && /Flat Intervals/.test(String(s.name)));
-        assertEquals(
-          !!hard, true,
-          `flat hard session vanished at ${liftingDays} lifting days, long run ${longRunDay}, hard ${day}`,
-        );
-      }
+  for (const longRunDay of ['saturday', 'sunday']) {
+    for (const day of DAYS) {
+      if (day === longRunDay) continue;
+      const p = composeStrengthPrimaryPlan({
+        durationWeeks: 12,
+        oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
+        enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+        longRunDay, easyPaceMinPerMile: PACE,
+        hardDay: { day, discipline: 'run', terrain: 'flat' },
+      } as never);
+      const hard = (p.sessions_by_week['2'] as any[])
+        .find((s) => s.type === 'run' && /Flat Intervals/.test(String(s.name)));
+      assertEquals(
+        !!hard, true,
+        `flat hard session vanished — long run ${longRunDay}, hard ${day}`,
+      );
     }
   }
 });
@@ -318,25 +318,23 @@ Deno.test('⛔ THE PREFERENCE NEVER BREACHES ANYTHING — least of all the long 
   // eccentric leg damage one session over. Scored below `breachPenalty`, it is structurally unable
   // to do that. ⚠️ If this test ever fails, someone moved the term up the score vector.
   const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  for (const liftingDays of [3, 4]) {
-    for (const longRunDay of ['saturday', 'sunday']) {
-      for (const day of DAYS) {
-        if (day === longRunDay) continue;
-        const p = composeStrengthPrimaryPlan({
-          durationWeeks: 12,
-          oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-          enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-          longRunDay, easyPaceMinPerMile: PACE, liftingDays,
-          hardDay: { day, discipline: 'run', terrain: 'flat' },
-        } as never);
-        const breaches = ((p as any).placement_compromises ?? [])
-          .filter((c: any) => c.kind === 'breach');
-        assertEquals(
-          breaches.length, 0,
-          `flat manufactured a breach at ${liftingDays} days, long run ${longRunDay}, hard ${day}: `
-            + breaches.map((b: any) => b.text).join(' | '),
-        );
-      }
+  for (const longRunDay of ['saturday', 'sunday']) {
+    for (const day of DAYS) {
+      if (day === longRunDay) continue;
+      const p = composeStrengthPrimaryPlan({
+        durationWeeks: 12,
+        oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
+        enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+        longRunDay, easyPaceMinPerMile: PACE,
+        hardDay: { day, discipline: 'run', terrain: 'flat' },
+      } as never);
+      const breaches = ((p as any).placement_compromises ?? [])
+        .filter((c: any) => c.kind === 'breach');
+      assertEquals(
+        breaches.length, 0,
+        `flat manufactured a breach — long run ${longRunDay}, hard ${day}: `
+          + breaches.map((b: any) => b.text).join(' | '),
+      );
     }
   }
 });
@@ -358,7 +356,7 @@ Deno.test('⛔ THE MATRIX FLOOR SURVIVES THE TRADE — heavy legs stay 48h apart
         durationWeeks: 12,
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-        longRunDay, easyPaceMinPerMile: PACE, liftingDays: 4,
+        longRunDay, easyPaceMinPerMile: PACE,
         hardDay: { day, discipline: 'run', terrain: 'flat' },
       } as never);
       const lowers = (p.sessions_by_week['2'] as any[])
@@ -383,12 +381,12 @@ Deno.test('⚠️ TAKEN WHEN THE WEEK HAS ROOM, DECLINED SILENTLY WHEN IT DOES N
     const r = Math.abs(DAYS.indexOf(a.toLowerCase()) - DAYS.indexOf(b.toLowerCase()));
     return Math.min(r, 7 - r) * 24;
   };
-  const closest = (terrain: string, longRunDay: string, day: string, liftingDays: number) => {
+  const closest = (terrain: string, longRunDay: string, day: string) => {
     const p = composeStrengthPrimaryPlan({
       durationWeeks: 12,
       oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
       enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-      longRunDay, easyPaceMinPerMile: PACE, liftingDays,
+      longRunDay, easyPaceMinPerMile: PACE,
       hardDay: { day, discipline: 'run', terrain },
     } as never);
     const lowers = (p.sessions_by_week['2'] as any[])
@@ -396,16 +394,14 @@ Deno.test('⚠️ TAKEN WHEN THE WEEK HAS ROOM, DECLINED SILENTLY WHEN IT DOES N
     return Math.min(...lowers.map((l: any) => gapH(String(l.day), day)));
   };
   let taken = 0, declined = 0, worse = 0;
-  for (const liftingDays of [3, 4]) {
-    for (const longRunDay of ['saturday', 'sunday']) {
-      for (const day of DAYS) {
-        if (day === longRunDay) continue;
-        const hill = closest('hill_3min', longRunDay, day, liftingDays);
-        const flat = closest('flat', longRunDay, day, liftingDays);
-        if (flat > hill) taken++;
-        else if (flat < hill) worse++;
-        else declined++;
-      }
+  for (const longRunDay of ['saturday', 'sunday']) {
+    for (const day of DAYS) {
+      if (day === longRunDay) continue;
+      const hill = closest('hill_3min', longRunDay, day);
+      const flat = closest('flat', longRunDay, day);
+      if (flat > hill) taken++;
+      else if (flat < hill) worse++;
+      else declined++;
     }
   }
   // Measured 2026-08-06 across all 24 legal shapes: 8 taken, 16 declined, 0 worse.
