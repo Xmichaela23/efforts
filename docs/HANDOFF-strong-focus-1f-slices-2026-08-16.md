@@ -144,33 +144,30 @@ without throwing, and the suites hold their baseline.
 
 ## Slice 4 — the chin count
 
-⛔ **DECIDED 2026-08-16 (work order §1f-0): THE WEEKLY TOTAL HOLDS AND THE PER-DAY NUMBER RISES** —
-roughly 25 → 35 on three days. The adaptation driver is accumulated weekly volume at sub-maximal
-effort, not a per-day figure, and the reps are split however the athlete likes anyway. **Do not
-re-decide this.**
+⛔ **SPEC'D IN FULL AT WORK ORDER §1h — READ THAT, IT IS THE INSTRUCTION.** Both fixes are decided;
+nothing here is an open question any more. Summary only:
 
-⚠️ **AND FIXING THE DEFAULT ALONE WILL NOT CARRY IT.** `weeklyVolumeFor` divides the weekly total by
-its `liftingDays` parameter (`src/lib/pullup-progression.ts:130`, default `4`; `:137`) — and **three
-call sites pass a literal `4`**, so they would keep the old divisor no matter what the default
-became, dropping the weekly total by a quarter. That is the opposite of the decision.
+**The divisor.** 100 a week ÷ 4 days, with only 3 days built → the athlete gets **75**. Verified, not
+suspected. Weekly 100 holds; the split becomes **33 · 33 · 34**, and that overrides the round-to-fives
+rule at `pullup-progression.ts:138` on purpose. Fixing the default at `:130` alone changes nothing —
+**three callers pass a literal `4`**: `strength-primary-plan.ts:582` (the engine),
+`NonRaceBuilder.tsx:3307` and `:3309`, plus `pullup-progression.test.ts:55, 65, 75, 83, 91`.
 
-- `supabase/functions/shared/strength-system/strength-primary-plan.ts:582` — **the engine**
-- `src/components/NonRaceBuilder.tsx:3307` and `:3309` — the wizard's dose note
-- `src/lib/pullup-progression.test.ts:55, 65, 75, 83, 91` pass `4` and move with them
+**The grip.** Underhand was mapped to the press day, which no longer exists, so three days build
+overhand · neutral · wide and **the chin-up progression never prescribes a chin-up.** Fix is
+`grips[absoluteSessionIndex % 4]` rotating across weeks, `GRIP_ROTATION` reordered to
+`['pull','neutral','wide','chin']`, index derived from `(week - 1) * 3 + dayPosition` so the composer
+keeps needing no memory of other days.
 
-⚠️ **THE GRIP ROTATION IS FOUR GRIPS FOR FOUR DAYS** — `pullup-progression.ts:64`: *"Four days, four
-grips, so a block never runs the same grip twice in a week."* With three sessions the fourth grip is
-never reached (`strength-primary-plan.ts:584-585`). Decide whether that is fine (three distinct
-grips a week still satisfies Forever p.26's "vary the grip") or whether the rotation should advance
-across weeks. **Ask Michael — do not pick silently.**
+⛔ **`WEIGHTED_DAY_INDEX = 2` IS NOT PART OF THIS.** Separate control, still valid, do not re-point it.
 
-⛔ **THE BEGINNER ON-RAMP OWNS ITS OWN DOSE** and is not held to the 25 floor: a band-assisted
-athlete gets ~15 a day on three days. A floor for a movement someone cannot yet perform one clean
-rep of is a wall, not a floor.
+⛔ **THE BEGINNER ON-RAMP OWNS ITS OWN DOSE** and is not held to the 25 floor: a band-assisted athlete
+gets ~15 a day on three days. A floor for a movement someone cannot yet perform one clean rep of is a
+wall, not a floor.
 
-**Done means:** one athlete's weekly chin total is unchanged before and after, the per-day number
-rose, the wizard's dose note matches what the engine builds, and the grip question has an answer
-from Michael.
+**Done means:** an athlete on the full dose gets 100 reps a week built (not 75), all four grips appear
+across a block with underhand among them, the wizard's dose note matches what the engine builds, and
+`src` holds its 3 standing failures.
 
 ---
 

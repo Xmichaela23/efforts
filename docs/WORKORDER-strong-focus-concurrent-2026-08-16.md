@@ -347,6 +347,60 @@ reach 75.
 ⚠️ **The jump doses are a separate control and are NOT changed here** — leaders and light weeks 10,
 anchor 15 (p.18, p.22). If the same reasoning should cut those too, say so; it is not assumed.
 
+### 1h. The pull-up progression on three days — the divisor and the missing chin-up
+**Added 2026-08-16.** Triggered by §1f-0. `src/lib/pullup-progression.ts` was written for four days.
+Dropping to three breaks its weekly volume **and deletes the underhand grip entirely.** Both are
+fixed in this build, not deferred.
+
+⚠️ **BOTH BUGS ARE VERIFIED, NOT REASONED** — a block was built at `pullupMaxReps: 12` and the rows
+read off it. The numbers below are what the engine actually emits today.
+
+#### 1. The divisor — 25 reps a week vanish
+
+- **The bug.** The engine prescribes 100 reps a week, divides by **4**, assigns 25 a day — and §1f-0
+  deleted the fourth day. The athlete receives **75**. Nothing reports the shortfall.
+- **The fix.** ⛔ **THE WEEKLY 100 IS THE BIOLOGICAL ANCHOR AND IT HOLDS** (2nd ed p.35 — *"100 or
+  more chins a week"*). The divisor becomes 3: **33 · 33 · 34** across Squat, Bench, Deadlift+Press.
+- **The code.** Remove `liftingDays` as a variable divisor (`pullup-progression.ts:130`, default `4`;
+  `:137`). ⚠️ **AND THE THREE CALLERS THAT PASS A LITERAL `4` MOVE WITH IT** — fixing the default
+  alone changes nothing: `strength-primary-plan.ts:582` (**the engine**), `NonRaceBuilder.tsx:3307`
+  and `:3309`. `pullup-progression.test.ts:55, 65, 75, 83, 91` pass `4` and move too.
+
+⚠️ **THIS OVERRIDES THE ROUND-TO-FIVES RULE, AND THAT IS DELIBERATE.** `round5` at
+`pullup-progression.ts:138` exists so the dose *"reads like a lifter's number"* — it is what turns
+100/3 into 35 and then 105. **33 · 33 · 34 is the instruction**, so the rounding does not apply to
+this split. Hitting the weekly anchor exactly beats a rounder per-day figure.
+
+#### 2. The grip rotation — the chin-up progression prescribes no chin-up
+
+- **The bug.** Four grips map statically to four days (`GRIP_ROTATION` + `LIFT_DAY_ORDER_FOR_GRIP`,
+  `pullup-progression.ts:71, :82`). **Underhand was mapped to the press day**, and the press merged
+  into the deadlift, so the fourth slot is orphaned. Verified output on three days: overhand ·
+  neutral · wide. ⛔ **`movementForGrip` returns `Chin-Up` for `chin` and `Pull Up` for everything
+  else — so the feature named after the chin-up no longer builds one.**
+- **The fix.** ⛔ **ROTATE ACROSS WEEKS, NOT WITHIN THE WEEK.** Drop the static day map. Take a
+  deterministic modulo on the absolute session index: `grip = grips[absoluteSessionIndex % 4]`.
+  - Week 1: Overhand · Neutral · Wide
+  - Week 2: Underhand · Overhand · Neutral
+  - Week 3: Wide · Underhand · Overhand
+- **The justification.** Wendler's only rule here is *vary the grip* (Forever p.26). Rotating
+  sequentially gives every grip equal volume across the block, satisfies the rule, and needs **no new
+  state**.
+
+⚠️ **THE ARRAY ORDER CHANGES WITH IT.** `GRIP_ROTATION` is `['chin','pull','neutral','wide']` today;
+the weeks above need `['pull','neutral','wide','chin']`. Getting this backwards opens the block on
+underhand instead of closing week 2 with it.
+
+⚠️ **`absoluteSessionIndex` MUST STAY DERIVABLE FROM (week, day position) ALONE.** The comment at
+`pullup-progression.ts:74` is a real constraint: the composer builds each lifting day independently
+and has no memory of the others. `(week - 1) * 3 + dayPosition` satisfies it; a running counter
+threaded through the composer does not.
+
+⚠️ **`WEIGHTED_DAY_INDEX = 2` IS A SEPARATE THING AND IS NOT SWEPT INTO THIS.** It indexes the day
+that carries the low-rep weighted work (Forever p.26), currently the squat day, which still exists.
+Do not re-point it at the grip rotation — one day a week carries weight, and which grip it uses is
+now a different question.
+
 ### 1i. Up to TWO hard endurance days, and they may be any mix of run and ride
 **Decided by Michael 2026-08-16, looking at the "Your week" screen.** Today the builder offers ONE
 hard session and forces a choice between run and ride. That is a maintenance dose by its own copy —
