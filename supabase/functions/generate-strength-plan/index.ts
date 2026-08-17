@@ -28,14 +28,16 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}));
     // `strength_frequency` / `strength_tier` / `needs_baseline` / `accessory_bias` are no longer read:
-    // V1 is four days, barbell, gated on baselines, with add-ons re-homed to Adjust (D-323). Callers
-    // may still send them; they are ignored rather than honoured.
+    // V1 is barbell, gated on baselines, with add-ons re-homed to Adjust (D-323). Callers may still
+    // send them; they are ignored rather than honoured.
     //
-    // ⛔ `lifting_days` IS THE EXCEPTION, ADDED 2026-07-29, AND IT IS NOT THE SAME FIELD.
-    // `strength_frequency` was the old how-many-sessions dial the whole chassis carried and D-323
-    // retired; this is a BLOCK SHAPE — 4 (Wendler's own) or 3 (upper lifts share a day, test week
-    // still runs on four). Anything other than 3 falls to 4, so a stale or hostile caller cannot
-    // reshape a block by accident.
+    // ⛔ `lifting_days` JOINED THAT LIST (§1f-0, 2026-08-17). It was the one shape field this handler
+    // still honoured — 4 by default, 3 as an opt-in — and there is no shape question left: every
+    // Strong Focus block is THREE days, Squat · Bench · Deadlift + Press. The composer's
+    // `StrengthPrimaryArgs` no longer declares the argument at all, so the read below was pushing a
+    // value nothing could receive. ⚠️ An old caller sending `lifting_days: 3` is now ignored rather
+    // than honoured, which is the same answer it would have got — three days is the only shape built.
+    // ⛔ Do not reintroduce it, and do not add a four-day branch "for later".
     const {
       user_id, duration_weeks,
       endurance_sport, endurance_frequency, goal_name, start_date, preview,
@@ -46,7 +48,6 @@ Deno.serve(async (req: Request) => {
       hard_day, target_weekly_ride_hours,
       // The bike, travelling beside the primary sport (2026-07-27). `{ hours, long_ride_day }`.
       bike,
-      lifting_days,
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
@@ -145,9 +146,6 @@ Deno.serve(async (req: Request) => {
       targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
       easyPaceMinPerMile: easyPaceMin,
       longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
-      // ⚠️ ONLY A LITERAL 3 REACHES THE COMPOSER. Everything else — absent, 0, "3", 5 — is 4, which
-      // is byte-identical to every block built before today.
-      liftingDays: Number(lifting_days) === 3 ? 3 : 4,
       blockShape,
       pullupMaxReps: Number(((ub as any)?.performance_numbers)?.pullupMaxReps) || undefined,
       // ⛔ D-326 layer 2 — the earned advance. Absent on a fresh block (nothing is logged yet), and

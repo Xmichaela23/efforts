@@ -2733,15 +2733,16 @@ Deno.serve(async (req: Request) => {
                 if (bike) return { hard_day: { day: bike, discipline: 'bike' } };
                 return {};
               })()),
-              // ⛔ THE BLOCK SHAPE — 4 lifting days or 3 (2026-07-29). Read straight off the goal's
-              // training prefs, where the intake card writes it. Absent → 4, so every goal created
-              // before today builds exactly the block it built yesterday.
+              // ⛔ `lifting_days` IS NO LONGER FORWARDED (§1f-0, 2026-08-17). It carried the intake
+              // card's 4-or-3 answer off the goal's training prefs, and both ends of that wire are
+              // gone: the card was deleted with slice 2, and `generate-strength-plan` no longer reads
+              // the field. Every Strong Focus block is three days — Squat · Bench · Deadlift + Press.
               //
-              // ⚠️ NOT `strength_frequency`. That field is the retired D-323 dial and several
-              // branches on this path still clamp it to 2; reusing the name would put this behind a
-              // clamp meant for something else. A distinct key is the point.
-              ...(Number((gsTp as Record<string, unknown>).lifting_days) === 3
-                ? { lifting_days: 3 } : {}),
+              // ⚠️ A GOAL ROW WRITTEN BEFORE TODAY MAY STILL CARRY `training_prefs.lifting_days`. It
+              // is simply not read; the stored value is inert, not honoured. Nothing reshapes a block
+              // from it, which is the point — three days is the only shape offered, and there is no
+              // legacy four-day path to fall into (decided 2026-08-17: delete and rebuild, do not
+              // tolerate).
               // ⛔ THE BIKE, travelling beside the primary sport rather than losing to it. Carries the
               // two things the athlete actually chose: how many hours, and which day is the long one.
               // Both were written to the goal and read by NOTHING under supabase/functions until now.
