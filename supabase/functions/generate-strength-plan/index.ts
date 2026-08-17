@@ -240,14 +240,17 @@ Deno.serve(async (req: Request) => {
         .map((raw) => {
           if (!raw || typeof raw !== 'object') return null;
           const hd = raw as Record<string, unknown>;
-          if (typeof hd.day !== 'string') return null;
           if (hd.discipline !== 'run' && hd.discipline !== 'bike') return null;
+          // ⛔ THE DAY IS OPTIONAL (§1i placement model, slice 8). Absent means "the engine proposes
+          // one" — the normal case for a prescribed hard day. A day that is PRESENT but not a string
+          // is still malformed and still drops the entry; absent and unusable are different answers.
+          if (hd.day != null && typeof hd.day !== 'string') return null;
           const terrainOk = new Set(['hill_3min', 'hill_short', 'treadmill', 'flat']);
           const terrain = typeof hd.terrain === 'string' && terrainOk.has(hd.terrain)
             ? hd.terrain as 'hill_3min' | 'hill_short' | 'treadmill' | 'flat'
             : undefined;
           return {
-            day: hd.day,
+            ...(typeof hd.day === 'string' && hd.day.trim() !== '' ? { day: hd.day } : {}),
             discipline: hd.discipline as 'run' | 'bike',
             ...(terrain ? { terrain } : {}),
             // ⚠️ ABSENT OR UNRECOGNISED → `prescribed`, the shipped behaviour. A club day is the

@@ -249,7 +249,14 @@ export type StrengthPrimaryArgs = {
    * a different question with a different cost, and not one §1i asked for.
    */
   hardDays?: Array<{
-    day: string;
+    /**
+     * ⛔ OPTIONAL AS OF THE §1i PLACEMENT MODEL (slice 8, 2026-08-17). Absent means **the engine
+     * proposes one** — a prescribed hard day arrives pre-placed and the athlete moves it, rather
+     * than being assembled from parts. A CLUB day still needs its day: only the athlete knows when
+     * the club meets, and an app-placed club session would be an invented appointment.
+     * ⚠️ Absent and MALFORMED are different answers — see the normaliser.
+     */
+    day?: string;
     discipline: 'run' | 'bike';
     /** Run terrain — the athlete's pick. Absent → `hill_3min`. Ignored when `discipline` is
      *  `bike`: the ride has one shape (Helgerud `4 × 4`) and no terrain question. */
@@ -1425,7 +1432,9 @@ function bikeQualitySession(day: string, wave: HardWave = { weekInCycle: 1, cycl
 type HardRole = 'vo2' | 'threshold' | 'club';
 
 function assignHardRoles(
-  days: ReadonlyArray<{ day: DayName; discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }>,
+  // ⚠️ THE DAY IS NOT READ — the role depends on ownership and order only, which is why the roles
+  // can be settled before the solver has placed anything (slice 8). Typed nullable to say so.
+  days: ReadonlyArray<{ day: DayName | null; discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }>,
 ): HardRole[] {
   const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'vo2'));
   // A club day already fills the threshold slot, so the app's own sessions fill what is left: the
@@ -2047,21 +2056,52 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ⚠️ ORDER IS THE ATHLETE'S. The first slot they filled is the first here, and `dedupe by day`
    * keeps the earlier one — a later entry on the same calendar day is a mistake, not a promotion.
    */
-  const hardDays: Array<{ day: DayName; discipline: 'run' | 'bike'; terrain?: HardRunTerrain; ownership: 'prescribed' | 'club' }> = [];
+  type HardDayReq = {
+    day: DayName | null;
+    discipline: 'run' | 'bike';
+    terrain?: HardRunTerrain;
+    ownership: 'prescribed' | 'club';
+  };
+  /**
+   * ⛔ THE DAY IS OPTIONAL NOW, AND THAT IS THE WHOLE OF SLICE 8 (§1i placement model, 2026-08-17).
+   *
+   * **Ours to write → ours to place.** A prescribed hard day with NO day is not a half-finished
+   * answer, it is the normal case: the engine proposes where it goes and the athlete moves it after.
+   * A day was previously REQUIRED here (`if (!day) continue`), so an unplaced hard session was
+   * silently dropped — which is what forced the screen to assemble one from parts and produce the
+   * "has a discipline but no day" error state this slice deletes.
+   *
+   * ⚠️ A CLUB DAY STILL NEEDS ITS DAY, and that is not an inconsistency — only the athlete knows
+   * when the club meets. It is dropped without one, because a club session the app placed would be
+   * the app inventing an appointment.
+   */
+  const requestedHardDays: HardDayReq[] = [];
   for (const raw of Array.isArray(args.hardDays) ? args.hardDays : []) {
-    if (hardDays.length >= MAX_HARD_DAYS) break;
-    const day = asDay(raw?.day);
-    if (!day) continue;
+    if (requestedHardDays.length >= MAX_HARD_DAYS) break;
     if (raw?.discipline !== 'run' && raw?.discipline !== 'bike') continue;
-    if (hardDays.some((h) => h.day === day)) continue;
-    hardDays.push({
+    /**
+     * ⛔ ABSENT IS NOT THE SAME AS UNPARSEABLE, AND CONFLATING THEM WOULD BE A SILENT MOVE.
+     *
+     * `day` absent (null / undefined / '') is the §1i placement model asking the engine to propose
+     * one — the normal case. `day` PRESENT but not a weekday is a malformed entry: a client bug or a
+     * hostile caller. Treating that as "you choose" would turn an athlete's mistyped Tuesday into a
+     * Thursday session with nothing said, which is the absorption failure this file has fixed twice.
+     * So a bad day DROPS the entry, exactly as it did before this slice.
+     */
+    const dayGiven = raw?.day != null && String(raw.day).trim() !== '';
+    const day = asDay(raw?.day);
+    if (dayGiven && !day) continue;
+    // ⚠️ ABSENT → PRESCRIBED, which is what every block before §1i was. An unrecognised value is
+    // treated as absent for the same reason the terrain allowlist is: a value the engine cannot
+    // act on must degrade to the shipped behaviour, not to no session at all.
+    const ownership: 'prescribed' | 'club' = raw.ownership === 'club' ? 'club' : 'prescribed';
+    if (!day && ownership === 'club') continue;
+    if (day && requestedHardDays.some((h) => h.day === day)) continue;
+    requestedHardDays.push({
       day,
       discipline: raw.discipline,
       ...(raw.terrain ? { terrain: raw.terrain } : {}),
-      // ⚠️ ABSENT → PRESCRIBED, which is what every block before §1i was. An unrecognised value is
-      // treated as absent for the same reason the terrain allowlist is: a value the engine cannot
-      // act on must degrade to the shipped behaviour, not to no session at all.
-      ownership: raw.ownership === 'club' ? 'club' : 'prescribed',
+      ownership,
     });
   }
   /**
@@ -2089,21 +2129,64 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       || (h.discipline === 'bike' ? ftpForHard != null : runPaceForHard != null);
   // ⚠️ COLLECTED HERE, SURFACED WHERE `placementCompromises` LIVES (below) — the gate has to run
   // before the pins are built and that array is declared after them.
-  const hardGateNotes: string[] = hardDays.filter((h) => !hardDayGate(h)).map((h) => (
+  const hardGateNotes: string[] = requestedHardDays.filter((h) => !hardDayGate(h)).map((h) => (
     h.discipline === 'bike'
       ? 'The hard ride was left out: without an FTP there is no wattage to prescribe, and no way for '
         + 'the session to get harder on purpose. Add it in Training Baselines and rebuild.'
       : 'The hard run was left out: without a 5K time there is no pace to prescribe, and no way for '
         + 'the session to get faster on purpose. Add it in Training Baselines and rebuild.'
   ));
-  const gatedHardDays = hardDays.filter(hardDayGate);
+  const gatedHardDays = requestedHardDays.filter(hardDayGate);
+  /**
+   * ⛔ THE ROLES ARE FIXED BEFORE THE DAYS ARE (§7 + slice 8). Which session each hard day IS depends
+   * on ownership and order — never on which weekday it lands on — so the assignment is settled here
+   * and the placement fills in underneath it. Deciding the role from the placed day would make the
+   * session type depend on the solver's answer, which is the tail wagging the dog.
+   */
   const hardRoles = assignHardRoles(gatedHardDays);
-  const roleOf = (day: DayName): HardRole =>
-    hardRoles[gatedHardDays.findIndex((h) => h.day === day)] ?? 'vo2';
-  const hardRunDays = gatedHardDays.filter((h) => h.discipline === 'run');
-  const hardRideDays = gatedHardDays.filter((h) => h.discipline === 'bike');
+  /**
+   * ⛔ THE ENGINE PROPOSES THE DAYS IT WAS NOT GIVEN — BY ASKING THE SOLVER, NOT BY SCORING AGAIN.
+   *
+   * A prescribed hard day with no day becomes a FLEXIBLE session in the SAME solve that places the
+   * bar (`week-solver`'s `flexible` input, the mechanism the easy runs and rides already use). So
+   * the proposal is the placement: same clearances, same matrix, same law, and there is no second
+   * scorer to disagree with the first one. ⛔ Do not add one — the handoff says so and the reason is
+   * that two placement authorities is exactly the doubled disease this codebase keeps deleting.
+   *
+   * ⚠️ AND IT PRE-WIRES §6 AT NO COST. When the stacking law ships, "where the solver prefers" moves
+   * to the heavy leg days on its own, and an athlete who never touches the defaults gets the better
+   * arrangement with NO screen change. That is the point of the model.
+   */
+  const proposedHardDays = gatedHardDays.filter((h) => h.day == null);
+  const pinnedHardDays = gatedHardDays.filter((h) => h.day != null);
+  /**
+   * The placed answer, filled in after the solve. Until then every consumer that needs a DAY must
+   * wait; the ones that need only a COUNT (the frequency budgets) read the gated list directly.
+   */
+  /**
+   * ⛔ THE ROLE TRAVELS WITH THE ENTRY, NOT WITH THE DAY (slice 8). `roleOf` matched on the calendar
+   * day, which worked only while every hard day HAD one — a proposed day has none at the point the
+   * roles are assigned, so both entries fell through to the `vo2` default and a two-day athlete got
+   * TWO VO2 sessions. That is precisely the arrangement §7 forbids, arriving silently.
+   */
+  const hardDays: Array<{
+    day: DayName; discipline: 'run' | 'bike'; terrain?: HardRunTerrain;
+    ownership: 'prescribed' | 'club'; role: HardRole;
+  }> = [];
+  const roleOf = (day: DayName): HardRole => hardDays.find((h) => h.day === day)?.role ?? 'vo2';
+  /**
+   * ⛔ LAZY, AND THAT IS NOT A STYLE CHOICE. `hardDays` is filled AFTER the solve (the proposal is
+   * read out of it), so a `const x = hardDays.filter(...)` here would capture the EMPTY array and
+   * every consumer would silently see no hard days at all — which is exactly what it did on the
+   * first pass of this slice. Functions, so they are evaluated where they are used.
+   */
+  const hardRunDays = () => hardDays.filter((h) => h.discipline === 'run');
+  const hardRideDays = () => hardDays.filter((h) => h.discipline === 'bike');
+  /** Counts are known before placement — a hard day costs its discipline a slot wherever it lands. */
+  const hardRunCount = gatedHardDays.filter((h) => h.discipline === 'run').length;
+  const hardRideCount = gatedHardDays.filter((h) => h.discipline === 'bike').length;
   const runSelected = enduranceSport === 'run' || askedRunMiles > 0 || !!asDay(args.longRunDay)
-    || hardRunDays.length > 0;
+    || hardRunCount > 0;
   const bikeSelected = hasBike || enduranceSport === 'bike';
 
   const longRunPin = runSelected ? asDay(args.longRunDay) : null;
@@ -2159,11 +2242,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // whether the app writes the session, not whether the day is spoken for.
   // ⚠️ THE LABEL NUMBERS THEM WHEN THERE ARE TWO, because "your hard run" twice in a compromise line
   // names neither. With one, the wording is unchanged from before §1i.
-  for (const h of hardDays) {
-    const sameDiscipline = (h.discipline === 'run' ? hardRunDays : hardRideDays);
-    const nth = sameDiscipline.length > 1 ? ` ${sameDiscipline.indexOf(h) + 1}` : '';
+  // ⚠️ ONLY A PINNED HARD DAY IS AN ANCHOR. A proposed one is FLEXIBLE — the solver is being asked
+  // where it goes, so making it an anchor would be pinning the answer before the question.
+  for (const h of pinnedHardDays) {
+    const sameDiscipline = pinnedHardDays.filter((x) => x.discipline === h.discipline);
+    const nth = (h.discipline === 'run' ? hardRunCount : hardRideCount) > 1
+      ? ` ${sameDiscipline.indexOf(h) + 1}` : '';
     pins.push({
-      day: h.day,
+      day: h.day as DayName,
       kind: h.discipline === 'bike' ? 'quality_bike' : 'quality_run',
       label: h.discipline === 'bike' ? `your hard ride${nth}` : `your hard run${nth}`,
     });
@@ -2214,8 +2300,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⛔ PER DAY, NOT PER BLOCK (§1i). This was one boolean off the single hard day; with two, one may
   // be a flat run and the other a hill, and charging the flat clearance to both would move a lift
   // for a session that is not paying for it. Keyed on the DAY so each anchor answers for itself.
+  // ⚠️ PINNED RUNS ONLY — this is an ANCHOR override and a proposed hard run is not an anchor. Its
+  // flat clearance still comes from the real table via `adjacencyBreach` on the flexible path; what
+  // it does not get is the anchor-specific 48h PREFERENCE. Named rather than left to be discovered.
   const flatHardRunDays = new Set(
-    hardRunDays.filter((h) => h.terrain === 'flat').map((h) => h.day as string),
+    pinnedHardDays.filter((h) => h.discipline === 'run' && h.terrain === 'flat').map((h) => String(h.day)),
   );
   const solverAnchors: SolverAnchor[] = pins.map((p) => ({
     day: p.day.toLowerCase() as SolverDay,
@@ -2304,7 +2393,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ⚠️ FLOORED AT 1 so a 2-run week with two hard runs still leaves a run to be long.
    */
   const runFreq = runSelected
-    ? Math.max(1, askedRunDays - hardRunDays.length)
+    ? Math.max(1, askedRunDays - hardRunCount)
     : askedRunDays;
   /** A selected run block has a long day: the one they pinned, or the engine's default when absent. */
   const runHasLongDay = runSelected;
@@ -2318,7 +2407,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    */
   // ⛔ THE COUNT, NOT A BOOLEAN (§1i) — same fix as the runs above, one discipline over.
   const ridesWanted = bikeSelected
-    ? Math.max(0, askedRideDays - (longRidePin ? 1 : 0) - hardRideDays.length)
+    ? Math.max(0, askedRideDays - (longRidePin ? 1 : 0) - hardRideCount)
     : 0;
 
   /**
@@ -2342,7 +2431,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * (see `solveWithFlexible`). Runs before rides preserves today's precedence exactly: the ride pass
    * has always been the one that reports a shortfall.
    */
+  // ⛔ THE PROPOSED HARD DAYS GO FIRST, AND THAT IS DELIBERATE (slice 8). The shortfall reduction
+  // below takes sessions off the END of this list, so the head is the priority position. A hard day
+  // is the athlete's requested QUALITY work; an easy run yielding before it is the right order, and
+  // the reverse would drop the one session they asked for by name.
+  // ⚠️ RUNS BEFORE RIDES IS PRESERVED among the easy sessions — the precedence the comment above
+  // documents is about those two, and adding a higher-priority head does not disturb it.
   const flexibleWanted: SolverFlexible[] = [
+    ...proposedHardDays.map((h, i) => ({
+      name: `hard:${i}`,
+      kind: h.discipline === 'bike' ? ('quality_bike' as const) : ('quality_run' as const),
+    })),
     ...Array.from({ length: easyRunsWanted }, (_, i) => ({ name: `easy_run:${i}`, kind: 'easy_run' as const })),
     ...Array.from({ length: ridesWanted }, (_, i) => ({ name: `easy_bike:${i}`, kind: 'easy_bike' as const })),
   ];
@@ -2500,6 +2599,29 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⚠️ THE SEPARATE TEST-WEEK SOLVE IS GONE with the week-3 split (see `isTestWeek`). Every week of
   // the block now uses one layout, which is what "three lifting days" was always supposed to mean.
   const solvedTest = solved;
+
+  /**
+   * ⛔ THE PROPOSAL, READ BACK OUT OF THE SOLVE (slice 8). Every hard day now has a day: the ones the
+   * athlete pinned, plus the ones the solver just placed. From here down NOTHING knows the
+   * difference — the budgets, the roles and the emitters all read one list, exactly as before §1i's
+   * placement model.
+   *
+   * ⚠️ A PROPOSED DAY THE SOLVER COULD NOT SEAT IS DROPPED, NOT INVENTED. `solveWithFlexible` reduces
+   * the ask from the tail when the week cannot hold everything, and a hard day sits at the head — so
+   * if it is missing here the week genuinely had no legal day for it. Guessing one would put a hard
+   * session on a day the law refused, which is the one thing the solver exists to prevent.
+   */
+  // ⚠️ THE ROLE IS TAKEN BY POSITION IN `gatedHardDays`, which is the list `assignHardRoles` scored —
+  // so it is carried across here rather than re-derived from the placed day.
+  gatedHardDays.forEach((h, i) => {
+    const role = hardRoles[i];
+    if (h.day != null) { hardDays.push({ ...h, day: h.day, role }); return; }
+    if (solved.status === 'unsolvable') return;
+    const placed = solved.week.flexible.find((f) => f.name === `hard:${proposedHardDays.indexOf(h)}`);
+    const day = placed ? asDay(placed.day) : null;
+    if (!day || hardDays.some((x) => x.day === day)) return;
+    hardDays.push({ ...h, day, role });
+  });
 
   // ⛔ A REFUSAL IS NOT A CRASH AND IT IS NOT A SILENT FALLBACK (§5.2). The solver names the anchors
   // that bound it and what would free them; those words go to the athlete. The block is still built
@@ -2926,7 +3048,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // for every hard run — right while they were all hill sessions, and wrong the moment the second
     // one became a THRESHOLD run, which is a different length. Under-subtracting hands the
     // difference back as easy miles every week, silently.
-    const hardRunMiles = hardRunDays.reduce(
+    const hardRunMiles = hardRunDays().reduce(
       (mi, h) => mi + hardRunMinutesForRole(roleOf(h.day), h.terrain) / pace, 0);
     const easyBudget = Math.max(1, held - hardRunMiles);
     // ⛔ ABOVE THE SELF-REGULATION LINE THE ENGINE STOPS SHAPING THE WEEK (2026-07-29).
@@ -3382,7 +3504,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // doctrine spent the whole day protecting.
       // ⛔ EVERY HARD RUN GETS FILLED, NOT "THE" HARD RUN (§1i). One loop, so two hard runs each get
       // their own session rather than the first winning and the second leaving a blank pinned day.
-      for (const h of hardRunDays) {
+      for (const h of hardRunDays()) {
         // ⛔ ON A DELOAD WEEK THE HARD SESSION IS DOWNGRADED, NOT DELETED (D-407). Dropping it would
         // hand back a blank day, which `place-week` already learned is worse than dropping the pin —
         // the week visibly loses a day and the athlete reads it as a bug. The day keeps an easy run
@@ -3536,7 +3658,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // second hard ride would have been built on top of the athlete's asked-for hours.
       // ⛔ AND EACH HARD RIDE COSTS ITS OWN SESSION'S MINUTES (§7) — a threshold ride is longer than
       // the 45-minute interval session, so a flat multiple would under-subtract it.
-      const hardRideMins = hardRideDays.reduce(
+      const hardRideMins = hardRideDays().reduce(
         (mins, h) => mins + (roleOf(h.day) === 'threshold' ? THRESHOLD_RUN_MIN : BIKE_QUALITY_MIN), 0);
       const totalMins = Math.max(30, Math.round(rideHours * 60) - hardRideMins);
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
@@ -3586,7 +3708,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // `place-week` already learned is worse than dropping the pin. Frequency holds (Hickson) and
       // the intensity that drives the interference comes off (Wilson 2012).
       // ⛔ EVERY HARD RIDE, NOT "THE" HARD RIDE (§1i) — same loop as the runs, one discipline over.
-      for (const h of hardRideDays) {
+      for (const h of hardRideDays()) {
         if (isStandalone) {
           weekSessions.push(enduranceSession('bike', h.day, BIKE_QUALITY_MIN,
             (isTmTest

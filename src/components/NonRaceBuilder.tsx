@@ -1082,12 +1082,18 @@ function assemblePayload(
           // This is the list that can express two runs, two rides, and whose session each one is.
           // ⚠️ ONLY DAYS THAT ARE FILLED. A slot with a discipline and no day yet is an unanswered
           // question, not a pin, and forwarding it would book a session on no day.
-          ...(state.hardDays.some((h) => !!h.day)
+          // ⛔ AN UNPLACED HARD DAY IS SENT, NOT FILTERED OUT (§1i placement model, slice 8). It used
+          // to be dropped — `.filter((h) => !!h.day)` — which is why the screen had to make the
+          // athlete assemble one. Absent `day` now means "engine, propose one", and the composer
+          // places it in the same solve that places the bar.
+          // ⚠️ A CLUB DAY WITHOUT A DAY IS STILL DROPPED: only the athlete knows when the club meets,
+          // and the engine declines to invent an appointment (it drops it server-side too).
+          ...(state.hardDays.some((h) => h.ownership !== 'club' || !!h.day)
             ? {
                 hard_days: state.hardDays
-                  .filter((h) => !!h.day)
+                  .filter((h) => h.ownership !== 'club' || !!h.day)
                   .map((h) => ({
-                    day: h.day,
+                    ...(h.day ? { day: h.day } : {}),
                     discipline: h.discipline,
                     ownership: h.ownership,
                     ...(h.discipline === 'run' ? { terrain: state.qualityRunTerrain } : {}),
@@ -1577,9 +1583,47 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const hardSlotIndex = Math.min(activeHardSlot, Math.max(0, state.hardDays.length - 1));
   const activeHard = state.hardDays[hardSlotIndex] ?? null;
   const hardDaySport: 'run' | 'bike' | null = activeHard?.discipline ?? null;
-  const hardDayValue = activeHard?.day || '';
   /** Every day already spoken for by a hard slot — a second slot may not take the first one's day. */
-  const hardDaysTaken = state.hardDays.map((h) => h.day).filter(Boolean) as DayName[];
+  /**
+   * ⛔ THE ENGINE'S PROPOSED DAY, READ OFF THE PREVIEW (§1i placement model, slice 8).
+   *
+   * The screen does not place anything and must not — `previewWeek` is the composer's own answer,
+   * built by the same solve that places the bar. A hard slot with no day of its own shows the day
+   * the engine chose, so the athlete sees the week already arranged and a tap MOVES a session
+   * rather than building one from nothing.
+   *
+   * ⚠️ MATCHED BY DISCIPLINE AND ORDER, not by name — the preview carries session names ("Hill
+   * Repeats", "Threshold Run", "Bike Intervals") and which name a slot gets is §7's business, not
+   * this screen's. Order within a discipline is the composer's order, which is the slot order.
+   */
+  const proposedDays = useMemo<Record<number, DayName | undefined>>(() => {
+    const out: Record<number, DayName | undefined> = {};
+    if (!previewWeek?.length) return out;
+    const byDiscipline: Record<'run' | 'bike', DayName[]> = { run: [], bike: [] };
+    for (const s of previewWeek) {
+      const hard = /Hill|Threshold|Intervals|Repeat|Club/i.test(String((s as { name?: string }).name ?? ''));
+      if (!hard) continue;
+      const t = String((s as { type?: string }).type ?? '');
+      const d = (s as { day?: string }).day as DayName | undefined;
+      if (!d) continue;
+      if (t === 'run') byDiscipline.run.push(d);
+      else if (t === 'ride') byDiscipline.bike.push(d);
+    }
+    const seen: Record<'run' | 'bike', number> = { run: 0, bike: 0 };
+    state.hardDays.forEach((h, i) => {
+      const list = byDiscipline[h.discipline];
+      const n = seen[h.discipline]++;
+      if (!h.day) out[i] = list[n];
+    });
+    return out;
+  }, [previewWeek, state.hardDays]);
+  /** What the row shows for a slot: the athlete's day if they moved it, otherwise the engine's. */
+  const dayForSlot = (i: number): DayName | '' => state.hardDays[i]?.day || proposedDays[i] || '';
+  const hardDayValue = activeHard ? dayForSlot(hardSlotIndex) : '';
+  // ⚠️ RESOLVED DAYS, not just the athlete's — a slot must not be able to take the day the engine
+  // proposed for the other one, or two hard sessions land together and the composer dedupes one away.
+  const hardDaysTaken = state.hardDays
+    .map((_, i) => dayForSlot(i)).filter(Boolean) as DayName[];
   /** ⛔ THE COUNT DRIVES THE COPY (§1i). One HOLDS top-end fitness; two BUILDS it. */
   const hardDayCount = state.hardDays.filter((h) => !!h.day).length;
   /**
@@ -1680,12 +1724,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       key: 'hard' as const,
       kind: 'day' as const,
       label: state.hardDays.length > 1 ? 'Hard days' : 'Hard day',
+      // ⚠️ "pick a day" IS GONE (slice 8) — a prescribed slot always HAS a day, either the athlete's
+      // or the engine's. The only dayless state left is a club slot the athlete has not answered.
       answer: state.hardDays.length === 0
         ? 'None'
         : state.hardDays
-          .map((h) => {
+          .map((h, i) => {
             const sport = h.discipline === 'run' ? 'Run' : 'Ride';
-            return h.day ? `${sport} · ${DAY_SHORT[h.day as DayName]}` : `${sport} · pick a day`;
+            const d = dayForSlot(i);
+            return d ? `${sport} · ${DAY_SHORT[d as DayName]}` : `${sport} · when does it meet?`;
           })
           .join('  ·  '),
       shown: true,
@@ -1948,8 +1995,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     targetMiles: state.targetMiles,
     rideHours: state.rideHours,
     qualityDays: state.qualityDays,
-    // §1i — the strength path's hard days, so a slot with no day still blocks Continue.
-    hardDays: state.hardDays,
+    // ⛔ NO LONGER SENT (§1i placement model, slice 8). A prescribed hard day with no day is not a
+    // half-answer any more — it is the engine being asked to place it — so the "has a discipline but
+    // no day" block is DELETED rather than re-worded. A club day without a day is simply not
+    // forwarded, which is a silent drop of an unanswered optional question, not a blocked flow.
   };
   const scheduleBlockedReason = scheduleGateReason(scheduleGateInput);
   const scheduleCanContinue = scheduleBlockedReason === null;
@@ -2066,6 +2115,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    *
    * ⚠️ IT PLACES NOTHING CLIENT-SIDE. The grid renders what the solver returned.
    */
+  /**
+   * ⛔ THE HARD DAY ARRIVES ALREADY THERE (§1i placement model, slice 8). A Strong Focus athlete
+   * reaching the scheduler finds one prescribed hard day proposed, not an empty optional row they
+   * have to discover and assemble. Same pattern as strength: engine-designed default, athlete
+   * adjusts after.
+   *
+   * ⚠️ ONE, NOT TWO. §7's assignment gives a single hard day the VO2 session, which is the quality
+   * ordinary easy volume cannot hold; the second is an ADDITION the athlete asks for, and it brings
+   * the threshold day with it. Seeding two would be the app deciding they want more hard training.
+   *
+   * ⚠️ SEEDED ONCE, AND ONLY WHEN EMPTY. `hardDaysSeeded` latches, so an athlete who removes the
+   * default does not get it handed back on the next render — "one or none" has to stay exactly as
+   * reachable as it is today, and a default that reappears is not a default, it is a refusal.
+   * ⚠️ AND THE §7 GATE COMPOSES: a discipline with no number offers no proposal at all.
+   */
+  const hardDaysSeeded = React.useRef(false);
+  React.useEffect(() => {
+    if (currentStep !== 'schedule' || hardDaysSeeded.current) return;
+    if (state.hardDays.length > 0) { hardDaysSeeded.current = true; return; }
+    const d = (['run', 'bike'] as const).find((x) => posturePresent(x) && hardDayAvailable[x]);
+    if (!d) return;
+    hardDaysSeeded.current = true;
+    setState((st) => (st.hardDays.length > 0 ? st : {
+      ...st,
+      hardDays: [{ discipline: d, day: '' as const, ownership: 'prescribed' as const }],
+    }));
+  }, [currentStep, state.hardDays.length, hardDayAvailable]);
+
   React.useEffect(() => {
     if (currentStep !== 'schedule') return;
     if (!state.longRunDay && !state.longRideDay) return;   // nothing to solve around yet
@@ -3737,7 +3814,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline)},0.16)`,
                                 color: '#fff',
                               }}
-                            >{h.discipline === 'run' ? 'Run' : 'Ride'}{h.day ? ` · ${DAY_SHORT[h.day as DayName]}` : ''}</button>
+                            >{h.discipline === 'run' ? 'Run' : 'Ride'}{dayForSlot(i) ? ` · ${DAY_SHORT[dayForSlot(i) as DayName]}` : ''}</button>
                           ))}
                           {state.hardDays.length < MAX_HARD_DAY_SLOTS
                             && (['run', 'bike'] as const)

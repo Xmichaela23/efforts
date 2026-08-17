@@ -154,28 +154,21 @@ Deno.test('a HALF-answered hard day blocks, and names itself', () => {
   assertEquals(scheduleBlockedReason(complete({ qualityDays: { bike: '' } })), reason, 'same for a ride');
 });
 
-// ── §1i: THE STRENGTH PATH SENDS A LIST, AND THE GATE READS IT ───────────────────────────────────
-Deno.test('§1i — a half-answered hard SLOT blocks, and two complete ones pass', () => {
-  // The strength path's hard days are a list (two runs is legal), not the sport-keyed bag. A slot
-  // with a discipline and no day is the same half-answer and must stop the flow the same way.
-  assertEquals(scheduleCanContinue(complete({ hardDays: [{ discipline: 'run', day: 'tuesday' }] })), true);
-  assertEquals(
-    scheduleCanContinue(complete({
-      hardDays: [{ discipline: 'run', day: 'tuesday' }, { discipline: 'run', day: 'thursday' }],
-    })),
-    true,
-    'two hard runs is a legal week as of §1i',
-  );
-  assertEquals(
-    scheduleCanContinue(complete({
-      hardDays: [{ discipline: 'run', day: 'tuesday' }, { discipline: 'bike', day: '' }],
-    })),
-    false,
-    'the SECOND slot being half-answered must block too',
-  );
-  // ⛔ ABSENT IS THE PRE-§1i SHAPE AND MUST PASS UNTOUCHED.
-  assertEquals(scheduleCanContinue(complete({ hardDays: [] })), true);
+// ── §1i / SLICE 8: THE HALF-ANSWERED HARD SLOT IS NOT A STATE ANY MORE ──────────────────────────
+Deno.test('⛔ A PRESCRIBED HARD DAY WITH NO DAY DOES NOT BLOCK — the engine places it', () => {
+  // ⛔ THIS ASSERTION INVERTED ON 2026-08-17 (§1i placement model). It used to pin that a slot with
+  // a discipline and no day BLOCKS Continue — correct while the athlete assembled a hard session
+  // from parts, and wrong under "ours to write → ours to place": an unplaced prescribed day is the
+  // engine being asked to propose one, which is the normal case and not an unfinished form.
+  //
+  // ⚠️ THE FIELD IS GONE FROM THE GATE ENTIRELY rather than defaulted to "fine". A gate that still
+  // read the list would be one edit away from blocking again, and the state it blocked on no longer
+  // exists as a concept.
   assertEquals(scheduleCanContinue(complete({})), true);
+  // The RACE path's club night is untouched: it is sport-keyed, the athlete names the day, and a
+  // discipline with no day there really is a half-answer.
+  assertEquals(scheduleCanContinue(complete({ qualityDays: { run: '' } })), false);
+  assertEquals(scheduleCanContinue(complete({ qualityDays: { run: 'tuesday' } })), true);
 });
 
 // ── THE LONG DAYS ────────────────────────────────────────────────────────────────────────────────

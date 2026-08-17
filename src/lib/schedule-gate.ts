@@ -148,8 +148,11 @@ export function scheduleBlockedReasons(i: ScheduleGateInput): string[] {
   // blocks: a discipline chosen with no day leaves an anchor the solver cannot place. Declining
   // passes. ⚠️ ONE SENTENCE HOWEVER MANY SLOTS ARE HALF-ANSWERED — two copies of the same line is
   // noise, and the fix for both is the same tap.
-  const halfAnswered = ['run', 'bike'].some((d) => d in i.qualityDays && !i.qualityDays[d])
-    || (i.hardDays ?? []).some((h) => !h.day);
+  // ⛔ THE STRONG FOCUS HALF-ANSWER STATE IS GONE (§1i placement model, slice 8). A prescribed hard
+  // day with no day is the engine being asked to place it, not an unfinished form — so there is
+  // nothing to block on. The RACE path's club night still is a half-answer: it is sport-keyed, the
+  // athlete names the day, and a discipline with no day there really is unfinished.
+  const halfAnswered = ['run', 'bike'].some((d) => d in i.qualityDays && !i.qualityDays[d]);
   if (halfAnswered) {
     out.push('A hard session has a discipline but no day. Tapping the discipline again drops it.');
   }
