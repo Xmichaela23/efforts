@@ -692,6 +692,20 @@ Weekly endurance volume is locked, so intensity and density are the only levers.
   preserved by general aerobic work. ⚠️ **Reasoned from standard practice, not from a page in
   either book** — source it properly before it ships as a claim.
 - ⛔ **A CLUB SESSION CANNOT BE PROGRESSED** (§1i). §7 only owns the sessions the app prescribes.
+- ⛔ **A CLUB SESSION IS THE THRESHOLD DAY — decided by Michael 2026-08-17.** A group ride or run
+  club settles into a sustained, fast rhythm at or around threshold; true VO2 work (precise
+  intervals, strict rest) is near-impossible in a pack. So the engine maps every club day to the
+  THRESHOLD slot, and the assignment falls out:
+  - **2 hard days, one is a club** → the app's day is **VO2**, prescribed and progressed. The club
+    is the threshold day: placed, protected, never given content.
+  - **1 hard day and it is a club** → the app prescribes **no hard intervals at all** that block.
+    The athlete traded VO2 development for the group environment — their choice, stated honestly in
+    the copy. (§6's stacking — squat routed onto the club day — applies when §6 ships, not before.)
+  - **Two clubs** → two threshold days, and the copy says the block holds no VO2 work.
+  ⚠️ Reasoned from group dynamics + Viada's separation of the two systems — coaching-model evidence,
+  not a trial. Label it that way in code.
+  ⚠️ The standing "ONE hard day → VO2 unless the goal is distance-oriented" rule above is for the
+  app's OWN sessions and is unchanged by this.
 - **Block mapping:** leader 1 establishes the wave · leader 2 advances it (more time in zone or a
   faster pace) · **light weeks delete the intervals entirely** (already true for the run, §7's bug
   for the bike) · the anchor shortens the intervals and demands the highest pace, mirroring the
