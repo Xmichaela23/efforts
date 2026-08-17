@@ -264,18 +264,6 @@ export type StrengthPrimaryArgs = {
    *  0 or absent → none. See `swimSessions` for what the app is and is not claiming here. */
   swimDays?: number;
   /**
-   * ⛔ HOW MANY DAYS THE LIFTING OCCUPIES. 4 (default, and Wendler's own shape) or 3.
-   *
-   * At 3 the two upper lifts share a day and the week-3 test still runs on four — see the block
-   * comment at the `solveWeek` call for the full reasoning and what is sourced versus reasoned.
-   *
-   * ⚠️ ABSENT MEANS 4, so every existing plan is byte-identical. This was a HARD CONSTANT before
-   * (`SPEC-week-solver.md` §0a constraint 4: *"a fixed count, lift frequency is not negotiable"*),
-   * and that constraint is now a DEFAULT rather than a law. The spec entry needs superseding, not
-   * quietly contradicting — a rule reversed in code and left standing in a doc is how this repo rots.
-   */
-  liftingDays?: 3 | 4;
-  /**
    * ⛔ WHAT EACH CYCLE EARNED, per lift — Wendler's 95% validity check, finally reachable.
    *
    * `verdicts[i]` is earned in cycle i+1 and decides what cycle i+2 carries: `advance` (+5/+10),
@@ -1798,37 +1786,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         }
       : {}),
   }));
-  /**
-   * ⛔ THREE LIFTING DAYS, AND THE SOLVER NEEDS NO CHANGE TO DO IT (2026-07-29).
-   *
-   * `week-solver.ts:527` refuses two lifts on one day, and its comment says why: *"the matrix permits
-   * `upper_body_strength × lower_body_strength` to share a day and that permission is real, but it
-   * belongs to a different block shape."* This IS that block shape — and the cheap way in is not to
-   * relax the rule but to hand the solver ONE upper slot that carries both upper lifts. One lift per
-   * day still holds, the clearance maths is identical (an upper day is an upper day whether it holds
-   * one press or two), and the composer expands the slot into two sessions afterwards.
-   *
-   * ⛔ WHY BENCH + PRESS AND NOT ANY OTHER PAIR. The second lift in a session is trained fatigued —
-   * the earliest exercise is the one that adapts most, and the later one gives up load and reps. So
-   * the pair has to be the one with least to lose: the two upper lifts are lighter and far less
-   * systemically taxing than a squat or a deadlift, and the heavy lower lifts — where the AMRAP
-   * matters most and fatigue costs most — keep their own days.
-   *
-   * ⛔ AND THE TEST WEEK IS FOUR DAYS. Week 3 of every cycle is Wendler's 95% set, which is what
-   * decides whether the bar goes up. A lift trained second gives a reading taken under fatigue, and
-   * fatigue status is a named standardisation variable in the strength-testing literature — %1RM
-   * prescriptions are built on testing done in a fatigue-free state. 1RM test-retest reliability is
-   * good-to-excellent (ICC ≥ 0.90) CONDITIONAL ON standardisation, which is why every test week is
-   * four days and not some of them. Comparable to each other is the property that matters.
-   *
-   * ⚠️ THE COMBINATION IS OURS. Nobody has trialled "train three, test on a fourth" — the components
-   * are measured (frequency is not the mechanism when volume is equated; test rested; test the same
-   * way every time), the join is reasoned. It is a scheduling choice made to protect a measurement,
-   * not a claim about the body. Wendler never wrote it either: at three days HE rotates the four
-   * lifts and lets the cycle run past four weeks; at two days he stacks two lifts per session and
-   * keeps the calendar. We are using his two-day trade one day up, and keeping his calendar.
-   */
-  const liftingDays = args.liftingDays === 3 ? 3 : 4;
+  // ⛔⛔ THE FOUR-DAY WEEK IS DELETED (2026-08-16, Michael). **Every Strong Focus block is three
+  // days: Squat · Bench · Deadlift + Press.** The `liftingDays` arg, its `3 | 4` type, the wizard
+  // step that set it and the `lifting_days` plumbing are all gone with it.
+  //
+  // What stood here: a default of 4 with 3 as an opt-in, and a `SPEC-week-solver.md` §0a note that
+  // lift frequency was "not negotiable". There is nothing left to negotiate — the branch below is
+  // unconditional now, and an unreachable four-day path is not "kept for later", it is a second
+  // shape nobody maintains.
   // ⛔ WHICH TWO LIFTS SHARE THE 3-DAY WEEK'S ONE DOUBLE SESSION — **DEADLIFT + PRESS AS OF
   // 2026-08-15 (§1f), and it used to be BENCH + PRESS.**
   //
@@ -1854,12 +1819,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     .filter((n) => MAIN_LIFTS.some((l) => l.name === n));
   const pairedSlotName = PAIRED_LIFTS.join(' + ');
   const pairedIsLower = MAIN_LIFTS.some((l) => PAIRED_LIFTS.includes(l.name) && l.isLower);
-  const solverLifts = liftingDays === 3
-    ? [
+  const solverLifts = [
         ...MAIN_LIFTS.filter((l) => !PAIRED_LIFTS.includes(l.name)).map((l) => ({ name: l.name, isLower: l.isLower })),
         { name: pairedSlotName, isLower: pairedIsLower },
-      ]
-    : MAIN_LIFTS.map((l) => ({ name: l.name, isLower: l.isLower }));
+      ];
   // ⛔ THE HARD DAY IS ONE OF THE RUN DAYS, NOT AN EXTRA ONE.
   //
   // `runFreq` counted only the EASY runs and the hill session was pushed on top, so an athlete who
@@ -2115,7 +2078,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const dayForLift = expandSlots(placedWeek.slots as never);
   // ⛔ THE TEST WEEK HAS ITS OWN MAP. Week 3 puts every lift on its own day, so the days MOVE between
   // a normal week and the test week — that is the whole point of the mode, not a bug to reconcile.
-  const dayForLiftTest = liftingDays === 3 && solvedTest.status !== 'unsolvable'
+  const dayForLiftTest = solvedTest.status !== 'unsolvable'
     ? expandSlots(solvedTest.week.lifts.map((l) => ({
         lift: l.lift, isLower: l.isLower, day: cap(l.day) as DayName,
       })))
@@ -2147,7 +2110,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // ⚠️ THE `l.isLower` GUARD IS GONE (§1f). The pair contains the DEADLIFT now, so testing for an
     // upper lift would have silently suppressed the note on the very lift that leads the day.
     // Membership in the pair is the question, and it is asked directly.
-    if (liftingDays !== 3 || !PAIRED_LIFTS.includes(l.name)) return '';
+    if (!PAIRED_LIFTS.includes(l.name)) return '';
     const [first, second] = PAIRED_LIFTS;
     if (l.name === first) {
       return ` Shares the day with ${second}, and goes first — the second lift of a session is done`
@@ -2824,7 +2787,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // ⚠️ ASSISTANCE COMES FROM THE FIRST LIFT'S RESOLUTION and that is not a shortcut: both lifts on
     // this day are presses, so `resolveAssistance` gives them the same day-type roles (push · pull ·
     // core). Taking the heavier lift's block is the same three slots either way.
-    if (liftingDays === 3) {
+    {
       const byDay = new Map<string, PlanSession[]>();
       for (const ws of weekSessions) {
         if (ws.type !== 'strength') continue;

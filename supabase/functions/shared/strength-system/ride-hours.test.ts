@@ -31,33 +31,34 @@ const rideHoursBuilt = (args: Record<string, unknown>): number => {
   return mins / 60;
 };
 
-Deno.test('⛔ THE RIDE HOURS ARE THE ASK — every shape, hard day or not, 3 or 4 lifting days', () => {
-  for (const liftingDays of [4, 3] as const) {
-    for (const hours of [4, 6, 8]) {
-      const shapes: Array<[string, Record<string, unknown>]> = [
-        ['bike primary + bike{} + hard ride', {
-          enduranceSport: 'bike', enduranceFrequency: 3,
-          bike: { hours, days: 3, longRideDay: 'saturday' }, targetWeeklyRideHours: hours,
-          hardDay: { day: 'tuesday', discipline: 'bike' }, liftingDays }],
-        ['bike primary + bike{}, no hard day', {
-          enduranceSport: 'bike', enduranceFrequency: 3,
-          bike: { hours, days: 3, longRideDay: 'saturday' }, liftingDays }],
-        // ⛔ THE HOURS-ONLY PATH: no `bike{}` object at all. This is the one that built 1.5h.
-        ['bike primary, hours only', {
-          enduranceSport: 'bike', enduranceFrequency: 3, targetWeeklyRideHours: hours,
-          hardDay: { day: 'tuesday', discipline: 'bike' }, liftingDays }],
-        ['run primary + bike alongside', {
-          enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
-          easyPaceMinPerMile: 9, longRunDay: 'sunday',
-          bike: { hours, days: 2, longRideDay: 'thursday' },
-          hardDay: { day: 'tuesday', discipline: 'run' }, liftingDays }],
-      ];
-      for (const [label, args] of shapes) {
-        const built = rideHoursBuilt(args);
-        // Half an hour of slack for rounding across the split; the defects were 0.8-1.5h.
-        assertEquals(Math.abs(built - hours) <= 0.5, true,
-          `${liftingDays}d · ${label}: asked ${hours}h, built ${Math.round(built * 10) / 10}h`);
-      }
+// ⚠️ THE `for (const liftingDays of [4, 3])` LOOP IS GONE (2026-08-16, §1f-0). There is one lifting
+// shape now, so the loop ran all twelve scenarios twice with identical inputs — 24 assertions that
+// looked like twice the coverage and were the same twelve.
+Deno.test('⛔ THE RIDE HOURS ARE THE ASK — every shape, hard day or not', () => {
+  for (const hours of [4, 6, 8]) {
+    const shapes: Array<[string, Record<string, unknown>]> = [
+      ['bike primary + bike{} + hard ride', {
+        enduranceSport: 'bike', enduranceFrequency: 3,
+        bike: { hours, days: 3, longRideDay: 'saturday' }, targetWeeklyRideHours: hours,
+        hardDay: { day: 'tuesday', discipline: 'bike' } }],
+      ['bike primary + bike{}, no hard day', {
+        enduranceSport: 'bike', enduranceFrequency: 3,
+        bike: { hours, days: 3, longRideDay: 'saturday' } }],
+      // ⛔ THE HOURS-ONLY PATH: no `bike{}` object at all. This is the one that built 1.5h.
+      ['bike primary, hours only', {
+        enduranceSport: 'bike', enduranceFrequency: 3, targetWeeklyRideHours: hours,
+        hardDay: { day: 'tuesday', discipline: 'bike' } }],
+      ['run primary + bike alongside', {
+        enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
+        easyPaceMinPerMile: 9, longRunDay: 'sunday',
+        bike: { hours, days: 2, longRideDay: 'thursday' },
+        hardDay: { day: 'tuesday', discipline: 'run' } }],
+    ];
+    for (const [label, args] of shapes) {
+      const built = rideHoursBuilt(args);
+      // Half an hour of slack for rounding across the split; the defects were 0.8-1.5h.
+      assertEquals(Math.abs(built - hours) <= 0.5, true,
+        `${label}: asked ${hours}h, built ${Math.round(built * 10) / 10}h`);
     }
   }
 });
@@ -73,14 +74,12 @@ Deno.test('the hard ride does not shrink to fit — intensity is the protected v
   assertEquals(hard.duration, 45, 'the intervals were trimmed to make the hours fit');
 });
 
-Deno.test('⛔ RIDE VOLUME DOES NOT MOVE WHEN THE LIFTING DOES', () => {
-  const args = {
-    enduranceSport: 'bike', enduranceFrequency: 3,
-    bike: { hours: 6, days: 3, longRideDay: 'saturday' },
-    hardDay: { day: 'tuesday', discipline: 'bike' },
-  };
-  const four = rideHoursBuilt({ ...args, liftingDays: 4 });
-  const three = rideHoursBuilt({ ...args, liftingDays: 3 });
-  assertEquals(Math.abs(four - three) <= 0.25, true,
-    `dropping a lifting day changed the ride volume: ${four}h vs ${three}h`);
-});
+// ⛔ DELETED 2026-08-16 (§1f-0): `⛔ RIDE VOLUME DOES NOT MOVE WHEN THE LIFTING DOES`.
+//
+// It built the same plan twice — once with `liftingDays: 4`, once with `3` — and asserted the ride
+// hours matched. With the argument removed from `StrengthPrimaryArgs` both calls pass an ignored
+// field and return the SAME NUMBER, so the assertion was `|x - x| <= 0.25`: true for any engine
+// behaviour whatsoever. It could no longer fail, which means it could no longer report anything.
+//
+// ⚠️ THE PROPERTY IT PROTECTED IS NOT LOST. "The ride hours are the ask" above still asserts the
+// built hours match the request across twelve shapes, on the only lifting shape there is.

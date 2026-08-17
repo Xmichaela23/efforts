@@ -41,8 +41,12 @@ const block = (weeks: number) => composeStrengthPrimaryPlan({
 
 const PLAN = block(12);
 
+// ⚠️ NAMED BY CONTENT, NOT BY EXACT TITLE (2026-08-16). The three-day week is the only week now, and
+// its shared day is titled `Strength — Deadlift + Overhead Press`, so an equality test loses two
+// lifts.
 const sessionFor = (plan: any, week: number, lift: string) =>
-  (plan.sessions_by_week[String(week)] ?? []).find((s: any) => s.name === `Strength — ${lift}`);
+  (plan.sessions_by_week[String(week)] ?? [])
+    .find((s: any) => s.type === 'strength' && String(s.name).includes(lift));
 const rowsFor = (plan: any, week: number, lift: string) =>
   (sessionFor(plan, week, lift)?.strength_exercises ?? []) as any[];
 const mainRow = (plan: any, week: number, lift: string) =>
@@ -56,12 +60,13 @@ const shapeOf = (plan: any, week: number, lift: string) =>
 
 // ── 1. The block is twelve weeks and every one of them is authored ──────────
 
-Deno.test('⛔ TWELVE WEEKS, FOUR LIFTING DAYS EACH, NOTHING MISSING', () => {
+Deno.test('⛔ TWELVE WEEKS, THREE LIFTING DAYS EACH, NOTHING MISSING', () => {
   assertEquals(PLAN.duration_weeks, 12);
   assertEquals(Object.keys(PLAN.sessions_by_week).length, 12);
   for (let week = 1; week <= 12; week++) {
     const strength = (PLAN.sessions_by_week[String(week)] as any[]).filter((s) => s.type === 'strength');
-    assertEquals(strength.length, 4, `week ${week} has ${strength.length} lifting days`);
+    // ⛔ THREE DAYS, ALWAYS (2026-08-16) — the four-day option is deleted.
+    assertEquals(strength.length, 3, `week ${week} has ${strength.length} lifting days`);
     for (const lift of LIFTS) {
       assert(mainRow(PLAN, week, lift), `week ${week} lost ${lift}`);
     }
@@ -123,20 +128,40 @@ Deno.test('⛔ A LEADER NEVER MEASURES AND A 7TH WEEK NEVER MEASURES', () => {
 // ── 3. The supplemental ─────────────────────────────────────────────────────
 
 Deno.test('⛔ FSL IS ON THE LEADER WEEKS AND NOWHERE ELSE', () => {
-  const fsl = (week: number, lift: string) => rowsFor(PLAN, week, lift).find((r) => r.supplemental);
+  // ⚠️ ONE SUPPLEMENTAL PER SESSION, NOT PER LIFT (2026-08-16). The shared deadlift + press day keeps
+  // the FIRST lift's FSL block and drops the second's (§1e) — Wendler's stacked day is the main lifts
+  // plus ONE round of everything else (p.77). So the row has to be found BY NAME: an untargeted
+  // `find(r => r.supplemental)` on the press's session returns the DEADLIFT's block and the test
+  // reads as if the press still had one.
+  const fsl = (week: number, lift: string) =>
+    rowsFor(PLAN, week, lift).find((r) => r.supplemental && r.name === lift);
+  // ⛔ THE PRESS NO LONGER HAS A DAY OF ITS OWN, so it carries no supplemental at all. That is the
+  // §1e dose rule, not an omission, and it is asserted below rather than skipped.
+  const OWN_DAY_LIFTS = LIFTS.filter((l) => l !== 'Overhead Press');
   for (const week of [1, 2, 3, 5, 6, 7]) {
-    for (const lift of LIFTS) {
+    for (const lift of OWN_DAY_LIFTS) {
       const row = fsl(week, lift);
       assert(row, `week ${week} ${lift} lost its supplemental`);
       assertEquals([row.name, row.sets, row.reps], [lift, 5, 5], `week ${week} ${lift}`);
       // ⛔ AT THE WEEK'S OWN OPENING WEIGHT — the bar is already loaded to it by the first work set.
       assertEquals(row.weight, workSets(PLAN, week, lift)[0].weight, `week ${week} ${lift} FSL weight`);
     }
+    // ⛔ AND THE SHARED DAY CARRIES EXACTLY ONE, THE DEADLIFT'S. A second FSL block here is ten sets
+    // of five on a day that already holds two main lifts — the dose error §1e exists to stop.
+    const shared = rowsFor(PLAN, week, 'Overhead Press').filter((r) => r.supplemental);
+    assertEquals(shared.length, 1, `week ${week} shared day carries ${shared.length} supplementals`);
+    assertEquals(shared[0].name, 'Deadlift', `week ${week} shared day kept the wrong lift's block`);
   }
   for (const week of [4, 8, 9, 10, 11, 12]) {
     for (const lift of LIFTS) {
       assertEquals(fsl(week, lift), undefined, `week ${week} ${lift} must carry no supplemental`);
     }
+    // Nothing supplemental anywhere on a deload, an anchor or the closing test week.
+    const any = (PLAN.sessions_by_week[String(week)] as any[])
+      .filter((s) => s.type === 'strength')
+      .flatMap((s) => (s.strength_exercises ?? []) as any[])
+      .filter((r) => r.supplemental);
+    assertEquals(any.length, 0, `week ${week} carries ${any.length} supplemental rows`);
   }
 });
 
@@ -185,9 +210,14 @@ Deno.test('⛔ THE JUMPS FOLLOW IT TOO — 2×5 light, 3×5 on the anchor, lower
   }
   // ⛔ AND NEVER ON AN UPPER DAY. `upper` is a LOAD CLAIM five separate things read; a jump on a
   // bench day makes it false on all five.
+  // ⚠️ THE PRESS HAS NO UPPER DAY OF ITS OWN ANY MORE (2026-08-16) — it shares the deadlift's, which
+  // is a LOWER day and takes the primer for that reason. Asserting `undefined` on the press would now
+  // be asserting the deadlift lost its jumps. So the claim is checked on the bench day, the one pure
+  // upper day left, and the shared day is pinned to ONE jump — the deadlift's, not one per lift.
   for (let week = 1; week <= 12; week++) {
     assertEquals(jump(week, 'Bench Press'), undefined, `week ${week} bench`);
-    assertEquals(jump(week, 'Overhead Press'), undefined, `week ${week} press`);
+    const shared = rowsFor(PLAN, week, 'Overhead Press').filter((r) => r.name === 'Box Jump');
+    assertEquals(shared.length, 1, `week ${week} shared day carries ${shared.length} jump rows`);
   }
 });
 

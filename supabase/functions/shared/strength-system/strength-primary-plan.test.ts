@@ -254,21 +254,35 @@ Deno.test('percent_1rm is the fraction of the REAL max, and stays buffered by th
 // That was the hardcoded grid, and the grid is gone: `place-week.ts` now places the bar around the
 // athlete's pins, so the days are an OUTPUT and pinning them would pin the bug we just removed.
 // What survives is the contract, and it is asserted harder than the day list ever did.
-Deno.test('four lifting days, one main lift each, the same days every week', () => {
+// ⛔ THREE DAYS, ALWAYS (2026-08-16, §1f-0). The four-day option is DELETED, not defaulted off, so
+// this is no longer "the default shape" — it is the only one. The lift count did not change with it:
+// four lifts still run every week, and the deadlift and the press now arrive as one session.
+Deno.test('three lifting days, all four lifts, the same days every week', () => {
   const week1 = sessionsFor(1).filter((s) => s.type === 'strength').map((s) => s.day);
-  assertEquals(week1.length, 4);
-  assertEquals(new Set(week1).size, 4, 'two main lifts landed on the same day');
+  assertEquals(week1.length, 3);
+  assertEquals(new Set(week1).size, 3, 'two lifting sessions landed on the same day');
   for (let week = 1; week <= 12; week++) {
     const strength = sessionsFor(week).filter((s) => s.type === 'strength');
-    assertEquals(strength.length, 4, `week ${week}`);
+    assertEquals(strength.length, 3, `week ${week}`);
     // Same days every week — 5/3/1 is a fixed weekly shape, only the loading moves.
     assertEquals(strength.map((s) => s.day), week1, `week ${week} moved a lifting day`);
   }
-  // All four lifts present exactly once.
   assertEquals(
     sessionsFor(1).filter((s) => s.type === 'strength').map((s) => s.name).sort(),
-    ['Strength — Back Squat', 'Strength — Bench Press', 'Strength — Deadlift', 'Strength — Overhead Press'],
+    ['Strength — Back Squat', 'Strength — Bench Press', 'Strength — Deadlift + Overhead Press'],
   );
+  // ⛔ AND "ALL FOUR, EXACTLY ONCE" IS THE CLAIM THE SESSION COUNT USED TO CARRY. Dropping to three
+  // sessions is only correct if nothing was subtracted with the day — §5.2b, the engine never
+  // silently loses a lift. A lift named twice would be a second dose; a lift missing is the failure
+  // the old `length === 4` was really guarding, so it is asserted directly now.
+  const mains = sessionsFor(1).filter((s) => s.type === 'strength')
+    .flatMap((s) => (s.strength_exercises ?? []) as any[])
+    .filter((e: any) => !e.supplemental)
+    .map((e: any) => e.name);
+  for (const lift of ['Back Squat', 'Bench Press', 'Deadlift', 'Overhead Press']) {
+    assertEquals(mains.filter((n: string) => n === lift).length, 1,
+      `${lift} appears ${mains.filter((n: string) => n === lift).length} times, not once`);
+  }
 });
 
 // ⛔ THE PROPERTY THE OLD DAY-LIST WAS REALLY PROTECTING, now stated directly.
@@ -294,7 +308,10 @@ Deno.test('⛔ JUMPS ARE ON LOWER DAYS ONLY — an upper day means legs are free
   // LOAD CLAIM read by the solver's 48h clocks, the descent rule, easy-run stacking, the
   // "share no prime movers" stack copy, and the session tag. With jumps on every day the claim was
   // false on all five.
-  const upper = sessionsFor(1).find((s) => s.name === 'Strength — Overhead Press')!.strength_exercises!;
+  // ⚠️ THE BENCH DAY IS THE ONE PURE UPPER DAY LEFT (2026-08-16, §1f-0). The press used to have its
+  // own and was named here; it now shares the deadlift's, which is a LOWER day and carries the primer
+  // for that reason. Naming the press session would assert the deadlift lost its jumps.
+  const upper = sessionsFor(1).find((s) => s.name === 'Strength — Bench Press')!.strength_exercises!;
   assertEquals(upper.some((r: any) => r.name === 'Box Jump'), false, 'a jump landed on an upper day');
   const lower = sessionsFor(1).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
   assertEquals(lower[0].name, 'Box Jump', 'the lower day lost its primer');
@@ -466,7 +483,10 @@ Deno.test('8 weeks is one leader and one anchor, same 3:1 rhythm', () => {
 
 Deno.test('endurance is easy-only, and the long run takes the biggest share', () => {
   const runs = sessionsFor(1).filter((s) => s.type === 'run');
-  assertEquals(runs.length, 3); // Wed + Sat, plus one stacked onto an upper-body lift day
+  // ⚠️ THREE RUNS ON THREE DAYS OF THEIR OWN (2026-08-16). This read "plus one stacked onto an
+  // upper-body lift day" — true at four lifting days, when three lifts + three runs did not fit in a
+  // six-day week. At three, they do, and nothing stacks in this fixture.
+  assertEquals(runs.length, 3);
   // ⚠️ ASSERTS THE SHARE, NOT THE WEEKDAY. This used to pin `longest.day === 'Saturday'`, and no
   // fixture ever asked for Saturday — it is the composer's DERIVED default. A test that pins a
   // derived day is defending current behaviour, and it goes red the moment placement legitimately
@@ -483,8 +503,22 @@ Deno.test('a stacked lift + run day puts the lift first', () => {
   // Was hardcoded to Monday. Which day carries both is the solver's call now, so find it — the
   // ORDER is the contract (Eddens 2018: resistance-first when sessions cannot be separated),
   // not the weekday.
+  //
+  // ⛔ ITS OWN FIXTURE AS OF 2026-08-16 (§1f-0), AND THE ALTERNATIVE WAS TO DELETE THE TEST. The
+  // shared `PLAN` runs three lifts + three runs, which at three lifting days fits in six days with a
+  // rest day left over — so it stacks NOTHING and the assertion below could only be satisfied by
+  // weakening it to "if anything stacked". Resistance-first is a real law and it has to stay pinned,
+  // so the fixture asks for a week that genuinely runs out of days: four runs against three lifts.
+  const stackedPlan = composeStrengthPrimaryPlan({
+    durationWeeks: 12,
+    oneRepMaxes: MAXES,
+    enduranceSport: 'run',
+    enduranceFrequency: 4,
+    targetWeeklyMiles: 25,
+    easyPaceMinPerMile: 9,
+  });
   const byDay = new Map<string, string[]>();
-  for (const s of sessionsFor(1)) byDay.set(s.day, [...(byDay.get(s.day) ?? []), s.type]);
+  for (const s of stackedPlan.sessions_by_week['1'] ?? []) byDay.set(s.day, [...(byDay.get(s.day) ?? []), s.type]);
   const stacked = [...byDay.entries()].filter(([, t]) => t.includes('strength') && t.includes('run'));
   assert(stacked.length > 0, 'expected at least one lift + run day in this fixture');
   for (const [day, types] of stacked) {

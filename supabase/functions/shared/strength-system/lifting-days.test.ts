@@ -1,8 +1,19 @@
 // THE THREE-DAY BLOCK — four lifts, three days, every week of the block.
 //
 // ⛔ WHY THIS EXISTS. Lifting frequency was a HARD CONSTANT of 4 (`SPEC-week-solver.md` §0a #4:
-// "a fixed count, lift frequency is not negotiable"). It is now a default: four days is the plan,
-// three is the fallback, and the trade-off is the athlete's.
+// "a fixed count, lift frequency is not negotiable"). It then became a DEFAULT of 4 with 3 as an
+// opt-in.
+//
+// ⛔⛔ AND AS OF 2026-08-16 (§1f-0, Michael) THERE IS NO CHOICE LEFT: **every Strong Focus block is
+// three days — Squat · Bench · Deadlift + Press.** The `liftingDays` argument is deleted from
+// `StrengthPrimaryArgs`, not defaulted off, so this file no longer builds two shapes and compares
+// them. It pins the one shape.
+//
+// ⚠️ A TEST WAS DELETED HERE, AND DELETING IT WAS THE POINT. `⛔ ABSENT liftingDays IS FOUR — every
+// block built before this option is unchanged` compared `build()` against `build(4)` and went GREEN
+// after the argument was removed, because both calls now pass an ignored field and produce the same
+// three-day block. It asserted a claim that had become false while reporting success. A vacuous
+// green is worse than a red one: it is the only kind of test failure nobody investigates.
 //
 // ⛔ REWRITTEN 2026-08-05 — THE WEEK-3 "TEST WEEK" IS GONE AND THIS FILE PINNED IT.
 //
@@ -33,11 +44,11 @@ import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 // standalone TM-TEST week — light band, no hard endurance session, trimmed easy volume — so it is
 // no longer the representative working week these assertions want. Week 2 is cycle 1's first
 // leader week and is the shape week 1 used to be.
-const build = (liftingDays?: 3 | 4) => composeStrengthPrimaryPlan({
+const build = () => composeStrengthPrimaryPlan({
   durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
   enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
   longRunDay: 'sunday', hardDay: { day: 'tuesday', discipline: 'run' },
-  easyPaceMinPerMile: 9, ...(liftingDays ? { liftingDays } : {}),
+  easyPaceMinPerMile: 9,
 } as never);
 
 const liftDaysIn = (plan: any, week: string): Set<string> =>
@@ -46,14 +57,8 @@ const liftDaysIn = (plan: any, week: string): Set<string> =>
 const liftNamesIn = (plan: any, week: string): string[] =>
   (plan.sessions_by_week[week] as any[]).filter((s) => s.type === 'strength').map((s) => s.name);
 
-Deno.test('⛔ ABSENT liftingDays IS FOUR — every block built before this option is unchanged', () => {
-  const a = JSON.stringify(build().sessions_by_week);
-  const b = JSON.stringify(build(4).sessions_by_week);
-  assertEquals(a, b, 'the default drifted from an explicit 4');
-});
-
 Deno.test('three days: four lifts, three days, EVERY week — no four-day exception', () => {
-  const p = build(3);
+  const p = build();
   for (let w = 1; w <= 12; w++) {
     const wk = String(w);
     assertEquals(liftDaysIn(p, wk).size, 3, `week ${wk} did not run on three days`);
@@ -71,7 +76,7 @@ Deno.test('⛔ THE PAIRED DAY IS ONE SESSION, TWO MAIN LIFTS AND ONE ASSISTANCE 
   // so the shared day emitted two sessions and eight exercises — two presses, two pushes, two pulls,
   // two core. Wendler's stacked day is the mains plus one round (p.77, "one or two exercises per
   // lift" for the whole day).
-  const p = build(3);
+  const p = build();
   const wk = (p.sessions_by_week['2'] as any[]).filter((s) => s.type === 'strength');
   const paired = wk.filter((s) => /\+/.test(s.name));
   assertEquals(paired.length, 1, 'expected exactly one paired session');
@@ -104,7 +109,7 @@ Deno.test('⛔ THE PAIRED DAY IS ONE SESSION, TWO MAIN LIFTS AND ONE ASSISTANCE 
 });
 
 Deno.test('⛔ THE PAIRED DAY STATES ITS ORDER AND WHY A FATIGUED LIFT STILL PROGRESSES', () => {
-  const p = build(3);
+  const p = build();
   const paired = (p.sessions_by_week['2'] as any[]).find((s) => s.type === 'strength' && /\+/.test(s.name));
   const d = String(paired.description ?? '');
   assertEquals(/goes first/.test(d), true, 'the shared day never named its order');
@@ -112,14 +117,14 @@ Deno.test('⛔ THE PAIRED DAY STATES ITS ORDER AND WHY A FATIGUED LIFT STILL PRO
   assertEquals(/rep target/.test(d), true, 'the trade-off is unstated: 5/3/1 progresses off the rep target');
 });
 
-Deno.test('the heavy lower lifts never share a day, at either shape', () => {
-  for (const shape of [3, 4] as const) {
-    const p = build(shape);
-    const lower = (p.sessions_by_week['2'] as any[])
-      .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(s.name));
-    assertEquals(new Set(lower.map((s) => s.day)).size, lower.length,
-      `${shape}-day: a squat and a deadlift shared a day`);
-  }
+// ⚠️ WAS "at either shape", looping [3, 4] (2026-08-16). There is one shape now, so the loop ran the
+// identical scenario twice and read as twice the coverage.
+Deno.test('the heavy lower lifts never share a day', () => {
+  const p = build();
+  const lower = (p.sessions_by_week['2'] as any[])
+    .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(s.name));
+  assertEquals(new Set(lower.map((s) => s.day)).size, lower.length,
+    'a squat and a deadlift shared a day');
 });
 
 
@@ -142,7 +147,7 @@ Deno.test('⛔ THE THREE-DAY WEEK ALTERNATES WHEN NOTHING PINS IT', () => {
   const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const p: any = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-    liftingDays: 3, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+    enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     easyPaceMinPerMile: 9,
   } as never);
   for (let w = 1; w <= 12; w++) {

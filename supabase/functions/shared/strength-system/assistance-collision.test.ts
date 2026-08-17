@@ -499,10 +499,24 @@ Deno.test('the composer gives each lifting day ITS OWN picks', () => {
   } as any);
   const rows = assistanceRowsOf(plan);
   const namesFor = (session: string) => rows.filter((r: any) => r.session === session).map((r: any) => r.name);
-  assertEquals(namesFor('Strength — Overhead Press').slice(0, 3), ['Plate Raise', 'Face Pull', 'Reverse Hyper']);
   assertEquals(namesFor('Strength — Bench Press').slice(0, 3), ['Dips', 'Barbell Row', 'Front Squat']);
   assertEquals(namesFor('Strength — Back Squat').slice(0, 3), ['Push-Up', 'Lat Pulldown', 'Reverse Lunge']);
-  assertEquals(namesFor('Strength — Deadlift').slice(0, 3), ['DB Shoulder Press', 'Inverted Row', 'Glute-Ham Raise']);
+  // ⛔ THREE LIFTING DAYS, SO THERE ARE THREE BLOCKS OF PICKS, NOT FOUR (2026-08-16, §1f-0). The
+  // shared day takes the FIRST lift's block — the deadlift's — because Wendler's stacked day is the
+  // main lifts plus ONE round of everything else (p.77). Two rounds is the eight-exercise dose error.
+  assertEquals(namesFor('Strength — Deadlift + Overhead Press').slice(0, 3),
+    ['DB Shoulder Press', 'Inverted Row', 'Glute-Ham Raise']);
+  // ⚠️ SO THE PRESS-DAY PICKS REACH NOTHING, AND THAT IS ASSERTED RATHER THAN LEFT UNSAID. `by_day.press`
+  // is now a stored preference the engine can never honour: the press has no day of its own to carry
+  // it. The wizard still offers a fourth card to fill it (`NonRaceBuilder.tsx`, §1f-1) — until that
+  // pass lands, an athlete can choose three movements that are silently discarded. This test is what
+  // makes that visible instead of it reading as a lost pick.
+  assertEquals(namesFor('Strength — Overhead Press'), []);
+  const everyName = rows.map((r: any) => r.name);
+  for (const pick of ['Plate Raise', 'Face Pull', 'Reverse Hyper']) {
+    assertEquals(everyName.includes(pick), false,
+      `${pick} was a press-day pick and the press has no day — it must not surface elsewhere`);
+  }
 });
 
 Deno.test('the main-lift name maps to the athlete\'s day, and an unknown lift degrades to a complete block', () => {
