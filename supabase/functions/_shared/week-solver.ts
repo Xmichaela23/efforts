@@ -339,6 +339,43 @@ function adjacencyBreach(
   return null;
 }
 
+/**
+ * ⛔ THE CLEARANCES `clearance_as_penalty` MAY NOT PRICE — the floor under the relaxation ladder.
+ *
+ * **Heavy legs and the long run, 48h, in both directions.** It is the oldest rule in the placement
+ * law and the audit of 2026-08-17 caught the engine breaching it and apologising: a Back Squat on
+ * Monday, 24h after Sunday's long run, with a compromise line disclosing it. Michael read the
+ * exported plan and called it a clown car; he is right, and a disclosure is not a defence.
+ *
+ * ⚠️ THE BREACH WAS NOT A SCORING BUG, WHICH IS WHY THIS IS A FLOOR AND NOT A WEIGHT. `breachPenalty`
+ * is element 1 of the score vector and was never outbid. The week — two hard days (Tue ride, Fri
+ * run), long ride Saturday, long run Sunday — is genuinely infeasible under strict rules: a heavy
+ * lower lift may not share a day with `quality_bike`, `quality_run` or `long_run`, and must clear
+ * the long run by 48h, which leaves exactly Wednesday and Thursday for TWO lower lifts that
+ * themselves need 48h apart. No strict answer exists, so the ladder relaxed and priced a breach.
+ *
+ * ⛔ THE RIGHT ANSWER TO AN IMPOSSIBLE WEEK IS TO YIELD A LESSER SESSION, NOT TO INJURE THE ATHLETE.
+ * With this floor the solver refuses instead, and the caller — which is the only layer that knows
+ * a hard day is optional while the bar is the block's spine — drops one and says so. See
+ * `strength-primary-plan.ts`'s hard-day yield.
+ *
+ * ⚠️ ONLY THIS PAIR. Every other clearance stays priceable: the ladder exists because most weeks
+ * that cannot be solved strictly are still worth building, and turning all of them into refusals
+ * would refuse weeks athletes really do train.
+ */
+function isUnbreachable(a: MatrixSessionKind, b: MatrixSessionKind): boolean {
+  const pair = new Set([a, b]);
+  if (!pair.has('lower_body_strength')) return false;
+  // ⛔ BOTH 48h ENTRIES IN THE HEAVY-LEG ROW, NOT JUST THE LONG RUN. The audit named the long-run
+  // pair because that is what the export showed; with only that one sealed the solver bought the
+  // OTHER 48h breach instead — a Wednesday squat and a Thursday deadlift, 24h apart — and the
+  // athlete reads the same sentence about a different pair. They are one rule: `ADJACENCY_HOURS_ROWS`
+  // gives heavy legs 48h from itself ("a second heavy day needs the damage window") and 48h from the
+  // long run, and both are the damage window. Sealing one and pricing the other is not a law.
+  // ⚠️ THIS IS A DELIBERATE EXTENSION BEYOND THE AUDIT'S LITERAL TEXT — flagged, not smuggled.
+  return pair.has('long_run') || (a === 'lower_body_strength' && b === 'lower_body_strength');
+}
+
 /** Same-day legality: the matrix, and nothing else. */
 function sameDayLegal(kind: MatrixSessionKind, dayIndex: number, placed: Placement[]): boolean {
   for (const p of placed) {
@@ -1057,11 +1094,13 @@ export function solve(input: SolverInput): SolverResult {
 
         const breaches: string[] = [];
         let breachMagnitude = 0;
+        let unbreachable = false;
         for (let i = 0; i < lifts.length; i++) {
           const kind: MatrixSessionKind = lifts[i].isLower ? 'lower_body_strength' : 'upper_body_strength';
           const others = placed.filter((_, k) => k !== anchorPlacements.length + i);
           const b = adjacencyBreach(kind, assignment[i], others);
           if (b) {
+            if (isUnbreachable(kind, b.against.kind)) unbreachable = true;
             breachMagnitude += b.required - b.actual;
             breaches.push(
               `${SOLVER_DAYS[assignment[i]]}'s ${lifts[i].name} sits ${b.actual}h from ` +
@@ -1069,7 +1108,10 @@ export function solve(input: SolverInput): SolverResult {
             );
           }
         }
+        // ⛔ THE FLOOR HOLDS AT EVERY RUNG OF THE LADDER (2026-08-17). `clearance_as_penalty` may
+        // price a shortfall; it may not price THIS one. See `isUnbreachable`.
         if (breaches.length > 0 && relax !== 'clearance_as_penalty') return;
+        if (unbreachable) return;
 
         // ⛔ ARITHMETIC GATE ON HOW MANY STACKS, not a score term. `place-week.resolveStacking`:
         // stacksRequired = sessions − MAX_ACTIVE_DAYS. Stacking beyond that is not an improvement,
@@ -1115,7 +1157,8 @@ export function solve(input: SolverInput): SolverResult {
         if (assignment.slice(0, liftIndex).includes(d)) continue;
         if (input.methodology?.forbidsKindOnDay(kind, SOLVER_DAYS[d])) continue;
         if (!sameDayLegal(kind, d, placed)) continue;
-        if (relax !== 'clearance_as_penalty' && adjacencyBreach(kind, d, placed)) continue;
+        const dayBreach = adjacencyBreach(kind, d, placed);
+        if (dayBreach && (relax !== 'clearance_as_penalty' || isUnbreachable(kind, dayBreach.against.kind))) continue;
 
         assignment[liftIndex] = d;
         placed.push({ kind, dayIndex: d, label: lift.name });

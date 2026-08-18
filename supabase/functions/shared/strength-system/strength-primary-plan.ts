@@ -2474,7 +2474,42 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * path "hangs off one `if` and touches no lift score"; if that ever stops being true, the lifts
    * would move when an athlete adds an easy run, and the test is what would catch it.
    */
-  const liftOnlySolve = solveWeek({ anchors: solverAnchors, lifts: solverLifts });
+  /**
+   * ⛔ WHEN THE WEEK CANNOT HOLD EVERYTHING, A HARD DAY YIELDS — THE BAR DOES NOT (audit 2026-08-17,
+   * defect #0). `week-solver` now REFUSES to breach the 48h between heavy legs and the long run
+   * (`isUnbreachable`), so an over-subscribed week comes back unsolvable instead of arriving with a
+   * squat the morning after the long run and a note apologising for it.
+   *
+   * ⛔ THIS LAYER IS THE ONLY ONE THAT KNOWS WHICH SESSION IS LESSER. The solver sees anchors and
+   * lifts; it cannot know that a hard day is OPTIONAL (§1i — the block is complete without one)
+   * while the lifting is the block's entire spine. So the yield is decided here: drop hard days from
+   * the end, one at a time, until the week is legal — and say which one went and why.
+   *
+   * ⚠️ THE LONG RUN AND LONG RIDE NEVER YIELD. They are the doctrine's two pins and the reason the
+   * athlete picked those days; dropping one to make room for a lift would be the engine rearranging
+   * the athlete's life around its own convenience.
+   * ⚠️ MEASURED, NOT SUPPOSED: Michael's own week (hard ride Tue, hard run Fri, long ride Sat, long
+   * run Sun) is exactly this case. A heavy lower lift may not share a day with `quality_bike`,
+   * `quality_run` or `long_run`, and must clear the long run by 48h — which leaves Wednesday and
+   * Thursday for TWO lower lifts that need 48h from each other. Impossible. Dropping the second hard
+   * day frees Tuesday and the week solves strictly.
+   */
+  const hardAnchorLabels = new Set(
+    pinnedHardDays.map((h) => (h.discipline === 'bike' ? 'your hard ride' : 'your hard run')),
+  );
+  const yieldedHardDays: string[] = [];
+  let solverAnchorsUsed: SolverAnchor[] = solverAnchors;
+  let liftOnlySolve = solveWeek({ anchors: solverAnchorsUsed, lifts: solverLifts });
+  while (liftOnlySolve.status === 'unsolvable') {
+    // ⚠️ FROM THE END. The first hard day is the VO2 session §7 calls the quality easy volume cannot
+    // hold; the second is the addition. Yielding the addition first is the smaller loss.
+    const lastHard = [...solverAnchorsUsed].reverse()
+      .find((a) => a.kind === 'quality_run' || a.kind === 'quality_bike');
+    if (!lastHard) break;   // nothing left to yield — the refusal stands and is surfaced as-is
+    solverAnchorsUsed = solverAnchorsUsed.filter((a) => a !== lastHard);
+    yieldedHardDays.push(lastHard.label);
+    liftOnlySolve = solveWeek({ anchors: solverAnchorsUsed, lifts: solverLifts });
+  }
   const heavyLegDaysForAvoid: SolverDay[] = liftOnlySolve.status === 'unsolvable'
     ? []
     : liftOnlySolve.week.lifts.filter((l) => l.isLower).map((l) => l.day);
@@ -2552,7 +2587,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * candidate single ordering was measured and none satisfies both suites.
        */
       const base = {
-        anchors: solverAnchors, lifts: solverLifts, flexible,
+        anchors: solverAnchorsUsed, lifts: solverLifts, flexible,
         flexibleRanking: 'separation-first' as const,
       };
       const plain = solveWeek(base);
@@ -2613,7 +2648,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    */
   // ⚠️ THE ROLE IS TAKEN BY POSITION IN `gatedHardDays`, which is the list `assignHardRoles` scored —
   // so it is carried across here rather than re-derived from the placed day.
+  // ⚠️ A YIELDED HARD DAY IS NOT BUILT. Its anchor is gone from the solve, so emitting the session
+  // would put it on a day the placer never reserved — the pin-and-empty-day failure inverted.
+  const yieldedLabels = new Set(yieldedHardDays);
+  const wasYielded = (h: { discipline: 'run' | 'bike' }) =>
+    yieldedLabels.has(h.discipline === 'bike' ? 'your hard ride' : 'your hard run');
   gatedHardDays.forEach((h, i) => {
+    if (h.day != null && wasYielded(h) && yieldedLabels.size > 0) {
+      // Only the LAST of a discipline yields; an earlier one of the same discipline stays.
+      const sameKind = gatedHardDays.filter((x) => x.discipline === h.discipline && x.day != null);
+      if (sameKind.indexOf(h) >= sameKind.length - yieldedHardDays.filter((l) =>
+        l === (h.discipline === 'bike' ? 'your hard ride' : 'your hard run')).length) return;
+    }
     const role = hardRoles[i];
     if (h.day != null) { hardDays.push({ ...h, day: h.day, role }); return; }
     if (solved.status === 'unsolvable') return;
@@ -2747,10 +2793,22 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // vanishing. Deduped — two gated days of the same discipline is one sentence, not two.
   const hardGateCompromises = [...new Set(hardGateNotes)]
     .map((text) => ({ kind: 'cost' as const, text }));
+  /**
+   * ⛔ THE YIELD IS DISCLOSED, ALWAYS. A session the athlete asked for that the week could not hold
+   * must say so — a silent drop is the absorption failure this file has fixed three times, and it
+   * is worse here because the athlete would simply not find the session they chose.
+   */
+  const hardYieldCompromises = [...new Set(yieldedHardDays)].map((label) => ({
+    kind: 'cost' as const,
+    text: `${label.replace(/^your /, 'Your ')} was left out this block: with your long run, long ride `
+      + 'and the other hard day fixed, there was no day left that kept heavy legs 48h clear of the '
+      + 'long run. The lifting keeps its spacing; the hard session is the one that gives way.',
+  }));
   const placementCompromises: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }> = [
     ...solverRefusal,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
     ...hardGateCompromises,
+    ...hardYieldCompromises,
   ];
   // ⛔ A BLOCK-LEVEL `assistanceRows(args.assistancePicks)` STOOD HERE AND NOTHING READ IT.
   // Deleted 2026-07-28. Zero consumers, confirmed by identifier scan — the live assistance is

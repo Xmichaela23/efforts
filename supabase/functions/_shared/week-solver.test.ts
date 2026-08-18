@@ -252,10 +252,59 @@ Deno.test('⛔ THE OTHER AXIS: session COUNT past capacity — seven come back a
       }
     }
   }
-  // The sweep has to reach all three fates or it is not exercising the boundary.
-  assert(solved > 0 && compromised > 0 && refused > 0,
-    `the load sweep did not reach all three fates: ${solved} solved, ${compromised} compromised, ${refused} refused`);
+  // The sweep has to reach both fates it can still produce, or it is not exercising the boundary.
+  //
+  // ⛔ `compromised` LEFT THIS SWEEP ON 2026-08-17 AND THAT IS THE POINT OF THE CHANGE, NOT A GAP.
+  // The two 48h heavy-leg clearances — lower×long_run and lower×lower — became UNBREACHABLE
+  // (`isUnbreachable`), so the weeks in this pool that used to come back breached-and-disclosed now
+  // come back REFUSED. With three lower lifts against these anchors, those two clearances are the
+  // only ones that bind, so this pool reaches two fates instead of three.
+  // ⚠️ THE COMPROMISE FATE IS STILL REACHABLE AND IS PINNED BELOW, on a clearance that is still
+  // priceable. Deleting the coverage idea would have lost the boundary; splitting it keeps it.
+  assert(solved > 0 && refused > 0,
+    `the load sweep did not reach both fates: ${solved} solved, ${compromised} compromised, ${refused} refused`);
 });
+
+const DAY_ORDER_FOR_TEST: string[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const circularGap = (a: number, b: number) => Math.min(Math.abs(a - b), 7 - Math.abs(a - b));
+
+Deno.test('⛔ `compromised` IS CURRENTLY UNREACHABLE FOR LIFTS — and that is the TABLE, not a deleted mechanism', () => {
+  // ⚠️ THIS IS A SURPRISING FACT AND IT IS PINNED RATHER THAN ASSUMED. Sealing the two 48h heavy-leg
+  // clearances (2026-08-17) did not merely narrow the breach-and-disclose path — it closed it for
+  // lift placement entirely, and the reason is arithmetic:
+  //
+  //   · a lift and an anchor on the SAME day is the matrix's question, refused before adjacency runs;
+  //   · adjacent days are a 24h gap, which SATISFIES every 24h clearance in the table;
+  //   · so the only clearances a lift could ever breach are the ones above 24h — and today the table
+  //     has exactly two of those, both heavy-leg, both now sealed.
+  //
+  // ⛔ SO THE LADDER IS NOT DEAD CODE. It becomes reachable again the moment any clearance above 24h
+  // is added that is not heavy-leg. This test is what will notice: if it starts FAILING, a new
+  // >24h clearance exists and somebody has to decide whether it is priceable or a floor.
+  let compromised = 0;
+  const KINDS = ['quality_run', 'quality_bike', 'long_run', 'long_ride', 'easy_swim', 'quality_swim'];
+  for (const k1 of KINDS) {
+    for (const k2 of KINDS) {
+      for (const d1 of DAY_ORDER_FOR_TEST) {
+        for (const d2 of DAY_ORDER_FOR_TEST) {
+          if (d1 === d2) continue;
+          const r = solve({
+            anchors: [anchor(d1 as SolverDay, k1, 'a'), anchor(d2 as SolverDay, k2, 'b')],
+            lifts: [
+              { name: 'Back Squat', isLower: true },
+              { name: 'Bench Press', isLower: false },
+              { name: 'Deadlift', isLower: true },
+            ],
+          });
+          if (r.status === 'compromised') compromised++;
+        }
+      }
+    }
+  }
+  assertEquals(compromised, 0,
+    `a lift week came back compromised — a clearance above 24h exists that is neither sealed nor reviewed`);
+});
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // DETERMINISM (§5.1)
