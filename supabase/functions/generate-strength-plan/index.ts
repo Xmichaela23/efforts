@@ -245,14 +245,44 @@ Deno.serve(async (req: Request) => {
           // one" — the normal case for a prescribed hard day. A day that is PRESENT but not a string
           // is still malformed and still drops the entry; absent and unusable are different answers.
           if (hd.day != null && typeof hd.day !== 'string') return null;
-          const terrainOk = new Set(['hill_3min', 'hill_short', 'treadmill', 'flat']);
+          /**
+           * ⛔⛔ THIS ALLOWLIST WAS THE 2026-08-06 SET AND THE WIZARD MOVED PAST IT ON 2026-08-18.
+           * Michael, on a built plan: *"it ended up giving me hills"* — after choosing Speed focus.
+           *
+           * Two fields were dropped ON THE FLOOR here, silently:
+           *   • `goal` ('speed' | 'vo2') — the whole Speed-vs-VO2 split. Absent reads as `vo2`, so
+           *     every sprint athlete got hill repeats and nothing said why.
+           *   • `environment` — the bike's smart-trainer / stationary / road / climb answer, which
+           *     had no reader at all.
+           * And `terrain` kept an allowlist of four, so the three SPEED grounds (`track`,
+           * `flat_road`, `turf`) and the threshold's `treadmill_1pct` were stripped as unrecognised.
+           *
+           * ⛔ THIS IS THE "COLLECTED AND DROPPED" PATTERN THIS CODEBASE KEEPS FINDING — the wizard
+           * stored the answer, the goal row carried it, and the translation layer between them had
+           * never heard of it. ⚠️ The allowlists now live beside the type they gate; adding a value
+           * to `HardRunTerrain` or `HardRideEnvironment` without adding it HERE silently degrades the
+           * athlete's pick to "not asked".
+           */
+          const terrainOk = new Set([
+            'hill_3min', 'hill_short', 'treadmill', 'flat',   // the VO2 grounds
+            'track', 'flat_road', 'turf',                     // the speed grounds
+            'treadmill_1pct',                                 // the threshold ground
+          ]);
           const terrain = typeof hd.terrain === 'string' && terrainOk.has(hd.terrain)
-            ? hd.terrain as 'hill_3min' | 'hill_short' | 'treadmill' | 'flat'
+            ? hd.terrain as never
+            : undefined;
+          const envOk = new Set(['smart_trainer', 'stationary', 'flat_road', 'hill_climb', 'long_climb']);
+          const environment = typeof hd.environment === 'string' && envOk.has(hd.environment)
+            ? hd.environment as never
             : undefined;
           return {
             ...(typeof hd.day === 'string' && hd.day.trim() !== '' ? { day: hd.day } : {}),
             discipline: hd.discipline as 'run' | 'bike',
             ...(terrain ? { terrain } : {}),
+            // ⚠️ ONLY 'speed' IS FORWARDED. Absent or anything else degrades to the shipped default
+            // (`vo2`) in the composer, which is the same allowlist discipline as terrain.
+            ...(hd.goal === 'speed' ? { goal: 'speed' as const } : {}),
+            ...(environment ? { environment } : {}),
             // ⚠️ ABSENT OR UNRECOGNISED → `prescribed`, the shipped behaviour. A club day is the
             // athlete telling us they already attend it; nothing may infer that on their behalf.
             ownership: hd.ownership === 'club' ? 'club' as const : 'prescribed' as const,

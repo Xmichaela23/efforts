@@ -4235,25 +4235,43 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             speaks the app's wayfinding language (run gold, ride green). It is
                             identity, not a cost signal: the §5 note against implying a hard ride is
                             "cheaper" than a hard run is about COPY, and no number here claims one. */}
-                        <div className="flex items-center gap-1" role="group" aria-label="Hard sessions">
+                        {/* ⛔ SELECTING AND DELETING WERE THE SAME TAP, AND THAT IS THE WONK
+                            (Michael, 2026-08-18: "the hard day buttons are wonky — it's not clear
+                            what the user is choosing"). Three behaviours sat on visually identical
+                            chips: tap a dim chip to SELECT it, tap the lit chip to DELETE it, tap
+                            +Run to ADD. The destructive one was the one you reached by tapping the
+                            thing you had just selected, with no affordance saying so.
+                            ⛔ NOW: the chip selects, and only the × removes. */}
+                        <div className="flex items-center gap-1.5" role="group" aria-label="Hard sessions">
                           {state.hardDays.map((h, i) => (
-                            <button
-                              key={`slot-${i}`} type="button"
-                              aria-label={`Hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
-                              aria-pressed={i === hardSlotIndex}
-                              onClick={() => {
-                                // Tapping the ACTIVE slot removes it; tapping another selects it.
-                                if (i !== hardSlotIndex) { setActiveHardSlot(i); return; }
-                                setState((st) => ({ ...st, hardDays: st.hardDays.filter((_, j) => j !== i) }));
-                                setActiveHardSlot(0);
-                              }}
-                              className={`px-3 py-1 rounded-xl text-xs border ${i === hardSlotIndex ? 'ring-1 ring-white/40' : ''}`}
+                            <span
+                              key={`slot-${i}`}
+                              className={`inline-flex items-center rounded-xl border overflow-hidden ${i === hardSlotIndex ? 'ring-1 ring-white/40' : ''}`}
                               style={{
                                 borderColor: `rgb(${getDisciplineColorRgb(h.discipline)})`,
                                 backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline)},0.16)`,
-                                color: '#fff',
                               }}
-                            >{h.discipline === 'run' ? 'Run' : 'Ride'}{dayForSlot(i) ? ` · ${DAY_SHORT[dayForSlot(i) as DayName]}` : ''}</button>
+                            >
+                              <button
+                                type="button"
+                                aria-label={`Hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
+                                aria-pressed={i === hardSlotIndex}
+                                onClick={() => setActiveHardSlot(i)}
+                                className="px-2.5 py-1 text-xs text-white"
+                              >
+                                {h.discipline === 'run' ? 'Run' : 'Ride'}
+                                {dayForSlot(i) ? ` · ${DAY_SHORT[dayForSlot(i) as DayName]}` : ''}
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Remove hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
+                                onClick={() => {
+                                  setState((st) => ({ ...st, hardDays: st.hardDays.filter((_, j) => j !== i) }));
+                                  setActiveHardSlot(0);
+                                }}
+                                className="pl-1 pr-2 py-1 text-xs text-white/55"
+                              >×</button>
+                            </span>
                           ))}
                           {state.hardDays.length < MAX_HARD_DAY_SLOTS
                             && (['run', 'bike'] as const)
