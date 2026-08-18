@@ -1809,7 +1809,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
        */
       key: 'hard' as const,
       kind: 'day' as const,
-      label: state.hardDays.length > 1 ? 'Hard days' : 'Hard day',
+      label: state.hardDays.length > 1 ? 'High intensity days' : 'High intensity day',
       // ⚠️ "pick a day" IS GONE (slice 8) — a prescribed slot always HAS a day, either the athlete's
       // or the engine's. The only dayless state left is a club slot the athlete has not answered.
       answer: state.hardDays.length === 0
@@ -3998,7 +3998,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   {[1, 2, 3].map((n) => (
                     <button
                       key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
-                      className={`w-9 py-1.5 rounded-xl text-sm border ${state.swimDays === n ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
+                      // ⚠️ SWIM BLUE, NOT THE BLOCK ACCENT. Run miles wear gold and ride hours wear
+                      // green on this card; the swim chips wore strength orange, which reads as a
+                      // fourth discipline. Wayfinding is by sport everywhere else.
+                      className="w-9 py-1.5 rounded-xl text-sm border"
+                      style={state.swimDays === n
+                        ? { borderColor: `rgb(${getDisciplineColorRgb('swim')})`, backgroundColor: `rgba(${getDisciplineColorRgb('swim')},0.16)`, color: '#fff' }
+                        : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)' }}
                     >{n}</button>
                   ))}
                   <span className="text-white/70 text-sm">{state.swimDays === 1 ? 'swim' : 'swims'}</span>
@@ -4059,7 +4065,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {(currentStep === 'schedule' || currentStep === 'hardday') && (
         <StepLayout
           step={stepNo(currentStep)} totalSteps={steps.length}
-          title={currentStep === 'hardday' ? 'Hard days' : 'Your week'}
+          // ⛔ "HIGH INTENSITY DAYS", NOT "HARD DAYS" (Michael, 2026-08-18). "Hard" is how an athlete
+          // describes a session that hurt; INTENSITY is what the block is actually budgeting, and it
+          // is the word every rule on this screen turns on — the CNS tax, the rep ceiling, the
+          // interference effect. ⚠️ The state key stays `hardDays`: renaming storage would strand
+          // every goal already written, and the athlete never sees a key.
+          title={currentStep === 'hardday' ? 'High intensity days' : 'Your week'}
           subtitle={currentStep === 'hardday'
             ? 'How much intensity the block carries. None is a valid answer.'
             : 'Your days. The lifting is placed around them.'}
@@ -4171,9 +4182,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           screen is not built yet — the control is still a row of this card's
                           disclosure list. When it is extracted, the note goes with it. */}
                       <p className="text-white/70 text-sm leading-relaxed px-3 pt-2.5">
-                        Intensity taxes your central nervous system. Every hard day you add lowers
-                        your lifting rep ceiling to protect the heavy barbell work. (You'll pick which
-                        days these land on in the Schedule step).
+                        Intensity taxes your central nervous system. Every high intensity day you add
+                        lowers your lifting rep ceiling to protect the heavy barbell work. (You'll pick
+                        which days these land on in the Schedule step).
                       </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
@@ -4298,7 +4309,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <WeekDayRow
                               selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
                               roles={scheduleRoles}
-                              taken={anchorDaysTaken(state, row.key === 'hard' ? 'hard day' : row.key === 'long' ? 'long run' : 'long ride')}
+                              /**
+                               * ⛔ THE LONG-DAY ROWS NO LONGER LOCK EACH OTHER (Michael, 2026-08-18:
+                               * "saturday isn't an option for long run"). A day held by the OTHER
+                               * long anchor was rendered dead with an em-dash, so swapping a Saturday
+                               * ride and a Sunday run meant clearing one, walking to the other row,
+                               * and setting both — three taps and a dead end in between.
+                               *
+                               * ⛔ AND LOCKING WAS THE WRONG SHAPE ANYWAY. His own ruling is that the
+                               * engine reports a collision and never blocks a pin, and two long days
+                               * on ONE day is a shape he validated by name — the Monster Brick. A
+                               * lock made the legal answer unreachable.
+                               *
+                               * ⚠️ THE HARD ROW KEEPS ITS LOCK, and that is a different rule: two
+                               * hard sessions on one calendar day is a DOUBLE, not two hard days, and
+                               * the composer drops the duplicate silently. Nothing is lost by
+                               * refusing it, which is not true of the long days.
+                               */
+                              taken={row.key === 'hard'
+                                ? anchorDaysTaken(state, 'hard day')
+                                : {}}
                               // ⚠️ INERT UNTIL A DISCIPLINE IS CHOSEN. `qualityDays` is keyed by
                               // sport, so there is no slot to write a day into before Run or Ride is
                               // tapped. The cue line above says which choice unlocks it — a dead row
@@ -4316,6 +4346,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 // pick is ever stuck and the athlete never hunts for a control to
                                 // undo one. Days the other anchors hold are locked in the row, so a
                                 // plain toggle is safe here.
+                                /**
+                                 * ⛔ TAPPING THE OTHER LONG DAY SWAPS THEM (2026-08-18) — which is
+                                 * what the athlete is almost always trying to do. Moving the long run
+                                 * onto the long ride's Saturday sends the ride to whichever day the
+                                 * run just left, in one tap. ⚠️ If the row has no day yet there is
+                                 * nothing to swap with, so the other anchor is simply cleared and the
+                                 * athlete picks it again — never two anchors silently stacked by a
+                                 * control that looked like a move.
+                                 */
+                                if (row.key === 'long' && state.longRideDay === d) {
+                                  const from = state.longRunDay;
+                                  setState((st) => ({ ...st, longRunDay: d as DayName, longRideDay: (from || '') as DayName | '' }));
+                                  return;
+                                }
+                                if (row.key === 'ride' && state.longRunDay === d) {
+                                  const from = state.longRideDay;
+                                  setState((st) => ({ ...st, longRideDay: d as DayName, longRunDay: (from || '') as DayName | '' }));
+                                  return;
+                                }
                                 if (row.key === 'hard') {
                                   // ⛔ WRITES INTO THE ACTIVE SLOT (§1i). It used to write into
                                   // `qualityDays[sport]`, which is keyed by sport and therefore
@@ -4608,9 +4657,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                       so rather than leaving them looking for a day picker. */}
                                   {activeHard.ownership === 'club' && (
                                     <span className="block text-white/45 text-xs mt-0.5 leading-snug">
-                                      Still one of your hard days — same recovery cost, same place in
-                                      the week. We hold the day and leave the session to you. You'll
-                                      pick which day in the Schedule step.
+                                      Still one of your high intensity days — same recovery cost, same
+                                      place in the week. We hold the day and leave the session to you.
+                                      You'll pick which day in the Schedule step.
                                     </span>
                                   )}
                                 </span>
@@ -4715,6 +4764,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               const role = hardRoleOf(hardSlotIndex) === 'threshold' ? 'threshold' : 'vo2';
                               return (
                                 <div className="space-y-1.5 pt-1">
+                                  {/* ⛔ THE RIDE NEVER GETS A GOAL QUESTION, so without this it was the
+                                      only slot where the athlete could not see WHAT they were being
+                                      given (Michael, 2026-08-18: "there is not clarity on ride what we
+                                      offer"). The run has two goals to choose between and each one
+                                      describes its session; the ride has one shape per role and the
+                                      card simply did not say it. This is the same disclosure the run
+                                      gets — it just isn't a choice. */}
+                                  <p className="text-white/70 text-sm leading-relaxed">
+                                    {role === 'threshold'
+                                      ? 'Your ride is sustained blocks just under your redline — 4 × 5 min '
+                                        + 'building to 2 × 10 across the block, at 95-105% FTP.'
+                                      : 'Your ride is the Helgerud 4 × 4 — four 4-minute efforts at maximum '
+                                        + 'sustainable power, easy spinning between. It halves to 2 × 4 in the '
+                                        + 'final weeks so your quads are loaded for the heavy lifts.'}
+                                  </p>
                                   <span className="text-white/85 text-sm">Where you can ride it</span>
                                   <p className="text-white/70 text-sm leading-relaxed">{HARD_RIDE_MENUS[role].note}</p>
                                   <div className="space-y-1">
