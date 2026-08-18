@@ -1585,46 +1585,40 @@ function assignHardRoles(
   days: ReadonlyArray<{ day: DayName | null; discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }>,
 ): HardRole[] {
   /**
-   * ⛔⛔ THRESHOLD IS THE DEFAULT AND VO2 IS THE UNLOCK (Michael, 2026-08-17). THIS INVERTS THE RULE
-   * THAT STOOD HERE, AND THE OLD ONE WAS AN ORDERING ACCIDENT WEARING A POLICY.
+   * ⛔⛔ INTENSITY IS THE FIRST SLOT, THRESHOLD IS THE SECOND (Michael, 2026-08-18). THIS REVERSES
+   * THE 2026-08-17 RULING, WHICH REVERSED THE ONE BEFORE IT — SO READ ALL THREE BEFORE TOUCHING IT.
    *
-   * It read: *first prescribed day takes VO2, any second takes threshold* — **discipline-blind**. So
-   * an athlete with ONE hard run always got Hill Repeats and the threshold run was unreachable, and
-   * an athlete who listed a run before a bike handed the threshold slot to the BIKE and got hills
-   * for their run. Reordering the same two hard days changed what both sessions were. The 12-week
-   * threshold doctrine Michael wrote describes *"the prescribed sustained run inside a Strong Focus
-   * block"* — singular, THE run — and it was firing almost nowhere.
+   * 1. **Originally:** first prescribed = VO2, second = threshold — and it was DISCIPLINE-BLIND, so
+   *    listing a run before a bike handed the threshold slot to the bike and an athlete with one
+   *    hard run always got hills. That defect is real and is NOT what changed back.
+   * 2. **2026-08-17:** inverted to threshold-first, on the reasoning that VO2 is a CNS stressor
+   *    competing with the squat and the deadlift, so the one hard session a week should be the
+   *    cheap one.
+   * 3. **2026-08-18, Michael, after the reversal was flagged to him explicitly:** *"intensity is
+   *    the first slot, threshold is second."* The high-intensity day protects the metabolic strength
+   *    pathways and is the one an athlete carrying a barbell block most wants; threshold is the
+   *    sustained engine-builder, and prolonged endurance work is what genuinely competes with
+   *    strength adaptation.
    *
-   * ⛔ THE BIOLOGY, AND IT IS WHY THIS IS A HIERARCHY AND NOT A PREFERENCE. VO2 work is a CNS
-   * stressor competing with the squat and the deadlift for the same neurological recovery. Threshold
-   * work sits below that line: it buys aerobic capacity and clears fatigue without spending what the
-   * bar needs. **In a block where heavy barbells are the point, one hard session a week has to be
-   * the threshold one.** VO2 is what an athlete unlocks by asking for a SECOND hard day in that
-   * discipline — i.e. by demonstrating the capacity to carry it.
-   *
-   * ⛔⛔ ONE BUDGET FOR THE WHOLE WEEK, NOT ONE PER DISCIPLINE — CORRECTED 2026-08-17, SAME DAY,
-   * AND THE VERSION IN BETWEEN ERASED THE ATHLETE'S SPEED WORK.
-   *
-   * The first version of this inversion made the rule PER DISCIPLINE: a first hard run took
-   * threshold, a first hard ride took threshold. Symmetrical, and wrong — an athlete asking for one
-   * hard run AND one hard ride (the standard mid-volume hybrid week) got **two sustained threshold
-   * sessions and no top-end work anywhere in the block.** Two sub-lactate sessions in two disciplines
-   * is biologically redundant: they buy the same adaptation twice and leave the aerobic ceiling
-   * untouched. Michael, 2026-08-17: *"a hybrid athlete needs top-end speed."*
-   *
-   * ⛔ SO THE SPLIT IS ACROSS THE WEEK: exactly one sustained lactate session and, if the athlete
-   * asked for a second hard day, exactly one top-end session. The PRIMARY discipline — the one
-   * listed first — takes threshold; the secondary takes VO2. It reads as position-based and it is
-   * really stimulus-based: the week gets one of each, in that order.
+   * ⛔ WHAT SURVIVES FROM (2) AND MUST NOT BE UNDONE: the budget is the WEEK, not the discipline.
+   * A first pass on 2026-08-17 made it per-discipline and the standard hybrid week — one hard run,
+   * one hard ride — came out as two sustained sessions with no top-end work anywhere in the block.
+   * Exactly one intensity session and, if a second hard day is asked for, exactly one threshold.
+   * The order of the list picks which discipline carries which; nothing else does.
    */
-  const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'threshold'));
-  // ⚠️ A CLUB DAY ALREADY *IS* THE SUSTAINED SESSION — a group run or ride settles into exactly that
-  // rhythm — so it consumes the threshold slot and the app's own days go VO2.
-  let thresholdTaken = roles.includes('club');
+  const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'vo2'));
+  // ⚠️ A CLUB DAY IS THE SUSTAINED SESSION — a group run or ride settles into exactly that rhythm and
+  // precise intervals with strict rest are near-impossible in a pack — so it consumes the THRESHOLD
+  // slot and the app's own days stay on intensity.
+  let intensityTaken = false;
   for (let i = 0; i < roles.length; i++) {
     if (roles[i] === 'club') continue;
-    if (!thresholdTaken) { roles[i] = 'threshold'; thresholdTaken = true; continue; }
-    roles[i] = 'vo2';
+    if (!intensityTaken) { roles[i] = 'vo2'; intensityTaken = true; continue; }
+    roles[i] = 'threshold';
+  }
+  if (roles.includes('club')) {
+    // The club already holds the sustained slot; nothing prescribed may take it as well.
+    for (let i = 0; i < roles.length; i++) if (roles[i] === 'threshold') roles[i] = 'vo2';
   }
   return roles;
 }
@@ -3825,8 +3819,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // prescribe 4 × 3 min uphill into a session the athlete turns up to and runs with a group,
         // and writing the template anyway would be a prescription for work nobody is going to do. It
         // keeps its pin, its recovery cost and its share of the week's miles.
-        // ⚠️ THE THRESHOLD RUN IS THE FIRST PRESCRIBED RUN (2026-08-17, inverted) — `assignHardRoles`
-        // owns that and it is asked here rather than re-derived. VO2 is the unlock, not the default.
+        // ⚠️ THE FIRST PRESCRIBED HARD DAY IS THE INTENSITY ONE (2026-08-18) — `assignHardRoles`
+        // owns that and it is asked here rather than re-derived. Threshold is what a SECOND unlocks.
         const role = roleOf(h.day);
         weekSessions.push(
           role === 'club'

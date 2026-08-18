@@ -195,11 +195,25 @@ superseded-for-hybrid banner is at the top of that file.
 
 ## 4. Open
 
-⚠️ **THE HARD-RUN HIERARCHY IS NOW STRICT (Michael, 2026-08-17), AND IT IS THE FRAME THIS WHOLE
-DOCUMENT SITS INSIDE.** VO2 work is a CNS stressor competing with the squat and the deadlift for the
-same neurological recovery; threshold work sits below that line. **In a block where heavy barbells
-are the point, one hard session a week has to be the threshold one.** VO2 is what an athlete unlocks
-by asking for a SECOND hard day in that discipline. ⛔ Do not restore an ordering-based rule.
+⛔ **THE HIERARCHY REVERSED AGAIN ON 2026-08-18 AND THIS DOCUMENT IS NO LONGER THE DEFAULT SESSION.**
+
+Michael, after the reversal was flagged to him explicitly: ***"intensity is the first slot, threshold
+is second."*** The high-intensity day protects the metabolic strength pathways; the sustained
+threshold effort is the one that genuinely competes with strength adaptation.
+
+| | |
+|---|---|
+| **Hard day 1** | **INTENSITY.** Either *Build Pure Speed* (flat sprints) or *Raise VO2 Max* (3-min climbs) — the athlete's goal, asked on the hard-day card. |
+| **Hard day 2** | **THIS DOCUMENT.** The sustained threshold session, and it is now what a SECOND hard day unlocks. |
+
+⚠️ **SO THE 12-WEEK MAP BELOW IS STILL EXACTLY RIGHT — IT IS SIMPLY REACHED LESS OFTEN.** Everything
+about the session, its progression and its anchor yield is unchanged. What changed is which slot it
+occupies. ⛔ Do not "fix" this document to be the default again; read `assignHardRoles`'s header,
+which records all three positions this rule has held and why.
+
+⚠️ **WHAT DID NOT COME BACK: the discipline-blindness.** The budget is the WEEK — exactly one
+intensity session and, if a second hard day is asked for, exactly one threshold. The 2026-08-17
+defect where listing a run before a bike changed what both sessions were is fixed and stays fixed.
 
 - **The terrain menu.** The hard-run screen offers hill / short hill / treadmill / flat — correct for
   the VO2 day, wrong for this one. When a run is the threshold day it should offer **track, flat

@@ -51,8 +51,8 @@ Deno.test('the hills are still the protected intensity — fixed, never shrunk t
     // plus rests plus a 20-min warm-up/cool-down). What this test protects is that the number does
     // NOT MOVE with the mileage budget, which is Hickson's point; the number itself belongs to
     // whichever session the hierarchy put there.
-    // Week 2 of the block is 3 × 7 min: 21 min of work + 2 × 2 min rest + 20 warm-up/cool-down.
-    assertEquals(hard.duration, 45, `the hard run shrank on a ${asked}-mile week`);
+    // ⚠️ 35 AGAIN — one hard day is the HILL session (2026-08-18), and its length is fixed.
+    assertEquals(hard.duration, 35, `the hard run shrank on a ${asked}-mile week`);
   }
 });
 

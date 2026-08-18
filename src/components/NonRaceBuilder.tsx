@@ -1882,10 +1882,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const hardRoleOf = (i: number): 'threshold' | 'vo2' | 'club' => {
     const slots = state.hardDays;
     if (slots[i]?.ownership === 'club') return 'club';
-    const thresholdTakenByClub = slots.some((h) => h.ownership === 'club');
-    if (thresholdTakenByClub) return 'vo2';
+    // ⛔ INTENSITY FIRST, THRESHOLD SECOND (2026-08-18) — mirrors `assignHardRoles`, which records
+    // all three positions this rule has held. A club session IS the sustained one, so it consumes
+    // the threshold slot and the app's own days stay on intensity.
+    if (slots.some((h) => h.ownership === 'club')) return 'vo2';
     const firstPrescribed = slots.findIndex((h) => h.ownership !== 'club');
-    return i === firstPrescribed ? 'threshold' : 'vo2';
+    return i === firstPrescribed ? 'vo2' : 'threshold';
   };
 
   const scheduleSelectedDay =
@@ -4434,10 +4436,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   ? 'Your club session. We hold the day and build the week around it — '
                                     + 'the lifting keeps its distance. We do not prescribe what you do in it.'
                                   : hardRoleOf(hardSlotIndex) === 'threshold'
-                                    ? 'Threshold — sustained work at a strong, controlled effort. '
-                                      + 'This is the one that holds your top-end fitness, and it costs the barbell least.'
-                                    : 'Intervals — short, hard efforts. This is the day that raises your top end, '
-                                      + 'and the one a second hard day exists for.'}
+                                    // ⚠️ MICHAEL'S WORDS, MINUS ONE CLAUSE. His copy ended "Costs
+                                    // accessory lifting volume" — and that is not what the engine
+                                    // does: the accessory band is set by the COUNT of hard days
+                                    // (`resolveEnduranceTier`), so a threshold day and an intensity
+                                    // day cost identical accessory volume. Shipping the sentence
+                                    // would have been a claim the plan then contradicts. ⛔ If
+                                    // threshold SHOULD cost more, that is a change to the tier model
+                                    // and the clause comes back with it.
+                                    ? 'Builds fatigue resistance and stamina. A sustained engine-builder — '
+                                      + 'and the prolonged effort is the one that competes hardest with strength.'
+                                    : 'Intensity — the day that raises your top end. It protects the '
+                                      + 'strength pathways the barbell runs on, which is why it comes first.'}
                               </p>
                             )}
                             {/* ⛔ AND WHEN AN OPTION IS NOT OFFERED, THE SCREEN SAYS WHY (§7's gate).
