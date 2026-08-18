@@ -69,46 +69,78 @@ const MAX_HARD_DAY_SLOTS = 2;
  * stopping. `stationary` is on the intervals menu and not the threshold one (a dumb bike can hold a
  * hard effort but not a precise sustained wattage); `long_climb` is the reverse.
  */
-const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold',
-  Array<{ id: string; title: string; body: string }>> = {
-  speed: [
-    { id: 'track', title: 'A track', body: 'Predictable footing and a safe run-out, which is what lets you go flat out.' },
-    { id: 'flat_road', title: 'A flat road', body: 'Any straight, level stretch with room to slow down at the end.' },
-    { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
-  ],
-  vo2: [
-    { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down. Running uphill may have less effect on your legs, leaving more of the week for lifting.' },
-    { id: 'treadmill', title: 'A treadmill', body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\u2019s job.' },
-    { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
-    // ⛔ `flat` IS OFF THIS MENU AND THAT IS A REAL CHANGE, FLAGGED RATHER THAN SLIPPED IN. Michael's
-    // 2026-08-18 VO2 menu is hill / treadmill / short hill, and `flat` — §2.0's last-resort 4 × 3 min
-    // on level ground for an athlete with no climb and no treadmill — is not on it.
-    // ⚠️ THAT ATHLETE IS NOT STRANDED: the goal split gives them the SPEED track, which is a flat
-    // session by design and a better answer than a VO2 session that pays full mechanical price for a
-    // stimulus the ground cannot support. The engine still builds `flat` for any goal that already
-    // stores it; it is simply no longer offered. ⛔ If it should come back, it comes back HERE — the
-    // session and its copy are untouched in `strength-primary-plan.ts`.
-  ],
-  threshold: [
-    { id: 'track', title: 'A track', body: 'The pace is the pace \u2014 nothing tilts, so you hold the number.' },
-    { id: 'flat_road', title: 'A flat road or path', body: 'If you hit mild inclines or rolling grades, yield the pace to hold the effort. Do not spike your heart rate on the uphills.' },
-    { id: 'treadmill_1pct', title: 'A treadmill at 1%', body: 'One percent, not the interval day\u2019s 5-8%. This session wants flat.' },
-  ],
+type GroundMenu = { note: string; options: Array<{ id: string; title: string; body: string }> };
+
+/**
+ * ⛔ EACH MENU LEADS WITH THE RULE THAT GOVERNS IT (Michael, 2026-08-18), then the options.
+ * *"The goal is real-world execution, removing pedantic restrictions while keeping the biological
+ * guardrails."* So the notes are deliberately PERMISSIVE about ground the athlete cannot control —
+ * a slight rise, natural rolling hills — and absolute about the one thing that actually injures
+ * people. His copy, verbatim.
+ */
+const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> = {
+  speed: {
+    // ⛔ THE DOWNHILL CLAUSE IS A SAFETY GUARDRAIL, NOT A PREFERENCE, and it is the one absolute on
+    // this screen. Maximal downhill running is the laboratory model for eccentric hamstring damage;
+    // it is also the fastest a runner can move, so it looks like the right idea. ⛔ Do not soften it
+    // into "prefer flat" — the sentence exists because the mistake is attractive.
+    note: 'Flat is preferred for pure speed mechanics, but a slight 2-3% uphill is completely fine. '
+      + 'Never sprint at absolute max effort downhill \u2014 the braking forces will tear up your '
+      + 'hamstrings and ruin your squat recovery.',
+    options: [
+      { id: 'track', title: 'A track', body: 'Predictable footing and a safe run-out, which is what lets you go flat out.' },
+      { id: 'flat_road', title: 'Road \u2014 flat or slight uphill', body: 'Any straight stretch with room to slow down at the end.' },
+      { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
+    ],
+  },
+  vo2: {
+    note: 'Hard climbs push your aerobic ceiling to the limit. Sprinting uphill removes the eccentric '
+      + 'braking impact, saving your knees and quads for the heavy barbell later in the week.',
+    options: [
+      { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down.' },
+      { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
+      { id: 'treadmill', title: 'A treadmill', body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\u2019s job.' },
+      // ⛔ `flat` IS OFF THIS MENU AND THAT IS A REAL CHANGE, FLAGGED RATHER THAN SLIPPED IN. It was
+      // §2.0's last-resort 4 × 3 min on level ground for an athlete with no climb and no treadmill,
+      // and Michael's menu does not include it. ⚠️ THAT ATHLETE IS NOT STRANDED: the goal split
+      // hands them the SPEED track, which is flat by design and a better answer than paying full
+      // mechanical price for a stimulus the ground cannot support. The engine still builds `flat`
+      // for any goal that already stores it; it is simply no longer offered.
+    ],
+  },
+  threshold: {
+    note: 'Uninterrupted pacing is the only rule. Natural 2-3% rolling hills are fine \u2014 just '
+      + 'maintain a steady effort and don\u2019t let the short uphills spike your heart rate out of '
+      + 'the zone.',
+    options: [
+      { id: 'track', title: 'A track', body: 'The pace is the pace \u2014 nothing tilts, so you hold the number.' },
+      { id: 'flat_road', title: 'Road \u2014 flat or rolling', body: 'Pick a stretch you can run unbroken.' },
+      { id: 'treadmill_1pct', title: 'A treadmill at 1%', body: 'One percent, not the interval day\u2019s 5-8%. This session wants flat.' },
+    ],
+  },
 };
 
-const HARD_RIDE_MENUS: Record<'vo2' | 'threshold',
-  Array<{ id: string; title: string; body: string }>> = {
-  vo2: [
-    { id: 'smart_trainer', title: 'Smart trainer, erg mode', body: 'It holds the number, so all you do is pedal.' },
-    { id: 'stationary', title: 'A stationary bike', body: 'No power to read, so ride it by effort \u2014 hard enough that a sentence is a struggle.' },
-    { id: 'flat_road', title: 'A flat road', body: 'Use a stretch with no junctions: you cannot redline safely with a stoplight in front of you.' },
-    { id: 'hill_climb', title: 'A climb you can repeat', body: 'The gradient holds the effort for you \u2014 ride back down easy.' },
-  ],
-  threshold: [
-    { id: 'smart_trainer', title: 'Smart trainer', body: 'Completely uninterrupted, which is what this session needs most.' },
-    { id: 'flat_road', title: 'A flat or rolling road', body: 'Pick a stretch you can ride unbroken \u2014 every stop restarts the effort.' },
-    { id: 'long_climb', title: 'A long steady climb', body: 'The gradient does the pacing and nothing interrupts it.' },
-  ],
+const HARD_RIDE_MENUS: Record<'vo2' | 'threshold', GroundMenu> = {
+  vo2: {
+    note: 'Cycling spares your joints from impact damage, but max-wattage pushes aggressively drain '
+      + 'glycogen from your quads. You need an environment where you can safely redline with zero '
+      + 'traffic or stoplights.',
+    options: [
+      { id: 'smart_trainer', title: 'Smart trainer, erg mode', body: 'It holds the number, so all you do is pedal.' },
+      { id: 'stationary', title: 'A stationary bike', body: 'No power to read, so ride it by effort \u2014 hard enough that a sentence is a struggle.' },
+      { id: 'flat_road', title: 'A flat road', body: 'Use a stretch with no junctions.' },
+      { id: 'hill_climb', title: 'A climb you can repeat', body: 'The gradient holds the effort for you \u2014 ride back down easy.' },
+    ],
+  },
+  threshold: {
+    note: 'Requires grueling, unbroken pedaling. Coasting or stopping for intersections breaks the '
+      + 'metabolic adaptation. If your local roads force you to stop, take this inside to the trainer.',
+    options: [
+      { id: 'smart_trainer', title: 'Smart trainer', body: 'Completely uninterrupted, which is what this session needs most.' },
+      { id: 'flat_road', title: 'A flat or rolling road', body: 'Pick a stretch you can ride unbroken \u2014 every stop restarts the effort.' },
+      { id: 'long_climb', title: 'A long steady climb', body: 'The gradient does the pacing and nothing interrupts it.' },
+    ],
+  },
 };
 
 /** The two things an athlete can want from the intensity day. Michael's copy, verbatim. */
@@ -4661,12 +4693,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed' && (() => {
                               const role = hardRoleOf(hardSlotIndex);
                               const key = role === 'threshold' ? 'threshold' : (activeHard.goal ?? 'vo2');
-                              const opts = HARD_RUN_MENUS[key as 'speed' | 'vo2' | 'threshold'];
+                              const menu = HARD_RUN_MENUS[key as 'speed' | 'vo2' | 'threshold'];
+                              const opts = menu.options;
                               const chosen = activeHard.terrain
                                 ?? (key === 'vo2' ? state.qualityRunTerrain : undefined);
                               return (
                                 <div className="space-y-1.5 pt-1">
                                   <span className="text-white/85 text-sm">What you can run it on</span>
+                                  {/* ⛔ THE RULE FIRST, THE OPTIONS AFTER. The note governs every
+                                      option below it, so putting it under them would be an
+                                      instruction arriving after the tap it applies to. */}
+                                  <p className="text-white/70 text-sm leading-relaxed">{menu.note}</p>
                                   <div className="space-y-1">
                                     {opts.map((opt) => {
                                       const on = chosen === opt.id;
@@ -4705,8 +4742,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               return (
                                 <div className="space-y-1.5 pt-1">
                                   <span className="text-white/85 text-sm">Where you can ride it</span>
+                                  <p className="text-white/70 text-sm leading-relaxed">{HARD_RIDE_MENUS[role].note}</p>
                                   <div className="space-y-1">
-                                    {HARD_RIDE_MENUS[role].map((opt) => {
+                                    {HARD_RIDE_MENUS[role].options.map((opt) => {
                                       const on = activeHard.environment === opt.id;
                                       return (
                                         <button
