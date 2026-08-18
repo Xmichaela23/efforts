@@ -1795,7 +1795,45 @@ export function descentIsJogged(hillDay: string, lowerDays: string[]): boolean {
  */
 export const HILL_SESSION_MIN = 35;
 
-function hillSession(day: string, lowerDays: string[] = []): PlanSession {
+/**
+ * ⛔ THE VO2 SESSION YIELDS IN THE ANCHOR TOO (Michael, 2026-08-18) — AND IT WAS THE LAST HARD
+ * SESSION IN THE BLOCK THAT DID NOT.
+ *
+ * The recipe suite caught it on its first run: sprints cut 6 → 4 and threshold cuts 20 → 10 min in
+ * the anchor, and this session's token was byte-identical every week — its copy even said *"this is
+ * the fastest this session gets in the block"*, which is the opposite of a taper. Defensible while
+ * hills were what a SECOND hard day unlocked; not defensible from 2026-08-18, when they became the
+ * DEFAULT and the common athlete started running the block's only untapered quality session into
+ * the weeks the barbell peaks in.
+ *
+ * ⛔ THE ARGUMENT IS CONCENTRIC, NOT ECCENTRIC, and that is why "hills spare the legs" did not save
+ * it. Uphill running removes the braking impact — the knees and quads keep that discount — but four
+ * three-minute efforts at maximum heart rate still cost concentric fatigue, local glycogen and CNS
+ * stress. Michael: *"you cannot express a 1RM on the squat rack if you spent 12 minutes at maximum
+ * heart rate two days prior."*
+ *
+ * | weeks | reps | |
+ * |---|---|---|
+ * | 1-3, 5-7 | full | the baseline engine builder |
+ * | 9-11 | **halved** | the cardiovascular volume slashed so the legs arrive fresh for the heaviest lifts |
+ *
+ * ⚠️ WEEKS 4, 8 AND 12 ARE NOT IN THE TABLE. His map says two reps there; the light-week rule
+ * DELETES every hard session on those weeks, which was ruled on 2026-08-18 for the sprint map and
+ * holds here for the same reason — a halved maximal session leaves the nervous system simmering.
+ *
+ * ⚠️ AND IT APPLIES TO ALL FOUR GROUNDS, NOT ONLY THE HILL. Michael named the hill session; the
+ * argument is about VO2 VOLUME and not about the surface, so a treadmill athlete left untapered
+ * would be the same gap wearing a different terrain. The short-hill session halves its ten reps to
+ * five on the same rule.
+ * ⛔ THE BIKE'S 4 × 4 IS STILL UNTAPERED and is flagged rather than changed: it is Helgerud's
+ * published protocol, he named a RUN table, and extending someone else's protocol on my own
+ * reasoning is the thing this file keeps deleting.
+ */
+function vo2RepsFor(full: number, wave: HardWave): number {
+  return wave.cycleKind === 'anchor' ? Math.max(1, Math.round(full / 2)) : full;
+}
+
+function hillSession(day: string, lowerDays: string[] = [], wave?: HardWave): PlanSession {
   // §5, run-only VO2 defence: 4 x 3min hard / 3min easy at 5-8%. Working time 12 min; ~35-40 min
   // with warm-up and cool-down. The token carries the grade because the cost row is not "run VO2" —
   // it is "run VO2 AT grade" (D-325 §1), and a token that cannot carry the constraint cannot be priced.
@@ -1837,7 +1875,8 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
   // "short float keeps VO2 elevated" rationale is struck through as retired in the doctrine itself.
   // **The second option is an unsolved protocol question, not a missing branch.** See the handoff
   // banner at the top of `docs/ENGINE-STATE.md`.
-  const token = `run_hills_4x180s_rlap_g5_8_d${jogged ? 'jog' : 'walk'}`;
+  const reps = vo2RepsFor(4, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
+  const token = `run_hills_${reps}x180s_rlap_g5_8_d${jogged ? 'jog' : 'walk'}`;
   return {
     day,
     type: 'run',
@@ -1845,7 +1884,7 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
     // ⛔ NO PACE, ANYWHERE IN THIS COPY. The pace-effort relationship changes with gradient, so a
     // pace target here is false precision (§2.2). Effort and grade only.
     description:
-      `4 × 3 min hard uphill on a 5-8% grade, ${jogged ? 'easy jog' : 'walk'} back down. `
+      `${reps} × 3 min hard uphill on a 5-8% grade, ${jogged ? 'easy jog' : 'walk'} back down. `
       + 'The descent has no timer — press the lap button at the bottom and the next rep starts. '
       + 'Hard means hard — you should not be able to hold a sentence. No pace target: on a hill the '
       + 'number would be wrong. The climb is what keeps this cheap on your legs, so the lifting '
@@ -1888,16 +1927,17 @@ function hillSession(day: string, lowerDays: string[] = []): PlanSession {
  */
 export const SHORT_HILL_SESSION_MIN = 37;
 
-function shortHillSession(day: string, lowerDays: string[] = []): PlanSession {
+function shortHillSession(day: string, lowerDays: string[] = [], wave?: HardWave): PlanSession {
   const jogged = descentIsJogged(day, lowerDays);
-  const token = `run_hills_10x60s_r60s_g4_6_d${jogged ? 'jog' : 'walk'}`;
+  const reps = vo2RepsFor(10, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
+  const token = `run_hills_${reps}x60s_r60s_g4_6_d${jogged ? 'jog' : 'walk'}`;
   return {
     day,
     type: 'run',
     name: 'Short Hill Repeats',
     // ⛔ NO PACE, ANYWHERE IN THIS COPY — same reason as the 3-minute session (§2.2).
     description:
-      `10 × 1 min hard uphill on a 4-6% grade, 1 min ${jogged ? 'easy jog' : 'walk'} back down. `
+      `${reps} × 1 min hard uphill on a 4-6% grade, 1 min ${jogged ? 'easy jog' : 'walk'} back down. `
       + 'Hard means hard — you should not be able to hold a sentence. No pace target: on a hill the '
       + 'number would be wrong. Shorter reps buy less time at the top end than the 3-minute version, '
       + 'so this is the session for the hill you have rather than the better one. The climb is still '
@@ -1934,12 +1974,13 @@ function shortHillSession(day: string, lowerDays: string[] = []): PlanSession {
  */
 export const TREADMILL_SESSION_MIN = 39;
 
-function treadmillSession(day: string): PlanSession {
+function treadmillSession(day: string, wave?: HardWave): PlanSession {
+  const reps = vo2RepsFor(4, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
   // ⚠️ `_tm` IS A LABEL SWITCH ONLY — the structure is identical to the outdoor fixed-recovery hill.
   // Without it the watch reads "Hill · 5-8% grade" and "Jog down" on a machine with no hill and no
   // down, which is the same species of wrong as a pace target on a gradient: a step label that
   // describes a session the athlete is not doing.
-  const token = 'run_hills_4x180s_r180s_g5_8_djog_tm';
+  const token = `run_hills_${reps}x180s_r180s_g5_8_djog_tm`;
   return {
     day,
     type: 'run',
@@ -2006,7 +2047,8 @@ function treadmillSession(day: string): PlanSession {
  */
 export const FLAT_SESSION_MIN = 41;
 
-function flatSession(day: string): PlanSession {
+function flatSession(day: string, wave?: HardWave): PlanSession {
+  const reps = vo2RepsFor(4, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
   return {
     day,
     type: 'run',
@@ -2025,7 +2067,7 @@ function flatSession(day: string): PlanSession {
     // ⚠️ THREE PRESETS, NOT ONE — `run_vo2_*` brackets nothing itself. `_r180s_` is the explicit
     // float: the token defaults to 90 s, which would make this a materially harder session than the
     // one costed above.
-    steps_preset: ['warmup_run_10min_easy', 'run_vo2_4x3min_r180s_z5', 'cooldown_run_10min_easy'],
+    steps_preset: ['warmup_run_10min_easy', `run_vo2_${reps}x3min_r180s_z5`, 'cooldown_run_10min_easy'],
     tags: ['quality', 'aerobic'],
   };
 }
@@ -2191,17 +2233,22 @@ function hardRunSession(
   if (goal === 'speed') return sprintSession(day, wave, terrain);
   const base = (() => {
     switch (terrain) {
-      case 'hill_short': return shortHillSession(day, lowerDays);
-      case 'treadmill': return treadmillSession(day);
-      case 'flat': return flatSession(day);
+      case 'hill_short': return shortHillSession(day, lowerDays, wave);
+      case 'treadmill': return treadmillSession(day, wave);
+      case 'flat': return flatSession(day, wave);
       case 'hill_3min':
-      default: return hillSession(day, lowerDays);
+      default: return hillSession(day, lowerDays, wave);
     }
   })();
   const step = Math.min(Math.max(1, Math.round(wave.weekInCycle)), 3);
+  // ⛔ THIS CUE SAID "THIS IS THE FASTEST THIS SESSION GETS IN THE BLOCK", WHICH IS THE OPPOSITE OF
+  // WHAT THE ANCHOR NOW DOES. The reps are halved there; a line telling the athlete to push hardest
+  // in the week the volume was cut would have them add back exactly what the cut removed.
   const cue = wave.cycleKind === 'anchor'
-    ? ' Anchor week: this is the fastest this session gets in the block — hold the top of what you '
-      + 'can repeat for every rep.'
+    // ⚠️ "run them well" WAS IN THIS LINE AND THE VOICE LINT CAUGHT IT — `well` is a banned word,
+    // and the clause was doing nothing the two sentences before it do not already say.
+    ? ' Anchor week: fewer reps from here to the end of the block. The barbell is peaking, and this '
+      + 'is the cardiovascular volume getting out of its way.'
     : step === 1
       ? ' First week of the wave: settle on an effort you can hold for all four reps, and remember it.'
       : ' Same reps, same hill: go a little faster than last week, and hold it for every rep.';

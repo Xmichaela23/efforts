@@ -100,13 +100,21 @@ const p = build({ ...RUN, hardDays: [{ day: 'tuesday', discipline: 'run' }] });
   assert(/faster than last week/i.test(String(w2.description)), `week 2 does not advance: ${w2.description}`);
 });
 
-Deno.test('the ANCHOR cycle asks for the fastest of the block, mirroring the 95% single', () => {
-  // ⚠️ THIS IS THE VO2 SESSION, AND IT IS THE ONE THAT STILL PEAKS WITH THE BAR. The THRESHOLD run
-  // does the opposite — it yields in the anchor (doctrine §2 wave 3) — so do not read this test as
-  // permission to make the threshold session harder there.
-const p = build({ ...RUN, hardDays: [{ day: 'tuesday', discipline: 'run' }] });
+Deno.test('⛔ THE ANCHOR CUTS THE VO2 SESSION — INVERTED 2026-08-18', () => {
+  // ⛔ THIS ASSERTED THE OPPOSITE — "the anchor asks for the fastest of the block, mirroring the 95%
+  // single" — and it was the last session in the block that peaked WITH the bar instead of yielding
+  // to it. The recipe suite caught it on its first run.
+  //
+  // Uphill running removes the ECCENTRIC impact, which is why hills were chosen; it does not remove
+  // the concentric fatigue, the local glycogen cost or the CNS stress of twelve minutes at maximum
+  // heart rate. Michael: "you cannot express a 1RM on the squat rack if you spent 12 minutes at
+  // maximum heart rate two days prior." Reps halve in the anchor and the copy explains the cut
+  // rather than urging them to push through it.
+  const p = build({ ...RUN, hardDays: [{ day: 'tuesday', discipline: 'run' }] });
   const anchorWeek = buildWeekMap(12).find((b) => b.cycleKind === 'anchor')!.week;
-  assert(/fastest this session gets/i.test(String(named(p, anchorWeek, /Hill/)[0].description)));
+  const anchor = String(named(p, anchorWeek, /Hill/)[0].description);
+  assertEquals(/fastest this session gets/i.test(anchor), false, 'the push-harder cue survived');
+  assert(/fewer reps|getting out of its way/i.test(anchor), `the anchor does not explain the cut: ${anchor}`);
 });
 
 Deno.test('⛔ LIGHT WEEKS STILL DELETE THE INTERVALS — the progression did not resurrect them', () => {

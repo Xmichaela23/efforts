@@ -124,22 +124,23 @@ for (const r of RECIPES) {
   });
 
   // ── THE TAPER RULE ─────────────────────────────────────────────────────────────────────────────
-  Deno.test(`${r.name} · ⛔ TAPER — the block never carries MORE interval work at the end`, () => {
+  Deno.test(`${r.name} · ⛔ TAPER — weeks 10-12 carry STRICTLY less interval work than week 1`, () => {
     /**
-     * ⚠️ "STRICTLY LESS" IS TRUE OF THE SPRINT AND THRESHOLD SESSIONS AND NOT OF THE HILL ONE, and
-     * that is a real gap rather than a test detail — see the standalone test at the bottom of this
-     * file. Sprints cut 6 → 4 and threshold cuts 20 → 14 min in the anchor; the hill session's
-     * token is deliberately IDENTICAL every week because it progresses by EFFORT, not volume.
+     * ⛔ STRICT AGAIN, AND THIS ASSERTION IS WHY THE SUITE PAID FOR ITSELF. It shipped as "never
+     * MORE" because the hill session was the one hard session in the block with no taper — its
+     * token was byte-identical every week. Michael ruled on 2026-08-18 that it must yield: uphill
+     * running removes the ECCENTRIC impact, but four three-minute efforts at maximum heart rate
+     * still cost concentric fatigue, local glycogen and CNS stress, and *"you cannot express a 1RM
+     * on the squat rack if you spent 12 minutes at maximum heart rate two days prior."*
      *
-     * ⛔ SO THE UNIVERSAL GUARANTEE IS "never MORE", and the strict cut is asserted per-session where
-     * a taper exists. Asserting strictness here would make this suite permanently red on the most
-     * common recipe there is, which teaches everyone to ignore it.
+     * ⚠️ SO EVERY HARD SESSION IN THE BLOCK NOW TAPERS, and the guarantee can be the strong one.
+     * If this ever has to be weakened back to `<=`, a session has stopped yielding to the barbell.
      */
     const base = weekOf(PLAN, 1).filter(isHard).reduce((n, s) => n + workMinutes(s), 0);
     assert(base > 0, 'week 1 built no hard session — the recipe tests nothing');
     for (const w of [10, 11, 12]) {
       const later = weekOf(PLAN, w).filter(isHard).reduce((n, s) => n + workMinutes(s), 0);
-      assert(later <= base, `week ${w} carries MORE (${later} min) than week 1's ${base}`);
+      assert(later < base, `week ${w} carries ${later} min against week 1's ${base}`);
     }
     assertEquals(weekOf(PLAN, 12).filter(isHard).length, 0, 'week 12 kept interval work');
   });
@@ -238,30 +239,42 @@ Deno.test('⛔ RECIPE D — intervals on slot 1, threshold on slot 2, both rides
 
 // ── THE ONE SESSION WITH NO TAPER ────────────────────────────────────────────────────────────────
 
-Deno.test('⚠️ THE HILL SESSION DOES NOT TAPER, AND IT IS NOW THE DEFAULT HARD DAY', () => {
-  // ⛔ A FINDING, PINNED SO IT IS NOT DISCOVERED IN A PLAN. The other two hard sessions cut their
-  // volume in the anchor so the legs arrive fresh at the heavy tests:
-  //     sprints    6 × 12 s  →  4 × 12 s
-  //     threshold  4 × 5 min →  1 × 10 min   (20 min of work → 10)
-  // The hill session does neither. Its token is byte-identical every week by design — it progresses
-  // by EFFORT ("go a little faster than last week"), and its anchor copy says "hold the top of the
-  // range", which is the opposite of a taper.
+Deno.test('⛔ THE HILL SESSION TAPERS — the gap this suite found on day one', () => {
+  // It shipped untapered: the token was byte-identical every week and the anchor copy said "this is
+  // the FASTEST this session gets in the block". Defensible while hills were what a SECOND hard day
+  // unlocked; not once they became the default and the common athlete ran the block's only
+  // untapered quality session into the weeks the barbell peaks in.
   //
-  // ⚠️ THAT WAS DEFENSIBLE WHILE HILLS WERE THE SESSION A SECOND HARD DAY UNLOCKED. As of
-  // 2026-08-18 they are the DEFAULT first hard day, so the common athlete now runs the block's only
-  // untapered quality session straight into the weeks the barbell peaks in.
-  // ⛔ MICHAEL'S CALL, NOT MINE. If the hill session should yield in the anchor the way the threshold
-  // one does, this test inverts and `hillSession` gains a rep table.
+  // ⚠️ ALL FOUR GROUNDS, NOT ONLY THE HILL. Michael named the hill session; the argument is about
+  // VO2 VOLUME rather than the surface, so a treadmill athlete left untapered would be the same gap
+  // wearing a different terrain. Short hills halve ten reps to five on the same rule.
+  // ⛔ THE BIKE'S 4 × 4 IS STILL UNTAPERED, deliberately: it is Helgerud's published protocol and he
+  // named a RUN table. Flagged, not silently extended.
+  const mk = (terrain: string) => build({
+    enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20, easyPaceMinPerMile: 9,
+    longRunDay: 'sunday', hardDays: [{ discipline: 'run', day: 'tuesday', goal: 'vo2', terrain }],
+  });
+  for (const [terrain, full, cut] of [['hill_3min', 4, 2], ['treadmill', 4, 2], ['hill_short', 10, 5]] as const) {
+    const p = mk(terrain);
+    const repsIn = (w: number) => {
+      const t = String(weekOf(p, w).find(isHard)?.steps_preset?.find((x: string) => /run_hills_/.test(x)) ?? '');
+      const m = t.match(/run_hills_(\d+)x/);
+      return m ? Number(m[1]) : null;
+    };
+    assertEquals(repsIn(1), full, `${terrain}: week 1 is not the baseline`);
+    assertEquals(repsIn(11), cut, `${terrain}: the anchor did not halve`);
+  }
+});
+
+Deno.test('⛔ AND THE ANCHOR COPY NO LONGER TELLS THEM TO PUSH HARDER', () => {
+  // It read "this is the FASTEST this session gets in the block — hold the top of what you can
+  // repeat", in the very week the reps are halved. That line would have the athlete add back exactly
+  // what the cut removed.
   const p = build({
     enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20, easyPaceMinPerMile: 9,
     longRunDay: 'sunday', hardDays: [{ discipline: 'run', day: 'tuesday', goal: 'vo2' }],
   });
-  const tokenIn = (w: number) => String(weekOf(p, w).find((s) => /Hill Repeats/.test(s.name))?.steps_preset?.[0] ?? '');
-  assertEquals(tokenIn(1), tokenIn(11), 'the hill token moved — a taper may have been added');
-  // ⚠️ AND THE COPY SAYS SO OUT LOUD, which is what makes this a decision rather than an oversight:
-  // "this is the FASTEST this session gets in the block — hold the top of what you can repeat."
-  // The block's other two hard sessions say the opposite in the same week.
-  assert(/fastest this session gets in the block/i.test(
-    String(weekOf(p, 11).find((s) => /Hill Repeats/.test(s.name))?.description ?? '')),
-    'the anchor copy changed without the token');
+  const anchor = String(weekOf(p, 11).find(isHard)?.description ?? '');
+  assertEquals(/fastest this session gets/i.test(anchor), false, 'the push-harder cue is back');
+  assert(/getting out of its way|fewer reps/i.test(anchor), `the anchor does not explain the cut: ${anchor}`);
 });
