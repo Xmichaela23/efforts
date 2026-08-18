@@ -201,10 +201,21 @@ export function scheduleHealth(input: WeekInput): ScheduleHealth {
     const placements: Placement[] = r.ok
       ? r.placements
       : (r as Extract<typeof r, { ok: false }>).best;
+    /**
+     * ⛔ A MIRRORED PAIR IS ONE COLLISION, NOT TWO (2026-08-18). When two sessions share a day, each
+     * blocks the other, so `unmetNeeds` reports it twice — "Back Squat is short from Long Run" AND
+     * "Long Run is short from Back Squat". The badge then said "2 collisions" for one problem, and an
+     * athlete who fixes it watches the count fall by two, which reads as the number being made up.
+     *
+     * ⚠️ THE KEY IS THE UNORDERED PAIR AND NOTHING ELSE — deliberately, including the SYSTEM. When a
+     * squat and a long run share a day they breach in both directions at once: the squat needs
+     * `long_effort` clear and the long run needs `heavy_legs` clear. Two systems, one situation, and
+     * keying on the system reported it as two collisions. The athlete has ONE thing to move.
+     */
     const seen = new Set<string>();
     const collisions: string[] = [];
     for (const u of unmetNeeds(placements)) {
-      const key = `${u.unit}|${u.system}|${u.blockedBy}`;
+      const key = [u.unit, u.blockedBy].sort().join('|');
       if (seen.has(key)) continue;
       seen.add(key);
       const what = u.system === 'long_effort' ? 'a long effort' : 'heavy legs';
@@ -314,16 +325,41 @@ export function solveWizardWeek(input: WeekInput): {
       return p ? DAY_NAMES[p.day].toLowerCase() : null;
     };
 
+    /**
+     * ⛔ A MIRRORED PAIR IS ONE COLLISION, NOT TWO (2026-08-18). When two sessions share a day, each
+     * blocks the other, so `unmetNeeds` reports it twice — "Back Squat is short from Long Run" AND
+     * "Long Run is short from Back Squat". The badge then said "2 collisions" for one problem, and an
+     * athlete who fixes it watches the count fall by two, which reads as the number being made up.
+     *
+     * ⚠️ THE KEY IS THE UNORDERED PAIR AND NOTHING ELSE — deliberately, including the SYSTEM. When a
+     * squat and a long run share a day they breach in both directions at once: the squat needs
+     * `long_effort` clear and the long run needs `heavy_legs` clear. Two systems, one situation, and
+     * keying on the system reported it as two collisions. The athlete has ONE thing to move.
+     */
     const seen = new Set<string>();
     const collisions: string[] = [];
     for (const u of unmetNeeds(placements)) {
-      const key = `${u.unit}|${u.system}|${u.blockedBy}`;
+      const key = [u.unit, u.blockedBy].sort().join('|');
       if (seen.has(key)) continue;
       seen.add(key);
+      /**
+       * ⛔ THE BANNER NAMES THE MOVE, NOT JUST THE FAULT (Michael, 2026-08-18). It read like an error
+       * code — "needs 24h more clearance, outstanding until Tuesday" — which tells an athlete they
+       * are wrong and leaves them to work out the fix. `clearsAtDay` is already the coordinate of the
+       * answer, so the suggestion costs no new modelling: the day the debt clears IS the earliest day
+       * the blocked session can legally sit.
+       *
+       * ⚠️ IT SUGGESTS MOVING THE BLOCKED SESSION, NOT THE BLOCKER. Either would clear it, but the
+       * blocker is usually the athlete's own anchor — the long run they told us about — and telling
+       * them to move that is telling them to change their life rather than their plan. The blocked
+       * one is nearly always something the engine placed.
+       * ⛔ AND IT IS A SUGGESTION IN WORDS, NOT A CONTROL. Nothing here moves anything.
+       */
       const what = u.system === 'long_effort' ? 'a long effort' : 'heavy legs';
       collisions.push(
-        `${u.unit} needs ${u.shortBy}h more clearance from ${what} — ${u.blockedBy} leaves it `
-        + `outstanding until ${DAY_NAMES[u.clearsAtDay]}.`,
+        `${u.unit} is ${u.shortBy}h short of clearance from ${what} — ${u.blockedBy} leaves the legs `
+        + `loaded until ${DAY_NAMES[u.clearsAtDay]}. Moving ${u.unit} to ${DAY_NAMES[u.clearsAtDay]} `
+        + `or later clears it.`,
       );
     }
     if (restDaysOf(placements).length === 0) {

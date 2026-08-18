@@ -1888,27 +1888,50 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const scheduleHealthState = wizardWeek.health;
   const [healthOpen, setHealthOpen] = useState(false);
 
+  /**
+   * ⛔ PRISTINE VS DIRTY — AND IT IS PRIORITY ZERO, because without it the smart default is a
+   * HOSTAGE SITUATION (Michael, 2026-08-18).
+   *
+   * The pre-fill guarded on "is this field empty", which is a state loop: tapping a chosen day to
+   * release it emptied the field, the solve then produced a suggestion for the now-empty field, and
+   * the effect refilled it. **The athlete could not clear a long day.** To them that reads as the
+   * button not working — the same complaint as the hard-day chips, from a different cause, and
+   * exactly the hostility the whiteboard change was meant to end.
+   *
+   * ⛔ EMPTY IS NOT THE QUESTION. TOUCHED IS. The engine fills a unit once, while nobody has said
+   * anything about it; the moment the athlete touches that unit — including to CLEAR it — it is
+   * theirs and the engine never writes to it again. An empty field they emptied is an answer.
+   *
+   * ⚠️ PER UNIT, NOT PER SCREEN. Clearing the long run must not stop the long ride being suggested;
+   * they are separate decisions and a screen-wide flag would make the first tap silence the rest.
+   * ⚠️ HARD SLOTS ARE KEYED BY INDEX, so removing a slot re-points the flags of the ones after it.
+   * The cost is one stale suggestion on a rebuilt slot, which the athlete can clear; keying on
+   * identity would mean giving slots ids for this alone.
+   */
+  const [touchedUnits, setTouchedUnits] = useState<Record<string, boolean>>({});
+  const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
+
   React.useEffect(() => {
-    if (currentStep !== 'schedule') return;
+    if (currentStep !== 'schedule' || touchedUnits.longRun) return;
     setState((st) => {
       if (st.longRunDay || !suggestedLongDays.run) return st;
       return { ...st, longRunDay: suggestedLongDays.run as typeof st.longRunDay };
     });
-  }, [currentStep, suggestedLongDays.run]);
+  }, [currentStep, suggestedLongDays.run, touchedUnits.longRun]);
   React.useEffect(() => {
-    if (currentStep !== 'schedule') return;
+    if (currentStep !== 'schedule' || touchedUnits.longRide) return;
     setState((st) => {
       if (st.longRideDay || !suggestedLongDays.ride) return st;
       return { ...st, longRideDay: suggestedLongDays.ride as typeof st.longRideDay };
     });
-  }, [currentStep, suggestedLongDays.ride]);
+  }, [currentStep, suggestedLongDays.ride, touchedUnits.longRide]);
 
   React.useEffect(() => {
     if (currentStep !== 'schedule') return;
     setState((st) => {
       let touched = false;
       const next = st.hardDays.map((h, i) => {
-        if (h.day || h.ownership === 'club') return h;
+        if (h.day || h.ownership === 'club' || touchedUnits[`hard:${i}`]) return h;
         const s = suggestedHardDays[i];
         if (!s) return h;
         touched = true;
@@ -1916,7 +1939,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       });
       return touched ? { ...st, hardDays: next } : st;
     });
-  }, [currentStep, suggestedHardDays]);
+  }, [currentStep, suggestedHardDays, touchedUnits]);
 
 
   /**
@@ -4346,6 +4369,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 // pick is ever stuck and the athlete never hunts for a control to
                                 // undo one. Days the other anchors hold are locked in the row, so a
                                 // plain toggle is safe here.
+                                // ⛔ THE TAP MARKS THE UNIT DIRTY, WHATEVER IT DOES NEXT — set, move
+                                // or CLEAR. Clearing is the case that matters: it is an answer, and
+                                // before this the engine read it as an empty field and refilled it.
+                                touch(row.key === 'hard' ? `hard:${hardSlotIndex}`
+                                  : row.key === 'long' ? 'longRun' : 'longRide');
                                 // ⛔ NO SWAP, NO EVICTION, NO LOCK. The tap writes the day and nothing
                                 // else moves — see the `taken` note above.
                                 if (row.key === 'hard') {
