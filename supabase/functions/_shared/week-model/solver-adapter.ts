@@ -99,27 +99,20 @@ export function solveWithWeekModel(input: SolverInput): SolverResult {
     sessions.push({ id: `f${i}`, label: f.name, load: LOAD_FOR_KIND[f.kind], sport: SPORT_FOR_KIND[f.kind], minutes: 60 });
   });
 
-  // ⛔ TWO ANCHORS ON ONE DAY THAT CANNOT SHARE IT IS THE CALLER'S TO RESOLVE, NOT THE ENGINE'S — the
-  // one refusal that survives from the slot solver, because both sessions are the athlete's own and
-  // picking one would be the engine overruling them.
-  const byDay = new Map<number, Anchor[]>();
-  input.anchors.forEach((a) => byDay.set(dayIndexOf(a.day), [...(byDay.get(dayIndexOf(a.day)) ?? []), a]));
-  for (const [, group] of byDay) {
-    if (group.length < 2) continue;
-    const loads = group.map((a) => LOAD_FOR_KIND[a.kind]);
-    const bothCostly = loads.filter((l) => l === 'long_cardio' || l === 'heavy_lower').length >= 2;
-    if (!bothCostly) continue;
-    return {
-      status: 'unsolvable',
-      code: 'SOLVER_GRIDLOCK_ANCHOR_COLLISION',
-      bindingAnchors: [group[0], group[1]],
-      options: [`Move ${group[0].label} to another day.`, `Move ${group[1].label} to another day.`],
-      message:
-        `${group[0].label} and ${group[1].label} are both on ${group[0].day}, and they cannot share `
-        + `a day. Both are fixed, so this is yours to resolve — the engine will not pick one.`,
-    };
-  }
-
+  /**
+   * ⛔ THERE IS NO REFUSAL PATH LEFT, AND THAT IS MICHAEL'S RULING (2026-08-17).
+   *
+   * A gate stood here: two anchors on one day that both cost the legs returned `unsolvable`, on the
+   * reasoning that both were the athlete's own and picking one would be the engine overruling them.
+   * **That is still true and it is still not a reason to refuse.** *"If the athlete needs to pin a
+   * ridiculous schedule because of their real-life constraints, let them. The engine's job is to warn
+   * them of the biological cost, not physically block them from building their week."*
+   *
+   * ⚠️ THE COLLISION IS NOT LOST — it comes out of `unmetNeeds` as a `compromised` week with the
+   * debt named, which is a better answer than a dead end: it says WHAT is outstanding, WHO owes it
+   * and WHEN it clears. ⛔ Do not restore a refusal here; the `unsolvable` arm of `SolverResult`
+   * stays in the type for the old engine's sake and this adapter never returns it.
+   */
   const units = buildUnits(sessions, pins);
   const r = resolve(units, { minRestDays: 1 });
   const placements: Placement[] = r.ok ? r.placements : r.best;

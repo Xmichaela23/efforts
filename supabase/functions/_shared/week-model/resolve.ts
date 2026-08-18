@@ -117,7 +117,6 @@ function score(placements: Placement[]): number {
   for (let i = 1; i < heavyDays.length; i++) bunching += Math.max(0, 3 - (heavyDays[i] - heavyDays[i - 1]));
 
   return rest * 4 - crowding - bunching
-    - impactAfterLong(placements) * 6
     - clustering(placements) * 2
     - sameSportDoubles(placements) * 20
     + interleaving(placements) * 3;
@@ -158,30 +157,14 @@ function sameSportDoubles(placements: Placement[]): number {
 /** One day off. ⚠️ A FLOOR the score stops paying past — see `score`. */
 const REST_FLOOR = 1;
 
-/**
- * ⛔ AN EASY RUN THE MORNING AFTER A LONG RUN — INHERITED BEHAVIOUR, AND IT NEEDS MICHAEL'S RULING.
- *
- * ⚠️ IT IS SCORED HERE, NOT MODELLED AS A DEBT, AND THE DIFFERENCE IS DELIBERATE. Michael's law gave
- * the 48h long-effort clearance to HEAVY LEGS and said nothing about easy running. The slot engine
- * it replaces avoided this day anyway (`impactAfterLongRun`), and the reasoning is real — a long run
- * leaves impact damage and the next morning's run is taken on it, which is the same tissue argument
- * the eccentric routing runs on. Deleting the behaviour silently in an engine swap would be losing a
- * rule nobody decided to lose.
- *
- * ⛔ SO IT IS A PREFERENCE AND IT CANNOT BREACH ANYTHING: `unmetNeeds` is what decides legality and
- * this never touches it. If Michael rules it a real debt, it moves into `COST` and out of here.
- */
-function impactAfterLong(placements: Placement[]): number {
-  const longRunDays = placements
-    .filter((p) => p.unit.sessions.some((s) => s.load === 'long_cardio' && s.sport === 'run'))
-    .map((p) => p.day);
-  if (longRunDays.length === 0) return 0;
-  return placements.filter((p) =>
-    p.unit.sessions.some((s) => s.load === 'easy' && s.sport === 'run')
-    && longRunDays.some((d) => (p.day - d + 7) % 7 === 1)).length;
-}
 
 /**
+ * ⛔ THE EASY-RUN-AFTER-LONG-RUN AVOIDANCE IS GONE (Michael, 2026-08-17). The old engine scored
+ * against it and I carried it across the engine swap rather than drop a rule silently — correctly,
+ * because it turned out to be a real question. His answer: **an easy Zone 1/2 run the morning after
+ * a long run is a standard shakeout.** There is nothing to protect, so there is nothing to score.
+ * ⛔ Do not reintroduce it as a preference; it was measured and ruled on.
+ *
  * Same-sport easy sessions on back-to-back days. ⚠️ SPREAD, NOT SEPARATION — this is what stops an
  * athlete's three easy runs landing Fri/Sat/Sun with Tuesday empty. It is shape, not law.
  */

@@ -133,44 +133,14 @@ Deno.test('⛔ a LOWER lift keeps its 48h from the long run', () => {
 });
 
 /**
- * ⛔ THE ONE ORDERING ON THE `separation-first` ARM THAT NOTHING ELSE HELD (2026-08-16, slice 1).
+ * ⛔⛔ DELETED 2026-08-17, MICHAEL'S RULING — AND THE DELETION IS RECORDED SO IT IS NOT REDISCOVERED
+ * AS A GAP. The test here asserted that no easy run lands the morning after the long run when the
+ * week has room, and the old engine scored against that day.
  *
- * `week-solver.ts` ranks `avoided` and `afterLong` ABOVE `selfAdjacent` on the strength path, and
- * before this test that was held by a code comment and nothing more. **Lifting `selfAdjacent` above
- * them passes every other test in this directory** — all 420 — which is exactly the shape of the
- * failure this repo has already paid for once: deleting `upperToNearestLiftPenalty` changed 36 of 43
- * three-day solver scenarios and *not one test noticed* (`week-solver.ts:440`).
- *
- * What the promoted order actually does, measured on the fixture below: it moves an easy run onto
- * **Wednesday, the morning after the Tuesday long run**, to buy a wider gap elsewhere in the week.
- * Correct order: Mon · Fri · Sat, Wednesday left clear. Promoted: Mon · **Wed** · Fri. That is the
- * same trade `base-week-spread.test.ts` caught on the marathon path — spending a recovery day to
- * win a spread term — and the strength suite could not see it.
- *
- * ⚠️ SCOPED TO A WEEK WITH ROOM, DELIBERATELY, AND NOT BLANKET-ASSERTED. `afterLong` is a SCORED
- * preference, not a hard prune, and a genuinely over-subscribed week cannot always honour it: at
- * five run days against three lifts, or with a Sunday long run at four run days, the day after is
- * forced and the solver takes it. That is the law working, not a defect. **Do not "extend" this
- * across every shape — it will go red on weeks that have no legal alternative**, and relaxing it
- * afterwards is how the assertion ends up meaning nothing.
+ * **His answer: an easy Zone 1/2 run the morning after a long run is a standard shakeout.** There is
+ * nothing to protect, so there is nothing to assert. ⛔ Do not reintroduce it — it survived the
+ * engine swap as a deliberately-carried preference precisely so it could be ruled on, and it was.
  */
-Deno.test('⛔ no easy run on the morning after the long run, when the week has room', () => {
-  const dayAfter = (d: string) => ORDER[(ORDER.indexOf(d) + 1) % 7];
-  const w = week1({
-    enduranceSport: 'run', enduranceFrequency: 4, targetWeeklyMiles: 13, longRunDay: 'tuesday',
-  });
-  // If the pin ever stops landing, this fixture is no longer testing what it says it tests.
-  const long = w.find(isLongRun)?.day;
-  assertEquals(long, 'Tuesday', 'the long-run pin moved — this fixture tests nothing now');
-  const after = dayAfter(String(long));
-  const landed = w.filter(isEasyRun).filter((s) => s.day === after).map((s) => s.name);
-  assertEquals(landed.length, 0,
-    `an easy run landed on ${after}, the morning after the long run: ${w.map((s) => `${s.day} ${s.name}`).join(', ')}`);
-  // ⛔ AND THE WEEK HAD SOMEWHERE ELSE TO PUT IT — otherwise the assertion above is satisfied by a
-  // week too full to have a choice, which would make it pass for the wrong reason.
-  assert(activeDays(w) <= 6, `no rest day left: ${activeDays(w)} active days`);
-  assertEquals(w.filter(isEasyRun).length, 3, 'the fixture stopped building three easy runs');
-});
 
 Deno.test('⛔ the athlete\'s anchors are never moved', () => {
   const w = week1({
