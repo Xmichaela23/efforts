@@ -3780,6 +3780,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </p>
               </div>
             )}
+            {/* ⛔ WHAT THE NUMBER ABOVE ACTUALLY BUYS (Michael, 2026-08-18). Plain on the card, not
+                behind the (i): *"if the app just asks for numbers it feels like a standard form. If
+                it states WHY it needs them — that their cardio budget pays for their lifting volume —
+                it teaches the hybrid doctrine while they build the plan. They stop fighting the
+                limits because they understand the math."*
+
+                ⚠️ IT IS A REAL CLAIM, NOT A REASSURANCE, AND IT IS TRUE OF THE CODE. These hours
+                feed `resolveEnduranceTier`, which sets the accessory band before a single rep is
+                authored (`docs/SPEC-viada-ingestion-order.md`). If it ever stops being true, delete
+                the sentence — do not soften it.
+
+                ⚠️ BELOW THE INPUTS, NOT ABOVE THEM, AND THAT PLACEMENT IS DELIBERATE. The card's
+                own history is that a paragraph at the top pushed the riding field off a phone screen
+                (2026-08-10, "NO ARGUMENT ON THIS CARD AT ALL"). Michael's instruction is that the
+                note must be plainly visible and not behind a tooltip — it is both, without
+                reintroducing the defect that rule was written for. */}
+            <p className="text-white/70 text-sm leading-relaxed border-t border-white/10 pt-3">
+              Your endurance volume is your budget. These total hours dictate how much accessory
+              lifting you can afford to recover from.
+            </p>
             {/* ⛔ THE PANEL OPENS AT THE BOTTOM, NOT BESIDE THE (i) THAT TOGGLES IT. Rendering it
                 inline under the running label would push the riding field off the screen the moment
                 it is tapped — which is the exact defect this whole card was rewritten to fix, and it
@@ -3884,6 +3904,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         because it QUALIFIES the question rather than answering it, and a div (not a
                         button) so the two toggles are not nested inside a button. */}
                     {active && row.key === 'hard' ? (
+                      <>
+                      {/* ⛔ WHAT PINNING A HARD DAY ACTUALLY COSTS (Michael, 2026-08-18). Plain on
+                          the card, not behind a tooltip — the same rule as the volume note, for the
+                          same reason: an athlete who understands why the limit exists stops fighting
+                          it. ⚠️ AND IT IS TRUE OF THE CODE, not reassurance: the hard-day COUNT is
+                          one of the two inputs to `resolveEnduranceTier`, which sets the accessory
+                          band before a rep is authored (`docs/SPEC-viada-ingestion-order.md`). Two
+                          hard days drops the band to 25-30; none opens it to 40-50.
+                          ⚠️ THIS BELONGS ON A HARD DAYS SCREEN OF ITS OWN and sits here because that
+                          screen is not built yet — the control is still a row of this card's
+                          disclosure list. When it is extracted, the note goes with it. */}
+                      <p className="text-white/70 text-sm leading-relaxed px-3 pt-2.5">
+                        Intensity taxes your nervous system. Pinning hard days here lowers your
+                        accessory rep limits to protect your recovery for the heavy barbell lifts.
+                      </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
                           {row.label}
@@ -3955,6 +3990,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             ))}
                         </div>
                       </div>
+                      </>
                     ) : (
                       <button
                         type="button"
