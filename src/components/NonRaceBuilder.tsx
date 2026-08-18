@@ -641,6 +641,9 @@ type NonRaceState = {
   /** How many days the weekly ride hours spread across. The run has always asked this; the bike
    *  did not, so the composer had a total with nothing to divide it by. */
   rideDays: number;
+  /** ⛔ WEEKLY SWIM DISTANCE, in the athlete's own unit (yards, or metres for a metric athlete).
+   *  Stored on the goal; nothing reads it yet — see the swim block on the volume card. */
+  swimVolume: number | '';
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
@@ -754,11 +757,29 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
   // endurance days are typed per discipline, so a total would only contradict both.
   // *"how many days is redundant."*
   if (!isStrengthFocus) out.push('days');
-  if (strengthDevelop) out.push('accessory');
+  // ⚠️ ON THE STRENGTH PATH THIS MOVED DOWN, to after the volume — see the block below. Every other
+  // goal keeps it here: there is no endurance tier deciding its numbers.
+  if (strengthDevelop && !isStrengthFocus) out.push('accessory');
   // ⛔ ONE SCHEDULER ON THE STRENGTH PATH. Every other goal keeps the per-discipline cards, because
   // there the endurance IS the plan and there is no lifting frequency to fit it around.
+  /**
+   * ⛔⛔ THE ENDURANCE LOAD IS GATHERED BEFORE THE STRENGTH ACCESSORIES, AND THE CALENDAR IS LAST
+   * (Michael, 2026-08-17). Strength path: goal → train → tier → posture → **volume (incl. swim) →
+   * accessory → schedule** → confirm.
+   *
+   * ⛔ IT IS A DATA DEPENDENCY, NOT A PREFERENCE. The accessory card's rep totals come from the
+   * ENDURANCE TIER — hard days plus total weekly hours (`resolveEnduranceTier`, and
+   * `docs/SPEC-viada-ingestion-order.md`). Asked before the volume, that card cannot state the
+   * number the athlete is signing up for, and the swim gate's warning on the pull-up progression
+   * cannot fire at all because the swim answer arrives two screens later. The ENGINE was put in this
+   * order on 2026-08-17; this is the screen catching up.
+   *
+   * ⚠️ AND IT GROUPS THE HUMAN DECISIONS: how much you do, then what you want to work on, then when.
+   * The calendar is the last thing because it is the only step that depends on all of the others.
+   */
   if (isStrengthFocus && (kept('run') || kept('bike'))) {
     out.push('volume');
+    if (strengthDevelop) out.push('accessory');
     out.push('schedule');
   } else {
     if (kept('run')) out.push('run');
@@ -771,8 +792,12 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
   // same mechanic whichever goal is leading; what gates it is whether the swim is KEPT, not which
   // discipline develops. Strength-path behaviour is unchanged (`maintain` is the only non-out state
   // that path seeds for swim).
+  // ⛔ THE STANDALONE SWIM CARD IS OFF THE STRENGTH PATH (2026-08-17). Michael: the swim belongs on
+  // the same card as the miles and the hours — it is a VOLUME question in its own unit, not a screen
+  // of its own. It renders as the third row of `volume`.
+  // ⚠️ THE RACE PATH KEEPS ITS CARD: that flow has no `volume` step to fold it into.
   const swimKept = state.posture?.swim != null && state.posture?.swim !== 'out';
-  if ((strengthDevelop || isRaceGoal) && swimKept) out.push('swim');
+  if (isRaceGoal && swimKept) out.push('swim');
   return out;
 }
 
@@ -1138,6 +1163,10 @@ function assemblePayload(
           // from nothing. Sending it makes the goal a record of what was actually built.
           ...(state.posture?.strength === 'develop' ? { assistance_picks: state.assistancePicks } : {}),
           ...(state.posture?.swim === 'maintain' && state.swimDays > 0 ? { swim_days: state.swimDays } : {}),
+          // ⚠️ STORED, NOT YET READ. The engine books off `swim_days`; this is the athlete's own
+          // number so the swim can stop being a guess without asking them again later.
+          ...(state.posture?.swim === 'maintain' && Number(state.swimVolume) > 0
+            ? { swim_volume: Number(state.swimVolume) } : {}),
           // Bike volume in HOURS (D-323 §6). Stored as typed; the engine turns hours into sessions —
           // it cannot turn miles into anything, having never learned a ride speed.
           ...(state.posture?.bike === 'maintain' && Number(state.rideHours) > 0
@@ -1351,7 +1380,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, rideHours: '', rideDays: 0, startDate: planWeekStartISO(),
+    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(),
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -3699,6 +3728,55 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         return `About ${len} a ride across ${state.rideDays} ride${state.rideDays === 1 ? '' : 's'}.`;
                       })()
                     : 'Hours, not distance — terrain and wind make ride distance a poor measure.'}
+                </p>
+              </div>
+            )}
+            {/* ── SWIM ─────────────────────────────────────────────────────────────────────────
+                ⛔ THE SWIM MOVED ONTO THIS CARD (Michael, 2026-08-17). It had a screen of its own
+                asking "swims per week", which made a booked courtesy hold look like a decision on the
+                same footing as the running volume. It is a VOLUME question in its own unit and it
+                belongs beside the miles and the hours.
+
+                ⛔ YARDS *AND* A COUNT, AND THE COUNT IS NOT REDUNDANT. The plan holds a ~60-minute
+                slot per swim; turning a weekly distance into a session length needs a swim PACE, and
+                the app has never asked for one and does not learn it. So the distance is what the
+                athlete thinks in and the count is what the calendar needs — and inventing the second
+                from the first would be exactly the unsourced number this codebase keeps deleting.
+
+                ⚠️ NOTHING DOWNSTREAM READS THE YARDS YET. It is stored on the goal so the swim can
+                stop being a guess later; today `swim_days` is still what the engine books off, and
+                the lat/shoulder gate on the assistance still keys on "does this athlete swim at all"
+                (`docs/SPEC-viada-ingestion-order.md` §3). Flagged rather than quietly wired. */}
+            {state.posture?.swim != null && state.posture?.swim !== 'out' && (
+              <div>
+                <p className="text-white/85 text-sm mb-2">Weekly swimming to hold</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" inputMode="numeric" min={0} step={100}
+                    placeholder={unit === 'km' ? 'e.g. 3000' : 'e.g. 3000'}
+                    value={state.swimVolume === '' ? '' : String(state.swimVolume)}
+                    onChange={(e) => setState((st) => ({ ...st, swimVolume: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <span className="px-2.5 py-1 rounded-xl text-sm font-medium" style={{ backgroundColor: `rgba(${getDisciplineColorRgb('swim')},0.16)`, color: `rgb(${getDisciplineColorRgb('swim')})` }}>
+                    {unit === 'km' ? 'metres' : 'yards'} / week
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-white/70 text-sm">across</span>
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
+                      className={`w-9 py-1.5 rounded-xl text-sm border ${state.swimDays === n ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}
+                    >{n}</button>
+                  ))}
+                  <span className="text-white/70 text-sm">{state.swimDays === 1 ? 'swim' : 'swims'}</span>
+                </div>
+                {/* The card's own words, unchanged from the screen it replaces — the swim is held,
+                    not coached, and the copy has to keep saying so or the slot reads as a workout. */}
+                <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
+                  Held on the calendar, not coached — no set, no target.
                 </p>
               </div>
             )}
