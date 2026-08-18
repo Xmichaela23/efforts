@@ -4288,8 +4288,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               >×</button>
                             </span>
                           ))}
-                          {state.hardDays.length < MAX_HARD_DAY_SLOTS
-                            && (['run', 'bike'] as const)
+                        </div>
+                        {/* ⛔ ADDING A DAY IS THE CARD'S PRIMARY ACTION AND IT WAS A GHOST CHIP
+                            (Michael, 2026-08-18: "these run ride buttons need to be much clearer and
+                            bigger"). "+ Run" and "+ Ride" were 12px dashed outlines at 60% white,
+                            tucked into the right edge of the label row, beside two paragraphs of
+                            prose. On a screen whose whole job is "how much intensity does this block
+                            carry", the control that answers it was the least visible thing on it.
+                            ⛔ THEY ARE FULL-WIDTH, SPORT-COLOURED AND SIZED TO TAP now, on their own
+                            row under the rationale rather than competing with the label. ⚠️ They
+                            disappear at the cap and when §7's gate has no number to price the
+                            session with — the reason renders below, so an absent button is never
+                            silent. */}
+                        {state.hardDays.length < MAX_HARD_DAY_SLOTS && (
+                          <div className="flex gap-2 pt-1">
+                            {(['run', 'bike'] as const)
                               .filter((d) => posturePresent(d))
                               // §7's gate: the option is not offered when the number that would
                               // price it is missing. The reason renders under the row.
@@ -4297,7 +4310,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               .map((d) => (
                               <button
                                 key={`add-${d}`} type="button"
-                                aria-label={`Add a hard ${d === 'run' ? 'run' : 'ride'}`}
+                                aria-label={`Add a high intensity ${d === 'run' ? 'run' : 'ride'}`}
                                 onClick={() => {
                                   setState((st) => (st.hardDays.length >= MAX_HARD_DAY_SLOTS ? st : {
                                     ...st,
@@ -4305,11 +4318,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   }));
                                   setActiveHardSlot(state.hardDays.length);
                                 }}
-                                className="px-3 py-1 rounded-xl text-xs border border-dashed"
-                                style={{ borderColor: 'rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.6)' }}
-                              >+ {d === 'run' ? 'Run' : 'Ride'}</button>
+                                className="flex-1 py-3 rounded-xl text-[15px] font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                style={{
+                                  borderColor: `rgb(${getDisciplineColorRgb(d)})`,
+                                  backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.12)`,
+                                  color: '#fff',
+                                }}
+                              >+ Add a {d === 'run' ? 'run' : 'ride'}</button>
                             ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
                       </>
                     ) : (
