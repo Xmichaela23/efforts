@@ -382,21 +382,32 @@ function WeekDayRow({
    * accent, the club night is amber. The day you are about to change gets a ring on top of
    * whatever it already is.
    */
-  const skin: Record<DayRole, string> = {
-    R: 'bg-white/[0.04] border-white/25 text-white/65',
-    E: 'bg-white/[0.10] border-white/20 text-white/90',
-    LR: 'bg-white/[0.14] border-white/60 text-white',
-    C: 'bg-amber-400/20 border-amber-400/50 text-amber-100',
-    // ⛔ THE ANCHOR FILL IS NEUTRAL WHITE, NOT THE ACCENT (2026-08-11). The wizard's accent is the
-    // FOCUS sport's colour (Get-Strong sets `--wiz-accent-rgb` to strength orange), so painting a
-    // picked long-RUN or long-RIDE day in it coded that day as strength — a run day glowing the
-    // strength hue. The sport cue now lives on the open ROW's box (gold run / green ride); the day
-    // chip only says "this is the one", in plain white. The LETTER (LR/LB) still separates them.
-    // ⚠️ `H`/`C` stay amber: that is this file's mark for an intensity day (hard/club), not a sport,
-    // so it does not miscode — leave it.
-    H: 'bg-amber-400/20 border-amber-400/50 text-amber-100',
-    LB: 'bg-white/[0.14] border-white/60 text-white',
+  /**
+   * ⛔ THE DAY CHIPS ARE NEUTRAL CHROME; THE SPORT LIVES ON WHAT IS PLACED (Michael, 2026-08-18:
+   * "the days should be neutral, where you place your runs and rides etc should be sport color").
+   *
+   * ⚠️ THIS IS THE THIRD COLOURING THIS ROW HAS HAD AND THE FIRST TWO ARE WHY. It painted picked
+   * anchors in the wizard ACCENT — which on this path is strength orange, so a long-RUN day glowed
+   * the strength hue. That was corrected to plain white, which stopped miscoding and left the grid
+   * saying nothing about sport at all: seven near-identical boxes where four different disciplines
+   * were sitting.
+   *
+   * ⛔ SO THE SURFACE IS ONE NEUTRAL FOR EVERY DAY, and the ROLE LETTER carries the discipline —
+   * `LR`/`R` gold, `LB` green, `H` amber for intensity. The eye reads the week's shape off the
+   * letters rather than off seven competing backgrounds.
+   * ⚠️ `H` STAYS AMBER AND IS NOT A SPORT. It is this file's mark for an intensity day, run or ride
+   * alike; colouring it by discipline would lose the one thing it exists to say.
+   */
+  const NEUTRAL = 'bg-white/[0.04] border-white/15';
+  const letterColour: Record<DayRole, string> = {
+    R: `rgba(${getDisciplineColorRgb('run')},0.55)`,
+    E: 'rgba(255,255,255,0.55)',
+    LR: `rgb(${getDisciplineColorRgb('run')})`,
+    LB: `rgb(${getDisciplineColorRgb('bike')})`,
+    H: 'rgb(251,191,36)',
+    C: 'rgb(251,191,36)',
   };
+
   return (
     <div className="grid grid-cols-7 gap-1 min-w-0">
       {DAYS.map((d) => {
@@ -415,13 +426,17 @@ function WeekDayRow({
             aria-label={heldBy
               ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
               : (active ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl text-[11px] min-w-0 border ${
-              off ? 'bg-transparent border-white/5 text-white/15' : skin[role]
-            } ${active && !off ? 'ring-2 ring-white/60' : ''}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl text-[11px] min-w-0 border text-white/70 focus:outline-none ${
+              off ? 'bg-transparent border-white/5 text-white/15' : NEUTRAL
+            } ${active && !off ? 'ring-2 ring-white/60 bg-white/[0.10] text-white' : ''}`}
           >
             <span className="leading-none font-medium">{DAY_SHORT[d]}</span>
             {/* Named, not just greyed — an inert square is a puzzle; "long run" is an answer. */}
-            <span className="leading-none text-[9px] opacity-80">{heldBy ? '—' : role}</span>
+            {/* ⛔ THE LETTER IS WHERE THE SPORT SHOWS. Neutral box, coloured mark. */}
+            <span
+              className="leading-none text-[9px] font-medium"
+              style={off ? undefined : { color: letterColour[role] }}
+            >{heldBy ? '—' : role}</span>
           </button>
         );
       })}
@@ -4257,7 +4272,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 aria-label={`Hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
                                 aria-pressed={i === hardSlotIndex}
                                 onClick={() => setActiveHardSlot(i)}
-                                className="px-2.5 py-1 text-xs text-white"
+                                className="px-2.5 py-1 text-xs text-white focus:outline-none"
                               >
                                 {h.discipline === 'run' ? 'Run' : 'Ride'}
                                 {dayForSlot(i) ? ` · ${DAY_SHORT[dayForSlot(i) as DayName]}` : ''}
@@ -4269,7 +4284,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   setState((st) => ({ ...st, hardDays: st.hardDays.filter((_, j) => j !== i) }));
                                   setActiveHardSlot(0);
                                 }}
-                                className="pl-1 pr-2 py-1 text-xs text-white/55"
+                                className="pl-1 pr-2 py-1 text-xs text-white/55 focus:outline-none"
                               >×</button>
                             </span>
                           ))}
@@ -4654,7 +4669,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   return { ...st, hardDays: next };
                                 })}
                                 aria-pressed={activeHard.ownership === 'club'}
-                                className="w-full text-left flex items-start gap-2.5 px-3 py-2 rounded-xl border border-white/12 bg-white/[0.04] mt-1"
+                                className="w-full text-left flex items-start gap-2.5 px-3 py-2 rounded-xl border border-white/12 bg-white/[0.04] mt-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                               >
                                 <span
                                   className="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-md border-2 grid place-items-center"
@@ -4727,7 +4742,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                           next[hardSlotIndex] = { ...next[hardSlotIndex], goal: opt.id, terrain: undefined };
                                           return { ...st, hardDays: next };
                                         })}
-                                        className={`w-full text-left rounded-xl border px-3 py-2 ${on ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'}`}
+                                        /**
+                                         * ⛔ THE SPORT'S COLOUR, NOT THE BLOCK ACCENT (Michael,
+                                         * 2026-08-18: "the wrong color for bike"). These options
+                                         * belong to a run slot or a ride slot, and the rest of the
+                                         * wizard wayfinds by discipline — gold for run, green for
+                                         * ride. The accent is strength orange, so a ride's chosen
+                                         * ground read as a strength control.
+                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF. The thick
+                                         * BLUE ring in the screenshot is Chrome's default focus ring
+                                         * on the button that was just clicked — not styling anyone
+                                         * chose, and blue is this app's SWIM colour, so a selected
+                                         * ride option looked like a swim. ⚠️ Keyboard focus keeps a
+                                         * visible ring via `focus-visible`; only the mouse ring goes.
+                                         */
+                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
+                                        style={on ? {
+                                          borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
+                                          backgroundColor: `rgba(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
+                                        } : undefined}
                                       >
                                         <span className="block text-white/90 text-sm">{opt.title}</span>
                                         <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
@@ -4772,7 +4805,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                               ? { ...st, hardDays: next, qualityRunTerrain: opt.id as typeof st.qualityRunTerrain }
                                               : { ...st, hardDays: next };
                                           })}
-                                          className={`w-full text-left rounded-xl border px-3 py-2 ${on ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'}`}
+                                          /**
+                                         * ⛔ THE SPORT'S COLOUR, NOT THE BLOCK ACCENT (Michael,
+                                         * 2026-08-18: "the wrong color for bike"). These options
+                                         * belong to a run slot or a ride slot, and the rest of the
+                                         * wizard wayfinds by discipline — gold for run, green for
+                                         * ride. The accent is strength orange, so a ride's chosen
+                                         * ground read as a strength control.
+                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF. The thick
+                                         * BLUE ring in the screenshot is Chrome's default focus ring
+                                         * on the button that was just clicked — not styling anyone
+                                         * chose, and blue is this app's SWIM colour, so a selected
+                                         * ride option looked like a swim. ⚠️ Keyboard focus keeps a
+                                         * visible ring via `focus-visible`; only the mouse ring goes.
+                                         */
+                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
+                                        style={on ? {
+                                          borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
+                                          backgroundColor: `rgba(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
+                                        } : undefined}
                                         >
                                           <span className="block text-white/90 text-sm">{opt.title}</span>
                                           <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
@@ -4821,7 +4872,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                             next[hardSlotIndex] = { ...next[hardSlotIndex], environment: opt.id };
                                             return { ...st, hardDays: next };
                                           })}
-                                          className={`w-full text-left rounded-xl border px-3 py-2 ${on ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'}`}
+                                          /**
+                                         * ⛔ THE SPORT'S COLOUR, NOT THE BLOCK ACCENT (Michael,
+                                         * 2026-08-18: "the wrong color for bike"). These options
+                                         * belong to a run slot or a ride slot, and the rest of the
+                                         * wizard wayfinds by discipline — gold for run, green for
+                                         * ride. The accent is strength orange, so a ride's chosen
+                                         * ground read as a strength control.
+                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF. The thick
+                                         * BLUE ring in the screenshot is Chrome's default focus ring
+                                         * on the button that was just clicked — not styling anyone
+                                         * chose, and blue is this app's SWIM colour, so a selected
+                                         * ride option looked like a swim. ⚠️ Keyboard focus keeps a
+                                         * visible ring via `focus-visible`; only the mouse ring goes.
+                                         */
+                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
+                                        style={on ? {
+                                          borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
+                                          backgroundColor: `rgba(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
+                                        } : undefined}
                                         >
                                           <span className="block text-white/90 text-sm">{opt.title}</span>
                                           <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
