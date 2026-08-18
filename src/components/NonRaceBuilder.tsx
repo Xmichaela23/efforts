@@ -616,9 +616,11 @@ type NonRaceState = {
    * the race path's club-night input, which is a different question; this is the Strong Focus
    * hard-day answer and it is a LIST because two hard runs is now a legal week.
    *
-   * ⚠️ EACH SLOT CARRIES ITS OWN OWNERSHIP. "Whose session is it — mine to prescribe, or one you
-   * already attend?" Both count as hard days for placement and recovery; only `prescribed` gets a
-   * session template. The app cannot write 4 × 3 min uphill into a club run and must not pretend to.
+   * ⚠️ EACH SLOT CARRIES ITS OWN OWNERSHIP — one checkbox: "this is a club session I already
+   * attend". ⛔ THE "OURS TO WRITE" FRAMING IS RETIRED (Michael, 2026-08-18: *"that's weird
+   * sounding anyway"*) and must not come back. Both kinds count as hard days for placement and
+   * recovery, identically; the ONLY difference is that a club slot gets no session template,
+   * because the app cannot write 4 × 3 min uphill into a group run and must not pretend to.
    *
    * ⚠️ A SLOT MAY HAVE A DISCIPLINE AND NO DAY YET — the same rule `qualityDays` documents. Presence
    * in this list means the discipline is chosen; the day arrives after.
@@ -4576,10 +4578,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   <span className="block text-white/90 text-sm">
                                     This is a club session I already attend
                                   </span>
+                                  {/* ⛔ IT HAS TO SAY THAT A CLUB SESSION IS STILL A HARD DAY
+                                      (Michael, 2026-08-18). The old copy described what the app
+                                      DOESN'T do — "we do not prescribe what you do in it" — which
+                                      reads as the session being lesser, or free. It is neither: it
+                                      takes a slot, it costs the same recovery, and the lifting is
+                                      placed around it exactly as it is around one we wrote. An
+                                      athlete who reads it as "doesn't count" will add another.
+                                      ⚠️ AND THE DAY IS NOT ASKED HERE. Only the athlete knows when
+                                      their club meets, so it is never suggested — but it is picked
+                                      on the Schedule step with everything else, and the card says
+                                      so rather than leaving them looking for a day picker. */}
                                   {activeHard.ownership === 'club' && (
                                     <span className="block text-white/45 text-xs mt-0.5 leading-snug">
-                                      We hold the day and build the week around it — the lifting keeps
-                                      its distance. We do not prescribe what you do in it.
+                                      Still one of your hard days — same recovery cost, same place in
+                                      the week. We hold the day and leave the session to you. You'll
+                                      pick which day in the Schedule step.
                                     </span>
                                   )}
                                 </span>
