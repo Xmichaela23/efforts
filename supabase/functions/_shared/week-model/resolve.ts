@@ -119,6 +119,8 @@ function score(placements: Placement[]): number {
   return rest * 4 - crowding - bunching
     - clustering(placements) * 2
     - sameSportDoubles(placements) * 20
+    - longDoubles(placements) * 25
+    + longOnWeekend(placements) * 5
     + interleaving(placements) * 3;
 }
 
@@ -178,6 +180,49 @@ function clustering(placements: Placement[]): number {
       if (sportA && sportA === b.unit.sessions[0].sport && (b.day - a.day + 7) % 7 === 1) n++;
     }
   }
+  return n;
+}
+
+/**
+ * ⛔ A LONG EFFORT PREFERS THE WEEKEND — AND THIS IS AVAILABILITY, NOT PHYSIOLOGY (2026-08-18).
+ *
+ * ⚠️ SAID PLAINLY BECAUSE EVERY OTHER TERM IN THIS FILE IS BIOLOGICAL AND THIS ONE IS NOT. Nothing
+ * about a long run is different on a Thursday. What is different is that almost nobody has three
+ * spare hours on one — and a suggester that offered "Thursday long run" would be worse than
+ * offering nothing, which is what it did before this term existed.
+ *
+ * ⛔ THE WEAKEST TERM HERE, DELIBERATELY, AND IT CAN ONLY EVER BREAK A TIE between legal weeks. An
+ * athlete who pins a Tuesday long run gets a Tuesday long run; this decides nothing they answered.
+ * ⚠️ It is also the codebase's existing default said properly — `DEFAULT_LONG_DAY` is Saturday, and
+ * was a hardcoded weekday nobody chose.
+ */
+function longOnWeekend(placements: Placement[]): number {
+  return placements.filter((p) =>
+    p.day >= 5 && p.unit.sessions.some((s) => s.load === 'long_cardio')).length;
+}
+
+/**
+ * ⛔ TWO LONG EFFORTS ON ONE DAY — legal under the law, and almost never what anyone means.
+ *
+ * ⚠️ THE LAW HAS NO OPINION HERE AND THAT IS CORRECT. `long_cardio` needs `heavy_legs` clear and
+ * emits `long_effort`; neither long day needs what the other emits, so nothing is breached. But a
+ * long run and a long ride on ONE day is the biggest day an athlete will ever have, and the model
+ * was choosing it freely — the long-day suggester put both on Saturday because nothing said not to.
+ *
+ * ⛔ SCORED, NOT FORBIDDEN, for the reason everything else here is: a genuinely constrained week has
+ * to put them somewhere, and Michael's own week already carries them back-to-back as a stated COST.
+ * Weighted above the same-sport penalty because it is a bigger day than a doubled easy session.
+ */
+function longDoubles(placements: Placement[]): number {
+  const perDay = new Map<number, number>();
+  for (const p of placements) {
+    for (const s of p.unit.sessions) {
+      if (s.load !== 'long_cardio') continue;
+      perDay.set(p.day, (perDay.get(p.day) ?? 0) + 1);
+    }
+  }
+  let n = 0;
+  for (const c of perDay.values()) n += Math.max(0, c - 1);
   return n;
 }
 

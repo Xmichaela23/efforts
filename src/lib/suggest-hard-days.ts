@@ -85,14 +85,27 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
   const sessions: Session[] = [...LIFTS];
   const pins: Record<string, number> = {};
 
-  const long = (id: string, label: string, sport: 'run' | 'bike', day?: string | null) => {
-    const d = DAY_INDEX[String(day ?? '').toLowerCase()];
-    if (d == null) return;
+  /**
+   * ⛔ AN UNPINNED LONG DAY IS PLACED, NOT OMITTED (2026-08-18). It used to be dropped from the model
+   * entirely when the athlete had not picked a day — which made the suggestion and the health badge
+   * blind to the single biggest constraint in the week, and left the long-day question with no
+   * opinion to offer at all.
+   *
+   * ⚠️ IT STILL NEEDS A DISCIPLINE TO EXIST FOR. A long run is only real if the athlete runs, and a
+   * long ride only if they ride — `hasRun` / `hasRide` come from the volume, not from a default.
+   */
+  const long = (id: string, label: string, sport: 'run' | 'bike', day: string | null | undefined, exists: boolean) => {
+    if (!exists) return;
     sessions.push({ id, label, load: 'long_cardio', sport, minutes: 90 });
-    pins[id] = d;
+    const d = DAY_INDEX[String(day ?? '').toLowerCase()];
+    if (d != null) pins[id] = d;
   };
-  long('lr', 'Long Run', 'run', input.longRunDay);
-  long('lb', 'Long Ride', 'bike', input.longRideDay);
+  const hasRun = Number(input.runDays) > 0 || slots.some((h) => h.discipline === 'run')
+    || !!input.longRunDay;
+  const hasRide = Number(input.rideDays) > 0 || slots.some((h) => h.discipline === 'bike')
+    || !!input.longRideDay;
+  long('lr', 'Long Run', 'run', input.longRunDay, hasRun);
+  long('lb', 'Long Ride', 'bike', input.longRideDay, hasRide);
 
   const easyCount = (total: number | null | undefined, sport: 'run' | 'bike', hasLong: boolean) => {
     const n = Number(total);
@@ -227,5 +240,45 @@ export function scheduleHealth(input: WeekInput): ScheduleHealth {
     // ⛔ A BADGE IS NEVER LOAD-BEARING. If the model throws, the screen says nothing rather than
     // claiming a week is healthy or broken on no evidence.
     return { ok: true, collisions: [] };
+  }
+}
+
+/**
+ * ⛔ THE LONG DAY THE MODEL WOULD CHOOSE — the nudge Michael asked for after the sweep, and it is a
+ * SOLVE rather than a rule (2026-08-18).
+ *
+ * The sweep found six breached shapes and they were all one pattern: **two hard runs against a
+ * SUNDAY long run, at every volume.** Not a volume problem. Five major stressors — two hard runs,
+ * two heavy lifts, one long run — and a Sunday long run puts its 48-hour shadow across Monday,
+ * leaving Tuesday to Saturday to hold four of them at 36-hour clearances. It does not fit.
+ *
+ * ⛔ HIS FIX WAS "ANCHOR THE LONG DAY TO SATURDAY FOR THAT SHAPE", AND THIS DOES NOT HARDCODE THAT.
+ * It asks the model where the long day goes when nothing pins it, and the model answers Saturday for
+ * that shape on its own — the same reason `suggestHardDays` runs the real engine instead of a
+ * lookup. A rule keyed on "two hard runs" would be right today and silently wrong the first time
+ * another constraint moved.
+ *
+ * ⚠️ IT ONLY EVER FILLS AN EMPTY ANSWER. A day the athlete picked is theirs — "the athlete's anchors
+ * are never moved" is a shipped test, and Michael's own ruling is that a ridiculous pin gets built
+ * and reported, never overridden. If they pin Sunday into that shape they get the plan they asked
+ * for and the health badge tells them what it costs.
+ */
+export function suggestLongDays(input: WeekInput): { run: string | null; ride: string | null } {
+  try {
+    const units = buildWizardWeek(input);
+    const r = resolve(units, { minRestDays: 1 });
+    const placements: Placement[] = r.ok
+      ? r.placements
+      : (r as Extract<typeof r, { ok: false }>).best;
+    const dayOf = (id: string): string | null => {
+      const p = placements.find((x) => x.unit.sessions.some((s) => s.id === id));
+      return p ? DAY_NAMES[p.day].toLowerCase() : null;
+    };
+    return {
+      run: input.longRunDay ? null : dayOf('lr'),
+      ride: input.longRideDay ? null : dayOf('lb'),
+    };
+  } catch {
+    return { run: null, ride: null };
   }
 }

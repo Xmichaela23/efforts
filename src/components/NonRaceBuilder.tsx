@@ -44,7 +44,7 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import { HARD_RIDE_MENUS, HARD_RUN_GOALS, HARD_RUN_MENUS } from '@/lib/hard-day-menus';
-import { scheduleHealth, suggestHardDays } from '@/lib/suggest-hard-days';
+import { scheduleHealth, suggestHardDays, suggestLongDays } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
@@ -1873,6 +1873,47 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     }),
     [state.hardDays, state.longRunDay, state.longRideDay],
   );
+  /**
+   * ⛔ THE LONG DAY IS SUGGESTED TOO (2026-08-18), AND IT IS THE SWEEP'S FINDING TURNED INTO A NUDGE.
+   * 61 built shapes produced six breaches and they were all one pattern: two hard runs against a
+   * SUNDAY long run, at every volume. Five stressors, and a Sunday long run puts its 48-hour shadow
+   * across Monday — Tuesday to Saturday cannot hold the rest at 36-hour clearances.
+   *
+   * ⚠️ IT IS A SOLVE, NOT THE RULE "TWO HARD RUNS → SATURDAY". The model answers Saturday for that
+   * shape on its own; a hardcoded rule would be right today and silently wrong the first time
+   * another constraint moved.
+   * ⚠️ AND IT ONLY FILLS AN EMPTY ANSWER. A day the athlete picked is theirs — pin Sunday into that
+   * shape and you get the plan you asked for, with the health badge saying what it costs.
+   */
+  const suggestedLongDays = React.useMemo(
+    () => suggestLongDays({
+      hardDays: state.hardDays.map((h) => ({
+        discipline: h.discipline, day: h.day, ownership: h.ownership,
+      })),
+      longRunDay: state.longRunDay,
+      longRideDay: state.longRideDay,
+      runDays: state.runDays,
+      rideDays: state.rideDays,
+      swimDays: state.posture?.swim === 'maintain' ? state.swimDays : 0,
+    }),
+    [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
+      state.swimDays, state.posture?.swim],
+  );
+  React.useEffect(() => {
+    if (currentStep !== 'schedule') return;
+    setState((st) => {
+      if (st.longRunDay || !suggestedLongDays.run) return st;
+      return { ...st, longRunDay: suggestedLongDays.run as typeof st.longRunDay };
+    });
+  }, [currentStep, suggestedLongDays.run]);
+  React.useEffect(() => {
+    if (currentStep !== 'schedule') return;
+    setState((st) => {
+      if (st.longRideDay || !suggestedLongDays.ride) return st;
+      return { ...st, longRideDay: suggestedLongDays.ride as typeof st.longRideDay };
+    });
+  }, [currentStep, suggestedLongDays.ride]);
+
   React.useEffect(() => {
     if (currentStep !== 'schedule') return;
     setState((st) => {
