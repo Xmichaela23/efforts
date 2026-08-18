@@ -489,9 +489,14 @@ Deno.test('⛔ THE CAPACITY SCALING SURVIVED THE MODEL CHANGE — the mock\'s fl
   // and a tested 25-rep capacity tops the slot out at 50 rather than climbing to the old 75.
   assertEquals(pulls.some((r: any) => r.reps === '50 total'), true,
     'a tested 25-rep capacity did not move the pull slot to its band ceiling');
-  // ⛔ AND EVERY WEEK READS THE SAME NOW. The cycle phase no longer touches the assistance total, so
-  // there is no light-week/anchor difference left to assert — competing stress is the only axis.
-  assertEquals(new Set(pulls.map((r: any) => r.reps)), new Set(['50 total']));
+  // ⛔ THE CYCLE PHASE STILL DOES NOT TOUCH THE TOTAL — competing stress is the only axis for the
+  // BAND. What the reps now also carry are the two 2026-08-17 rules, which are not phase and not
+  // band: the merged Deadlift + Press day takes the 25-rep floor, and the recovery weeks scale
+  // (7th weeks halve, the TM test week carries none at all).
+  assertEquals(
+    new Set(pulls.map((r: any) => r.reps)),
+    new Set(['50 total', '25 total', '25 total', '15 total']),
+  );
 });
 
 // ── THE COMPOSER ──────────────────────────────────────────────────────────────────────────────────

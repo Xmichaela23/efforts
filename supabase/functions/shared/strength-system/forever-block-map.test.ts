@@ -178,6 +178,9 @@ Deno.test('the supplemental sits between the main lift and the assistance', () =
 
 // ── 4. The assistance and jump bands, per phase ─────────────────────────────
 
+/** The Deadlift + Press day — two main lifts, one session, one capped accessory budget. */
+const MERGED_DAY_LIFTS = new Set(['Deadlift', 'Overhead Press']);
+
 Deno.test('⛔ THE ASSISTANCE BAND FOLLOWS THE PHASE — leaders light, anchor heavy (Forever p.18)', () => {
   const totals = (week: number, lift: string) => rowsFor(PLAN, week, lift)
     .filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'))
@@ -185,26 +188,40 @@ Deno.test('⛔ THE ASSISTANCE BAND FOLLOWS THE PHASE — leaders light, anchor h
   // ⛔ REWRITTEN 2026-08-16 (§1g): THE BAND IS SET BY COMPETING STRESS, NOT BY THE CYCLE PHASE.
   //   0 hard endurance days → 40-50 · 1 → 30-40 · 2 → 25-30. Whole block capped at 50, which is
   //   OURS and a deliberate step below Wendler's 50-100 base (p.24) for a concurrent athlete.
-  // This plan carries no hard day and no tested capacity, so every slot sits at 40 all block.
-  const FLAT = '40 total';
-  const EXPECTED: Record<number, string> = Object.fromEntries(
-    Array.from({ length: 12 }, (_, i) => [i + 1, FLAT]),
-  );
-  for (let week = 1; week <= 12; week++) {
+  // This plan carries no hard day and no tested capacity, so every slot sits at 40 all block —
+  // EXCEPT where the two rules added 2026-08-17 bite:
+  //   • the MERGED Deadlift + Press day takes the 25-rep floor whatever the band says, because two
+  //     main lifts on one day is the most taxing session in the block;
+  //   • the 7th weeks (4, 8) halve, and the TM test week (12) carries nothing.
+  const CYCLE_WEEKS = [1, 2, 3, 5, 6, 7, 9, 10, 11];
+  for (const week of CYCLE_WEEKS) {
     for (const lift of LIFTS) {
       const t = totals(week, lift);
       assertEquals(t.length, 3, `week ${week} ${lift} should carry three slots`);
-      for (const v of t) assertEquals(v, EXPECTED[week], `week ${week} ${lift}`);
+      // ⚠️ BOTH LIFTS ON THE MERGED DAY TAKE THE FLOOR — the press shares the deadlift's day.
+      const expected = MERGED_DAY_LIFTS.has(lift) ? '25 total' : '40 total';
+      for (const v of t) assertEquals(v, expected, `week ${week} ${lift}`);
     }
   }
+  for (const week of [4, 8]) {
+    for (const lift of LIFTS) {
+      const expected = MERGED_DAY_LIFTS.has(lift) ? '15 total' : '20 total';
+      for (const v of totals(week, lift)) assertEquals(v, expected, `week ${week} ${lift}`);
+    }
+  }
+  for (const lift of LIFTS) assertEquals(totals(12, lift).length, 0, `week 12 ${lift} kept accessories`);
 });
 
 Deno.test('⛔ THE JUMPS FOLLOW IT TOO — 2×5 light, 3×5 on the anchor, lower days only', () => {
   const jump = (week: number, lift: string) => rowsFor(PLAN, week, lift).find((r) => r.name === 'Box Jump');
-  for (const week of [1, 4, 5, 8, 12]) {
+  for (const week of [1, 4, 5, 8]) {
     assertEquals(jump(week, 'Back Squat')?.sets, 2, `week ${week} squat`);
     assertEquals(jump(week, 'Deadlift')?.sets, 2, `week ${week} deadlift`);
   }
+  // ⛔ THE TM TEST WEEK HAS NO PRIMER (2026-08-17). A box jump is the highest loading-rate item in
+  // the block; the week's whole job is to measure a max, not to build fatigue in front of one.
+  assertEquals(jump(12, 'Back Squat'), undefined, 'jumps survived the test week');
+  assertEquals(jump(12, 'Deadlift'), undefined, 'jumps survived the test week');
   for (const week of [9, 10, 11]) {
     assertEquals(jump(week, 'Back Squat')?.sets, 3, `week ${week} squat`);
   }
@@ -216,8 +233,10 @@ Deno.test('⛔ THE JUMPS FOLLOW IT TOO — 2×5 light, 3×5 on the anchor, lower
   // upper day left, and the shared day is pinned to ONE jump — the deadlift's, not one per lift.
   for (let week = 1; week <= 12; week++) {
     assertEquals(jump(week, 'Bench Press'), undefined, `week ${week} bench`);
+    // ⚠️ ONE jump row on the shared day — the deadlift's, not one per lift. ZERO on the TM test week,
+    // which carries no primer at all (2026-08-17).
     const shared = rowsFor(PLAN, week, 'Overhead Press').filter((r) => r.name === 'Box Jump');
-    assertEquals(shared.length, 1, `week ${week} shared day carries ${shared.length} jump rows`);
+    assertEquals(shared.length, week === 12 ? 0 : 1, `week ${week} shared day carries ${shared.length} jump rows`);
   }
 });
 

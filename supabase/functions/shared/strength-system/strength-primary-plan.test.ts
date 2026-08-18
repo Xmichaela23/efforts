@@ -120,18 +120,34 @@ Deno.test('⛔ FIRST SET LAST — 5×5 AT THE WEEK\u2019S OPENING WEIGHT, LEADER
   assertEquals(/same lift at its opening weight/.test(desc), true, desc);
 });
 
-Deno.test('⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE, at the light band', () => {
-  // ⛔ SUPERSEDES 'a deload is a volume cut — the main lift only'. Forever p.22 puts 10 jumps on the
-  // 7th week and p.23 puts 25-50 reps per assistance slot on it. The cut is in the main lift and in
-  // the band, not in the session's structure.
-  for (const week of [4, 8, 12]) {
+Deno.test('⛔ THE 7th WEEKS HALVE THE ACCESSORIES AND KEEP THE PRIMER (Michael, 2026-08-17)', () => {
+  // ⛔ SUPERSEDES 'A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE, at the light band', which
+  // itself superseded 'a deload is a volume cut — the main lift only'. THIS ONE IS MICHAEL'S CALL
+  // AGAINST THE BOOK, and it is recorded as such: Forever p.23 puts 25-50 reps per slot on the 7th
+  // week, and halving the band lands below that. His reason is systemic-fatigue clearance for an
+  // athlete carrying a conditioning load the 7th week was not written against.
+  // The jumps STAY at p.22's light dose — halving a set count is a different question.
+  for (const week of [4, 8]) {
     const squat = sessionsFor(week).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
     assertEquals(squat[0].name, 'Box Jump', `week ${week} lost its primer`);
     assertEquals(squat[0].sets, 2, `week ${week} should carry the light jump dose`);
     const acc = (squat as any[]).filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total'));
-    assertEquals(acc.length, 3, `week ${week} should carry three assistance slots`);
-    for (const r of acc) assertEquals(r.reps, '40 total', `week ${week}: ${r.name}`);
+    assertEquals(acc.length, 3, `week ${week} should still carry three slots`);
+    for (const r of acc) assertEquals(r.reps, '20 total', `week ${week}: ${r.name}`);
   }
+});
+
+Deno.test('⛔ THE TM TEST WEEK CARRIES THE BAR AND NOTHING ELSE', () => {
+  // Warm up, hit the training max, walk out. You do not build fatigue in front of a measurement,
+  // and a "0 total" row would be the plan naming a movement and then asking for none of it.
+  const squat = sessionsFor(12).find((s) => s.name === 'Strength — Back Squat')!.strength_exercises!;
+  assertEquals(squat.filter((r: any) => r.name === 'Box Jump').length, 0, 'jumps survived the test week');
+  assertEquals(
+    (squat as any[]).filter((r) => typeof r.reps === 'string' && String(r.reps).endsWith('total')).length,
+    0,
+    'assistance survived the test week',
+  );
+  assertEquals(squat.length, 1, `week 12 squat should be the lift alone: ${squat.map((r: any) => r.name)}`);
 });
 
 Deno.test('the working number steps BETWEEN cycles, never inside one — Wendler\'s fixed increment', () => {

@@ -41,6 +41,7 @@ import {
   type AssistancePhase,
   type AssistanceScaleInputs,
   ASSISTANCE_GUIDANCE,
+  ASSISTANCE_MERGED_DAY_REPS,
   assistanceTotalReps,
 } from '../../../../src/lib/assistance-menu.ts';
 // ⛔ D-407 — THE PER-DAY PICKER. `resolveAssistance` / `assistanceSubstitutionNote` are gone with the
@@ -625,6 +626,42 @@ const ONE_RM_KEY_FOR_REF: Record<string, keyof OneRepMaxes | null> = {
 };
 
 /** 50 total broken into the sets a lifter runs is 3-5 × 10-15; p.51 prescribes 5 × 10-20. */
+/**
+ * ⛔ WHAT A RECOVERY WEEK DOES TO THE ACCESSORIES (Michael, 2026-08-17).
+ *
+ * | week          | scale | why                                                              |
+ * |---------------|-------|------------------------------------------------------------------|
+ * | cycle (1-3…)  | 1     | the band decides; nothing here touches it                        |
+ * | 7th-week (4,8)| 0.5   | the main lift's volume drops and the accessories drop with it    |
+ * | TM test (12)  | 0     | warm up, hit the TM, walk out — no fatigue is built on a test day |
+ *
+ * ⚠️ **THE 0.5 CONTRADICTS FOREVER p.23 AND MICHAEL RULED ANYWAY — HIS CALL, RECORDED SO IT IS NOT
+ * "FIXED" BACK.** p.23 prescribes 25-50 reps per assistance slot on the 7th week, and the decision
+ * of 2026-08-15 (§1a/§1c) deliberately kept them for exactly that reason — its own words: cutting
+ * them "removed the one week where the athlete has the freshness to do them well." Halving the
+ * busiest band's 25 lands at 13, BELOW the book's stated floor for that week. The reasoning given
+ * for overriding it is systemic-fatigue clearance for a hybrid athlete, which is a load Wendler's
+ * 7th week was not written against. ⛔ Do not restore p.23's number without asking him.
+ *
+ * ⚠️ THE ZERO IS NOT IN THAT CONFLICT. p.22/p.23 describe the 7th week; the TM-test week is a
+ * different animal and the book does not prescribe accessories into a max attempt.
+ */
+export const RECOVERY_ASSISTANCE_SCALE = { cycle: 1, deload: 0.5, tm_test: 0 } as const;
+
+/**
+ * ⛔ WHICH DAY CARRIES TWO MAIN LIFTS — DERIVED, NEVER NAMED. In the three-day layout that is the
+ * Deadlift + Press day, but writing `'deadlift'` here would rot the moment the pairing changes
+ * again (it was Bench + Press until 2026-08-15). Read off `MAIN_LIFTS`, so it cannot disagree.
+ */
+function mergedLiftDays(): Set<string> {
+  const byDay = new Map<string, number>();
+  for (const l of MAIN_LIFTS) {
+    const d = liftDayForMainLift(l.name);
+    if (d) byDay.set(d, (byDay.get(d) ?? 0) + 1);
+  }
+  return new Set([...byDay.entries()].filter(([, n]) => n > 1).map(([d]) => d));
+}
+
 const ASSISTANCE_SUGGESTION_REPS = 12;
 /** `ASSISTANCE_GUIDANCE` verbatim: "a few reps left, never to failure." */
 const ASSISTANCE_SUGGESTION_RIR = 2;
@@ -663,7 +700,16 @@ function assistanceRows(
   oneRepMaxes?: Record<string, number> | null,
   /** The athlete's declared kit — threaded to `resolveDayAssistance`'s build-time gate. */
   athleteEquipment?: string[] | null,
+  /**
+   * ⛔ WHAT THE WEEK DOES TO EVERY TOTAL IN HERE — see {@link RECOVERY_ASSISTANCE_SCALE}. 1 on a
+   * cycle week, 0.5 on a 7th-week, 0 on the TM test. Absent → 1, so any caller that has not been
+   * taught about recovery weeks builds exactly what it built before.
+   */
+  volumeScale: number = 1,
 ): { rows: StrengthExercise[]; note: string | null } {
+  // ⛔ ZERO MEANS NO ROWS, NOT ROWS OF ZERO. A "0 total" line on a test-week card is the plan asking
+  // for a movement and then asking for none of it.
+  if (volumeScale <= 0) return { rows: [], note: null };
   const prefs: AssistanceWeekPrefs = normalizeAssistancePrefs(picks);
   // ⛔ THE FALLBACK IS A REAL DAY. It was `?? 'press'`, which slice 5 deleted (2026-08-17) — an
   // unrecognised main lift would have handed `resolveDayAssistance` a key that is no longer a
@@ -692,11 +738,33 @@ function assistanceRows(
   const pullup = dose
     // ⚠️ THIS DAY'S SHARE, not the week's and not an average — `perDay` is the exact split and the
     // last day carries the remainder.
-    ? { movement: movementForGrip(grip), totalReps: dose.perDay[dayPosition] ?? dose.perDay[0] }
+    // ⛔ AND THE PROGRAMME HALVES ON A RECOVERY WEEK LIKE EVERYTHING ELSE. 100 chins a week is the
+    // thing a deload most needs to clear; leaving the one opt-in programme at full volume would make
+    // the athlete who opted in the only one who never gets a light week.
+    ? {
+      movement: movementForGrip(grip),
+      totalReps: Math.max(
+        volumeScale >= 1 ? 1 : 5,
+        Math.round(((dose.perDay[dayPosition] ?? dose.perDay[0]) * volumeScale)),
+      ),
+    }
     : null;
   // ⚠️ ONE SLOT BUDGET FOR THE DAY. `assistanceTotalReps` is per-slot and the pull slot is the only
   // one with a tested capacity, so it is asked per category and each row carries its own total.
-  const rows = resolveDayAssistance(prefs, day, assistanceTotalReps('push', scale).totalReps, pullup, athleteEquipment)
+  /**
+   * ⛔ THE MERGED DAY OVERRIDES THE BAND AND TAKES THE FLOOR (wired 2026-08-17).
+   * `ASSISTANCE_MERGED_DAY_REPS` was declared with the note "not wired until the three-card picker
+   * lands". The picker landed and nothing ever read the constant, so the block's most neurologically
+   * taxing session — two main lifts on one day — was taking the same accessory volume as the bench
+   * day, and a light-endurance week could hand it 40-50. It cannot outrank the floor.
+   */
+  const bandTotal = assistanceTotalReps('push', scale).totalReps;
+  const dayTotal = mergedLiftDays().has(day) ? Math.min(bandTotal, ASSISTANCE_MERGED_DAY_REPS) : bandTotal;
+  /** ⚠️ Round to fives so a halved total still reads like a lifter's number; floor at 5, never 0. */
+  const scaled = (n: number): number =>
+    volumeScale >= 1 ? n : Math.max(5, Math.round((n * volumeScale) / 5) * 5);
+
+  const rows = resolveDayAssistance(prefs, day, scaled(dayTotal), pullup, athleteEquipment)
     .map((a) => {
       // ⛔ THE PROGRESSION'S DOSE WINS OVER THE SLOT SCALER ON THE PULL ROW. Both answer "how many
       // reps", and running them both would double-count: `assistanceTotalReps` sizes a maintenance
@@ -705,7 +773,15 @@ function assistanceRows(
       const totalReps = a.isAbsAddOn
         ? a.totalReps
         : (a.category === 'pull'
-            ? (pullup ? pullup.totalReps : assistanceTotalReps('pull', scale).totalReps)
+            // ⚠️ THE PULL SLOT ASKS THE BAND SEPARATELY (it has its own tested capacity), so it has
+            // to take the merged-day cap and the recovery scale separately too — it is the one row
+            // that does not inherit them from `dayTotal` above. It did not, and a 7th week printed a
+            // full-volume pull slot beside three halved ones.
+            ? (pullup
+                ? pullup.totalReps
+                : scaled(mergedLiftDays().has(day)
+                    ? Math.min(assistanceTotalReps('pull', scale).totalReps, ASSISTANCE_MERGED_DAY_REPS)
+                    : assistanceTotalReps('pull', scale).totalReps))
             : a.totalReps);
       return {
         name: a.name,
@@ -3256,8 +3332,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // — whose sub-45 sets the plan description flags as women's-bar work (2026-08-13).
         barFloorForWorkingNumber(wn),
       );
-      // Jumps and assistance are dropped on the deload — the deload is a volume cut, not a lighter
-      // version of the same session [Bosquet 2007, Wang 2023: cut volume, hold intensity].
+      // ⛔ THE LINE THAT STOOD HERE — "jumps and assistance are dropped on the deload" — WAS A GHOST.
+      // It described a code path that went away when cycles stopped containing deload weeks, it was
+      // contradicted twenty lines further down by the 2026-08-15 block that kept them, and the built
+      // plan carried full assistance and full jumps through weeks 4, 8 and 12. Deleted 2026-08-17
+      // with the real scaling — see `RECOVERY_ASSISTANCE_SCALE`.
       // ⛔ JUMPS ARE LOWER-BODY WORK AND ONLY GO ON LOWER DAYS. Fixed 2026-07-27.
       //
       // `Box Jump 3×5` was added to EVERY lifting session, bench and overhead press included — a
@@ -3295,8 +3374,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // ⛔ THE REAL COUNT (§1i). This was `hardPin ? 1 : 0` with the note "ONE hard day is the most
         // this block can carry today — a second is §1i, not built". It is built; the band reads two.
         hardEnduranceDays: hardDays.length,
-      }, lift.name, args.oneRepMaxes, args.athleteEquipment);
-      const jumps = jumpsFor(assistancePhase);
+      }, lift.name, args.oneRepMaxes, args.athleteEquipment,
+        isTmTest
+          ? RECOVERY_ASSISTANCE_SCALE.tm_test
+          : isDeload
+            ? RECOVERY_ASSISTANCE_SCALE.deload
+            : RECOVERY_ASSISTANCE_SCALE.cycle);
+      /**
+       * ⛔ NO JUMPS ON THE TM TEST WEEK (Michael, 2026-08-17). A box jump is the highest loading-rate
+       * item in the block and the week's whole job is to measure a max, not to build fatigue in
+       * front of one. The 7th weeks KEEP theirs — p.22's tables print 10, and halving a set count is
+       * not the same question as halving a rep total.
+       */
+      const jumps = isTmTest ? null : jumpsFor(assistancePhase);
       // ⛔ A STANDALONE WEEK KEEPS ITS JUMPS AND ITS ASSISTANCE — CHANGED 2026-08-15 (§1a/§1c).
       //
       // The old week-4 deload was the main lift ALONE, on the reasoning that a deload is a volume cut
@@ -3318,13 +3408,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         ? fslRow(lift, wn, oneRepMaxes[lift.ref], weekSets, barFloorForWorkingNumber(wn))
         : null;
       const ex: StrengthExercise[] = [
-        ...(lift.isLower ? [jumps] : []),
+        ...(lift.isLower && jumps ? [jumps] : []),
         main,
         ...(fsl ? [fsl] : []),
         ...cycleAssistance.rows,
       ];
       // What the PROSE may name: the work this stage prescribes and no later stage rewrites.
-      const prescribedLabels = [...(lift.isLower ? [jumps] : []), main, ...(fsl ? [fsl] : [])];
+      const prescribedLabels = [...(lift.isLower && jumps ? [jumps] : []), main, ...(fsl ? [fsl] : [])];
         // ⛔ THE ANCHOR TOP SET IS A REP-OUT, AND THE PRESCRIPTION READS LIKE A TARGET.
       //
       // Week 11 prescribes `125×1+`. The number after the plus is the entire point — but "1+"
