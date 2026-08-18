@@ -10,7 +10,34 @@ bike 2d maintain + strength develop, long run Sun, long ride Sat, hard days Fri 
 pullup progression on, focus chest/glutes/abs). Every defect below was observed in that real
 export, not hypothesized.
 
-⛔ **FIX IN THIS ORDER. #1 blocks training; the rest make the plan unreadable or untrustworthy.**
+⚠️ **THE MIXED-BUILD THEORY IS DEAD (2026-08-17, late).** Michael confirmed the export came off a
+REFRESHED client. Everything below is current code. (The goal row may still carry old-wizard
+values — #6 — but nothing else gets blamed on staleness.)
+
+⛔ **MICHAEL IS DONE TESTING. Verify with fixtures built from HIS EXACT CONFIG (the prefs block on
+the export: run 3d maintain, bike 2d maintain, strength develop, long run Sun, long ride Sat, hard
+days Fri run + Tue ride, pullup progression on, focus chest/glutes/abs, 15 mi, 3h ride). The
+acceptance test is READING the generated plan as a document. He gets one finished plan, not QA
+rounds.**
+
+⛔ **FIX IN THIS ORDER. #0 is a broken LAW; #1 blocks training; the rest make the plan unreadable
+or untrustworthy.**
+
+---
+
+## 0. THE 48H LONG-RUN LAW IS BREACHED ⛔ REGRESSION AGAINST THE OLDEST RULE
+
+Observed: **Monday's Back Squat, 24h after Sunday's long run**, with a compromise line disclosing
+it. The 48h clearance between a heavy lower lift and the long run is a law the fixtures pin
+(`easy-session-spread.test.ts` "a LOWER lift keeps its 48h from the long run") — and this week
+shape (two hard days Fri+Tue, long ride Sat, long run Sun) evidently is not covered by them. The
+two-hard-day work (slices 6–8) crowded the week until the solver bought a breach and apologised.
+
+**A breach-and-disclose is NOT acceptable for this pair.** The old behaviour refused or found
+another shape. Find which change let `breachPenalty` be outbid (or which path bypasses the prune),
+fix it, and add HIS week shape to the law's fixture so it cannot re-open. If the week genuinely
+cannot hold everything, the engine drops or moves a LESSER session and says so — it does not put a
+squat the morning after the long run.
 
 ---
 
@@ -100,14 +127,9 @@ value feeds anything besides display.
 
 ## 8. MICHAEL'S TWO FINDINGS FROM THE DEVICE, mid-audit
 
-- **"It's running the old builder."** The export's prefs block is the old wizard's vocabulary
-  (defect #6: 4×/week, thursday twice) while the plan body has today's features (Threshold Ride,
-  grip rotation) — a MIXED build. Most likely: the goal row was written by an old client bundle
-  (stale Netlify build or cached app) or predates today's slices, and the plan was rebuilt on top
-  of it. **First diagnostic step for this whole audit: hard-refresh the app, delete the goal AND
-  block, rebuild from scratch on the current deploy, re-export, and re-read.** Whatever survives a
-  clean rebuild is a real current bug; whatever disappears was the mixed build. Do this BEFORE
-  chasing #1 or #5 — they may be the old materializer's rows.
+- **"It's running the old builder."** ⚠️ SUPERSEDED by the banner above: the client was refreshed,
+  so the only stale thing left is the GOAL ROW's stored prefs (#6). Rebuild-from-scratch remains
+  useful as a diagnostic, but nobody asks Michael to do it — reproduce in fixtures.
 - **"We didn't offer the correct run drills."** The hard-run options screen still offers only the
   VO2 terrain menu (hill / treadmill / short hill / flat). Under §7 the run can now be the
   THRESHOLD day, and a threshold run is not a hill-repeat session — the offer has to follow the
