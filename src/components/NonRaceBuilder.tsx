@@ -38,6 +38,8 @@ import {
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
 // §7 — the hard day's gate reads the SAME resolvers the composer prices off. Fed, never re-derived.
+// ⛔ THE SCHEDULER'S OPINIONATED DEFAULT — the SAME solver the composer uses, via `@shared`.
+import { suggestHardDays } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
@@ -1805,6 +1807,46 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         && scheduleRows.some((r) => r.key === scheduleQuestion))
       ? scheduleQuestion
       : (scheduleRows.find((r) => r.key !== 'hard' && r.key !== 'runs' && r.key !== 'rides')?.key ?? 'long');
+  /**
+   * ⛔ THE OPINIONATED DEFAULT (Michael, 2026-08-18). The scheduler does not open on a blank grid for
+   * the hard days — it opens with the model's own answer already chosen, labelled as a suggestion.
+   *
+   * ⛔ IT IS THE REAL ENGINE, NOT A CLIENT-SIDE GUESS. `suggestHardDays` runs `week-model/resolve`
+   * through the `@shared` alias, so the day the wizard offers is the day the composer would pick. A
+   * cheaper approximation here would disagree with the built plan the moment the week got tight,
+   * which is the one place an athlete would catch it.
+   *
+   * ⚠️ IT WRITES INTO STATE RATHER THAN MERELY DISPLAYING, so the athlete can walk straight past the
+   * screen and still get the optimal week. Agency is intact: any chip overrides it, and a move that
+   * creates a collision is caught and reported by the plan, never blocked here.
+   * ⚠️ AND IT NEVER OVERWRITES AN ANSWER. It fills only slots that are still empty — a day the
+   * athlete typed, or a club night, is theirs.
+   */
+  const suggestedHardDays = React.useMemo(
+    () => suggestHardDays({
+      hardDays: state.hardDays.map((h) => ({
+        discipline: h.discipline, day: h.day, ownership: h.ownership,
+      })),
+      longRunDay: state.longRunDay,
+      longRideDay: state.longRideDay,
+    }),
+    [state.hardDays, state.longRunDay, state.longRideDay],
+  );
+  React.useEffect(() => {
+    if (currentStep !== 'schedule') return;
+    setState((st) => {
+      let touched = false;
+      const next = st.hardDays.map((h, i) => {
+        if (h.day || h.ownership === 'club') return h;
+        const s = suggestedHardDays[i];
+        if (!s) return h;
+        touched = true;
+        return { ...h, day: s as typeof h.day };
+      });
+      return touched ? { ...st, hardDays: next } : st;
+    });
+  }, [currentStep, suggestedHardDays]);
+
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
       : scheduleAsk === 'long' ? (state.longRunDay || '')
@@ -3971,9 +4013,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               {scheduleRows
                 // ⚠️ THE PER-WEEK COUNTS ARE GONE FROM HERE TOO — they moved onto the volume card
                 // where their divisor lives. What is left is the two long-day anchors: pure picking.
+                // ⛔ THE HARD ROW APPEARS ON BOTH STEPS, ANSWERING A DIFFERENT HALF OF ITSELF EACH
+                // TIME (2026-08-18). `hardday` asks WHAT — how many, which sport, club or ours, what
+                // ground. `schedule` asks WHEN, and arrives with the model's own answer already
+                // selected. That is Michael's copy on the hard-day card made literally true:
+                // *"you'll pick which days these land on in the Schedule step."*
                 .filter((r) => (currentStep === 'hardday'
                   ? r.key === 'hard'
-                  : r.key !== 'hard' && r.key !== 'runs' && r.key !== 'rides'))
+                  : r.key !== 'runs' && r.key !== 'rides'))
                 .map((row, i) => {
                 const active = scheduleAsk === row.key;
                 // Only the per-week COUNTS block Continue (a kept discipline with no session count —
@@ -4126,12 +4173,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     {/* THE OPEN QUESTION'S CONTROLS — inside the row, which is inside the card. */}
                     {active && (
                       <div className="px-3 pb-3 space-y-2">
-                        {row.kind === 'day' ? (
+                        {row.kind === 'day' && !(row.key === 'hard' && currentStep === 'hardday') ? (
                           <>
                             {/* Tap-to-pick cue, contextual to the open question. */}
                             <p className="text-xs" style={{ color: rowSportRgb ? `rgba(${rowSportRgb},0.85)` : 'rgba(var(--wiz-accent-rgb,236,233,227),0.85)' }}>
                               {row.key === 'hard'
-                                ? (hardDaySport ? 'Tap a day for your hard session' : 'Choose run or ride, then tap a day')
+                                ? (hardDaySport
+                                    ? (hardDayValue && suggestedHardDays[hardSlotIndex] === hardDayValue
+                                        ? 'Suggested — tap another day to move it'
+                                        : 'Tap a day for your hard session')
+                                    : 'Choose run or ride, then tap a day')
                                 : row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
                             </p>
                             {/* ⛔ ONE ROW, EVERY DAY QUESTION. `taken` excludes the OPEN question's
@@ -4180,6 +4231,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 }
                               }}
                             />
+                            {/* ⛔ THE OPINIONATED DEFAULT, SAID OUT LOUD (Michael, 2026-08-18). The
+                                chip above arrives already selected by `week-model` — the same solver
+                                that will build the block — so the athlete opens this screen on the
+                                best week rather than a blank grid. This line is what stops that
+                                selection reading as an arbitrary preset.
+                                ⚠️ ONLY WHILE THE SUGGESTION IS THE THING SELECTED. The moment they
+                                move it, the sentence would be describing a day they are no longer on
+                                — and a claim that has stopped being true is worse than no claim. */}
+                            {row.key === 'hard' && hardDayValue
+                              && suggestedHardDays[hardSlotIndex] === hardDayValue && (
+                              <p className="text-white/70 text-sm leading-relaxed pt-1">
+                                This is the best placement of your hard days to allow for maximum
+                                recovery.
+                              </p>
+                            )}
                           </>
                         ) : (
                           // COUNTS — the athlete says how many, `week-optimizer` says which days.
@@ -4206,7 +4272,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             were moved above them — which put a sentence explaining the FIRST control
                             an entire screen away from it. *"Description gets totally lost."* Inside
                             the row, the distance is structural: it cannot grow. */}
-                        {row.key === 'hard' && (
+                        {row.key === 'hard' && currentStep === 'hardday' && (
                           <>
                             {/* ⛔ IT HAS TO SAY WHAT THE SESSION IS FOR (2026-07-29). "Never yields —
                                 intensity holds your aerobic fitness" stated the RULE and not the
