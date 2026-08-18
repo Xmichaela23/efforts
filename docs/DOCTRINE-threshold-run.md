@@ -34,7 +34,7 @@ this note away by upgrading the citation.
 |---|---|
 | **Pace** | **5K pace + 20–25 s/mi.** |
 | **Why that number** | 5K pace is VO2 max work — lactate accumulates and the athlete is failing toward the finish. Stepping down ~20 s/mi lands on the **lactate threshold**: the tipping point where clearance matches production. Above it the session becomes a short VO2 session; below it, grey-zone volume. |
-| **Terrain** | **Flat or rolling uninterrupted road.** Track, flat road or path, or treadmill at **1% incline**. |
+| **Terrain** | **Flat or rolling uninterrupted path.** Track, flat road or path, or treadmill at **1% incline**. |
 | **Why** | Power output must stay static to train clearance. A climb run at flat-ground pace spikes heart rate into the VO2 band, floods the legs, and the threshold adaptation is destroyed. |
 | **Rest** | **2 minutes** easy jog or walk between efforts, every week of the block. Enough for heart rate to fall slightly, then straight back onto pace. |
 | **Warm-up / cool-down** | 10 minutes easy jog either side. |
@@ -51,9 +51,13 @@ harder, never longer.
 
 ## 1b. ⛔ EFFORT OUTRANKS PACE — the rule that survives real roads
 
-**Michael, 2026-08-17.** A perfectly flat route is a laboratory condition, not a Los Angeles one.
-Outside a track or the Strand, an athlete will meet 2–3% rolling grades, and the target pace stops
-being achievable at threshold effort.
+**Michael, 2026-08-17.** A perfectly flat route is a laboratory condition. Outside a track, an
+athlete will meet 2–3% rolling grades, and the target pace stops being achievable at threshold
+effort.
+
+⚠️ **GEOGRAPHICALLY AGNOSTIC ON PURPOSE.** No city, no named road, no terrain type beyond the angle
+of the ground. The rule keys on the GRADE in front of the athlete and their own biological feedback,
+so it reads the same everywhere on earth. ⛔ Do not "make it concrete" with a local example.
 
 **The rule: maintain the EFFORT, not the pace.**
 
@@ -73,7 +77,7 @@ That is presentation, not data.
 
 | surface | what it carries |
 |---|---|
-| **The terrain menu**, when they pick the environment | Under *Flat road or path*: *"If you hit rolling grades (2–3%), yield the pace to maintain the effort. Do not spike your heart rate on uphills."* |
+| **The terrain menu**, when they pick the environment | Under *Flat road or path*: *"If you hit mild inclines or rolling grades (2–3%), yield the pace to maintain the effort. Do not spike your heart rate on uphills."* |
 | **The daily session card**, on the day | A target AND a cap, not a rigid pace. **Target:** the pace, marked *flat ground*. **Effort cap:** threshold — lactate equilibrium. **Note:** *"Pace is a proxy for effort. If the road tilts up, consciously slow by 10–15 seconds per mile. If you are gasping or redlining, you are stealing recovery from your heavy lifting. Yield to the hill."* |
 | **The block intro**, once | *"Threshold work sits right below your redline. If you force your flat-ground pace up a hill, you cross the redline, flood your legs with lactic acid, and destroy the recovery capital your nervous system needs for heavy squats. Let the GPS watch look slow so the barbell can stay heavy."* |
 
