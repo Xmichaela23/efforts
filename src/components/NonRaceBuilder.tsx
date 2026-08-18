@@ -3753,68 +3753,59 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             added fatigue charged against the endurance budget, which is the one
                             thing this whole model is arranged to protect. The split happens in
                             `resolveDayAssistance`; the copy below says so. */}
-                        {picks.abs ? (
-                          <div>
-                            <div className="flex items-baseline justify-between gap-2 mb-1">
-                              <span className="text-white/85 text-sm">Abs</span>
-                              <GalaxyButton
-                                shape="chip"
-                                variant="ghost"
-                                onClick={() => setState((st) => ({
-                                  ...st,
-                                  assistancePicks: {
-                                    ...st.assistancePicks,
-                                    by_day: {
-                                      ...st.assistancePicks.by_day,
-                                      [day]: { ...st.assistancePicks.by_day[day], abs: null },
-                                    },
-                                  },
-                                }))}
-                              >Remove</GalaxyButton>
-                            </div>
-                            <select
-                              value={picks.abs}
-                              onChange={(e) => setState((st) => ({
-                                ...st,
-                                assistancePicks: {
-                                  ...st.assistancePicks,
-                                  by_day: {
-                                    ...st.assistancePicks.by_day,
-                                    [day]: { ...st.assistancePicks.by_day[day], abs: e.target.value },
-                                  },
-                                },
-                              }))}
-                              className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
-                              style={{ fontSize: '16px' }}
-                              aria-label={`${LIFT_DAY_LABEL[day]} abs exercise`}
-                            >
-                              {absOptions(strengthEquipment).map((o) => (
-                                <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
-                              ))}
-                            </select>
-                            <p className="text-white/50 text-xs mt-1">
-                              Splits the single-leg/core reps with {displayName(picks.single_leg_core)} — it
-                              does not add to the day.</p>
+                        {/* ⛔ ONE FIELD WITH AN EMPTY STATE, NOT A BUTTON THAT BECOMES A FIELD
+                            (Michael, 2026-08-18: "add abs gets lost in dropdowns"). It was a small
+                            ghost pill sitting under three full-width selects — a different SHAPE from
+                            the things it belongs with, which is exactly why the eye skipped it. The
+                            three rows above establish a rhythm (label · qualifier · full-width
+                            control) and the optional fourth answered in a different visual language.
+
+                            ⛔ THE CONVENTION IS TO SHOW AN OPTIONAL FIELD AS A FIELD, with "None"
+                            selected — the pattern every settings list uses — rather than hiding it
+                            behind an affordance the user has to notice first. It also collapses two
+                            states into one control: no "Add", no "Remove", just a value.
+
+                            ⚠️ AND IT IS STILL NOT A FOURTH CATEGORY. Forever p.32 allows one or two
+                            movements per category; this is the SECOND movement in single-leg/core and
+                            it SPLITS that slot's reps. The label says "shares the reps" where the
+                            other rows name a muscle, so the row cannot be read as new volume — which
+                            is the one thing this model is arranged to prevent. */}
+                        <div>
+                          <div className="flex items-baseline justify-between gap-2 mb-1">
+                            <span className="text-white/85 text-sm">Abs</span>
+                            <span className="text-white/50 text-xs">
+                              {picks.abs ? 'shares the reps' : 'optional'}
+                            </span>
                           </div>
-                        ) : (
-                          <GalaxyButton
-                            shape="chip"
-                            variant="secondary"
-                            onClick={() => setState((st) => ({
+                          <select
+                            value={picks.abs ?? ''}
+                            onChange={(e) => setState((st) => ({
                               ...st,
                               assistancePicks: {
                                 ...st.assistancePicks,
                                 by_day: {
                                   ...st.assistancePicks.by_day,
-                                  [day]: {
-                                    ...st.assistancePicks.by_day[day],
-                                    abs: absOptions(strengthEquipment)[0]?.name ?? null,
-                                  },
+                                  [day]: { ...st.assistancePicks.by_day[day], abs: e.target.value || null },
                                 },
                               },
                             }))}
-                          >Add abs</GalaxyButton>
-                        )}
+                            className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                            style={{ fontSize: '16px' }}
+                            aria-label={`${LIFT_DAY_LABEL[day]} abs exercise`}
+                          >
+                            {/* ⚠️ "None" IS THE VALUE, NOT A PROMPT — picking it clears the row, which
+                                is what the old Remove button did. */}
+                            <option value="" className="bg-neutral-900">None</option>
+                            {absOptions(strengthEquipment).map((o) => (
+                              <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                            ))}
+                          </select>
+                          {picks.abs && (
+                            <p className="text-white/50 text-xs mt-1">
+                              Splits the single-leg/core reps with {displayName(picks.single_leg_core)} — it
+                              does not add to the day.</p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
