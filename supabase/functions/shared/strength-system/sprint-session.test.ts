@@ -105,16 +105,19 @@ Deno.test('⛔ THE SPRINT IS INSIDE THE TYPED MILEAGE, not on top of it', () => 
 
 // ── THE LIGHT WEEKS ──────────────────────────────────────────────────────────────────────────────
 
-Deno.test('⚠️ THE LIGHT WEEKS DELETE IT ENTIRELY — and that is NOT what Michael\'s map says', () => {
-  // ⛔ FLAGGED, NOT RESOLVED. His 12-week map asks for a HALVED sprint session in weeks 4 and 8
-  // ("cut volume in half — this must sync with the barbell deload"). The engine's light-week rule
-  // deletes every hard session on 4, 8 and 12 and replaces it with an easy run — a rule he affirmed
-  // on 2026-08-17 in the threshold doctrine ("weeks 4, 8 and 12 remain strictly no intervals").
+Deno.test('⛔ THE LIGHT WEEKS DELETE IT ENTIRELY — RULED 2026-08-18, LEAVE IT', () => {
+  // ⛔ RESOLVED, NOT OPEN. Michael's own 12-week map asked for a HALVED sprint session in weeks 4
+  // and 8; the engine's light-week rule deletes every hard session on 4, 8 and 12 instead. Both were
+  // his, they could not both hold, and the deletion is what shipped.
   //
-  // The two cannot both hold. This test pins what SHIPS so the disagreement is visible rather than
-  // discovered in a plan; the deletion is the more conservative reading of his own CNS argument,
-  // since a maximal sprint is the most neurally expensive thing in the block.
-  // ⛔ If he rules for the halved version, this test inverts and `sprintRepsFor` grows a third row.
+  // ⛔ HIS RULING, AND THE REASON IS THE PART TO KEEP: *"a true 100m maximum-velocity sprint is the
+  // single most neurally demanding movement in the entire block. Cutting it in half leaves the
+  // nervous system simmering. Deleting it entirely guarantees a true central nervous system reset to
+  // match the barbell deload."*
+  //
+  // ⛔ SO A HALVED SPRINT IS NOT A SMALLER VERSION OF THIS SESSION — it is the same maximal neural
+  // demand at lower volume, which is exactly what a deload cannot carry. Do not "restore" the third
+  // row of `sprintRepsFor`; there is nothing to restore.
   const p = build();
   for (const week of [4, 8, 12]) {
     assertEquals(sprintIn(p, week), undefined, `week ${week} kept a sprint session`);

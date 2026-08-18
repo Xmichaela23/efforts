@@ -100,12 +100,16 @@ const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> = {
       { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down.' },
       { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
       { id: 'treadmill', title: 'A treadmill', body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\u2019s job.' },
-      // ⛔ `flat` IS OFF THIS MENU AND THAT IS A REAL CHANGE, FLAGGED RATHER THAN SLIPPED IN. It was
-      // §2.0's last-resort 4 × 3 min on level ground for an athlete with no climb and no treadmill,
-      // and Michael's menu does not include it. ⚠️ THAT ATHLETE IS NOT STRANDED: the goal split
-      // hands them the SPEED track, which is flat by design and a better answer than paying full
-      // mechanical price for a stimulus the ground cannot support. The engine still builds `flat`
-      // for any goal that already stores it; it is simply no longer offered.
+      // ⛔ `flat` IS OFF THIS MENU DELIBERATELY — RULED 2026-08-18, DO NOT PUT IT BACK. It was §2.0's
+      // last-resort 4 × 3 min on level ground for an athlete with no climb and no treadmill.
+      //
+      // ⛔ MICHAEL'S REASON, AND IT IS WHY THIS IS AN IMPROVEMENT RATHER THAN A LOSS: *"trying to
+      // hack a VO2 max session on flat ground guarantees massive eccentric tissue damage. Removing
+      // flat routes them to the Speed goal, which gives them a flat-ground session specifically
+      // designed to manage that mechanical impact. The system protects the user from their own
+      // geography."* The no-hill athlete is not losing an option; they are being moved off a bad one
+      // onto the session built for their ground. The engine still builds `flat` for any goal that
+      // already stores it.
     ],
   },
   threshold: {

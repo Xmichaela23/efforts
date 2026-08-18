@@ -2071,10 +2071,21 @@ export function hardRunSessionMinutes(terrain?: HardRunTerrain, goal: HardRunGoa
  * effort is a neural session; an incomplete recovery turns it into a lactate session, which is the
  * one thing it must not become in a block that already has a threshold day.
  *
- * ⚠️ THE 48h CLAIM IS THE SESSION'S OWN COST AND IT IS REAL: hard footfall at maximum velocity is
- * mechanical damage, which is why the speed track asks for leg clearance the hill track does not.
- * ⛔ The SCHEDULER does not yet know this — `week-model`'s `COST` gives an uncoupled hard day 36h,
- * not 48h, and it does not distinguish a sprint from a hill. Named here rather than assumed.
+ * ⚠️ THE CARD SAYS 48h AND THE SCHEDULER ENFORCES 36h — RULED 2026-08-18, AND THE GAP IS INTENDED.
+ *
+ * Hard footfall at maximum velocity is real mechanical damage, and the speed track's copy says so.
+ * `week-model`'s `COST` gives an uncoupled hard day 36h and does not distinguish a sprint from a
+ * hill. Michael, asked directly: **leave the scheduler alone.**
+ *
+ * ⛔ THE REASON IS THE PART TO KEEP, because 36 reads like a rounding error next to 48 and someone
+ * will "correct" it: *"a 36-hour gap functionally forces TWO NIGHTS OF SLEEP between the sessions —
+ * Monday 6pm sprint to Wednesday 6am heavy squat is 36 hours. Muscle glycogen replenishment and
+ * acute eccentric inflammation reduction depend heavily on sleep cycles. As long as the scheduler
+ * forces that two-sleep gap, the athlete clears the biological threshold."*
+ *
+ * ⚠️ SO THE UNIT THAT MATTERS IS SLEEPS, NOT HOURS, and 36 is what buys two of them at every hour of
+ * the day. ⛔ Do not raise it to 48 to match the copy; that would cost a training day to make two
+ * numbers look alike.
  */
 /** The allowlist. ⚠️ An unrecognised environment degrades to "not asked", never to a default that
  *  would put words about a smart trainer on the card of someone who does not own one. */
