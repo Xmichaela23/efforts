@@ -52,6 +52,22 @@ export type WeekInput = {
   hardDays: HardSlot[];
   longRunDay?: string | null;
   longRideDay?: string | null;
+  /**
+   * ⛔ THE EASY SESSIONS, AND THEY ARE HERE FOR EXACTLY ONE REASON: COUNTING DAYS.
+   *
+   * They emit no debt and need nothing clear, so they cannot create or prevent a clearance
+   * collision — that part of `scheduleHealth` is identical with or without them. What they DO decide
+   * is whether a rest day survives, and without them the wizard's week is at most five units across
+   * seven days: the "no rest day left" flag could never fire, because the model could not see the
+   * sessions that fill the calendar.
+   *
+   * ⚠️ TOTALS, NOT EASY COUNTS. The long day and any hard day of that discipline come out of these
+   * here, the same subtraction the composer makes — passing the already-subtracted number from two
+   * different screens is how the two would drift.
+   */
+  runDays?: number | null;
+  rideDays?: number | null;
+  swimDays?: number | null;
 };
 
 /**
@@ -77,6 +93,24 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
   };
   long('lr', 'Long Run', 'run', input.longRunDay);
   long('lb', 'Long Ride', 'bike', input.longRideDay);
+
+  const easyCount = (total: number | null | undefined, sport: 'run' | 'bike', hasLong: boolean) => {
+    const n = Number(total);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    const hard = slots.filter((h) => h.discipline === sport).length;
+    return Math.max(0, Math.round(n) - (hasLong ? 1 : 0) - hard);
+  };
+  const easyRuns = easyCount(input.runDays, 'run', !!DAY_INDEX[String(input.longRunDay ?? '').toLowerCase()]);
+  const easyRides = easyCount(input.rideDays, 'bike', !!DAY_INDEX[String(input.longRideDay ?? '').toLowerCase()]);
+  for (let i = 0; i < easyRuns; i++) {
+    sessions.push({ id: `er${i}`, label: 'Easy Run', load: 'easy', sport: 'run', minutes: 45 });
+  }
+  for (let i = 0; i < easyRides; i++) {
+    sessions.push({ id: `eb${i}`, label: 'Easy Ride', load: 'easy', sport: 'bike', minutes: 60 });
+  }
+  for (let i = 0; i < Math.max(0, Math.round(Number(input.swimDays) || 0)); i++) {
+    sessions.push({ id: `sw${i}`, label: 'Swim', load: 'easy', sport: 'swim', minutes: 60 });
+  }
 
   slots.forEach((h, i) => {
     const id = `h${i}`;
@@ -132,10 +166,14 @@ export function suggestHardDays(input: WeekInput): Array<string | null> {
  * `buildWizardWeek`) — but if the badge and the built plan ever disagree, the BADGE is what is
  * wrong. ⛔ Do not "fix" a disagreement by softening the plan's message.
  *
- * ⚠️ ONLY CLEARANCE COLLISIONS COUNT (Michael, 2026-08-18). A ride the week had no room for, a
- * crowded day, the interleaving preference — all real costs, none of them a biological collision,
- * and folding them in would light the badge on weeks where nothing is actually breached. A week with
- * no rest day is excluded for the same reason.
+ * ⚠️ WHAT COUNTS, AND WHAT DOES NOT (Michael, 2026-08-18). Clearance collisions — the 48h long-
+ * effort law both ways, 48h between heavy lower days, the 36h an uncoupled hard day leaves on the
+ * legs — plus the ZERO-REST-DAY state, which is systemic rather than local and is included anyway
+ * because a seven-day hybrid week is a real risk the athlete has to consent to knowingly.
+ *
+ * ⛔ AND NOTHING ELSE. A ride the week had no room for, a crowded day, the interleaving preference:
+ * real costs, none of them a reason to warn. Folding those in would light the badge on weeks where
+ * nothing is wrong, and a warning that fires on everything stops being read.
  */
 export type ScheduleHealth = {
   ok: boolean;
@@ -162,8 +200,28 @@ export function scheduleHealth(input: WeekInput): ScheduleHealth {
         + `outstanding until ${DAY_NAMES[u.clearsAtDay]}.`,
       );
     }
-    // ⚠️ Referenced so the rest-day exclusion above is a DECISION in the code, not an omission.
-    void restDaysOf(placements);
+    /**
+     * ⛔ A SEVEN-DAY WEEK IS A FLAG (Michael, 2026-08-18) — and it is the one entry here that is not
+     * a tissue clearance. *"A 7-day hybrid schedule is a massive systemic fatigue risk. The badge
+     * must enforce informed consent."* So the count carries it, and the receipt says plainly which
+     * kind of problem it is rather than dressing it as a clearance breach.
+     *
+     * ⚠️ IT IS LAST IN THE LIST DELIBERATELY: a clearance collision names two specific sessions and
+     * a number of hours, and this names the shape of the whole week. Reading the specific ones first
+     * is the order an athlete can act in.
+     */
+    /**
+     * ⚠️ MEASURED 2026-08-18: THIS IS A TRIPWIRE, NOT AN EXPECTED STATE, and saying so is the point.
+     * The resolver protects the rest day by STACKING rather than spending it — 7 runs, 4 rides and
+     * 3 swims all still leave one day clear — and the wizard can pin at most four days (two longs,
+     * two hard), so a seven-day week is not currently reachable from this screen. It is kept because
+     * it is nearly free and because the engine swap DID produce seven-active-day weeks while its
+     * scoring was wrong; if that ever regresses, the athlete sees it before the plan does.
+     * ⛔ Do not delete it as dead code without re-running that measurement.
+     */
+    if (restDaysOf(placements).length === 0) {
+      collisions.push('No rest day left — every day of the week carries a session.');
+    }
     return { ok: collisions.length === 0, collisions };
   } catch {
     // ⛔ A BADGE IS NEVER LOAD-BEARING. If the model throws, the screen says nothing rather than

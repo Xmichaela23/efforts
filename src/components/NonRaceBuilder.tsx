@@ -1855,8 +1855,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       })),
       longRunDay: state.longRunDay,
       longRideDay: state.longRideDay,
+      // ⚠️ THE EASY COUNTS ARE PASSED FOR THE REST-DAY FLAG ONLY. They cannot change a clearance
+      // result — easy work emits no debt — but without them the model cannot see a full calendar.
+      runDays: state.runDays,
+      rideDays: state.rideDays,
+      swimDays: state.posture?.swim === 'maintain' ? state.swimDays : 0,
     }),
-    [state.hardDays, state.longRunDay, state.longRideDay],
+    [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
+      state.swimDays, state.posture?.swim],
   );
   const [healthOpen, setHealthOpen] = useState(false);
 
