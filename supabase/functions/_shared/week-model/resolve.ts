@@ -306,9 +306,17 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
   return { ok: false, unmet: b.unmet, best: b.placements };
 }
 
-/** The week as a document — the only way to tell whether this is right. */
+/**
+ * The week as a document — the only way to tell whether this is right.
+ *
+ * ⚠️ THE UNION IS NARROWED EXPLICITLY, NOT BY `r.ok`. This file is now in the CLIENT's type graph
+ * too (`src/lib/suggest-hard-days.ts` reaches it through the `@shared` alias), and the app compiles
+ * with `strict: false` — under which a boolean discriminant does not narrow a union. It type-checked
+ * under Deno and failed under Vite, which is the kind of split a shared file has to be written for.
+ */
 export function render(r: Resolution): string {
-  const placements = r.ok ? r.placements : r.best;
+  const bad = r.ok ? null : (r as Extract<Resolution, { ok: false }>);
+  const placements = bad ? bad.best : (r as Extract<Resolution, { ok: true }>).placements;
   const lines: string[] = [];
   for (let d = 0; d < 7; d++) {
     const on = placements.filter((p) => p.day === d);
@@ -318,11 +326,11 @@ export function render(r: Resolution): string {
     ).join('   ·   ');
     lines.push(`${DAY_NAMES[d].padEnd(10)} ${text}`);
   }
-  if (!r.ok) {
+  if (bad) {
     lines.push('');
     lines.push('CANNOT BE BUILT:');
     const seen = new Set<string>();
-    for (const u of r.unmet) {
+    for (const u of bad.unmet) {
       const key = `${u.unit}|${u.system}|${u.blockedBy}`;
       if (seen.has(key)) continue;
       seen.add(key);
