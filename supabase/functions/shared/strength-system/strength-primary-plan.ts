@@ -1640,11 +1640,35 @@ function hardRunMinutesForRole(
  * wave, not both"); the anchor's copy asks for the top of the range, which is a CUE and not a second
  * prescribed step.
  */
+/**
+ * ⛔ THE RIDE YIELDS IN THE ANCHOR TOO (Michael, 2026-08-18) — THE LAST SESSION IN THE BLOCK THAT
+ * DID NOT, AND IT WAS FLAGGED RATHER THAN ASSUMED BEFORE HE RULED.
+ *
+ * It is Helgerud's published 4 × 4, which is why it was left alone when the run's VO2 session was
+ * cut: extending someone else's protocol on our own reasoning is what this file keeps deleting. His
+ * ruling, and the receipt is the part to keep:
+ *
+ * ⛔ *"Helgerud's 4 × 4 is the gold standard for building VO2 max in pure endurance athletes. But we
+ * are shifting into a RETAINING load to protect a strength peak. Cycling has zero eccentric tissue
+ * damage — no impact — but sixteen minutes of max-HR pedalling obliterates local muscle glycogen in
+ * the vastus lateralis. You cannot squat a 1RM on empty quads. Halving the intervals maintains the
+ * central cardiovascular adaptation while cutting the local glycogen depletion in half."*
+ *
+ * ⚠️ SO THE COST BEING CUT IS PERIPHERAL, NOT CENTRAL, and the copy says exactly that — the engine is
+ * maintained, the glycogen bill is halved. A rider told only "fewer intervals" would read it as the
+ * plan losing interest and add them back.
+ *
+ * ⚠️ THE DURATION IS UNCHANGED AT 45 MIN AND THAT IS DELIBERATE. `BIKE_QUALITY_MIN` is what the
+ * week's RIDE-HOURS budget subtracts, and it is computed once for the block; shrinking it in the
+ * anchor would hand the difference back as easy riding on exactly the weeks the taper exists to
+ * protect. Over-subtracting is the safe direction — the same call `THRESHOLD_RUN_MIN` makes.
+ */
 function bikeQualitySession(
   day: string,
   wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' },
   env?: HardRideEnvironment,
 ): PlanSession {
+  const reps = vo2RepsFor(4, wave);
   // 4 min in week one of a wave, 3 from week two — and 3 is where it stays.
   const restMin = Math.max(1, Math.round(wave.weekInCycle)) <= 1 ? 4 : 3;
   const anchor = wave.cycleKind === 'anchor';
@@ -1653,16 +1677,22 @@ function bikeQualitySession(
     type: 'ride',
     name: 'Bike Intervals',
     description:
-      `4 × 4 min hard, ${restMin} min easy between. Hard means hard — you should not be able to hold a `
+      `${reps} × 4 min hard, ${restMin} min easy between. Hard means hard — you should not be able to hold a `
       + 'sentence. Spin it, do not grind it: a fast, easy spin keeps this in your lungs instead of '
       + 'your legs, which is what leaves the lifting intact.'
       + (restMin === 3
         ? ' The recovery is shorter than week one — same work, less rest.'
         : '')
-      + (anchor ? ' Anchor week: hold the top of the range.' : '')
+      // ⛔ THIS SAID "Anchor week: hold the top of the range" — a push-harder cue in the week the
+      // intervals are halved, which is how a rider adds back exactly what the cut removed. Same
+      // defect the run's VO2 session carried, one discipline over.
+      + (anchor
+        ? ' Anchor week: fewer intervals from here to the end of the block. We are maintaining your '
+          + 'engine while cutting the glycogen cost in half so your quads are fully loaded for the barbell.'
+        : '')
       + rideEnvironmentNote(env, 'vo2'),
     duration: BIKE_QUALITY_MIN,
-    steps_preset: [`bike_vo2_4x4min_R${restMin}min`],
+    steps_preset: [`bike_vo2_${reps}x4min_R${restMin}min`],
     tags: ['quality', 'bike', 'aerobic'],
   };
 }

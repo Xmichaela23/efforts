@@ -68,13 +68,20 @@ Deno.test('⛔ THE 30-40 MIN THRESHOLD CEILING HOLDS IN EVERY WEEK — §6 depen
   }
 });
 
-Deno.test('⛔ THE 12-18 MIN VO2 CEILING HOLDS — reps and working time are STATIC, only density moves', () => {
+Deno.test('⛔ THE VO2 CEILING HOLDS IN THE LEADERS AND THE ANCHOR HALVES IT', () => {
+  // ⚠️ "reps and working time are STATIC, only density moves" WAS THIS TEST'S NAME AND IT IS NO
+  // LONGER TRUE (2026-08-18). Michael extended the anchor taper to the ride: sixteen minutes of
+  // max-HR pedalling obliterates local quad glycogen, and "you cannot squat a 1RM on empty quads".
+  // Halving the intervals holds the central adaptation while cutting the peripheral bill.
+  // ⛔ WHAT IS STILL STATIC IS THE LEADER BASELINE — 16 min, every leader week — and Helgerud's
+  // 3-minute recovery floor. Those are the protocol; the anchor cut is the block yielding to the bar.
   const p = build({ ...BIKE, hardDays: [{ day: 'tuesday', discipline: 'bike' }] });
   for (const bw of buildWeekMap(12)) {
     for (const s of named(p, bw.week, /Bike Intervals/)) {
       const m = String(tokenOf(s)).match(/^bike_vo2_(\d+)x(\d+)min_R(\d+)min$/);
       assert(!!m, `unexpected VO2 token: ${tokenOf(s)}`);
-      assertEquals(Number(m![1]) * Number(m![2]), 16, `week ${bw.week}: the VO2 working time moved`);
+      const expected = bw.cycleKind === 'anchor' ? 8 : 16;
+      assertEquals(Number(m![1]) * Number(m![2]), expected, `week ${bw.week}: the VO2 working time moved`);
       // ⛔ AND THE RECOVERY NEVER GOES BELOW HELGERUD'S OWN 3 MIN. Past that this stops being the
       // protocol the 7% VO2max figure came from.
       assert(Number(m![3]) >= 3, `week ${bw.week}: recovery cut to ${m![3]} min, below the protocol`);

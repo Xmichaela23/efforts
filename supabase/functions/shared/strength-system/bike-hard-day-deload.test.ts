@@ -42,10 +42,14 @@ const onHardDay = (week: number): any[] =>
 // week one of a cycle, `_R3min` from week two, which is the density lever. Matching the literal
 // week-one token would have read every later week as "no intervals here", which is the opposite of
 // what this file exists to pin. The PREFIX is what identifies the session; the suffix is the wave.
+// ⚠️ THE REP COUNT IS NO LONGER LITERAL (2026-08-18). The anchor halves the intervals — 4 × 4 in the
+// leaders, 2 × 4 in weeks 9-11 — so a matcher pinned to `4x4min` stopped seeing the session it was
+// written to guard and reported it as MISSING from a working week. What this file is about is the
+// deload, not the rep count.
 const isIntervals = (s: any): boolean =>
   s.type === 'ride'
   && (Array.isArray(s.steps_preset)
-    ? s.steps_preset.some((t: string) => /^bike_vo2_4x4min_R\d+min$/.test(t))
+    ? s.steps_preset.some((t: string) => /^bike_vo2_\d+x4min_R\d+min$/.test(t))
     : false);
 
 Deno.test('the block under test actually has both light week shapes and some cycle weeks', () => {
