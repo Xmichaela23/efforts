@@ -106,12 +106,17 @@ for (const [label, cfg] of CASES) {
 
 // ── The rules that must survive the reroute ──────────────────────────────────────────────────
 
-Deno.test('⛔ no LOWER lift on a hard or long day, on any shape', () => {
+Deno.test('⛔ NO LOWER LIFT ON A LONG DAY — AND ON A HARD DAY IT IS NOW THE POINT (inverted 2026-08-17)', () => {
+  // ⛔ THIS TEST USED TO FORBID BOTH, AND HALF OF IT ENCODED THE SEPARATION LAW THAT CONSOLIDATION
+  // REPLACED. Michael's law: heavy lower work and hard cardio SHARE a day deliberately — squat with
+  // the hard run, deadlift with the hard ride, barbell first, six hours apart — so a squat on the
+  // hard day is the arrangement working, not a breach. What survives unchanged is the LONG day:
+  // zero heavy lower lifting on a long run or a long ride, and 48h clear of one either side.
   for (const [label, cfg] of CASES) {
     const w = week1(cfg);
-    const hard = new Set(w.filter((s) => isLongRun(s) || isHardRun(s) || isLongRide(s)).map((s) => s.day));
+    const longDays = new Set(w.filter((s) => isLongRun(s) || isLongRide(s)).map((s) => s.day));
     for (const s of w.filter(isLower)) {
-      assert(!hard.has(s.day), `${label}: ${s.name} on ${s.day}, a hard/long day`);
+      assert(!longDays.has(s.day), `${label}: ${s.name} on ${s.day}, a LONG day`);
     }
   }
 });

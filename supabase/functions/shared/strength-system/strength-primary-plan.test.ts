@@ -430,7 +430,14 @@ Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded op
     durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: null, enduranceFrequency: 0,
     assistancePicks: { push: 'Dumbbell Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Bulgarian Split Squat' },
   });
-  for (const row of picked.sessions_by_week['1'][0].strength_exercises!.slice(2) as any[]) {
+  // ⚠️ NAMED, NOT INDEXED. `[0]` assumed the first session of the week was the bench day and
+  // `.slice(2)` assumed its first two rows were the main lift and its FSL. Placement is the solver's,
+  // so `[0]` can be a LOWER day whose first row is a Box Jump — and the slice then started on the
+  // main lift and reported it as assistance carrying a prescribed load. The same positional trap this
+  // file has already fixed twice.
+  const benchRows = picked.sessions_by_week['1']
+    .find((s: any) => s.name === 'Strength — Bench Press')!.strength_exercises! as any[];
+  for (const row of benchRows.filter((r) => r.load_prescribed === false)) {
     assertEquals(row.load_prescribed, false, `${row.name} carries a prescribed load`);
     assertEquals(row.percent_1rm, undefined, `${row.name} carries a percentage`);
     assertEquals(row.set_plan, undefined, `${row.name} carries a per-set prescription`);

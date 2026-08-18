@@ -204,11 +204,15 @@ Deno.test('⛔ TWO HARD DAYS STILL PLACE LEGALLY — the week builds and keeps i
     // ⛔ MAX_ACTIVE_DAYS = 6 — one full rest day survives every shape, two hard days included.
     const active = new Set(w.map((s) => String(s.day))).size;
     assert(active <= 6, `${label}: ${active} active days — no rest day left`);
-    // ⛔ AND NO HEAVY LOWER LIFT LANDS ON A HARD DAY. The clearance rules are the reason the pins
-    // exist; a second pin that the placer ignored would be worse than not offering it.
-    const hardDaysUsed = new Set(w.filter((s) => isHardRun(s) || isHardRide(s) || isClub(s)).map((s) => String(s.day)));
+    // ⛔ INVERTED 2026-08-17 — THIS ASSERTED THE SEPARATION LAW. It read "no heavy lower lift lands
+    // on a hard day", which under consolidation is backwards: a heavy lower lift and its matching
+    // hard session are ONE UNIT and share a day on purpose, barbell first, six hours apart.
+    // What still holds, and what this checks now: a heavy lift never lands on a LONG day.
+    const longDaysUsed = new Set(w
+      .filter((s: any) => /Long Run|Long Ride/.test(String(s.name)))
+      .map((s: any) => String(s.day)));
     for (const s of w.filter((x) => x.type === 'strength' && /Back Squat|Deadlift/.test(x.name))) {
-      assert(!hardDaysUsed.has(String(s.day)), `${label}: ${s.name} landed on a hard day`);
+      assert(!longDaysUsed.has(String(s.day)), `${label}: ${s.name} landed on a LONG day`);
     }
   }
 });

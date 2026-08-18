@@ -113,9 +113,22 @@ const SOLVER_DAY_ORDER = ['monday','tuesday','wednesday','thursday','friday','sa
 import {
   type Anchor as SolverAnchor,
   type FlexibleSession as SolverFlexible,
-  solve as solveWeek,
   type SolverDay,
 } from '../../_shared/week-solver.ts';
+// ⛔⛔ THE PLACEMENT ENGINE IS THE WEEK-MODEL NOW (2026-08-17). ONE IMPORT LINE, AND REVERTING IS
+// ONE IMPORT LINE — `solve` from `week-solver.ts` is the previous behaviour, byte for byte.
+//
+// The slot solver asked "which weekday is legal and free" and filled slots. It could not say these
+// two sessions are ONE thing, and it could not say this session left something outstanding until
+// Tuesday. So a squat could never FOLLOW a hard run onto a day: nothing in the model said they
+// belonged together, only that they were permitted to touch. That is why the hard ride was being
+// dropped out of this athlete's week entirely.
+//
+// ⚠️ THE SLOT SOLVER IS NOT DELETED YET AND THAT IS DELIBERATE. `week-optimizer` still serves the
+// triathlon side, `place-week` still owns the arithmetic screens the intake shows, and a week that
+// has not been read on a device is not a week that has been verified. Delete after Michael has seen
+// a built block, not before.
+import { solveWithWeekModel as solveWeek } from '../../_shared/week-model/solver-adapter.ts';
 
 
 /** The four lifts, in lb. **All four are required** — the entry gate gets this far only

@@ -277,38 +277,25 @@ Deno.test('⚠️ THE TREADMILL NEVER WALKS — there is nothing to walk down', 
 });
 
 // ── 6. The flat option's tighter clearance ───────────────────────────────────────────────────────
-
-Deno.test('⛔ FLAT PREFERS 48h FROM HEAVY LEGS — the other three keep the matrix\'s 24h', () => {
-  // Flat is the one terrain that keeps the impact transient, so it is the one that asks for the
-  // eccentric cell rather than the quality cell. ⚠️ The hill and treadmill options must NOT inherit
-  // this: uphill removes the transient, which is the whole argument of doctrine §2.
-  // ⚠️ SATURDAY LONG RUN + FRIDAY HARD DAY IS ONE OF THE 8 SHAPES THAT HAS ROOM, and the choice of
-  // week is the whole test. On a shape with no room (Saturday + Tuesday, say) flat and hill place
-  // identically and correctly — asserting 48h there would be asserting that a preference is a floor.
-  const clearanceOf = (terrain?: string): number => {
-    const p = composeStrengthPrimaryPlan({
-      durationWeeks: 12,
-      oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-      fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-      longRunDay: 'saturday', easyPaceMinPerMile: PACE,
-      hardDays: [{ day: 'friday', discipline: 'run', ...(terrain ? { terrain } : {}) }],
-    } as never);
-    // The stamp is not on the plan, so measure what it BUYS: the gap the solver actually left.
-    const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const gap = (a: string, b: string) => {
-      const r = Math.abs(DAYS.indexOf(a.toLowerCase()) - DAYS.indexOf(b.toLowerCase()));
-      return Math.min(r, 7 - r) * 24;
-    };
-    const lowers = (p.sessions_by_week['2'] as any[])
-      .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));
-    return Math.min(...lowers.map((l: any) => gap(String(l.day), 'friday')));
-  };
-  // On this week shape the flat option buys real separation the hill option does not get.
-  assertEquals(clearanceOf('flat') >= 48, true, 'flat did not get its 48h on a week that can give it');
-  assertEquals(clearanceOf('hill_3min') < 48, true,
-    'the hill baseline also reached 48h here — this week no longer demonstrates the preference');
-  assertEquals(clearanceOf('hill_3min') >= 24, true, 'the hill lost its matrix clearance');
-});
+//
+// ⛔⛔ THREE TESTS DELETED HERE, 2026-08-17, MICHAEL'S CALL — AND THIS NOTE IS WHY, SO THE DELETION
+// IS NOT REDISCOVERED AS A GAP.
+//
+// They pinned `preferredClearance`: a FLAT hard run asks heavy legs to sit 48h clear rather than the
+// matrix's 24h, because flat keeps the impact transient that uphill removes. Sound reasoning, and it
+// belongs to the SEPARATION model — a week where the hard run sits days away from the barbell and
+// the only question is how many.
+//
+// ⛔ CONSOLIDATION MAKES THE QUESTION INCOHERENT. Heavy lower work and its matching hard session now
+// share a day BY DESIGN — barbell first, intervals six hours later. "How far should the squat sit
+// from the flat run" has no answer when the answer is "the same morning". The three tests asserted a
+// preference was taken, that it never manufactured a breach, and that it yielded silently on a full
+// week; none of the three can be stated in the new law.
+//
+// ⚠️ WHAT REPLACES THEM IS NOT NOTHING. `week-model`'s COST table gives an UNCOUPLED hard day a 36h
+// debt on the legs, which is the same concern — a hard run that is not paired with a lift still
+// costs the legs something — expressed once, in the law, instead of as a scoring preference. See
+// `_shared/week-model/model.ts`.
 
 Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week still builds one', () => {
   // The tighter clearance makes some weeks unsatisfiable. The rule is that they DEGRADE AND REPORT,
@@ -338,40 +325,6 @@ Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week s
       assertEquals(
         !!hard, true,
         `flat hard session vanished — long run ${longRunDay}, hard ${day}`,
-      );
-    }
-  }
-});
-
-Deno.test('⛔ THE PREFERENCE NEVER BREACHES ANYTHING — least of all the long run', () => {
-  // ⛔ THIS IS THE WHOLE REASON THE HARD-CONSTRAINT VERSION WAS THROWN AWAY. Forcing 48h produced a
-  // breach in 8 of 12 week shapes, and 11 of the 16 breaches were against the LONG RUN — the solver
-  // bought the flat run its two days by putting a squat next to the long run, which is the same
-  // eccentric leg damage one session over. Scored below `breachPenalty`, it is structurally unable
-  // to do that. ⚠️ If this test ever fails, someone moved the term up the score vector.
-  const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  for (const longRunDay of ['saturday', 'sunday']) {
-    for (const day of DAYS) {
-      if (day === longRunDay) continue;
-      const p = composeStrengthPrimaryPlan({
-        durationWeeks: 12,
-        oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-        fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-        longRunDay, easyPaceMinPerMile: PACE,
-        // ⚠️ TWO HARD RUNS, TERRAIN ON THE SECOND (2026-08-17). Terrain belongs to the VO2 session
-        // and VO2 unlocks only on a second hard day, so a one-day fixture builds a Threshold Run and
-        // this sweep would report every shape as "the flat session vanished".
-        hardDays: [
-          { day: day === 'monday' ? 'tuesday' : 'monday', discipline: 'run' },
-          { day, discipline: 'run', terrain: 'flat' },
-        ],
-      } as never);
-      const breaches = ((p as any).placement_compromises ?? [])
-        .filter((c: any) => c.kind === 'breach');
-      assertEquals(
-        breaches.length, 0,
-        `flat manufactured a breach — long run ${longRunDay}, hard ${day}: `
-          + breaches.map((b: any) => b.text).join(' | '),
       );
     }
   }
@@ -415,43 +368,6 @@ Deno.test('⛔ THE MATRIX FLOOR SURVIVES THE TRADE — heavy legs stay 48h apart
       }
     }
   }
-});
-
-Deno.test('⚠️ TAKEN WHEN THE WEEK HAS ROOM, DECLINED SILENTLY WHEN IT DOES NOT', () => {
-  // Both halves matter. A preference that never binds is not a term (§0e); one that always binds is
-  // a constraint wearing a preference's name.
-  const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  const gapH = (a: string, b: string) => {
-    const r = Math.abs(DAYS.indexOf(a.toLowerCase()) - DAYS.indexOf(b.toLowerCase()));
-    return Math.min(r, 7 - r) * 24;
-  };
-  const closest = (terrain: string, longRunDay: string, day: string) => {
-    const p = composeStrengthPrimaryPlan({
-      durationWeeks: 12,
-      oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-      fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
-      longRunDay, easyPaceMinPerMile: PACE,
-      hardDays: [{ day, discipline: 'run', terrain }],
-    } as never);
-    const lowers = (p.sessions_by_week['2'] as any[])
-      .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));
-    return Math.min(...lowers.map((l: any) => gapH(String(l.day), day)));
-  };
-  let taken = 0, declined = 0, worse = 0;
-  for (const longRunDay of ['saturday', 'sunday']) {
-    for (const day of DAYS) {
-      if (day === longRunDay) continue;
-      const hill = closest('hill_3min', longRunDay, day);
-      const flat = closest('flat', longRunDay, day);
-      if (flat > hill) taken++;
-      else if (flat < hill) worse++;
-      else declined++;
-    }
-  }
-  // Measured 2026-08-06 across all 24 legal shapes: 8 taken, 16 declined, 0 worse.
-  assertEquals(worse, 0, 'the preference made a week WORSE than the hill baseline');
-  assertEquals(taken > 0, true, 'the preference never binds — it is not a term (§0e)');
-  assertEquals(declined > 0, true, 'the preference always binds — that is a constraint, not a preference');
 });
 
 Deno.test('the outdoor hills still obey the descent rule, and the labels still say hill', () => {

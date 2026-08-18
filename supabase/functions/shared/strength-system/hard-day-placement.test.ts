@@ -96,18 +96,23 @@ Deno.test('⛔ A MALFORMED DAY STILL DROPS THE ENTRY — it is not read as "you 
 // ── THE PLACEMENT IS LEGAL, AND IT IS THE SOLVER'S ───────────────────────────────────────────────
 
 Deno.test('⛔ A PROPOSED HARD DAY OBEYS THE SAME LAW AS A PINNED ONE', () => {
-  // No heavy lower lift on a hard day — the clearance rules are the whole reason the placement runs
-  // through the solver rather than through a rule of thumb on the screen.
+  // ⛔ THE LAW IT OBEYS CHANGED, AND THE ASSERTION IS INVERTED WITH IT (2026-08-17). This read "no
+  // heavy lower lift on a hard day". Under consolidation a heavy lower lift and its matching hard
+  // session are ONE UNIT that shares a day by design. What must still hold — and what this now
+  // checks — is that a proposal never lands a heavy lift on a LONG day, and never spends the rest
+  // day. The placement still runs through the solver rather than a rule of thumb on the screen;
+  // that was always the real claim here.
   for (const hardDays of [
     [{ discipline: 'run' }],
     [{ discipline: 'run' }, { discipline: 'run' }],
     [{ discipline: 'run' }, { discipline: 'bike' }],
   ]) {
     const p = build({ ...RUN, bike: { hours: 4, days: 2, longRideDay: 'saturday' }, hardDays });
-    const hardDayNames = new Set(hardOf(p).map((s) => String(s.day)));
+    const longDays = new Set(week2(p)
+      .filter((s: any) => /Long Run|Long Ride/.test(String(s.name)))
+      .map((s: any) => String(s.day)));
     for (const s of week2(p).filter(isLower)) {
-      assert(!hardDayNames.has(String(s.day)),
-        `${s.name} landed on a proposed hard day (${s.day})`);
+      assert(!longDays.has(String(s.day)), `${s.name} landed on a LONG day (${s.day})`);
     }
     // ⛔ AND THE REST DAY SURVIVES. MAX_ACTIVE_DAYS = 6, proposals included.
     const active = new Set(week2(p).map((s) => String(s.day))).size;
