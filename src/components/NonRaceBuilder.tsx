@@ -39,6 +39,11 @@ import {
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
 // §7 — the hard day's gate reads the SAME resolvers the composer prices off. Fed, never re-derived.
 // ⛔ THE SCHEDULER'S OPINIONATED DEFAULT — the SAME solver the composer uses, via `@shared`.
+// ⛔ THE MENUS MOVED TO `src/lib/` SO A TEST CAN READ THEM (2026-08-18). They were data inside this
+// component, which meant the doctrine's terrain rules could only be checked by a human on a device —
+// and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
+// for the same reason its header gives: anything the client and the engine must agree on lives here.
+import { HARD_RIDE_MENUS, HARD_RUN_GOALS, HARD_RUN_MENUS } from '@/lib/hard-day-menus';
 import { scheduleHealth, suggestHardDays } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
@@ -69,99 +74,6 @@ const MAX_HARD_DAY_SLOTS = 2;
  * stopping. `stationary` is on the intervals menu and not the threshold one (a dumb bike can hold a
  * hard effort but not a precise sustained wattage); `long_climb` is the reverse.
  */
-type GroundMenu = { note: string; options: Array<{ id: string; title: string; body: string }> };
-
-/**
- * ⛔ EACH MENU LEADS WITH THE RULE THAT GOVERNS IT (Michael, 2026-08-18), then the options.
- * *"The goal is real-world execution, removing pedantic restrictions while keeping the biological
- * guardrails."* So the notes are deliberately PERMISSIVE about ground the athlete cannot control —
- * a slight rise, natural rolling hills — and absolute about the one thing that actually injures
- * people. His copy, verbatim.
- */
-const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> = {
-  speed: {
-    // ⛔ THE DOWNHILL CLAUSE IS A SAFETY GUARDRAIL, NOT A PREFERENCE, and it is the one absolute on
-    // this screen. Maximal downhill running is the laboratory model for eccentric hamstring damage;
-    // it is also the fastest a runner can move, so it looks like the right idea. ⛔ Do not soften it
-    // into "prefer flat" — the sentence exists because the mistake is attractive.
-    note: 'Flat is preferred for pure speed mechanics, but a slight 2-3% uphill is completely fine. '
-      + 'Never sprint at absolute max effort downhill \u2014 the braking forces will tear up your '
-      + 'hamstrings and ruin your squat recovery.',
-    options: [
-      { id: 'track', title: 'A track', body: 'Predictable footing and a safe run-out, which is what lets you go flat out.' },
-      { id: 'flat_road', title: 'Road \u2014 flat or slight uphill', body: 'Any straight stretch with room to slow down at the end.' },
-      { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
-    ],
-  },
-  vo2: {
-    note: 'Hard climbs push your aerobic ceiling to the limit. Sprinting uphill removes the eccentric '
-      + 'braking impact, saving your knees and quads for the heavy barbell later in the week.',
-    options: [
-      { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down.' },
-      { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
-      { id: 'treadmill', title: 'A treadmill', body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\u2019s job.' },
-      // ⛔ `flat` IS OFF THIS MENU DELIBERATELY — RULED 2026-08-18, DO NOT PUT IT BACK. It was §2.0's
-      // last-resort 4 × 3 min on level ground for an athlete with no climb and no treadmill.
-      //
-      // ⛔ MICHAEL'S REASON, AND IT IS WHY THIS IS AN IMPROVEMENT RATHER THAN A LOSS: *"trying to
-      // hack a VO2 max session on flat ground guarantees massive eccentric tissue damage. Removing
-      // flat routes them to the Speed goal, which gives them a flat-ground session specifically
-      // designed to manage that mechanical impact. The system protects the user from their own
-      // geography."* The no-hill athlete is not losing an option; they are being moved off a bad one
-      // onto the session built for their ground. The engine still builds `flat` for any goal that
-      // already stores it.
-    ],
-  },
-  threshold: {
-    note: 'Uninterrupted pacing is the only rule. Natural 2-3% rolling hills are fine \u2014 just '
-      + 'maintain a steady effort and don\u2019t let the short uphills spike your heart rate out of '
-      + 'the zone.',
-    options: [
-      { id: 'track', title: 'A track', body: 'The pace is the pace \u2014 nothing tilts, so you hold the number.' },
-      { id: 'flat_road', title: 'Road \u2014 flat or rolling', body: 'Pick a stretch you can run unbroken.' },
-      { id: 'treadmill_1pct', title: 'A treadmill at 1%', body: 'One percent, not the interval day\u2019s 5-8%. This session wants flat.' },
-    ],
-  },
-};
-
-const HARD_RIDE_MENUS: Record<'vo2' | 'threshold', GroundMenu> = {
-  vo2: {
-    note: 'Cycling spares your joints from impact damage, but max-wattage pushes aggressively drain '
-      + 'glycogen from your quads. You need an environment where you can safely redline with zero '
-      + 'traffic or stoplights.',
-    options: [
-      { id: 'smart_trainer', title: 'Smart trainer, erg mode', body: 'It holds the number, so all you do is pedal.' },
-      { id: 'stationary', title: 'A stationary bike', body: 'No power to read, so ride it by effort \u2014 hard enough that a sentence is a struggle.' },
-      { id: 'flat_road', title: 'A flat road', body: 'Use a stretch with no junctions.' },
-      { id: 'hill_climb', title: 'A climb you can repeat', body: 'The gradient holds the effort for you \u2014 ride back down easy.' },
-    ],
-  },
-  threshold: {
-    note: 'Requires grueling, unbroken pedaling. Coasting or stopping for intersections breaks the '
-      + 'metabolic adaptation. If your local roads force you to stop, take this inside to the trainer.',
-    options: [
-      { id: 'smart_trainer', title: 'Smart trainer', body: 'Completely uninterrupted, which is what this session needs most.' },
-      { id: 'flat_road', title: 'A flat or rolling road', body: 'Pick a stretch you can ride unbroken \u2014 every stop restarts the effort.' },
-      { id: 'long_climb', title: 'A long steady climb', body: 'The gradient does the pacing and nothing interrupts it.' },
-    ],
-  },
-};
-
-/** The two things an athlete can want from the intensity day. Michael's copy, verbatim. */
-const HARD_RUN_GOALS: Array<{ id: 'speed' | 'vo2'; title: string; body: string }> = [
-  {
-    id: 'speed',
-    title: 'Build pure speed',
-    body: 'Short, explosive flat sprints to make you faster. High neurological drive, but the hard '
-      + 'footfall creates mechanical damage that requires 48 hours of leg clearance before heavy squats.',
-  },
-  {
-    id: 'vo2',
-    title: 'Raise VO2 max',
-    body: 'Hard 3-minute climbs to push your maximum aerobic ceiling. Spikes your heart rate to the '
-      + 'limit, but running uphill removes the eccentric impact, saving your knees and quads for the barbell.',
-  },
-];
 
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
