@@ -1866,6 +1866,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   );
   const [healthOpen, setHealthOpen] = useState(false);
 
+  /**
+   * ⛔ WHAT EACH HARD SLOT WILL ACTUALLY BE — the screen's copy of `assignHardRoles`
+   * (`strength-primary-plan.ts`), and it exists so the athlete is told before they build rather
+   * than after. Threshold is the DEFAULT and intervals are the UNLOCK: VO2 work competes with the
+   * squat and the deadlift for the same nervous system, so one hard session a week has to be the
+   * cheap one.
+   *
+   * ⚠️ A CLUB SESSION CONSUMES THE THRESHOLD SLOT — a group run or ride already settles into exactly
+   * that rhythm — so the app's own day goes to intervals. Same rule, same order, as the engine.
+   * ⛔ TWO OWNERS OF ONE RULE, ACCEPTED DELIBERATELY: importing an edge-function constant into the
+   * wizard would pull the whole composer into the client bundle. If `assignHardRoles` changes, this
+   * changes with it.
+   */
+  const hardRoleOf = (i: number): 'threshold' | 'vo2' | 'club' => {
+    const slots = state.hardDays;
+    if (slots[i]?.ownership === 'club') return 'club';
+    const thresholdTakenByClub = slots.some((h) => h.ownership === 'club');
+    if (thresholdTakenByClub) return 'vo2';
+    const firstPrescribed = slots.findIndex((h) => h.ownership !== 'club');
+    return i === firstPrescribed ? 'threshold' : 'vo2';
+  };
+
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
       : scheduleAsk === 'long' ? (state.longRunDay || '')
@@ -4192,7 +4214,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     {/* THE OPEN QUESTION'S CONTROLS — inside the row, which is inside the card. */}
                     {active && (
                       <div className="px-3 pb-3 space-y-2">
-                        {row.kind === 'day' && !(row.key === 'hard' && currentStep === 'hardday') ? (
+                        {/* ⛔ THE HARD-DAY STEP RENDERS NEITHER BRANCH, AND SKIPPING THAT WAS A REAL
+                            BUG (found on the device 2026-08-18). Hiding the day picker with a
+                            condition on the `?` sent the hard row into the ELSE arm — the per-week
+                            COUNTS — and because `row.key !== 'runs'` it drew the RIDE chips, 1 · 2 ·
+                            3, on the Hard days screen. Tapping one silently rewrote `rideDays` from
+                            a card that has nothing to do with riding. */}
+                        {row.key === 'hard' && currentStep === 'hardday' ? null
+                          : row.kind === 'day' ? (
                           <>
                             {/* Tap-to-pick cue, contextual to the open question. */}
                             <p className="text-xs" style={{ color: rowSportRgb ? `rgba(${rowSportRgb},0.85)` : 'rgba(var(--wiz-accent-rgb,236,233,227),0.85)' }}>
@@ -4390,14 +4419,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 question: intervals raise the ceiling, threshold holds pace longer.
                                 ⛔ NO §6 PROMISE. "The lifting stacks onto these days" is §6 and §6
                                 is not built — the placer still keeps lifting AWAY from hard days. */}
+                            {/* ⛔⛔ THIS LINE SAID THE OPPOSITE OF WHAT THE ENGINE BUILDS, AND IT WAS
+                                STALE BY A DAY. It read "slot 0 → Intervals, slot 1 → Sustained". The
+                                hierarchy was inverted on 2026-08-17: VO2 is a CNS stressor competing
+                                with the squat and the deadlift, so the FIRST hard day is the
+                                THRESHOLD session and intervals are what a SECOND one unlocks. The
+                                screen was promising an athlete the session they would not get.
+                                ⛔ IT MIRRORS `assignHardRoles` AND MUST KEEP DOING SO — including the
+                                club rule: a group run or ride already IS the sustained session, so it
+                                consumes that slot and the app's own day goes to intervals. */}
                             {activeHard && (
                               <p className="text-white/45 text-xs leading-snug pt-1">
                                 {activeHard.ownership === 'club'
-                                  ? 'We build the week around this one and keep the lifting clear of it. '
-                                    + 'We do not prescribe what you do in it.'
-                                  : hardSlotIndex === 0
-                                    ? 'Intervals — this is the day that raises your top end.'
-                                    : 'Sustained work — this is the day that lets you hold a pace for longer.'}
+                                  ? 'Your club session. We hold the day and build the week around it — '
+                                    + 'the lifting keeps its distance. We do not prescribe what you do in it.'
+                                  : hardRoleOf(hardSlotIndex) === 'threshold'
+                                    ? 'Threshold — sustained work at a strong, controlled effort. '
+                                      + 'This is the one that holds your top-end fitness, and it costs the barbell least.'
+                                    : 'Intervals — short, hard efforts. This is the day that raises your top end, '
+                                      + 'and the one a second hard day exists for.'}
                               </p>
                             )}
                             {/* ⛔ AND WHEN AN OPTION IS NOT OFFERED, THE SCREEN SAYS WHY (§7's gate).
@@ -4473,7 +4513,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 run: the terrain question exists to shape a session the app writes,
                                 and the app is not writing this one. ⛔ The copy inside is unchanged
                                 and must stay so — §2.0's ruling on the flat option depends on it. */}
-                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed' && (
+                            {/* ⛔ TERRAIN BELONGS TO THE INTERVAL SESSION, AND ONLY TO IT (2026-08-18).
+                                The hill / treadmill / short-hill / flat menu shapes a VO2 session —
+                                four 3-minute climbs. A THRESHOLD run is flat or rolling ground by
+                                doctrine (`DOCTRINE-threshold-run.md` §1), so offering the menu there
+                                asked the athlete to choose the ground for a session whose ground is
+                                already decided. It rendered on every prescribed hard run.
+                                ⚠️ THE THRESHOLD RUN'S OWN TERRAIN QUESTION — track / flat road /
+                                treadmill 1% — is §4 of that doctrine and is NOT BUILT. Not offering
+                                the wrong menu is not the same as answering the right one. */}
+                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed'
+                              && hardRoleOf(hardSlotIndex) === 'vo2' && (
                               <div className="space-y-1.5 pt-1">
                                 <span className="text-white/85 text-sm">What you can run it on</span>
                                 <div className="space-y-1">
