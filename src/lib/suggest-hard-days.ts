@@ -96,7 +96,7 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
    */
   const long = (id: string, label: string, sport: 'run' | 'bike', day: string | null | undefined, exists: boolean) => {
     if (!exists) return;
-    sessions.push({ id, label, load: 'long_cardio', sport, minutes: 90 });
+    sessions.push({ id, label, load: sport === 'run' ? 'long_run' : 'long_ride', sport, minutes: 90 });
     const d = DAY_INDEX[String(day ?? '').toLowerCase()];
     if (d != null) pins[id] = d;
   };

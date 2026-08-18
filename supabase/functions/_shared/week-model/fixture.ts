@@ -13,8 +13,8 @@ const SESSIONS: Session[] = [
   S('sq', 'Back Squat', 'heavy_lower', 60),
   S('hardrun', 'Hard Run', 'hard_cardio', 40, 'run'),
   S('hardride', 'Hard Ride', 'hard_cardio', 45, 'bike'),
-  S('longrun', 'Long Run', 'long_cardio', 54, 'run'),
-  S('longride', 'Long Ride', 'long_cardio', 135, 'bike'),
+  S('longrun', 'Long Run', 'long_run', 54, 'run'),
+  S('longride', 'Long Ride', 'long_ride', 135, 'bike'),
   S('easyrun', 'Easy Run', 'easy', 45, 'run'),
 ];
 

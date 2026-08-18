@@ -60,8 +60,10 @@ const LOAD_FOR_KIND: Record<MatrixSessionKind, Load> = {
   quality_swim: 'easy',
   quality_bike: 'hard_cardio',
   quality_run: 'hard_cardio',
-  long_ride: 'long_cardio',
-  long_run: 'long_cardio',
+  // ⚠️ NO LONGER ONE TOKEN. The matrix's two long kinds map to two loads, because a long ride and a
+  // long run stopped costing the same thing on 2026-08-18 — see `COST`.
+  long_ride: 'long_ride',
+  long_run: 'long_run',
   lower_body_strength: 'heavy_lower',
   upper_body_strength: 'upper',
 };

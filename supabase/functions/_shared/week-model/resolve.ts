@@ -11,6 +11,7 @@
 // ============================================================================
 
 import {
+  type Load,
   type SystemId,
   type Unit,
   COST,
@@ -22,6 +23,16 @@ import {
 } from './model.ts';
 
 export type Placement = { unit: Unit; day: number };
+
+/**
+ * ⛔ "IS THIS A LONG DAY" IS A QUESTION ABOUT BOTH LOADS (2026-08-18). `long_cardio` split into
+ * `long_run` and `long_ride` in Layer 1, and every shape term that asked for the old token by name
+ * would have silently stopped seeing HALF the long days — the weekend preference would have ignored
+ * long runs, the double-long penalty would never have fired. Asked through these two, so the split
+ * cannot leave a term half-blind.
+ */
+const isLong = (l: Load): boolean => l === 'long_run' || l === 'long_ride';
+const isEndurance = (l: Load): boolean => isLong(l) || l === 'easy' || l === 'hard_cardio';
 
 export type Unmet = {
   unit: string;
@@ -146,7 +157,7 @@ function sameSportDoubles(placements: Placement[]): number {
   for (const p of placements) {
     for (const s of p.unit.sessions) {
       if (!s.sport) continue;
-      if (s.load !== 'easy' && s.load !== 'long_cardio' && s.load !== 'hard_cardio') continue;
+      if (!isEndurance(s.load)) continue;
       const k = `${p.day}|${s.sport}`;
       perDaySport.set(k, (perDaySport.get(k) ?? 0) + 1);
     }
@@ -203,7 +214,7 @@ function clustering(placements: Placement[]): number {
  */
 function longOnWeekend(placements: Placement[]): number {
   return placements.filter((p) =>
-    p.day >= 5 && p.unit.sessions.some((s) => s.load === 'long_cardio')).length;
+    p.day >= 5 && p.unit.sessions.some((s) => isLong(s.load))).length;
 }
 
 /**
@@ -238,7 +249,7 @@ function longDoubles(placements: Placement[]): number {
   const perDay = new Map<number, number>();
   for (const p of placements) {
     for (const s of p.unit.sessions) {
-      if (s.load !== 'long_cardio') continue;
+      if (!isLong(s.load)) continue;
       perDay.set(p.day, (perDay.get(p.day) ?? 0) + 1);
     }
   }
@@ -258,7 +269,7 @@ function longDoubles(placements: Placement[]): number {
 function interleaving(placements: Placement[]): number {
   const daysOf = (sport: string) => placements
     .filter((p) => p.unit.sessions.some((s) => s.sport === sport
-      && (s.load === 'easy' || s.load === 'long_cardio' || s.load === 'hard_cardio')))
+      && isEndurance(s.load)))
     .map((p) => p.day).sort((a, b) => a - b);
   const runs = daysOf('run');
   const rides = daysOf('bike');

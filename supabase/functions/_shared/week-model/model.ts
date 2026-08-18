@@ -32,7 +32,17 @@ export type SystemId =
   /** The residue of a long continuous effort — impact damage and empty glycogen. */
   | 'long_effort';
 
-export type Load = 'heavy_lower' | 'upper' | 'hard_cardio' | 'long_cardio' | 'easy';
+/**
+ * ⛔ `long_cardio` IS SPLIT IN TWO (Michael, 2026-08-18) — and the asymmetry between them is the
+ * point, not an oversight. See {@link COST}.
+ */
+export type Load =
+  | 'heavy_lower'
+  | 'upper'
+  | 'hard_cardio'
+  | 'long_run'
+  | 'long_ride'
+  | 'easy';
 
 export type Sport = 'run' | 'bike' | 'swim';
 
@@ -56,15 +66,32 @@ export type Cost = {
  * ⛔ THE ENTIRE LAW, IN ONE TABLE. Every scheduling behaviour below is a consequence of
  * these five rows. There is no second place a rule can hide — that was the disease.
  *
- * ⛔ THE LONG-EFFORT CLEARANCE IS SYMMETRIC (Michael, 2026-08-17). It reads as two rows
- * because it is two directions of one fact:
- *   • FORWARD — `heavy_lower` needs `long_effort` clear: no heavy legs for 48h AFTER a
- *     long effort, because the tissue is damaged and the glycogen is gone.
- *   • BACKWARD — `long_cardio` needs `heavy_legs` clear: no long effort for 48h after
- *     heavy legs. Squatting the day before three hours on the bike starts the ride with
- *     empty legs, breaks down mechanics, and invites the injury.
- * ⚠️ The first draft ran FORWARD ONLY, because the law as spoken only said "after". A
- * Friday squat before a Saturday long ride came out legal. It is not.
+ * ⛔⛔ THE LONG-EFFORT CLEARANCE IS SYMMETRIC FOR THE RUN AND ASYMMETRIC FOR THE RIDE
+ * (Michael, 2026-08-18), AND THAT ONE MISSING WORD IS THE WHOLE ROW.
+ *
+ *   • FORWARD, BOTH DISCIPLINES — `heavy_lower` needs `long_effort` clear: no heavy legs for
+ *     48h AFTER a long effort. **Non-negotiable, and it is the injury-prevention half.** A long
+ *     ride has no eccentric damage but it is the most glycogen-expensive session in the block,
+ *     and squatting heavy on empty quads is a tendon problem, not a comfort problem.
+ *   • BACKWARD, RUN ONLY — `long_run` needs `heavy_legs` clear. Squatting the day before a long
+ *     RUN puts damaged, depleted legs into an impact session.
+ *   • BACKWARD, RIDE — **NOTHING.** Michael, ruling on the split: *"the backward shadow (squat
+ *     fatigue blocking the ride) makes for a miserable ride, but it doesn't cause structural
+ *     failure."* A rider can turn the pedals on tired legs and pay for it inside the session.
+ *
+ * ⚠️ THIS REVERSES THE 2026-08-17 SYMMETRY RULING FOR THE RIDE, deliberately and with a measured
+ * reason. That ruling's stated case was *"squatting heavy the day before a three-hour ride is
+ * biological suicide — you start with zero glycogen"*; the cost is real and it is a QUALITY cost,
+ * and it was blocking the standard multisport weekend for everyone. Forced to the Sat-ride /
+ * Sun-run layout, the engine's only complaint was *"Long Ride needs heavy_legs clear — Deadlift
+ * leaves that outstanding"*. This row is that complaint, removed.
+ *
+ * ⛔ AND THE DIAGNOSIS THAT PROMPTED IT WAS WRONG, WHICH IS WHY THE FIX IS HERE AND NOT WHERE IT
+ * WAS ASKED FOR. The report was that one shared `long_cardio` token made a Saturday long ride
+ * block a Sunday long run. It never did: a long day emits `long_effort`, and only `heavy_lower`
+ * needs that clear — Sat-ride + Sun-run has always been legal and tests as such. Removing the
+ * ride's FORWARD shadow, which is what "leaves no leg shadow" would have meant, changes nothing
+ * about the weekend and deletes the injury guard. ⛔ Do not re-apply that version.
  *
  * ⛔ AND `hard_cardio` LEAVES 36h ON THE LEGS — always, not only when uncoupled. Hard
  * cardio is systemic fatigue and cannot cost nothing.
@@ -88,11 +115,15 @@ export type Cost = {
  */
 export const COST: Record<Load, Cost> = {
   heavy_lower: { emits: { heavy_legs: 48 }, needs: ['heavy_legs', 'long_effort'] },
-  long_cardio: { emits: { long_effort: 48 }, needs: ['heavy_legs'] },
+  long_run: { emits: { long_effort: 48 }, needs: ['heavy_legs'] },
+  long_ride: { emits: { long_effort: 48 }, needs: [] },
   hard_cardio: { emits: { heavy_legs: 36 }, needs: [] },
   upper: { emits: {}, needs: [] },
   easy: { emits: {}, needs: [] },
 };
+
+/** Both long loads, where something genuinely means "a long day" and not one discipline's. */
+export const LONG_LOADS: Load[] = ['long_run', 'long_ride'];
 
 /**
  * ⛔ THE PAIRING, AND IT IS A CLAIM ABOUT TISSUE, NOT A PREFERENCE.

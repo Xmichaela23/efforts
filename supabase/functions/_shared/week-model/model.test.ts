@@ -12,8 +12,8 @@ const DL = S('dl', 'Deadlift', 'heavy_lower');
 const BENCH = S('bench', 'Bench Press', 'upper');
 const HARD_RUN = S('hr', 'Hard Run', 'hard_cardio', 'run');
 const HARD_RIDE = S('hb', 'Hard Ride', 'hard_cardio', 'bike');
-const LONG_RUN = S('lr', 'Long Run', 'long_cardio', 'run');
-const LONG_RIDE = S('lb', 'Long Ride', 'long_cardio', 'bike');
+const LONG_RUN = S('lr', 'Long Run', 'long_run', 'run');
+const LONG_RIDE = S('lb', 'Long Ride', 'long_ride', 'bike');
 
 const place = (sessions: Session[], pins: Record<string, number>) =>
   buildUnits(sessions, pins).map((u) => ({ unit: u, day: u.pinnedDay! }));
@@ -114,12 +114,40 @@ Deno.test('⛔ AN IMPOSSIBLE PIN NAMES THE DEBT, WHO OWES IT, AND WHEN IT CLEARS
 });
 
 // ── 5. THE TWO SILENCES, CLOSED 2026-08-17 ───────────────────────────────────
-Deno.test('⛔ NO HEAVY LEGS IN THE 48h BEFORE A LONG EFFORT — the Friday squat', () => {
-  // Squatting heavy the day before three hours on the bike starts the ride with empty
-  // legs. The law as spoken only said "after"; the first draft therefore allowed this.
-  assert(unmetNeeds(place([SQ, LONG_RIDE], { sq: 4, lb: 5 })).length > 0, 'Friday squat, Saturday long ride');
-  assert(unmetNeeds(place([DL, LONG_RUN], { dl: 5, lr: 6 })).length > 0, 'Saturday deadlift, Sunday long run');
-  assertEquals(unmetNeeds(place([SQ, LONG_RIDE], { sq: 3, lb: 5 })).length, 0, 'Thursday squat is exactly 48h');
+Deno.test('⛔ THE BACKWARD 48h IS THE RUN\'S ONLY — the ride carries no leg clearance', () => {
+  /**
+   * ⚠️ THIS ASSERTION FLIPPED FOR THE RIDE ON 2026-08-18 AND THE HISTORY IS THE POINT.
+   *   • It ran FORWARD ONLY at first, because the spoken law said "after" — a Friday squat before a
+   *     Saturday long ride came out legal, and that was a hole.
+   *   • It was made SYMMETRIC the same day: "squatting heavy the day before a three-hour ride is
+   *     biological suicide — you start with zero glycogen."
+   *   • It is now asymmetric BY DISCIPLINE. Michael: *"the backward shadow — squat fatigue blocking
+   *     the ride — makes for a miserable ride, but it doesn't cause structural failure."* A rider
+   *     turns the pedals on tired legs and pays inside the session; a RUNNER puts damaged, depleted
+   *     legs into an impact session, which is a different kind of bill.
+   *
+   * ⛔ THE FORWARD DIRECTION IS UNTOUCHED FOR BOTH — see the test below. That is the injury guard: a
+   * long ride is the most glycogen-expensive session in the block and squatting on empty quads is a
+   * tendon problem. Do not read this relaxation as the ride becoming free.
+   */
+  assertEquals(unmetNeeds(place([SQ, LONG_RIDE], { sq: 4, lb: 5 })).length, 0,
+    'a Friday squat before a Saturday long ride should now be legal');
+  assert(unmetNeeds(place([DL, LONG_RUN], { dl: 5, lr: 6 })).length > 0,
+    'the RUN still needs its legs clear — a Saturday deadlift before a Sunday long run');
+});
+
+Deno.test('⛔ AND THE FORWARD 48h STILL HOLDS FOR BOTH — the injury guard is untouched', () => {
+  // Heavy legs after a long effort, either discipline. This is the half that is non-negotiable.
+  assert(unmetNeeds(place([LONG_RIDE, SQ], { lb: 5, sq: 6 })).length > 0, 'squat the day after a long ride');
+  assert(unmetNeeds(place([LONG_RUN, SQ], { lr: 6, sq: 0 })).length > 0, 'squat the day after a long run');
+  assertEquals(unmetNeeds(place([LONG_RIDE, SQ], { lb: 5, sq: 0 })).length, 0, 'Monday is exactly 48h');
+});
+
+Deno.test('⛔ AND THE STANDARD MULTISPORT WEEKEND IS WHAT THE SPLIT BUYS', () => {
+  // Sat ride / Sun run / Mon bench / Tue squat — the layout the symmetric row made unreachable once
+  // three lifts and two hard days were also in the week.
+  assertEquals(
+    unmetNeeds(place([LONG_RIDE, LONG_RUN, BENCH, SQ], { lb: 5, lr: 6, bench: 0, sq: 1 })).length, 0);
 });
 
 Deno.test('⛔ AN UNCOUPLED HARD DAY LEAVES 24h ON THE LEGS', () => {
