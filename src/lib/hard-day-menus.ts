@@ -43,13 +43,16 @@ export const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> =
       // ⚠️ THE ONLY OPTION THAT NEEDS A METHOD, NOT A DESCRIPTION. Nobody's road is perfectly flat,
       // so this says how to run the session on the road they actually have: pick the efforts, walk
       // the descents. Without it the note above reads as "you cannot do this outside".
-      // ⛔ THIS BODY MIRRORS THE NOTE'S WORDS ON PURPOSE (Michael, 2026-08-18: "people get sloppy").
-      // The note carries the absolute; this is the card an athlete picks BECAUSE their road rolls, so
-      // it is where the decision is actually made and where a skimmer meets the rule for the first
-      // time. It repeats "1-2%", "overspeed" and "hamstrings" verbatim — deliberate duplication,
-      // which is normally the thing to cut and is the right call exactly once, on a safety absolute.
-      // ⚠️ "Save your legs" was the old ending and it was too soft for what this prevents.
-      { id: 'flat_road', title: 'Road (flat or rolling)', body: 'If your road isn\u2019t perfectly flat, time your max efforts for the flat or slight uphill stretches. Walk or jog every downhill \u2014 even a 1-2% decline is overspeed, and the braking lands on your hamstrings.' },
+      // ⛔ THE CALLOUT CARRIES THE LAW, THE BULLET CARRIES THE TACTIC — and this line has now been
+      // written BOTH ways, a mirror and back again, so the reasoning matters more than the wording.
+      //
+      // It was mirrored on purpose ("people get sloppy"): repeat the absolute where the decision is
+      // made. The mobile-scanning read is stronger and it reverses that: a reader who meets the same
+      // warning in the callout and again in the first bullet learns the bullets are redundant and
+      // starts skipping them — so duplicating the warning costs the THREE options underneath it.
+      // ⚠️ THE RULE IS NOT WEAKENED, IT IS RELOCATED. "Even a 1-2% decline creates overspeed braking
+      // forces" is still absolute, still first, and still unmissable in the callout above.
+      { id: 'flat_road', title: 'Road \u2014 flat or rolling', body: 'If your road isn\u2019t perfectly flat, time your max efforts for the flat or slight uphill stretches. Strictly walk or jog the downhills to save your legs.' },
       { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
     ],
   },
@@ -93,7 +96,7 @@ export const HARD_RIDE_MENUS: Record<'vo2' | 'threshold', GroundMenu> = {
       + 'glycogen from your quads. You need an environment where you can safely redline with zero '
       + 'traffic or stoplights.',
     options: [
-      { id: 'smart_trainer', title: 'Smart trainer, erg mode', body: 'It holds the number, so all you do is pedal.' },
+      { id: 'smart_trainer', title: 'Smart trainer \u2014 erg mode', body: 'It holds the number, so all you do is pedal.' },
       { id: 'stationary', title: 'A stationary bike', body: 'No power to read, so ride it by effort \u2014 hard enough that a sentence is a struggle.' },
       { id: 'flat_road', title: 'A flat road', body: 'Use a stretch with no junctions.' },
       { id: 'hill_climb', title: 'A climb you can repeat', body: 'The gradient holds the effort for you \u2014 ride back down easy.' },
