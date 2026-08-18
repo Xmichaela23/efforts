@@ -1584,6 +1584,28 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       return out;
     }
   }
+  // ⛔ FLAT SPRINTS — `run_sprint_{reps}x{sec}s_r{sec}s` (2026-08-18, the speed track).
+  //
+  // ⛔ NO PACE, AND THAT IS THE PRESCRIPTION. Every other run token prices off a baseline; this one
+  // asks for MAXIMUM EFFORT over 10-15 seconds, and a pace target would cap the very thing the
+  // session exists to train. The recovery is a WALK, not an easy jog — a paced recovery would turn a
+  // neural session into a lactate one, which is the one thing it must not become in a block that
+  // already carries a threshold day.
+  if (/^run_sprint_\d+x\d+s_r\d+s$/.test(lower)) {
+    const m = lower.match(/^run_sprint_(\d+)x(\d+)s_r(\d+)s$/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const work_s = parseInt(m[2], 10);
+      const rest_s = parseInt(m[3], 10);
+      for (let i = 0; i < reps; i++) {
+        out.push({ id: uid(), kind: 'work', duration_s: work_s, label: 'Sprint' });
+        if (i < reps - 1) {
+          out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, label: 'Walk back' });
+        }
+      }
+      return out;
+    }
+  }
   if (/^run_vo2_\d+x\d+min(?:_r\d+s)?_z5$/.test(lower)) {
     const m = lower.match(/^run_vo2_(\d+)x(\d+)min(?:_r(\d+)s)?_z5$/);
     if (m) {

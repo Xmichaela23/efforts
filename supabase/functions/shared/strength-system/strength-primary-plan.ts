@@ -181,7 +181,30 @@ export type HardRunTerrain =
    * a nicety. Flat keeps the impact transient the other three options remove, the lifting is what
    * pays for it, and the card says a cheap treadmill or trainer would serve them better.
    */
-  | 'flat';
+  | 'flat'
+  /**
+   * ⛔ THE SPEED TRACK'S THREE GROUNDS (2026-08-18). They belong to `hardRunGoal: 'speed'` and are
+   * meaningless on the VO2 track — a sprint needs flat, predictable footing and a safe run-out, not
+   * a gradient. ⚠️ `flat_road` is NOT the same answer as `flat`: `flat` is §2.0's last-resort
+   * 4 × 3 min VO2 session on level ground, this is a sprint surface. Two different sessions.
+   */
+  | 'track'
+  | 'flat_road'
+  | 'turf';
+
+/**
+ * ⛔ WHAT THE ATHLETE WANTS FROM THE INTENSITY DAY (Michael, 2026-08-18). The first hard day is the
+ * high-intensity one; this is the athlete saying WHICH kind of intensity, and the two are genuinely
+ * different trades rather than two names for one session:
+ *
+ *   `speed` — short explosive flat sprints. High neurological drive, and the hard footfall creates
+ *             mechanical damage that wants 48h of leg clearance before heavy squats.
+ *   `vo2`   — hard 3-minute climbs. Spikes heart rate to the limit, and running uphill removes the
+ *             eccentric impact, saving the knees and quads for the barbell.
+ *
+ * ⚠️ ABSENT → `vo2`, which is what every block built before this asked for. A pure addition.
+ */
+export type HardRunGoal = 'speed' | 'vo2';
 
 export type StrengthPrimaryArgs = {
   durationWeeks: number;
@@ -277,6 +300,12 @@ export type StrengthPrimaryArgs = {
     /** Run terrain — the athlete's pick. Absent → `hill_3min`. Ignored when `discipline` is
      *  `bike`: the ride has one shape (Helgerud `4 × 4`) and no terrain question. */
     terrain?: HardRunTerrain;
+    /**
+     * ⛔ WHICH KIND OF INTENSITY (2026-08-18). Only meaningful on the INTENSITY slot — a threshold
+     * day has no goal question, its session is settled. Absent → `vo2`, which is what every block
+     * built before this asked for.
+     */
+    goal?: HardRunGoal;
     /**
      * ⛔ WHOSE SESSION IS IT (§1i). `prescribed` — the app owns the content, writes the template and
      * can progress it. `club` — the athlete already attends it and does whatever the group does.
@@ -1514,8 +1543,15 @@ const THRESHOLD_RUN_MIN = Math.max(
 );
 
 /** The minutes a hard run costs the week's mileage budget, by the role it was assigned (§7). */
-function hardRunMinutesForRole(role: HardRole, terrain?: HardRunTerrain): number {
-  return role === 'threshold' ? THRESHOLD_RUN_MIN : hardRunSessionMinutes(terrain);
+function hardRunMinutesForRole(
+  role: HardRole,
+  terrain?: HardRunTerrain,
+  goal: HardRunGoal = 'vo2',
+): number {
+  // ⚠️ THREE SESSION LENGTHS NOW, NOT TWO. A sprint session is not a hill session and not a
+  // threshold session; a budget that quoted the wrong one would hand the difference back as easy
+  // miles, which is the defect this function was written to fix in the first place.
+  return role === 'threshold' ? THRESHOLD_RUN_MIN : hardRunSessionMinutes(terrain, goal);
 }
 
 /**
@@ -1931,7 +1967,10 @@ function flatSession(day: string): PlanSession {
  * +3.5 mi bug). Two owners for one fact is how that bug returns: a 39-minute treadmill session
  * subtracted as 35 hands the athlete the difference back as easy miles, silently, every week.
  */
-export function hardRunSessionMinutes(terrain?: HardRunTerrain): number {
+export function hardRunSessionMinutes(terrain?: HardRunTerrain, goal: HardRunGoal = 'vo2'): number {
+  // ⚠️ THE VOLUME BUDGETS SUBTRACT THIS, so a sprint session that reported a hill's length would be
+  // paid for twice — the defect §7 already fixed once for the threshold session.
+  if (goal === 'speed') return SPRINT_SESSION_MIN;
   switch (terrain) {
     case 'hill_short': return SHORT_HILL_SESSION_MIN;
     case 'treadmill': return TREADMILL_SESSION_MIN;
@@ -1939,6 +1978,67 @@ export function hardRunSessionMinutes(terrain?: HardRunTerrain): number {
     case 'hill_3min':
     default: return HILL_SESSION_MIN;
   }
+}
+
+/**
+ * ⛔ FLAT SPRINTS — THE SPEED TRACK'S SESSION (Michael, 2026-08-18). A retaining load that syncs
+ * with the barbell, NOT a progressive track programme.
+ *
+ * *"Because this is a Strong Focus block, this is a retaining load that must sync with the barbell.
+ * Do not add volume; just pay the biological rent to hold the speed adaptation."*
+ *
+ * | weeks | reps | why |
+ * |---|---|---|
+ * | 1-3, 5-7 (leaders) | **6** | the baseline. Flat across the wave — volume never climbs |
+ * | 9-11 (anchor) + 12 | **4** | peripheral leg fatigue and eccentric damage stripped away so the legs are fresh to express maximum strength on the heavy tests |
+ *
+ * ⛔ COMPLETE WALKING RECOVERY, AND IT IS THE PRESCRIPTION RATHER THAN A DETAIL. 10-15 s at maximum
+ * effort is a neural session; an incomplete recovery turns it into a lactate session, which is the
+ * one thing it must not become in a block that already has a threshold day.
+ *
+ * ⚠️ THE 48h CLAIM IS THE SESSION'S OWN COST AND IT IS REAL: hard footfall at maximum velocity is
+ * mechanical damage, which is why the speed track asks for leg clearance the hill track does not.
+ * ⛔ The SCHEDULER does not yet know this — `week-model`'s `COST` gives an uncoupled hard day 36h,
+ * not 48h, and it does not distinguish a sprint from a hill. Named here rather than assumed.
+ */
+const SPRINT_REPS_LEADER = 6;
+const SPRINT_REPS_ANCHOR = 4;
+/** Seconds of maximum effort per rep — the middle of Michael's 10-15 s. */
+const SPRINT_WORK_SEC = 12;
+/** Complete walking recovery — the middle of his 2-3 min. */
+const SPRINT_REST_SEC = 150;
+const SPRINT_SESSION_MIN = 35;
+
+function sprintRepsFor(wave: HardWave): number {
+  return wave.cycleKind === 'anchor' ? SPRINT_REPS_ANCHOR : SPRINT_REPS_LEADER;
+}
+
+function sprintSession(day: string, wave: HardWave, terrain?: HardRunTerrain): PlanSession {
+  const reps = sprintRepsFor(wave);
+  const ground = terrain === 'turf'
+    ? 'on grass or turf'
+    : terrain === 'flat_road'
+      ? 'on a flat road'
+      : 'on a track';
+  return {
+    day,
+    type: 'run',
+    name: 'Flat Sprints',
+    description:
+      `${reps} × ${SPRINT_WORK_SEC} seconds at maximum effort ${ground}, walking back between each. `
+      + 'Take the full two to three minutes — this is a speed session, and a short recovery turns it '
+      + 'into a lactate session instead. '
+      + (wave.cycleKind === 'anchor'
+        // ⛔ THE ANCHOR CUT IS THE POINT OF THE WHOLE TABLE, so the card says why rather than just
+        // printing a smaller number the athlete reads as the plan losing interest.
+        ? 'Fewer reps from here to the end of the block: the legs are being cleared so they can '
+          + 'express maximum strength on the heavy lifts.'
+        : 'The number does not climb across the block. This holds the speed you have; the barbell '
+          + 'is what is being built.'),
+    duration: SPRINT_SESSION_MIN,
+    steps_preset: [`run_sprint_${reps}x${SPRINT_WORK_SEC}s_r${SPRINT_REST_SEC}s`],
+    tags: ['quality', 'run', 'speed', 'neuromuscular'],
+  };
 }
 
 /**
@@ -1963,7 +2063,12 @@ function hardRunSession(
   lowerDays: string[],
   terrain?: HardRunTerrain,
   wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' },
+  goal: HardRunGoal = 'vo2',
 ): PlanSession {
+  // ⛔ THE SPEED TRACK IS A DIFFERENT SESSION, NOT A TERRAIN OF THE VO2 ONE. It returns whole: no
+  // wave cue is appended, because its progression is a volume CUT rather than an effort climb and
+  // the "go a little faster than last week" line below would contradict the table it runs on.
+  if (goal === 'speed') return sprintSession(day, wave, terrain);
   const base = (() => {
     switch (terrain) {
       case 'hill_short': return shortHillSession(day, lowerDays);
@@ -2270,6 +2375,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       day,
       discipline: raw.discipline,
       ...(raw.terrain ? { terrain: raw.terrain } : {}),
+      // ⚠️ SAME ALLOWLIST DISCIPLINE AS TERRAIN — an unrecognised goal degrades to the shipped
+      // behaviour (`vo2`), never to no session.
+      ...(raw.goal === 'speed' ? { goal: 'speed' as const } : {}),
       ownership,
     });
   }
@@ -2339,6 +2447,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * TWO VO2 sessions. That is precisely the arrangement §7 forbids, arriving silently.
    */
   const hardDays: Array<{
+    goal?: HardRunGoal;
     day: DayName; discipline: 'run' | 'bike'; terrain?: HardRunTerrain;
     ownership: 'prescribed' | 'club'; role: HardRole;
   }> = [];
@@ -3276,7 +3385,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // one became a THRESHOLD run, which is a different length. Under-subtracting hands the
     // difference back as easy miles every week, silently.
     const hardRunMiles = hardRunDays().reduce(
-      (mi, h) => mi + hardRunMinutesForRole(roleOf(h.day), h.terrain) / pace, 0);
+      (mi, h) => mi + hardRunMinutesForRole(roleOf(h.day), h.terrain, h.goal) / pace, 0);
     const easyBudget = Math.max(1, held - hardRunMiles);
     // ⛔ ABOVE THE SELF-REGULATION LINE THE ENGINE STOPS SHAPING THE WEEK (2026-07-29).
     //
@@ -3828,7 +3937,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             : role === 'threshold'
               ? thresholdRunSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex },
                 asPositiveNumber(args.thresholdPaceSecPerMi) != null ? 'measured' : 'derived')
-              : hardRunSession(h.day, heavyLowerDays, h.terrain, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }),
+              // ⛔ THE GOAL ONLY REACHES THE INTENSITY SESSION. A threshold day has no goal question
+              // — its session is settled — and `role` is what decides which branch is taken above.
+              : hardRunSession(h.day, heavyLowerDays, h.terrain,
+                { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }, h.goal),
         );
       }
     } else if (enduranceSport === 'bike' && !hasBike) {
