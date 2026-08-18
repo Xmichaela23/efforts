@@ -1,160 +1,98 @@
-# AUDIT — the built plan read as one document (2026-08-17)
+# WORK ORDER — repair the built plan (2026-08-17)
 
-**Michael exported his real Strong Focus plan and read it end to end. Verdict: "a clown car."**
-He is right, and the lesson is the forever-block-map lesson at the next level up: **465 tests
-green, every mechanism pinned, and the assembled document fails review** — because every fixture
-reads fields and no test reads the plan the way the athlete does.
+**What happened.** Michael built a real Strong Focus plan on current, deployed code and read the
+export end to end. It fails review. Every mechanism test is green (465/0) because the fixtures
+read fields; nothing reads the assembled plan the way the athlete does. This document is the
+repair order.
 
-**The source document:** the athlete-facing export of the live plan (goal prefs: run 3d maintain +
-bike 2d maintain + strength develop, long run Sun, long ride Sat, hard days Fri run + Tue ride,
-pullup progression on, focus chest/glutes/abs). Every defect below was observed in that real
-export, not hypothesized.
+**The athlete config that produced it** (build every verification fixture from this):
+run 3d maintain · bike 2d maintain · strength develop · long run Sunday · long ride Saturday ·
+hard days: Friday run + Tuesday ride, both prescribed · pullup progression on ·
+focus chest/glutes/abs · 15 mi/wk · 3 h/wk ride · maxes on file.
 
-⚠️ **THE MIXED-BUILD THEORY IS DEAD (2026-08-17, late).** Michael confirmed the export came off a
-REFRESHED client. Everything below is current code. (The goal row may still carry old-wizard
-values — #6 — but nothing else gets blamed on staleness.)
+**The model the plan must match** — all decided, all in the parent docs; none of this is open:
+- Three lifting days: Squat · Bench · Deadlift + Press (§1f-0).
+- Hard endurance days are ENERGY SYSTEMS (§7): the VO2 day (4×3 uphill run / 4×4 ride) and the
+  threshold day (4×5 → 3×7 → 2×10 wave). 1 day → VO2 · 2 days → one of each · club → threshold.
+- The scheduling laws hold: heavy lower lifts 48h from the long run and from each other; a test
+  week is measured rested.
+- Copy is fact-first, stated once, and never promises what §6 has not built.
 
-⛔ **MICHAEL IS DONE TESTING. Verify with fixtures built from HIS EXACT CONFIG (the prefs block on
-the export: run 3d maintain, bike 2d maintain, strength develop, long run Sun, long ride Sat, hard
-days Fri run + Tue ride, pullup progression on, focus chest/glutes/abs, 15 mi, 3h ride). The
-acceptance test is READING the generated plan as a document. He gets one finished plan, not QA
-rounds.**
-
-⛔ **FIX IN THIS ORDER. #0 is a broken LAW; #1 blocks training; the rest make the plan unreadable
-or untrustworthy.**
+**Verification.** Fixtures from the config above. The acceptance test is GENERATING the plan and
+READING it as a document. Michael does not test intermediate states; he reads one finished plan.
 
 ---
 
-## 0. THE 48H LONG-RUN LAW IS BREACHED ⛔ REGRESSION AGAINST THE OLDEST RULE
+## The defects, in fix order
 
-Observed: **Monday's Back Squat, 24h after Sunday's long run**, with a compromise line disclosing
-it. The 48h clearance between a heavy lower lift and the long run is a law the fixtures pin
-(`easy-session-spread.test.ts` "a LOWER lift keeps its 48h from the long run") — and this week
-shape (two hard days Fri+Tue, long ride Sat, long run Sun) evidently is not covered by them. The
-two-hard-day work (slices 6–8) crowded the week until the solver bought a breach and apologised.
+### 0. The 48h long-run law is breached ⛔ LAW
+Monday's Back Squat sits 24h after Sunday's long run, with a compromise line disclosing it. The
+48h clearance between a heavy lower lift and the long run is pinned law
+(`easy-session-spread.test.ts`), and this week shape — two hard days Fri+Tue, long ride Sat, long
+run Sun — is evidently outside the fixtures. Breach-and-disclose is not acceptable for this pair:
+the engine drops or moves a LESSER session and says so. Find what lets the breach be bought
+(suspect: the two-hard-day work crowding the week until `breachPenalty` is outbid, or a path that
+bypasses the prune), fix it, and add this exact week shape to the law's fixture.
 
-**A breach-and-disclose is NOT acceptable for this pair.** The old behaviour refused or found
-another shape. Find which change let `breachPenalty` be outbid (or which path bypasses the prune),
-fix it, and add HIS week shape to the law's fixture so it cannot re-open. If the week genuinely
-cannot hold everything, the engine drops or moves a LESSER session and says so — it does not put a
-squat the morning after the long run.
+### 1. Week 1 has no exercise rows ⛔ BLOCKS TRAINING
+Weeks 2–12 export full exercise blocks; week 1 exports descriptions only — nothing to log in the
+week the athlete is in. The export (`AllPlansInterface.tsx:1816`) reads `computed.steps` then
+`strength_exercises`; week 1 comes from materialized `planned_workouts` rows, later weeks from
+plan JSON. Determine whether week 1's rows lack the fields (materializer bug) or carry them under
+names the export does not read (export bug). Fix at the source. The same rows price the threshold
+ride at 43m where every later week prices the identical session at 24m — one clock must win, and
+one cause may explain both.
 
----
+### 2. The run's hard day speaks the old vocabulary
+The session is named "Hill Repeats" and the wizard frames the day as a terrain menu. That is the
+maintenance-dose era. The day is the VO2 DAY (§7): named for what it builds, 4×3 uphill as its
+prescription, terrain surviving as a detail inside it (the hill/treadmill/flat variants exist).
+The run's threshold day matches the ride's naming ("Threshold Run" beside "Threshold Ride"). The
+offer follows the role; the role comes from §7's assignment. Nothing here needs a new decision.
 
-## 1. WEEK 1 HAS NO EXERCISE ROWS — the current week is not loggable ⛔ TRAINING-BLOCKING
+### 3. The descriptions are boilerplate walls
+The same sentences — assistance load-by-feel, the chins programme, the 50-in-10 standard, the FSL
+explanation — print on every strength session, every week: ~36 times each. The rule: a sentence
+true every week moves to the plan header, once. A session keeps only what is its own — this day's
+sets, this day's grip, this week's step in the wave, this day's sharing note. Cut duplication,
+never information: every fact still exists exactly once.
 
-Weeks 2–12 carry full `**Exercises:**` blocks (warmups, work sets, FSL, assistance with totals).
-Week 1 — the week the athlete is IN — has descriptions only. Nothing to log.
+### 4. The paired-day note is doubled and names itself
+Verbatim: *"…Deadlift + Overhead Press goes first and Overhead Press follows…"* — the merged
+SESSION name used as a lift name, in a second sentence restating the first. Two writers
+(`pairNoteFor` and the merge's order sentence, which reads `ordered[0].name` after the title
+rewrite). One note, one writer, naming the lift: deadlift first, press follows fatigued.
 
-**Where to look, traced:** the export (`AllPlansInterface.tsx:1816`) reads
-`w.computed?.steps` (strength kind) `|| w.strength_exercises`. Weeks come from week-scoped
-`planned_workouts` when materialized (`:632-657`), falling back to `plans.sessions_by_week`.
-So week 1's MATERIALIZED rows are missing their strength steps/exercises while the unmaterialized
-weeks render fine from the plan JSON. Suspect `materialize-plan` (it was changed today for the
-`run_thr_*` token) or the on-demand week-1 materialization path. **Find whether week 1's
-`planned_workouts` rows have `computed.steps` / `strength_exercises` at all — if they do, the bug
-is the export's field priority; if they don't, it is the materializer.** Fix at the source, not in
-the export.
+### 5. The week-cost paragraph is garbled
+The back-to-back sentence prints twice with different day pairs; weekday names print lowercase;
+and "You asked for 2 ride days; the week had room for 1" is false on a calendar showing two rides
+— if the line means easy rides it says easy rides, and it counts what the athlete sees. The
+24h-squat disclosure itself is honest behaviour; #0 removes its cause, the casing gets fixed
+regardless.
 
-Also observable on the same rows: week 1's threshold ride says 43m where every later week prices
-the same 4×5 session at 24m (defect #5) — consistent with week 1 coming off a different, older
-path. One cause may explain both.
+### 6. The saved goal still speaks four-day
+The goal's stored prefs read "Strength Frequency: 4×/week" and strength days
+"monday, tuesday, thursday, thursday". Something on the goal-write path still derives from the
+four-lift list. Fix the writer; check whether the stored value feeds anything beyond display.
 
-## 2. THE DESCRIPTIONS ARE BOILERPLATE WALLS — say it once, not 36 times
-
-Every strength session, every week, carries the same concatenated sentences: the assistance
-load-by-feel note + the 100-chins note + the 50-in-10 note + the grip + the FSL explanation + the
-sharing note. A 12-week plan prints each ~36 times. The athlete reads a paragraph of boilerplate to
-find the one line that is about TODAY.
-
-**The rule: a sentence that is true every week belongs in the plan header (once), not in every
-session.** A session's description carries only what is specific to it: the day's sets summary,
-the grip for THIS day, what changed this week in the wave, and this day's sharing/order note.
-- The chins programme (100/wk, 50-in-10 standard, split guidance) → header. The session keeps
-  "chins 33 — underhand today."
-- The FSL explanation → header once. The session keeps "First Set Last — 5×5 @ 55."
-- The assistance load-by-feel rule → header once.
-- ⚠️ Cut duplication, not information. Every fact must still exist exactly once.
-
-## 3. THE PAIRED-DAY NOTE IS GARBLED AND DOUBLED
-
-Observed, verbatim: *"Shares the day with Overhead Press, and goes first — the second lift of a
-session is done fatigued, so it gives up load and reps. **Deadlift + Overhead Press goes first and
-Overhead Press follows on the same day.** The second lift of a session is trained fatigued, so it
-gives up load and reps. 5/3/1 adds weight…"*
-
-Two writers say the same thing, and the second uses the MERGED SESSION NAME as the first lift's
-name ("Deadlift + Overhead Press goes first"). The merge's order sentence
-(`strength-primary-plan.ts`, the block that builds `first.description`) derives `firstName` from
-`ordered[0].name` AFTER the name has been rewritten to the joined title. And `pairNoteFor` fires
-on top of it. **One note, written once, naming the lift not the session: "Deadlift goes first;
-Overhead Press follows fatigued…"**
-
-## 4. THE WEEK-COST PARAGRAPH IS GARBLED
-
-Observed: the back-to-back sentence prints twice with different pairs ("long ride and long run…
-Saturday into Sunday", then "hard run and long ride… Friday into Saturday", both ending "Both are
-your days, so the week is built around them"); day names print lowercase mid-sentence ("monday's
-Back Squat"); and **"You asked for 2 ride days; the week had room for 1" reads FALSE** — the
-calendar shows two rides (Tue threshold + Sat long). If the line means EASY rides, it must say
-easy rides, and it must count what the athlete sees, not an internal category.
-
-The 24h-after-long-run squat disclosure is CORRECT behaviour (a jammed week, honestly stated) —
-keep the disclosure, fix its casing.
-
-## 5. THE THRESHOLD RIDE'S CLOCK DISAGREES WITH ITSELF
-
-Week 1: "4 × 5 min at threshold, 1 min easy" priced at **43m**. Week 5, the identical session:
-**24m**. Weeks 2/3: 27m/26m for the longer-interval variants. Two pricing paths for one session;
-at most one is right. (20 min work + 3 min rests + warmup/cooldown — decide what the session
-actually includes and price it in ONE place.) Likely the same week-1-different-path cause as #1.
-
-## 6. THE SAVED GOAL STILL SPEAKS FOUR-DAY
-
-The prefs block on the export: **"Strength Frequency: 4×/week"** and **"Strength (scheduled by
-app): monday, tuesday, thursday, thursday"** — Thursday twice, four entries for three days.
-Something on the goal-write path (`create-goal-and-materialize-plan` or what seeds
-`training_prefs`) still derives strength days from the four-lift list. §1f-0 said the four-day
-vocabulary is deleted; this is a live remnant on the wire. Fix the writer; note whether the stored
-value feeds anything besides display.
-
-## 7. SENTENCE-LEVEL LINT, while in there
-
-- "overhand this day." / "neutral grip this day." — fragments; fold the grip into the chins line.
-- Lowercase weekday names anywhere copy interpolates a day.
-- The week-1 threshold ride prints its raw token "(Bike Threshold 5min)"; later weeks do not.
-  Tokens are plumbing and never print.
-
-## 8. MICHAEL'S TWO FINDINGS FROM THE DEVICE, mid-audit
-
-- **"It's running the old builder."** ⚠️ SUPERSEDED by the banner above: the client was refreshed,
-  so the only stale thing left is the GOAL ROW's stored prefs (#6). Rebuild-from-scratch remains
-  useful as a diagnostic, but nobody asks Michael to do it — reproduce in fixtures.
-- **"We didn't offer the correct run drills" / "it shouldn't say Hill Repeats — that stuff is
-  old."** ⛔ THE SPEC ALREADY EXISTS — work order §7's table, from Michael's own design paste
-  (2026-08-17). The sessions are named and offered by ENERGY SYSTEM, not by the old
-  maintenance-era vocabulary:
-  - **The VO2 day** prescribes §7's session — 4×3 min hard uphill (run) / 4×4 min (ride) — but it
-    is the VO2 day: named for what it builds ("VO2 Intervals" / the top-end day), with uphill as
-    part of the prescription. "Hill Repeats" as a workout name, and the four-card "what you can
-    run it on" terrain menu as the framing, are the OLD maintenance-dose era. The terrain choice
-    survives as a detail inside the VO2 day (hill / treadmill incline / flat variants exist in the
-    engine), not as the day's identity.
-  - **The threshold day** prescribes §7's wave (4×5 → 3×7 → 2×10) and is named as the sustained
-    day, run and ride alike — the export already names "Threshold Ride"; the run side must match.
-  - Do NOT re-ask Michael for a menu. The offer is the role; the role comes from §7's assignment.
+### 7. Sentence lint
+Grip fragments ("overhand this day.") fold into the chins line. No lowercase weekdays anywhere
+copy interpolates a day. No raw tokens in athlete-facing text (week 1 prints
+"(Bike Threshold 5min)").
 
 ---
+
+## The missing test class
+
+One fixture that renders a full session description and the week-cost paragraph AS STRINGS and
+asserts: no sentence appears twice, no lowercase weekday, no token text. This is the gap that let
+every mechanism pass while the document failed.
 
 ## Done means
 
-Michael exports the same plan and reads it: week 1 logs like every other week, each session's
-description is a few lines all specific to that session, the paired day names the lift order once,
-the cost paragraph states only true things with capitalized days, one clock for the threshold
-ride, and the goal prefs speak three-day. The suites hold `72c0126b`'s baseline
-(465/0 · 3000/3 · 683/3) except where a fixture pinned the doubled/boilerplate copy — those move
-with the fix, none weakened.
-
-⚠️ **And add the missing class of test: ONE fixture that renders a full session description and a
-full week-cost paragraph as STRINGS and asserts no sentence appears twice, no lowercase weekday,
-no token text.** That is the gap that let every mechanism pass while the document failed.
+The plan generated from the config above, read start to finish: week 1 logs like every other
+week; the squat is never within 48h of the long run; the hard days are named by energy system;
+each session's description is a few lines that are all about that session; the paired day states
+its order once; the cost paragraph states only true things; one clock per session; the goal
+speaks three-day. Suites hold `72c0126b`'s baseline except fixtures that pinned the doubled or
+boilerplate copy — those move with it, none weakened.
