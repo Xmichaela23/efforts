@@ -4487,10 +4487,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 consumes that slot and the app's own day goes to intervals. */}
                             {activeHard && (
                               <p className="text-white/45 text-xs leading-snug pt-1">
-                                {activeHard.ownership === 'club'
-                                  ? 'Your club session. We hold the day and build the week around it — '
-                                    + 'the lifting keeps its distance. We do not prescribe what you do in it.'
-                                  : hardRoleOf(hardSlotIndex) === 'threshold'
+                                {/* ⛔ THE CLUB BRANCH IS DELETED (2026-08-18). It said "we do not
+                                    prescribe what you do in it" — the wording replaced on the
+                                    checkbox below — so a club slot showed the OLD framing and the
+                                    NEW one stacked, and the old one described the session as lesser.
+                                    A club slot now falls through to its ROLE line, which is true of
+                                    it: it is the intensity day or the threshold day like any other,
+                                    and the checkbox says the one thing that differs. */}
+                                {/* ⚠️ A CLUB SLOT READS AS THRESHOLD, because that is what it IS.
+                                    `assignHardRoles` gives the club the sustained slot — a group run
+                                    or ride settles into exactly that rhythm — and pushes the app's
+                                    own day to intensity. Falling through to the intensity line would
+                                    have told a club runner their Tuesday group run raises their top
+                                    end, which is the opposite of what the engine built. */}
+                                {(['threshold', 'club'] as const).includes(hardRoleOf(hardSlotIndex) as never)
                                     // ⚠️ MICHAEL'S WORDS, MINUS ONE CLAUSE. His copy ended "Costs
                                     // accessory lifting volume" — and that is not what the engine
                                     // does: the accessory band is set by the COUNT of hard days
@@ -4501,7 +4511,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     // and the clause comes back with it.
                                     ? 'Builds fatigue resistance and stamina. A sustained engine-builder — '
                                       + 'and the prolonged effort is the one that competes hardest with strength.'
-                                    : 'Intensity — the day that raises your top end. It protects the '
+                                    // ⛔ "PRESERVES", NOT "PROTECTS" (Michael, 2026-08-18) — and the
+                                    // one word carries the actual mechanism. Short intensity does
+                                    // not DEFEND the strength pathways; it recruits the same Type II
+                                    // fibres and ATP-PC system the barbell does, so it never sends
+                                    // the signal that converts fibre toward Type I. That signal is
+                                    // long slow work, and it is the interference effect. "Protects"
+                                    // implies an active guard the session does not provide.
+                                    : 'Intensity — the day that raises your top end. It preserves the '
                                       + 'strength pathways the barbell runs on, which is why it comes first.'}
                               </p>
                             )}

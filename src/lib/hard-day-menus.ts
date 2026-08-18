@@ -28,12 +28,22 @@ export const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> =
     // this screen. Maximal downhill running is the laboratory model for eccentric hamstring damage;
     // it is also the fastest a runner can move, so it looks like the right idea. ⛔ Do not soften it
     // into "prefer flat" — the sentence exists because the mistake is attractive.
-    note: 'Flat is preferred for pure speed mechanics, but a slight 2-3% uphill is completely fine. '
-      + 'Never sprint at absolute max effort downhill \u2014 the braking forces will tear up your '
-      + 'hamstrings and ruin your squat recovery.',
+    // ⛔ THE DOWNHILL CLAUSE IS THE ONE ABSOLUTE ON THIS SCREEN, and it got STRICTER on 2026-08-18:
+    // "even a 1-2% decline". A gentle downhill does not read as dangerous, which is exactly why it
+    // has to be named — a runner chasing a fast split takes the free speed and the hamstrings do the
+    // braking. Downhill sprinting is the laboratory model for eccentric hamstring damage.
+    // ⚠️ AND THE PERMISSION MOVED OUT OF THIS NOTE. "A slight 2-3% uphill is completely fine" used
+    // to sit here, which put a licence and a prohibition in one paragraph; the licence now lives on
+    // the Road option, where the athlete is actually deciding what to do with a rolling road.
+    note: 'Flat is preferred for pure speed mechanics. Never sprint at absolute max effort downhill'
+      + '\u2014even a 1-2% decline creates overspeed braking forces that tear up your hamstrings and '
+      + 'ruin your squat recovery.',
     options: [
       { id: 'track', title: 'A track', body: 'Predictable footing and a safe run-out, which is what lets you go flat out.' },
-      { id: 'flat_road', title: 'Road \u2014 flat or slight uphill', body: 'Any straight stretch with room to slow down at the end.' },
+      // ⚠️ THE ONLY OPTION THAT NEEDS A METHOD, NOT A DESCRIPTION. Nobody's road is perfectly flat,
+      // so this says how to run the session on the road they actually have: pick the efforts, walk
+      // the descents. Without it the note above reads as "you cannot do this outside".
+      { id: 'flat_road', title: 'Road (flat or rolling)', body: 'If your road isn\u2019t perfectly flat, time your max efforts for the flat or slight uphill stretches. Strictly walk or jog the downhills to save your legs.' },
       { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
     ],
   },
