@@ -1708,8 +1708,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const hardDayValue = activeHard ? dayForSlot(hardSlotIndex) : '';
   // ⚠️ RESOLVED DAYS, not just the athlete's — a slot must not be able to take the day the engine
   // proposed for the other one, or two hard sessions land together and the composer dedupes one away.
-  const hardDaysTaken = state.hardDays
-    .map((_, i) => dayForSlot(i)).filter(Boolean) as DayName[];
   /** ⛔ THE COUNT DRIVES THE COPY (§1i). One HOLDS top-end fitness; two BUILDS it. */
   const hardDayCount = state.hardDays.filter((h) => !!h.day).length;
   /**
@@ -4310,25 +4308,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
                               roles={scheduleRoles}
                               /**
-                               * ⛔ THE LONG-DAY ROWS NO LONGER LOCK EACH OTHER (Michael, 2026-08-18:
-                               * "saturday isn't an option for long run"). A day held by the OTHER
-                               * long anchor was rendered dead with an em-dash, so swapping a Saturday
-                               * ride and a Sunday run meant clearing one, walking to the other row,
-                               * and setting both — three taps and a dead end in between.
+                               * ⛔⛔ THE UI IS A DUMB WHITEBOARD (Michael, 2026-08-18). NOTHING here
+                               * prevents a collision, evicts an anchor, or locks a day. The pin lands
+                               * where they tapped, the chip shows it, and the ENGINE says what it
+                               * cost. *"If you want the UI to stop fighting the user, you have to rip
+                               * out the code that is blocking the pins from landing."*
                                *
-                               * ⛔ AND LOCKING WAS THE WRONG SHAPE ANYWAY. His own ruling is that the
-                               * engine reports a collision and never blocks a pin, and two long days
-                               * on ONE day is a shape he validated by name — the Monster Brick. A
-                               * lock made the legal answer unreachable.
+                               * ⛔ THIS FILE HAS TRIED THREE SMARTER THINGS AND ALL THREE WERE FRICTION:
+                               *   • locking a day another anchor held — rendered it dead with an
+                               *     em-dash, so a Saturday/Sunday swap took three taps and a dead end;
+                               *   • locking the other hard slot's day — read as a button that would
+                               *     not register the tap;
+                               *   • auto-SWAPPING the two long days — better, and still the UI
+                               *     deciding something the athlete did not ask for.
                                *
-                               * ⚠️ THE HARD ROW KEEPS ITS LOCK, and that is a different rule: two
-                               * hard sessions on one calendar day is a DOUBLE, not two hard days, and
-                               * the composer drops the duplicate silently. Nothing is lost by
-                               * refusing it, which is not true of the long days.
+                               * ⚠️ AND THE ENGINE IS WHAT MAKES THIS SAFE. A collision reaches the
+                               * health badge on the same screen, and a doubled hard day now reaches
+                               * the plan's compromise list in words. ⛔ Do not reintroduce a lock
+                               * here: defensive UI is what made this screen feel broken.
                                */
-                              taken={row.key === 'hard'
-                                ? anchorDaysTaken(state, 'hard day')
-                                : {}}
+                              taken={{}}
                               // ⚠️ INERT UNTIL A DISCIPLINE IS CHOSEN. `qualityDays` is keyed by
                               // sport, so there is no slot to write a day into before Run or Ride is
                               // tapped. The cue line above says which choice unlocks it — a dead row
@@ -4336,35 +4335,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               // ⚠️ AND THE OTHER SLOT'S DAY IS LOCKED (§1i) — two hard sessions on one
                               // calendar day is a double, not two hard days, and the composer would
                               // drop the duplicate silently. Locked in the row so it cannot be entered.
-                              disabled={row.key === 'hard'
-                                ? (!activeHard
-                                    ? DAYS
-                                    : DAYS.filter((d) => hardDaysTaken.includes(d) && d !== activeHard.day))
-                                : []}
+                              // ⚠️ THE ONLY DISABLED STATE LEFT IS "THERE IS NOTHING TO WRITE INTO":
+                              // a hard row with no discipline chosen yet has no slot to hold a day.
+                              // ⛔ The other slot's day is NOT locked any more. Two hard sessions on
+                              // one day still builds as one, and the plan now SAYS so — a lock made
+                              // it look like the button was broken instead.
+                              disabled={row.key === 'hard' && !activeHard ? DAYS : []}
                               onTap={(d) => {
                                 // ⛔ TAP YOUR OWN DAY TO RELEASE IT — every question toggles, so no
                                 // pick is ever stuck and the athlete never hunts for a control to
                                 // undo one. Days the other anchors hold are locked in the row, so a
                                 // plain toggle is safe here.
-                                /**
-                                 * ⛔ TAPPING THE OTHER LONG DAY SWAPS THEM (2026-08-18) — which is
-                                 * what the athlete is almost always trying to do. Moving the long run
-                                 * onto the long ride's Saturday sends the ride to whichever day the
-                                 * run just left, in one tap. ⚠️ If the row has no day yet there is
-                                 * nothing to swap with, so the other anchor is simply cleared and the
-                                 * athlete picks it again — never two anchors silently stacked by a
-                                 * control that looked like a move.
-                                 */
-                                if (row.key === 'long' && state.longRideDay === d) {
-                                  const from = state.longRunDay;
-                                  setState((st) => ({ ...st, longRunDay: d as DayName, longRideDay: (from || '') as DayName | '' }));
-                                  return;
-                                }
-                                if (row.key === 'ride' && state.longRunDay === d) {
-                                  const from = state.longRideDay;
-                                  setState((st) => ({ ...st, longRideDay: d as DayName, longRunDay: (from || '') as DayName | '' }));
-                                  return;
-                                }
+                                // ⛔ NO SWAP, NO EVICTION, NO LOCK. The tap writes the day and nothing
+                                // else moves — see the `taken` note above.
                                 if (row.key === 'hard') {
                                   // ⛔ WRITES INTO THE ACTIVE SLOT (§1i). It used to write into
                                   // `qualityDays[sport]`, which is keyed by sport and therefore

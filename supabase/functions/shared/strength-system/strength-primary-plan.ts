@@ -2547,6 +2547,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * the app inventing an appointment.
    */
   const requestedHardDays: HardDayReq[] = [];
+  /** Days the athlete put TWO hard sessions on. Surfaced below rather than dropped in silence. */
+  const doubledHardDays: string[] = [];
   for (const raw of Array.isArray(args.hardDays) ? args.hardDays : []) {
     if (requestedHardDays.length >= MAX_HARD_DAYS) break;
     if (raw?.discipline !== 'run' && raw?.discipline !== 'bike') continue;
@@ -2567,7 +2569,24 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // act on must degrade to the shipped behaviour, not to no session at all.
     const ownership: 'prescribed' | 'club' = raw.ownership === 'club' ? 'club' : 'prescribed';
     if (!day && ownership === 'club') continue;
-    if (day && requestedHardDays.some((h) => h.day === day)) continue;
+    /**
+     * ⛔ TWO HARD SESSIONS ON ONE DAY IS A DOUBLE, NOT TWO HARD DAYS — and it is now SAID rather
+     * than silently dropped (Michael, 2026-08-18).
+     *
+     * The entry still does not build: a double is a different stimulus with a different recovery
+     * cost, and nothing in this block has been reasoned about for one. What changed is that the
+     * athlete used to tap a day, watch the app accept it, and receive a plan with one session in it
+     * and no explanation. His words: *"a silent drop doesn't feel like a rule; it just looks like a
+     * broken button."*
+     *
+     * ⚠️ SO THE UI NO LONGER BLOCKS THE TAP EITHER. The pin lands, the chip shows, and this line is
+     * what tells them what the plan did with it. ⛔ Do not restore the lock in the wizard and do not
+     * make this silent again — one of the two has to speak, and the plan is the one that knows.
+     */
+    if (day && requestedHardDays.some((h) => h.day === day)) {
+      doubledHardDays.push(day);
+      continue;
+    }
     requestedHardDays.push({
       day,
       discipline: raw.discipline,
@@ -3276,6 +3295,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * must say so — a silent drop is the absorption failure this file has fixed three times, and it
    * is worse here because the athlete would simply not find the session they chose.
    */
+  const doubledHardCompromises = [...new Set(doubledHardDays)].map((day) => ({
+    kind: 'cost' as const,
+    text: `You put two hard sessions on ${day}. The plan builds one — two on a single day is a `
+      + `double, which is a different session with a different cost, not a second hard day.`,
+  }));
   const hardYieldCompromises = [...new Set(yieldedHardDays)].map((label) => ({
     kind: 'cost' as const,
     text: `${label.replace(/^your /, 'Your ')} was left out this block: with your long run, long ride `
@@ -3287,6 +3311,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
     ...hardGateCompromises,
     ...hardYieldCompromises,
+    ...doubledHardCompromises,
   ];
   // ⛔ A BLOCK-LEVEL `assistanceRows(args.assistancePicks)` STOOD HERE AND NOTHING READ IT.
   // Deleted 2026-07-28. Zero consumers, confirmed by identifier scan — the live assistance is
