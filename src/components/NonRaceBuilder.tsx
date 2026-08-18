@@ -23,6 +23,8 @@ import {
   buildDefaultWeek,
   CATEGORY_LABEL,
   displayName,
+  // ⛔ THE COST LINE FOR A HIGH-ECCENTRIC PICK ON AN UPPER DAY (2026-08-17). Advice, never a gate.
+  eccentricCostNote,
   FOCUS_CAP,
   FOCUS_CHIPS,
   FOCUS_LABEL,
@@ -3407,7 +3409,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     {open && (
                       <div className="px-3 pb-3 space-y-3">
                         {ASSISTANCE_CATEGORIES.map((category) => {
-                          const opts = optionsFor(category, strengthEquipment);
+                          // ⛔ THE DAY RANKS THE SINGLE-LEG/CORE MENU (2026-08-17). On the bench day
+                          // — the block's one PURE UPPER day — the core movements lead and the
+                          // high-eccentric leg work sorts dead last; on a lower day it inverts.
+                          // ⚠️ ORDERING ONLY. Nothing is removed and nothing is substituted: the
+                          // athlete may still pick anything on the list (D-407/D-423), and what a
+                          // costly pick gets is the line below, not a swap.
+                          const opts = optionsFor(category, strengthEquipment, day);
                           const value = picks[category];
                           const muscle = opts.find((o) => o.name === value)?.muscle ?? '';
                           // ⛔ THE PULL PICKER GOES QUIET WHILE THE PROGRESSION OWNS THE SLOT
@@ -3459,6 +3467,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
                                 ))}
                               </select>
+                              {/* ⛔ THE COST OF THE PICK, WHEN THERE IS ONE — heavy eccentric leg
+                                  work on an upper day. Fact then consequence, no imperative: the
+                                  athlete chose it and the app is not going to argue, it is going to
+                                  say what happens. Silent on every safe pick. */}
+                              {eccentricCostNote(value, day) && (
+                                <p className="text-amber-200/70 text-xs mt-1.5 leading-snug">
+                                  {eccentricCostNote(value, day)}
+                                </p>
+                              )}
                             </div>
                           );
                         })}

@@ -142,17 +142,32 @@ Deno.test('the balanced default is Wendler\'s own pairings (Triumvirate p.48, Bi
   // deadlift's day, which keeps its own block (§1e, one round per stacked day).
   assertEquals(BALANCED_WEEK.bench.push, 'DB Bench Press');
   assertEquals(BALANCED_WEEK.bench.pull, 'Dumbbell Row');
-  // p.51: squat day → low back; deadlift day → hamstrings.
-  assertEquals(BALANCED_WEEK.squat.single_leg_core, 'Back Extension');
-  assertEquals(BALANCED_WEEK.deadlift.single_leg_core, 'Glute-Ham Raise');
-  // ⚠️ AND THE DEFAULT WEEK NOW CARRIES NO ABS MOVEMENT. It used to land once, on the press day —
-  // the only day with no lower-body main lift. That day is gone, so it is asserted as ABSENT rather
-  // than left unsaid: an athlete reaches abs through "+ abs" or the Abs focus chip. This is a
-  // content consequence of the merge, and pinning it is what stops it being rediscovered as a bug.
-  assertEquals(
-    Object.values(BALANCED_WEEK).some((d) => d.single_leg_core === 'Hanging Leg Raise'), false,
-    'the balanced week grew an abs default back without a decision',
-  );
+  // ⛔ THE SINGLE-LEG/CORE DEFAULTS NO LONGER FOLLOW p.51, AND THAT IS MICHAEL'S CALL (2026-08-17).
+  // p.51 pairs squat day → low back and deadlift day → hamstrings. For a hybrid athlete that lands a
+  // Glute-Ham Raise — one of the most eccentric hamstring movements there is — on the day the
+  // deadlift already loaded the hamstrings, and it left the mildest option on the squat day while the
+  // one PURE UPPER day carried a Reverse Lunge. Routed by `eccentricCost` instead: heavy work on the
+  // squat day, hip-hinge on the deadlift day, core on the bench day. ⛔ Do not restore p.51 here
+  // without asking him — the whole rule is in `BALANCED_WEEK`'s comments.
+  assertEquals(BALANCED_WEEK.squat.single_leg_core, 'Bulgarian Split Squat');
+  assertEquals(BALANCED_WEEK.deadlift.single_leg_core, 'Back Extension');
+  assertEquals(BALANCED_WEEK.bench.single_leg_core, 'Hanging Leg Raise');
+  // ⛔ THE ABS DEFAULT IS BACK, AND THIS TIME IT IS A DECISION (Michael, 2026-08-17) — WHICH IS
+  // EXACTLY WHAT THE GUARD BELOW ASKED FOR.
+  //
+  // It used to land once, on the press day — the only day with no lower-body main lift — and it went
+  // when that day did. This assertion then pinned its ABSENCE, so that it could not creep back
+  // unnoticed. It has not crept: the eccentric routing needs a `none`-cost movement on the one pure
+  // upper day, and EVERY `none` movement in the catalog is an abs movement. There is no non-abs,
+  // zero-leg-cost option to reach for. Michael named Hanging Leg Raise himself.
+  //
+  // ⚠️ SO THE GUARD IS INVERTED, NOT DELETED. It now pins that the abs default sits on the BENCH day
+  // and nowhere else — a `none` movement on a lower day would mean the high-eccentric work went
+  // somewhere it is not covered by the 48h heavy-legs clearance.
+  const absDays = Object.entries(BALANCED_WEEK)
+    .filter(([, d]) => catalogEntry(d.single_leg_core)?.eccentricCost === 'none')
+    .map(([day]) => day);
+  assertEquals(absDays, ['bench'], 'the zero-leg-cost default belongs on the pure upper day, and only there');
   assertEquals(Object.keys(BALANCED_WEEK).sort(), ['bench', 'deadlift', 'squat']);
 });
 

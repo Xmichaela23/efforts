@@ -133,6 +133,25 @@ export type CatalogEntry = {
   focus: FocusChip[];
   /** On the add-abs menu (Forever p.30 / 2nd ed p.43). */
   isAbs?: boolean;
+  /**
+   * ⛔ HOW MUCH LOCAL TISSUE DAMAGE THIS MOVEMENT LEAVES BEHIND — the axis this catalog was missing,
+   * and the reason the default block put Reverse Lunges on the one pure upper day (2026-08-17).
+   *
+   * ⚠️ IT IS NOT A CNS COST, AND CONFLATING THE TWO IS THE MISTAKE THIS TAG EXISTS TO PREVENT.
+   * The nervous system is taxed by heavy BILATERAL AXIAL loading — a bar on the back compressing the
+   * spine. Single-leg work carries a fraction of the absolute load and does not load the spine that
+   * way, so it is CHEAP on the CNS. What it is expensive on is the muscle itself: deep flexion under
+   * eccentric load micro-tears the glutes, hamstrings and VMO, and the athlete wakes up with legs
+   * that cannot hold a stride. Their threshold run collapses and they blame the barbell programme.
+   *
+   * ⚠️ ONLY MEANINGFUL ON `single_leg_core`. Push and pull rows leave it absent — a category-3 tag
+   * on a triceps pushdown would be a number nobody can read.
+   *
+   * `high` — deep flexion under eccentric load; the leg is trashed for ~48h.
+   * `mild` — hip-hinge posterior chain; loaded, but not through deep knee flexion.
+   * `none` — trunk only; the legs are untouched and the run is unaffected.
+   */
+  eccentricCost?: 'high' | 'mild' | 'none';
 };
 
 /**
@@ -174,9 +193,9 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   { name: 'Dumbbell Curl', display: 'Curls', category: 'pull', muscle: 'biceps', source: 'p.27', focus: ['arms'] },
 
   // ── SINGLE-LEG / CORE ───────────────────────────────────────────────────────────────────────────
-  { name: 'Reverse Lunge', display: 'Reverse Lunge', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] },
-  { name: 'Bulgarian Split Squat', display: 'Bulgarian Split Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] },
-  { name: 'Front Squat', display: 'Front Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] },
+  { name: 'Reverse Lunge', display: 'Reverse Lunge', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
+  { name: 'Bulgarian Split Squat', display: 'Bulgarian Split Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
+  { name: 'Front Squat', display: 'Front Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
   // ⛔ THE ONE DELIBERATE DEPARTURE FROM WENDLER'S LIST, AND IT IS HERE RATHER THAN IN A CHANGELOG SO
   // NOBODY "CORRECTS" IT BACK OUT.
   //
@@ -192,15 +211,15 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   // ⚠️ BARBELL LEADS ON PURPOSE. The loaded version is the movement; the single-leg version is the
   // answer for someone with no barbell, and it ranks itself there automatically (ALWAYS route) rather
   // than by being listed first.
-  { name: 'Barbell Hip Thrust', display: 'Barbell Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] },
-  { name: 'Single-Leg Hip Thrust', display: 'Single-Leg Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] },
-  { name: 'Glute-Ham Raise', display: 'Glute-Ham Raise', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] },
-  { name: 'Back Extension', display: 'Back Raise', category: 'single_leg_core', muscle: 'lower back / glutes', source: 'p.29', focus: ['glutes'] },
-  { name: 'Reverse Hyper', display: 'Reverse Hyper', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] },
-  { name: 'Hanging Leg Raise', display: 'Hanging Leg Raise', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: ['abs'], isAbs: true },
-  { name: 'Ab Wheel Rollout', display: 'Ab Wheel', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: ['abs'], isAbs: true },
-  { name: 'Weighted Sit-Up', display: 'Weighted Sit-Up', category: 'single_leg_core', muscle: 'abs', source: '2nd ed p.43', focus: ['abs'], isAbs: true },
-  { name: 'DB Side Bend', display: 'DB Side Bend', category: 'single_leg_core', muscle: 'abs / obliques', source: '2nd ed p.51', focus: ['abs'], isAbs: true },
+  { name: 'Barbell Hip Thrust', display: 'Barbell Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] , eccentricCost: 'mild' },
+  { name: 'Single-Leg Hip Thrust', display: 'Single-Leg Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] , eccentricCost: 'mild' },
+  { name: 'Glute-Ham Raise', display: 'Glute-Ham Raise', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'high' },
+  { name: 'Back Extension', display: 'Back Raise', category: 'single_leg_core', muscle: 'lower back / glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
+  { name: 'Reverse Hyper', display: 'Reverse Hyper', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
+  { name: 'Hanging Leg Raise', display: 'Hanging Leg Raise', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
+  { name: 'Ab Wheel Rollout', display: 'Ab Wheel', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
+  { name: 'Weighted Sit-Up', display: 'Weighted Sit-Up', category: 'single_leg_core', muscle: 'abs', source: '2nd ed p.43', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
+  { name: 'DB Side Bend', display: 'DB Side Bend', category: 'single_leg_core', muscle: 'abs / obliques', source: '2nd ed p.51', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
 ];
 
 const BY_NAME = new Map(ASSISTANCE_CATALOG.map((e) => [e.name.toLowerCase(), e]));
@@ -241,10 +260,16 @@ export function absCatalog(): CatalogEntry[] {
 export function optionsFor(
   category: AssistanceCategory,
   athleteEquipment?: string[] | null,
+  /**
+   * ⛔ WHICH DAY THE PICKER IS OPEN ON. Absent → today's order exactly, so every existing caller is
+   * unchanged. Given, and on `single_leg_core`, the menu is ranked by {@link orderByEccentricCost}.
+   */
+  day?: LiftDay | null,
 ): CatalogEntry[] {
   const all = catalogFor(category);
   const usable = all.filter((e) => canPerform(e.name, athleteEquipment));
-  return usable.length > 0 ? usable : all;
+  const list = usable.length > 0 ? usable : all;
+  return day && category === 'single_leg_core' ? orderByEccentricCost(list, day) : list;
 }
 
 export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
@@ -286,15 +311,66 @@ export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
  * restore it: that is a default-content decision, and it belongs to whoever owns §1f's card copy.
  */
 export const BALANCED_WEEK: Record<LiftDay, Record<AssistanceCategory, string>> = {
-  bench: { push: 'DB Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Reverse Lunge' },
+  // ⛔ SINGLE-LEG/CORE IS ROUTED BY `eccentricCost`, NOT PICKED FOR VARIETY (2026-08-17).
+  //
+  // This day's single-leg pick WAS `Reverse Lunge` — a `high` movement on the one PURE UPPER day in
+  // the block. An athlete who never opened the picker got deep-flexion eccentric leg damage on their
+  // cleanest day, woke with legs that could not hold a stride, and ran their threshold session on
+  // them. The squat day meanwhile got `Back Extension`, the mildest option in the category. Exactly
+  // inverted. ⛔ Do not "rebalance" these back for variety: the ordering IS the rule.
+  bench: { push: 'DB Bench Press', pull: 'Dumbbell Row', single_leg_core: 'Hanging Leg Raise' },
   // ⛔ INVERTED ROW, NOT LAT PULLDOWN (Slice 7). The default block must be performable BY A NORMAL
   // HOME GYM with nothing swapped — that is Slice 7's guardrail — and a lat pulldown needs a cable
   // stack or a band, which barbell/rack/bench/pull-up-bar does not include. It is still on the pull
   // menu for anyone who has the stack; it is no longer what the app hands someone by default.
-  squat: { push: 'Push-Up', pull: 'Inverted Row', single_leg_core: 'Back Extension' },
-  deadlift: { push: 'DB Shoulder Press', pull: 'Barbell Row', single_leg_core: 'Glute-Ham Raise' },
+  // ⚠️ THE HIGH-ECCENTRIC WORK LIVES HERE. The legs are already taking the day's systemic hit, so the
+  // local tissue damage is quarantined into one 24h window that the 48h heavy-legs clearance then
+  // covers. Bulgarian split squats need a bench, which Slice 7's home gym has.
+  squat: { push: 'Push-Up', pull: 'Inverted Row', single_leg_core: 'Bulgarian Split Squat' },
+  // ⚠️ MILD, NOT HIGH, AND THAT IS THE ONE PLACE THIS RULE IS NOT "LOWER DAY → HEAVY". The deadlift
+  // already loads the hamstrings eccentrically; `Glute-Ham Raise` — the old default here — is one of
+  // the most eccentric hamstring movements there is, and stacking it on deadlift day is the same
+  // tissue twice. A hip-hinge that does not go through deep knee flexion is the answer.
+  deadlift: { push: 'DB Shoulder Press', pull: 'Barbell Row', single_leg_core: 'Back Extension' },
 };
 
+/**
+ * ⛔ IS THIS DAY A PURE UPPER DAY — the one that must stay clean for the cardio around it?
+ * Squat and Deadlift + Press both carry a heavy barbell through the legs; bench does not.
+ */
+export function isUpperOnlyDay(day: LiftDay): boolean {
+  return day === 'bench';
+}
+
+/** Ranking order for the single-leg/core menu on a given day. Lower sorts first. */
+const ECCENTRIC_RANK_UPPER: Record<'high' | 'mild' | 'none', number> = { none: 0, mild: 1, high: 2 };
+const ECCENTRIC_RANK_LOWER: Record<'high' | 'mild' | 'none', number> = { high: 0, mild: 1, none: 2 };
+
+/**
+ * ⛔ THE ADVICE, NOT A GATE (2026-08-17). On an upper day the core movements sort to the top and the
+ * high-eccentric ones sort dead last; on a lower day the order inverts. **The athlete may still pick
+ * anything on the list** — D-407/D-423 is that the athlete's pick is what appears, and a build-time
+ * substitution here would bring back the apology sentence those decisions were written to delete.
+ * What a bad pick gets is {@link eccentricCostNote}, not a swap.
+ */
+export function orderByEccentricCost(entries: CatalogEntry[], day: LiftDay): CatalogEntry[] {
+  const rank = isUpperOnlyDay(day) ? ECCENTRIC_RANK_UPPER : ECCENTRIC_RANK_LOWER;
+  return [...entries].sort((a, b) =>
+    (rank[a.eccentricCost ?? 'none'] ?? 0) - (rank[b.eccentricCost ?? 'none'] ?? 0));
+}
+
+/**
+ * The cost of the pick, when there is one. `null` on every safe choice — a note on every row is a
+ * note nobody reads.
+ *
+ * ⚠️ FACT THEN CONSEQUENCE, NO IMPERATIVE. It does not tell the athlete to change their mind.
+ */
+export function eccentricCostNote(name: string, day: LiftDay): string | null {
+  if (!isUpperOnlyDay(day)) return null;
+  if (catalogEntry(name)?.eccentricCost !== 'high') return null;
+  return 'This puts heavy eccentric leg work on an upper-body day. '
+    + 'The soreness peaks a day later, which is when your cardio has to run on it.';
+}
 /**
  * The movements a focus chip re-points a category to, in preference order.
  *

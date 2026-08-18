@@ -359,7 +359,10 @@ Deno.test('a work session is jumps → main lift → the phase\u2019s rep total 
   // ⚠️ THE SECOND 'Back Squat' IS THE FSL SUPPLEMENTAL — leader week, First Set Last after the main
   // work (2026-08-16: week 1 is a leader now that the opening TM-test week is gone).
   assertEquals(rows.map((r: any) => r.name),
-    ['Box Jump', 'Back Squat', 'Back Squat', 'Push-Up', 'Inverted Row', 'Back Extension']);
+    // ⚠️ THE SQUAT DAY'S SINGLE-LEG/CORE DEFAULT IS THE HIGH-ECCENTRIC ONE NOW (2026-08-17). The
+    // local tissue damage is quarantined onto a day the legs are already loaded, where the 48h
+    // heavy-legs clearance covers it. See `BALANCED_WEEK`.
+    ['Box Jump', 'Back Squat', 'Back Squat', 'Push-Up', 'Inverted Row', 'Bulgarian Split Squat']);
   // `sets` is optional on the type now (assistance rows carry a rep TOTAL and no set count), but the
   // jump row always has one. ⛔ THE DOSE IS PER PHASE AS OF 2026-08-15 (Forever p.18): 2×5 = 10 in a
   // leader and on a light standalone week, 3×5 = 15 in an anchor. Week 1 of a default block is a
@@ -412,8 +415,11 @@ Deno.test('the athlete’s picks reach the block, and an unknown name falls back
   // ⛔ FALLBACK IS PER SLOT AND PER DAY, so an unrecognised name costs that one slot rather than the
   // week. All three are unusable here, so the bench day is its balanced default verbatim — which is
   // Wendler's Triumvirate pairing for a bench day (p.48: DB Bench + DB Row).
+  // ⚠️ 'Hanging Leg Raise', NOT 'Reverse Lunge' (2026-08-17): the bench day's single-leg/core default
+  // is now a CORE movement, because a `high` eccentric pick on the one pure upper day put leg damage
+  // in front of the next day's cardio. See `BALANCED_WEEK`.
   assertEquals(benchOf(stale),
-    ['Bench Press', 'Bench Press', 'DB Bench Press', 'Dumbbell Row', 'Reverse Lunge']);
+    ['Bench Press', 'Bench Press', 'DB Bench Press', 'Dumbbell Row', 'Hanging Leg Raise']);
 });
 
 Deno.test('⛔ ASSISTANCE CARRIES NO PRESCRIBED LOAD — including the loaded options', () => {
