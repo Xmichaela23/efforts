@@ -130,11 +130,19 @@ value feeds anything besides display.
 - **"It's running the old builder."** ⚠️ SUPERSEDED by the banner above: the client was refreshed,
   so the only stale thing left is the GOAL ROW's stored prefs (#6). Rebuild-from-scratch remains
   useful as a diagnostic, but nobody asks Michael to do it — reproduce in fixtures.
-- **"We didn't offer the correct run drills."** The hard-run options screen still offers only the
-  VO2 terrain menu (hill / treadmill / short hill / flat). Under §7 the run can now be the
-  THRESHOLD day, and a threshold run is not a hill-repeat session — the offer has to follow the
-  role. ⚠️ UNSPECIFIED: what the correct threshold-run offer is (track / flat road / treadmill?).
-  **Ask Michael before building — do not invent the menu.**
+- **"We didn't offer the correct run drills" / "it shouldn't say Hill Repeats — that stuff is
+  old."** ⛔ THE SPEC ALREADY EXISTS — work order §7's table, from Michael's own design paste
+  (2026-08-17). The sessions are named and offered by ENERGY SYSTEM, not by the old
+  maintenance-era vocabulary:
+  - **The VO2 day** prescribes §7's session — 4×3 min hard uphill (run) / 4×4 min (ride) — but it
+    is the VO2 day: named for what it builds ("VO2 Intervals" / the top-end day), with uphill as
+    part of the prescription. "Hill Repeats" as a workout name, and the four-card "what you can
+    run it on" terrain menu as the framing, are the OLD maintenance-dose era. The terrain choice
+    survives as a detail inside the VO2 day (hill / treadmill incline / flat variants exist in the
+    engine), not as the day's identity.
+  - **The threshold day** prescribes §7's wave (4×5 → 3×7 → 2×10) and is named as the sustained
+    day, run and ride alike — the export already names "Threshold Ride"; the run side must match.
+  - Do NOT re-ask Michael for a menu. The offer is the role; the role comes from §7's assignment.
 
 ---
 
