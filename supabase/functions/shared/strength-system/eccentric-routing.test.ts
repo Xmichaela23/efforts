@@ -14,13 +14,19 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  absOptions,
   BALANCED_WEEK,
+  buildDefaultWeek,
   catalogEntry,
   eccentricCostNote,
+  FOCUS_CHIPS,
+  FOCUS_LABEL,
   isUpperOnlyDay,
   LIFT_DAYS,
+  normalizeAssistancePrefs,
   optionsFor,
   orderByEccentricCost,
+  pickForDay,
 } from '../../../../src/lib/assistance-catalog.ts';
 
 const costOf = (name: string) => catalogEntry(name)?.eccentricCost;
@@ -91,11 +97,15 @@ Deno.test('⛔ ON AN UPPER DAY CORE LEADS AND HIGH-ECCENTRIC RANKS DEAD LAST', (
   assertEquals(ordered[ordered.length - 1].eccentricCost, 'high', `ended with ${ordered.at(-1)!.name}`);
 });
 
-Deno.test('on a lower day the order inverts — the heavy work is what belongs there', () => {
-  for (const day of ['squat', 'deadlift'] as const) {
-    const ordered = orderByEccentricCost(optionsFor('single_leg_core'), day);
-    assertEquals(ordered[0].eccentricCost, 'high', `${day} led with ${ordered[0].name}`);
-  }
+Deno.test('⛔ THE ROUTING HAS THREE ANSWERS, NOT UPPER-VS-LOWER', () => {
+  // A binary rank stood here first and it disagreed with its own defaults: it led the DEADLIFT day's
+  // menu with `high` while `BALANCED_WEEK.deadlift` had just been fixed to `mild` — recommending the
+  // exact thing the default was corrected to avoid.
+  const lead = (day: 'squat' | 'bench' | 'deadlift') =>
+    orderByEccentricCost(optionsFor('single_leg_core'), day)[0].eccentricCost;
+  assertEquals(lead('squat'), 'high', 'the legs already took the hit here');
+  assertEquals(lead('deadlift'), 'mild', 'the deadlift already loaded those hamstrings');
+  assertEquals(lead('bench'), 'none', 'the one day that must stay clean for the cardio');
 });
 
 Deno.test('optionsFor takes the day and orders by it, and is unchanged without one', () => {
@@ -129,4 +139,55 @@ Deno.test('and every safe pick is silent — a note on every row is a note nobod
 
 Deno.test('bench is the only pure upper day', () => {
   assertEquals(LIFT_DAYS.filter(isUpperOnlyDay), ['bench']);
+});
+
+// ── THE FOCUS CHIP CANNOT SMUGGLE HIGH-ECCENTRIC WORK ONTO A DAY ─────────────────────────────────
+
+Deno.test('⛔ THE GLUTES CHIP KEEPS THE GHR OFF THE BENCH AND DEADLIFT DAYS', () => {
+  // The chip pool rotates by day index and was blind to tissue cost, so it handed the DEADLIFT day a
+  // Glute-Ham Raise — the exact stack the defaults were fixed to remove, arriving one layer up.
+  const week = buildDefaultWeek(['glutes']);
+  assert(costOf(week.bench.single_leg_core) !== 'high', `bench got ${week.bench.single_leg_core}`);
+  assert(costOf(week.deadlift.single_leg_core) !== 'high', `deadlift got ${week.deadlift.single_leg_core}`);
+});
+
+Deno.test('⛔ AND IT IS A QUARANTINE, NOT A MAGNET — the chip still answers its own name', () => {
+  // The first version SORTED by cost, which made the squat day PREFER `high` — so Glutes returned a
+  // hamstring raise over a hip thrust and the chip stopped meaning what it says. The law is that the
+  // squat day can AFFORD high-eccentric work, never that it requires it.
+  assertEquals(buildDefaultWeek(['glutes']).squat.single_leg_core, 'Barbell Hip Thrust');
+});
+
+Deno.test('the routing never strands — a pool with no safe option still yields a movement', () => {
+  const highOnly = optionsFor('single_leg_core').filter((e) => e.eccentricCost === 'high');
+  for (const day of LIFT_DAYS) {
+    assert(!!pickForDay(highOnly, day, 0), `${day} returned nothing`);
+  }
+});
+
+// ── THE TWO DELETED CHIPS ────────────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ FOUR CHIPS — `back` AND `abs` ARE GONE, AND THEY WERE REDUNDANT UI', () => {
+  // `abs` pointed at the slot the Add-abs button already governs (and the button SPLITS the bucket's
+  // reps rather than re-pointing it); `back` pointed at the slot the pull-up progression takes
+  // outright. Two controls for one slot is how an athlete spends one recovery budget twice.
+  assertEquals(FOCUS_CHIPS, ['arms', 'chest', 'shoulders', 'glutes']);
+  assertEquals(Object.keys(FOCUS_LABEL).sort(), ['arms', 'chest', 'shoulders', 'glutes'].sort());
+});
+
+Deno.test('⛔ A GOAL STORED WITH THE OLD CHIPS DEGRADES — the filter IS the migration', () => {
+  const prefs = normalizeAssistancePrefs({ focus: ['back', 'abs'] });
+  assertEquals(prefs.focus, [], 'a deleted chip survived into the built week');
+  // ⚠️ AND THE WEEK IS STILL COMPLETE — no chip means the balanced default, which is a full block.
+  const week = buildDefaultWeek(prefs.focus);
+  for (const day of LIFT_DAYS) assert(!!week[day].single_leg_core, `${day} lost its slot`);
+});
+
+Deno.test('⛔ THE ADD-ABS MENU IS UNTOUCHED BY THE CHIP DELETION — it reads `isAbs`, not the tag', () => {
+  // The `focus: ['abs']` tags went with the chip. If the abs MENU had read those tags instead of the
+  // `isAbs` flag, the button would have silently emptied.
+  assertEquals(
+    absOptions().map((e) => e.name),
+    ['Hanging Leg Raise', 'Ab Wheel Rollout', 'Weighted Sit-Up', 'DB Side Bend'],
+  );
 });

@@ -221,11 +221,14 @@ Deno.test('absent, null, garbage and a wrong-category pick all produce a COMPLET
 });
 
 Deno.test('the focus cap is three, and unknown chips are dropped rather than stored', () => {
+  // ⛔ `back` AND `abs` ARE NOW AMONG THE UNKNOWN ONES (2026-08-17) — both chips were deleted as
+  // redundant UI, and a goal stored with them degrades through exactly this filter. That IS the
+  // migration; there is no shim and none is wanted.
   const prefs = normalizeAssistancePrefs({
-    focus: ['chest', 'back', 'abs', 'glutes', 'legs', 42],
+    focus: ['chest', 'back', 'abs', 'glutes', 'arms', 'shoulders', 'legs', 42],
   });
   assertEquals(prefs.focus.length, 3);
-  assertEquals(prefs.focus, ['chest', 'back', 'abs']);
+  assertEquals(prefs.focus, ['chest', 'glutes', 'arms']);
 });
 
 // ── FOCUS ─────────────────────────────────────────────────────────────────────────────────────────
@@ -255,12 +258,12 @@ Deno.test('⛔ THE MOVEMENT THAT MATCHES THE ATHLETE\'S OWN KIT LEADS THE POOL',
     focusPool('arms', 'push', bandsAndDb).filter((e) => canPerformCat(e.name, bandsAndDb)).map((e) => e.name),
     ['Triceps Extension', 'Triceps Pushdown'],
   );
-  // Same shape one pool over: bands-only Back led with Lat Pulldown (band = backup) over Inverted
-  // Row (needs nothing).
-  assertEquals(focusPool('back', 'pull', ['Resistance bands'])[0].name, 'Inverted Row');
+  // ⚠️ THE `back` HALF OF THIS TEST IS GONE WITH THE CHIP (2026-08-17). It pinned the same
+  // best-fit-leads rule one pool over; the rule itself is still pinned above and on `arms`/`pull`
+  // below, so nothing about it went unasserted.
   // ⚠️ A CABLE OWNER STILL GETS THE CABLE MOVEMENT — the rule is "best fit", not "avoid cables".
   assertEquals(focusPool('arms', 'push', ['Commercial gym'])[0].name, 'Dips');
-  assertEquals(focusPool('back', 'pull', ['Commercial gym'])[0].name, 'Chin-Up');
+  assertEquals(focusPool('arms', 'pull', ['Commercial gym'])[0].name, 'Chin-Up');
 });
 
 Deno.test('the ranking REORDERS, it never filters — and unknown kit leaves catalog order alone', () => {
@@ -341,6 +344,8 @@ Deno.test('the bodyweight hip thrust carries the glutes focus when there is no b
     .filter((e) => canPerformCat(e.name, DB)).map((e) => e.name);
   assertEquals(pool, ['Single-Leg Hip Thrust']);
   assertEquals(buildDefaultWeek(['glutes'], DB).squat.single_leg_core, 'Single-Leg Hip Thrust');
+  // ⚠️ AND ON A KIT WITH ONE OPTION IT LANDS ON EVERY DAY — the routing prefers a tier, it does not
+  // invent a movement the athlete cannot do.
   // The barbell version is correctly off the menu, not silently substituted.
   assertEquals(canPerformCat('Barbell Hip Thrust', DB), false);
 });

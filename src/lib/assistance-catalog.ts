@@ -102,15 +102,36 @@ export function liftDayForMainLift(mainLiftName: string | null | undefined): Lif
  * is no Legs or Quads chip: this athlete runs, and the doc's call is that leg volume is not something
  * to encourage. Glutes covers hamstrings (Forever p.29 groups them).
  */
-export type FocusChip = 'arms' | 'chest' | 'shoulders' | 'back' | 'glutes' | 'abs';
-export const FOCUS_CHIPS: FocusChip[] = ['arms', 'chest', 'shoulders', 'back', 'glutes', 'abs'];
+/**
+ * ⛔ FOUR CHIPS, NOT SIX — `back` AND `abs` ARE DELETED (Michael, 2026-08-17).
+ *
+ * Both were REDUNDANT UI: a second control pointing at a slot another control already owns, which
+ * is how an athlete spends the same recovery budget twice without being told.
+ *
+ *   • **`abs`** pointed at `single_leg_core` — the slot the **Add abs** button already governs, and
+ *     the button is the better control because it SPLITS the bucket's rep total rather than
+ *     re-pointing it. Two ways to reach one slot, one of which silently displaces the leg work.
+ *   • **`back`** pointed at `pull` — the slot the **pull-up progression** takes outright when it is
+ *     on, and which defaults sensibly when it is off. A Back chip beside a live progression toggle
+ *     reads as "you get both"; the chins do not double.
+ *
+ * ⚠️ NOTHING STRANDS. A goal stored with `focus: ['back','abs']` degrades through `isFocusChip`,
+ * which filters unknown values — so an old goal simply builds its balanced default for that
+ * category, exactly as an athlete who picked no chip at all. ⛔ Do not add a migration or a
+ * tolerance branch; the filter IS the migration.
+ *
+ * ⚠️ AND THE CATALOG'S `focus` TAGS FOR THEM GO WITH THE CHIPS. A tag no chip can name is a pool
+ * nothing can reach — see `focusPool`'s own warning that an empty pool is the tell of a missing tag.
+ * `isAbs` is UNTOUCHED: the add-abs menu reads that flag, never the focus tag, so the button keeps
+ * every movement it had.
+ */
+export type FocusChip = 'arms' | 'chest' | 'shoulders' | 'glutes';
+export const FOCUS_CHIPS: FocusChip[] = ['arms', 'chest', 'shoulders', 'glutes'];
 export const FOCUS_LABEL: Record<FocusChip, string> = {
   arms: 'Arms',
   chest: 'Chest',
   shoulders: 'Shoulders',
-  back: 'Back',
   glutes: 'Glutes',
-  abs: 'Abs',
 };
 /** ⛔ THREE. Past that every day is a focus day and the emphasis means nothing. */
 export const FOCUS_CAP = 3;
@@ -183,12 +204,12 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   { name: 'Triceps Extension', display: 'Triceps Extension', category: 'push', muscle: 'triceps', source: 'p.26', focus: ['arms'] },
 
   // ── PULL ────────────────────────────────────────────────────────────────────────────────────────
-  { name: 'Chin-Up', display: 'Chin-Up', category: 'pull', muscle: 'lats / biceps', source: 'p.26', focus: ['back', 'arms'] },
-  { name: 'Dumbbell Row', display: 'Dumbbell Row', category: 'pull', muscle: 'upper back', source: 'p.27', focus: ['back'] },
-  { name: 'Barbell Row', display: 'Barbell Row', category: 'pull', muscle: 'upper back', source: 'p.27', focus: ['back'] },
-  { name: 'Lat Pulldown', display: 'Lat Pulldown', category: 'pull', muscle: 'lats', source: 'p.27', focus: ['back'] },
-  { name: 'Inverted Row', display: 'Inverted Row', category: 'pull', muscle: 'back', source: 'p.26', focus: ['back'] },
-  { name: 'Face Pull', display: 'Face Pull', category: 'pull', muscle: 'upper back', source: 'p.28', focus: ['back'] },
+  { name: 'Chin-Up', display: 'Chin-Up', category: 'pull', muscle: 'lats / biceps', source: 'p.26', focus: ['arms'] },
+  { name: 'Dumbbell Row', display: 'Dumbbell Row', category: 'pull', muscle: 'upper back', source: 'p.27', focus: [] },
+  { name: 'Barbell Row', display: 'Barbell Row', category: 'pull', muscle: 'upper back', source: 'p.27', focus: [] },
+  { name: 'Lat Pulldown', display: 'Lat Pulldown', category: 'pull', muscle: 'lats', source: 'p.27', focus: [] },
+  { name: 'Inverted Row', display: 'Inverted Row', category: 'pull', muscle: 'back', source: 'p.26', focus: [] },
+  { name: 'Face Pull', display: 'Face Pull', category: 'pull', muscle: 'upper back', source: 'p.28', focus: [] },
   // Stored canonical, displayed as Wendler writes it.
   { name: 'Dumbbell Curl', display: 'Curls', category: 'pull', muscle: 'biceps', source: 'p.27', focus: ['arms'] },
 
@@ -216,10 +237,10 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   { name: 'Glute-Ham Raise', display: 'Glute-Ham Raise', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'high' },
   { name: 'Back Extension', display: 'Back Raise', category: 'single_leg_core', muscle: 'lower back / glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
   { name: 'Reverse Hyper', display: 'Reverse Hyper', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
-  { name: 'Hanging Leg Raise', display: 'Hanging Leg Raise', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
-  { name: 'Ab Wheel Rollout', display: 'Ab Wheel', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
-  { name: 'Weighted Sit-Up', display: 'Weighted Sit-Up', category: 'single_leg_core', muscle: 'abs', source: '2nd ed p.43', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
-  { name: 'DB Side Bend', display: 'DB Side Bend', category: 'single_leg_core', muscle: 'abs / obliques', source: '2nd ed p.51', focus: ['abs'], isAbs: true , eccentricCost: 'none' },
+  { name: 'Hanging Leg Raise', display: 'Hanging Leg Raise', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: [], isAbs: true , eccentricCost: 'none' },
+  { name: 'Ab Wheel Rollout', display: 'Ab Wheel', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: [], isAbs: true , eccentricCost: 'none' },
+  { name: 'Weighted Sit-Up', display: 'Weighted Sit-Up', category: 'single_leg_core', muscle: 'abs', source: '2nd ed p.43', focus: [], isAbs: true , eccentricCost: 'none' },
+  { name: 'DB Side Bend', display: 'DB Side Bend', category: 'single_leg_core', muscle: 'abs / obliques', source: '2nd ed p.51', focus: [], isAbs: true , eccentricCost: 'none' },
 ];
 
 const BY_NAME = new Map(ASSISTANCE_CATALOG.map((e) => [e.name.toLowerCase(), e]));
@@ -337,26 +358,81 @@ export const BALANCED_WEEK: Record<LiftDay, Record<AssistanceCategory, string>> 
 /**
  * ⛔ IS THIS DAY A PURE UPPER DAY — the one that must stay clean for the cardio around it?
  * Squat and Deadlift + Press both carry a heavy barbell through the legs; bench does not.
+ * ⚠️ THIS IS THE COST NOTE'S QUESTION ONLY. The ROUTING has three answers, not two — see
+ * {@link ECCENTRIC_RANK}.
  */
 export function isUpperOnlyDay(day: LiftDay): boolean {
   return day === 'bench';
 }
 
-/** Ranking order for the single-leg/core menu on a given day. Lower sorts first. */
-const ECCENTRIC_RANK_UPPER: Record<'high' | 'mild' | 'none', number> = { none: 0, mild: 1, high: 2 };
-const ECCENTRIC_RANK_LOWER: Record<'high' | 'mild' | 'none', number> = { high: 0, mild: 1, none: 2 };
+/**
+ * ⛔ THE ROUTING, PER DAY — and it is THREE answers, not "upper vs lower" (corrected 2026-08-17).
+ *
+ * | day               | wants | why                                                                |
+ * |-------------------|-------|--------------------------------------------------------------------|
+ * | bench (pure upper)| none  | the legs must stay clean for the cardio on either side of it        |
+ * | squat             | high  | the legs already took the day's hit; quarantine the damage here     |
+ * | deadlift + press  | mild  | the deadlift already loaded the hamstrings — high is the same tissue twice |
+ *
+ * ⚠️ A BINARY UPPER/LOWER RANK STOOD HERE FIRST AND IT DISAGREED WITH ITS OWN DEFAULTS. It put
+ * `high` at the top of the deadlift day's menu while `BALANCED_WEEK.deadlift` was deliberately
+ * `mild` — so the picker recommended the thing the default had just been fixed to avoid.
+ */
+const ECCENTRIC_RANK: Record<LiftDay, Record<'high' | 'mild' | 'none', number>> = {
+  bench: { none: 0, mild: 1, high: 2 },
+  squat: { high: 0, mild: 1, none: 2 },
+  deadlift: { mild: 0, high: 1, none: 2 },
+};
 
 /**
- * ⛔ THE ADVICE, NOT A GATE (2026-08-17). On an upper day the core movements sort to the top and the
- * high-eccentric ones sort dead last; on a lower day the order inverts. **The athlete may still pick
- * anything on the list** — D-407/D-423 is that the athlete's pick is what appears, and a build-time
- * substitution here would bring back the apology sentence those decisions were written to delete.
- * What a bad pick gets is {@link eccentricCostNote}, not a swap.
+ * ⛔ THE ADVICE, NOT A GATE (2026-08-17). The menu is ORDERED for the day; nothing is removed and
+ * nothing is substituted. **The athlete may still pick anything on the list** — D-407/D-423 is that
+ * the athlete's pick is what appears, and a build-time substitution here would bring back the
+ * apology sentence those decisions were written to delete. What a costly pick gets is
+ * {@link eccentricCostNote}, not a swap.
  */
 export function orderByEccentricCost(entries: CatalogEntry[], day: LiftDay): CatalogEntry[] {
-  const rank = isUpperOnlyDay(day) ? ECCENTRIC_RANK_UPPER : ECCENTRIC_RANK_LOWER;
+  const rank = ECCENTRIC_RANK[day] ?? ECCENTRIC_RANK.bench;
   return [...entries].sort((a, b) =>
     (rank[a.eccentricCost ?? 'none'] ?? 0) - (rank[b.eccentricCost ?? 'none'] ?? 0));
+}
+
+/**
+ * ⛔ WHICH TIERS MAY LAND ON A DAY AT ALL. This is a QUARANTINE, not a magnet.
+ *
+ * ⚠️ AND THAT DISTINCTION IS A BUG I WROTE AND THE GLUTES CHIP CAUGHT. The first version SORTED the
+ * focus pool by day, which made the squat day actively PREFER `high` — so an athlete asking for
+ * Glutes got a Glute-Ham Raise (a hamstring raise) over a Barbell Hip Thrust, and the chip stopped
+ * answering its own name. The law never said high-eccentric work is REQUIRED on the squat day; it
+ * said it is the only day that can AFFORD it. So the day filters what may land and the pool's own
+ * order — equipment fit, then the catalog — still decides which one does.
+ */
+const ALLOWED_ECCENTRIC: Record<LiftDay, ReadonlyArray<'high' | 'mild' | 'none'>> = {
+  // The one day that must stay clean for the cardio either side of it.
+  bench: ['none', 'mild'],
+  // The deadlift already loaded those hamstrings; `high` on top is the same tissue twice.
+  deadlift: ['mild', 'none'],
+  // The legs took the day's hit already. Everything is affordable here.
+  squat: ['high', 'mild', 'none'],
+};
+
+/**
+ * ⛔ WHICH MOVEMENT A FOCUS POOL GIVES THIS DAY — QUARANTINED, THEN ROTATED (2026-08-17).
+ *
+ * Every other category rotates its focus pool by day index so the week has variety. Bucket 3 cannot
+ * do that blind: the rotation put a Glute-Ham Raise (`high`) on the deadlift day for anyone who
+ * picked the Glutes chip, reintroducing through the chip exactly the stack the defaults had just
+ * been fixed to remove.
+ *
+ * ⚠️ IT NEVER STRANDS. If the day's allowed tiers empty the pool — a kit whose only glute option is
+ * a `high` movement — the whole pool rotates as before. A missing movement is worse than a costly
+ * one, and the athlete still gets {@link eccentricCostNote} on the card.
+ */
+export function pickForDay(pool: CatalogEntry[], day: LiftDay, dayIndex: number): CatalogEntry {
+  const allowed = ALLOWED_ECCENTRIC[day] ?? ALLOWED_ECCENTRIC.bench;
+  const safe = pool.filter((e) => allowed.includes(e.eccentricCost ?? 'none'));
+  const usable = safe.length > 0 ? safe : pool;
+  return usable[dayIndex % usable.length];
 }
 
 /**
@@ -422,9 +498,7 @@ const CATEGORY_FOR_FOCUS: Record<FocusChip, AssistanceCategory[]> = {
   arms: ['push', 'pull'],
   chest: ['push'],
   shoulders: ['push'],
-  back: ['pull'],
   glutes: ['single_leg_core'],
-  abs: ['single_leg_core'],
 };
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────────────────────────
@@ -603,7 +677,12 @@ export function buildDefaultWeek(
         // who has only bands keeps every movement they can do.
         const loadable = pool.filter((e) => hasLoadableFit(e.name, athleteEquipment));
         const rotation = loadable.length > 0 ? loadable : pool;
-        picks[category] = rotation[dayIndex % rotation.length].name;
+        // ⛔ BUCKET 3 IS ROUTED BY THE DAY, NOT ROTATED BLIND — see `pickForDay`. A Glutes chip used
+        // to hand the deadlift day a Glute-Ham Raise, which is the exact stack the defaults were
+        // fixed to remove; the chip was reintroducing it one layer up.
+        picks[category] = category === 'single_leg_core'
+          ? pickForDay(rotation, day, dayIndex).name
+          : rotation[dayIndex % rotation.length].name;
       } else {
         const fallback = BALANCED_WEEK[day][category];
         // ⚠️ THE REPLACEMENT IS RANKED TOO. When the balanced default is un-performable the app is
