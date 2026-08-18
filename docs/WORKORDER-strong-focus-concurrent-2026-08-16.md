@@ -1016,3 +1016,48 @@ more for this athlete. Record it as a trade taken, not an error corrected.
 - Generators that do not route through the optimizer (`generate-run-plan`, `generate-triathlon-plan`,
   `generate-plan`) will not inherit this. Known and pre-existing.
 - Pin tests over the matrix and the adjacency table.
+
+---
+
+## 8. The first built plan — read 2026-08-17, and it fails review
+
+**Michael built a real block on the deployed §1/§7 code and read the export end to end.** Every
+mechanism test green (465/0); the assembled document fails — the fixtures read fields, nothing
+reads the plan the way the athlete does. These are the defects, in fix order, verified against the
+real export, reproducible from his config (run 3d maintain · bike 2d maintain · strength develop ·
+long run Sun · long ride Sat · hard days Fri run + Tue ride, both prescribed · pullup progression
+on · focus chest/glutes/abs · 15 mi · 3 h ride).
+
+⛔ **Verification for this section: generate the plan from that config and READ IT AS A DOCUMENT.**
+Michael does not QA intermediate states; one finished plan at the end.
+
+1. ⛔ **The 48h long-run law is breached.** Monday's squat sits 24h after Sunday's long run, with a
+   compromise line apologising. Breach-and-disclose is not acceptable for this pair — the engine
+   drops or moves a LESSER session and says so. The §1i two-hard-day work crowded the week until
+   the law lost; find where, fix it, and pin THIS week shape in the law's fixture.
+2. ⛔ **Week 1 has no exercise rows** — the current week is unloggable while weeks 2–12 export full
+   blocks. Week 1 comes off materialized `planned_workouts`; later weeks off plan JSON. Same rows
+   price the threshold ride at 43m where every later week says 24m. One cause may explain both;
+   fix at the source, not in the export.
+3. **The run's hard day speaks the pre-§7 vocabulary.** "Hill Repeats" as an identity and the
+   terrain-card menu are the maintenance-dose era. The day is the VO2 DAY — named for what it
+   builds, 4×3 uphill as its prescription, terrain a detail inside it; the run's threshold day is
+   named beside "Threshold Ride". The offer follows §7's role assignment. Nothing new to decide.
+4. **The descriptions are boilerplate walls.** The same sentences (assistance load-by-feel, the
+   chins programme, 50-in-10, the FSL explanation) print ~36 times each. A sentence true every
+   week moves to the plan header once; a session keeps only its own facts. Cut duplication, never
+   information.
+5. **The paired-day note is doubled and names itself** — "Deadlift + Overhead Press goes first and
+   Overhead Press follows": two writers (`pairNoteFor` + the merge's order sentence, which reads
+   `ordered[0].name` after the title rewrite). One writer, naming the lift.
+6. **The week-cost paragraph**: the back-to-back sentence prints twice, weekdays print lowercase,
+   and "you asked for 2 ride days; the week had room for 1" is false on a calendar showing two
+   rides. Count what the athlete sees.
+7. **The saved goal still speaks four-day** — "Strength Frequency: 4×/week", strength days
+   "monday, tuesday, thursday, thursday". Fix the writer on the goal path; check what reads it.
+8. **Lint:** grip fragments fold into the chins line; no lowercase weekdays; no raw tokens in
+   athlete text (week 1 prints "(Bike Threshold 5min)").
+
+⛔ **The missing test class, and it joins §4's verification:** render a full session description
+and the week-cost paragraph AS STRINGS; assert no sentence twice, no lowercase weekday, no token
+text. That gap is how every mechanism passed while the document failed.
