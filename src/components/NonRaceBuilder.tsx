@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Bike, Waves, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
+import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
@@ -39,7 +39,7 @@ import {
 import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
 // §7 — the hard day's gate reads the SAME resolvers the composer prices off. Fed, never re-derived.
 // ⛔ THE SCHEDULER'S OPINIONATED DEFAULT — the SAME solver the composer uses, via `@shared`.
-import { suggestHardDays } from '@/lib/suggest-hard-days';
+import { scheduleHealth, suggestHardDays } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
@@ -1846,6 +1846,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       return touched ? { ...st, hardDays: next } : st;
     });
   }, [currentStep, suggestedHardDays]);
+
+  /** ⛔ ONE SOLVE, RECOMPUTED AS THEY TAP — the badge above the week and nothing else reads it. */
+  const scheduleHealthState = React.useMemo(
+    () => scheduleHealth({
+      hardDays: state.hardDays.map((h) => ({
+        discipline: h.discipline, day: h.day, ownership: h.ownership,
+      })),
+      longRunDay: state.longRunDay,
+      longRideDay: state.longRideDay,
+    }),
+    [state.hardDays, state.longRunDay, state.longRideDay],
+  );
+  const [healthOpen, setHealthOpen] = useState(false);
 
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
@@ -4534,6 +4547,57 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 disconnect that let an athlete miss the "Runs a week" count. One sentence, one place,
                 at the button. */}
 
+            {/* ── SCHEDULE HEALTH ──────────────────────────────────────────────────────────────
+                ⛔ PINNED DIRECTLY ABOVE THE WEEK (Michael, 2026-08-18), so it answers the tap that
+                caused it. It reads the SAME model that will build the block — one solve, run as they
+                move a chip — so the badge and the plan agree by construction rather than by luck.
+
+                ⛔ ONLY CLEARANCE COLLISIONS LIGHT IT. A ride the week had no room for, a crowded
+                day, the interleaving preference: real costs, none of them biological collisions.
+                Folding those in would light the badge on weeks where nothing is breached and the
+                warning would stop meaning anything. A week with no rest day is excluded for the same
+                reason.
+
+                ⛔ NEUTRAL SURFACE, NOT A COLOUR. This app already spends amber on STRENGTH and green
+                on RIDE — a coloured badge here would read as a discipline, which is the wayfinding
+                language the rest of the wizard is built in. The state is carried by an ICON and the
+                WORDS; the surface stays the card's own.
+
+                ⚠️ A COUNT, NEVER A PERCENTAGE. A week either breaches a clearance or it does not,
+                so a score would be a number with no scale behind it — the "score that lies" this
+                codebase keeps deleting. It says how many, and tapping shows exactly which. */}
+            {(state.hardDays.length > 0 || state.longRunDay || state.longRideDay) && (
+              <button
+                type="button"
+                onClick={() => scheduleHealthState.ok ? undefined : setHealthOpen((v) => !v)}
+                aria-expanded={scheduleHealthState.ok ? undefined : healthOpen}
+                className={`w-full text-left rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5 ${scheduleHealthState.ok ? 'cursor-default' : ''}`}
+              >
+                <span className="flex items-center gap-2">
+                  {scheduleHealthState.ok
+                    ? <Check className="h-4 w-4 shrink-0 text-white/70" />
+                    : <AlertTriangle className="h-4 w-4 shrink-0 text-white/70" />}
+                  <span className="text-white/85 text-sm">
+                    {scheduleHealthState.ok
+                      ? 'Optimal schedule'
+                      : `High fatigue risk: ${scheduleHealthState.collisions.length} collision${scheduleHealthState.collisions.length === 1 ? '' : 's'}`}
+                  </span>
+                  {!scheduleHealthState.ok && (
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 ml-auto transition-transform ${healthOpen ? 'rotate-180' : ''}`} />
+                  )}
+                </span>
+                {/* ⛔ THE RECEIPT, IN THE ENGINE'S OWN WORDS. Not re-worded client-side: the athlete
+                    reads the same sentence the plan will print, so the two cannot drift. */}
+                {!scheduleHealthState.ok && healthOpen && (
+                  <span className="block mt-2 space-y-1.5">
+                    {scheduleHealthState.collisions.map((c, i) => (
+                      <span key={i} className="block text-white/70 text-sm leading-relaxed">{c}</span>
+                    ))}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* ⛔ THE WEEK, NOW BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY.
                 It led this card on the reasoning that the answer must stay on screen while they tap
                 — right in principle, and it reserved nine rems for a sentence that showed no
@@ -4920,6 +4984,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               ago, in the vocabulary of the engine rather than of their week. The grid below says the
               same thing in days they recognise, and says it specifically. The one fact it carried
               that the grid cannot — the protocol — moved to the subtitle. */}
+          {/* ⛔ THE HEALTH BADGE CARRIES OVER (Michael, 2026-08-18) — the last screen before the
+              tap is where a collision matters most, and an athlete who never opened the scheduler's
+              expander should still meet it here. Same state, same words, same neutral surface.
+              ⚠️ IT DOES NOT BLOCK. The Continue key is unaffected: this is the cost stated, not a
+              gate, which is the ruling the whole engine runs on. */}
+          {!scheduleHealthState.ok && (
+            <button
+              type="button"
+              onClick={() => setHealthOpen((v) => !v)}
+              aria-expanded={healthOpen}
+              className="w-full text-left rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5 mb-3"
+            >
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-white/70" />
+                <span className="text-white/85 text-sm">
+                  High fatigue risk: {scheduleHealthState.collisions.length} collision{scheduleHealthState.collisions.length === 1 ? '' : 's'}
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 ml-auto transition-transform ${healthOpen ? 'rotate-180' : ''}`} />
+              </span>
+              {healthOpen && (
+                <span className="block mt-2 space-y-1.5">
+                  {scheduleHealthState.collisions.map((c, i2) => (
+                    <span key={i2} className="block text-white/70 text-sm leading-relaxed">{c}</span>
+                  ))}
+                </span>
+              )}
+            </button>
+          )}
           <div className="space-y-3">
             {/* ⛔ THE REFUSAL, WHERE THE ATHLETE TAPPED. `complete()` can still be turned down by
                 the server, but the timeline wall is no longer what does it — that gate was demoted
