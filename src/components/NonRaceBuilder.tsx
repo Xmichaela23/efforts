@@ -3504,7 +3504,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 make. Forever p.24 asks for one movement per category per day; asked directly, there
                 is nothing to explain. */}
             <p className="text-white/70 text-sm leading-relaxed">
-              Three lifting days, each with a push, a pull and a single-leg or core movement. Pick a
+              Three lifting days, each with a push, a pull and a single-leg or core movement, plus an
+              optional abs movement that shares the single-leg reps rather than adding to them. Pick a
               focus and the days fill in — every slot is still yours to change, and anything can be
               swapped in the session.</p>
 
@@ -3572,6 +3573,60 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 ⚠️ THE COPY NAMES THE DOSE AND THE STANDARD SEPARATELY. 50 reps in 10 minutes is a
                 SESSION measure; a max-clean-rep figure is not the same measurement, and the two must
                 never be merged into "progress toward 50". */}
+            {/* ⛔ ABS NEEDED A CARD-LEVEL AFFORDANCE (Michael, 2026-08-18: "abs are lost if the user
+                doesn't know to open the adjustment"). Making it a proper FIELD fixed the shape
+                problem inside an open day — but the three day cards are COLLAPSED by default, and a
+                closed card's summary lists only what is set. An athlete who never opens one never
+                learns the option exists.
+                ⛔ SO IT IS ANSWERED AT THE LEVEL THE QUESTION IS ASKED. This mirrors the Pull-up
+                progression row exactly — same shape, same place, one tap — because "do I want abs in
+                this block" is a block-level decision, and picking WHICH movement on WHICH day is the
+                per-day refinement that already lives inside the cards.
+                ⚠️ IT IS A CONVENIENCE, NOT A FOURTH BUCKET. It sets every day's optional abs slot,
+                which still SPLITS the single-leg/core reps. The per-day field remains authoritative:
+                change one day and this row simply stops reading as fully on. */}
+            {(() => {
+              const days = LIFT_DAYS;
+              const absOn = days.every((d) => !!state.assistancePicks.by_day[d]?.abs);
+              const first = absOptions(strengthEquipment)[0]?.name ?? null;
+              return (
+                <div
+                  className="rounded-lg border transition"
+                  style={absOn
+                    ? { borderColor: `${getDisciplineColor('strength')}66`, backgroundColor: `${getDisciplineColor('strength')}14` }
+                    : { borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.02)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setState((st) => {
+                      const by_day = { ...st.assistancePicks.by_day };
+                      for (const d of days) {
+                        by_day[d] = { ...by_day[d], abs: absOn ? null : (by_day[d]?.abs ?? first) };
+                      }
+                      return { ...st, assistancePicks: { ...st.assistancePicks, by_day } };
+                    })}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-white/80 text-sm">Add abs</p>
+                      <p className="text-white/45 text-xs mt-0.5">
+                        An abs movement on every lifting day. It shares the single-leg reps — it does not add to the day.
+                      </p>
+                    </div>
+                    <span
+                      className="shrink-0 w-[18px] h-[18px] rounded-full border-2 grid place-items-center transition"
+                      style={{
+                        borderColor: absOn ? getDisciplineColor('strength') : 'rgba(255,255,255,0.25)',
+                        backgroundColor: absOn ? getDisciplineColor('strength') : 'transparent',
+                      }}
+                    >
+                      {absOn && <span className="text-[9px] text-black font-bold leading-none">✓</span>}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
+
             <div
               className="rounded-lg border transition"
               style={state.assistancePicks.performance_focus === 'pullups'
