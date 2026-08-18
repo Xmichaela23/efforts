@@ -190,7 +190,14 @@ export type HardRunTerrain =
    */
   | 'track'
   | 'flat_road'
-  | 'turf';
+  | 'turf'
+  /**
+   * ⛔ THE THRESHOLD RUN'S OWN GROUND (§4 of `DOCTRINE-threshold-run.md`, built 2026-08-18). It
+   * shares `track` and `flat_road` with the speed track and adds the treadmill at ONE PERCENT — the
+   * doctrine's number, and not the 5-8% the VO2 treadmill option asks for. Different session,
+   * different incline, and the two must never be folded together.
+   */
+  | 'treadmill_1pct';
 
 /**
  * ⛔ WHAT THE ATHLETE WANTS FROM THE INTENSITY DAY (Michael, 2026-08-18). The first hard day is the
@@ -205,6 +212,39 @@ export type HardRunTerrain =
  * ⚠️ ABSENT → `vo2`, which is what every block built before this asked for. A pure addition.
  */
 export type HardRunGoal = 'speed' | 'vo2';
+
+/**
+ * ⛔ WHERE THE HARD RIDE HAPPENS (Michael, 2026-08-18) — THE BIKE HAD NO TERRAIN QUESTION AT ALL,
+ * and its own comment said so: *"the ride has one shape and no terrain question."* That was true
+ * while the ride was only ever Helgerud 4 × 4; it stopped being true the moment the bike carried
+ * both an intensity day and a threshold day.
+ *
+ * ⚠️ IT IS AN ENVIRONMENT, NOT A GRADIENT, AND THAT IS THE DIFFERENCE FROM THE RUN. Cycling has no
+ * footfall, so there is no eccentric impact to trade away — the question is not what the ground does
+ * to the legs, it is whether the athlete can hold an exact power target without stopping. Michael:
+ * intervals need *"an environment where the athlete can safely redline and hit exact power targets
+ * without worrying about traffic or stoplights"*; threshold needs *"completely uninterrupted
+ * pedalling — urban routes with intersections break the physiological adaptation."*
+ *
+ * ⚠️ SO THE TWO MENUS OVERLAP AND ARE NOT THE SAME. `stationary` is on the intervals menu (a dumb
+ * bike can hold a hard effort) and NOT on the threshold one (it cannot hold a precise sustained
+ * wattage); `long_climb` is on the threshold menu and not on intervals.
+ *
+ * ⚠️ ABSENT → `smart_trainer` ON NEITHER MENU. Absent means "we have not asked", and the ride is
+ * built exactly as it was before this type existed — the session does not change, only what the card
+ * says about where to do it. ⛔ Do not make one of these a default that alters the prescription.
+ */
+export type HardRideEnvironment =
+  /** Erg mode: the trainer holds the number, so the athlete only has to pedal. */
+  | 'smart_trainer'
+  /** A gym or dumb bike — no power target, effort by feel. Intervals only. */
+  | 'stationary'
+  /** Open flat or rolling road. ⚠️ The one that carries the interruption risk. */
+  | 'flat_road'
+  /** A climb short enough to repeat — the intervals answer for a rider who has hills. */
+  | 'hill_climb'
+  /** A long steady climb — uninterrupted by construction, which is why it suits threshold. */
+  | 'long_climb';
 
 export type StrengthPrimaryArgs = {
   durationWeeks: number;
@@ -306,6 +346,8 @@ export type StrengthPrimaryArgs = {
      * built before this asked for.
      */
     goal?: HardRunGoal;
+    /** ⛔ WHERE THE HARD RIDE HAPPENS. Ignored when `discipline` is `run`. Absent → nothing said. */
+    environment?: HardRideEnvironment;
     /**
      * ⛔ WHOSE SESSION IS IT (§1i). `prescribed` — the app owns the content, writes the template and
      * can progress it. `club` — the athlete already attends it and does whatever the group does.
@@ -1466,7 +1508,33 @@ function thresholdWorkingMinutes(wave: HardWave): number {
  * rule) — and the copy says which of the two it used, because a pace target the athlete cannot
  * trace is the number-without-provenance this codebase keeps deleting.
  */
-function thresholdRunSession(day: string, wave: HardWave, basis: 'measured' | 'derived'): PlanSession {
+/**
+ * ⛔ THE GROUND THE THRESHOLD RUN IS RUN ON (§1b / §4). Flat or rolling, uninterrupted — because
+ * power output has to stay static to train clearance, and a climb run at flat-ground pace spikes the
+ * heart rate into the VO2 band and destroys the adaptation.
+ * ⚠️ EVERY OPTION CARRIES THE EFFORT-OUTRANKS-PACE PERMISSION except the treadmill, which is the one
+ * surface where the grade cannot surprise the athlete.
+ */
+function thresholdGroundNote(terrain?: HardRunTerrain): string {
+  switch (terrain) {
+    case 'track':
+      return ' On a track the pace is the pace — nothing tilts, so hold the number.';
+    case 'treadmill_1pct':
+      return ' On the treadmill at 1%, which is the flat this session wants.';
+    case 'flat_road':
+      return ' On flat or rolling ground. If you hit mild inclines or rolling grades, yield the pace '
+        + 'to hold the effort — do not spike your heart rate on the uphills.';
+    default:
+      return '';
+  }
+}
+
+function thresholdRunSession(
+  day: string,
+  wave: HardWave,
+  basis: 'measured' | 'derived',
+  terrain?: HardRunTerrain,
+): PlanSession {
   const st = thresholdStep(wave);
   const anchor = wave.cycleKind === 'anchor';
   const drop = thresholdPaceDrop(wave);
@@ -1488,7 +1556,8 @@ function thresholdRunSession(day: string, wave: HardWave, basis: 'measured' | 'd
           : 'The reps get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
       + (basis === 'measured'
         ? 'The pace comes from your measured threshold.'
-        : 'The pace is derived from your 5K — threshold sits about 20 s/mi slower.'),
+        : 'The pace is derived from your 5K — threshold sits about 20 s/mi slower.')
+      + thresholdGroundNote(terrain),
     duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
     // ⚠️ `_f{sec}` IS THE FASTER-THAN-THRESHOLD SUFFIX, and it is OPTIONAL — the token without it is
     // the pre-2026-08-17 form exactly, so every already-materialized plan is unaffected.
@@ -1504,7 +1573,7 @@ function thresholdRunSession(day: string, wave: HardWave, basis: 'measured' | 'd
  * through the `bike_thr_*` token family, which the expander already understands; nothing new was
  * invented for the bike.
  */
-function thresholdRideSession(day: string, wave: HardWave): PlanSession {
+function thresholdRideSession(day: string, wave: HardWave, env?: HardRideEnvironment): PlanSession {
   const st = thresholdStep(wave);
   const anchor = wave.cycleKind === 'anchor';
   return {
@@ -1517,7 +1586,8 @@ function thresholdRideSession(day: string, wave: HardWave): PlanSession {
       + (anchor
         ? 'Anchor week: hold the top of the range. This is the hardest this session gets in the block. '
         : 'The efforts get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
-      + 'Spin it, do not grind it: the same cue as the interval day, and for the same reason.',
+      + 'Spin it, do not grind it: the same cue as the interval day, and for the same reason.'
+      + rideEnvironmentNote(env, 'threshold'),
     duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
     steps_preset: [`bike_thr_${st.reps}x${st.minutes}min_R${st.restMin}min`],
     tags: ['quality', 'bike', 'aerobic', 'threshold'],
@@ -1570,7 +1640,11 @@ function hardRunMinutesForRole(
  * wave, not both"); the anchor's copy asks for the top of the range, which is a CUE and not a second
  * prescribed step.
  */
-function bikeQualitySession(day: string, wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' }): PlanSession {
+function bikeQualitySession(
+  day: string,
+  wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' },
+  env?: HardRideEnvironment,
+): PlanSession {
   // 4 min in week one of a wave, 3 from week two — and 3 is where it stays.
   const restMin = Math.max(1, Math.round(wave.weekInCycle)) <= 1 ? 4 : 3;
   const anchor = wave.cycleKind === 'anchor';
@@ -1585,7 +1659,8 @@ function bikeQualitySession(day: string, wave: HardWave = { weekInCycle: 1, cycl
       + (restMin === 3
         ? ' The recovery is shorter than week one — same work, less rest.'
         : '')
-      + (anchor ? ' Anchor week: hold the top of the range.' : ''),
+      + (anchor ? ' Anchor week: hold the top of the range.' : '')
+      + rideEnvironmentNote(env, 'vo2'),
     duration: BIKE_QUALITY_MIN,
     steps_preset: [`bike_vo2_4x4min_R${restMin}min`],
     tags: ['quality', 'bike', 'aerobic'],
@@ -2001,6 +2076,40 @@ export function hardRunSessionMinutes(terrain?: HardRunTerrain, goal: HardRunGoa
  * ⛔ The SCHEDULER does not yet know this — `week-model`'s `COST` gives an uncoupled hard day 36h,
  * not 48h, and it does not distinguish a sprint from a hill. Named here rather than assumed.
  */
+/** The allowlist. ⚠️ An unrecognised environment degrades to "not asked", never to a default that
+ *  would put words about a smart trainer on the card of someone who does not own one. */
+const RIDE_ENVIRONMENTS: HardRideEnvironment[] =
+  ['smart_trainer', 'stationary', 'flat_road', 'hill_climb', 'long_climb'];
+
+/**
+ * ⛔ THE ONE SENTENCE THE ENVIRONMENT BUYS — and it is COPY, not a change to the session. The
+ * intervals and the threshold blocks are identical wattages wherever they are ridden; what differs
+ * is whether the athlete can actually hold them, which is a fact about the road and not about the
+ * prescription.
+ */
+function rideEnvironmentNote(env: HardRideEnvironment | undefined, role: 'vo2' | 'threshold'): string {
+  if (!env) return '';
+  const uninterrupted = role === 'threshold';
+  switch (env) {
+    case 'smart_trainer':
+      return ' On the trainer in erg mode: it holds the number, so all you do is pedal.';
+    case 'stationary':
+      return ' On a gym bike there is no power to read, so ride it by effort — hard enough that a '
+        + 'sentence is a struggle.';
+    case 'flat_road':
+      return uninterrupted
+        ? ' On the road, pick a stretch you can ride unbroken — every stop restarts the effort, and '
+          + 'the adaptation is in the uninterrupted minutes.'
+        : ' On the road, use a stretch with no junctions: you cannot redline safely with a stoplight '
+          + 'in front of you.';
+    case 'hill_climb':
+      return ' On the climb, the gradient holds the effort for you — ride it back down easy.';
+    case 'long_climb':
+      return ' A long steady climb is the easiest place to hold this: the gradient does the pacing '
+        + 'and nothing interrupts it.';
+  }
+}
+
 const SPRINT_REPS_LEADER = 6;
 const SPRINT_REPS_ANCHOR = 4;
 /** Seconds of maximum effort per rep — the middle of Michael's 10-15 s. */
@@ -2378,6 +2487,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⚠️ SAME ALLOWLIST DISCIPLINE AS TERRAIN — an unrecognised goal degrades to the shipped
       // behaviour (`vo2`), never to no session.
       ...(raw.goal === 'speed' ? { goal: 'speed' as const } : {}),
+      ...(RIDE_ENVIRONMENTS.includes(raw.environment as HardRideEnvironment)
+        ? { environment: raw.environment as HardRideEnvironment } : {}),
       ownership,
     });
   }
@@ -2448,6 +2559,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    */
   const hardDays: Array<{
     goal?: HardRunGoal;
+    environment?: HardRideEnvironment;
     day: DayName; discipline: 'run' | 'bike'; terrain?: HardRunTerrain;
     ownership: 'prescribed' | 'club'; role: HardRole;
   }> = [];
@@ -3936,7 +4048,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             ? clubEnduranceSession('run', h.day, hardRunSessionMinutes(h.terrain))
             : role === 'threshold'
               ? thresholdRunSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex },
-                asPositiveNumber(args.thresholdPaceSecPerMi) != null ? 'measured' : 'derived')
+                asPositiveNumber(args.thresholdPaceSecPerMi) != null ? 'measured' : 'derived', h.terrain)
               // ⛔ THE GOAL ONLY REACHES THE INTENSITY SESSION. A threshold day has no goal question
               // — its session is settled — and `role` is what decides which branch is taken above.
               : hardRunSession(h.day, heavyLowerDays, h.terrain,
@@ -4130,8 +4242,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           role === 'club'
             ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_MIN)
             : role === 'threshold'
-              ? thresholdRideSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex })
-              : bikeQualitySession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }),
+              ? thresholdRideSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }, h.environment)
+              : bikeQualitySession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }, h.environment),
         );
       }
     }

@@ -55,6 +55,78 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
  */
 const MAX_HARD_DAY_SLOTS = 2;
 
+/**
+ * ⛔ THE HARD DAY'S GROUND, KEYED BY WHAT THE SESSION ACTUALLY IS (Michael, 2026-08-18).
+ *
+ * One menu could not serve three sessions. Hill / treadmill / short-hill / flat shapes a VO2
+ * session; a SPRINT needs flat predictable footing and a safe run-out; a THRESHOLD run needs
+ * uninterrupted flat or rolling ground and a treadmill at ONE percent, not the VO2 option's 5-8%.
+ * Offering the wrong list is how an athlete ends up choosing the ground for a session whose ground
+ * was already decided.
+ *
+ * ⚠️ THE BIKE'S IS AN ENVIRONMENT, NOT A GRADIENT. Cycling has no footfall, so the question is not
+ * what the ground does to the legs — it is whether the rider can hold an exact power target without
+ * stopping. `stationary` is on the intervals menu and not the threshold one (a dumb bike can hold a
+ * hard effort but not a precise sustained wattage); `long_climb` is the reverse.
+ */
+const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold',
+  Array<{ id: string; title: string; body: string }>> = {
+  speed: [
+    { id: 'track', title: 'A track', body: 'Predictable footing and a safe run-out, which is what lets you go flat out.' },
+    { id: 'flat_road', title: 'A flat road', body: 'Any straight, level stretch with room to slow down at the end.' },
+    { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
+  ],
+  vo2: [
+    { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down. Running uphill may have less effect on your legs, leaving more of the week for lifting.' },
+    { id: 'treadmill', title: 'A treadmill', body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\u2019s job.' },
+    { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
+    // ⛔ `flat` IS OFF THIS MENU AND THAT IS A REAL CHANGE, FLAGGED RATHER THAN SLIPPED IN. Michael's
+    // 2026-08-18 VO2 menu is hill / treadmill / short hill, and `flat` — §2.0's last-resort 4 × 3 min
+    // on level ground for an athlete with no climb and no treadmill — is not on it.
+    // ⚠️ THAT ATHLETE IS NOT STRANDED: the goal split gives them the SPEED track, which is a flat
+    // session by design and a better answer than a VO2 session that pays full mechanical price for a
+    // stimulus the ground cannot support. The engine still builds `flat` for any goal that already
+    // stores it; it is simply no longer offered. ⛔ If it should come back, it comes back HERE — the
+    // session and its copy are untouched in `strength-primary-plan.ts`.
+  ],
+  threshold: [
+    { id: 'track', title: 'A track', body: 'The pace is the pace \u2014 nothing tilts, so you hold the number.' },
+    { id: 'flat_road', title: 'A flat road or path', body: 'If you hit mild inclines or rolling grades, yield the pace to hold the effort. Do not spike your heart rate on the uphills.' },
+    { id: 'treadmill_1pct', title: 'A treadmill at 1%', body: 'One percent, not the interval day\u2019s 5-8%. This session wants flat.' },
+  ],
+};
+
+const HARD_RIDE_MENUS: Record<'vo2' | 'threshold',
+  Array<{ id: string; title: string; body: string }>> = {
+  vo2: [
+    { id: 'smart_trainer', title: 'Smart trainer, erg mode', body: 'It holds the number, so all you do is pedal.' },
+    { id: 'stationary', title: 'A stationary bike', body: 'No power to read, so ride it by effort \u2014 hard enough that a sentence is a struggle.' },
+    { id: 'flat_road', title: 'A flat road', body: 'Use a stretch with no junctions: you cannot redline safely with a stoplight in front of you.' },
+    { id: 'hill_climb', title: 'A climb you can repeat', body: 'The gradient holds the effort for you \u2014 ride back down easy.' },
+  ],
+  threshold: [
+    { id: 'smart_trainer', title: 'Smart trainer', body: 'Completely uninterrupted, which is what this session needs most.' },
+    { id: 'flat_road', title: 'A flat or rolling road', body: 'Pick a stretch you can ride unbroken \u2014 every stop restarts the effort.' },
+    { id: 'long_climb', title: 'A long steady climb', body: 'The gradient does the pacing and nothing interrupts it.' },
+  ],
+};
+
+/** The two things an athlete can want from the intensity day. Michael's copy, verbatim. */
+const HARD_RUN_GOALS: Array<{ id: 'speed' | 'vo2'; title: string; body: string }> = [
+  {
+    id: 'speed',
+    title: 'Build pure speed',
+    body: 'Short, explosive flat sprints to make you faster. High neurological drive, but the hard '
+      + 'footfall creates mechanical damage that requires 48 hours of leg clearance before heavy squats.',
+  },
+  {
+    id: 'vo2',
+    title: 'Raise VO2 max',
+    body: 'Hard 3-minute climbs to push your maximum aerobic ceiling. Spikes your heart rate to the '
+      + 'limit, but running uphill removes the eccentric impact, saving your knees and quads for the barbell.',
+  },
+];
+
 import { anchorDaysTaken } from '@/lib/anchor-days';
 // The "why can't I continue" rule, extracted so it can be RUN — it shipped a dead Continue button
 // beside a fully built week, which is exactly the kind of rule that rots inside a component.
@@ -603,7 +675,23 @@ type NonRaceState = {
    * ⚠️ A SLOT MAY HAVE A DISCIPLINE AND NO DAY YET — the same rule `qualityDays` documents. Presence
    * in this list means the discipline is chosen; the day arrives after.
    */
-  hardDays: Array<{ discipline: 'run' | 'bike'; day: DayName | ''; ownership: 'prescribed' | 'club' }>;
+  /**
+   * ⛔ THE SLOT CARRIES ITS OWN ANSWERS NOW (2026-08-18). `goal`, `terrain` and `environment` were
+   * either global (`qualityRunTerrain`) or absent, and neither survives two hard days with different
+   * shapes: an athlete running sprints on Tuesday and a threshold run on Friday needs two different
+   * grounds, and one field cannot hold both.
+   */
+  hardDays: Array<{
+    discipline: 'run' | 'bike';
+    day: DayName | '';
+    ownership: 'prescribed' | 'club';
+    /** Intensity slot, run only: sprints or hills. Absent → hills, the shipped behaviour. */
+    goal?: 'speed' | 'vo2';
+    /** The ground. Its OPTIONS depend on the slot's role and goal — see `HARD_RUN_MENUS`. */
+    terrain?: string;
+    /** Where the hard ride happens. Ride slots only. */
+    environment?: string;
+  }>;
   /**
    * ⛔ WHICH GROUND THE HARD RUN HAPPENS ON. The one fact about this session the app cannot derive —
    * whether there is a climb outside their door they can run hard for three minutes. Not in posture,
@@ -1135,7 +1223,12 @@ function assemblePayload(
                     ...(h.day ? { day: h.day } : {}),
                     discipline: h.discipline,
                     ownership: h.ownership,
-                    ...(h.discipline === 'run' ? { terrain: state.qualityRunTerrain } : {}),
+                    // ⚠️ THE SLOT'S OWN TERRAIN WINS, and `qualityRunTerrain` is the fallback for a
+                    // goal that was created before slots carried one. One field could not hold two
+                    // hard runs with different shapes.
+                    ...(h.discipline === 'run' ? { terrain: h.terrain || state.qualityRunTerrain } : {}),
+                    ...(h.discipline === 'run' && h.goal ? { goal: h.goal } : {}),
+                    ...(h.discipline === 'bike' && h.environment ? { environment: h.environment } : {}),
                   })),
               }
             : {}),
@@ -4523,80 +4616,118 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 run: the terrain question exists to shape a session the app writes,
                                 and the app is not writing this one. ⛔ The copy inside is unchanged
                                 and must stay so — §2.0's ruling on the flat option depends on it. */}
-                            {/* ⛔ TERRAIN BELONGS TO THE INTERVAL SESSION, AND ONLY TO IT (2026-08-18).
-                                The hill / treadmill / short-hill / flat menu shapes a VO2 session —
-                                four 3-minute climbs. A THRESHOLD run is flat or rolling ground by
-                                doctrine (`DOCTRINE-threshold-run.md` §1), so offering the menu there
-                                asked the athlete to choose the ground for a session whose ground is
-                                already decided. It rendered on every prescribed hard run.
-                                ⚠️ THE THRESHOLD RUN'S OWN TERRAIN QUESTION — track / flat road /
-                                treadmill 1% — is §4 of that doctrine and is NOT BUILT. Not offering
-                                the wrong menu is not the same as answering the right one. */}
+                            {/* ── THE GOAL, THEN THE GROUND ────────────────────────────────────
+                                ⛔ THE INTENSITY DAY ASKS WHAT KIND (Michael, 2026-08-18). Sprints and
+                                hill repeats are different trades, not two names for one session: one
+                                buys neural drive and pays for it in footfall damage, the other buys
+                                the aerobic ceiling and spends nothing eccentric. The athlete owns
+                                that choice; the app owns the consequence.
+                                ⚠️ ONLY ON A PRESCRIBED RUN. A club session is not ours to shape, and
+                                the threshold slot has no goal question — its session is settled. */}
                             {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed'
                               && hardRoleOf(hardSlotIndex) === 'vo2' && (
                               <div className="space-y-1.5 pt-1">
-                                <span className="text-white/85 text-sm">What you can run it on</span>
+                                <span className="text-white/85 text-sm">What you want from it</span>
                                 <div className="space-y-1">
-                                  {([
-                                    {
-                                      id: 'hill_3min' as const,
-                                      title: 'A hill you can run for 3 minutes',
-                                      body: 'Four 3-minute climbs, walk or jog back down. Running uphill may have less effect on your legs, leaving more of the week for lifting.',
-                                    },
-                                    {
-                                      id: 'treadmill' as const,
-                                      title: 'A treadmill',
-                                      body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\'s job, so it may affect your legs no more than the hill does.',
-                                    },
-                                    {
-                                      id: 'hill_short' as const,
-                                      title: 'Only a short hill',
-                                      body: 'Ten 1-minute climbs. Shorter efforts hold less VO2 stimulus than the 3-minute version — the session for the hill you have.',
-                                    },
-                                    {
-                                      id: 'flat' as const,
-                                      // ⛔ THE STATED COST IS THE RULING'S CONDITION. §2.1 bans this
-                                      // session outright and §2.0 governs only because the athlete owns
-                                      // a STATED trade — the leg/lift effect must stay in the copy.
-                                      title: 'Flat ground only',
-                                      body: 'Four 3-minute efforts on the flat. The same hard work, but without the climb it may have more effect on your legs, and your next lift may feel it.',
-                                    },
-                                  ]).map((opt) => (
-                                    <button
-                                      key={opt.id} type="button"
-                                      onClick={() => setState((st) => ({ ...st, qualityRunTerrain: opt.id }))}
-                                      className={`w-full text-left px-3 py-2 rounded-xl border ${
-                                        state.qualityRunTerrain === opt.id
-                                          ? 'border-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]'
-                                          : 'border-white/12 bg-white/[0.04]'
-                                      }`}
-                                    >
-                                      <span className="block text-white/90 text-sm">{opt.title}</span>
-                                      <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
-                                    </button>
-                                  ))}
+                                  {HARD_RUN_GOALS.map((opt) => {
+                                    const on = (activeHard.goal ?? 'vo2') === opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id} type="button"
+                                        onClick={() => setState((st) => {
+                                          const next = [...st.hardDays];
+                                          // ⛔ THE GROUND IS CLEARED WITH THE GOAL. A track pick has no
+                                          // meaning on the hill menu and a hill pick has none on the
+                                          // sprint menu; carrying it across would leave a stored value
+                                          // the new menu cannot show as selected.
+                                          next[hardSlotIndex] = { ...next[hardSlotIndex], goal: opt.id, terrain: undefined };
+                                          return { ...st, hardDays: next };
+                                        })}
+                                        className={`w-full text-left rounded-xl border px-3 py-2 ${on ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'}`}
+                                      >
+                                        <span className="block text-white/90 text-sm">{opt.title}</span>
+                                        <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
-                            {/* ── and the hard RIDE says what it is ──────────────────────────
-                                ⛔ RIDE USED TO GET NOTHING. Run offered four terrain options with
-                                their consequences; Ride ended the row in silence, which reads as an
-                                unfinished screen rather than a settled question. *"Ride has no
-                                description."*
 
-                                ⚠️ A STATEMENT, NOT A MENU, AND THE ASYMMETRY IS REAL. Terrain forks
-                                the RUN because it changes the stimulus and the cost to the next lift
-                                — which is the only reason §2.0 permits the flat version at all. A
-                                bike has no such fork: resistance is the athlete's own power, so the
-                                interval is the same work wherever it happens. The ride gets the one
-                                thing the run branch actually gives, which is knowing what was agreed
-                                to. Copy + citation in `HARD_RIDE_SHAPE`. */}
-                            {activeHard?.discipline === 'bike' && activeHard.ownership === 'prescribed' && (
-                              <div className="space-y-1 pt-1">
-                                <span className="text-white/85 text-sm">What the hard ride is</span>
-                                <p className="text-white/45 text-xs leading-snug">{HARD_RIDE_SHAPE}</p>
-                              </div>
-                            )}
+                            {/* ⛔ THE GROUND, KEYED BY WHAT THE SESSION IS. One menu could not serve
+                                three sessions — see `HARD_RUN_MENUS`. A club run gets none of them:
+                                the question exists to shape a session the app writes, and the app is
+                                not writing this one. */}
+                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed' && (() => {
+                              const role = hardRoleOf(hardSlotIndex);
+                              const key = role === 'threshold' ? 'threshold' : (activeHard.goal ?? 'vo2');
+                              const opts = HARD_RUN_MENUS[key as 'speed' | 'vo2' | 'threshold'];
+                              const chosen = activeHard.terrain
+                                ?? (key === 'vo2' ? state.qualityRunTerrain : undefined);
+                              return (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-white/85 text-sm">What you can run it on</span>
+                                  <div className="space-y-1">
+                                    {opts.map((opt) => {
+                                      const on = chosen === opt.id;
+                                      return (
+                                        <button
+                                          key={opt.id} type="button"
+                                          onClick={() => setState((st) => {
+                                            const next = [...st.hardDays];
+                                            next[hardSlotIndex] = { ...next[hardSlotIndex], terrain: opt.id };
+                                            // ⚠️ THE LEGACY GLOBAL IS KEPT IN STEP for the VO2 menu only —
+                                            // it is what a pre-2026-08-18 goal reads back, and letting it
+                                            // drift would make an old plan disagree with the screen.
+                                            return key === 'vo2'
+                                              ? { ...st, hardDays: next, qualityRunTerrain: opt.id as typeof st.qualityRunTerrain }
+                                              : { ...st, hardDays: next };
+                                          })}
+                                          className={`w-full text-left rounded-xl border px-3 py-2 ${on ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'}`}
+                                        >
+                                          <span className="block text-white/90 text-sm">{opt.title}</span>
+                                          <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* ⛔ AND THE RIDE HAS ONE TOO NOW. It had none — "the ride has one shape
+                                and no terrain question" was true while the ride was only ever
+                                Helgerud 4 × 4, and stopped being true when the bike gained a
+                                threshold day. It is an ENVIRONMENT: can you hold an exact power
+                                target without stopping. */}
+                            {activeHard?.discipline === 'bike' && activeHard.ownership === 'prescribed' && (() => {
+                              const role = hardRoleOf(hardSlotIndex) === 'threshold' ? 'threshold' : 'vo2';
+                              return (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-white/85 text-sm">Where you can ride it</span>
+                                  <div className="space-y-1">
+                                    {HARD_RIDE_MENUS[role].map((opt) => {
+                                      const on = activeHard.environment === opt.id;
+                                      return (
+                                        <button
+                                          key={opt.id} type="button"
+                                          onClick={() => setState((st) => {
+                                            const next = [...st.hardDays];
+                                            next[hardSlotIndex] = { ...next[hardSlotIndex], environment: opt.id };
+                                            return { ...st, hardDays: next };
+                                          })}
+                                          className={`w-full text-left rounded-xl border px-3 py-2 ${on ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'}`}
+                                        >
+                                          <span className="block text-white/90 text-sm">{opt.title}</span>
+                                          <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
                           </>
                         )}
                       </div>
