@@ -44,7 +44,7 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import { HARD_RIDE_MENUS, HARD_RUN_GOALS, HARD_RUN_MENUS } from '@/lib/hard-day-menus';
-import { scheduleHealth, suggestHardDays, suggestLongDays } from '@/lib/suggest-hard-days';
+import { solveWizardWeek } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
@@ -1863,30 +1863,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ AND IT NEVER OVERWRITES AN ANSWER. It fills only slots that are still empty — a day the
    * athlete typed, or a club night, is theirs.
    */
-  const suggestedHardDays = React.useMemo(
-    () => suggestHardDays({
-      hardDays: state.hardDays.map((h) => ({
-        discipline: h.discipline, day: h.day, ownership: h.ownership,
-      })),
-      longRunDay: state.longRunDay,
-      longRideDay: state.longRideDay,
-    }),
-    [state.hardDays, state.longRunDay, state.longRideDay],
-  );
   /**
-   * ⛔ THE LONG DAY IS SUGGESTED TOO (2026-08-18), AND IT IS THE SWEEP'S FINDING TURNED INTO A NUDGE.
-   * 61 built shapes produced six breaches and they were all one pattern: two hard runs against a
-   * SUNDAY long run, at every volume. Five stressors, and a Sunday long run puts its 48-hour shadow
-   * across Monday — Tuesday to Saturday cannot hold the rest at 36-hour clearances.
-   *
-   * ⚠️ IT IS A SOLVE, NOT THE RULE "TWO HARD RUNS → SATURDAY". The model answers Saturday for that
-   * shape on its own; a hardcoded rule would be right today and silently wrong the first time
-   * another constraint moved.
-   * ⚠️ AND IT ONLY FILLS AN EMPTY ANSWER. A day the athlete picked is theirs — pin Sunday into that
-   * shape and you get the plan you asked for, with the health badge saying what it costs.
+   * ⛔ ONE SOLVE, THREE ANSWERS (2026-08-18). This was three separate memos — the hard-day
+   * suggestion, the long-day suggestion and the health badge — each running the exhaustive placer
+   * over the same week on every tap. On a browser that reads as buttons not responding.
+   * ⚠️ It also means the three can no longer disagree: they are literally the same placement.
    */
-  const suggestedLongDays = React.useMemo(
-    () => suggestLongDays({
+  const wizardWeek = React.useMemo(
+    () => solveWizardWeek({
       hardDays: state.hardDays.map((h) => ({
         discipline: h.discipline, day: h.day, ownership: h.ownership,
       })),
@@ -1899,6 +1883,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
       state.swimDays, state.posture?.swim],
   );
+  const suggestedHardDays = wizardWeek.hardDays;
+  const suggestedLongDays = { run: wizardWeek.longRun, ride: wizardWeek.longRide };
+  const scheduleHealthState = wizardWeek.health;
+  const [healthOpen, setHealthOpen] = useState(false);
+
   React.useEffect(() => {
     if (currentStep !== 'schedule') return;
     setState((st) => {
@@ -1929,24 +1918,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     });
   }, [currentStep, suggestedHardDays]);
 
-  /** ⛔ ONE SOLVE, RECOMPUTED AS THEY TAP — the badge above the week and nothing else reads it. */
-  const scheduleHealthState = React.useMemo(
-    () => scheduleHealth({
-      hardDays: state.hardDays.map((h) => ({
-        discipline: h.discipline, day: h.day, ownership: h.ownership,
-      })),
-      longRunDay: state.longRunDay,
-      longRideDay: state.longRideDay,
-      // ⚠️ THE EASY COUNTS ARE PASSED FOR THE REST-DAY FLAG ONLY. They cannot change a clearance
-      // result — easy work emits no debt — but without them the model cannot see a full calendar.
-      runDays: state.runDays,
-      rideDays: state.rideDays,
-      swimDays: state.posture?.swim === 'maintain' ? state.swimDays : 0,
-    }),
-    [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
-      state.swimDays, state.posture?.swim],
-  );
-  const [healthOpen, setHealthOpen] = useState(false);
 
   /**
    * ⛔ WHAT EACH HARD SLOT WILL ACTUALLY BE — the screen's copy of `assignHardRoles`
@@ -4559,45 +4530,60 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 cheaper: it keeps its pin, its recovery cost and its share of the
                                 week's volume. What changes is whether the app writes the session.
                                 ⚠️ Same rule as swim — booked, not coached. */}
+                            {/* ⛔ ONE LINE, NOT TWO CARDS (Michael, 2026-08-18: "this isn't
+                                necessary"). Ownership was a full two-option question with a
+                                paragraph each, stacked above the goal question and the ground
+                                question — three blocks of prose on one card, for a decision almost
+                                every athlete answers the same way once.
+
+                                ⛔ THE QUESTION SURVIVES, THE WEIGHT DOES NOT. A club session is a
+                                real and irreversible difference: it takes its day, its recovery cost
+                                and its share of the week's volume, and the app must NOT write a
+                                session template into it — it cannot prescribe 4 × 3 min uphill into
+                                a group run. Deleting the control would silently turn every club
+                                night into a prescribed session. It is a toggle now: the default is
+                                ours, and the sentence that matters appears only when it is on. */}
                             {activeHard && (
-                              <div className="space-y-1.5 pt-1">
-                                <span className="text-white/85 text-sm">Whose session is it</span>
-                                <div className="space-y-1">
-                                  {([
-                                    {
-                                      id: 'prescribed' as const,
-                                      title: 'Ours to write',
-                                      body: activeHard.discipline === 'run'
-                                        ? 'We prescribe the session and it progresses across the block.'
-                                        : 'We prescribe the intervals and they progress across the block.',
-                                    },
-                                    {
-                                      id: 'club' as const,
-                                      title: 'A club session you already attend',
-                                      body: 'We hold the day and build the week around it — the lifting keeps its distance. We do not prescribe what you do in it.',
-                                    },
-                                  ]).map((opt) => (
-                                    <button
-                                      key={opt.id} type="button"
-                                      onClick={() => setState((st) => {
-                                        const next = [...st.hardDays];
-                                        const cur = next[hardSlotIndex];
-                                        if (!cur) return st;
-                                        next[hardSlotIndex] = { ...cur, ownership: opt.id };
-                                        return { ...st, hardDays: next };
-                                      })}
-                                      className={`w-full text-left px-3 py-2 rounded-xl border ${
-                                        activeHard.ownership === opt.id
-                                          ? 'border-[rgba(var(--wiz-accent-rgb,236,233,227),0.70)] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]'
-                                          : 'border-white/12 bg-white/[0.04]'
-                                      }`}
-                                    >
-                                      <span className="block text-white/90 text-sm">{opt.title}</span>
-                                      <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setState((st) => {
+                                  const next = [...st.hardDays];
+                                  const cur = next[hardSlotIndex];
+                                  if (!cur) return st;
+                                  next[hardSlotIndex] = {
+                                    ...cur,
+                                    ownership: cur.ownership === 'club' ? 'prescribed' : 'club',
+                                  };
+                                  return { ...st, hardDays: next };
+                                })}
+                                aria-pressed={activeHard.ownership === 'club'}
+                                className="w-full text-left flex items-start gap-2.5 px-3 py-2 rounded-xl border border-white/12 bg-white/[0.04] mt-1"
+                              >
+                                <span
+                                  className="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-md border-2 grid place-items-center"
+                                  style={{
+                                    borderColor: activeHard.ownership === 'club'
+                                      ? 'rgb(var(--wiz-accent-rgb,236,233,227))' : 'rgba(255,255,255,0.25)',
+                                    backgroundColor: activeHard.ownership === 'club'
+                                      ? 'rgb(var(--wiz-accent-rgb,236,233,227))' : 'transparent',
+                                  }}
+                                >
+                                  {activeHard.ownership === 'club' && (
+                                    <span className="text-[10px] text-black font-bold leading-none">✓</span>
+                                  )}
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block text-white/90 text-sm">
+                                    This is a club session I already attend
+                                  </span>
+                                  {activeHard.ownership === 'club' && (
+                                    <span className="block text-white/45 text-xs mt-0.5 leading-snug">
+                                      We hold the day and build the week around it — the lifting keeps
+                                      its distance. We do not prescribe what you do in it.
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
                             )}
                             {/* ⚠️ THE TERRAIN MENU IS GATED ON THE ACTIVE SLOT NOW, not on
                                 `'run' in qualityDays` — with two slots the sport-keyed test cannot

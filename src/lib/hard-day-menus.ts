@@ -38,8 +38,11 @@ export const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> =
     ],
   },
   vo2: {
-    note: 'Hard climbs push your aerobic ceiling to the limit. Sprinting uphill removes the eccentric '
-      + 'braking impact, saving your knees and quads for the heavy barbell later in the week.',
+    // ⛔ THIS NOTE SAID THE SAME THING AS THE GOAL OPTION DIRECTLY ABOVE IT, almost word for word —
+    // "pushes your aerobic ceiling, uphill removes the eccentric impact, saves your knees and quads".
+    // The athlete read one paragraph, chose it, and immediately read it again. The goal card sells
+    // the SESSION; this line's only job is the ground it needs.
+    note: 'Any climb you can run hard for the full effort. The gradient is what does the work.',
     options: [
       { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down.' },
       { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
@@ -95,13 +98,13 @@ export const HARD_RIDE_MENUS: Record<'vo2' | 'threshold', GroundMenu> = {
 export const HARD_RUN_GOALS: Array<{ id: 'speed' | 'vo2'; title: string; body: string }> = [
   {
     id: 'speed',
-    title: 'Build pure speed',
+    title: 'Speed focus',
     body: 'Short, explosive flat sprints to make you faster. High neurological drive, but the hard '
       + 'footfall creates mechanical damage that requires 48 hours of leg clearance before heavy squats.',
   },
   {
     id: 'vo2',
-    title: 'Raise VO2 max',
+    title: 'VO2 max focus',
     body: 'Hard 3-minute climbs to push your maximum aerobic ceiling. Spikes your heart rate to the '
       + 'limit, but running uphill removes the eccentric impact, saving your knees and quads for the barbell.',
   },

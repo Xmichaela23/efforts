@@ -282,3 +282,62 @@ export function suggestLongDays(input: WeekInput): { run: string | null; ride: s
     return { run: null, ride: null };
   }
 }
+
+/**
+ * ⛔ ONE SOLVE FOR THE WHOLE SCREEN (2026-08-18) — AND IT IS A PERFORMANCE FIX, NOT A TIDY-UP.
+ *
+ * The wizard called `suggestHardDays`, `suggestLongDays` and `scheduleHealth` as three separate
+ * memos, so every tap that touched a hard day or a long day ran the exhaustive placer THREE TIMES
+ * over the same week. Michael, on the browser: *"buttons don't push easy or open quickly."* Each
+ * call is cheap; three of them on every keystroke, behind a re-render, is not.
+ *
+ * ⚠️ THE THREE ANSWERS COME FROM ONE PLACEMENT, which also removes a subtler problem: three solves
+ * could in principle disagree with each other if any of them was passed a slightly different input.
+ * Now the suggestion, the long day and the health badge are literally the same week.
+ */
+export function solveWizardWeek(input: WeekInput): {
+  hardDays: Array<string | null>;
+  longRun: string | null;
+  longRide: string | null;
+  health: ScheduleHealth;
+} {
+  const slots = input.hardDays ?? [];
+  try {
+    const units = buildWizardWeek(input);
+    const r = resolve(units, { minRestDays: 1 });
+    const placements: Placement[] = r.ok
+      ? r.placements
+      : (r as Extract<typeof r, { ok: false }>).best;
+
+    const dayOf = (id: string): string | null => {
+      const p = placements.find((x) => x.unit.sessions.some((s) => s.id === id));
+      return p ? DAY_NAMES[p.day].toLowerCase() : null;
+    };
+
+    const seen = new Set<string>();
+    const collisions: string[] = [];
+    for (const u of unmetNeeds(placements)) {
+      const key = `${u.unit}|${u.system}|${u.blockedBy}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const what = u.system === 'long_effort' ? 'a long effort' : 'heavy legs';
+      collisions.push(
+        `${u.unit} needs ${u.shortBy}h more clearance from ${what} — ${u.blockedBy} leaves it `
+        + `outstanding until ${DAY_NAMES[u.clearsAtDay]}.`,
+      );
+    }
+    if (restDaysOf(placements).length === 0) {
+      collisions.push('No rest day left — every day of the week carries a session.');
+    }
+
+    return {
+      hardDays: slots.map((h, i) => (h.ownership === 'club' ? null : dayOf(`h${i}`))),
+      longRun: input.longRunDay ? null : dayOf('lr'),
+      longRide: input.longRideDay ? null : dayOf('lb'),
+      health: { ok: collisions.length === 0, collisions },
+    };
+  } catch {
+    // ⛔ NEVER LOAD-BEARING. No opinion beats a wrong one, and a build screen must still render.
+    return { hardDays: slots.map(() => null), longRun: null, longRide: null, health: { ok: true, collisions: [] } };
+  }
+}
