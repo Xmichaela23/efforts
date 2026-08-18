@@ -731,6 +731,12 @@ type StepKey =
   //
   // ⚠️ VOLUME STAYS SEPARATE. Miles and hours are HOW MUCH; this card is WHEN. Deciding the second
   // while looking at the first is what made the old run card scroll past the fold.
+  // ⛔ HARD DAYS GET THEIR OWN PAGE (Michael, 2026-08-18) — "so when they get to scheduler it's just
+  // picking, and hard days can be explained better in their own section". It renders the SAME
+  // disclosure list as `schedule`, filtered to the one row: the control, its rationale, the
+  // ownership question and the terrain menu are ~500 lines of JSX that already work, and copying
+  // them into a second block would be the doubled disease. One renderer, two steps, filtered.
+  | 'hardday'
   | 'schedule' | 'volume'
   // ⛔ THE 'lifting' STEP IS DELETED (§1f-0, 2026-08-16). It asked four days or three, and there is
   // no longer a choice to make: every Strong Focus block is three — Squat · Bench · Deadlift + Press.
@@ -779,6 +785,10 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
    */
   if (isStrengthFocus && (kept('run') || kept('bike'))) {
     out.push('volume');
+    // ⛔ HOW HARD, BEFORE WHAT TO BUILD, BEFORE WHEN. The hard-day COUNT is the second input to the
+    // endurance tier, so it has to be answered before the accessory card can state its rep totals —
+    // the same data dependency that moved `accessory` after `volume`.
+    out.push('hardday');
     if (strengthDevelop) out.push('accessory');
     out.push('schedule');
   } else {
@@ -1784,9 +1794,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * shown row, so the card always opens on a question the athlete has, whichever disciplines they
    * kept. Hardcoding a key here is how the card ended up opening on the optional question.
    */
-  const scheduleAsk = (scheduleQuestion && scheduleRows.some((r) => r.key === scheduleQuestion))
-    ? scheduleQuestion
-    : (scheduleRows[0]?.key ?? 'hard');
+  /**
+   * ⛔ THE HARD-DAY STEP OPENS ON ITS OWN QUESTION, ALWAYS (2026-08-18). Without this the list's
+   * "open the first shown row" rule resolved to `long`, and the hard row rendered CLOSED on the page
+   * built for it — a screen whose only question is collapsed behind a tap.
+   */
+  const scheduleAsk = currentStep === 'hardday'
+    ? ('hard' as const)
+    : (scheduleQuestion && scheduleQuestion !== 'hard'
+        && scheduleRows.some((r) => r.key === scheduleQuestion))
+      ? scheduleQuestion
+      : (scheduleRows.find((r) => r.key !== 'hard' && r.key !== 'runs' && r.key !== 'rides')?.key ?? 'long');
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
       : scheduleAsk === 'long' ? (state.longRunDay || '')
@@ -1941,18 +1959,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // "How much" (volume) gate — mirror the schedule gate's "require only what the card renders" rule:
   // the running field shows on posturePresent('run'), the riding field on bike === 'maintain'. Require
   // a number for each field that is actually shown; a strength-only athlete (neither shown) is not blocked.
+  /**
+   * ⛔ THE COUNTS GATE HERE NOW, BECAUSE THE COUNTS ARE HERE NOW (2026-08-18). They moved off the
+   * scheduler onto this card; leaving their requirement in `scheduleBlockedReasons` would block
+   * Continue on a screen that no longer shows the control, naming a chip the athlete cannot see.
+   * ⚠️ The shared gate is UNCHANGED and still asserts the same rule — the caller below simply drops
+   * the two count sentences from what the SCHEDULE step displays, so one rule keeps one owner.
+   */
   const volumeCanContinue =
-    (!posturePresent('run') || Number(state.targetMiles) > 0) &&
-    (state.posture?.bike !== 'maintain' || Number(state.rideHours) > 0);
+    (!posturePresent('run') || (Number(state.targetMiles) > 0 && state.runDays >= 2)) &&
+    (state.posture?.bike !== 'maintain' || (Number(state.rideHours) > 0 && state.rideDays >= 1));
   // Reason shown at the Continue key when blocked — fact-statement, matching the schedule gate's
   // "Runs a week has no number yet" voice (not an imperative).
   const volumeMissing: string[] = [];
   if (posturePresent('run') && !(Number(state.targetMiles) > 0)) volumeMissing.push('running');
   if (state.posture?.bike === 'maintain' && !(Number(state.rideHours) > 0)) volumeMissing.push('riding');
+  // ⚠️ THE COUNT IS ITS OWN SENTENCE, in the scheduler's exact words — the athlete may have met one
+  // half of the question and not the other, and "Weekly running has no number yet" would be false
+  // when the miles are typed and the count is not.
+  const volumeCountMissing: string[] = [];
+  if (posturePresent('run') && Number(state.targetMiles) > 0 && state.runDays < 2) {
+    volumeCountMissing.push('Runs a week has no number yet.');
+  }
+  if (state.posture?.bike === 'maintain' && Number(state.rideHours) > 0 && state.rideDays < 1) {
+    volumeCountMissing.push('Rides a week has no number yet.');
+  }
   const volumeBlockedReason =
-    volumeMissing.length === 0 ? undefined
-    : volumeMissing.length === 1 ? `Weekly ${volumeMissing[0]} has no number yet.`
-    : 'Weekly running and riding have no number yet.';
+    volumeMissing.length === 0
+      ? (volumeCountMissing[0] ?? undefined)
+      : volumeMissing.length === 1 ? `Weekly ${volumeMissing[0]} has no number yet.`
+      : 'Weekly running and riding have no number yet.';
 
   // A blocker reason that NAMES a discipline gets that discipline's colour (run gold / ride green) —
   // the same wayfinding as the rows. Without this the line renders in the wizard accent, which is the
@@ -2032,10 +2068,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // forwarded, which is a silent drop of an unanswered optional question, not a blocked flow.
   };
   const scheduleBlockedReason = scheduleGateReason(scheduleGateInput);
-  const scheduleCanContinue = scheduleBlockedReason === null;
+  const scheduleCanContinue = scheduleGateReasons(scheduleGateInput)
+    .filter((r) => !/^(Runs|Rides) a week has no number yet\.$/.test(r)).length === 0;
   // Surface EVERY missing required field at once (runs AND rides, not just the first), each in its
   // own discipline colour — so the athlete sees the whole ask, not one-then-the-next.
-  const scheduleAllReasons = scheduleGateReasons(scheduleGateInput);
+  // ⛔ THE COUNT SENTENCES BELONG TO THE VOLUME STEP NOW. The shared gate still produces them —
+  // one rule, one owner — and this step simply does not speak for a control it no longer renders.
+  const scheduleAllReasons = scheduleGateReasons(scheduleGateInput)
+    .filter((r) => !/^(Runs|Rides) a week has no number yet\.$/.test(r));
   const scheduleReasonNode = scheduleAllReasons.length === 0
     ? undefined
     : scheduleAllReasons.length === 1
@@ -3674,6 +3714,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     builds around, and the sessions will not shrink to meet you" — is now the last
                     section of the (i), where it sits with the reason it is true. It was costing a
                     line of height on the screen whose whole defect was height. */}
+                {/* ⛔ THE COUNT LIVES WITH THE VOLUME (Michael, 2026-08-18). It was on the
+                    scheduler, two steps later — so the line below could never render its per-session
+                    split ("about 1h a ride across 3 rides"), because the divisor had not been asked
+                    for yet. That line is the unit-slip guard: it is how someone who types 20 meaning
+                    MILES sees it come back as "6h40 a ride". It only works if both numbers are on
+                    one card.
+                    ⚠️ AND IT LEAVES THE SCHEDULER AS PURELY "WHICH DAYS", which is Michael's whole
+                    reason for the reorder. */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-white/70 text-sm">across</span>
+                  {[2, 3, 4].map((n) => {
+                    const on = (state.runDays === n);
+                    return (
+                      <button
+                        key={n} type="button"
+                        onClick={() => setState((st) => ({ ...st, runDays: n }))}
+                        className="w-9 py-1.5 rounded-xl text-sm border"
+                        style={on
+                          ? { borderColor: `rgb(${getDisciplineColorRgb('run')})`, backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.16)`, color: '#fff' }
+                          : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
+                      >{n}</button>
+                    );
+                  })}
+                  <span className="text-white/70 text-sm">runs a week</span>
+                </div>
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                   A week you can hit when work is bad, not your best one.
                 </p>
@@ -3719,6 +3784,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     was picked it read "About 20h a ride across 0 rides", which is a wrong number and
                     a broken sentence in one go. It waits for the count now; the unit-slip warning
                     this line exists for still fires the moment both are in. */}
+                {/* ⛔ THE COUNT LIVES WITH THE VOLUME (Michael, 2026-08-18). It was on the
+                    scheduler, two steps later — so the line below could never render its per-session
+                    split ("about 1h a ride across 3 rides"), because the divisor had not been asked
+                    for yet. That line is the unit-slip guard: it is how someone who types 20 meaning
+                    MILES sees it come back as "6h40 a ride". It only works if both numbers are on
+                    one card.
+                    ⚠️ AND IT LEAVES THE SCHEDULER AS PURELY "WHICH DAYS", which is Michael's whole
+                    reason for the reorder. */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-white/70 text-sm">across</span>
+                  {[2, 3, 4].map((n) => {
+                    const on = (state.rideDays === n);
+                    return (
+                      <button
+                        key={n} type="button"
+                        onClick={() => setState((st) => ({ ...st, rideDays: n }))}
+                        className="w-9 py-1.5 rounded-xl text-sm border"
+                        style={on
+                          ? { borderColor: `rgb(${getDisciplineColorRgb('bike')})`, backgroundColor: `rgba(${getDisciplineColorRgb('bike')},0.16)`, color: '#fff' }
+                          : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)' }}
+                      >{n}</button>
+                    );
+                  })}
+                  <span className="text-white/70 text-sm">rides a week</span>
+                </div>
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                   {Number(state.rideHours) > 0 && state.rideDays > 0
                     ? (() => {
@@ -3796,9 +3886,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 (2026-08-10, "NO ARGUMENT ON THIS CARD AT ALL"). Michael's instruction is that the
                 note must be plainly visible and not behind a tooltip — it is both, without
                 reintroducing the defect that rule was written for. */}
+            {/* ⚠️ THE 8 IS THE REAL NUMBER, NOT A ROUND ONE. `resolveEnduranceTier` drops to the
+                `survival` band — 25-30 reps, the block's floor — on `> 8 total hours` OR `>= 2 hard
+                days`. Naming the threshold is the whole point: the athlete can see the cliff before
+                they walk off it. ⛔ If that constant ever moves, this sentence moves with it. */}
             <p className="text-white/70 text-sm leading-relaxed border-t border-white/10 pt-3">
-              Your endurance volume is your budget. These total hours dictate how much accessory
-              lifting you can afford to recover from.
+              Your endurance volume is your budget. Crossing 8 hours a week automatically drops your
+              accessory lifting to the bare minimum so your body can actually recover.
             </p>
             {/* ⛔ THE PANEL OPENS AT THE BOTTOM, NOT BESIDE THE (i) THAT TOGGLES IT. Rendering it
                 inline under the running label would push the riding field off the screen the moment
@@ -3822,11 +3916,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {/* ⛔ THE SCHEDULER — one screen for every WHEN question, and the week underneath it.
           Replaces the run, bike and hard-day cards, which asked the same question in three places
           and none of which could show the answer. */}
-      {currentStep === 'schedule' && (
+      {(currentStep === 'schedule' || currentStep === 'hardday') && (
         <StepLayout
-          step={stepNo('schedule')} totalSteps={steps.length} title="Your week"
-          subtitle="Your days. The lifting is placed around them."
-          onBack={back} onContinue={next} canContinue={scheduleCanContinue} blockedReason={scheduleReasonNode}
+          step={stepNo(currentStep)} totalSteps={steps.length}
+          title={currentStep === 'hardday' ? 'Hard days' : 'Your week'}
+          subtitle={currentStep === 'hardday'
+            ? 'How much intensity the block carries. None is a valid answer.'
+            : 'Your days. The lifting is placed around them.'}
+          onBack={back} onContinue={next}
+          // ⚠️ THE HARD-DAY STEP NEVER BLOCKS. Its own row is optional — "None" is a real answer —
+          // and `scheduleCanContinue` is about the per-week COUNTS, which live on the other step.
+          canContinue={currentStep === 'hardday' ? true : scheduleCanContinue}
+          blockedReason={currentStep === 'hardday' ? undefined : scheduleReasonNode}
         >
           {/* ⛔ ONE CARD, ONE OPEN QUESTION — A DISCLOSURE LIST (2026-08-10).
               ═══════════════════════════════════════════════════════════════════════════════════
@@ -3864,7 +3965,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               chrome. `scheduleQuestion` holds the single open key and every row reads it. */}
           <div className="space-y-3">
             <div className="rounded-xl border border-white/10 overflow-hidden">
-              {scheduleRows.map((row, i) => {
+              {/* ⛔ ONE LIST, TWO STEPS. `hardday` shows the hard row alone; `schedule` shows
+                  everything else. The row's controls, rationale, ownership question and terrain menu
+                  are unchanged — they simply render under a different title. */}
+              {scheduleRows
+                // ⚠️ THE PER-WEEK COUNTS ARE GONE FROM HERE TOO — they moved onto the volume card
+                // where their divisor lives. What is left is the two long-day anchors: pure picking.
+                .filter((r) => (currentStep === 'hardday'
+                  ? r.key === 'hard'
+                  : r.key !== 'hard' && r.key !== 'runs' && r.key !== 'rides'))
+                .map((row, i) => {
                 const active = scheduleAsk === row.key;
                 // Only the per-week COUNTS block Continue (a kept discipline with no session count —
                 // the "half-answer" the gate refuses). Long-run/ride days are optional anchors and do
@@ -3916,8 +4026,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           screen is not built yet — the control is still a row of this card's
                           disclosure list. When it is extracted, the note goes with it. */}
                       <p className="text-white/70 text-sm leading-relaxed px-3 pt-2.5">
-                        Intensity taxes your nervous system. Pinning hard days here lowers your
-                        accessory rep limits to protect your recovery for the heavy barbell lifts.
+                        Intensity taxes your central nervous system. Every hard day you add lowers
+                        your lifting rep ceiling to protect the heavy barbell work. (You'll pick which
+                        days these land on in the Schedule step).
                       </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
