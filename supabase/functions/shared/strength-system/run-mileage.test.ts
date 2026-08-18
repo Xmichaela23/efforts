@@ -43,8 +43,16 @@ Deno.test('the hills are still the protected intensity — fixed, never shrunk t
   // Hickson: intensity holds VO2max, frequency and duration are the expendable variables. A 13-mile
   // athlete and a 30-mile athlete get the same hard session; what flexes is the easy volume.
   for (const [asked, days] of [[13, 3], [30, 4]] as const) {
-    const hill = built(asked, days).runs.find((s: any) => /Hill/.test(s.name))!;
-    assertEquals(hill.duration, 35, `hills shrank on a ${asked}-mile week`);
+    // ⚠️ THE HARD RUN IS A THRESHOLD RUN NOW ON A ONE-HARD-DAY WEEK (2026-08-17) — VO2/hills unlock on
+    // a SECOND hard run. This assertion is about the hard session being a PROTECTED, fixed cost that
+    // small mileage budgets do not shrink; which session carries that cost is not what it tests.
+    const hard = built(asked, days).runs.find((s: any) => /Hill|Threshold/.test(s.name))!;
+    // ⚠️ 43 MIN, NOT 35 — the threshold session is longer than the hill session (20-21 min of work
+    // plus rests plus a 20-min warm-up/cool-down). What this test protects is that the number does
+    // NOT MOVE with the mileage budget, which is Hickson's point; the number itself belongs to
+    // whichever session the hierarchy put there.
+    // Week 2 of the block is 3 × 7 min: 21 min of work + 2 × 2 min rest + 20 warm-up/cool-down.
+    assertEquals(hard.duration, 45, `the hard run shrank on a ${asked}-mile week`);
   }
 });
 
@@ -67,7 +75,7 @@ Deno.test('⛔ NO SINGLE RUN SWALLOWS THE WEEK', () => {
 // line and a future session re-applying it everywhere would reinstate the 16.
 Deno.test('⛔ 25+ IS SELF-REGULATED — the engine names the long day and stops sizing it', () => {
   const { runs, miles } = built(40, 4);
-  const easy = runs.filter((s: any) => !/Hill/.test(s.name));
+  const easy = runs.filter((s: any) => !/Hill|Threshold/.test(s.name));
   const longest = Math.max(...easy.map((s: any) => s.duration)) / PACE;
   const share = longest / miles;
   assertEquals(share <= 0.32, true, `long run took ${Math.round(share * 100)}% of the week (was 40%)`);
@@ -80,7 +88,7 @@ Deno.test('⛔ 25+ IS SELF-REGULATED — the engine names the long day and stops
 // getting four equal jogs is a worse answer, and 45% of a small budget is not the same defect.
 Deno.test('below 25 the long run is still the long run', () => {
   const { runs } = built(20, 3);
-  const easy = runs.filter((s: any) => !/Hill/.test(s.name));
+  const easy = runs.filter((s: any) => !/Hill|Threshold/.test(s.name));
   const longest = Math.max(...easy.map((s: any) => s.duration));
   const shortest = Math.min(...easy.map((s: any) => s.duration));
   assertEquals(longest > shortest, true, 'the long run stopped being longer below the line');

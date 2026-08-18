@@ -1,5 +1,40 @@
 # Aerobic Maintenance Doctrine — Run-Only Athlete, Strength-Led Block
 
+> # ⛔⛔ SUPERSEDED FOR THE HYBRID ENGINE — 2026-08-17, MICHAEL'S RULING. READ THIS BEFORE §5.
+>
+> **The key is in the filename: `run-only`.** This document reasons about an athlete whose only
+> stressor is running. Efforts' Strong Focus block puts a heavy barbell underneath, and the barbell
+> changes the physiological landscape this doctrine was written against. **Merging the two is how
+> rules from two different physiological states end up in one engine.**
+>
+> ### What is overridden, and what stands
+>
+> | | this document | the hybrid engine |
+> |---|---|---|
+> | **§5 THE MIX — 3 hill : 1 flat per 4-week cycle** | the flat week stops sustained flat capability from never being trained | ⛔ **DISCARDED. Do not build it.** |
+> | **§5's flat week lands on the 5/3/1 deload** | the bar is light, so the expensive run falls where the budget is free | ⛔ **REVERSED. Weeks 4, 8 and 12 carry NO intervals at all.** |
+> | **The one quality run is hill repeats** | ✅ | ⚠️ **VO2 only. The DEFAULT hard run is now the threshold run** — see `DOCTRINE-threshold-run.md`. |
+> | **§3's 4 × 3 min structure and its sources** | ✅ | ✅ **STANDS.** Fleckenstein 2025 + the BMC time-at-VO2max meta are not affected by the barbell. |
+> | **§2 gradient, §2.1 prohibitions, §2.2 pace anchors** | ✅ | ✅ **STAND.** |
+>
+> ### Why the deload ruling reverses
+>
+> ⛔ **A DELOAD THAT REPLACES ONE PEAK STRESSOR WITH ANOTHER IS NOT A DELOAD.** Weeks 4/8/12 strip
+> the barbell volume so the central nervous system can clear. Dropping flat speed work into that gap
+> spends the recovery on the endurance side instead — the CNS never actually gets its week.
+>
+> ⛔ **AND THE TISSUE ARGUMENT POINTS THE SAME WAY.** Flat speed work loads the hamstrings and the
+> Achilles hard, and heavy deadlifts and squats already take those exact tissues to their limit. **The
+> incline is the whole point of choosing hills**: it maxes the cardiovascular system out before the
+> mechanical impact reaches the tissue the barbell is already spending. ⛔ So VO2 work in this engine
+> is **strictly hill repeats** — flat VO2 stays what §2.1 already calls it.
+>
+> ⚠️ **THIS DOCUMENT'S OWN §5 FLAGGED THE PLACEMENT AS REASONED, NOT RULED** — *"flagged because it
+> was reasoned and not stated by Michael"*, with its own counter-argument recorded as unresolved.
+> **That is now resolved, against it.** Everything below is the run-only case and remains correct
+> for a run-only athlete; none of it is a build instruction for Strong Focus.
+
+
 **Scope:** governs aerobic prescription during a strength-led block for an athlete with no bike.
 **Status:** doctrine. Companion to `DOCTRINE-aerobic-maintenance.md`. Sections 1–4 of that document apply unchanged and are not restated.
 **Author:** Michael, 2026-07-26.

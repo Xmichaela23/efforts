@@ -110,6 +110,14 @@ starts from the server-side generators — not from baked client JSON.
 
 ### D-432 — Strong Focus aligns to 5/3/1 Forever: three-week cycles, standalone light weeks, the verdict on the rested week, FSL in the leaders (2026-08-15, **PUSHED `48889070` + DEPLOYED; NOT device-verified**) — supersedes the volume half of [D-385] and the pairing half of [D-387]
 
+> ⛔ **PARTLY SUPERSEDED 2026-08-17 — MICHAEL, AGAINST THIS ENTRY'S OWN PAGE-PINNED READING. Everything below is history for the two rows named here; the rest stands.**
+>
+> **1. The standalone weeks' assistance row is reversed.** This entry's table gives weeks 4/8/12 `25 / 10` — the seventh-week band at full volume plus ten jumps — on the strength of **p.23: 25–50 is the SEVENTH WEEK's number**, and that citation is correct. Michael overruled it for the hybrid case: **the 7th weeks (4, 8) now HALVE every accessory total, and the TM-test week (12) carries no accessories and no jumps at all.** His reason is systemic-fatigue clearance for an athlete carrying a conditioning load Wendler's seventh week was not written against, and for week 12 that you do not build fatigue in front of a measurement. Halving the busiest band lands at 13, **below p.23's floor** — that is known and accepted. Code: `RECOVERY_ASSISTANCE_SCALE` in `strength-primary-plan.ts`, with the conflict recorded beside the number.
+>
+> **2. The band axis moved again, and it is now a resolved WEEK-LEVEL tier.** This entry shipped `7th week 25–50 · leader 50–75 · anchor 75–100, clamped at 75` — a PHASE axis. That was already replaced on 2026-08-16 (§1g) by competing stress, and on 2026-08-17 the resolution was **hoisted out of the per-slot call into one tier decided once per week** off hard days **plus total endurance hours**: `survival 25–30 · base 30–40 · strength 40–50`. The phase no longer touches accessory volume at all. Spec: `docs/SPEC-viada-ingestion-order.md`.
+>
+> ⚠️ **AND THIS ENTRY'S WEEK-BY-WEEK TABLE IS STALE INDEPENDENTLY OF ANY OF THAT** — it shows week 1 as a TM-test week, and the opening TM-test week was removed afterwards. Week 1 is a leader week in the code. Not caused by 2026-08-17; noticed while auditing it.
+
 **Decided by Michael 2026-08-15.** The work order was `docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` (deleted on ship, per the spec lifecycle). The 12-week container, the four lifts, days per week and endurance placement are UNTOUCHED. What changed is the internal shape.
 
 **Sources.** Two primaries. *5/3/1 2nd edition* — the licensed PDF, cited throughout and never committed. *5/3/1 Forever* — Michael's physical copy; **page photos of pp.16–45 were read in the 2026-08-15 session and only those pages are verified**, transcribed into `docs/REFERENCE-531-forever-pp16-45.md`. ⚠️ Anything attributed to another page of Forever anywhere in this codebase is secondary and must be marked so.

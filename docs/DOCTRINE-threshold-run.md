@@ -36,7 +36,7 @@ this note away by upgrading the citation.
 | **Why that number** | 5K pace is VO2 max work — lactate accumulates and the athlete is failing toward the finish. Stepping down ~20 s/mi lands on the **lactate threshold**: the tipping point where clearance matches production. Above it the session becomes a short VO2 session; below it, grey-zone volume. |
 | **Terrain** | **Flat or rolling uninterrupted path.** Track, flat road or path, or treadmill at **1% incline**. |
 | **Why** | Power output must stay static to train clearance. A climb run at flat-ground pace spikes heart rate into the VO2 band, floods the legs, and the threshold adaptation is destroyed. |
-| **Rest** | **2 minutes** easy jog or walk between efforts, every week of the block. Enough for heart rate to fall slightly, then straight back onto pace. |
+| **Rest** | **Scales with the interval: 1 · 2 · 3 min** across the three weeks of a wave. ⛔ **REVERSED 2026-08-17 — this row said "2 minutes, every week of the block" and Michael overruled it:** a flat rest fails to clear lactate on the longer intervals, so a 10-minute effort cannot take the same recovery as a 5-minute one. The code already had the scaling; this document was the thing that was wrong. |
 | **Warm-up / cool-down** | 10 minutes easy jog either side. |
 | **Working time** | **20–21 minutes in the leader waves; deliberately LESS in the anchor** — see §2. |
 | **Whole session** | ~40–42 minutes in the leader waves. |
@@ -105,7 +105,9 @@ intervals off entirely.
 run replaces it. *You cannot adapt if you never clear the fatigue.*
 
 ### Wave 2 — Leader 2: advance the wave
-**Lever: pace.** The identical structure to wave 1, run **5–10 s/mi faster**. Rest stays 2 min.
+**Lever: pace.** The identical structure to wave 1, run **5–10 s/mi faster**. Rest scales as in wave 1.
+⚠️ **BUILT AS 8 s/mi**, the middle of the range, and that pick is ours. ⛔ Floored at 5K pace — a
+progression is not a licence to cross into VO2 work, which is the one thing this session must not be.
 
 | week | session |
 |---|---|
@@ -127,8 +129,8 @@ high-quality flush that holds the adaptation the leader waves bought, at a fract
 under tension, so the nervous system arrives at the AMRAP loaded.
 
 - **Pace:** back to wave 1 — **5K + 20 s. Do not run faster.** ⛔ No 5K-pace work in this block.
-- **Rest:** back to **2 minutes**.
-- **Volume:** slashed.
+- **Rest:** the same 1 · 2 · 3 scaling as the leaders.
+- **Volume:** slashed — 15 · 14 · 10 min against the leaders' 20 · 21 · 20.
 
 | week | session | working time |
 |---|---|---|
@@ -160,10 +162,11 @@ specifics**. Listed so the next change is a correction, not a rebuild.
 
 | | built today | this doctrine |
 |---|---|---|
-| **Rest** | 1 min · 2 min · 3 min, scaling with interval length | **2 min flat**, every week |
-| **Wave 2** | identical to wave 1 — no pace change | **5–10 s/mi faster**, same structure |
-| **Anchor** | repeats 4×5 / 3×7 / 2×10 at full volume | **3×5 · 2×7 · 1×10**, wave-1 pace, 2 min rest — the run yields to the AMRAP |
-| **Terrain** | not asked; the run's only terrain menu is the hill/treadmill/flat set built for the VO2 day | **track / flat road or path / treadmill 1%**, with the effort-outranks-pace copy (§1b) |
+| **Rest** | ✅ 1 · 2 · 3 min, scaling with interval length | **KEPT — the doctrine was corrected to match the code**, 2026-08-17. See §1. |
+| **Wave 2** | ✅ **BUILT 2026-08-17** — `_f8` on the token, 8 s/mi faster, floored at 5K pace so a progression cannot cross into VO2 work | **5–10 s/mi faster**, same structure |
+| **Anchor** | ✅ **BUILT 2026-08-17** — `ANCHOR_THRESHOLD_WAVE`, and the copy that said *"this is the fastest this session gets in the block"* is deleted with it | **3×5 · 2×7 · 1×10**, wave-1 pace — the run yields to the AMRAP |
+| **Terrain** | ❌ still not asked; the run's only terrain menu is the hill/treadmill/flat set built for the VO2 day | **track / flat road or path / treadmill 1%**, with the effort-outranks-pace copy (§1b) |
+| **Reachability** | ✅ **FIXED 2026-08-17 — AND IT WAS THE BIGGEST MISS ON THIS PAGE.** The role rule was *first prescribed hard day = VO2, second = threshold*, **discipline-blind**: one hard run always got Hill Repeats, and listing a run before a bike handed the threshold slot to the BIKE. This entire document described a session that almost never fired. | the first prescribed run IS the threshold run; VO2 unlocks on a second |
 
 ⚠️ **THE PACE BASIS IS ALREADY RIGHT.** The engine derives threshold as **5K + 20 s/mi** when no
 measured threshold exists, which is this document's number, and the session copy already states which
@@ -174,7 +177,29 @@ say why. Built and verified.
 
 ---
 
+## 3b. ⛔ THIS DOCUMENT OVERRIDES `DOCTRINE-aerobic-maintenance-run-only.md` FOR THE HYBRID ENGINE
+
+**Michael, 2026-08-17.** That document is 47KB of sourced reasoning about a **run-only** athlete, and
+its §5 asks for a 3 hill : 1 flat mix per four-week cycle with the flat week landing on the 5/3/1
+deload. ⛔ **Not built, and not to be built.** A deload that swaps one peak stressor for another is
+not a deload — the CNS never gets its week — and flat speed work loads the hamstrings and Achilles
+the deadlift and squat already spend. Weeks 4, 8 and 12 carry **no intervals**. VO2 work in this
+engine is **strictly hill repeats**; the incline is what maxes the cardiovascular system out before
+the impact reaches the tissue the barbell needs.
+
+⚠️ **WHAT SURVIVES FROM IT:** §3's 4 × 3 min structure and its sources (Fleckenstein 2025, the BMC
+time-at-VO2max meta), §2's gradient reasoning, §2.1's prohibitions, §2.2's pace anchors. The full
+superseded-for-hybrid banner is at the top of that file.
+
+---
+
 ## 4. Open
+
+⚠️ **THE HARD-RUN HIERARCHY IS NOW STRICT (Michael, 2026-08-17), AND IT IS THE FRAME THIS WHOLE
+DOCUMENT SITS INSIDE.** VO2 work is a CNS stressor competing with the squat and the deadlift for the
+same neurological recovery; threshold work sits below that line. **In a block where heavy barbells
+are the point, one hard session a week has to be the threshold one.** VO2 is what an athlete unlocks
+by asking for a SECOND hard day in that discipline. ⛔ Do not restore an ordering-based rule.
 
 - **The terrain menu.** The hard-run screen offers hill / short hill / treadmill / flat — correct for
   the VO2 day, wrong for this one. When a run is the threshold day it should offer **track, flat

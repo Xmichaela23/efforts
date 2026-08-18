@@ -68,7 +68,11 @@ Deno.test('the hard ride does not shrink to fit — intensity is the protected v
     durationWeeks: 12, oneRepMaxes: MAXES,
     fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'bike', enduranceFrequency: 3,
     bike: { hours: 4, days: 3, longRideDay: 'saturday' },
-    hardDays: [{ day: 'tuesday', discipline: 'bike' }],
+    // ⚠️ TWO HARD DAYS, VO2 SECOND (2026-08-17). The first prescribed hard day in a week is the
+  // THRESHOLD session now — VO2 is what a SECOND hard day unlocks — so a one-hard-day fixture
+  // cannot reach the interval session it is asserting about. The leading entry is a decoy that
+  // absorbs the threshold slot; the session under test is the second.
+    hardDays: [{ day: 'monday', discipline: 'run' }, { day: 'tuesday', discipline: 'bike' }],
   } as never);
   const hard = (p.sessions_by_week['2'] as any[]).find((s) => /Intervals/.test(s.name));
   assertEquals(hard.duration, 45, 'the intervals were trimmed to make the hours fit');

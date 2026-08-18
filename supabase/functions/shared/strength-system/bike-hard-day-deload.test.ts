@@ -27,7 +27,11 @@ const BIKE_BLOCK = {
   enduranceFrequency: 3,
   bike: { hours: 6, days: 3, longRideDay: 'saturday' },
   targetWeeklyRideHours: 6,
-  hardDays: [{ day: HARD_DAY, discipline: 'bike' }],
+  // ⚠️ TWO HARD DAYS, VO2 SECOND (2026-08-17). The first prescribed hard day in a week is the
+  // THRESHOLD session now — VO2 is what a SECOND hard day unlocks — so a one-hard-day fixture
+  // cannot reach the interval session it is asserting about. The leading entry is a decoy that
+  // absorbs the threshold slot; the session under test is the second.
+  hardDays: [{ day: 'monday', discipline: 'run' }, { day: HARD_DAY, discipline: 'bike' }],
 } as const;
 
 const plan: any = composeStrengthPrimaryPlan(BIKE_BLOCK as never);

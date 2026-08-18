@@ -40,7 +40,10 @@ const week1 = (cfg: Record<string, unknown>): S[] =>
 
 const isLower = (s: S) => s.type === 'strength' && /Back Squat|Deadlift/.test(s.name);
 const isLongRun = (s: S) => s.type === 'run' && /Long/.test(s.name);
-const isHardRun = (s: S) => s.type === 'run' && /Hill|Interval|Hard|Tempo/.test(s.name);
+// ⚠️ `Threshold` ADDED 2026-08-17. The first prescribed hard run is a THRESHOLD run now — VO2/hills
+// unlock only on a second — so a matcher that named only the VO2 session stopped seeing the hard day
+// at all and reported the athlete's pin as moved. A stale matcher, not a moved pin.
+const isHardRun = (s: S) => s.type === 'run' && /Hill|Interval|Hard|Tempo|Threshold/.test(s.name);
 const isEasyRun = (s: S) => s.type === 'run' && !isLongRun(s) && !isHardRun(s);
 const isLongRide = (s: S) => s.type === 'ride' && /Long/.test(s.name);
 const isEasyRide = (s: S) => s.type === 'ride' && !isLongRide(s);
@@ -231,7 +234,9 @@ const runsIn = (w: S[]) => w.filter((x) => x.type === 'run');
 const ridesIn = (w: S[]) => w.filter((x) => x.type === 'ride');
 const minutesOf = (w: S[], type: string) =>
   w.filter((x) => x.type === type).reduce((n, x) => n + x.duration, 0);
-const isHardRide = (s: S) => s.type === 'ride' && /Interval/i.test(s.name);
+// ⚠️ `Threshold` ADDED 2026-08-17 — a single hard ride is a THRESHOLD ride now, not the Helgerud
+// 4 × 4. A matcher naming only the VO2 session stopped seeing the hard day at all.
+const isHardRide = (s: S) => s.type === 'ride' && /Interval|Threshold/i.test(s.name);
 
 /** The athlete's verification case: 3 runs + 2 rides, hard day = run. */
 const FLOW = {

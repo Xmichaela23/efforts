@@ -117,6 +117,7 @@ import {
   type SolverDay,
 } from '../../_shared/week-solver.ts';
 
+
 /** The four lifts, in lb. **All four are required** — the entry gate gets this far only
  *  when every one is on file (SPEC §0). Missing one leaves a lifting day with no weight. */
 export type OneRepMaxes = {
@@ -1337,7 +1338,13 @@ const BIKE_QUALITY_MIN = 45;
  * ⚠️ `cycleKind` IS THE SECOND AXIS, and it mirrors the bar: leaders establish and advance, the
  * ANCHOR is shortest and fastest — the same shape as the anchor's 95% single.
  */
-type HardWave = { weekInCycle: number; cycleKind: CycleKind };
+/**
+ * Where a week sits in the block: which week of its cycle, which KIND of cycle, and WHICH cycle.
+ *
+ * ⛔ `cycleIndex` WAS MISSING AND THE DOCTRINE NEEDED IT. `cycleKind` cannot tell leader 1 from
+ * leader 2 — both are `'leader'` — so wave 2's pace drop had nowhere to read from. 1-based.
+ */
+type HardWave = { weekInCycle: number; cycleKind: CycleKind; cycleIndex?: number };
 
 /**
  * ⛔ 20 MINUTES IN ZONE, HELD, WITH THE CONTINUOUS EFFORT LENGTHENING (§7, Michael's spec).
@@ -1354,9 +1361,49 @@ const THRESHOLD_WAVE: ReadonlyArray<{ reps: number; minutes: number; restMin: nu
   { reps: 2, minutes: 10, restMin: 3 },
 ];
 
+/**
+ * ⛔ THE ANCHOR: THE RUN YIELDS AND THE BARBELL WINS (doctrine §2 wave 3, built 2026-08-17).
+ *
+ * The anchor is where the bar expresses peak strength — 95% singles and an open last set taken
+ * toward failure. **Two peak nervous-system efforts on one day is the collapse this whole
+ * arrangement exists to prevent**, so the run drops to a maintenance flush that HOLDS the adaptation
+ * the leader waves bought at a fraction of the time under tension.
+ *
+ * ⚠️ THE PACE GOES BACK TO WAVE 1 — no offset, deliberately. The doctrine is explicit: *"Do not run
+ * faster. No 5K-pace work in this block."*
+ * ⚠️ SO THE RUN'S PEAK AND THE BAR'S PEAK ARE OUT OF PHASE ON PURPOSE. The hardest running in the
+ * block is week 7, not week 11. If a later change makes the anchor's run harder "for symmetry with
+ * the bar", it is reintroducing the double-peak this table exists to remove.
+ *
+ * Working time 15 · 14 · 10 min against the leaders' 20 · 21 · 20 — the ~60% cut Michael asked for,
+ * expressed as his own rep schemes rather than as a multiplier.
+ */
+const ANCHOR_THRESHOLD_WAVE: ReadonlyArray<{ reps: number; minutes: number; restMin: number }> = [
+  { reps: 3, minutes: 5, restMin: 1 },
+  { reps: 2, minutes: 7, restMin: 2 },
+  { reps: 1, minutes: 10, restMin: 3 },
+];
+
+/**
+ * ⛔ WAVE 2 IS THE SAME STRUCTURE RUN FASTER (doctrine §2 wave 2, built 2026-08-17).
+ *
+ * Wave 1's lever is the LENGTH of the continuous effort; wave 2's lever is PACE. Without this, wave
+ * 2 is byte-identical to wave 1 and the block has no progression in it at all — it is the same three
+ * sessions run twice. The doctrine's range is 5–10 s/mi; 8 is the middle of it, and the pick is ours.
+ *
+ * ⚠️ ZERO ON EVERY OTHER WAVE, INCLUDING THE ANCHOR. See `ANCHOR_THRESHOLD_WAVE`.
+ */
+const WAVE_2_PACE_DROP_SEC_PER_MI = 8;
+
 function thresholdStep(wave: HardWave): { reps: number; minutes: number; restMin: number } {
-  const i = Math.min(Math.max(1, Math.round(wave.weekInCycle)), THRESHOLD_WAVE.length) - 1;
-  return THRESHOLD_WAVE[i];
+  const table = wave.cycleKind === 'anchor' ? ANCHOR_THRESHOLD_WAVE : THRESHOLD_WAVE;
+  const i = Math.min(Math.max(1, Math.round(wave.weekInCycle)), table.length) - 1;
+  return table[i];
+}
+
+/** How much faster than threshold this week's session runs, in sec/mi. 0 on waves 1 and 3. */
+function thresholdPaceDrop(wave: HardWave): number {
+  return wave.cycleKind === 'leader' && wave.cycleIndex === 2 ? WAVE_2_PACE_DROP_SEC_PER_MI : 0;
 }
 
 /** Total working minutes of a threshold step — the number the 30–40 min ceiling is checked against. */
@@ -1380,6 +1427,7 @@ function thresholdWorkingMinutes(wave: HardWave): number {
 function thresholdRunSession(day: string, wave: HardWave, basis: 'measured' | 'derived'): PlanSession {
   const st = thresholdStep(wave);
   const anchor = wave.cycleKind === 'anchor';
+  const drop = thresholdPaceDrop(wave);
   return {
     day,
     type: 'run',
@@ -1388,13 +1436,23 @@ function thresholdRunSession(day: string, wave: HardWave, basis: 'measured' | 'd
       `${st.reps} × ${st.minutes} min at threshold, ${st.restMin} min easy between. `
       + 'Comfortably hard — you could say a sentence, not hold a conversation. '
       + (anchor
-        ? 'Anchor week: hold the top of the range. This is the fastest this session gets in the block. '
-        : 'The reps get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
+        // ⛔ THE ANCHOR'S COPY SAID THE OPPOSITE OF WHAT THE ANCHOR IS FOR. It read "hold the top of
+        // the range — this is the fastest this session gets in the block", which is the double-peak
+        // the doctrine was rewritten to remove.
+        ? 'Anchor week: the running yields so the barbell can peak. Same pace as the first block, '
+          + 'less of it — this holds what you built rather than adding to it. '
+        : drop > 0
+          ? `Same shape as the first block, run about ${drop} s/mi faster. The length held; now the pace moves. `
+          : 'The reps get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
       + (basis === 'measured'
         ? 'The pace comes from your measured threshold.'
         : 'The pace is derived from your 5K — threshold sits about 20 s/mi slower.'),
     duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
-    steps_preset: [`run_thr_${st.reps}x${st.minutes}min_r${st.restMin * 60}s`],
+    // ⚠️ `_f{sec}` IS THE FASTER-THAN-THRESHOLD SUFFIX, and it is OPTIONAL — the token without it is
+    // the pre-2026-08-17 form exactly, so every already-materialized plan is unaffected.
+    steps_preset: [
+      `run_thr_${st.reps}x${st.minutes}min_r${st.restMin * 60}s${drop > 0 ? `_f${drop}` : ''}`,
+    ],
     tags: ['quality', 'run', 'aerobic', 'threshold'],
   };
 }
@@ -1509,24 +1567,51 @@ function bikeQualitySession(day: string, wave: HardWave = { weekInCycle: 1, cycl
 type HardRole = 'vo2' | 'threshold' | 'club';
 
 function assignHardRoles(
-  // ⚠️ THE DAY IS NOT READ — the role depends on ownership and order only, which is why the roles
+  // ⚠️ THE DAY IS NOT READ — the role depends on discipline and order only, which is why the roles
   // can be settled before the solver has placed anything (slice 8). Typed nullable to say so.
   days: ReadonlyArray<{ day: DayName | null; discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }>,
 ): HardRole[] {
-  const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'vo2'));
-  // A club day already fills the threshold slot, so the app's own sessions fill what is left: the
-  // FIRST prescribed day takes VO2 and any second prescribed day takes threshold.
-  const clubHoldsThreshold = roles.includes('club');
-  let vo2Taken = false;
+  /**
+   * ⛔⛔ THRESHOLD IS THE DEFAULT AND VO2 IS THE UNLOCK (Michael, 2026-08-17). THIS INVERTS THE RULE
+   * THAT STOOD HERE, AND THE OLD ONE WAS AN ORDERING ACCIDENT WEARING A POLICY.
+   *
+   * It read: *first prescribed day takes VO2, any second takes threshold* — **discipline-blind**. So
+   * an athlete with ONE hard run always got Hill Repeats and the threshold run was unreachable, and
+   * an athlete who listed a run before a bike handed the threshold slot to the BIKE and got hills
+   * for their run. Reordering the same two hard days changed what both sessions were. The 12-week
+   * threshold doctrine Michael wrote describes *"the prescribed sustained run inside a Strong Focus
+   * block"* — singular, THE run — and it was firing almost nowhere.
+   *
+   * ⛔ THE BIOLOGY, AND IT IS WHY THIS IS A HIERARCHY AND NOT A PREFERENCE. VO2 work is a CNS
+   * stressor competing with the squat and the deadlift for the same neurological recovery. Threshold
+   * work sits below that line: it buys aerobic capacity and clears fatigue without spending what the
+   * bar needs. **In a block where heavy barbells are the point, one hard session a week has to be
+   * the threshold one.** VO2 is what an athlete unlocks by asking for a SECOND hard day in that
+   * discipline — i.e. by demonstrating the capacity to carry it.
+   *
+   * ⛔⛔ ONE BUDGET FOR THE WHOLE WEEK, NOT ONE PER DISCIPLINE — CORRECTED 2026-08-17, SAME DAY,
+   * AND THE VERSION IN BETWEEN ERASED THE ATHLETE'S SPEED WORK.
+   *
+   * The first version of this inversion made the rule PER DISCIPLINE: a first hard run took
+   * threshold, a first hard ride took threshold. Symmetrical, and wrong — an athlete asking for one
+   * hard run AND one hard ride (the standard mid-volume hybrid week) got **two sustained threshold
+   * sessions and no top-end work anywhere in the block.** Two sub-lactate sessions in two disciplines
+   * is biologically redundant: they buy the same adaptation twice and leave the aerobic ceiling
+   * untouched. Michael, 2026-08-17: *"a hybrid athlete needs top-end speed."*
+   *
+   * ⛔ SO THE SPLIT IS ACROSS THE WEEK: exactly one sustained lactate session and, if the athlete
+   * asked for a second hard day, exactly one top-end session. The PRIMARY discipline — the one
+   * listed first — takes threshold; the secondary takes VO2. It reads as position-based and it is
+   * really stimulus-based: the week gets one of each, in that order.
+   */
+  const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'threshold'));
+  // ⚠️ A CLUB DAY ALREADY *IS* THE SUSTAINED SESSION — a group run or ride settles into exactly that
+  // rhythm — so it consumes the threshold slot and the app's own days go VO2.
+  let thresholdTaken = roles.includes('club');
   for (let i = 0; i < roles.length; i++) {
     if (roles[i] === 'club') continue;
-    if (!vo2Taken) { roles[i] = 'vo2'; vo2Taken = true; continue; }
-    roles[i] = 'threshold';
-  }
-  // ⚠️ WITH A CLUB DAY PRESENT, A SECOND PRESCRIBED DAY IS STILL VO2 — the club is the threshold
-  // day, so the app's day is the one that has to carry the intervals (§7's two-day-one-club case).
-  if (clubHoldsThreshold) {
-    for (let i = 0; i < roles.length; i++) if (roles[i] === 'threshold') roles[i] = 'vo2';
+    if (!thresholdTaken) { roles[i] = 'threshold'; thresholdTaken = true; continue; }
+    roles[i] = 'vo2';
   }
   return roles;
 }
@@ -3727,16 +3812,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         // prescribe 4 × 3 min uphill into a session the athlete turns up to and runs with a group,
         // and writing the template anyway would be a prescription for work nobody is going to do. It
         // keeps its pin, its recovery cost and its share of the week's miles.
-        // ⚠️ THE THRESHOLD RUN IS THE SECOND PRESCRIBED DAY, never the first — `assignHardRoles`
-        // owns that and it is asked here rather than re-derived.
+        // ⚠️ THE THRESHOLD RUN IS THE FIRST PRESCRIBED RUN (2026-08-17, inverted) — `assignHardRoles`
+        // owns that and it is asked here rather than re-derived. VO2 is the unlock, not the default.
         const role = roleOf(h.day);
         weekSessions.push(
           role === 'club'
             ? clubEnduranceSession('run', h.day, hardRunSessionMinutes(h.terrain))
             : role === 'threshold'
-              ? thresholdRunSession(h.day, { weekInCycle, cycleKind },
+              ? thresholdRunSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex },
                 asPositiveNumber(args.thresholdPaceSecPerMi) != null ? 'measured' : 'derived')
-              : hardRunSession(h.day, heavyLowerDays, h.terrain, { weekInCycle, cycleKind }),
+              : hardRunSession(h.day, heavyLowerDays, h.terrain, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }),
         );
       }
     } else if (enduranceSport === 'bike' && !hasBike) {
@@ -3926,8 +4011,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           role === 'club'
             ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_MIN)
             : role === 'threshold'
-              ? thresholdRideSession(h.day, { weekInCycle, cycleKind })
-              : bikeQualitySession(h.day, { weekInCycle, cycleKind }),
+              ? thresholdRideSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex })
+              : bikeQualitySession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }),
         );
       }
     }

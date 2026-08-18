@@ -47,7 +47,9 @@ Deno.test('⛔ 4×5 → 3×7 → 2×10 ACROSS THE WAVE — same time in zone, he
   assertEquals(tokenOf(named(p, 2, /Threshold Run/)[0]), 'run_thr_3x7min_r120s');
   assertEquals(tokenOf(named(p, 3, /Threshold Run/)[0]), 'run_thr_2x10min_r180s');
   // ⛔ AND THE WAVE RESETS WITH THE BAR, not with the block — week 5 opens cycle 2 at 4 × 5 again.
-  assertEquals(tokenOf(named(p, 5, /Threshold Run/)[0]), 'run_thr_4x5min_r60s');
+  // ⚠️ `_f8` — cycle 2 is the SAME structure run 8 s/mi faster (doctrine §2 wave 2, built
+  // 2026-08-17). The shape resets with the bar; the pace is the lever that moved.
+  assertEquals(tokenOf(named(p, 5, /Threshold Run/)[0]), 'run_thr_4x5min_r60s_f8');
 });
 
 Deno.test('⛔ THE 30-40 MIN THRESHOLD CEILING HOLDS IN EVERY WEEK — §6 depends on it', () => {
@@ -58,13 +60,16 @@ Deno.test('⛔ THE 30-40 MIN THRESHOLD CEILING HOLDS IN EVERY WEEK — §6 depen
       assert(!!m, `unparseable threshold token: ${tokenOf(s)}`);
       const working = Number(m![1]) * Number(m![2]);
       assert(working <= 40, `week ${bw.week}: ${working} min of threshold work is past the ceiling`);
-      assert(working >= 15, `week ${bw.week}: ${working} min is not a threshold dose`);
+      // ⚠️ FLOOR LOWERED TO 10 (2026-08-17). The ANCHOR runs 3×5 · 2×7 · 1×10 — the run yields so the
+      // barbell can peak — so week 11 is 10 minutes of work ON PURPOSE. A 15-minute floor was
+      // asserting the pre-anchor-cut volume and would fail the doctrine it is meant to protect.
+      assert(working >= 10, `week ${bw.week}: ${working} min is not a threshold dose`);
     }
   }
 });
 
 Deno.test('⛔ THE 12-18 MIN VO2 CEILING HOLDS — reps and working time are STATIC, only density moves', () => {
-  const p = build({ ...BIKE, hardDays: [{ day: 'tuesday', discipline: 'bike' }] });
+  const p = build({ ...BIKE, hardDays: [{ day: 'monday', discipline: 'bike' }, { day: 'tuesday', discipline: 'bike' }] });
   for (const bw of buildWeekMap(12)) {
     for (const s of named(p, bw.week, /Bike Intervals/)) {
       const m = String(tokenOf(s)).match(/^bike_vo2_(\d+)x(\d+)min_R(\d+)min$/);
@@ -78,7 +83,7 @@ Deno.test('⛔ THE 12-18 MIN VO2 CEILING HOLDS — reps and working time are STA
 });
 
 Deno.test('the ride VO2 progresses by DENSITY — 4 min recovery in week one, 3 from week two', () => {
-  const p = build({ ...BIKE, hardDays: [{ day: 'tuesday', discipline: 'bike' }] });
+  const p = build({ ...BIKE, hardDays: [{ day: 'monday', discipline: 'bike' }, { day: 'tuesday', discipline: 'bike' }] });
   assertEquals(tokenOf(named(p, 1, /Bike Intervals/)[0]), 'bike_vo2_4x4min_R4min');
   assertEquals(tokenOf(named(p, 2, /Bike Intervals/)[0]), 'bike_vo2_4x4min_R3min');
   assertEquals(tokenOf(named(p, 3, /Bike Intervals/)[0]), 'bike_vo2_4x4min_R3min');
@@ -87,7 +92,9 @@ Deno.test('the ride VO2 progresses by DENSITY — 4 min recovery in week one, 3 
 Deno.test('the run VO2 progresses in the PRESCRIPTION — its token cannot carry a pace', () => {
   // The recovery is the descent, which ends on the lap button; there is no clock to shorten, so
   // pace is the only lever and it lives in the copy. The token is deliberately identical.
-  const p = build({ ...RUN, hardDays: [{ day: 'tuesday', discipline: 'run' }] });
+  // ⚠️ TWO HARD RUNS — VO2 is what a SECOND hard day unlocks (2026-08-17). The leading entry
+  // absorbs the threshold slot; the hill session under test is the second.
+  const p = build({ ...RUN, hardDays: [{ day: 'monday', discipline: 'run' }, { day: 'tuesday', discipline: 'run' }] });
   const w1 = named(p, 1, /Hill/)[0], w2 = named(p, 2, /Hill/)[0];
   assertEquals(tokenOf(w1), tokenOf(w2), 'the hill token moved — the expander was not asked for that');
   assert(String(w1.description) !== String(w2.description), 'the hill session says the same thing every week');
@@ -96,7 +103,12 @@ Deno.test('the run VO2 progresses in the PRESCRIPTION — its token cannot carry
 });
 
 Deno.test('the ANCHOR cycle asks for the fastest of the block, mirroring the 95% single', () => {
-  const p = build({ ...RUN, hardDays: [{ day: 'tuesday', discipline: 'run' }] });
+  // ⚠️ THIS IS THE VO2 SESSION, AND IT IS THE ONE THAT STILL PEAKS WITH THE BAR. The THRESHOLD run
+  // does the opposite — it yields in the anchor (doctrine §2 wave 3) — so do not read this test as
+  // permission to make the threshold session harder there.
+  // ⚠️ TWO HARD RUNS — VO2 is what a SECOND hard day unlocks (2026-08-17). The leading entry
+  // absorbs the threshold slot; the hill session under test is the second.
+  const p = build({ ...RUN, hardDays: [{ day: 'monday', discipline: 'run' }, { day: 'tuesday', discipline: 'run' }] });
   const anchorWeek = buildWeekMap(12).find((b) => b.cycleKind === 'anchor')!.week;
   assert(/fastest this session gets/i.test(String(named(p, anchorWeek, /Hill/)[0].description)));
 });
@@ -122,10 +134,32 @@ Deno.test('⛔ NEVER TWO VO2 DAYS — two prescribed days is one of each', () =>
   assertEquals(named(p, 2, /Threshold/).length, 1, 'no threshold day was built');
 });
 
-Deno.test('ONE hard day is the VO2 day — the quality easy volume cannot hold', () => {
+Deno.test('⛔ ONE HARD DAY IS THE THRESHOLD DAY — INVERTED 2026-08-17, MICHAEL', () => {
+  // This asserted the opposite — "ONE hard day is the VO2 day" — and it was an ordering accident
+  // wearing a policy: the rule was `first prescribed = VO2`, discipline-blind, so an athlete with one
+  // hard run ALWAYS got Hill Repeats and the 12-week threshold doctrine fired almost nowhere.
+  //
+  // ⛔ THE BIOLOGY IS WHY IT IS A HIERARCHY. VO2 work is a CNS stressor competing with the squat and
+  // the deadlift for the same neurological recovery; threshold work sits below that line and buys
+  // aerobic capacity without spending what the bar needs. In a block where heavy barbells are the
+  // point, one hard session a week has to be the threshold one. VO2 is what a SECOND hard day
+  // unlocks.
   const p = build({ ...RUN, hardDays: [{ day: 'tuesday', discipline: 'run' }] });
-  assertEquals(named(p, 2, /Hill|Interval/).length, 1);
-  assertEquals(named(p, 2, /Threshold/).length, 0);
+  assertEquals(named(p, 2, /Threshold/).length, 1, 'the one hard day was not the threshold day');
+  assertEquals(named(p, 2, /Hill|Interval/).length, 0, 'VO2 fired without a second hard day');
+});
+
+Deno.test('⛔ AND THE SPLIT IS ACROSS THE WEEK, NOT PER DISCIPLINE', () => {
+  // A first pass made the rule per-discipline — a first hard RUN took threshold and a first hard
+  // RIDE took threshold — so the standard hybrid week (1 hard run + 1 hard ride) came out as TWO
+  // sustained sessions and erased top-end work from the whole block. Two sub-lactate sessions in two
+  // disciplines buy the same adaptation twice. Michael: "a hybrid athlete needs top-end speed."
+  const runFirst = build({ ...RUN, bike: { hours: 4, days: 2, longRideDay: 'saturday' },
+    hardDays: [{ day: 'tuesday', discipline: 'run' }, { day: 'thursday', discipline: 'bike' }] });
+  assertEquals(named(runFirst, 2, /Threshold/).length, 1, 'not exactly one sustained session');
+  assertEquals(named(runFirst, 2, /Hill|Interval/).length, 1, 'not exactly one top-end session');
+  // ⚠️ THE PRIMARY DISCIPLINE — the one listed first — is the one that takes threshold.
+  assertEquals(named(runFirst, 2, /Threshold/)[0].type, 'run');
 });
 
 Deno.test('⛔ A CLUB DAY IS ALWAYS THE THRESHOLD SLOT — so the app\'s own day stays VO2', () => {
@@ -186,7 +220,9 @@ Deno.test('the gate is PER DISCIPLINE — a 5K without an FTP still gets its har
     bike: { hours: 4, days: 2, longRideDay: 'saturday' },
     hardDays: [{ day: 'tuesday', discipline: 'run' }, { day: 'thursday', discipline: 'bike' }],
   } as never) as any;
-  assertEquals(named(p, 2, /Hill|Interval/).filter((s) => s.type === 'run').length, 1);
+  // ⚠️ THE UNGATED RUN IS THE THRESHOLD SESSION NOW — it is the FIRST hard day, and the ride's
+  // proposal is dropped for a missing FTP, so no second day unlocks VO2.
+  assertEquals(named(p, 2, /Threshold/).filter((s) => s.type === 'run').length, 1);
   assertEquals(named(p, 2, /Bike Intervals/).length, 0, 'the ride was built without an FTP');
 });
 

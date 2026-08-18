@@ -41,13 +41,29 @@ const ALL = [undefined, 'hill_3min', 'hill_short', 'treadmill', 'flat'] as const
 /** The three that run on a gradient. §2.2's no-pace rule is theirs; flat is exempt. */
 const GRADED = [undefined, 'hill_3min', 'hill_short', 'treadmill'] as const;
 
+/**
+ * ⛔ TWO HARD DAYS, AND THE SESSION UNDER TEST IS THE SECOND ONE (2026-08-17).
+ *
+ * The terrain menu belongs to the **VO2 session**, and VO2 is no longer what a first hard day is.
+ * The hierarchy is now strict: the first prescribed day in a discipline is the THRESHOLD session —
+ * VO2 work is a CNS stressor competing with the squat and deadlift, so it unlocks only when the
+ * athlete asks for a second hard day in that discipline. So a one-hard-day fixture cannot reach a
+ * hill session at all, and every assertion in this file was silently testing a Threshold Run.
+ *
+ * ⚠️ THE FIRST ENTRY IS A DECOY THAT ABSORBS THE THRESHOLD SLOT. It carries no terrain because
+ * terrain is meaningless on a threshold session — that is §4 of the doctrine, still open.
+ */
 const week = (terrain?: string, discipline: 'run' | 'bike' = 'run') => {
   const p = composeStrengthPrimaryPlan({
     durationWeeks: 12,
     oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
-    fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
+    fiveKPaceSecPerMi: 435, thresholdPaceSecPerMi: 455,
+    ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 4, targetWeeklyMiles: 20,
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
-    hardDays: [{ day: 'tuesday', discipline, ...(terrain ? { terrain } : {}) }],
+    hardDays: [
+      { day: 'thursday', discipline },
+      { day: 'tuesday', discipline, ...(terrain ? { terrain } : {}) },
+    ],
   } as never);
   return (p.sessions_by_week['2'] as any[]);
 };
@@ -107,7 +123,13 @@ Deno.test('⚠️ THE RIDE HAS NO TERRAIN — a turbo, a chaingang and a climb a
     fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
     longRunDay: 'sunday', easyPaceMinPerMile: PACE,
     bike: { hours: 4, days: 2 },
-    hardDays: [{ day: 'tuesday', discipline: 'bike', terrain: 'flat' }],
+    // ⚠️ TWO HARD RIDES (2026-08-17) — `Bike Intervals` is the VO2 session and VO2 unlocks on a
+    // SECOND hard day. The first ride absorbs the threshold slot; terrain rides on the second, where
+    // it must still be ignored.
+    hardDays: [
+      { day: 'monday', discipline: 'bike' },
+      { day: 'tuesday', discipline: 'bike', terrain: 'flat' },
+    ],
   } as never);
   const sessions = (p.sessions_by_week['2'] as any[]);
   const ride = sessions.find((s) => s.type === 'ride' && /Interval/.test(s.name))!;
@@ -303,7 +325,13 @@ Deno.test('⛔ THE HARD SESSION IS NEVER SILENTLY DROPPED — every legal week s
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
-        hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
+        // ⚠️ TWO HARD RUNS, TERRAIN ON THE SECOND (2026-08-17). Terrain belongs to the VO2 session
+        // and VO2 unlocks only on a second hard day, so a one-day fixture builds a Threshold Run and
+        // this sweep would report every shape as "the flat session vanished".
+        hardDays: [
+          { day: day === 'monday' ? 'tuesday' : 'monday', discipline: 'run' },
+          { day, discipline: 'run', terrain: 'flat' },
+        ],
       } as never);
       const hard = (p.sessions_by_week['2'] as any[])
         .find((s) => s.type === 'run' && /Flat Intervals/.test(String(s.name)));
@@ -330,7 +358,13 @@ Deno.test('⛔ THE PREFERENCE NEVER BREACHES ANYTHING — least of all the long 
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
-        hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
+        // ⚠️ TWO HARD RUNS, TERRAIN ON THE SECOND (2026-08-17). Terrain belongs to the VO2 session
+        // and VO2 unlocks only on a second hard day, so a one-day fixture builds a Threshold Run and
+        // this sweep would report every shape as "the flat session vanished".
+        hardDays: [
+          { day: day === 'monday' ? 'tuesday' : 'monday', discipline: 'run' },
+          { day, discipline: 'run', terrain: 'flat' },
+        ],
       } as never);
       const breaches = ((p as any).placement_compromises ?? [])
         .filter((c: any) => c.kind === 'breach');
@@ -361,7 +395,13 @@ Deno.test('⛔ THE MATRIX FLOOR SURVIVES THE TRADE — heavy legs stay 48h apart
         oneRepMaxes: { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 },
         fiveKPaceSecPerMi: 435, ftpWatts: 240, enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20,
         longRunDay, easyPaceMinPerMile: PACE,
-        hardDays: [{ day, discipline: 'run', terrain: 'flat' }],
+        // ⚠️ TWO HARD RUNS, TERRAIN ON THE SECOND (2026-08-17). Terrain belongs to the VO2 session
+        // and VO2 unlocks only on a second hard day, so a one-day fixture builds a Threshold Run and
+        // this sweep would report every shape as "the flat session vanished".
+        hardDays: [
+          { day: day === 'monday' ? 'tuesday' : 'monday', discipline: 'run' },
+          { day, discipline: 'run', terrain: 'flat' },
+        ],
       } as never);
       const lowers = (p.sessions_by_week['2'] as any[])
         .filter((s) => s.type === 'strength' && /Squat|Deadlift/.test(String(s.name)));

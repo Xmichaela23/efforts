@@ -1556,13 +1556,24 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   // ⛔ THE PACE IS THE ONE THE APP ALREADY OWNS. `secPerMiFromBaseline(_, 'threshold')` is the
   // single reader — measured threshold if the athlete has one, otherwise 5K + 20 s/mi, which is
   // this file's own long-standing rule. No second derivation here.
-  if (/^run_thr_\d+x\d+min(?:_r\d+s)?$/.test(lower)) {
-    const m = lower.match(/^run_thr_(\d+)x(\d+)min(?:_r(\d+)s)?$/);
+  // ⛔ `_f{sec}` — FASTER THAN THRESHOLD BY THAT MANY SEC/MI (2026-08-17, doctrine §2 wave 2).
+  // Wave 2 is the same structure run 5-10 s/mi quicker; without a way to say so in the token, wave 2
+  // materialized byte-identical to wave 1 and the block had no progression in it.
+  // ⚠️ OPTIONAL. A token without the suffix is the pre-2026-08-17 form exactly.
+  if (/^run_thr_\d+x\d+min(?:_r\d+s)?(?:_f\d+)?$/.test(lower)) {
+    const m = lower.match(/^run_thr_(\d+)x(\d+)min(?:_r(\d+)s)?(?:_f(\d+))?$/);
     if (m) {
       const reps = parseInt(m[1], 10);
       const work_s = parseInt(m[2], 10) * 60;
       const rest_s = m[3] ? parseInt(m[3], 10) : 60;
-      const thr = secPerMiFromBaseline(baselines, 'threshold') ?? undefined;
+      const faster = m[4] ? parseInt(m[4], 10) : 0;
+      const thrBase = secPerMiFromBaseline(baselines, 'threshold');
+      // ⚠️ FLOORED AT 5K PACE. A pace drop is a progression, not a licence to cross into VO2 work —
+      // the doctrine's whole point is that this session stays below the redline.
+      const fiveK = secPerMiFromBaseline(baselines, 'fivek');
+      const thr = thrBase == null
+        ? undefined
+        : (faster > 0 ? Math.max(fiveK ?? 0, thrBase - faster) : thrBase);
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       for (let i = 0; i < reps; i++) {
         out.push({ id: uid(), kind: 'work', duration_s: work_s, pace_sec_per_mi: thr, label: 'Threshold' });
