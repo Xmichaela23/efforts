@@ -119,6 +119,65 @@ export const ASSISTANCE_TOTAL_REPS_FLOOR = 25;
 export const ASSISTANCE_TOTAL_REPS_CEILING = 50;
 
 /**
+ * ⛔ THE ENDURANCE TIER — RESOLVED ONCE PER WEEK, PASSED DOWN (2026-08-17).
+ * Spec: `docs/SPEC-viada-ingestion-order.md`.
+ *
+ * ⚠️ IT IS A PROPERTY OF THE WEEK AND IT USED TO BE ASKED PER SLOT. `assistanceTotalReps` took
+ * `hardEnduranceDays` and re-derived the band on every call, which meant three call sites could each
+ * form their own opinion of which tier the athlete is in. One resolution, one answer.
+ *
+ * | tier | band | trigger |
+ * |---|---|---|
+ * | `survival` | 25-30 | `>= 2 hard days` **OR** `> 8 total hours` |
+ * | `base`     | 30-40 | `== 1 hard day` **AND** `4-8 total hours` |
+ * | `strength` | 40-50 | `0 hard days` **AND** `< 4 total hours` |
+ *
+ * ⛔ THE TRIGGERS ARE ASYMMETRIC ON PURPOSE. Survival fires on **OR** — either condition alone is
+ * enough. The other two require **AND**. Anything falling through both AND-gates lands in
+ * `survival`, which is the safe direction: under-prescribing accessories costs some hypertrophy,
+ * over-prescribing them costs the athlete their running economy.
+ */
+export type EnduranceTier = 'survival' | 'base' | 'strength';
+
+export const TIER_BAND: Readonly<Record<EnduranceTier, readonly [number, number]>> = {
+  survival: [25, 30],
+  base: [30, 40],
+  strength: [40, 50],
+};
+
+export function resolveEnduranceTier(input: {
+  /** Hard endurance days in the week — prescribed AND club. A club ride costs the same recovery. */
+  hardDays?: number | null;
+  /**
+   * Total weekly endurance hours. ⚠️ ABSENT IS NOT ZERO — an unknown week is not licence to hand out
+   * the ceiling (§0h). Absent means the hours condition simply cannot be satisfied, so an athlete
+   * with 0 hard days and no hours figure lands in `survival` rather than `strength`.
+   */
+  totalHours?: number | null;
+}): EnduranceTier {
+  // ⛔ `Number(null)` IS 0 AND `Number.isFinite(0)` IS TRUE, so the null check has to come FIRST or
+  // every unknown reads as a tested zero — which on the hours axis buys the athlete the CEILING, the
+  // exact inversion this function's own doc comment forbids. Same trap `weeklyVolumeFor` carries a
+  // warning about, caught here by the test below rather than in a plan.
+  const num = (v: unknown): number | null => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const rawHard = num(input.hardDays);
+  const hard = rawHard == null ? null : Math.max(0, Math.round(rawHard));
+  const rawHours = num(input.totalHours);
+  const hours = rawHours == null ? null : Math.max(0, rawHours);
+
+  // OR — either alone is enough.
+  if ((hard != null && hard >= 2) || (hours != null && hours > 8)) return 'survival';
+  // AND — every condition must hold, and an unknown cannot hold.
+  if (hard === 1 && hours != null && hours >= 4 && hours <= 8) return 'base';
+  if (hard === 0 && hours != null && hours < 4) return 'strength';
+  return 'survival';
+}
+
+/**
  * ⛔ THE MERGED DEADLIFT + PRESS DAY SITS AT 25, whatever the week's band. Two main lifts on one day
  * is the heaviest session in the block; the floor is what makes an open push slot safe there.
  * ⚠️ Not wired until the three-card picker lands (§1f) — the composer has nowhere to say "this is
@@ -217,6 +276,27 @@ export type AssistanceScaleInputs = {
    * the heaviest one, and treating it as 0 would hand a busy athlete the ceiling.
    */
   hardEnduranceDays?: number | null;
+  /**
+   * ⛔ THE WEEK'S RESOLVED TIER — see {@link resolveEnduranceTier}. When present it OVERRIDES
+   * `hardEnduranceDays`, because it is the only one of the two that has seen the total hours.
+   */
+  tier?: EnduranceTier | null;
+  /**
+   * ⛔ IS THE ATHLETE SWIMMING AT ALL — the lat and shoulder quarantine (2026-08-17).
+   *
+   * Swimming is thousands of unweighted pull-ups: the lats, teres major and shoulder capsule are
+   * under continuous tension through the catch phase of every stroke. So the PULL slot is locked to
+   * the floor of the tier's band regardless of tested capacity, to protect the shoulder and the
+   * stroke.
+   *
+   * ⚠️ IT KEYS ON *ANY* SWIMMING, NOT ON YARDAGE, AND MICHAEL RULED THAT DELIBERATELY. Exact volume
+   * is secondary to the mechanic — even a light 1,500-yard recovery swim is hundreds of unweighted
+   * pulls. ⛔ Do not add a yards question to buy precision this gate does not need.
+   *
+   * ⚠️ IT IS THE ONE PLACE A TESTED CAPACITY IS DELIBERATELY NOT SPENT. Everywhere else a measured
+   * chin max walks the slot up its band; here it does not.
+   */
+  swimming?: boolean | null;
 };
 
 /**
@@ -232,11 +312,18 @@ function capacityFor(slot: AssistanceSlot, inputs?: AssistanceScaleInputs): numb
   return typeof raw === 'number' && raw > 0 ? raw : null;
 }
 
-/** The band for a week: [floor, ceiling], picked by how much hard endurance competes with it. */
-function bandFor(hardEnduranceDays: number | null | undefined): readonly [number, number] {
-  const n = Number(hardEnduranceDays);
-  // ⚠️ ABSENT READS AS ONE, the middle band. Unknown is not licence to prescribe the heaviest, and
-  // reading it as zero would hand the busiest athlete the ceiling (§0h).
+/**
+ * The band for a week: [floor, ceiling].
+ *
+ * ⛔ IT READS THE RESOLVED TIER NOW, NOT A HARD-DAY COUNT. `hardEnduranceDays` is still accepted so
+ * a caller that has not been hoisted yet behaves exactly as before, but it is the FALLBACK — when a
+ * tier is present the tier wins, because the tier is the thing that saw the hours.
+ * ⚠️ NEITHER PRESENT → the middle band. Unknown is not licence to prescribe the heaviest, and
+ * reading it as zero would hand the busiest athlete the ceiling (§0h).
+ */
+function bandFor(inputs?: AssistanceScaleInputs): readonly [number, number] {
+  if (inputs?.tier) return TIER_BAND[inputs.tier];
+  const n = Number(inputs?.hardEnduranceDays);
   if (!Number.isFinite(n)) return ASSISTANCE_BAND_BY_HARD_DAYS[1];
   const clamped = Math.max(0, Math.min(2, Math.round(n)));
   return ASSISTANCE_BAND_BY_HARD_DAYS[clamped];
@@ -259,8 +346,14 @@ export function assistanceTotalReps(
   slot: AssistanceSlot,
   inputs?: AssistanceScaleInputs,
 ): { totalReps: number; basis: 'capacity' | 'posture' | 'floor' } {
-  const [floor, ceiling] = bandFor(inputs?.hardEnduranceDays);
+  const [floor, ceiling] = bandFor(inputs);
   const developing = (inputs?.strengthPosture ?? 'develop') === 'develop';
+
+  // ⛔ THE SWIM GATE. The pull slot takes the tier's floor and nothing moves it — not the focus, not
+  // a tested capacity. ⚠️ It does NOT touch the opt-in pull-up progression, which overrides this slot
+  // upstream in `resolveDayAssistance`: the athlete asked for that programme by name, and D-407/D-423
+  // is that an explicit choice is honoured. What they get instead is a warning on the card.
+  if (slot === 'pull' && inputs?.swimming) return { totalReps: floor, basis: 'floor' };
 
   // ⛔ EVERY SLOT SCALES ON THE SAME RULE NOW (§1f) — it just has an input for one of the three. A
   // 50-rep session against an 8-rep chin max is a different exercise from the same session against a

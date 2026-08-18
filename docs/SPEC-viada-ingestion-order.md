@@ -114,13 +114,35 @@ intake grows a yards question. **Michael's call — do not silently substitute d
 
 ---
 
-## 5. Open
+## 5. Resolved and built, 2026-08-17
 
-- **The swim gate versus the pull-up progression** (§3). Blocking.
-- **Yards or days** for the swim trigger (§4). Blocking.
-- **What counts toward "total hours"** — every endurance session, or only the prescribed ones? A
-  club ride the athlete already attends costs the same recovery as one the app wrote (§1i's own
-  rule), which argues for all of them.
-- **Where the tier is decided.** The band is currently asked per slot inside `assistanceRows`. A
-  tier is a property of the WEEK, so it likely wants resolving once and passing down — otherwise
-  three call sites can disagree about which tier the athlete is in.
+- ✅ **The swim gate versus the pull-up progression.** D-407/D-423 settles it: **the progression
+  wins.** The athlete toggled it on by name and an explicit choice is honoured; the gate yields.
+  What they get instead of a cap is an amber line on the progression card. ⛔ Do not "resolve" this
+  later by capping the progression — that is the override those decisions exist to delete.
+- ✅ **Yards or days.** **Days.** `swimDays > 0` is the binary trigger. Exact yardage is secondary to
+  the mechanic; even a light 1,500-yard recovery swim is hundreds of unweighted pulls. ⛔ Do not add
+  a yards question to buy precision this gate does not need.
+- ✅ **The tier is hoisted.** Resolved once at the top of `composeStrengthPrimaryPlan` off hard days
+  + total hours, and passed down as `AssistanceScaleInputs.tier`. `bandFor` prefers it whenever it
+  is present; `hardEnduranceDays` survives only as the fallback for an un-hoisted caller.
+- ✅ **Total hours = run + ride, and every hard day counts** — club sessions included, because a club
+  ride costs the same recovery as one the app wrote (§1i's own rule). Swim is deliberately NOT summed
+  into hours: only days exist, and inventing a duration to complete the arithmetic is the kind of
+  number this codebase deletes. It enters as the gate instead.
+
+### Two traps caught while building, both recorded because they will recur
+
+- ⛔ **`Number(null)` is 0 and `Number.isFinite(0)` is true**, so the first resolver read every
+  unknown as a tested zero — which on the HOURS axis buys the athlete the ceiling, the exact
+  inversion §2 forbids. The null check must come first. (`weeklyVolumeFor` carries a warning about
+  the same trap on `pullupMaxReps`.)
+- ⛔ **A measured zero is not an unknown.** `enduranceSport: null` with no bike is a strength-only
+  block — a declared zero — and reading it as "we have not asked" dropped the athlete Tier 3 exists
+  for into the survival band and took their ceiling away. `null` is reserved for the genuinely
+  unknown: a declared runner whose weekly miles never arrived.
+
+## 6. Still open
+
+- **The intake order.** The wizard does not yet ask the endurance questions before the strength
+  ones. The ENGINE order is done; the SCREEN order is not.

@@ -3377,6 +3377,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     : ''}
                 </p>
               )}
+              {/* ── THE SWIM COLLISION ──────────────────────────────────────────────────────────
+                  ⛔ THE PROGRESSION WINS AND THE ATHLETE IS WARNED (Michael, 2026-08-17).
+
+                  The Viada lat quarantine locks the pull slot to its floor for any athlete who
+                  swims — swimming is thousands of unweighted pull-ups, and the lats, teres major
+                  and shoulder capsule are under continuous tension through the catch of every
+                  stroke. The progression asks for Wendler's 100 chins a week. Two rules, one
+                  bucket, opposite directions.
+
+                  ⚠️ D-407/D-423 SETTLES IT: the engine advises, the athlete decides. They toggled
+                  this on by name, so it is honoured and the gate yields. What they get is this
+                  line — the same shape as the eccentric cost note, and for the same reason.
+                  ⛔ Do not "resolve" this by capping the progression; that is the override those
+                  decisions were written to delete. */}
+              {state.assistancePicks.performance_focus === 'pullups'
+                && state.posture?.swim === 'maintain' && state.swimDays > 0 && (
+                <p className="text-amber-200/70 text-xs px-3 pb-3 -mt-1.5 leading-relaxed">
+                  Combining a high-volume pull-up progression with swim training places extreme,
+                  continuous tension on the lats and shoulder capsule. Proceed with caution.
+                </p>
+              )}
             </div>
 
             {/* ── THE FOUR DAY CARDS ────────────────────────────────────────────────────────────

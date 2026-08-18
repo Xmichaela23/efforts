@@ -43,6 +43,7 @@ import {
   ASSISTANCE_GUIDANCE,
   ASSISTANCE_MERGED_DAY_REPS,
   assistanceTotalReps,
+  resolveEnduranceTier,
 } from '../../../../src/lib/assistance-menu.ts';
 // ⛔ D-407 — THE PER-DAY PICKER. `resolveAssistance` / `assistanceSubstitutionNote` are gone with the
 // re-roling model they served; the athlete now picks each day's three movements and the composer
@@ -3231,6 +3232,53 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     }
   }
 
+  /**
+   * ⛔ THE ENDURANCE TIER, RESOLVED ONCE, HERE, BEFORE A SINGLE ACCESSORY REP IS AUTHORED
+   * (Michael, 2026-08-17). Spec: `docs/SPEC-viada-ingestion-order.md`.
+   *
+   * ⛔ THE ORDER IS THE POINT, NOT THE LOOKUP. Endurance volume is the physiological BANDWIDTH and
+   * strength adaptation is what fits inside it, so the tier is settled before the materializer runs
+   * rather than consulted while it runs. It was asked PER SLOT — `assistanceTotalReps` re-derived
+   * the band from a hard-day count on every call — which let three call sites hold three opinions of
+   * which tier the athlete is in.
+   *
+   * ⚠️ HOURS ARE RUN + RIDE. Swim is DELIBERATELY not summed in: only `swimDays` exists, the
+   * courtesy session is a booked hour the app does not coach, and inventing a duration to make the
+   * arithmetic look complete is the kind of number this codebase deletes. It enters as the swim
+   * GATE below instead, which is the axis it actually has.
+   *
+   * ⚠️ AND UNDEFINED IS NOT ZERO. An athlete with no volume figure lands in `survival`, not
+   * `strength` — §0h: unknown is "we have not asked", never "they do nothing".
+   */
+  const weeklyRunHours = Number(args.targetWeeklyMiles) > 0 && Number(args.easyPaceMinPerMile) > 0
+    ? (Number(args.targetWeeklyMiles) * Number(args.easyPaceMinPerMile)) / 60
+    : null;
+  const weeklyRideHours = Number(args.bike?.hours) > 0
+    ? Number(args.bike!.hours)
+    : (Number(args.targetWeeklyRideHours) > 0 ? Number(args.targetWeeklyRideHours) : null);
+  /**
+   * ⛔ ZERO IS KNOWABLE AND `null` IS NOT THE SAME ANSWER. An athlete with `enduranceSport: null`
+   * and no bike is a STRENGTH-ONLY block — that is a measured zero, and reading it as "we have not
+   * asked" drops them into `survival` and strips the accessory ceiling from precisely the athlete
+   * Tier 3 exists for. `null` is reserved for the genuinely unknown: a declared runner whose weekly
+   * miles never arrived.
+   */
+  const enduranceDeclared = args.enduranceSport != null || !!args.bike
+    || Number(args.targetWeeklyRideHours) > 0;
+  const totalEnduranceHours = !enduranceDeclared
+    ? 0
+    : (weeklyRunHours == null && weeklyRideHours == null
+        ? null
+        : (weeklyRunHours ?? 0) + (weeklyRideHours ?? 0));
+
+  const enduranceTier = resolveEnduranceTier({
+    // ⚠️ EVERY hard day, club included — a club ride costs the same recovery as one the app wrote.
+    hardDays: hardDays.length,
+    totalHours: totalEnduranceHours,
+  });
+  /** ⛔ ANY swimming at all, never a yardage — see `AssistanceScaleInputs.swimming`. */
+  const isSwimming = (args.swimDays ?? 0) > 0;
+
   // ── The weeks ─────────────────────────────────────────────────────────────
   const sessions_by_week: Record<string, PlanSession[]> = {};
 
@@ -3371,8 +3419,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         strengthPosture: args.blockShape?.strengthPosture,
         // ⛔ COMPETING STRESS, NOT THE CYCLE PHASE (2026-08-16, §1g). The band is set by how much
         // hard endurance the week carries; the phase no longer touches the assistance total.
-        // ⛔ THE REAL COUNT (§1i). This was `hardPin ? 1 : 0` with the note "ONE hard day is the most
-        // this block can carry today — a second is §1i, not built". It is built; the band reads two.
+        // ⛔ AND IT IS THE HOISTED TIER NOW, NOT A COUNT RE-DERIVED HERE (2026-08-17). The tier is
+        // the only one of the two that has seen the total HOURS — a 10-hour Zone 2 week with zero
+        // hard days is a survival week and a hard-day count alone reads it as a strength block.
+        tier: enduranceTier,
+        swimming: isSwimming,
+        // ⚠️ CARRIED AS THE FALLBACK ONLY. `bandFor` prefers the tier whenever one is present; this
+        // keeps a caller that has not been hoisted behaving exactly as it did.
         hardEnduranceDays: hardDays.length,
       }, lift.name, args.oneRepMaxes, args.athleteEquipment,
         isTmTest
