@@ -191,6 +191,11 @@ function clustering(placements: Placement[]): number {
  * spare hours on one — and a suggester that offered "Thursday long run" would be worse than
  * offering nothing, which is what it did before this term existed.
  *
+ * ⛔ RULED IN DELIBERATELY, 2026-08-18: *"a mathematically perfect schedule that prescribes a 3-hour
+ * trail run on a Tuesday at 10:00 AM is a failed product. Endurance athletes live in the real world
+ * where jobs dictate volume availability."* ⛔ Do not delete it as "not biology" — its NOT being
+ * biology is why it carries the lowest weight here, not a reason to remove it.
+ *
  * ⛔ THE WEAKEST TERM HERE, DELIBERATELY, AND IT CAN ONLY EVER BREAK A TIE between legal weeks. An
  * athlete who pins a Tuesday long run gets a Tuesday long run; this decides nothing they answered.
  * ⚠️ It is also the codebase's existing default said properly — `DEFAULT_LONG_DAY` is Saturday, and
@@ -209,9 +214,25 @@ function longOnWeekend(placements: Placement[]): number {
  * long run and a long ride on ONE day is the biggest day an athlete will ever have, and the model
  * was choosing it freely — the long-day suggester put both on Saturday because nothing said not to.
  *
- * ⛔ SCORED, NOT FORBIDDEN, for the reason everything else here is: a genuinely constrained week has
- * to put them somewhere, and Michael's own week already carries them back-to-back as a stated COST.
- * Weighted above the same-sport penalty because it is a bigger day than a doubled easy session.
+ * ⛔⛔ SCORED, NOT FORBIDDEN — AND WHEN IT FIRES IT IS USUALLY THE RIGHT ANSWER, WHICH IS THE PART
+ * THAT MUST NOT BE LOST. Michael, 2026-08-18, on the two-hard-run shape that produces it:
+ *
+ * > *"In elite endurance programming this is a **Monster Brick** or a **Big Day**. It is brutal, but
+ * > it is a highly effective, biologically sound way to consolidate extreme volume to buy back
+ * > systemic recovery days. The engine didn't fail; it correctly solved an extreme physiological
+ * > puzzle."*
+ *
+ * ⛔ AND THE SPLIT IS THE WORSE ANSWER, WHICH IS WHY THIS IS A PREFERENCE AND NOT A LAW. Long run
+ * Saturday + long ride Sunday stretches the 48h shadow through TUESDAY, wiping out Monday and
+ * Tuesday for heavy lifting and leaving three days to hold two max-effort runs and two barbell
+ * sessions. The week collapses. Stacking both on Saturday pays one acute metabolic cost, lets Sunday
+ * absorb the whole shadow, and clears the board by Monday for the heavy-lower + hard-cardio couplet.
+ *
+ * ⛔ SO DO NOT PROMOTE THIS TO A PROHIBITION. The penalty exists to stop the model choosing a double
+ * long day FREELY — it was putting both on Saturday because nothing said not to, in weeks that had
+ * room to split them. It must stay outbiddable by the law, or the only legal answer to a genuinely
+ * extreme week becomes unreachable. An athlete demanding that much volume in seven days is buying a
+ * ticket for a massive Saturday, and the engine's job is to say so, not to refuse.
  */
 function longDoubles(placements: Placement[]): number {
   const perDay = new Map<number, number>();
