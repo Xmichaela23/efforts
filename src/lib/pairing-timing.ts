@@ -86,16 +86,37 @@ function classifyKind(w: unknown): PartnerKind | 'lower_body_strength' | 'other'
  *       • strength_first: Lower AM, partner PM
  *       • endurance_first: partner AM, Lower PM
  */
+/**
+ * ⛔⛔ THE BARBELL GOES FIRST ON A CONSOLIDATED DAY, AND IT IS LAW RATHER THAN A PREFERENCE
+ * (Michael, 2026-08-18). The card showed "Flat Sprints" above "Strength — Back Squat" — the exact
+ * inverse of what the plan it came from says.
+ *
+ * ⛔ TWO OWNERS DISAGREED AND THE DISPLAY WAS THE WRONG ONE. The composer emits the pairing with
+ * `stackedWith: { order: 'lift_first', gapHours: 6 }` and the session copy says *"the lift goes
+ * first… leave 6h between them"* — because the whole consolidation arrangement is Eddens: resistance
+ * BEFORE endurance, +6.91% lower-body dynamic strength in exactly the concurrent case this block is.
+ * This function was defaulting a quality pair to `endurance_first`, so the athlete read the reverse
+ * of their own plan.
+ *
+ * ⛔ AND THE PHYSIOLOGY IS ONE-WAY. Max-effort sprints or 3-minute climbs empty local glycogen and
+ * fatigue the CNS; stepping under a heavy bar after them means lifting with compromised stabilisers
+ * on empty fuel. It sacrifices the primary adaptation the block exists for, and invites the injury.
+ *
+ * ⚠️ SO `strength_ordering_preference` NO LONGER DECIDES THE QUALITY PAIR — stated rather than left
+ * to be discovered. It still exists and is still read; there is simply no branch left that consults
+ * it, because every pairing now has a physiological answer. ⛔ Do not restore it here to "give the
+ * athlete the choice": the choice it offered was to invert a law.
+ */
 function decideOrdering(
   partnerKind: PartnerKind,
-  pref: StrengthOrderingPreference,
+  _pref: StrengthOrderingPreference,
 ): { lowerOrdering: 'AM' | 'PM'; partnerOrdering: 'AM' | 'PM' } {
+  // ⚠️ THE LONG RIDE KEEPS ITS INVERSION, and it is nearly unreachable now: heavy lower work on a
+  // long day is forbidden outright by `week-model`'s COST table. Left as-is rather than deleted,
+  // because a legacy plan built before that law can still contain the pair.
   if (partnerKind === 'long_ride') return { lowerOrdering: 'PM', partnerOrdering: 'AM' };
-  if (partnerKind === 'easy_run' || partnerKind === 'easy_bike') {
-    return { lowerOrdering: 'AM', partnerOrdering: 'PM' };
-  }
-  if (pref === 'strength_first') return { lowerOrdering: 'AM', partnerOrdering: 'PM' };
-  return { lowerOrdering: 'PM', partnerOrdering: 'AM' };
+  // Everything else — easy work and the consolidated QUALITY pair alike — lifts first.
+  return { lowerOrdering: 'AM', partnerOrdering: 'PM' };
 }
 
 /**

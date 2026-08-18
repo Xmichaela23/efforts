@@ -21,17 +21,28 @@ const lowerStrength = { type: 'strength', tags: ['lower_body'], name: 'Strength 
 const upperStrength = { type: 'strength', tags: ['upper_body'], name: 'Strength (Upper)' };
 const swim = { type: 'swim', tags: [], name: 'Swim — Drills' };
 
-Deno.test('endurance_first: run+lower → Run before Strength (the Thursday bug)', () => {
-  // Input deliberately Strength-first to prove the helper reorders it.
-  const out = orderDayWorkoutsByTimingThenDiscipline([lowerStrength, qualityRun], 'endurance_first');
-  assertEquals(out.map((w) => w.type), ['run', 'strength']);
-});
-
-Deno.test('strength_first: run+lower → Strength before Run (pref honored, not just discipline-rank)', () => {
-  const out = orderDayWorkoutsByTimingThenDiscipline([qualityRun, lowerStrength], 'strength_first');
-  assertEquals(out.map((w) => w.type), ['strength', 'run']);
-  // Discipline-rank alone would force run(2) < strength(3); strength-first here
-  // can ONLY come from the AM/PM timing path → confirms the pref is applied.
+Deno.test('⛔ THE BARBELL GOES FIRST ON A QUALITY PAIR — WHICHEVER PREFERENCE IS SET', () => {
+  /**
+   * ⛔ THIS ASSERTED THE OPPOSITE UNTIL 2026-08-18 ("endurance_first: run+lower → Run before
+   * Strength"), and it was showing the athlete the INVERSE of their own plan. The composer emits the
+   * pairing as `order: 'lift_first'` with a 6h gap and the session copy says so; this layer was
+   * defaulting a quality pair to endurance-first, so the card read "Flat Sprints" above "Back
+   * Squat".
+   *
+   * ⛔ IT IS LAW, NOT A PREFERENCE, WHICH IS WHY BOTH VALUES NOW GIVE THE SAME ANSWER. The whole
+   * consolidation arrangement is Eddens — resistance BEFORE endurance — and the physiology is
+   * one-way: sprints and 3-minute climbs empty local glycogen and fatigue the CNS, and a heavy bar
+   * after them is lifted on compromised stabilisers.
+   * ⛔ Do not restore the preference here to "give the athlete the choice"; the choice it offered was
+   * to invert a law.
+   */
+  for (const pref of ['endurance_first', 'strength_first'] as const) {
+    const out = orderDayWorkoutsByTimingThenDiscipline([qualityRun, lowerStrength], pref);
+    assertEquals(out.map((w) => w.type), ['strength', 'run'], `pref=${pref}`);
+    // And the input order does not decide it either.
+    const flipped = orderDayWorkoutsByTimingThenDiscipline([lowerStrength, qualityRun], pref);
+    assertEquals(flipped.map((w) => w.type), ['strength', 'run'], `pref=${pref} (flipped input)`);
+  }
 });
 
 Deno.test('swim+upper: no lower → discipline-rank tiebreaker, swim before upper (Q-001 cosmetic, pref-agnostic)', () => {
@@ -45,7 +56,9 @@ Deno.test('accessor: CalendarEvent { _src } wrappers order identically to bare w
   const wrap = (w: unknown) => ({ date: '2026-05-21', label: 'x', _src: w });
   const wrapped = [wrap(lowerStrength), wrap(qualityRun)];
   const out = orderDayWorkoutsByTimingThenDiscipline(wrapped, 'endurance_first', (e) => e._src);
-  assertEquals(out.map((e) => (e._src as { type: string }).type), ['run', 'strength']);
+  // ⚠️ `strength, run` NOW — the quality pair lifts first whatever the preference says (2026-08-18).
+  // This test is about the ACCESSOR reaching through the wrapper, not about the order itself.
+  assertEquals(out.map((e) => (e._src as { type: string }).type), ['strength', 'run']);
   // wrappers preserved (not replaced by _src), date intact
   assert(out.every((e) => e.date === '2026-05-21' && '_src' in e));
 });
