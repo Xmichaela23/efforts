@@ -34,3 +34,7 @@ scripts/_*
 scripts/screens/.screenshot-auth.json
 # Captured app screenshots (personal data) — keep local unless you choose to share
 docs/screens/
+
+# Sweep output — regenerate with `deno run --allow-read --allow-write scripts/dump-plans.ts`.
+# The SCRIPT is the artefact; 61 built plans are not source.
+test-outputs/
