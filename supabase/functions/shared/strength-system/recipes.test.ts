@@ -19,6 +19,7 @@ import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 import {
   RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION, singleSlotOptions,
 } from '../../../../src/lib/hard-day-menus.ts';
+import { HARD_DAY_WHY } from '../../../../src/lib/strength-focus-copy.ts';
 
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -224,6 +225,33 @@ for (const r of RECIPES) {
     }
     // ⚠️ The recommendation is stated on a recommended option and nowhere else — the athlete is
     // told which one the engine prefers rather than being steered silently.
+    /**
+     * ⛔ ONE OPERATIONAL LINE PER OPTION — the rule `CopyOption` states, enforced (2026-08-18).
+     * Michael: *"three lines of dense physiological explanation inside a radio button is terrible
+     * for mobile scannability."* The bodies said what the session is AND why it costs what it costs;
+     * the why moved into `HARD_DAY_WHY` behind the (i).
+     *
+     * ⚠️ THE LENGTH CAP IS A PROXY AND THE BANNED CLAUSES ARE THE REAL RULE. A body may name the
+     * movement, the ground and the reps. It may not carry a mechanism — that is what the tooltip is
+     * for, and a mechanism clause is how three lines grew back last time.
+     */
+    const MECHANISM = /\bbecause\b|\bso (that|your)\b|eccentric|neural|fast-twitch|hypertroph|metabolic|interferen/i;
+    for (const d of ['run', 'bike'] as const) {
+      for (const o of singleSlotOptions(d)) {
+        assert(o.body.length <= 96, `${d}/${o.id} body is ${o.body.length} chars: ${o.body}`);
+        assertEquals(MECHANISM.test(o.body), false, `${d}/${o.id} carries a mechanism clause: ${o.body}`);
+      }
+    }
+    for (const o of RUN_GROUND_OPTIONS) {
+      assert(o.body.length <= 96, `${o.id} body is ${o.body.length} chars: ${o.body}`);
+      assertEquals(MECHANISM.test(o.body), false, `${o.id} carries a mechanism clause: ${o.body}`);
+    }
+    // ⛔ AND THE ARGUMENT IS NOT LOST — it has to be findable one tap away, or cutting it was just
+    // deleting it. The (i) sections are asserted for the two claims that moved out of the options.
+    const why = HARD_DAY_WHY.map((x) => `${x.heading} ${x.body}`).join(' ');
+    assert(/eccentric|impact transient/i.test(why), 'the eccentric argument left the options and never arrived');
+    assert(/48 hours/.test(why), 'the 48-hour clearance left the options and never arrived');
+
     // ⚠️ CASE-INSENSITIVE. The 2026-08-18 copy pass cut *"which is why we recommend it"* down to a
     // one-word *"Recommended."*, and a literal lowercase `includes` read that as the recommendation
     // having been DELETED. The assertion is about the recommendation existing, not its grammar.
