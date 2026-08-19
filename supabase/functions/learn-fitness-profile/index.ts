@@ -526,7 +526,7 @@ interface RunAnalysisResult {
   threshold_pace: LearnedMetric | null;
 }
 
-function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
+export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
   if (runs.length < 3) {
     return {
       easy_hr: null,
@@ -711,29 +711,8 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
   let threshold_pace: LearnedMetric | null = null;
   let easy_pace: LearnedMetric | null = null;
 
-  if (thresholdHRValue && observedMaxHR) {
-    // Find runs where avg HR was within ±5 bpm of threshold HR
-    const thresholdPaceRuns = runs.filter(r => {
-      const duration = r.moving_time || r.duration || 0;
-      const hr = r.avg_heart_rate || 0;
-      const pace = r.avg_pace || 0;
-      return duration >= 15 && 
-             pace > 150 && pace < 900 && // Valid pace range
-             Math.abs(hr - thresholdHRValue!) <= 5;
-    });
-
-    if (thresholdPaceRuns.length >= 2) {
-      const sortedPaces = thresholdPaceRuns.map(r => r.avg_pace).sort((a, b) => a - b);
-      const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
-      
-      threshold_pace = {
-        value: Math.round(medianPace),
-        confidence: thresholdPaceRuns.length >= 3 ? 'high' : 'medium',
-        source: `pace at threshold HR (${thresholdPaceRuns.length} runs)`,
-        sample_count: thresholdPaceRuns.length
-      };
-    }
-  }
+  // ⛔⛔ EASY PACE IS LEARNED FIRST NOW, AND THRESHOLD IS MEASURED AGAINST IT (2026-08-19).
+  // The order is load-bearing — see the block below `easy_pace` for why. Threshold pace follows.
 
   // Find easy pace (pace when HR is in easy zone)
   // Q-169: THE STARVATION. This gate (`hr <= observedMaxHR * 0.75` = 130.5 bpm for a 174 max) excluded
@@ -763,6 +742,88 @@ function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
         source: `pace at easy HR (${easyPaceRuns.length} runs; ${runEasyBand.basis})`,
         sample_count: easyPaceRuns.length,
         as_of: newestDate(easyPaceRuns),  // Q-173: heat can silence this learner for a whole summer
+      };
+    }
+  }
+
+  // ==========================================================================
+  // STEP 5b: Threshold PACE — the pace at which threshold HR occurs.
+  //
+  // ⛔⛔ IT PUBLISHED A THRESHOLD PACE SLOWER THAN THE ATHLETE'S EASY PACE (2026-08-19, seen on
+  // Michael's baselines: easy 12:35/mi, threshold 14:44/mi, 5K 25:21 = 8:10/mi). A threshold pace
+  // slower than easy is not a low-confidence reading, it is not a reading at all.
+  //
+  // ⛔ THE MECHANISM. The filter took any run ≥15 min whose AVERAGE HR sat within ±5 bpm of
+  // threshold HR, then took the median of that run's AVERAGE PACE over the whole activity. A
+  // hill-repeat session averages near threshold HR — and its average pace includes the walk-back
+  // descents. So the walking was folded into "threshold pace". The same is true of any interval run
+  // with recoveries, and of any run with stops. Two such sessions were enough: the minimum was 2.
+  //
+  // ⛔ THE GUARD IS AN INVARIANT, NOT A CONTAMINATION LIST. Detecting hills, then intervals, then
+  // stops, then whatever comes next is a guard per source, forever. **A threshold effort is faster
+  // than an easy effort** is true for every athlete in every sport, so it is applied twice: once to
+  // drop the individual dirty candidates, and once to the median as a last check. A session whose
+  // whole-activity average pace is slower than the athlete's own easy pace cannot be a threshold
+  // read, whatever its average HR says.
+  //
+  // ⚠️ AND WHEN IT CANNOT BE MEASURED IT PUBLISHES NOTHING — the same call the swim CSS learner
+  // above already makes, and LAW 2 in this file ("we do not know it yet; say so"). `null` is safe
+  // here because `resolveCurrentRunThresholdPace` (`src/lib/resolve-current-run-pace.ts:274`) has a
+  // tier chain beneath it: the athlete's typed value, then the wizard/VDOT pace off their 5K. An
+  // abstention falls back to a sane derived number; a published lie does not.
+  // ==========================================================================
+
+  if (thresholdHRValue && observedMaxHR) {
+    /**
+     * ⚠️ THE CEILING IS THE LEARNED EASY PACE WHEN THERE IS ONE, AND OTHERWISE NOTHING.
+     * With no easy pace learned there is no reference to measure against, and inventing one (a
+     * fraction of threshold HR pace, say) would be the fabrication LAW 2 deleted from this file.
+     * Candidates are then unfiltered and the abstention below is the only guard — which is the
+     * honest position, not a gap.
+     */
+    const easyRaw = Number(easy_pace?.value);
+    const easyPaceCeiling = Number.isFinite(easyRaw) && easyRaw > 0 ? easyRaw : null;
+
+    const thresholdPaceRuns = runs.filter(r => {
+      const duration = r.moving_time || r.duration || 0;
+      const hr = r.avg_heart_rate || 0;
+      const pace = r.avg_pace || 0;
+      if (!(duration >= 15 && pace > 150 && pace < 900)) return false;   // Valid pace range
+      if (Math.abs(hr - thresholdHRValue!) > 5) return false;
+      // ⛔ SLOWER THAN EASY → NOT A THRESHOLD READ. `avg_pace` is sec/km, so LARGER is slower.
+      if (easyPaceCeiling != null && pace >= easyPaceCeiling) return false;
+      return true;
+    });
+
+    /**
+     * ⛔ THREE, NOT TWO — AND THE TIER MOVED WITH IT. Two runs used to publish at `medium`, and
+     * `resolveCurrentRunThresholdPace` treats medium as TRUSTED, so a two-session read drove real
+     * prescriptions. Both of Michael's were contaminated. Two runs is now `low` — visible on the
+     * baselines card, ignored by the resolver — and it takes three to steer a plan.
+     */
+    if (thresholdPaceRuns.length >= 2) {
+      const sortedPaces = thresholdPaceRuns.map(r => r.avg_pace).sort((a, b) => a - b);
+      const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
+
+      /**
+       * ⛔ THE INVARIANT IS ENFORCED ON THE CANDIDATES, AND ONLY THERE. A second check on the
+       * MEDIAN stood here and was deleted the hour it was written: every candidate is already
+       * faster than the ceiling, so their median is too — it could never fire, and unreachable
+       * defence is how this codebase's guards multiply. Filtering also SALVAGES the clean runs
+       * instead of throwing away the whole read because one session was dirty.
+       *
+       * ⚠️ WHAT PROTECTS IT NOW IS THE TEST, NOT A SECOND BRANCH. Deleting the filter above fails
+       * `threshold-pace.test.ts` — verified by mutation, which is also how the dead branch was
+       * caught: removing it broke nothing.
+       */
+      threshold_pace = {
+        value: Math.round(medianPace),
+        confidence: thresholdPaceRuns.length >= 5
+          ? 'high'
+          : (thresholdPaceRuns.length >= 3 ? 'medium' : 'low'),
+        source: `pace at threshold HR (${thresholdPaceRuns.length} runs)`,
+        sample_count: thresholdPaceRuns.length,
+        as_of: newestDate(thresholdPaceRuns),
       };
     }
   }
