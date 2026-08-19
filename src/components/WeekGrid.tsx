@@ -55,8 +55,8 @@ export default function WeekGrid({
   const mins = sessions.reduce((a, s) => a + (Number(s.duration) || 0), 0);
 
   return (
-    <div className={`space-y-1.5 ${className}`}>
-      <p className="text-white/70 text-xs">
+    <div className={`space-y-2 ${className}`}>
+      <p className="text-white/75 text-sm">
         {activeDays} training {activeDays === 1 ? 'day' : 'days'}, {7 - activeDays} rest
         {' · '}about {Math.floor(mins / 60)}h{mins % 60 ? String(mins % 60).padStart(2, '0') : ''} a week
       </p>
@@ -89,18 +89,31 @@ export default function WeekGrid({
           };
           const ordered = [...(lift ? [lift] : []), ...endur];
           return (
-            <div key={d} className="flex items-baseline gap-2 text-xs leading-tight py-px">
-              <span className="text-white/40 w-8 shrink-0">{d.slice(0, 3)}</span>
+            /**
+             * ⛔ THE DAY IS NOT A GUTTER LABEL (Michael, 2026-08-19: *"don't hide the days of the
+             * week"*). It sat at `white/40` — dimmer than the rest-day dash — against session text
+             * at `white/85`, so the column an athlete scans BY read as chrome and the thing they
+             * were scanning for read as content. A week is read day-first.
+             *
+             * ⚠️ STILL BELOW THE SESSION, deliberately: the day names are the same seven every time
+             * and the sessions are what changes. Legible, not competing.
+             */
+            <div key={d} className="flex items-baseline gap-3 text-sm leading-snug py-1">
+              <span className="text-white/75 w-9 shrink-0">{d.slice(0, 3)}</span>
               <span className="flex-1 min-w-0">
                 {ordered.length === 0 ? (
-                  <span className="text-white/30">—</span>
+                  <span className="text-white/40">—</span>
                 ) : (
-                  <span className={lift ? 'text-white/85' : 'text-white/70'}>
+                  <span className={lift ? 'text-white/90' : 'text-white/80'}>
                     {ordered.map(label).join('  ·  ')}
                   </span>
                 )}
+                {/* ⚠️ THE SWAPS ARE THE PART THE ATHLETE CANNOT PREDICT, and at `white/35` they were
+                    close to invisible on a phone. Lifted to `/55` — still secondary to the named
+                    session above them, no longer a texture. `truncate` stays: the row is one line
+                    by design and the ellipsis is the honest end of a list that does not fit. */}
                 {accessories.length > 0 && (
-                  <span className="block text-white/35 truncate">{accessories.join(' · ')}</span>
+                  <span className="block text-white/55 truncate">{accessories.join(' · ')}</span>
                 )}
               </span>
             </div>
