@@ -255,13 +255,82 @@ Deno.test('⛔ ONE SLOT ALLOCATED, ONE NOT — the week still carries exactly on
   }
 });
 
-Deno.test('⚠️ AND THE MARKED SLOT IS THE ONE THAT GETS WHAT IT ASKED FOR', () => {
-  // Enforcing the budget must not mean overriding the athlete: the half they DID answer stands, and
-  // only the unanswered slot is filled in by subtraction.
+/**
+ * ⚠️⚠️ THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-18, AND IT WAS THE BUG WEARING A GREEN TICK.
+ *
+ * It read: a lone `intensity` mark on the BIKE plus an unmarked run means the ride keeps the
+ * intervals — *"the half they DID answer stands."* Reasonable, and wrong, because of where that
+ * mark comes from: the one-slot card asks "what is this session" and recommends "Top-end
+ * intensity", so a mark on the first sport added is not an allocation between two sports. Adding a
+ * run second therefore produced "Run — sustained threshold" above "Ride — top-end intensity" on the
+ * device, which is the impact distribution inverted.
+ *
+ * ⛔ A BARE `intensity` MARK YIELDS TO THE DISCIPLINE RULE. A `threshold` mark does not — it
+ * unambiguously declines the top end — and a FULL allocation never yields at all.
+ */
+Deno.test('⛔ A BARE INTENSITY MARK YIELDS — but a decline and a full allocation both stand', () => {
+  // 1. Inherited from a one-slot answer: the run takes the top end regardless of who was added first.
+  const inherited = build([
+    { day: 'tuesday', discipline: 'bike', role: 'intensity' },
+    { day: 'friday', discipline: 'run' },
+  ]);
+  assertEquals(named(inherited, /Bike Intervals/).length, 0, 'a bare intensity mark still won');
+  assert(named(inherited, /Hill|Sprint/).length > 0, 'the run did not take the top end');
+
+  // 2. A decline stands: the run said "sustained", so the ride takes the top end.
+  const declined = build([
+    { day: 'tuesday', discipline: 'run', role: 'threshold' },
+    { day: 'friday', discipline: 'bike' },
+  ]);
+  assertEquals(named(declined, /Bike Intervals/).length, 1, 'the declining run was handed the top end');
+
+  // 3. A full allocation stands: both marked means the athlete used the control, which writes both.
+  const explicit = build([
+    { day: 'tuesday', discipline: 'run', role: 'threshold' },
+    { day: 'friday', discipline: 'bike', role: 'intensity' },
+  ]);
+  assertEquals(named(explicit, /Bike Intervals/).length, 1, 'the manual override was second-guessed');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// A LONE-SLOT ANSWER IS NOT AN ALLOCATION — the device bug, kept
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⛔ MEASURED ON DEVICE 2026-08-18, screenshot: "Run — sustained threshold" above "Ride — top-end
+ * intensity". Add a hard RIDE first, answer its one-slot list (whose recommended default IS
+ * "Top-end intensity"), then add a hard run. The ride carried `role: 'intensity'`, the run carried
+ * nothing, and the ride kept the top end — the exact inversion the principled default exists to
+ * prevent. The athlete never allocated anything; they answered "what is this session" about the
+ * only session they had.
+ */
+Deno.test('⛔ ADDING A RUN AFTER ANSWERING A LONE RIDE — the run still takes the top end', () => {
   const p = build([
     { day: 'tuesday', discipline: 'bike', role: 'intensity' },
     { day: 'friday', discipline: 'run' },
   ]);
-  assertEquals(named(p, /Bike Intervals/).length, 1, 'the marked ride did not get the intervals');
-  assert(named(p, /Threshold/).length > 0, 'the unmarked run did not become the sustained session');
+  assert(named(p, /Hill|Sprint/).length > 0, 'the ride kept the top end off an inherited mark');
+  assertEquals(named(p, /Bike Intervals/).length, 0, 'the ride is still holding the intervals');
+  assert(named(p, /Threshold Ride|Threshold/).length > 0, 'the ride did not become the sustained one');
+});
+
+Deno.test('⚠️ BUT AN EXPLICIT THRESHOLD MARK SURVIVES — it DECLINES the top end, unambiguously', () => {
+  // A lone RUN set to "Sustained threshold", then a ride added. The athlete said what they did not
+  // want for the run; the ride takes the top end even though the discipline rule prefers the run.
+  const p = build([
+    { day: 'tuesday', discipline: 'run', role: 'threshold' },
+    { day: 'friday', discipline: 'bike' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1, 'the declining run was handed the top end anyway');
+  assertEquals(named(p, /Hill|Sprint/).length, 0, 'the run kept a top-end session it declined');
+});
+
+Deno.test('⛔ AND A FULL ALLOCATION IS NEVER SECOND-GUESSED — the override outranks the rule', () => {
+  // Both slots marked means the athlete used "Set as top-end", which writes both. Even though the
+  // discipline rule prefers the run, an explicit ride allocation stands.
+  const p = build([
+    { day: 'tuesday', discipline: 'run', role: 'threshold' },
+    { day: 'friday', discipline: 'bike', role: 'intensity' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1, 'the manual override was overridden');
 });

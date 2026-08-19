@@ -2075,12 +2075,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
      * ⚠️ MIRRORED IN `assignHardRoles`, which takes the same half-allocated payload off the wire and
      * had the same hole. Change both or the screen and the plan disagree.
      */
-    if (slots.some((h) => h.ownership !== 'club' && h.role)) {
-      const explicit = slots.findIndex((h) => h.ownership !== 'club' && h.role === 'intensity');
-      const intensityIdx = explicit >= 0
-        ? explicit
-        : slots.findIndex((h) => h.ownership !== 'club' && h.role !== 'threshold');
-      return i === intensityIdx ? 'vo2' : 'threshold';
+    /**
+     * ⛔ A LONE-SLOT ANSWER IS NOT AN ALLOCATION — full reasoning on `assignHardRoles` in
+     * `strength-primary-plan.ts`, which this MUST mirror exactly. Answering a one-slot card's
+     * "what is this session" list and then adding a second sport used to hand the top end to
+     * whichever sport was added first. ⛔ Change both or the screen and the plan disagree.
+     */
+    const pres = slots.map((h, j) => ({ h, j })).filter(({ h }) => h.ownership !== 'club');
+    if (pres.some(({ h }) => h.role)) {
+      const fullyAllocated = pres.length > 0 && pres.every(({ h }) => !!h.role);
+      const candidates = pres.filter(({ h }) => h.role !== 'threshold');
+      const pick = fullyAllocated
+        ? candidates.find(({ h }) => h.role === 'intensity') ?? candidates[0]
+        : (candidates.find(({ h }) => h.discipline === 'run') ?? candidates[0]);
+      return i === (pick?.j ?? -1) ? 'vo2' : 'threshold';
     }
     /**
      * ⛔ THE FALLBACK IS A TRAINING RULE NOW, NOT LIST ORDER (2026-08-18) — the run holds the
@@ -4797,7 +4805,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                             type="button"
                                             onClick={() => allocateIntensityTo(i)}
                                             className="text-xs px-2 py-1 rounded-xl border border-white/25 bg-white/[0.06] text-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                                          >Make this the top-end one</button>
+                                          // ⚠️ AN ACTION, NOT A SENTENCE (Michael, 2026-08-18). "Make this the top-end one" read
+                                            // as spoken English in a control that has to be scanned.
+                                          >Set as top-end</button>
                                         )}
                                         <button
                                           type="button"

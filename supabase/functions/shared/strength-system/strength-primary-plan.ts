@@ -1807,10 +1807,42 @@ function assignHardRoles(
      * ⚠️ MIRRORED IN `hardRoleOf` in `NonRaceBuilder.tsx`, which had the same hole and lit both
      * allocation buttons. Change both together.
      */
-    const explicit = days.findIndex((h) => h.ownership !== 'club' && h.role === 'intensity');
-    const intensityIdx = explicit >= 0
-      ? explicit
-      : days.findIndex((h) => h.ownership !== 'club' && h.role !== 'threshold');
+    /**
+ * ⛔⛔ A LONE-SLOT ANSWER IS NOT AN ALLOCATION (found on device 2026-08-18). READ BEFORE SIMPLIFYING.
+ *
+ * **The bug, exactly:** add a hard RIDE first, answer its one-slot list — whose options are "Top-end
+ * intensity" and "Sustained threshold", and whose recommended default is the former — then add a
+ * hard run. The ride now carries `role: 'intensity'` and the run carries nothing, so the ride kept
+ * the top-end session and the run was handed the SUSTAINED one. That is the exact inversion the
+ * principled default exists to prevent: twenty-plus minutes of level footfall on the legs the
+ * barbell needs, and the short concentric session on the machine that costs them nothing.
+ *
+ * The athlete never allocated anything. They answered "what is this session" about a session that
+ * was, at that moment, the only one they had.
+ *
+ * **The rule that fixes it, and it is one rule for all cases:**
+ *   · EVERY prescribed slot marked → the athlete used the allocation control, which writes both.
+ *     Honour it exactly. This is the manual override and it must never be second-guessed.
+ *   · SOME marked → the marks are inherited from a one-slot answer. A `threshold` mark is still
+ *     authoritative, because it unambiguously DECLINES the top end for that session; a bare
+ *     `intensity` mark is not, because it was the answer to a different question. So threshold marks
+ *     remove candidates, and the intensity holder is chosen from what is left by the discipline rule.
+ *   · NONE marked → the discipline rule alone.
+ *
+ * ⚠️ SO AN EXPLICIT "SUSTAINED THRESHOLD" ON A LONE RUN SURVIVES ADDING A RIDE — the ride takes the
+ * top end, which is what the athlete asked for. Only the bare intensity mark yields.
+ */
+    const pres = days.map((h, i) => ({ h, i })).filter(({ h }) => h.ownership !== 'club');
+    const fullyAllocated = pres.length > 0 && pres.every(({ h }) => !!h.role);
+    // A threshold mark declines the top end; everything else is a candidate for it.
+    const candidates = pres.filter(({ h }) => h.role !== 'threshold');
+    const pick = fullyAllocated
+      ? candidates.find(({ h }) => h.role === 'intensity') ?? candidates[0]
+      // ⛔ THE DISCIPLINE RULE — the run holds the top end when both sports are candidates. Full
+      // reasoning on this function's own header; the short version is that the SUSTAINED session is
+      // the long one and belongs on the machine with no footfall.
+      : (candidates.find(({ h }) => h.discipline === 'run') ?? candidates[0]);
+    const intensityIdx = pick?.i ?? -1;
     const chosen: HardRole[] = days.map((h, i) =>
       h.ownership === 'club' ? 'club' : i === intensityIdx ? 'vo2' : 'threshold'
     );
