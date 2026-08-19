@@ -4489,7 +4489,31 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * four rides got three with a "the week had room for 3" note blaming the SOLVER for a cap
        * this line applied. Two owners of one rule, which is the doubled disease.
        */
-      const wantDays = askedRideDays;
+      /**
+       * ⛔⛔ THE HARD RIDE IS ONE OF THE PICKED RIDE DAYS, AND THIS LINE WAS THE ONE PLACE THAT
+       * FORGOT (2026-08-19, found on Michael's export).
+       *
+       * `rideDays` below holds the LONG ride and the EASY rides. The hard ride is NOT in it — it is
+       * placed separately as a hard-day anchor. `askedRideDays` DOES include it. So this compared a
+       * list of 2 against an ask of 3 and reported a shortfall that did not exist: a real week with
+       * `Wed Easy Ride · Fri Threshold Ride · Sat Long Ride` — three ride days, exactly the answer —
+       * carried *"You asked for 3 ride days; the week had room for 2."* on the plan description.
+       *
+       * ⚠️ EVERY OTHER COUNT IN THIS FILE ALREADY SUBTRACTS. `runFreq` (`:3142`) takes
+       * `askedRunDays - hardRunCount` — Michael's rule, *"one of the runs is the hill session."*
+       * `ridesWanted` (`:3168`) takes `askedRideDays - long - hardRideCount`, and the comment above
+       * it states this rule outright: *"when the hard day is a RIDE it is one of the picked ride
+       * days too, exactly as the hard run is one of the run days."*
+       *
+       * ⛔ AND IT WAS NOT ONLY THE NOTE. `wantDays` also caps the fill loop below, so an inflated
+       * ask let it take an extra day from `solvedRideDays` — the long ride, an easy ride, ANOTHER
+       * easy ride, plus the hard ride: four sessions against an answer of three. It did not fire on
+       * this export only because the solver had one flexible ride day to give, not two.
+       *
+       * ⚠️ THE HARD-RUN CASE IS UNCHANGED AND ITS NOTE MUST STILL FIRE. `hardRideCount` is 0 there,
+       * so a genuine ride shortfall still says so. Both are pinned in `ride-count-note.test.ts`.
+       */
+      const wantDays = Math.max(0, askedRideDays - hardRideCount);
       /**
        * ⛔ THE RIDE DAYS COME OUT OF THE SAME SOLVE AS THE RUNS AND THE BAR (2026-08-08).
        *

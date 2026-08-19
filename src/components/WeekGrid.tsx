@@ -70,9 +70,28 @@ export default function WeekGrid({
           // a chin-up on bench day and a row on press day is the rule working, and it reads as a
           // mistake if the first time they see it is week one. The MAIN lift and the primer are
           // dropped from this line: they are already named to the left.
-          const accessories = (lift?.strength_exercises ?? [])
-            .map((e) => e.name)
-            .filter((n) => n !== lift?.name.replace('Strength — ', '') && n !== 'Box Jump');
+          /**
+           * ⛔⛔ THE PAIRED DAY LEAKED BOTH MAIN LIFTS INTO THE ACCESSORY LINE (2026-08-19, Michael's
+           * screen). The filter compared each exercise against the session's WHOLE name, and on the
+           * three-day week's double session that name is `Deadlift + Overhead Press`. Neither
+           * `Deadlift` nor `Overhead Press` equals it, so both main lifts fell through — and the
+           * First Set Last row is a SECOND entry also named `Deadlift`, so the line read
+           * *"Deadlift · Overhead Press · Deadlift · DB Bench Press · Chin-Up · Weighted Sit-Up"*
+           * while Monday and Tuesday read clean. The main lifts are already named to the left; this
+           * line is for the swaps the athlete cannot predict.
+           *
+           * ⚠️ SPLIT ON ` + `, WHICH IS THE SAME SEPARATOR `pairedSlotName` JOINS ON
+           * (`strength-primary-plan.ts:3071`). ⛔ AND DEDUPED, because First Set Last repeats the
+           * main lift by design — it is the same lift at its opening weight, not a second movement.
+           */
+          const mainNames = new Set(
+            (lift?.name ?? '').replace('Strength — ', '').split(' + ').map((n) => n.trim()),
+          );
+          const accessories = [...new Set(
+            (lift?.strength_exercises ?? [])
+              .map((e) => e.name)
+              .filter((n) => !mainNames.has(n) && n !== 'Box Jump'),
+          )];
           /**
            * ⛔ THE EM-DASH WAS THE LIFT SLOT, AND ON A RUN PLAN IT WAS EVERY ROW (2026-08-06).
            * This grid was built for the strength block, so it printed the lift first and fell back
