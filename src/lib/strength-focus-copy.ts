@@ -607,8 +607,8 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
     body:
       'Short intensity recruits the same fast-twitch fibers and energy system the barbell runs on.\n'
       + 'It does not send the signal that shifts muscle toward endurance.\n'
-      + 'Prolonged metabolic work does \u2014 that is the interference effect, which is why the '
-      + 'threshold option names it as a cost.',
+      + 'Prolonged metabolic work does \u2014 that is the interference effect, and it is why a block '
+      + 'carries only one top-end session.',
   },
   {
     /**

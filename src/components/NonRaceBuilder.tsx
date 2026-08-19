@@ -4491,8 +4491,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         </li>
                         {state.hardDays.length < 2 && !state.hardDays.some((h) => h.ownership === 'club') && (
                           <li className="text-white/70 text-sm leading-relaxed pl-1">
-                            A second session defaults to sustained threshold to protect your barbell
-                            progression. You can switch which sport carries the top-end work.
+                            A second session defaults to sustained threshold — a block carries one
+                            top-end session, and a bike carries the sustained work at no cost to your
+                            legs. You can switch which sport carries the top-end work.
                           </li>
                         )}
                       </ul>
