@@ -334,3 +334,34 @@ Deno.test('⛔ AND A FULL ALLOCATION IS NEVER SECOND-GUESSED — the override ou
   ]);
   assertEquals(named(p, /Bike Intervals/).length, 1, 'the manual override was overridden');
 });
+
+/**
+ * ⛔ THE CLUB CASE REVERSES THE RULE — pinned because a UI FORECAST depends on it.
+ *
+ * The hard-day banner tells an athlete with one session what a SECOND one will be. That sentence is
+ * only true while the existing session is one the app writes: `assignHardRoles` gives a club session
+ * the SUSTAINED slot by its nature, so whatever is added beside it takes the TOP END instead. The
+ * banner suppresses itself beside a club session for exactly this reason.
+ *
+ * ⚠️ SO THIS TEST IS LOAD-BEARING FOR COPY, not only for the plan. If the club rule ever changes,
+ * the banner's suppression condition has to change with it or the screen starts forecasting the
+ * opposite of what gets built.
+ */
+Deno.test('⛔ A SESSION ADDED BESIDE A CLUB ONE TAKES THE TOP END, not the threshold', () => {
+  const p = build([
+    { day: 'tuesday', discipline: 'run', ownership: 'club' },
+    { day: 'friday', discipline: 'bike' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1,
+    'the added ride did not take the top end beside a club run');
+  assertEquals(named(p, /Threshold/).length, 0,
+    'something was handed the sustained slot the club already holds');
+
+  // ⚠️ AND THE CONTRAST THE FORECAST IS ABOUT: the same pair without the club flag goes the other
+  // way, which is what makes suppressing the sentence necessary rather than tidy.
+  const normal = build([
+    { day: 'tuesday', discipline: 'run' },
+    { day: 'friday', discipline: 'bike' },
+  ]);
+  assert(named(normal, /Threshold/).length > 0, 'the non-club pair stopped producing a sustained session');
+});

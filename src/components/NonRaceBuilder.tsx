@@ -4436,9 +4436,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
                         Add speed, VO2 max, or threshold work. High-intensity sessions create
                         competing fatigue; each day added actively reduces your accessory lifting
-                        volume to protect your strength gains. A second session defaults to sustained
-                        threshold to manage physical impact and protect your barbell progression; you
-                        can switch which sport carries the top-end work.
+                        volume to protect your strength gains.
+                        {/* ⛔ THE FORECAST DIES THE MOMENT IT COMES TRUE (Michael, 2026-08-18:
+                            *"redundancy is clutter"*). At 0-1 sessions this teaches the rule before
+                            they act on it. At 2 the cards SHOW the allocation and the delta line
+                            below states its cost — telling an athlete what the app "defaults to"
+                            while they are looking at the resulting default is patronising and costs
+                            vertical space on a screen that has none to spare.
+
+                            ⛔ AND IT IS SUPPRESSED BESIDE A CLUB SESSION, BECAUSE THERE THE RULE
+                            REVERSES. `assignHardRoles` gives the club the SUSTAINED slot by its
+                            nature — a group run settles into exactly that rhythm and the app writes
+                            nothing into it — so the session added beside it takes the TOP END, not
+                            the threshold. Verified: a club run plus a ride builds `Club Run + Bike
+                            Intervals`, where a normal run plus a ride builds `Hill Repeats +
+                            Threshold Ride`. The forecast would have been the opposite of what the
+                            engine does, on the one screen whose whole job is to stop surprising
+                            them. ⛔ Do not simplify this back to a count. */}
+                        {state.hardDays.length < 2 && !state.hardDays.some((h) => h.ownership === 'club') && (
+                          <> A second session defaults to sustained threshold to manage physical
+                          impact and protect your barbell progression; you can switch which sport
+                          carries the top-end work.</>
+                        )}
                       </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
