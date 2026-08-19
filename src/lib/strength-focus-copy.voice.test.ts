@@ -146,10 +146,18 @@ Deno.test('⛔ the chooser copy quotes the engine\'s real numbers, not remembere
   assertEquals(hard.includes(`+${cycleIncrementLb(false)} lb upper`), true, 'the upper increment drifted');
   assertEquals(hard.includes(`+${cycleIncrementLb(true)} lb lower`), true, 'the lower increment drifted');
 
-  // The three assistance bands, on BOTH choosers — hours and hard days land in the same tiers.
+  /**
+   * The three assistance bands, on BOTH choosers — hours and hard days land in the same tiers.
+   *
+   * ⚠️ DASH-AGNOSTIC. The 2026-08-19 bullet rewrite put EN dashes in the tier rows (`40–50`) while
+   * the constants are hyphenated (`[40, 50]`). A literal `${lo}-${hi}` read that as the band having
+   * been DELETED from the copy — the same false negative the cost-line test hit. What is asserted is
+   * that the band is STATED, not which dash character sits inside it.
+   */
   for (const [days, [lo, hi]] of Object.entries(ASSISTANCE_BAND_BY_HARD_DAYS)) {
+    const band = new RegExp(`${lo}\\s*[-\u2013]\\s*${hi}`);
     for (const [label, text] of [['hard day', hard], ['hours', vol]] as const) {
-      assertEquals(text.includes(`${lo}-${hi}`), true,
+      assertEquals(band.test(text), true,
         `the ${label} chooser never states the ${days}-hard-day band (${lo}-${hi})`);
     }
   }

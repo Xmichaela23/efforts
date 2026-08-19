@@ -4274,12 +4274,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 costs nothing until it is opened and nothing that matters after. */}
             {showVolumeWhy && (
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
-                {VOLUME_WHY.map((s) => (
-                  <div key={s.heading}>
-                    <p className="text-white/70 text-xs font-medium">{s.heading}</p>
-                    <p className="text-white/45 text-xs leading-snug">{s.body}</p>
-                  </div>
-                ))}
+                {/* ⛔ SAME NEWLINE-TO-BULLET RULE AS `HARD_DAY_WHY` (2026-08-19). ⚠️ THE FYFE
+                    SECTION IS MULTI-LINE AND ITS FIRST LINE IS THE CLAIM — which is what the
+                    2026-08-10 ruling protects and what `strength-focus-copy.voice.test.ts` asserts
+                    (`VOLUME_WHY[0].body` STARTS WITH it). Rendering it as the first bullet keeps
+                    both true. */}
+                {VOLUME_WHY.map((s) => {
+                  const lines = s.body.split('\n');
+                  return (
+                    <div key={s.heading}>
+                      <p className="text-white/70 text-xs font-medium">{s.heading}</p>
+                      {lines.length > 1 ? (
+                        <ul className="list-disc list-outside ml-4 space-y-0.5 marker:text-white/25">
+                          {lines.map((l) => (
+                            <li key={l} className="text-white/45 text-xs leading-snug pl-0.5">{l}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-white/45 text-xs leading-snug">{s.body}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -4299,7 +4315,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           // every goal already written, and the athlete never sees a key.
           title={currentStep === 'hardday' ? 'High intensity days' : 'Your week'}
           subtitle={currentStep === 'hardday'
-            ? 'How much intensity the block carries. None is a valid answer.'
+            // ⚠️ "None is a valid answer" MOVED INTO THE CARD'S LEAD LINE (2026-08-19), where it
+            // sits beside the buttons it is about. Two places said it; the subtitle yielded because
+            // the card is where the athlete acts.
+            ? 'How much intensity the block carries.'
             : 'Your days. The lifting is placed around them.'}
           onBack={back} onContinue={next}
           // ⚠️ THE HARD-DAY STEP NEVER BLOCKS. Its own row is optional — "None" is a real answer —
@@ -4433,32 +4452,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           COUNT is one of the two inputs to `resolveEnduranceTier`, which sets the
                           accessory band before a rep is authored. Two hard days drops the band to
                           25-30 reps; none opens it to 40-50. */}
+                      {/* ⛔ A LEAD LINE AND BULLETS, NOT A PARAGRAPH (Michael, 2026-08-19). Five
+                          sentences of prose is a wall on a phone, and three of them were distinct
+                          facts an athlete needs to scan rather than read.
+                          ⚠️ THE THIRD BULLET IS STILL CONDITIONAL, and that is deliberate — it was
+                          made responsive an hour earlier and the reasoning is unchanged by the
+                          bullet form: at two sessions the cards SHOW the allocation and the delta
+                          line states its cost, so repeating it is the redundancy that call removed.
+                          ⛔ AND IT IS STILL SUPPRESSED BESIDE A CLUB SESSION, where the rule
+                          REVERSES — the club holds the sustained slot by its nature, so what is
+                          added beside it takes the TOP END. Pinned in `intent-allocation.test.ts`. */}
                       <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
-                        Add speed, VO2 max, or threshold work. High-intensity sessions create
-                        competing fatigue; each day added actively reduces your accessory lifting
-                        volume to protect your strength gains.
-                        {/* ⛔ THE FORECAST DIES THE MOMENT IT COMES TRUE (Michael, 2026-08-18:
-                            *"redundancy is clutter"*). At 0-1 sessions this teaches the rule before
-                            they act on it. At 2 the cards SHOW the allocation and the delta line
-                            below states its cost — telling an athlete what the app "defaults to"
-                            while they are looking at the resulting default is patronising and costs
-                            vertical space on a screen that has none to spare.
-
-                            ⛔ AND IT IS SUPPRESSED BESIDE A CLUB SESSION, BECAUSE THERE THE RULE
-                            REVERSES. `assignHardRoles` gives the club the SUSTAINED slot by its
-                            nature — a group run settles into exactly that rhythm and the app writes
-                            nothing into it — so the session added beside it takes the TOP END, not
-                            the threshold. Verified: a club run plus a ride builds `Club Run + Bike
-                            Intervals`, where a normal run plus a ride builds `Hill Repeats +
-                            Threshold Ride`. The forecast would have been the opposite of what the
-                            engine does, on the one screen whose whole job is to stop surprising
-                            them. ⛔ Do not simplify this back to a count. */}
-                        {state.hardDays.length < 2 && !state.hardDays.some((h) => h.ownership === 'club') && (
-                          <> A second session defaults to sustained threshold to manage physical
-                          impact and protect your barbell progression; you can switch which sport
-                          carries the top-end work.</>
-                        )}
+                        Add speed, VO2 max, or threshold work. None is a valid answer.
                       </p>
+                      <ul className="px-3 pt-1.5 space-y-1 list-disc list-outside ml-7 marker:text-white/30">
+                        <li className="text-white/70 text-sm leading-relaxed pl-1">
+                          Each hard day cuts your accessory lifting volume — that&rsquo;s the trade to
+                          protect your strength gains.
+                        </li>
+                        <li className="text-white/70 text-sm leading-relaxed pl-1">
+                          A club ride or run counts as a high intensity day.
+                        </li>
+                        {state.hardDays.length < 2 && !state.hardDays.some((h) => h.ownership === 'club') && (
+                          <li className="text-white/70 text-sm leading-relaxed pl-1">
+                            A second session defaults to sustained threshold to protect your barbell
+                            progression. You can switch which sport carries the top-end work.
+                          </li>
+                        )}
+                      </ul>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
                           {row.label}
@@ -4705,7 +4726,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     the old wording; the voice lint catches `keep`. */}
                                 {hardDayCount >= 2
                                   ? ''
-                                  : 'Holds your top-end fitness. It does not build it. A club session goes here.'}
+                                  // ⚠️ THE CLUB CLAUSE MOVED INTO THE BULLETS ABOVE (2026-08-19),
+                                  // where it is stated once for the whole screen instead of hiding
+                                  // in a sub-label that only renders under two sessions.
+                                  : 'Holds your top-end fitness. It does not build it.'}
                               </p>
                               <button
                                 type="button"
@@ -4719,12 +4743,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             </div>
                             {showHardDayWhy && (
                               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
-                                {HARD_DAY_WHY.map((s) => (
-                                  <div key={s.heading}>
-                                    <p className="text-white/70 text-xs font-medium">{s.heading}</p>
-                                    <p className="text-white/45 text-xs leading-snug">{s.body}</p>
-                                  </div>
-                                ))}
+                                {/* ⛔ A `body` MAY NOW CARRY NEWLINES, AND EACH LINE IS A BULLET
+                                    (2026-08-19). The tier grid and the rules-of-thumb are lists by
+                                    nature and read as walls when set as prose. A single-line body
+                                    renders as a plain paragraph, so nothing that was a sentence
+                                    grew a bullet it did not ask for. */}
+                                {HARD_DAY_WHY.map((s) => {
+                                  const lines = s.body.split('\n');
+                                  return (
+                                    <div key={s.heading}>
+                                      <p className="text-white/70 text-xs font-medium">{s.heading}</p>
+                                      {lines.length > 1 ? (
+                                        <ul className="list-disc list-outside ml-4 space-y-0.5 marker:text-white/25">
+                                          {lines.map((l) => (
+                                            <li key={l} className="text-white/45 text-xs leading-snug pl-0.5">{l}</li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <p className="text-white/45 text-xs leading-snug">{s.body}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                             {/* ── the ground the hard RUN happens on ──────────────────────────

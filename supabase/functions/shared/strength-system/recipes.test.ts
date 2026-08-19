@@ -251,7 +251,11 @@ for (const r of RECIPES) {
     // deleting it. The (i) sections are asserted for the two claims that moved out of the options.
     const why = HARD_DAY_WHY.map((x) => `${x.heading} ${x.body}`).join(' ');
     assert(/eccentric|impact transient/i.test(why), 'the eccentric argument left the options and never arrived');
-    assert(/48 hours/.test(why), 'the 48-hour clearance left the options and never arrived');
+    // ⚠️ ABBREVIATION-AGNOSTIC. The 2026-08-19 bullet rewrite shortened "48 hours" to "48 hrs" and a
+    // literal match read that as the clearance having been DELETED from the disclosure. What is
+    // asserted is that the claim SURVIVED the move out of the option bodies, not how it is spelled.
+    assert(/48\s*(hours|hrs|h)\b/i.test(why),
+      'the 48-hour clearance left the options and never arrived');
 
     /**
      * ⛔ THE COST LINE SPEAKS ONLY WHEN THE MATH MOVED (Michael, 2026-08-18: *"if the math doesn't

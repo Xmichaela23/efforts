@@ -538,96 +538,105 @@ export function topSetIndex(sets: ReadonlyArray<{ weight?: number | null }>): nu
  * build.
  */
 export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
+  /**
+   * ⛔ BULLETS, NOT PARAGRAPHS (Michael, 2026-08-19). Eleven prose blocks behind one (i) is a wall
+   * nobody reads, and the tier table in particular was five sentences describing a grid — a shape
+   * that wants rows.
+   *
+   * ⚠️ NOTHING WAS DELETED. Every one of the eleven sections survives, reworded; the two Hickson
+   * sections merged into one "What it holds and what it does not" because they were two halves of a
+   * single finding, and the club-day rationale moved up beside the tier it affects. Sources kept
+   * verbatim — they are the reason any of this is quotable.
+   *
+   * ⚠️ NO ORDERING RULE APPLIES HERE. The 2026-08-10 ruling that the Fyfe claim must OPEN its list
+   * names `VOLUME_WHY[0]` and only that; `strength-focus-copy.voice.test.ts` asserts cleanliness for
+   * this table and nothing about its order. So it leads with the optional line, which is the first
+   * thing an athlete needs to know about a screen they are allowed to skip.
+   */
   {
-    heading: 'What it changes',
-    body:
-      'Assistance reps only. Main lifts always run at 85% training max, advancing +5 lb upper / '
-      + '+10 lb lower per cycle. Cardio never touches the bar.',
+    heading: 'Hard days are optional',
+    body: 'Zero is a valid answer. The block is strength-led and complete without one.',
   },
   {
-    heading: '0 hard days',
-    // ⚠️ THE HOURS CLAUSE IS THE CORRECTION, NOT A CAVEAT. Without it this line is false for any
-    // athlete over 4 hours a week, which is most of them.
+    heading: 'What changes',
     body:
-      'Full assistance volume: 40-50 reps per exercise — if you are also under 4 total hours. '
-      + '4 to 8 hours puts you at 30-40; ride 10 easy hours and volume alone drops you to 25-30.',
+      'Assistance reps only. Main lifts always run at 85% training max, +5 lb upper / +10 lb lower '
+      + 'per cycle. Cardio never touches the bar.',
+  },
+  /**
+   * ⛔ FIVE ROWS, AND THEY ARE `resolveEnduranceTier`'s GRID — not a description of it. The function
+   * reads hard days AND hours and takes the heavier cost; every row here is one cell of that.
+   * ⚠️ PINNED BY `recipes.test.ts` AGAINST `ASSISTANCE_BAND_BY_HARD_DAYS`. If a band moves, the test
+   * fails here rather than the card quietly selling a block the plan does not build.
+   */
+  {
+    heading: 'The tiers',
+    body:
+      '0 hard days, under 4 hrs \u2192 40\u201350 reps. Full volume.\n'
+      + '0 hard days, 4\u20138 hrs \u2192 30\u201340 reps.\n'
+      + '1 hard day, 8 hrs or under \u2192 30\u201340 reps.\n'
+      + 'Over 8 hrs, any days \u2192 25\u201330 reps.\n'
+      + '2+ hard days, any hours \u2192 25\u201330 reps. Minimum effective dose.',
   },
   {
-    heading: '1 hard day',
-    // ⛔ "AT 8 HOURS OR UNDER", NOT "AT 4-8" (2026-08-18). The 4-8 window was the OLD AND-gate, and
-    // it was the inversion: one hard day on three hours failed it and fell through to 25-30, so a
-    // lighter week bought FEWER accessories than a heavier one. `base` is the fall-through now, so
-    // one hard day is 30-40 at any hours up to eight — see `resolveEnduranceTier`'s header.
+    heading: 'Why accessories are what move',
     body:
-      '30-40 assistance reps, at 8 total hours or under. Slower accessory growth. Main lift '
-      + 'progress unchanged.',
-  },
-  {
-    heading: '2 or more hard days',
-    body:
-      '25-30 assistance reps, whatever the hours. Accessories run at the minimum effective dose. '
-      + 'Main lift progress unchanged.',
-  },
-  {
-    heading: 'Why the accessories are what move',
-    body:
-      'Each hard cardio day is a nervous-system hit. Assistance reps are the only expendable '
-      + 'volume — they get cut, bar weight never does.',
+      'Each hard day is a nervous-system hit.\n'
+      + 'Assistance reps are the only expendable volume.\n'
+      + 'They get cut. Bar weight never does.',
   },
   {
     heading: 'How the two combine',
-    body:
-      'Hours and hard days combine, and the engine takes the heavier of the two costs. Whichever '
-      + 'tier you land in, only assistance reps change: your 85% working numbers and +5/+10 '
-      + 'progression run untouched.',
+    body: 'Hours and hard days combine \u2014 the engine takes the heavier cost.',
   },
-  /**
-   * ⛔ THE SESSION BIOLOGY LIVES HERE NOW, NOT BETWEEN THE OPTIONS (2026-08-18). Each option card on
-   * the hard-day screen carries one operational line — movement, ground, reps — and everything that
-   * answers "why would I pick this one" is in these two sections, one tap away.
-   *
-   * ⚠️ THIS IS WHERE THE 48-HOUR CLAIM LIVES NOW, AND IT IS LOAD-BEARING: `goal: 'speed'` is what
-   * makes the solver prefer 48h between the session and heavy lower work (`isFlatFootfall` →
-   * `preferredClearance`). If that preference is ever removed, this sentence is a promise the week
-   * stops keeping.
-   */
   {
-    heading: 'Incline vs flat — what the ground costs',
+    /**
+     * ⚠️ THE 48-HOUR CLAIM IS LOAD-BEARING: `goal: 'speed'` is what makes the solver prefer 48h
+     * between the session and heavy lower work (`isFlatFootfall` \u2192 `preferredClearance`). If that
+     * preference is removed, this line is a promise the week stops keeping.
+     */
+    heading: 'Incline vs flat',
     body:
-      'Running uphill removes the impact transient, so a hard 3-minute climb buys a top-end aerobic '
-      + 'session the legs barely pay for. Flat sprinting is the opposite: repeated maximal footfall '
-      + 'is mechanical damage, and it is the one session the engine holds 48 hours clear of heavy '
-      + 'squats. Sustained threshold sits between them — level footfall, submaximal effort, but far '
-      + 'more of it.',
+      'Uphill: no impact transient. Top-end aerobic work the legs barely pay for.\n'
+      + 'Flat sprints: maximal footfall is mechanical damage \u2014 the one session held 48 hrs clear '
+      + 'of heavy squats.\n'
+      + 'Threshold: level footfall, submaximal, but lots of it.',
   },
   {
     heading: 'Why intensity is the one we recommend',
     body:
-      'Short intensity recruits the same fast-twitch fibers and the same energy system the barbell '
-      + 'runs on, so it does not send the signal that shifts muscle toward endurance. Prolonged '
-      + 'metabolic work does, and that is the interference effect — which is why the threshold '
-      + 'option names it as a cost rather than hiding it.',
+      'Short intensity recruits the same fast-twitch fibers and energy system the barbell runs on.\n'
+      + 'It does not send the signal that shifts muscle toward endurance.\n'
+      + 'Prolonged metabolic work does \u2014 that is the interference effect, which is why the '
+      + 'threshold option names it as a cost.',
   },
   {
-    heading: 'What it holds',
+    /**
+     * ⛔ TWO SECTIONS MERGED (2026-08-19): "What it holds" and "What it does not do" were the two
+     * halves of one Hickson finding and read as a contradiction apart. ⚠️ THE CITATION IS VERBATIM
+     * and stays — the maintenance experiments, NOT the 1980 interference paper, and that
+     * distinction is the whole reason the claim is quotable.
+     */
+    heading: 'What one hard day holds — and what it does not',
     body:
-      'Cutting how often the training happens, or how long each session runs, leaves top-end aerobic '
-      + 'fitness intact — six days a week down to two, and forty-minute sessions down to thirteen, both '
-      + 'held it for fifteen weeks. Cutting how hard is the one that lost it. '
-      + '(Hickson 1981, 1982, 1985 — the maintenance experiments, not the 1980 interference paper.)',
+      'Frequency and duration can fall a long way and top-end fitness holds: six days a week down '
+      + 'to two, forty-minute sessions down to thirteen, both held for fifteen weeks.\n'
+      + 'Cutting how HARD is the one that lost it.\n'
+      + 'But one session a week sits below where trained athletes improve \u2014 this block holds the '
+      + 'engine where it is and promises nothing bigger.\n'
+      + '(Hickson 1981, 1982, 1985 \u2014 the maintenance experiments, not the 1980 interference paper.)',
   },
   {
-    heading: 'What it does not do',
+    /**
+     * ⚠️ MOVED, NOT CUT. This was the last section; it belongs beside the tier table now, because a
+     * club day COUNTS toward the hard-day count that sets the band — which is the fact an athlete
+     * needs when deciding whether to declare one.
+     */
+    heading: 'A club session counts',
     body:
-      'One hard session a week sits below the level where trained athletes improve. Two to three a week '
-      + 'is where gains happen; roughly one every one to two weeks is enough to preserve. So this block '
-      + 'holds the engine where it already is, and nothing here promises a bigger one at the end of it.',
-  },
-  {
-    heading: 'Why the day is asked for',
-    body:
-      'A fixed group session — a run club, a ride club — lands in this same slot. Naming the day it '
-      + 'falls on is what lets the lifting be placed around it rather than on top of it.',
+      'A fixed group run or ride lands in this same slot and costs the week the same recovery.\n'
+      + 'Naming the day it falls on is what lets the lifting be placed around it rather than on top '
+      + 'of it.',
   },
 ];
 
@@ -702,32 +711,29 @@ export const HARD_RIDE_SHAPE =
  * running it.
  */
 export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
+  /**
+   * ⛔ SAME BULLET TREATMENT AS `HARD_DAY_WHY` (2026-08-19) — eight prose blocks was the same wall.
+   *
+   * ⛔⛔ AND THE FYFE CLAIM STILL OPENS IT. That is the 2026-08-10 ruling and it is enforced by
+   * `strength-focus-copy.voice.test.ts`, which asserts `VOLUME_WHY[0].body` STARTS WITH the claim
+   * sentence: *"if a future trim drops it entirely, the app has quietly stopped saying the one
+   * counterintuitive thing it knows about this choice."* The bullets go after it, inside the same
+   * section, so the assertion holds and the numbers stop being a paragraph.
+   *
+   * ⚠️ NOTHING DELETED. Both hedges survive — it was CYCLING not running, and total work is the
+   * authors' SUGGESTION rather than their result — because those are the conditions the claim is
+   * allowed on, not decoration.
+   */
   {
     heading: 'What the trial found',
-    // ⛔ THE CLAIM SENTENCE LIVES HERE NOW, NOT ON THE CARD (2026-08-10). It was the one line left
-    // above the inputs, and it was still a paragraph of argument on a screen whose only job is to
-    // take two numbers. The card leads straight into the inputs on the holding-dose framing the
-    // subtitle already carries; anyone who wants to know why the number matters taps the (i) and
-    // reads it as the first thing in here, where it belongs with the evidence for it.
     body:
-      'Pace is not what competes with strength here — total work is. Eight weeks, three groups: '
-      + 'lifting alone gained 38.5% on leg press, hard cycling alongside the lifting gained 28.7%, '
-      + 'easy cycling 27.5% — almost the same number. Every endurance session was matched for equal '
-      + 'work and equal duration, so pace was not what separated them. '
-      + '(Fyfe et al. 2016, Frontiers in Physiology 7:487.)',
+      'Pace is not what competes with strength here — total work is.\n'
+      + 'Lifting alone: +38.5% on leg press.\n'
+      + 'Hard cycling alongside it: +28.7%.\n'
+      + 'Easy cycling alongside it: +27.5% — almost the same number.\n'
+      + 'Every session was matched for equal work and equal duration, so pace was not what separated '
+      + 'them. (Fyfe et al. 2016, Frontiers in Physiology 7:487.)',
   },
-  /**
-   * ⛔ THE COST TIERS SIT SECOND, AND THAT IS A DELIBERATE YIELD TO AN OLDER RULING. They were
-   * drafted at index 0 — what an athlete typing a number wants first is what the number DOES — and
-   * `strength-focus-copy.voice.test.ts` refused it: the 2026-08-10 decision requires the Fyfe claim
-   * to OPEN this list, because *"if a future trim drops it entirely, the app has quietly stopped
-   * saying the one counterintuitive thing it knows about this choice."* That reason still holds, and
-   * one short section above these costs a reader nothing.
-   *
-   * ⚠️ SAME CORRECTION AS `HARD_DAY_WHY` — see its header. This chooser touches the assistance band
-   * and NOTHING ELSE: no training-max hold, no AMRAP cap, no maintenance mode. Those were in the
-   * draft and are not in the engine.
-   */
   {
     heading: 'What it changes',
     body:
@@ -735,38 +741,43 @@ export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
       + 'AMRAP sets.',
   },
   {
-    heading: 'Under 4 hours a week',
-    body: 'Full assistance volume: 40-50 reps, with 0 hard days. No strength cost.',
-  },
-  {
-    heading: '4 to 8 hours a week',
-    body: '30-40 assistance reps. Slower accessory growth. Main lifts unchanged.',
-  },
-  {
-    heading: 'Over 8 hours a week',
+    /**
+     * ⛔ THE HOURS AXIS OF `resolveEnduranceTier`, AS ROWS. Pinned against
+     * `ASSISTANCE_BAND_BY_HARD_DAYS` in `strength-focus-copy.voice.test.ts`.
+     * ⚠️ EXACTLY 4 AND EXACTLY 8 ARE BOTH `base` — the boundary convention is `> 8` and `< 4`, and
+     * the code test in `endurance-tier.test.ts` pins the same thing from the other side.
+     */
+    heading: 'The tiers',
     body:
-      '25-30 assistance reps, even with zero hard days. Accessories at the minimum dose. Main '
-      + 'lifts unchanged.',
+      'Under 4 hrs, 0 hard days \u2192 40\u201350 reps. Full volume.\n'
+      + '4\u20138 hrs \u2192 30\u201340 reps.\n'
+      + 'Over 8 hrs \u2192 25\u201330 reps, even with zero hard days.\n'
+      + 'Main lifts unchanged in every row.',
   },
   {
     heading: 'How the two combine',
-    body:
-      'Hours and hard days combine, and the engine takes the heavier of the two costs. Whichever '
-      + 'tier you land in, only assistance reps change: your 85% working numbers and +5/+10 '
-      + 'progression run untouched.',
+    body: 'Hours and hard days combine \u2014 the engine takes the heavier cost.',
   },
   {
+    /**
+     * ⛔ BOTH HEDGES, KEPT. They were two sections and are one; neither is optional. The trial was
+     * CYCLING, and reading it across to running errs toward overstating the cost. And total work is
+     * what the authors POINT AT rather than what they measured — work was held constant while
+     * intensity varied, so what is measured is that intensity does not mediate.
+     */
     heading: 'What it does not say',
     body:
-      'The authors point at total work instead, and they call that a possibility rather than a result — '
-      + 'work was held constant while intensity varied, so what the trial measures is that intensity '
-      + 'does not mediate. The endurance was also cycling. Running carries more eccentric load, so '
-      + 'reading the number across to running errs toward overstating the cost.',
+      'The authors point at total work, and call it a possibility rather than a result.\n'
+      + 'Work was held constant while intensity varied \u2014 so what the trial measures is that '
+      + 'intensity does not mediate.\n'
+      + 'The endurance was cycling. Running carries more eccentric load, so reading the number '
+      + 'across to running errs toward overstating the cost.',
   },
   {
     heading: 'Why the number here matters',
     body:
-      'As weekly volume climbs, the strength gained across a block gets smaller. The number entered on '
-      + 'this screen is the one the plan builds around, and the sessions do not shrink to meet it.',
+      'As weekly volume climbs, the strength gained across a block gets smaller.\n'
+      + 'The number entered on this screen is the one the plan builds around, and the sessions do '
+      + 'not shrink to meet it.',
   },
 ];
