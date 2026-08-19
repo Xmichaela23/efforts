@@ -60,6 +60,13 @@ nicer week, stop: that is the failure mode this architecture was built to preven
 and `* 25` were chosen to dominate, not measured. Nobody has ever swept them. `scripts/dump-plans.ts`
 builds 61 athlete shapes in about a second — that is your instrument, and it already exists.
 
+⚠️ **AND READ `docs/SPEC-week-solver.md` §0b-§0j — BUT ONLY AFTER ITS BANNER.** That file said
+*"Status: spec. Not built."* until 2026-08-19 and it is 100KB, so it is the first and most misleading
+thing a search for "solver" returns. It IS built, in a **different shape** than it describes (the
+two-layer split), and `place-week.ts` was **not** replaced. Its corrected banner says all of that.
+What is still live and has no other home: the general laws — Monday weeks, hours-not-weekdays,
+*"a missing signal is not a verdict"*, *"a test that has never failed is not evidence"*.
+
 ### THE THREE FACTS YOU NEED BEFORE YOU START
 
 1. **The search is not exhaustive, deliberately.** `resolve.ts` searches only the CONSTRAINED units

@@ -1,7 +1,40 @@
 # SPEC — The Week Solver
 
-**Status:** spec. Not built. Replaces the placement half of `place-week.ts`, which filters and takes
-the first legal answer.
+> # ⛔⛔ STATUS CORRECTED 2026-08-19 — **THIS IS BUILT.** THE LINE BELOW SAID "NOT BUILT" AND WAS
+> # THE FIRST THING ANYONE SEARCHING "SOLVER" WOULD READ.
+>
+> **It shipped as `supabase/functions/_shared/week-model/` on 2026-08-18** — `model.ts` (246 lines,
+> the LAW), `resolve.ts` (422, the SEARCH and the six score terms), `solver-adapter.ts` (187, the
+> seam the composer calls). **18 tests pass on it** (`week-model/model.test.ts`). The composer
+> imports it; one import line in `strength-primary-plan.ts` swapped the old solver out.
+>
+> ⚠️ **AND IT SHIPPED IN A DIFFERENT SHAPE THAN THIS DOCUMENT DESCRIBES — a TWO-LAYER model, which
+> is the single most important thing to know before reading any of the 1,500 lines below:**
+>
+> * **Layer 1 — `model.ts`. The LAW.** `COST`, coupling, debt, eligibility. It answers *"is this week
+>   LEGAL"* and nothing else. Five rows; `long_ride` is deliberately asymmetric.
+> * **Layer 2 — `resolve.ts`. The PREFERENCES.** Six score terms that can only ever choose among
+>   weeks Layer 1 has already ruled legal. ⛔ **A score term can never buy an illegal week.** If a
+>   reader finds themselves weakening a `COST` cell to get a nicer arrangement, that is the failure
+>   mode the split exists to prevent.
+>
+> ⛔ **`place-week.ts` WAS NOT REPLACED.** This doc says it replaces "the placement half"; it did not.
+> `place-week.ts` still owns the ANCHORS — long run, long ride, hard days — and the solver fills in
+> around them, plus it remains the fallback when `solve()` returns `unsolvable`. **Two placers on one
+> law**, which is what `CAPABILITY-MAP.md` already records.
+>
+> ⛔ **READ THE HANDOFF BANNER IN `ENGINE-STATE.md` FIRST.** It is dated, it names the four files with
+> line counts, and it quotes the six score terms. **This document is the REASONING, not the state.**
+> Sections `0b`–`0j` are the general laws (Monday weeks, hours-not-weekdays, "a missing signal is not
+> a verdict") and are still live and still worth reading. The build plan and the "not built" framing
+> are history.
+>
+> ⚠️ **Per this repo's own spec lifecycle a shipped spec should fold into a `D-NNN` and be DELETED.**
+> That has not been done here and is deliberate for now: `0b`–`0j` are load-bearing rules with no
+> other home, and moving them is its own job. **Filed rather than pretended.**
+
+**Status:** ⛔ see the corrected banner above — BUILT as `_shared/week-model/`, in a two-layer shape,
+with `place-week.ts` retained for anchors and fallback.
 **Author:** Michael + Claude, 2026-07-27.
 **Companion:** `DOCTRINE-aerobic-maintenance.md` (what the block is for), `D-325` (costs and ceilings).
 
