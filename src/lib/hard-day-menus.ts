@@ -71,9 +71,7 @@ export type CopyOption<T extends string> = { id: T; title: string; body: string 
  * copy-voice rule is enforced as a hard check, not a preference. `stimulus` carries the same claim
  * and is the term the sessions themselves use.
  */
-export const SINGLE_SLOT_NOTE =
-  'Because you are only carrying one hard session, your choice sets the cardiovascular stimulus '
-  + 'for your entire 12-week block.';
+export const SINGLE_SLOT_NOTE = 'One hard session. It sets the cardiovascular stimulus for all 12 weeks.';
 
 /**
  * ⛔ `HARD_DAY_INTENT` LIVED HERE AND IS DELETED — do not reintroduce it. It was the single-slot
@@ -96,9 +94,7 @@ export const SINGLE_SLOT_NOTE =
  * other — there is no second question, and the card states the other sport's session rather than
  * asking about it. That is what makes the budget visible instead of enforced in silence.
  */
-export const INTENT_ALLOCATION_NOTE =
-  'A 12-week block carries exactly one top-end intensity session and one sustained threshold '
-  + 'session. Pick which sport holds your top-end speed.';
+export const INTENT_ALLOCATION_NOTE = 'One top-end session, one sustained. Pick which sport holds your speed.';
 
 /**
  * ⛔ LEAD WITH THE GOAL, NOT THE GROUND (Michael, 2026-08-18): *"hills are VO2 max, flat is speed
@@ -125,24 +121,20 @@ export const INTENT_ALLOCATION_NOTE =
  * (§2.0's last-resort VO2 intervals on the level). The wizard writes `goal` and nothing else; which
  * flat surface, or hill versus treadmill, is answered on the day.
  */
-export const RUN_GROUND_NOTE =
-  'The engine needs your terrain to schedule your recovery. Flat sprints require 48 hours of leg '
-  + 'clearance before heavy squats.';
+export const RUN_GROUND_NOTE = 'Flat sprints need 48 hours clear of heavy squats. Hills do not.';
 
 export const RUN_GROUND_OPTIONS: Array<CopyOption<'speed' | 'vo2'>> = [
   {
     id: 'speed',
     title: 'Speed focus',
-    body: 'Flat ground — a track or road. Short, explosive sprints to make you faster. High '
-      + 'neurological drive, but the hard footfall creates mechanical damage that requires 48 hours '
-      + 'of leg clearance before heavy squats.',
+    body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
+      + 'costs you 48 hours clear of heavy squats.',
   },
   {
     id: 'vo2',
     title: 'VO2 max focus',
-    body: 'Incline — a hill or treadmill. Hard 3-minute climbs to push your maximum aerobic ceiling. '
-      + 'Spikes your heart rate to the limit, but running uphill removes the eccentric impact, '
-      + 'saving your knees and quads for the barbell.',
+    body: 'Incline — hill or treadmill. Hard 3-minute climbs. Uphill removes the eccentric impact, '
+      + 'so your knees and quads are still there for the barbell.',
   },
 ];
 
@@ -170,16 +162,13 @@ export const RUN_GROUND_OPTIONS: Array<CopyOption<'speed' | 'vo2'>> = [
  */
 export const SESSION_PRESCRIPTION = {
   ride_intensity:
-    'The Helgerud 4 × 4 — four 4-minute efforts at maximum sustainable power, easy spinning between. '
-    + 'It halves to 2 × 4 in the final weeks so your quads are loaded for the heavy lifts. You will '
-    + 'choose your setup (trainer vs. road) on the day.',
+    'Helgerud 4 × 4 — four 4-minute efforts at max sustainable power, easy spinning between. Halves '
+    + 'to 2 × 4 in the final weeks. Setup (trainer vs. road) on the day.',
   ride_threshold:
-    'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the block, at '
-    + '95-105% FTP. You will choose your setup (trainer vs. road) on the day.',
+    '4 × 5 min building to 2 × 10, at 95-105% FTP. Setup (trainer vs. road) on the day.',
   run_threshold:
-    'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the block, at a '
-    + 'pace about 20 s/mi slower than your 5K. You will choose your setup (track vs. rolling road) '
-    + 'on the day.',
+    '4 × 5 min building to 2 × 10, about 20 s/mi slower than 5K pace. Setup (track vs. rolling '
+    + 'road) on the day.',
 } as const;
 
 /**
@@ -189,8 +178,8 @@ export const SESSION_PRESCRIPTION = {
  */
 export const interlockLine = (intensitySport: 'run' | 'bike'): string =>
   intensitySport === 'bike'
-    ? 'Your ride is holding the top-end intensity, so your run is the sustained one.'
-    : 'Your run is holding the top-end intensity, so your ride is the sustained one.';
+    ? 'Your ride holds the speed. Your run is the sustained one.'
+    : 'Your run holds the speed. Your ride is the sustained one.';
 
 /**
  * ⛔⛔ ONE SLOT IS ONE QUESTION (Michael, 2026-08-18: *"4 options? confusing?"*).
@@ -229,17 +218,15 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
         title: 'Top-end intensity',
         // ⚠️ THE REAL SESSION, not a character sketch — same rule as `SESSION_PRESCRIPTION`, which
         // this deliberately mirrors word for word so the two cannot drift apart.
-        body: 'The Helgerud 4 × 4 — four 4-minute efforts at maximum sustainable power, easy '
-          + 'spinning between, halving to 2 × 4 in the final weeks. Recruits fast-twitch fibers and '
-          + 'aligns with heavy lifting pathways, which is why we recommend it.',
+        body: 'Helgerud 4 × 4 — four 4-minute efforts at max sustainable power, halving to 2 × 4 in '
+          + 'the final weeks. Same fast-twitch pathways as the barbell. Recommended.',
         role: 'intensity',
       },
       {
         id: 'threshold',
         title: 'Sustained threshold',
-        body: 'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the '
-          + 'block, at 95-105% FTP. Builds immense stamina, but prolonged metabolic efforts compete '
-          + 'directly with strength adaptations.',
+        body: '4 × 5 min building to 2 × 10 at 95-105% FTP. Builds stamina, but prolonged efforts '
+          + 'compete hardest with strength.',
         role: 'threshold',
       },
     ]
@@ -247,27 +234,24 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
       {
         id: 'speed',
         title: 'Speed focus',
-        body: 'Flat ground — a track or road. Short, explosive sprints to make you faster. High '
-          + 'neurological drive, but the hard footfall creates mechanical damage that requires 48 '
-          + 'hours of leg clearance before heavy squats.',
+        body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
+          + 'costs you 48 hours clear of heavy squats.',
         role: 'intensity',
         goal: 'speed',
       },
       {
         id: 'vo2',
         title: 'VO2 max focus',
-        body: 'Incline — a hill or treadmill. Hard 3-minute climbs to push your maximum aerobic '
-          + 'ceiling. Running uphill removes the eccentric impact, saving your knees and quads for '
-          + 'the barbell, which is why we recommend it.',
+        body: 'Incline — hill or treadmill. Hard 3-minute climbs. Uphill removes the eccentric '
+          + 'impact, so your legs are still there for the barbell. Recommended.',
         role: 'intensity',
         goal: 'vo2',
       },
       {
         id: 'threshold',
         title: 'Sustained threshold',
-        body: 'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the '
-          + 'block, at a pace about 20 s/mi slower than your 5K. Builds immense stamina, but '
-          + 'prolonged metabolic efforts compete directly with strength adaptations.',
+        body: '4 × 5 min building to 2 × 10, about 20 s/mi slower than 5K pace. Builds stamina, '
+          + 'but prolonged efforts compete hardest with strength.',
         role: 'threshold',
       },
     ]

@@ -205,10 +205,13 @@ for (const r of RECIPES) {
     }
     // ⚠️ The recommendation is stated on a recommended option and nowhere else — the athlete is
     // told which one the engine prefers rather than being steered silently.
-    assert(singleSlotOptions('run').some((o) => o.body.includes('recommend')),
-      'the run list stopped stating a recommendation');
-    assert(singleSlotOptions('bike').some((o) => o.body.includes('recommend')),
-      'the ride list stopped stating a recommendation');
+    // ⚠️ CASE-INSENSITIVE. The 2026-08-18 copy pass cut *"which is why we recommend it"* down to a
+    // one-word *"Recommended."*, and a literal lowercase `includes` read that as the recommendation
+    // having been DELETED. The assertion is about the recommendation existing, not its grammar.
+    for (const d of ['run', 'bike'] as const) {
+      assert(singleSlotOptions(d).some((o) => /recommend/i.test(o.body)),
+        `the ${d} list stopped stating a recommendation`);
+    }
     /**
      * ⛔ EVERY ASK-NOTHING STATE NAMES WHERE THE REST GETS DECIDED. *"You will choose your setup on
      * the day"* is a CONTRACT with the session description — the materializer now lists the setups,

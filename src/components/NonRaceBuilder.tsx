@@ -1759,7 +1759,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // ⚠️ RESOLVED DAYS, not just the athlete's — a slot must not be able to take the day the engine
   // proposed for the other one, or two hard sessions land together and the composer dedupes one away.
   /** ⛔ THE COUNT DRIVES THE COPY (§1i). One HOLDS top-end fitness; two BUILDS it. */
-  const hardDayCount = state.hardDays.filter((h) => !!h.day).length;
+  /**
+   * ⛔ IT COUNTED PINNED DAYS, NOT HARD DAYS, AND ON THIS STEP THAT IS ALWAYS ZERO (found 2026-08-18).
+   *
+   * `filter(h => !!h.day)` was written when the hard row asked WHAT and WHEN together. The two were
+   * split on 2026-08-18 — `hardday` asks what, `schedule` asks when — so on the screen this number
+   * is read from, no slot has a day yet. An athlete with two hard sessions selected was told "one
+   * hard session a week holds top-end aerobic fitness", which is the wrong sentence about the wrong
+   * week.
+   *
+   * ⚠️ THE SLOT IS THE ANSWER, THE DAY IS THE SCHEDULE. Presence in `hardDays` means the discipline
+   * is chosen; the day arrives later and may be the engine's to propose (§1i slice 8). Anything
+   * counting "how much intensity does this block carry" must count slots.
+   */
+  const hardDayCount = state.hardDays.length;
   /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Long run and long ride are posture-gated
    * rows, and posture is editable on an earlier step — so walking Back, dropping the bike, and
@@ -4325,10 +4338,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   : null;
                 const rowSportRgb = rowSport ? getDisciplineColorRgb(rowSport) : null;
                 const border = i > 0 ? 'border-t border-white/8' : '';
-                const activeSkin = active && !rowSportRgb
-                  ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] border-l-2 border-l-[rgb(var(--wiz-accent-rgb,236,233,227))]'
+                /**
+                 * ⛔ THE HARD ROW IS NEUTRAL, WHOLE (Michael, 2026-08-18: *"this whole bar should be
+                 * neutral"*). Every other row keeps its sport wayfinding — a long-run row IS a run
+                 * row and the colour tells you so at a glance.
+                 *
+                 * ⚠️ THE HARD ROW IS THE ONE ROW THAT IS NOT ONE SPORT. It holds a run and a ride at
+                 * once, so `rowSport` fell back to whichever was toggled and repainted the entire
+                 * card — orange while empty, then gold or green — which is the card SHOUTING a
+                 * discipline it does not belong to. Sport colour on this screen marks identity, and
+                 * the chips inside already carry it.
+                 */
+                const neutralRow = row.key === 'hard';
+                const activeSkin = active && (neutralRow || !rowSportRgb)
+                  ? (neutralRow
+                    ? 'bg-white/[0.04] border-l-2 border-l-white/25'
+                    : 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] border-l-2 border-l-[rgb(var(--wiz-accent-rgb,236,233,227))]')
                   : active ? 'border-l-2' : '';
-                const activeSportStyle = active && rowSportRgb
+                const activeSportStyle = active && rowSportRgb && !neutralRow
                   ? { backgroundColor: `rgba(${rowSportRgb},0.10)`, borderLeftColor: `rgb(${rowSportRgb})` }
                   : undefined;
                 // Colour the "Pick one" of EVERY discipline row (long run/ride + the counts) in its
@@ -4357,10 +4384,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           ⚠️ THIS BELONGS ON A HARD DAYS SCREEN OF ITS OWN and sits here because that
                           screen is not built yet — the control is still a row of this card's
                           disclosure list. When it is extracted, the note goes with it. */}
-                      <p className="text-white/70 text-sm leading-relaxed px-3 pt-2.5">
-                        Intensity taxes your central nervous system. Every high intensity day you add
-                        lowers your lifting rep ceiling to protect the heavy barbell work. (You'll pick
-                        which days these land on in the Schedule step).
+                      {/* ⛔ LEAD WITH WHAT THEY ARE ADDING (Michael, 2026-08-18). It opened on the
+                          COST — *"intensity taxes your central nervous system"* — which is the second
+                          thing an athlete needs and reads as a warning against the row's own button.
+                          Name the three sessions first, then the price.
+                          ⛔ AND THE PARENTHETICAL IS GONE: *"we don't need a paren."* "You'll pick
+                          which days in the Schedule step" was a navigation footnote inside a training
+                          statement, and the Schedule step says so itself when they get there.
+                          ⚠️ THE PRICE CLAIM IS STILL TRUE OF THE CODE, not reassurance: the hard-day
+                          COUNT is one of the two inputs to `resolveEnduranceTier`, which sets the
+                          accessory band before a rep is authored. Two hard days drops the band to
+                          25-30 reps; none opens it to 40-50. */}
+                      <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
+                        Add speed, VO2 max or threshold work. Each day you add trims your accessory
+                        lifting — your nervous system pays for both, and the barbell gets paid first.
                       </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
@@ -4682,10 +4719,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <div className="flex items-start gap-1.5 pt-0.5">
                               <p className="text-white/45 text-xs leading-snug">
                                 {hardDayCount >= 2
-                                  ? 'Two hard sessions build top-end speed: one intervals, one sustained. '
-                                    + 'The lifting is placed to keep its distance from both.'
-                                  : 'One hard session a week holds top-end aerobic fitness. It does not build it. '
-                                    + 'A run or ride club goes here.'}
+                                  // ⚠️ "keep its distance" WAS THE OLD WORDING AND THE VOICE LINT
+                                  // CATCHES `keep`. It survived only because nothing linted this
+                                  // string until the copy pass touched it.
+                                  ? 'Two hard sessions: one top-end, one sustained. The lifting is placed '
+                                    + 'clear of both.'
+                                  : 'Holds your top-end fitness. It does not build it. A club session goes here.'}
                               </p>
                               <button
                                 type="button"
