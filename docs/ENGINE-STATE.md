@@ -23,84 +23,113 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-16 PM — **build one of `docs/WORKORDER-strong-focus-concurrent-2026-08-16.md` is 2/6 DONE AND COMMITTED, and a 3rd is HALF-DONE AND UNCOMMITTED.** Read the work order before touching anything: it is the spec, it is complete, and every decision in it is Michael's from that day. **Banner owned by ONE chat.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-19 — **your job is the DEFAULT SCHEDULING ENGINE, with fresh eyes.** Michael's words: *"we need to optimize the default scheduling engine and I'd like fresh eyes on this whole thing."* Banner owned by ONE chat.)
 
-### ⛔ THE TREE IS NOT CLEAN — read this first
-Three files are modified and uncommitted, all the same in-flight change (§1f-0, the three-day week):
-`strength-primary-plan.ts` (the engine change, **done**), `forever-block-map.test.ts` and
-`strength-primary-plan.test.ts` (**partly updated**). HEAD is `8e330c0f`.
+### YOUR JOB
 
-**8 tests still expect four lifting days.** They are the whole remaining job for that slice:
-`assistance-collision:486` · `easy-session-spread:93,98` · `forever-block-map:130,182` ·
-`strength-primary-plan:257,291,482`.
+**Make the week the solver produces by DEFAULT a better week.** Not the law — the law is settled and
+tested. The *preferences*. An athlete who never touches a control should open the block on the best
+arrangement available to them, and today they open on a legal one.
 
-Two causes, both mechanical: (1) three strength sessions a week now, not four; (2) the shared day is
-titled `Strength — Deadlift + Overhead Press`, so any helper matching `s.name === 'Strength — '+lift`
-loses two lifts. `forever-block-map.test.ts`'s `sessionFor` already carries the fix to copy — match
-on `String(s.name).includes(lift)`.
+**Start at these four files, in this order. Nothing else is the scheduler.**
 
-### ✅ COMMITTED THIS SESSION — do NOT re-litigate
-- `feee083c` **The 3:1 block.** `leader · light · leader · light · anchor · TM test`. A light week
-  after EVERY cycle (p.21's "after any cycle" licence — a concurrent athlete is the taxing case it
-  names). **No opening TM-test week** — knowingly overrides p.21's bolded advice, stated as ours.
-  **The continuity tiers are DELETED** with their supplier in `generate-strength-plan`: they produced
-  1 leader : 2 anchors, not one of Forever's three models. Ratio is now every cycle but the last,
-  capped at two. **16 weeks is not offered**; `blockWeeks` is an allowlist of `{8, 12}`. The week map
-  takes no shape inputs at all — length alone decides it.
-- `8e330c0f` **The assistance band is set by COMPETING STRESS, not the cycle phase.** 0 hard
-  endurance days → 40-50 · 1 → 30-40 · 2 → 25-30, whole block capped at 50. **Cite 25-50 as OURS** —
-  his base is p.24's 50-100; 25-50 is p.23's seventh-week number. Capacity still moves the athlete
-  within their band. ⚠️ **The p.18 leader-vs-anchor direction is GONE, not reversed** — back-annotate
-  D-432 or it reads as the 2026-08-15 fix regressing.
-- `0fa83eea` + `d707da6c` **One 5K-pace resolver**, five hand-rolled fallback chains deleted, and the
-  two write-path bugs behind it (metric paces were per-mile numbers labelled /km; the backfill only
-  ever filled a blank, so accepting the "training data suggests…" nudge changed no workout target).
-- Also in `feee083c`: the **bike hard day never deloaded** — 4×4 VO2 intervals ran through every
-  light week including the TM test. Mirrors the run branch now.
+| file | lines | what it owns |
+|---|---|---|
+| `supabase/functions/_shared/week-model/model.ts` | 246 | **THE LAW.** `COST`, coupling, debt, eligibility. ⛔ Layer 1. Do not tune this to improve a week. |
+| `supabase/functions/_shared/week-model/resolve.ts` | 422 | **THE PREFERENCES.** The search + six score terms. ⛔ **This is your file.** |
+| `supabase/functions/_shared/week-model/solver-adapter.ts` | 187 | the `SolverInput`/`SolverResult` seam the composer calls |
+| `supabase/functions/shared/strength-system/place-week.ts` | 436 | anchors, pins, and the compromise notes the athlete reads |
 
-### ⛔ STILL TO DO IN BUILD ONE — in this order
-1. **Finish §1f-0** (the 8 tests above), then its follow-ons: the stale "four lifting days" copy
-   (`NonRaceBuilder.tsx:3203,3209,3265,3308`, `strength-focus-copy.ts:87,136`, and the shape test at
-   `strength-focus-copy.shape.test.ts:42` that pins the wrong string), the **"Lifting days" wizard
-   step** (step 5 of 9) and the `lifting_days` plumbing, and `pullup-progression.ts:130`'s
-   `liftingDays = 4` default (**decided: the weekly total holds, per-day rises to ~35**).
-2. **§1c — a miss is the top working set of EVERY main-lift day**, not one 95% set per cycle.
-   ⛔ **This is the risky one and it was deliberately not started.** The prescribed rep count is NOT
-   on the logged set (`LoggedSet` has no such field, and the logger prefills), so it has to come from
-   the plan — `setsForWeek(kind, weekInCycle)`'s last work set. Leaders carry no `amrap` flag, so
-   `amrapRepsForLift` cannot answer for them; prefer the flagged set where it exists and fall back to
-   the heaviest performed set. **And the stall clock moves from once a cycle to once a week**, which
-   changes the shape of the training-max walk. Five surfaces describe the old rule and must change in
-   the same pass — see §5b of the work order, which names them.
-3. **§1d** the training max falls immediately mid-cycle, rises only at a boundary. Must ride the
-   existing consent sheet (`useStrengthCalibration.ts`), never a silent write.
-4. **§1e** the intake asks for no lift number at all — the gate is a 409 at build time pointing at
-   Training Baselines. The rep-set door already exists there (`save-baseline-test`). Route to it.
-5. **§1f** three accessory cards, merged card filtered on pull and core only, push open, day at 25.
+**The six score terms are at `resolve.ts:130`, and the weights are the whole optimisation surface:**
 
-### ⛔ SUITE BASELINE — six failures are PRE-EXISTING
-`3637 passed / 6 failed` on a clean tree: `d031-convergence-e2e` ×3, `non-race-goal-seeds` ×2,
-`club-anchor` ×1. Two of those three strength ones assert `preferred_days.strength` returns a day
-list where it now returns `undefined` — **likely stale from when the optimizer became sole placement
-authority. A hypothesis, not a finding.** Anything failing beyond those six is new.
+```
+return rest * 4 - crowding - bunching
+  - clustering(placements) * 2
+  - sameSportDoubles(placements) * 20
+  - longDoubles(placements) * 25
+  + longOnWeekend(placements) * 5
+  + interleaving(placements) * 3;
+```
 
-### ⛔ STATE
-- **PUSHED: NO.** Six commits sit on `main` unpushed (`e8c7394b`…`8e330c0f`).
-- **DEPLOYED: NO.** ⚠️ When it goes: `strength-primary-plan.ts` and `src/lib/assistance-menu.ts` are
-  both SHARED — the `_shared` trap applies, and the client ships too.
-- **VERIFIED: NO.** Nothing seen on a device.
-- Prod was checked against main earlier today and matched; that predates these commits.
+⛔ **THE TWO-LAYER RULE IS THE ONE THING THAT MUST SURVIVE YOU.** Layer 1 says which weeks are
+LEGAL; Layer 2 chooses among them. A score term can only ever pick between weeks that are already
+legal — it can never buy an illegal one. If you find yourself weakening a `COST` cell to get a
+nicer week, stop: that is the failure mode this architecture was built to prevent.
 
-### ⛔ §6 AND §7 ARE SEPARATE BUILDS — do not fold them in
-§6 is the scheduling law and **most of it already exists**: `docs/CONSOLIDATED-MODE.md` (2026-05-18,
-"Decisions LOCKED") defines `integration_mode: separated | consolidated` — the same-day stacking rule
-— **built, tested, and never executed because no wizard writes the field**
-(`POLISH-PUNCH-LIST.md:765-769`). The one real blocker: it lives in `week-optimizer`, and Strong
-Focus places with `week-solver` + `place-week`. **`docs/SPEC-week-solver.md` already owns the
-direction — collapse onto `week-solver`; Strong Focus is the migrated path, not the outlier.**
-§7 is the interval progression, and nothing exists for a threshold session.
+⚠️ **AND THE WEIGHTS ARE HAND-PICKED, WHICH IS EXACTLY THE THING THIS REPO KEEPS DELETING.** `* 20`
+and `* 25` were chosen to dominate, not measured. Nobody has ever swept them. `scripts/dump-plans.ts`
+builds 61 athlete shapes in about a second — that is your instrument, and it already exists.
 
----
+### THE THREE FACTS YOU NEED BEFORE YOU START
+
+1. **The search is not exhaustive, deliberately.** `resolve.ts` searches only the CONSTRAINED units
+   exhaustively; free units are laid in and then improved by a 4-pass local search. A first version
+   searched everything and timed out at 7^8. ⛔ Do not "fix" it back.
+2. **`place-week.ts` still owns the anchors** — long run, long ride, hard days — and the solver fills
+   in around them. Two placement authorities is a defect this codebase has deleted before; if you
+   need a new preference, it belongs in `resolve.ts`'s score, not in a second scorer.
+3. **The one live preference override is `preferredClearance`** (`strength-primary-plan.ts`,
+   `isFlatFootfall`): flat sprints prefer 48h clear of heavy lower work. It sits BELOW
+   `breachPenalty` — *"prefer, don't force"* — and is taken in 8 of 24 legal shapes, silently
+   declined in 16. That is the shape a new preference should copy.
+
+### ⛔ WHAT SHIPPED 2026-08-18/19 — DO NOT RE-LITIGATE
+
+61 commits. `main` at `9d49db9a`. **All four strength edge functions deployed and matching main.**
+The whole session was the Strong Focus intake, and the engine changes below are the ones that alter
+a built plan:
+
+- **`resolveEnduranceTier`: `base` is the fall-through, not `survival`** (`580bfed1`). It was
+  non-monotonic — 1 hard day at 3 hrs returned 25-30 while the same athlete at 5 hrs returned 30-40,
+  so more endurance bought MORE accessory volume. Grid + boundary + a monotonicity property test in
+  `endurance-tier.test.ts`. ⚠️ Unknown hours now resolve to `base`, not `survival`.
+- **The intensity default is a training rule, not list order** (`011e8fdf`, `fbf40348`). Run + ride
+  with no allocation → the RUN holds the top-end session. The mechanism is the SUSTAINED session:
+  threshold is the long one, and putting it on the bike removes the block's largest block of
+  repetitive impact. ⚠️ A bare `intensity` mark inherited from a one-slot answer YIELDS to this; an
+  explicit `threshold` mark and a full allocation both stand. `intent-allocation.test.ts`.
+- **One session a week is legal, and the count built is the count asked for** (`9d49db9a`). It was
+  blocked in four places. Fixing it exposed an overage already live at two sessions: `asked 2, hard
+  2` built THREE runs. The long run is a session, not an extra. `one-session-week.test.ts`.
+- **Abs are a `single_leg_core` movement, not a fourth slot** (`4bf31385`). The add-on halved the
+  slot's reps to pay for itself. Deleted; a stored `abs` on an old goal is dropped on read.
+- **An untested pull-up max takes the conservative dose** (`d0b53e02`). It took the full 100/week —
+  the maximal prescription, on no evidence. ⚠️ And the `Number(null) === 0` trap was live in two
+  more places, reading "no answer" as "tested zero".
+- **`withTerrain` no longer stamps the §1i list** (`011e8fdf`). It was writing `hill_3min` onto every
+  hard run, which silently removed the *"no hill? a treadmill at 5-8%"* line for everyone.
+- **`activeHardSlot` is deleted** (`bafb67bb`). A hidden cursor: one visible control edited a
+  different hard day depending on a chip tapped two screens earlier. Every hard session is now a
+  self-contained card writing its own index, on both the intensity and schedule steps.
+- **`scripts/plan-test-output/` deleted** — 973 files, 232,962 lines. A resume cache for
+  `plan-generation-matrix.mjs`, committed. Gitignored now.
+
+### ⚠️ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
+
+⛔ **NOTHING FROM THIS SESSION HAS BEEN SEEN ON A DEVICE.** Not one screen. The suites are green and
+that is not the same claim — twice this session a defect reached the device that the suites could not
+see (a half-allocated pair that lit both allocation buttons, and a white screen from an IIFE reading
+a const declared 500 lines below it). **Settled by:** building a Strong Focus block and opening it.
+
+- **`scripts/check-tdz.mjs` exists now** and catches the white-screen class. `tsc` cannot: it allows
+  use-before-declaration inside a function body, and an IIFE is called immediately.
+- **The "renders, but wrong" class has no checker at all.** A smoke test that mounts
+  `NonRaceBuilder` with a null arc would have caught the white screen in seconds. Not built; worth
+  proposing before the next big UI change.
+- **One run + one hard run builds 3.5 mi against a 12-mile ask.** The hard session is a fixed cost
+  and there is no easy volume left to absorb the rest. Structurally correct, unsaid on screen.
+  Hypothesis, not a finding: athletes at low mileage with a hard day are being under-prescribed and
+  nothing tells them.
+- **Three PRE-EXISTING test failures** in `club-anchor.test.ts` and `non-race-goal-seeds.test.ts`.
+  6 failing assertions before this session and 6 after — unrelated, untouched, unlooked-at.
+
+### ⚠️ TWO VOICE OVERRIDES ON THE RECORD
+
+`voiceViolation()` flags `focus` and the metric name `VO2 max`, and both ship: "Speed focus" /
+"VO2 max focus" are Michael's own approved labels and this screen's domain vocabulary. The pull-up
+prompt *"Do one set to failure and enter your number."* is an IMPERATIVE and also ships — it asks for
+a measurement the engine cannot take itself, the way a form asks for a field. All three are recorded
+beside the strings. ⛔ Do not "fix" them to satisfy the lint.
 
 ## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 

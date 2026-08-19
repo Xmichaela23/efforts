@@ -703,6 +703,15 @@ one place a future session would edit to put a pull back on the leg days. It car
 
 ## Q-270 — The endurance-frequency default chain is FOUR layers deep and it is intentional (2026-08-10, **INTENTIONAL — DO NOT "FIX"**)
 
+> ⚠️ **UPDATED 2026-08-19 ([D-430]) — THE RANGES IN THIS ENTRY MOVED, THE FOUR LAYERS DID NOT.**
+> Opening the picker to ONE session a week exposed that layer 1 is the only one of the four that
+> VALIDATES rather than merely falls back, so it was the only one that could reject a legal answer:
+> `run_days >= 2` turned a 1 into a 2 and logged a warning blaming the intake for carrying it
+> correctly. It is `>= 1` now, and `ride_days <= 3` became `<= 4` for the same reason. The
+> composer's `DEFAULT_ENDURANCE_SESSIONS` FLOOR also moved to 1. **The entry's point stands: four
+> layers, deliberately, and the warn still earns its keep on a genuinely absent value.**
+
+
 ⛔ **This entry exists because the outermost layer looks exactly like a bug, and one session already
 came within a commit of removing it.** Read this before touching any of the four.
 
@@ -766,3 +775,47 @@ user has and adjust accordingly," and the NAME should carry what it resolved to 
 Extension (dumbbell)") wherever a movement spans implements. Scope when picked up: display-side
 naming at plan/logger surfaces, driven by the same `strength-gear.ts` route that won the pick — no
 pool or gating changes.
+
+
+---
+
+## Q-272 — The `resolve.ts` score weights have never been swept (2026-08-19) — **LEAD**
+
+The six Layer-2 terms at `resolve.ts:130` carry hand-picked multipliers — `* 20` on
+`sameSportDoubles`, `* 25` on `longDoubles`, `* 2` on `clustering`, `* 5` on `longOnWeekend`, `* 3` on
+`interleaving`. They were chosen to DOMINATE, not measured, and nobody has ever varied one and
+looked at the output.
+
+`scripts/dump-plans.ts` builds 61 athlete shapes in about a second and already exists. A sweep would
+say which terms are load-bearing and which are decoration. ⛔ **This is a Layer 2 question only** —
+the weights can only choose between weeks that are already legal, so a sweep cannot produce an
+illegal week and is safe to run. Named for the scheduling-optimisation session.
+
+---
+
+## Q-273 — "Renders, but wrong" has no checker, and it reached the device twice in one session (2026-08-19) — **LEAD**
+
+Two defects reached Michael's device on 2026-08-18/19 that a green suite could not see: a
+half-allocated pair that lit BOTH allocation buttons and built two intensity sessions, and a white
+screen from an IIFE reading a const declared 500 lines below it.
+
+`scripts/check-tdz.mjs` now catches the second class — `tsc` cannot, because it permits
+use-before-declaration inside a function body and an IIFE is called immediately. **The first class
+has nothing.** A smoke test that mounts `NonRaceBuilder` with a null arc and asserts it renders would
+have caught the white screen in seconds and is the cheapest next step; component-level assertions
+about what renders would catch the rest. No test infrastructure for React components exists in this
+repo today, which is why this is a lead rather than a task.
+
+---
+
+## Q-274 — A one-session week with a hard day under-delivers the typed mileage, silently (2026-08-19) — **LEAD**
+
+One run a week plus a hard run builds ~3.5 mi against a 12-mile ask: the hard session is a fixed cost
+(Hickson — intensity is the protected variable) and there is no easy volume left to absorb the
+remainder. The same shape appears at 2 runs with 2 hard days: ~8 mi against 12.
+
+⚠️ **This is arguably correct behaviour and is filed as a COPY gap rather than an engine one.** The
+week is what the athlete asked for in SESSIONS; it is not what they asked for in MILES, and no
+surface says so. `run-mileage.test.ts` asserts the week never EXCEEDS the ask and says nothing about
+falling short. Noticed while opening the count to 1; not chased.
+

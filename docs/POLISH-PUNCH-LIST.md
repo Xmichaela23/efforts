@@ -8,6 +8,43 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE STRONG FOCUS INTAKE (2026-08-19, PUSHED `9d49db9a`; four edge functions DEPLOYED `12:23`; **ZERO of it device-verified**)
+
+**61 commits over 2026-08-18/19 rebuilding the Strong Focus intake.** Suites are green — 556
+strength-system, 53 lib, 61/61 sweep shapes, TDZ clean, tsc 313 — and that is not the same claim.
+**Two defects reached the device this session that the suites could not see**, so this list is what
+a human still has to look at.
+
+### The matrix Michael wrote, still unrun
+1. **Card independence** — two hard days; toggle "club session" on the Run card; the Ride card must
+   be entirely unaffected.
+2. **Allocation swap** — tap "Set as top-end" on the Ride; the labels swap and the sport, day and
+   club status stay anchored to their own cards.
+3. **Schedule step** — two hard days must show TWO labelled day rows. Assign Run→Tue, Ride→Fri;
+   tapping Friday must not overwrite Tuesday.
+4. **Copy and tooltip** — option bodies read as one operational line; the (i) renders the
+   eccentric-impact and 48-hour sections without blowing out the modal width.
+
+### Added after that matrix was written
+5. **Zero hard days** — the Schedule step should read *"No high intensity sessions in this block.
+   Nothing to place."*, not an empty grid. New path, untested.
+6. **Two of one sport** — two rides: both cards read "Ride", the first holds the top end, and the
+   swap action appears only on the second.
+7. **One session a week** — the new `1` on both pickers. A 1-run week builds ONE run; the helper line
+   reads *"One run carries it all (~12 mi)."*
+8. **The split lines** — set a long run day, then walk back: the line must recompute, never stale.
+9. **Pull-up prompt** — turn the progression on with no max on file: *"Do one set to failure and
+   enter your number."* It must vanish permanently once any number is entered, including 0.
+10. **The DEFAULT tag** — two hard days, nothing allocated: the sustained card shows `DEFAULT`. Tap
+    "Set as top-end" and it disappears.
+11. **The 20-mile / one-hard-day bench session** — accessory rows at **30 total**, not 25. Fixture-
+    verified, device-unverified. This is the [D-428] tier fix landing.
+
+⚠️ **Known and unsaid on screen:** one run + one hard run builds ~3.5 mi against a 12-mile ask
+([Q-274]).
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE READOUT LANGUAGE (2026-08-15, PUSHED `905dd75f`→`30d04687`; `get-week` DEPLOYED; client on Netlify; **not device-verified**)
 
 One day's UI campaign, driven live by Michael, all browser-verified only. What to eyeball on the phone:

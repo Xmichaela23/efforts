@@ -1242,6 +1242,12 @@ zero net new lint errors. **No device verification** — the ghost render has no
 
 ---
 
+> ⚠️ **STILL CURRENT, WITH ONE INPUT MOVED UNDER IT (2026-08-19, [D-428]).** The recovery scaling
+> here is unchanged. What changed is the BAND it scales: `resolveEnduranceTier` now falls through to
+> `base` rather than `survival`, so an athlete on light hours with one hard day starts from 30-40
+> instead of 25-30 before this deload factor applies. No edit needed here — recorded so the numbers
+> in the examples below are read as of their date.
+
 ### D-407 — The deload week eases the ENDURANCE too (2026-08-09, **SHIPPED — `09796193`**)
 
 > ⚠️ **HEADER CORRECTED 2026-08-10**, verified against `git log`. ⛔ And its narration carried a missing space — *"…aerobic base.Deload week —"* — on every deload week until 2026-08-10; see the join fix in `enduranceSession` and `session-description-join.test.ts`.
@@ -2128,6 +2134,14 @@ file. No athlete-facing weight changes in this entry — it adds a field and per
 
 ---
 
+> ⛔ **PARTLY SUPERSEDED 2026-08-19 BY [D-431] — the ADD-ABS slot this model carried is DELETED.**
+> Abs were never a fourth category: Hanging Leg Raise, Ab Wheel, Weighted Sit-Up and DB Side Bend are
+> all `category: 'single_leg_core'`, so the add-on was a SECOND control for a choice the slot already
+> offered — and the only one of the two that halved the reps to pay for itself. `splitRepsForAbs` and
+> the `isAbsAddOn` row flag are gone with it. **The twelve-picks model itself is INTACT and is still
+> the law:** three slots per day, the athlete's pick is what appears, the pull-up progression is the
+> one place that bends. Everything below is history on the abs half only.
+
 ### D-423 — Assistance is TWELVE picks the athlete makes, not three the engine re-roles (2026-08-13, **BUILT — fixtures green (3491 pass / 6 pre-existing unrelated failures); DEPLOYED 2026-08-13 + VERIFIED in a generated Strong Focus plan**) — **supersedes [D-385], [D-404], [D-405]**; [D-406] and [D-322] intact
 
 **The decision.** Wendler 5/3/1 *Forever* p.24: four lifting days, each carrying **push · pull · single-leg/core**, one movement per category. The athlete picks all twelve. The engine re-roles nothing, substitutes nothing, and prints no note explaining why they got something other than what they chose.
@@ -2233,3 +2247,125 @@ Forever's assistance chapter has **no true glute movement** — its glute/poster
 **Close-Grip Bench** added to the triceps pool (no exception — it is Wendler's own Simplest-Strength big assistance lift) and **leads** the meaty/loadable order; the band-only pushdown sorts last (`equipmentFitRank`, D-425's loadable-first rule).
 
 **The pull-up-progression × Arms interaction is NAMED, not fixed.** When `performance_focus==='pullups'` AND the focus picks include `arms`, the progression pins the pull slot to chins, so the biceps half of Arms is subsumed. The composer surfaces ONE line saying so — 100 weighted chins/week is heavy biceps volume, and stacking curls on top would fight the by-feel low-volume design. A NOTE, not a movement change (`strength-primary-plan.ts`, commit `9a0895e2`). **This line deployed after the verified plan was generated — not yet eyeballed.**
+
+
+---
+
+## D-428 — `resolveEnduranceTier`: `base` is the fall-through, `survival` is only ever earned (2026-08-19, Michael)
+
+**The model was non-monotonic and the copy could not have been written honestly against it.**
+`base` required `1 hard day AND 4-8 hours`, and everything failing every AND-gate dropped to
+`survival` — described in the code as *"the safe direction"*. The grid says otherwise:
+
+    1 hard day + 3 hrs   ->  survival (25-30)
+    1 hard day + 5 hrs   ->  base     (30-40)
+    0 hard days + 5 hrs  ->  survival (25-30)   -- the same band as TWO hard days
+
+**More competing stress bought MORE accessory volume**, on a model whose entire claim is the
+opposite. The fix is the ORDER, not new numbers: both explicit triggers and both boundaries are
+unchanged; `survival` is now only ever assigned by its own trigger and `base` catches the remainder,
+which IS the middle case — some competing stress, not a lot.
+
+⚠️ **The unknown case moved deliberately.** No hours figure used to resolve to `survival` and now
+resolves to `base`. `strength` still refuses it — the full band is a claim the week carries almost no
+competing stress — but `survival` is equally a positive claim that it is heavily loaded, and nobody
+has said so. An unmeasured athlete gets 10 more reps than before.
+
+⛔ **Pinned as a PROPERTY, not a table.** `endurance-tier.test.ts` asserts monotonicity across 14
+hour-values × 5 day-values on both axes. A six-row grid can be satisfied by a lookup that is wrong
+between the rows; that cannot. `580bfed1`.
+
+---
+
+## D-429 — The intensity/threshold allocation is a training rule, never list order (2026-08-19, Michael)
+
+**Which sport held the block's top-end session was decided by which chip the athlete tapped first,**
+and no surface said so — two athletes making identical picks got different twelve-week blocks.
+Michael: *"principled; never rely on list order. An array sort change in the future shouldn't
+biologically alter an athlete's week."*
+
+**The rule: with a run and a ride, the RUN holds the top-end session.** The mechanism is the
+SUSTAINED session, not the intensity one — threshold is the long one (4 × 5 building to 2 × 10),
+which on a run is twenty-plus minutes of level footfall and on a bike is zero.
+
+⛔ **AND THE JUSTIFICATION IS TISSUE DAMAGE, NOT ADAPTATION INTERFERENCE.** `DOCTRINE-aerobic-
+maintenance.md` §5 retired *"bike does not attenuate strength; run does"* on 2026-07-26 — three
+metas, three answers; Schumann 2022 (largest) found no modality moderation and Sabag 2018 found the
+REVERSE. Card copy briefly said *"to protect your barbell progression"*, which was that retired claim
+in new words **and** contradicted our own tooltip four taps away. Corrected the same day.
+
+⚠️ **A bare `intensity` mark yields to the rule; an explicit `threshold` mark and a full allocation
+do not.** The one-slot card asks *"what is this session"* and recommends Top-end intensity, so a mark
+on the first sport added is not an allocation between two sports — measured on device as "Run —
+sustained threshold" above "Ride — top-end intensity". `011e8fdf`, `fbf40348`.
+
+---
+
+## D-430 — One endurance session a week is a legal answer, and the long day is a session not an extra (2026-08-19, Michael)
+
+**1 was unreachable in four places at once:** the picker offered 2/3/4, `assemblePayload` sent
+`run_days` only at `>= 2`, the Continue gate demanded 2, and the composer floored at
+`Math.max(DEFAULT_ENDURANCE_SESSIONS, …)`.
+
+⛔ **Fixing the floor exposed an overage already live at two sessions.** `runFreq` read
+`Math.max(1, asked - hardRunCount)` so that *"a 2-run week with two hard runs still leaves a run to
+be long"* — which is the +1 the line above it exists to prevent. **Two asked, two hard, three built.**
+There is a long day only when a session is left over once the hard days are seated. Same one
+discipline over for the long ride, plus a ride ceiling that was `3` in TWO places.
+
+⚠️ **Known and unsaid:** one run + one hard run builds ~3.5 mi against a 12-mile ask. The hard
+session is a fixed cost and no easy volume remains to absorb the rest. Structurally correct; nothing
+on screen says it. `9d49db9a`, `one-session-week.test.ts`.
+
+---
+
+## D-431 — Abs are a `single_leg_core` movement; the add-abs slot is deleted (2026-08-19, Michael)
+
+**It was a SECOND control for a choice the slot already offered, and the only one of the two that
+charged half the reps.** Hanging Leg Raise, Ab Wheel, Weighted Sit-Up and DB Side Bend are all
+`category: 'single_leg_core'`, and `BALANCED_WEEK.bench` already defaults to Hanging Leg Raise. The
+add-on paid for its extra movement out of the same budget (`splitRepsForAbs`: 30 -> 15/15), so an
+athlete who wanted abs traded away half their leg work to ask a question they could have asked free.
+
+⚠️ **A stored `abs` on an old goal is DROPPED on read, not honoured** — the same "nothing strands"
+rule the file applies to an unrecognised focus chip. Honouring it would mean two athletes on
+identical visible settings getting different rep totals from a control one of them cannot see.
+`4bf31385`.
+
+---
+
+## D-432 — An untested pull-up max takes the conservative dose (2026-08-19, Michael)
+
+`weeklyVolumeFor(null)` returned the full **100 chins a week**, citing §0h — *"unknown degrades to
+UNCHANGED, never to a guess at a smaller one."* That is right on a field whose shipped behaviour is
+the SAFE one and backwards here: **100/week IS the maximal prescription.** §0h's actual rule is that
+an unknown must not buy the ceiling.
+
+⚠️ **`untested` and `on_ramp` dose identically and are kept apart.** `on_ramp` says *"no clean rep on
+file"* — a claim about the athlete, and an untested one may have fifteen.
+
+⛔ **AND THE `Number(null) === 0` TRAP WAS LIVE IN TWO MORE PLACES** — the component memo and the
+library's cap parse both read a stored null or blank as a TESTED ZERO, which would have defeated all
+of the above and hidden the test prompt. **Third field in this codebase bitten by that trap.**
+`d0b53e02`.
+
+---
+
+## D-433 — Hidden state cursors are an architecture defect, not a convenience (2026-08-19, Michael)
+
+`activeHardSlot` held *"which hard session are the shared controls editing"* and **nothing on screen
+said which.** A chip row set it; the club checkbox, the session sub-question and the Schedule step's
+day picker all read it — so one visible control edited two different pieces of data depending on an
+invisible background toggle, and an athlete with two hard sessions picked BOTH days through ONE row.
+Michael: *"that is exactly how users accidentally delete their own inputs without realising it."*
+
+**The replacement is containment, not compression:** every hard session renders its own card and its
+own labelled day row, each writing its own loop index. There is no shared cursor, so there is nothing
+to desync.
+
+⚠️ **It was hiding a second bug.** `weekDayRoles` took ONE `hardDay`, so the week preview lettered
+whichever session the cursor pointed at and left the other blank. It takes `extraHardDays` now.
+
+⛔ **The generalisable rule:** if a control's target is not visible on screen, the athlete cannot tell
+a deliberate edit from an accidental one. `bafb67bb`.
+

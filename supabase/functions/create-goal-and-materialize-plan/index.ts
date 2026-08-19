@@ -2521,7 +2521,14 @@ Deno.serve(async (req: Request) => {
               ? Number(gsTp.target_weekly_ride_hours) : undefined;
             const gsLongRide = (gsTp.preferred_days as Record<string, string> | undefined)?.long_ride;
             // How many days the ride hours spread across. Absent → the composer's own default.
-            const gsRideDays = Number(gsTp.ride_days) >= 1 && Number(gsTp.ride_days) <= 3
+            /**
+             * ⛔ THE CEILING IS 4 NOW ([D-430], 2026-08-19). This validated `<= 3` — the range the
+             * picker offered then — so an athlete answering FOUR rides had the value dropped to
+             * `undefined` here and fell back to the composer's default of 2. Their answer did not
+             * survive the wire. ⚠️ The composer's own cap was `Math.min(3, …)` in TWO places and
+             * both moved in the same change; this was the third.
+             */
+            const gsRideDays = Number(gsTp.ride_days) >= 1 && Number(gsTp.ride_days) <= 4
               ? Number(gsTp.ride_days) : undefined;
             // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
             // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent
@@ -2670,7 +2677,21 @@ Deno.serve(async (req: Request) => {
              * NEW build this branch should be unreachable unless running is out entirely. This warn
              * is how we find out whether that is true, rather than assuming it.
              */
-            const gsRunDaysGiven = Number(gsTp.run_days) >= 2 && Number(gsTp.run_days) <= 4;
+            /**
+             * ⛔ THE FLOOR IS 1, NOT 2, AS OF 2026-08-19 ([D-430]). This read `>= 2` — the range the
+             * picker offered at the time — so an athlete answering ONE run a week failed the test,
+             * was DEFAULTED to two, and had their answer overwritten with a console warning blaming
+             * a "leaking intake gate" for carrying it correctly.
+             *
+             * ⚠️ THIS IS LAYER 1 OF Q-270's FOUR-LAYER DEFAULT CHAIN, and it is the only one that
+             * VALIDATES rather than merely falls back — so it is the only one that could reject a
+             * legal answer. The other three supply 2 for a missing value and pass a present one
+             * through; the composer's own floor moved to 1 in the same change.
+             *
+             * ⛔ THE WARN BELOW IS UNCHANGED AND STILL EARNS ITS KEEP: it fires on a genuinely
+             * absent or out-of-range value, which is what it was written to detect.
+             */
+            const gsRunDaysGiven = Number(gsTp.run_days) >= 1 && Number(gsTp.run_days) <= 4;
             if (!gsRunDaysGiven && gsSport === 'run') {
               console.warn(
                 `[create-goal] endurance_frequency DEFAULTED to 2 — run_days was ${JSON.stringify(gsTp.run_days)} `

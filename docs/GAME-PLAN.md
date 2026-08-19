@@ -4,12 +4,33 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> ## ⛔ 2026-08-19 — THE NEXT PHASE IS THE DEFAULT SCHEDULING ENGINE
+>
+> Michael: *"we need to optimize the default scheduling engine and I'd like fresh eyes on this whole
+> thing."* **Everything below this line is earlier phases and is history unless the banner in
+> `ENGINE-STATE.md` says otherwise — read that banner first; it names the four files and the six
+> score terms and is written for someone who has never seen this code.**
+>
+> The job is **Layer 2 only**: the weights at `resolve.ts:130` decide which of the LEGAL weeks the
+> athlete opens on, and they are hand-picked and never swept ([Q-272]). `scripts/dump-plans.ts`
+> builds 61 athlete shapes in about a second and is the instrument.
+>
+> ⛔ **The Strong Focus intake is finished and deployed but ZERO of it is device-verified** — 61
+> commits on 2026-08-18/19, four edge functions live at `9d49db9a`. Two defects reached the device
+> this session that green suites could not see ([Q-273]). An acceptance pass on that intake is owed
+> before, or alongside, the scheduler work.
+
 > ⛔ **2026-08-13 — THE ASSISTANCE MODEL BELOW IS SUPERSEDED.** [D-423]–[D-427] replaced the
 > standard-template assistance (arms on press days, legs+abs on leg days) with Wendler **Forever**
 > per-day picks: push/pull/single-leg-core every day, athlete picks per day, equipment-gated, chins
 > every day when the pull-up progression is on. A new plan will NOT match the checklist below on
 > those points. Also 2026-08-13: the plan wasteland was demolished and the planner-landing bug
-> root-caused + fixed [D-429], `AUDIT-plan-navigation-2026-08-13.md`. Everything below is history.
+> root-caused + fixed (see `AUDIT-plan-navigation-2026-08-13.md`). Everything below is history.
+>
+> ⚠️ **THE `[D-429]` CITATION THAT STOOD HERE WAS DANGLING AND IS REMOVED (2026-08-19).** The log
+> ended at D-427 on that date, so it pointed at nothing — and D-429 has since been issued for the
+> intensity/threshold allocation rule, which would have made a stale reference silently resolve to
+> an unrelated decision. The audit doc is the real source for the navigation fix.
 
 > **2026-08-09 — THE STRONG FOCUS WORK ORDER IS DONE, AND IT IS WAITING ON ONE DEVICE PASS.**
 > Six fixes, D-404 → D-408 + Q-269. The block now runs Wendler's **standard** assistance templates
