@@ -512,7 +512,71 @@ export function topSetIndex(sets: ReadonlyArray<{ weight?: number | null }>): nu
  * "top-end aerobic fitness" rather than the metric name, which rule 9 bans the same way it bans
  * "aerobic base" and "Z2". The paper names are citations, not jargon, and they stay.
  */
+/**
+ * ⛔ WHAT THE CHOICE COSTS THE LIFTING — Michael's copy, 2026-08-18, CORRECTED AGAINST THE CODE
+ * BEFORE IT SHIPPED. Read the correction; it is the whole reason this is worth trusting.
+ *
+ * His first draft attributed the assistance band to the hard-day COUNT alone. `resolveEnduranceTier`
+ * reads hard days AND hours, and hours can override — so "0 hard days → 40-50 reps" would have been
+ * promised to an athlete riding ten easy hours, who actually receives 25-30. The tiers, verbatim
+ * from `assistance-menu.ts`:
+ *
+ *   | survival | 25-30 | >= 2 hard days **OR** > 8 total hours |
+ *   | base     | 30-40 | == 1 hard day  **AND** 4-8 total hours |
+ *   | strength | 40-50 | 0 hard days    **AND** < 4 total hours |
+ *
+ * ⛔ AND WHAT WAS CUT FROM THE DRAFT ENTIRELY, because it is not built: a second chooser copy
+ * described training-max HOLD gates, AMRAP capping and a maintenance mode at 8/14/18 weekly hours.
+ * None of that exists. `totalEnduranceHours` has exactly ONE consumer in the whole engine —
+ * `resolveEnduranceTier` — and the training max advances off cycle index and the earned-advance
+ * verdicts, never off endurance volume. Michael: *"ship what's true today; B is a real engine
+ * decision that deserves its own pass, not a copy deadline."*
+ *
+ * ⚠️ SO THE CLAIMS HERE ARE LOAD-BEARING AND CHECKABLE. 85% is `WORKING_NUMBER_PCT_OF_1RM`; +5/+10
+ * is `cycleIncrementLb(isLowerBody)`; the three bands are `ASSISTANCE_BAND_BY_HARD_DAYS`. ⛔ If any
+ * of those move, this copy moves with them or the chooser starts selling a block the plan does not
+ * build.
+ */
 export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
+  {
+    heading: 'What it changes',
+    body:
+      'Assistance reps only. Main lifts always run at 85% training max, advancing +5 lb upper / '
+      + '+10 lb lower per cycle. Cardio never touches the bar.',
+  },
+  {
+    heading: '0 hard days',
+    // ⚠️ THE HOURS CLAUSE IS THE CORRECTION, NOT A CAVEAT. Without it this line is false for any
+    // athlete over 4 hours a week, which is most of them.
+    body:
+      'Full assistance volume: 40-50 reps per exercise — if you are also under 4 total hours. Ride '
+      + '10 easy hours and volume alone drops you to 25-30.',
+  },
+  {
+    heading: '1 hard day',
+    body:
+      '30-40 assistance reps, at 4-8 total hours. Slower accessory growth. Main lift progress '
+      + 'unchanged.',
+  },
+  {
+    heading: '2 or more hard days',
+    body:
+      '25-30 assistance reps, whatever the hours. Accessories run at the minimum effective dose. '
+      + 'Main lift progress unchanged.',
+  },
+  {
+    heading: 'Why the accessories are what move',
+    body:
+      'Each hard cardio day is a nervous-system hit. Assistance reps are the only expendable '
+      + 'volume — they get cut, bar weight never does.',
+  },
+  {
+    heading: 'How the two combine',
+    body:
+      'Hours and hard days combine, and the engine takes the heavier of the two costs. Whichever '
+      + 'tier you land in, only assistance reps change: your 85% working numbers and +5/+10 '
+      + 'progression run untouched.',
+  },
   {
     heading: 'What it holds',
     body:
@@ -620,6 +684,45 @@ export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
       + 'easy cycling 27.5% — almost the same number. Every endurance session was matched for equal '
       + 'work and equal duration, so pace was not what separated them. '
       + '(Fyfe et al. 2016, Frontiers in Physiology 7:487.)',
+  },
+  /**
+   * ⛔ THE COST TIERS SIT SECOND, AND THAT IS A DELIBERATE YIELD TO AN OLDER RULING. They were
+   * drafted at index 0 — what an athlete typing a number wants first is what the number DOES — and
+   * `strength-focus-copy.voice.test.ts` refused it: the 2026-08-10 decision requires the Fyfe claim
+   * to OPEN this list, because *"if a future trim drops it entirely, the app has quietly stopped
+   * saying the one counterintuitive thing it knows about this choice."* That reason still holds, and
+   * one short section above these costs a reader nothing.
+   *
+   * ⚠️ SAME CORRECTION AS `HARD_DAY_WHY` — see its header. This chooser touches the assistance band
+   * and NOTHING ELSE: no training-max hold, no AMRAP cap, no maintenance mode. Those were in the
+   * draft and are not in the engine.
+   */
+  {
+    heading: 'What it changes',
+    body:
+      'Assistance reps only. Nothing here touches your training max, your progression, or your '
+      + 'AMRAP sets.',
+  },
+  {
+    heading: 'Under 4 hours a week',
+    body: 'Full assistance volume: 40-50 reps, with 0 hard days. No strength cost.',
+  },
+  {
+    heading: '4 to 8 hours a week',
+    body: '30-40 assistance reps. Slower accessory growth. Main lifts unchanged.',
+  },
+  {
+    heading: 'Over 8 hours a week',
+    body:
+      '25-30 assistance reps, even with zero hard days. Accessories at the minimum dose. Main '
+      + 'lifts unchanged.',
+  },
+  {
+    heading: 'How the two combine',
+    body:
+      'Hours and hard days combine, and the engine takes the heavier of the two costs. Whichever '
+      + 'tier you land in, only assistance reps change: your 85% working numbers and +5/+10 '
+      + 'progression run untouched.',
   },
   {
     heading: 'What it does not say',

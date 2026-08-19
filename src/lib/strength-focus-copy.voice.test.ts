@@ -112,3 +112,56 @@ Deno.test('VOLUME_WHY carries the numbers, the paper, and both hedges', () => {
     'volume-as-mediator is the authors\' suggestion, never stated flatly',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE COPY MUST TRACK THE ENGINE
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⛔ THE CHOOSER COPY MAKES NUMERIC PROMISES, AND NOTHING WAS CHECKING THEM (added 2026-08-18).
+ *
+ * Both disclosures now quote engine constants back at the athlete: 85% training max, +5 upper /
+ * +10 lower per cycle, and the three assistance bands. A copy table and an engine table saying
+ * different numbers is the "score that lies" failure this repo keeps finding — the athlete reads a
+ * promise on the chooser and the plan hands them something else, with nothing in between to notice.
+ *
+ * ⚠️ THIS IS DELIBERATELY A STRING CHECK, NOT A RE-DERIVATION. It asserts the copy CONTAINS what
+ * the constants say. If someone changes `WORKING_NUMBER_PCT_OF_1RM` to 0.90 or flips the increments,
+ * this fails and the copy has to be rewritten with it — which is the whole point.
+ */
+Deno.test('⛔ the chooser copy quotes the engine\'s real numbers, not remembered ones', async () => {
+  const { WORKING_NUMBER_PCT_OF_1RM, cycleIncrementLb } = await import(
+    '../../supabase/functions/shared/strength-system/loading/wendler-531.ts'
+  );
+  const { ASSISTANCE_BAND_BY_HARD_DAYS } = await import('./assistance-menu.ts');
+
+  const hard = HARD_DAY_WHY.map((s) => s.body).join(' ');
+  const vol = VOLUME_WHY.map((s) => s.body).join(' ');
+
+  // 85% training max — stated on the hard-day chooser as the thing cardio never moves.
+  const pct = `${Math.round(WORKING_NUMBER_PCT_OF_1RM * 100)}%`;
+  assertEquals(hard.includes(pct), true, `the copy says 85% but the engine works at ${pct}`);
+
+  // +5 upper / +10 lower per cycle.
+  assertEquals(hard.includes(`+${cycleIncrementLb(false)} lb upper`), true, 'the upper increment drifted');
+  assertEquals(hard.includes(`+${cycleIncrementLb(true)} lb lower`), true, 'the lower increment drifted');
+
+  // The three assistance bands, on BOTH choosers — hours and hard days land in the same tiers.
+  for (const [days, [lo, hi]] of Object.entries(ASSISTANCE_BAND_BY_HARD_DAYS)) {
+    for (const [label, text] of [['hard day', hard], ['hours', vol]] as const) {
+      assertEquals(text.includes(`${lo}-${hi}`), true,
+        `the ${label} chooser never states the ${days}-hard-day band (${lo}-${hi})`);
+    }
+  }
+
+  /**
+   * ⛔ AND NEITHER CHOOSER MAY CLAIM A CONSEQUENCE THE ENGINE DOES NOT HAVE. `totalEnduranceHours`
+   * has exactly ONE consumer — `resolveEnduranceTier` — so endurance volume moves the assistance
+   * band and nothing else. A draft of this copy described training-max holds, AMRAP capping and a
+   * maintenance mode at 8/14/18 weekly hours; none of it is built, and it was cut before shipping.
+   * ⚠️ If those gates ARE built later, this assertion is what has to be deleted deliberately rather
+   * than the copy quietly regrowing them.
+   */
+  assertEquals(/training max (holds|stops|freezes)|no AMRAP|AMRAP capped|maintenance only/i.test(vol), false,
+    'the hours chooser is promising a training-max or AMRAP consequence the engine does not have');
+});
