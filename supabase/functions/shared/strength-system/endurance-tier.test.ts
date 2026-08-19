@@ -39,24 +39,94 @@ Deno.test('⛔ SURVIVAL FIRES ON *OR* — either condition alone is enough', () 
   assertEquals(tier(1, 12), 'survival');
 });
 
-Deno.test('⛔ BASE AND STRENGTH REQUIRE *AND* — every condition must hold', () => {
-  assertEquals(tier(1, 6), 'base');
-  assertEquals(tier(1, 4), 'base', 'the boundary is inclusive');
-  assertEquals(tier(1, 8), 'base', 'the boundary is inclusive');
-  assertEquals(tier(0, 3), 'strength');
-  assertEquals(tier(0, 0), 'strength');
-  // One hard day at two hours satisfies neither AND-gate.
-  assertEquals(tier(1, 2), 'survival');
-  // Zero hard days at six hours satisfies neither either.
-  assertEquals(tier(0, 6), 'survival');
+/**
+ * ⛔⛔ THE SIX-ROW GRID. `base` IS THE FALL-THROUGH AS OF 2026-08-18 — this is the whole change.
+ *
+ * What it replaced was **backwards**: `base` required `1 hard day AND 4-8 hours`, and anything
+ * failing every AND-gate dropped to `survival`. So `1 hard day + 3 hrs` returned 25-30 while the
+ * SAME athlete at 5 hrs returned 30-40 — more endurance buying more assistance, on a model whose
+ * entire claim is the opposite.
+ *
+ * ⚠️ THE TRIGGERS AND THEIR BOUNDARIES ARE UNCHANGED. Only which tier catches the remainder moved.
+ */
+Deno.test('⛔ THE GRID — all six rows, exactly', () => {
+  assertEquals(tier(0, 3), 'strength', '0 hard days, under 4 hrs');
+  assertEquals(tier(0, 6), 'base', '0 hard days, 4-8 hrs');
+  assertEquals(tier(0, 10), 'survival', '0 hard days, over 8 hrs');
+  assertEquals(tier(1, 6), 'base', '1 hard day, 8 hrs or under');
+  assertEquals(tier(1, 12), 'survival', '1 hard day, over 8 hrs');
+  assertEquals(tier(2, 1), 'survival', '2+ hard days, any hours');
+  assertEquals(tier(4, 20), 'survival');
 });
 
-Deno.test('⛔ UNKNOWN FALLS TO SURVIVAL, NEVER TO THE CEILING', () => {
-  // §0h: absent means "we have not asked", never "they do nothing". Under-prescribing accessories
-  // costs some hypertrophy; over-prescribing them costs the athlete their running economy.
-  assertEquals(tier(0, null), 'survival', 'no hours figure bought the ceiling');
-  assertEquals(tier(null, 2), 'survival');
-  assertEquals(tier(null, null), 'survival');
+Deno.test('⛔ THE BUG CASE, KEPT — one hard day on LIGHT hours is not a survival week', () => {
+  // The exact inversion, pinned as a pair so the regression is visible as a pair.
+  assertEquals(tier(1, 3), 'base', 'one hard day at 3 hrs used to return survival');
+  assertEquals(tier(1, 5), 'base');
+  // And its twin at zero hard days: five easy hours used to land on the same band as two hard days.
+  assertEquals(tier(0, 5), 'base', 'five easy hours used to return survival');
+  assertEquals(tier(2, 5), 'survival', 'two hard days still does');
+});
+
+Deno.test('⚠️ THE BOUNDARIES ARE `> 8` AND `< 4` — 4 and 8 are BOTH base', () => {
+  // ⛔ THIS IS THE CONVENTION THE CHOOSER COPY STATES ("4 to 8 hours a week -> 30-40"), and the two
+  // must not drift apart. `strength-focus-copy.voice.test.ts` pins the copy; this pins the code.
+  assertEquals(tier(0, 3.99), 'strength');
+  assertEquals(tier(0, 4), 'base', 'exactly 4 is base, not strength');
+  assertEquals(tier(0, 8), 'base', 'exactly 8 is base, not survival');
+  assertEquals(tier(0, 8.01), 'survival');
+  assertEquals(tier(1, 8), 'base');
+  assertEquals(tier(1, 8.01), 'survival');
+});
+
+/**
+ * ⛔ MONOTONICITY, AS A PROPERTY RATHER THAN A ROW. The six-row grid above can be satisfied by a
+ * table lookup that is wrong everywhere between the rows; this cannot. More competing stress must
+ * never buy more accessory volume, on either axis, anywhere in the domain.
+ *
+ * ⚠️ IT COMPARES BAND FLOORS. The three bands are strictly ordered (25 < 30 < 40) so the floor is a
+ * faithful stand-in for "how much volume this tier grants", and it does not assume which tier is
+ * which — a future fourth tier slots in without editing this test.
+ */
+Deno.test('⛔ MONOTONIC ON BOTH AXES — more load never buys more assistance', () => {
+  const floorAt = (hard: number, hours: number) => TIER_BAND[tier(hard, hours)][0];
+  const HOURS = [0, 1, 2, 3, 3.99, 4, 5, 6, 7, 8, 8.01, 9, 12, 20];
+  const DAYS = [0, 1, 2, 3, 4];
+
+  for (const d of DAYS) {
+    for (let i = 1; i < HOURS.length; i++) {
+      assert(floorAt(d, HOURS[i]) <= floorAt(d, HOURS[i - 1]),
+        `${d} hard days: ${HOURS[i]} hrs grants MORE than ${HOURS[i - 1]} hrs`);
+    }
+  }
+  for (const h of HOURS) {
+    for (let i = 1; i < DAYS.length; i++) {
+      assert(floorAt(DAYS[i], h) <= floorAt(DAYS[i - 1], h),
+        `${h} hrs: ${DAYS[i]} hard days grants MORE than ${DAYS[i - 1]}`);
+    }
+  }
+});
+
+/**
+ * ⛔ UNKNOWN NEVER BUYS THE CEILING — AND IT NOW LANDS IN `base`, NOT `survival` (changed
+ * 2026-08-18 with the fall-through). This test used to assert `survival` and the assertion was
+ * correct for the model it described; the model moved, so read what moved before "restoring" it.
+ *
+ * `strength` is a claim that the week carries almost no competing stress. An unknown cannot make
+ * that claim, so the AND-gate still refuses it — that half is untouched and is the part §0h is
+ * actually about. What changed is the floor: `survival` is a claim that the week IS heavily loaded,
+ * and we do not know that either. The middle band is the only honest answer to "we have not asked".
+ *
+ * ⚠️ THE COST IS REAL AND WAS ACCEPTED: an unmeasured athlete gets 30-40 reps where they got 25-30.
+ */
+Deno.test('⚠️ UNKNOWN LANDS IN BASE — never the ceiling, and no longer the floor', () => {
+  assertEquals(tier(0, null), 'base', 'no hours figure must not buy the ceiling');
+  assertEquals(tier(null, 2), 'base');
+  assertEquals(tier(null, null), 'base');
+  // ⛔ AND AN UNKNOWN NEVER OVERRIDES A KNOWN TRIGGER. Two hard days is two hard days whether or not
+  // anyone typed an hours figure.
+  assertEquals(tier(2, null), 'survival');
+  assertEquals(tier(null, 12), 'survival');
 });
 
 // ── IT REACHES THE BUILT PLAN ────────────────────────────────────────────────────────────────────
@@ -150,10 +220,16 @@ Deno.test('⛔ A STRENGTH-ONLY BLOCK IS A MEASURED ZERO, NOT AN UNKNOWN', () => 
 
 Deno.test('but a DECLARED runner with no mileage figure is still unknown', () => {
   // We know they run; we do not know how much. That is the case `null` is reserved for.
+  //
+  // ⚠️ 40, NOT 30, AS OF 2026-08-18 — and the assertion this test exists to make is UNCHANGED. The
+  // ceiling is 50 and an unknown still does not reach it, which is what "bought the ceiling" means
+  // here. What moved is the floor: unknown now resolves to `base` rather than `survival`, because
+  // `survival` is a positive claim that the week IS heavily loaded and nobody has told us that.
+  // See `resolveEnduranceTier`'s header for why the fall-through changed at all.
   const p: any = composeStrengthPrimaryPlan({
     durationWeeks: 12, oneRepMaxes: MAXES, fiveKPaceSecPerMi: 435, ftpWatts: 240,
     enduranceSport: 'run', enduranceFrequency: 3, pullupMaxReps: 25,
   } as never);
   const pull = rowsOf(p, 'Bench Press').find((r: any) => /Row|Chin|Pull/i.test(r.name));
-  assertEquals(String(pull?.reps), '30 total', 'an unknown volume bought the ceiling');
+  assertEquals(String(pull?.reps), '40 total', 'an unknown volume bought the ceiling');
 });

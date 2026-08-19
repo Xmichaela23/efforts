@@ -73,11 +73,22 @@ const RECIPES: Recipe[] = [
       hardDays: [{ discipline: 'run', day: 'tuesday', goal: 'vo2', terrain: 'hill_3min' }],
     },
     menus: ['vo2'],
-    // ⚠️ 25, NOT 30, AND THE TEST WAS WRONG BEFORE THE ENGINE WAS. 20 mi at 9 min/mi is THREE hours,
-    // and the `base` tier needs one hard day AND 4-8 hours. Three fails the AND-gate, so this
-    // athlete falls through to `survival` — which is the asymmetry the spec asks for on purpose:
-    // anything that satisfies neither AND-gate lands in the floor band, the safe direction.
-    accessory: 25,
+    /**
+     * ⛔⛔ 30 AGAIN AS OF 2026-08-18, AND THIS RECIPE IS THE BUG CASE ITSELF. Read the history — the
+     * number has now moved twice and the reasons are opposite.
+     *
+     * 20 mi at 9 min/mi is THREE hours with one hard day. It read 30 originally; it was changed to
+     * 25 on 2026-08-17 with the note *"the test was wrong before the engine was"*, because `base`
+     * required `1 hard day AND 4-8 hours` and three hours failed the AND-gate, dropping through to
+     * `survival`. That was described as "the safe direction".
+     *
+     * ⛔ IT WAS NOT SAFE, IT WAS BACKWARDS, and this recipe is where you can see it: the SAME athlete
+     * riding two hours more — five hours, one hard day — got 30. More endurance bought more
+     * assistance. `base` is the fall-through now and `survival` is only ever assigned by its own
+     * explicit trigger, so a light week with one hard session sits in the middle band where it
+     * always belonged. Nothing about this athlete changed; the model stopped inverting.
+     */
+    accessory: 30,
   },
   {
     name: 'D — the cyclist',

@@ -129,13 +129,43 @@ export const ASSISTANCE_TOTAL_REPS_CEILING = 50;
  * | tier | band | trigger |
  * |---|---|---|
  * | `survival` | 25-30 | `>= 2 hard days` **OR** `> 8 total hours` |
- * | `base`     | 30-40 | `== 1 hard day` **AND** `4-8 total hours` |
  * | `strength` | 40-50 | `0 hard days` **AND** `< 4 total hours` |
+ * | `base`     | 30-40 | **everything else** — this is the fall-through |
  *
- * ⛔ THE TRIGGERS ARE ASYMMETRIC ON PURPOSE. Survival fires on **OR** — either condition alone is
- * enough. The other two require **AND**. Anything falling through both AND-gates lands in
- * `survival`, which is the safe direction: under-prescribing accessories costs some hypertrophy,
- * over-prescribing them costs the athlete their running economy.
+ * ⛔⛔ `base` IS THE FALL-THROUGH AS OF 2026-08-18, AND `survival` IS NOW ONLY EVER REACHED BY ITS
+ * OWN EXPLICIT TRIGGER. READ WHY BEFORE MOVING IT BACK.
+ *
+ * **What stood here, and what it did.** `base` used to require `== 1 hard day` **AND** `4-8 hours`,
+ * with everything failing both AND-gates dropping to `survival` — described in this very comment as
+ * "the safe direction". It was not safe, it was **backwards**, and the grid says so:
+ *
+ *     1 hard day + 3 hrs  ->  survival  (25-30)
+ *     1 hard day + 5 hrs  ->  base      (30-40)
+ *
+ * **More endurance bought MORE assistance.** The same inversion sat at zero hard days: 5 easy hours
+ * failed the `< 4` gate, fell through, and landed on the same 25-30 band as an athlete doing two
+ * hard sessions a week. The model's whole claim is that accessory volume comes DOWN as competing
+ * stress goes UP, and on two stretches of its own domain it did the opposite.
+ *
+ * ⛔ THE FIX IS THE ORDER, NOT NEW NUMBERS. Both explicit triggers are unchanged, including their
+ * boundaries. What changed is which tier catches the remainder: the middle band does, because the
+ * remainder IS the middle case — some competing stress, not a lot. Nothing in this file is
+ * hand-picked that was not hand-picked before.
+ *
+ * ⚠️ THE RESULT IS MONOTONIC AND THE TEST BESIDE THIS FILE PROVES IT AS A PROPERTY, NOT AS A ROW:
+ * for fixed hard days, more hours never raises the band; for fixed hours, more hard days never
+ * raises it. ⛔ Any future edit that breaks that is the same defect returning under a new shape.
+ *
+ * ⚠️ AND IT MOVES THE UNKNOWN CASE, WHICH IS A REAL CONSEQUENCE AND NOT A ROUNDING ERROR. An athlete
+ * with no hours figure used to land in `survival` (25-30); they now land in `base` (30-40), because
+ * unknown fails `strength`'s AND-gate and no longer falls to the bottom. That is the correct
+ * direction for the same reason as the rest of the change — `survival` is a statement that the week
+ * IS heavily loaded, and we do not know that — but it does hand an unmeasured athlete ten more reps
+ * than yesterday. Deliberate.
+ *
+ * ⚠️ BOUNDARY CONVENTION, UNCHANGED AND PINNED BY TEST: `> 8` and `< 4`, so **exactly 4 and exactly
+ * 8 hours are both `base`**. That is what the chooser copy in `strength-focus-copy.ts` states
+ * ("4 to 8 hours a week -> 30-40"), and the two must not drift apart.
  */
 export type EnduranceTier = 'survival' | 'base' | 'strength';
 
@@ -169,12 +199,15 @@ export function resolveEnduranceTier(input: {
   const rawHours = num(input.totalHours);
   const hours = rawHours == null ? null : Math.max(0, rawHours);
 
-  // OR — either alone is enough.
+  // ⛔ SURVIVAL IS ONLY EVER ASSIGNED BY ITS OWN TRIGGER. OR — either condition alone is enough, and
+  // nothing reaches this tier by failing to qualify for another one.
   if ((hard != null && hard >= 2) || (hours != null && hours > 8)) return 'survival';
-  // AND — every condition must hold, and an unknown cannot hold.
-  if (hard === 1 && hours != null && hours >= 4 && hours <= 8) return 'base';
+  // ⛔ STRENGTH IS THE ONLY REMAINING AND-GATE, and an unknown cannot satisfy it: the full band is a
+  // claim that the week carries almost no competing stress, which is not something to assume.
   if (hard === 0 && hours != null && hours < 4) return 'strength';
-  return 'survival';
+  // ⛔ BASE CATCHES THE REST, and the remainder IS the middle case — some competing stress, not a
+  // lot. This is the line that fixed the inversion; see the table above before changing it.
+  return 'base';
 }
 
 /**

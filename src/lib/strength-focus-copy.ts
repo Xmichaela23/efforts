@@ -549,14 +549,18 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
     // ⚠️ THE HOURS CLAUSE IS THE CORRECTION, NOT A CAVEAT. Without it this line is false for any
     // athlete over 4 hours a week, which is most of them.
     body:
-      'Full assistance volume: 40-50 reps per exercise — if you are also under 4 total hours. Ride '
-      + '10 easy hours and volume alone drops you to 25-30.',
+      'Full assistance volume: 40-50 reps per exercise — if you are also under 4 total hours. '
+      + '4 to 8 hours puts you at 30-40; ride 10 easy hours and volume alone drops you to 25-30.',
   },
   {
     heading: '1 hard day',
+    // ⛔ "AT 8 HOURS OR UNDER", NOT "AT 4-8" (2026-08-18). The 4-8 window was the OLD AND-gate, and
+    // it was the inversion: one hard day on three hours failed it and fell through to 25-30, so a
+    // lighter week bought FEWER accessories than a heavier one. `base` is the fall-through now, so
+    // one hard day is 30-40 at any hours up to eight — see `resolveEnduranceTier`'s header.
     body:
-      '30-40 assistance reps, at 4-8 total hours. Slower accessory growth. Main lift progress '
-      + 'unchanged.',
+      '30-40 assistance reps, at 8 total hours or under. Slower accessory growth. Main lift '
+      + 'progress unchanged.',
   },
   {
     heading: '2 or more hard days',
