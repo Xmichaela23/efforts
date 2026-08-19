@@ -123,18 +123,32 @@ export const INTENT_ALLOCATION_NOTE = 'One top-end session, one sustained. Pick 
  */
 export const RUN_GROUND_NOTE = 'Flat sprints need 48 hours clear of heavy squats. Hills do not.';
 
-export const RUN_GROUND_OPTIONS: Array<CopyOption<'speed' | 'vo2'>> = [
-  {
-    id: 'speed',
-    title: 'Speed focus',
-    body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
-      + 'costs you 48 hours clear of heavy squats.',
-  },
+/**
+ * ⛔ ORDERED BY WHAT IT COSTS THE LEGS, CHEAPEST FIRST (Michael, 2026-08-18: *"is VO2 max the most
+ * forgiving? then put it up top — order by easiest on legs if we auto prefer"*).
+ *
+ * ⚠️ THE ORDER IS AN ARGUMENT, NOT A LAYOUT CHOICE, AND IT IS THE BLOCK'S OWN AXIS. `HardRunTerrain`
+ * already ranks its options this way in its header — *"VO2max stimulus bought at the least cost to
+ * the legs"* — and the reason is doctrine §2: running uphill removes the impact transient, so the
+ * hill session buys a hard aerobic stimulus the barbell does not pay for. Flat sprints are the only
+ * option that charges a mechanical cost, which is why they are the only one carrying a clearance
+ * window. Recommended-first and cheapest-first are the same order here, and that is not a
+ * coincidence — the recommendation IS the cost ranking.
+ *
+ * ⛔ SO IF A NEW OPTION IS ADDED, IT GOES IN BY LEG COST, not at the end.
+ */
+export const RUN_GROUND_OPTIONS: Array<CopyOption<'vo2' | 'speed'>> = [
   {
     id: 'vo2',
     title: 'VO2 max focus',
     body: 'Incline — hill or treadmill. Hard 3-minute climbs. Uphill removes the eccentric impact, '
       + 'so your knees and quads are still there for the barbell.',
+  },
+  {
+    id: 'speed',
+    title: 'Speed focus',
+    body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
+      + 'costs you 48 hours clear of heavy squats.',
   },
 ];
 
@@ -176,10 +190,26 @@ export const SESSION_PRESCRIPTION = {
  * thing that was invisible for the entire life of this screen, so it is stated even though the two
  * blocks below it already imply it.
  */
-export const interlockLine = (intensitySport: 'run' | 'bike'): string =>
-  intensitySport === 'bike'
+export const interlockLine = (intensitySport: 'run' | 'bike', chosen: boolean): string => {
+  const stated = intensitySport === 'bike'
     ? 'Your ride holds the speed. Your run is the sustained one.'
     : 'Your run holds the speed. Your ride is the sustained one.';
+  /**
+   * ⛔ THE APP PICKED AND SAID NOTHING (Michael, 2026-08-18: *"is it auto picks sustained for ride?
+   * we need to make it clear how this happens"*).
+   *
+   * With two slots and no allocation yet, `hardRoleOf` falls back to the positional rule and ONE
+   * BUTTON RENDERS ALREADY FILLED. To the athlete that is indistinguishable from a choice they
+   * made — so the sustained session appeared on one sport for no reason they could see. That is the
+   * same invisible-decision defect the allocation toggle was built to end, surviving as a default.
+   *
+   * ⚠️ THE LINE DOES NOT INVENT A RATIONALE. The fallback is list order and nothing more; claiming
+   * a training reason for it would be worse than saying it is a starting point. What it does say is
+   * the MECHANISM — tap either, that sport takes the speed, the other takes the sustained work —
+   * which is the part that was never stated anywhere.
+   */
+  return chosen ? stated : `${stated} Nothing picked yet — tap either to set it.`;
+};
 
 /**
  * ⛔⛔ ONE SLOT IS ONE QUESTION (Michael, 2026-08-18: *"4 options? confusing?"*).
@@ -231,14 +261,12 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
       },
     ]
     : [
-      {
-        id: 'speed',
-        title: 'Speed focus',
-        body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
-          + 'costs you 48 hours clear of heavy squats.',
-        role: 'intensity',
-        goal: 'speed',
-      },
+      /**
+       * ⛔ CHEAPEST ON THE LEGS FIRST — the same ranking `RUN_GROUND_OPTIONS` documents, and for the
+       * same reason. Uphill removes the impact transient; sustained running is a lot of level
+       * footfall at a submaximal effort; maximal flat sprinting is the one session that charges a
+       * mechanical cost, which is why it is the only one with a clearance window attached.
+       */
       {
         id: 'vo2',
         title: 'VO2 max focus',
@@ -253,6 +281,14 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
         body: '4 × 5 min building to 2 × 10, about 20 s/mi slower than 5K pace. Builds stamina, '
           + 'but prolonged efforts compete hardest with strength.',
         role: 'threshold',
+      },
+      {
+        id: 'speed',
+        title: 'Speed focus',
+        body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
+          + 'costs you 48 hours clear of heavy squats.',
+        role: 'intensity',
+        goal: 'speed',
       },
     ]
 );

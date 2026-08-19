@@ -5075,9 +5075,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     not fixed it. ⚠️ Reads the resolved role rather than the stored
                                     allocation, so it cannot drift from what the engine will build. */}
                                 <p className="text-white/70 text-sm leading-relaxed">
-                                  {interlockLine(state.hardDays[
-                                    Math.max(0, state.hardDays.findIndex((_, i) => hardRoleOf(i) === 'vo2'))
-                                  ]?.discipline === 'bike' ? 'bike' : 'run')}
+                                  {interlockLine(
+                                    state.hardDays[
+                                      Math.max(0, state.hardDays.findIndex((_, i) => hardRoleOf(i) === 'vo2'))
+                                    ]?.discipline === 'bike' ? 'bike' : 'run',
+                                    // ⛔ "HAS THE ATHLETE ACTUALLY PICKED?" — not "is a button lit".
+                                    // One button is ALWAYS lit, because `hardRoleOf` falls back to
+                                    // list order, and that fallback is exactly what the athlete had
+                                    // no way to tell apart from their own choice.
+                                    state.hardDays.some((h) => h.ownership !== 'club' && h.role),
+                                  )}
                                 </p>
                               </div>
                             )}

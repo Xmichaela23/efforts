@@ -186,14 +186,22 @@ for (const r of RECIPES) {
      * §2.0's last-resort VO2 intervals on the level — a completely different session. If a future
      * session "tidies" these ids back into terrain values, this is the test that catches it.
      */
-    assertEquals(RUN_GROUND_OPTIONS.map((o) => o.id), ['speed', 'vo2'], 'the ground question drifted');
+    /**
+     * ⛔ THE ORDER IS PART OF THE ASSERTION — CHEAPEST ON THE LEGS FIRST (Michael, 2026-08-18).
+     * Uphill removes the impact transient, so the VO2 session buys a hard aerobic stimulus the
+     * barbell does not pay for; flat sprints are the only option charging a mechanical cost, which
+     * is why they are the only one with a clearance window. Recommended-first and cheapest-first are
+     * the same order, which is the argument, not a coincidence. ⛔ A new option goes in BY LEG COST,
+     * not appended.
+     */
+    assertEquals(RUN_GROUND_OPTIONS.map((o) => o.id), ['vo2', 'speed'], 'the ground question drifted');
     /**
      * ⛔ ONE SLOT IS ONE QUESTION, AND THE COUNT IS THE ASSERTION. A single hard run has exactly
      * three possible sessions and a single hard ride exactly two. When these were two separate
      * lists the card showed FOUR cards for one decision (*"4 options? confusing?"*), so the number
      * itself is what regressed and the number is what this pins.
      */
-    assertEquals(singleSlotOptions('run').map((o) => o.id), ['speed', 'vo2', 'threshold'],
+    assertEquals(singleSlotOptions('run').map((o) => o.id), ['vo2', 'threshold', 'speed'],
       'the single hard run question drifted');
     assertEquals(singleSlotOptions('bike').map((o) => o.id), ['intensity', 'threshold'],
       'the single hard ride question drifted');
