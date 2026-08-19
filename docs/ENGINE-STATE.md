@@ -23,127 +23,108 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-19 — **your job is the DEFAULT SCHEDULING ENGINE, with fresh eyes.** Michael's words: *"we need to optimize the default scheduling engine and I'd like fresh eyes on this whole thing."* Banner owned by ONE chat.)
+## 🧭 NEXT SESSION — START HERE (2026-08-19 LATE — **your job is WHICH PACE IS TRUE.** The full brief is `docs/HANDOFF-builder-fixes-and-pace-truth-2026-08-19.md` §PART 2 — read it, it was written for someone who has seen none of this. Banner owned by ONE chat.)
 
 ### YOUR JOB
 
-**Make the week the solver produces by DEFAULT a better week.** Not the law — the law is settled and
-tested. The *preferences*. An athlete who never touches a control should open the block on the best
-arrangement available to them, and today they open on a legal one.
+**A threshold pace slower than the athlete's own easy pace reached a real screen.** Easy 12:35/mi,
+threshold 14:44/mi, 5K 25:21 (8:10/mi). The learner is fixed and deployed (`fe0d8b0f`); what is left
+is the question underneath it — **when the measured value abstains, the fallback derives from a TYPED
+5K, and a typed 5K goes stale as fitness changes.**
 
-⛔ **FIRST, THE TRAP THAT WOULD COST YOU A DAY: THERE ARE TWO SCHEDULERS AND THEY SHARE NO CODE.**
-`_shared/week-optimizer.ts` (2,434 lines) is the RACE path — `generate-combined-plan`. It is NOT
-your file. `CLAUDE.md` called it *"the sole authority"* until 2026-08-19 and a session reading that
-would land there and be in the wrong engine for everything below. **Yours is
-`_shared/week-model/`**, the strength-primary path, which is what `strength-primary-plan.ts` and the
-wizard both call.
+⛔ **THE BRIEF IS THE HANDOFF DOC, NOT THIS BANNER.** It carries the facts already gathered so nobody
+re-derives them: the 1.19 easy-to-threshold ratio from the app's own pace table, the ±4% divergence
+number that already exists, the missing per-field date on the typed 5K, and the two machines that
+already solve the hard parts for other disciplines. It also carries a **what NOT to do** list.
 
-**Start at these four files, in this order. Nothing else is the scheduler you were asked about.**
+**Build, in this order (Michael's call):**
+1. Derive threshold from the MEASURED easy pace as a floor, so a stale 5K can never prescribe
+   something too fast.
+2. Three states, each said plainly rather than picked silently — **measured** · **worked out from
+   your easy pace** · **not enough data, and no number shown**.
+3. A flag: *"your 5K doesn't match your recent runs — worth a retest."*
 
-| file | lines | what it owns |
-|---|---|---|
-| `supabase/functions/_shared/week-model/model.ts` | 246 | **THE LAW.** `COST`, coupling, debt, eligibility. ⛔ Layer 1. Do not tune this to improve a week. |
-| `supabase/functions/_shared/week-model/resolve.ts` | 422 | **THE PREFERENCES.** The search + six score terms. ⛔ **This is your file.** |
-| `supabase/functions/_shared/week-model/solver-adapter.ts` | 187 | the `SolverInput`/`SolverResult` seam the composer calls |
-| `supabase/functions/shared/strength-system/place-week.ts` | 436 | anchors, pins, and the compromise notes the athlete reads |
+⛔ **THE POINT OF THE FLAG:** today the app picks a source silently and the athlete never learns the
+two numbers disagree. Michael only found this because he looked.
 
-**The six score terms are at `resolve.ts:130`, and the weights are the whole optimisation surface:**
+⚠️ **DO NOT TUNE TO MICHAEL'S NUMBERS.** His export is the symptom, not the spec. Verify across the
+61-shape sweep and a range of paces. If a fix only works at his pace it is the wrong fix.
 
-```
-return rest * 4 - crowding - bunching
-  - clustering(placements) * 2
-  - sameSportDoubles(placements) * 20
-  - longDoubles(placements) * 25
-  + longOnWeekend(placements) * 5
-  + interleaving(placements) * 3;
-```
+### ⛔ WHAT SHIPPED 2026-08-19 — DO NOT RE-LITIGATE
 
-⛔ **THE TWO-LAYER RULE IS THE ONE THING THAT MUST SURVIVE YOU.** Layer 1 says which weeks are
-LEGAL; Layer 2 chooses among them. A score term can only ever pick between weeks that are already
-legal — it can never buy an illegal one. If you find yourself weakening a `COST` cell to get a
-nicer week, stop: that is the failure mode this architecture was built to prevent.
+Nine commits, `141e0e6c` → `e3968435`. **Full detail, with per-item verification state, is PART 1 of
+the handoff doc.** The short version:
 
-⚠️ **AND THE WEIGHTS ARE HAND-PICKED, WHICH IS EXACTLY THE THING THIS REPO KEEPS DELETING.** `* 20`
-and `* 25` were chosen to dominate, not measured. Nobody has ever swept them. `scripts/dump-plans.ts`
-builds 61 athlete shapes in about a second — that is your instrument, and it already exists.
-
-⚠️ **AND READ `docs/SPEC-week-solver.md` §0b-§0j — BUT ONLY AFTER ITS BANNER.** That file said
-*"Status: spec. Not built."* until 2026-08-19 and it is 100KB, so it is the first and most misleading
-thing a search for "solver" returns. It IS built, in a **different shape** than it describes (the
-two-layer split), and `place-week.ts` was **not** replaced. Its corrected banner says all of that.
-What is still live and has no other home: the general laws — Monday weeks, hours-not-weekdays,
-*"a missing signal is not a verdict"*, *"a test that has never failed is not evidence"*.
-
-### THE THREE FACTS YOU NEED BEFORE YOU START
-
-1. **The search is not exhaustive, deliberately.** `resolve.ts` searches only the CONSTRAINED units
-   exhaustively; free units are laid in and then improved by a 4-pass local search. A first version
-   searched everything and timed out at 7^8. ⛔ Do not "fix" it back.
-2. **`place-week.ts` still owns the anchors** — long run, long ride, hard days — and the solver fills
-   in around them. Two placement authorities is a defect this codebase has deleted before; if you
-   need a new preference, it belongs in `resolve.ts`'s score, not in a second scorer.
-3. **The one live preference override is `preferredClearance`** (`strength-primary-plan.ts`,
-   `isFlatFootfall`): flat sprints prefer 48h clear of heavy lower work. It sits BELOW
-   `breachPenalty` — *"prefer, don't force"* — and is taken in 8 of 24 legal shapes, silently
-   declined in 16. That is the shape a new preference should copy.
-
-### ⛔ WHAT SHIPPED 2026-08-18/19 — DO NOT RE-LITIGATE
-
-61 commits. `main` at `9d49db9a`. **All four strength edge functions deployed and matching main.**
-The whole session was the Strong Focus intake, and the engine changes below are the ones that alter
-a built plan:
-
-- **`resolveEnduranceTier`: `base` is the fall-through, not `survival`** (`580bfed1`). It was
-  non-monotonic — 1 hard day at 3 hrs returned 25-30 while the same athlete at 5 hrs returned 30-40,
-  so more endurance bought MORE accessory volume. Grid + boundary + a monotonicity property test in
-  `endurance-tier.test.ts`. ⚠️ Unknown hours now resolve to `base`, not `survival`.
-- **The intensity default is a training rule, not list order** (`011e8fdf`, `fbf40348`). Run + ride
-  with no allocation → the RUN holds the top-end session. The mechanism is the SUSTAINED session:
-  threshold is the long one, and putting it on the bike removes the block's largest block of
-  repetitive impact. ⚠️ A bare `intensity` mark inherited from a one-slot answer YIELDS to this; an
-  explicit `threshold` mark and a full allocation both stand. `intent-allocation.test.ts`.
-- **One session a week is legal, and the count built is the count asked for** (`9d49db9a`). It was
-  blocked in four places. Fixing it exposed an overage already live at two sessions: `asked 2, hard
-  2` built THREE runs. The long run is a session, not an extra. `one-session-week.test.ts`.
-- **Abs are a `single_leg_core` movement, not a fourth slot** (`4bf31385`). The add-on halved the
-  slot's reps to pay for itself. Deleted; a stored `abs` on an old goal is dropped on read.
-- **An untested pull-up max takes the conservative dose** (`d0b53e02`). It took the full 100/week —
-  the maximal prescription, on no evidence. ⚠️ And the `Number(null) === 0` trap was live in two
-  more places, reading "no answer" as "tested zero".
-- **`withTerrain` no longer stamps the §1i list** (`011e8fdf`). It was writing `hill_3min` onto every
-  hard run, which silently removed the *"no hill? a treadmill at 5-8%"* line for everyone.
-- **`activeHardSlot` is deleted** (`bafb67bb`). A hidden cursor: one visible control edited a
-  different hard day depending on a chip tapped two screens earlier. Every hard session is now a
-  self-contained card writing its own index, on both the intensity and schedule steps.
-- **`scripts/plan-test-output/` deleted** — 973 files, 232,962 lines. A resume cache for
-  `plan-generation-matrix.mjs`, committed. Gitignored now.
+- **The scheduler counts STRESSORS, not calendar days or placements** (`dc916b56`). `upper` and
+  `easy` are not stressors — that is the unlock. Weight ordering is a ruling: `overCap 60` > `blank
+  40` > `lock 24 + crowding 6`. Gap-filling buys 30 and the day off costs 40, so a press moves into a
+  dead zone ONLY when the alternative is a capped day. ⛔ No `COST` cell moved; Layer 1's 18 tests
+  still pass. 3 of 61 shapes changed. **DEPLOYED** (`generate-strength-plan`).
+- **The High intensity row could not be opened** (`6386df81`). One expression held both the DEFAULT
+  rule and the CHOICE rule; `!== 'hard'` refused a deliberate tap, so neither hard session's day
+  picker was reachable from the Schedule step. Split into `src/lib/schedule-ask.ts`. **VERIFIED by
+  Michael on screen** — both pickers now reachable and independently settable.
+- **The week grid hid the days of the week** (`adbeba56`). Day names were dimmer than the rest-day
+  dash. **VERIFIED by Michael.**
+- **The ride shortfall note was FALSE on 27 of 61 shapes** (`76e66f4a`). `wantDays` counted the hard
+  ride, `rideDays` did not. Also capped the fill loop, so the inflated ask could build a FOURTH ride.
+  **DEPLOYED** (`generate-strength-plan`).
+- **The paired lift day leaked both main lifts into the accessory line** (`76e66f4a`, client only).
+- **Threshold pace slower than easy now publishes nothing** (`fe0d8b0f`). **DEPLOYED**
+  (`learn-fitness-profile`). ⚠️ The stored bad value does not correct until the learner runs again —
+  next Garmin/Strava ingest.
+- **Docs: four ghost-clearing commits.** `CLAUDE.md` named the WRONG scheduler as sole authority
+  (`36d8283a`), both `SCHEDULING-RULES*.md` now say which engine they describe (`4d869eac`),
+  `CAPABILITY-MAP` cited six files that do not exist (`965cad3a`), `SPEC-week-solver` said "not
+  built" (`141e0e6c`).
 
 ### ⚠️ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
 
-⛔ **NOTHING FROM THIS SESSION HAS BEEN SEEN ON A DEVICE.** Not one screen. The suites are green and
-that is not the same claim — twice this session a defect reached the device that the suites could not
-see (a half-allocated pair that lit both allocation buttons, and a white screen from an IIFE reading
-a const declared 500 lines below it). **Settled by:** building a Strong Focus block and opening it.
+⛔ **THE STRONG FOCUS INTAKE ACCEPTANCE PASS IS STILL OWED** — 61 commits from 2026-08-18/19, four
+edge functions live, and the matrix at the top of `POLISH-PUNCH-LIST.md` is still mostly unrun. Items
+1-4 were partly walked today. **Settled by:** building a block and tapping through it.
 
-- **`scripts/check-tdz.mjs` exists now** and catches the white-screen class. `tsc` cannot: it allows
-  use-before-declaration inside a function body, and an IIFE is called immediately.
-- **The "renders, but wrong" class has no checker at all.** A smoke test that mounts
-  `NonRaceBuilder` with a null arc would have caught the white screen in seconds. Not built; worth
-  proposing before the next big UI change.
-- **One run + one hard run builds 3.5 mi against a 12-mile ask.** The hard session is a fixed cost
-  and there is no easy volume left to absorb the rest. Structurally correct, unsaid on screen.
-  Hypothesis, not a finding: athletes at low mileage with a hard day are being under-prescribed and
-  nothing tells them.
-- **Three PRE-EXISTING test failures** in `club-anchor.test.ts` and `non-race-goal-seeds.test.ts`.
-  6 failing assertions before this session and 6 after — unrelated, untouched, unlooked-at.
+⚠️ **Four of today's six code fixes have not been seen on a screen** — the solver's new week shape,
+the ride note, the accessory line, and the threshold abstention. **Settled by:** one built block.
 
-### ⚠️ TWO VOICE OVERRIDES ON THE RECORD
+⚠️ **THE SOLVER'S CAP AND STREAK TERMS ARE DORMANT.** They never fire on any shape the composer can
+emit — the three-day Wendler structure never puts three stressors on one day. Their arithmetic is
+pinned by direct unit tests; their WEIGHTS are not, and nothing would catch a future retune. Accepted
+deliberately; the composer's own limits are the wall.
 
-`voiceViolation()` flags `focus` and the metric name `VO2 max`, and both ship: "Speed focus" /
-"VO2 max focus" are Michael's own approved labels and this screen's domain vocabulary. The pull-up
-prompt *"Do one set to failure and enter your number."* is an IMPERATIVE and also ships — it asks for
-a measurement the engine cannot take itself, the way a form asks for a field. All three are recorded
-beside the strings. ⛔ Do not "fix" them to satisfy the lint.
+⚠️ **THE RIDE SHORTFALL NOTE MAY NOW BE UNREACHABLE.** Across the sweep and six hand-built
+over-subscribed weeks, every shape builds every ride day asked for. Not deleted — an invariant test
+guards it: whenever it fires, the number must match the calendar.
+
+### ⛔ MUTATION-TEST ANY NEW TEST BEFORE BELIEVING IT
+
+**Two of today's three new test files were VACUOUS on the first pass and passed anyway.** The solver
+tests passed with every new weight zeroed (`crowding` and Layer 1 were already producing the asserted
+outcome); a threshold-pace guard was written, and mutation showed removing it broke nothing because
+it was unreachable behind the filter in front of it. Both were rewritten. **A test that passes with
+the code deleted is not evidence.**
+
+### THE QUEUE AFTER THE PACE JOB (Michael-approved, none urgent)
+
+1. **The `AthleteWeeklyIntent` refactor**, as its own engineer session. In `strength-primary-plan.ts`
+   the single concept "how many rides did the athlete ask for" exists as NINE variables — `rideDays`
+   15×, `hardRideCount` 8×, `wantDays` 6×, `askedRideDays` 6×, `ridesWanted` 5×, `rideHasLongDay` 5×,
+   `solvedRideDays` 4×, `rideHours` 2×, `bike.days` 1× — plus five more for runs. **Three of today's
+   five bugs were cross-representation errors in that file.** One typed object, computed once at the
+   wizard boundary with hard days already subtracted, read-only downstream. One discipline at a time,
+   61-shape sweep as the gate. ⛔ Not a rewrite.
+2. **Running best-effort (critical speed) fit** — the durable answer to the pace question.
+   `_shared/swim/swim-css-learner.ts` already does exactly this for swimming, abstention included.
+3. The router session (Q-267 core), Slice b auto-recalibrate, the logger colour pass — all still open
+   from the 2026-08-13 banner below.
+
+### ⛔ THE PATTERN WORTH CARRYING FORWARD
+
+**Four of today's five bugs were the same shape: code comparing two different representations of one
+concept.** Ride days counted two ways. Crowding counting placements while meaning stressors. An
+accessory filter matching a joined name against individual lifts. One expression holding both a
+default rule and a choice rule. The fifth was a derived value with **no invariant** — nothing asserted
+that threshold is faster than easy. **A guard fixes one case; an invariant makes a class impossible.**
 
 ## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 
