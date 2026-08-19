@@ -3753,9 +3753,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 record for "Speed focus" / "VO2 max focus". It is this screen's domain word for the
                 chips, and one word for one concept beats a synonym per surface. ⛔ Do not "fix" it
                 to satisfy the lint without asking. */}
-            <p className="text-white/70 text-sm leading-relaxed">
-              Three lifting days, each with a push, a pull and a single-leg or core movement. Pick a
-              focus and the days fill in — change to preferred movements below or swap on the day.</p>
+            <ul className="space-y-1 list-disc list-outside ml-5 marker:text-white/30">
+              <li className="text-white/70 text-sm leading-relaxed pl-1">
+                Three lifting days, each with a push, a pull and a single-leg or core movement.
+              </li>
+              <li className="text-white/70 text-sm leading-relaxed pl-1">
+                Pick a focus and the days fill in.
+              </li>
+              <li className="text-white/70 text-sm leading-relaxed pl-1">
+                Change to preferred movements below, or swap on the day.
+              </li>
+            </ul>
 
             {/* ── FOCUS CHIPS ───────────────────────────────────────────────────────────────────
                 ⛔ A FOCUS RE-POINTS MOVEMENT CHOICE INSIDE A CATEGORY. It is not a new axis and it
@@ -3766,7 +3774,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <span className="text-white/85 text-sm">Focus</span>
                 <span className="text-white/50 text-xs">{state.assistancePicks.focus.length}/{FOCUS_CAP}</span>
               </div>
-              <div className="flex flex-wrap gap-2">
+              {/* ⛔ FIVE ACROSS DOES NOT FIT, MEASURED RATHER THAN GUESSED (2026-08-19). On a 390px
+                  viewport the card's content is ~358px. "Shoulders" is nine characters: ~59px of
+                  glyphs at 12px plus chip padding and border is ~77px, and five of those with gaps
+                  is ~400px. It only fits by dropping to 11px type, which is under a comfortable
+                  label size and still breaks on a 360px phone.
+
+                  ⛔ SO IT IS AN EVEN 3-COLUMN GRID INSTEAD OF A WRAP. Five chips in a flex-wrap
+                  produce a ragged 4 + 1 — "Glutes" orphaned on its own line, which is what reads as
+                  broken. A grid gives 3 + 2 with equal widths, which reads as a layout rather than
+                  an accident, and every chip keeps a full-size tap target. ⚠️ Do not "tidy" this
+                  back to flex-wrap; the raggedness was the complaint. */}
+              <div className="grid grid-cols-3 gap-2">
                 <GalaxyButton
                   shape="chip"
                   variant={state.assistancePicks.focus.length === 0 ? 'primary' : 'secondary'}
@@ -3861,7 +3880,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
               >
                 <div className="min-w-0">
-                  <p className="text-white/80 text-sm">Pull-up progression</p>
+                  {/* ⚠️ "ADD …", MATCHING THE HARD-DAY CARD'S "+ Add a run" (Michael, 2026-08-19).
+                      "Pull-up progression" named a THING; the row is an ACTION that turns it on, and
+                      an athlete scanning for what they can add was reading a noun. */}
+                  <p className="text-white/80 text-sm">Add pull-up progression</p>
                   <p className="text-white/45 text-xs mt-0.5">Build your chin-up number up — chins every day, tracked.</p>
                 </div>
                 <span
