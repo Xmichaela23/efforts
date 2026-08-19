@@ -20,6 +20,7 @@ import {
   forwardGap,
   needsOf,
   sessionHours,
+  stressorsOf,
 } from './model.ts';
 
 export type Placement = { unit: Unit; day: number };
@@ -94,6 +95,106 @@ export function restDaysOf(placements: Placement[]): number[] {
   return [0, 1, 2, 3, 4, 5, 6].filter((d) => !used.has(d));
 }
 
+/** Stressors landing on each day, 0-6. The unit the shape terms below count in. */
+function stressorsPerDay(placements: Placement[]): number[] {
+  const out = [0, 0, 0, 0, 0, 0, 0];
+  for (const p of placements) out[p.day] += stressorsOf(p.unit);
+  return out;
+}
+
+/**
+ * ⛔ DAYS THE ATHLETE ACTUALLY RECOVERS ON — no stressor, whatever else is there.
+ *
+ * ⚠️ THIS IS WHAT THE FLOOR NOW COUNTS, AND IT IS A WIDER SET THAN `restDaysOf`. A Thursday
+ * carrying nothing but a bench press is a recovery day; a Thursday carrying a squat is not. The old
+ * floor counted EMPTY days, which meant a jammed week defended its one blank square at −500 while
+ * a third session piled onto a day already holding the coupled pair for 6. Measured on the sweep:
+ * 27 of 61 shapes put a heavy lower lift, a hard endurance session AND an upper lift on one day,
+ * with an empty day beside it.
+ */
+export function recoveryDaysOf(placements: Placement[]): number[] {
+  const s = stressorsPerDay(placements);
+  return [0, 1, 2, 3, 4, 5, 6].filter((d) => s[d] === 0);
+}
+
+/**
+ * ⛔ THE CAP: MORE THAN TWO STRESSORS ON ONE DAY (Michael, 2026-08-19). Counted in stressors ABOVE
+ * two, so a day at four is charged twice what a day at three is.
+ *
+ * ⚠️ TWO IS THE CAP AND NOT ONE BECAUSE THE COUPLED PAIR IS EXACTLY TWO. Squat + hard run is one
+ * unit by design in `model.ts` — barbell first, intervals six hours later. The cap has to permit
+ * the arrangement Layer 1 deliberately builds, and forbid the thing stacked on top of it.
+ *
+ * ⛔ SCORED, NOT FORBIDDEN — the same call `longDoubles` records and for the same reason. A week
+ * with more demand than legal slots must still return a week the athlete can see, not a refusal.
+ * Weighted above every other shape term so it only loses to the law.
+ */
+export function overCap(placements: Placement[]): number {
+  return stressorsPerDay(placements).reduce((n, c) => n + Math.max(0, c - 2), 0);
+}
+
+/**
+ * ⛔ A DAY AT THE CAP IS LOCKED — nothing else may be added to it, stressor or not (Michael,
+ * 2026-08-19: *"a heavy lower-body lift plus a hard endurance session locks the day. Upper body
+ * must spill to adjacent days."*).
+ *
+ * ⚠️ AND THIS — NOT THE CAP — IS THE TERM THAT MOVES THE OVERHEAD PRESS OFF FRIDAY. The press is
+ * not a stressor, so a Friday holding deadlift + threshold ride + press is at TWO stressors and the
+ * cap is silent on it. What is wrong with that day is that a third session was added to a day that
+ * was already full. Counted per extra session, not per day, so a fourth costs more than a third.
+ *
+ * ⚠️ `crowding` DOES NOT COVER THIS, AND MY FIRST READING THAT IT WAS A BUG WAS WRONG. It counts
+ * PLACEMENTS, which is correct — a coupled unit is one thing and must not be charged for being
+ * coupled. The gap was that the third session on such a day cost a flat 6 and nothing named the
+ * day as full.
+ */
+export function lockedDayExtras(placements: Placement[]): number {
+  const stress = stressorsPerDay(placements);
+  const sessions = [0, 0, 0, 0, 0, 0, 0];
+  for (const p of placements) sessions[p.day] += p.unit.sessions.length;
+  let n = 0;
+  for (let d = 0; d < 7; d++) {
+    if (stress[d] < 2) continue;
+    n += Math.max(0, sessions[d] - stress[d]);
+  }
+  return n;
+}
+
+/** How many consecutive stressor days a run may hold before the score starts charging. */
+const STREAK_ALLOWANCE = 3;
+
+/**
+ * ⛔ CONSECUTIVE STRESSOR DAYS, CYCLIC — the term that breaks a five-day block when an empty day
+ * exists (Michael, 2026-08-19). Measured on the sweep before it was written: 54 of 61 shapes ran
+ * five or more consecutive training days with a rest day still free.
+ *
+ * ⚠️ IT COUNTS STRESSOR DAYS, NOT ACTIVE DAYS, AND THAT RESOLVES THE TENSION WITH THE TERM ABOVE.
+ * Dropping the press into an empty Thursday makes the week seven ACTIVE days — a longer streak by
+ * the old reading, and the two requests would have pulled against each other. A press day is not
+ * what makes five days in a row punishing, so it breaks the run instead of extending it.
+ *
+ * ⛔ THE WEEK IS A CYCLE, NOT A LINE — a Friday-to-Tuesday run is five consecutive days and reading
+ * the array end-to-end would see three and two.
+ */
+export function stressorStreakExcess(placements: Placement[]): number {
+  const s = stressorsPerDay(placements);
+  const on = s.map((c) => c > 0);
+  if (on.every(Boolean)) return 7 - STREAK_ALLOWANCE;
+  // Start on a day that is OFF, so every run is seen once and whole.
+  const start = on.indexOf(false);
+  let total = 0;
+  let run = 0;
+  for (let i = 0; i < 7; i++) {
+    if (on[(start + i) % 7]) {
+      run++;
+    } else {
+      total += Math.max(0, run - STREAK_ALLOWANCE);
+      run = 0;
+    }
+  }
+  return total + Math.max(0, run - STREAK_ALLOWANCE);
+}
+
 /**
  * ⛔ THE ONLY PREFERENCE IN THE FILE, and it is deliberately thin. Feasibility is
  * decided by the law; among LEGAL weeks the resolver prefers more rest and heavy units
@@ -108,7 +209,31 @@ function score(placements: Placement[]): number {
    * emptying the calendar into a single Tuesday. The old engine had `MAX_ACTIVE_DAYS = 6` — one rest
    * day, a floor — and that is the right shape. Meeting the floor pays; exceeding it pays nothing.
    */
-  const rest = Math.min(restDaysOf(placements).length, REST_FLOOR);
+  const recovery = Math.min(recoveryDaysOf(placements).length, REST_FLOOR);
+
+  /**
+   * ⛔⛔ A COMPLETELY BLANK DAY IS EXPENSIVE, AND THE ORDERING AROUND IT IS THE WHOLE RULING
+   * (Michael, 2026-08-19): *"a day with zero physical demands has massive psychological and
+   * physiological value. Stripping away an athlete's only true day off just to make the weekly
+   * layout look symmetrical is a failure of coaching."*
+   *
+   * ⛔ THE HIERARCHY, AND EVERY WEIGHT IN THIS FILE IS SET TO PRODUCE IT:
+   *   1. `overCap` (60) — three real stressors on one day is worse than losing the day off.
+   *   2. `blank` (40) — the athlete keeps one square with nothing on it.
+   *   3. `lockedDayExtras` (24) + `crowding` (6) — gap-filling is worth 30, which LOSES to 40.
+   *
+   * ⚠️ THAT ARITHMETIC IS THE RULE, NOT A COINCIDENCE. Dropping a bench press into the only empty
+   * day buys at most 30 points of relief; the blank day costs 40 to give up. So it stays put in a
+   * week that has room, and it moves only when the alternative is a capped day at 60 — which is
+   * *"gap-fill as a last resort, only when the week is genuinely choking."*
+   *
+   * ⛔ THE FIRST VERSION WEIGHTED THIS AT 3 AND IT WAS WRONG IN A WAY THE SUITE ALREADY KNEW.
+   * Gap-filling outbid it and 37 of 61 sweep shapes came back with no blank day at all, failing
+   * `a week with room KEEPS its rest day — releasing it is a last resort, not the default` and four
+   * others. ⚠️ Those tests are the record of this decision and they were right; do not relax them
+   * to let a tidier-looking week through.
+   */
+  const blank = Math.min(restDaysOf(placements).length, REST_FLOOR);
 
   // ⛔ A REST DAY BOUGHT BY STACKING FIVE SESSIONS ONTO ONE DAY IS NOT A REST DAY.
   // ⚠️ IT ESCALATES, IT DOES NOT ACCUMULATE LINEARLY. A flat per-extra-session charge made a day
@@ -127,10 +252,13 @@ function score(placements: Placement[]): number {
   let bunching = 0;
   for (let i = 1; i < heavyDays.length; i++) bunching += Math.max(0, 3 - (heavyDays[i] - heavyDays[i - 1]));
 
-  return rest * 4 - crowding - bunching
+  return recovery * 4 + blank * 40 - crowding - bunching
     - clustering(placements) * 2
     - sameSportDoubles(placements) * 20
     - longDoubles(placements) * 25
+    - overCap(placements) * 60
+    - lockedDayExtras(placements) * 24
+    - stressorStreakExcess(placements) * 8
     + longOnWeekend(placements) * 5
     + interleaving(placements) * 3;
 }
@@ -314,7 +442,7 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
     const withFree: Placement[] = [...acc];
     /** The full score of a candidate, INCLUDING the rest floor — one function, used everywhere. */
     const rate = (ps: Placement[]): number =>
-      score(ps) - Math.max(0, minRest - restDaysOf(ps).length) * 500;
+      score(ps) - Math.max(0, minRest - recoveryDaysOf(ps).length) * 500;
 
     // ⛔ THE FREE UNITS ARE LAID IN AGAINST THE REAL SCORE, NOT A SECOND HAND-ROLLED COST FUNCTION.
     // The first version used its own "emptiest day wins" heuristic and lost three things the old
@@ -363,8 +491,8 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
     }
 
     const unmet = unmetNeeds(withFree);
-    const rest = restDaysOf(withFree).length;
-    const s = score(withFree) - unmet.length * 1000 - Math.max(0, minRest - rest) * 500;
+    const recovery = recoveryDaysOf(withFree).length;
+    const s = score(withFree) - unmet.length * 1000 - Math.max(0, minRest - recovery) * 500;
     if (!best || s > best.score) best = { placements: withFree, unmet, score: s };
   };
 
@@ -376,8 +504,14 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
 
   if (!best) return { ok: false, unmet: [], best: [] };
   const b = best as { placements: Placement[]; unmet: Unmet[]; score: number };
+  /**
+   * ⛔ THE GATE COUNTS RECOVERY DAYS; `restDays` STILL REPORTS GENUINELY BLANK ONES.
+   * The two are different questions and the caller wants the second. A week whose only free day
+   * carries a bench press SATISFIES the floor — that is the unlock — but telling the athlete they
+   * have a day off when they have a press would be the score that lies.
+   */
   const rest = restDaysOf(b.placements);
-  if (b.unmet.length === 0 && rest.length >= minRest) {
+  if (b.unmet.length === 0 && recoveryDaysOf(b.placements).length >= minRest) {
     return { ok: true, placements: b.placements, restDays: rest };
   }
   return { ok: false, unmet: b.unmet, best: b.placements };

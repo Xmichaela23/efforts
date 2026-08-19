@@ -126,6 +126,35 @@ export const COST: Record<Load, Cost> = {
 export const LONG_LOADS: Load[] = ['long_run', 'long_ride'];
 
 /**
+ * ⛔ A STRESSOR IS A LOAD THAT COSTS THE ATHLETE A DAY. VOCABULARY ONLY — NO `COST` CELL MOVES HERE.
+ *
+ * Layer 1 already says which weeks are LEGAL and this changes none of it. What this adds is the
+ * unit the SHAPE terms in `resolve.ts` count in, and the reason it had to exist is that they were
+ * counting the wrong thing: **calendar days** (a day is occupied or it is not) and **placements**
+ * (a coupled squat + hard run is one). Neither is what fatigue tracks.
+ *
+ * ⚠️ `upper` AND `easy` ARE DELIBERATELY NOT STRESSORS, AND THAT IS THE WHOLE UNLOCK (Michael,
+ * 2026-08-19). A bench press on an otherwise-empty Thursday is not what makes five days in a row
+ * punishing. Under the old day-counting rest floor it was indistinguishable from a squat, so the
+ * only empty day in a jammed week was defended at a cost of −500 while stacking the press onto a
+ * day that already held a deadlift and a threshold ride cost 6. The press stacked, every time.
+ * Counting stressors instead lets it take Thursday, which is what an athlete would do.
+ *
+ * ⛔ THIS IS NOT A CLAIM THAT UPPER WORK IS FREE. It still occupies the day, it is still charged by
+ * `crowding`, and a day already holding the coupled pair is still LOCKED against it — see
+ * `lockedDays()` in `resolve.ts`. It is a claim about what a REST day is protecting the athlete
+ * from, and the answer is systemic load, not activity.
+ */
+export const STRESSOR_LOADS: Load[] = ['heavy_lower', 'hard_cardio', 'long_run', 'long_ride'];
+
+export const isStressor = (l: Load): boolean => STRESSOR_LOADS.includes(l);
+
+/** How many stressors a unit carries. The coupled pair carries TWO — that is the point of the cap. */
+export function stressorsOf(u: Unit): number {
+  return u.sessions.filter((s) => isStressor(s.load)).length;
+}
+
+/**
  * ⛔ THE PAIRING, AND IT IS A CLAIM ABOUT TISSUE, NOT A PREFERENCE.
  * Squat + hard run: the run's impact is taken by erectors that have not yet been
  * loaded that week. Deadlift + hard ride: the ride is seated and structurally
