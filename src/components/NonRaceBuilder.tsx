@@ -44,7 +44,6 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import {
   accessoryCostLine, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
-  SECONDARY_DEFAULT_NOTE,
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
 import { solveWizardWeek } from '@/lib/suggest-hard-days';
@@ -2119,15 +2118,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * its nature and the athlete does not get to reassign it.
    */
   /**
-   * ⛔ DID THE ATHLETE ALLOCATE, OR DID THE ENGINE? Exactly the `fullyAllocated` test `hardRoleOf`
-   * and `assignHardRoles` both use: every prescribed slot carrying a role means they tapped the
-   * control, which writes both. Anything less is inherited from a one-slot answer or absent
-   * entirely, and the role on the sustained card is the engine's discipline rule speaking.
+   * ⚠️ `allocationIsExplicit` STOOD HERE AND IS DELETED (2026-08-18). It existed for one caller —
+   * the per-card "secondary sessions default to sustained threshold" note — which moved to the
+   * banner, where it is a rule stated up front rather than a fact about one card. The gate went
+   * with it: a banner explaining how the block is BUILT is true whether or not this athlete has
+   * overridden anything.
+   * ⛔ The `fullyAllocated` test itself is NOT gone — it lives in `hardRoleOf` and `assignHardRoles`,
+   * where it decides whether an explicit allocation outranks the discipline rule.
    */
-  const allocationIsExplicit = (() => {
-    const pres = state.hardDays.filter((h) => h.ownership !== 'club');
-    return pres.length > 0 && pres.every((h) => !!h.role);
-  })();
 
   const allocateIntensityTo = (slot: number) => setState((st) => ({
     ...st,
@@ -4438,7 +4436,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
                         Add speed, VO2 max, or threshold work. High-intensity sessions create
                         competing fatigue; each day added actively reduces your accessory lifting
-                        volume to protect your strength gains.
+                        volume to protect your strength gains. A second session defaults to sustained
+                        threshold to manage physical impact and protect your barbell progression; you
+                        can switch which sport carries the top-end work.
                       </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
@@ -4880,21 +4880,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     </div>
 
                                     <div className="px-3 pb-2.5 space-y-1.5">
-                                      {/* ⛔ WHY THE APP CHOSE FOR THEM, ON THE CARD IT CHOSE FOR —
-                                          and ONLY when it actually chose. A second hard session is
-                                          handed the sustained role by the discipline rule; without
-                                          this it arrives as a decision with no reason attached.
-                                          ⛔ GATED ON `fullyAllocated`: once the athlete taps "Set as
-                                          top-end", both slots carry an explicit role and the
-                                          sustained one is THEIR call. Saying the app defaulted it
-                                          would be false — and the kind of false that teaches an
-                                          athlete to stop reading the copy. Same test the resolver
-                                          uses, so the two cannot drift. */}
-                                      {!club && !lone && role === 'threshold' && !allocationIsExplicit && (
-                                        <p className="text-white/50 text-xs leading-snug">
-                                          {SECONDARY_DEFAULT_NOTE}
-                                        </p>
-                                      )}
+                                      {/* ⛔ `SECONDARY_DEFAULT_NOTE` RENDERED HERE AND MOVED TO THE
+                                          BANNER (Michael, 2026-08-18: *"top screen needs to explain
+                                          2nd ride or run defaults to threshold to protect strength
+                                          work"*). It is a RULE about how the block is built, not a
+                                          fact about this card — and the card's own title already
+                                          says "sustained threshold", so stating it again three
+                                          lines lower was the third-line-of-the-same-thing pattern
+                                          this screen has now been cut for twice.
+                                          ⛔ THE BANNER EXPLAINS THE MODEL BEFORE THEY ADD ANYTHING,
+                                          which is the whole point: an athlete who learns the rule
+                                          when the consequence appears has already been surprised. */}
                                       {/* ── the session: a choice, or a statement ─────────────── */}
                                       {opts ? (
                                         <div className="space-y-1">
@@ -4956,18 +4952,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                           return { ...st, hardDays: next };
                                         })}
                                         aria-pressed={club}
-                                        className="w-full text-left flex items-center gap-2.5 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-xl"
+                                        /**
+                                         * ⛔ SIZED TO TAP (Michael, 2026-08-18: *"run ride club too
+                                         * small"*). It was an 18px box beside 12px text on a bare
+                                         * row — under the ~44px minimum a thumb needs, and visually
+                                         * a caption rather than a control. It is a bordered row at
+                                         * the card's own text size now, matching the option buttons
+                                         * above it, because it IS the same kind of thing: a choice
+                                         * about this session.
+                                         */
+                                        className="w-full text-left flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl border border-white/12 bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                                       >
                                         <span
-                                          className="shrink-0 w-[18px] h-[18px] rounded-md border-2 grid place-items-center"
+                                          className="shrink-0 w-[22px] h-[22px] rounded-md border-2 grid place-items-center"
                                           style={{
-                                            borderColor: club ? `rgb(${rgb})` : 'rgba(255,255,255,0.30)',
+                                            borderColor: club ? `rgb(${rgb})` : 'rgba(255,255,255,0.35)',
                                             backgroundColor: club ? `rgba(${rgb},0.30)` : 'transparent',
                                           }}
                                         >
-                                          {club && <Check className="h-3 w-3 text-white" />}
+                                          {club && <Check className="h-3.5 w-3.5 text-white" />}
                                         </span>
-                                        <span className="text-white/70 text-xs leading-snug">
+                                        <span className="text-white/85 text-sm leading-snug">
                                           A club session I already attend
                                         </span>
                                       </button>

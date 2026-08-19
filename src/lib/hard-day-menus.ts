@@ -334,17 +334,11 @@ export const accessoryCostLine = (
 };
 
 /**
- * ⛔ WHY THE APP CHOSE FOR THEM — SHOWN ONLY WHEN IT ACTUALLY DID (Michael, 2026-08-18).
+ * ⛔ `SECONDARY_DEFAULT_NOTE` LIVED HERE AND IS DELETED (2026-08-18) — the sentence moved into the
+ * hard-day card's BANNER, where it belongs: it is a rule about how a block is built, not a fact
+ * about one card, and an athlete who learns the rule at the moment its consequence appears has
+ * already been surprised by it.
  *
- * A second hard session is handed `sustained threshold` by the discipline rule, and to the athlete
- * that arrives as a decision made on their behalf with no reason attached. This is the reason,
- * grounded in impact and load rather than in physiology — the science stays behind the (i).
- *
- * ⛔ IT MUST NOT SHOW ON A CARD THE ATHLETE ALLOCATED THEMSELVES. Once they tap "Set as top-end",
- * both slots carry an explicit role and the sustained one is THEIR call — telling them the app
- * defaulted it would be false, and it is the kind of false that teaches an athlete to stop reading
- * the copy. The caller gates on the same "fully allocated" test the resolver uses.
+ * ⛔ DO NOT RE-EXPORT IT "IN CASE". One sentence with two homes is how a screen ends up saying the
+ * same thing three times, which this card has now been cut for twice.
  */
-export const SECONDARY_DEFAULT_NOTE =
-  'Secondary sessions default to sustained threshold to manage physical impact and maintain '
-  + 'training integrity.';
