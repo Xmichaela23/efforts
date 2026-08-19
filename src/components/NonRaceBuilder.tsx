@@ -4894,11 +4894,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                           };
                                           return { ...st, hardDays: next };
                                         })}
-                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
-                                        style={on ? {
-                                          borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
-                                          backgroundColor: `rgba(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
-                                        } : undefined}
+                                        /**
+                                         * ⛔ NEUTRAL WHEN SELECTED (Michael, 2026-08-18):
+                                         * *"overall colour should be neutral — ride kinda sits in
+                                         * running, it's confusing."*
+                                         *
+                                         * The sport colours were applied here on 2026-08-18 to fix
+                                         * the opposite complaint (a ride's option rendering in
+                                         * strength orange). That fix over-corrected: a GREEN
+                                         * "Ride is intensity" button sitting inside the hard-day
+                                         * card reads as a ride ROW, not as a ride CHOICE, and the
+                                         * card is about both sports at once.
+                                         *
+                                         * ⛔ THE RULE THIS SETTLES: on this screen sport colour
+                                         * means IDENTITY — it belongs on the Ride / Run chips that
+                                         * say which sessions exist. A control that is merely
+                                         * SELECTED is neutral white. Do not re-colour these; the
+                                         * next screenshot round will just swing it back.
+                                         */
+                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'border-white/55 bg-white/[0.10]' : 'border-white/12 bg-white/[0.03]'}`}
                                       >
                                         <span className="block text-white/90 text-sm">{opt.title}</span>
                                         <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
@@ -4942,11 +4956,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                       <button
                                         key={`alloc-${i}`} type="button"
                                         onClick={() => allocateIntensityTo(i)}
-                                        className={`flex-1 rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'text-white/90' : 'border-white/12 bg-white/[0.03] text-white/60'}`}
-                                        style={on ? {
-                                          borderColor: `rgb(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')})`,
-                                          backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
-                                        } : undefined}
+                                        // ⛔ NEUTRAL WHEN SELECTED — see the note on the option
+                                        // buttons below. A green "Ride is intensity" made the
+                                        // allocation toggle read as a ride row inside a card that
+                                        // is about both sports.
+                                        className={`flex-1 rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'border-white/55 bg-white/[0.10] text-white/90' : 'border-white/12 bg-white/[0.03] text-white/60'}`}
                                       >
                                         {sport}{qualifier} is intensity
                                       </button>
@@ -4996,11 +5010,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                          * ring, and blue is this app's SWIM colour. ⚠️ Keyboard
                                          * focus keeps its ring via `focus-visible`.
                                          */
-                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
-                                        style={on ? {
-                                          borderColor: `rgb(${getDisciplineColorRgb('run')})`,
-                                          backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.12)`,
-                                        } : undefined}
+                                        /**
+                                         * ⛔ NEUTRAL WHEN SELECTED (Michael, 2026-08-18):
+                                         * *"overall colour should be neutral — ride kinda sits in
+                                         * running, it's confusing."*
+                                         *
+                                         * The sport colours were applied here on 2026-08-18 to fix
+                                         * the opposite complaint (a ride's option rendering in
+                                         * strength orange). That fix over-corrected: a GREEN
+                                         * "Ride is intensity" button sitting inside the hard-day
+                                         * card reads as a ride ROW, not as a ride CHOICE, and the
+                                         * card is about both sports at once.
+                                         *
+                                         * ⛔ THE RULE THIS SETTLES: on this screen sport colour
+                                         * means IDENTITY — it belongs on the Ride / Run chips that
+                                         * say which sessions exist. A control that is merely
+                                         * SELECTED is neutral white. Do not re-colour these; the
+                                         * next screenshot round will just swing it back.
+                                         */
+                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'border-white/55 bg-white/[0.10]' : 'border-white/12 bg-white/[0.03]'}`}
                                       >
                                         <span className="block text-white/90 text-sm">{opt.title}</span>
                                         <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
