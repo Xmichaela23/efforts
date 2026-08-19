@@ -2127,6 +2127,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * where it decides whether an explicit allocation outranks the discipline rule.
    */
 
+  /**
+   * ⛔ DID THE ATHLETE ALLOCATE, OR DID THE ENGINE? Exactly the `fullyAllocated` test `hardRoleOf`
+   * and `assignHardRoles` both use: every prescribed slot carrying a role means they tapped the
+   * control, which writes both. Anything less means the role on the sustained card is the engine's
+   * discipline rule speaking, not a choice.
+   *
+   * ⚠️ IT EXISTED, WAS DELETED WHEN ITS ONLY CALLER MOVED TO THE BANNER, AND IS BACK FOR A SMALLER
+   * ONE — a `Default` tag rather than a sentence. Michael: *"we default to threshold — a way to
+   * notify the user, quick and non-idiomatic."* A tag is the shortest honest form of that: it names
+   * who decided, sits beside the control that undoes it, and vanishes the moment they use it.
+   */
+  const allocationIsExplicit = (() => {
+    const pres = state.hardDays.filter((h) => h.ownership !== 'club');
+    return pres.length > 0 && pres.every((h) => !!h.role);
+  })();
+
   const allocateIntensityTo = (slot: number) => setState((st) => ({
     ...st,
     hardDays: st.hardDays.map((h, i) => (
@@ -4904,6 +4920,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                           {club ? ' — club session'
                                             : role === 'threshold' ? ' — sustained threshold' : ' — top-end intensity'}
                                         </span>
+                                        {/* ⛔ ONE WORD, NOT A SENTENCE (Michael, 2026-08-19). The app
+                                            chose this role and said nothing — every other trade on
+                                            this screen states its price, and the one place the
+                                            ENGINE decided was silent. A paragraph was tried and cut
+                                            for redundancy; this is the shortest honest form: it
+                                            names who decided and sits beside the button that undoes
+                                            it.
+                                            ⚠️ SAME `OPTIONAL` TREATMENT the row label already uses,
+                                            deliberately — the athlete has seen this tag before and
+                                            it means the same thing: nobody typed this.
+                                            ⛔ ONLY ON THE SUSTAINED CARD, and only while the
+                                            allocation is the engine's. Tagging both cards would be
+                                            noise, and tagging one the athlete allocated would be a
+                                            lie about who chose. */}
+                                        {!club && !lone && role === 'threshold' && !allocationIsExplicit && (
+                                          <span className="ml-1.5 text-[10px] uppercase tracking-wide text-white/35 font-normal">
+                                            Default
+                                          </span>
+                                        )}
                                       </span>
                                       <div className="flex items-center gap-1.5 shrink-0">
                                         {/* ⛔ THE ALLOCATION IS AN ACTION ON THE CARD IT CHANGES
