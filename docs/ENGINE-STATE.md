@@ -31,7 +31,14 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 tested. The *preferences*. An athlete who never touches a control should open the block on the best
 arrangement available to them, and today they open on a legal one.
 
-**Start at these four files, in this order. Nothing else is the scheduler.**
+⛔ **FIRST, THE TRAP THAT WOULD COST YOU A DAY: THERE ARE TWO SCHEDULERS AND THEY SHARE NO CODE.**
+`_shared/week-optimizer.ts` (2,434 lines) is the RACE path — `generate-combined-plan`. It is NOT
+your file. `CLAUDE.md` called it *"the sole authority"* until 2026-08-19 and a session reading that
+would land there and be in the wrong engine for everything below. **Yours is
+`_shared/week-model/`**, the strength-primary path, which is what `strength-primary-plan.ts` and the
+wizard both call.
+
+**Start at these four files, in this order. Nothing else is the scheduler you were asked about.**
 
 | file | lines | what it owns |
 |---|---|---|

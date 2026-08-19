@@ -248,9 +248,30 @@ Plus secondary state: `coach_cache`, `block_adaptation_cache`, `session_load`, `
 
 Type at `supabase/functions/_shared/session-detail/types.ts` (~732 lines, ~30 nested fields). Built by `workout-detail/index.ts:815` from an athlete-snapshot slice + `workout_analysis` via `_shared/session-detail/build.ts` (2102 lines). ⟨A31⟩ Client renders verbatim.
 
-### Scheduling: optimizer is the sole authority
+### ⛔ Scheduling: TWO ENGINES, TWO PATHS — check which one you are in FIRST
 
-After the 2026-05-09 consolidation, `_shared/week-optimizer.ts` owns every "what day does X go on" decision. `generate-combined-plan/week-builder.ts` reads day assignments from `AthleteState` fields populated by `reconcile-athlete-state-week-optimizer.ts` and only generates session content (intervals, paces, durations, flavor by phase, brick targets, swim templates). The reconciler now runs unconditionally inside `generate-combined-plan/index.ts`; it self-short-circuits when `long_run_day` is missing, in which case the builder's minimal legacy strength fallback fires for that contained edge case.
+**This section said "the optimizer is the sole authority" until 2026-08-19, and that stopped being
+true on 2026-08-18.** A session told to work on "the scheduling engine" read it, went to
+`week-optimizer.ts`, and would have been in the wrong file for anything Strong Focus.
+
+| path | engine | entry |
+|---|---|---|
+| **Race / combined plans** | `_shared/week-optimizer.ts` (2,434 lines) | `generate-combined-plan`, `create-goal-and-materialize-plan`, `arc-setup-chat` |
+| **Strength-primary (Strong Focus)** | `_shared/week-model/` — `model.ts` = the LAW, `resolve.ts` = the six score terms | `strength-primary-plan.ts`, and the CLIENT: `NonRaceBuilder.tsx`, `suggest-hard-days.ts`, `pairing-timing.ts` |
+
+⛔ **They share no code.** `week-model` is a two-layer design: Layer 1 (`model.ts`) rules a week
+LEGAL, Layer 2 (`resolve.ts`) picks among legal weeks with six weighted score terms that can never
+buy an illegal one. `week-optimizer` predates that split. **Do not "unify" them without a ruling** —
+they encode different laws for different block types.
+
+⚠️ **`place-week.ts` is a THIRD placer and is not a rival:** it owns the ANCHORS (long run, long
+ride, hard days) on the strength path and is the fallback when `resolve()` returns `unsolvable`. Two
+placers on one law, as `CAPABILITY-MAP.md` records.
+
+⚠️ **And `week-model` runs on the CLIENT too** — the `@shared` Vite alias means the wizard runs the
+real solver, so a change there moves the intake preview and the built plan together.
+
+Within the race path, and unchanged: `_shared/week-optimizer.ts` owns every "what day does X go on" decision. `generate-combined-plan/week-builder.ts` reads day assignments from `AthleteState` fields populated by `reconcile-athlete-state-week-optimizer.ts` and only generates session content (intervals, paces, durations, flavor by phase, brick targets, swim templates). The reconciler now runs unconditionally inside `generate-combined-plan/index.ts`; it self-short-circuits when `long_run_day` is missing, in which case the builder's minimal legacy strength fallback fires for that contained edge case.
 
 The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table at line 337; the separate `ADJACENCY_HOURS_ROWS` table at line 131) ⟨A31⟩; sequential rules + placement live in `week-optimizer.ts` (`sequentialOk`, `canPlaceWithModifier`, `deriveOptimalWeek`). Spec: `docs/SCHEDULING-RULES.md`. ⚠️ **`docs/SCHEDULING-RULES-EXTRACTED.md` is NOT a snapshot of current code** — its own banner reads *"SNAPSHOT OUTDATED — 2026-05-09 … Kept for historical reference only"*, because the consolidation pass removed the builder guards it describes. **Read the code, not that file.** ⟨A31⟩
 
@@ -291,7 +312,7 @@ Audit details: `notes/docs-audit-2026-05-09.md`.
 Read these before touching the corresponding subsystem:
 
 - Session contract → `supabase/functions/_shared/session-detail/types.ts`, `build.ts`
-- Schedule placement → `supabase/functions/_shared/schedule-session-constraints.ts` (matrix + sequential prose), `_shared/week-optimizer.ts` (sole authority), `generate-combined-plan/reconcile-athlete-state-week-optimizer.ts` (plumbing)
+- Schedule placement → ⛔ **TWO ENGINES — read the Scheduling section above before opening either.** Race path: `_shared/schedule-session-constraints.ts` (matrix), `_shared/week-optimizer.ts`, `generate-combined-plan/reconcile-athlete-state-week-optimizer.ts` (plumbing). Strength-primary path: `_shared/week-model/model.ts` (law) + `resolve.ts` (score) + `shared/strength-system/place-week.ts` (anchors, fallback)
 - Arc / athlete state → `supabase/functions/_shared/arc-context.ts`, `_shared/athlete-snapshot/`, `compute-snapshot/`, `compute-facts/`
 - Coach (deterministic week-context engine, LLM on top) → `supabase/functions/coach/`, `coach/methodologies/`
 - Plan generation → `generate-combined-plan/`, `generate-run-plan/types.ts` (`PlanContractV1`)
