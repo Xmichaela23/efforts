@@ -262,8 +262,15 @@ for (const r of RECIPES) {
     assertEquals(accessoryCostLine([25, 30], [25, 30]), null,
       'a high-volume athlete already in survival was told their hard day cost them a band');
     const moved = accessoryCostLine([25, 30], [40, 50]);
-    assert(moved && /25-30/.test(moved) && /40-50/.test(moved),
-      'the line must state BOTH bands — "reduced" without a from-number is not a price');
+    // ⚠️ DASH-AGNOSTIC. The line uses EN dashes in prose while the constants use hyphens, and a
+    // literal `/25-30/` read the 2026-08-18 copy rewrite as the from-number having been DELETED.
+    // What this asserts is that both bands are stated — "reduced" without a from-number is not a
+    // price — not which dash character sits between them.
+    const bands = (t: string) => (t.match(/\d+\s*[-\u2013]\s*\d+/g) ?? []);
+    assert(moved != null, 'the line went silent on a real change');
+    assertEquals(bands(moved!).length, 2, `the line must state BOTH bands: ${moved}`);
+    assert(/25/.test(moved!) && /30/.test(moved!) && /40/.test(moved!) && /50/.test(moved!),
+      `the line lost one of its numbers: ${moved}`);
     // ⛔ NO IMPERATIVE. It describes a checkbook being balanced, never an instruction — and this is
     // exactly the sentence that would attract one.
     assertEquals(voiceViolation(moved!), null, `the cost line broke voice: ${moved}`);

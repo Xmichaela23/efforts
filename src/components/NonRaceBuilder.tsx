@@ -44,6 +44,7 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import {
   accessoryCostLine, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
+  SECONDARY_DEFAULT_NOTE,
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
 import { solveWizardWeek } from '@/lib/suggest-hard-days';
@@ -2117,6 +2118,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ CLUB SLOTS ARE SKIPPED, not overwritten: a club session already holds the sustained slot by
    * its nature and the athlete does not get to reassign it.
    */
+  /**
+   * ⛔ DID THE ATHLETE ALLOCATE, OR DID THE ENGINE? Exactly the `fullyAllocated` test `hardRoleOf`
+   * and `assignHardRoles` both use: every prescribed slot carrying a role means they tapped the
+   * control, which writes both. Anything less is inherited from a one-slot answer or absent
+   * entirely, and the role on the sustained card is the engine's discipline rule speaking.
+   */
+  const allocationIsExplicit = (() => {
+    const pres = state.hardDays.filter((h) => h.ownership !== 'club');
+    return pres.length > 0 && pres.every((h) => !!h.role);
+  })();
+
   const allocateIntensityTo = (slot: number) => setState((st) => ({
     ...st,
     hardDays: st.hardDays.map((h, i) => (
@@ -4424,8 +4436,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           accessory band before a rep is authored. Two hard days drops the band to
                           25-30 reps; none opens it to 40-50. */}
                       <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
-                        Add speed, VO2 max or threshold work. Each day you add trims your accessory
-                        lifting — your nervous system pays for both, and the barbell gets paid first.
+                        Add speed, VO2 max, or threshold work. High-intensity sessions create
+                        competing fatigue; each day added actively reduces your accessory lifting
+                        volume to protect your strength gains.
                       </p>
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
@@ -4867,6 +4880,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     </div>
 
                                     <div className="px-3 pb-2.5 space-y-1.5">
+                                      {/* ⛔ WHY THE APP CHOSE FOR THEM, ON THE CARD IT CHOSE FOR —
+                                          and ONLY when it actually chose. A second hard session is
+                                          handed the sustained role by the discipline rule; without
+                                          this it arrives as a decision with no reason attached.
+                                          ⛔ GATED ON `fullyAllocated`: once the athlete taps "Set as
+                                          top-end", both slots carry an explicit role and the
+                                          sustained one is THEIR call. Saying the app defaulted it
+                                          would be false — and the kind of false that teaches an
+                                          athlete to stop reading the copy. Same test the resolver
+                                          uses, so the two cannot drift. */}
+                                      {!club && !lone && role === 'threshold' && !allocationIsExplicit && (
+                                        <p className="text-white/50 text-xs leading-snug">
+                                          {SECONDARY_DEFAULT_NOTE}
+                                        </p>
+                                      )}
                                       {/* ── the session: a choice, or a statement ─────────────── */}
                                       {opts ? (
                                         <div className="space-y-1">

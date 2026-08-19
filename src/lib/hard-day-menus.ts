@@ -326,6 +326,25 @@ export const accessoryCostLine = (
   baseline: readonly [number, number],
 ): string | null => {
   if (band[0] === baseline[0] && band[1] === baseline[1]) return null;
-  return `Accessory work drops to ${band[0]}-${band[1]} reps per exercise, from ${baseline[0]}-${baseline[1]}. `
-    + 'The barbell gets paid first.';
+  // ⚠️ EN DASHES IN THE RANGES, deliberately — these are numeric ranges in running prose, not the
+  // hyphenated `25-30` the code constants use.
+  return `Accessory work reduced to ${band[0]}\u2013${band[1]} reps per exercise `
+    + `(down from ${baseline[0]}\u2013${baseline[1]}). `
+    + 'Volume is strictly capped to protect your heavy barbell progression.';
 };
+
+/**
+ * ⛔ WHY THE APP CHOSE FOR THEM — SHOWN ONLY WHEN IT ACTUALLY DID (Michael, 2026-08-18).
+ *
+ * A second hard session is handed `sustained threshold` by the discipline rule, and to the athlete
+ * that arrives as a decision made on their behalf with no reason attached. This is the reason,
+ * grounded in impact and load rather than in physiology — the science stays behind the (i).
+ *
+ * ⛔ IT MUST NOT SHOW ON A CARD THE ATHLETE ALLOCATED THEMSELVES. Once they tap "Set as top-end",
+ * both slots carry an explicit role and the sustained one is THEIR call — telling them the app
+ * defaulted it would be false, and it is the kind of false that teaches an athlete to stop reading
+ * the copy. The caller gates on the same "fully allocated" test the resolver uses.
+ */
+export const SECONDARY_DEFAULT_NOTE =
+  'Secondary sessions default to sustained threshold to manage physical impact and maintain '
+  + 'training integrity.';
