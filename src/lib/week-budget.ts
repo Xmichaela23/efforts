@@ -107,8 +107,17 @@ export function weekDayRoles(input: {
   trainingDays: readonly string[];
   longRunDay?: string;
   standingDay?: string;
-  /** The one hard session's day — Strong Focus's own anchor. Absent on the race flow. */
+  /**
+   * ⛔ HARD SESSION DAYS — PLURAL SINCE 2026-08-18. §1i allows up to two, and this took ONE, so a
+   * week with a hard run and a hard ride lettered whichever the caller happened to pass and left the
+   * other blank. The athlete saw a preview missing a day they had picked.
+   *
+   * ⚠️ `hardDay` IS KEPT AS THE SINGULAR ALIAS so the race flow and every other caller are
+   * untouched. Both are read; duplicates are harmless because the loop matches per day.
+   */
   hardDay?: string;
+  /** Additional hard-session days beyond the first. Strong Focus only. */
+  extraHardDays?: readonly string[];
   /** The long ride's day. Absent on the race flow, which has no bike anchor. */
   longRideDay?: string;
   /** Day vocabulary to answer in. Defaults to the lower-case names the intake uses. */
@@ -124,7 +133,7 @@ export function weekDayRoles(input: {
     // stable answer instead of flickering between two.
     if (input.longRunDay === d) { out[d] = 'LR'; continue; }
     if (input.longRideDay === d) { out[d] = 'LB'; continue; }
-    if (input.hardDay === d) { out[d] = 'H'; continue; }
+    if (input.hardDay === d || input.extraHardDays?.includes(d)) { out[d] = 'H'; continue; }
     if (input.standingDay === d) { out[d] = 'C'; continue; }
     if (!pinned) continue;
     out[d] = input.trainingDays.includes(d) ? 'E' : 'R';

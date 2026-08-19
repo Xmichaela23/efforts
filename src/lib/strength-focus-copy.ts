@@ -581,6 +581,33 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
       + 'tier you land in, only assistance reps change: your 85% working numbers and +5/+10 '
       + 'progression run untouched.',
   },
+  /**
+   * ⛔ THE SESSION BIOLOGY LIVES HERE NOW, NOT BETWEEN THE OPTIONS (2026-08-18). Each option card on
+   * the hard-day screen carries one operational line — movement, ground, reps — and everything that
+   * answers "why would I pick this one" is in these two sections, one tap away.
+   *
+   * ⚠️ THIS IS WHERE THE 48-HOUR CLAIM LIVES NOW, AND IT IS LOAD-BEARING: `goal: 'speed'` is what
+   * makes the solver prefer 48h between the session and heavy lower work (`isFlatFootfall` →
+   * `preferredClearance`). If that preference is ever removed, this sentence is a promise the week
+   * stops keeping.
+   */
+  {
+    heading: 'Incline vs flat — what the ground costs',
+    body:
+      'Running uphill removes the impact transient, so a hard 3-minute climb buys a top-end aerobic '
+      + 'session the legs barely pay for. Flat sprinting is the opposite: repeated maximal footfall '
+      + 'is mechanical damage, and it is the one session the engine holds 48 hours clear of heavy '
+      + 'squats. Sustained threshold sits between them — level footfall, submaximal effort, but far '
+      + 'more of it.',
+  },
+  {
+    heading: 'Why intensity is the one we recommend',
+    body:
+      'Short intensity recruits the same fast-twitch fibers and the same energy system the barbell '
+      + 'runs on, so it does not send the signal that shifts muscle toward endurance. Prolonged '
+      + 'metabolic work does, and that is the interference effect — which is why the threshold '
+      + 'option names it as a cost rather than hiding it.',
+  },
   {
     heading: 'What it holds',
     body:

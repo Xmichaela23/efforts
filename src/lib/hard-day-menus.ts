@@ -44,6 +44,19 @@
  * sets it.
  */
 
+/**
+ * ⛔ `body` IS ONE OPERATIONAL LINE — WHAT YOU DO AND WHERE. NOT WHY (Michael, 2026-08-18: *"three
+ * lines of dense physiological explanation inside a radio button is terrible for mobile
+ * scannability… dump the biological why into the tooltip"*).
+ *
+ * The athlete here is choosing fast between two or three sessions. The eccentric-impact argument,
+ * the neural-drive argument and the 48-hour clearance are all real and all live one tap away in
+ * `HARD_DAY_WHY`, not stacked between the options they are choosing between.
+ *
+ * ⛔ A `body` THAT GROWS A SECOND SENTENCE OF MECHANISM IS A REGRESSION. Keep: the movement, the
+ * ground, the reps. Move to the (i): any clause carrying "because", "so that", or a physiological
+ * noun. ⚠️ "Recommended." is the one exception — it is a decision, not a mechanism.
+ */
 export type CopyOption<T extends string> = { id: T; title: string; body: string };
 
 /**
@@ -141,14 +154,12 @@ export const RUN_GROUND_OPTIONS: Array<CopyOption<'vo2' | 'speed'>> = [
   {
     id: 'vo2',
     title: 'VO2 max focus',
-    body: 'Incline — hill or treadmill. Hard 3-minute climbs. Uphill removes the eccentric impact, '
-      + 'so your knees and quads are still there for the barbell.',
+    body: 'Incline — a hill or treadmill. Hard 3-minute climbs.',
   },
   {
     id: 'speed',
     title: 'Speed focus',
-    body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
-      + 'costs you 48 hours clear of heavy squats.',
+    body: 'Flat ground — a track or road. Short explosive sprints.',
   },
 ];
 
@@ -248,15 +259,13 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
         title: 'Top-end intensity',
         // ⚠️ THE REAL SESSION, not a character sketch — same rule as `SESSION_PRESCRIPTION`, which
         // this deliberately mirrors word for word so the two cannot drift apart.
-        body: 'Helgerud 4 × 4 — four 4-minute efforts at max sustainable power, halving to 2 × 4 in '
-          + 'the final weeks. Same fast-twitch pathways as the barbell. Recommended.',
+        body: 'Helgerud 4 × 4 — four 4-minute efforts at max sustainable power. Recommended.',
         role: 'intensity',
       },
       {
         id: 'threshold',
         title: 'Sustained threshold',
-        body: '4 × 5 min building to 2 × 10 at 95-105% FTP. Builds stamina, but prolonged efforts '
-          + 'compete hardest with strength.',
+        body: '4 × 5 min building to 2 × 10 at 95-105% FTP.',
         role: 'threshold',
       },
     ]
@@ -270,23 +279,20 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
       {
         id: 'vo2',
         title: 'VO2 max focus',
-        body: 'Incline — hill or treadmill. Hard 3-minute climbs. Uphill removes the eccentric '
-          + 'impact, so your legs are still there for the barbell. Recommended.',
+        body: 'Incline — a hill or treadmill. Hard 3-minute climbs. Recommended.',
         role: 'intensity',
         goal: 'vo2',
       },
       {
         id: 'threshold',
         title: 'Sustained threshold',
-        body: '4 × 5 min building to 2 × 10, about 20 s/mi slower than 5K pace. Builds stamina, '
-          + 'but prolonged efforts compete hardest with strength.',
+        body: '4 × 5 min building to 2 × 10, about 20 s/mi slower than 5K pace.',
         role: 'threshold',
       },
       {
         id: 'speed',
         title: 'Speed focus',
-        body: 'Flat ground — track or road. Explosive sprints. High neural drive, but the footfall '
-          + 'costs you 48 hours clear of heavy squats.',
+        body: 'Flat ground — a track or road. Short explosive sprints.',
         role: 'intensity',
         goal: 'speed',
       },

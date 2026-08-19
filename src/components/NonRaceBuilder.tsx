@@ -1440,7 +1440,23 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // qualityDays.run (gold) or qualityDays.bike (green). Kept single: switching sport drops the other.
   const [clubSport, setClubSport] = useState<'run' | 'bike'>('run');
   /** Which hard-day slot the shared day row is currently filling (§1i). Card-local, like `clubSport`. */
-  const [activeHardSlot, setActiveHardSlot] = useState(0);
+  /**
+   * ⛔⛔ `activeHardSlot` IS DELETED (2026-08-18). ⛔ DO NOT REINTRODUCE IT IN ANY FORM.
+   *
+   * It held "which hard session are the shared controls editing", and NOTHING ON SCREEN SAID WHICH.
+   * A chip row set it; the club checkbox, the session sub-question and the Schedule step's day
+   * picker all read it. So one visible control edited two different pieces of data depending on an
+   * invisible background toggle — an athlete with two hard sessions picked BOTH days through ONE
+   * row, and a tap landed on whichever slot a chip two screens earlier had left selected.
+   *
+   * Michael: *"a classic state entanglement trap… that is exactly how users accidentally delete
+   * their own inputs without realising it."*
+   *
+   * ⛔ THE REPLACEMENT IS CONTAINMENT: every hard session renders its own card on the intensity step
+   * and its own labelled day row on the Schedule step, and each writes its own index `i` from the
+   * loop it is in. There is no shared cursor, so there is nothing to desync. If you find yourself
+   * wanting "the current slot", you are about to rebuild this bug.
+   */
   const [state, setState] = useState<NonRaceState>({
     // Deep-linked from the Goals door. ⚠️ `goal` IS SEEDED HERE FOR RACE, DELIBERATELY: `getSteps`
     // branches on it, so leaving it null for one render would flash the posture screen before the
@@ -1715,9 +1731,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ Clamped to the list on every render: dropping a slot must not leave the row writing into an
    * index that no longer exists, which is the same class of bug `scheduleAsk` guards against above.
    */
-  const hardSlotIndex = Math.min(activeHardSlot, Math.max(0, state.hardDays.length - 1));
-  const activeHard = state.hardDays[hardSlotIndex] ?? null;
-  const hardDaySport: 'run' | 'bike' | null = activeHard?.discipline ?? null;
+  /**
+   * ⚠️ `hardSlotIndex` / `activeHard` / `hardDaySport` WENT WITH IT. `hardDaySport` fed the row's
+   * accent colour — which is now neutral for this row anyway, because the hard row is the one row
+   * that is not one sport.
+   */
   /** Every day already spoken for by a hard slot — a second slot may not take the first one's day. */
   /**
    * ⛔ THE ENGINE'S PROPOSED DAY, READ OFF THE PREVIEW (§1i placement model, slice 8).
@@ -1754,7 +1772,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   }, [previewWeek, state.hardDays]);
   /** What the row shows for a slot: the athlete's day if they moved it, otherwise the engine's. */
   const dayForSlot = (i: number): DayName | '' => state.hardDays[i]?.day || proposedDays[i] || '';
-  const hardDayValue = activeHard ? dayForSlot(hardSlotIndex) : '';
+  /**
+   * ⛔ EVERY HARD DAY, NOT "THE ACTIVE ONE" (2026-08-18). `hardDayValue` was one string read through
+   * the deleted cursor, so the week preview below lettered ONE hard session and silently ignored the
+   * other — the athlete saw a week that was missing a day they had picked.
+   */
+  const hardDayValues: string[] = state.hardDays
+    .map((_, i) => String(dayForSlot(i) ?? ''))
+    .filter((d) => d !== '');
   // ⚠️ RESOLVED DAYS, not just the athlete's — a slot must not be able to take the day the engine
   // proposed for the other one, or two hard sessions land together and the composer dedupes one away.
   /** ⛔ THE COUNT DRIVES THE COPY (§1i). One HOLDS top-end fitness; two BUILDS it. */
@@ -2099,9 +2124,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     )),
   }));
 
+  /**
+   * ⚠️ THE HARD ROW NO LONGER USES THIS — it renders one `WeekDayRow` per session, each with its own
+   * `selected`. Only the two single-answer anchors read it.
+   */
   const scheduleSelectedDay =
-    scheduleAsk === 'hard' ? hardDayValue
-      : scheduleAsk === 'long' ? (state.longRunDay || '')
+    scheduleAsk === 'long' ? (state.longRunDay || '')
         : scheduleAsk === 'ride' ? (state.longRideDay || '')
           : '';
   /**
@@ -2115,7 +2143,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     trainingDays: [],
     longRunDay: state.longRunDay || undefined,
     longRideDay: state.longRideDay || undefined,
-    hardDay: hardDayValue || undefined,
+    // ⛔ ALL OF THEM. This took one day and dropped the second hard session out of the preview.
+    hardDay: hardDayValues[0] as DayName | undefined,
+    extraHardDays: hardDayValues.slice(1) as DayName[],
     days: DAYS,
   }) as Partial<Record<DayName, DayRole>>;
 
@@ -4278,7 +4308,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 const rowSport =
                   row.key === 'runs' || row.key === 'long' ? 'run'
                   : row.key === 'rides' || row.key === 'ride' ? 'bike'
-                  : row.key === 'hard' ? (hardDaySport || null)
+                  // ⚠️ THE HARD ROW IS NEUTRAL — it holds a run and a ride at once.
                   : null;
                 const rowSportRgb = rowSport ? getDisciplineColorRgb(rowSport) : null;
                 const border = i > 0 ? 'border-t border-white/8' : '';
@@ -4350,111 +4380,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <span className="text-[10px] uppercase tracking-wide text-white/35 font-normal">Optional</span>
                           )}
                         </span>
-                        {/* ⛔ RUN OR RIDE, PER SLOT — AND THERE ARE UP TO TWO NOW (§1i, 2026-08-17).
-                            This was a one-of-n radio over `qualityDays`, which is keyed BY SPORT and
-                            therefore cannot hold two hard runs. It is now one chip per slot: tap Run
-                            or Ride to ADD a slot, tap a slot to make it the one the day row is
-                            filling, tap the lit one again to remove it.
+                        {/* ⛔⛔ THE SPORT CHIPS AND THE ADD BUTTONS ARE GONE FROM THE HEADER (2026-08-18).
+                            THIS IS THE `activeHardSlot` TEARDOWN — read it before putting either back.
 
-                            ⛔ WHAT THE OLD RADIO WAS PROTECTING, AND WHY IT NO LONGER APPLIES. Its
-                            comment lists three things that broke when both disciplines were lit at
-                            once: D-327 allowed exactly one hard day; `hardDaySport` resolved
-                            run-first and left the other holding ''; and the terrain menu was gated on
-                            the sport rather than on the slot. §1i retires the first outright, and the
-                            other two are fixed at the root here — the day row writes into an INDEX,
-                            and the slot list is what every gate reads.
+                            The chips did TWO jobs at once: they listed the hard sessions, and tapping
+                            one silently changed which slot every control below was editing. That
+                            second job was invisible. The club checkbox, the day picker on the
+                            Schedule step and the whole session sub-question all wrote into
+                            `hardDays[hardSlotIndex]` — an index the athlete had no way to see. Two
+                            identical-looking controls, one of them writing somewhere you were not
+                            looking. Michael: *"one visual control secretly editing multiple discrete
+                            pieces of data based on an invisible background toggle."*
 
-                            ⚠️ THE CAP IS TWO AND THE SCREEN ENFORCES IT, not just the engine. A third
-                            chip that silently did nothing would be worse than one that is not there.
+                            ⛔ EVERY HARD SESSION IS NOW A SELF-CONTAINED CARD, rendered below, that
+                            carries its own role, its own session choice, its own club flag and its
+                            own remove. There is no active slot, so there is nothing to desync.
 
-                            ⚠️ SPORT COLOUR, NOT THE BLOCK ACCENT — this is a discipline SELECTOR and
-                            speaks the app's wayfinding language (run gold, ride green). It is
-                            identity, not a cost signal: the §5 note against implying a hard ride is
-                            "cheaper" than a hard run is about COPY, and no number here claims one. */}
-                        {/* ⛔ SELECTING AND DELETING WERE THE SAME TAP, AND THAT IS THE WONK
-                            (Michael, 2026-08-18: "the hard day buttons are wonky — it's not clear
-                            what the user is choosing"). Three behaviours sat on visually identical
-                            chips: tap a dim chip to SELECT it, tap the lit chip to DELETE it, tap
-                            +Run to ADD. The destructive one was the one you reached by tapping the
-                            thing you had just selected, with no affordance saying so.
-                            ⛔ NOW: the chip selects, and only the × removes. */}
-                        <div className="flex items-center gap-1.5" role="group" aria-label="Hard sessions">
-                          {state.hardDays.map((h, i) => (
-                            <span
-                              key={`slot-${i}`}
-                              className={`inline-flex items-center rounded-xl border overflow-hidden ${i === hardSlotIndex ? 'ring-1 ring-white/40' : ''}`}
-                              style={{
-                                borderColor: `rgb(${getDisciplineColorRgb(h.discipline)})`,
-                                backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline)},0.16)`,
-                              }}
-                            >
-                              <button
-                                type="button"
-                                aria-label={`Hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
-                                aria-pressed={i === hardSlotIndex}
-                                onClick={() => setActiveHardSlot(i)}
-                                className="px-2.5 py-1 text-xs text-white focus:outline-none"
-                              >
-                                {h.discipline === 'run' ? 'Run' : 'Ride'}
-                                {dayForSlot(i) ? ` · ${DAY_SHORT[dayForSlot(i) as DayName]}` : ''}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Remove hard ${h.discipline === 'run' ? 'run' : 'ride'} ${i + 1}`}
-                                onClick={() => {
-                                  setState((st) => ({ ...st, hardDays: st.hardDays.filter((_, j) => j !== i) }));
-                                  setActiveHardSlot(0);
-                                }}
-                                className="pl-1 pr-2 py-1 text-xs text-white/55 focus:outline-none"
-                              >×</button>
-                            </span>
-                          ))}
-                        </div>
-                        {/* ⛔ ADDING A DAY IS THE CARD'S PRIMARY ACTION AND IT WAS A GHOST CHIP
-                            (Michael, 2026-08-18: "these run ride buttons need to be much clearer and
-                            bigger"). "+ Run" and "+ Ride" were 12px dashed outlines at 60% white,
-                            tucked into the right edge of the label row, beside two paragraphs of
-                            prose. On a screen whose whole job is "how much intensity does this block
-                            carry", the control that answers it was the least visible thing on it.
-                            ⛔ THEY ARE FULL-WIDTH, SPORT-COLOURED AND SIZED TO TAP now, on their own
-                            row under the rationale rather than competing with the label. ⚠️ They
-                            disappear at the cap and when §7's gate has no number to price the
-                            session with — the reason renders below, so an absent button is never
-                            silent. */}
-                        {state.hardDays.length < MAX_HARD_DAY_SLOTS && (
-                          <div className="flex gap-2 pt-1">
-                            {(['run', 'bike'] as const)
-                              .filter((d) => posturePresent(d))
-                              // §7's gate: the option is not offered when the number that would
-                              // price it is missing. The reason renders under the row.
-                              .filter((d) => hardDayAvailable[d])
-                              .map((d) => (
-                              <button
-                                key={`add-${d}`} type="button"
-                                aria-label={`Add a high intensity ${d === 'run' ? 'run' : 'ride'}`}
-                                onClick={() => {
-                                  setState((st) => (st.hardDays.length >= MAX_HARD_DAY_SLOTS ? st : {
-                                    ...st,
-                                    hardDays: [...st.hardDays, { discipline: d, day: '' as const, ownership: 'prescribed' as const }],
-                                  }));
-                                  setActiveHardSlot(state.hardDays.length);
-                                }}
-                                /**
-                                 * ⛔ NEUTRAL — THIS IS WHAT THE ATHLETE LANDS ON (Michael,
-                                 * 2026-08-18: *"user lands here, should be neutral"*).
-                                 *
-                                 * ⚠️ IT NARROWS THE IDENTITY RULE FROM THE COMMIT BEFORE THIS ONE,
-                                 * and the narrowing is the point. Sport colour marks a session that
-                                 * EXISTS — the Ride / Run chips listing what the block carries. An
-                                 * empty card is two colours shouting before anything has been
-                                 * chosen, which is the whole screen's first impression. The button
-                                 * says which sport in its own words; it does not need to shout it.
-                                 */
-                                className="flex-1 py-3 rounded-xl text-[15px] font-medium border border-white/15 bg-white/[0.05] text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                              >+ Add a {d === 'run' ? 'run' : 'ride'}</button>
-                            ))}
-                          </div>
-                        )}
+                            ⚠️ THE ADD BUTTONS MOVED BELOW THE CARDS, where "add another" belongs —
+                            they were above a list they append to. */}
                       </div>
                       </>
                     ) : (
@@ -4489,16 +4432,85 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             a card that has nothing to do with riding. */}
                         {row.key === 'hard' && currentStep === 'hardday' ? null
                           : row.kind === 'day' ? (
+                          row.key === 'hard' ? (
+                            /* ══ ONE DAY PICKER PER HARD SESSION ═══════════════════════════════
+                               ⛔⛔ THE SCHEDULE STEP HAD THE SAME `activeHardSlot` TRAP, AND WORSE.
+                               A single day row wrote into `hardDays[hardSlotIndex]` — so an athlete
+                               with two hard sessions picked BOTH days through ONE control, and which
+                               session a tap landed on depended on a chip they may have touched two
+                               screens ago. The row could not even show them the other day.
+
+                               ⛔ EVERY SESSION GETS ITS OWN LABELLED ROW, writing its own index. The
+                               label repeats the card's title so the two steps name the same thing.
+                               ⚠️ `roles` and `taken` are unchanged: the long-run and long-ride
+                               anchors still render NAMED in every row rather than merely dead. */
+                            <div className="space-y-3">
+                              {state.hardDays.map((h, i) => {
+                                const dayVal = dayForSlot(i);
+                                const rgb = getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run');
+                                const label = `${h.discipline === 'bike' ? 'Ride' : 'Run'}${
+                                  h.ownership === 'club' ? ' — club session'
+                                    : hardRoleOf(i) === 'threshold' ? ' — sustained threshold'
+                                      : ' — top-end intensity'}`;
+                                return (
+                                  <div key={`hard-day-${i}`} className="space-y-1">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-white/85 text-sm">{label}</span>
+                                      <span className="text-xs" style={{ color: `rgba(${rgb},0.85)` }}>
+                                        {/* ⚠️ THE CUE IS PER ROW because the answer is per row — a
+                                            shared "tap a day for your hard session" could not say
+                                            WHICH session was still unanswered. */}
+                                        {dayVal
+                                          ? (suggestedHardDays[i] === dayVal ? 'Suggested — tap to move' : DAY_SHORT[dayVal as DayName])
+                                          : 'Tap a day'}
+                                      </span>
+                                    </div>
+                                    <WeekDayRow
+                                      selected={dayVal ? [dayVal as DayName] : []}
+                                      roles={scheduleRoles}
+                                      taken={{}}
+                                      /* ⛔ NOTHING IS DISABLED. The other slot's day is NOT locked:
+                                         two hard sessions on one day still builds as one, and the
+                                         PLAN says so — a lock made it look like a broken button. */
+                                      disabled={[]}
+                                      onTap={(d) => {
+                                        // ⛔ THE TAP MARKS THIS UNIT DIRTY WHATEVER IT DOES — set,
+                                        // move or CLEAR. Clearing is the case that matters: it is an
+                                        // answer, and the engine used to read it as an empty field
+                                        // and refill it.
+                                        touch(`hard:${i}`);
+                                        setState((st) => {
+                                          const next = [...st.hardDays];
+                                          const cur = next[i];
+                                          if (!cur) return st;
+                                          next[i] = { ...cur, day: cur.day === d ? '' : d };
+                                          return { ...st, hardDays: next };
+                                        });
+                                      }}
+                                    />
+                                    {/* ⛔ THE OPINIONATED DEFAULT, SAID OUT LOUD — and per session,
+                                        because each one gets its own suggestion. ⚠️ Only while the
+                                        suggestion IS what is selected: the moment they move it, the
+                                        sentence would describe a day they are no longer on. */}
+                                    {dayVal && suggestedHardDays[i] === dayVal && (
+                                      <p className="text-white/60 text-xs leading-snug">
+                                        The best placement for this one, for recovery.
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {state.hardDays.length === 0 && (
+                                <p className="text-white/45 text-xs leading-snug">
+                                  No high intensity sessions in this block. Nothing to place.
+                                </p>
+                              )}
+                            </div>
+                          ) : (
                           <>
                             {/* Tap-to-pick cue, contextual to the open question. */}
                             <p className="text-xs" style={{ color: rowSportRgb ? `rgba(${rowSportRgb},0.85)` : 'rgba(var(--wiz-accent-rgb,236,233,227),0.85)' }}>
-                              {row.key === 'hard'
-                                ? (hardDaySport
-                                    ? (hardDayValue && suggestedHardDays[hardSlotIndex] === hardDayValue
-                                        ? 'Suggested — tap another day to move it'
-                                        : 'Tap a day for your hard session')
-                                    : 'Choose run or ride, then tap a day')
-                                : row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
+                              {row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
                             </p>
                             {/* ⛔ ONE ROW, EVERY DAY QUESTION. `taken` excludes the OPEN question's
                                 own anchor, which is what leaves that anchor releasable —
@@ -4508,88 +4520,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <WeekDayRow
                               selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
                               roles={scheduleRoles}
-                              /**
-                               * ⛔⛔ THE UI IS A DUMB WHITEBOARD (Michael, 2026-08-18). NOTHING here
-                               * prevents a collision, evicts an anchor, or locks a day. The pin lands
-                               * where they tapped, the chip shows it, and the ENGINE says what it
-                               * cost. *"If you want the UI to stop fighting the user, you have to rip
-                               * out the code that is blocking the pins from landing."*
-                               *
-                               * ⛔ THIS FILE HAS TRIED THREE SMARTER THINGS AND ALL THREE WERE FRICTION:
-                               *   • locking a day another anchor held — rendered it dead with an
-                               *     em-dash, so a Saturday/Sunday swap took three taps and a dead end;
-                               *   • locking the other hard slot's day — read as a button that would
-                               *     not register the tap;
-                               *   • auto-SWAPPING the two long days — better, and still the UI
-                               *     deciding something the athlete did not ask for.
-                               *
-                               * ⚠️ AND THE ENGINE IS WHAT MAKES THIS SAFE. A collision reaches the
-                               * health badge on the same screen, and a doubled hard day now reaches
-                               * the plan's compromise list in words. ⛔ Do not reintroduce a lock
-                               * here: defensive UI is what made this screen feel broken.
-                               */
                               taken={{}}
-                              // ⚠️ INERT UNTIL A DISCIPLINE IS CHOSEN. `qualityDays` is keyed by
-                              // sport, so there is no slot to write a day into before Run or Ride is
-                              // tapped. The cue line above says which choice unlocks it — a dead row
-                              // with no reason is worse than one that explains itself.
-                              // ⚠️ AND THE OTHER SLOT'S DAY IS LOCKED (§1i) — two hard sessions on one
-                              // calendar day is a double, not two hard days, and the composer would
-                              // drop the duplicate silently. Locked in the row so it cannot be entered.
-                              // ⚠️ THE ONLY DISABLED STATE LEFT IS "THERE IS NOTHING TO WRITE INTO":
-                              // a hard row with no discipline chosen yet has no slot to hold a day.
-                              // ⛔ The other slot's day is NOT locked any more. Two hard sessions on
-                              // one day still builds as one, and the plan now SAYS so — a lock made
-                              // it look like the button was broken instead.
-                              disabled={row.key === 'hard' && !activeHard ? DAYS : []}
+                              disabled={[]}
                               onTap={(d) => {
-                                // ⛔ TAP YOUR OWN DAY TO RELEASE IT — every question toggles, so no
-                                // pick is ever stuck and the athlete never hunts for a control to
-                                // undo one. Days the other anchors hold are locked in the row, so a
-                                // plain toggle is safe here.
-                                // ⛔ THE TAP MARKS THE UNIT DIRTY, WHATEVER IT DOES NEXT — set, move
-                                // or CLEAR. Clearing is the case that matters: it is an answer, and
-                                // before this the engine read it as an empty field and refilled it.
-                                touch(row.key === 'hard' ? `hard:${hardSlotIndex}`
-                                  : row.key === 'long' ? 'longRun' : 'longRide');
-                                // ⛔ NO SWAP, NO EVICTION, NO LOCK. The tap writes the day and nothing
-                                // else moves — see the `taken` note above.
-                                if (row.key === 'hard') {
-                                  // ⛔ WRITES INTO THE ACTIVE SLOT (§1i). It used to write into
-                                  // `qualityDays[sport]`, which is keyed by sport and therefore
-                                  // cannot hold two hard runs. The slot index is what the day row is
-                                  // answering; a slot with no discipline yet has nothing to write to.
-                                  if (!activeHard) return;
-                                  setState((st) => {
-                                    const next = [...st.hardDays];
-                                    const cur = next[hardSlotIndex];
-                                    if (!cur) return st;
-                                    next[hardSlotIndex] = { ...cur, day: cur.day === d ? '' : d };
-                                    return { ...st, hardDays: next };
-                                  });
-                                } else if (row.key === 'long') {
+                                touch(row.key === 'long' ? 'longRun' : 'longRide');
+                                if (row.key === 'long') {
                                   setState((st) => ({ ...st, longRunDay: st.longRunDay === d ? '' : d }));
                                 } else {
                                   setState((st) => ({ ...st, longRideDay: st.longRideDay === d ? '' : d }));
                                 }
                               }}
                             />
-                            {/* ⛔ THE OPINIONATED DEFAULT, SAID OUT LOUD (Michael, 2026-08-18). The
-                                chip above arrives already selected by `week-model` — the same solver
-                                that will build the block — so the athlete opens this screen on the
-                                best week rather than a blank grid. This line is what stops that
-                                selection reading as an arbitrary preset.
-                                ⚠️ ONLY WHILE THE SUGGESTION IS THE THING SELECTED. The moment they
-                                move it, the sentence would be describing a day they are no longer on
-                                — and a claim that has stopped being true is worse than no claim. */}
-                            {row.key === 'hard' && hardDayValue
-                              && suggestedHardDays[hardSlotIndex] === hardDayValue && (
-                              <p className="text-white/70 text-sm leading-relaxed pt-1">
-                                This is the best placement of your hard days to allow for maximum
-                                recovery.
-                              </p>
-                            )}
                           </>
+                          )
                         ) : (
                           // COUNTS — the athlete says how many, `week-optimizer` says which days.
                           <div className="flex items-center gap-1.5">
@@ -4770,382 +4713,213 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                       + 'so the session could not get harder across the block. Add it in Training Baselines.'}
                                 </p>
                               ))}
-                            {/* ── WHOSE SESSION IS IT (§1i) ───────────────────────────────────
-                                ⛔ THE FLOW ASKED ONE QUESTION AND NEEDED TWO. "Which day" and "whose
-                                session" are different facts: the app can prescribe intervals into
-                                its own session and cannot prescribe anything into a club run the
-                                athlete turns up to. Today the hard day IS the club day — one input
-                                doing two jobs — which is right for PLACEMENT and wrong for
-                                PRESCRIPTION.
+                            {/* ══ ONE SELF-CONTAINED CARD PER HARD SESSION ══════════════════════
+                                ⛔⛔ THIS REPLACED A FLAT STACK OF SIX SHARED REGIONS AND AN INVISIBLE
+                                MODE (Michael, 2026-08-18: *"you're patching a frankenstein thing"*).
+                                He was right; read what it was before adding to it.
 
-                                ⚠️ BOTH ANSWERS ARE HARD DAYS. The club option does not make the day
-                                cheaper: it keeps its pin, its recovery cost and its share of the
-                                week's volume. What changes is whether the app writes the session.
-                                ⚠️ Same rule as swim — booked, not coached. */}
-                            {/* ⛔ ONE LINE, NOT TWO CARDS (Michael, 2026-08-18: "this isn't
-                                necessary"). Ownership was a full two-option question with a
-                                paragraph each, stacked above the goal question and the ground
-                                question — three blocks of prose on one card, for a decision almost
-                                every athlete answers the same way once.
+                                WHAT STOOD HERE: a club checkbox, a "what you want from it" list, an
+                                "intent allocation" note, an allocation toggle, a ground-question
+                                list and a per-slot statement block — six regions in one column, on a
+                                card already carrying a banner and a chip row. About two and a half
+                                phone screens, in which the second hard session's block was below the
+                                fold behind all of it.
 
-                                ⛔ THE QUESTION SURVIVES, THE WEIGHT DOES NOT. A club session is a
-                                real and irreversible difference: it takes its day, its recovery cost
-                                and its share of the week's volume, and the app must NOT write a
-                                session template into it — it cannot prescribe 4 × 3 min uphill into
-                                a group run. Deleting the control would silently turn every club
-                                night into a prescribed session. It is a toggle now: the default is
-                                ours, and the sentence that matters appears only when it is on. */}
-                            {activeHard && (
-                              <button
-                                type="button"
-                                onClick={() => setState((st) => {
-                                  const next = [...st.hardDays];
-                                  const cur = next[hardSlotIndex];
-                                  if (!cur) return st;
-                                  next[hardSlotIndex] = {
-                                    ...cur,
-                                    ownership: cur.ownership === 'club' ? 'prescribed' : 'club',
-                                  };
-                                  return { ...st, hardDays: next };
-                                })}
-                                aria-pressed={activeHard.ownership === 'club'}
-                                className="w-full text-left flex items-start gap-2.5 px-3 py-2 rounded-xl border border-white/12 bg-white/[0.04] mt-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                              >
-                                <span
-                                  className="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-md border-2 grid place-items-center"
-                                  style={{
-                                    borderColor: activeHard.ownership === 'club'
-                                      ? 'rgb(var(--wiz-accent-rgb,236,233,227))' : 'rgba(255,255,255,0.25)',
-                                    backgroundColor: activeHard.ownership === 'club'
-                                      ? 'rgb(var(--wiz-accent-rgb,236,233,227))' : 'transparent',
-                                  }}
-                                >
-                                  {activeHard.ownership === 'club' && (
-                                    <span className="text-[10px] text-black font-bold leading-none">✓</span>
-                                  )}
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block text-white/90 text-sm">
-                                    This is a club session I already attend
-                                  </span>
-                                  {/* ⛔ IT HAS TO SAY THAT A CLUB SESSION IS STILL A HARD DAY
-                                      (Michael, 2026-08-18). The old copy described what the app
-                                      DOESN'T do — "we do not prescribe what you do in it" — which
-                                      reads as the session being lesser, or free. It is neither: it
-                                      takes a slot, it costs the same recovery, and the lifting is
-                                      placed around it exactly as it is around one we wrote. An
-                                      athlete who reads it as "doesn't count" will add another.
-                                      ⚠️ AND THE DAY IS NOT ASKED HERE. Only the athlete knows when
-                                      their club meets, so it is never suggested — but it is picked
-                                      on the Schedule step with everything else, and the card says
-                                      so rather than leaving them looking for a day picker. */}
-                                  {activeHard.ownership === 'club' && (
-                                    <span className="block text-white/45 text-xs mt-0.5 leading-snug">
-                                      Still one of your high intensity days — same recovery cost, same
-                                      place in the week. We hold the day and leave the session to you.
-                                      You'll pick which day in the Schedule step.
-                                    </span>
-                                  )}
-                                </span>
-                              </button>
-                            )}
-                            {/* ⛔⛔ THE HIGH INTENSITY CARD, REBUILT 2026-08-18 (Michael, from the
-                                live screen). FOUR STATES, AND EACH ONE ASKS AT MOST ONE QUESTION.
+                                ⛔ AND THE STRUCTURAL DEFECT UNDERNEATH: three of those regions edited
+                                `hardDays[hardSlotIndex]` — a slot chosen by tapping a chip, with
+                                nothing on screen saying which one was active. The club checkbox
+                                rendered ONE slot's state while the session blocks rendered BOTH.
 
-                                WHAT WAS HERE: a goal menu (2 options) stacked on a ground menu (3-4
-                                options) stacked on a ride environment menu (3 options). One hard run
-                                asked five questions on one card and the ride asked about a setting
-                                that changed nothing but a sentence. His verdict: *"this is all a bit
-                                of a mess and consuing — need to be clear on intent and what the work
-                                out is, too many options."*
+                                ⛔ THE FIX IS CONTAINMENT, NOT COMPRESSION. Everything about a hard
+                                session — its role, its session choice, whose session it is, and
+                                removing it — lives inside that session's own card and edits that
+                                session's own index, `i`, which is right there in the loop. There is
+                                no active slot to desync. ⛔ Do not add a control here that reads or
+                                writes any slot other than `i`. */}
+                            <div className="space-y-2 pt-1">
+                              {state.hardDays.map((h, i) => {
+                                const role = hardRoleOf(i);
+                                const sport = h.discipline === 'bike' ? 'Ride' : 'Run';
+                                const rgb = getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run');
+                                const club = h.ownership === 'club';
+                                /**
+                                 * ⛔ THE ONE CASE THAT STILL ASKS: a prescribed RUN holding the top-end
+                                 * slot. Flat-vs-incline is the eccentric/concentric fork and the only
+                                 * ground choice that reaches Layer 1 — `goal: 'speed'` is what makes
+                                 * the solver prefer 48h between the session and heavy lower work.
+                                 * ⚠️ AT ONE SLOT THE QUESTION IS WIDER: intensity-vs-threshold has not
+                                 * been settled by an allocation toggle, so the list carries all three
+                                 * sessions and one tap writes both `role` and `goal`.
+                                 */
+                                const lone = state.hardDays.length === 1;
+                                const opts = club ? null
+                                  : lone ? singleSlotOptions(h.discipline)
+                                    : (h.discipline === 'run' && role === 'vo2'
+                                        ? RUN_GROUND_OPTIONS.map((o) => ({ ...o, role: 'intensity' as const, goal: o.id }))
+                                        : null);
+                                const prescription = h.discipline === 'bike'
+                                  ? (role === 'threshold' ? SESSION_PRESCRIPTION.ride_threshold : SESSION_PRESCRIPTION.ride_intensity)
+                                  : SESSION_PRESCRIPTION.run_threshold;
+                                return (
+                                  <div
+                                    key={`hard-card-${i}`}
+                                    className="rounded-xl border overflow-hidden"
+                                    style={{ borderColor: `rgba(${rgb},0.45)`, backgroundColor: `rgba(${rgb},0.07)` }}
+                                  >
+                                    {/* ── the card's own title bar: what this session IS ────────── */}
+                                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                                      <span className="text-white text-sm font-medium">
+                                        {sport}
+                                        {/* ⚠️ THE ROLE IS PART OF THE TITLE, NOT A SENTENCE UNDER IT.
+                                            The old card narrated "Your run holds the speed, your ride
+                                            is the sustained one" above two blocks whose headings said
+                                            the same thing. The heading IS the interlock now. */}
+                                        <span className="text-white/55 font-normal">
+                                          {club ? ' — club session'
+                                            : role === 'threshold' ? ' — sustained threshold' : ' — top-end intensity'}
+                                        </span>
+                                      </span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {/* ⛔ THE ALLOCATION IS AN ACTION ON THE CARD IT CHANGES
+                                            (2026-08-18). It was a separate two-button block with its
+                                            own heading and its own explanatory line, sitting above
+                                            both sessions and describing neither. One tap here still
+                                            writes BOTH slots — picking intensity for one IS picking
+                                            threshold for the other — so the interlock is unchanged;
+                                            what moved is where the athlete finds it.
+                                            ⚠️ ONLY ON THE SUSTAINED CARD, and only with two prescribed
+                                            slots: on the card that already holds the top end it would
+                                            be a no-op button, and a club session is the sustained one
+                                            by nature and not the athlete's to reassign. */}
+                                        {!lone && !club && role === 'threshold'
+                                          && !state.hardDays.some((o) => o.ownership === 'club') && (
+                                          <button
+                                            type="button"
+                                            onClick={() => allocateIntensityTo(i)}
+                                            className="text-xs px-2 py-1 rounded-xl border border-white/25 bg-white/[0.06] text-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                          >Make this the top-end one</button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          aria-label={`Remove hard ${sport.toLowerCase()}`}
+                                          onClick={() => setState((st) => ({
+                                            ...st, hardDays: st.hardDays.filter((_, j) => j !== i),
+                                          }))}
+                                          className="w-7 h-7 grid place-items-center rounded-xl text-white/55 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                        >×</button>
+                                      </div>
+                                    </div>
 
-                                THE FOUR STATES:
-                                  0. nothing chosen  → the price of intensity, and "none is valid"
-                                  1. one slot        → what you want from it (intensity / threshold)
-                                  2. two slots       → which sport holds the top-end speed
-                                  3. any intensity RUN → flat ground or incline
+                                    <div className="px-3 pb-2.5 space-y-1.5">
+                                      {/* ── the session: a choice, or a statement ─────────────── */}
+                                      {opts ? (
+                                        <div className="space-y-1">
+                                          {opts.map((opt) => {
+                                            /**
+                                             * ⚠️ ABSENT READS AS THE INTENSITY SESSION on both axes —
+                                             * `hardRoleOf` and `assignHardRoles` both default that
+                                             * way, so a slot with no stored answer must SHOW the one
+                                             * the engine will build rather than showing nothing
+                                             * selected. For a run that also means the `vo2` row.
+                                             */
+                                            const chosen = opt.role === 'threshold'
+                                              ? (h.role ?? 'intensity') === 'threshold'
+                                              : (h.role ?? 'intensity') !== 'threshold'
+                                                && (opt.goal === undefined || (h.goal ?? 'vo2') === opt.goal);
+                                            return (
+                                              <button
+                                                key={opt.id} type="button"
+                                                onClick={() => setState((st) => {
+                                                  const next = [...st.hardDays];
+                                                  // ⛔ WRITES SLOT `i` AND NOTHING ELSE. `terrain` is
+                                                  // cleared with every tap: a ground value from an
+                                                  // older draft belongs to a menu this list replaced.
+                                                  next[i] = { ...next[i], role: opt.role, goal: opt.goal, terrain: undefined };
+                                                  return { ...st, hardDays: next };
+                                                })}
+                                                // ⛔ NEUTRAL WHEN SELECTED — the card is already
+                                                // sport-coloured; these are a choice WITHIN it.
+                                                className={`w-full text-left rounded-xl border px-2.5 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${chosen ? 'border-white/55 bg-white/[0.10]' : 'border-white/12 bg-white/[0.03]'}`}
+                                              >
+                                                <span className="block text-white/90 text-sm">{opt.title}</span>
+                                                <span className="block text-white/50 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <p className="text-white/70 text-sm leading-relaxed">
+                                          {/* ⚠️ A CLUB SESSION HAS NO PRESCRIPTION — the app writes
+                                              nothing into it, which is the one thing that actually
+                                              differs about it. */}
+                                          {club
+                                            ? 'You run this one as it comes. It still costs the week its recovery, so the lifting is placed around it.'
+                                            : prescription}
+                                        </p>
+                                      )}
 
-                                ⛔ STATE 3 IS THE ONLY SUB-MENU AND THAT IS RULE 1 OF THE SPEC. It is
-                                the eccentric/concentric fork and the only ground choice that reaches
-                                Layer 1 — it decides whether the solver asks for 48h of clearance
-                                against heavy lower work. Every other setting (which flat surface,
-                                hill or treadmill, trainer or road) changes one sentence of the
-                                session description and is now IN that description, answered on the
-                                day. ⛔ Do not bring any of them back onto this card. */}
-
-                            {/* ── STATE 0: nothing chosen ────────────────────────────────────
-                                ⛔ THERE IS NOTHING TO RENDER HERE, AND THAT IS THE FIX. The first
-                                draft printed `HARD_DAY_EMPTY_NOTE` — Michael's copy for the empty
-                                state — directly below the card's own banner at :4334, which already
-                                carries the SAME two sentences plus the Schedule-step line. The
-                                athlete landed on this screen and read the CNS cost twice, six lines
-                                apart.
-                                ⚠️ THE CLASSIC "COLLECTED AND DOUBLED": the copy was written fresh
-                                from the spec without checking whether the card already said it, and
-                                the banner had shipped hours earlier the same day. The constant is
-                                deleted with this block; the banner is the one owner. */}
-
-                            {/* ── STATE 1: one slot — ONE question, one list ─────────────────
-                                ⛔⛔ IT ASKED TWICE AND THE ATHLETE READ FOUR OPTIONS (Michael,
-                                2026-08-18: *"4 options? confusing?"*). "Top-end intensity /
-                                Sustained threshold" stacked directly on "Speed focus / VO2 max
-                                focus" — two headings, four cards, for what is a single decision.
-
-                                ⛔ BOTH QUESTIONS ARE THE SAME AXIS WHEN THERE IS ONLY ONE SLOT.
-                                There are exactly three sessions a lone hard run can be — sprints,
-                                hills, threshold — and the two-step framing was the two-slot flow
-                                leaking into the one-slot one. One list now, each option carrying its
-                                own prescription so the choice and its consequence arrive together,
-                                and one tap writes both `role` and `goal`.
-
-                                ⚠️ THE PER-SLOT BLOCK BELOW SKIPS THE LONE SLOT for exactly this
-                                reason — it would re-ask the half this list already answered, which
-                                is how the four appeared in the first place.
-
-                                ⚠️ Prescribed only: a club run or ride is the sustained session by
-                                its nature and is not ours to reassign. */}
-                            {state.hardDays.length === 1 && activeHard?.ownership === 'prescribed' && (
-                              <div className="space-y-1.5 pt-1">
-                                <span className="text-white/85 text-sm">What you want from it</span>
-                                {/* ⛔ THE RULE FIRST, THE OPTIONS AFTER — the note governs every
-                                    option below it, so putting it under them would be an
-                                    instruction arriving after the tap it applies to. */}
-                                <p className="text-white/70 text-sm leading-relaxed">{SINGLE_SLOT_NOTE}</p>
-                                <div className="space-y-1">
-                                  {singleSlotOptions(activeHard.discipline).map((opt) => {
-                                    /**
-                                     * ⚠️ ABSENT READS AS THE INTENSITY SESSION — `hardRoleOf`'s
-                                     * fallback and `assignHardRoles` both do, so a slot with no
-                                     * stored answer must show it as chosen rather than showing
-                                     * nothing selected while the engine quietly builds one.
-                                     * ⚠️ AND FOR A RUN THAT MEANS THE `vo2` ROW: absent `goal` is
-                                     * hills, which is what every block built before the goal
-                                     * question existed got.
-                                     */
-                                    const role = activeHard.role ?? 'intensity';
-                                    const on = opt.role === 'threshold'
-                                      ? role === 'threshold'
-                                      : role !== 'threshold'
-                                        && (opt.goal === undefined || (activeHard.goal ?? 'vo2') === opt.goal);
-                                    return (
+                                      {/* ── whose session is it — PER CARD, not shared ──────────
+                                          ⛔ THIS IS THE CONTROL THE OLD LAYOUT GOT WRONG. There was
+                                          ONE checkbox for up to two sessions, bound to the hidden
+                                          active slot, so an athlete with a club run and a prescribed
+                                          ride saw a single box whose state depended on which chip
+                                          they last touched. */}
                                       <button
-                                        key={opt.id} type="button"
+                                        type="button"
                                         onClick={() => setState((st) => {
                                           const next = [...st.hardDays];
-                                          next[hardSlotIndex] = {
-                                            ...next[hardSlotIndex],
-                                            role: opt.role,
-                                            // ⛔ `goal` IS SET OR CLEARED ON EVERY TAP, never left
-                                            // behind. A stored `speed` under a threshold pick would
-                                            // charge the week a 48h clearance for a session that is
-                                            // not a sprint.
-                                            goal: opt.goal,
-                                            // ⛔ AND `terrain` GOES WITH IT — a ground value from an
-                                            // older draft belongs to a menu this list replaced.
-                                            terrain: undefined,
-                                          };
+                                          next[i] = { ...next[i], ownership: club ? 'prescribed' : 'club' };
                                           return { ...st, hardDays: next };
                                         })}
-                                        // ⛔ NEUTRAL WHEN SELECTED — sport colour on this screen
-                                        // marks IDENTITY (which sessions the block carries), and
-                                        // this is a choice WITHIN one already-labelled session.
-                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'border-white/55 bg-white/[0.10]' : 'border-white/12 bg-white/[0.03]'}`}
+                                        aria-pressed={club}
+                                        className="w-full text-left flex items-center gap-2.5 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-xl"
                                       >
-                                        <span className="block text-white/90 text-sm">{opt.title}</span>
-                                        <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                        <span
+                                          className="shrink-0 w-[18px] h-[18px] rounded-md border-2 grid place-items-center"
+                                          style={{
+                                            borderColor: club ? `rgb(${rgb})` : 'rgba(255,255,255,0.30)',
+                                            backgroundColor: club ? `rgba(${rgb},0.30)` : 'transparent',
+                                          }}
+                                        >
+                                          {club && <Check className="h-3 w-3 text-white" />}
+                                        </span>
+                                        <span className="text-white/70 text-xs leading-snug">
+                                          A club session I already attend
+                                        </span>
                                       </button>
-                                    );
-                                  })}
-                                </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* ── ADD, BELOW THE LIST IT APPENDS TO ──────────────────────────
+                                ⚠️ It sat ABOVE the sessions until 2026-08-18, which is why an athlete
+                                with two already had to scroll past the button to reach them. The
+                                buttons disappear at the cap and when §7's gate has no number to price
+                                the session with — the reason renders above, so an absent button is
+                                never silent. */}
+                            {state.hardDays.length < MAX_HARD_DAY_SLOTS && (
+                              <div className="flex gap-2 pt-1">
+                                {(['run', 'bike'] as const)
+                                  .filter((d) => posturePresent(d))
+                                  .filter((d) => hardDayAvailable[d])
+                                  .map((d) => (
+                                    <button
+                                      key={`add-${d}`} type="button"
+                                      aria-label={`Add a high intensity ${d === 'run' ? 'run' : 'ride'}`}
+                                      onClick={() => setState((st) => (st.hardDays.length >= MAX_HARD_DAY_SLOTS ? st : {
+                                        ...st,
+                                        hardDays: [...st.hardDays, { discipline: d, day: '' as const, ownership: 'prescribed' as const }],
+                                      }))}
+                                      // ⛔ NEUTRAL — this is the screen the athlete lands on, and
+                                      // sport colour here marks a session that EXISTS, not an
+                                      // invitation to create one.
+                                      className="flex-1 py-3 rounded-xl text-[15px] font-medium border border-white/15 bg-white/[0.05] text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                    >+ Add a {d === 'run' ? 'run' : 'ride'}</button>
+                                  ))}
                               </div>
                             )}
-
-                            {/* ── STATE 2: two slots — which sport holds the speed ───────────
-                                ⛔⛔ THE INTERLOCK, MADE VISIBLE. THIS IS THE WHOLE REBUILD.
-                                The budget — one top-end session, one sustained session — was already
-                                the law. Which sport got which was decided by LIST ORDER and shown
-                                nowhere, so two athletes making identical picks got different blocks
-                                depending on which chip they tapped first.
-                                ⚠️ ONE TOGGLE WRITES BOTH SLOTS (`allocateIntensityTo`). There is no
-                                second question: picking intensity for one sport IS picking threshold
-                                for the other, which is the sentence the note above states.
-                                ⚠️ HIDDEN WHEN A CLUB SESSION IS PRESENT — the club already holds the
-                                sustained slot by its nature, so there is nothing to allocate. */}
-                            {state.hardDays.length === 2
-                              && !state.hardDays.some((h) => h.ownership === 'club') && (
-                              <div className="space-y-1.5 pt-1">
-                                {/* ⚠️ NO "Intent allocation" HEADING — two buttons reading "Run is
-                                    intensity" / "Ride is intensity" under a one-line rule ARE the
-                                    question. The heading was a label for a label. */}
-                                <p className="text-white/70 text-sm leading-relaxed">{INTENT_ALLOCATION_NOTE}</p>
-                                <div className="flex gap-2">
-                                  {state.hardDays.map((h, i) => {
-                                    const on = hardRoleOf(i) === 'vo2';
-                                    const sport = h.discipline === 'bike' ? 'Ride' : 'Run';
-                                    // ⚠️ TWO SLOTS OF THE SAME SPORT NEED DISAMBIGUATING, or both
-                                    // buttons read "Run is intensity" and the athlete cannot tell
-                                    // which one they are tapping. The pinned day is the clearest
-                                    // label when there is one; the ordinal is the fallback for a
-                                    // slot the engine has not placed yet.
-                                    /**
-                                     * ⛔ "PRIMARY" / "SECONDARY", NOT "(first)" / "(second)" (Michael,
-                                     * 2026-08-18): *"reads like a parsed array index."* It was one —
-                                     * the ordinal was the list position leaking onto the screen.
-                                     *
-                                     * ⚠️ AND THE NEW WORDS CARRY A CLAIM THE ENGINE KEEPS: the
-                                     * primary slot is the one that ends up holding the top-end
-                                     * session by default, so "primary" names which ride matters more
-                                     * to the block's progression rather than which chip was tapped
-                                     * first. ⛔ If the default ever stops favouring the first slot,
-                                     * these labels are wrong and must move with it.
-                                     */
-                                    const twin = state.hardDays.filter((o) => o.discipline === h.discipline).length > 1;
-                                    const qualifier = !twin ? ''
-                                      : i === 0 ? 'Primary ' : 'Secondary ';
-                                    return (
-                                      <button
-                                        key={`alloc-${i}`} type="button"
-                                        onClick={() => allocateIntensityTo(i)}
-                                        /**
-                                         * ⛔ THE CHOSEN SPORT FILLS WITH ITS OWN COLOUR (Michael,
-                                         * 2026-08-18: *"ride intensity needs to fill with green"*).
-                                         *
-                                         * ⚠️ THIS IS NOT THE THIRD SWING IT LOOKS LIKE — read the
-                                         * rule before changing it again. Sport colour on this screen
-                                         * marks IDENTITY, and this toggle is the one control that
-                                         * assigns identity: it says which sport owns the block's
-                                         * top-end session for twelve weeks. Everything else here is
-                                         * a choice WITHIN an already-labelled session and stays
-                                         * neutral — the ground options, the intent options, the add
-                                         * buttons on the empty card.
-                                         *
-                                         * ⛔ A FILL, NOT AN OUTLINE. The outlined version read as a
-                                         * ride ROW sitting inside the card rather than a selected
-                                         * button; a solid fill is unambiguously "this one is on".
-                                         */
-                                        className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'text-white' : 'border-white/12 bg-white/[0.03] text-white/60'}`}
-                                        style={on ? {
-                                          borderColor: `rgb(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')})`,
-                                          backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')},0.38)`,
-                                        } : undefined}
-                                      >
-                                        {qualifier}{qualifier ? sport.toLowerCase() : sport} is intensity
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {/* ⛔ THE INTERLOCK SENTENCE IS DELETED (Michael, 2026-08-18: *"very
-                                    messy UI"*). It read *"Your run holds the speed. Your ride is the
-                                    sustained one."* — and the two headings six lines below it say
-                                    exactly that, as headings, on the blocks they describe:
-                                    "Run — top-end intensity" and "Ride — sustained threshold".
-                                    ⚠️ THE INTERLOCK IS STILL VISIBLE, which was the whole point of
-                                    the rebuild. It is shown by the two labelled blocks rather than
-                                    narrated above them, which is one fewer thing to read and one
-                                    fewer place to drift. ⛔ Do not re-add a sentence that restates a
-                                    heading. */}
-                              </div>
-                            )}
-
-                            {/* ── EVERY SLOT SHOWS ITS OWN SESSION, ALL AT ONCE ──────────────
-                                ⛔⛔ IT USED TO RENDER THE ACTIVE SLOT ONLY, AND THAT WAS THE BUG
-                                (Michael, 2026-08-18: *"ride intensity needs to fill with green,
-                                actual ride prescription"*).
-
-                                Allocate intensity to the ride while the RUN chip is active and the
-                                card told you about the run — *"your ride is holding the top-end
-                                intensity, this run will be…"* — and never once said what the ride
-                                actually was. The athlete made a decision about their ride and could
-                                not see its consequence without tapping the other chip. That is the
-                                same *"there is not clarity on ride what we offer"* complaint the
-                                rebuild was supposed to close, surviving in a new place.
-
-                                ⛔ SO BOTH BLOCKS RENDER TOGETHER. The interlock stops being a
-                                sentence about the other sport and becomes two sessions side by side.
-                                ⚠️ The active-slot chip still governs the DAY and ownership controls
-                                above; it no longer governs what the athlete is allowed to read.
-
-                                ⚠️ CLUB SLOTS RENDER NOTHING — the app writes no session into one, so
-                                there is no prescription to state. The ownership checkbox says it. */}
-                            {state.hardDays.map((h, i) => {
-                              if (h.ownership === 'club') return null;
-                              // ⛔ THE LONE SLOT IS ANSWERED ABOVE, IN ONE LIST. Rendering its block
-                              // here would re-ask the speed-vs-VO2 half and put four options back on
-                              // the card — which is the defect this whole pass exists to remove.
-                              if (state.hardDays.length === 1) return null;
-                              const role = hardRoleOf(i);
-                              const bike = h.discipline === 'bike';
-                              const heading = `${bike ? 'Ride' : 'Run'}${role === 'threshold'
-                                ? ' — sustained threshold' : ' — top-end intensity'}`;
-                              /**
-                               * ⛔ THE INTENSITY RUN IS THE ONE SLOT THAT ASKS INSTEAD OF STATING —
-                               * Rule 1. Flat-vs-incline is the eccentric/concentric fork and the only
-                               * ground choice that reaches Layer 1, so this slot carries the goal
-                               * question and the option bodies ARE its prescription. Every other slot
-                               * states what it is and asks nothing.
-                               */
-                              const asks = !bike && role === 'vo2';
-                              const copy = bike
-                                ? (role === 'threshold'
-                                  ? SESSION_PRESCRIPTION.ride_threshold
-                                  : SESSION_PRESCRIPTION.ride_intensity)
-                                : SESSION_PRESCRIPTION.run_threshold;
-                              return (
-                                <div key={`slot-${i}`} className="space-y-1.5 pt-2">
-                                  <span className="text-white/85 text-sm">{heading}</span>
-                                  {asks ? (
-                                    <>
-                                      {/* ⛔ `RUN_GROUND_NOTE` IS NOT RENDERED HERE ANY MORE (2026-08-18).
-                                          It read *"Flat sprints need 48 hours clear of heavy squats.
-                                          Hills do not."* — and the Speed focus option's own body
-                                          says *"the footfall costs you 48 hours clear of heavy
-                                          squats"* two lines below it. The rule belongs ON the option
-                                          that pays it, not stacked above both.
-                                          ⚠️ The constant stays exported and voice-linted: it is the
-                                          one-line statement of the rule and the next surface that
-                                          needs it should use it rather than rewrite it. */}
-                                      <div className="space-y-1">
-                                        {RUN_GROUND_OPTIONS.map((opt) => {
-                                          // ⚠️ ABSENT READS AS `vo2` — the shipped default, and what
-                                          // every block built before the goal question existed got.
-                                          const on = (h.goal ?? 'vo2') === opt.id;
-                                          return (
-                                            <button
-                                              key={opt.id} type="button"
-                                              onClick={() => setState((st) => {
-                                                const next = [...st.hardDays];
-                                                // ⛔ `terrain` IS CLEARED, NOT SET. A ground value from
-                                                // an older draft belongs to the OTHER menu — `track`
-                                                // means nothing on the hill session and `hill_short`
-                                                // nothing on the sprint — so carrying it across would
-                                                // build a session the athlete did not choose.
-                                                next[i] = { ...next[i], goal: opt.id, terrain: undefined };
-                                                return { ...st, hardDays: next };
-                                              })}
-                                              /**
-                                               * ⛔ NEUTRAL WHEN SELECTED (Michael, 2026-08-18:
-                                               * *"bottom cards should be neutral"*). Sport colour on
-                                               * this screen marks IDENTITY — which sessions the block
-                                               * carries — and these are a choice WITHIN one session
-                                               * that is already labelled. Two gold cards under a gold
-                                               * button read as three separate run rows.
-                                               */
-                                              className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'border-white/55 bg-white/[0.10]' : 'border-white/12 bg-white/[0.03]'}`}
-                                            >
-                                              <span className="block text-white/90 text-sm">{opt.title}</span>
-                                              <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <p className="text-white/70 text-sm leading-relaxed">{copy}</p>
-                                  )}
-                                </div>
-                              );
-                            })}
-
                           </>
                         )}
                       </div>
