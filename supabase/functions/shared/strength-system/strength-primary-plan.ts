@@ -869,9 +869,10 @@ function assistanceRows(
       // reps", and running them both would double-count: `assistanceTotalReps` sizes a maintenance
       // slot off tested capacity, `weeklyVolumeFor` sizes a PROGRAMME off the same capacity. When the
       // athlete opted into the programme, the programme's number is the prescription.
-      const totalReps = a.isAbsAddOn
-        ? a.totalReps
-        : (a.category === 'pull'
+      // ⚠️ THE `isAbsAddOn` BRANCH IS GONE WITH THE ADD-ABS ROW (2026-08-18). It existed to let a
+      // row that SHARED another slot's budget keep the number `resolveDayAssistance` had already
+      // split for it, rather than being re-sized here. No row shares a budget any more.
+      const totalReps = (a.category === 'pull'
             // ⚠️ THE PULL SLOT ASKS THE BAND SEPARATELY (it has its own tested capacity), so it has
             // to take the merged-day cap and the recovery scale separately too — it is the one row
             // that does not inherit them from `dayTotal` above. It did not, and a 7th week printed a

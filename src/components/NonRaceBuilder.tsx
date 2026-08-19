@@ -19,7 +19,6 @@ import { ASSISTANCE_GUIDANCE } from '@/lib/assistance-menu';
 import {
   ASSISTANCE_CATEGORIES,
   type AssistanceWeekPrefs,
-  absOptions,
   buildDefaultWeek,
   CATEGORY_LABEL,
   displayName,
@@ -3680,59 +3679,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 ⚠️ THE COPY NAMES THE DOSE AND THE STANDARD SEPARATELY. 50 reps in 10 minutes is a
                 SESSION measure; a max-clean-rep figure is not the same measurement, and the two must
                 never be merged into "progress toward 50". */}
-            {/* ⛔ ABS NEEDED A CARD-LEVEL AFFORDANCE (Michael, 2026-08-18: "abs are lost if the user
-                doesn't know to open the adjustment"). Making it a proper FIELD fixed the shape
-                problem inside an open day — but the three day cards are COLLAPSED by default, and a
-                closed card's summary lists only what is set. An athlete who never opens one never
-                learns the option exists.
-                ⛔ SO IT IS ANSWERED AT THE LEVEL THE QUESTION IS ASKED. This mirrors the Pull-up
-                progression row exactly — same shape, same place, one tap — because "do I want abs in
-                this block" is a block-level decision, and picking WHICH movement on WHICH day is the
-                per-day refinement that already lives inside the cards.
-                ⚠️ IT IS A CONVENIENCE, NOT A FOURTH BUCKET. It sets every day's optional abs slot,
-                which still SPLITS the single-leg/core reps. The per-day field remains authoritative:
-                change one day and this row simply stops reading as fully on. */}
-            {(() => {
-              const days = LIFT_DAYS;
-              const absOn = days.every((d) => !!state.assistancePicks.by_day[d]?.abs);
-              const first = absOptions(strengthEquipment)[0]?.name ?? null;
-              return (
-                <div
-                  className="rounded-lg border transition"
-                  style={absOn
-                    ? { borderColor: `${getDisciplineColor('strength')}66`, backgroundColor: `${getDisciplineColor('strength')}14` }
-                    : { borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.02)' }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setState((st) => {
-                      const by_day = { ...st.assistancePicks.by_day };
-                      for (const d of days) {
-                        by_day[d] = { ...by_day[d], abs: absOn ? null : (by_day[d]?.abs ?? first) };
-                      }
-                      return { ...st, assistancePicks: { ...st.assistancePicks, by_day } };
-                    })}
-                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-white/80 text-sm">Add abs</p>
-                      <p className="text-white/45 text-xs mt-0.5">
-                        An abs movement on every lifting day. It shares the single-leg reps — it does not add to the day.
-                      </p>
-                    </div>
-                    <span
-                      className="shrink-0 w-[18px] h-[18px] rounded-full border-2 grid place-items-center transition"
-                      style={{
-                        borderColor: absOn ? getDisciplineColor('strength') : 'rgba(255,255,255,0.25)',
-                        backgroundColor: absOn ? getDisciplineColor('strength') : 'transparent',
-                      }}
-                    >
-                      {absOn && <span className="text-[9px] text-black font-bold leading-none">✓</span>}
-                    </span>
-                  </button>
-                </div>
-              );
-            })()}
+            {/* ⛔⛔ THE "ADD ABS" ROW IS DELETED (Michael, 2026-08-18) — AND SO IS THE FOURTH SLOT
+                IT DROVE. Do not rebuild either; the reason is that abs were never a fourth bucket.
+
+                It shipped that morning to fix a real problem — *"abs are lost if the user doesn't
+                know to open the adjustment"* — and the fix was the wrong shape. Abs already ARE a
+                single-leg/core movement in the catalog: Hanging Leg Raise, Ab Wheel, Weighted
+                Sit-Up and DB Side Bend all sit in that category, and `BALANCED_WEEK.bench` already
+                defaults to Hanging Leg Raise. The add-on gave the athlete a SECOND way to ask for a
+                movement they could already choose in the slot itself, then halved the slot's reps
+                to pay for it (`splitRepsForAbs`: 30 -> 15/15).
+
+                ⛔ SO THE ANSWER IS THE SAME ONE THE OTHER TWO SLOTS GET: pick your preferred
+                movement in the Single-leg / core field, exactly like Push and Pull. Choose an abs
+                movement there and it takes the WHOLE slot budget instead of half of it. One
+                question per slot, three slots, no optional fourth.
+
+                ⚠️ WHAT THIS COSTS, STATED: abs on every lifting day used to be one tap. It is now
+                three picks, one per day card. That is the same number of taps the athlete spends on
+                any other preference, and it buys back the full rep total on whichever days they
+                choose it. */}
+
 
             <div
               className="rounded-lg border transition"
@@ -3816,7 +3783,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               {LIFT_DAYS.map((day) => {
                 const picks = state.assistancePicks.by_day[day];
                 const open = expandedAssistanceDay === day;
-                const summary = [picks.push, picks.pull, picks.single_leg_core, picks.abs]
+                // ⚠️ THREE SLOTS, NOT FOUR — `picks.abs` went with the add-on row (2026-08-18).
+                const summary = [picks.push, picks.pull, picks.single_leg_core]
                   .filter(Boolean).map((n) => displayName(n as string)).join(' · ');
                 return (
                   <div key={day} className="rounded-xl border border-white/12 bg-white/[0.03] overflow-hidden">
@@ -3915,59 +3883,23 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             added fatigue charged against the endurance budget, which is the one
                             thing this whole model is arranged to protect. The split happens in
                             `resolveDayAssistance`; the copy below says so. */}
-                        {/* ⛔ ONE FIELD WITH AN EMPTY STATE, NOT A BUTTON THAT BECOMES A FIELD
-                            (Michael, 2026-08-18: "add abs gets lost in dropdowns"). It was a small
-                            ghost pill sitting under three full-width selects — a different SHAPE from
-                            the things it belongs with, which is exactly why the eye skipped it. The
-                            three rows above establish a rhythm (label · qualifier · full-width
-                            control) and the optional fourth answered in a different visual language.
+                        {/* ⛔⛔ THE PER-DAY "ABS" FIELD IS DELETED WITH THE CARD TOGGLE (Michael,
+                            2026-08-18: *"kill add abs, but let users still choose their preferred
+                            exercises like the other"*). Read this before adding a fourth field back.
 
-                            ⛔ THE CONVENTION IS TO SHOW AN OPTIONAL FIELD AS A FIELD, with "None"
-                            selected — the pattern every settings list uses — rather than hiding it
-                            behind an affordance the user has to notice first. It also collapses two
-                            states into one control: no "Add", no "Remove", just a value.
+                            It was a SECOND way to ask for a movement the Single-leg / core field
+                            above already offers. Hanging Leg Raise, Ab Wheel, Weighted Sit-Up and
+                            DB Side Bend are all `single_leg_core` entries — the bench day's default
+                            IS Hanging Leg Raise. So the athlete could reach abs through two
+                            different controls, and only one of them charged them half the slot.
 
-                            ⚠️ AND IT IS STILL NOT A FOURTH CATEGORY. Forever p.32 allows one or two
-                            movements per category; this is the SECOND movement in single-leg/core and
-                            it SPLITS that slot's reps. The label says "shares the reps" where the
-                            other rows name a muscle, so the row cannot be read as new volume — which
-                            is the one thing this model is arranged to prevent. */}
-                        <div>
-                          <div className="flex items-baseline justify-between gap-2 mb-1">
-                            <span className="text-white/85 text-sm">Abs</span>
-                            <span className="text-white/50 text-xs">
-                              {picks.abs ? 'shares the reps' : 'optional'}
-                            </span>
-                          </div>
-                          <select
-                            value={picks.abs ?? ''}
-                            onChange={(e) => setState((st) => ({
-                              ...st,
-                              assistancePicks: {
-                                ...st.assistancePicks,
-                                by_day: {
-                                  ...st.assistancePicks.by_day,
-                                  [day]: { ...st.assistancePicks.by_day[day], abs: e.target.value || null },
-                                },
-                              },
-                            }))}
-                            className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                            style={{ fontSize: '16px' }}
-                            aria-label={`${LIFT_DAY_LABEL[day]} abs exercise`}
-                          >
-                            {/* ⚠️ "None" IS THE VALUE, NOT A PROMPT — picking it clears the row, which
-                                is what the old Remove button did. */}
-                            <option value="" className="bg-neutral-900">None</option>
-                            {absOptions(strengthEquipment).map((o) => (
-                              <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
-                            ))}
-                          </select>
-                          {picks.abs && (
-                            <p className="text-white/50 text-xs mt-1">
-                              Splits the single-leg/core reps with {displayName(picks.single_leg_core)} — it
-                              does not add to the day.</p>
-                          )}
-                        </div>
+                            ⛔ AND THE HALVING IS WHAT ACTUALLY DIED HERE. `splitRepsForAbs` paid for
+                            the extra movement out of the same budget (30 -> 15/15), because Forever
+                            p.32 allows two movements per category but this model cannot afford a
+                            fourth 30. An athlete who wanted abs was quietly trading away half their
+                            leg work to get them. Choosing an abs movement in the slot itself takes
+                            the WHOLE budget, which is the honest version of the same choice. */}
+
                       </div>
                     )}
                   </div>

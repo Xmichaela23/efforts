@@ -52,7 +52,6 @@ import {
   liftDayForMainLift,
   normalizeAssistancePrefs,
   resolveDayAssistance,
-  splitRepsForAbs,
 } from '../../../../src/lib/assistance-catalog.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import {
@@ -398,9 +397,63 @@ Deno.test('⛔ THE FOCUS NEVER OFFERS KIT THE ATHLETE DOES NOT HAVE', () => {
   }
 });
 
-// ── ADD-ABS: shares the slot, never stacks ────────────────────────────────────────────────────────
+// ── ABS ARE A SINGLE-LEG/CORE MOVEMENT, NOT A FOURTH SLOT ─────────────────────────────────────────
 
-Deno.test('⛔ ADD-ABS SHARES THE SINGLE-LEG/CORE BUDGET — it never adds a fresh total', () => {
+/**
+ * ⛔⛔ THE ADD-ABS FEATURE IS DELETED (Michael, 2026-08-18) AND THESE TESTS ARE ITS HEADSTONE.
+ *
+ * Three tests stood here pinning the add-on: that it shared the slot's budget (50 -> 25/25), that
+ * the split rounded to fives and never emptied a half, and that a non-abs movement was refused from
+ * the abs field. Every one of them passed, and the feature was still wrong one level up.
+ *
+ * **Abs were never a fourth category.** Hanging Leg Raise, Ab Wheel, Weighted Sit-Up and DB Side
+ * Bend are all `category: 'single_leg_core'`, and `BALANCED_WEEK.bench` already defaults to Hanging
+ * Leg Raise. The add-on was a SECOND control for a choice the slot already offered — and the only
+ * one of the two that charged half the reps for it.
+ *
+ * ⛔ WHAT REPLACES THEM: the slot is whole, and an abs movement chosen in it takes the entire
+ * budget. That is what these assert now.
+ */
+Deno.test('⛔ THREE ROWS, ALWAYS — no fourth slot exists to be added', () => {
+  const prefs = normalizeAssistancePrefs({
+    version: 2,
+    by_day: {
+      ...normalizeAssistancePrefs(null).by_day,
+      squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge' },
+    },
+    focus: [],
+  });
+  const rows = resolveDayAssistance(prefs, 'squat', 50);
+  assertEquals(rows.length, 3, 'a fourth assistance row appeared');
+  assertEquals(new Set(rows.map((r) => r.category)).size, 3);
+  // ⛔ EVERY SLOT OWNS ITS WHOLE BUDGET. The single-leg/core row used to be halved when abs were on.
+  for (const r of rows) assertEquals(r.totalReps, 50, `${r.name} did not get the full slot`);
+});
+
+Deno.test('⛔ AN ABS MOVEMENT TAKES THE WHOLE SLOT, NOT HALF OF IT', () => {
+  // The athlete who wants abs picks one in the single-leg/core field, exactly like push and pull.
+  // Under the add-on this same intent cost them 25 reps of it instead of 50.
+  const prefs = normalizeAssistancePrefs({
+    version: 2,
+    by_day: {
+      ...normalizeAssistancePrefs(null).by_day,
+      squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Hanging Leg Raise' },
+    },
+    focus: [],
+  });
+  const rows = resolveDayAssistance(prefs, 'squat', 50);
+  const slc = rows.filter((r) => r.category === 'single_leg_core');
+  assertEquals(slc.length, 1);
+  assertEquals(slc[0].name, 'Hanging Leg Raise');
+  assertEquals(slc[0].totalReps, 50, 'the abs pick was still being halved');
+});
+
+/**
+ * ⚠️ AND A GOAL SAVED WITH THE OLD `abs` FIELD MUST NOT STRAND — the same rule this file applies to
+ * an unrecognised focus chip. It degrades to the current three-slot shape rather than erroring, and
+ * it does NOT resurrect the halving through a control the athlete can no longer see.
+ */
+Deno.test('⚠️ A STORED `abs` FROM AN OLD GOAL IS DROPPED, NOT HONOURED', () => {
   const prefs = normalizeAssistancePrefs({
     version: 2,
     by_day: {
@@ -409,34 +462,11 @@ Deno.test('⛔ ADD-ABS SHARES THE SINGLE-LEG/CORE BUDGET — it never adds a fre
     },
     focus: [],
   });
+  assertEquals((prefs.by_day.squat as Record<string, unknown>).abs, undefined, 'the old field survived the read');
   const rows = resolveDayAssistance(prefs, 'squat', 50);
-  assertEquals(rows.length, 4, 'the abs add-on did not appear');
-  // Still three CATEGORIES — the fourth row is a second single-leg/core movement, not a new axis.
-  assertEquals(new Set(rows.map((r) => r.category)).size, 3);
-  const slc = rows.filter((r) => r.category === 'single_leg_core');
-  assertEquals(slc.reduce((n, r) => n + r.totalReps, 0), 50, 'the slot budget grew');
-  assertEquals(slc.map((r) => r.totalReps), [25, 25]);
-  assertEquals(rows.find((r) => r.isAbsAddOn)?.name, 'Hanging Leg Raise');
-});
-
-Deno.test('the rep split rounds to fives and never leaves a slot empty', () => {
-  assertEquals(splitRepsForAbs(50), [25, 25]);
-  assertEquals(splitRepsForAbs(75), [40, 35]);
-  for (const total of [10, 25, 50, 55, 60, 75]) {
-    const [a, b] = splitRepsForAbs(total);
-    assertEquals(a + b, total, `${total} did not split cleanly`);
-    assertEquals(a >= 5 && b >= 5, true, `${total} produced an empty half`);
-  }
-});
-
-Deno.test('an abs pick that is not an abs movement is refused', () => {
-  const prefs = normalizeAssistancePrefs({
-    version: 2,
-    by_day: { ...normalizeAssistancePrefs(null).by_day, bench: { push: 'Dips', pull: 'Chin-Up', single_leg_core: 'Reverse Lunge', abs: 'Front Squat' } },
-    focus: [],
-  });
-  assertEquals(prefs.by_day.bench.abs, null);
-  assertEquals(resolveDayAssistance(prefs, 'bench', 50).length, 3);
+  assertEquals(rows.length, 3, 'an old goal still built a fourth row');
+  assertEquals(rows.find((r) => r.category === 'single_leg_core')?.totalReps, 50,
+    'an old goal is still being halved');
 });
 
 // ── REP SCALING: kept through D-407 ───────────────────────────────────────────────────────────────

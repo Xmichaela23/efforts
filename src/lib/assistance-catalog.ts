@@ -507,8 +507,9 @@ export type DayPicks = {
   push: string;
   pull: string;
   single_leg_core: string;
-  /** The optional add-abs movement for this day. Null / absent = the default three. */
-  abs?: string | null;
+  /** ⚠️ `abs` IS GONE (2026-08-18) AND A STORED ONE IS DROPPED ON READ, not honoured — see
+   *  `normalizeAssistancePrefs`. Same "nothing strands" rule this file already applies to an
+   *  unrecognised focus chip: an old value degrades to the current shape rather than erroring. */
 };
 
 /**
@@ -614,13 +615,17 @@ export function normalizeAssistancePrefs(raw: unknown): AssistanceWeekPrefs {
     const pickFor = (category: AssistanceCategory): string =>
       resolvePick(src ? src[category] : legacy?.[category], category)
         ?? BALANCED_WEEK[day][category];
-    const absRaw = src ? src.abs : null;
-    const absEntry = absRaw ? catalogEntry(String(absRaw)) : null;
+    /**
+     * ⛔ A STORED `abs` IS DROPPED HERE, DELIBERATELY (2026-08-18). This is the "nothing strands"
+     * rule the file already applies to an unrecognised focus chip: an old shape degrades to the
+     * current one rather than erroring, and it does not resurrect a control the athlete can no
+     * longer see. The movement itself is not lost to them — every abs entry is a `single_leg_core`
+     * option, so it is one pick away in the slot that now owns the whole rep budget.
+     */
     by_day[day] = {
       push: pickFor('push'),
       pull: pickFor('pull'),
       single_leg_core: pickFor('single_leg_core'),
-      abs: absEntry?.isAbs ? absEntry.name : null,
     };
   }
 
@@ -693,7 +698,8 @@ export function buildDefaultWeek(
           : (rankByEquipmentFit(optionsFor(category, athleteEquipment), athleteEquipment)[0]?.name ?? fallback);
       }
     }
-    picks.abs = null;
+    // ⚠️ `picks.abs = null` STOOD HERE — the focus-built week never set an abs movement, and now
+    // there is no field to set. A focus chip has never spoken to abs and still does not.
     out[day] = picks;
   });
 
@@ -709,23 +715,29 @@ export type ResolvedAssistanceRow = {
   /** Wendler's word — what the athlete reads. */
   display: string;
   totalReps: number;
-  /** True for the add-abs row: it SHARES the single-leg/core budget, it does not add one. */
-  isAbsAddOn?: boolean;
+  /** ⚠️ `isAbsAddOn` WENT WITH THE ADD-ABS ROW (2026-08-18). Every row now owns its slot's whole
+   *  budget, so there is no longer a row that means "I share someone else's". */
 };
 
 /**
- * ⛔ THE ADD-ABS SPLIT. Forever p.32 allows "one or two exercises per category", so a second
- * single-leg/core movement is his — but it must SHARE the slot's rep total, never stack a fresh one.
- * A fourth 50 would be pure added fatigue charged against the endurance budget, which is the one
- * thing this whole model is arranged to protect.
+ * ⛔⛔ `splitRepsForAbs` LIVED HERE AND IS DELETED (Michael, 2026-08-18: *"kill add abs, but let
+ * users still choose their preferred exercises like the other"*). ⛔ DO NOT REINTRODUCE IT.
  *
- * Rounded to fives so the numbers read like a lifter's: 50 → 25/25, 75 → 40/35.
+ * It halved the single-leg/core budget between the slot's movement and an optional abs movement —
+ * 50 -> 25/25, 30 -> 15/15 — on the reasoning that Forever p.32 allows two movements per category
+ * but a fourth full slot would be pure added fatigue charged against the endurance budget. That
+ * reasoning was sound and the FEATURE was still wrong, for a reason upstream of it:
+ *
+ * **Abs were never a fourth category. They are single-leg/core movements.** Hanging Leg Raise, Ab
+ * Wheel, Weighted Sit-Up and DB Side Bend are all `category: 'single_leg_core'`, and
+ * `BALANCED_WEEK.bench` already defaults to Hanging Leg Raise. So the add-on was a SECOND control
+ * for a choice the slot already offered — and the only one of the two that charged half the reps.
+ * An athlete who wanted abs was trading away half their leg work to ask a question they could have
+ * asked for free.
+ *
+ * ⚠️ SO THE SLOT IS WHOLE AGAIN AND ABS ARE PICKED LIKE ANYTHING ELSE. On a 30-rep week, choosing
+ * Hanging Leg Raise now means 30 reps of it, not 15 beside 15 of a split squat.
  */
-export function splitRepsForAbs(total: number): [number, number] {
-  const half = Math.round(total / 2 / 5) * 5;
-  const first = Math.max(5, Math.min(total - 5, half));
-  return [first, total - first];
-}
 
 /**
  * The rows for one lifting day.
@@ -782,7 +794,7 @@ export function resolveDayAssistance(
    * "this athlete trains nothing".
    */
   const dayDefaults = BALANCED_WEEK[day] ?? BALANCED_WEEK[LIFT_DAYS[0]];
-  const picks: DayPicks = prefs.by_day[day] ?? { ...dayDefaults, abs: null };
+  const picks: DayPicks = prefs.by_day[day] ?? { ...dayDefaults };
   const row = (category: AssistanceCategory, name: string, reps: number): ResolvedAssistanceRow => ({
     category,
     name,
@@ -796,14 +808,14 @@ export function resolveDayAssistance(
     return pool[0]?.name ?? name;
   };
 
+  /**
+   * ⛔ ONE MOVEMENT, THE WHOLE BUDGET (2026-08-18). The add-abs branch stood here and split
+   * `totalReps` between this movement and an optional second one. It is gone with the field that
+   * fed it — see the note above `resolveDayAssistance`'s neighbours. A stored `abs` on an OLD goal
+   * is now simply not read, which is deliberate: the alternative is two athletes on the same
+   * settings getting different rep totals because of a control one of them can no longer see.
+   */
   const legName = gated('single_leg_core', picks.single_leg_core || dayDefaults.single_leg_core);
-  // The abs add-on gates against the ABS pool, not the single-leg one — replacing a Weighted Sit-Up
-  // with a lunge would double the leg slot and drop the abs work the athlete added.
-  const absRaw = picks.abs || null;
-  const absName = absRaw && !canPerform(absRaw, athleteEquipment)
-    ? (rankByEquipmentFit(absOptions(athleteEquipment), athleteEquipment)[0]?.name ?? absRaw)
-    : absRaw;
-  const [legReps, absReps] = absName ? splitRepsForAbs(totalReps) : [totalReps, 0];
 
   const rows = [
     row('push', gated('push', picks.push || dayDefaults.push), totalReps),
@@ -814,11 +826,8 @@ export function resolveDayAssistance(
     pullup
       ? row('pull', pullup.movement, pullup.totalReps)
       : row('pull', gated('pull', picks.pull || dayDefaults.pull), totalReps),
-    row('single_leg_core', legName, legReps),
+    row('single_leg_core', legName, totalReps),
   ];
-  if (absName) {
-    rows.push({ ...row('single_leg_core', absName, absReps), isAbsAddOn: true });
-  }
   return rows;
 }
 
