@@ -349,6 +349,19 @@ export type StrengthPrimaryArgs = {
     /** ⛔ WHERE THE HARD RIDE HAPPENS. Ignored when `discipline` is `run`. Absent → nothing said. */
     environment?: HardRideEnvironment;
     /**
+     * ⛔ THE ATHLETE'S OWN ALLOCATION (Michael, 2026-08-18) — WHICH SESSION THIS DAY IS.
+     *
+     * A block carries exactly one top-end intensity session and one sustained threshold session, and
+     * until now WHICH discipline held which was decided by list ORDER. That was invisible: an
+     * athlete picked a hard run and a hard ride and could not see, anywhere, that the run had taken
+     * the intensity slot because it happened to be listed first.
+     *
+     * ⚠️ ABSENT FALLS BACK TO THE POSITIONAL RULE, byte-identical to before — every goal written
+     * before this field keeps the block it built. ⛔ A CLUB DAY STILL OVERRIDES IT: a group session
+     * is the sustained one whatever the athlete allocated, because the app is not writing it.
+     */
+    role?: 'intensity' | 'threshold';
+    /**
      * ⛔ WHOSE SESSION IS IT (§1i). `prescribed` — the app owns the content, writes the template and
      * can progress it. `club` — the athlete already attends it and does whatever the group does.
      *
@@ -1525,7 +1538,14 @@ function thresholdGroundNote(terrain?: HardRunTerrain): string {
       return ' On flat or rolling ground. If you hit mild inclines or rolling grades, yield the pace '
         + 'to hold the effort — do not spike your heart rate on the uphills.';
     default:
-      return '';
+      // ⛔ THE UNANSWERED CASE IS NOW THE COMMON ONE (2026-08-18) — the wizard asks for no ground on a
+      // threshold run at all, so this branch is what nearly every athlete reads. Returning '' left
+      // the session with no guidance on the one variable that decides whether the pace is honest.
+      // ⚠️ "wherever the pace can STAY level" WAS THE FIRST DRAFT AND THE VOICE LINT CAUGHT IT —
+      // `stay` is a banned word. The sentence says the same thing without it.
+      return ' Run it on ground that holds a level pace — a track, a flat or rolling road, or a '
+        + 'treadmill at 1%. On rolling ground, yield the pace to hold the effort rather than '
+        + 'spiking your heart rate on the uphills.';
   }
 }
 
@@ -1723,7 +1743,12 @@ type HardRole = 'vo2' | 'threshold' | 'club';
 function assignHardRoles(
   // ⚠️ THE DAY IS NOT READ — the role depends on discipline and order only, which is why the roles
   // can be settled before the solver has placed anything (slice 8). Typed nullable to say so.
-  days: ReadonlyArray<{ day: DayName | null; discipline: 'run' | 'bike'; ownership: 'prescribed' | 'club' }>,
+  days: ReadonlyArray<{
+    day: DayName | null;
+    discipline: 'run' | 'bike';
+    ownership: 'prescribed' | 'club';
+    role?: 'intensity' | 'threshold';
+  }>,
 ): HardRole[] {
   /**
    * ⛔⛔ INTENSITY IS THE FIRST SLOT, THRESHOLD IS THE SECOND (Michael, 2026-08-18). THIS REVERSES
@@ -1747,6 +1772,45 @@ function assignHardRoles(
    * Exactly one intensity session and, if a second hard day is asked for, exactly one threshold.
    * The order of the list picks which discipline carries which; nothing else does.
    */
+  /**
+   * ⛔⛔ THE ATHLETE'S OWN ALLOCATION WINS, AND IT IS THE ONLY THING ON THIS SCREEN THAT DOES
+   * (Michael, 2026-08-18). Everything below this block is the FALLBACK for a goal that carried no
+   * allocation — every plan built before the wizard started asking.
+   *
+   * ⛔ WHY IT HAD TO STOP BEING ORDER. The rule below is correct and it is INVISIBLE: an athlete
+   * who picked a hard run and a hard ride got top-end work on whichever one the wizard happened to
+   * list first, and no surface anywhere said so. Two athletes making the identical two picks got
+   * different blocks off list order alone. The allocation is a real training decision — which sport
+   * holds your speed for twelve weeks — and it now belongs to the athlete, stated on the card.
+   *
+   * ⚠️ THE WEEK'S BUDGET IS STILL THE WEEK'S BUDGET. This does not let an athlete buy two intensity
+   * sessions; the wizard offers one allocation toggle, so picking intensity for one sport IS picking
+   * threshold for the other. The engine trusts what it is handed — it is not a second gate — but
+   * nothing in the UI can hand it two: the allocation is a single two-way toggle, so picking
+   * intensity for one sport IS picking threshold for the other.
+   */
+  const allocated = days.some((h) => h.ownership !== 'club' && h.role);
+  if (allocated) {
+    const chosen: HardRole[] = days.map((h) =>
+      h.ownership === 'club' ? 'club' : h.role === 'threshold' ? 'threshold' : 'vo2'
+    );
+    /**
+     * ⛔ THE CLUB RULE SURVIVES THE ALLOCATION, AND IT IS NOT AN OVERRIDE OF THE ATHLETE — IT IS THE
+     * SAME BUDGET. A group run or ride already IS the sustained session (a pack settles into exactly
+     * that rhythm and precise intervals with strict rest are near-impossible in one), so it consumes
+     * the threshold slot whatever anyone allocated. Letting a second threshold through would give
+     * the block TWO sustained sessions and no top-end work anywhere — the exact arrangement the
+     * per-discipline budget bug produced on 2026-08-17.
+     *
+     * ⚠️ THE WIZARD HIDES THE TOGGLE WHEN A CLUB SLOT IS PRESENT, so in practice this fires only for
+     * a draft saved before that gate and then edited. It is the safety net, not the path.
+     */
+    if (chosen.includes('club')) {
+      for (let i = 0; i < chosen.length; i++) if (chosen[i] === 'threshold') chosen[i] = 'vo2';
+    }
+    return chosen;
+  }
+
   const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'vo2'));
   // ⚠️ A CLUB DAY IS THE SUSTAINED SESSION — a group run or ride settles into exactly that rhythm and
   // precise intervals with strict rest are near-impossible in a pack — so it consumes the THRESHOLD
@@ -2171,7 +2235,21 @@ const RIDE_ENVIRONMENTS: HardRideEnvironment[] =
  * prescription.
  */
 function rideEnvironmentNote(env: HardRideEnvironment | undefined, role: 'vo2' | 'threshold'): string {
-  if (!env) return '';
+  /**
+   * ⛔ THE WIZARD NO LONGER ASKS THIS AT ALL (Michael, 2026-08-18), SO THIS IS THE LIVE BRANCH.
+   *
+   * The environment menu changed no token, no duration and no rep count — it changed this sentence
+   * and nothing else, which made it a question the builder had no business asking. It is gone, and
+   * the requirement it existed to express is stated here instead: what the session needs from the
+   * road, and which setups give it. The athlete decides on the day, when they know the weather.
+   */
+  if (!env) {
+    return role === 'threshold'
+      ? ' Ride it somewhere you will not have to stop — a trainer, or a road stretch with no '
+        + 'junctions. The adaptation is in the unbroken minutes, and every stoplight restarts them.'
+      : ' Ride it somewhere you can go to the limit safely — a trainer, a climb, or a clear road. '
+        + 'Anywhere you have to watch for traffic, you will hold back without meaning to.';
+  }
   const uninterrupted = role === 'threshold';
   switch (env) {
     case 'smart_trainer':
@@ -2207,11 +2285,22 @@ function sprintRepsFor(wave: HardWave): number {
 
 function sprintSession(day: string, wave: HardWave, terrain?: HardRunTerrain): PlanSession {
   const reps = sprintRepsFor(wave);
+  /**
+   * ⛔ ABSENT NO LONGER MEANS "ASSUME A TRACK" (Michael, 2026-08-18). The wizard stopped asking which
+   * flat surface, because standing in a builder twelve weeks out is the wrong moment to answer it —
+   * *"let the materializing explain what their options are."* So the session states the requirement
+   * and lists what satisfies it, and the athlete answers on the morning they run it.
+   *
+   * ⚠️ AN EXPLICIT PICK IS STILL HONOURED. Old goals carry one and read exactly as they did.
+   */
   const ground = terrain === 'turf'
     ? 'on grass or turf'
     : terrain === 'flat_road'
       ? 'on a flat road'
-      : 'on a track';
+      : terrain === 'track'
+        ? 'on a track'
+        : 'on any flat, predictable surface with room to run out — a track, a quiet flat road, or '
+          + 'grass if your legs want the softer landing';
   return {
     day,
     type: 'run',
@@ -2270,6 +2359,19 @@ function hardRunSession(
       default: return hillSession(day, lowerDays, wave);
     }
   })();
+  /**
+   * ⛔ THE SAME MOVE AS THE SPRINT AND THE RIDE (2026-08-18): the wizard asks for INCLINE, not for
+   * WHICH incline. A hill and a treadmill are peers on this session's own ranking — the belt IS the
+   * grade — so making the athlete choose between them in a builder bought nothing the day card
+   * cannot say better. `hill_3min` is still what gets BUILT; this names the substitute.
+   *
+   * ⚠️ ONLY WHEN NOTHING WAS PICKED. An athlete who chose `treadmill` reads the treadmill session
+   * and must not be told to find a hill.
+   */
+  const groundNote = terrain === undefined
+    ? ' No hill outside? A treadmill at 5-8% is the same session — the belt is the gradient, and it '
+      + 'takes the impact out the same way.'
+    : '';
   const step = Math.min(Math.max(1, Math.round(wave.weekInCycle)), 3);
   // ⛔ THIS CUE SAID "THIS IS THE FASTEST THIS SESSION GETS IN THE BLOCK", WHICH IS THE OPPOSITE OF
   // WHAT THE ANCHOR NOW DOES. The reps are halved there; a line telling the athlete to push hardest
@@ -2282,7 +2384,7 @@ function hardRunSession(
     : step === 1
       ? ' First week of the wave: settle on an effort you can hold for all four reps, and remember it.'
       : ' Same reps, same hill: go a little faster than last week, and hold it for every rep.';
-  return { ...base, description: `${base.description}${cue}` };
+  return { ...base, description: `${base.description}${groundNote}${cue}` };
 }
 
 /**
@@ -2532,6 +2634,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     discipline: 'run' | 'bike';
     terrain?: HardRunTerrain;
     ownership: 'prescribed' | 'club';
+    /** ⚠️ These three were being PUSHED onto this shape without being declared on it, which the
+     *  loose client `strict: false` and Deno's `--no-check` between them let through. Named now, so
+     *  the next reader can see what a request actually carries. */
+    goal?: HardRunGoal;
+    environment?: HardRideEnvironment;
+    /** The athlete's own allocation — see `assignHardRoles`. */
+    role?: 'intensity' | 'threshold';
   };
   /**
    * ⛔ THE DAY IS OPTIONAL NOW, AND THAT IS THE WHOLE OF SLICE 8 (§1i placement model, 2026-08-17).
@@ -2596,6 +2705,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       ...(raw.goal === 'speed' ? { goal: 'speed' as const } : {}),
       ...(RIDE_ENVIRONMENTS.includes(raw.environment as HardRideEnvironment)
         ? { environment: raw.environment as HardRideEnvironment } : {}),
+      ...(raw.role === 'intensity' || raw.role === 'threshold' ? { role: raw.role } : {}),
       ownership,
     });
   }
@@ -2800,8 +2910,24 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⚠️ PINNED RUNS ONLY — this is an ANCHOR override and a proposed hard run is not an anchor. Its
   // flat clearance still comes from the real table via `adjacencyBreach` on the flexible path; what
   // it does not get is the anchor-specific 48h PREFERENCE. Named rather than left to be discovered.
+  /**
+   * ⛔ IT MISSED THE SPRINT SESSION — THE ONE SESSION IT WAS MOST FOR (found 2026-08-18).
+   *
+   * The test was `terrain === 'flat'`, which is §2.0's last-resort **VO2 intervals on level ground**.
+   * The **Flat Sprints** session — maximum-effort efforts on a track, a flat road or turf — carries
+   * `goal: 'speed'` and one of `track` / `flat_road` / `turf`, so it matched NOTHING here and got the
+   * ordinary 24h. That is backwards: repeated maximal flat footfall is a harder eccentric hit than
+   * sustained flat intervals, and it is the session whose own card tells the athlete it *"requires
+   * strict clearance before the barbell."* The screen was promising a clearance the solver was not
+   * asking for.
+   *
+   * ⛔ THE AXIS IS FLAT FOOTFALL, NOT A TERRAIN NAME. Both flat tracks qualify; every incline is
+   * exempt, because removing the impact transient is the entire argument for choosing a hill.
+   */
+  const isFlatFootfall = (h: { discipline: string; terrain?: HardRunTerrain; goal?: HardRunGoal }) =>
+    h.discipline === 'run' && (h.goal === 'speed' || h.terrain === 'flat');
   const flatHardRunDays = new Set(
-    pinnedHardDays.filter((h) => h.discipline === 'run' && h.terrain === 'flat').map((h) => String(h.day)),
+    pinnedHardDays.filter(isFlatFootfall).map((h) => String(h.day)),
   );
   const solverAnchors: SolverAnchor[] = pins.map((p) => ({
     day: p.day.toLowerCase() as SolverDay,

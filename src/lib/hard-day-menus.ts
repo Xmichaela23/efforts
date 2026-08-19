@@ -1,130 +1,182 @@
 /**
- * THE HARD DAY'S GROUND — one table, read by the wizard and by the recipe suite.
+ * THE HIGH INTENSITY DAY'S COPY — one table, read by the wizard and by the recipe suite.
  *
- * ⛔ IT LIVED INSIDE `NonRaceBuilder.tsx` AND THAT MADE IT UNTESTABLE. The doctrine's terrain rules —
- * no flat option on the VO2 menu, a treadmill at 1% on the threshold menu and 5-8% on the interval
- * one, `stationary` on the bike's intervals and not its threshold — could only be verified by a
- * human looking at a phone. Moved here for the same reason `assistance-menu.ts` gives in its own
- * header: **anything the client and the engine must agree on lives in `src/lib/`.**
+ * ⛔ IT LIVED INSIDE `NonRaceBuilder.tsx` AND THAT MADE IT UNTESTABLE. Anything the client and the
+ * engine must agree on lives in `src/lib/` — the same reason `assistance-menu.ts` gives in its own
+ * header.
  *
- * ⚠️ THE `id`s ARE STORED VALUES. They go onto the goal as `hard_days[].terrain` / `.environment`
- * and the composer's allowlists read them — `HardRunTerrain` and `HardRideEnvironment` in
- * `strength-primary-plan.ts`. Renaming one here without renaming it there degrades the athlete's
+ * ⛔⛔ REBUILT 2026-08-18 (Michael, from the live screen). WHAT THIS FILE USED TO BE AND WHY IT IS
+ * NOT THAT ANY MORE — read this before adding an option back.
+ *
+ * It held FIVE ground menus: three for the run (speed / vo2 / threshold, three or four surfaces
+ * each) and two for the ride. Stacked with the goal question above them, one hard run asked the
+ * athlete FIVE questions on a single card. His verdict: *"this is all a bit of a mess and
+ * consuing — need to be clear on intent and what the work out is, too many options."*
+ *
+ * Three things were wrong, and they are different problems:
+ *
+ * 1. **MOST OF IT WAS NOT A PLANNING QUESTION.** Track versus flat road versus turf, hill versus
+ *    treadmill, trainer versus road — none of them changed a token, a duration or a rep count. They
+ *    changed one sentence of the session description. A builder standing twelve weeks from the
+ *    session is the worst possible moment to ask where you will be on a Tuesday morning in week
+ *    nine. *"Let the materializing explain what their options are."* So those sentences now live in
+ *    the session itself (`sprintSession`, `thresholdGroundNote`, `rideEnvironmentNote`, and the
+ *    incline note in `hardRunSession`), which is where the athlete reads them on the day.
+ *
+ * 2. **ONE OF THEM WAS REAL AND IS KEPT.** Flat versus incline is not a preference — it is the
+ *    eccentric-versus-concentric fork. Flat sprints pound the legs and buy the 48h backward
+ *    clearance against heavy lower work; running uphill removes the impact transient entirely.
+ *    It changes the session AND the week. It is the only ground question left, and it is asked in
+ *    exactly one state: a run holding the top-end intensity slot.
+ *
+ * 3. **THE BIKE HAD NO INTENT QUESTION AT ALL, AND THE INTERLOCK WAS INVISIBLE.** Which sport got
+ *    the intensity session was decided by which one the wizard happened to list first. Two athletes
+ *    making identical picks got different blocks off list order. The allocation is now a stated,
+ *    athlete-owned toggle — see `INTENT_ALLOCATION`.
+ *
+ * ⚠️ THE `id`s ARE STORED VALUES. `intent` maps to `hard_days[].role` and the run ground maps to
+ * `hard_days[].goal`; the composer's allowlists read them (`assignHardRoles`, `HardRunGoal` in
+ * `strength-primary-plan.ts`). Renaming one here without renaming it there degrades the athlete's
  * pick to "not asked", silently.
+ *
+ * ⚠️ `terrain` IS NO LONGER WRITTEN BY THE WIZARD. `HardRunTerrain` still exists and is still
+ * honoured — every goal built before today carries one and reads exactly as it did. Nothing new
+ * sets it.
  */
 
-export type GroundMenu = { note: string; options: Array<{ id: string; title: string; body: string }> };
+export type CopyOption<T extends string> = { id: T; title: string; body: string };
 
 /**
- * ⛔ EACH MENU LEADS WITH THE RULE THAT GOVERNS IT (Michael, 2026-08-18), then the options.
- * *"The goal is real-world execution, removing pedantic restrictions while keeping the biological
- * guardrails."* So the notes are deliberately PERMISSIVE about ground the athlete cannot control —
- * a slight rise, natural rolling hills — and absolute about the one thing that actually injures
- * people. His copy, verbatim.
+ * ⛔ THE EMPTY STATE HAS TO STATE THE PRICE (Michael's copy, verbatim). "None is a valid answer" is
+ * the load-bearing half: every other row on this screen is something the athlete adds, and an
+ * athlete who reads a blank intensity row as an unfinished form will add one they do not want.
+ *
+ * ⚠️ THE REP-CEILING CLAIM IS REAL AND IS THE ONE THING HERE THE ENGINE MUST KEEP TRUE.
+ * `resolveEnduranceTier` bands the accessory work off the COUNT of hard days — survival 25-30 reps
+ * at two or more, base 30-40 at one, strength 40-50 at none. If that model ever stops keying on the
+ * count, this sentence becomes a lie and must change with it.
  */
-export const HARD_RUN_MENUS: Record<'speed' | 'vo2' | 'threshold', GroundMenu> = {
-  speed: {
-    // ⛔ THE DOWNHILL CLAUSE IS A SAFETY GUARDRAIL, NOT A PREFERENCE, and it is the one absolute on
-    // this screen. Maximal downhill running is the laboratory model for eccentric hamstring damage;
-    // it is also the fastest a runner can move, so it looks like the right idea. ⛔ Do not soften it
-    // into "prefer flat" — the sentence exists because the mistake is attractive.
-    // ⛔ THE DOWNHILL CLAUSE IS THE ONE ABSOLUTE ON THIS SCREEN, and it got STRICTER on 2026-08-18:
-    // "even a 1-2% decline". A gentle downhill does not read as dangerous, which is exactly why it
-    // has to be named — a runner chasing a fast split takes the free speed and the hamstrings do the
-    // braking. Downhill sprinting is the laboratory model for eccentric hamstring damage.
-    // ⚠️ AND THE PERMISSION MOVED OUT OF THIS NOTE. "A slight 2-3% uphill is completely fine" used
-    // to sit here, which put a licence and a prohibition in one paragraph; the licence now lives on
-    // the Road option, where the athlete is actually deciding what to do with a rolling road.
-    note: 'Flat is preferred for pure speed mechanics. Never sprint at absolute max effort downhill'
-      + '\u2014even a 1-2% decline creates overspeed braking forces that tear up your hamstrings and '
-      + 'ruin your squat recovery.',
-    options: [
-      { id: 'track', title: 'A track', body: 'Predictable footing and a safe run-out, which is what lets you go flat out.' },
-      // ⚠️ THE ONLY OPTION THAT NEEDS A METHOD, NOT A DESCRIPTION. Nobody's road is perfectly flat,
-      // so this says how to run the session on the road they actually have: pick the efforts, walk
-      // the descents. Without it the note above reads as "you cannot do this outside".
-      // ⛔ THE CALLOUT CARRIES THE LAW, THE BULLET CARRIES THE TACTIC — and this line has now been
-      // written BOTH ways, a mirror and back again, so the reasoning matters more than the wording.
-      //
-      // It was mirrored on purpose ("people get sloppy"): repeat the absolute where the decision is
-      // made. The mobile-scanning read is stronger and it reverses that: a reader who meets the same
-      // warning in the callout and again in the first bullet learns the bullets are redundant and
-      // starts skipping them — so duplicating the warning costs the THREE options underneath it.
-      // ⚠️ THE RULE IS NOT WEAKENED, IT IS RELOCATED. "Even a 1-2% decline creates overspeed braking
-      // forces" is still absolute, still first, and still unmissable in the callout above.
-      { id: 'flat_road', title: 'Road \u2014 flat or rolling', body: 'If your road isn\u2019t perfectly flat, time your max efforts for the flat or slight uphill stretches. Strictly walk or jog the downhills to save your legs.' },
-      { id: 'turf', title: 'Grass or turf', body: 'Softer landing than tarmac, so the same session costs your legs a little less.' },
-    ],
-  },
-  vo2: {
-    // ⛔ THIS NOTE SAID THE SAME THING AS THE GOAL OPTION DIRECTLY ABOVE IT, almost word for word —
-    // "pushes your aerobic ceiling, uphill removes the eccentric impact, saves your knees and quads".
-    // The athlete read one paragraph, chose it, and immediately read it again. The goal card sells
-    // the SESSION; this line's only job is the ground it needs.
-    note: 'Any climb you can run hard for the full effort. The gradient is what does the work.',
-    options: [
-      { id: 'hill_3min', title: 'A hill you can run for 3 minutes', body: 'Four 3-minute climbs, walk or jog back down.' },
-      { id: 'hill_short', title: 'Only a short hill', body: 'Ten 1-minute climbs. Shorter efforts hold less stimulus than the 3-minute version \u2014 the session for the hill you have.' },
-      { id: 'treadmill', title: 'A treadmill', body: 'The same four 3-minute efforts at 5-8% incline. The incline does the hill\u2019s job.' },
-      // ⛔ `flat` IS OFF THIS MENU DELIBERATELY — RULED 2026-08-18, DO NOT PUT IT BACK. It was §2.0's
-      // last-resort 4 × 3 min on level ground for an athlete with no climb and no treadmill.
-      //
-      // ⛔ MICHAEL'S REASON, AND IT IS WHY THIS IS AN IMPROVEMENT RATHER THAN A LOSS: *"trying to
-      // hack a VO2 max session on flat ground guarantees massive eccentric tissue damage. Removing
-      // flat routes them to the Speed goal, which gives them a flat-ground session specifically
-      // designed to manage that mechanical impact. The system protects the user from their own
-      // geography."* The no-hill athlete is not losing an option; they are being moved off a bad one
-      // onto the session built for their ground. The engine still builds `flat` for any goal that
-      // already stores it.
-    ],
-  },
-  threshold: {
-    note: 'Uninterrupted pacing is the only rule. Natural 2-3% rolling hills are fine \u2014 just '
-      + 'maintain a steady effort and don\u2019t let the short uphills spike your heart rate out of '
-      + 'the zone.',
-    options: [
-      { id: 'track', title: 'A track', body: 'The pace is the pace \u2014 nothing tilts, so you hold the number.' },
-      { id: 'flat_road', title: 'Road \u2014 flat or rolling', body: 'Pick a stretch you can run unbroken.' },
-      { id: 'treadmill_1pct', title: 'A treadmill at 1%', body: 'One percent, not the interval day\u2019s 5-8%. This session wants flat.' },
-    ],
-  },
-};
+export const HARD_DAY_EMPTY_NOTE =
+  'Intensity taxes your central nervous system. Every high intensity day you add lowers your '
+  + 'lifting rep ceiling to protect the heavy barbell work.';
 
-export const HARD_RIDE_MENUS: Record<'vo2' | 'threshold', GroundMenu> = {
-  vo2: {
-    note: 'Cycling spares your joints from impact damage, but max-wattage pushes aggressively drain '
-      + 'glycogen from your quads. You need an environment where you can safely redline with zero '
-      + 'traffic or stoplights.',
-    options: [
-      { id: 'smart_trainer', title: 'Smart trainer \u2014 erg mode', body: 'It holds the number, so all you do is pedal.' },
-      { id: 'stationary', title: 'A stationary bike', body: 'No power to read, so ride it by effort \u2014 hard enough that a sentence is a struggle.' },
-      { id: 'flat_road', title: 'A flat road', body: 'Use a stretch with no junctions.' },
-      { id: 'hill_climb', title: 'A climb you can repeat', body: 'The gradient holds the effort for you \u2014 ride back down easy.' },
-    ],
-  },
-  threshold: {
-    note: 'Requires grueling, unbroken pedaling. Coasting or stopping for intersections breaks the '
-      + 'metabolic adaptation. If your local roads force you to stop, take this inside to the trainer.',
-    options: [
-      { id: 'smart_trainer', title: 'Smart trainer', body: 'Completely uninterrupted, which is what this session needs most.' },
-      { id: 'flat_road', title: 'A flat or rolling road', body: 'Pick a stretch you can ride unbroken \u2014 every stop restarts the effort.' },
-      { id: 'long_climb', title: 'A long steady climb', body: 'The gradient does the pacing and nothing interrupts it.' },
-    ],
-  },
-};
+/**
+ * ⛔ THE SINGLE-SLOT QUESTION. One hard session is not a fragment of a two-session week — it IS the
+ * cardiovascular content of the block, and the athlete is choosing what twelve weeks of it buys.
+ *
+ * ⚠️ THE RECOMMENDATION IS STATED, NOT ENFORCED. The engine advises, the athlete decides — the
+ * standing rule on this screen. `intensity` is the default because it preserves the barbell; a
+ * `threshold` pick is honoured with nothing said about it afterwards.
+ */
+/**
+ * ⚠️ ONE WORD CHANGED FROM MICHAEL'S DRAFT, AND IT WAS THE LINT, NOT AN EDIT. His line read
+ * *"dictates the cardiovascular focus"*; `focus` is a banned word in `voiceViolation()` and the
+ * copy-voice rule is enforced as a hard check, not a preference. `stimulus` carries the same claim
+ * and is the term the sessions themselves use.
+ */
+export const SINGLE_SLOT_NOTE =
+  'Because you are only carrying one hard session, your choice sets the cardiovascular stimulus '
+  + 'for your entire 12-week block.';
 
-/** The two things an athlete can want from the intensity day. Michael's copy, verbatim. */
-export const HARD_RUN_GOALS: Array<{ id: 'speed' | 'vo2'; title: string; body: string }> = [
+export const HARD_DAY_INTENT: Array<CopyOption<'intensity' | 'threshold'>> = [
+  {
+    id: 'intensity',
+    title: 'Top-end intensity',
+    // ⚠️ "aligns with heavy lifting pathways", NOT "protects them" — the same correction the role
+    // line took on 2026-08-18. Short intensity recruits the same Type II fibres and ATP-PC system
+    // the barbell does; it does not stand guard over anything.
+    body: 'Short, explosive pushes. Recruits fast-twitch fibers and aligns with heavy lifting '
+      + 'pathways. Preserves the barbell, which is why we recommend it.',
+  },
+  {
+    id: 'threshold',
+    title: 'Sustained threshold',
+    // ⛔ THE COST IS NAMED AND IT IS THE HONEST ONE. Prolonged metabolic work is what the
+    // interference literature actually implicates — not intervals. Do not soften this into "may
+    // compete"; the athlete is choosing it with the trade in front of them.
+    body: 'Grueling, unbroken pacing just under your redline. Builds immense stamina, but prolonged '
+      + 'metabolic efforts compete directly with strength adaptations.',
+  },
+];
+
+/**
+ * ⛔ THE INTERLOCK, SAID OUT LOUD — THE WHOLE POINT OF THE 2026-08-18 REBUILD.
+ *
+ * The week's budget is one top-end session and one sustained session. That was already true and it
+ * was decided by LIST ORDER, which no surface displayed. An athlete picked a hard run and a hard
+ * ride and had no way to learn that the run took the speed because it was tapped first.
+ *
+ * ⚠️ ONE TOGGLE, TWO CONSEQUENCES. Picking intensity for one sport IS picking threshold for the
+ * other — there is no second question, and the card states the other sport's session rather than
+ * asking about it. That is what makes the budget visible instead of enforced in silence.
+ */
+export const INTENT_ALLOCATION_NOTE =
+  'A 12-week block carries exactly one top-end intensity session and one sustained threshold '
+  + 'session. Pick which sport holds your top-end speed.';
+
+/**
+ * ⛔ THE ONE SURVIVING GROUND QUESTION, AND IT IS A BIOLOGICAL ONE — NOT A PREFERENCE.
+ *
+ * ⚠️ IT IS ASKED IN EXACTLY ONE STATE: a RUN holding the TOP-END INTENSITY slot. A threshold run, a
+ * ride of either kind and a club session all ask nothing. Rule 1 of the spec, and the reason is
+ * that this is the only ground choice that reaches Layer 1: `goal: 'speed'` is what makes the
+ * solver prefer 48h of clearance between the session and heavy lower work
+ * (`isFlatFootfall` → `preferredClearance` in `strength-primary-plan.ts`).
+ *
+ * ⛔ THE `id`s ARE `HardRunGoal` VALUES, NOT TERRAIN VALUES, AND THAT IS DELIBERATE. `flat` here
+ * means the SPRINT session on level ground; it must never be written to `terrain`, where `'flat'`
+ * is a different thing entirely (§2.0's last-resort VO2 intervals on the level). The wizard writes
+ * `goal` and nothing else; which flat surface, or hill versus treadmill, is answered on the day.
+ */
+export const RUN_GROUND_NOTE =
+  'The engine needs your terrain to schedule your recovery. Flat sprints require 48 hours of leg '
+  + 'clearance before heavy squats.';
+
+export const RUN_GROUND_OPTIONS: Array<CopyOption<'speed' | 'vo2'>> = [
   {
     id: 'speed',
-    title: 'Speed focus',
-    body: 'Short, explosive flat sprints to make you faster. High neurological drive, but the hard '
-      + 'footfall creates mechanical damage that requires 48 hours of leg clearance before heavy squats.',
+    title: 'Flat ground',
+    body: 'Track or road — pure speed mechanics. The hard footfall creates mechanical damage that '
+      + 'requires strict clearance before the barbell.',
   },
   {
     id: 'vo2',
-    title: 'VO2 max focus',
-    body: 'Hard 3-minute climbs to push your maximum aerobic ceiling. Spikes your heart rate to the '
-      + 'limit, but running uphill removes the eccentric impact, saving your knees and quads for the barbell.',
+    title: 'Incline',
+    body: 'A hill or treadmill — removes the eccentric impact. Saves your knees and quads, allowing '
+      + 'the barbell to sit closer in the week.',
   },
 ];
+
+/**
+ * ⛔ WHAT THE ATHLETE IS GETTING, FOR EVERY STATE THAT ASKS NOTHING. Three of the four session
+ * states are pure confirmation — the athlete reads what the block will contain and moves on. They
+ * still have to be TOLD, which is where the previous screen failed hardest: the ride had no intent
+ * question, so it was the one slot where an athlete could not see what they were being given.
+ *
+ * ⚠️ EACH ONE NAMES WHERE THE REMAINING CHOICE GETS MADE. *"You will choose your setup on the day."*
+ * That sentence is the contract with the session description — if the materializer ever stops
+ * listing the setups, this line is promising something the app does not deliver.
+ */
+export const SESSION_STATEMENTS = {
+  /** A ride holding the intensity slot. Helgerud 4 × 4. */
+  ride_intensity:
+    'Short, explosive pushes to raise your maximum wattage. You will choose your setup '
+    + '(trainer vs. road) on the day.',
+  /** A ride holding the threshold slot, with the run holding the speed. */
+  ride_threshold:
+    'Your run is holding the top-end intensity. This ride will be sustained threshold blocks. '
+    + 'You will choose your setup (trainer vs. road) on the day.',
+  /** A run holding the threshold slot, with the ride holding the speed. */
+  run_threshold:
+    'Your ride is holding the top-end intensity. This run will be grueling, unbroken pacing. '
+    + 'You will choose your setup (track vs. rolling road) on the day.',
+  /** ⚠️ THE SINGLE-SLOT THRESHOLD RUN — no other sport to point at, so it cannot use the line
+   *  above. Same session, and the sentence has to stand on its own. */
+  run_threshold_solo:
+    'This run will be grueling, unbroken pacing just under your redline. You will choose your '
+    + 'setup (track vs. rolling road) on the day.',
+  /** ⚠️ AND THE SINGLE-SLOT THRESHOLD RIDE, for the same reason. */
+  ride_threshold_solo:
+    'This ride will be sustained blocks just under your redline. You will choose your setup '
+    + '(trainer vs. road) on the day.',
+} as const;

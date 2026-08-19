@@ -16,7 +16,9 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
-import { HARD_RIDE_MENUS, HARD_RUN_MENUS } from '../../../../src/lib/hard-day-menus.ts';
+import {
+  HARD_DAY_INTENT, RUN_GROUND_OPTIONS, SESSION_STATEMENTS,
+} from '../../../../src/lib/hard-day-menus.ts';
 
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -25,6 +27,11 @@ type Recipe = {
   name: string;
   cfg: Record<string, unknown>;
   /** Which menu each hard slot must be offered, in order. */
+  /**
+   * ⛔ THE FIVE GROUND MENUS ARE GONE (2026-08-18) — see `hard-day-menus.ts`' header. The field is
+   * kept because each recipe still declares which SESSIONS it should produce, and the card test
+   * below reads it to check the copy that names them. What it no longer implies is a menu.
+   */
   menus: Array<'speed' | 'vo2' | 'threshold' | 'ride_vo2' | 'ride_threshold'>;
   /** The accessory rep total every slot must carry on a working week. */
   accessory: number;
@@ -164,25 +171,38 @@ for (const r of RECIPES) {
     }
   });
 
-  // ── THE MENU RULE ──────────────────────────────────────────────────────────────────────────────
-  Deno.test(`${r.name} · ⛔ MENU — each hard slot is offered exactly the doctrine's ground`, () => {
-    const EXPECTED: Record<string, string[]> = {
-      speed: ['track', 'flat_road', 'turf'],
-      vo2: ['hill_3min', 'hill_short', 'treadmill'],
-      threshold: ['track', 'flat_road', 'treadmill_1pct'],
-      ride_vo2: ['smart_trainer', 'stationary', 'flat_road', 'hill_climb'],
-      ride_threshold: ['smart_trainer', 'flat_road', 'long_climb'],
-    };
-    for (const key of r.menus) {
-      const menu = key.startsWith('ride_')
-        ? HARD_RIDE_MENUS[key === 'ride_vo2' ? 'vo2' : 'threshold']
-        : HARD_RUN_MENUS[key as 'speed' | 'vo2' | 'threshold'];
-      assertEquals(menu.options.map((o) => o.id), EXPECTED[key], `${key} menu drifted`);
-      assert(menu.note.length > 0, `${key} menu has no rule above it`);
+  // ── THE CARD RULE ──────────────────────────────────────────────────────────────────────────────
+  Deno.test(`${r.name} · ⛔ CARD — one question per state, and the ground question stays a GOAL`, () => {
+    /**
+     * ⛔⛔ WHAT THIS TEST USED TO BE, AND WHY IT IS NOT THAT (2026-08-18). It pinned five ground
+     * menus — three run surfaces sets and two ride ones, 17 options between them. Michael, on the
+     * live screen: *"this is all a bit of a mess and consuing… too many options."* Every one of
+     * those options changed a SENTENCE and nothing else, so they moved into the session
+     * descriptions where the athlete reads them on the day. The one that changed the WEEK stayed.
+     *
+     * ⛔ THE INVARIANT THAT REPLACES THEM: the surviving ground question is asked as a GOAL, not a
+     * terrain. `RUN_GROUND_OPTIONS` writes `hard_days[].goal`, and `speed` there means the SPRINT
+     * session. Writing it to `terrain` would collide with `HardRunTerrain`'s own `'flat'`, which is
+     * §2.0's last-resort VO2 intervals on the level — a completely different session. If a future
+     * session "tidies" these ids back into terrain values, this is the test that catches it.
+     */
+    assertEquals(RUN_GROUND_OPTIONS.map((o) => o.id), ['speed', 'vo2'], 'the ground question drifted');
+    assertEquals(HARD_DAY_INTENT.map((o) => o.id), ['intensity', 'threshold'], 'the intent question drifted');
+    // ⚠️ The recommendation is stated on the intensity option and nowhere else — it is the default
+    // because it preserves the barbell, and the athlete is told so rather than steered silently.
+    assert(HARD_DAY_INTENT[0].body.includes('recommend'), 'the intensity option stopped stating the recommendation');
+    /**
+     * ⛔ EVERY ASK-NOTHING STATE NAMES WHERE THE REST GETS DECIDED. *"You will choose your setup on
+     * the day"* is a CONTRACT with the session description — the materializer now lists the setups,
+     * and if it ever stops, these lines are promising something the app does not deliver.
+     */
+    for (const [key, line] of Object.entries(SESSION_STATEMENTS)) {
+      assert(line.includes('on the day'), `${key} stopped naming where the setup is chosen`);
     }
-    // ⛔ AND THE ONE ABSENCE THE DOCTRINE TURNS ON: no flat VO2 option, ever.
-    assertEquals(HARD_RUN_MENUS.vo2.options.some((o) => o.id === 'flat'), false,
-      'the flat option is back on the VO2 menu');
+    // ⚠️ AND THE TWO-SLOT LINES POINT AT THE OTHER SPORT — that pointing IS the interlock being
+    // visible, which is the whole reason this card was rebuilt.
+    assert(SESSION_STATEMENTS.ride_threshold.includes('run'), 'the ride threshold line stopped naming the run');
+    assert(SESSION_STATEMENTS.run_threshold.includes('ride'), 'the run threshold line stopped naming the ride');
   });
 
   // ── THE ACCESSORY TIER ─────────────────────────────────────────────────────────────────────────

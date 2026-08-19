@@ -283,6 +283,18 @@ Deno.serve(async (req: Request) => {
             // (`vo2`) in the composer, which is the same allowlist discipline as terrain.
             ...(hd.goal === 'speed' ? { goal: 'speed' as const } : {}),
             ...(environment ? { environment } : {}),
+            /**
+             * ⛔ THE ATHLETE'S INTENT ALLOCATION (2026-08-18) — WHICH SESSION THIS DAY IS.
+             *
+             * ⚠️ THIS IS THE FIELD THAT WOULD HAVE BEEN DROPPED NEXT. `goal` and `environment` were
+             * both stored by the wizard, carried on the goal row, and thrown away right here for
+             * twelve days — *"it ended up giving me hills"*. This one decides whether the athlete's
+             * hard run is a sprint session or a threshold run, so losing it would put the plan in
+             * direct contradiction with the card that promised it. Same allowlist discipline:
+             * anything unrecognised degrades to absent, and absent falls back to list order.
+             */
+            ...(hd.role === 'intensity' || hd.role === 'threshold'
+              ? { role: hd.role as 'intensity' | 'threshold' } : {}),
             // ⚠️ ABSENT OR UNRECOGNISED → `prescribed`, the shipped behaviour. A club day is the
             // athlete telling us they already attend it; nothing may infer that on their behalf.
             ownership: hd.ownership === 'club' ? 'club' as const : 'prescribed' as const,

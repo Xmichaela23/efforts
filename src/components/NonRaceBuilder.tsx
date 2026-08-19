@@ -43,7 +43,10 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // component, which meant the doctrine's terrain rules could only be checked by a human on a device —
 // and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
-import { HARD_RIDE_MENUS, HARD_RUN_GOALS, HARD_RUN_MENUS } from '@/lib/hard-day-menus';
+import {
+  HARD_DAY_EMPTY_NOTE, HARD_DAY_INTENT, INTENT_ALLOCATION_NOTE, RUN_GROUND_NOTE,
+  RUN_GROUND_OPTIONS, SESSION_STATEMENTS, SINGLE_SLOT_NOTE,
+} from '@/lib/hard-day-menus';
 import { solveWizardWeek } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
@@ -650,11 +653,25 @@ type NonRaceState = {
     discipline: 'run' | 'bike';
     day: DayName | '';
     ownership: 'prescribed' | 'club';
-    /** Intensity slot, run only: sprints or hills. Absent → hills, the shipped behaviour. */
+    /**
+     * ⛔ THE ATHLETE'S OWN ALLOCATION (2026-08-18) — WHICH SESSION THIS SLOT IS.
+     * Absent → the old positional rule (first prescribed slot is the intensity one), which is what
+     * every draft made before today carries. `hardRoleOf` holds both paths.
+     */
+    role?: 'intensity' | 'threshold';
+    /**
+     * ⛔ THE ONE GROUND QUESTION LEFT, AND IT IS ASKED AS A GOAL. Flat sprints or hill repeats —
+     * the eccentric/concentric fork, the only ground choice that reaches Layer 1. Run slots holding
+     * the intensity role only. Absent → hills.
+     */
     goal?: 'speed' | 'vo2';
-    /** The ground. Its OPTIONS depend on the slot's role and goal — see `HARD_RUN_MENUS`. */
+    /**
+     * ⚠️ NO LONGER WRITTEN BY THE WIZARD (2026-08-18) — the surface menus moved into the session
+     * descriptions. Kept on the shape because drafts made before today carry values, and the
+     * composer still honours them.
+     */
     terrain?: string;
-    /** Where the hard ride happens. Ride slots only. */
+    /** ⚠️ SAME — read from old drafts, never set by this screen any more. */
     environment?: string;
   }>;
   /**
@@ -1188,12 +1205,30 @@ function assemblePayload(
                     ...(h.day ? { day: h.day } : {}),
                     discipline: h.discipline,
                     ownership: h.ownership,
-                    // ⚠️ THE SLOT'S OWN TERRAIN WINS, and `qualityRunTerrain` is the fallback for a
-                    // goal that was created before slots carried one. One field could not hold two
-                    // hard runs with different shapes.
-                    ...(h.discipline === 'run' ? { terrain: h.terrain || state.qualityRunTerrain } : {}),
+                    /**
+                     * ⛔ THE `qualityRunTerrain` FALLBACK IS DELETED, AND IT HAD TO GO WITH THE MENU
+                     * (2026-08-18). It defaulted to `hill_3min`, so with the terrain menu removed
+                     * EVERY hard run would have been stamped `hill_3min` — and a stamped terrain is
+                     * indistinguishable from an athlete who chose one. That would have silently
+                     * suppressed the session's own *"no hill outside? a treadmill at 5-8% is the
+                     * same session"* line, which is the whole point of moving the question to the
+                     * day. Absent must stay absent.
+                     *
+                     * ⚠️ AN OLD DRAFT'S STORED `terrain` IS STILL SENT AND STILL HONOURED — the
+                     * composer's allowlist has not changed. Nothing NEW writes one.
+                     */
+                    ...(h.discipline === 'run' && h.terrain ? { terrain: h.terrain } : {}),
                     ...(h.discipline === 'run' && h.goal ? { goal: h.goal } : {}),
                     ...(h.discipline === 'bike' && h.environment ? { environment: h.environment } : {}),
+                    /**
+                     * ⛔ THE ALLOCATION TRAVELS, OR THE SCREEN AND THE ENGINE DISAGREE. The athlete
+                     * picked which sport holds the top-end session; without this the composer falls
+                     * back to list order and can hand them the opposite of what the card promised.
+                     * ⚠️ CLUB SLOTS SEND NOTHING — `assignHardRoles` gives the club the sustained
+                     * slot by its nature, and an allocation on it would be a value the engine
+                     * ignores, sitting in the goal looking authoritative.
+                     */
+                    ...(h.ownership !== 'club' && h.role ? { role: h.role } : {}),
                   })),
               }
             : {}),
@@ -1970,16 +2005,49 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * wizard would pull the whole composer into the client bundle. If `assignHardRoles` changes, this
    * changes with it.
    */
+  /**
+   * ⛔ IT MIRRORS `assignHardRoles` AND MUST KEEP DOING SO — INCLUDING THE ORDER OF THE TWO PATHS.
+   * The screen and the composer disagreeing about which session an athlete is getting is the exact
+   * failure this card has now been rebuilt twice to fix.
+   */
   const hardRoleOf = (i: number): 'threshold' | 'vo2' | 'club' => {
     const slots = state.hardDays;
     if (slots[i]?.ownership === 'club') return 'club';
-    // ⛔ INTENSITY FIRST, THRESHOLD SECOND (2026-08-18) — mirrors `assignHardRoles`, which records
-    // all three positions this rule has held. A club session IS the sustained one, so it consumes
-    // the threshold slot and the app's own days stay on intensity.
+    // ⛔ THE ATHLETE'S ALLOCATION WINS (2026-08-18). Which sport holds the top-end session is a real
+    // training decision and it used to be settled by which chip was tapped first, with no surface
+    // saying so. Now it is a stated toggle and this reads it.
+    if (slots.some((h) => h.ownership !== 'club' && h.role)) {
+      return slots[i]?.role === 'threshold' ? 'threshold' : 'vo2';
+    }
+    // ⚠️ THE FALLBACK, FOR A DRAFT SAVED BEFORE THE TOGGLE EXISTED: intensity first, threshold
+    // second. A club session IS the sustained one, so it consumes the threshold slot and the app's
+    // own days stay on intensity.
     if (slots.some((h) => h.ownership === 'club')) return 'vo2';
     const firstPrescribed = slots.findIndex((h) => h.ownership !== 'club');
     return i === firstPrescribed ? 'vo2' : 'threshold';
   };
+  /**
+   * ⛔ ONE TOGGLE, BOTH SLOTS. Allocating intensity to one sport IS allocating threshold to the
+   * other — the week's budget is one of each — so this writes both rather than leaving the second
+   * to be inferred. Writing only the tapped slot would leave the other reading the positional
+   * fallback, and the two rules can disagree.
+   * ⚠️ CLUB SLOTS ARE SKIPPED, not overwritten: a club session already holds the sustained slot by
+   * its nature and the athlete does not get to reassign it.
+   */
+  const allocateIntensityTo = (slot: number) => setState((st) => ({
+    ...st,
+    hardDays: st.hardDays.map((h, i) => (
+      h.ownership === 'club' ? h
+        : {
+          ...h,
+          role: i === slot ? 'intensity' as const : 'threshold' as const,
+          // ⚠️ THE GROUND ANSWER DIES WITH THE ROLE. `goal` is only meaningful on an intensity RUN;
+          // leaving a stored `speed` on a slot that just became the threshold session would charge
+          // the week a 48h clearance for a session that is no longer a sprint.
+          ...(i === slot ? {} : { goal: undefined }),
+        }
+    )),
+  }));
 
   const scheduleSelectedDay =
     scheduleAsk === 'hard' ? hardDayValue
@@ -4642,43 +4710,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 ⛔ IT MIRRORS `assignHardRoles` AND MUST KEEP DOING SO — including the
                                 club rule: a group run or ride already IS the sustained session, so it
                                 consumes that slot and the app's own day goes to intervals. */}
-                            {activeHard && (
-                              <p className="text-white/45 text-xs leading-snug pt-1">
-                                {/* ⛔ THE CLUB BRANCH IS DELETED (2026-08-18). It said "we do not
-                                    prescribe what you do in it" — the wording replaced on the
-                                    checkbox below — so a club slot showed the OLD framing and the
-                                    NEW one stacked, and the old one described the session as lesser.
-                                    A club slot now falls through to its ROLE line, which is true of
-                                    it: it is the intensity day or the threshold day like any other,
-                                    and the checkbox says the one thing that differs. */}
-                                {/* ⚠️ A CLUB SLOT READS AS THRESHOLD, because that is what it IS.
-                                    `assignHardRoles` gives the club the sustained slot — a group run
-                                    or ride settles into exactly that rhythm — and pushes the app's
-                                    own day to intensity. Falling through to the intensity line would
-                                    have told a club runner their Tuesday group run raises their top
-                                    end, which is the opposite of what the engine built. */}
-                                {(['threshold', 'club'] as const).includes(hardRoleOf(hardSlotIndex) as never)
-                                    // ⚠️ MICHAEL'S WORDS, MINUS ONE CLAUSE. His copy ended "Costs
-                                    // accessory lifting volume" — and that is not what the engine
-                                    // does: the accessory band is set by the COUNT of hard days
-                                    // (`resolveEnduranceTier`), so a threshold day and an intensity
-                                    // day cost identical accessory volume. Shipping the sentence
-                                    // would have been a claim the plan then contradicts. ⛔ If
-                                    // threshold SHOULD cost more, that is a change to the tier model
-                                    // and the clause comes back with it.
-                                    ? 'Builds fatigue resistance and stamina. A sustained engine-builder — '
-                                      + 'and the prolonged effort is the one that competes hardest with strength.'
-                                    // ⛔ "PRESERVES", NOT "PROTECTS" (Michael, 2026-08-18) — and the
-                                    // one word carries the actual mechanism. Short intensity does
-                                    // not DEFEND the strength pathways; it recruits the same Type II
-                                    // fibres and ATP-PC system the barbell does, so it never sends
-                                    // the signal that converts fibre toward Type I. That signal is
-                                    // long slow work, and it is the interference effect. "Protects"
-                                    // implies an active guard the session does not provide.
-                                    : 'Intensity — the day that raises your top end. It preserves the '
-                                      + 'strength pathways the barbell runs on, which is why it comes first.'}
-                              </p>
-                            )}
+                            {/* ⛔⛔ THE ROLE PARAGRAPH IS DELETED (2026-08-18), AND IT IS A DELETION
+                                RATHER THAN A MOVE. It sat here saying "Intensity — the day that
+                                raises your top end. It preserves the strength pathways the barbell
+                                runs on" (or the sustained equivalent), keyed off `hardRoleOf`.
+
+                                ⛔ IT NOW SAYS WHAT THREE OTHER THINGS ON THIS CARD SAY. The intent
+                                options carry it in their own bodies, the allocation toggle names
+                                which sport holds it, and `SESSION_STATEMENTS` states the ask-nothing
+                                cases. Four sentences making one point is exactly the *"too many
+                                options"* the rebuild was for.
+
+                                ⚠️ WHAT WAS LOAD-BEARING IN IT SURVIVES, VERBATIM, IN
+                                `HARD_DAY_INTENT` — including the two corrections it accumulated:
+                                "preserves", never "protects" (short intensity recruits the same
+                                Type II fibres the barbell does; it does not stand guard), and NO
+                                accessory-cost clause on the threshold option (the band is set by the
+                                COUNT of hard days, so both roles cost identical accessory volume and
+                                the sentence would have been a claim the plan contradicts).
+
+                                ⛔ THE CLUB CASE IS COVERED TOO: a club slot reads as the threshold
+                                session, which is what `assignHardRoles` makes it, and the ownership
+                                checkbox below says the one thing that differs. */}
                             {/* ⛔ AND WHEN AN OPTION IS NOT OFFERED, THE SCREEN SAYS WHY (§7's gate).
                                 A chip that is simply absent reads as a bug. The reason is the
                                 PROGRESSION, not a missing database field: a session that cannot
@@ -4773,53 +4826,74 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 </span>
                               </button>
                             )}
-                            {/* ⚠️ THE TERRAIN MENU IS GATED ON THE ACTIVE SLOT NOW, not on
-                                `'run' in qualityDays` — with two slots the sport-keyed test cannot
-                                say WHICH hard run is being answered. It is also hidden for a CLUB
-                                run: the terrain question exists to shape a session the app writes,
-                                and the app is not writing this one. ⛔ The copy inside is unchanged
-                                and must stay so — §2.0's ruling on the flat option depends on it. */}
-                            {/* ── THE GOAL, THEN THE GROUND ────────────────────────────────────
-                                ⛔ THE INTENSITY DAY ASKS WHAT KIND (Michael, 2026-08-18). Sprints and
-                                hill repeats are different trades, not two names for one session: one
-                                buys neural drive and pays for it in footfall damage, the other buys
-                                the aerobic ceiling and spends nothing eccentric. The athlete owns
-                                that choice; the app owns the consequence.
-                                ⚠️ ONLY ON A PRESCRIBED RUN. A club session is not ours to shape, and
-                                the threshold slot has no goal question — its session is settled. */}
-                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed'
-                              && hardRoleOf(hardSlotIndex) === 'vo2' && (
+                            {/* ⛔⛔ THE HIGH INTENSITY CARD, REBUILT 2026-08-18 (Michael, from the
+                                live screen). FOUR STATES, AND EACH ONE ASKS AT MOST ONE QUESTION.
+
+                                WHAT WAS HERE: a goal menu (2 options) stacked on a ground menu (3-4
+                                options) stacked on a ride environment menu (3 options). One hard run
+                                asked five questions on one card and the ride asked about a setting
+                                that changed nothing but a sentence. His verdict: *"this is all a bit
+                                of a mess and consuing — need to be clear on intent and what the work
+                                out is, too many options."*
+
+                                THE FOUR STATES:
+                                  0. nothing chosen  → the price of intensity, and "none is valid"
+                                  1. one slot        → what you want from it (intensity / threshold)
+                                  2. two slots       → which sport holds the top-end speed
+                                  3. any intensity RUN → flat ground or incline
+
+                                ⛔ STATE 3 IS THE ONLY SUB-MENU AND THAT IS RULE 1 OF THE SPEC. It is
+                                the eccentric/concentric fork and the only ground choice that reaches
+                                Layer 1 — it decides whether the solver asks for 48h of clearance
+                                against heavy lower work. Every other setting (which flat surface,
+                                hill or treadmill, trainer or road) changes one sentence of the
+                                session description and is now IN that description, answered on the
+                                day. ⛔ Do not bring any of them back onto this card. */}
+
+                            {/* ── STATE 0: nothing chosen ────────────────────────────────────
+                                ⚠️ RENDERS ONLY WHEN THE ROW IS EMPTY. An athlete who has already
+                                added a session does not need to be sold on the cost of one, and
+                                leaving it up would push the actual question below the fold. */}
+                            {state.hardDays.length === 0 && (
+                              <p className="text-white/70 text-sm leading-relaxed pt-1">
+                                {HARD_DAY_EMPTY_NOTE}
+                              </p>
+                            )}
+
+                            {/* ── STATE 1: one slot — what do you want from it ───────────────
+                                ⛔ THIS QUESTION DID NOT EXIST. One hard day was ALWAYS the intensity
+                                session, decided by `assignHardRoles` and never offered. An athlete
+                                whose whole block hangs on one hard session had no say in what it
+                                was. ⚠️ Prescribed only: a club run or ride is the sustained session
+                                by its nature and is not ours to reassign. */}
+                            {state.hardDays.length === 1 && activeHard?.ownership === 'prescribed' && (
                               <div className="space-y-1.5 pt-1">
                                 <span className="text-white/85 text-sm">What you want from it</span>
+                                {/* ⛔ THE RULE FIRST, THE OPTIONS AFTER — the note governs every
+                                    option below it, so putting it under them would be an
+                                    instruction arriving after the tap it applies to. */}
+                                <p className="text-white/70 text-sm leading-relaxed">{SINGLE_SLOT_NOTE}</p>
                                 <div className="space-y-1">
-                                  {HARD_RUN_GOALS.map((opt) => {
-                                    const on = (activeHard.goal ?? 'vo2') === opt.id;
+                                  {HARD_DAY_INTENT.map((opt) => {
+                                    // ⚠️ ABSENT READS AS `intensity`, matching both `hardRoleOf`'s
+                                    // fallback and `assignHardRoles`. A slot with no stored role is
+                                    // the intensity one, so the chip must show it as chosen.
+                                    const on = (activeHard.role ?? 'intensity') === opt.id;
                                     return (
                                       <button
                                         key={opt.id} type="button"
                                         onClick={() => setState((st) => {
                                           const next = [...st.hardDays];
-                                          // ⛔ THE GROUND IS CLEARED WITH THE GOAL. A track pick has no
-                                          // meaning on the hill menu and a hill pick has none on the
-                                          // sprint menu; carrying it across would leave a stored value
-                                          // the new menu cannot show as selected.
-                                          next[hardSlotIndex] = { ...next[hardSlotIndex], goal: opt.id, terrain: undefined };
+                                          next[hardSlotIndex] = {
+                                            ...next[hardSlotIndex],
+                                            role: opt.id,
+                                            // ⚠️ THE GROUND ANSWER DIES WITH THE ROLE — a stored
+                                            // `speed` on a threshold slot would charge the week a
+                                            // 48h clearance for a session that is not a sprint.
+                                            ...(opt.id === 'threshold' ? { goal: undefined } : {}),
+                                          };
                                           return { ...st, hardDays: next };
                                         })}
-                                        /**
-                                         * ⛔ THE SPORT'S COLOUR, NOT THE BLOCK ACCENT (Michael,
-                                         * 2026-08-18: "the wrong color for bike"). These options
-                                         * belong to a run slot or a ride slot, and the rest of the
-                                         * wizard wayfinds by discipline — gold for run, green for
-                                         * ride. The accent is strength orange, so a ride's chosen
-                                         * ground read as a strength control.
-                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF. The thick
-                                         * BLUE ring in the screenshot is Chrome's default focus ring
-                                         * on the button that was just clicked — not styling anyone
-                                         * chose, and blue is this app's SWIM colour, so a selected
-                                         * ride option looked like a swim. ⚠️ Keyboard focus keeps a
-                                         * visible ring via `focus-visible`; only the mouse ring goes.
-                                         */
                                         className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
                                         style={on ? {
                                           borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
@@ -4835,133 +4909,137 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                               </div>
                             )}
 
-                            {/* ⛔ THE GROUND, KEYED BY WHAT THE SESSION IS. One menu could not serve
-                                three sessions — see `HARD_RUN_MENUS`. A club run gets none of them:
-                                the question exists to shape a session the app writes, and the app is
-                                not writing this one. */}
-                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed' && (() => {
-                              const role = hardRoleOf(hardSlotIndex);
-                              const key = role === 'threshold' ? 'threshold' : (activeHard.goal ?? 'vo2');
-                              const menu = HARD_RUN_MENUS[key as 'speed' | 'vo2' | 'threshold'];
-                              const opts = menu.options;
-                              const chosen = activeHard.terrain
-                                ?? (key === 'vo2' ? state.qualityRunTerrain : undefined);
-                              return (
-                                <div className="space-y-1.5 pt-1">
-                                  <span className="text-white/85 text-sm">What you can run it on</span>
-                                  {/* ⛔ THE RULE FIRST, THE OPTIONS AFTER. The note governs every
-                                      option below it, so putting it under them would be an
-                                      instruction arriving after the tap it applies to. */}
-                                  <p className="text-white/70 text-sm leading-relaxed">{menu.note}</p>
-                                  <div className="space-y-1">
-                                    {opts.map((opt) => {
-                                      const on = chosen === opt.id;
-                                      return (
-                                        <button
-                                          key={opt.id} type="button"
-                                          onClick={() => setState((st) => {
-                                            const next = [...st.hardDays];
-                                            next[hardSlotIndex] = { ...next[hardSlotIndex], terrain: opt.id };
-                                            // ⚠️ THE LEGACY GLOBAL IS KEPT IN STEP for the VO2 menu only —
-                                            // it is what a pre-2026-08-18 goal reads back, and letting it
-                                            // drift would make an old plan disagree with the screen.
-                                            return key === 'vo2'
-                                              ? { ...st, hardDays: next, qualityRunTerrain: opt.id as typeof st.qualityRunTerrain }
-                                              : { ...st, hardDays: next };
-                                          })}
-                                          /**
-                                         * ⛔ THE SPORT'S COLOUR, NOT THE BLOCK ACCENT (Michael,
-                                         * 2026-08-18: "the wrong color for bike"). These options
-                                         * belong to a run slot or a ride slot, and the rest of the
-                                         * wizard wayfinds by discipline — gold for run, green for
-                                         * ride. The accent is strength orange, so a ride's chosen
-                                         * ground read as a strength control.
-                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF. The thick
-                                         * BLUE ring in the screenshot is Chrome's default focus ring
-                                         * on the button that was just clicked — not styling anyone
-                                         * chose, and blue is this app's SWIM colour, so a selected
-                                         * ride option looked like a swim. ⚠️ Keyboard focus keeps a
-                                         * visible ring via `focus-visible`; only the mouse ring goes.
-                                         */
-                                        className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
+                            {/* ── STATE 2: two slots — which sport holds the speed ───────────
+                                ⛔⛔ THE INTERLOCK, MADE VISIBLE. THIS IS THE WHOLE REBUILD.
+                                The budget — one top-end session, one sustained session — was already
+                                the law. Which sport got which was decided by LIST ORDER and shown
+                                nowhere, so two athletes making identical picks got different blocks
+                                depending on which chip they tapped first.
+                                ⚠️ ONE TOGGLE WRITES BOTH SLOTS (`allocateIntensityTo`). There is no
+                                second question: picking intensity for one sport IS picking threshold
+                                for the other, which is the sentence the note above states.
+                                ⚠️ HIDDEN WHEN A CLUB SESSION IS PRESENT — the club already holds the
+                                sustained slot by its nature, so there is nothing to allocate. */}
+                            {state.hardDays.length === 2
+                              && !state.hardDays.some((h) => h.ownership === 'club') && (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-white/85 text-sm">Intent allocation</span>
+                                <p className="text-white/70 text-sm leading-relaxed">{INTENT_ALLOCATION_NOTE}</p>
+                                <div className="flex gap-2">
+                                  {state.hardDays.map((h, i) => {
+                                    const on = hardRoleOf(i) === 'vo2';
+                                    const sport = h.discipline === 'bike' ? 'Ride' : 'Run';
+                                    // ⚠️ TWO SLOTS OF THE SAME SPORT NEED DISAMBIGUATING, or both
+                                    // buttons read "Run is intensity" and the athlete cannot tell
+                                    // which one they are tapping. The pinned day is the clearest
+                                    // label when there is one; the ordinal is the fallback for a
+                                    // slot the engine has not placed yet.
+                                    const twin = state.hardDays.filter((o) => o.discipline === h.discipline).length > 1;
+                                    const qualifier = !twin ? ''
+                                      : h.day ? ` (${h.day.slice(0, 3).replace(/^./, (c) => c.toUpperCase())})`
+                                        : i === 0 ? ' (first)' : ' (second)';
+                                    return (
+                                      <button
+                                        key={`alloc-${i}`} type="button"
+                                        onClick={() => allocateIntensityTo(i)}
+                                        className={`flex-1 rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'text-white/90' : 'border-white/12 bg-white/[0.03] text-white/60'}`}
                                         style={on ? {
-                                          borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
-                                          backgroundColor: `rgba(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
+                                          borderColor: `rgb(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')})`,
+                                          backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
                                         } : undefined}
-                                        >
-                                          <span className="block text-white/90 text-sm">{opt.title}</span>
-                                          <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
+                                      >
+                                        {sport}{qualifier} is intensity
+                                      </button>
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })()}
+                              </div>
+                            )}
 
-                            {/* ⛔ AND THE RIDE HAS ONE TOO NOW. It had none — "the ride has one shape
-                                and no terrain question" was true while the ride was only ever
-                                Helgerud 4 × 4, and stopped being true when the bike gained a
-                                threshold day. It is an ENVIRONMENT: can you hold an exact power
-                                target without stopping. */}
-                            {activeHard?.discipline === 'bike' && activeHard.ownership === 'prescribed' && (() => {
-                              const role = hardRoleOf(hardSlotIndex) === 'threshold' ? 'threshold' : 'vo2';
-                              return (
-                                <div className="space-y-1.5 pt-1">
-                                  {/* ⛔ THE RIDE NEVER GETS A GOAL QUESTION, so without this it was the
-                                      only slot where the athlete could not see WHAT they were being
-                                      given (Michael, 2026-08-18: "there is not clarity on ride what we
-                                      offer"). The run has two goals to choose between and each one
-                                      describes its session; the ride has one shape per role and the
-                                      card simply did not say it. This is the same disclosure the run
-                                      gets — it just isn't a choice. */}
-                                  <p className="text-white/70 text-sm leading-relaxed">
-                                    {role === 'threshold'
-                                      ? 'Your ride is sustained blocks just under your redline — 4 × 5 min '
-                                        + 'building to 2 × 10 across the block, at 95-105% FTP.'
-                                      : 'Your ride is the Helgerud 4 × 4 — four 4-minute efforts at maximum '
-                                        + 'sustainable power, easy spinning between. It halves to 2 × 4 in the '
-                                        + 'final weeks so your quads are loaded for the heavy lifts.'}
-                                  </p>
-                                  <span className="text-white/85 text-sm">Where you can ride it</span>
-                                  <p className="text-white/70 text-sm leading-relaxed">{HARD_RIDE_MENUS[role].note}</p>
-                                  <div className="space-y-1">
-                                    {HARD_RIDE_MENUS[role].options.map((opt) => {
-                                      const on = activeHard.environment === opt.id;
-                                      return (
-                                        <button
-                                          key={opt.id} type="button"
-                                          onClick={() => setState((st) => {
-                                            const next = [...st.hardDays];
-                                            next[hardSlotIndex] = { ...next[hardSlotIndex], environment: opt.id };
-                                            return { ...st, hardDays: next };
-                                          })}
-                                          /**
+                            {/* ── STATE 3: the one surviving ground question ─────────────────
+                                ⛔ A RUN HOLDING THE INTENSITY SLOT, AND NOTHING ELSE. Rule 1: this
+                                is the only path with a sub-menu, because it is the only ground
+                                choice that reaches Layer 1 — `goal: 'speed'` is what makes the
+                                solver prefer 48h between the session and heavy lower work.
+                                ⚠️ IT WRITES `goal`, NEVER `terrain`. Which flat surface, and hill
+                                versus treadmill, are answered on the day by the session itself. */}
+                            {activeHard?.discipline === 'run' && activeHard.ownership === 'prescribed'
+                              && hardRoleOf(hardSlotIndex) === 'vo2' && (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-white/85 text-sm">What you can run it on</span>
+                                <p className="text-white/70 text-sm leading-relaxed">{RUN_GROUND_NOTE}</p>
+                                <div className="space-y-1">
+                                  {RUN_GROUND_OPTIONS.map((opt) => {
+                                    // ⚠️ ABSENT READS AS `vo2` (incline) — the shipped default, and
+                                    // what every block built before the goal question existed got.
+                                    const on = (activeHard.goal ?? 'vo2') === opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id} type="button"
+                                        onClick={() => setState((st) => {
+                                          const next = [...st.hardDays];
+                                          // ⛔ `terrain` IS CLEARED, NOT SET. A ground value stored by
+                                          // an older draft belongs to the OTHER menu — a `track` pick
+                                          // means nothing on the hill session and `hill_short` means
+                                          // nothing on the sprint — so carrying it across would build
+                                          // a session the athlete did not choose.
+                                          next[hardSlotIndex] = { ...next[hardSlotIndex], goal: opt.id, terrain: undefined };
+                                          return { ...st, hardDays: next };
+                                        })}
+                                        /**
                                          * ⛔ THE SPORT'S COLOUR, NOT THE BLOCK ACCENT (Michael,
-                                         * 2026-08-18: "the wrong color for bike"). These options
-                                         * belong to a run slot or a ride slot, and the rest of the
-                                         * wizard wayfinds by discipline — gold for run, green for
-                                         * ride. The accent is strength orange, so a ride's chosen
-                                         * ground read as a strength control.
-                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF. The thick
-                                         * BLUE ring in the screenshot is Chrome's default focus ring
-                                         * on the button that was just clicked — not styling anyone
-                                         * chose, and blue is this app's SWIM colour, so a selected
-                                         * ride option looked like a swim. ⚠️ Keyboard focus keeps a
-                                         * visible ring via `focus-visible`; only the mouse ring goes.
+                                         * 2026-08-18: "the wrong color for bike"). The accent is
+                                         * strength orange, so a chosen endurance option read as a
+                                         * strength control.
+                                         * ⛔ AND `focus:outline-none` IS THE OTHER HALF — the thick
+                                         * BLUE ring in the screenshot was Chrome's default focus
+                                         * ring, and blue is this app's SWIM colour. ⚠️ Keyboard
+                                         * focus keeps its ring via `focus-visible`.
                                          */
                                         className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? '' : 'border-white/12 bg-white/[0.03]'}`}
                                         style={on ? {
-                                          borderColor: `rgb(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')})`,
-                                          backgroundColor: `rgba(${getDisciplineColorRgb(activeHard.discipline === 'bike' ? 'bike' : 'run')},0.12)`,
+                                          borderColor: `rgb(${getDisciplineColorRgb('run')})`,
+                                          backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.12)`,
                                         } : undefined}
-                                        >
-                                          <span className="block text-white/90 text-sm">{opt.title}</span>
-                                          <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
+                                      >
+                                        <span className="block text-white/90 text-sm">{opt.title}</span>
+                                        <span className="block text-white/45 text-xs mt-0.5 leading-snug">{opt.body}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── AND EVERY STATE THAT ASKS NOTHING STILL SAYS WHAT IT GIVES ──
+                                ⛔ THIS IS WHERE THE OLD CARD FAILED HARDEST. The ride had no intent
+                                question at all, so it was the one slot where an athlete could not
+                                see what they were being handed (Michael: *"there is not clarity on
+                                ride what we offer"*). Three of the four session states are pure
+                                confirmation — they still have to be TOLD.
+                                ⚠️ EACH LINE NAMES WHERE THE REST GETS DECIDED — "you will choose
+                                your setup on the day." That is a contract with the session
+                                description, which now lists the setups. */}
+                            {activeHard?.ownership === 'prescribed' && (() => {
+                              const role = hardRoleOf(hardSlotIndex);
+                              const solo = state.hardDays.length === 1;
+                              const bike = activeHard.discipline === 'bike';
+                              // ⚠️ THE INTENSITY RUN IS THE ONE CASE WITH NO STATEMENT — it is the
+                              // state that ASKS (state 3 above), and a confirmation sentence under
+                              // an open question would be answering it for them.
+                              if (!bike && role === 'vo2') return null;
+                              const copy = bike
+                                ? (role === 'threshold'
+                                  ? (solo ? SESSION_STATEMENTS.ride_threshold_solo : SESSION_STATEMENTS.ride_threshold)
+                                  : SESSION_STATEMENTS.ride_intensity)
+                                : (solo ? SESSION_STATEMENTS.run_threshold_solo : SESSION_STATEMENTS.run_threshold);
+                              return (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-white/85 text-sm">
+                                    {activeHard.discipline === 'bike' ? 'Ride' : 'Run'}
+                                    {role === 'threshold' ? ' — sustained threshold' : ' — top-end intensity'}
+                                  </span>
+                                  <p className="text-white/70 text-sm leading-relaxed">{copy}</p>
                                 </div>
                               );
                             })()}

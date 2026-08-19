@@ -1,0 +1,180 @@
+// THE ATHLETE ALLOCATES THE INTENSITY. LIST ORDER NO LONGER DOES.
+//
+// ⛔ WHAT WAS WRONG (Michael, 2026-08-18, from the live screen): *"ride just needs two options and
+// one effects the other — speed drill or intervals means they get threshold for one or the other,
+// none of this is clear."*
+//
+// The week's budget was already exactly one top-end session and one sustained session. Which SPORT
+// held which was decided by the ORDER the wizard happened to list them in, and no surface anywhere
+// said so — two athletes making identical picks got different twelve-week blocks depending on which
+// chip they tapped first. The bike had no intent question at all.
+//
+// ⛔ AND ONE THING THE OLD SCREEN PROMISED, THE SOLVER WAS NOT DOING. The Flat Sprints card says the
+// session *"requires strict clearance before the barbell"*, but the 48h preferred clearance was
+// keyed on `terrain === 'flat'` — §2.0's VO2-intervals-on-the-level, a different session. The sprint
+// carries `goal: 'speed'`, matched nothing, and got the ordinary 24h.
+//
+// Run: ~/.deno/bin/deno test --no-check supabase/functions/shared/strength-system/intent-allocation.test.ts
+
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
+
+const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
+
+const build = (hardDays: unknown[]) => composeStrengthPrimaryPlan({
+  durationWeeks: 12, oneRepMaxes: MAXES,
+  fiveKPaceSecPerMi: 435, ftpWatts: 240,
+  enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 25,
+  easyPaceMinPerMile: 9, longRunDay: 'sunday',
+  bike: { hours: 4, days: 2 }, targetWeeklyRideHours: 4,
+  hardDays,
+} as never) as any;
+
+/** Every session in a representative working week (week 2 — week 1 is the standalone TM test). */
+const week2 = (p: any): any[] => (p.sessions_by_week['2'] ?? []) as any[];
+const named = (p: any, re: RegExp) => week2(p).filter((s) => re.test(String(s.name)));
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE ALLOCATION
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ THE RUN HOLDS THE SPEED WHEN THE ATHLETE SAYS SO — even listed second', () => {
+  // The bike is listed FIRST, which under the old positional rule handed it the intensity slot.
+  const p = build([
+    { day: 'tuesday', discipline: 'bike', role: 'threshold' },
+    { day: 'friday', discipline: 'run', role: 'intensity' },
+  ]);
+  assert(named(p, /Hill|Sprint/).length > 0, 'the run did not get the intensity session');
+  // ⚠️ `session.day` IS TITLE-CASED ("Tuesday"). Comparing it raw to a lowercase weekday is silently
+  // always false, which is how the first draft of this file "passed" nothing.
+  const ride = week2(p).find((s) => s.type === 'ride' && String(s.day).toLowerCase() === 'tuesday'
+    && Array.isArray(s.tags) && s.tags.includes('quality'));
+  assert(ride, 'no hard ride on the pinned day');
+  assert(!/Intervals/.test(String(ride.name)),
+    `the ride took the intensity slot anyway: ${ride.name}`);
+});
+
+Deno.test('⛔ AND THE RIDE HOLDS IT WHEN THE ATHLETE SAYS SO — even listed second', () => {
+  const p = build([
+    { day: 'tuesday', discipline: 'run', role: 'threshold' },
+    { day: 'friday', discipline: 'bike', role: 'intensity' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1, 'the ride did not get the intervals');
+  // ⚠️ The run must be the THRESHOLD session, not hills — that is the other half of one toggle.
+  assertEquals(named(p, /Hill|Sprint/).length, 0, 'the run kept a top-end session as well');
+  assert(named(p, /Threshold/).length > 0, 'the run did not become the threshold session');
+});
+
+Deno.test('⛔ ONE HARD DAY CAN BE THE SUSTAINED ONE — a choice that did not exist before', () => {
+  // A single hard day was ALWAYS the intensity session and the athlete was never asked. For someone
+  // whose entire block hangs on one hard session, that is the whole cardiovascular decision.
+  const p = build([{ day: 'tuesday', discipline: 'run', role: 'threshold' }]);
+  assert(named(p, /Threshold/).length > 0, 'a solo threshold run was not built');
+  assertEquals(named(p, /Hill|Sprint/).length, 0, 'it built the intensity session anyway');
+});
+
+Deno.test('⚠️ NO ALLOCATION → THE OLD POSITIONAL RULE, BYTE-FOR-BYTE', () => {
+  // Every goal written before the toggle existed carries no `role`, and must build exactly the
+  // block it built yesterday: first prescribed slot is the intensity one.
+  const p = build([
+    { day: 'tuesday', discipline: 'run' },
+    { day: 'friday', discipline: 'bike' },
+  ]);
+  assert(named(p, /Hill|Sprint/).length > 0, 'the first slot lost the intensity session');
+  assertEquals(named(p, /Bike Intervals/).length, 0, 'the second slot took intensity too');
+});
+
+Deno.test('⛔ A CLUB DAY STILL OVERRIDES THE ALLOCATION — it is the sustained one by nature', () => {
+  // A group run settles into exactly that rhythm and the app writes nothing into it, so the athlete
+  // does not get to allocate the top-end session to it.
+  const p = build([
+    { day: 'tuesday', discipline: 'run', ownership: 'club', role: 'intensity' },
+    { day: 'friday', discipline: 'bike', role: 'threshold' },
+  ]);
+  // The club consumed the sustained slot, so the app's own day is the intensity one regardless of
+  // what was allocated to it.
+  assertEquals(named(p, /Bike Intervals/).length, 1,
+    'the prescribed ride did not take the intensity slot beside a club day');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE 48h BACKWARD SHADOW — the clearance the sprint card promises
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ FLAT SPRINTS BUY THE 48h CLEARANCE — the gap the old filter missed entirely', () => {
+  const p = build([{ day: 'wednesday', discipline: 'run', goal: 'speed', role: 'intensity' }]);
+  const sprint = named(p, /Sprint/)[0];
+  assert(sprint, 'no sprint session built');
+  const order = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const si = order.indexOf(String(sprint.day).toLowerCase());
+  assert(si >= 0, `unrecognised day ${sprint.day}`);
+  /**
+   * ⛔ IT IS A FORWARD SHADOW, AND SAME-DAY IS EXEMPT — BOTH HALVES MATTER.
+   *
+   * The clearance the card promises is *"48 hours of leg clearance BEFORE heavy squats"*: the
+   * damage from maximal flat footfall arrives the next morning, so what must not happen is a heavy
+   * lower day landing INTO it. A squat EARLIER THE SAME DAY is the opposite arrangement — the
+   * coupling law deliberately stacks them (barbell first, six hours' gap), and the lift is done
+   * before the damage exists. Measuring an undirected gap reads that correct week as a breach.
+   *
+   * ⚠️ A PREFERENCE, NOT A LAW — `preferredClearance` sits below `breachPenalty` and can only choose
+   * among weeks that are already legal (*"prefer, don't force"*, taken in 8 of 24 legal shapes). So
+   * this asserts the outcome on a week that HAS room, not that a breach is impossible.
+   */
+  const heavyLower = week2(p).filter((s) => s.type === 'strength'
+    && /Squat|Deadlift/.test(String(s.name)));
+  assert(heavyLower.length > 0, 'no heavy lower day to measure against');
+  for (const lift of heavyLower) {
+    const li = order.indexOf(String(lift.day).toLowerCase());
+    const forward = (li - si + 7) % 7;   // 0 = same day (coupled, barbell first)
+    assert(forward === 0 || forward >= 2,
+      `${lift.name} (${lift.day}) is ${forward}d AFTER the sprints (${sprint.day}) — inside the 48h`);
+  }
+});
+
+Deno.test('⚠️ AND THE INCLINE SESSION DOES NOT PAY IT — removing the impact is the whole argument', () => {
+  // The hill and treadmill options must not be charged the sprint's clearance. Uphill running has
+  // no eccentric impact transient; making it buy 48h would move a lift for a cost it is not paying.
+  const p = build([{ day: 'wednesday', discipline: 'run', role: 'intensity' }]);
+  assert(named(p, /Hill/).length > 0, 'the default intensity run stopped being the hill session');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE MATERIALIZER EXPLAINS THE SETUP — the contract the card's copy makes
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ EVERY SESSION NAMES ITS OWN SETUP OPTIONS — the wizard stopped asking', () => {
+  // The card tells the athlete *"you will choose your setup on the day."* If the session does not
+  // list the setups, that promise is empty and the athlete is left with no guidance at all — which
+  // is what the `return ''` branches used to do.
+  const cases: Array<[string, unknown[], RegExp, RegExp]> = [
+    ['sprint', [{ day: 'wednesday', discipline: 'run', goal: 'speed', role: 'intensity' }],
+      /Sprint/, /track/i],
+    ['hill', [{ day: 'wednesday', discipline: 'run', role: 'intensity' }],
+      /Hill/, /treadmill/i],
+    ['threshold run', [{ day: 'wednesday', discipline: 'run', role: 'threshold' }],
+      /Threshold/, /track|treadmill/i],
+    ['hard ride', [{ day: 'wednesday', discipline: 'bike', role: 'intensity' }],
+      /Bike Intervals/, /trainer/i],
+    ['threshold ride', [{ day: 'wednesday', discipline: 'bike', role: 'threshold' }],
+      /Threshold Ride|Threshold/, /trainer/i],
+  ];
+  for (const [label, hardDays, nameRe, groundRe] of cases) {
+    const p = build(hardDays);
+    const s = week2(p).find((x) => nameRe.test(String(x.name))
+      && Array.isArray(x.tags) && x.tags.includes('quality'));
+    assert(s, `${label}: session not built`);
+    assert(groundRe.test(String(s.description)),
+      `${label}: the description names no setup — ${s.description}`);
+  }
+});
+
+Deno.test('⚠️ AN OLD GOAL WITH A STORED TERRAIN READS ITS OWN GROUND, NOT THE MENU', () => {
+  // A treadmill pick must not be told to go find a hill. The "no hill outside?" line is for the
+  // athlete who was never asked, which as of today is everyone new.
+  const p = build([{ day: 'wednesday', discipline: 'run', terrain: 'treadmill', role: 'intensity' }]);
+  const s = week2(p).find((x) => Array.isArray(x.tags) && x.tags.includes('quality') && x.type === 'run');
+  assert(s, 'no hard run built');
+  assert(!/No hill outside/.test(String(s.description)),
+    `an explicit treadmill pick was handed the substitute note — ${s.description}`);
+});

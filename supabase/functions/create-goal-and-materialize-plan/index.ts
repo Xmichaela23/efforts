@@ -2727,9 +2727,32 @@ Deno.serve(async (req: Request) => {
                 // The §1i shape, written by the builder's two hard-day slots.
                 const stored = (gsTp as Record<string, unknown>).hard_days;
                 if (Array.isArray(stored) && stored.length > 0) {
+                  /**
+                   * ⛔⛔ THE `typeof h.day === 'string'` TEST IS GONE (2026-08-18), AND IT WAS SILENTLY
+                   * KILLING THE §1i PLACEMENT MODEL ON THIS PATH.
+                   *
+                   * Slice 8 made the day OPTIONAL: a prescribed hard day with no day is not a
+                   * half-finished answer, it is the normal case — *"ours to write, ours to place"* —
+                   * and the composer turns it into a FLEXIBLE session in the same solve that places
+                   * the bar. The composer learned that. This forwarding layer never did, so every
+                   * unpinned hard day was dropped here and the athlete's hard session vanished
+                   * between the goal and the generator with nothing said.
+                   *
+                   * ⚠️ MALFORMED IS STILL DIFFERENT FROM ABSENT, and conflating them would be the
+                   * silent move this file has fixed twice. `day` absent (null / undefined / '') means
+                   * "engine, propose one". `day` PRESENT but not a string is a client bug or a
+                   * hostile caller, and it still drops the entry — exactly as `strength-primary-plan`
+                   * does with the same rule.
+                   *
+                   * ⚠️ A CLUB DAY WITH NO DAY IS NOT DROPPED HERE ANY MORE — the composer drops it
+                   * itself (`if (!day && ownership === 'club') continue`), because only the athlete
+                   * knows when the club meets and the engine declines to invent an appointment. One
+                   * owner for that rule, not two.
+                   */
                   const days = stored
                     .filter((h): h is Record<string, unknown> => !!h && typeof h === 'object')
-                    .filter((h) => typeof h.day === 'string' && (h.discipline === 'run' || h.discipline === 'bike'))
+                    .filter((h) => (h.day == null || typeof h.day === 'string')
+                      && (h.discipline === 'run' || h.discipline === 'bike'))
                     .map(withTerrain);
                   return days.length > 0 ? { hard_days: days } : {};
                 }
