@@ -112,18 +112,29 @@ export const INTENT_ALLOCATION_NOTE =
   + 'session. Pick which sport holds your top-end speed.';
 
 /**
- * ⛔ THE ONE SURVIVING GROUND QUESTION, AND IT IS A BIOLOGICAL ONE — NOT A PREFERENCE.
+ * ⛔ LEAD WITH THE GOAL, NOT THE GROUND (Michael, 2026-08-18): *"hills are VO2 max, flat is speed
+ * work — needs to be clear, need to lead with the goal: speed focus, VO2 max focus."*
  *
- * ⚠️ IT IS ASKED IN EXACTLY ONE STATE: a RUN holding the TOP-END INTENSITY slot. A threshold run, a
- * ride of either kind and a club session all ask nothing. Rule 1 of the spec, and the reason is
- * that this is the only ground choice that reaches Layer 1: `goal: 'speed'` is what makes the
- * solver prefer 48h of clearance between the session and heavy lower work
- * (`isFlatFootfall` → `preferredClearance` in `strength-primary-plan.ts`).
+ * The first draft titled these "Flat ground" and "Incline" and buried what they BUY in the body
+ * text. That is backwards. The athlete is choosing a training goal; the surface is the consequence
+ * of the goal, not the question. These titles are his own approved wording, restored verbatim from
+ * the pre-rebuild `HARD_RUN_GOALS` — they were live before today and should not have been renamed.
  *
- * ⛔ THE `id`s ARE `HardRunGoal` VALUES, NOT TERRAIN VALUES, AND THAT IS DELIBERATE. `flat` here
- * means the SPRINT session on level ground; it must never be written to `terrain`, where `'flat'`
- * is a different thing entirely (§2.0's last-resort VO2 intervals on the level). The wizard writes
- * `goal` and nothing else; which flat surface, or hill versus treadmill, is answered on the day.
+ * ⚠️ TWO BANNED WORDS, KNOWINGLY SHIPPED. `focus` and the metric name `VO2 max` both trip
+ * `voiceViolation()` (copy-voice rule 9 bans naming the metric, as it bans "aerobic base" and "Z2").
+ * Michael named both explicitly and these are the labels he already approved once. His call, on the
+ * record — ⛔ do not "fix" them to satisfy the lint without asking him.
+ *
+ * ⚠️ AND IT IS STILL A BIOLOGICAL QUESTION, NOT A PREFERENCE. It is asked in exactly one state: a RUN
+ * holding the TOP-END INTENSITY slot. A threshold run, a ride of either kind and a club session all
+ * ask nothing. It is the only ground choice that reaches Layer 1 — `goal: 'speed'` is what makes the
+ * solver prefer 48h of clearance between the session and heavy lower work (`isFlatFootfall` →
+ * `preferredClearance` in `strength-primary-plan.ts`).
+ *
+ * ⛔ THE `id`s ARE `HardRunGoal` VALUES, NOT TERRAIN VALUES. `speed` here means the SPRINT session on
+ * level ground; it must never be written to `terrain`, where `'flat'` is a different thing entirely
+ * (§2.0's last-resort VO2 intervals on the level). The wizard writes `goal` and nothing else; which
+ * flat surface, or hill versus treadmill, is answered on the day.
  */
 export const RUN_GROUND_NOTE =
   'The engine needs your terrain to schedule your recovery. Flat sprints require 48 hours of leg '
@@ -132,48 +143,62 @@ export const RUN_GROUND_NOTE =
 export const RUN_GROUND_OPTIONS: Array<CopyOption<'speed' | 'vo2'>> = [
   {
     id: 'speed',
-    title: 'Flat ground',
-    body: 'Track or road — pure speed mechanics. The hard footfall creates mechanical damage that '
-      + 'requires strict clearance before the barbell.',
+    title: 'Speed focus',
+    body: 'Flat ground — a track or road. Short, explosive sprints to make you faster. High '
+      + 'neurological drive, but the hard footfall creates mechanical damage that requires 48 hours '
+      + 'of leg clearance before heavy squats.',
   },
   {
     id: 'vo2',
-    title: 'Incline',
-    body: 'A hill or treadmill — removes the eccentric impact. Saves your knees and quads, allowing '
-      + 'the barbell to sit closer in the week.',
+    title: 'VO2 max focus',
+    body: 'Incline — a hill or treadmill. Hard 3-minute climbs to push your maximum aerobic ceiling. '
+      + 'Spikes your heart rate to the limit, but running uphill removes the eccentric impact, '
+      + 'saving your knees and quads for the barbell.',
   },
 ];
 
 /**
- * ⛔ WHAT THE ATHLETE IS GETTING, FOR EVERY STATE THAT ASKS NOTHING. Three of the four session
- * states are pure confirmation — the athlete reads what the block will contain and moves on. They
- * still have to be TOLD, which is where the previous screen failed hardest: the ride had no intent
- * question, so it was the one slot where an athlete could not see what they were being given.
+ * ⛔ THE ACTUAL PRESCRIPTION, NOT A CHARACTER SKETCH (Michael, 2026-08-18: *"ride intensity needs
+ * to fill with green, actual ride prescription"*).
  *
- * ⚠️ EACH ONE NAMES WHERE THE REMAINING CHOICE GETS MADE. *"You will choose your setup on the day."*
- * That sentence is the contract with the session description — if the materializer ever stops
- * listing the setups, this line is promising something the app does not deliver.
+ * The first draft said things like *"short, explosive pushes to raise your maximum wattage"* — true,
+ * and it tells an athlete nothing they can plan around. The run's options have always stated their
+ * reps; the ride's said nothing, which is the same *"there is not clarity on ride what we offer"*
+ * complaint in a new outfit. These are the sessions the composer actually builds.
+ *
+ * ⛔ AND BOTH SLOTS RENDER AT ONCE — see the per-slot loop in `NonRaceBuilder`. Showing only the
+ * active slot meant an athlete could allocate intensity to the ride and never once read what the
+ * ride was; the card told them about the run instead. Two blocks, side by side, is the interlock
+ * made concrete rather than described.
+ *
+ * ⚠️ EACH ONE NAMES WHERE THE REMAINING CHOICE GETS MADE — *"you will choose your setup on the day."*
+ * That sentence is a CONTRACT with the session description, which now lists the setups. If the
+ * materializer ever stops listing them, these lines promise something the app does not deliver.
+ *
+ * ⚠️ THE NUMBERS MUST TRACK THE COMPOSER. `4 × 5 → 3 × 7 → 2 × 10` is the threshold wave for both
+ * disciplines; the Helgerud `4 × 4` halves to `2 × 4` in the anchor. If those tables move, these
+ * move with them or the card starts lying about the block it just sold.
  */
-export const SESSION_STATEMENTS = {
-  /** A ride holding the intensity slot. Helgerud 4 × 4. */
+export const SESSION_PRESCRIPTION = {
   ride_intensity:
-    'Short, explosive pushes to raise your maximum wattage. You will choose your setup '
-    + '(trainer vs. road) on the day.',
-  /** A ride holding the threshold slot, with the run holding the speed. */
+    'The Helgerud 4 × 4 — four 4-minute efforts at maximum sustainable power, easy spinning between. '
+    + 'It halves to 2 × 4 in the final weeks so your quads are loaded for the heavy lifts. You will '
+    + 'choose your setup (trainer vs. road) on the day.',
   ride_threshold:
-    'Your run is holding the top-end intensity. This ride will be sustained threshold blocks. '
-    + 'You will choose your setup (trainer vs. road) on the day.',
-  /** A run holding the threshold slot, with the ride holding the speed. */
+    'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the block, at '
+    + '95-105% FTP. You will choose your setup (trainer vs. road) on the day.',
   run_threshold:
-    'Your ride is holding the top-end intensity. This run will be grueling, unbroken pacing. '
-    + 'You will choose your setup (track vs. rolling road) on the day.',
-  /** ⚠️ THE SINGLE-SLOT THRESHOLD RUN — no other sport to point at, so it cannot use the line
-   *  above. Same session, and the sentence has to stand on its own. */
-  run_threshold_solo:
-    'This run will be grueling, unbroken pacing just under your redline. You will choose your '
-    + 'setup (track vs. rolling road) on the day.',
-  /** ⚠️ AND THE SINGLE-SLOT THRESHOLD RIDE, for the same reason. */
-  ride_threshold_solo:
-    'This ride will be sustained blocks just under your redline. You will choose your setup '
-    + '(trainer vs. road) on the day.',
+    'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the block, at a '
+    + 'pace about 20 s/mi slower than your 5K. You will choose your setup (track vs. rolling road) '
+    + 'on the day.',
 } as const;
+
+/**
+ * ⛔ THE INTERLOCK LINE — one sentence, above the pair, naming which sport took the speed. It is the
+ * thing that was invisible for the entire life of this screen, so it is stated even though the two
+ * blocks below it already imply it.
+ */
+export const interlockLine = (intensitySport: 'run' | 'bike'): string =>
+  intensitySport === 'bike'
+    ? 'Your ride is holding the top-end intensity, so your run is the sustained one.'
+    : 'Your run is holding the top-end intensity, so your ride is the sustained one.';

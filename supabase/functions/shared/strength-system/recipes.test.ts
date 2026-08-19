@@ -17,7 +17,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 import {
-  HARD_DAY_INTENT, RUN_GROUND_OPTIONS, SESSION_STATEMENTS,
+  HARD_DAY_INTENT, RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION,
 } from '../../../../src/lib/hard-day-menus.ts';
 
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
@@ -196,13 +196,25 @@ for (const r of RECIPES) {
      * the day"* is a CONTRACT with the session description — the materializer now lists the setups,
      * and if it ever stops, these lines are promising something the app does not deliver.
      */
-    for (const [key, line] of Object.entries(SESSION_STATEMENTS)) {
+    for (const [key, line] of Object.entries(SESSION_PRESCRIPTION)) {
       assert(line.includes('on the day'), `${key} stopped naming where the setup is chosen`);
     }
-    // ⚠️ AND THE TWO-SLOT LINES POINT AT THE OTHER SPORT — that pointing IS the interlock being
-    // visible, which is the whole reason this card was rebuilt.
-    assert(SESSION_STATEMENTS.ride_threshold.includes('run'), 'the ride threshold line stopped naming the run');
-    assert(SESSION_STATEMENTS.run_threshold.includes('ride'), 'the run threshold line stopped naming the ride');
+    /**
+     * ⛔ AND EACH ONE STATES THE ACTUAL SESSION, NOT A CHARACTER SKETCH (Michael, 2026-08-18:
+     * *"actual ride prescription"*). The ride's lines said things like "short, explosive pushes to
+     * raise your maximum wattage" — true, and unplannable. ⚠️ These numbers must track the composer:
+     * `4 × 5 → 2 × 10` is the threshold wave, `4 × 4` halving to `2 × 4` is the Helgerud anchor. If
+     * those tables move and these do not, the card lies about the block it just sold.
+     */
+    assert(/4 × 4/.test(SESSION_PRESCRIPTION.ride_intensity), 'the hard ride stopped stating its reps');
+    assert(/2 × 4/.test(SESSION_PRESCRIPTION.ride_intensity), 'the hard ride stopped stating the anchor cut');
+    for (const k of ['ride_threshold', 'run_threshold'] as const) {
+      assert(/4 × 5/.test(SESSION_PRESCRIPTION[k]) && /2 × 10/.test(SESSION_PRESCRIPTION[k]),
+        `${k} stopped stating the threshold wave`);
+    }
+    // ⚠️ AND EACH NAMES ITS OWN UNIT — the ride is priced in FTP, the run in pace off the 5K.
+    assert(/FTP/.test(SESSION_PRESCRIPTION.ride_threshold), 'the threshold ride stopped naming FTP');
+    assert(/5K/.test(SESSION_PRESCRIPTION.run_threshold), 'the threshold run stopped naming its pace basis');
   });
 
   // ── THE ACCESSORY TIER ─────────────────────────────────────────────────────────────────────────
