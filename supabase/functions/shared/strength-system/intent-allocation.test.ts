@@ -73,15 +73,57 @@ Deno.test('⛔ ONE HARD DAY CAN BE THE SUSTAINED ONE — a choice that did not e
   assertEquals(named(p, /Hill|Sprint/).length, 0, 'it built the intensity session anyway');
 });
 
-Deno.test('⚠️ NO ALLOCATION → THE OLD POSITIONAL RULE, BYTE-FOR-BYTE', () => {
-  // Every goal written before the toggle existed carries no `role`, and must build exactly the
-  // block it built yesterday: first prescribed slot is the intensity one.
-  const p = build([
+/**
+ * ⛔⛔ NO ALLOCATION → THE RUN, WHATEVER THE ORDER (Michael, 2026-08-18: *"principled; never rely on
+ * list order. An array sort change in the future shouldn't biologically alter an athlete's week."*)
+ *
+ * ⚠️ THIS REPLACED A `BYTE-FOR-BYTE` TEST AND THE GUARANTEE IT NAMED IS DELIBERATELY GONE. The old
+ * fallback gave intensity to the first prescribed slot, so a run+ride goal saved with the RIDE
+ * listed first now rebuilds with the roles swapped. That is the trade "never rely on list order"
+ * asks for, made on purpose rather than discovered later.
+ *
+ * ⛔ THE ORDER-REVERSED CASE IS THE ONE THAT MATTERS. The run-first case passes under BOTH rules and
+ * proves nothing on its own — it is here only so a future edit that breaks it is visible.
+ */
+Deno.test('⛔ NO ALLOCATION → THE RUN HOLDS THE TOP END, EVEN LISTED SECOND', () => {
+  const rideFirst = build([
+    { day: 'tuesday', discipline: 'bike' },
+    { day: 'friday', discipline: 'run' },
+  ]);
+  assert(named(rideFirst, /Hill|Sprint/).length > 0,
+    'the run did not take the intensity session when the ride was listed first');
+  assertEquals(named(rideFirst, /Bike Intervals/).length, 0, 'the ride took intensity off list order');
+  assert(named(rideFirst, /Threshold/).length > 0, 'the ride did not become the sustained session');
+
+  // ⚠️ AND THE SAME ANSWER THE OTHER WAY ROUND — the rule is the discipline, not the position.
+  const runFirst = build([
     { day: 'tuesday', discipline: 'run' },
     { day: 'friday', discipline: 'bike' },
   ]);
-  assert(named(p, /Hill|Sprint/).length > 0, 'the first slot lost the intensity session');
-  assertEquals(named(p, /Bike Intervals/).length, 0, 'the second slot took intensity too');
+  assert(named(runFirst, /Hill|Sprint/).length > 0, 'the run lost the intensity session');
+  assertEquals(named(runFirst, /Bike Intervals/).length, 0, 'the ride took intensity too');
+});
+
+Deno.test('⚠️ ORDER STILL DECIDES WHEN THE RULE CANNOT SPEAK — two of one discipline', () => {
+  // Two rides: there is no discipline asymmetry to read, so the first slot takes the top end and the
+  // labels on the card say "Primary". Exactly one of each either way — that is the invariant.
+  const p = build([
+    { day: 'tuesday', discipline: 'bike' },
+    { day: 'friday', discipline: 'bike' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1, 'two rides did not produce exactly one top-end ride');
+  assert(named(p, /Threshold/).length > 0, 'the second ride did not become the sustained one');
+});
+
+Deno.test('⛔ AN EXPLICIT ALLOCATION STILL OVERRIDES THE RULE — the athlete outranks the default', () => {
+  // The principled default is a DEFAULT. An athlete who wants the speed on the bike says so and
+  // gets it, and the run becomes the sustained session.
+  const p = build([
+    { day: 'tuesday', discipline: 'run', role: 'threshold' },
+    { day: 'friday', discipline: 'bike', role: 'intensity' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1, 'the default overrode the athlete');
+  assertEquals(named(p, /Hill|Sprint/).length, 0, 'the run kept a top-end session');
 });
 
 Deno.test('⛔ A CLUB DAY STILL OVERRIDES THE ALLOCATION — it is the sustained one by nature', () => {

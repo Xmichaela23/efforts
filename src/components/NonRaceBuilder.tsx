@@ -2057,12 +2057,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         : slots.findIndex((h) => h.ownership !== 'club' && h.role !== 'threshold');
       return i === intensityIdx ? 'vo2' : 'threshold';
     }
-    // ⚠️ THE FALLBACK, FOR A DRAFT SAVED BEFORE THE TOGGLE EXISTED: intensity first, threshold
-    // second. A club session IS the sustained one, so it consumes the threshold slot and the app's
-    // own days stay on intensity.
+    /**
+     * ⛔ THE FALLBACK IS A TRAINING RULE NOW, NOT LIST ORDER (2026-08-18) — the run holds the
+     * top-end session when the pair is a run and a ride. Full reasoning lives on `assignHardRoles`
+     * in `strength-primary-plan.ts`; the short version is that the THRESHOLD session is the long
+     * one, and putting it on the bike takes twenty-plus minutes of level footfall off the legs the
+     * barbell needs. ⛔ MIRRORS THE ENGINE AND MUST KEEP DOING SO — the screen and the plan
+     * disagreeing about which session an athlete gets is the failure this card has been rebuilt
+     * twice to fix.
+     * ⚠️ A club session IS the sustained one, so it consumes the threshold slot and the app's own
+     * days stay on intensity.
+     */
     if (slots.some((h) => h.ownership === 'club')) return 'vo2';
-    const firstPrescribed = slots.findIndex((h) => h.ownership !== 'club');
-    return i === firstPrescribed ? 'vo2' : 'threshold';
+    const prescribed = slots.map((h, j) => ({ h, j })).filter(({ h }) => h.ownership !== 'club');
+    const runIdx = prescribed.find(({ h }) => h.discipline === 'run')?.j ?? -1;
+    const rideIdx = prescribed.find(({ h }) => h.discipline === 'bike')?.j ?? -1;
+    // ⚠️ ORDER STILL DECIDES WHEN THE RULE CANNOT SPEAK — two runs, or two rides.
+    const idx = runIdx >= 0 && rideIdx >= 0 ? runIdx : (prescribed[0]?.j ?? -1);
+    return i === idx ? 'vo2' : 'threshold';
   };
   /**
    * ⛔ ONE TOGGLE, BOTH SLOTS. Allocating intensity to one sport IS allocating threshold to the
@@ -4965,10 +4977,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     // which one they are tapping. The pinned day is the clearest
                                     // label when there is one; the ordinal is the fallback for a
                                     // slot the engine has not placed yet.
+                                    /**
+                                     * ⛔ "PRIMARY" / "SECONDARY", NOT "(first)" / "(second)" (Michael,
+                                     * 2026-08-18): *"reads like a parsed array index."* It was one —
+                                     * the ordinal was the list position leaking onto the screen.
+                                     *
+                                     * ⚠️ AND THE NEW WORDS CARRY A CLAIM THE ENGINE KEEPS: the
+                                     * primary slot is the one that ends up holding the top-end
+                                     * session by default, so "primary" names which ride matters more
+                                     * to the block's progression rather than which chip was tapped
+                                     * first. ⛔ If the default ever stops favouring the first slot,
+                                     * these labels are wrong and must move with it.
+                                     */
                                     const twin = state.hardDays.filter((o) => o.discipline === h.discipline).length > 1;
                                     const qualifier = !twin ? ''
-                                      : h.day ? ` (${h.day.slice(0, 3).replace(/^./, (c) => c.toUpperCase())})`
-                                        : i === 0 ? ' (first)' : ' (second)';
+                                      : i === 0 ? 'Primary ' : 'Secondary ';
                                     return (
                                       <button
                                         key={`alloc-${i}`} type="button"
@@ -4996,7 +5019,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                           backgroundColor: `rgba(${getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run')},0.38)`,
                                         } : undefined}
                                       >
-                                        {sport}{qualifier} is intensity
+                                        {qualifier}{qualifier ? sport.toLowerCase() : sport} is intensity
                                       </button>
                                     );
                                   })}

@@ -38,3 +38,11 @@ docs/screens/
 # Sweep output — regenerate with `deno run --allow-read --allow-write scripts/dump-plans.ts`.
 # The SCRIPT is the artefact; 61 built plans are not source.
 test-outputs/
+
+# ⛔ A RESUME CACHE, NOT A FIXTURE — and it was committed for months (removed 2026-08-18).
+# `scripts/plan-generation-matrix.mjs` writes one .md + one .json per combination so a re-run can
+# skip regeneration; its own header says "Delete plan-test-output/ to fully reset". Nothing asserts
+# against these files. 973 of them had accumulated — 232,962 lines, MORE THAN THE ENTIRE
+# APPLICATION — and they are output of `generate-combined-plan`, a different subsystem from the
+# strength composer whose behaviour the deno suites actually pin.
+scripts/plan-test-output/

@@ -2720,6 +2720,27 @@ Deno.serve(async (req: Request) => {
               ...(((): Record<string, unknown> => {
                 const pd = gsTp.preferred_days as Record<string, unknown> | undefined;
                 const terrain = pd?.quality_run_terrain;
+                /**
+                 * ⛔⛔ IT NO LONGER STAMPS THE §1i LIST, AND THAT WAS SILENTLY RUINING SESSIONS
+                 * (found 2026-08-18). READ BEFORE RESTORING.
+                 *
+                 * `quality_run_terrain` defaults to `hill_3min` and the goal seed writes it whenever
+                 * a hard run has a pinned day. This stamped it onto every §1i hard run that carried
+                 * no terrain of its own — and since the wizard STOPPED asking for terrain on
+                 * 2026-08-18, that is now every new goal.
+                 *
+                 * ⛔ A STAMPED TERRAIN IS INDISTINGUISHABLE FROM A CHOSEN ONE. `hardRunSession` adds
+                 * *"no hill outside? a treadmill at 5-8% is the same session"* ONLY when terrain is
+                 * absent, precisely because an athlete who picked the treadmill must not be told to
+                 * go find a hill. Stamping killed that line for everyone — so an athlete in a flat
+                 * neighbourhood was handed a 4 × 3 min hill session with the backup plan removed,
+                 * and no way to know one existed.
+                 *
+                 * ⚠️ THE PRE-§1i FALLBACK BELOW STILL USES IT, deliberately. That path builds a hard
+                 * day from `preferred_days.quality_run` alone — a goal from before slots carried
+                 * their own terrain — where `quality_run_terrain` IS the athlete's answer rather
+                 * than a default standing in for one.
+                 */
                 const withTerrain = (d: Record<string, unknown>) =>
                   (d.discipline === 'run' && typeof terrain === 'string' && !d.terrain)
                     ? { ...d, terrain }
@@ -2752,8 +2773,7 @@ Deno.serve(async (req: Request) => {
                   const days = stored
                     .filter((h): h is Record<string, unknown> => !!h && typeof h === 'object')
                     .filter((h) => (h.day == null || typeof h.day === 'string')
-                      && (h.discipline === 'run' || h.discipline === 'bike'))
-                    .map(withTerrain);
+                      && (h.discipline === 'run' || h.discipline === 'bike'));
                   return days.length > 0 ? { hard_days: days } : {};
                 }
                 // ⚠️ THE PRE-§1i GOAL. One pin, run winning if both somehow arrived — the D-327 gate

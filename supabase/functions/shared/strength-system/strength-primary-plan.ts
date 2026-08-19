@@ -1831,15 +1831,56 @@ function assignHardRoles(
     return chosen;
   }
 
+  /**
+   * ⛔⛔ THE DEFAULT IS THE RUN, AND IT IS A TRAINING RULE — NOT LIST ORDER (Michael, 2026-08-18:
+   * *"principled; never rely on list order. An array sort change in the future shouldn't
+   * biologically alter an athlete's week."*).
+   *
+   * **What it replaced:** the first prescribed slot took the intensity session. That is the wizard's
+   * tap order reaching into the physiology — two athletes making identical picks got different
+   * twelve-week blocks depending on which chip they touched first, and a future `.sort()` anywhere
+   * upstream would have silently rewritten someone's training.
+   *
+   * **The rule: when one discipline is a run and the other a ride, the RUN holds the top-end
+   * session and the RIDE holds the sustained one.** The mechanism is the sustained session, not the
+   * intensity one:
+   *
+   *   · The threshold session is the LONG one — 4 x 5 min building to 2 x 10 min of work. On a run
+   *     that is twenty-plus minutes of level footfall at a submaximal effort; on a bike it is zero
+   *     footfall. Putting it on the bike removes the block's largest single block of repetitive
+   *     impact from the legs the barbell needs.
+   *   · The run's intensity session then defaults to hills (`goal: 'vo2'`), which is the cheapest
+   *     option on the legs by this file's own ranking — uphill removes the impact transient
+   *     entirely. So the run keeps the short concentric session and sheds the long eccentric one.
+   *
+   * ⚠️ ONE CORRECTION TO THE REASONING AS GIVEN, RECORDED BECAUSE IT WOULD MISLEAD THE NEXT READER.
+   * The brief said the default lets the engine *"apply the survival tier cuts"*. It does not — no
+   * such mechanism exists. `resolveEnduranceTier` reads the hard-day COUNT and total HOURS and is
+   * completely blind to which sport holds which role. The conclusion stands on the paragraph above
+   * it; the tier is not part of it.
+   *
+   * ⛔ WHAT THIS COSTS, AND IT IS A REAL COST: a goal written before the allocation toggle existed
+   * carries no role, so it takes this fallback — and a run+ride goal whose RIDE was listed first
+   * now rebuilds with the roles swapped. That is the byte-identical guarantee being deliberately
+   * traded away, which is exactly what "never rely on list order" asks for.
+   *
+   * ⚠️ ORDER STILL DECIDES WHEN THE RULE CANNOT SPEAK — two runs, or two rides. There is no
+   * discipline asymmetry to read there, so the first slot takes it and the labels say "Primary".
+   */
+  const prescribed = days.map((h, i) => ({ h, i })).filter(({ h }) => h.ownership !== 'club');
+  const runIdx = prescribed.find(({ h }) => h.discipline === 'run')?.i ?? -1;
+  const rideIdx = prescribed.find(({ h }) => h.discipline === 'bike')?.i ?? -1;
+  const defaultIntensityIdx = runIdx >= 0 && rideIdx >= 0
+    ? runIdx
+    : (prescribed[0]?.i ?? -1);
+
   const roles: HardRole[] = days.map((h) => (h.ownership === 'club' ? 'club' : 'vo2'));
   // ⚠️ A CLUB DAY IS THE SUSTAINED SESSION — a group run or ride settles into exactly that rhythm and
   // precise intervals with strict rest are near-impossible in a pack — so it consumes the THRESHOLD
   // slot and the app's own days stay on intensity.
-  let intensityTaken = false;
   for (let i = 0; i < roles.length; i++) {
     if (roles[i] === 'club') continue;
-    if (!intensityTaken) { roles[i] = 'vo2'; intensityTaken = true; continue; }
-    roles[i] = 'threshold';
+    roles[i] = i === defaultIntensityIdx ? 'vo2' : 'threshold';
   }
   if (roles.includes('club')) {
     // The club already holds the sustained slot; nothing prescribed may take it as well.
