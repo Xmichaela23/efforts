@@ -103,7 +103,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
 // ⛔ ONE READING OF THE WEEK, shared with whatever renders it next — the letters under the day chips
 // are the same rule on all three intake cards, so the rule cannot live on any one of them.
-import { weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
+import { roundMiles, roundRideMinutes, splitNote, weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -1258,7 +1258,10 @@ function assemblePayload(
             ? { strength_protocol: 'neural_speed', strength_intent: 'performance' }
             : (shape.strength_protocol ? { strength_protocol: shape.strength_protocol } : {})),
           ...(typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0 ? { target_weekly_miles: targetWeeklyMiles } : {}), // Get Strong maintenance mileage (canonical miles); engine guardrails it to the band
-          ...(state.posture?.strength === 'develop' && state.runDays >= 2 ? { run_days: state.runDays } : {}), // Get Strong run frequency (2/3/4); engine spreads miles + stacks extras onto upper lift days
+          // ⚠️ `>= 1` (2026-08-19) — this sent `run_days` only at 2+, so a 1-run answer was
+          // dropped on the floor and the engine fell back to its default of 2. The screen
+          // offered an option the payload refused to carry.
+          ...(state.posture?.strength === 'develop' && state.runDays >= 1 ? { run_days: state.runDays } : {}),
           // Strength Focus: the three assistance picks. The composer validates each name against the
           // shared menu, so a stale one falls back to the default rather than reaching a session.
           // ⛔ ALWAYS SENT NOW, and that is the migration working rather than a widened condition.
@@ -2385,7 +2388,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * the two count sentences from what the SCHEDULE step displays, so one rule keeps one owner.
    */
   const volumeCanContinue =
-    (!posturePresent('run') || (Number(state.targetMiles) > 0 && state.runDays >= 2)) &&
+    // ⚠️ `>= 1`, NOT `>= 2` — one run a week is an answer now, and a gate demanding two
+    // would refuse the option the picker offers.
+    (!posturePresent('run') || (Number(state.targetMiles) > 0 && state.runDays >= 1)) &&
     (state.posture?.bike !== 'maintain' || (Number(state.rideHours) > 0 && state.rideDays >= 1));
   // Reason shown at the Continue key when blocked — fact-statement, matching the schedule gate's
   // "Runs a week has no number yet" voice (not an imperative).
@@ -2396,7 +2401,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // half of the question and not the other, and "Weekly running has no number yet" would be false
   // when the miles are typed and the count is not.
   const volumeCountMissing: string[] = [];
-  if (posturePresent('run') && Number(state.targetMiles) > 0 && state.runDays < 2) {
+  if (posturePresent('run') && Number(state.targetMiles) > 0 && state.runDays < 1) {
     volumeCountMissing.push('Runs a week has no number yet.');
   }
   if (state.posture?.bike === 'maintain' && Number(state.rideHours) > 0 && state.rideDays < 1) {
@@ -4167,7 +4172,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     reason for the reorder. */}
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-white/70 text-sm">across</span>
-                  {[2, 3, 4].map((n) => {
+                  {/* ⛔ 1 IS A LEGAL ANSWER (Michael, 2026-08-19). The engine's floor was
+                      `Math.max(2, …)`, so an athlete who could only run once a week had no way to
+                      say it — and the engine would have built two if they had. Both are fixed. */}
+                  {[1, 2, 3, 4].map((n) => {
                     const on = (state.runDays === n);
                     return (
                       <button
@@ -4182,6 +4190,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   })}
                   <span className="text-white/70 text-sm">runs a week</span>
                 </div>
+                {/* ⛔ THE SPLIT, COMPUTED FROM THE LIVE PINS (Michael, 2026-08-19). The ride line
+                    below has stated its per-session figure since 2026-08-17 — it is the unit-slip
+                    guard, how someone who types 20 meaning MILES sees it come back wrong — and the
+                    run had none.
+                    ⛔ IT KEYS OFF `longRunDay`, THE EXISTING DESIGNATION, and introduces no second
+                    anchor concept. ⚠️ AND IT READS THE PIN LIVE RATHER THAN A SNAPSHOT: the long-day
+                    toggle lives on the SCHEDULE step, two screens away, so a cached string would go
+                    stale the moment the athlete walked back and cleared one. */}
+                {(() => {
+                  const miles = typeof state.targetMiles === 'number' && state.targetMiles > 0
+                    ? state.targetMiles : 0;
+                  const note = splitNote({
+                    total: miles,
+                    sessions: state.runDays,
+                    hasLongDay: !!state.longRunDay,
+                    fmt: (n) => `${roundMiles(n)} ${unit === 'km' ? 'km' : 'mi'}`,
+                    noun: 'run',
+                  });
+                  return note ? (
+                    <p className="text-white/70 text-sm mt-1.5 leading-relaxed">{note}</p>
+                  ) : null;
+                })()}
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                   A week you can hit when work is bad, not your best one.
                 </p>
@@ -4237,7 +4267,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     reason for the reorder. */}
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-white/70 text-sm">across</span>
-                  {[2, 3, 4].map((n) => {
+                  {/* ⚠️ 1/2/3/4 ON BOTH SPORTS. The ride cap was 3 in TWO places in the composer —
+                      the hoisted count and a second re-derivation 1300 lines later — and raising
+                      only the picker would have silently discarded a 4. */}
+                  {[1, 2, 3, 4].map((n) => {
                     const on = (state.rideDays === n);
                     return (
                       <button
@@ -4253,14 +4286,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   <span className="text-white/70 text-sm">rides a week</span>
                 </div>
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
-                  {Number(state.rideHours) > 0 && state.rideDays > 0
-                    ? (() => {
-                        const per = Number(state.rideHours) / state.rideDays;
-                        const h = Math.floor(per); const m = Math.round((per - h) * 60);
-                        const len = h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
-                        return `About ${len} a ride across ${state.rideDays} ride${state.rideDays === 1 ? '' : 's'}.`;
-                      })()
-                    : 'Hours, not distance — terrain and wind make ride distance a poor measure.'}
+                  {/* ⚠️ THE SAME HELPER AS THE RUN NOW. This computed its own even split inline —
+                      correct while every ride was equal, and blind to the long ride the athlete had
+                      pinned two screens away. One function, one rule, both sports. */}
+                  {(() => {
+                    const mins = Number(state.rideHours) > 0 ? Number(state.rideHours) * 60 : 0;
+                    const note = splitNote({
+                      total: mins,
+                      sessions: state.rideDays,
+                      hasLongDay: !!state.longRideDay,
+                      fmt: (n) => {
+                        const r = roundRideMinutes(n);
+                        const h = Math.floor(r / 60); const mm = r % 60;
+                        return h > 0 ? (mm ? `${h}h${String(mm).padStart(2, '0')}` : `${h}h`) : `${mm} min`;
+                      },
+                      noun: 'ride',
+                    });
+                    return note ?? 'Hours, not distance — terrain and wind make ride distance a poor measure.';
+                  })()}
                 </p>
               </div>
             )}
@@ -4339,9 +4382,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 `survival` band — 25-30 reps, the block's floor — on `> 8 total hours` OR `>= 2 hard
                 days`. Naming the threshold is the whole point: the athlete can see the cliff before
                 they walk off it. ⛔ If that constant ever moves, this sentence moves with it. */}
-            <p className="text-white/70 text-sm leading-relaxed border-t border-white/10 pt-3">
-              Your endurance volume is your budget. Crossing 8 hours a week automatically drops your
-              accessory lifting to the bare minimum so your body can actually recover.
+            {/* ⚠️ LARGER THAN THE FIELD COPY AROUND IT (Michael, 2026-08-19: *"larger"*). It is the
+                one sentence on this screen that is not about a field — it is the consequence of BOTH
+                numbers together, and at `text-sm` in a column of `text-sm` it read as a third
+                footnote. `text-base` and brighter, above the divider it already had. */}
+            <p className="text-white/85 text-base leading-relaxed border-t border-white/10 pt-3">
+              Over 8 hours a week of endurance, accessory lifting drops to the minimum. Main lifts
+              don&rsquo;t change.
             </p>
             {/* ⛔ THE PANEL OPENS AT THE BOTTOM, NOT BESIDE THE (i) THAT TOGGLES IT. Rendering it
                 inline under the running label would push the riding field off the screen the moment

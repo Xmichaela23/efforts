@@ -140,3 +140,81 @@ export function weekDayRoles(input: {
   }
   return out;
 }
+
+
+/**
+ * ⛔ THE PER-SESSION SPLIT, STATED ON THE INTAKE CARD (Michael, 2026-08-19).
+ *
+ * The card asks for a weekly total and a session count and then says nothing about what that means
+ * per session — which is the unit-slip the ride line already guards ("someone who types 20 meaning
+ * MILES sees it come back as 6h40 a ride"). This is the same guard for the run, and it names the
+ * long session where there is one.
+ *
+ * ⛔ IT KEYS OFF THE EXISTING LONG-DAY DESIGNATION AND INTRODUCES NO SECOND ANCHOR CONCEPT. Whether
+ * a long session exists is `longRunDay` / `longRideDay` — the pins the whole engine already turns
+ * on. This function is told the answer; it does not decide it.
+ *
+ * ⚠️ THE SHARE IS 55%, AND IT IS A DISPLAY ESTIMATE RATHER THAN THE ENGINE'S ARITHMETIC. The
+ * composer weights the easy budget through `distributeRunMiles` and takes the hard sessions out
+ * first, so an exact match would mean duplicating three of its rules on a screen that cannot see
+ * the placement. 55% sits inside the field's 50-60% long-run band and inside the 25-32% share the
+ * mileage test pins for a WEEK — the copy says "~", and the plan is the authority.
+ *
+ * ⛔ ONE SESSION TAKES ALL OF IT, LONG DAY OR NOT. There is nothing to split and no conflict state:
+ * if the athlete pinned a long day, that single session simply IS the long one.
+ */
+export const LONG_SESSION_SHARE = 0.55;
+
+export function sessionSplit(input: {
+  /** Weekly total in the athlete's own unit — miles, or minutes for a ride. */
+  total: number;
+  /** How many sessions carry it. */
+  sessions: number;
+  /** Whether a long session is designated — `longRunDay` / `longRideDay`, never a new concept. */
+  hasLongDay: boolean;
+}): { long: number | null; other: number | null; even: number | null } {
+  const total = Number(input.total);
+  const n = Math.max(0, Math.round(Number(input.sessions)));
+  if (!Number.isFinite(total) || total <= 0 || n <= 0) return { long: null, other: null, even: null };
+  // ⛔ ONE SESSION CARRIES 100%, whatever the long-day setting says.
+  if (n === 1) return { long: input.hasLongDay ? total : null, other: null, even: total };
+  if (!input.hasLongDay) return { long: null, other: null, even: total / n };
+  const long = total * LONG_SESSION_SHARE;
+  return { long, other: (total - long) / (n - 1), even: null };
+}
+
+/** Miles to the half — the unit the intake types in. */
+export const roundMiles = (mi: number): number => Math.round(mi * 2) / 2;
+/** Ride minutes to the nearest 5. ⚠️ Floored at 5 so a tiny week never reads as "0 min a ride". */
+export const roundRideMinutes = (min: number): number => Math.max(5, Math.round(min / 5) * 5);
+
+/**
+ * ⛔ THE HELPER LINE, COMPUTED — NEVER A PLACEHOLDER (Michael, 2026-08-19). It names the long
+ * session where one is designated, states an even split where none is, and says so plainly at one
+ * session.
+ *
+ * ⚠️ IT RECOMPUTES FROM `hasLongDay` ON EVERY RENDER, which is what keeps it honest across steps:
+ * the long-day toggle lives on the SCHEDULE step and this line lives on the volume step, so a
+ * cached string would go stale the moment the athlete walked back and cleared a long day. Pass the
+ * live pin, never a snapshot.
+ */
+export function splitNote(input: {
+  total: number;
+  sessions: number;
+  hasLongDay: boolean;
+  /** How a figure is written — miles to the half, ride time as `1h20` / `30 min`. */
+  fmt: (n: number) => string;
+  /** `run` / `ride`, for the noun. */
+  noun: string;
+}): string | null {
+  const { long, other, even } = sessionSplit(input);
+  if (input.sessions === 1) {
+    return even == null ? null : `One ${input.noun} carries it all (~${input.fmt(even)}).`;
+  }
+  if (long != null && other != null) {
+    return `Your long ${input.noun} carries ~${input.fmt(long)}, the other `
+      + `${input.sessions > 2 ? `${input.sessions - 1} ${input.noun}s carry` : `${input.noun} carries`} `
+      + `~${input.fmt(other)}.`;
+  }
+  return even == null ? null : `Split evenly, ~${input.fmt(even)} a ${input.noun}.`;
+}

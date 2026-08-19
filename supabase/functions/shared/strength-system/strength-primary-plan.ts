@@ -3095,8 +3095,21 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ⛔ THE PICKED COUNT IS BUILT, FULL STOP (2026-08-08). No priority cap, no maintenance cap —
    * 2/3/4 runs and 1/2/3 rides are wizard answers and this file's job is to seat them.
    */
+  /**
+   * ⛔ ONE SESSION A WEEK IS A LEGAL ANSWER (Michael, 2026-08-19). The floor was
+   * `Math.max(DEFAULT_ENDURANCE_SESSIONS, …)` — a hard 2 — so an athlete who asked for ONE run got
+   * TWO built, and the screen and the plan disagreed about the week the athlete had described.
+   *
+   * ⚠️ THE FLOOR WAS NOT ARBITRARY: 2 is the maintenance dose the aerobic base holds on (Hickson).
+   * But that is an argument for what to RECOMMEND, not for overriding a stated answer — the same
+   * "the picked count is built, full stop" rule the comment above already states for 2/3/4.
+   *
+   * ⚠️ `|| DEFAULT` STILL CATCHES 0 AND NaN, and that is correct here rather than the usual trap:
+   * zero runs is expressed by `runSelected` being false, not by a 0 in this field, so a 0 arriving
+   * here is a malformed input rather than an answer.
+   */
   const askedRunDays = runSelected
-    ? Math.max(DEFAULT_ENDURANCE_SESSIONS, Math.min(4, Math.round(Number(args.enduranceFrequency) || DEFAULT_ENDURANCE_SESSIONS)))
+    ? Math.max(1, Math.min(4, Math.round(Number(args.enduranceFrequency) || DEFAULT_ENDURANCE_SESSIONS)))
     : 0;
   /**
    * ⛔ THE HARD SESSIONS ARE DAYS THEY PICKED, NOT EXTRA ONES. Three run days with one hard run
@@ -3108,22 +3121,51 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * asked-for count — the same overage, arriving through the door that was just widened.
    * ⚠️ FLOORED AT 1 so a 2-run week with two hard runs still leaves a run to be long.
    */
-  const runFreq = runSelected
-    ? Math.max(1, askedRunDays - hardRunCount)
-    : askedRunDays;
-  /** A selected run block has a long day: the one they pinned, or the engine's default when absent. */
-  const runHasLongDay = runSelected;
+  /**
+   * ⛔⛔ THE FLOOR-AT-1 WAS ITSELF AN OVERAGE (found 2026-08-19, opening the count to 1).
+   *
+   * It read `Math.max(1, askedRunDays - hardRunCount)` so that *"a 2-run week with two hard runs
+   * still leaves a run to be long"* — which is exactly the +1 it was written to prevent one line
+   * up. Two asked, two hard, and the block built THREE: a long run nobody had room for. The same
+   * arithmetic gave an athlete asking for ONE run a long run PLUS a hill session.
+   *
+   * ⛔ THE LONG RUN IS A SESSION, NOT AN EXTRA. There is one only when a session is left over after
+   * the hard days are seated. `runFreq` is now that leftover, floored at ZERO, and the long day
+   * exists only when it is positive.
+   *
+   *   asked 1, hard 0  ->  1 long
+   *   asked 1, hard 1  ->  1 hard          (the single session carries the role)
+   *   asked 2, hard 1  ->  long + hard
+   *   asked 2, hard 2  ->  2 hard          (was long + 2 hard = 3)
+   *   asked 3, hard 1  ->  long + easy + hard
+   */
+  const runFreq = runSelected ? Math.max(0, askedRunDays - hardRunCount) : 0;
+  /** A long day exists when a session is left over after the hard ones are seated. */
+  const runHasLongDay = runSelected && runFreq > 0;
   const easyRunsWanted = runSelected ? Math.max(0, runFreq - (runHasLongDay ? 1 : 0)) : 0;
-  /** Ride count, exactly as picked. */
-  const askedRideDays = bikeSelected ? Math.max(1, Math.min(3, Math.round(Number(args.bike?.days) || 2))) : 0;
-  const rideHasLongDay = bikeSelected && !!longRidePin;
+  /**
+   * ⛔ RIDE COUNT, EXACTLY AS PICKED — AND THE CEILING IS 4 NOW (2026-08-19). It was 3 while the
+   * picker offered 1/2/3; the picker offers 1/2/3/4 for both sports, and a cap the screen does not
+   * know about silently discards an answer.
+   */
+  const askedRideDays = bikeSelected ? Math.max(1, Math.min(4, Math.round(Number(args.bike?.days) || 2))) : 0;
+  /**
+   * ⛔ A LONG RIDE NEEDS A SESSION LEFT OVER — the same fix the runs just took. `!!longRidePin`
+   * alone meant an athlete with ONE ride and a hard ride got the hard session PLUS a long ride:
+   * two sessions against an answer of one. The pin says they WANT a long ride; it cannot say there
+   * is room for one.
+   */
+  const rideHasLongDay = bikeSelected && !!longRidePin
+    && askedRideDays > hardRideCount;
   /**
    * The long ride is a pin/anchor, so only the EASY rides are flexible — and when the hard day is a
    * RIDE it is one of the picked ride days too, exactly as the hard run is one of the run days.
    */
   // ⛔ THE COUNT, NOT A BOOLEAN (§1i) — same fix as the runs above, one discipline over.
+  // ⚠️ READS `rideHasLongDay`, NOT `longRidePin` — otherwise a pin with no room still subtracts a
+  // session that is never built, and the week comes back one ride short of the ask.
   const ridesWanted = bikeSelected
-    ? Math.max(0, askedRideDays - (longRidePin ? 1 : 0) - hardRideCount)
+    ? Math.max(0, askedRideDays - (rideHasLongDay ? 1 : 0) - hardRideCount)
     : 0;
 
   /**
@@ -4440,7 +4482,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ THE ATHLETE'S ANSWER, not a guess. Asking "how many days to ride" is what the run step has
       // always done and the bike never did — without it this code held a weekly total and split it
       // by an invented ratio, so 20 hours produced ONE 1,200-minute ride.
-      const wantDays = Math.max(1, Math.min(3, Math.round(Number(args.bike?.days) || 2)));
+      /**
+       * ⛔ THE HOISTED ANSWER, NOT A THIRD DERIVATION OF IT (2026-08-19). This re-derived the ride
+       * count from `args.bike.days` with its own `Math.min(3, …)` cap — so raising the picker to 4
+       * fixed the count in one place and left it silently clamped here, and an athlete asking for
+       * four rides got three with a "the week had room for 3" note blaming the SOLVER for a cap
+       * this line applied. Two owners of one rule, which is the doubled disease.
+       */
+      const wantDays = askedRideDays;
       /**
        * ⛔ THE RIDE DAYS COME OUT OF THE SAME SOLVE AS THE RUNS AND THE BAR (2026-08-08).
        *
@@ -4454,14 +4503,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * so it is not in the flexible list and cannot be spread — the athlete named that day.
        */
       const rideDays: string[] = [];
-      if (longRidePin) rideDays.push(longRidePin);
+      // ⚠️ `rideHasLongDay`, NOT `longRidePin` — the pin says they WANT a long ride; it cannot say
+      // there is room for one. With one ride and a hard ride, pushing it here built two sessions
+      // against an answer of one.
+      if (rideHasLongDay) rideDays.push(longRidePin!);
       for (const d of solvedRideDays) {
         if (rideDays.length >= wantDays) break;
         if (rideDays.includes(d)) continue;
         rideDays.push(d);
       }
       // ⚠️ If nothing is free the long ride still lands — an athlete who named a day gets that day.
-      if (rideDays.length === 0 && longRidePin) rideDays.push(longRidePin);
+      // ⚠️ THE LAST-RESORT PIN STILL FIRES when nothing else was placeable AND no hard ride is
+      // already carrying the discipline — otherwise it reintroduces the extra session above.
+      if (rideDays.length === 0 && longRidePin && hardRideCount === 0) rideDays.push(longRidePin);
       // ⛔ AND IF THE WEEK STILL CANNOT HOLD WHAT THEY ASKED FOR, SAY SO. Never silently fewer.
       // ⚠️ ONCE, not twelve times. This block runs inside the week loop, so an unguarded push
       // repeated the same sentence for every week in the block — the shape is identical every week,
