@@ -1,7 +1,23 @@
 # Scheduling Rules — Extracted from Code
 
-> **⚠️ SNAPSHOT OUTDATED — 2026-05-09**
-> This document describes scheduling logic as it existed before the consolidation pass on 2026-05-09. Builder-owned guards, swim bump logic, and tri-specific overrides described here have been removed. The optimizer is now the sole scheduling authority. For current behavior, read the code directly. Kept for historical reference only.
+> # ⛔ THIS IS THE **RACE PATH**, AND THE SNAPSHOT IS FROM 2026-05-09. TWICE OUT OF DATE.
+>
+> **⚠️ 1. IT DESCRIBES ONE OF TWO SCHEDULERS AND NEVER SAYS SO.** Everything here is
+> `_shared/week-optimizer.ts` — `generate-combined-plan`'s engine. **Strength-primary (Strong Focus)
+> blocks do not use any of it.** They use `_shared/week-model/` (`model.ts` = the law,
+> `resolve.ts` = six score terms) plus `shared/strength-system/place-week.ts` for anchors. The two
+> share no code. See the Scheduling section of `CLAUDE.md`.
+>
+> **⛔ 2. "The optimizer is now the sole scheduling authority" — THAT SENTENCE IS FALSE and was
+> deleted from `CLAUDE.md` on 2026-08-19.** It was true when written and stopped being true on
+> 2026-08-18, when `week-model` shipped. It is struck here rather than silently edited because a
+> reader who remembers it from `CLAUDE.md` needs to see it retracted, not vanish.
+>
+> **⚠️ 3. AND THE SNAPSHOT ITSELF IS PRE-CONSOLIDATION (2026-05-09).** Builder-owned guards, swim
+> bump logic and tri-specific overrides described below have been removed from the race path too.
+>
+> **For current behaviour, read the code — and read it in the right engine.** Kept for its file:line
+> citations only.
 
 Snapshot of scheduling logic in the plan-generation pipeline as of 2026-05-09.
 Descriptive: this records what the code does, not what the spec wishes it did.

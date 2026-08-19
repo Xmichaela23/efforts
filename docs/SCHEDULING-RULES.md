@@ -1,5 +1,19 @@
 # Scheduling Rules — Prescriptive
 
+> # ⛔ THIS DOCUMENT IS THE **RACE PATH**. It had no banner at all until 2026-08-19.
+>
+> The rules below are what `_shared/week-optimizer.ts` should enforce — `generate-combined-plan`'s
+> engine. **Strength-primary (Strong Focus) blocks use a different scheduler and none of this
+> applies to them:** `_shared/week-model/` is a two-layer design where `model.ts` rules a week LEGAL
+> and `resolve.ts` picks among legal weeks with six weighted score terms. The two share no code and
+> encode different laws for different block types.
+>
+> ⚠️ **The clearance NUMBERS are the part most likely to be read across by mistake.** They are not
+> automatically the strength path's numbers — that path's law is `model.ts`'s `COST` table, and where
+> the two agree it is because someone made them agree, not because this file governs there.
+>
+> See the Scheduling section of `CLAUDE.md` for which engine serves which path.
+
 The rules the plan-generation engine should enforce. Constraint-based, athlete-aware, tradeoff-transparent.
 
 Companion to `docs/SCHEDULING-RULES-EXTRACTED.md` (descriptive — what the code does today). This document is what the code *should* do.
