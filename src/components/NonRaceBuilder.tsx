@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
@@ -104,6 +104,7 @@ import WeekGrid from '@/components/WeekGrid';
 // ⛔ ONE READING OF THE WEEK, shared with whatever renders it next — the letters under the day chips
 // are the same rule on all three intake cards, so the rule cannot live on any one of them.
 import { roundMiles, roundRideMinutes, splitNote, weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
+import { defaultScheduleAsk, resolveScheduleAsk, type ScheduleRowKey } from '@/lib/schedule-ask';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -1946,12 +1947,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * "open the first shown row" rule resolved to `long`, and the hard row rendered CLOSED on the page
    * built for it — a screen whose only question is collapsed behind a tap.
    */
-  const scheduleAsk = currentStep === 'hardday'
-    ? ('hard' as const)
-    : (scheduleQuestion && scheduleQuestion !== 'hard'
-        && scheduleRows.some((r) => r.key === scheduleQuestion))
-      ? scheduleQuestion
-      : (scheduleRows.find((r) => r.key !== 'hard' && r.key !== 'runs' && r.key !== 'rides')?.key ?? 'long');
+  /**
+   * ⛔⛔ THE `!== 'hard'` CONDITION IS GONE FROM THE RENDER GATE (2026-08-19, found on a device).
+   * It stopped the card auto-opening on the optional question, and it also stopped a deliberate TAP
+   * on that question from opening it — so neither hard session's day picker was reachable from this
+   * step, while the row's summary line still read `Run · Tue · Ride · Fri` and looked answered.
+   * The default and the choice are two different rules and they now live in two different places:
+   * `defaultScheduleAsk` excludes `hard`, `resolveScheduleAsk` honours a tap unconditionally.
+   */
+  const scheduleRowKeys = scheduleRows.map((r) => r.key as ScheduleRowKey);
+  const scheduleAsk = resolveScheduleAsk(currentStep, scheduleQuestion, scheduleRowKeys);
+
+  /**
+   * ⛔ THE DEFAULT IS WRITTEN ONCE, AND ONLY OVER AN UNSET VALUE (Michael, 2026-08-19). An athlete
+   * who has chosen a row keeps it — walking Back and forward again must not silently re-open the
+   * card on a question they already left.
+   *
+   * ⚠️ THE DERIVATION ABOVE ALREADY FALLS BACK TO THE SAME KEY, so this changes nothing on screen.
+   * What it changes is that the choice becomes STATE rather than an absence of state, which is what
+   * makes "has the athlete chosen?" a question the card can answer.
+   */
+  useEffect(() => {
+    if (scheduleQuestion !== null || scheduleRowKeys.length === 0) return;
+    setScheduleQuestion(defaultScheduleAsk(scheduleRowKeys));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleQuestion, scheduleRowKeys.join('|')]);
   /**
    * ⛔ THE OPINIONATED DEFAULT (Michael, 2026-08-18). The scheduler does not open on a blank grid for
    * the hard days — it opens with the model's own answer already chosen, labelled as a suggestion.
