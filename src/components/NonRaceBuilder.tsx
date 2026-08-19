@@ -2016,8 +2016,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // ⛔ THE ATHLETE'S ALLOCATION WINS (2026-08-18). Which sport holds the top-end session is a real
     // training decision and it used to be settled by which chip was tapped first, with no surface
     // saying so. Now it is a stated toggle and this reads it.
+    /**
+     * ⛔⛔ A HALF-ALLOCATED PAIR LIT BOTH BUTTONS AND BUILT TWO INTENSITY SESSIONS (found on device,
+     * 2026-08-18: *"wrong buttons for ride"*). READ THIS BEFORE SIMPLIFYING IT.
+     *
+     * The first version read one slot's own field: `role === 'threshold' ? 'threshold' : 'vo2'`. An
+     * UNSET slot therefore answered `vo2` — and unset is reachable in one ordinary sequence:
+     *
+     *     add a run → pick a session from the merged one-slot list (writes role to slot 0)
+     *     → add a ride (slot 1 has no role at all)
+     *
+     * Both slots then resolved to intensity. The toggle showed BOTH buttons filled, the card printed
+     * "Run — top-end intensity" above "Ride — top-end intensity", and the interlock line above them
+     * said the ride was the sustained one — three statements, two of them false, on one screen.
+     *
+     * ⛔ THE BUDGET IS ONE OF EACH AND THE RESOLVER MUST ENFORCE IT, not assume the writer did. So
+     * it derives the single intensity INDEX rather than answering per slot in isolation: an explicit
+     * `intensity` mark wins, otherwise the first slot not marked `threshold` takes it, and every
+     * other prescribed slot is the sustained one by subtraction.
+     *
+     * ⚠️ MIRRORED IN `assignHardRoles`, which takes the same half-allocated payload off the wire and
+     * had the same hole. Change both or the screen and the plan disagree.
+     */
     if (slots.some((h) => h.ownership !== 'club' && h.role)) {
-      return slots[i]?.role === 'threshold' ? 'threshold' : 'vo2';
+      const explicit = slots.findIndex((h) => h.ownership !== 'club' && h.role === 'intensity');
+      const intensityIdx = explicit >= 0
+        ? explicit
+        : slots.findIndex((h) => h.ownership !== 'club' && h.role !== 'threshold');
+      return i === intensityIdx ? 'vo2' : 'threshold';
     }
     // ⚠️ THE FALLBACK, FOR A DRAFT SAVED BEFORE THE TOGGLE EXISTED: intensity first, threshold
     // second. A club session IS the sustained one, so it consumes the threshold slot and the app's

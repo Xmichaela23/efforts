@@ -1791,8 +1791,27 @@ function assignHardRoles(
    */
   const allocated = days.some((h) => h.ownership !== 'club' && h.role);
   if (allocated) {
-    const chosen: HardRole[] = days.map((h) =>
-      h.ownership === 'club' ? 'club' : h.role === 'threshold' ? 'threshold' : 'vo2'
+    /**
+     * ⛔⛔ A HALF-ALLOCATED PAYLOAD USED TO PRODUCE TWO INTENSITY SESSIONS (found on device,
+     * 2026-08-18). The first version answered per entry — `role === 'threshold' ? 'threshold' :
+     * 'vo2'` — so an entry with NO role fell to `vo2`, and the wizard can legitimately send one:
+     * the athlete answers the one-slot list, then adds a second hard day.
+     *
+     * That is the exact arrangement §7 forbids, arriving silently: two top-end sessions and no
+     * sustained work anywhere in the block. ⛔ THE WEEK'S BUDGET IS ONE OF EACH AND THIS FUNCTION IS
+     * WHERE IT IS ENFORCED — do not trust the caller to have written both fields. It derives the
+     * single intensity INDEX: an explicit `intensity` mark wins, otherwise the first entry not
+     * marked `threshold` takes it, and everything else prescribed is sustained by subtraction.
+     *
+     * ⚠️ MIRRORED IN `hardRoleOf` in `NonRaceBuilder.tsx`, which had the same hole and lit both
+     * allocation buttons. Change both together.
+     */
+    const explicit = days.findIndex((h) => h.ownership !== 'club' && h.role === 'intensity');
+    const intensityIdx = explicit >= 0
+      ? explicit
+      : days.findIndex((h) => h.ownership !== 'club' && h.role !== 'threshold');
+    const chosen: HardRole[] = days.map((h, i) =>
+      h.ownership === 'club' ? 'club' : i === intensityIdx ? 'vo2' : 'threshold'
     );
     /**
      * ⛔ THE CLUB RULE SURVIVES THE ALLOCATION, AND IT IS NOT AN OVERRIDE OF THE ATHLETE — IT IS THE

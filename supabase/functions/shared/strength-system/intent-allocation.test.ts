@@ -178,3 +178,48 @@ Deno.test('⚠️ AN OLD GOAL WITH A STORED TERRAIN READS ITS OWN GROUND, NOT TH
   assert(!/No hill outside/.test(String(s.description)),
     `an explicit treadmill pick was handed the substitute note — ${s.description}`);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE HALF-ALLOCATED PAIR — the bug case, kept
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+// ⛔ MEASURED ON DEVICE 2026-08-18. The wizard's one-slot list writes a role to the slot the athlete
+// answered; adding a SECOND hard day leaves that one with no role at all. Both entries then resolved
+// to `vo2` — two top-end sessions, no sustained work anywhere, which is the arrangement §7 forbids.
+// The screen showed it too: both allocation buttons filled and both slots headed "top-end intensity".
+Deno.test('⛔ ONE SLOT ALLOCATED, ONE NOT — the week still carries exactly one of each', () => {
+  for (const [label, hardDays] of [
+    ['run marked, ride bare', [
+      { day: 'tuesday', discipline: 'run', role: 'intensity' },
+      { day: 'friday', discipline: 'bike' },
+    ]],
+    ['ride marked, run bare', [
+      { day: 'tuesday', discipline: 'bike', role: 'intensity' },
+      { day: 'friday', discipline: 'run' },
+    ]],
+    // ⚠️ AND THE OTHER HALF: only a THRESHOLD mark arrives. The unmarked slot must take the
+    // intensity rather than both falling to sustained.
+    ['run marked threshold, ride bare', [
+      { day: 'tuesday', discipline: 'run', role: 'threshold' },
+      { day: 'friday', discipline: 'bike' },
+    ]],
+  ] as const) {
+    const p = build(hardDays as unknown[]);
+    const quality = week2(p).filter((s) => Array.isArray(s.tags) && s.tags.includes('quality'));
+    const topEnd = quality.filter((s) => /Hill|Sprint|Bike Intervals/.test(String(s.name)));
+    const sustained = quality.filter((s) => /Threshold/.test(String(s.name)));
+    assertEquals(topEnd.length, 1, `${label}: ${topEnd.length} top-end sessions (${quality.map((s) => s.name).join(', ')})`);
+    assertEquals(sustained.length, 1, `${label}: ${sustained.length} sustained sessions (${quality.map((s) => s.name).join(', ')})`);
+  }
+});
+
+Deno.test('⚠️ AND THE MARKED SLOT IS THE ONE THAT GETS WHAT IT ASKED FOR', () => {
+  // Enforcing the budget must not mean overriding the athlete: the half they DID answer stands, and
+  // only the unanswered slot is filled in by subtraction.
+  const p = build([
+    { day: 'tuesday', discipline: 'bike', role: 'intensity' },
+    { day: 'friday', discipline: 'run' },
+  ]);
+  assertEquals(named(p, /Bike Intervals/).length, 1, 'the marked ride did not get the intervals');
+  assert(named(p, /Threshold/).length > 0, 'the unmarked run did not become the sustained session');
+});
