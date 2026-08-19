@@ -195,8 +195,12 @@ export type PullupDose = {
   perDay: number[];
   /** True when the athlete has no clean rep yet and the band on-ramp is the prescription (p.36). */
   assistedOnRamp: boolean;
-  /** Why this dose — named, never a bare number. */
-  basis: 'full_dose' | 'scaled_to_capacity' | 'on_ramp';
+  /**
+   * Why this dose — named, never a bare number.
+   * ⚠️ `untested` DOSES EXACTLY LIKE `on_ramp` AND IS NOT THE SAME THING: one is a measured zero,
+   * the other is no measurement. They are kept apart so the copy can be honest about which.
+   */
+  basis: 'full_dose' | 'scaled_to_capacity' | 'on_ramp' | 'untested';
 };
 
 /**
@@ -215,7 +219,15 @@ export function weeklyVolumeFor(pullupMaxReps: number | null | undefined): Pullu
   // ⛔ `Number(null)` IS 0, AND ON THIS FIELD 0 IS A REAL ANSWER — so the null check has to come
   // FIRST or every untested athlete is read as a 0-rep athlete and put on the band on-ramp. This is
   // Q-102's trap ("0 is valid") biting from the other side, and the test that caught it stays.
-  const cap = pullupMaxReps == null || !Number.isFinite(Number(pullupMaxReps))
+  /**
+   * ⚠️ EMPTY STRING IS NO ANSWER, NOT ZERO — the same `Number(null) === 0` trap this comment already
+   * warns about, arriving through a different door. `Number('')` is 0 and `Number.isFinite(0)` is
+   * true, so a blank stored field read as a TESTED zero: dosed identically, but labelled `on_ramp`,
+   * which puts *"no clean rep on file"* in front of an athlete who never said that — and hides the
+   * test prompt, because a 0 is an answer and the prompt only asks the unanswered.
+   */
+  const blank = pullupMaxReps == null || String(pullupMaxReps).trim() === '';
+  const cap = blank || !Number.isFinite(Number(pullupMaxReps))
     ? null
     : Math.max(0, Math.round(Number(pullupMaxReps)));
   const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
@@ -227,10 +239,31 @@ export function weeklyVolumeFor(pullupMaxReps: number | null | undefined): Pullu
     return { weeklyVolume: weekly, perDay: splitAcrossDays(weekly), assistedOnRamp: true, basis: 'on_ramp' };
   }
 
-  // Unknown capacity → the full dose. ⚠️ §0h: unknown degrades to UNCHANGED (the book's own number),
-  // never to a guess at a smaller one. The athlete opted into a pull-up progression; the honest
-  // default is the protocol as written.
-  if (cap == null || cap >= FULL_DOSE_CAPACITY) {
+  /**
+   * ⛔⛔ UNKNOWN NOW DOSES LIKE ZERO, NOT LIKE EIGHT (Michael, 2026-08-19). READ BEFORE REVERTING.
+   *
+   * **What stood here:** `cap == null` fell through to the FULL 100/week dose, on §0h's reasoning
+   * that *"unknown degrades to UNCHANGED — the book's own number — never to a guess at a smaller
+   * one."* That reasoning is right on a field where the shipped behaviour is the safe one. It is
+   * backwards here: 100 chins a week is the MAXIMAL prescription, so an athlete who had never
+   * tested — and who might manage four clean reps — was handed 33 a day on the strength of no
+   * evidence at all. §0h's own rule is that an unknown must not buy the CEILING; this was the
+   * ceiling.
+   *
+   * ⛔ SO UNKNOWN TAKES THE CONSERVATIVE DOSE: the same ~50/week band on-ramp a tested zero gets.
+   *
+   * ⚠️ AND IT IS A DIFFERENT `basis`, NOT THE SAME ONE — the two dose identically and MEAN different
+   * things. `on_ramp` is a measured answer ("no clean rep on file"); `untested` is the absence of
+   * one. Collapsing them would have `pullupDoseNote` telling an athlete who can do fifteen clean
+   * reps that they have none, which is both false and the kind of false that stops copy being read.
+   * ⛔ AND NOTHING WRITES 0 OVER null. They stay distinct in storage for the same reason.
+   */
+  if (cap == null) {
+    const weekly = round5(WEEKLY_CHIN_VOLUME_TARGET / 2);
+    return { weeklyVolume: weekly, perDay: splitAcrossDays(weekly), assistedOnRamp: true, basis: 'untested' };
+  }
+
+  if (cap >= FULL_DOSE_CAPACITY) {
     return {
       weeklyVolume: WEEKLY_CHIN_VOLUME_TARGET,
       perDay: splitAcrossDays(WEEKLY_CHIN_VOLUME_TARGET),
@@ -246,6 +279,12 @@ export function weeklyVolumeFor(pullupMaxReps: number | null | undefined): Pullu
 
 /** The sentence that names the evidence. Fact-first, no imperative, never a target to beat. */
 export function pullupDoseNote(dose: PullupDose, pullupMaxReps: number | null | undefined): string {
+  // ⚠️ SEPARATE SENTENCE FROM `on_ramp`, AND THAT IS THE POINT OF THE SEPARATE BASIS. "No clean rep
+  // on file" is a claim about the athlete; an untested athlete may have plenty. This says only what
+  // is known — that nothing is.
+  if (dose.basis === 'untested') {
+    return `Untested, so this starts band-assisted at ${dose.weeklyVolume} reps a week.`;
+  }
   if (dose.basis === 'on_ramp') {
     return `No clean rep on file, so this runs band-assisted — ${dose.weeklyVolume} reps a week, ` +
       `walking the band down as they get easier.`;
@@ -344,3 +383,14 @@ export function canWritePullupCapacity(
 ): boolean {
   return !isAssistedSet(exerciseName, set);
 }
+
+/**
+ * ⛔ THE TEST PROMPT — shown on the pull slot ONLY while the progression is active and no max exists
+ * (Michael, 2026-08-19). It is what makes the conservative unknown-dose a short state rather than a
+ * permanent one: the athlete enters a number and the prescription jumps to its real tier.
+ *
+ * ⚠️ IT NAMES THE MEASUREMENT AND NOTHING ELSE. No imperative, and no dosing internals — an athlete
+ * does not need to know that untested resolves to the on-ramp in order to go do one set.
+ * ⛔ IT DISAPPEARS PERMANENTLY ONCE A MAX EXISTS, INCLUDING A TESTED ZERO. Zero is an answer.
+ */
+export const PULLUP_TEST_PROMPT = 'Your pull-up max is untested. One set to failure gives the number.';

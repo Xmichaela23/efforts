@@ -8,7 +8,7 @@
  *
  * Run: ~/.deno/bin/deno test --no-check --allow-read src/lib/pullup-progression.test.ts
  */
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   canWritePullupCapacity,
   countPullupWork,
@@ -18,6 +18,8 @@ import {
   isAssistedSet,
   gripForSession,
   movementForGrip,
+  pullupDoseNote,
+  PULLUP_TEST_PROMPT,
   SESSION_STANDARD_MINUTES,
   SESSION_STANDARD_REPS,
   WEEKLY_CHIN_VOLUME_TARGET,
@@ -113,12 +115,77 @@ Deno.test('⛔ ZERO REPS IS THE ON-RAMP, NOT AN EXCLUSION (2nd ed p.36)', () => 
   assertEquals(dose.weeklyVolume > 0, true);
 });
 
-Deno.test('§0h — an untested athlete gets the protocol as written, never a guessed smaller dose', () => {
-  for (const raw of [null, undefined, NaN]) {
+/**
+ * ⛔⛔ THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-19, AND IT CITED §0h TO DO IT.
+ *
+ * It read: *"an untested athlete gets the protocol as written, never a guessed smaller dose"* —
+ * `basis: 'full_dose'`, 100 chins a week. The §0h instinct is right on a field whose shipped
+ * behaviour is the SAFE one; it is backwards here, because 100/week is the MAXIMAL prescription.
+ * §0h's actual rule is that an unknown must not buy the CEILING, and this was the ceiling: an
+ * athlete who had never tested, and who might manage four clean reps, was handed 33 a day on no
+ * evidence at all.
+ *
+ * ⛔ UNKNOWN NOW TAKES THE CONSERVATIVE DOSE — the same ~50/week band on-ramp a tested zero gets.
+ * The card carries `PULLUP_TEST_PROMPT` so it is a short state rather than a permanent one.
+ */
+Deno.test('⛔ UNKNOWN TAKES THE CONSERVATIVE DOSE, NOT THE CEILING', () => {
+  for (const raw of [null, undefined, NaN, '' as unknown as number]) {
     const dose = weeklyVolumeFor(raw as number | null | undefined);
-    assertEquals(dose.basis, 'full_dose', String(raw));
-    assertEquals(dose.weeklyVolume, 100);
+    assertEquals(dose.basis, 'untested', String(raw));
+    assertEquals(dose.assistedOnRamp, true, String(raw));
+    assertEquals(dose.weeklyVolume, 50, String(raw));
   }
+});
+
+Deno.test('⛔ UNKNOWN AND A TESTED ZERO PRESCRIBE IDENTICALLY — and are not the same state', () => {
+  const untested = weeklyVolumeFor(null);
+  const zero = weeklyVolumeFor(0);
+  // The prescription is the same, rep for rep and day for day.
+  assertEquals(untested.weeklyVolume, zero.weeklyVolume);
+  assertEquals(untested.perDay, zero.perDay);
+  assertEquals(untested.assistedOnRamp, zero.assistedOnRamp);
+  /**
+   * ⛔ BUT THE BASIS IS DIFFERENT, AND THAT IS LOAD-BEARING FOR COPY. `on_ramp` says "no clean rep
+   * on file" — a claim about the athlete. An untested athlete may have fifteen. Collapsing the two
+   * would put a false sentence in front of them, which is the kind of false that stops copy being
+   * read at all.
+   */
+  assertEquals(untested.basis, 'untested');
+  assertEquals(zero.basis, 'on_ramp');
+  assertEquals(pullupDoseNote(untested, null) === pullupDoseNote(zero, 0), false,
+    'the untested athlete is being told they have no clean rep on file');
+});
+
+Deno.test('⚠️ ENTERING ANY TESTED MAX SWITCHES TO ITS REAL TIER — the prompt state is short', () => {
+  // The tested tiers are UNCHANGED by this fix; this pins that the untested branch does not
+  // swallow them.
+  assertEquals(weeklyVolumeFor(3).basis, 'scaled_to_capacity');
+  assertEquals(weeklyVolumeFor(5).basis, 'scaled_to_capacity');
+  assertEquals(weeklyVolumeFor(8).basis, 'full_dose');
+  assertEquals(weeklyVolumeFor(8).weeklyVolume, 100);
+  assertEquals(weeklyVolumeFor(20).weeklyVolume, 100);
+  // ⚠️ AND A TESTED ZERO IS AN ANSWER: it leaves the untested state even though the dose matches.
+  assertEquals(weeklyVolumeFor(0).basis, 'on_ramp');
+});
+
+/**
+ * ⛔ THE PROMPT'S RENDER CONDITION, PINNED AS THE PREDICATE THE CARD USES: active progression AND no
+ * max on file. The component reads `performance_focus === 'pullups' && pullupMaxReps == null`.
+ * ⚠️ A TESTED ZERO MUST NOT RE-ASK. Zero is an answer, and `== null` is what keeps it out — `|| 0`
+ * or a falsy check would ask an athlete who already told us.
+ */
+Deno.test('⛔ THE TEST PROMPT SHOWS ONLY FOR AN ACTIVE PROGRESSION WITH NO MAX', () => {
+  const shows = (focus: string | null, max: number | null | undefined) =>
+    focus === 'pullups' && max == null;
+  assertEquals(shows('pullups', null), true, 'the untested athlete was never asked');
+  assertEquals(shows('pullups', undefined), true);
+  assertEquals(shows('pullups', 0), false, 'a tested zero is being asked again');
+  assertEquals(shows('pullups', 12), false);
+  assertEquals(shows(null, null), false, 'the prompt showed without the progression');
+  assert(PULLUP_TEST_PROMPT.length > 0);
+  // ⚠️ NO DOSING INTERNALS AND NO IMPERATIVE — it names the measurement and stops.
+  assertEquals(/\b(50|100|reps a week|band)\b/i.test(PULLUP_TEST_PROMPT), false,
+    `the prompt leaked dosing internals: ${PULLUP_TEST_PROMPT}`);
 });
 
 Deno.test('⛔ THE SPLIT ALWAYS SUMS TO THE WEEKLY TOTAL, AT EVERY CAPACITY', () => {

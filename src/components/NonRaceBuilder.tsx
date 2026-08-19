@@ -35,7 +35,9 @@ import {
   optionsFor,
 } from '@/lib/assistance-catalog';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
-import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor } from '@/lib/pullup-progression';
+import {
+  PULLUP_TEST_PROMPT, pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor,
+} from '@/lib/pullup-progression';
 // §7 — the hard day's gate reads the SAME resolvers the composer prices off. Fed, never re-derived.
 // ⛔ THE SCHEDULER'S OPINIONATED DEFAULT — the SAME solver the composer uses, via `@shared`.
 // ⛔ THE MENUS MOVED TO `src/lib/` SO A TEST CAN READ THEM (2026-08-18). They were data inside this
@@ -1396,10 +1398,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   /**
    * The athlete's tested pull-up capacity, for the progression's dose copy. ⛔ 0 IS A REAL VALUE
    * ("goal: your first pull-up", Q-102) and must not be coerced to absent — 0 is precisely what
-   * triggers the band on-ramp. `null` means untested, which takes the full dose (§0h).
+   * triggers the band on-ramp. ⚠️ `null` means UNTESTED and takes the same conservative
+   * on-ramp dose as of 2026-08-19 — it used to take the full 100/week, which handed the
+   * maximal prescription out on no evidence. See `weeklyVolumeFor`.
    */
   const pullupMaxReps = useMemo<number | null>(() => {
     const raw = (arc as { performance_numbers?: { pullupMaxReps?: unknown } } | null)?.performance_numbers?.pullupMaxReps;
+    /**
+     * ⛔ `Number(null)` IS 0 AND `Number('')` IS 0, SO THIS TURNED "NO ANSWER" INTO "TESTED ZERO"
+     * (found 2026-08-19). A stored null or blank came back as 0 — an ANSWER — which both mislabels
+     * the dose as the `on_ramp` ("no clean rep on file", a claim the athlete never made) and hides
+     * the test prompt, since the prompt only asks athletes who have not answered.
+     * ⚠️ THE NULL CHECK HAS TO COME FIRST. This is Q-102's trap, and it is the third field in this
+     * codebase to be bitten by it — `resolveEnduranceTier` and `weeklyVolumeFor` both carry the
+     * same warning. ⛔ A tested 0 still returns 0: zero is a real answer and must not be re-asked.
+     */
+    if (raw == null || String(raw).trim() === '') return null;
     const n = Number(raw);
     return Number.isFinite(n) && n >= 0 ? n : null;
   }, [arc]);
@@ -3871,6 +3885,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   {weeklyVolumeFor(pullupMaxReps).assistedOnRamp
                     ? ' Band-assisted reps are logged separately, so they never count as clean ones.'
                     : ''}
+                </p>
+              )}
+              {/* ⛔ THE TEST PROMPT — ACTIVE PROGRESSION AND NO MAX ON FILE, AND NOTHING ELSE
+                  (Michael, 2026-08-19). Unknown capacity now takes the CONSERVATIVE dose — the same
+                  ~50/week band on-ramp a tested zero gets — rather than the full 100, because 100
+                  chins a week is the maximal prescription and handing it out on no evidence is
+                  exactly the "unknown buys the ceiling" trap §0h exists to prevent.
+                  ⛔ THIS LINE IS WHAT KEEPS THAT A SHORT STATE RATHER THAN A PERMANENT ONE. One set
+                  to failure and the prescription jumps to its real tier.
+                  ⚠️ IT DISAPPEARS PERMANENTLY ONCE A MAX EXISTS, INCLUDING A TESTED ZERO — zero is
+                  an answer, and an athlete who gave it must not be asked again.
+                  ⚠️ `pullupMaxReps` IS ALREADY NULL-SAFE at :1401: it reads `performance_numbers`
+                  and returns null for absent, empty or unparseable, so `== null` is the whole
+                  test. ⛔ Do not add `|| 0` here — that would erase the distinction this change
+                  was made to preserve. */}
+              {state.assistancePicks.performance_focus === 'pullups' && pullupMaxReps == null && (
+                <p className="text-white/45 text-xs px-3 pb-3 -mt-1.5 leading-relaxed">
+                  {PULLUP_TEST_PROMPT}
                 </p>
               )}
               {/* ── THE SWIM COLLISION ──────────────────────────────────────────────────────────
