@@ -44,7 +44,7 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import {
-  HARD_DAY_EMPTY_NOTE, HARD_DAY_INTENT, INTENT_ALLOCATION_NOTE, RUN_GROUND_NOTE,
+  HARD_DAY_INTENT, INTENT_ALLOCATION_NOTE, RUN_GROUND_NOTE,
   RUN_GROUND_OPTIONS, SESSION_STATEMENTS, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
 import { solveWizardWeek } from '@/lib/suggest-hard-days';
@@ -4432,12 +4432,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   }));
                                   setActiveHardSlot(state.hardDays.length);
                                 }}
-                                className="flex-1 py-3 rounded-xl text-[15px] font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                                style={{
-                                  borderColor: `rgb(${getDisciplineColorRgb(d)})`,
-                                  backgroundColor: `rgba(${getDisciplineColorRgb(d)},0.12)`,
-                                  color: '#fff',
-                                }}
+                                /**
+                                 * ⛔ NEUTRAL — THIS IS WHAT THE ATHLETE LANDS ON (Michael,
+                                 * 2026-08-18: *"user lands here, should be neutral"*).
+                                 *
+                                 * ⚠️ IT NARROWS THE IDENTITY RULE FROM THE COMMIT BEFORE THIS ONE,
+                                 * and the narrowing is the point. Sport colour marks a session that
+                                 * EXISTS — the Ride / Run chips listing what the block carries. An
+                                 * empty card is two colours shouting before anything has been
+                                 * chosen, which is the whole screen's first impression. The button
+                                 * says which sport in its own words; it does not need to shout it.
+                                 */
+                                className="flex-1 py-3 rounded-xl text-[15px] font-medium border border-white/15 bg-white/[0.05] text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                               >+ Add a {d === 'run' ? 'run' : 'ride'}</button>
                             ))}
                           </div>
@@ -4851,14 +4857,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 day. ⛔ Do not bring any of them back onto this card. */}
 
                             {/* ── STATE 0: nothing chosen ────────────────────────────────────
-                                ⚠️ RENDERS ONLY WHEN THE ROW IS EMPTY. An athlete who has already
-                                added a session does not need to be sold on the cost of one, and
-                                leaving it up would push the actual question below the fold. */}
-                            {state.hardDays.length === 0 && (
-                              <p className="text-white/70 text-sm leading-relaxed pt-1">
-                                {HARD_DAY_EMPTY_NOTE}
-                              </p>
-                            )}
+                                ⛔ THERE IS NOTHING TO RENDER HERE, AND THAT IS THE FIX. The first
+                                draft printed `HARD_DAY_EMPTY_NOTE` — Michael's copy for the empty
+                                state — directly below the card's own banner at :4334, which already
+                                carries the SAME two sentences plus the Schedule-step line. The
+                                athlete landed on this screen and read the CNS cost twice, six lines
+                                apart.
+                                ⚠️ THE CLASSIC "COLLECTED AND DOUBLED": the copy was written fresh
+                                from the spec without checking whether the card already said it, and
+                                the banner had shipped hours earlier the same day. The constant is
+                                deleted with this block; the banner is the one owner. */}
 
                             {/* ── STATE 1: one slot — what do you want from it ───────────────
                                 ⛔ THIS QUESTION DID NOT EXIST. One hard day was ALWAYS the intensity

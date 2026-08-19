@@ -47,18 +47,15 @@
 export type CopyOption<T extends string> = { id: T; title: string; body: string };
 
 /**
- * ⛔ THE EMPTY STATE HAS TO STATE THE PRICE (Michael's copy, verbatim). "None is a valid answer" is
- * the load-bearing half: every other row on this screen is something the athlete adds, and an
- * athlete who reads a blank intensity row as an unfinished form will add one they do not want.
+ * ⛔ THERE IS NO `HARD_DAY_EMPTY_NOTE` HERE, AND ONE MUST NOT COME BACK. Michael's spec gave copy for
+ * the empty state — *"Intensity taxes your central nervous system…"* — and it was added here and
+ * rendered on the card, where the card's OWN banner (`NonRaceBuilder.tsx:4334`) had been carrying
+ * those same two sentences since earlier the same day, plus the Schedule-step line. The athlete
+ * landed on the screen and read the cost twice.
  *
- * ⚠️ THE REP-CEILING CLAIM IS REAL AND IS THE ONE THING HERE THE ENGINE MUST KEEP TRUE.
- * `resolveEnduranceTier` bands the accessory work off the COUNT of hard days — survival 25-30 reps
- * at two or more, base 30-40 at one, strength 40-50 at none. If that model ever stops keying on the
- * count, this sentence becomes a lie and must change with it.
+ * ⚠️ THE BANNER IS THE ONE OWNER. If the empty state ever needs different words, change the banner —
+ * do not add a second string that says the same thing in a different place.
  */
-export const HARD_DAY_EMPTY_NOTE =
-  'Intensity taxes your central nervous system. Every high intensity day you add lowers your '
-  + 'lifting rep ceiling to protect the heavy barbell work.';
 
 /**
  * ⛔ THE SINGLE-SLOT QUESTION. One hard session is not a fragment of a two-session week — it IS the
