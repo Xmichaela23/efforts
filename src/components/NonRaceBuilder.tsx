@@ -4660,14 +4660,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 placer still pushes lifting AWAY from hard days. Printing it would be
                                 a promise the engine is not keeping, which the work order forbids by
                                 name. The sentence says only what is true today. */}
-                            <div className="flex items-start gap-1.5 pt-0.5">
-                              <p className="text-white/45 text-xs leading-snug">
+                            {/* ⚠️ THE (i) STAYS EVEN WHEN THE LINE IS SILENT — it is the only route to
+                                `HARD_DAY_WHY`, which now carries the whole assistance-cost table.
+                                `justify-end` so a lone icon sits where it sat beside text. */}
+                            <div className={`flex items-start gap-1.5 pt-0.5${hardDayCount >= 2 ? ' justify-end' : ''}`}>
+                              <p className="text-white/45 text-xs leading-snug empty:hidden">
+                                {/* ⛔ AT TWO SESSIONS THIS LINE IS SILENT NOW (2026-08-18). It said
+                                    "Two hard sessions: one top-end, one sustained" — which is the
+                                    SAME sentence `INTENT_ALLOCATION_NOTE` prints four lines below,
+                                    above the buttons that act on it. Two statements of one rule, one
+                                    of them attached to no control.
+                                    ⚠️ IT STILL SPEAKS AT 0 AND 1, where there is no allocation block
+                                    and this is the only thing naming what the slot is for — and it
+                                    is where the club option is disclosed. ⚠️ "keep its distance" was
+                                    the old wording; the voice lint catches `keep`. */}
                                 {hardDayCount >= 2
-                                  // ⚠️ "keep its distance" WAS THE OLD WORDING AND THE VOICE LINT
-                                  // CATCHES `keep`. It survived only because nothing linted this
-                                  // string until the copy pass touched it.
-                                  ? 'Two hard sessions: one top-end, one sustained. The lifting is placed '
-                                    + 'clear of both.'
+                                  ? ''
                                   : 'Holds your top-end fitness. It does not build it. A club session goes here.'}
                               </p>
                               <button
@@ -4966,7 +4974,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             {state.hardDays.length === 2
                               && !state.hardDays.some((h) => h.ownership === 'club') && (
                               <div className="space-y-1.5 pt-1">
-                                <span className="text-white/85 text-sm">Intent allocation</span>
+                                {/* ⚠️ NO "Intent allocation" HEADING — two buttons reading "Run is
+                                    intensity" / "Ride is intensity" under a one-line rule ARE the
+                                    question. The heading was a label for a label. */}
                                 <p className="text-white/70 text-sm leading-relaxed">{INTENT_ALLOCATION_NOTE}</p>
                                 <div className="flex gap-2">
                                   {state.hardDays.map((h, i) => {
@@ -5024,23 +5034,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     );
                                   })}
                                 </div>
-                                {/* ⛔ AND THE CONSEQUENCE IS SPELLED OUT, not left to be inferred
-                                    from the two blocks below. *"One effects the other"* was the
-                                    whole complaint; a screen that only IMPLIES the interlock has
-                                    not fixed it. ⚠️ Reads the resolved role rather than the stored
-                                    allocation, so it cannot drift from what the engine will build. */}
-                                <p className="text-white/70 text-sm leading-relaxed">
-                                  {interlockLine(
-                                    state.hardDays[
-                                      Math.max(0, state.hardDays.findIndex((_, i) => hardRoleOf(i) === 'vo2'))
-                                    ]?.discipline === 'bike' ? 'bike' : 'run',
-                                    // ⛔ "HAS THE ATHLETE ACTUALLY PICKED?" — not "is a button lit".
-                                    // One button is ALWAYS lit, because `hardRoleOf` falls back to
-                                    // list order, and that fallback is exactly what the athlete had
-                                    // no way to tell apart from their own choice.
-                                    state.hardDays.some((h) => h.ownership !== 'club' && h.role),
-                                  )}
-                                </p>
+                                {/* ⛔ THE INTERLOCK SENTENCE IS DELETED (Michael, 2026-08-18: *"very
+                                    messy UI"*). It read *"Your run holds the speed. Your ride is the
+                                    sustained one."* — and the two headings six lines below it say
+                                    exactly that, as headings, on the blocks they describe:
+                                    "Run — top-end intensity" and "Ride — sustained threshold".
+                                    ⚠️ THE INTERLOCK IS STILL VISIBLE, which was the whole point of
+                                    the rebuild. It is shown by the two labelled blocks rather than
+                                    narrated above them, which is one fewer thing to read and one
+                                    fewer place to drift. ⛔ Do not re-add a sentence that restates a
+                                    heading. */}
                               </div>
                             )}
 
@@ -5092,10 +5095,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   <span className="text-white/85 text-sm">{heading}</span>
                                   {asks ? (
                                     <>
-                                      {/* ⛔ THE RULE FIRST, THE OPTIONS AFTER — the note governs every
-                                          option below it, so putting it under them would be an
-                                          instruction arriving after the tap it applies to. */}
-                                      <p className="text-white/70 text-sm leading-relaxed">{RUN_GROUND_NOTE}</p>
+                                      {/* ⛔ `RUN_GROUND_NOTE` IS NOT RENDERED HERE ANY MORE (2026-08-18).
+                                          It read *"Flat sprints need 48 hours clear of heavy squats.
+                                          Hills do not."* — and the Speed focus option's own body
+                                          says *"the footfall costs you 48 hours clear of heavy
+                                          squats"* two lines below it. The rule belongs ON the option
+                                          that pays it, not stacked above both.
+                                          ⚠️ The constant stays exported and voice-linted: it is the
+                                          one-line statement of the rule and the next surface that
+                                          needs it should use it rather than rewrite it. */}
                                       <div className="space-y-1">
                                         {RUN_GROUND_OPTIONS.map((opt) => {
                                           // ⚠️ ABSENT READS AS `vo2` — the shipped default, and what
