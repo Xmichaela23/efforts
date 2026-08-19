@@ -14,7 +14,7 @@ import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY, HARD_RIDE_SHAPE
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
-import { ASSISTANCE_GUIDANCE } from '@/lib/assistance-menu';
+import { ASSISTANCE_GUIDANCE, resolveEnduranceTier, TIER_BAND } from '@/lib/assistance-menu';
 // D-407 — the per-day picker. Twelve slots inside a locked frame, not three block-wide picks.
 import {
   ASSISTANCE_CATEGORIES,
@@ -43,7 +43,7 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import {
-  INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
+  accessoryCostLine, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
 import { solveWizardWeek } from '@/lib/suggest-hard-days';
@@ -1797,6 +1797,40 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * counting "how much intensity does this block carry" must count slots.
    */
   const hardDayCount = state.hardDays.length;
+  /**
+   * ⛔ THE ACCESSORY BAND, COMPUTED THE WAY THE ENGINE COMPUTES IT — OR THE CARD SELLS A BLOCK THE
+   * PLAN DOES NOT BUILD.
+   *
+   * ⚠️ THE FORMULA IS COPIED FROM `strength-primary-plan.ts:3898-3917` DELIBERATELY, not
+   * approximated: run hours = miles x easy pace / 60, ride hours = the typed figure, absent stays
+   * ABSENT rather than becoming zero (§0h — an unknown week is not licence to hand out the
+   * ceiling). `resolveEnduranceTier` is the shared function, so the tier decision itself has exactly
+   * one owner; what is duplicated here is only the two inputs. ⛔ If that derivation moves, this
+   * moves with it.
+   */
+  const accessoryBands = (() => {
+    const miles = typeof state.targetMiles === 'number' && state.targetMiles > 0
+      ? (unit === 'km' ? state.targetMiles / 1.609344 : state.targetMiles)
+      : null;
+    /**
+     * ⚠️ `paceMinPerMile` IS THE SAME NUMBER THE ENGINE RECEIVES — `assemblePayload` sends it as
+     * `easyPaceMinPerMile`. That includes its 10:00/mi fallback for an athlete with no learned pace,
+     * so the card and the plan agree even in the unmeasured case. ⛔ If the payload ever sends a
+     * different figure, this line is the one that starts lying.
+     */
+    const runHours = miles != null && paceMinPerMile > 0 ? (miles * paceMinPerMile) / 60 : null;
+    const rideHours = Number(state.rideHours) > 0 ? Number(state.rideHours) : null;
+    const declared = posturePresent('run') || posturePresent('bike');
+    const totalHours = !declared ? 0
+      : (runHours == null && rideHours == null ? null : (runHours ?? 0) + (rideHours ?? 0));
+    return {
+      now: TIER_BAND[resolveEnduranceTier({ hardDays: hardDayCount, totalHours })],
+      // ⚠️ THE BASELINE IS THE SAME WEEK WITH NO HARD DAYS — which is what makes the line about the
+      // athlete's CHOICE rather than about their volume. A high-volume athlete already in survival
+      // on hours alone sees nothing, because their hard day cost them nothing further.
+      none: TIER_BAND[resolveEnduranceTier({ hardDays: 0, totalHours })],
+    };
+  })();
   /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Long run and long ride are posture-gated
    * rows, and posture is editable on an earlier step — so walking Back, dropping the bike, and
@@ -4902,6 +4936,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 );
                               })}
                             </div>
+
+                            {/* ⛔ THE PRICE, ONLY WHEN IT MOVED. Under the cards, because the count
+                                that sets it is what the cards above just changed — and above the add
+                                buttons, so the consequence of adding one more is stated before the
+                                button that does it. ⚠️ SILENT WHEN THE MATH DID NOT MOVE. */}
+                            {accessoryCostLine(accessoryBands.now, accessoryBands.none) && (
+                              <p className="text-white/70 text-sm leading-relaxed pt-1">
+                                {accessoryCostLine(accessoryBands.now, accessoryBands.none)}
+                              </p>
+                            )}
 
                             {/* ── ADD, BELOW THE LIST IT APPENDS TO ──────────────────────────
                                 ⚠️ It sat ABOVE the sessions until 2026-08-18, which is why an athlete

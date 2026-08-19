@@ -17,9 +17,10 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 import {
-  RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION, singleSlotOptions,
+  accessoryCostLine, RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION, singleSlotOptions,
 } from '../../../../src/lib/hard-day-menus.ts';
 import { HARD_DAY_WHY } from '../../../../src/lib/strength-focus-copy.ts';
+import { voiceViolation } from '../../_shared/state-trend/week-accent.ts';
 
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -251,6 +252,21 @@ for (const r of RECIPES) {
     const why = HARD_DAY_WHY.map((x) => `${x.heading} ${x.body}`).join(' ');
     assert(/eccentric|impact transient/i.test(why), 'the eccentric argument left the options and never arrived');
     assert(/48 hours/.test(why), 'the 48-hour clearance left the options and never arrived');
+
+    /**
+     * ⛔ THE COST LINE SPEAKS ONLY WHEN THE MATH MOVED (Michael, 2026-08-18: *"if the math doesn't
+     * change, don't lecture them"*). Silence is the assertion that matters — a line that always
+     * shows is a banner, and a banner about a cost that was not incurred is a false claim.
+     */
+    assertEquals(accessoryCostLine([30, 40], [30, 40]), null, 'it lectured with nothing to report');
+    assertEquals(accessoryCostLine([25, 30], [25, 30]), null,
+      'a high-volume athlete already in survival was told their hard day cost them a band');
+    const moved = accessoryCostLine([25, 30], [40, 50]);
+    assert(moved && /25-30/.test(moved) && /40-50/.test(moved),
+      'the line must state BOTH bands — "reduced" without a from-number is not a price');
+    // ⛔ NO IMPERATIVE. It describes a checkbook being balanced, never an instruction — and this is
+    // exactly the sentence that would attract one.
+    assertEquals(voiceViolation(moved!), null, `the cost line broke voice: ${moved}`);
 
     // ⚠️ CASE-INSENSITIVE. The 2026-08-18 copy pass cut *"which is why we recommend it"* down to a
     // one-word *"Recommended."*, and a literal lowercase `includes` read that as the recommendation

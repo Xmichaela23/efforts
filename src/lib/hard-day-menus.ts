@@ -298,3 +298,34 @@ export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[
       },
     ]
 );
+
+/**
+ * ⛔ THE COST LINE — SHOWN ONLY WHEN THE MATH ACTUALLY MOVED (Michael, 2026-08-18).
+ *
+ * *"Only deploy trade-off language when the math actually changes. If the math doesn't change,
+ * don't lecture them."* So this is not a banner and not a warning: it compares the band the athlete
+ * IS getting against the band they WOULD get with no hard days, and speaks only on a difference.
+ *
+ * ⚠️ WHICH MEANS IT IS SILENT IN TWO CASES THAT LOOK DIFFERENT AND ARE THE SAME. No hard days — no
+ * change, nothing to say. And a high-volume athlete already in `survival` on HOURS alone — adding a
+ * hard day costs them nothing further, so claiming it did would be false.
+ *
+ * ⛔ STATE THE PRICE, HIDE THE BIOLOGY. The numbers and the priority, nothing else; the CNS
+ * argument, the eccentric-impact rule and the 48-hour clearance are all in `HARD_DAY_WHY` behind
+ * the (i). *"They do not need the anatomy lesson unless they ask for it."*
+ *
+ * ⚠️ WARN, DO NOT GATE. The line describes a checkbook being balanced against cheques the athlete
+ * wrote — never a punishment, never a reason not to. ⛔ Do not add an imperative to it; the voice
+ * lint bans them and this is exactly the sentence that would attract one.
+ *
+ * @param band  the band the athlete's current answers produce, `[floor, ceiling]`.
+ * @param baseline the band the same week would produce with zero hard days.
+ */
+export const accessoryCostLine = (
+  band: readonly [number, number],
+  baseline: readonly [number, number],
+): string | null => {
+  if (band[0] === baseline[0] && band[1] === baseline[1]) return null;
+  return `Accessory work drops to ${band[0]}-${band[1]} reps per exercise, from ${baseline[0]}-${baseline[1]}. `
+    + 'The barbell gets paid first.';
+};
