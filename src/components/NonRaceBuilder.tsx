@@ -44,8 +44,8 @@ import { pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weekly
 // and the recipe suite's Menu Rule had nothing to assert against. Same home as `assistance-menu.ts`,
 // for the same reason its header gives: anything the client and the engine must agree on lives here.
 import {
-  HARD_DAY_INTENT, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE,
-  RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION, SINGLE_SLOT_NOTE,
+  INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
+  SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
 import { solveWizardWeek } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
@@ -4868,12 +4868,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 the banner had shipped hours earlier the same day. The constant is
                                 deleted with this block; the banner is the one owner. */}
 
-                            {/* ── STATE 1: one slot — what do you want from it ───────────────
-                                ⛔ THIS QUESTION DID NOT EXIST. One hard day was ALWAYS the intensity
-                                session, decided by `assignHardRoles` and never offered. An athlete
-                                whose whole block hangs on one hard session had no say in what it
-                                was. ⚠️ Prescribed only: a club run or ride is the sustained session
-                                by its nature and is not ours to reassign. */}
+                            {/* ── STATE 1: one slot — ONE question, one list ─────────────────
+                                ⛔⛔ IT ASKED TWICE AND THE ATHLETE READ FOUR OPTIONS (Michael,
+                                2026-08-18: *"4 options? confusing?"*). "Top-end intensity /
+                                Sustained threshold" stacked directly on "Speed focus / VO2 max
+                                focus" — two headings, four cards, for what is a single decision.
+
+                                ⛔ BOTH QUESTIONS ARE THE SAME AXIS WHEN THERE IS ONLY ONE SLOT.
+                                There are exactly three sessions a lone hard run can be — sprints,
+                                hills, threshold — and the two-step framing was the two-slot flow
+                                leaking into the one-slot one. One list now, each option carrying its
+                                own prescription so the choice and its consequence arrive together,
+                                and one tap writes both `role` and `goal`.
+
+                                ⚠️ THE PER-SLOT BLOCK BELOW SKIPS THE LONE SLOT for exactly this
+                                reason — it would re-ask the half this list already answered, which
+                                is how the four appeared in the first place.
+
+                                ⚠️ Prescribed only: a club run or ride is the sustained session by
+                                its nature and is not ours to reassign. */}
                             {state.hardDays.length === 1 && activeHard?.ownership === 'prescribed' && (
                               <div className="space-y-1.5 pt-1">
                                 <span className="text-white/85 text-sm">What you want from it</span>
@@ -4882,11 +4895,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     instruction arriving after the tap it applies to. */}
                                 <p className="text-white/70 text-sm leading-relaxed">{SINGLE_SLOT_NOTE}</p>
                                 <div className="space-y-1">
-                                  {HARD_DAY_INTENT.map((opt) => {
-                                    // ⚠️ ABSENT READS AS `intensity`, matching both `hardRoleOf`'s
-                                    // fallback and `assignHardRoles`. A slot with no stored role is
-                                    // the intensity one, so the chip must show it as chosen.
-                                    const on = (activeHard.role ?? 'intensity') === opt.id;
+                                  {singleSlotOptions(activeHard.discipline).map((opt) => {
+                                    /**
+                                     * ⚠️ ABSENT READS AS THE INTENSITY SESSION — `hardRoleOf`'s
+                                     * fallback and `assignHardRoles` both do, so a slot with no
+                                     * stored answer must show it as chosen rather than showing
+                                     * nothing selected while the engine quietly builds one.
+                                     * ⚠️ AND FOR A RUN THAT MEANS THE `vo2` ROW: absent `goal` is
+                                     * hills, which is what every block built before the goal
+                                     * question existed got.
+                                     */
+                                    const role = activeHard.role ?? 'intensity';
+                                    const on = opt.role === 'threshold'
+                                      ? role === 'threshold'
+                                      : role !== 'threshold'
+                                        && (opt.goal === undefined || (activeHard.goal ?? 'vo2') === opt.goal);
                                     return (
                                       <button
                                         key={opt.id} type="button"
@@ -4894,32 +4917,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                           const next = [...st.hardDays];
                                           next[hardSlotIndex] = {
                                             ...next[hardSlotIndex],
-                                            role: opt.id,
-                                            // ⚠️ THE GROUND ANSWER DIES WITH THE ROLE — a stored
-                                            // `speed` on a threshold slot would charge the week a
-                                            // 48h clearance for a session that is not a sprint.
-                                            ...(opt.id === 'threshold' ? { goal: undefined } : {}),
+                                            role: opt.role,
+                                            // ⛔ `goal` IS SET OR CLEARED ON EVERY TAP, never left
+                                            // behind. A stored `speed` under a threshold pick would
+                                            // charge the week a 48h clearance for a session that is
+                                            // not a sprint.
+                                            goal: opt.goal,
+                                            // ⛔ AND `terrain` GOES WITH IT — a ground value from an
+                                            // older draft belongs to a menu this list replaced.
+                                            terrain: undefined,
                                           };
                                           return { ...st, hardDays: next };
                                         })}
-                                        /**
-                                         * ⛔ NEUTRAL WHEN SELECTED (Michael, 2026-08-18):
-                                         * *"overall colour should be neutral — ride kinda sits in
-                                         * running, it's confusing."*
-                                         *
-                                         * The sport colours were applied here on 2026-08-18 to fix
-                                         * the opposite complaint (a ride's option rendering in
-                                         * strength orange). That fix over-corrected: a GREEN
-                                         * "Ride is intensity" button sitting inside the hard-day
-                                         * card reads as a ride ROW, not as a ride CHOICE, and the
-                                         * card is about both sports at once.
-                                         *
-                                         * ⛔ THE RULE THIS SETTLES: on this screen sport colour
-                                         * means IDENTITY — it belongs on the Ride / Run chips that
-                                         * say which sessions exist. A control that is merely
-                                         * SELECTED is neutral white. Do not re-colour these; the
-                                         * next screenshot round will just swing it back.
-                                         */
+                                        // ⛔ NEUTRAL WHEN SELECTED — sport colour on this screen
+                                        // marks IDENTITY (which sessions the block carries), and
+                                        // this is a choice WITHIN one already-labelled session.
                                         className={`w-full text-left rounded-xl border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${on ? 'border-white/55 bg-white/[0.10]' : 'border-white/12 bg-white/[0.03]'}`}
                                       >
                                         <span className="block text-white/90 text-sm">{opt.title}</span>
@@ -5027,6 +5039,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 there is no prescription to state. The ownership checkbox says it. */}
                             {state.hardDays.map((h, i) => {
                               if (h.ownership === 'club') return null;
+                              // ⛔ THE LONE SLOT IS ANSWERED ABOVE, IN ONE LIST. Rendering its block
+                              // here would re-ask the speed-vs-VO2 half and put four options back on
+                              // the card — which is the defect this whole pass exists to remove.
+                              if (state.hardDays.length === 1) return null;
                               const role = hardRoleOf(i);
                               const bike = h.discipline === 'bike';
                               const heading = `${bike ? 'Ride' : 'Run'}${role === 'threshold'

@@ -75,26 +75,15 @@ export const SINGLE_SLOT_NOTE =
   'Because you are only carrying one hard session, your choice sets the cardiovascular stimulus '
   + 'for your entire 12-week block.';
 
-export const HARD_DAY_INTENT: Array<CopyOption<'intensity' | 'threshold'>> = [
-  {
-    id: 'intensity',
-    title: 'Top-end intensity',
-    // ⚠️ "aligns with heavy lifting pathways", NOT "protects them" — the same correction the role
-    // line took on 2026-08-18. Short intensity recruits the same Type II fibres and ATP-PC system
-    // the barbell does; it does not stand guard over anything.
-    body: 'Short, explosive pushes. Recruits fast-twitch fibers and aligns with heavy lifting '
-      + 'pathways. Preserves the barbell, which is why we recommend it.',
-  },
-  {
-    id: 'threshold',
-    title: 'Sustained threshold',
-    // ⛔ THE COST IS NAMED AND IT IS THE HONEST ONE. Prolonged metabolic work is what the
-    // interference literature actually implicates — not intervals. Do not soften this into "may
-    // compete"; the athlete is choosing it with the trade in front of them.
-    body: 'Grueling, unbroken pacing just under your redline. Builds immense stamina, but prolonged '
-      + 'metabolic efforts compete directly with strength adaptations.',
-  },
-];
+/**
+ * ⛔ `HARD_DAY_INTENT` LIVED HERE AND IS DELETED — do not reintroduce it. It was the single-slot
+ * intensity-vs-threshold pair, and it stacked on the speed-vs-VO2 pair to make one list of four
+ * (Michael: *"4 options? confusing?"*). `singleSlotOptions()` at the bottom of this file merged both
+ * into one question. Its two corrections survive there verbatim: "aligns with heavy lifting
+ * pathways", never "protects them", and NO accessory-cost clause on the threshold option — the band
+ * is set by the COUNT of hard days, so both roles cost identical accessory volume and the sentence
+ * would be a claim the plan then contradicts.
+ */
 
 /**
  * ⛔ THE INTERLOCK, SAID OUT LOUD — THE WHOLE POINT OF THE 2026-08-18 REBUILD.
@@ -202,3 +191,84 @@ export const interlockLine = (intensitySport: 'run' | 'bike'): string =>
   intensitySport === 'bike'
     ? 'Your ride is holding the top-end intensity, so your run is the sustained one.'
     : 'Your run is holding the top-end intensity, so your ride is the sustained one.';
+
+/**
+ * ⛔⛔ ONE SLOT IS ONE QUESTION (Michael, 2026-08-18: *"4 options? confusing?"*).
+ *
+ * A single hard RUN was being asked twice, and the athlete read it as one list of four:
+ *
+ *     What you want from it   → Top-end intensity | Sustained threshold
+ *     Run — top-end intensity → Speed focus       | VO2 max focus
+ *
+ * Both questions are the SAME AXIS for a lone hard session. There are exactly three sessions a
+ * single hard run can be — sprints, hills, or threshold — and the two-step framing was an artifact
+ * of the two-slot flow leaking into the one-slot one. Merged into one list, each option carrying
+ * its own prescription, so the choice and its consequence arrive together.
+ *
+ * ⚠️ THE TWO-SLOT FLOW IS UNCHANGED AND MUST STAY THAT WAY. There the allocation toggle settles
+ * intensity-vs-threshold first, so the run's remaining question is genuinely only speed-vs-VO2 —
+ * one list of two under an already-labelled heading. ⛔ Do not merge that one; it would put four
+ * options back on the card by the other route.
+ *
+ * ⚠️ `role` AND `goal` ARE BOTH WRITTEN FROM ONE TAP. That is the point of merging: the athlete
+ * answers once and the engine gets both fields it needs.
+ */
+export type SingleSlotOption = {
+  id: string;
+  title: string;
+  body: string;
+  role: 'intensity' | 'threshold';
+  goal?: 'speed' | 'vo2';
+};
+
+export const singleSlotOptions = (discipline: 'run' | 'bike'): SingleSlotOption[] => (
+  discipline === 'bike'
+    ? [
+      {
+        id: 'intensity',
+        title: 'Top-end intensity',
+        // ⚠️ THE REAL SESSION, not a character sketch — same rule as `SESSION_PRESCRIPTION`, which
+        // this deliberately mirrors word for word so the two cannot drift apart.
+        body: 'The Helgerud 4 × 4 — four 4-minute efforts at maximum sustainable power, easy '
+          + 'spinning between, halving to 2 × 4 in the final weeks. Recruits fast-twitch fibers and '
+          + 'aligns with heavy lifting pathways, which is why we recommend it.',
+        role: 'intensity',
+      },
+      {
+        id: 'threshold',
+        title: 'Sustained threshold',
+        body: 'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the '
+          + 'block, at 95-105% FTP. Builds immense stamina, but prolonged metabolic efforts compete '
+          + 'directly with strength adaptations.',
+        role: 'threshold',
+      },
+    ]
+    : [
+      {
+        id: 'speed',
+        title: 'Speed focus',
+        body: 'Flat ground — a track or road. Short, explosive sprints to make you faster. High '
+          + 'neurological drive, but the hard footfall creates mechanical damage that requires 48 '
+          + 'hours of leg clearance before heavy squats.',
+        role: 'intensity',
+        goal: 'speed',
+      },
+      {
+        id: 'vo2',
+        title: 'VO2 max focus',
+        body: 'Incline — a hill or treadmill. Hard 3-minute climbs to push your maximum aerobic '
+          + 'ceiling. Running uphill removes the eccentric impact, saving your knees and quads for '
+          + 'the barbell, which is why we recommend it.',
+        role: 'intensity',
+        goal: 'vo2',
+      },
+      {
+        id: 'threshold',
+        title: 'Sustained threshold',
+        body: 'Sustained blocks just under your redline — 4 × 5 min building to 2 × 10 across the '
+          + 'block, at a pace about 20 s/mi slower than your 5K. Builds immense stamina, but '
+          + 'prolonged metabolic efforts compete directly with strength adaptations.',
+        role: 'threshold',
+      },
+    ]
+);

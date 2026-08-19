@@ -17,7 +17,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeStrengthPrimaryPlan } from './strength-primary-plan.ts';
 import {
-  HARD_DAY_INTENT, RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION,
+  RUN_GROUND_OPTIONS, SESSION_PRESCRIPTION, singleSlotOptions,
 } from '../../../../src/lib/hard-day-menus.ts';
 
 const MAXES = { bench: 155, squat: 205, deadlift: 245, overheadPress: 105 };
@@ -187,10 +187,28 @@ for (const r of RECIPES) {
      * session "tidies" these ids back into terrain values, this is the test that catches it.
      */
     assertEquals(RUN_GROUND_OPTIONS.map((o) => o.id), ['speed', 'vo2'], 'the ground question drifted');
-    assertEquals(HARD_DAY_INTENT.map((o) => o.id), ['intensity', 'threshold'], 'the intent question drifted');
-    // ⚠️ The recommendation is stated on the intensity option and nowhere else — it is the default
-    // because it preserves the barbell, and the athlete is told so rather than steered silently.
-    assert(HARD_DAY_INTENT[0].body.includes('recommend'), 'the intensity option stopped stating the recommendation');
+    /**
+     * ⛔ ONE SLOT IS ONE QUESTION, AND THE COUNT IS THE ASSERTION. A single hard run has exactly
+     * three possible sessions and a single hard ride exactly two. When these were two separate
+     * lists the card showed FOUR cards for one decision (*"4 options? confusing?"*), so the number
+     * itself is what regressed and the number is what this pins.
+     */
+    assertEquals(singleSlotOptions('run').map((o) => o.id), ['speed', 'vo2', 'threshold'],
+      'the single hard run question drifted');
+    assertEquals(singleSlotOptions('bike').map((o) => o.id), ['intensity', 'threshold'],
+      'the single hard ride question drifted');
+    // ⚠️ ONE TAP MUST WRITE BOTH FIELDS — that is the whole point of merging the two lists. A run
+    // option that sets `role` and forgets `goal` hands the engine half an answer.
+    for (const o of singleSlotOptions('run')) {
+      assertEquals(o.role === 'intensity', o.goal !== undefined,
+        `${o.id}: role and goal disagree about whether this is an intensity session`);
+    }
+    // ⚠️ The recommendation is stated on a recommended option and nowhere else — the athlete is
+    // told which one the engine prefers rather than being steered silently.
+    assert(singleSlotOptions('run').some((o) => o.body.includes('recommend')),
+      'the run list stopped stating a recommendation');
+    assert(singleSlotOptions('bike').some((o) => o.body.includes('recommend')),
+      'the ride list stopped stating a recommendation');
     /**
      * ⛔ EVERY ASK-NOTHING STATE NAMES WHERE THE REST GETS DECIDED. *"You will choose your setup on
      * the day"* is a CONTRACT with the session description — the materializer now lists the setups,
