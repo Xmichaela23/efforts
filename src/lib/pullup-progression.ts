@@ -389,8 +389,14 @@ export function canWritePullupCapacity(
  * (Michael, 2026-08-19). It is what makes the conservative unknown-dose a short state rather than a
  * permanent one: the athlete enters a number and the prescription jumps to its real tier.
  *
- * ⚠️ IT NAMES THE MEASUREMENT AND NOTHING ELSE. No imperative, and no dosing internals — an athlete
- * does not need to know that untested resolves to the on-ramp in order to go do one set.
+ * ⚠️ IT IS AN IMPERATIVE AND THAT IS DELIBERATE (Michael's wording, 2026-08-19). The copy-voice
+ * rule bans instructions because the app OBSERVES rather than directs — and this is the one place
+ * that does not apply: it is asking for a MEASUREMENT the engine cannot take itself, the way a form
+ * asks for a field. `voiceViolation()` passes it, because its banned list is finite and does not
+ * catch this shape; the exemption is recorded here rather than resting on the lint missing it.
+ * ⛔ Do not soften it into an observation — a statement of fact does not get the number entered.
+ * ⚠️ AND NO DOSING INTERNALS. An athlete does not need to know that untested resolves to the
+ * on-ramp in order to go do one set.
  * ⛔ IT DISAPPEARS PERMANENTLY ONCE A MAX EXISTS, INCLUDING A TESTED ZERO. Zero is an answer.
  */
-export const PULLUP_TEST_PROMPT = 'Your pull-up max is untested. One set to failure gives the number.';
+export const PULLUP_TEST_PROMPT = 'Do one set to failure and enter your number.';

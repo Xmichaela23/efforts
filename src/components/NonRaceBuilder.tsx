@@ -3745,11 +3745,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 every clause of it was the app explaining an inference the athlete never asked it to
                 make. Forever p.24 asks for one movement per category per day; asked directly, there
                 is nothing to explain. */}
+            {/* ⛔ IT WAS STILL SELLING THE ADD-ABS SLOT (Michael's replacement, 2026-08-19). The
+                paragraph read *"plus an optional abs movement that shares the single-leg reps"* —
+                a fourth slot and a rep-splitting rule that were both DELETED yesterday. The intro
+                to a screen was describing a control that is not on it.
+                ⚠️ `focus` TRIPS THE VOICE LINT and ships anyway — the same override already on
+                record for "Speed focus" / "VO2 max focus". It is this screen's domain word for the
+                chips, and one word for one concept beats a synonym per surface. ⛔ Do not "fix" it
+                to satisfy the lint without asking. */}
             <p className="text-white/70 text-sm leading-relaxed">
-              Three lifting days, each with a push, a pull and a single-leg or core movement, plus an
-              optional abs movement that shares the single-leg reps rather than adding to them. Pick a
-              focus and the days fill in — every slot is still yours to change, and anything can be
-              swapped in the session.</p>
+              Three lifting days, each with a push, a pull and a single-leg or core movement. Pick a
+              focus and the days fill in — change to preferred movements below or swap on the day.</p>
 
             {/* ── FOCUS CHIPS ───────────────────────────────────────────────────────────────────
                 ⛔ A FOCUS RE-POINTS MOVEMENT CHOICE INSIDE A CATEGORY. It is not a new axis and it
