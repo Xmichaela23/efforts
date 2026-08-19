@@ -82,8 +82,11 @@ Then the state docs (in order) — they prevent re-litigating settled choices an
 npm run dev            # Vite dev server, port 8080 (Garmin OAuth proxy)
 npm run build          # Production build → dist/
 npm run lint           # ESLint
-npm run bake[:all]     # Bake library plans (scripts/bake-*.mjs)
-npm run plan:validate  # Validate library plan JSON
+# ⛔ `npm run bake[:all]` and `npm run plan:validate` WERE LISTED HERE AND DO NOT EXIST
+# (checked 2026-08-19 against package.json). The library-plan baker is gone — `LibraryPlans.ts`,
+# `plan_bake_and_compute.ts` and the scripts have no references anywhere in the repo. A session
+# that tried them got a script-not-found and had no way to know the whole capability had been
+# retired rather than the command mistyped.
 npm run ios            # build + cap sync ios
 
 # Edge functions (project ref yyriamwvtvzlkumqrvpm)

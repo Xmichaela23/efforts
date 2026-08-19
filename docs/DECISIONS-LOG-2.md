@@ -2369,3 +2369,59 @@ whichever session the cursor pointed at and left the other blank. It takes `extr
 ⛔ **The generalisable rule:** if a control's target is not visible on screen, the athlete cannot tell
 a deliberate edit from an accidental one. `bafb67bb`.
 
+
+
+---
+
+## D-434 — `PlanWizard` is retired; `NonRaceBuilder` is the only client front door (retired `b0fecb8f`, **WRITTEN 2026-08-19, LATE**)
+
+⛔ **THIS DECISION EXISTED ONLY IN A COMMIT MESSAGE FOR WEEKS, AND THAT IS THE POINT OF THE ENTRY.**
+`b0fecb8f cleanup: retire PlanWizard — the goal lifecycle is the only front door (D-429)` shipped the
+work and cited a number **that was never written to this log** — it ended at D-427. `CLAUDE.md` warns
+about exactly this by name (the D-288 story): *"a decision that lives only in a commit message does
+not exist."*
+
+⛔ **AND THE PHANTOM NUMBER HAS SINCE BEEN REUSED.** [D-429] was issued on 2026-08-19 for the
+intensity/threshold allocation rule, so every surviving citation of "D-429 retired PlanWizard" now
+resolves to a decision about which sport carries a block's top-end session. Two of those citations
+have been removed (`GAME-PLAN.md`, and the `CAPABILITY-MAP` rows); the commit message cannot be
+changed and is why this entry names it.
+
+**The decision itself:** the client had a third plan-building door. `PlanWizard.tsx` called
+`generate-run-plan` **directly** — writing a plan with no goal row and no `activate-plan`, bypassing
+the `create-goal-and-materialize-plan` lifecycle every other path goes through. It is deleted.
+
+**The front doors as of today, verified on disk:**
+
+| component | lines | status |
+|---|---|---|
+| `NonRaceBuilder.tsx` | 5,843 | **THE one.** All three Focus cards open it, deep-linked by which was tapped. What the 2026-08-18/19 rebuild touched. |
+| `ArcSetupWizard.tsx` | 2,969 | **LIVE and not a rival** — multi-race season planning, reached from a link inside `NonRaceBuilder` and a State-tab nudge. ⛔ Do not retire it. |
+| `PlanWizard.tsx` | — | **GONE.** |
+
+⚠️ **WHY IT MATTERED THAT THE MAP STILL LISTED IT.** `CAPABILITY-MAP.md` is the file `CLAUDE.md`
+orders every session to read FIRST as the anti-rebuild index, and it described the dead door as live
+— with a file, a line (`:858`), a route (`App.tsx:55`) and a real-sounding hazard. A session auditing
+plan lifecycle would have chased a ghost for hours. **An anti-rebuild index that lists something gone
+is worse than one that omits it:** the reader concludes "already built" and stops looking.
+
+---
+
+## D-435 — The library-plan baker is retired, and `CLAUDE.md` was still telling sessions to run it (2026-08-19)
+
+Found while clearing the runway for the scheduler session. `LibraryPlans.ts`,
+`plan_bake_and_compute.ts` and the `bake` / `plan:validate` npm scripts have **zero references
+anywhere in the repo** — file, caller, script, all gone.
+
+⛔ **THREE DOCS STILL DESCRIBED IT AS PRESENT**, in three different flavours of wrong:
+
+* `CLAUDE.md`'s **Commands** block listed `npm run bake[:all]` and `npm run plan:validate`. A session
+  running them gets script-not-found and no way to tell a retired capability from a typo.
+* `CAPABILITY-MAP`'s Library-plans row read **PARTIAL** with a live `file:line` and *"the baker is
+  disabled"* — which reads as a feature waiting for a flag.
+* The **anti-rebuild list** said *"a plan baker… exists, works offline"*. That is the list whose
+  entire job is stopping a rebuild, asserting something is built that is not.
+
+⚠️ **If library plans are ever wanted again, that is a BUILD, not a re-enable.** Recorded so the next
+reader does not go looking for the switch.
+
