@@ -1798,40 +1798,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const hardDayCount = state.hardDays.length;
   /**
-   * ⛔ THE ACCESSORY BAND, COMPUTED THE WAY THE ENGINE COMPUTES IT — OR THE CARD SELLS A BLOCK THE
-   * PLAN DOES NOT BUILD.
-   *
-   * ⚠️ THE FORMULA IS COPIED FROM `strength-primary-plan.ts:3898-3917` DELIBERATELY, not
-   * approximated: run hours = miles x easy pace / 60, ride hours = the typed figure, absent stays
-   * ABSENT rather than becoming zero (§0h — an unknown week is not licence to hand out the
-   * ceiling). `resolveEnduranceTier` is the shared function, so the tier decision itself has exactly
-   * one owner; what is duplicated here is only the two inputs. ⛔ If that derivation moves, this
-   * moves with it.
-   */
-  const accessoryBands = (() => {
-    const miles = typeof state.targetMiles === 'number' && state.targetMiles > 0
-      ? (unit === 'km' ? state.targetMiles / 1.609344 : state.targetMiles)
-      : null;
-    /**
-     * ⚠️ `paceMinPerMile` IS THE SAME NUMBER THE ENGINE RECEIVES — `assemblePayload` sends it as
-     * `easyPaceMinPerMile`. That includes its 10:00/mi fallback for an athlete with no learned pace,
-     * so the card and the plan agree even in the unmeasured case. ⛔ If the payload ever sends a
-     * different figure, this line is the one that starts lying.
-     */
-    const runHours = miles != null && paceMinPerMile > 0 ? (miles * paceMinPerMile) / 60 : null;
-    const rideHours = Number(state.rideHours) > 0 ? Number(state.rideHours) : null;
-    const declared = posturePresent('run') || posturePresent('bike');
-    const totalHours = !declared ? 0
-      : (runHours == null && rideHours == null ? null : (runHours ?? 0) + (rideHours ?? 0));
-    return {
-      now: TIER_BAND[resolveEnduranceTier({ hardDays: hardDayCount, totalHours })],
-      // ⚠️ THE BASELINE IS THE SAME WEEK WITH NO HARD DAYS — which is what makes the line about the
-      // athlete's CHOICE rather than about their volume. A high-volume athlete already in survival
-      // on hours alone sees nothing, because their hard day cost them nothing further.
-      none: TIER_BAND[resolveEnduranceTier({ hardDays: 0, totalHours })],
-    };
-  })();
-  /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Long run and long ride are posture-gated
    * rows, and posture is editable on an earlier step — so walking Back, dropping the bike, and
    * walking forward again would leave "ride" selected with no row for it and a day row quietly
@@ -2321,6 +2287,52 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const runCanContinue = true;
   const posturePresent = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
+
+  /**
+   * ⛔⛔ THIS BLOCK LIVED 500 LINES HIGHER AND WHITE-SCREENED THE APP (2026-08-18). It is an IIFE —
+   * it runs the moment the component body reaches it — and it calls `posturePresent`, which is
+   * declared just above. From up there that is a temporal dead zone: `Uncaught ReferenceError:
+   * Cannot access 'Un' before initialization`, and the whole wizard renders black.
+   *
+   * ⚠️ `tsc` AND THE BUILD BOTH PASSED. TypeScript flags a direct use-before-declaration (TS2448)
+   * but not one inside a function body, because a function COULD be called later — and this one is
+   * called immediately. ⛔ So an IIFE reading other component-scope consts must sit below every one
+   * of them, and a green build is not evidence that it does.
+   */
+  /**
+   * ⛔ THE ACCESSORY BAND, COMPUTED THE WAY THE ENGINE COMPUTES IT — OR THE CARD SELLS A BLOCK THE
+   * PLAN DOES NOT BUILD.
+   *
+   * ⚠️ THE FORMULA IS COPIED FROM `strength-primary-plan.ts:3898-3917` DELIBERATELY, not
+   * approximated: run hours = miles x easy pace / 60, ride hours = the typed figure, absent stays
+   * ABSENT rather than becoming zero (§0h — an unknown week is not licence to hand out the
+   * ceiling). `resolveEnduranceTier` is the shared function, so the tier decision itself has exactly
+   * one owner; what is duplicated here is only the two inputs. ⛔ If that derivation moves, this
+   * moves with it.
+   */
+  const accessoryBands = (() => {
+    const miles = typeof state.targetMiles === 'number' && state.targetMiles > 0
+      ? (unit === 'km' ? state.targetMiles / 1.609344 : state.targetMiles)
+      : null;
+    /**
+     * ⚠️ `paceMinPerMile` IS THE SAME NUMBER THE ENGINE RECEIVES — `assemblePayload` sends it as
+     * `easyPaceMinPerMile`. That includes its 10:00/mi fallback for an athlete with no learned pace,
+     * so the card and the plan agree even in the unmeasured case. ⛔ If the payload ever sends a
+     * different figure, this line is the one that starts lying.
+     */
+    const runHours = miles != null && paceMinPerMile > 0 ? (miles * paceMinPerMile) / 60 : null;
+    const rideHours = Number(state.rideHours) > 0 ? Number(state.rideHours) : null;
+    const declared = posturePresent('run') || posturePresent('bike');
+    const totalHours = !declared ? 0
+      : (runHours == null && rideHours == null ? null : (runHours ?? 0) + (rideHours ?? 0));
+    return {
+      now: TIER_BAND[resolveEnduranceTier({ hardDays: hardDayCount, totalHours })],
+      // ⚠️ THE BASELINE IS THE SAME WEEK WITH NO HARD DAYS — which is what makes the line about the
+      // athlete's CHOICE rather than about their volume. A high-volume athlete already in survival
+      // on hours alone sees nothing, because their hard day cost them nothing further.
+      none: TIER_BAND[resolveEnduranceTier({ hardDays: 0, totalHours })],
+    };
+  })();
 
   // "How much" (volume) gate — mirror the schedule gate's "require only what the card renders" rule:
   // the running field shows on posturePresent('run'), the riding field on bike === 'maintain'. Require
