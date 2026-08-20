@@ -1420,11 +1420,17 @@ return (
                                       : `Your recent runs suggest ~${nudge.implied_5k_label}, faster than the ${nudge.manual_5k_label} on file. Update?`}
                                   </p>
                                   <div className="flex items-center gap-2">
+                                    {/* Sport-coloured, like every other selection on this card — the
+                                        generic teal said "a button", not "this is your running data". */}
                                     <button
                                       type="button"
                                       onClick={() => void handleFiveKNudgeYes()}
                                       disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-teal-500/25 text-teal-200 border border-teal-500/40 hover:bg-teal-500/35 disabled:opacity-50"
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl text-white disabled:opacity-50"
+                                      style={{
+                                        backgroundColor: `${SPORT_COLORS.run}26`,
+                                        border: `1px solid ${SPORT_COLORS.run}80`,
+                                      }}
                                     >
                                       Yes
                                     </button>

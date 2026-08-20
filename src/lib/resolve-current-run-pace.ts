@@ -293,10 +293,31 @@ const NULL_TP: ResolvedThresholdPace = {
  * branch, and two copies of "which easy pace counts" is exactly how this fact fractured the first time.
  */
 export function resolveMeasuredEasyPaceSecPerMi(baselines: RunBaselinesLike): number | null {
+  /**
+   * ⛔ THE ATHLETE'S CHOICE IS HONOURED HERE TOO (2026-08-20, seen on screen). This read the LEARNED
+   * value and only it — so an athlete who had selected "use my number" saw their own easy pace on the
+   * card while the threshold beside it was derived from the learned one they had just declined.
+   * Q-174 exists precisely so a chosen number wins, and a derivation FROM easy pace has to obey it or
+   * the two boxes contradict each other in the same card.
+   *
+   * ⛔ WHAT IS STILL REFUSED, AND WHY THIS IS NOT JUST `resolveCurrentRunEasyPace`. That resolver can
+   * answer from `effort_paces.base` — the same VDOT lookup off the same typed 5K that produces the
+   * threshold candidate being bounded. Founding the bound on it would derive the 5K's answer from the
+   * 5K and bound it with itself. A TYPED easy pace is not circular: it is an assertion about the
+   * athlete's own running, independent of any race time.
+   */
+  const pn = baselines?.performance_numbers;
+  const chosen = pn?.easy_pace_source;
+  const manual = parsePaceToSecPerMi(pn?.easyPace ?? pn?.easy_pace);
+  if (chosen === 'manual' && manual != null) return manual;
+
   const raw = baselines?.learned_fitness?.run_easy_pace_sec_per_km;
   const conf = confOf(raw);
-  if (conf !== 'medium' && conf !== 'high') return null;
-  return secPerKmToMi(asPositiveFinite(raw?.value));
+  const learned = (conf === 'medium' || conf === 'high') ? secPerKmToMi(asPositiveFinite(raw?.value)) : null;
+  if (learned != null) return learned;
+
+  // `chosen === 'learned'` means "track my runs" — a declined typed value must not resurface.
+  return chosen === 'learned' ? null : manual;
 }
 
 /**

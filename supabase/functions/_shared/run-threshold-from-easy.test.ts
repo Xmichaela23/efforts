@@ -428,3 +428,32 @@ Deno.test('the typed and 5K states are distinct sentences, and neither says meas
  * the first sixteen mutations caught it. Sweep the range AND run the thing end to end; they fail
  * differently.
  */
+
+Deno.test('the derivation honours the athlete\'s easy-pace CHOICE (Q-174)', () => {
+  // ⛔ SEEN ON SCREEN. He selected "use my number 11:30" and the threshold beside it still read 10:39
+  // — derived from the learned 12:41 he had just declined. Two boxes in one card contradicting.
+  const both = {
+    learned_fitness: { run_easy_pace_sec_per_km: { value: 761 / SEC_PER_KM_TO_SEC_PER_MI, confidence: 'high', sample_count: 18 } },
+    performance_numbers: { easyPace: '11:30', easy_pace_source: 'manual' },
+  };
+  const chosen = resolveCurrentRunThresholdPace(both as never);
+  assertEquals(chosen.sec_per_mi, Math.round(690 / 1.19));   // 11:30 -> 9:40
+  assertEquals(chosen.source, 'derived-from-easy');
+
+  // Tracking the runs instead derives from the learned value.
+  const tracking = resolveCurrentRunThresholdPace({
+    ...both, performance_numbers: { easyPace: '11:30', easy_pace_source: 'learned' },
+  } as never);
+  assertEquals(tracking.sec_per_mi, Math.round(761 / 1.19));
+});
+
+Deno.test('a TYPED easy pace can found the bound; the 5K-derived one still cannot', () => {
+  // An assertion about their own running is independent of the race time. `effort_paces.base` is not.
+  const typed = resolveCurrentRunThresholdPace({ performance_numbers: { easyPace: '10:00' } } as never);
+  assertEquals(typed.sec_per_mi, Math.round(600 / 1.19));
+  assertEquals(typed.source, 'derived-from-easy');
+  // Unchanged: base + steady both from the 5K → no bound, the wizard value stands.
+  const circular = resolveCurrentRunThresholdPace({ effort_paces: { base: 755, steady: 400 } } as never);
+  assertEquals(circular.sec_per_mi, 400);
+  assertEquals(circular.source, 'effort_paces');
+});
