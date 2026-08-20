@@ -1,3 +1,4 @@
+import { resolveCurrentLthr } from '../../../../src/lib/resolve-current-lthr.ts';
 import type { DriftExplanation, FactPacketV1, FlagV1, HrZone, WeatherV1, WorkoutSegmentV1 } from './types.ts';
 import {
   classifyTerrain,
@@ -183,9 +184,20 @@ function deriveWeather(workout: any): WeatherV1 | null {
   };
 }
 
+/**
+ * ⛔ ANCHORED THROUGH THE ONE LTHR RESOLVER (2026-08-19, TRUTH-MAP §5). This read the learned column
+ * raw, so it skipped the D-284 sample-count gate: a `run_threshold_hr` written as "88% of observed
+ * max (estimated)" carries `sample_count: 0`, is a FORMULA rather than a measurement, and can never
+ * anchor a zone band. Five zones were being built off it.
+ *
+ * ⚠️ THE CALLER PASSES ONLY `learned_fitness` TODAY, so the resolver's typed and configured tiers
+ * stay dark here. That is not a regression — those tiers were unreachable before too — and the
+ * function name says learned-fitness. Widening it is a separate change with its own caller audit.
+ */
 function buildZonesFromLearnedFitness(learnedFitness: any): HrZone[] | null {
   try {
-    const thr = coerceNumber(learnedFitness?.run_threshold_hr?.value ?? learnedFitness?.runThresholdHr?.value);
+    const thr = resolveCurrentLthr({ learned_fitness: learnedFitness } as never).bpm
+      ?? coerceNumber(learnedFitness?.runThresholdHr?.value);
     if (thr == null || !(thr > 0)) return null;
     // Conservative 5-zone model anchored to threshold HR.
     // Not perfect, but deterministic and user-specific.

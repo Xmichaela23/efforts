@@ -29,7 +29,8 @@ import { addTimingLogic } from './timing-logic.ts';
 import { resolveCurrentMaxHr, ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 // THE run-pace resolver (D-285/D-287) — the pace ladder here reads through it rather than off
 // `learned_fitness`, so this consumer cannot land on a different number from every other surface.
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import {
   calculateEffortScore,
   getPacesFromScore,
@@ -163,7 +164,8 @@ Deno.serve(async (req: Request) => {
       );
       const { data: ubZones } = await sbZones
         .from('user_baselines')
-        .select('performance_numbers, learned_fitness, configured_hr_zones, birthday')
+        // `effort_paces` added 2026-08-19 — the wizard/VDOT tier of the pace resolvers. Same row, no extra query.
+        .select('performance_numbers, learned_fitness, configured_hr_zones, birthday, effort_paces')
         .eq('user_id', request.user_id)
         .maybeSingle();
       const parse = (v: unknown): Record<string, any> => {
@@ -174,6 +176,7 @@ Deno.serve(async (req: Request) => {
       const pn = parse(ubZones?.performance_numbers);
       const lf = parse(ubZones?.learned_fitness);
       const cfg = parse(ubZones?.configured_hr_zones); // manual overrides / Strava / FIT
+      const ep = parse(ubZones?.effort_paces);
       const num = (v: any): number | undefined => {
         const n = Number(v?.value ?? v);
         return Number.isFinite(n) && n > 0 ? n : undefined;
@@ -197,7 +200,25 @@ Deno.serve(async (req: Request) => {
         { athlete_config: cfg, learned_fitness: lf },
         { sport: 'run', allowAgeEstimate: false },
       ).bpm ?? ageMaxHr;
-      zoneLthr = num(cfg.manual_run_lthr) ?? num(lf.run_threshold_hr) ?? ageLthr;
+      /**
+       * ⛔ THROUGH THE ONE LTHR RESOLVER (2026-08-19, TRUTH-MAP §5). This was a private chain —
+       * manual override, then the learned column, then an age formula — and it skipped the two
+       * checks that chain exists to apply:
+       *
+       *   · **the D-284 sample-count gate.** A learned `run_threshold_hr` written as "88% of observed
+       *     max (estimated)" carries `sample_count: 0`. It is a FORMULA, not a measurement, and the
+       *     resolver refuses it at both its learned tiers. This read took it and anchored every HR
+       *     zone in the marathon block on a number measured from nothing.
+       *   · **the athlete's Q-174 choice.** `lthr_source` was invisible here.
+       *
+       * ⚠️ THE AGE FALLBACK STAYS BELOW IT, and stays here rather than moving into the resolver. The
+       * resolver returns null over an estimate by design (Law 2 — it never invents); this file has
+       * always been willing to fall back to 220−age for zone shaping and says so. That is the
+       * caller's call to make, out loud, not a default to bury in a shared owner.
+       */
+      zoneLthr = resolveCurrentLthr({
+        learned_fitness: lf, performance_numbers: pn, configured_hr_zones: cfg,
+      } as never).bpm ?? ageLthr;
       zoneRestingHr = num(pn.restingHeartRate) ?? num(pn.resting_hr) ?? num(cfg.resting_heart_rate) ?? 60;
       /**
        * ⛔ THE ATHLETE'S SELECTED EASY PACE OUTRANKS EVERYTHING (2026-08-06, Michael's call).
@@ -223,13 +244,22 @@ Deno.serve(async (req: Request) => {
        * score, then nothing (which is the RPE wording, never an invented pace).
        */
       const selectedEasy = resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as never);
-      const thrSecPerKm = num(lf.run_threshold_pace_sec_per_km);
+      /**
+       * ⛔ THE THRESHOLD FALLBACK NOW ASKS THE RESOLVER TOO (2026-08-19, TRUTH-MAP §5). It read
+       * the learned threshold column raw, so it could not see a threshold pace the athlete had
+       * TYPED, could not see their Q-174 choice, and applied no confidence bar — while the line above
+       * it resolved easy pace properly. One tier of one chain, hand-rolled, next to a resolver call.
+       */
+      const thrResolvedForZones = resolveCurrentRunThresholdPace({
+        learned_fitness: lf, performance_numbers: pn, effort_paces: ep,
+      } as never);
       if (selectedEasy.sec_per_mi != null) {
         zoneEasySecPerMi = selectedEasy.sec_per_mi;
         zoneVdot = estimateVdotFromBasePace(selectedEasy.sec_per_mi) ?? undefined;
         console.log(`[PlanGen] pace anchor: SELECTED easy ${selectedEasy.sec_per_mi}s/mi (source=${selectedEasy.source}, confidence=${selectedEasy.confidence ?? '-'}) → vdot ${zoneVdot ?? '-'}`);
-      } else if (thrSecPerKm) {
-        zoneVdot = estimateVdotFromPace(thrSecPerKm * 1.60934) ?? undefined;
+      } else if (thrResolvedForZones.sec_per_mi != null) {
+        // Resolver is sec/MILE already — the raw read's `* 1.60934` went with it.
+        zoneVdot = estimateVdotFromPace(thrResolvedForZones.sec_per_mi) ?? undefined;
       } else if (typeof effortScore === 'number' && effortScore > 0) {
         zoneVdot = effortScore;
       }

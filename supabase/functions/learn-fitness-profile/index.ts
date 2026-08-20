@@ -25,6 +25,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
+  fitRunCriticalSpeed,
+  paceCurveToEfforts,
+  type RunPaceCurve,
+} from '../../../src/lib/run-critical-speed.ts';
+import {
   inferAthleteIdentityV1,
   inferDisciplinesTextArray,
   inferTrainingBackgroundSentence,
@@ -828,6 +833,53 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
     }
   }
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * STEP 5c: THE MEASURED THRESHOLD — FITTED FROM BEST EFFORTS (2026-08-20)
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * ⛔ THIS OUTRANKS STEP 5b, AND STEP 5b IS THE BUG. 5b averages a WHOLE ACTIVITY whose average
+   * heart rate happened to land near threshold. A hill-repeat session averages near threshold heart
+   * rate and its average pace includes every walk back down — which is how a threshold pace slower
+   * than the athlete's own easy pace reached a real screen. Averaging an activity cannot measure a
+   * sustained effort; looking inside it can.
+   *
+   * ⛔ THE BIKE AND THE SWIM ALREADY DO THIS. FTP is learned from the best 20-minute power window;
+   * the swim fits a critical-speed curve across best efforts and abstains when the curve does not
+   * hold. Running was the last discipline still averaging.
+   *
+   * ⚠️ IT ABSTAINS OFTEN, AND THAT IS CORRECT. It needs at least two genuinely hard efforts in
+   * DIFFERENT duration bands. An athlete whose hard running is all hill repeats has one band and
+   * gets nothing — at which point 5b's read, and below that the easy-pace derivation in
+   * `resolveCurrentRunThresholdPace`, are what answer. The tiers stack; none of them was removed.
+   *
+   * ⚠️ NO BACKFILL (Michael's call). `pace_curve` is written by `compute-workout-analysis` at
+   * analysis time, so it lands on runs from here forward and older runs carry none. Until two
+   * qualifying efforts accumulate this returns null and nothing changes.
+   */
+  const csEfforts = runs.flatMap((r) =>
+    paceCurveToEfforts((r.computed as { pace_curve?: RunPaceCurve } | null)?.pace_curve, String(r.date ?? ''))
+  );
+  if (csEfforts.length > 0) {
+    const fit = fitRunCriticalSpeed(
+      csEfforts,
+      thresholdHRValue ?? null,
+      // The invariant's reference — the easy pace THIS pass just learned, in the same sec/km unit.
+      Number.isFinite(Number(easy_pace?.value)) ? Number(easy_pace!.value) : null,
+    );
+    console.log(`  📊 Run critical speed: ${fit.csSecPerKm ?? 'abstained'} — ${fit.reason}`);
+    if (fit.csSecPerKm != null) {
+      threshold_pace = {
+        value: fit.csSecPerKm,
+        // The fit's own tiers map straight across; `low` still means "visible, not steerable".
+        confidence: fit.confidence === 'high' ? 'high' : (fit.confidence === 'moderate' ? 'medium' : 'low'),
+        source: `critical speed from ${fit.nPoints} best-effort windows (R² ${fit.r2})`,
+        sample_count: fit.nPoints,
+        as_of: newestDate(runs.filter((r) => (r.computed as { pace_curve?: unknown } | null)?.pace_curve)),
+      };
+    }
+  }
+
   return {
     easy_hr,
     threshold_hr,
@@ -927,7 +979,49 @@ export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
 
     console.log(`  📊 Threshold candidates (power-filtered): ${thresholdCandidates.length}`);
 
-    if (thresholdCandidates.length >= 2) {
+    /**
+     * ⛔ THE HEART RATE DURING THE BEST 20-MINUTE POWER EFFORT (2026-08-20). Tried FIRST, because the
+     * filter above cannot work for most riders and the fallback beneath it is a formula.
+     *
+     * ⛔ WHY THE FILTER FAILS. It requires a WHOLE RIDE to average 85-95% of max heart rate. Real
+     * rides do not: you coast, you descend, you stop at lights. On a real account — 20 rides, high
+     * confidence on max HR — it found ZERO candidates and published `90% of observed max (estimated)`,
+     * sample_count 0, which every consumer then treated as this athlete's cycling threshold. It is the
+     * same defect the RUN threshold pace had, one sport over: judging a sustained effort by an average
+     * over an activity that was not sustained.
+     *
+     * ⛔ AND THE EFFORT WAS ALREADY IDENTIFIED. `power_curve['20min']` is the best 20 minutes of
+     * pedalling in the ride, and the FTP tier below already trusts it enough to derive FTP from it at
+     * 95%. If it is a threshold effort for power it is a threshold effort for heart rate. The only
+     * thing missing was the heart rate during it — now carried as `power_curve._hr`
+     * (`compute-workout-analysis:calculatePowerCurve`).
+     *
+     * ⚠️ THE BEST EFFORT, NOT THE MEDIAN. FTP takes `Math.max` of the 20-minute bests; this takes the
+     * heart rate from THAT SAME ride, so the two anchors describe one effort instead of two.
+     *
+     * ⚠️ NO BACKFILL. `_hr` is written at analysis time, so it lands on rides from here forward.
+     * Until two carry it, the tiers below still answer.
+     */
+    const twentyMinEfforts = rides
+      .map((r) => ({
+        power: Number(r.computed?.power_curve?.['20min']) || 0,
+        hr: Number(r.computed?.power_curve?._hr?.['20min']) || 0,
+      }))
+      .filter((e) => e.power > 50 && e.hr > 0
+        // Plausibility, not judgement: a threshold heart rate sits below max and well above resting.
+        && e.hr < observedMaxHR && e.hr > observedMaxHR * 0.6)
+      .sort((a, b) => b.power - a.power);
+
+    if (twentyMinEfforts.length >= 1) {
+      const best = twentyMinEfforts[0];
+      threshold_hr = {
+        value: Math.round(best.hr),
+        confidence: twentyMinEfforts.length >= 3 ? 'high' : (twentyMinEfforts.length >= 2 ? 'medium' : 'low'),
+        source: `HR during best 20-min power effort (${best.power}W, ${twentyMinEfforts.length} efforts on file)`,
+        sample_count: twentyMinEfforts.length,
+      };
+      console.log(`  💓 Threshold HR from the 20-min power window: ${threshold_hr.value} bpm at ${best.power}W`);
+    } else if (thresholdCandidates.length >= 2) {
       // Take the HIGHER end of the HR range (true threshold, not tempo)
       const sortedHRs = thresholdCandidates.map(r => r.avg_heart_rate).sort((a, b) => b - a); // Descending
       // Take 25th percentile from top (not median - we want hard efforts, not average)

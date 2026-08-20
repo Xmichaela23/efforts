@@ -14,6 +14,8 @@
 // - Designed to be <500ms under normal DB conditions
 // =============================================================================
 
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 
@@ -164,7 +166,19 @@ function isComparableZ2Run(
   const lf = typeof learnedFitness === 'string' ? parseJson<any>(learnedFitness) : learnedFitness;
   const easyHrMetric: LearnedMetric | null = lf?.run_easy_hr ?? null;
   const easyHrConf = confidenceToNumber(easyHrMetric?.confidence);
-  const thresholdHrMetric: LearnedMetric | null = lf?.run_threshold_hr ?? null;
+  /**
+   * ⛔ THROUGH THE ONE LTHR RESOLVER (2026-08-19, TRUTH-MAP §5). The raw read skipped the D-284
+   * sample-count gate — a `run_threshold_hr` written as "88% of observed max (estimated)" carries
+   * `sample_count: 0`, is a formula rather than a measurement, and must never anchor a Z2 band —
+   * and it ignored the athlete's Q-174 choice.
+   */
+  const thresholdResolved = resolveCurrentLthr({
+    learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: null,
+  } as never);
+  const thresholdHrMetric: LearnedMetric | null =
+    thresholdResolved.bpm != null
+      ? ({ value: thresholdResolved.bpm, confidence: thresholdResolved.confidence ?? undefined } as LearnedMetric)
+      : null;
   const thresholdHrConf = confidenceToNumber(thresholdHrMetric?.confidence);
 
   let z2Lower: number;
@@ -200,12 +214,22 @@ function isComparableZ2Run(
   // Optional pace gate using manual easy pace baseline (reduces false negatives when HR is noisy)
   const avgPace = Number(workout?.avg_pace); // sec/km
   const lf2 = lf;
-  const learnedEasyPaceMetric: LearnedMetric | null = lf2?.run_easy_pace_sec_per_km ?? null;
-  const learnedEasyPaceConf = confidenceToNumber(learnedEasyPaceMetric?.confidence);
-  const baselineEasySecPerKm =
-    learnedEasyPaceMetric?.value && learnedEasyPaceConf >= 0.35
-      ? Number(learnedEasyPaceMetric.value)
-      : parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
+  /**
+   * ⛔ THROUGH THE ONE EASY-PACE RESOLVER (2026-08-19). This was a private two-tier chain — learned
+   * above a 0.35 confidence bar, else the typed value — which is the resolver's chain with a
+   * different bar and without the athlete's Q-174 choice. An athlete who said "use my number" had it
+   * overridden here by a low-confidence learned pace.
+   *
+   * ⚠️ The resolver is sec/MILE; this gate works in sec/KM (it compares against `workout.avg_pace`).
+   * Converted once, here.
+   */
+  const resolvedEasy = resolveCurrentRunEasyPace({
+    learned_fitness: lf2, performance_numbers: perfNumbers,
+  } as never);
+  const learnedEasyPaceConf = confidenceToNumber(resolvedEasy.confidence ?? undefined);
+  const baselineEasySecPerKm = resolvedEasy.sec_per_mi != null
+    ? resolvedEasy.sec_per_mi / 1.60934
+    : parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
   if (!Number.isFinite(avgPace) || !(avgPace > 0)) {
     // If HR matches our easy range, we can still accept and store pace as missing (but aerobic efficiency can't be computed).
     // For comparability gating, treat missing pace as non-comparable to keep the metric clean.
@@ -254,8 +278,11 @@ function isComparableZ2Run(
         hrLooksEasy,
         hrHardCap,
         notClearlyHard,
-        learned_easy_pace_sec_per_km: learnedEasyPaceMetric?.value ?? null,
-        learned_easy_pace_conf: learnedEasyPaceMetric?.confidence ?? null,
+        // The debug receipt reports what was actually USED, and now says where it came from —
+        // `source` is the resolver's tier, so a typed pace can no longer be logged as a learned one.
+        learned_easy_pace_sec_per_km: resolvedEasy.sec_per_mi != null ? resolvedEasy.sec_per_mi / 1.60934 : null,
+        learned_easy_pace_conf: resolvedEasy.confidence ?? null,
+        easy_pace_source: resolvedEasy.source ?? null,
       },
     };
   }
@@ -278,8 +305,9 @@ function isComparableZ2Run(
       hrLooksEasy,
       hrHardCap,
       notClearlyHard,
-      learned_easy_pace_sec_per_km: learnedEasyPaceMetric?.value ?? null,
-      learned_easy_pace_conf: learnedEasyPaceMetric?.confidence ?? null,
+      learned_easy_pace_sec_per_km: resolvedEasy.sec_per_mi != null ? resolvedEasy.sec_per_mi / 1.60934 : null,
+      learned_easy_pace_conf: resolvedEasy.confidence ?? null,
+      easy_pace_source: resolvedEasy.source ?? null,
     },
   };
 }

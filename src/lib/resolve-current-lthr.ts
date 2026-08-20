@@ -1,5 +1,20 @@
 /**
- * Shared resolver for the athlete's current run LACTATE-THRESHOLD HEART RATE (LTHR) — the single
+ * ⛔ PER SPORT AS OF 2026-08-20 — pass `{ sport: 'ride' }` for the bike. The default is `run`, so
+ * every existing caller is unchanged.
+ *
+ * The bike had NO owner for this fact and three files read `ride_threshold_hr` raw
+ * (`compute-workout-analysis`, `calculate-workload`, `_shared/ride-easy-hr.ts`), each with its own
+ * fallback order and none with the sample-count gate. Adding a `sport` option rather than a second
+ * `resolveCurrentRideLthr` follows the precedent this codebase already set for the same shape:
+ * `resolve-current-max-hr.ts` keeps run and ride peaks apart behind one `opts.sport`. Two functions
+ * for one fact is how the anchors fractured the first time.
+ *
+ * ⚠️ THE SPORTS DO NOT SHARE A NUMBER, and that is the point of the switch rather than a nicety.
+ * Running heart rate sits 5-10 bpm above cycling at the same effort — the same fact Q-169 fixed in
+ * the easy band — so a bike anchor used for a run reads every run zone low, and the reverse reads
+ * every ride zone high.
+ *
+ * Shared resolver for the athlete's current LACTATE-THRESHOLD HEART RATE (LTHR) — the single
  * source of truth for the anchor that every HR interpretation hangs off (easy band, HR zones, the
  * zone bins → 80/20 read, the load/intensity ladder, the coach's HR bins).
  *
@@ -48,20 +63,53 @@ type LearnedThr = {
 } | number | string | null | undefined;
 
 export type BaselinesLike = {
-  learned_fitness?: { run_threshold_hr?: LearnedThr } | null;
+  learned_fitness?: { run_threshold_hr?: LearnedThr; ride_threshold_hr?: LearnedThr } | null;
   performance_numbers?: {
     threshold_heart_rate?: number | string | null;
     thresholdHeartRate?: number | string | null;
     lthr_source?: 'manual' | 'learned' | null;
   } | null;
   configured_hr_zones?: {
+    /**
+     * ⛔ THE RUN-SPECIFIC MANUAL OVERRIDE, AND IT WAS NOT READ HERE UNTIL 2026-08-19.
+     *
+     * `TrainingBaselines.tsx:717` writes FOUR per-sport overrides (`manual_run_lthr`,
+     * `manual_ride_lthr`, and the two max-HR twins) alongside a single sport-AGNOSTIC
+     * `threshold_heart_rate`. This resolver read only the agnostic one — so an athlete who typed a
+     * run LTHR had it ignored by every surface that asks this resolver, while
+     * `generate-run-plan:202` (the MARATHON builder) read `manual_run_lthr` directly and got it.
+     * Two answers, one athlete, and the one the plan used was the one nobody could see.
+     *
+     * ⚠️ AND THE AGNOSTIC KEY CAN HOLD A BIKE NUMBER. `TrainingBaselines.tsx:702` sets
+     * `threshold_heart_rate = effectiveRunLTHR || effectiveRideLTHR` — so for an athlete with a bike
+     * LTHR and no run one, this RUN resolver was returning a CYCLING threshold. Running HR sits
+     * 5-10 bpm above cycling at the same effort (the same fact Q-169 fixed in the easy band), so it
+     * anchors every run zone too low.
+     *
+     * ⚠️ THE RESIDUAL LEAK IS NOT CLOSED, DELIBERATELY. Preferring the run key fixes it whenever the
+     * athlete typed one. When they did not, `threshold_heart_rate` may still be a bike number and
+     * this resolver cannot tell — the field carries no sport. Closing that needs the WRITER to stop
+     * collapsing two sports into one key, which is a change to `TrainingBaselines`, not a detector
+     * bolted on here. Recorded rather than guessed at.
+     */
+    manual_run_lthr?: number | string | null;
+    /** The bike's own typed override, written beside the run one by `TrainingBaselines.tsx:718`. */
+    manual_ride_lthr?: number | string | null;
     threshold_heart_rate?: number | string | null;
     source?: string | null;
   } | null;
 } | null | undefined;
 
 /** Optional per-call context a workout-aware caller can supply for the lowest (device) tier. */
-export type LthrResolveOpts = { deviceThresholdHr?: number | string | null };
+export type LthrResolveOpts = {
+  deviceThresholdHr?: number | string | null;
+  /**
+   * Which sport's anchor. Default `run` — every pre-2026-08-20 caller passes nothing and keeps the
+   * behaviour it had. Matched loosely (`ride`/`bike`/`cycling`) exactly as `resolveCurrentMaxHr` does,
+   * because callers hand this a raw `workout.type` string.
+   */
+  sport?: 'run' | 'ride' | string | null;
+};
 
 const NULL_RESULT: ResolvedLthr = {
   bpm: null, source: null, confidence: null, sample_count: null, as_of: null, is_estimate: false,
@@ -75,9 +123,12 @@ function asPositiveFinite(v: unknown): number | null {
 
 export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveOpts): ResolvedLthr {
   if (!baselines) return NULL_RESULT;
+  const isRide = String(opts?.sport ?? '').toLowerCase().match(/ride|bike|cycl/) != null;
 
   // Learned value — normalise the {value, confidence, sample_count, as_of} shape (or a bare number).
-  const learnedRaw = baselines.learned_fitness?.run_threshold_hr;
+  const learnedRaw = isRide
+    ? baselines.learned_fitness?.ride_threshold_hr
+    : baselines.learned_fitness?.run_threshold_hr;
   const learnedObj = (learnedRaw != null && typeof learnedRaw === 'object') ? learnedRaw : null;
   const learnedValue = asPositiveFinite(learnedObj ? learnedObj.value : learnedRaw);
   const learnedConf = String(learnedObj?.confidence ?? '').toLowerCase();
@@ -95,9 +146,25 @@ export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveO
   const learnedTrusted = learnedUsable && (learnedConf === 'medium' || learnedConf === 'high');
 
   const pn = baselines.performance_numbers;
-  const manualValue = asPositiveFinite(pn?.threshold_heart_rate)
-    ?? asPositiveFinite(pn?.thresholdHeartRate)
-    ?? asPositiveFinite(baselines.configured_hr_zones?.threshold_heart_rate);
+  // ⛔ SPORT-SPECIFIC BEFORE SPORT-AGNOSTIC. `manual_run_lthr` is unambiguously a RUN number;
+  // `threshold_heart_rate` is whichever sport the writer happened to call primary. See the type above.
+  /**
+   * ⛔ THE SPORT-AGNOSTIC FIELD IS READ FOR THE RUN AND REFUSED FOR THE BIKE, and the asymmetry is
+   * deliberate. `TrainingBaselines.tsx:702` computes it as `runLTHR || rideLTHR` — run PREFERRED. So
+   * for a run it is right far more often than not, and for a RIDE it is most likely the run's number,
+   * which is 5-10 bpm too high for the same effort on a bike. The bike has its own typed field; when
+   * that is empty the honest answer is to fall through to the learned ride value, not to borrow the
+   * run's.
+   *
+   * ⚠️ The residual run-side leak (agnostic field holding a bike number when the athlete has no run
+   * one) is unchanged and still open — it needs the WRITER to stop collapsing two sports into one key.
+   */
+  const manualValue = isRide
+    ? asPositiveFinite(baselines.configured_hr_zones?.manual_ride_lthr)
+    : (asPositiveFinite(baselines.configured_hr_zones?.manual_run_lthr)
+        ?? asPositiveFinite(pn?.threshold_heart_rate)
+        ?? asPositiveFinite(pn?.thresholdHeartRate)
+        ?? asPositiveFinite(baselines.configured_hr_zones?.threshold_heart_rate));
 
   const deviceValue = asPositiveFinite(opts?.deviceThresholdHr);
 

@@ -73,7 +73,12 @@ Deno.test('⛔ THE WIRING: the SELECTED easy pace is the FIRST rung, ahead of th
     return i;
   };
   const selection = at('selectedEasy.sec_per_mi != null');
-  const threshold = at('estimateVdotFromPace(thrSecPerKm');
+  // ⚠️ THE NEEDLE MOVED 2026-08-19, THE RULE DID NOT. The threshold rung used to read
+  // `lf.run_threshold_pace_sec_per_km` raw into a local `thrSecPerKm`; it now goes through
+  // `resolveCurrentRunThresholdPace` like every other anchor read (TRUTH-MAP §5), so the variable
+  // changed name and the sec/km→sec/mi conversion went with it. What this test pins — selection
+  // first, threshold second, 5K score last — is unchanged.
+  const threshold = at('estimateVdotFromPace(thrResolvedForZones.sec_per_mi');
   const effort = at('zoneVdot = effortScore');
 
   assert(selection < threshold, 'the selected easy pace must be tried FIRST');
@@ -84,6 +89,19 @@ Deno.test('⛔ THE WIRING: the SELECTED easy pace is the FIRST rung, ahead of th
     SRC.includes('resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn }'),
     'the selection must be read through the ONE run-pace resolver',
   );
+  // ⛔ AND SO MUST THE THRESHOLD RUNG (2026-08-19). It read the raw column while the line above it
+  // resolved properly — one hand-rolled tier sitting next to a resolver call, blind to a typed
+  // threshold and to the athlete's Q-174 choice, with no confidence bar.
+  assert(
+    SRC.includes('resolveCurrentRunThresholdPace({'),
+    'the threshold rung must be read through the ONE threshold resolver, not off learned_fitness',
+  );
+  assert(
+    !/lf\.run_threshold_pace_sec_per_km/.test(SRC),
+    'generate-run-plan must not read the raw threshold column again — note this check is '
+      + 'comment-BLIND on purpose, unlike the anchor lint: naming the column in prose here trips it, '
+      + 'which is the cheapest possible reminder not to reintroduce the read by copy-paste.',
+  );
   // The exact selected number travels too — the VDOT round trip is lossy and the athlete is looking
   // at the pace they picked.
   assert(
@@ -92,7 +110,7 @@ Deno.test('⛔ THE WIRING: the SELECTED easy pace is the FIRST rung, ahead of th
   );
   // The fallbacks are an if/else chain: nothing below may overwrite the selection.
   assert(
-    /} else if \(thrSecPerKm\) \{/.test(SRC),
+    /} else if \(thrResolvedForZones\.sec_per_mi != null\) \{/.test(SRC),
     'the fallbacks are no longer exclusive — something below can overwrite the selection',
   );
 });

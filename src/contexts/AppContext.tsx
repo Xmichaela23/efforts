@@ -110,6 +110,14 @@ interface BaselineData {
     strength?: string[];
   };
   lastUpdated?: string;
+  /** The auto-learned fitness profile. Returned by `loadUserBaselines`; read via the shared resolvers. */
+  learned_fitness?: Record<string, any> | null;
+  /**
+   * Wizard/VDOT training paces (`{ base, race, steady, power, speed }`, sec/MILE) — the third input
+   * every pace resolver takes. Declared 2026-08-19: it was being fetched by `select('*')` and
+   * dropped on the way out, so client surfaces resolved paces with the wizard tier invisible.
+   */
+  effort_paces?: Record<string, any> | null;
 }
 
 interface AppContextType {
@@ -477,6 +485,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastUpdated: data.updated_at,
         // Auto-learned fitness profile
         learned_fitness: data.learned_fitness || null,
+        // ⛔ ADDED 2026-08-19. `select('*')` had always fetched it and this return silently dropped
+        // it, so every client surface resolving a pace was handed two of the resolver's three inputs
+        // and could not see the wizard/VDOT tier at all. Purely additive.
+        effort_paces: data.effort_paces || null,
       };
     } catch (error) {
       console.error('Error in loadUserBaselines:', error);

@@ -21,7 +21,16 @@ export type ArcFiveKLearnedDivergence = {
   manual_5k_label: string;
   implied_5k_total_sec: number;
   implied_5k_label: string;
+  /** manual − implied; positive = the saved 5K is SLOWER than the training data suggests. */
   gap_sec: number;
+  /**
+   * Which way the disagreement runs (2026-08-19). `stale-fast` — the saved 5K is FASTER than recent
+   * running — is the direction the old flag treated as fine, and it is the expensive one: every pace
+   * derived from that 5K comes out faster than current fitness.
+   */
+  direction: 'stale-fast' | 'behind' | 'aligned';
+  /** Where the training-side number came from, so a surface can say so (Law 3). */
+  evidence: 'measured' | 'derived-from-easy' | 'stated';
   message: string;
 };
 

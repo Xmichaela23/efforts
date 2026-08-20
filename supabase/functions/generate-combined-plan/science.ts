@@ -25,17 +25,21 @@ import type { Phase, Sport, Intensity, Priority, RunObservedFitness, PerDiscipli
 //     if any week in the worsening window has acwr > 1.3, or both weeks are null.
 //     The improving path has NO acwr gate (fitness gains under load are
 //     unambiguous).
-//   - Confidence gating: mirrors arc-context.ts:learnedThresholdPaceUsable
+//   - Confidence gating: mirrors resolveCurrentRunThresholdPace (src/lib/resolve-current-run-pace.ts)
 //     (`medium`/`high` + sample_count ≥ 2 to be usable; otherwise observed wins
 //     when sufficient or baseline-default when both insufficient).
 // All values locked at spec level. Specs do NOT relitigate; this helper is a pure
 // implementation of the locked decision tree.
 
-const RUN_PACE_DIVERGENCE_THRESHOLD = 0.04;            // ±4% sustained
+// ⛔ EXPORTED (2026-08-19) SO THERE IS EXACTLY ONE OF IT. `_shared/arc-context.ts` needs the same
+// ±4% band to decide when a typed 5K has drifted from the athlete's recent running, and the
+// alternative was a second divergence number chosen independently for the same question. The value
+// and its spec are unchanged — only its visibility.
+export const RUN_PACE_DIVERGENCE_THRESHOLD = 0.04;     // ±4% sustained
 const RUN_PACE_WORSENING_CONSECUTIVE_WEEKS = 2;        // safety-favored fast trigger
 const RUN_PACE_IMPROVING_CONSECUTIVE_WEEKS = 4;        // slow trigger; protects against PR-week false positives
 const RUN_PACE_ACWR_GATE_THRESHOLD = 1.3;              // sports-science convention; >1.3 = caution / overload
-const RUN_PACE_MIN_SAMPLE_COUNT = 2;                   // baseline-side; mirrors learnedThresholdPaceUsable
+const RUN_PACE_MIN_SAMPLE_COUNT = 2;                   // baseline-side; mirrors resolveCurrentRunThresholdPace
 
 /**
  * Resolution outcome from `resolveRunEasyPace`. Carries the chosen pace value

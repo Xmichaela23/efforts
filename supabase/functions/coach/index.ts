@@ -3766,8 +3766,15 @@ Deno.serve(async (req) => {
           strong: false, // v1: effort/ledger are direction-only (no magnitude tier) → cannot solo-escalate
         });
         // anchorThin from LTHR confidence (Q-146): low/absent → thin (describes, never solo-escalates / no baseline).
-        const _lthrConf = String((learnedFitness as any)?.run_threshold_hr?.confidence || '');
-        const anchorThin = _lthrConf !== 'medium' && _lthrConf !== 'high';
+        // ⛔ THE ANCHOR'S CONFIDENCE COMES FROM THE OWNER (2026-08-19, TRUTH-MAP §5). Reading the raw
+        // column's `confidence` judged a value the coach may not even be using: it ignored the
+        // athlete's Q-174 choice and the D-284 sample-count gate, so a formula-derived LTHR with
+        // `sample_count: 0` could report `high` and clear the thin check.
+        // Only `learned_fitness` is in scope here (`arc.learned_fitness`, :1859) — the same input the
+        // raw read had. The typed/configured tiers stay dark, exactly as before; what is GAINED is the
+        // sample-count gate and one normalisation of the confidence string.
+        const _lthrResolved = resolveCurrentLthr({ learned_fitness: learnedFitness } as never);
+        const anchorThin = _lthrResolved.confidence !== 'medium' && _lthrResolved.confidence !== 'high';
         // This week's easy runs → mean HR drift, gate-filtered per-session (intent-easy proxy =
         // below-threshold HR; non-negative drift) BEFORE the mean, so it inherits the gate's honesty.
         const _easyRunDrifts = dailyLedger

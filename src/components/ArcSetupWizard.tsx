@@ -18,6 +18,8 @@
  * Step 10 — Start date + notes + confirm
  */
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
@@ -1470,12 +1472,21 @@ function Step4Bike({
   const canContinue = state.hasGroupRide !== null &&
     (state.hasGroupRide === false || (!!state.groupRideDay && state.groupRideIntensity !== null));
 
+  /**
+   * ⛔ THE LEARNED FTP WAS NEVER REACHED HERE (fixed 2026-08-19). `learned_fitness.ride_ftp_estimated`
+   * is stored as `{ value, confidence, … }` (`learn-fitness-profile:352`), and this tested
+   * `typeof … === 'number'` — which an object never is. So a rider whose FTP was learned from riding
+   * was told in season setup that no FTP was on file, while every other surface resolved it fine.
+   *
+   * ⛔ AND THE ORDER WAS INVERTED. This read manual FIRST; `resolveCurrentFtp` is learned-first at
+   * medium/high confidence, then manual — the precedence D-240 settled and the whole app uses. The
+   * wizard was quoting a different FTP from the one the plan would be built with.
+   */
   const ftp = (() => {
-    const manual = arc?.performanceNumbers?.ftp ?? arc?.performanceNumbers?.FTP;
-    if (typeof manual === 'number' && manual > 0) return Math.round(manual);
-    const learned = arc?.learnedFitness?.ride_ftp_estimated;
-    if (typeof learned === 'number' && learned > 0) return Math.round(learned);
-    return null;
+    const v = resolveCurrentFtp({
+      learned_fitness: arc?.learnedFitness, performance_numbers: arc?.performanceNumbers,
+    } as never).value;
+    return typeof v === 'number' && v > 0 ? Math.round(v) : null;
   })();
 
   const bikeNote = arc
@@ -1689,8 +1700,20 @@ function Step5Run({
     }
     return null;
   };
-  const threshSec = readLearnedPace('run_threshold_pace_sec_per_km');
-  const easySec   = readLearnedPace('run_easy_pace_sec_per_km');
+  /**
+   * ⛔ THROUGH THE RESOLVERS (2026-08-19). `readLearnedPace` saw the learned column and nothing else,
+   * so the note said "No threshold pace on file" for an athlete who had typed one, or whose threshold
+   * is now worked out from their measured easy runs. It was telling them the app knew less than it did.
+   * Both are sec/KM here — that is what `fmtPaceKm` prints — so the sec/MILE resolvers convert once.
+   */
+  const _resolvedThresh = resolveCurrentRunThresholdPace({
+    learned_fitness: arc?.learnedFitness, performance_numbers: arc?.performanceNumbers,
+  } as never);
+  const _resolvedEasy = resolveCurrentRunEasyPace({
+    learned_fitness: arc?.learnedFitness, performance_numbers: arc?.performanceNumbers,
+  } as never);
+  const threshSec = _resolvedThresh.sec_per_km;
+  const easySec = _resolvedEasy.sec_per_mi != null ? Math.round(_resolvedEasy.sec_per_mi / 1.609344) : null;
   const runPaceNote = arc
     ? threshSec
       ? easySec
@@ -2557,12 +2580,17 @@ function Step9Confirm({
     }
     return null;
   };
-  const ftpManual = arc?.performanceNumbers?.ftp ?? arc?.performanceNumbers?.FTP;
-  const ftp = (typeof ftpManual === 'number' && ftpManual > 0)
-    ? Math.round(ftpManual)
-    : typeof arc?.learnedFitness?.ride_ftp_estimated === 'number'
-      ? Math.round(arc.learnedFitness.ride_ftp_estimated as number) : null;
-  const threshSec = readPace('run_threshold_pace_sec_per_km');
+  // Same fix as the bike-note block above — see the comment there for why the old read could not fire.
+  const ftp = (() => {
+    const v = resolveCurrentFtp({
+      learned_fitness: arc?.learnedFitness, performance_numbers: arc?.performanceNumbers,
+    } as never).value;
+    return typeof v === 'number' && v > 0 ? Math.round(v) : null;
+  })();
+  // Same resolver as the run-pace note — see that comment.
+  const threshSec = resolveCurrentRunThresholdPace({
+    learned_fitness: arc?.learnedFitness, performance_numbers: arc?.performanceNumbers,
+  } as never).sec_per_km;
   const fitnessLines: string[] = [];
   if (arc && arc.swimSessions28 > 0) fitnessLines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
   if (arc && arc.runSessions28 > 0) fitnessLines.push(`Run: ${arc.runSessions28} sessions in last 4 weeks`);

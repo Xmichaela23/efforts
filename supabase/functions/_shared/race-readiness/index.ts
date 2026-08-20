@@ -1,3 +1,4 @@
+import { resolveCurrentRunThresholdPace } from '../../../../src/lib/resolve-current-run-pace.ts';
 import { estimateVdotFromPace, getTargetTime, getPacesFromScore, formatPace } from '../../generate-run-plan/effort-score.ts';
 
 // =============================================================================
@@ -121,24 +122,39 @@ function formatDelta(deltaSeconds: number): string {
 }
 
 function resolveThresholdPaceSecPerMi(input: RaceReadinessInput): { pace: number; source: 'observed' | 'plan_targets' } | null {
-  const lf = input.learnedFitness;
-  if (lf?.run_threshold_pace_sec_per_km != null) {
-    // LearnedMetric is stored as { value, confidence, ... } — extract .value if object
-    const raw = lf.run_threshold_pace_sec_per_km;
-    const secPerKm = Number(typeof raw === 'object' && raw !== null ? (raw as any).value : raw);
-    if (Number.isFinite(secPerKm) && secPerKm > 0) {
-      return { pace: secPerKm * KM_TO_MI, source: 'observed' };
-    }
+  /**
+   * ⛔ THIS WAS A PRIVATE COPY OF THE RESOLVER'S TIER CHAIN (routed 2026-08-19, TRUTH-MAP §5).
+   *
+   * It read `learned_fitness.run_threshold_pace_sec_per_km` raw — **with no confidence gate** — then
+   * fell through to `effort_paces.steady`. That is the shared resolver's chain, minus every check
+   * the shared resolver applies: the athlete's Q-174 choice, the three typed spellings, the
+   * medium/high bar, and (since 2026-08-19) the bound that stops a stale 5K prescribing a threshold
+   * faster than the athlete's own measured easy pace can support.
+   *
+   * ⚠️ SAME `observed` RULE AS THE SPINE, DELIBERATELY. Only a MEASURED value earns `observed`; a
+   * typed number, the 5K-derived pace and the easy-pace derivation are all legitimate answers for
+   * prescribing and none of them is a measurement to judge race readiness against. That mirrors
+   * `compute-snapshot` and `race-projections.ts` rather than inventing a third opinion.
+   */
+  const resolved = resolveCurrentRunThresholdPace({
+    learned_fitness: input.learnedFitness as never,
+    performance_numbers: input.performanceNumbers as never,
+    effort_paces: input.effortPaces as never,
+  });
+  if (resolved.sec_per_mi != null) {
+    return { pace: resolved.sec_per_mi, source: resolved.source === 'learned' ? 'observed' : 'plan_targets' };
   }
 
   const ep = input.effortPaces;
-  if (ep?.steady != null) {
-    const steady = Number(ep.steady);
-    if (Number.isFinite(steady) && steady > 0) {
-      return { pace: steady, source: 'plan_targets' };
-    }
-  }
-
+  /**
+   * ⚠️ TWO LEGACY SPELLINGS THE RESOLVER DOES NOT KNOW, KEPT ON PURPOSE. `threshold_pace` and
+   * `thresholdPace` have **no writer anywhere in this repo** (grep 2026-08-19 — the only hits are
+   * three files READING them: here, `course-detail:295`, `course-strategy:434`). They are almost
+   * certainly dead. But `performance_numbers` is JSONB and rows written by older versions of this app
+   * can carry keys the current code never emits, and reading one costs nothing and sits BELOW the
+   * resolver, so it cannot become a second authority. `threshold_pace_sec_per_mi` is now redundant —
+   * the resolver owns it — and is left only so this list reads as one legacy group.
+   */
   const pn = input.performanceNumbers as Record<string, unknown> | null | undefined;
   const thresholdFromPn =
     pn?.threshold_pace ??

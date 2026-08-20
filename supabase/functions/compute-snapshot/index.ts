@@ -58,6 +58,9 @@ import { resolvePlanWeekIndex } from "../_shared/plan-week.ts";
 import { computeEfficiencyIndex } from "../_shared/efficiency-index.ts"; // ONE efficiency formula (grade-adjusted feed)
 import { projectStandardRaces } from "../_shared/race-readiness/index.ts"; // goal-free VDOT 5k/10k/half/marathon
 import { deriveSnapshotWatermark } from "./watermark.ts";
+// ⛔ THE ANCHOR RULE (TRUTH-MAP §5): a reference anchor is read through its resolver, never off the
+// raw column. The spine had its own private chain for threshold pace — see the block below.
+import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current-run-pace.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1108,7 +1111,9 @@ serve(async (req: Request) => {
         let strengthBaselines: Record<string, number> | null = null;
         let ub: any = null;
         try {
-          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness").eq("user_id", userId).maybeSingle();
+          // `effort_paces` added 2026-08-19: it is the wizard/VDOT tier of the pace resolvers, and without
+          // it the resolver answers with one of its three inputs missing. Same row, no extra query.
+          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness, effort_paces").eq("user_id", userId).maybeSingle();
           ub = r.data;
           strengthBaselines = buildStrengthBaselines(ub?.performance_numbers, ub?.learned_fitness?.strength_1rms);
         } catch { /* non-fatal */ }
@@ -1226,23 +1231,48 @@ serve(async (req: Request) => {
         // projectStandardRaces from the longest recent run's DURATION. Attached to runFitness (by reference,
         // so toStateTrendsV1's display.runFitness carries it). Non-fatal — never breaks the snapshot.
         try {
+          /**
+           * ⛔ THE SPINE HAD ITS OWN THRESHOLD-PACE CHAIN, AND IT CHECKED NOTHING (fixed 2026-08-19).
+           *
+           * It read `learned_fitness.run_threshold_pace_sec_per_km` straight — **with no confidence
+           * gate at all** — then fell back to `performance_numbers.threshold_pace`, a spelling
+           * **nothing in this codebase writes** (verified by grep: the only hits are a local variable
+           * in the learner and the unrelated `swim_threshold_pace`). So the fallback was dead and the
+           * primary was unguarded. `resolveCurrentRunThresholdPace` refuses a low-confidence read;
+           * this took it.
+           *
+           * ⚠️ WHAT SAVED IT WAS A DIFFERENT GUARD, WHICH IS NOT THE SAME AS BEING SAFE. The 8-run
+           * floor on `projRobust` below withheld the projection when a contaminated 2-run threshold
+           * was on file. Right outcome, wrong reason — a bad read from 8+ runs would have printed a
+           * race time to the second on the State screen.
+           *
+           * ⚠️ WHAT CHANGES, HONESTLY: very little today, because that 8-run floor dominates. What
+           * the spine GAINS is the athlete's explicit choice (Q-174), the three real typed spellings,
+           * and a confidence bar it never had. What it must NOT gain is the right to project a race
+           * time off an inference — so only `learned` counts as `observed` below, exactly as
+           * `race-projections.ts` and `infer-training-fitness.ts` already gate it.
+           */
+          const thrResolved = resolveCurrentRunThresholdPace({
+            learned_fitness: ub?.learned_fitness ?? null,
+            performance_numbers: ub?.performance_numbers ?? null,
+            effort_paces: ub?.effort_paces ?? null,
+          } as never);
           let projTp: number | null = null;
           let projSrc: 'observed' | 'plan_targets' = 'plan_targets';
-          const lfTpRaw = ub?.learned_fitness?.run_threshold_pace_sec_per_km;
-          const lfTp = lfTpRaw && typeof lfTpRaw === 'object' ? (lfTpRaw as any).value : lfTpRaw;
           // ⚠️ THE BASIS TRAVELS WITH THE NUMBER (D-346, 2026-07-31). These render as "5K 29:54" — to
           // the second — off a threshold pace that can rest on three runs. The times are internally
           // consistent (5K projects faster than threshold, as it should) but the PRECISION overstates
           // the input, and it was the last thing on the run row with no receipt beside it.
           let projSamples: number | null = null;
-          if (Number.isFinite(Number(lfTp)) && Number(lfTp) > 0) {
-            projTp = Number(lfTp) * 1.60934; projSrc = 'observed';
-            const sc = lfTpRaw && typeof lfTpRaw === 'object' ? Number((lfTpRaw as any).sample_count) : NaN;
-            projSamples = Number.isFinite(sc) && sc > 0 ? sc : null;
-          }
-          else {
-            const pnTp = ub?.performance_numbers?.threshold_pace ?? ub?.performance_numbers?.threshold_pace_sec_per_mi;
-            if (Number.isFinite(Number(pnTp)) && Number(pnTp) > 0) { projTp = Number(pnTp); }
+          if (thrResolved.sec_per_mi != null) {
+            projTp = thrResolved.sec_per_mi;   // resolver is sec/MILE already — the *1.60934 is gone with the raw read
+            // MEASURED only earns `observed`. A typed value, the wizard's 5K-derived pace and the
+            // easy-pace derivation are all real answers for PRESCRIBING, and none of them is a
+            // measurement to predict a race finish from.
+            if (thrResolved.source === 'learned') {
+              projSrc = 'observed';
+              projSamples = thrResolved.sample_count ?? null;
+            }
           }
           const longestDur = runJoined.reduce((m, r) => Math.max(m, Number(r.duration_minutes) || 0), 0);
           const proj = projectStandardRaces({

@@ -1,3 +1,5 @@
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+
 /**
  * WAS THIS RIDE ACTUALLY EASY — the heart-rate governor for an easy prescription.
  *
@@ -44,11 +46,25 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-export function resolveRideEasyCeiling(learnedFitness: any): RideEasyCeiling {
-  const lthr = num(learnedFitness?.ride_threshold_hr?.value);
-  const lthrConf = String(learnedFitness?.ride_threshold_hr?.confidence ?? '').toLowerCase();
-  if (lthr && (lthrConf === 'medium' || lthrConf === 'high')) {
-    return { ceiling: Math.round(lthr * RIDE_EASY_CEILING_PCT_LTHR), anchor: 'threshold', confidence: lthrConf };
+/**
+ * ⛔ THE BIKE ANCHOR NOW HAS AN OWNER (2026-08-20, TRUTH-MAP §5). This read `ride_threshold_hr` raw
+ * with its own medium/high test — a private copy of the LTHR resolver's tier 1, minus the D-284
+ * sample-count gate (so "88% of observed max (estimated)" could anchor an easy band) and minus the
+ * athlete's typed `manual_ride_lthr` override, which was invisible here.
+ *
+ * ⚠️ `resolveCurrentLthr` was RUN-ONLY until today; the `sport` option is what unblocked this. The
+ * caller passes the whole baselines row now rather than just `learned_fitness`, so the typed override
+ * can be seen — an athlete who set their bike threshold by hand had it ignored by the easy band.
+ */
+export function resolveRideEasyCeiling(learnedFitness: any, baselines?: unknown): RideEasyCeiling {
+  const resolved = resolveCurrentLthr(
+    (baselines ?? { learned_fitness: learnedFitness }) as never,
+    { sport: 'ride' },
+  );
+  const lthr = resolved.bpm;
+  const lthrConf = resolved.confidence ?? '';
+  if (lthr && (resolved.source === 'manual' || resolved.source === 'manual-chosen' || lthrConf === 'medium' || lthrConf === 'high')) {
+    return { ceiling: Math.round(lthr * RIDE_EASY_CEILING_PCT_LTHR), anchor: 'threshold', confidence: lthrConf || null };
   }
   const maxHr = num(learnedFitness?.ride_max_hr_observed?.value);
   if (maxHr) {

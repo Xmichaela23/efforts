@@ -30,6 +30,8 @@
  * Deno edge functions (the `src/lib/session-frequency-defaults.ts` precedent).
  */
 
+import { boundInferredThresholdSecPerMi, deriveThresholdFromEasySecPerMi } from './run-threshold-from-easy.ts';
+
 const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
 
 /** Where the number came from. Travels to the surface with it (Law 3). */
@@ -38,7 +40,15 @@ export type RunPaceSource =
   | 'learned'        // measured from the athlete's own easy runs, confidence medium|high
   | 'manual'         // the athlete typed it, but has not chosen it over the learned value
   | 'effort_paces'   // wizard/VDOT-derived. An INFERENCE — is_estimate: true.
-  | 'learned-low';   // measured, but the learner is not confident yet
+  | 'learned-low'    // measured, but the learner is not confident yet
+  /**
+   * THRESHOLD ONLY (2026-08-19). The athlete's own MEASURED easy pace ÷ 1.19, used when the 5K's
+   * answer is faster than that ratio allows or when there is no other candidate at all. An
+   * INFERENCE — is_estimate: true — and it must never be described as measured. See
+   * `run-threshold-from-easy.ts` for the ratio, its 0.69% spread, and its one weakness.
+   * `resolveCurrentRunEasyPace` never returns it: easy pace is the input, not the output.
+   */
+  | 'derived-from-easy';
 
 export type ResolvedRunPace = {
   /** sec per MILE. null = we do not know. Consumers MUST disclose, never invent. */
@@ -99,9 +109,25 @@ type PerformanceNumbersLike = {
 type EffortPacesLike = {
   /** sec per MILE */
   base?: number | string | null;
-  /** sec per MILE — the wizard/VDOT threshold pace the COACH reads today (and only it). */
+  /**
+   * ⛔ THE KEY THE APP ACTUALLY WRITES, AND IT WAS MISSING (2026-08-19).
+   *
+   * `effort_paces` has exactly one producer — `getPacesFromScore` (`effort-score.ts`) — and it emits
+   * `TrainingPaces`: `{ base, race, steady, power, speed }`. `steady` IS the threshold pace; the type
+   * says so and `materialize-plan/index.ts:679` reads it as threshold. Every write site in the app
+   * (`run-pace-calibration.ts:128`, `GoalsScreen.tsx:1217`, `create-goal-and-materialize-plan:375`,
+   * `materialize-plan:3395`, `generate-run-plan:270`) writes that shape and only that shape.
+   *
+   * ⛔ SO THE WIZARD TIER BELOW HAD NEVER ONCE RUN. It read `threshold ?? z4` — two keys **nothing in
+   * this codebase writes**, in either direction. The tier was green in test
+   * (`_shared/resolve-current-run-threshold-pace.test.ts:49,59`) because the fixtures hand-built the
+   * shape the fixtures invented. This is the starved-input pattern from the ENGINE-STATE banner
+   * exactly: built, spec'd, fixtured, never fed.
+   */
+  steady?: number | string | null;
+  /** sec per MILE. Read by `coach/index.ts:4445`'s legacy chain; no writer. Kept so it cannot rot. */
   threshold?: number | string | null;
-  /** sec per MILE — the Z4 pace, used as the threshold proxy when `threshold` is absent. */
+  /** sec per MILE — the Z4 proxy. Same: read in the wild, never written here. Kept for the same reason. */
   z4?: number | string | null;
 } | null | undefined;
 
@@ -250,6 +276,30 @@ const NULL_TP: ResolvedThresholdPace = {
 };
 
 /**
+ * The athlete's MEASURED easy pace, sec/MILE — learned from their own runs, at medium/high
+ * confidence, and NOTHING ELSE. The one input the threshold bound is allowed to stand on.
+ *
+ * ⛔ THIS IS NOT `resolveCurrentRunEasyPace`, AND THE DIFFERENCE IS THE WHOLE POINT. That resolver
+ * can answer from `effort_paces.base` — the same VDOT lookup off the same typed 5K that produces the
+ * threshold candidate being bounded. Founding the bound on it would have the 5K bound itself: a
+ * limit that can never be crossed and a guard that always passes. It can also answer from a typed
+ * easy pace, which is an assertion rather than a measurement.
+ *
+ * ⚠️ `low` IS EXCLUDED. The learner saying "not confident yet" is not a base to bound a prescription
+ * with. No easy pace at this bar returns `null`, the bound does not exist, and nothing is
+ * fabricated to replace it (LAW 2).
+ *
+ * Exported because `materialize-plan` needs the identical rule for its own last-ditch threshold
+ * branch, and two copies of "which easy pace counts" is exactly how this fact fractured the first time.
+ */
+export function resolveMeasuredEasyPaceSecPerMi(baselines: RunBaselinesLike): number | null {
+  const raw = baselines?.learned_fitness?.run_easy_pace_sec_per_km;
+  const conf = confOf(raw);
+  if (conf !== 'medium' && conf !== 'high') return null;
+  return secPerKmToMi(asPositiveFinite(raw?.value));
+}
+
+/**
  * Shared resolver for the athlete's current THRESHOLD RUN PACE (lactate-threshold / ~1hr race pace) —
  * the sibling of `resolveCurrentRunEasyPace`, and the fix for audit 2026-07-17 #6.
  *
@@ -292,8 +342,12 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
     ?? secPerKmToMi(asPositiveFinite(pn?.threshold_pace_sec_per_km))
     ?? (typeof pn?.threshold_pace_min_per_mi === 'string' ? parsePaceToSecPerMi(pn.threshold_pace_min_per_mi) : null);
 
-  // The wizard/VDOT inference the coach reads today — threshold, else the Z4 proxy.
-  const wizard = parsePaceToSecPerMi(baselines.effort_paces?.threshold ?? baselines.effort_paces?.z4);
+  // The wizard/VDOT inference — `steady` FIRST, because it is the only one of the three that anything
+  // writes (see the type above). `threshold`/`z4` stay as read-fallbacks so nothing that ever wrote
+  // them in the past goes silently unread.
+  const wizard = parsePaceToSecPerMi(
+    baselines.effort_paces?.steady ?? baselines.effort_paces?.threshold ?? baselines.effort_paces?.z4,
+  );
 
   // Result builder — carries both units. `kmNative` is the exact km value when the tier is km-native
   // (learned); for mi-native tiers (typed/wizard) km is derived once from mi.
@@ -310,6 +364,27 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
     is_estimate,
   });
 
+  /**
+   * ⛔ THE BOUND, AND WHAT IT IS FOUNDED ON (2026-08-19). A threshold pace may not be faster than
+   * the athlete's own MEASURED easy pace ÷ 1.19 (`run-threshold-from-easy.ts`). It exists because
+   * the tier below — the wizard/VDOT pace — is computed from a 5K the athlete TYPED ONCE, that
+   * nothing measures and nothing dates. A 5K goes stale as fitness changes, and a stale 5K
+   * prescribes a threshold that is too FAST.
+   *
+   * ⛔ MEASURED ONLY, AND THAT IS NOT FUSSINESS — IT IS THE WHOLE POINT. `resolveCurrentRunEasyPace`
+   * can itself answer from `effort_paces.base`, which is the SAME VDOT lookup off the SAME typed 5K.
+   * Founding the bound on that would derive the 5K's answer from the 5K and bound it with itself:
+   * a floor that can never be crossed, and a guard that always passes. So the bound reads the
+   * learned metric directly, at medium/high confidence — the athlete's own runs, measured
+   * independently of anything they typed.
+   *
+   * ⚠️ `low` IS EXCLUDED HERE ON PURPOSE. The learner saying "not confident yet" is not a base to
+   * bound a prescription with, and a thin easy read that is itself too slow would drag threshold
+   * with it. No easy pace at this bar → `null` → the bound does not exist → nothing is clamped and
+   * nothing is fabricated. LAW 2.
+   */
+  const measuredEasySecPerMi = resolveMeasuredEasyPaceSecPerMi(baselines);
+
   // ── Tier 0 (Q-174): the athlete's explicit choice outranks everything. ──
   const chosen = pn?.threshold_pace_source;
   if (chosen === 'manual' && manual != null) return mk(manual, 'manual-chosen', false);
@@ -320,13 +395,120 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
     return mk(learnedSecPerMi, 'learned', false, { confidence: learnedConf, sample_count: learnedSamples, as_of: learnedAsOf, kmNative: learnedSecPerKm });
   }
   // 2. manual / typed (an assertion).
+  //
+  // ⛔ NOT BOUNDED, DELIBERATELY. This is a number a person typed about themselves. Silently
+  // replacing it would show them one value while the engine used another — the exact lie D-285
+  // exists to kill — and an assertion outranks an inference everywhere else in this file. When a
+  // typed value disagrees with the training data the app SAYS SO (the 5K retest flag,
+  // `_shared/arc-context.ts`); it does not edit the athlete behind their back.
   if (manual != null && manualEligible) return mk(manual, 'manual', false);
-  // 3. effort_paces (wizard/VDOT) — an INFERENCE.
-  if (wizard != null) return mk(wizard, 'effort_paces', true);
-  // 4. learned-low (any confidence, still measured).
+
+  // 3. effort_paces (wizard/VDOT off the typed 5K) — an INFERENCE, and therefore BOUNDED.
+  //
+  // ⚠️ WHEN THE BOUND DOES NOT BITE, THE 5K STILL WINS — and that is correct, not a concession. A
+  // race time is a PERFORMANCE; easy pace is partly a CHOICE (heat, hills, discipline, coming back
+  // from illness all make it slower without making the athlete slower). So a 5K that is coherent
+  // with the measured easy runs is the sharper anchor and passes through untouched. The bound only
+  // fires on a 5K the athlete's own recent running says they can no longer run — and then the
+  // source changes with the number, because a value the 5K did not produce must not keep the 5K's
+  // name on screen.
+  if (wizard != null) {
+    const bounded = boundInferredThresholdSecPerMi(wizard, measuredEasySecPerMi);
+    return mk(bounded.sec_per_mi!, bounded.replaced ? 'derived-from-easy' : 'effort_paces', true);
+  }
+
+  // 4. derived from the measured easy pace — no candidate at all, but their own runs imply one.
+  //
+  // ⛔ ABOVE `learned-low`, AND THAT ORDER IS THE RULING. `low` is the learner's own statement that
+  // it cannot yet steer a plan — it is the tier the contaminated 14:44/mi read now lands in. Ten
+  // clean easy runs are better evidence about an athlete than two marginal threshold candidates,
+  // so the derivation goes first and the thin measurement is the last thing tried before `null`.
+  const derived = deriveThresholdFromEasySecPerMi(measuredEasySecPerMi);
+  if (derived != null) return mk(derived, 'derived-from-easy', true);
+
+  // 5. learned-low (any confidence, still measured).
   if (learnedSecPerMi != null) {
     return mk(learnedSecPerMi, 'learned-low', false, { confidence: learnedConf, sample_count: learnedSamples, as_of: learnedAsOf, kmNative: learnedSecPerKm });
   }
-  // 5. null — we do not know. SAY SO.
+  // 6. null — we do not know. SAY SO.
   return NULL_TP;
+}
+
+/**
+ * ⛔ WHICH OF THE STATES THE ATHLETE IS IN, AND THE SENTENCE THAT SAYS SO. One owner for the words
+ * (2026-08-19), because the bug that started this was not a bad number — it was a number shown
+ * with NO ACCOUNT OF WHERE IT CAME FROM. The app picked a source silently and the athlete only
+ * found the disagreement by looking.
+ *
+ * The three states Michael named:
+ *   `measured`            — enough clean runs of their own; here is your threshold
+ *   `derived-from-easy`   — worked out from your easy pace, and SAID so, never dressed as measured
+ *   `unknown`             — not enough data. **Show no number.** Not a placeholder, not a guess.
+ *
+ * Two more exist because they already occur on screen today and collapsing them would be a
+ * downgrade, not a simplification — neither is a new invention:
+ *   `stated`              — the athlete typed it (the easy-pace card already says "you entered this")
+ *   `derived-from-5k`     — the wizard/VDOT pace, uncontested by the bound (the strength session
+ *                           copy already says "derived from your 5K — threshold sits about 20 s/mi
+ *                           slower")
+ *
+ * ⚠️ `note` IS THE HONEST CAVEAT, NOT DECORATION. It is null for the states that need none. On the
+ * derived state it carries the ratio's one weakness — easy pace is partly a choice — because an
+ * athlete running deliberately extra-easy gets a threshold read back that is too slow, and they
+ * are the only person who can know that.
+ *
+ * ⛔ Voice check: fact-first, no imperative, no encouragement, no second person telling them what
+ * to do. Consequences are stated conditionally.
+ */
+export type ThresholdBasis = {
+  state: 'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k' | 'unknown';
+  /** One line, athlete-facing. Never null — `unknown` says that it has no number, which is the point. */
+  label: string;
+  /** A second line where the state carries a real caveat. Null where it does not. */
+  note: string | null;
+  /** False only for `unknown` — the one state where a surface must render no pace at all. */
+  showNumber: boolean;
+};
+
+export function describeThresholdBasis(resolved: ResolvedThresholdPace | null | undefined): ThresholdBasis {
+  const source = resolved?.sec_per_mi != null ? resolved.source : null;
+  switch (source) {
+    case 'learned':
+    case 'learned-low':
+      return {
+        state: 'measured',
+        label: 'Measured from your runs.',
+        // The learner publishes two runs at `low` and treats three as steerable; a reader is
+        // entitled to know which side of that line the number they are looking at sits on.
+        note: resolved?.confidence === 'low'
+          ? 'Based on few enough sessions that it moves as more land.'
+          : null,
+        showNumber: true,
+      };
+    case 'derived-from-easy':
+      return {
+        state: 'derived-from-easy',
+        label: 'Worked out from your easy pace.',
+        note: 'Threshold sits about 19% faster than easy. Easy pace is partly a choice — '
+          + 'runs held deliberately slower than easy make this read slower too.',
+        showNumber: true,
+      };
+    case 'manual':
+    case 'manual-chosen':
+      return { state: 'stated', label: 'You entered this.', note: null, showNumber: true };
+    case 'effort_paces':
+      return {
+        state: 'derived-from-5k',
+        label: 'Worked out from your 5K.',
+        note: null,
+        showNumber: true,
+      };
+    default:
+      return {
+        state: 'unknown',
+        label: 'Not enough data yet.',
+        note: 'A few more easy runs with heart rate, or a 5K time, gives this a number.',
+        showNumber: false,
+      };
+  }
 }

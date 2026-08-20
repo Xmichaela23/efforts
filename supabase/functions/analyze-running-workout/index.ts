@@ -325,18 +325,11 @@ Deno.serve(async (req) => {
       }
     };
 
-    const learnedEasySecPerMi = (() => {
-      try {
-        const lf = learnedFitness || {};
-        const metric = (lf as any)?.run_easy_pace_sec_per_km ?? (lf as any)?.runEasyPaceSecPerKm ?? null;
-        const v = (metric && typeof metric === 'object') ? Number((metric as any)?.value) : Number(metric);
-        if (!Number.isFinite(v) || !(v > 0)) return null;
-        // sec/km -> sec/mi
-        return v * 1.60934;
-      } catch {
-        return null;
-      }
-    })();
+    // ⛔ `learnedEasySecPerMi` STOOD HERE AND WAS NEVER READ (deleted 2026-08-19). It was the raw
+    // learned-column read this file used before D-287 routed the grading pace through the resolver;
+    // the replacement landed, the old computation did not go with it. Zero references — verified by
+    // grep before deleting. A dead raw read is still a raw read: it survives greps, it gets copied,
+    // and it makes a file look like it has two opinions about one fact.
 
     // D-287 — the EASY pace this card GRADES the athlete against now comes from the ONE resolver.
     // It used to run its own chain: effort_paces -> manual -> learned. That is the OPPOSITE precedence to

@@ -17,6 +17,19 @@ import {
   type WorkoutFinishRow,
 } from './goal-finish-from-workouts.ts';
 import { computeLongitudinalSignals, type LongitudinalSignals } from './longitudinal-signals.ts';
+// ⛔ THE 5K FLAG'S THREE INPUTS, ALL OF WHICH ALREADY EXISTED (2026-08-19). It used to carry a
+// private `FIVEK_PACE_TO_THRESHOLD_SEC_KM = 0.82` and a private `NUDGE_FIVEK_GAP_MIN_SEC = 90` —
+// two numbers invented for a question the app had already answered three times over.
+import {
+  estimateVdotFromPace,
+  getTargetTime,
+} from '../generate-run-plan/effort-score.ts';
+import { RUN_PACE_DIVERGENCE_THRESHOLD } from '../generate-combined-plan/science.ts';
+import {
+  describeThresholdBasis,
+  resolveCurrentRunEasyPace,
+  resolveCurrentRunThresholdPace,
+} from '../../../src/lib/resolve-current-run-pace.ts';
 import { type StateTrendsV1 } from './state-trend/assemble.ts';
 
 /** JSON payload from `user_baselines.athlete_identity` */
@@ -113,21 +126,58 @@ export interface RunPaceForCoachEntry {
   confidence?: 'low' | 'medium' | 'high' | string;
   sample_count?: number;
   as_of?: string;
+  /**
+   * ⛔ WHERE THE NUMBER CAME FROM (2026-08-19), and it is not decoration. This builder used to read
+   * `learned_fitness` RAW while the coach's own code path used `resolveCurrentRunThresholdPace` —
+   * two paces for one athlete inside one function, and the model was handed the one the app was not
+   * using. Now both come from the resolver, which means a value can legitimately be a typed one or
+   * one worked out from the athlete's easy runs — and the model must never call those measured.
+   */
+  basis?: 'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k';
 }
 
 /**
- * When manual 5K in `performance_numbers` is much slower than a rough 5K implied by
- * learned threshold pace, coaches / prompts can suggest updating the saved race time.
+ * ⛔ "YOUR 5K DOESN'T MATCH YOUR RECENT RUNS." The typed 5K against the athlete's own training,
+ * in BOTH directions (2026-08-19).
+ *
+ * ⛔ WHY IT WAS REBUILT. The point of this flag is that the app picks a pace source silently and
+ * the athlete never learns the two numbers disagree — it was found by hand, by looking. The first
+ * version could not do that job:
+ *
+ *   1. **It was silent in the direction that matters.** A typed 5K FASTER than the training data
+ *      returned `should_prompt: false` with *"the manual race time is already the sharper anchor"*.
+ *      That is precisely the stale-5K case — fitness drops, the old race time stays on file, and the
+ *      app prescribes off a performance the athlete can no longer produce. It was told it was fine.
+ *   2. **It was starved in the case that matters.** It required a MEASURED threshold pace at
+ *      medium/high confidence — the exact value that now abstains when the learner cannot get a
+ *      clean read. Null threshold, null flag, on the athlete whose data prompted the whole job.
+ *   3. **Its arithmetic was wrong for anyone slow.** `5K pace ≈ 0.82 × threshold pace` is true at
+ *      vdot 56-60. Measured off the app's own tables the real ratio runs 0.96 at vdot 30 down to
+ *      0.79 at vdot 80. At vdot 33 the 0.82 constant understated the implied 5K by over three
+ *      minutes — which SHRANK the gap and pushed it into the no-prompt branch. A flag that is
+ *      wrongest for the athletes furthest from elite.
+ *
+ * All three are gone: the comparison runs through `estimateVdotFromPace` → `getTargetTime`, the
+ * app's own VDOT tables run backwards; the threshold pace comes from the shared resolver, which
+ * includes the easy-pace derivation; and the trigger is the app's existing ±4%
+ * `RUN_PACE_DIVERGENCE_THRESHOLD`, in pace space where that band was defined.
  */
 export interface ArcFiveKLearnedDivergence {
   should_prompt: boolean;
   manual_5k_total_sec: number;
   manual_5k_label: string;
-  /** From learned `run_threshold_pace_sec_per_km` via a Daniels-style heuristic. */
+  /** From the resolved threshold pace via the app's own VDOT tables, run backwards. */
   implied_5k_total_sec: number;
   implied_5k_label: string;
-  /** manual − implied; positive = saved 5K is slower than the estimate. */
+  /** manual − implied; positive = the saved 5K is SLOWER than the training data suggests. */
   gap_sec: number;
+  /**
+   * Which way the disagreement runs. `stale-fast` is the expensive one: the saved 5K is faster than
+   * recent running, so every pace derived from it is set faster than current fitness.
+   */
+  direction: 'stale-fast' | 'behind' | 'aligned';
+  /** Where the training-side number came from, so the message can say so (Law 3). */
+  evidence: 'measured' | 'derived-from-easy' | 'stated';
   message: string;
 }
 
@@ -463,11 +513,12 @@ function parseJsonObject(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
-/** 5K race effort is faster per km than "threshold" (hour) pace — simple multiplier on sec/km. */
-const FIVEK_PACE_TO_THRESHOLD_SEC_KM = 0.82;
-const NUDGE_FIVEK_GAP_MIN_SEC = 90;
-const THR_SEC_KM_MIN = 200;
-const THR_SEC_KM_MAX = 520;
+// ⛔ `FIVEK_PACE_TO_THRESHOLD_SEC_KM = 0.82` AND `NUDGE_FIVEK_GAP_MIN_SEC = 90` WERE DELETED HERE
+// (2026-08-19). The first was a flat 5K:threshold ratio that is only true near vdot 58 — the app's
+// own PACE_TABLE puts the real ratio between 0.79 and 0.96 — and the second was a third divergence
+// threshold for a question `RUN_PACE_DIVERGENCE_THRESHOLD` was already chosen to answer. Both are
+// replaced by machinery that already existed; see `ArcFiveKLearnedDivergence`.
+// (`THR_SEC_KM_MIN` / `THR_SEC_KM_MAX` went with it — the resolver's own sanity bands cover this.)
 /** Reject only obvious bad inputs (seconds full race time, typos, etc.) */
 const FIVEK_TOTAL_SEC_SANE = { min: 7 * 60, max: 80 * 60 };
 
@@ -506,19 +557,21 @@ function readManualFiveK(performanceNumbers: Record<string, unknown> | null): { 
   return null;
 }
 
-function learnedThresholdPaceUsable(
-  m: { value?: unknown; confidence?: unknown; sample_count?: unknown } | null | undefined
-): m is { value: number; confidence?: string; sample_count: number } {
-  if (!m || typeof m !== 'object') return false;
-  const v = m.value;
-  if (typeof v !== 'number' || !Number.isFinite(v) || v < THR_SEC_KM_MIN || v > THR_SEC_KM_MAX) return false;
-  if (m.confidence === 'low') return false;
-  const sc = m.sample_count;
-  const n = typeof sc === 'number' && Number.isFinite(sc) ? Math.floor(sc) : 0;
-  if (n < 2) return false;
-  if (m.confidence === 'medium' || m.confidence === 'high') return true;
-  return n >= 3;
-}
+/**
+ * ⛔ `learnedThresholdPaceUsable` LIVED HERE AND IS DELETED (2026-08-19). It was the 5K flag's only
+ * gate: a MEASURED threshold pace, medium/high confidence, sample_count ≥ 2. That gate is the
+ * reason the flag was silent on the athlete who prompted this work — his threshold learner had
+ * abstained, so the flag had nothing to compare against and returned null.
+ *
+ * ⚠️ ITS RULE IS NOT LOST, IT MOVED UP A LAYER. `resolveCurrentRunThresholdPace` already applies the
+ * same confidence bar (medium/high to be trusted as `learned`), and the flag now excludes
+ * `learned-low` explicitly and by name. One confidence rule, in the resolver that owns the fact,
+ * instead of a private copy here.
+ *
+ * ⚠️ `generate-combined-plan/science.ts:28,42` still cite this function by name as the thing
+ * `RUN_PACE_MIN_SAMPLE_COUNT` mirrors. That citation now points at the resolver instead — the rule
+ * is unchanged, only its address is.
+ */
 
 function formatGapDurationSec(gap: number): string {
   const a = Math.abs(Math.round(gap));
@@ -543,109 +596,218 @@ function formatMmSsPaceFromSecPerUnit(totalSeconds: number): string {
  * For arc / coach prompts: same math as `TrainingBaselines` `formatPace(secPerKm)` so the
  * model is never tempted to call `value` 371 "6:11/mi" (that is 6:11/**km** ≈ 9:57/mi).
  */
-function buildRunPaceForCoach(learnedFitness: LearnedFitness | null): RunPaceForCoach | null {
-  if (!learnedFitness) return null;
-  const one = (key: 'run_threshold_pace_sec_per_km' | 'run_easy_pace_sec_per_km') => {
-    const raw = learnedFitness[key];
-    const o =
-      raw && typeof raw === 'object' && !Array.isArray(raw)
-        ? (raw as { value?: unknown; confidence?: unknown; sample_count?: unknown; as_of?: unknown })
-        : null;
-    const secKm = o?.value;
-    if (typeof secKm !== 'number' || !Number.isFinite(secKm) || secKm <= 0) return null;
-    const secMi = secKm * PACE_KM_TO_MI;
-    // D-285 / LAW 3 — confidence, sample size and FRESHNESS travel with the number, all the way to the
-    // model. They used to be stripped here: the LLM received threshold and easy rendered IDENTICALLY and
-    // INDISTINGUISHABLY, with no way to tell a 5-run medium-confidence read from a 20-run high-confidence
-    // one — or a number learned this week from one that has not moved since May. Law 3's failure tell,
-    // verbatim: "a number shown without its confidence". The prompt tells the model to quote these paces,
-    // so a stripped number is an unhedged assertion in the athlete's ear.
-    const conf = typeof o?.confidence === 'string' ? o.confidence : null;
-    const n = typeof o?.sample_count === 'number' && Number.isFinite(o.sample_count)
-      ? o.sample_count
-      : null;
-    const asOf = typeof o?.as_of === 'string' && o.as_of.length >= 10 ? o.as_of.slice(0, 10) : null;
+function buildRunPaceForCoach(
+  learnedFitness: LearnedFitness | null,
+  performanceNumbers: Record<string, unknown> | null,
+  effortPaces: Record<string, unknown> | null,
+): RunPaceForCoach | null {
+  /**
+   * ⛔ THROUGH THE RESOLVERS, NOT THE RAW COLUMN (TRUTH-MAP §5, fixed 2026-08-19).
+   *
+   * This read `learnedFitness['run_threshold_pace_sec_per_km']` and `['run_easy_pace_sec_per_km']`
+   * directly, while `coach/index.ts:4912` — the same request — resolved the same fact properly. So
+   * the deterministic path and the text handed to the model could name two different paces for one
+   * athlete, and the model's is the one the athlete READS.
+   *
+   * ⚠️ AND THE RAW READ COULD ONLY EVER SEE ONE TIER. A pace the athlete typed, the pace implied by
+   * their 5K, and their Q-174 "use my number" choice were all invisible here — the model was told
+   * "no threshold pace on file" for an athlete who had one.
+   */
+  const baselines = {
+    learned_fitness: learnedFitness as never,
+    performance_numbers: performanceNumbers as never,
+    effort_paces: effortPaces as never,
+  };
+
+  const entry = (
+    secPerMi: number | null,
+    conf: string | null,
+    n: number | null,
+    asOf: string | null,
+    basis: RunPaceForCoachEntry['basis'],
+  ): RunPaceForCoachEntry | null => {
+    if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null;
+    const secKm = secPerMi / PACE_KM_TO_MI;
     return {
       sec_per_km: Math.round(secKm * 10) / 10,
       per_km: `${formatMmSsPaceFromSecPerUnit(secKm)}/km`,
-      per_mile: `${formatMmSsPaceFromSecPerUnit(secMi)}/mi`,
+      per_mile: `${formatMmSsPaceFromSecPerUnit(secPerMi)}/mi`,
       confidence: conf ?? undefined,
       sample_count: n ?? undefined,
-      as_of: asOf ?? undefined,
+      as_of: asOf && asOf.length >= 10 ? asOf.slice(0, 10) : undefined,
+      basis,
     };
   };
-  const threshold = one('run_threshold_pace_sec_per_km');
-  const easy = one('run_easy_pace_sec_per_km');
+
+  const t = resolveCurrentRunThresholdPace(baselines);
+  const tBasis = describeThresholdBasis(t);
+  const threshold = tBasis.state === 'unknown'
+    ? null
+    : entry(t.sec_per_mi, t.confidence, t.sample_count, t.as_of, tBasis.state as RunPaceForCoachEntry['basis']);
+
+  const e = resolveCurrentRunEasyPace(baselines);
+  // Easy pace has no derivation tier — it is the INPUT to one — so its basis maps straight off source.
+  const eBasis: RunPaceForCoachEntry['basis'] | undefined =
+    e.source === 'learned' || e.source === 'learned-low' ? 'measured'
+    : e.source === 'manual' || e.source === 'manual-chosen' ? 'stated'
+    : e.source === 'effort_paces' ? 'derived-from-5k'
+    : undefined;
+  const easy = eBasis == null ? null : entry(e.sec_per_mi, e.confidence, e.sample_count, e.as_of, eBasis);
+
   if (!threshold && !easy) return null;
   return {
     _unit_note: 'run threshold/easy paces in JSON are sec/km. Use per_km and per_mile only.',
-    // Law 3: the model must not assert above the confidence it was handed, and must not present a stale
-    // pace as current. `as_of` is the newest SESSION behind the number, not the last profile rebuild.
+    // Law 3: the model must not assert above the confidence it was handed, must not present a stale
+    // pace as current, and — new 2026-08-19 — must not call a derived pace a measured one.
     _confidence_note:
-      'Each pace carries confidence / sample_count / as_of. Do NOT state a pace more confidently than its '
-      + 'confidence allows, and do NOT present a pace as current if as_of is old — say when it was last measured.',
+      'Each pace carries basis / confidence / sample_count / as_of. Do NOT state a pace more confidently '
+      + 'than its confidence allows, and do NOT present a pace as current if as_of is old — say when it '
+      + 'was last measured. `basis` is load-bearing: only "measured" was read from the athlete\'s own '
+      + 'runs. "derived-from-easy" was worked out from their easy pace, "derived-from-5k" from a 5K they '
+      + 'typed, "stated" is a number they entered. Never describe any of those three as measured.',
     threshold: threshold ?? undefined,
     easy: easy ?? undefined,
   };
 }
 
-function impliedFiveKFromThresholdSecPerKm(thresholdSecPerKm: number): number {
-  const pace5kSecPerKm = thresholdSecPerKm * FIVEK_PACE_TO_THRESHOLD_SEC_KM;
-  return 5 * pace5kSecPerKm;
+/**
+ * The 5K time a threshold pace implies, in seconds — through the app's OWN tables, run backwards:
+ * `estimateVdotFromPace` (PACE_TABLE `steady` → vdot) then `getTargetTime` (VDOT_TABLE → 5K clock).
+ *
+ * ⛔ NOT A MULTIPLIER. The 5K-to-threshold relationship is NOT constant across fitness — it is 0.96
+ * at vdot 30 and 0.79 at vdot 80 in this app's own table — so any single ratio is wrong at one end
+ * or the other, and it is wrongest for the slower athletes a retest flag matters most to. Both
+ * functions have existed in `generate-run-plan/effort-score.ts` the whole time; this is a wiring
+ * job, not a calculation.
+ */
+function impliedFiveKFromThresholdSecPerMi(thresholdSecPerMi: number): number | null {
+  const vdot = estimateVdotFromPace(thresholdSecPerMi);
+  if (vdot == null) return null;
+  const t = getTargetTime(vdot, '5k');
+  return t != null && Number.isFinite(t) && t > 0 ? Math.round(t) : null;
 }
 
-function buildFiveKNudge(
+// Exported for `five-k-retest-flag.test.ts` — the same reason `analyzeRuns` was exported from
+// `learn-fitness-profile`: this decision reaches the athlete, so it gets fixtures rather than a
+// hand-check through the whole `getArcContext` assembly.
+export function buildFiveKNudge(
   performanceNumbers: Record<string, unknown> | null,
   learnedFitness: LearnedFitness | null
 ): ArcFiveKLearnedDivergence | null {
   const manual = readManualFiveK(performanceNumbers);
   if (!manual) return null;
 
-  const rawThr = learnedFitness?.run_threshold_pace_sec_per_km;
-  const thrObj =
-    rawThr && typeof rawThr === 'object' && !Array.isArray(rawThr)
-      ? (rawThr as { value?: unknown; confidence?: unknown; sample_count?: unknown })
-      : null;
-  if (!learnedThresholdPaceUsable(thrObj)) return null;
+  /**
+   * ⛔ `effort_paces` IS DELIBERATELY NOT PASSED, AND THAT OMISSION IS THE GATE.
+   *
+   * The resolver's wizard tier reads `effort_paces.steady`, which is the VDOT lookup off THIS SAME
+   * typed 5K. Feeding it here would have the flag compare the 5K against itself, agree perfectly,
+   * and never fire. So the independence requirement is expressed by WHAT IS HANDED IN rather than by
+   * a filter afterwards: only evidence the athlete did not type into the 5K box can reach this.
+   *
+   * ⚠️ What survives that: a MEASURED threshold pace, a threshold pace the athlete typed separately,
+   * and the value DERIVED FROM THEIR MEASURED EASY RUNS — the last being the whole reason the flag
+   * now fires at all for an athlete whose threshold learner has abstained.
+   */
+  const resolved = resolveCurrentRunThresholdPace({
+    learned_fitness: learnedFitness as never,
+    performance_numbers: performanceNumbers as never,
+  });
+  if (resolved.sec_per_mi == null) return null;
 
-  const implied = impliedFiveKFromThresholdSecPerKm(thrObj.value);
-  if (implied < FIVEK_TOTAL_SEC_SANE.min || implied > FIVEK_TOTAL_SEC_SANE.max) return null;
+  /**
+   * ⛔ `learned-low` IS EXCLUDED. Everything else that can appear here is either a measurement, an
+   * assertion, or a derivation off ten-plus clean easy runs. `learned-low` is the tier a two-session
+   * contaminated read lands in — and since the derivation now outranks it, seeing it at all means
+   * there was no measured easy pace either. Prompting a retest off the thinnest evidence in the
+   * system is how a useful flag turns into noise the athlete learns to dismiss.
+   */
+  const evidence: ArcFiveKLearnedDivergence['evidence'] | null =
+    resolved.source === 'learned' ? 'measured'
+    : resolved.source === 'derived-from-easy' ? 'derived-from-easy'
+    : (resolved.source === 'manual' || resolved.source === 'manual-chosen') ? 'stated'
+    : null;
+  if (evidence == null) return null;
+
+  /**
+   * ⛔ THE `FIVEK_TOTAL_SEC_SANE` CHECK THAT STOOD HERE IS DELETED (2026-08-19) — it could not fire.
+   * `estimateVdotFromPace` clamps to the ends of PACE_TABLE (vdot 30..85), and `getTargetTime` maps
+   * that whole range to 5K times of 9:12..31:00 — entirely inside the 7..80 minute sane band. Proven
+   * by mutation: removing it broke nothing. That band still guards the athlete's TYPED 5K in
+   * `readManualFiveK`, where the input is a person and unreachable defence is not what it is.
+   */
+  const implied = impliedFiveKFromThresholdSecPerMi(resolved.sec_per_mi);
+  if (implied == null) return null;
 
   const impliedLabel = formatRaceClockSec(implied);
   const gap = manual.sec - implied;
-  if (gap < -NUDGE_FIVEK_GAP_MIN_SEC) {
-    return {
-      should_prompt: false,
-      manual_5k_total_sec: manual.sec,
-      manual_5k_label: manual.label,
-      implied_5k_total_sec: implied,
-      implied_5k_label: impliedLabel,
-      gap_sec: gap,
-      message:
-        'Saved 5K is faster than a rough estimate from your learned threshold pace; the manual race time is already the sharper anchor.'
-    };
-  }
-  if (gap >= NUDGE_FIVEK_GAP_MIN_SEC) {
-    return {
-      should_prompt: true,
-      manual_5k_total_sec: manual.sec,
-      manual_5k_label: manual.label,
-      implied_5k_total_sec: implied,
-      implied_5k_label: impliedLabel,
-      gap_sec: gap,
-      message: `Your saved 5K (${manual.label}) is about ${formatGapDurationSec(
-        gap
-      )} slower than a rough estimate from recent threshold training data (${impliedLabel}). You can update your 5K in Training Baselines if you want coaching tuned to current fitness.`
-    };
-  }
-  return {
-    should_prompt: false,
+
+  /**
+   * ⛔ THE TRIGGER IS THE APP'S EXISTING ±4% BAND, MEASURED IN PACE SPACE. `RUN_PACE_DIVERGENCE_THRESHOLD`
+   * was chosen deliberately for exactly this question (`generate-combined-plan/science.ts`, D-033) and
+   * is defined as a fraction of a PACE — so it is applied to one, not to a race clock. Over a fixed
+   * 5 km the two are proportional, which is why `implied` may stand in for the pace directly.
+   *
+   * ⛔ AND IT IS SYMMETRIC. A band has two sides; the old 90-second rule only had one.
+   */
+  const divergence = gap / implied;
+  const direction: ArcFiveKLearnedDivergence['direction'] =
+    divergence > RUN_PACE_DIVERGENCE_THRESHOLD ? 'behind'
+    : divergence < -RUN_PACE_DIVERGENCE_THRESHOLD ? 'stale-fast'
+    : 'aligned';
+
+  // Law 3 — the number's provenance travels into the sentence the athlete reads.
+  const basisPhrase =
+    evidence === 'measured' ? 'your measured threshold pace'
+    : evidence === 'stated' ? 'the threshold pace you entered'
+    : 'your recent easy runs';
+
+  const base = {
     manual_5k_total_sec: manual.sec,
     manual_5k_label: manual.label,
     implied_5k_total_sec: implied,
     implied_5k_label: impliedLabel,
     gap_sec: gap,
-    message: 'Saved 5K and the estimate from your learned threshold pace are close; no change suggested.'
+    direction,
+    evidence,
+  };
+
+  if (direction === 'stale-fast') {
+    /**
+     * ⛔ THE CASE THE OLD FLAG CALLED FINE. The saved 5K is FASTER than the athlete's own recent
+     * running. Every pace derived from it — threshold above all — comes out faster than current
+     * fitness, and in a strength-led block that is the expensive direction: the session stops being
+     * threshold and starts eating the lifting.
+     *
+     * ⚠️ Voice: it states what is true and what follows from it, conditionally. It does not diagnose
+     * detraining, and it does not tell the athlete to do anything — a race time going stale and an
+     * athlete having lost fitness are not the same claim, and only they can tell the two apart.
+     */
+    return {
+      ...base,
+      should_prompt: true,
+      message:
+        `Your 5K doesn't match your recent runs — worth a retest. The saved time (${manual.label}) is about `
+        + `${formatGapDurationSec(gap)} faster than ${basisPhrase} suggests (${impliedLabel}). Paces derived `
+        + `from a 5K that no longer matches recent training come out faster than current fitness.`,
+    };
+  }
+
+  if (direction === 'behind') {
+    return {
+      ...base,
+      should_prompt: true,
+      message:
+        `Your 5K doesn't match your recent runs — worth a retest. The saved time (${manual.label}) is about `
+        + `${formatGapDurationSec(gap)} slower than ${basisPhrase} suggests (${impliedLabel}). Paces derived `
+        + `from it come out slower than recent training indicates.`,
+    };
+  }
+
+  return {
+    ...base,
+    should_prompt: false,
+    message: `Saved 5K and ${basisPhrase} agree within the ${Math.round(RUN_PACE_DIVERGENCE_THRESHOLD * 100)}% band; no change suggested.`,
   };
 }
 
@@ -1319,7 +1481,7 @@ export async function getArcContext(
     runsSinceLastRace: runsSinceLastRaceCount,
   });
 
-  const run_pace_for_coach = buildRunPaceForCoach(learned_fitness);
+  const run_pace_for_coach = buildRunPaceForCoach(learned_fitness, performance_numbers, effort_paces);
 
   return {
     athlete_identity,

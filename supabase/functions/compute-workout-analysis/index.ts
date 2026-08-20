@@ -1,6 +1,7 @@
 // Supabase Edge Function: compute-workout-analysis
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildRunPaceCurve, type RunPaceCurve } from '../../../src/lib/run-critical-speed.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -76,20 +77,37 @@ function rollingMaxAverage(data: (number | null)[], windowSize: number): number 
   maxAvg = windowSum / windowSize;
   
   // Slide window
+  let maxStart = 0;
   for (let i = windowSize; i < validPower.length; i++) {
     windowSum += validPower[i].val - validPower[i - windowSize].val;
     const avg = windowSum / windowSize;
-    if (avg > maxAvg) maxAvg = avg;
+    if (avg > maxAvg) { maxAvg = avg; maxStart = i - windowSize + 1; }
   }
-  
+
+  // ⛔ THE WINDOW'S POSITION IS RETURNED NOW (2026-08-20), NOT JUST ITS VALUE. The best 20-minute
+  // power window IS a sustained threshold effort — the FTP learner already treats it as one — and the
+  // athlete's heart rate DURING it is their cycling threshold heart rate. That number was being
+  // thrown away here while `analyzeRides` went looking for whole rides whose AVERAGE heart rate sat
+  // at 85-95% of max, which almost no real ride does: you coast, you descend, you stop at lights.
+  // Twenty rides, zero candidates, and the learner fell back to `90% of observed max (estimated)`.
+  lastWindow = { startIdx: validPower[maxStart].idx, endIdx: validPower[maxStart + windowSize - 1].idx };
   return Math.round(maxAvg);
 }
+
+/**
+ * Where `rollingMaxAverage` last found its best window, in ORIGINAL sample indices. A module-level
+ * handoff rather than a changed return type, because the return value is read in several places and
+ * widening it would touch all of them for one caller's benefit.
+ *
+ * ⚠️ Read it IMMEDIATELY after the call that produced it. It is overwritten by the next call.
+ */
+let lastWindow: { startIdx: number; endIdx: number } | null = null;
 
 /**
  * Calculate power curve for a cycling workout
  * Returns best power at key durations for fitness tracking
  */
-function calculatePowerCurve(powerData: (number | null)[]): PowerCurve | null {
+function calculatePowerCurve(powerData: (number | null)[], hrData?: (number | null)[]): PowerCurve | null {
   const validCount = powerData.filter(p => p !== null && Number.isFinite(p) && p > 0).length;
   
   // Need at least 60 seconds of power data
@@ -99,6 +117,7 @@ function calculatePowerCurve(powerData: (number | null)[]): PowerCurve | null {
   }
   
   const curve: PowerCurve = {};
+  const curveHr: Record<string, number> = {};
   const durations: { label: keyof PowerCurve; seconds: number }[] = [
     { label: '5s', seconds: 5 },
     { label: '1min', seconds: 60 },
@@ -109,9 +128,19 @@ function calculatePowerCurve(powerData: (number | null)[]): PowerCurve | null {
   
   for (const { label, seconds } of durations) {
     if (validCount >= seconds) {
+      lastWindow = null;
       const best = rollingMaxAverage(powerData, seconds);
       if (best !== null && best > 0) {
         curve[label] = best;
+        // The heart rate DURING that window — the bike's threshold anchor, for the 20-minute one.
+        const w = lastWindow;
+        if (w && hrData) {
+          const slice = hrData.slice(w.startIdx, w.endIdx + 1)
+            .filter((h): h is number => h != null && Number.isFinite(h) && h > 0);
+          if (slice.length > 0) {
+            curveHr[label] = Math.round(slice.reduce((a, b) => a + b, 0) / slice.length);
+          }
+        }
       }
     }
   }
@@ -122,6 +151,7 @@ function calculatePowerCurve(powerData: (number | null)[]): PowerCurve | null {
     console.log(`⚡ Power curve values:`, curve);
   }
   
+  if (Object.keys(curveHr).length > 0) (curve as Record<string, unknown>)._hr = curveHr;
   return Object.keys(curve).length > 0 ? curve : null;
 }
 
@@ -921,7 +951,8 @@ Deno.serve(async (req) => {
     let userFtp: number | null = null;
     let userMaxHR: number | null = null;
     // Q-169: the learned LTHR (Friel anchor). Null -> the %HRmax fallback below.
-    let learnedLthr: number | null = null;
+    // ⛔ `learnedLthr` DELETED 2026-08-20 — nothing assigned it once the bike moved onto the resolver,
+    // so its only remaining use was as an always-null third fallback in the ride chain.
     let configuredHrZones: any = null;
     // D-lthr-one-anchor (audit 2026-07-17): the Priority-2 LTHR for zone bins, resolved ONCE from the
     // baselines below, so it can't diverge from the easy band. Computed inside the baseline block (where
@@ -991,11 +1022,10 @@ Deno.serve(async (req) => {
           // `calculate-workload:378` ALREADY does this correctly (it hydrates threshold_heart_rate from
           // learned_fitness before inferring intensity), which is why the ACWR/load ladder was never
           // poisoned. This is the same read, forty lines away, in the file that forgot it.
-          const sportLthr = isRideSport ? lf?.ride_threshold_hr : lf?.run_threshold_hr;
-          if (sportLthr?.value && Number.isFinite(Number(sportLthr.value)) && Number(sportLthr.value) > 100) {
-            learnedLthr = Number(sportLthr.value);
-            console.log('[HR ZONES] LTHR from learned_fitness:', learnedLthr, '(confidence:', sportLthr.confidence, ')');
-          }
+          // ⛔ THE `learnedLthr` PRE-READ IS DELETED (2026-08-20). It narrowed to the bike on
+          // 2026-08-19 because the resolver was run-only; the resolver covers the bike now, and the
+          // ride branch below asks it directly. What stood here was an ungated raw read whose only
+          // remaining job was to be the third fallback of a chain whose first rung already answers it.
         }
         if (baseline?.configured_hr_zones) {
           configuredHrZones = typeof baseline.configured_hr_zones === 'string'
@@ -1003,14 +1033,21 @@ Deno.serve(async (req) => {
             : baseline.configured_hr_zones;
           console.log('[HR ZONES] Configured zones from', configuredHrZones?.source, ':', JSON.stringify(configuredHrZones?.zones?.length ?? 0), 'zones');
         }
-        // Resolve the RUN LTHR once, through the ONE resolver (learned-first, sample_count-gated) — the
-        // SAME bpm the easy band uses. The BIKE keeps its own ride_threshold_hr chain (separate anchor).
+        // Resolve the LTHR once, through the ONE resolver (learned-first, sample_count-gated) — the
+        // SAME bpm the easy band uses. Per sport as of 2026-08-20: the bike is no longer a private chain.
         {
           const isRide = sport.includes('ride') || sport.includes('bike') || sport.includes('cycling');
+          // ⛔ THE BIKE GOES THROUGH THE SAME RESOLVER NOW (2026-08-20) — it was run-only, which is
+          // why this branch carried its own chain. `configured_hr_zones.threshold_heart_rate` is
+          // dropped from it: `TrainingBaselines:702` computes that as `runLTHR || rideLTHR`, so on a
+          // RIDE it is most likely the run's number, and running HR sits 5-10 bpm above cycling at the
+          // same effort. The device column stays as the per-workout fallback.
           priorityTwoLthr = isRide
-            ? (configuredHrZones?.threshold_heart_rate
-                || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null)
-                || learnedLthr)
+            ? (resolveCurrentLthr(
+                 { learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: configuredHrZones },
+                 { sport: 'ride' },
+               ).bpm
+                || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null))
             : resolveCurrentLthr(
                 { learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: configuredHrZones },
                 { deviceThresholdHr: (w as any)?.threshold_heart_rate },
@@ -1568,9 +1605,29 @@ Deno.serve(async (req) => {
     let hrZoneBoundaries: number[] | null = null;
     let hrZoneSchema = 'fallback';
 
-    // Priority 1: Athlete-configured zone boundaries from Strava or FIT
-    if (configuredHrZones?.zones && Array.isArray(configuredHrZones.zones) && configuredHrZones.zones.length >= 3) {
-      const zones = configuredHrZones.zones;
+    /**
+     * Priority 1: Athlete-configured zone boundaries from Strava or FIT.
+     *
+     * ⛔ PER SPORT FIRST (2026-08-20). This read ONE `zones` array for every discipline, and
+     * `TrainingBaselines` built that array from `runLTHR || rideLTHR` — run preferred. So a RIDE was
+     * binned against the athlete's RUNNING zones, at priority 1, above every resolver below. Cycling
+     * heart rate sits 5-10 bpm under running at the same effort, so each ride landed a zone too easy:
+     * threshold work counted as tempo, and the time-in-zone the 80/20 read rests on was wrong.
+     *
+     * ⚠️ `zones` REMAINS THE FALLBACK, deliberately. Strava writes that key with genuinely
+     * sport-agnostic zones (its model has one set per athlete), and rows written before today carry
+     * only it. Preferring the sport-specific array when one exists costs nothing and changes nothing
+     * for an athlete who has none.
+     */
+    // ⚠️ `sport` (:919) is the function-scope one; the `isRideSport` up at :972 lives inside the
+    // baselines block and is NOT visible here. This file is `@ts-nocheck`, so the typechecker would
+    // not have caught the reference — derived locally on purpose.
+    const zoneIsRide = /ride|bike|cycl/.test(sport);
+    const sportZones = zoneIsRide
+      ? (configuredHrZones?.zones_ride ?? configuredHrZones?.zones)
+      : (configuredHrZones?.zones_run ?? configuredHrZones?.zones);
+    if (sportZones && Array.isArray(sportZones) && sportZones.length >= 3) {
+      const zones = sportZones;
       // Map variable-length athlete zones to boundaries array: [min0, max0/min1, max1/min2, ..., lastMax]
       const boundaries: number[] = [zones[0].min ?? 0];
       for (const z of zones) {
@@ -1585,20 +1642,21 @@ Deno.serve(async (req) => {
       }
       if (boundaries.length >= 4) {
         hrZoneBoundaries = boundaries;
-        hrZoneSchema = `configured:${configuredHrZones.source ?? 'unknown'}`;
-        console.log('[HR ZONES] Using athlete-configured zones from', configuredHrZones.source, ':', hrZoneBoundaries);
+        const whichArray = zoneIsRide
+          ? (configuredHrZones?.zones_ride ? 'zones_ride' : 'zones')
+          : (configuredHrZones?.zones_run ? 'zones_run' : 'zones');
+        hrZoneSchema = `configured:${configuredHrZones.source ?? 'unknown'}:${whichArray}`;
+        console.log('[HR ZONES] Using athlete-configured zones from', configuredHrZones.source, whichArray, ':', hrZoneBoundaries);
       }
     }
 
     // Priority 2: LTHR from configured_hr_zones or workout (Friel 5-zone model)
     if (!hrZoneBoundaries) {
-      // Q-169: `learnedLthr` added as the THIRD source. It is last so an athlete's explicitly
-      // configured zones and a device-supplied threshold still win — but it means an athlete whose LTHR
-      // the app LEARNED no longer silently falls through to %HRmax zones that contradict the Friel
-      // zones their own Baselines screen displays.
-      // D-lthr-one-anchor (audit 2026-07-17): resolved ONCE above (priorityTwoLthr) — RUN via the one
-      // resolver (learned-first, gated, congruent with the easy band); BIKE via its own chain. This
-      // deletes the old configured-first chain that was inverted against easy-hr.
+      // Q-169's intent — an athlete whose LTHR the app LEARNED must not silently fall through to
+      // %HRmax zones that contradict the Friel zones their own Baselines screen shows — is now carried
+      // by the resolver itself rather than by a third fallback bolted onto this chain.
+      // D-lthr-one-anchor (audit 2026-07-17), extended 2026-08-20: resolved ONCE above
+      // (`priorityTwoLthr`) through the ONE resolver, for BOTH sports. The bike's private chain is gone.
       const lthr = priorityTwoLthr;
       if (lthr && lthr > 100) {
         // Q-171 — the Z2/Z3 boundary is sourced from the ONE easy band (`_shared/easy-hr.ts`), not a second
@@ -1979,10 +2037,11 @@ Deno.serve(async (req) => {
     
     let powerCurve: PowerCurve | null = null;
     let bestEfforts: BestEfforts | null = null;
+    let paceCurve: RunPaceCurve | null = null;
     
     if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
       // Calculate power curve for bikes
-      powerCurve = calculatePowerCurve(power_watts);
+      powerCurve = calculatePowerCurve(power_watts, hr_bpm);
       if (powerCurve) {
         console.log(`⚡ Power curve saved for bike workout`);
       }
@@ -1994,6 +2053,23 @@ Deno.serve(async (req) => {
       if (bestEfforts) {
         console.log(`🏃 Best efforts saved for run workout`);
       }
+      /**
+       * ⛔ THE PACE CURVE — the run twin of `power_curve` above, added 2026-08-20.
+       *
+       * `best_efforts` beside it is DISTANCE-based (fastest mile / 5K / 10K) and only exists when the
+       * run is long enough to contain the distance. Those points cluster: a runner's best mile and
+       * best 5K sit close together on the speed-duration curve, which is exactly the "no duration
+       * spread" case a critical-speed fit has to refuse. This samples fixed DURATIONS instead — the
+       * shape the bike's power curve has always used — so the curve gets sampled where it bends.
+       *
+       * ⚠️ IT JUDGES NOTHING. Heart rate and net elevation ride along on each window so the LEARNER
+       * can decide whether the effort was hard and whether it was downhill. Deciding here would put
+       * the gates in the one place that can only see a single activity.
+       */
+      paceCurve = buildRunPaceCurve(distance_m, time_s, hr_bpm, elevation_m);
+      if (paceCurve) {
+        console.log(`🏃 Pace curve: ${Object.keys(paceCurve).join(', ')}s windows`);
+      }
     }
 
     // Build partial computed data (only what this function writes)
@@ -2003,7 +2079,8 @@ Deno.serve(async (req) => {
       analysis,
       // Peak performance metrics (null if not calculated/applicable)
       power_curve: powerCurve,
-      best_efforts: bestEfforts
+      best_efforts: bestEfforts,
+      pace_curve: paceCurve
     };
 
     console.log('📝 About to UPDATE:', {

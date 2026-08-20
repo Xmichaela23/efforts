@@ -14,8 +14,9 @@ import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { frielRunZones } from '@/lib/friel-zones';
-import { resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
-import { ageEstimateMaxHr } from '@/lib/resolve-current-max-hr';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
+import { ageEstimateMaxHr, resolveCurrentMaxHr } from '@/lib/resolve-current-max-hr';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -63,6 +64,12 @@ equipment: {
   injuryHistory: string;
   injuryRegions: string[];
   trainingBackground: string;
+  /**
+   * Wizard/VDOT training paces (`{ base, race, steady, power, speed }`, sec/MILE). Declared here so
+   * the threshold card can hand the resolver all three of its inputs — without it the wizard tier is
+   * invisible on this screen and a 5K-derived pace reads as "not enough data".
+   */
+  effort_paces?: Record<string, unknown> | null;
 }
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
@@ -687,21 +694,63 @@ const handleSave = async () => {
       if (userId) {
         const restingHR = customRestingHR || garminRestingHR || 60;
 
-        const effectiveRunLTHR = manualRunLTHR || learnedFitness?.run_threshold_hr?.value || null;
-        const effectiveRunMax = manualRunMaxHR || learnedFitness?.run_max_hr_observed?.value || null;
-        const effectiveRideLTHR = manualRideLTHR || learnedFitness?.ride_threshold_hr?.value || null;
-        const effectiveRideMax = manualRideMaxHR || learnedFitness?.ride_max_hr_observed?.value || null;
+        /**
+         * ⛔ THROUGH THE RESOLVERS, OR THE SCREEN AND THE ENGINE PART COMPANY (2026-08-20).
+         *
+         * These read the learned columns RAW, which means no D-284 sample-count gate. The learner
+         * writes a FALLBACK when it finds no hard rides — `90% of observed max (estimated)`, with
+         * `sample_count: 0` — and a raw read takes it. Every server surface now refuses that value,
+         * so the zones saved from here would be built on a number the engine will not use: the screen
+         * showing one set of bins while workload and the analyser bin against another.
+         *
+         * ⚠️ IT IS VISIBLE ON A REAL SCREEN, WHICH IS HOW IT WAS FOUND: max HR 175, LTHR 158, and
+         * 175 × 0.90 = 157.5 → 158. The card labelled that "learned".
+         *
+         * The resolvers apply the gate, honour the athlete's typed override and their Q-174 choice,
+         * and are the same functions the server asks — so what is stored here is what the engine reads.
+         */
+        const baselinesForHr = {
+          learned_fitness: learnedFitness,
+          performance_numbers: data.performanceNumbers,
+          configured_hr_zones: { manual_run_lthr: manualRunLTHR, manual_ride_lthr: manualRideLTHR },
+        } as never;
+        const effectiveRunLTHR = manualRunLTHR || resolveCurrentLthr(baselinesForHr, { sport: 'run' }).bpm || null;
+        const effectiveRunMax = manualRunMaxHR || resolveCurrentMaxHr(
+          { learned_fitness: learnedFitness } as never, { sport: 'run', allowAgeEstimate: false },
+        ).bpm || null;
+        const effectiveRideLTHR = manualRideLTHR || resolveCurrentLthr(baselinesForHr, { sport: 'ride' }).bpm || null;
+        const effectiveRideMax = manualRideMaxHR || resolveCurrentMaxHr(
+          { learned_fitness: learnedFitness } as never, { sport: 'ride', allowAgeEstimate: false },
+        ).bpm || null;
 
         // Compute primary zone boundaries from the best available anchor
         const primaryLTHR = effectiveRunLTHR || effectiveRideLTHR;
         const primaryMax = effectiveRunMax || effectiveRideMax;
 
-        let zones: { min: number; max: number | null }[] | undefined;
-        if (primaryLTHR && primaryLTHR > 100) {
-          zones = getFrielZones(primaryLTHR).map(z => ({ min: z.min, max: z.max }));
-        } else if (primaryMax && primaryMax > 100) {
-          zones = getKarvonenZones(primaryMax, restingHR).map(z => ({ min: z.min, max: z.max }));
-        }
+        /**
+         * ⛔ ZONES ARE PER SPORT NOW (2026-08-20), AND THIS WAS THE REAL COLLAPSE.
+         *
+         * One `zones` array was built from `primaryLTHR` — which is `runLTHR || rideLTHR`, run
+         * PREFERRED — and `compute-workout-analysis:1580` reads it as **priority 1** for EVERY sport,
+         * above every resolver. So a ride's heart-rate zone bins were the athlete's RUNNING zones.
+         * Cycling heart rate sits 5-10 bpm below running at the same effort, so every ride binned one
+         * zone easy: real threshold work counted as tempo, and the time-in-zone the whole 80/20 read
+         * rests on was wrong for the bike.
+         *
+         * ⚠️ `zones` IS STILL WRITTEN, unchanged, and that is not laziness — Strava writes the same
+         * key with genuinely sport-agnostic zones (`strava-token-exchange:131`; Strava's own model has
+         * one HR zone set per athlete), and older rows carry it. It stays as the fallback. What is new
+         * is that when the app has a per-sport anchor it now says so instead of averaging two sports
+         * into one array.
+         */
+        const zonesFor = (lthr: number | null, maxHr: number | null) => {
+          if (lthr && lthr > 100) return getFrielZones(lthr).map(z => ({ min: z.min, max: z.max }));
+          if (maxHr && maxHr > 100) return getKarvonenZones(maxHr, restingHR).map(z => ({ min: z.min, max: z.max }));
+          return undefined;
+        };
+        const zonesRun = zonesFor(effectiveRunLTHR, effectiveRunMax);
+        const zonesRide = zonesFor(effectiveRideLTHR, effectiveRideMax);
+        const zones = zonesFor(primaryLTHR, primaryMax);
 
         const configuredZones: Record<string, any> = {
           source: 'manual',
@@ -711,11 +760,31 @@ const handleSave = async () => {
           manual_run_lthr: manualRunLTHR,
           manual_ride_max_hr: manualRideMaxHR,
           manual_ride_lthr: manualRideLTHR,
-          threshold_heart_rate: primaryLTHR,
-          max_heart_rate: primaryMax,
+          /**
+           * ⛔ ONLY WRITTEN WHEN IT IS UNAMBIGUOUS (2026-08-20). These two were
+           * `runLTHR || rideLTHR` and `runMax || rideMax` — one number claiming to speak for two
+           * sports, and every reader that trusted it got the RUN's number for a bike. That is the
+           * collapse the per-sport arrays above exist to end, and continuing to write the collapsed
+           * value would leave the next reader a loaded gun.
+           *
+           * Written only when a single sport has an anchor, so the value cannot be the wrong sport's.
+           * With both on file it is `null` and readers use the per-sport fields, which every reader in
+           * this app now does. With neither it was null anyway.
+           *
+           * ⚠️ NOT DELETED. The KEY stays because Strava writes it (`strava-token-exchange:138`) and
+           * rows written before today carry it — a reader hitting `undefined` versus a missing key is
+           * the same answer, but removing the key from the write would strand nothing and confuse the
+           * next person reading the shape.
+           */
+          threshold_heart_rate: (effectiveRunLTHR && effectiveRideLTHR) ? null : primaryLTHR,
+          max_heart_rate: (effectiveRunMax && effectiveRideMax) ? null : primaryMax,
           resting_heart_rate: restingHR,
         };
         if (zones) configuredZones.zones = zones;
+        // The per-sport arrays. Absent when that sport has no anchor — which is honest, and lets a
+        // reader fall back rather than bin a ride against running zones.
+        if (zonesRun) configuredZones.zones_run = zonesRun;
+        if (zonesRide) configuredZones.zones_ride = zonesRide;
 
         await supabase
           .from('user_baselines')
@@ -1222,6 +1291,25 @@ return (
                       {/* Running */}
                       {activeSport === 'running' && (() => {
                         const easyLearned = learnedFitness?.run_easy_pace_sec_per_km;
+                        /**
+                         * ⛔ THE THRESHOLD CARD READS THE RESOLVER NOW, NOT THE RAW LEARNED METRIC
+                         * (2026-08-19). It used to render `learned_fitness.run_threshold_pace_sec_per_km`
+                         * directly and only when that value existed, which broke in three ways at once:
+                         *
+                         *   · it showed a number the ENGINE might not be using (the same lie the easy-pace
+                         *     card above was fixed for — a number on screen that is not the number in use);
+                         *   · when the learner abstained the whole card VANISHED, so an athlete with a
+                         *     threshold pace derived from their easy runs saw nothing at all and never
+                         *     learned a derivation was standing in;
+                         *   · and "not enough data" was expressed as SILENCE, which is not the same as
+                         *     saying it. Michael only found the original bug because he went looking.
+                         */
+                        const resolvedThr = resolveCurrentRunThresholdPace({
+                          learned_fitness: learnedFitness,
+                          performance_numbers: data.performanceNumbers,
+                          effort_paces: data.effort_paces,
+                        } as any);
+                        const thrBasis = describeThresholdBasis(resolvedThr);
                         const thrLearned = learnedFitness?.run_threshold_pace_sec_per_km;
                         const hasEasyLearned = easyLearned?.value != null && Number.isFinite(Number(easyLearned.value)) && Number(easyLearned.value) > 0;
                         const hasThrLearned = thrLearned?.value != null && Number.isFinite(Number(thrLearned.value)) && Number(thrLearned.value) > 0;
@@ -1253,8 +1341,16 @@ return (
                               />
                               {showFiveKNudge && nudge && (
                                 <div className="mt-1 flex flex-col gap-2 pl-0.5">
+                                  {/* ⛔ THE DIRECTION IS SAID (2026-08-19). This read "Training data
+                                      suggests ~X. Update?" for a flag that could only fire one way.
+                                      It fires both ways now, and the stale-fast case — a saved 5K
+                                      FASTER than recent running — is the one that sets every derived
+                                      pace above current fitness. An athlete shown a slower number
+                                      with no reason will decline it. */}
                                   <p className="text-[11px] text-white/55 leading-snug max-w-[18rem]">
-                                    Training data suggests ~{nudge.implied_5k_label}. Update?
+                                    {nudge.direction === 'stale-fast'
+                                      ? `Your recent runs suggest ~${nudge.implied_5k_label}, slower than the ${nudge.manual_5k_label} on file. Paces built from the saved time come out faster than current fitness. Update?`
+                                      : `Your recent runs suggest ~${nudge.implied_5k_label}, faster than the ${nudge.manual_5k_label} on file. Update?`}
                                   </p>
                                   <div className="flex items-center gap-2">
                                     <button
@@ -1376,11 +1472,25 @@ return (
                                           }))}
                                           // flex-1 + a fixed min-height: both pills are the same size in both
                                           // states, so selecting one does not resize it and shove the other.
+                                          /**
+                                           * ⛔ THE SELECTED PILL WEARS THE SPORT'S COLOUR, NOT TEAL
+                                           * (2026-08-20). Generic teal said "something is selected";
+                                           * the sport colour says WHICH FACT this choice governs, and
+                                           * it is the same colour the card, the chips and the zone
+                                           * dots already use one screen up. Inline rather than a
+                                           * Tailwind class because the palette is a JS constant
+                                           * (`SPORT_COLORS`) and the class names would have to be
+                                           * enumerated per sport for the JIT to keep them.
+                                           */
                                           className={`flex-1 min-h-[2.75rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
                                             active
-                                              ? 'bg-teal-500/15 border-teal-500/50 text-white'
+                                              ? 'text-white'
                                               : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
                                           } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                          style={active ? {
+                                            backgroundColor: `${SPORT_COLORS.run}26`,
+                                            borderColor: `${SPORT_COLORS.run}80`,
+                                          } : undefined}
                                           title={key === 'manual'
                                             ? 'Your entered pace is used, even if your runs say otherwise.'
                                             : 'Tracks what your easy runs actually show, and keeps updating.'}
@@ -1399,23 +1509,37 @@ return (
                                 </div>
                               )}
                             </div>
-                            {hasThrLearned && (
-                            <div className="flex flex-col gap-1.5 min-w-[10rem]">
+                            {/* ⛔ ALWAYS RENDERED. "Not enough data" is a STATE the athlete is told, not
+                                an absence they have to notice. Fixed width + min-height for the same
+                                reason the easy card has them: the states carry different amounts of
+                                provenance and the page jumped when they swapped. */}
+                            <div className="flex flex-col gap-1.5 w-[17rem] max-w-full">
                               <label className="text-xs text-white/50 font-medium">Threshold pace</label>
-                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left min-h-[6.5rem]">
                                 <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-lg font-medium text-white tabular-nums">{formatPace(thrLearned.value)}</span>
-                                  <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(thrLearned.confidence)}</span>
+                                  <span className="text-lg font-medium text-white tabular-nums">
+                                    {thrBasis.showNumber ? formatPaceSecPerMi(resolvedThr.sec_per_mi) : '—'}
+                                  </span>
+                                  {/* Confidence dots belong to a MEASURED value. A derived one has no
+                                      sample count, and borrowing the measured one's dots would dress an
+                                      inference as a measurement. */}
+                                  {thrBasis.state === 'measured' && hasThrLearned && (
+                                    <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(thrLearned.confidence)}</span>
+                                  )}
                                 </div>
-                                {learnedBasisLine(thrLearned, 'run') && (
+                                {/* THE STATE, SAID PLAINLY. One owner for these words: `describeThresholdBasis`. */}
+                                <p className="text-[11px] text-white/50 mt-1 leading-snug">{thrBasis.label}</p>
+                                {thrBasis.note && (
+                                  <p className="text-[11px] text-white/35 mt-0.5 leading-snug">{thrBasis.note}</p>
+                                )}
+                                {thrBasis.state === 'measured' && learnedBasisLine(thrLearned, 'run') && (
                                   <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(thrLearned, 'run')}</p>
                                 )}
-                                {learnedAsOfLine(thrLearned) && (
+                                {thrBasis.state === 'measured' && learnedAsOfLine(thrLearned) && (
                                   <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>
                                 )}
                               </div>
                             </div>
-                            )}
                           </div>
                         </div>
                         );
@@ -1526,11 +1650,17 @@ return (
                                                   ...prev,
                                                   performanceNumbers: { ...prev.performanceNumbers, ftp_source: key },
                                                 }))}
+                                                // Sport-coloured selection — the cycling twin of the run
+                                                // pills above; see the note there.
                                                 className={`flex-1 min-h-[2.75rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
                                                   active
-                                                    ? 'bg-teal-500/15 border-teal-500/50 text-white'
+                                                    ? 'text-white'
                                                     : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
                                                 }`}
+                                                style={active ? {
+                                                  backgroundColor: `${SPORT_COLORS.cycling}26`,
+                                                  borderColor: `${SPORT_COLORS.cycling}80`,
+                                                } : undefined}
                                                 title={key === 'manual'
                                                   ? 'Your entered FTP is used, even if your rides estimate a different one.'
                                                   : 'Tracks what your hard rides estimate, and keeps updating.'}
@@ -2088,7 +2218,13 @@ return (
                           icon: <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />,
                           color: SPORT_COLORS.run,
                           learnedMaxHR: learnedFitness?.run_max_hr_observed?.value || null,
-                          learnedLTHR: learnedFitness?.run_threshold_hr?.value || null,
+                          // ⛔ RESOLVED, NOT RAW (2026-08-20) — see `effectiveRunLTHR` above. A raw read
+                          // shows the learner's `88%/90% of observed max (estimated)` fallback and calls
+                          // it "learned"; the resolver refuses it, and so must the card.
+                          learnedLTHR: resolveCurrentLthr(
+                            { learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as never,
+                            { sport: 'run' },
+                          ).bpm,
                           learnedThresholdPace: learnedFitness?.run_threshold_pace_sec_per_km || null,
                           manualMaxHR: manualRunMaxHR, setManualMaxHR: setManualRunMaxHR,
                           manualLTHR: manualRunLTHR, setManualLTHR: setManualRunLTHR,
@@ -2100,7 +2236,10 @@ return (
                           icon: <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />,
                           color: SPORT_COLORS.cycling,
                           learnedMaxHR: learnedFitness?.ride_max_hr_observed?.value || null,
-                          learnedLTHR: learnedFitness?.ride_threshold_hr?.value || null,
+                          learnedLTHR: resolveCurrentLthr(
+                            { learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as never,
+                            { sport: 'ride' },
+                          ).bpm,
                           learnedThresholdPace: null,
                           manualMaxHR: manualRideMaxHR, setManualMaxHR: setManualRideMaxHR,
                           manualLTHR: manualRideLTHR, setManualLTHR: setManualRideLTHR,
@@ -2126,6 +2265,9 @@ return (
                             const model = getZoneModel(effectiveLTHR, effectiveMaxHR, restingInfo.value);
 
                             const maxSource = sport.manualMaxHR ? 'manual' : sport.learnedMaxHR ? 'observed' : ageEstimates ? 'age est.' : '';
+                            // ⚠️ "learned" HERE MEANS MEASURED, and it now only says so when that is true.
+                            // The value is resolved (gated), so a formula-derived anchor no longer reaches
+                            // this line at all — it falls to the age estimate, which is labelled as one.
                             const lthrSource = sport.manualLTHR ? 'manual' : sport.learnedLTHR ? 'learned' : ageEstimates ? 'age est.' : '';
 
                             return (

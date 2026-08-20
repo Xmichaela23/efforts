@@ -398,6 +398,21 @@ export type StrengthPrimaryArgs = {
   /** sec per MILE, from `resolveCurrentRunThresholdPace`. */
   thresholdPaceSecPerMi?: number | null;
   /**
+   * ⛔ WHERE THAT NUMBER CAME FROM, AND THE SESSION COPY MUST SAY IT (2026-08-19). From
+   * `describeThresholdBasis` — `'measured'` | `'derived-from-easy'` | `'stated'` | `'derived-from-5k'`
+   * | `'unknown'`.
+   *
+   * ⛔ THE COPY USED TO INFER IT FROM NULLNESS: `thresholdPaceSecPerMi != null ? 'measured' :
+   * 'derived'`. That was wrong for three of the five states — a pace the athlete TYPED, a pace the
+   * VDOT table produced from their 5K, and a pace worked out from their easy runs were all announced
+   * to them as *"the pace comes from your measured threshold."* A number presented as measured when
+   * it was inferred is the score that lies, and the athlete has no way to know.
+   *
+   * Absent → the copy falls back to naming the 5K, which is what it did before this field existed,
+   * so an old caller says nothing new rather than something false.
+   */
+  thresholdPaceBasis?: 'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k' | 'unknown' | null;
+  /**
    * sec per MILE, from `resolveCurrent5kPace`. ⛔ THE RUN GATE TESTS THIS, NOT A THRESHOLD PACE —
    * §7: *"there is no independent threshold pace on the athlete"*; the app derives it as 5K + 20
    * s/mi when nothing measured exists (`materialize-plan`'s own rule). So the number that has to be
@@ -1550,10 +1565,43 @@ function thresholdGroundNote(terrain?: HardRunTerrain): string {
   }
 }
 
+/**
+ * ⛔ ONE SENTENCE PER PROVENANCE, AND NONE OF THEM OVERSTATES. `describeThresholdBasis`
+ * (`src/lib/resolve-current-run-pace.ts`) owns the states; this owns how the SESSION says them,
+ * because a session description is written in the second person and a baselines card is not.
+ *
+ * ⚠️ `unknown` still produces a session — the hard-day gate tests the 5K, not this — but it says
+ * the pace is not on file rather than naming a source that does not exist. Voice: fact first, no
+ * imperative, the consequence stated conditionally.
+ */
+const THRESHOLD_BASIS_LINE: Record<'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k' | 'unknown', string> = {
+  measured: 'The pace comes from your measured threshold.',
+  'derived-from-easy':
+    'The pace is worked out from your easy runs, not from a test — threshold sits about 19% faster '
+    + 'than easy. If your easy runs are deliberately slower than easy, this comes out slow with them.',
+  stated: 'The pace is the threshold you entered.',
+  'derived-from-5k': 'The pace is derived from your 5K — threshold sits about 20 s/mi slower.',
+  /**
+   * ⚠️ UNREACHABLE FROM `thresholdRunSession` AND KEPT ANYWAY — the one case in this file where that
+   * is the right call. §7's `hardDayGate` drops a prescribed hard RUN unless a 5K or a threshold pace
+   * exists, and `materialize-plan` prices the token off 5K + 20 s/mi when the threshold resolver
+   * abstains — so a surviving threshold session always has a number, and `generate-strength-plan`
+   * translates `unknown` to `derived-from-5k` before it ever arrives here.
+   *
+   * It stays because this is a LOOKUP TABLE over a shared union, not a branch: the union comes from
+   * `describeThresholdBasis`, where `unknown` IS reachable (the baselines card renders it), and a
+   * table with a hole would fail at the type level the day a second caller appears. The cost is one
+   * string; the alternative is a narrower duplicate union.
+   */
+  unknown:
+    'No threshold pace is on file, so this one has no number yet. Effort is the target: comfortably '
+    + 'hard, a sentence and not a conversation.',
+};
+
 function thresholdRunSession(
   day: string,
   wave: HardWave,
-  basis: 'measured' | 'derived',
+  basis: 'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k' | 'unknown',
   terrain?: HardRunTerrain,
 ): PlanSession {
   const st = thresholdStep(wave);
@@ -1575,9 +1623,9 @@ function thresholdRunSession(
         : drop > 0
           ? `Same shape as the first block, run about ${drop} s/mi faster. The length held; now the pace moves. `
           : 'The reps get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
-      + (basis === 'measured'
-        ? 'The pace comes from your measured threshold.'
-        : 'The pace is derived from your 5K — threshold sits about 20 s/mi slower.')
+      // ⛔ THE THREE STATES, SAID PLAINLY RATHER THAN PICKED SILENTLY. The athlete reads this line
+      // and it is the only place the session tells them where its number came from.
+      + THRESHOLD_BASIS_LINE[basis]
       + thresholdGroundNote(terrain),
     duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
     // ⚠️ `_f{sec}` IS THE FASTER-THAN-THRESHOLD SUFFIX, and it is OPTIONAL — the token without it is
@@ -4421,8 +4469,14 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           role === 'club'
             ? clubEnduranceSession('run', h.day, hardRunSessionMinutes(h.terrain))
             : role === 'threshold'
+              // ⛔ THE BASIS IS ASKED FOR, NOT INFERRED FROM NULLNESS. See `thresholdPaceBasis`.
+              // ⚠️ THE FALLBACK IS `derived-from-5k`, NOT `unknown`. An older caller that passes no
+              // basis still reaches this line only AFTER `hardDayGate` proved a 5K or a threshold
+              // exists, and `materialize-plan` prices the token off 5K + 20 s/mi when the threshold
+              // resolver abstains — so "no number yet" would be false on a card that shows a pace.
               ? thresholdRunSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex },
-                asPositiveNumber(args.thresholdPaceSecPerMi) != null ? 'measured' : 'derived', h.terrain)
+                args.thresholdPaceBasis ?? 'derived-from-5k',
+                h.terrain)
               // ⛔ THE GOAL ONLY REACHES THE INTENSITY SESSION. A threshold day has no goal question
               // — its session is settled — and `role` is what decides which branch is taken above.
               : hardRunSession(h.day, heavyLowerDays, h.terrain,

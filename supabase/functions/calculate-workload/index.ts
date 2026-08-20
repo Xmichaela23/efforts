@@ -250,21 +250,18 @@ serve(async (req) => {
             : baseline.learned_fitness;
           
           lthrLearnedObj = learned;
-          // Run threshold HR from learned data (superseded by the resolver after both blocks — kept so
-          // ride/max reads below are unaffected).
-          if (learned?.run_threshold_hr?.value) {
-            runThresholdHr = Number(learned.run_threshold_hr.value);
-          }
+          // ⛔ THE RUN THRESHOLD READ IS DELETED (2026-08-19). It assigned `runThresholdHr` here and
+          // `:312` overwrote it unconditionally with the resolver's answer, so this line's only effect
+          // was to make the file look like it held two opinions about one anchor. The ride and max
+          // reads below are untouched — they have no resolver (run-only) and are the real work of
+          // this block.
           
           // Run max HR from learned data (for TRIMP)
           if (learned?.run_max_hr_observed?.value) {
             runMaxHr = Number(learned.run_max_hr_observed.value);
           }
           
-          // Ride threshold HR from learned data
-          if (learned?.ride_threshold_hr?.value) {
-            rideThresholdHr = Number(learned.ride_threshold_hr.value);
-          }
+          // The ride threshold is resolved below, beside the run one — see the resolver block.
           
           // Ride max HR from learned data (for TRIMP)
           if (learned?.ride_max_hr_observed?.value) {
@@ -310,6 +307,17 @@ serve(async (req) => {
     // ungated read would have accepted. The device-first reconciliation below still wins with the
     // workout's own threshold_heart_rate column. Byte-identical for a learned athlete with >0 samples.
     runThresholdHr = resolveCurrentLthr({ learned_fitness: lthrLearnedObj, performance_numbers: lthrPerfObj }).bpm;
+    /**
+     * ⛔ AND THE BIKE, AS OF 2026-08-20. `resolveCurrentLthr` was RUN-ONLY, so the ride anchor was
+     * still the raw `ride_threshold_hr` read above: no sample-count gate, so a formula-derived bike
+     * threshold ("88% of observed max") could anchor the TRIMP ladder, and no sight of the athlete's
+     * typed `manual_ride_lthr`. Placed HERE rather than at the raw read because both inputs are only
+     * assembled by this point.
+     */
+    rideThresholdHr = resolveCurrentLthr(
+      { learned_fitness: lthrLearnedObj, performance_numbers: lthrPerfObj },
+      { sport: 'ride' },
+    ).bpm;
 
     // If workout_data not provided, fetch full workout data
     if (!finalWorkoutData) {

@@ -143,3 +143,80 @@ Deno.test('the two paces never contradict each other, whatever the input', () =>
     );
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STEP 5c — THE FITTED THRESHOLD OUTRANKS THE AVERAGED ONE (2026-08-20)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** A run carrying a stored pace curve, the shape `compute-workout-analysis` writes. */
+const runWithCurve = (
+  date: string,
+  windows: Record<string, { distanceM: number; timeS: number; avgHr: number }>,
+) => run({
+  date, duration: 40, moving_time: 40,
+  avg_heart_rate: EASY_HR, max_heart_rate: MAX_HR, avg_pace: 480,
+  computed: { pace_curve: Object.fromEntries(
+    Object.entries(windows).map(([k, w]) => [k, { ...w, netAscentM: 0 }]),
+  ) },
+});
+
+/** Points exactly on distance = CS·t + D'. */
+const onCurve = (csMps: number, dPrimeM: number, timeS: number, avgHr: number) =>
+  ({ distanceM: csMps * timeS + dPrimeM, timeS, avgHr });
+
+Deno.test('5c: two hard efforts in different bands publish a FITTED threshold', () => {
+  const CS = 3.4, DP = 160, HARD = 168;
+  const runs = [
+    runWithCurve('2026-08-01', { '360': onCurve(CS, DP, 360, HARD) }),
+    runWithCurve('2026-08-08', { '1200': onCurve(CS, DP, 1200, HARD) }),
+  ];
+  const out = analyzeRuns([...easyRuns(480), ...thresholdRuns(390), ...runs] as never);
+  const tp = out.threshold_pace;
+  assert(tp != null, 'no threshold published');
+  assert(/critical speed/i.test(String(tp!.source)), `not the fitted tier: ${tp!.source}`);
+  // Recovers the curve it was built from, not an average of anything.
+  assertEquals(tp!.value, Math.round(1000 / CS));
+});
+
+Deno.test('5c: one session cannot publish — it is one duration band', () => {
+  const CS = 3.4, DP = 160, HARD = 168;
+  const runs = [runWithCurve('2026-08-01', { '720': onCurve(CS, DP, 720, HARD) })];
+  const out = analyzeRuns([...easyRuns(480), ...thresholdRuns(390), ...runs] as never);
+  const src = String(out.threshold_pace?.source ?? '');
+  assert(!/critical speed/i.test(src), `a single band published a fit: ${src}`);
+});
+
+Deno.test('5c: easy-heart-rate windows never become a threshold', () => {
+  // The "best 6 minutes of a jog" case. Same geometry, heart rate well under the gate.
+  const CS = 3.4, DP = 160, EASY = 120;
+  const runs = [
+    runWithCurve('2026-08-01', { '360': onCurve(CS, DP, 360, EASY) }),
+    runWithCurve('2026-08-08', { '1200': onCurve(CS, DP, 1200, EASY) }),
+  ];
+  const out = analyzeRuns([...easyRuns(480), ...thresholdRuns(390), ...runs] as never);
+  const src = String(out.threshold_pace?.source ?? '');
+  assert(!/critical speed/i.test(src), `a jog was fitted as threshold: ${src}`);
+});
+
+Deno.test('5c: runs with no pace curve leave the older tier untouched', () => {
+  // No backfill — old runs carry no curve, and the behaviour is exactly what it was before 5c.
+  const out = analyzeRuns([...easyRuns(480), ...thresholdRuns(390)] as never);
+  const src = String(out.threshold_pace?.source ?? '');
+  assert(!/critical speed/i.test(src), src);
+});
+
+Deno.test('5c: a fit slower than the learned EASY pace publishes nothing', () => {
+  // ⛔ THE ORIGINAL BUG, ARRIVING AT THE NEW TIER — and the test that was missing until mutation
+  // showed the wiring was unpinned. The fit's own gate is tested in `run-critical-speed.test.ts`;
+  // this pins that the LEARNER actually hands it the easy pace it just learned. With `null` passed
+  // instead, the gate has no reference and this impossible read would publish.
+  const HARD = 168;
+  const SLOW = 1.9;   // 1.9 m/s = 526 s/km, slower than the fixtures' 480 s/km easy pace
+  const runs = [
+    runWithCurve('2026-08-21', { '360': onCurve(SLOW, 160, 360, HARD) }),
+    runWithCurve('2026-08-22', { '1200': onCurve(SLOW, 160, 1200, HARD) }),
+  ];
+  const out = analyzeRuns([...easyRuns(480), ...thresholdRuns(390), ...runs] as never);
+  const src = String(out.threshold_pace?.source ?? '');
+  assert(!/critical speed/i.test(src), `published a threshold slower than easy: ${src}`);
+});

@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // D-326 layer 2 — the verdict supplier. Pure grouping + selection; the query in the strength branch
 // is the only database part.
 import {
@@ -29,7 +30,7 @@ import {
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB, type BarbellLift } from '../shared/strength-system/barbell-maxes.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 // ⛔ THE INTAKE'S OWN SEED TABLE, read here to tell an ANSWER from a PREFILL. See the precedence
 // note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
 // cannot drift; `create-goal-and-materialize-plan` must be redeployed when it changes.
@@ -313,10 +314,32 @@ function mergeRunPerformanceSeeds(
 ): RunMergeResult | null {
   if (!baseline) return null;
   const learned = parseLearnedFitnessForSeed(baseline.learned_fitness);
-  const th = learned?.run_threshold_pace_sec_per_km;
-  const easy = learned?.run_easy_pace_sec_per_km;
-  const hasLearnedTh = learnedPaceUsable(th);
-  const hasLearnedEasy = learnedPaceUsable(easy);
+  /**
+   * ⛔ THROUGH THE RESOLVERS (2026-08-19, TRUTH-MAP §5) — with ONE tier deliberately refused.
+   *
+   * This read the learned columns raw at a medium/high bar, which is the resolvers' own tier 1 minus
+   * the athlete's Q-174 choice and minus any pace they had TYPED. An athlete who said "use my number"
+   * had it ignored while seeding the very table their plan is built from.
+   *
+   * ⛔ `effort_paces` IS REFUSED AS A SOURCE HERE, AND THAT IS THE WHOLE CARE OF THIS BLOCK. This
+   * function WRITES `effort_paces`. The resolvers' wizard tier READS `effort_paces`. Accepting it
+   * would seed the table from itself — last week's derived number laundered into this week's input,
+   * with nothing new measured. So only a MEASURED or ASSERTED pace may seed: `learned`, `learned-low`,
+   * `manual`, `manual-chosen`, and the easy-pace derivation (which rests on measured easy runs, not on
+   * this table).
+   */
+  const SEEDABLE = new Set(['learned', 'learned-low', 'manual', 'manual-chosen', 'derived-from-easy']);
+  const seedBaselines = {
+    learned_fitness: baseline.learned_fitness,
+    performance_numbers: baseline.performance_numbers,
+  } as never;
+  const rThr = resolveCurrentRunThresholdPace(seedBaselines);
+  const rEasy = resolveCurrentRunEasyPace(seedBaselines);
+  const hasLearnedTh = rThr.sec_per_mi != null && SEEDABLE.has(String(rThr.source));
+  const hasLearnedEasy = rEasy.sec_per_mi != null && SEEDABLE.has(String(rEasy.source));
+  // Kept in sec/KM shape so the arithmetic below is untouched — one conversion, at the boundary.
+  const th = hasLearnedTh ? { value: rThr.sec_per_km as number } : null;
+  const easy = hasLearnedEasy ? { value: (rEasy.sec_per_mi as number) / 1.609344 } : null;
 
   let foundation: TrainingPaces | null = null;
   let anchorVdot: number | undefined;
@@ -692,9 +715,19 @@ async function buildRunObservedFitness(
 function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
   const swim = arc.swim_training_from_workouts;
   if (swim && swim.completed_swim_sessions_last_90_days === 0) return 'swim';
-  const lf = arc.learned_fitness as Record<string, unknown> | null | undefined;
-  const ftp = lf?.ride_ftp_estimated as { confidence?: string } | undefined;
-  if (ftp && typeof ftp === 'object' && String(ftp.confidence || '').toLowerCase() === 'low') {
+  /**
+   * ⛔ THROUGH THE FTP RESOLVER (2026-08-19, TRUTH-MAP §5). This read the learned estimate's
+   * `confidence` raw and called the bike the limiter whenever it was `low` — including for an athlete
+   * who had TYPED an FTP. A number the athlete asserted is not a data gap, so the bike was being named
+   * as the weak discipline on the strength of an estimate the app was not even using.
+   *
+   * The resolver reports `low` only when a low-confidence learned value is genuinely what it landed on
+   * (its `learned-low` tier) — i.e. exactly when there is nothing better.
+   */
+  const resolvedFtp = resolveCurrentFtp({
+    learned_fitness: arc.learned_fitness, performance_numbers: arc.performance_numbers,
+  } as never);
+  if (resolvedFtp.source === 'learned-low' || (resolvedFtp.value == null && arc.learned_fitness)) {
     return 'bike';
   }
   return 'run';

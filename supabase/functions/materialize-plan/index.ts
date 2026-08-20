@@ -28,7 +28,8 @@ import {
   swimGearNormalized,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
+import { boundInferredThresholdSecPerMi } from '../../../src/lib/run-threshold-from-easy.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 
 // Type for plan adjustments
@@ -643,6 +644,19 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
     }
   }
 
+  // §1b-threshold (2026-08-19) — the SAME resolver, for the sibling fact. See the assignment site for
+  // why this was missing: the two branches below never read `learned_fitness`, so a measured threshold
+  // pace could not compete with the typed 5K here — it was not in the running. The value arriving here
+  // is already held to the band the athlete's measured easy pace implies, so a stale 5K cannot come
+  // through it too fast.
+  if (which === 'threshold') {
+    const resolvedThr = (b as any)._resolvedThresholdSecPerMi;
+    if (typeof resolvedThr === 'number' && Number.isFinite(resolvedThr) && resolvedThr > 0) {
+      console.log(`[Paces] Using RESOLVED threshold: ${resolvedThr}s/mi (basis=${(b as any)._thresholdBasis ?? 'unknown'})`);
+      return resolvedThr;
+    }
+  }
+
   // §1c — 5K PACE via the ONE resolver (`src/lib/resolve-current-5k-pace.ts`), the third of the family
   // after FTP and easy/threshold (D-287). It owns every key spelling, the sec/mi unit, and the
   // distinction this file used to get wrong: `performance_numbers.fiveK` is a race CLOCK ("22:30"), and
@@ -676,10 +690,11 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
       console.log(`[Paces] Using effort_paces.race for marathon: ${paceSec}s/mi (${min}:${String(sec).padStart(2,'0')}/mi)`);
       return b.effort_paces.race;
     }
-    if (which === 'threshold' && b.effort_paces.steady) {
-      console.log(`[Paces] Using effort_paces.steady for threshold: ${b.effort_paces.steady}s/mi`);
-      return b.effort_paces.steady;
-    }
+    // ⛔ THE `effort_paces.steady` BRANCH IS DELETED (2026-08-19), NOT DISABLED. §1b-threshold above
+    // resolves the same key through `resolveCurrentRunThresholdPace`, which reads `steady` as its
+    // wizard tier and returns before this line — so this could only ever have fired when the
+    // resolver had already declined the identical value, which cannot happen. An unreachable second
+    // authority on one fact is how this file grew two of everything; it goes rather than sits.
   }
   
   // FALLBACK to legacy performance_numbers ('fivek' returned at §1c above — it has an owner now)
@@ -692,9 +707,19 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
       if (easyPace) return easyPace - 30; // Marathon is faster than easy, typically ~30s/mi
     }
   } else if (which === 'threshold') {
-    // Threshold not in legacy - estimate from 5K pace + 20s
+    // Threshold not in legacy - estimate from 5K pace + 20s.
+    //
+    // ⛔ AND IT IS HELD TO THE SAME BAND AS EVERY OTHER INFERENCE (2026-08-19). This is the RAW
+    // stale-5K path — reached when the athlete has a typed 5K and no `effort_paces` at all — and it
+    // was the one place a threshold pace was still derived from a number that nothing measures and
+    // nothing dates. `+20 s/mi` off a 5K the athlete could run two years ago prescribes a session
+    // they cannot run today. Same invariant, same helper, no second rule.
     const fkp = secPerMiFromBaseline(b, 'fivek');
-    if (fkp) return fkp + 20;
+    if (fkp) {
+      const bounded = boundInferredThresholdSecPerMi(fkp + 20, (b as any)._measuredEasySecPerMi);
+      if (bounded.replaced) console.log(`[Paces] 5K+20 (${fkp + 20}s/mi) contradicted the measured easy pace — held to ${bounded.sec_per_mi}s/mi`);
+      return bounded.sec_per_mi;
+    }
     return null;
   } else {
     raw = b.easyPace ?? b.easy_pace;
@@ -3426,6 +3451,47 @@ Deno.serve(async (req) => {
         (baselines as any)._resolvedEasySecPerMi = easyResolved.sec_per_mi;
         console.log(`[Paces] Resolved easy: ${easyResolved.sec_per_mi}s/mi (source=${easyResolved.source})`);
       }
+
+      // ⛔ THRESHOLD PACE VIA THE SAME RESOLVER — AND IT HAD NEVER BEEN CONSULTED HERE AT ALL
+      // (2026-08-19). Easy pace got the D-287 treatment above; threshold did not, and the omission
+      // was not a smaller version of the same gap — it was a bigger one. The chain below resolves
+      // threshold as `effort_paces.steady` and then `5K pace + 20 s/mi`, **neither of which reads
+      // `learned_fitness`**. So a MEASURED threshold pace did not lose to the athlete's typed 5K on
+      // this path; it was never entered. The 5K won by walkover, on every unpinned plan.
+      //
+      // ⚠️ AND THE 5K IS TYPED ONCE, MEASURED BY NOTHING, AND DATED BY NOTHING. As fitness changes
+      // it goes stale, and a stale 5K prescribes a threshold that is too FAST — which in a
+      // strength-led block is the expensive direction, because the session stops being threshold
+      // and starts eating the lifting. The resolver now holds an inferred threshold to the band the
+      // athlete's own measured easy pace implies (`src/lib/run-threshold-from-easy.ts`), so the
+      // number that arrives here is already bounded.
+      //
+      // Sits BELOW the snapshot pin (§1 — a plan freezes its paces for its lifetime, unchanged) and
+      // ABOVE the ad-hoc chain, exactly as easy pace does. `_thresholdBasis` travels with it so the
+      // session copy can say which of the three states the athlete is in rather than guessing from
+      // whether the number is non-null.
+      // ⚠️ RESOLVED AGAINST `effortPaces`, NOT `ub.effort_paces`. The block above may have
+      // RECALCULATED the paces from `effort_score` and used the new ones for everything downstream;
+      // handing the resolver the stale row would make it answer about a different set of numbers
+      // than the chain below it reads, which is the divergence this whole file keeps deleting.
+      const thrResolved = resolveCurrentRunThresholdPace({
+        learned_fitness: ub?.learned_fitness ?? null,
+        performance_numbers: ub?.performance_numbers ?? null,
+        effort_paces: (effortPaces ?? null) as any,
+      } as any);
+      if (thrResolved.sec_per_mi != null) {
+        (baselines as any)._resolvedThresholdSecPerMi = thrResolved.sec_per_mi;
+        (baselines as any)._thresholdBasis = describeThresholdBasis(thrResolved).state;
+        console.log(`[Paces] Resolved threshold: ${thrResolved.sec_per_mi}s/mi (source=${thrResolved.source})`);
+      } else {
+        // LAW 2 / D-285 — no number, and we say so rather than letting the chain below invent one.
+        console.log('[Paces] No threshold pace on file — the chain below is the last word');
+      }
+
+      // The MEASURED easy pace, carried so the legacy `5K + 20 s/mi` branch can be held to the same
+      // band the resolver holds its own wizard tier to. Same accessor, so there is one definition of
+      // "which easy pace counts" rather than a second copy of the rule down there.
+      (baselines as any)._measuredEasySecPerMi = resolveMeasuredEasyPaceSecPerMi(ub as any);
 
       // FTP via shared precedence helper. Quality-gated for plan baking — accepts learned
       // (≥medium) > manual but REJECTS 'learned-low' (low-confidence values shouldn't get

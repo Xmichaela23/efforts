@@ -12,7 +12,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-primary-plan.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
-import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { describeThresholdBasis, resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
@@ -308,6 +308,25 @@ Deno.serve(async (req: Request) => {
       // is not — the block rebuilds.
       ftpWatts: ftpResolved.value,
       thresholdPaceSecPerMi: thrResolved.sec_per_mi,
+      /**
+       * ⛔ AND WHERE IT CAME FROM. The session copy used to infer "measured" from the number merely
+       * being non-null, which announced a typed value and a VDOT lookup as measurements.
+       *
+       * ⛔ `unknown` IS TRANSLATED, NOT PASSED (2026-08-19). The resolver abstaining does NOT mean the
+       * session ships without a pace: `materialize-plan`'s threshold token falls through to **5K + 20
+       * s/mi** (`:1596`), which is that file's own long-standing rule and is exactly why §7's hard-day
+       * gate tests the 5K rather than a threshold. So a session whose resolver said "unknown" would
+       * have told the athlete "no number yet" on a card that then showed them a pace target — the
+       * two-authorities lie, one screen apart.
+       *
+       * The gate guarantees the 5K exists for any prescribed hard run that survives, so when the
+       * resolver abstains the honest word is `derived-from-5k`.
+       */
+      thresholdPaceBasis: (() => {
+        const b = describeThresholdBasis(thrResolved).state;
+        if (b !== 'unknown') return b;
+        return fiveKResolved.sec_per_mi != null ? 'derived-from-5k' : 'unknown';
+      })(),
       fiveKPaceSecPerMi: fiveKResolved.sec_per_mi,
       // Bike hours (D-323 §6) — hours, never miles. Used on the bike-PRIMARY path.
       targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0
