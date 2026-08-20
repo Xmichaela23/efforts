@@ -819,3 +819,56 @@ week is what the athlete asked for in SESSIONS; it is not what they asked for in
 surface says so. `run-mileage.test.ts` asserts the week never EXCEEDS the ask and says nothing about
 falling short. Noticed while opening the count to 1; not chased.
 
+
+---
+
+## Q-275 — `analyze-running-workout` can permanently null the columns the new curves live on (2026-08-20)
+
+**HYPOTHESIS, NOT A FINDING — never observed.** A memory-saving step blanks
+`computed.best_efforts` / `power_curve` / `raw_laps` on the in-memory copy (`:585`), and a rare
+legacy duration-repair path writes that same object back to the DB (`:2146`). By code trace they
+share a reference (`workoutForFact = {...workout}` is a shallow spread), so on that path the blanked
+fields would save as **null, permanently**.
+
+It fires only when `duration_s_moving` is off by ≥3×. **It matters more now:** the run pace curve
+(D-437) and the bike's threshold HR (D-441) both live on the columns it blanks.
+
+**What would settle it:** a workout with a 3× duration mismatch, or a targeted read of `computed`
+before/after that repair path runs. The file is 5,002 lines with **zero test files** — it is the
+next session's job per the ENGINE-STATE banner.
+
+---
+
+## Q-276 — Wrist optical HR can cadence-lock and feed a jog into the run fit (2026-08-20)
+
+Cadence lock makes a wrist sensor track step rate instead of pulse, producing a plausible-but-wrong
+elevated reading. Since D-437 removed the HR gate, HR only affects CONFIDENCE, so a locked reading
+can lift a fit from `moderate` to `high` without changing the number. The curve's own gates
+(monotonic, R², faster-than-easy) should reject a jog regardless — **unproven.**
+
+**What would settle it:** a fixture shaped like cadence lock — easy-paced windows carrying elevated
+HR — asserting the fit still abstains and that confidence does not reach `high`.
+
+---
+
+## Q-277 — The typed 5K still has no honest date (2026-08-20)
+
+`effort_updated_at` exists but `materialize-plan:3396` refreshes it on a recompute from an unchanged
+`effort_score`, so it dates the recompute, not the athlete's input. The "5K Time" box writes no stamp
+at all.
+
+⛔ **If added it must be a RACE date the athlete enters, not an auto-stamp.** An auto-stamp records
+when they typed it; type a 2019 PB today and the app calls it fresh, which is worse than no date.
+Low priority — the retest flag (D-436) works by disagreement with training, which is stronger
+evidence than an age, and only fails for an athlete with almost no run history.
+
+---
+
+## Q-278 — The shared `threshold_heart_rate` field is closed for readers, open as a model (2026-08-20)
+
+Nothing bike-related reads it (D-439). But `TrainingBaselines` **still writes it** — now only when a
+single sport has an anchor, so it cannot be the wrong sport's, yet the field is still there and still
+filled from the run number in the single-sport case, waiting for the next reader that trusts it.
+
+**The real fix is the WRITER emitting per-sport fields only** — not another guard on a reader.
+⛔ Do not record this as "closed"; the next session reads closed and stops looking.

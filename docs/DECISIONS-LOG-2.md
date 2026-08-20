@@ -2425,3 +2425,143 @@ anywhere in the repo** — file, caller, script, all gone.
 ⚠️ **If library plans are ever wanted again, that is a BUILD, not a re-enable.** Recorded so the next
 reader does not go looking for the switch.
 
+
+---
+
+## D-436 — A threshold pace is bounded by the athlete's own measured easy pace (2026-08-20)
+
+A threshold pace **slower than the athlete's easy pace** reached a real screen: easy 12:35/mi,
+threshold 14:44/mi. `fe0d8b0f` fixed the learner. This is the question underneath — when the
+measured value abstains, what answers.
+
+**THE RULE, ONE PLACE (`src/lib/run-threshold-from-easy.ts`):** an *inferred* threshold must sit in
+the band a MEASURED easy pace implies — `easy ÷ 1.19`, ±4% — and still be faster than easy. Outside
+it, the easy-pace derivation stands in and the source changes with the number.
+
+- **The ratio is the app's own**, measured off `PACE_TABLE` as `base ÷ steady`: 1.1880–1.1961 across
+  all 21 rows, a **0.69% spread** from a 30-vdot beginner to an 80-vdot elite. That spread is why a
+  flat constant is defensible where a table lookup would drag a VDOT — and therefore the 5K — back
+  into the one derivation whose purpose is to not need the 5K.
+- **The tolerance is `RUN_PACE_DIVERGENCE_THRESHOLD`**, now exported from
+  `generate-combined-plan/science.ts` rather than copied. ⛔ It is load-bearing, not decoration: a
+  bare 1.19 bound is *tighter than the table it came from*, and a fixture sweep caught it rejecting a
+  slow athlete's perfectly fresh 5K by three seconds per mile.
+- ⛔ **INFERENCES ONLY.** A measurement and a number the athlete typed are never clamped. Disagreement
+  with an assertion surfaces as the 5K retest flag, never as a silent edit.
+- ⚠️ **Founded on the LEARNED easy pace, or one the athlete CHOSE — never `effort_paces.base`**,
+  which is the same VDOT lookup off the same typed 5K. That would bound the 5K with itself.
+
+**RIPPLE.** `resolveCurrentRunThresholdPace` gained a `derived-from-easy` tier, and its wizard tier
+now reads `effort_paces.steady` — the key the app actually writes. It had read `threshold`/`z4`,
+which **nothing writes in either direction**, so that tier had never once run; its tests were green
+against a shape the fixtures invented.
+
+Supersedes nothing. Extends D-285/D-287.
+
+---
+
+## D-437 — Run threshold is MEASURED by fitting best efforts, not by averaging activities (2026-08-20)
+
+`src/lib/run-critical-speed.ts`. The learner took any run whose AVERAGE heart rate sat near threshold
+and medianed its AVERAGE PACE over the whole activity — so a hill session's walk-backs were folded
+into "threshold pace". **Averaging an activity cannot measure a sustained effort; looking inside it
+can.** The bike already learns FTP from a best 20-minute window and the swim already fits a
+critical-speed curve; running was the last discipline still averaging.
+
+The pace curve (`buildRunPaceCurve`) samples fixed DURATIONS — 3/6/12/20/35 min — the shape the
+bike's power curve already uses. Distance-based bests cluster and produce no duration spread.
+
+⛔ **THERE IS NO HEART-RATE GATE, AND REMOVING IT WAS THE FIX.** The first version required 92% of
+threshold HR — the one anchor a base-training athlete does not have. On the real account threshold HR
+was a guess at 146, so the gate sat at **134** while that athlete's easy runs run 133-141: it would
+have admitted his easy running as threshold work. The alternative was a third "is this anchor real"
+check — a guard per consumer, forever. Critical-power modelling does not HR-gate; the filter is the
+curve's own shape, and all of it was already present: monotonic, R² ≥ 0.95, faster than measured easy
+by more than the ±4% band, efforts from **different sessions**, and no net descent past 1%. None of
+those needs anything outside the athlete's own runs. HR now earns confidence instead of gating.
+
+⚠️ What this measures is **critical speed**, which sits a few percent above maximal lactate steady
+state. The app already made that call for swim, so this is consistent with precedent rather than a
+new claim. ⚠️ **No backfill (Michael's call)** — curves are written at analysis time.
+
+---
+
+## D-438 — Anchor reads are ENFORCED, not documented (2026-08-20)
+
+`TRUTH-MAP §5` already said a reference anchor is read through its resolver and never off the raw
+column. Nothing enforced it, so every new surface grew its own chain — the "ten different things"
+problem stated exactly. `_shared/anchor-resolver-lint.test.ts` froze **49** raw readers; the ledger
+MAY ONLY SHRINK and the test fails the build on a new one. **Now 32 — 26 legitimate, 6 swim.**
+
+Routed: the SPINE (`compute-snapshot` read the learned threshold with **no confidence check at all**,
+feeding State's race projections), the Arc's coach text (raw while the coach's own code resolved —
+two paces in one function), race readiness, the marathon builder, the goal builder's seed and limiter.
+Categories `writer` / `receipt` / `presence-gate` / `reconciler-input` / `comparator` /
+`measurement-source` / `output-key` / `prompt-text` record the legitimate ones so the count stays
+honest rather than silenced. ⛔ It earned itself the same day: a new invariant check was written as a
+raw read and the ledger failed the build on brand-new code.
+
+---
+
+## D-439 — Heart-rate anchors and zones are PER SPORT (2026-08-20)
+
+`resolveCurrentLthr` gained a `sport` option — the pattern `resolve-current-max-hr` already set —
+rather than a second `resolveCurrentRideLthr`. The bike had **no owner** and three private chains,
+none with the D-284 sample-count gate.
+
+⛔ **THE ZONES MATTERED MORE THAN THE ANCHOR.** One `zones` array built from `runLTHR || rideLTHR`
+(run PREFERRED) was **priority 1 in `compute-workout-analysis` for every discipline**, above every
+resolver. Rides were binned against RUNNING zones — cycling HR sits 5-10 bpm under running at the
+same effort, so each ride landed a zone easy and the time-in-zone the 80/20 read rests on was wrong.
+Now per-sport arrays; the shared one stays as the fallback because Strava genuinely has one set per
+athlete.
+
+⚠️ `configured_hr_zones.threshold_heart_rate` is **CLOSED FOR READERS, OPEN AS A DATA MODEL** — see
+TRUTH-MAP #8. `TrainingBaselines` still writes it (now only when one sport has an anchor, so it
+cannot be the wrong sport's). **Do not shorten that to "closed."**
+
+---
+
+## D-440 — A number nobody DETECTED may not anchor anything (2026-08-20)
+
+`LearnedMetric` gained **`is_estimate`**, set by every branch that fills a hole instead of measuring.
+
+The distinction existed only in prose, so readers inferred it from `sample_count === 0` (D-284) — and
+the two branches that mean the same thing disagreed under that proxy. `88% of observed max` wrote
+`0`; `95th percentile of sustained efforts (no clear threshold data)` wrote **18**, the count of the
+efforts it took a percentile OF. Both are non-detections; one passed every gate.
+
+⛔ **THE COST, OBSERVED LIVE.** The percentile branch published 146 bpm and anchored the easy band at
+89% × 146 = **130**. That athlete's easy runs sit at 133-141, so ZERO qualified and
+`run_easy_pace_sec_per_km` went null. With no easy pace there is no ceiling on the threshold-pace
+filter either, so contaminated candidates published at **12:51/mi** — slower than his own easy runs,
+labelled "Measured from your runs". **One mislabelled number took out four layers.**
+
+⚠️ **Q-171 IS NOT REVERSED.** *Weak but MEASURED still anchors — the gate is invented-vs-measured, not
+weak-vs-strong* stands, and its test is untouched. What changed is that a non-detection now declares
+itself instead of being guessed at from a count.
+
+**And the second half:** a pace "at threshold HR" now requires a threshold HR that was DETECTED.
+Measuring a real pace against an invented reference is Law 2 one layer up — harder to spot, same lie.
+
+---
+
+## D-441 — The run offers its threshold test; the bike learns its anchor from the effort it already found (2026-08-20)
+
+**Abstaining is correct — Garmin greys the number out too. Abstaining SILENTLY is not.** The bike card
+scheduled an FTP test and the swim card explained its 400/200 protocol; the run offered nothing, while
+the 12-minute time trial had been built end to end for months (`materialize-plan:1334` expands it,
+`compute-workout-analysis` finds the ~720 s lap). Built, tested, unreachable. The button is gated on
+the threshold being unmeasured so an athlete who has one is never nagged. ⛔ `run_test` is the
+contract, not the name.
+
+Its result now obeys the invariant, writes `as_of` (it wrote only `tested_at`, so the app's most
+authoritative reading was undated to every reader), and declares `is_estimate: false`.
+
+**THE BIKE.** Its threshold-HR filter required a WHOLE RIDE to average 85-95% of max — which real
+riding never does; you coast, you descend, you stop. Verified live: 20 rides, high-confidence max HR,
+**zero** candidates, and `90% of observed max (estimated)` published at `sample_count: 0`. The effort
+was already identified — `power_curve['20min']` is what FTP comes from — so the power curve now
+carries the HR **during** each window, and FTP and threshold describe one ride.
+
+⚠️ And the card says when an FTP rests on easy riding, reusing that same already-computed signal.
