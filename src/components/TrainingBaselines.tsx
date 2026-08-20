@@ -97,6 +97,20 @@ const [ftpTestDate, setFtpTestDate] = useState(() => {
   return d.toISOString().split('T')[0];
 });
 const [scheduledFtpTest, setScheduledFtpTest] = useState<{id: string, date: string} | null>(null);
+/**
+ * ⛔ THE RUN HAD NO WAY TO ASK FOR THE TEST (2026-08-20). The bike offers "Schedule FTP Test"; the
+ * swim explains its 400/200 protocol; the run offered nothing — while the 12-minute time trial was
+ * built end to end and had been for months. `materialize-plan:1334` expands the session,
+ * `compute-workout-analysis:843` finds the ~720 s lap and writes the threshold pace at high
+ * confidence. The app could measure it, had the protocol, and never asked. Same starved-input shape
+ * as everything else: built, tested, unreachable.
+ */
+const [scheduledRunTest, setScheduledRunTest] = useState<{id: string, date: string} | null>(null);
+const [showRunTestDatePicker, setShowRunTestDatePicker] = useState(false);
+const [runTestDate, setRunTestDate] = useState<string>(() => {
+  const d = new Date(); d.setDate(d.getDate() + 3);
+  return d.toISOString().split('T')[0];
+});
 const [checkingFtpTest, setCheckingFtpTest] = useState(false);
 const [showSwimTest, setShowSwimTest] = useState(false);
 
@@ -128,10 +142,63 @@ const checkScheduledFtpTest = async () => {
   }
 };
 
+const checkScheduledRunTest = async () => {
+  try {
+    const userId = getStoredUserId();
+    if (!userId) return;
+    const { data } = await supabase
+      .from('planned_workouts')
+      .select('id, date, name')
+      .eq('user_id', userId)
+      .eq('workout_status', 'planned')
+      .ilike('name', '%Threshold Test%')
+      .gte('date', new Date().toISOString().split('T')[0])
+      .order('date', { ascending: true })
+      .limit(1);
+    setScheduledRunTest(data && data.length > 0 ? { id: data[0].id, date: data[0].date } : null);
+  } catch { /* non-fatal — the button just offers to schedule one */ }
+};
+
 // Check on mount
 useEffect(() => {
   checkScheduledFtpTest();
+  checkScheduledRunTest();
 }, []);
+
+/**
+ * ⛔ THE TAGS ARE THE CONTRACT, NOT THE NAME. `run_test` is what `materialize-plan:1334` expands into
+ * the 12-minute protocol and what `compute-workout-analysis:843` looks for before it goes hunting for
+ * the ~720 s lap. Renaming the session is safe; dropping that tag silently turns the test into an
+ * ordinary hard run that measures nothing.
+ */
+const scheduleRunTest = async () => {
+  try {
+    await addPlannedWorkout({
+      name: 'Threshold Test - 12 Min Time Trial',
+      type: 'run',
+      date: runTestDate,
+      description: 'Twelve-minute time trial to measure your threshold pace. PREPARATION: no hard training 48 hours prior; flat route or track, and wear the heart rate strap — the result is only as good as the trace. WARMUP: 15 min easy, then 4 x 30 sec strides with 30 sec walk. TEST: 12 min at the hardest pace you can hold the whole way — start conservatively, the last 2 min should be everything. COOL-DOWN: 10 min easy. RESULT: the app reads the 12-minute lap and sets your threshold pace from it.',
+      duration: 45,
+      steps_preset: [],
+      workout_status: 'planned',
+      tags: ['assessment', 'run_test', 'time_trial', 'baseline_establishment', 'key_workout'],
+    });
+    setShowRunTestDatePicker(false);
+    await checkScheduledRunTest();
+  } catch {
+    alert('Error scheduling the threshold test. Please try again.');
+  }
+};
+
+const deleteRunTest = async () => {
+  if (!scheduledRunTest) return;
+  try {
+    await supabase.from('planned_workouts').delete().eq('id', scheduledRunTest.id);
+    setScheduledRunTest(null);
+  } catch {
+    alert('Error removing the threshold test. Please try again.');
+  }
+};
 
 const scheduleFtpTest = async () => {
   try {
@@ -1534,6 +1601,62 @@ return (
                                 )}
                                 {thrBasis.state === 'measured' && learnedBasisLine(thrLearned, 'run') && (
                                   <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(thrLearned, 'run')}</p>
+                                )}
+                                {/* ⛔ WHEN IT IS NOT MEASURED, OFFER THE TEST. Abstaining is the right
+                                    behaviour — Garmin greys the number out too — but abstaining
+                                    SILENTLY is not. The 12-minute protocol has been built end to end
+                                    for months and the run card never offered it, while the bike card
+                                    right beside it schedules an FTP test. This is that button. */}
+                                {thrBasis.state !== 'measured' && thrBasis.state !== 'stated' && (
+                                  <div className="mt-2 pt-2 border-t border-white/[0.06]">
+                                    {scheduledRunTest ? (
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] text-white/55">
+                                          Threshold test on {new Date(scheduledRunTest.date + 'T12:00:00').toLocaleDateString()}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => void deleteRunTest()}
+                                          className="text-[11px] text-white/40 hover:text-white/70 underline underline-offset-2"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ) : showRunTestDatePicker ? (
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <input
+                                          type="date"
+                                          value={runTestDate}
+                                          min={new Date().toISOString().split('T')[0]}
+                                          onChange={(e) => setRunTestDate(e.target.value)}
+                                          className="h-8 px-2 text-[11px] bg-white/[0.06] border border-white/15 rounded-lg text-white"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => void scheduleRunTest()}
+                                          className="h-8 px-3 text-[11px] font-medium rounded-lg text-white"
+                                          style={{ backgroundColor: `${SPORT_COLORS.run}26`, border: `1px solid ${SPORT_COLORS.run}80` }}
+                                        >
+                                          Schedule
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowRunTestDatePicker(false)}
+                                          className="h-8 px-2 text-[11px] text-white/45 hover:text-white/70"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowRunTestDatePicker(true)}
+                                        className="text-[11px] font-medium text-white/70 hover:text-white underline underline-offset-2"
+                                      >
+                                        Schedule a threshold test — 12 min, measures it properly
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                                 {thrBasis.state === 'measured' && learnedAsOfLine(thrLearned) && (
                                   <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>

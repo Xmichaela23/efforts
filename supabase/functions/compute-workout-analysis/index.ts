@@ -2,6 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildRunPaceCurve, type RunPaceCurve } from '../../../src/lib/run-critical-speed.ts';
+import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -853,7 +854,24 @@ async function extractAssessmentBaseline(
         const paceSecPerKm = Math.round(t / (d / 1000));
         console.log(`[assessment] Run TT: ${d}m in ${t}s = ${paceSecPerKm} sec/km threshold pace`);
 
-        if (paceSecPerKm > 180 && paceSecPerKm < 600) {
+        /**
+         * ⛔ THE INVARIANT APPLIES TO A TEST RESULT TOO (2026-08-20). This is now the PRIMARY way an
+         * athlete gets a measured threshold — the run card offers the test — so it has to obey the same
+         * rule as every other threshold writer: **a threshold effort is faster than an easy effort.**
+         * A 12-minute TT slower than the athlete's own measured easy pace is not a threshold reading;
+         * it is a lap detected in the wrong place, a GPS dropout, or a test the athlete abandoned. It
+         * refuses rather than publishing at `confidence: 'high'`, which is what every consumer trusts.
+         */
+        // ⛔ THROUGH THE OWNER (the anchor lint caught the raw read the moment it was written — which is
+        // the ledger doing its job on brand-new code, not on legacy). The resolver is sec/MILE; this
+        // comparison is sec/KM because a TT lap is measured in metres per second. Converted once.
+        const easyResolved = resolveCurrentRunEasyPace({ learned_fitness: existingLF } as never);
+        const easySecPerKm = easyResolved.sec_per_mi != null ? easyResolved.sec_per_mi / 1.609344 : NaN;
+        const slowerThanEasy = Number.isFinite(easySecPerKm) && easySecPerKm > 0 && paceSecPerKm >= easySecPerKm;
+        if (slowerThanEasy) {
+          console.warn(`[assessment] run TT ${paceSecPerKm} s/km is not faster than easy pace ${easySecPerKm} — not a threshold reading, skipped`);
+        }
+        if (paceSecPerKm > 180 && paceSecPerKm < 600 && !slowerThanEasy) {
           const newLF = {
             ...existingLF,
             run_threshold_pace_sec_per_km: {
@@ -861,7 +879,13 @@ async function extractAssessmentBaseline(
               confidence: 'high',
               source: 'Run 12-min time trial',
               sample_count: 1,
+              // ⛔ `as_of` IS THE FIELD EVERY READER USES (Q-173). This wrote only `tested_at`, so the
+              // resolver reported NO DATE for the app's most authoritative threshold reading — the one
+              // measurement that should never look stale reported as undated. Both are written: `as_of`
+              // for the readers, `tested_at` kept because rows already carry it.
+              as_of: new Date().toISOString().slice(0, 10),
               tested_at: new Date().toISOString(),
+              is_estimate: false,
             },
           };
           await supabase
