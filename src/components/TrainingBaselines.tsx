@@ -1681,7 +1681,9 @@ return (
                                         <span className="text-[12px] text-white/60">watts</span>
                                       </div>
                                       <p className="text-[12px] text-white/60 mt-1 leading-snug">
-                                        {resolved.source === 'manual' || resolved.source === 'manual-chosen'
+                                        {/* FTP has no `manual-chosen` tier — Q-240 folds the athlete's
+                                            choice into `ftp_source`, so `manual` is the only asserted one. */}
+                                        {resolved.source === 'manual'
                                           ? 'you entered this'
                                           : 'from your best 20-minute power'}
                                       </p>
