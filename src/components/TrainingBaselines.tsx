@@ -1661,8 +1661,34 @@ return (
                               
                               return (
                                 <div className="space-y-1">
+                                  {/**
+                                    * ⛔ SHOW THE NUMBER IN USE, NOT ONLY THE ONE YOU TYPED (2026-08-20).
+                                    *
+                                    * The input below holds the athlete's own value and nothing else —
+                                    * deliberately, because falling back to the learned number made the
+                                    * field impossible to clear (see its comment). But that left the ONLY
+                                    * prominent number on the card being 176 while the power zones under
+                                    * it were built from 156. The card whose job is saying which number is
+                                    * in use was showing the one that wasn't.
+                                    *
+                                    * Same shape as the easy-pace block: resolved value and its receipt on
+                                    * top, your own number under it, the picker under that.
+                                    */}
+                                  {resolved.value != null && (
+                                    <div className="px-3 py-2.5 rounded-xl bg-white/[0.09] border border-white/25 text-left mb-1.5">
+                                      <div className="flex items-baseline gap-2">
+                                        <span className="text-2xl font-semibold text-white tabular-nums">{Math.round(Number(resolved.value))}</span>
+                                        <span className="text-[12px] text-white/60">watts</span>
+                                      </div>
+                                      <p className="text-[12px] text-white/60 mt-1 leading-snug">
+                                        {resolved.source === 'manual' || resolved.source === 'manual-chosen'
+                                          ? 'you entered this'
+                                          : 'from your best 20-minute power'}
+                                      </p>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-2">
-                                    <label className="text-xs text-white/60" htmlFor="ftp-input">FTP</label>
+                                    <label className="text-sm text-white/75 font-medium" htmlFor="ftp-input">Your number</label>
                                     <input
                                       id="ftp-input"
                                       ref={ftpInputRef}
@@ -1697,7 +1723,7 @@ return (
                                       className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
                                       style={{ fontFamily: 'Inter, sans-serif' }}
                                     />
-                                    <span className="text-xs text-white/60">watts</span>
+                                    <span className="text-[12px] text-white/60">watts</span>
                                   </div>
                                   
                                   {/* Status helper text */}
