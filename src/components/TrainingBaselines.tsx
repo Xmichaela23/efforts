@@ -1406,7 +1406,7 @@ return (
                               * which is what the two-block version was protecting and is preserved here.
                               */}
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-xs text-white/50 font-medium">Easy pace</label>
+                              <label className="text-sm text-white/75 font-medium">Easy pace</label>
                               {(() => {
                                 const resolvedEasy = resolveCurrentRunEasyPace({
                                   learned_fitness: learnedFitness,
@@ -1414,9 +1414,9 @@ return (
                                 } as never);
                                 const onManual = resolvedEasy.source === 'manual-chosen' || resolvedEasy.source === 'manual';
                                 return (
-                                  <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                                  <div className="px-3 py-2.5 rounded-xl bg-white/[0.09] border border-white/25 text-left">
                                     <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-lg font-medium text-white tabular-nums">
+                                      <span className="text-2xl font-semibold text-white tabular-nums">
                                         {formatPaceSecPerMi(resolvedEasy.sec_per_mi)}
                                       </span>
                                       {!onManual && hasEasyLearned && (
@@ -1425,13 +1425,13 @@ return (
                                         </span>
                                       )}
                                     </div>
-                                    <p className="text-[11px] text-white/40 mt-1 leading-snug">
+                                    <p className="text-[12px] text-white/60 mt-1 leading-snug">
                                       {onManual
                                         ? 'you entered this'
                                         : (learnedBasisLine(easyLearned, 'run') || 'measured from your runs')}
                                     </p>
                                     {!onManual && learnedAsOfLine(easyLearned) && (
-                                      <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
+                                      <p className="text-[12px] text-white/50 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
                                     )}
                                   </div>
                                 );
@@ -1445,9 +1445,9 @@ return (
                                     performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value },
                                   }))}
                                   placeholder="11:30"
-                                  className="w-24 h-10 px-3 text-sm font-medium bg-white/[0.06] border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 text-center"
+                                  className="w-24 h-10 px-3 text-sm font-medium bg-white/[0.09] border border-white/30 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 text-center"
                                 />
-                                <span className="text-[11px] text-white/40">your own number, /mi</span>
+                                <span className="text-[12px] text-white/60">your own number, /mi</span>
                               </div>
                               {/* The picker only appears when there are two real answers to choose between. */}
                               {hasEasyLearned && data.performanceNumbers?.easyPace && (
@@ -1490,10 +1490,10 @@ return (
                                 reason the easy card has them: the states carry different amounts of
                                 provenance and the page jumped when they swapped. */}
                             <div className="flex flex-col gap-1.5 w-[17rem] max-w-full">
-                              <label className="text-xs text-white/50 font-medium">Threshold pace</label>
-                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left min-h-[6.5rem]">
+                              <label className="text-sm text-white/75 font-medium">Threshold pace</label>
+                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.09] border border-white/25 text-left min-h-[6.5rem]">
                                 <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-lg font-medium text-white tabular-nums">
+                                  <span className="text-2xl font-semibold text-white tabular-nums">
                                     {thrBasis.showNumber ? formatPaceSecPerMi(resolvedThr.sec_per_mi) : '—'}
                                   </span>
                                   {/* Confidence dots belong to a MEASURED value. A derived one has no
@@ -1504,12 +1504,12 @@ return (
                                   )}
                                 </div>
                                 {/* THE STATE, SAID PLAINLY. One owner for these words: `describeThresholdBasis`. */}
-                                <p className="text-[11px] text-white/50 mt-1 leading-snug">{thrBasis.label}</p>
+                                <p className="text-[12px] text-white/70 mt-1 leading-snug">{thrBasis.label}</p>
                                 {thrBasis.note && (
-                                  <p className="text-[11px] text-white/35 mt-0.5 leading-snug">{thrBasis.note}</p>
+                                  <p className="text-[12px] text-white/55 mt-0.5 leading-snug">{thrBasis.note}</p>
                                 )}
                                 {thrBasis.state === 'measured' && learnedBasisLine(thrLearned, 'run') && (
-                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(thrLearned, 'run')}</p>
+                                  <p className="text-[12px] text-white/60 mt-1 leading-snug">{learnedBasisLine(thrLearned, 'run')}</p>
                                 )}
                                 {/* ⛔ WHEN IT IS NOT MEASURED, OFFER THE TEST. Abstaining is the right
                                     behaviour — Garmin greys the number out too — but abstaining
@@ -1526,7 +1526,7 @@ return (
                                         <button
                                           type="button"
                                           onClick={() => void deleteRunTest()}
-                                          className="text-[11px] text-white/40 hover:text-white/70 underline underline-offset-2"
+                                          className="text-[12px] text-white/60 hover:text-white/70 underline underline-offset-2"
                                         >
                                           Remove
                                         </button>
@@ -1563,13 +1563,13 @@ return (
                                         className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg text-white/80 hover:text-white bg-white/[0.05] border border-white/15 text-left"
                                       >
                                         Schedule a threshold test
-                                        <span className="block text-[10px] text-white/40 mt-0.5">12 min — measures it properly</span>
+                                        <span className="block text-[11px] text-white/55 mt-0.5">12 min — measures it properly</span>
                                       </button>
                                     )}
                                   </div>
                                 )}
                                 {thrBasis.state === 'measured' && learnedAsOfLine(thrLearned) && (
-                                  <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>
+                                  <p className="text-[12px] text-white/50 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>
                                 )}
                               </div>
                             </div>
@@ -1579,7 +1579,7 @@ return (
                                 by side and drops the 5K underneath — which is also the right reading
                                 order: the paces you train by first, the seed they came from last. */}
                             <div className="flex flex-col gap-1.5 min-w-[12rem]">
-                              <label className="text-xs text-white/50 font-medium">5K Time</label>
+                              <label className="text-sm text-white/75 font-medium">5K Time</label>
                               <input
                                 type="text"
                                 value={data.performanceNumbers?.fiveK || ''}
@@ -1591,7 +1591,7 @@ return (
                                   }
                                 }))}
                                 placeholder="25:00"
-                                className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
+                                className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.09] backdrop-blur-lg border border-white/30 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                               />
                               {showFiveKNudge && nudge && (
@@ -1701,7 +1701,7 @@ return (
                                   </div>
                                   
                                   {/* Status helper text */}
-                                  <div className="text-[11px] text-white/40 pl-8">
+                                  <div className="text-[12px] text-white/60 pl-8">
                                     {!manualFtp && !learnedFtp && (
                                       <span>Enter your FTP or we'll learn it from your workouts</span>
                                     )}
@@ -1917,15 +1917,15 @@ return (
                                     </div>
                           {/* D-199 C1: seed microcopy — plain, science-accurate threshold framing (~20-30 min
                               sustainable; longer than the old "hard 400" cue which biased fast). No "CSS"/Z-names. */}
-                          <p className="text-[11px] text-white/40 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / hard zones are all built from this one number.</p>
+                          <p className="text-[12px] text-white/60 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / hard zones are all built from this one number.</p>
                           {/* D-199: (i) test protocol — how to FIND the threshold (the benchmark). Tappable (iOS:
                               no hover). The 400/200 CSS test, the formula, a worked example, plus a no-test fallback. */}
                           {showSwimTest && (
                             <div className="px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 -mt-0.5 space-y-1.5">
                               <p className="text-[11px] text-white/70 font-medium">How to find your threshold pace</p>
-                              <p className="text-[11px] text-white/50 leading-snug">Best way is a quick test. Warm up, then swim an all-out <span className="text-white/70">400</span>, rest fully, then an all-out <span className="text-white/70">200</span> — each as fast as you can hold the whole way.</p>
-                              <p className="text-[11px] text-white/50 leading-snug">Threshold 100 pace = (400 time − 200 time) ÷ 2.<br />Example: 400 in 6:40 and 200 in 3:00 → (400s − 180s) ÷ 2 = <span className="text-white/70">1:50 / 100</span>.</p>
-                              <p className="text-[11px] text-white/40 leading-snug">No test handy? Enter your best steady pace for a continuous 20–30 minute swim, and update it after you test.</p>
+                              <p className="text-[12px] text-white/70 leading-snug">Best way is a quick test. Warm up, then swim an all-out <span className="text-white/70">400</span>, rest fully, then an all-out <span className="text-white/70">200</span> — each as fast as you can hold the whole way.</p>
+                              <p className="text-[12px] text-white/70 leading-snug">Threshold 100 pace = (400 time − 200 time) ÷ 2.<br />Example: 400 in 6:40 and 200 in 3:00 → (400s − 180s) ÷ 2 = <span className="text-white/70">1:50 / 100</span>.</p>
+                              <p className="text-[12px] text-white/60 leading-snug">No test handy? Enter your best steady pace for a continuous 20–30 minute swim, and update it after you test.</p>
                             </div>
                           )}
                           <div className="space-y-2">
@@ -1976,7 +1976,7 @@ return (
                                 <div className="flex items-center justify-between">
                                   <div className="text-xs text-white/60">Pace Zones</div>
                                   {bands.length > 0 && (
-                                    <div className="text-[10px] text-white/40">Threshold pace · {data.performanceNumbers?.swimPace100}/100yd</div>
+                                    <div className="text-[11px] text-white/55">Threshold pace · {data.performanceNumbers?.swimPace100}/100yd</div>
                                   )}
                                 </div>
                                 {bands.length === 0 ? (
@@ -2145,7 +2145,7 @@ return (
                                 className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                                       />
-                              <span className="text-[10px] text-white/40">reps</span>
+                              <span className="text-[11px] text-white/55">reps</span>
                                     </div>
                                   </div>
                           <div className="space-y-4 mt-4 pt-4 border-t border-white/10">
