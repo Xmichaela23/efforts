@@ -1393,62 +1393,6 @@ return (
                               a wrapping flex row left ragged columns and dead space — "a little jammed".
                               Each fact gets one cell and they line up. */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-2 items-start">
-                            <div className="flex flex-col gap-1.5 min-w-[12rem]">
-                              <label className="text-xs text-white/50 font-medium">5K Time</label>
-                              <input
-                                type="text"
-                                value={data.performanceNumbers?.fiveK || ''}
-                                onChange={(e) => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    fiveK: e.target.value
-                                  }
-                                }))}
-                                placeholder="25:00"
-                                className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                              />
-                              {showFiveKNudge && nudge && (
-                                <div className="mt-1 flex flex-col gap-2 pl-0.5">
-                                  {/* ⛔ THE DIRECTION IS SAID (2026-08-19). This read "Training data
-                                      suggests ~X. Update?" for a flag that could only fire one way.
-                                      It fires both ways now, and the stale-fast case — a saved 5K
-                                      FASTER than recent running — is the one that sets every derived
-                                      pace above current fitness. An athlete shown a slower number
-                                      with no reason will decline it. */}
-                                  <p className="text-[11px] text-white/55 leading-snug max-w-[18rem]">
-                                    {nudge.direction === 'stale-fast'
-                                      ? `Your recent runs suggest ~${nudge.implied_5k_label}, slower than the ${nudge.manual_5k_label} on file. Paces built from the saved time come out faster than current fitness. Update?`
-                                      : `Your recent runs suggest ~${nudge.implied_5k_label}, faster than the ${nudge.manual_5k_label} on file. Update?`}
-                                  </p>
-                                  <div className="flex items-center gap-2">
-                                    {/* Sport-coloured, like every other selection on this card — the
-                                        generic teal said "a button", not "this is your running data". */}
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleFiveKNudgeYes()}
-                                      disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl text-white disabled:opacity-50"
-                                      style={{
-                                        backgroundColor: `${SPORT_COLORS.run}26`,
-                                        border: `1px solid ${SPORT_COLORS.run}80`,
-                                      }}
-                                    >
-                                      Yes
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleFiveKNudgeNo()}
-                                      disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-white/[0.06] text-white/70 border border-white/15 hover:bg-white/10 disabled:opacity-50"
-                                    >
-                                      No
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
                             {/**
                               * ⛔ ONE EASY-PACE BLOCK (2026-08-20). There were TWO — a display card showing
                               * the resolved value, and a separate "Easy pace (manual)" input with the
@@ -1628,6 +1572,67 @@ return (
                                   <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>
                                 )}
                               </div>
+                            </div>
+                            {/* ⛔ THE 5K SITS LAST, AND THAT IS THE INFORMATION ORDER (2026-08-20).
+                                Three cells in a two-column grid left an orphan row and a tall empty
+                                space beneath a small input. Pairing the two TALL cards puts them side
+                                by side and drops the 5K underneath — which is also the right reading
+                                order: the paces you train by first, the seed they came from last. */}
+                            <div className="flex flex-col gap-1.5 min-w-[12rem]">
+                              <label className="text-xs text-white/50 font-medium">5K Time</label>
+                              <input
+                                type="text"
+                                value={data.performanceNumbers?.fiveK || ''}
+                                onChange={(e) => setData(prev => ({
+                                  ...prev,
+                                  performanceNumbers: {
+                                    ...prev.performanceNumbers,
+                                    fiveK: e.target.value
+                                  }
+                                }))}
+                                placeholder="25:00"
+                                className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
+                                style={{ fontFamily: 'Inter, sans-serif' }}
+                              />
+                              {showFiveKNudge && nudge && (
+                                <div className="mt-1 flex flex-col gap-2 pl-0.5">
+                                  {/* ⛔ THE DIRECTION IS SAID (2026-08-19). This read "Training data
+                                      suggests ~X. Update?" for a flag that could only fire one way.
+                                      It fires both ways now, and the stale-fast case — a saved 5K
+                                      FASTER than recent running — is the one that sets every derived
+                                      pace above current fitness. An athlete shown a slower number
+                                      with no reason will decline it. */}
+                                  <p className="text-[11px] text-white/55 leading-snug max-w-[18rem]">
+                                    {nudge.direction === 'stale-fast'
+                                      ? `Your recent runs suggest ~${nudge.implied_5k_label}, slower than the ${nudge.manual_5k_label} on file. Paces built from the saved time come out faster than current fitness. Update?`
+                                      : `Your recent runs suggest ~${nudge.implied_5k_label}, faster than the ${nudge.manual_5k_label} on file. Update?`}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    {/* Sport-coloured, like every other selection on this card — the
+                                        generic teal said "a button", not "this is your running data". */}
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleFiveKNudgeYes()}
+                                      disabled={saving}
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl text-white disabled:opacity-50"
+                                      style={{
+                                        backgroundColor: `${SPORT_COLORS.run}26`,
+                                        border: `1px solid ${SPORT_COLORS.run}80`,
+                                      }}
+                                    >
+                                      Yes
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleFiveKNudgeNo()}
+                                      disabled={saving}
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-white/[0.06] text-white/70 border border-white/15 hover:bg-white/10 disabled:opacity-50"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
