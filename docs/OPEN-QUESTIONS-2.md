@@ -703,7 +703,7 @@ one place a future session would edit to put a pull back on the leg days. It car
 
 ## Q-270 — The endurance-frequency default chain is FOUR layers deep and it is intentional (2026-08-10, **INTENTIONAL — DO NOT "FIX"**)
 
-> ⚠️ **UPDATED 2026-08-19 ([D-430]) — THE RANGES IN THIS ENTRY MOVED, THE FOUR LAYERS DID NOT.**
+> ⚠️ **UPDATED 2026-08-19 ([D-444]) — THE RANGES IN THIS ENTRY MOVED, THE FOUR LAYERS DID NOT.**
 > Opening the picker to ONE session a week exposed that layer 1 is the only one of the four that
 > VALIDATES rather than merely falls back, so it was the only one that could reject a legal answer:
 > `run_days >= 2` turned a 1 into a 2 and logged a warning blaming the intake for carrying it
