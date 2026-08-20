@@ -97,3 +97,17 @@ Deno.test('the estimate tier anchors on the athlete\'s OWN max, not on their age
   // And the label distinguishes the two, so "est. from max" and "age est." cannot read alike.
   assert(/'est\. from max'/.test(baselinesSrc), 'the estimate no longer says what it was estimated from');
 });
+
+Deno.test('the HR inputs show the SAME number the zones are built from', () => {
+  // ⛔ FOUND ON SCREEN, 2026-08-20. The LTHR box kept its own copy of the tier chain — ending in the
+  // age estimate — while `effectiveLTHR` moved to estimating from the measured max. The box read 148
+  // (Tanaka(57) x 0.88) beneath a label that said "est. from max", which would have been 154. One
+  // number, two chains, one component. The zones and the label used one; the input used the other.
+  assert(/value=\{effectiveLTHR \?\? ''\}/.test(baselinesSrc), 'the LTHR input carries its own chain again');
+  assert(/value=\{effectiveMaxHR \?\? ''\}/.test(baselinesSrc), 'the max HR input carries its own chain again');
+  const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert(
+    !/value=\{sport\.manual(LTHR|MaxHR)\s*\|\|/.test(codeOnly),
+    'an HR input is rebuilding the tier chain instead of reading the resolved value',
+  );
+});

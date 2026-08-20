@@ -2311,7 +2311,11 @@ return (
                                     <div className="flex items-center gap-1.5">
                                       <input
                                         type="number"
-                                        value={sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates?.maxHR ?? '')}
+                                        // ⛔ THE INPUT SHOWS WHAT THE ZONES ARE BUILT FROM. It carried its
+                                        // own copy of the tier chain; `effectiveMaxHR` is the same
+                                        // expression today, but two copies of one number in one component
+                                        // is how the LTHR box below ended up disagreeing with its zones.
+                                        value={effectiveMaxHR ?? ''}
                                         onChange={(e) => {
                                           const val = parseInt(e.target.value);
                                           if (val >= 120 && val <= 230) {
@@ -2334,7 +2338,16 @@ return (
                                     <div className="flex items-center gap-1.5">
                                       <input
                                         type="number"
-                                        value={sport.manualLTHR || sport.learnedLTHR || (ageEstimates?.thresholdHR ?? '')}
+                                        /**
+                                         * ⛔ THIS BOX DISAGREED WITH ITS OWN ZONES (found on screen,
+                                         * 2026-08-20). It kept the OLD chain — ending in the age
+                                         * estimate — while `effectiveLTHR` above moved to estimating
+                                         * from the athlete's MEASURED max. Live result: the box read
+                                         * 148 (Tanaka(57) x 0.88) under a label that said "est. from
+                                         * max", which would have been 154. One number, two chains, one
+                                         * component. Reads the single computed value now.
+                                         */
+                                        value={effectiveLTHR ?? ''}
                                         onChange={(e) => {
                                           const val = parseInt(e.target.value);
                                           if (val >= 100 && val <= 210) {
