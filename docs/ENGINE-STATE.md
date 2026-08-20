@@ -23,32 +23,98 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-19 LATE — **your job is WHICH PACE IS TRUE.** The full brief is `docs/HANDOFF-builder-fixes-and-pace-truth-2026-08-19.md` §PART 2 — read it, it was written for someone who has seen none of this. Banner owned by ONE chat.)
+## 🧭 NEXT SESSION — START HERE (2026-08-20 — **the pace-truth job is DONE and DEPLOYED.** Your job is the acceptance pass, then `analyze-running-workout`. Banner owned by ONE chat.)
 
 ### YOUR JOB
 
-**A threshold pace slower than the athlete's own easy pace reached a real screen.** Easy 12:35/mi,
-threshold 14:44/mi, 5K 25:21 (8:10/mi). The learner is fixed and deployed (`fe0d8b0f`); what is left
-is the question underneath it — **when the measured value abstains, the fallback derives from a TYPED
-5K, and a typed 5K goes stale as fitness changes.**
+**Nothing from 2026-08-20 has been seen working on a device.** Thirty edge functions are live and
+every claim below is code-traced and fixture-backed — not verified. The acceptance pass is the job.
 
-⛔ **THE BRIEF IS THE HANDOFF DOC, NOT THIS BANNER.** It carries the facts already gathered so nobody
-re-derives them: the 1.19 easy-to-threshold ratio from the app's own pace table, the ±4% divergence
-number that already exists, the missing per-field date on the typed 5K, and the two machines that
-already solve the hard parts for other disciplines. It also carries a **what NOT to do** list.
+**Then:** `analyze-running-workout` — 5,002 lines, **zero test files**, one of the oldest pieces still
+running. Two defects were found in it in passing and one is live: a memory-saving step blanks
+`computed.best_efforts` / `power_curve` / `raw_laps` on its in-memory copy (`:585`), and a rare legacy
+duration-repair path writes that same object back to the DB (`:2146`). By code trace they share a
+reference, so on that path the blanked fields save as **null, permanently**. ⚠️ It fires only when
+`duration_s_moving` is off by ≥3×, and it has NOT been observed — hypothesis, not finding. **It
+matters more now:** the new run pace curve and the bike's threshold HR both live on the columns it
+blanks.
 
-**Build, in this order (Michael's call):**
-1. Derive threshold from the MEASURED easy pace as a floor, so a stale 5K can never prescribe
-   something too fast.
-2. Three states, each said plainly rather than picked silently — **measured** · **worked out from
-   your easy pace** · **not enough data, and no number shown**.
-3. A flag: *"your 5K doesn't match your recent runs — worth a retest."*
+### ⛔ WHAT SHIPPED 2026-08-20 — PUSHED + DEPLOYED (30 functions), NOT VERIFIED
 
-⛔ **THE POINT OF THE FLAG:** today the app picks a source silently and the athlete never learns the
-two numbers disagree. Michael only found this because he looked.
+Commit `3966bd2f`. Read it — the message is the record, and it names every file.
 
-⚠️ **DO NOT TUNE TO MICHAEL'S NUMBERS.** His export is the symptom, not the spec. Verify across the
-61-shape sweep and a range of paces. If a fix only works at his pace it is the wrong fix.
+1. **The bound** (`src/lib/run-threshold-from-easy.ts`). An INFERRED threshold must sit in the band a
+   MEASURED easy pace implies — `easy ÷ 1.19`, ±4% — and still be faster than easy. Ratio measured off
+   the app's own `PACE_TABLE` (1.1880–1.1961, 0.69% spread); tolerance is the existing
+   `RUN_PACE_DIVERGENCE_THRESHOLD`, now **exported** from `generate-combined-plan/science.ts` rather
+   than copied. ⛔ Bounds inferences ONLY — never a measurement, never a number the athlete typed.
+2. **The measurement** (`src/lib/run-critical-speed.ts`). Threshold FITTED from best efforts at
+   3/6/12/20/35 min — the run twin of the bike's power curve and the swim's CSS fit. Six gates, all
+   abstaining: 92% of threshold HR, ≤1% net descent, ≥2 duration bands, monotonic, R² ≥ 0.95, faster
+   than measured easy. New tier in the learner ABOVE the whole-activity averaging read; the old tiers
+   stay under it. ⚠️ **NO BACKFILL (Michael's call)** — needs 2 hard efforts in different bands before
+   it publishes anything.
+3. **The three states** (`describeThresholdBasis`). measured · worked out from your easy pace · worked
+   out from your 5K · you entered this · not enough data. The baselines card used to VANISH when the
+   learner abstained, so "not enough data" was silence.
+4. **The 5K retest flag** (`buildFiveKNudge`). Was silent in the direction that matters — a typed 5K
+   FASTER than the training data returned `should_prompt: false`. Also starved (needed a MEASURED
+   threshold, the value that abstains) and used a flat `0.82` 5K:threshold ratio that is 0.96 at vdot
+   30. Now bidirectional, resolver-fed, computed through `estimateVdotFromPace` + `getTargetTime`.
+5. **One owner per anchor.** `_shared/anchor-resolver-lint.test.ts` — 49 raw readers found and frozen;
+   **now 32 (26 legitimate, 6 swim).** The ledger MAY ONLY SHRINK and the test enforces it.
+6. **Per-sport heart rate.** `resolveCurrentLthr` gained a `sport` option (the pattern
+   `resolve-current-max-hr` already set). The bike had no owner and three private chains.
+7. **Per-sport HR ZONES, and this mattered most.** One `zones` array built from `runLTHR || rideLTHR`
+   was **priority 1 in `compute-workout-analysis` for every sport**, above every resolver. Rides were
+   binned against RUNNING zones — threshold work counted as tempo, and the time-in-zone the 80/20 read
+   rests on was wrong for the bike.
+8. **The bike learns its threshold.** Verified on the real account: 20 rides, high-confidence max HR,
+   **ZERO** threshold candidates, and `90% of observed max (estimated)` published at `sample_count: 0`.
+   The filter needed a WHOLE RIDE to average 85–95% of max, which real riding never does. The effort
+   was already identified — `power_curve['20min']` is what FTP comes from — so the power curve now
+   carries the HR **during** each window. ⚠️ No backfill: needs new rides.
+
+### ⚠️ WHAT IS TRUE ABOUT THE SHARED HR FIELD — read this exactly as written
+
+**`configured_hr_zones.threshold_heart_rate` is CLOSED FOR READERS, OPEN AS A DATA MODEL.**
+
+- **Closed for readers:** nothing bike-related touches it. `resolveCurrentLthr` refuses it for
+  `sport: 'ride'`, and `compute-workout-analysis` prefers `zones_ride`.
+- **OPEN as a model:** `TrainingBaselines.tsx` **still writes it**. It is now written only when ONE
+  sport has an anchor (so it cannot be the wrong sport's), but the field is still there, still filled
+  from the run number in the single-sport case, waiting for the next thing that trusts it.
+- ⛔ **Do not shorten this to "closed."** The next session reads "closed" and stops looking. The real
+  fix is the WRITER emitting per-sport fields only — not a guard on a reader.
+
+### ⚠️ UNVERIFIED — and what would settle each
+
+| claim | how to settle |
+|---|---|
+| Michael's threshold now reads ~10:34/mi, basis "worked out from your easy pace" | open Baselines → Run after the next Garmin/Strava ingest |
+| The bike HR card drops from a false 158 to an age estimate, then to a measured value | open Baselines → Cycle; then again after 2 rides with a 20-min effort |
+| Rides bin against ride zones | any new ride's analysis; the log line now names `zones_ride` vs `zones` |
+| The retest flag fires on the stale 5K | Baselines → Run, the 5K nudge |
+| The `analyze-running-workout` null-write | **hypothesis only.** Needs a workout with `duration_s_moving` ≥3× off |
+
+### ⛔ STILL OWED, UNCHANGED
+
+- **The Strong Focus intake acceptance pass** — the matrix at the top of `POLISH-PUNCH-LIST.md`.
+- **`AthleteWeeklyIntent` refactor** — nine variables for "how many rides did the athlete ask for".
+- **Docs:** DECISIONS-LOG / OPEN-QUESTIONS / TRUTH-MAP / CAPABILITY-MAP entries for the above are NOT
+  written. Michael is deliberately keeping doc overhead low; this banner is the record until then.
+
+### ⛔ DELIBERATE GAPS — do not "fix" these
+
+- **Swim has no resolver and is not getting one.** Six ledger entries. The reason is DATA QUALITY, not
+  priority: pool distance comes from wrist-motion turn detection, open-water distance is interpolated
+  between surfacing strokes, and optical HR is unreliable wet. `swim-css-learner.ts` already carries
+  five gates — that is evidence of how dirty the input is, not a template to extend.
+- **Wrist optical HR can cadence-lock** and feed a jog into the run fit as a hard effort. The monotonic
+  and R² gates would *probably* catch the result. **Unproven** — worth a cadence-lock-shaped fixture.
+- **The typed 5K has no honest date.** `effort_updated_at` is refreshed by a recompute, so it dates the
+  recompute. If added, it must be a RACE date the athlete enters, not an auto-stamp — an auto-stamp
+  calls a 2019 PB fresh, which is worse than no date.
 
 ### ⛔ WHAT SHIPPED 2026-08-19 — DO NOT RE-LITIGATE
 

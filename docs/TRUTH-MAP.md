@@ -52,6 +52,41 @@ For any fact, this says who owns it and whether the screens agree. **Before buil
 
 ---
 
+**✅/⚠️ #8 — HEART-RATE ANCHORS AND ZONES: PER SPORT (2026-08-20). Read the wording, it is deliberate.**
+
+- **Threshold HR — CLOSED.** `resolveCurrentLthr` now takes a `sport` option (the pattern
+  `resolve-current-max-hr` already set). The bike previously had **no owner** and three private chains
+  (`compute-workout-analysis`, `calculate-workload`, `_shared/ride-easy-hr.ts`), none with the D-284
+  sample-count gate. All three route through the resolver.
+- **HR ZONES — CLOSED, and this was the bigger one.** One `zones` array, built from
+  `runLTHR || rideLTHR` (run PREFERRED), was **priority 1 in `compute-workout-analysis:1580` for every
+  discipline**, above every resolver. Rides were binned against RUNNING zones — cycling HR sits 5-10
+  bpm under running at the same effort, so each ride landed a zone easy and the time-in-zone the 80/20
+  read rests on was wrong for the bike. `TrainingBaselines` now writes `zones_run` / `zones_ride`; the
+  shared `zones` stays as the fallback because **Strava genuinely has one set per athlete**.
+- ⚠️ **`configured_hr_zones.threshold_heart_rate` — CLOSED FOR READERS, OPEN AS A DATA MODEL.**
+  Nothing bike-related reads it. But `TrainingBaselines.tsx` **still writes it** — now only when one
+  sport has an anchor, so it cannot be the wrong sport's, yet the field is still there and still filled
+  from the run number in the single-sport case. ⛔ **Do not shorten this row to "closed."** The next
+  session reads "closed" and stops looking. The real fix is the WRITER emitting per-sport fields only,
+  not a guard on a reader.
+- **The bike's threshold was a formula, and now is not.** Verified on the real account: 20 rides,
+  high-confidence max HR, **zero** threshold candidates, and `90% of observed max (estimated)`
+  published at `sample_count: 0`. The filter required a WHOLE RIDE to average 85-95% of max — real
+  riding never does. `power_curve` now carries the HR *during* each best window, so the bike's
+  threshold and its FTP describe one effort. ⚠️ No backfill; needs new rides.
+
+**✅ #9 — ANCHOR READS ARE ENFORCED, NOT JUST DOCUMENTED (2026-08-20).** §5's rule ("read through its
+resolver — never the raw column") had nothing behind it, so every new surface grew its own chain.
+`_shared/anchor-resolver-lint.test.ts` froze 49 raw readers and the ledger MAY ONLY SHRINK; it is at
+**32 — 26 legitimate, 6 swim (unowned by design)**. The spine, the Arc's coach text, race readiness,
+the marathon builder and the goal builder were all routed. ⛔ The spine (`compute-snapshot`) had read
+the learned threshold with **no confidence check at all** and fell back to a `performance_numbers`
+spelling nothing writes; an unrelated 8-run floor is the only reason a contaminated 2-run read never
+printed a race time on State.
+
+---
+
 ## 4. The verified fractures (recorded so they're never rediscovered)
 
 **Per-discipline cohesion verdict (traced + verified 2026-07-10):**
