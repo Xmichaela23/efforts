@@ -1769,7 +1769,33 @@ return (
                                             resolver feeds the coach, the analyzers, the plan generators and
                                             every power zone. The athlete deserves to know the choice moves
                                             all of them. */}
-                                        <span className="text-[10px] text-white/35 leading-snug">
+                                        {/**
+                                          * ⛔ SAY WHEN THE NUMBER RESTS ON EASY RIDING (2026-08-20).
+                                          *
+                                          * FTP is 95% of the best 20-minute power across the athlete's
+                                          * rides. That is only an FTP if one of those twenty minutes was
+                                          * actually hard — otherwise it is their best EASY twenty
+                                          * minutes wearing an FTP's name, and every power zone and plan
+                                          * target below is built on it.
+                                          *
+                                          * ⚠️ THE SIGNAL IS ALREADY COMPUTED, so this invents nothing.
+                                          * `analyzeRides` marks `ride_threshold_hr` as an estimate when
+                                          * it finds no hard rides — the exact same condition. If there
+                                          * were no hard efforts to detect a threshold heart rate from,
+                                          * there were none to produce a maximal twenty minutes either.
+                                          */}
+                                        {(() => {
+                                          const rideThr = learnedFitness?.ride_threshold_hr;
+                                          const noHardRides = rideThr?.is_estimate === true;
+                                          const onLearned = ((data.performanceNumbers as any)?.ftp_source ?? 'learned') === 'learned';
+                                          if (!noHardRides || !onLearned || !learnedFtp) return null;
+                                          return (
+                                            <span className="text-[12px] text-white/60 leading-snug">
+                                              No hard rides on file, so this is your best easy 20 minutes — likely lower than your real FTP. A test, or one hard ride, moves it.
+                                            </span>
+                                          );
+                                        })()}
+                                        <span className="text-[11px] text-white/55 leading-snug">
                                           Sets your power zones and the targets in your plan.
                                         </span>
                                       </div>

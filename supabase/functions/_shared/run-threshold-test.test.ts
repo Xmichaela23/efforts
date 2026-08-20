@@ -60,3 +60,22 @@ Deno.test('the TEST RESULT carries the date field readers actually use', () => {
   assert(/as_of:/.test(block), 'the test result is undated to every reader again');
   assert(/is_estimate: false/.test(block), 'the test result no longer declares itself measured');
 });
+
+Deno.test('an FTP built on rides that never went hard SAYS SO', () => {
+  // ⛔ FTP is 95% of the best 20-minute power across the athlete's rides. That is only an FTP if one
+  // of those twenty minutes was actually hard — otherwise it is their best EASY twenty minutes
+  // wearing an FTP's name, and every power zone and plan target is built on it.
+  //
+  // ⚠️ THE SIGNAL IS ALREADY COMPUTED. `analyzeRides` marks `ride_threshold_hr` as an estimate when
+  // it finds no hard rides; if there were none to detect a threshold heart rate from, there were none
+  // to produce a maximal twenty minutes either. No new field, no new threshold.
+  assert(/No hard rides on file/.test(card), 'the FTP card no longer flags an easy-rides estimate');
+  assert(
+    /rideThr\?\.is_estimate === true/.test(card),
+    'the flag no longer keys on the already-computed no-hard-rides signal',
+  );
+  assert(
+    /ftp_source[\s\S]{0,80}'learned'/.test(card),
+    'the flag fires even when the athlete is on their own typed FTP, which it must not',
+  );
+});
