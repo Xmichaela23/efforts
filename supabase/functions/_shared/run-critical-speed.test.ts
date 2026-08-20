@@ -36,11 +36,12 @@ const effortOn = (csMps: number, dPrimeM: number, timeS: number, over: Partial<R
 /** 3.2 m/s ≈ 5:12/km ≈ 8:22/mi — a mid-pack runner. Nothing depends on the exact value. */
 const CS = 3.2;
 const DP = 180;
+/** Four efforts on four different days — a curve needs sessions, not one run measured five ways. */
 const clean = (): RunEffort[] => [
-  effortOn(CS, DP, 240),   // 4 min
-  effortOn(CS, DP, 600),   // 10 min
-  effortOn(CS, DP, 1080),  // 18 min
-  effortOn(CS, DP, 1500),  // 25 min
+  effortOn(CS, DP, 240, { date: '2026-08-01' }),
+  effortOn(CS, DP, 600, { date: '2026-08-08' }),
+  effortOn(CS, DP, 1080, { date: '2026-08-15' }),
+  effortOn(CS, DP, 1500, { date: '2026-08-22' }),
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -61,7 +62,7 @@ Deno.test('SWEEP: recovers the curve across the whole range of runners', () => {
   for (const cs of [2.4, 2.8, 3.2, 3.6, 4.0, 4.5, 5.0, 5.4]) {
     for (const dp of [80, 150, 250, 400]) {
       const r = fitRunCriticalSpeed(
-        [240, 600, 1080, 1500].map((t) => effortOn(cs, dp, t)),
+        [240, 600, 1080, 1500].map((t, i) => effortOn(cs, dp, t, { date: `2026-08-0${i + 1}` })),
         THR_HR,
         null,
       );
@@ -75,7 +76,7 @@ Deno.test('SWEEP: recovers the curve across the whole range of runners', () => {
 
 Deno.test('two points is the minimum, and can never be better than low confidence', () => {
   // A line through two points has R² = 1 by construction — it is arithmetic, not evidence.
-  const r = fitRunCriticalSpeed([effortOn(CS, DP, 300), effortOn(CS, DP, 1200)], THR_HR, null);
+  const r = fitRunCriticalSpeed([effortOn(CS, DP, 300, { date: '2026-08-01' }), effortOn(CS, DP, 1200, { date: '2026-08-08' })], THR_HR, null);
   assert(r.csSecPerKm != null, r.reason);
   assertEquals(r.nPoints, 2);
   assertEquals(r.confidence, 'low');
@@ -84,7 +85,7 @@ Deno.test('two points is the minimum, and can never be better than low confidenc
 Deno.test('more points on a tight line earn more confidence', () => {
   assertEquals(fitRunCriticalSpeed(clean(), THR_HR, null).confidence, 'high');
   assertEquals(
-    fitRunCriticalSpeed([effortOn(CS, DP, 240), effortOn(CS, DP, 600), effortOn(CS, DP, 1500)], THR_HR, null).confidence,
+    fitRunCriticalSpeed([effortOn(CS, DP, 240, { date: '2026-08-01' }), effortOn(CS, DP, 600, { date: '2026-08-08' }), effortOn(CS, DP, 1500, { date: '2026-08-15' })], THR_HR, null).confidence,
     'moderate',
   );
 });
@@ -93,23 +94,54 @@ Deno.test('more points on a tight line earn more confidence', () => {
 // THE GATES — each abstains, none guesses
 // ═══════════════════════════════════════════════════════════════════════════
 
-Deno.test('GATE: no threshold heart rate → abstain, never an ungated fit', () => {
-  const r = fitRunCriticalSpeed(clean(), null, null);
-  assertEquals(r.csSecPerKm, null);
-  assert(/hard-effort gate/i.test(r.reason), r.reason);
-});
 
-Deno.test('GATE: efforts below the hard-effort floor are not threshold efforts', () => {
-  // Every window at easy heart rate — the "best 6 minutes of a jog" case the whole fit exists to refuse.
-  const easy = clean().map((e) => ({ ...e, avgHr: Math.round(THR_HR * 0.8) }));
-  const r = fitRunCriticalSpeed(easy, THR_HR, null);
-  assertEquals(r.csSecPerKm, null);
-  assert(/threshold effort/i.test(r.reason), r.reason);
-});
 
-Deno.test('GATE: a window with NO heart rate is dropped, not assumed hard', () => {
+
+Deno.test('NO HEART-RATE GATE — the curve\'s own shape is the filter', () => {
+  // ⛔ THE GATE WAS REMOVED, AND THAT WAS THE FIX (2026-08-20). It required 92% of threshold HR — the
+  // one anchor a base-training athlete does not have. On a real account threshold HR was a guess at
+  // 146, so the gate sat at 134 while that athlete's EASY runs run 133-141: it would have admitted
+  // his easy running as threshold efforts. Critical-power modelling does not HR-gate; the monotonic
+  // check, the R² floor and the faster-than-easy invariant do the work, and none of them needs an
+  // external anchor.
   const noHr = clean().map((e) => ({ ...e, avgHr: null }));
-  assertEquals(fitRunCriticalSpeed(noHr, THR_HR, null).csSecPerKm, null);
+  const r = fitRunCriticalSpeed(noHr, null, null);
+  assert(r.csSecPerKm != null, `abstained with no HR anywhere: ${r.reason}`);
+  assertEquals(r.csSecPerKm, Math.round(1000 / CS));
+});
+
+Deno.test('a curve fitted from JOGGING is caught by the invariant, not by heart rate', () => {
+  // The case the HR gate was supposed to prevent. Easy-paced windows fit a perfectly good curve —
+  // and the fitted speed comes out at roughly the jogging pace, which is not faster than easy.
+  // Jogging at 320 s/km; the athlete's measured easy pace is 315 s/km. The fit recovers ~320, which
+  // is SLOWER than easy — impossible for a threshold, so it is refused.
+  const easyPaceSecPerKm = 315;
+  const joggy = [240, 600, 1080, 1500].map((t, i) =>
+    effortOn(1000 / 320, DP, t, { avgHr: 120, date: `2026-08-0${i + 1}` }));
+  const r = fitRunCriticalSpeed(joggy, 165, easyPaceSecPerKm);
+  assertEquals(r.csSecPerKm, null);
+  assert(/not meaningfully faster than measured easy/i.test(r.reason), r.reason);
+});
+
+Deno.test('heart rate EARNS confidence rather than gating', () => {
+  const withHr = clean().map((e) => ({ ...e, avgHr: 170 }));      // >= 92% of 175
+  const withoutHr = clean().map((e) => ({ ...e, avgHr: null }));
+  assertEquals(fitRunCriticalSpeed(withHr, 175, null).confidence, 'high');
+  assertEquals(fitRunCriticalSpeed(withoutHr, 175, null).confidence, 'moderate');
+  // Same number either way — only the confidence differs.
+  assertEquals(
+    fitRunCriticalSpeed(withHr, 175, null).csSecPerKm,
+    fitRunCriticalSpeed(withoutHr, 175, null).csSecPerKm,
+  );
+});
+
+Deno.test('⛔ ONE SESSION CANNOT SUPPLY THE CURVE, however many bands it fills', () => {
+  // A 40-min run with a 12-min surge fills four bands on its own: the short bests sit inside the
+  // surge, the long ones drag in the easy running around it. One effort measured five ways.
+  const oneDay = [240, 600, 1080, 1500].map((t) => effortOn(CS, DP, t, { date: '2026-08-01' }));
+  const r = fitRunCriticalSpeed(oneDay, 175, null);
+  assertEquals(r.csSecPerKm, null);
+  assert(/one session|different days/i.test(r.reason), r.reason);
 });
 
 Deno.test('GATE: net downhill is gravity, not fitness', () => {
@@ -132,7 +164,7 @@ Deno.test('GATE: absent elevation is not evidence of a hill', () => {
 
 Deno.test('GATE: one session cannot supply the whole curve', () => {
   // Four windows all ~10 minutes land in ONE duration band; only the fastest survives.
-  const oneSession = [600, 620, 640, 660].map((t) => effortOn(CS, DP, t));
+  const oneSession = [600, 620, 640, 660].map((t, i) => effortOn(CS, DP, t, { date: `2026-08-0${i + 1}` }));
   const r = fitRunCriticalSpeed(oneSession, THR_HR, null);
   assertEquals(r.csSecPerKm, null);
   assert(/duration band/i.test(r.reason), r.reason);
@@ -140,7 +172,7 @@ Deno.test('GATE: one session cannot supply the whole curve', () => {
 
 Deno.test('GATE: efforts outside 3-60 min are not on the curve', () => {
   // 90 s is anaerobic; 75 min drifts below CS for reasons that are not fitness.
-  const r = fitRunCriticalSpeed([effortOn(CS, DP, 90), effortOn(CS, DP, 4500)], THR_HR, null);
+  const r = fitRunCriticalSpeed([effortOn(CS, DP, 90, { date: '2026-08-01' }), effortOn(CS, DP, 4500, { date: '2026-08-08' })], THR_HR, null);
   assertEquals(r.csSecPerKm, null);
 });
 
@@ -148,8 +180,8 @@ Deno.test('GATE: a longer effort that is FASTER is not a real curve', () => {
   // The 20-minute window has to come out FASTER PER METRE than the 5-minute one, which takes a big
   // overshoot: 5 min sits at 0.263 s/m, so 20 min must beat that — 5000 m in 1200 s is 0.240 s/m.
   const bent = [
-    effortOn(CS, DP, 300),
-    { ...effortOn(CS, DP, 1200), distanceM: 5000 },
+    effortOn(CS, DP, 300, { date: '2026-08-01' }),
+    { ...effortOn(CS, DP, 1200, { date: '2026-08-08' }), distanceM: 5000 },
   ];
   const r = fitRunCriticalSpeed(bent, THR_HR, null);
   assertEquals(r.csSecPerKm, null);
@@ -163,12 +195,12 @@ Deno.test('GATE: THE INVARIANT — a threshold slower than easy is REFUSED, neve
   const slowCs = 2.0;                       // 8:20/km
   const easyPaceSecPerKm = 400;             // 6:40/km — faster than the "threshold" just fitted
   const r = fitRunCriticalSpeed(
-    [240, 600, 1080, 1500].map((t) => effortOn(slowCs, DP, t)),
+    [240, 600, 1080, 1500].map((t, i) => effortOn(slowCs, DP, t, { date: `2026-08-0${i + 1}` })),
     THR_HR,
     easyPaceSecPerKm,
   );
   assertEquals(r.csSecPerKm, null);
-  assert(/not faster than measured easy/i.test(r.reason), r.reason);
+  assert(/not meaningfully faster than measured easy/i.test(r.reason), r.reason);
 });
 
 Deno.test('the invariant passes silently when the fit is coherent', () => {
@@ -180,10 +212,10 @@ Deno.test('the invariant passes silently when the fit is coherent', () => {
 Deno.test('GATE: scattered points are refused even when every other gate passes', () => {
   // Hard, level, spread across bands, monotonic — but not on one line.
   const noisy: RunEffort[] = [
-    effortOn(CS, DP, 240),
-    { ...effortOn(CS, DP, 600), distanceM: CS * 600 * 0.90 },
-    { ...effortOn(CS, DP, 1080), distanceM: CS * 1080 * 0.88 },
-    { ...effortOn(CS, DP, 1500), distanceM: CS * 1500 * 0.60 },
+    effortOn(CS, DP, 240, { date: '2026-08-01' }),
+    { ...effortOn(CS, DP, 600, { date: '2026-08-08' }), distanceM: CS * 600 * 0.90 },
+    { ...effortOn(CS, DP, 1080, { date: '2026-08-15' }), distanceM: CS * 1080 * 0.88 },
+    { ...effortOn(CS, DP, 1500, { date: '2026-08-22' }), distanceM: CS * 1500 * 0.60 },
   ];
   const r = fitRunCriticalSpeed(noisy, THR_HR, null);
   assertEquals(r.csSecPerKm, null);
@@ -323,4 +355,29 @@ Deno.test('END TO END: two sessions at different durations DO publish', () => {
   assert(fit.csSecPerKm != null, `abstained: ${fit.reason}`);
   // The fitted threshold sits between the two efforts' paces, which is what an asymptote should do.
   assert(fit.csSecPerKm! > 250 && fit.csSecPerKm! < 400, `${fit.csSecPerKm} s/km is not between the efforts`);
+});
+
+Deno.test('the invariant carries a MARGIN — "one second faster than easy" is not faster', () => {
+  // ⛔ FOUND BY A FIXTURE LANDING ON THE BOUNDARY. A bare `>=` let a fit come out a second under the
+  // easy pace and publish — which is exactly what jogging produces when one window carries a slight
+  // surge. Refused now, and the margin is the app's own ±4% band.
+  const easy = 480;
+  const barely = [240, 600, 1080, 1500].map((t, i) =>
+    effortOn(1000 / 479, DP, t, { date: `2026-08-0${i + 1}` }));   // 479 vs easy 480
+  assertEquals(fitRunCriticalSpeed(barely, THR_HR, easy).csSecPerKm, null);
+
+  // Comfortably past the band still publishes — the gate refuses the impossible, not the athlete.
+  const real = [240, 600, 1080, 1500].map((t, i) =>
+    effortOn(1000 / 420, DP, t, { date: `2026-08-0${i + 1}` }));   // 12.5% faster
+  assert(fitRunCriticalSpeed(real, THR_HR, easy).csSecPerKm != null);
+});
+
+Deno.test('the margin IS the app\'s divergence band — pinned so the two cannot drift', async () => {
+  const science = await Deno.readTextFile(new URL('../generate-combined-plan/science.ts', import.meta.url));
+  const m = science.match(/RUN_PACE_DIVERGENCE_THRESHOLD\s*=\s*([0-9.]+)/);
+  assert(m, 'the divergence constant moved or was renamed');
+  const cs = await Deno.readTextFile(new URL('../../../src/lib/run-critical-speed.ts', import.meta.url));
+  const local = cs.match(/CS_MIN_MARGIN_ON_EASY\s*=\s*([0-9.]+)/);
+  assert(local, 'the critical-speed margin moved or was renamed');
+  assertEquals(local![1], m![1], 'the two copies of the ±4% band have drifted apart');
 });

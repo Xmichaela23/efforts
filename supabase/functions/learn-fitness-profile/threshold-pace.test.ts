@@ -186,16 +186,27 @@ Deno.test('5c: one session cannot publish — it is one duration band', () => {
   assert(!/critical speed/i.test(src), `a single band published a fit: ${src}`);
 });
 
-Deno.test('5c: easy-heart-rate windows never become a threshold', () => {
-  // The "best 6 minutes of a jog" case. Same geometry, heart rate well under the gate.
-  const CS = 3.4, DP = 160, EASY = 120;
+Deno.test('5c: JOGGING never becomes a threshold — caught by pace, not heart rate', () => {
+  // ⛔ THIS TEST CHANGED SIDES 2026-08-20 AND THE OLD VERSION IS WORTH KNOWING ABOUT. It used to pin
+  // the fit's heart-rate gate: same fast windows, easy HR, refused. That gate is GONE — it required
+  // 92% of a threshold heart rate, which a base-training athlete does not have, and on a real account
+  // it sat at 134 while that athlete's easy runs ran 133-141, so it would have admitted his easy
+  // running as threshold work. Critical-power modelling does not heart-rate gate.
+  //
+  // ⚠️ AND THE OLD FIXTURE WAS WRONG ABOUT ITSELF. Its windows were at 294 s/km — genuinely fast,
+  // merely labelled with an easy heart rate. Covering that distance in that time IS a hard effort
+  // whatever the strap says, and straps drop out and cadence-lock. Publishing there is correct.
+  //
+  // What actually catches jogging is the invariant: windows at the athlete's OWN EASY PACE fit a
+  // perfectly good curve whose answer is not faster than easy, which is impossible for a threshold.
+  const EASY = 480;   // s/km — the same easy pace `easyRuns(480)` teaches the learner below
   const runs = [
-    runWithCurve('2026-08-01', { '360': onCurve(CS, DP, 360, EASY) }),
-    runWithCurve('2026-08-08', { '1200': onCurve(CS, DP, 1200, EASY) }),
+    runWithCurve('2026-08-21', { '360': onCurve(1000 / EASY, 160, 360, 120) }),
+    runWithCurve('2026-08-22', { '1200': onCurve(1000 / EASY, 160, 1200, 120) }),
   ];
-  const out = analyzeRuns([...easyRuns(480), ...thresholdRuns(390), ...runs] as never);
+  const out = analyzeRuns([...easyRuns(EASY), ...thresholdRuns(390), ...runs] as never);
   const src = String(out.threshold_pace?.source ?? '');
-  assert(!/critical speed/i.test(src), `a jog was fitted as threshold: ${src}`);
+  assert(!/critical speed/i.test(src), `jogging was fitted as a threshold: ${src}`);
 });
 
 Deno.test('5c: runs with no pace curve leave the older tier untouched', () => {
