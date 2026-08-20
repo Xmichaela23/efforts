@@ -1,6 +1,6 @@
 // The heart-rate governor for an easy ride (2026-08-01, Michael: "it was prescribed as easy").
 // Run: deno test --no-check ride-easy-hr.test.ts
-import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { resolveRideEasyCeiling } from './ride-easy-hr.ts';
 import { timeUnderCeilingPct } from './time-under-ceiling.ts';
 
@@ -50,4 +50,19 @@ Deno.test('no ceiling or no heart rate → null, so execution falls back to dura
   assertEquals(timeUnderCeilingPct([120, 125], null), null);
   assertEquals(timeUnderCeilingPct([], 131), null);
   assertEquals(timeUnderCeilingPct([null, null], 131), null);
+});
+
+Deno.test('⛔ THE REAL CALLER PASSES THE WHOLE ROW — the typed bike threshold must be visible', async () => {
+  // ⛔ FOUND BY AUDIT, 2026-08-20. `resolveRideEasyCeiling` was routed through the LTHR resolver and
+  // given an optional second argument for the full baselines row, but the only caller was never
+  // updated — so `configured_hr_zones.manual_ride_lthr` stayed invisible to the easy ceiling, and the
+  // file's own comment claimed otherwise. A source-shape test because the caller is a 2,000-line
+  // `@ts-nocheck` edge function with no fixtures of its own.
+  const src = await Deno.readTextFile(new URL('../analyze-cycling-workout/index.ts', import.meta.url));
+  const call = src.slice(src.indexOf('resolveRideEasyCeiling('));
+  assert(/configured_hr_zones:/.test(call.slice(0, 400)), 'the caller stopped passing the full baselines row');
+  assert(
+    /\.select\('performance_numbers, learned_fitness, configured_hr_zones/.test(src),
+    'the query stopped fetching configured_hr_zones, so the typed override is unreadable',
+  );
 });

@@ -2091,6 +2091,8 @@ Deno.serve(async (req) => {
       analysis_version: partialComputed.analysis?.version,
       swim_in_analysis: !!partialComputed.analysis?.swim,
       power_in_analysis: !!partialComputed.analysis?.power,
+      // `_hr` is a sibling of the duration labels (the HR during each best window), so it appears in
+      // this key list. Log line only — every reader indexes by duration label.
       power_curve: partialComputed.power_curve ? Object.keys(partialComputed.power_curve).join(',') : null,
       best_efforts: partialComputed.best_efforts ? Object.keys(partialComputed.best_efforts).join(',') : null
     });

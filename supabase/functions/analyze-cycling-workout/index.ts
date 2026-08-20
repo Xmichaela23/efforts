@@ -1547,7 +1547,9 @@ Deno.serve(async (req) => {
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, learned_fitness, units, weight')
+        // `configured_hr_zones` added 2026-08-20 — it carries the athlete's typed `manual_ride_lthr`,
+        // which the easy-ceiling resolver reads. Same row, no extra query.
+        .select('performance_numbers, learned_fitness, configured_hr_zones, units, weight')
         .eq('user_id', workout.user_id)
         .single();
 
@@ -1840,7 +1842,15 @@ Deno.serve(async (req) => {
     // Time UNDER the ceiling, never the average: this ride climbed 958 ft, and an average would score
     // the hills as indiscipline. See `_shared/ride-easy-hr.ts` for the anchor and why the ceiling is not
     // the learned `ride_easy_hr` median.
-    const easyCeiling = resolveRideEasyCeiling(fullBaselines?.learned_fitness);
+    // ⛔ THE WHOLE ROW, NOT JUST `learned_fitness` (2026-08-20). `resolveRideEasyCeiling` routes through
+    // `resolveCurrentLthr({ sport: 'ride' })` now, and that resolver's typed tier reads
+    // `configured_hr_zones.manual_ride_lthr` — so passing only the learned block left an athlete's own
+    // entered bike threshold invisible to the easy ceiling, which is the number this read is scored on.
+    const easyCeiling = resolveRideEasyCeiling(fullBaselines?.learned_fitness, {
+      learned_fitness: fullBaselines?.learned_fitness ?? null,
+      performance_numbers: fullBaselines?.performance_numbers ?? null,
+      configured_hr_zones: fullBaselines?.configured_hr_zones ?? null,
+    });
     const easyRead = hasGradedPower
       ? null
       : timeUnderCeiling(sensorData.map((sample: any) => sample?.heart_rate), easyCeiling.ceiling);

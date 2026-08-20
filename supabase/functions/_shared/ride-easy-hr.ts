@@ -52,9 +52,13 @@ const num = (v: unknown): number | null => {
  * sample-count gate (so "88% of observed max (estimated)" could anchor an easy band) and minus the
  * athlete's typed `manual_ride_lthr` override, which was invisible here.
  *
- * ⚠️ `resolveCurrentLthr` was RUN-ONLY until today; the `sport` option is what unblocked this. The
- * caller passes the whole baselines row now rather than just `learned_fitness`, so the typed override
- * can be seen — an athlete who set their bike threshold by hand had it ignored by the easy band.
+ * ⚠️ `resolveCurrentLthr` was RUN-ONLY until today; the `sport` option is what unblocked this.
+ *
+ * ⚠️ THE SECOND ARGUMENT IS WHAT MAKES THE TYPED OVERRIDE VISIBLE, and it is OPTIONAL — a caller that
+ * passes only `learned_fitness` gets the learned tier and nothing else. `analyze-cycling-workout:1843`
+ * passes the whole row (and its query fetches `configured_hr_zones` for exactly that). Any new caller
+ * that passes one argument silently loses the athlete's own entered bike threshold; the test below
+ * pins the real caller.
  */
 export function resolveRideEasyCeiling(learnedFitness: any, baselines?: unknown): RideEasyCeiling {
   const resolved = resolveCurrentLthr(

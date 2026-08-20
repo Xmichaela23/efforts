@@ -875,7 +875,16 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
         confidence: fit.confidence === 'high' ? 'high' : (fit.confidence === 'moderate' ? 'medium' : 'low'),
         source: `critical speed from ${fit.nPoints} best-effort windows (R² ${fit.r2})`,
         sample_count: fit.nPoints,
-        as_of: newestDate(runs.filter((r) => (r.computed as { pace_curve?: unknown } | null)?.pace_curve)),
+        // ⚠️ DATES THE RUNS THAT ACTUALLY SURVIVED THE GATES, not every run carrying a curve. The
+        // looser version overstated freshness: a recent easy run has a pace curve and contributes
+        // nothing, so it would have stamped the fit as newer than the efforts it rests on.
+        as_of: newestDate(runs.filter((r) => {
+          const c = (r.computed as { pace_curve?: RunPaceCurve } | null)?.pace_curve;
+          if (!c) return false;
+          return paceCurveToEfforts(c, String(r.date ?? '')).some((e) =>
+            e.avgHr != null && thresholdHRValue != null && e.avgHr >= thresholdHRValue * 0.92
+          );
+        })),
       };
     }
   }
