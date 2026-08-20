@@ -112,7 +112,7 @@ register: in one screenshot both rows read Sunday and the week below updated to 
 not settle.
 
 **Where to look:** `NonRaceBuilder.tsx`, the schedule card's `long` / `ride` rows and
-`setScheduleQuestion` (`:4637`). Candidates, in order — a state write that lands a render late; the
+`setScheduleQuestion` (`:4657`). Candidates, in order — a state write that lands a render late; the
 mount effect added on 2026-08-19 that writes the default over `null`; the accordion re-resolving
 `scheduleAsk` while a tap is in flight. ⛔ **Reproduce it before theorising** — it is the only one of
 the four with no trace behind it.
