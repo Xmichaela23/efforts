@@ -60,6 +60,13 @@ type LearnedThr = {
   confidence?: 'low' | 'medium' | 'high' | string | null;
   sample_count?: number | string | null;
   as_of?: string | null;
+  /**
+   * ⛔ THE WRITER SAYING "I DID NOT DETECT THIS" (2026-08-20). `learn-fitness-profile` sets it on every
+   * branch that fills a hole rather than measuring: `88% of observed max`, `90% of observed max`, and
+   * `95th percentile of sustained efforts (no clear threshold data)`. Absent = written before the field
+   * existed, so the `sample_count === 0` gate below remains the legacy path.
+   */
+  is_estimate?: boolean | null;
 } | number | string | null | undefined;
 
 export type BaselinesLike = {
@@ -142,7 +149,20 @@ export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveO
   // measurement — "88% of observed max (estimated)" — and can NEVER anchor. An ABSENT sample_count is
   // "not stated" (the in-pass synthetic band the learner builds passes no count), NOT "measured nothing",
   // so it is accepted. The distinction the gate draws is measured-vs-invented, not strong-vs-weak.
-  const learnedUsable = learnedValue != null && learnedSamples !== 0;
+  /**
+   * ⛔ D-284, NOW WITH THE WRITER'S OWN ANSWER FIRST. The sample-count gate was a PROXY for
+   * measured-vs-invented, and it read the wrong thing on the branch that mattered: `95th percentile of
+   * sustained efforts (no clear threshold data)` carries the count of the efforts it took a percentile
+   * OF (18 on the account this was found on), so it sailed through, anchored the easy band at 130 bpm,
+   * and starved the easy-pace learner whose runs sit at 133-141. `is_estimate` is the writer stating
+   * it outright; the count stays for rows written before the field existed.
+   *
+   * ⚠️ Q-171 IS UNCHANGED. *Weak but MEASURED still anchors* — a low-confidence reading from four real
+   * threshold efforts is `is_estimate: false` and still anchors. The gate was always
+   * invented-vs-measured; it can now read that directly instead of inferring it.
+   */
+  const learnedIsEstimate = learnedObj?.is_estimate === true;
+  const learnedUsable = learnedValue != null && learnedSamples !== 0 && !learnedIsEstimate;
   const learnedTrusted = learnedUsable && (learnedConf === 'medium' || learnedConf === 'high');
 
   const pn = baselines.performance_numbers;

@@ -102,6 +102,32 @@ interface LearnedMetric {
   source: string;
   sample_count: number;
   /**
+   * ⛔ LAW 2, MADE EXPLICIT ON THE STORED FACT (2026-08-20). `true` = this number was NOT detected;
+   * it was filled in so a hole would have something in it.
+   *
+   * ⛔ WHY IT HAD TO BE ITS OWN FIELD. The distinction existed — every fallback branch says so in
+   * `source` — but readers had no way to act on prose, so they inferred it from `sample_count === 0`
+   * (D-284). That proxy answers "how many samples", not "is this a measurement", and the two branches
+   * that mean the same thing disagreed under it: `88% of observed max (estimated)` wrote `0`, while
+   * `95th percentile of sustained efforts (no clear threshold data)` wrote **18** — the count of the
+   * efforts it took a percentile OF. Both are non-detections. One passed every gate.
+   *
+   * ⛔ WHAT THAT COST, OBSERVED ON A REAL ACCOUNT. The percentile branch published 146 bpm and
+   * anchored the easy band at 89% of it = 130. That athlete's easy runs sit at 133-141, so ZERO
+   * qualified and `run_easy_pace_sec_per_km` went null. With no easy pace there is no ceiling on the
+   * threshold-pace filter either, so contaminated candidates published at 12:51/mi — slower than his
+   * own easy runs. One mislabelled number took out the entire chain beneath it.
+   *
+   * ⚠️ THIS DOES NOT REVERSE Q-171. That ruling is *weak but MEASURED still anchors — the gate is
+   * invented-vs-measured, not weak-vs-strong*, and it stands untouched: a low-confidence reading from
+   * four real threshold efforts still anchors. What changed is that a non-detection now SAYS it is
+   * one, instead of being guessed at from a sample count.
+   *
+   * ⚠️ ABSENT means "written before this field existed" — treated as NOT an estimate, so the
+   * `sample_count === 0` gate stays as the legacy path. Both are checked.
+   */
+  is_estimate?: boolean;
+  /**
    * Q-173 / Law 3 — the date of the NEWEST session that actually fed this number.
    *
    * NOT the same as `learned_fitness.last_updated`, which only says when the profile was last REBUILT.
@@ -612,7 +638,9 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
           value: Math.round(thresholdHRValue),
           confidence: 'low',
           source: '95th percentile of sustained efforts (no clear threshold data)',
-          sample_count: sortedAllHRs.length
+          // The count is of the efforts a percentile was taken OF — not of threshold detections.
+          sample_count: sortedAllHRs.length,
+          is_estimate: true,
         };
       } else {
         // Last resort: 88% of max HR
@@ -622,7 +650,8 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
           value: thresholdHRValue,
           confidence: 'low',
           source: '88% of observed max (estimated)',
-          sample_count: 0
+          sample_count: 0,
+          is_estimate: true,
         };
       }
     }
@@ -778,7 +807,23 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
   // abstention falls back to a sane derived number; a published lie does not.
   // ==========================================================================
 
-  if (thresholdHRValue && observedMaxHR) {
+  /**
+   * ⛔ A PACE "AT THRESHOLD HR" REQUIRES A THRESHOLD HR THAT WAS DETECTED (2026-08-20).
+   *
+   * This filtered candidates to within ±5 bpm of `thresholdHRValue` without asking where that number
+   * came from. When STEP 2 detects nothing it fills the hole — `95th percentile of sustained efforts
+   * (no clear threshold data)`, or `88% of observed max` — and this read then measured a pace against
+   * a guess and published the result as `Measured from your runs`. That is Law 2 one layer up: not an
+   * invented number, but a real measurement of an invented reference, which is harder to spot and
+   * carries the same lie to the athlete.
+   *
+   * ⚠️ IT ABSTAINS RATHER THAN WIDENING. There is no honest weaker version of "pace at threshold HR"
+   * when threshold HR is unknown — and abstaining is not a hole, because
+   * `resolveCurrentRunThresholdPace` derives from the measured easy pace beneath this, which is a
+   * reference the athlete actually produced.
+   */
+  const thresholdHrDetected = threshold_hr != null && threshold_hr.is_estimate !== true;
+  if (thresholdHRValue && observedMaxHR && thresholdHrDetected) {
     /**
      * ⚠️ THE CEILING IS THE LEARNED EASY PACE WHEN THERE IS ONE, AND OTHERWISE NOTHING.
      * With no easy pace learned there is no reference to measure against, and inventing one (a
@@ -1060,7 +1105,8 @@ export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
         value: Math.round(observedMaxHR * 0.90),
         confidence: 'low',
         source: '90% of observed max (estimated - no hard rides found)',
-        sample_count: 0
+        sample_count: 0,
+        is_estimate: true,
       };
       console.log(`  💓 Threshold HR fallback: ${Math.round(observedMaxHR * 0.90)} bpm (90% of max)`);
     }
@@ -1126,7 +1172,8 @@ export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
         value: Math.round(observedMaxHR * 0.70),
         confidence: 'low',
         source: '70% of observed max (estimated - no easy training rides found)',
-        sample_count: 0
+        sample_count: 0,
+        is_estimate: true,
       };
     }
   }

@@ -7,7 +7,7 @@
  * the shape that proved the gate was STRUCTURALLY dead (0 of 77), and it must never silently regress.
  */
 
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   resolveRunEasyHrBand,
   isEasyHr,
