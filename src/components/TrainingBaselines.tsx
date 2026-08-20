@@ -1389,7 +1389,10 @@ return (
                             <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
                             <h3 className="text-sm font-medium text-white/90">Running</h3>
                           </div>
-                          <div className="flex flex-wrap gap-6 mt-2">
+                          {/* ⛔ A GRID, NOT `flex-wrap` (2026-08-20). Four blocks of different widths in
+                              a wrapping flex row left ragged columns and dead space — "a little jammed".
+                              Each fact gets one cell and they line up. */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-2 items-start">
                             <div className="flex flex-col gap-1.5 min-w-[12rem]">
                               <label className="text-xs text-white/50 font-medium">5K Time</label>
                               <input
@@ -1446,139 +1449,95 @@ return (
                                 </div>
                               )}
                             </div>
-                            {hasEasyLearned && (
-                            // Fixed width + a min-height on the card below: the two sources have different
-                            // amounts of provenance (a 3-line receipt vs "you entered this"), so without this
-                            // the card resized and the whole page jumped every time you switched.
-                            <div className="flex flex-col gap-1.5 w-[17rem] max-w-full">
+                            {/**
+                              * ⛔ ONE EASY-PACE BLOCK (2026-08-20). There were TWO — a display card showing
+                              * the resolved value, and a separate "Easy pace (manual)" input with the
+                              * picker under it. Same fact, twice, in one card, with a conditional so the
+                              * display half vanished when nothing was learned and the manual half retitled
+                              * itself "— in use" to compensate. It read as jammed because it was.
+                              *
+                              * Now: the resolved value and its receipt on top, the number you can type
+                              * under it, and the picker only when there are genuinely two to choose
+                              * between. Both values stay visible and the one IN USE is named (Law 3) —
+                              * which is what the two-block version was protecting and is preserved here.
+                              */}
+                            <div className="flex flex-col gap-1.5">
                               <label className="text-xs text-white/50 font-medium">Easy pace</label>
-                              {/* THE BOX SHOWS THE NUMBER YOU CHOSE. It used to render the LEARNED value
-                                  unconditionally, so picking "use my number" changed what the APP used and not
-                                  what the SCREEN said — a number on screen that isn't the number in use, which
-                                  is the exact lie D-285 exists to kill. Resolved through the SAME resolver the
-                                  9 server surfaces use, so the screen and the engine cannot disagree. */}
                               {(() => {
                                 const resolvedEasy = resolveCurrentRunEasyPace({
                                   learned_fitness: learnedFitness,
                                   performance_numbers: data.performanceNumbers,
-                                } as any);
+                                } as never);
                                 const onManual = resolvedEasy.source === 'manual-chosen' || resolvedEasy.source === 'manual';
                                 return (
-                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left min-h-[6.5rem]">
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-lg font-medium text-white tabular-nums">{formatPaceSecPerMi(resolvedEasy.sec_per_mi)}</span>
-                                  {!onManual && (
-                                    <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(easyLearned.confidence)}</span>
-                                  )}
-                                </div>
-                                {onManual ? (
-                                  // The athlete's own number has no date, no samples, no basis. Say only what is true.
-                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">you entered this</p>
-                                ) : (
-                                  <>
-                                    {learnedBasisLine(easyLearned, 'run') && (
-                                      <p className="text-[11px] text-white/40 mt-1 leading-snug">{learnedBasisLine(easyLearned, 'run')}</p>
-                                    )}
-                                    {learnedAsOfLine(easyLearned) && (
+                                  <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-lg font-medium text-white tabular-nums">
+                                        {formatPaceSecPerMi(resolvedEasy.sec_per_mi)}
+                                      </span>
+                                      {!onManual && hasEasyLearned && (
+                                        <span className="text-[10px] text-white/35" title="Model confidence">
+                                          {getConfidenceDots(easyLearned.confidence)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-white/40 mt-1 leading-snug">
+                                      {onManual
+                                        ? 'you entered this'
+                                        : (learnedBasisLine(easyLearned, 'run') || 'measured from your runs')}
+                                    </p>
+                                    {!onManual && learnedAsOfLine(easyLearned) && (
                                       <p className="text-[11px] text-white/30 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
                                     )}
-                                  </>
-                                )}
-                              </div>
+                                  </div>
                                 );
                               })()}
-                            </div>
-                            )}
-                            {/* D-285 / GLASS BOX — the manual input is ALWAYS rendered.
-                                It used to be gated on `!hasEasyLearned`, so the moment the app learned an easy
-                                pace the athlete's own field VANISHED: no accept, no reject, no override. The
-                                app's inference won and the athlete had no recourse — the opposite of a glass box,
-                                and the reason a wrong manual value could sit there uncorrectable.
-                                Both values are now visible, and the one actually IN USE is named (Law 3). */}
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs text-white/50 font-medium">
-                                Easy pace (manual){hasEasyLearned ? '' : ' — in use'}
-                              </label>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mt-0.5">
                                 <input
                                   type="text"
                                   value={data.performanceNumbers?.easyPace || ''}
                                   onChange={(e) => setData(prev => ({
                                     ...prev,
-                                    performanceNumbers: {
-                                      ...prev.performanceNumbers,
-                                      easyPace: e.target.value
-                                    }
+                                    performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value },
                                   }))}
-                                  placeholder="9:30"
-                                  className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
-                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                  placeholder="11:30"
+                                  className="w-24 h-10 px-3 text-sm font-medium bg-white/[0.06] border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 text-center"
                                 />
-                                <span className="text-sm text-white/50">/mi</span>
+                                <span className="text-[11px] text-white/40">your own number, /mi</span>
                               </div>
-                              {/* Q-174 — THE ATHLETE CHOOSES, and their choice wins.
-                                  Before this, a learned value silently outranked the typed one and the typed
-                                  field was hidden entirely — the app decided, and the athlete had no say and no
-                                  way to see it. Now: when both exist, they pick, and the pick is honoured over
-                                  even a high-confidence learned pace. An assertion beats an inference (Law 2);
-                                  Garmin and TrainingPeaks both respect a value you set.
-                                  Absent a choice, behavior is byte-identical to before (learned-first). */}
-                              {hasEasyLearned && (
-                                <div className="flex flex-col gap-1.5 mt-0.5 w-[17rem] max-w-full">
-                                  <div className="flex items-stretch gap-1.5">
-                                    {([
-                                      { key: 'learned', label: 'Use my runs', val: formatPace(easyLearned.value) },
-                                      { key: 'manual', label: 'Use my number', val: data.performanceNumbers?.easyPace || '—' },
-                                    ] as const).map(({ key, label, val }) => {
-                                      // Absent choice === 'learned' (the historical default).
-                                      const chosen = (data.performanceNumbers as any)?.easy_pace_source ?? 'learned';
-                                      const active = chosen === key;
-                                      const disabled = key === 'manual' && !data.performanceNumbers?.easyPace;
-                                      return (
-                                        <button
-                                          key={key}
-                                          type="button"
-                                          disabled={disabled}
-                                          onClick={() => setData(prev => ({
-                                            ...prev,
-                                            performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
-                                          }))}
-                                          // flex-1 + a fixed min-height: both pills are the same size in both
-                                          // states, so selecting one does not resize it and shove the other.
-                                          /**
-                                           * ⛔ THE SELECTED PILL WEARS THE SPORT'S COLOUR, NOT TEAL
-                                           * (2026-08-20). Generic teal said "something is selected";
-                                           * the sport colour says WHICH FACT this choice governs, and
-                                           * it is the same colour the card, the chips and the zone
-                                           * dots already use one screen up. Inline rather than a
-                                           * Tailwind class because the palette is a JS constant
-                                           * (`SPORT_COLORS`) and the class names would have to be
-                                           * enumerated per sport for the JIT to keep them.
-                                           */
-                                          className={`flex-1 min-h-[2.75rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
-                                            active
-                                              ? 'text-white'
-                                              : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
-                                          } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
-                                          style={active ? {
-                                            backgroundColor: `${SPORT_COLORS.run}26`,
-                                            borderColor: `${SPORT_COLORS.run}80`,
-                                          } : undefined}
-                                          title={key === 'manual'
-                                            ? 'Your entered pace is used, even if your runs say otherwise.'
-                                            : 'Tracks what your easy runs actually show, and keeps updating.'}
-                                        >
-                                          <span className="block">{label}</span>
-                                          <span className="block tabular-nums text-white/50">{val}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  {!data.performanceNumbers?.easyPace && (
-                                    <p className="text-[11px] text-white/25 leading-snug">
-                                      Enter a pace above to be able to choose it.
-                                    </p>
-                                  )}
+                              {/* The picker only appears when there are two real answers to choose between. */}
+                              {hasEasyLearned && data.performanceNumbers?.easyPace && (
+                                <div className="flex items-stretch gap-1.5 mt-0.5">
+                                  {([
+                                    { key: 'learned', label: 'Use my runs', val: formatPace(easyLearned.value) },
+                                    { key: 'manual', label: 'Use my number', val: data.performanceNumbers?.easyPace || '—' },
+                                  ] as const).map(({ key, label, val }) => {
+                                    const chosen = (data.performanceNumbers as any)?.easy_pace_source ?? 'learned';
+                                    const active = chosen === key;
+                                    return (
+                                      <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
+                                        }))}
+                                        className={`flex-1 min-h-[2.5rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
+                                          active ? 'text-white' : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
+                                        }`}
+                                        style={active ? {
+                                          backgroundColor: `${SPORT_COLORS.run}26`,
+                                          borderColor: `${SPORT_COLORS.run}80`,
+                                        } : undefined}
+                                        title={key === 'manual'
+                                          ? 'Your entered pace is used, even when your runs measure a different one.'
+                                          : 'Tracks what your easy runs measure, and keeps updating.'}
+                                      >
+                                        <div className="font-medium">{label}</div>
+                                        <div className="opacity-70 tabular-nums">{val}</div>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -1657,9 +1616,10 @@ return (
                                       <button
                                         type="button"
                                         onClick={() => setShowRunTestDatePicker(true)}
-                                        className="text-[11px] font-medium text-white/70 hover:text-white underline underline-offset-2"
+                                        className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg text-white/80 hover:text-white bg-white/[0.05] border border-white/15 text-left"
                                       >
-                                        Schedule a threshold test — 12 min, measures it properly
+                                        Schedule a threshold test
+                                        <span className="block text-[10px] text-white/40 mt-0.5">12 min — measures it properly</span>
                                       </button>
                                     )}
                                   </div>
