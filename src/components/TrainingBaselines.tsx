@@ -2260,7 +2260,25 @@ return (
                           {/* Per-sport: anchor inputs + zone table */}
                           {sportSections.map((sport) => {
                             const effectiveMaxHR = sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates ? ageEstimates.maxHR : null);
-                            const effectiveLTHR = sport.manualLTHR || sport.learnedLTHR || (ageEstimates ? ageEstimates.thresholdHR : null);
+                            /**
+                             * ⛔ THE ESTIMATE TIER ANCHORS ON THE ATHLETE'S OWN MAX, NOT ON THEIR AGE
+                             * (2026-08-20). It fell straight to `ageEstimates.thresholdHR`, which is
+                             * `Tanaka(age) x 0.88` — a formula on top of a formula. `effectiveMaxHR`
+                             * above is a MEASURED peak when one exists (20 rides, high confidence, on
+                             * the account this was found on), so estimating from it is one inference
+                             * instead of two. Age stays underneath for an athlete with no history.
+                             *
+                             * ⚠️ THE POINT WAS NEVER "NO ESTIMATES." The defect was an estimate stored
+                             * as a LEARNED value at `sample_count: 0` and consumed by plans, workload
+                             * and zone bins as a measurement. The engine refuses it now. This card is
+                             * an EDITOR — it has to seed the two inputs with something, and it labels
+                             * what it used ("age est." / "observed"), so a number here is a prompt to
+                             * enter one, not a claim to have measured it.
+                             */
+                            const estimatedLTHR = effectiveMaxHR
+                              ? Math.round(effectiveMaxHR * 0.88)
+                              : (ageEstimates ? ageEstimates.thresholdHR : null);
+                            const effectiveLTHR = sport.manualLTHR || sport.learnedLTHR || estimatedLTHR;
                             const zones = getHRZones(effectiveLTHR, effectiveMaxHR, restingInfo.value);
                             const model = getZoneModel(effectiveLTHR, effectiveMaxHR, restingInfo.value);
 
@@ -2268,7 +2286,15 @@ return (
                             // ⚠️ "learned" HERE MEANS MEASURED, and it now only says so when that is true.
                             // The value is resolved (gated), so a formula-derived anchor no longer reaches
                             // this line at all — it falls to the age estimate, which is labelled as one.
-                            const lthrSource = sport.manualLTHR ? 'manual' : sport.learnedLTHR ? 'learned' : ageEstimates ? 'age est.' : '';
+                            // "learned" means MEASURED and now only says so when it is true — the
+                            // value is resolved, so a formula-derived anchor never reaches that branch.
+                            const lthrSource = sport.manualLTHR
+                              ? 'manual'
+                              : sport.learnedLTHR
+                                ? 'learned'
+                                : effectiveMaxHR
+                                  ? 'est. from max'
+                                  : (ageEstimates ? 'age est.' : '');
 
                             return (
                               <div key={sport.key} className="space-y-3">

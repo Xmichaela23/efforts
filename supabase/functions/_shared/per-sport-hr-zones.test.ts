@@ -81,3 +81,19 @@ Deno.test('the SCREEN resolves its anchors — it cannot show zones the engine r
     'the screen reaches past the resolver to the raw threshold column',
   );
 });
+
+Deno.test('the estimate tier anchors on the athlete\'s OWN max, not on their age', () => {
+  // ⛔ Refusing the learner's `90% of observed max` anchor must not drop the card to
+  // `Tanaka(age) x 0.88` — that swaps a formula on a MEASUREMENT for a formula on a formula. The
+  // athlete's observed peak is real (20 rides, high confidence on the account this was found on).
+  assert(
+    /const estimatedLTHR = effectiveMaxHR[\s\S]{0,120}Math\.round\(effectiveMaxHR \* 0\.88\)/.test(baselinesSrc),
+    'the LTHR estimate no longer anchors on the measured max',
+  );
+  assert(
+    /ageEstimates\s*\?\s*ageEstimates\.thresholdHR\s*:\s*null/.test(baselinesSrc),
+    'the age tier was removed entirely — it is the right answer for an athlete with no history',
+  );
+  // And the label distinguishes the two, so "est. from max" and "age est." cannot read alike.
+  assert(/'est\. from max'/.test(baselinesSrc), 'the estimate no longer says what it was estimated from');
+});
