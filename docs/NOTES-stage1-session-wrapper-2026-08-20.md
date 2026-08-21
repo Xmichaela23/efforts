@@ -3,7 +3,9 @@
 **2026-08-20. Work order: `WORKORDER-finish-the-swaps-2026-08-20.md` § Stage 1. Evidence:
 `REPORT-session-structure-and-clumping-2026-08-20.md`.**
 
-**State: PUSHED — no. DEPLOYED — no. VERIFIED ON A DEVICE — no.** Nothing has left this machine.
+**State: PUSHED — yes, `024d9152` (2026-08-21). DEPLOYED — yes, 2026-08-21:
+`generate-strength-plan` + `materialize-plan`, the full importer set of every touched file.
+VERIFIED ON A DEVICE — no.** §9 lists what would settle it; it only shows on a NEWLY built block.
 Every claim below is fixture-backed or sweep-backed, and none of it has been seen in the app.
 
 ---

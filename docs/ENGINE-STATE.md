@@ -32,7 +32,7 @@ order.** Its evidence is `docs/REPORT-session-structure-and-clumping-2026-08-20.
 order first; it is the sequence, not the findings.
 
 **Stage 1 is done and its notes are `docs/NOTES-stage1-session-wrapper-2026-08-20.md`.**
-⛔ **PUSHED — no. DEPLOYED — no. VERIFIED — no.** It is sitting in the working tree awaiting Michael.
+⛔ **PUSHED — yes (`024d9152`). DEPLOYED — yes (2026-08-21, `generate-strength-plan` + `materialize-plan`). VERIFIED ON A DEVICE — no.** What would settle it is §9 of the stage 1 notes; it needs a NEW block built.
 
 ### YOUR JOB — STAGE 2: THE SPORTS STOP CLUMPING
 
