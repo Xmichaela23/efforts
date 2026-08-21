@@ -21,10 +21,20 @@ const build = (cfg: Record<string, unknown> = {}): any => composeStrengthPrimary
   hardDays: [{ discipline: 'run', day: 'wednesday', goal: 'speed' }],
   ...cfg,
 } as never);
+/**
+ * ⛔ THE WORK TOKEN, NOT `steps_preset[0]` (2026-08-20, stage 1). Every quality session now opens
+ * with a warm-up preset — `quality-session.ts` emits `[warmup, work, cooldown]` — so index 0 is the
+ * bracket, not the prescription. These helpers ask for the token that carries the WORK.
+ */
+const workTokens = (s: any): string[] =>
+  (Array.isArray(s?.steps_preset) ? s.steps_preset : [])
+    .filter((t: string) => !/^(warmup|cooldown)_/.test(String(t)));
+const workTokenOf = (s: any): string => workTokens(s)[0] ?? '';
+
 const sprintIn = (p: any, week: number) =>
   (p.sessions_by_week[String(week)] ?? []).find((s: any) => s.name === 'Flat Sprints');
 const repsIn = (p: any, week: number): number | null => {
-  const m = String(sprintIn(p, week)?.steps_preset?.[0] ?? '').match(/^run_sprint_(\d+)x/);
+  const m = workTokenOf(sprintIn(p, week)).match(/^run_sprint_(\d+)x/);
   return m ? Number(m[1]) : null;
 };
 
@@ -74,7 +84,7 @@ Deno.test('the rest is COMPLETE and it is stated as the prescription, not a deta
   // 10-15 s at maximum effort is a NEURAL session; an incomplete recovery turns it into a lactate
   // session, which is the one thing it must not become in a block that already has a threshold day.
   const s = sprintIn(build(), 2);
-  assertEquals(/_r150s$/.test(String(s.steps_preset[0])), true, `rest moved: ${s.steps_preset[0]}`);
+  assertEquals(/_r150s$/.test(workTokenOf(s)), true, `rest moved: ${workTokenOf(s)}`);
   assert(/short recovery turns it into a lactate session/i.test(String(s.description)));
 });
 
@@ -87,7 +97,7 @@ Deno.test('the speed terrains name the ground and change nothing else', () => {
     const s = sprintIn(p, 2);
     assert(words.test(String(s.description)), `${terrain}: ${s.description}`);
     // ⚠️ TERRAIN DOES NOT TOUCH THE TOKEN. A sprint is a sprint; the ground is where, not what.
-    assertEquals(s.steps_preset[0], 'run_sprint_6x12s_r150s');
+    assertEquals(workTokenOf(s), 'run_sprint_6x12s_r150s');
   }
 });
 

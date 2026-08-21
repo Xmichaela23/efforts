@@ -342,9 +342,25 @@ Deno.test('⛔ a hard RUN is inside the typed miles, not on top of them', () => 
     longRunDay: 'sunday', hardDays: [{ day: 'thursday', discipline: 'run' }],
   });
   const built = minutesOf(withHard, 'run');
+  /**
+   * ⚠️ THE LAP-BUTTON DESCENTS ARE THE SLACK, AND THEY ARE ON THE UNDER SIDE (2026-08-20).
+   *
+   * This week's hard run is the 3-minute hill. Its budget reserves 35 minutes; its STATED duration
+   * is 32, because the descents end on the lap button and carry no clock — so summing the stated
+   * durations comes in about three minutes under the ask, every time, by construction.
+   *
+   * ⛔ THE DIRECTION IS WHAT THIS TEST IS FOR AND IT STILL HOLDS: the hard run must not be ADDED ON
+   * TOP of the typed miles. Under-running by the un-clockable descent is the opposite failure, and
+   * the safe one. Stated as a one-sided bound so it cannot quietly become a licence to overshoot.
+   */
+  const OPEN_DESCENT_MIN = 3;
   assert(
-    Math.abs(built - 21 * 9) <= RIDE_TOLERANCE_MIN,
+    built - 21 * 9 <= RIDE_TOLERANCE_MIN,
     `asked ${21 * 9} min of running, built ${built} min — the hard run was added on top`,
+  );
+  assert(
+    21 * 9 - built <= RIDE_TOLERANCE_MIN + OPEN_DESCENT_MIN,
+    `asked ${21 * 9} min of running, built only ${built} min — more than the open descents explain`,
   );
 });
 

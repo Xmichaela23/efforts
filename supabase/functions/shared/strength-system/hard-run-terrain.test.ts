@@ -121,8 +121,11 @@ Deno.test('⚠️ THE RIDE HAS NO TERRAIN — a turbo, a chaingang and a climb a
   // ⚠️ THE RECOVERY MOVES ACROSS THE WAVE (§7, 2026-08-17) — week 2 of a cycle is `_R3min`. What
   // this line is actually protecting is that TERRAIN never reaches the ride, so it asserts the
   // token's shape rather than one week's literal.
-  assertEquals(/^bike_vo2_4x4min_R\d+min$/.test(ride.steps_preset[0]), true,
-    `terrain leaked into the ride: ${ride.steps_preset[0]}`);
+  // ⛔ THE WORK TOKEN — the ride opens with `warmup_bike_*` since 2026-08-20.
+  const rideWork = (ride.steps_preset as string[])
+    .filter((t) => !/^(warmup|cooldown)_/.test(String(t)))[0];
+  assertEquals(/^bike_vo2_4x4min_R\d+min$/.test(rideWork), true,
+    `terrain leaked into the ride: ${rideWork}`);
   assertEquals(
     sessions.some((s) => /Hill|Treadmill|Flat/.test(String(s.name))), false,
     'a bike hard day must not also build a hard run',
@@ -196,9 +199,25 @@ Deno.test('⛔ THE DURATION TRACKS THE SESSION — one owner, or the miles come 
   assertEquals(hardRunSessionMinutes('hill_short'), SHORT_HILL_SESSION_MIN);
   assertEquals(hardRunSessionMinutes('treadmill'), TREADMILL_SESSION_MIN);
   assertEquals(hardRunSessionMinutes('flat'), FLAT_SESSION_MIN);
+  /**
+   * ⛔ ONE EXCEPTION, AND IT IS A FACT ABOUT THE WATCH RATHER THAN A SECOND OWNER (2026-08-20).
+   *
+   * The 3-minute hill's descents end on the LAP BUTTON, so they reach the watch with no duration and
+   * contribute zero to `total_duration_seconds` (`hills-lap-button.test.ts` — the absence IS the
+   * instruction). `materialize-plan` therefore writes 32 for that session whatever the composer
+   * says, so the card must say 32 too, or the wizard and the plan disagree — which is precisely the
+   * `Flat Sprints 35m / 0h 14m` defect this stage closed.
+   *
+   * ⚠️ THE BUDGET STILL RESERVES 35, AND THAT IS DELIBERATE. The athlete really spends those three
+   * minutes walking or jogging back down; the clock simply cannot hold them. So the two numbers
+   * answer two different questions — *what will the card say* and *what will the day cost* — and the
+   * gap between them is asserted here EXACTLY rather than tolerated.
+   */
+  const OPEN_DESCENT_MIN = 3;
   for (const terrain of ALL) {
+    const openGap = (terrain === 'hill_3min' || terrain === undefined) ? OPEN_DESCENT_MIN : 0;
     assertEquals(
-      hardRun(terrain).duration, hardRunSessionMinutes(terrain as never),
+      hardRun(terrain).duration + openGap, hardRunSessionMinutes(terrain as never),
       `the session and the budget disagree on ${terrain}`,
     );
   }

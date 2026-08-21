@@ -52,7 +52,13 @@ Deno.test('the hills are still the protected intensity — fixed, never shrunk t
     // NOT MOVE with the mileage budget, which is Hickson's point; the number itself belongs to
     // whichever session the hierarchy put there.
     // ⚠️ 35 AGAIN — one hard day is the HILL session (2026-08-18), and its length is fixed.
-    assertEquals(hard.duration, 35, `the hard run shrank on a ${asked}-mile week`);
+    // ⚠️ 32, NOT 35, SINCE 2026-08-20 — AND THE SESSION DID NOT CHANGE BY ONE SECOND. The stated
+    // duration is now what the token actually builds: 10 min warm-up + 4 × 3 min + 10 min cool-down
+    // = 32 clocked. The three missing minutes are the lap-button descents, which reach the watch
+    // with no duration by design, so `materialize-plan` has always written 32 here — the composer
+    // simply used to say 35 and be overruled. The BUDGET still reserves 35 (`HILL_SESSION_MIN`).
+    // ⛔ WHAT THIS TEST PROTECTS IS UNCHANGED: the number does not move with the mileage budget.
+    assertEquals(hard.duration, 32, `the hard run shrank on a ${asked}-mile week`);
   }
 });
 

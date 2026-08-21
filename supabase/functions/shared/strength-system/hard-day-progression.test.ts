@@ -31,7 +31,14 @@ const build = (cfg: Record<string, unknown>): any =>
   composeStrengthPrimaryPlan({ durationWeeks: 12, oneRepMaxes: MAXES, ...NUMBERS, ...cfg } as never);
 const wk = (p: any, n: number): any[] => (p.sessions_by_week[String(n)] ?? []) as any[];
 const named = (p: any, n: number, re: RegExp) => wk(p, n).filter((s) => re.test(String(s.name)));
-const tokenOf = (s: any): string => (Array.isArray(s.steps_preset) ? s.steps_preset[0] : '') ?? '';
+/**
+ * ⛔ THE WORK TOKEN, NOT `steps_preset[0]` (2026-08-20, stage 1). Every quality session now opens
+ * with a warm-up preset — `quality-session.ts` emits `[warmup, work, cooldown]` — so index 0 is the
+ * bracket. Every assertion in this file is about the PRESCRIPTION, so it asks for that.
+ */
+const tokenOf = (s: any): string =>
+  (Array.isArray(s?.steps_preset) ? s.steps_preset : [])
+    .filter((t: string) => !/^(warmup|cooldown)_/.test(String(t)))[0] ?? '';
 
 // ── 1. THE THRESHOLD SESSION EXISTS, AND IT LENGTHENS ────────────────────────────────────────────
 

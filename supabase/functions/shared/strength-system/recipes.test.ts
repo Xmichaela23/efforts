@@ -120,7 +120,9 @@ const dayIdx = (d: string) => DAYS.indexOf(String(d));
 
 /** Working minutes of a hard session, read off its own token so the test cannot drift from the plan. */
 function workMinutes(s: any): number {
-  const t = String(s.steps_preset?.[0] ?? '');
+  // ⛔ THE WORK TOKEN, NOT INDEX 0 — quality sessions open with a warm-up preset since 2026-08-20.
+  const t = String((Array.isArray(s.steps_preset) ? s.steps_preset : [])
+    .filter((x: string) => !/^(warmup|cooldown)_/.test(String(x)))[0] ?? '');
   let m = t.match(/_(\d+)x(\d+)min/);
   if (m) return Number(m[1]) * Number(m[2]);
   m = t.match(/_(\d+)x(\d+)s_/);
@@ -332,7 +334,11 @@ for (const r of RECIPES) {
 Deno.test('⛔ RECIPE A — sprints on the intensity slot, threshold on the ride', () => {
   const p = build(RECIPES[0].cfg);
   const w2 = weekOf(p, 2);
-  assertEquals(w2.find((s) => s.name === 'Flat Sprints')?.steps_preset?.[0], 'run_sprint_6x12s_r150s');
+  assertEquals(
+    (w2.find((s) => s.name === 'Flat Sprints')?.steps_preset ?? [])
+      .filter((x: string) => !/^(warmup|cooldown)_/.test(String(x)))[0],
+    'run_sprint_6x12s_r150s',
+  );
   assert(w2.some((s) => s.name === 'Threshold Ride'), 'the second hard day is not the ride threshold');
 });
 

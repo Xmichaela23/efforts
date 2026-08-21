@@ -129,6 +129,21 @@ import {
 // has not been read on a device is not a week that has been verified. Delete after Michael has seen
 // a built block, not before.
 import { solveWithWeekModel as solveWeek } from '../../_shared/week-model/solver-adapter.ts';
+/**
+ * ⛔ ONE OWNER FOR A QUALITY SESSION'S LENGTH AND ITS WARM-UP (2026-08-20, stage 1).
+ *
+ * Every builder below used to state its length THREE times — the constant the volume budget
+ * subtracts, the `duration` field, and the token — and `materialize-plan` overwrote the first two
+ * from the third. Four sessions leaked between 13 and 22 minutes each, and Flat Sprints reached the
+ * watch with an EMPTY warm-up array. Builders no longer state a duration at all: they declare a
+ * CORE and receive `{ duration, steps_preset }` as one object.
+ */
+import {
+  type QualityCore,
+  qualityBudgetMinutes,
+  wrapperNote,
+  wrapQualitySession,
+} from './quality-session.ts';
 
 
 /** The four lifts, in lb. **All four are required** — the entry gate gets this far only
@@ -1426,7 +1441,7 @@ function enduranceSession(
 /** ⛔ ONE OWNER FOR THE HARD RIDE'S LENGTH. The ride budget subtracts this before splitting the easy
  *  hours, so a literal 45 in two places would drift and the week would silently overshoot the ask —
  *  which is exactly the defect that subtraction was added to fix. Mirrors `HILL_SESSION_MIN`. */
-const BIKE_QUALITY_MIN = 45;
+const BIKE_QUALITY_ALLOWANCE_MIN = 45;
 
 /**
  * ⛔ THE WAVE — THE HARD DAY MOVES WITH THE BARBELL, WEEK BY WEEK (§7, 2026-08-17).
@@ -1458,6 +1473,24 @@ const BIKE_QUALITY_MIN = 45;
  * leader 2 — both are `'leader'` — so wave 2's pace drop had nowhere to read from. 1-based.
  */
 type HardWave = { weekInCycle: number; cycleKind: CycleKind; cycleIndex?: number };
+
+/**
+ * ⛔ EVERY WEEK-SHAPE A HARD SESSION TAKES ACROSS THE BLOCK — the set the volume budget has to be
+ * right for (2026-08-20, stage 1).
+ *
+ * The budget is settled ONCE for the block; the session's core moves week to week. So "what does
+ * this session cost" is a question about the whole wave, not about week 1, and `qualityBudgetMinutes`
+ * takes the largest answer over this list. ⚠️ SIX ENTRIES, NOT THREE: the anchor cycle runs its own
+ * rep tables (`ANCHOR_THRESHOLD_WAVE`, `vo2RepsFor`, `sprintRepsFor`) and quoting only the leader
+ * weeks is how a budget ends up right for nine weeks of twelve.
+ *
+ * ⚠️ `cycleIndex` IS ABSENT DELIBERATELY. It selects wave 2's pace drop, which changes the token
+ * suffix and not one second of the session's length.
+ */
+const ALL_HARD_WAVES: ReadonlyArray<HardWave> = ([1, 2, 3] as const).flatMap((weekInCycle) => ([
+  { weekInCycle, cycleKind: 'leader' as CycleKind },
+  { weekInCycle, cycleKind: 'anchor' as CycleKind },
+]));
 
 /**
  * ⛔ 20 MINUTES IN ZONE, HELD, WITH THE CONTINUOUS EFFORT LENGTHENING (§7, Michael's spec).
@@ -1598,6 +1631,22 @@ const THRESHOLD_BASIS_LINE: Record<'measured' | 'derived-from-easy' | 'stated' |
     + 'hard, a sentence and not a conversation.',
 };
 
+/**
+ * ⛔ THE WORK, EXACTLY AS `run_thr_*` EXPANDS IT (`materialize-plan:1600`): the efforts, and the
+ * recoveries BETWEEN them — the loop is `if (i < reps - 1)`, so there is no trailing rest. Getting
+ * that off by one rest interval is a minute of drift, which is the whole class of defect this
+ * stage closes.
+ */
+function thresholdRunCore(wave: HardWave): QualityCore {
+  const st = thresholdStep(wave);
+  const drop = thresholdPaceDrop(wave);
+  return {
+    tokens: [`run_thr_${st.reps}x${st.minutes}min_r${st.restMin * 60}s${drop > 0 ? `_f${drop}` : ''}`],
+    workSeconds: st.reps * st.minutes * 60 + (st.reps - 1) * st.restMin * 60,
+    selfWrapped: false,
+  };
+}
+
 function thresholdRunSession(
   day: string,
   wave: HardWave,
@@ -1607,6 +1656,7 @@ function thresholdRunSession(
   const st = thresholdStep(wave);
   const anchor = wave.cycleKind === 'anchor';
   const drop = thresholdPaceDrop(wave);
+  const wrapped = wrapQualitySession(thresholdRunCore(wave), THRESHOLD_RUN_ALLOWANCE_MIN, 'run');
   return {
     day,
     type: 'run',
@@ -1626,13 +1676,14 @@ function thresholdRunSession(
       // ⛔ THE THREE STATES, SAID PLAINLY RATHER THAN PICKED SILENTLY. The athlete reads this line
       // and it is the only place the session tells them where its number came from.
       + THRESHOLD_BASIS_LINE[basis]
-      + thresholdGroundNote(terrain),
-    duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
-    // ⚠️ `_f{sec}` IS THE FASTER-THAN-THRESHOLD SUFFIX, and it is OPTIONAL — the token without it is
-    // the pre-2026-08-17 form exactly, so every already-materialized plan is unaffected.
-    steps_preset: [
-      `run_thr_${st.reps}x${st.minutes}min_r${st.restMin * 60}s${drop > 0 ? `_f${drop}` : ''}`,
-    ],
+      + thresholdGroundNote(terrain)
+      // ⛔ THE WARM-UP IS NOW PART OF THE SESSION, SO THE CARD SAYS SO. A prescription the athlete
+      // reads as "4 × 5 min at threshold" beside a duration of 45 minutes is a gap they have to
+      // guess at; naming the bracket closes it. ⚠️ `_f{sec}` IS THE FASTER-THAN-THRESHOLD SUFFIX on
+      // the token and it is OPTIONAL — the token without it is the pre-2026-08-17 form exactly, so
+      // every already-materialized plan is unaffected.
+      + wrapperNote(wrapped),
+    ...wrapped.fields,
     tags: ['quality', 'run', 'aerobic', 'threshold'],
   };
 }
@@ -1642,9 +1693,26 @@ function thresholdRunSession(
  * through the `bike_thr_*` token family, which the expander already understands; nothing new was
  * invented for the bike.
  */
+/**
+ * ⛔ THE WORK, EXACTLY AS `bike_thr_*` EXPANDS IT (`materialize-plan:1976`) — and it differs from the
+ * RUN's token in the one way that matters here: the bike loop is `if (rest) out.push(recovery)`
+ * with NO `i < reps - 1` guard, so it emits a recovery after EVERY rep including the last. Four ×
+ * 5 min with 1 min rest is 24 minutes on the bike and 23 on foot. Reading the run's arithmetic onto
+ * the ride is a minute of drift, which is exactly the class of defect this stage closes.
+ */
+function thresholdRideCore(wave: HardWave): QualityCore {
+  const st = thresholdStep(wave);
+  return {
+    tokens: [`bike_thr_${st.reps}x${st.minutes}min_R${st.restMin}min`],
+    workSeconds: st.reps * (st.minutes + st.restMin) * 60,
+    selfWrapped: false,
+  };
+}
+
 function thresholdRideSession(day: string, wave: HardWave, env?: HardRideEnvironment): PlanSession {
   const st = thresholdStep(wave);
   const anchor = wave.cycleKind === 'anchor';
+  const wrapped = wrapQualitySession(thresholdRideCore(wave), THRESHOLD_RIDE_ALLOWANCE_MIN, 'bike');
   return {
     day,
     type: 'ride',
@@ -1656,30 +1724,32 @@ function thresholdRideSession(day: string, wave: HardWave, env?: HardRideEnviron
         ? 'Anchor week: hold the top of the range. This is the hardest this session gets in the block. '
         : 'The efforts get longer across the block, not more numerous — the same time in zone, held for longer each time. ')
       + 'Spin it, do not grind it: the same cue as the interval day, and for the same reason.'
-      + rideEnvironmentNote(env, 'threshold'),
-    duration: st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN,
-    steps_preset: [`bike_thr_${st.reps}x${st.minutes}min_R${st.restMin}min`],
+      + rideEnvironmentNote(env, 'threshold')
+      + wrapperNote(wrapped),
+    ...wrapped.fields,
     tags: ['quality', 'bike', 'aerobic', 'threshold'],
   };
 }
 
-/** Warm-up plus cool-down, the same allowance the VO2 sessions carry in their stated duration. */
-const WARMUP_COOLDOWN_MIN = 20;
-
 /**
- * ⛔ ONE OWNER FOR THE THRESHOLD RUN'S LENGTH — the run mileage budget subtracts it before
- * distributing easy volume, exactly as it does for the hill session (`hardRunSessionMinutes`).
+ * ⛔ THE THRESHOLD RUN'S ALLOWANCE — AND "ALLOWANCE" IS THE WORD THAT CHANGED (2026-08-20, stage 1).
  *
- * ⚠️ IT IS THE WAVE'S LONGEST WEEK (45 min: 3 × 7 + 2 × 2 rest + 20 warm-up/cool-down), not a mean.
- * The budget is computed once for the block while the session's length moves 43 · 45 · 43 across a
- * wave, so one number has to stand for three. Taking the LONGEST over-subtracts by two minutes on
- * two weeks in three; taking the shortest would hand those minutes back as easy miles every week,
- * which is the +3.5 mi defect this file has already fixed twice. Over-subtracting is the safe
- * direction and it is small.
+ * This was `THRESHOLD_RUN_MIN`, computed as the wave's LONGEST week (`3 × 7 + 2 × 2 + 20`), because
+ * the budget is settled once for the block while the session's length moved 43 · 45 · 43 across the
+ * wave and one number had to stand for three. Its own comment conceded it over-subtracted by two
+ * minutes on two weeks in three.
+ *
+ * ⛔ THERE IS NOTHING LEFT TO STAND IN FOR. `quality-session.ts` spends whatever the core does not
+ * use on the warm-up and cool-down, so **every week of the wave now costs exactly this number** —
+ * the core moves and the wrapper absorbs it. The value is unchanged at 45; what it means is no
+ * longer "roughly how long this session is" but "how much of the week this session may have".
+ *
+ * ⚠️ AND THE THRESHOLD RIDE HAS ITS OWN NOW. The ride budget read `THRESHOLD_RUN_MIN` — the RUN's
+ * constant, on a ride — which was harmless only because the two numbers happened to be equal. Two
+ * concepts sharing one name is how a rename becomes a bug six weeks later.
  */
-const THRESHOLD_RUN_MIN = Math.max(
-  ...THRESHOLD_WAVE.map((st) => st.reps * st.minutes + (st.reps - 1) * st.restMin + WARMUP_COOLDOWN_MIN),
-);
+const THRESHOLD_RUN_ALLOWANCE_MIN = 45;
+const THRESHOLD_RIDE_ALLOWANCE_MIN = 45;
 
 /** The minutes a hard run costs the week's mileage budget, by the role it was assigned (§7). */
 function hardRunMinutesForRole(
@@ -1690,7 +1760,19 @@ function hardRunMinutesForRole(
   // ⚠️ THREE SESSION LENGTHS NOW, NOT TWO. A sprint session is not a hill session and not a
   // threshold session; a budget that quoted the wrong one would hand the difference back as easy
   // miles, which is the defect this function was written to fix in the first place.
-  return role === 'threshold' ? THRESHOLD_RUN_MIN : hardRunSessionMinutes(terrain, goal);
+  //
+  // ⛔ AND EACH ONE IS NOW ASKED OF THE SESSION ITSELF (2026-08-20). Every branch below runs the
+  // SAME constructor the week loop runs, over every week of the wave, and takes the largest — so
+  // the number subtracted here and the number built there cannot drift apart. That drift was the
+  // whole defect: this function returned 35 for Flat Sprints while the plan built 14.
+  if (role === 'threshold') {
+    return qualityBudgetMinutes(
+      ALL_HARD_WAVES.map(thresholdRunCore),
+      THRESHOLD_RUN_ALLOWANCE_MIN,
+      'run',
+    );
+  }
+  return hardRunSessionMinutes(terrain, goal);
 }
 
 /**
@@ -1727,11 +1809,25 @@ function hardRunMinutesForRole(
  * maintained, the glycogen bill is halved. A rider told only "fewer intervals" would read it as the
  * plan losing interest and add them back.
  *
- * ⚠️ THE DURATION IS UNCHANGED AT 45 MIN AND THAT IS DELIBERATE. `BIKE_QUALITY_MIN` is what the
+ * ⚠️ THE DURATION IS UNCHANGED AT 45 MIN AND THAT IS DELIBERATE. `BIKE_QUALITY_ALLOWANCE_MIN` is what the
  * week's RIDE-HOURS budget subtracts, and it is computed once for the block; shrinking it in the
  * anchor would hand the difference back as easy riding on exactly the weeks the taper exists to
  * protect. Over-subtracting is the safe direction — the same call `THRESHOLD_RUN_MIN` makes.
  */
+/**
+ * ⛔ THE WORK, EXACTLY AS `bike_vo2_*` EXPANDS IT (`materialize-plan:1979`) — same shape as
+ * `bike_thr_*` above, recovery after every rep including the last.
+ */
+function bikeQualityCore(wave: HardWave): QualityCore {
+  const reps = vo2RepsFor(4, wave);
+  const restMin = Math.max(1, Math.round(wave.weekInCycle)) <= 1 ? 4 : 3;
+  return {
+    tokens: [`bike_vo2_${reps}x4min_R${restMin}min`],
+    workSeconds: reps * (4 + restMin) * 60,
+    selfWrapped: false,
+  };
+}
+
 function bikeQualitySession(
   day: string,
   wave: HardWave = { weekInCycle: 1, cycleKind: 'leader' },
@@ -1741,6 +1837,7 @@ function bikeQualitySession(
   // 4 min in week one of a wave, 3 from week two — and 3 is where it stays.
   const restMin = Math.max(1, Math.round(wave.weekInCycle)) <= 1 ? 4 : 3;
   const anchor = wave.cycleKind === 'anchor';
+  const wrapped = wrapQualitySession(bikeQualityCore(wave), BIKE_QUALITY_ALLOWANCE_MIN, 'bike');
   return {
     day,
     type: 'ride',
@@ -1759,9 +1856,9 @@ function bikeQualitySession(
         ? ' Anchor week: fewer intervals from here to the end of the block. We are maintaining your '
           + 'engine while cutting the glycogen cost in half so your quads are fully loaded for the barbell.'
         : '')
-      + rideEnvironmentNote(env, 'vo2'),
-    duration: BIKE_QUALITY_MIN,
-    steps_preset: [`bike_vo2_${reps}x4min_R${restMin}min`],
+      + rideEnvironmentNote(env, 'vo2')
+      + wrapperNote(wrapped),
+    ...wrapped.fields,
     tags: ['quality', 'bike', 'aerobic'],
   };
 }
@@ -2031,6 +2128,70 @@ export function descentIsJogged(hillDay: string, lowerDays: string[]): boolean {
 export const HILL_SESSION_MIN = 35;
 
 /**
+ * ⛔ THE FOUR TERRAIN CORES — AND THREE OF THEM ARE `selfWrapped`, WHICH IS THE ONE FLAG THAT STOPS
+ * THIS STAGE DOUBLING THEIR WARM-UP (2026-08-20, stage 1).
+ *
+ * The `run_hills_*` expander builds its own bracket — 600 s before, 480 or 600 s after
+ * (`materialize-plan:1779`, `:1831`) — so `workSeconds` here counts the WHOLE token including that
+ * bracket, and `quality-session.ts` adds nothing. `run_vo2_*` brackets nothing, so `flatCore` is
+ * the one that takes an external wrapper, exactly as `flatSession` has passed two separate presets
+ * since it shipped.
+ *
+ * ⚠️ THEY COME THROUGH THE CONSTRUCTOR ANYWAY, AND THAT IS THE POINT OF THE STAGE. Three of the
+ * four were already correct — on LEADER weeks. Nobody had computed the anchor weeks, where the rep
+ * count halves and the stated duration did not move: `HILL_SESSION_MIN` said 35 on every week of
+ * twelve while the anchor's token comes to 27. Routing them here recomputes the duration per week
+ * and puts them under the same sweep assertion as everything else.
+ */
+function hillCore(wave: HardWave, jogged: boolean): QualityCore {
+  const reps = vo2RepsFor(4, wave);
+  return {
+    tokens: [`run_hills_${reps}x180s_rlap_g5_8_d${jogged ? 'jog' : 'walk'}`],
+    // 10 min warm-up + reps × 3 min + 10 min cool-down. The descents carry no clock at all.
+    workSeconds: 600 + reps * 180 + 600,
+    // ⛔ THE ONE SESSION WHOSE STEPS CANNOT ADD UP, AND `workSeconds` DOES NOT PRETEND OTHERWISE.
+    // Each descent ends on the lap button, so it reaches the watch with no duration and contributes
+    // ZERO to `total_duration_seconds` — the absence IS the instruction (`hills-lap-button.test.ts`).
+    // So the stated duration is the CLOCKED time, exactly what the athlete's card will read, and the
+    // minutes the descents really take live in the allowance instead. `HILL_SESSION_MIN` is 35
+    // against 32 clocked, and that three-minute headroom is what it has always been for.
+    selfWrapped: true,
+  };
+}
+
+function shortHillCore(wave: HardWave, jogged: boolean): QualityCore {
+  const reps = vo2RepsFor(10, wave);
+  return {
+    tokens: [`run_hills_${reps}x60s_r60s_g4_6_d${jogged ? 'jog' : 'walk'}`],
+    // ⚠️ THE FIXED-RECOVERY BRANCH COOLS DOWN IN 8, NOT 10 (`materialize-plan:1861`). Reading the
+    // lap-button branch's 10 onto this one is two minutes of drift on three sessions.
+    workSeconds: 600 + reps * 60 + Math.max(0, reps - 1) * 60 + 480,
+    selfWrapped: true,
+  };
+}
+
+function treadmillCore(wave: HardWave): QualityCore {
+  const reps = vo2RepsFor(4, wave);
+  return {
+    // ⚠️ `_tm` IS A LABEL SWITCH AND CHANGES NO DURATION — it shares the fixed-recovery branch.
+    tokens: [`run_hills_${reps}x180s_r180s_g5_8_djog_tm`],
+    workSeconds: 600 + reps * 180 + Math.max(0, reps - 1) * 180 + 480,
+    selfWrapped: true,
+  };
+}
+
+function flatCore(wave: HardWave): QualityCore {
+  const reps = vo2RepsFor(4, wave);
+  return {
+    // ⚠️ `_r180s_` IS THE EXPLICIT FLOAT. The token defaults to 90 s, which would be a materially
+    // harder session than the one this is costed as.
+    tokens: [`run_vo2_${reps}x3min_r180s_z5`],
+    workSeconds: reps * 180 + Math.max(0, reps - 1) * 180,
+    selfWrapped: false,
+  };
+}
+
+/**
  * ⛔ THE VO2 SESSION YIELDS IN THE ANCHOR TOO (Michael, 2026-08-18) — AND IT WAS THE LAST HARD
  * SESSION IN THE BLOCK THAT DID NOT.
  *
@@ -2110,8 +2271,12 @@ function hillSession(day: string, lowerDays: string[] = [], wave?: HardWave): Pl
   // "short float keeps VO2 elevated" rationale is struck through as retired in the doctrine itself.
   // **The second option is an unsolved protocol question, not a missing branch.** See the handoff
   // banner at the top of `docs/ENGINE-STATE.md`.
+  const wrapped = wrapQualitySession(
+    hillCore(wave ?? { weekInCycle: 1, cycleKind: 'leader' }, jogged),
+    HILL_SESSION_MIN,
+    'run',
+  );
   const reps = vo2RepsFor(4, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
-  const token = `run_hills_${reps}x180s_rlap_g5_8_d${jogged ? 'jog' : 'walk'}`;
   return {
     day,
     type: 'run',
@@ -2127,8 +2292,7 @@ function hillSession(day: string, lowerDays: string[] = [], wave?: HardWave): Pl
       + (jogged
         ? ''
         : ' Walk the descents — running down is the part that would reach your next heavy day.'),
-    duration: HILL_SESSION_MIN,
-    steps_preset: [token],
+    ...wrapped.fields,
     tags: ['quality', 'hills', 'aerobic'],
   };
 }
@@ -2164,8 +2328,12 @@ export const SHORT_HILL_SESSION_MIN = 37;
 
 function shortHillSession(day: string, lowerDays: string[] = [], wave?: HardWave): PlanSession {
   const jogged = descentIsJogged(day, lowerDays);
+  const wrapped = wrapQualitySession(
+    shortHillCore(wave ?? { weekInCycle: 1, cycleKind: 'leader' }, jogged),
+    SHORT_HILL_SESSION_MIN,
+    'run',
+  );
   const reps = vo2RepsFor(10, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
-  const token = `run_hills_${reps}x60s_r60s_g4_6_d${jogged ? 'jog' : 'walk'}`;
   return {
     day,
     type: 'run',
@@ -2180,8 +2348,7 @@ function shortHillSession(day: string, lowerDays: string[] = [], wave?: HardWave
       + (jogged
         ? ''
         : ' Walk the descents — running down is the part that would reach your next heavy day.'),
-    duration: SHORT_HILL_SESSION_MIN,
-    steps_preset: [token],
+    ...wrapped.fields,
     tags: ['quality', 'hills', 'aerobic'],
   };
 }
@@ -2215,7 +2382,11 @@ function treadmillSession(day: string, wave?: HardWave): PlanSession {
   // Without it the watch reads "Hill · 5-8% grade" and "Jog down" on a machine with no hill and no
   // down, which is the same species of wrong as a pace target on a gradient: a step label that
   // describes a session the athlete is not doing.
-  const token = `run_hills_${reps}x180s_r180s_g5_8_djog_tm`;
+  const wrapped = wrapQualitySession(
+    treadmillCore(wave ?? { weekInCycle: 1, cycleKind: 'leader' }),
+    TREADMILL_SESSION_MIN,
+    'run',
+  );
   return {
     day,
     type: 'run',
@@ -2229,8 +2400,7 @@ function treadmillSession(day: string, wave?: HardWave): PlanSession {
       + 'number that means hard is not the one it would be on the flat. '
       + 'The incline is what keeps this cheap on your legs, so the lifting still gets what it needs — '
       + 'and it is the same session as the outdoor hill, not a substitute for it.',
-    duration: TREADMILL_SESSION_MIN,
-    steps_preset: [token],
+    ...wrapped.fields,
     tags: ['quality', 'hills', 'aerobic'],
   };
 }
@@ -2284,6 +2454,11 @@ export const FLAT_SESSION_MIN = 41;
 
 function flatSession(day: string, wave?: HardWave): PlanSession {
   const reps = vo2RepsFor(4, wave ?? { weekInCycle: 1, cycleKind: 'leader' });
+  const wrapped = wrapQualitySession(
+    flatCore(wave ?? { weekInCycle: 1, cycleKind: 'leader' }),
+    FLAT_SESSION_MIN,
+    'run',
+  );
   return {
     day,
     type: 'run',
@@ -2298,11 +2473,15 @@ function flatSession(day: string, wave?: HardWave): PlanSession {
       + 'the impact a climb takes away, and the lifting is what pays for it. Your heavy leg days are '
       + 'held two days clear of it where the week allows. '
       + 'A treadmill or a cheap indoor trainer would buy you the same session for less.',
-    duration: FLAT_SESSION_MIN,
-    // ⚠️ THREE PRESETS, NOT ONE — `run_vo2_*` brackets nothing itself. `_r180s_` is the explicit
-    // float: the token defaults to 90 s, which would make this a materially harder session than the
-    // one costed above.
-    steps_preset: ['warmup_run_10min_easy', `run_vo2_${reps}x3min_r180s_z5`, 'cooldown_run_10min_easy'],
+    // ⚠️ THREE PRESETS, NOT ONE — `run_vo2_*` brackets nothing itself, and `_r180s_` is the explicit
+    // float (the token defaults to 90 s, which would make this a materially harder session than the
+    // one costed above). ⛔ THE TWO BRACKETING PRESETS NOW COME FROM THE CONSTRUCTOR RATHER THAN
+    // FROM THIS LITERAL, AND ON A LEADER WEEK IT EMITS THE SAME TWO STRINGS BYTE FOR BYTE — 41 min
+    // allowance, 21 min of work, 20 left over, split 10 and 10. That is the check on the whole
+    // stage: the one session that was already correct is reproduced exactly by the thing replacing
+    // the four that were not. ⚠️ On an ANCHOR week the rep count halves and the wrapper grows to
+    // absorb it, which is the leak this session used to carry in silence with the rest of them.
+    ...wrapped.fields,
     tags: ['quality', 'aerobic'],
   };
 }
@@ -2322,7 +2501,16 @@ function flatSession(day: string, wave?: HardWave): PlanSession {
 export function hardRunSessionMinutes(terrain?: HardRunTerrain, goal: HardRunGoal = 'vo2'): number {
   // ⚠️ THE VOLUME BUDGETS SUBTRACT THIS, so a sprint session that reported a hill's length would be
   // paid for twice — the defect §7 already fixed once for the threshold session.
-  if (goal === 'speed') return SPRINT_SESSION_MIN;
+  // ⛔ ASKED OF THE SESSION, NOT OF A CONSTANT (2026-08-20). This returned 35 while the plan built
+  // 14, and the 21-minute difference was handed back to the athlete as easy miles every week. The
+  // constructor is now the only thing that answers "how long is this", here and in the week loop.
+  if (goal === 'speed') {
+    return qualityBudgetMinutes(
+      ALL_HARD_WAVES.map(sprintCore),
+      SPRINT_ALLOWANCE_MIN,
+      'run',
+    );
+  }
   switch (terrain) {
     case 'hill_short': return SHORT_HILL_SESSION_MIN;
     case 'treadmill': return TREADMILL_SESSION_MIN;
@@ -2418,14 +2606,30 @@ const SPRINT_REPS_ANCHOR = 4;
 const SPRINT_WORK_SEC = 12;
 /** Complete walking recovery — the middle of his 2-3 min. */
 const SPRINT_REST_SEC = 150;
-const SPRINT_SESSION_MIN = 35;
+const SPRINT_ALLOWANCE_MIN = 35;
 
 function sprintRepsFor(wave: HardWave): number {
   return wave.cycleKind === 'anchor' ? SPRINT_REPS_ANCHOR : SPRINT_REPS_LEADER;
 }
 
+/**
+ * ⛔ THE WORK, EXACTLY AS `run_sprint_*` EXPANDS IT (`materialize-plan:1619`): the efforts plus the
+ * walk-backs BETWEEN them. Six × 12 s with 150 s walks is **822 seconds** — 13.7 minutes, not 14 —
+ * and the fraction is why `workSeconds` is in seconds. Rounding here instead of at the end puts
+ * this 18 seconds away from what the plan will say.
+ */
+function sprintCore(wave: HardWave): QualityCore {
+  const reps = sprintRepsFor(wave);
+  return {
+    tokens: [`run_sprint_${reps}x${SPRINT_WORK_SEC}s_r${SPRINT_REST_SEC}s`],
+    workSeconds: reps * SPRINT_WORK_SEC + (reps - 1) * SPRINT_REST_SEC,
+    selfWrapped: false,
+  };
+}
+
 function sprintSession(day: string, wave: HardWave, terrain?: HardRunTerrain): PlanSession {
   const reps = sprintRepsFor(wave);
+  const wrapped = wrapQualitySession(sprintCore(wave), SPRINT_ALLOWANCE_MIN, 'run');
   /**
    * ⛔ ABSENT NO LONGER MEANS "ASSUME A TRACK" (Michael, 2026-08-18). The wizard stopped asking which
    * flat surface, because standing in a builder twelve weeks out is the wrong moment to answer it —
@@ -2456,9 +2660,16 @@ function sprintSession(day: string, wave: HardWave, terrain?: HardRunTerrain): P
         ? 'Fewer reps from here to the end of the block: the legs are being cleared so they can '
           + 'express maximum strength on the heavy lifts.'
         : 'The number does not climb across the block. This holds the speed you have; the barbell '
-          + 'is what is being built.'),
-    duration: SPRINT_SESSION_MIN,
-    steps_preset: [`run_sprint_${reps}x${SPRINT_WORK_SEC}s_r${SPRINT_REST_SEC}s`],
+          + 'is what is being built.')
+      // ⛔ THIS SESSION IS THE REASON THE WHOLE STAGE EXISTS, SO ITS COPY CARRIES THE WHY. Six
+      // maximal 12-second efforts is the one session in the block where an absent warm-up is an
+      // injury and not a quality problem — maximal running velocity is where hamstring strains
+      // happen — and until 2026-08-20 this reached the watch with an empty warm-up array.
+      // ⚠️ VOICE: the fact, then the consequence, conditional, no imperative.
+      + wrapperNote(wrapped)
+      + ' A maximal effort from cold is where sprint injuries happen, so the easy running before it '
+      + 'is part of the session rather than optional preparation for it.',
+    ...wrapped.fields,
     tags: ['quality', 'run', 'speed', 'neuromuscular'],
   };
 }
@@ -4640,7 +4851,21 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ AND EACH HARD RIDE COSTS ITS OWN SESSION'S MINUTES (§7) — a threshold ride is longer than
       // the 45-minute interval session, so a flat multiple would under-subtract it.
       const hardRideMins = hardRideDays().reduce(
-        (mins, h) => mins + (roleOf(h.day) === 'threshold' ? THRESHOLD_RUN_MIN : BIKE_QUALITY_MIN), 0);
+        (mins, h) => mins + (roleOf(h.day) === 'threshold'
+          // ⛔ THE RIDE'S OWN ALLOWANCE, ASKED OF THE RIDE'S OWN SESSION (2026-08-20). This read
+          // `THRESHOLD_RUN_MIN` — the RUN's constant — on a ride, which was harmless only because
+          // the two happened to be equal. And it was a constant where it should have been the
+          // session: budgeted 45, built 24, and the athlete's three hours came out at two thirty-nine.
+          ? qualityBudgetMinutes(
+            ALL_HARD_WAVES.map(thresholdRideCore),
+            THRESHOLD_RIDE_ALLOWANCE_MIN,
+            'bike',
+          )
+          : qualityBudgetMinutes(
+            ALL_HARD_WAVES.map(bikeQualityCore),
+            BIKE_QUALITY_ALLOWANCE_MIN,
+            'bike',
+          )), 0);
       const totalMins = Math.max(30, Math.round(rideHours * 60) - hardRideMins);
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
       // authored number left in this block and it is marked as such: a long ride that is the same
@@ -4691,7 +4916,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ EVERY HARD RIDE, NOT "THE" HARD RIDE (§1i) — same loop as the runs, one discipline over.
       for (const h of hardRideDays()) {
         if (isStandalone) {
-          weekSessions.push(enduranceSession('bike', h.day, BIKE_QUALITY_MIN,
+          weekSessions.push(enduranceSession('bike', h.day, BIKE_QUALITY_ALLOWANCE_MIN,
             (isTmTest
               ? 'Test week — the intervals come off so the lifting is measured rested. '
               : 'Light week — the intervals come off. ')
@@ -4704,7 +4929,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         const role = roleOf(h.day);
         weekSessions.push(
           role === 'club'
-            ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_MIN)
+            ? clubEnduranceSession('bike', h.day, BIKE_QUALITY_ALLOWANCE_MIN)
             : role === 'threshold'
               ? thresholdRideSession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }, h.environment)
               : bikeQualitySession(h.day, { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }, h.environment),

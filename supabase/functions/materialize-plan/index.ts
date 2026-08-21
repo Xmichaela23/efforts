@@ -1917,7 +1917,12 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   return out;
 }
 
-function expandBikeToken(tok: string, baselines: Baselines): any[] {
+/**
+ * ⚠️ EXPORTED 2026-08-20 so `scripts/dump-plans.ts` can re-expand what the composer emitted and
+ * assert the two agree. `expandRunToken` has been exported for the same reason since the
+ * lap-button hill tests; the bike half was the one nothing could reach.
+ */
+export function expandBikeToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {

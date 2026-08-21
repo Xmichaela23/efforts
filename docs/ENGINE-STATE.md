@@ -23,23 +23,79 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-20 — **the pace-truth job is DONE and DEPLOYED.** Your job is the acceptance pass, then `analyze-running-workout`. Banner owned by ONE chat.)
+## 🧭 NEXT SESSION — START HERE (2026-08-20 — **stage 1 of the six-stage swap plan is BUILT, NOT PUSHED.** Your job is STAGE 2. One banner, owned by ONE chat.)
 
-### YOUR JOB
+### ⛔ THE PLAN YOU ARE IN
 
-**Nothing from 2026-08-20 has been seen working on a device.** Thirty edge functions are live and
-every claim below is code-traced and fixture-backed — not verified. The acceptance pass is the job.
+`docs/WORKORDER-finish-the-swaps-2026-08-20.md` — **six stages, one terminal session each, in
+order.** Its evidence is `docs/REPORT-session-structure-and-clumping-2026-08-20.md`. Read the work
+order first; it is the sequence, not the findings.
 
-**Then:** `analyze-running-workout` — 5,002 lines, **zero test files**, one of the oldest pieces still
-running. Two defects were found in it in passing and one is live: a memory-saving step blanks
-`computed.best_efforts` / `power_curve` / `raw_laps` on its in-memory copy (`:585`), and a rare legacy
-duration-repair path writes that same object back to the DB (`:2146`). By code trace they share a
-reference, so on that path the blanked fields save as **null, permanently**. ⚠️ It fires only when
-`duration_s_moving` is off by ≥3×, and it has NOT been observed — hypothesis, not finding. **It
-matters more now:** the new run pace curve and the bike's threshold HR both live on the columns it
-blanks.
+**Stage 1 is done and its notes are `docs/NOTES-stage1-session-wrapper-2026-08-20.md`.**
+⛔ **PUSHED — no. DEPLOYED — no. VERIFIED — no.** It is sitting in the working tree awaiting Michael.
+
+### YOUR JOB — STAGE 2: THE SPORTS STOP CLUMPING
+
+The week builds three runs Monday-Wednesday, then two rides Friday-Saturday. The term meant to
+prevent that **scores a clumped week and a perfectly alternating week identically — 54 against 54,
+every term in the vector the same.** The winner is decided by enumeration order.
+
+**The three facts you need to start:**
+
+1. `interleaving()` (`_shared/week-model/resolve.ts:397`) asks *"is one sport bracketed by the
+   other"*. A week with an easy run early and the long run on Sunday answers YES to every ride
+   placement except Monday and Sunday, so it fires at full strength on a fully clumped week.
+2. ⚠️ **`clustering()` LOOKS LIKE IT ALREADY COVERS THIS AND DOES NOT** — it only sees back-to-back
+   days between units whose sessions are ALL `easy` and the same sport, so a hard Tuesday is
+   invisible to it. ⛔ **Read both before writing a third; the obvious name is taken by something
+   narrower.**
+3. The measure that separates them is **cyclic adjacent same-sport days** — measured at **4 against
+   1** between the two weeks, which at weight 6 is 30 against 48.
+
+⛔ **WEIGHT IT BELOW THE DAY OFF.** The ordering ruled on 2026-08-19 is `overCap 60` > `blank 40` >
+`lockedDayExtras 24 + crowding 6`. A spread term that outbids 40 starts eating rest days — the exact
+mistake made and caught that day. Moving one session into a blank day can remove at most 2
+adjacencies, so the term must satisfy `2w < 40`.
+
+**Gate:** the sweep. Say how many of the 61 moved and show one before/after.
+
+### ⛔ WHAT STAGE 1 CHANGED THAT YOU WILL TRIP OVER
+
+- **`steps_preset[0]` IS NOW THE WARM-UP, NOT THE WORK.** Every quality session is
+  `[warmup, work, cooldown]`. Six test files were updated for this and use a `workTokenOf` helper;
+  copy it rather than indexing 0.
+- **A session builder can no longer state a duration.** It declares a core and spreads
+  `...wrapped.fields` from `shared/strength-system/quality-session.ts`.
+- **The sweep now needs `--no-check`** and asserts budget-equals-built on every session of every
+  week. `~/.deno/bin/deno run --no-check --allow-read --allow-write scripts/dump-plans.ts`.
+  ⛔ **It exits non-zero on a violation. If it goes red, that is you.**
+- Stage 1 moved **40 of 61 shapes**, all of them hard-session durations. **Zero easy or long
+  sessions moved.** Stage 2 is a PLACEMENT change and should move different shapes for different
+  reasons — if you see a hard session's duration move, something is wrong.
+
+### ⚠️ ONE PRE-EXISTING RED TEST, AND IT IS NOT YOURS
+
+`_shared/anchor-resolver-lint.test.ts` **fails on a clean tree** — `lthr::src/components/TrainingBaselines.tsx`
+reads an anchor raw and is not on the ledger. Verified pre-existing by stashing. It matters because
+the item 5 claim below says that ledger "MAY ONLY SHRINK and the test enforces it" — **the test is
+red, so it is enforcing nothing.** Nobody has claimed it.
+
+### ⛔ STILL OWED FROM BEFORE THE SWAP PLAN
+
+- **The Strong Focus intake acceptance pass** — the matrix at the top of `POLISH-PUNCH-LIST.md`.
+- **`analyze-running-workout`** — 5,002 lines, zero test files. Two defects found in passing, one
+  live by code trace: a memory-saving step blanks `computed.best_efforts` / `power_curve` /
+  `raw_laps` in memory (`:585`) and a rare legacy duration-repair path writes that same object back
+  to the DB (`:2146`). ⚠️ **Hypothesis, not a finding** — it fires only when `duration_s_moving` is
+  off by ≥3× and has not been observed.
+- **Docs:** DECISIONS-LOG / OPEN-QUESTIONS / TRUTH-MAP / CAPABILITY-MAP entries for the 08-19 and
+  08-20 work are NOT written. Michael is deliberately keeping doc overhead low; this banner and the
+  per-stage notes are the record until then.
 
 ### ⛔ WHAT SHIPPED 2026-08-20 — PUSHED + DEPLOYED (30 functions), NOT VERIFIED
+
+**Nothing from the 2026-08-20 pace-truth job has been seen working on a device.** Thirty edge
+functions are live and every claim below is code-traced and fixture-backed — not verified.
 
 Commit `3966bd2f`. Read it — the message is the record, and it names every file.
 
