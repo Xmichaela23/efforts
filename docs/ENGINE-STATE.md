@@ -23,58 +23,173 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-22 — **the swaps are finished. The next job is THE STANDING PLAN, starting with the endurance session library.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-22 — **stages 1 and 2 of the Standing Plan are built. Your job is STAGE 3: the accessory rework.**)
 
-### ⛔ THE JOB: THE ENDURANCE SESSION LIBRARY WITH LEVELS
+### ⛔ THE JOB: SET-BASED DOSING, A PER-MUSCLE FLOOR, AND CORE SPLIT FROM SINGLE-LEG
 
-`docs/DECISIONS-2026-08-21-standing-plan.md` §4, item 1 — **the highest-leverage item, and the one
-everything else waits on.** It feeds the base plan *and* every pivot.
+`WORKORDER-the-standing-plan-2026-08-22.md` stage 3. **Read the work order's §"THE SHAPE" first** — it
+decides where code goes and what "done" means at every stage.
 
-> *"The mirror of `wendler-531.ts`."*
+**The defect:** today's model is a **rep total per category**, split however the athlete likes, and
+**nothing counts sets**. The growth driver is *effective reps per muscle per week*; the recovery cost
+is *work sets per session*. **Neither is expressible in reps-per-category**, so the app cannot reason
+about either.
 
-⛔ **BUILD IT AS A GENERATOR, NOT A TRANSCRIPTION.** Methods are not ownable and should be cited
-freely; the specific session tables and movement lists are the authors' expression. **Generate
-sessions from the RULES against the athlete's own thresholds.** ⚠️ This is also the better
-engineering, and it matters commercially: Michael intends to write to both authors.
+**Build:**
+- **Set-based dosing** — 8–10 reps at 1–2 RIR, ~4 effective reps per set.
+- **A floor per muscle group**, so the focus picker can no longer leave quads and shoulders at zero.
+  (Worked from the sample plan: triceps ~8–9 sets, biceps ~8, chest ~6, glutes ~3, **quads zero,
+  shoulders zero direct**.)
+- **Core split off from single-leg.** Wendler bundles them (`'push' | 'pull' | 'single_leg_core'`);
+  **Viada gives core its own slot**, and that is why abs feel starved — they compete with Bulgarian
+  split squats for one budget. ⚠️ Abs are cheap; single-leg is leg volume on an athlete who already
+  runs. Different budgets.
 
-⛔ **THE TEST FOR "THE LAST ENGINE": if this work produces a `generate-all-rounder` function, it
-failed.** `TARGET-ARCHITECTURE.md` is one history-aware path. The Standing Plan's composer should
-become *the* composer that other plans are configurations of — not a fifth sibling beside four dead
-ones.
+**Hold the ceilings** (Ch.4 / `SOURCE` Part B2): **8–12 sets per muscle per week** is solid, **18–20
+borders overreaching**; **6–8 work sets in a session recover in 24–48h, 14+ can cost up to 72h**.
 
-**Read before building:** §3 (the science settled), §3b (hard days CONVERT a session, they do not ADD
-one), §3c (the PROGRAM owns the count, the ATHLETE owns sport and level), §3d (session lengths capped
-at the book's numbers). `docs/SOURCE-viada-hybrid-athlete.md` is the corpus.
+⚠️ **KEEP THE PICKER.** Both authors endorse athlete choice (Wendler p.24 *"it is the work that
+matters"*; Viada encourages rotation). **The change is a floor beneath it, not its removal.**
 
-**Then, in dependency order** (§4): the strength grid → accessory rework → the composer → levels in
-the builder → stage 6's new compromise truths alongside it.
+**Gate:** across a wide sweep of focus picks, assert **no muscle group falls below its floor and no
+session exceeds its set ceiling.**
+
+⛔ **CLIENT-REACHABLE, same as stages 1 and 2** — row three of the work order's layer table. Pure, no
+Deno-only imports, importable through `@shared`, which means **`supabase/functions/_shared/`, NOT
+`supabase/functions/shared/`.**
+
+⚠️ **Part B of `SOURCE-viada-hybrid-athlete.md` is ONE GENERATION REMOVED** — written from notes, not
+with the pages open. Its own provenance table says so. **Re-shoot pp.69–125 before those numbers
+become constants**, exactly as stages 1 and 2 opened pp.229–241 and pp.218–227.
 
 ---
 
-### ⛔ FIRST, THE THING NOBODY HAS DONE: MICHAEL BUILDS A BLOCK
+### ⛔ STAGE 2 HANDED YOU A FINDING THAT IS DIRECTLY YOUR JOB
 
-⚠️ **Nothing from any of this has been seen on a device.** That check closes stage 1's outstanding
-verification and every stage since, and it is worth doing before a new composer is built on top.
+**A commercial-gym athlete is substituted on 4 of 12 grid cells, and 3 of the 4 are missing GEAR
+TAGS rather than missing movements.** Measured 2026-08-22:
 
-⛔ **DEPLOY FIRST OR IT MEANS NOTHING.** Stages 2–5 are pushed (`807216b8`), stage 6 is pushed
+| cell | falls back to | why |
+|---|---|---|
+| `braced / push_upper` | secondary | ⛔ **the cell is EMPTY** — no machine chest press, Smith press or dip machine in the catalogue |
+| `braced / press_lower` | secondary | `leg press` exists, carries **no gear tag** |
+| `focused / press_lower` | secondary | `leg extension`, `seated calf raise` — **no gear tag** |
+| `focused / pull_upper` | braced | `rear delt fly`, `cable curl` — **no gear tag** |
+
+**162 of the 210 movements the grid classifies carry no gear tag.** `gearRoutesFor` returns "needs
+nothing" for each and **prints a warning telling you to fix it**: *"Add it in
+src/lib/strength-gear.ts before anything gates on equipment."*
+
+⛔ **AND THE CODEBASE ALREADY HAS THE POLICY — follow it, do not override it.** `leg curl` is tagged
+`ALWAYS` with a written reason: *"A leg-curl machine is required and NOT commonly declarable… Gating
+it here would have deleted the movement instead of swapping it."* So: **gate on declarable gear;
+leave machine-only movements ungated and let substitution handle them.** ⛔ **Do not add a `machine`
+gear key** — it would be undeclarable, and the file's header says a key that gates must be commonly
+declarable.
+
+⚠️ **Filling `braced / push_upper` needs new movements, and a new `EXERCISE_CONFIG` entry needs a
+RATIO. A ratio is a number** — that file sources its ratios to NSCA / Schoenfeld / Helms. **Do not
+invent one.**
+
+---
+
+### ⛔ WHAT STAGES 1 AND 2 SHIPPED, SO YOU DO NOT REBUILD THEM
+
+Both are new directories under `_shared/`. **Neither touched a single existing file.**
+
+**Stage 1 — `_shared/endurance-library/`** (`docs/NOTES-stage1-endurance-session-library-2026-08-22.md`)
+13 families × 3 levels × 32 shapes, generated from Viada's rules against the athlete's own thresholds.
+`buildEnduranceSession({family, level, size, baselines})`; `sessionDurationBandSeconds(...)` returns
+the slot floor and cap that stage 5's size control reads.
+
+**Stage 2 — `_shared/strength-grid/`** (`docs/NOTES-stage2-strength-grid-2026-08-22.md`)
+`resolveSlot({category, pattern, intent, asymmetrical, equipment})` → a prescription plus the
+movements that can fill it, **never empty**. 210 of 316 catalogue movements classified into Viada's
+five categories plus core.
+
+**Four facts you will need:**
+
+1. ⛔ **`@shared` IS `supabase/functions/_shared`. `shared/strength-system/` IS NOT CLIENT-REACHABLE.**
+   The alias (`vite.config.ts:14`, `tsconfig.app.json`) points at `_shared` only. `wendler-531.ts`
+   lives in the other one. Anything the wizard must run goes under `_shared/`.
+2. ⛔ **ME/DE/SKILL/HYP ARE NOT `StrengthIntent`.** `protocols/intent-taxonomy.ts` names whole
+   SESSIONS (`LOWER_NEURAL`, `UPPER_STRENGTH`); Viada's four name how ONE movement's sets are loaded.
+   They compose. **Do not merge them** — `isLowerIntent()` would answer nonsense for half its union.
+3. **Four accessors now sit over `MovementPattern`** — the pattern itself (Q-181), `MovementGroup`
+   (placement, D-315), `MovementFamily` (collision, Q-212), and the grid (Viada's bracing tiers).
+   **Same data, four questions.** Stage 3's per-muscle floor is a fifth question — check all four
+   before adding vocabulary.
+4. **`ASSISTANCE_CATALOG` is Wendler's 28 movements in Wendler's THREE categories** (`push` / `pull` /
+   `single_leg_core`) and Strong Focus reads it. ⛔ **It is not Viada's five and must not be
+   conflated** — and Strong Focus stays live (rule 0), so it stays as it is until stage 6.
+
+**Both stages, three ways: pushed NO · deployed NO · verified on a device NO.** Nothing calls either
+one yet — deliberately. Stage 4's composer is the first consumer of both.
+
+---
+
+### ⚠️ THREE METHOD LESSONS FROM STAGES 1 AND 2 — mutation testing found every one of them
+
+**1. A test that recomputes its expectation from the constant it checks can never fail.** Two of
+stage 1's assertions read `THRESHOLD_WORK_TO_REST` to build their own expected value and stayed green
+when it was mutated. **Write the number out.**
+
+**2. A rule with no subject in the data cannot be tested through the data.** Stage 1's 10-minute bout
+floor and 15-minute tempo crossover are both real, both enforced, and **neither is reached by any
+session the library builds** — deleting either left the whole sweep green. Both are now exported as
+pure functions and tested directly. Stage 2 found the same shape in a *guard*: a dumbbell exclusion in
+the primary classifier that **guarded nothing** (measured), and was deleted rather than kept.
+
+**3. A test that inspects only the CHOSEN result cannot see the LIST being wrong.** Stage 2's stub
+check passed while the stubs sat second in the options, and its ranking check passed with the ranking
+deleted. **Assert on the collection, not just its head.**
+
+Totals: stage 1 **30 mutations, 30 killed**; stage 2 **36 mutations, 36 killed** — 12 of those 66 only
+after the tests above were repaired.
+
+---
+
+### ⛔ STILL UNANSWERED, AND STILL MICHAEL'S — do not fill these quietly
+
+- **Gap #4** — block length, and when the taper column fires. "All-year" with no stated trigger.
+- **Gap #12** — how often to re-estimate threshold. **It is his stated progression mechanism for this
+  plan** (p275: adjust intensity and threshold, never level).
+- **Gap #5** — which of the 3–4 workouts inside a slot to use. **Blocks stage 5.**
+- **Gaps #10 and #11 are CLOSED as "named, not filled"** by stage 2 — rest between sets is unstated,
+  and nothing raises the set count off its low end on its own.
+- ⚠️ **One ruling wanted:** stage 2 keeps Viada's movement LISTS in its test file as the classifier's
+  ground truth (37 worked examples). The shipped code holds only his definitions. **If that is still
+  too close, say so** — the table can move to `docs/` beside the existing full transcription.
+
+---
+
+### ⛔ STRONG FOCUS STAYS LIVE UNTIL THE STANDING PLAN REPLACES IT
+
+Rule 0. It is deployed and it is the only plan an athlete can build. Do not delete it, do not migrate
+it, do not "unify" the two. It retires at stage 6, when the Standing Plan works on a device.
+
+---
+
+### ⛔ NOTHING FROM THE LAST SIX STAGES HAS BEEN SEEN ON A DEVICE
+
+Still true. Stages 2–5 of the *previous* work order are pushed (`807216b8`), stage 6 is pushed
 (`b68c2d5c`), and as far as these sessions know **none of it is deployed** — so a block built right
-now exercises stage 1 and the OLD engine for everything after it.
+now exercises the OLD engine for most of it.
 
 **Build a Strong Focus block:** keep run AND bike, four runs, two rides, two hard days (one run, one
 ride), long run and long ride on the weekend, swim on. In order:
 
-1. **A quality session has a warm-up** (stage 1) — Flat Sprints especially; six maximal 12-second
-   efforts used to reach the watch cold.
-2. **The ride-count chip on the VOLUME step responds instantly** (stage 3). It cost **922 ms** on a
-   desktop before this work, for a suggestion nobody reads until two screens later.
-3. **Four rides is offered and survives** (stage 4) — tap 4, confirm the plan has four ride days.
-4. **The long run and long ride cannot both take Sunday** (stage 3).
-5. **The week does not clump** (stage 2) — runs and rides alternate rather than block up.
-6. **The rest day survives**, and if the week genuinely fills, the plan SAYS so (stage 6).
+1. **A quality session has a warm-up** — Flat Sprints especially; six maximal 12-second efforts used
+   to reach the watch cold.
+2. **The ride-count chip on the VOLUME step responds instantly.** It cost **922 ms** before.
+3. **Four rides is offered and survives** — tap 4, confirm the plan has four ride days.
+4. **The long run and long ride cannot both take Sunday.**
+5. **The week does not clump** — runs and rides alternate rather than block up.
+6. **The rest day survives**, and if the week genuinely fills, the plan SAYS so.
 
 ---
 
-### THE WORK ORDER, COMPLETE — AND WHAT EACH STATE ACTUALLY IS
+### THE FINISH-THE-SWAPS WORK ORDER, COMPLETE — AND WHAT EACH STATE ACTUALLY IS
 
 | stage | what | pushed | deployed | verified |
 |---|---|---|---|---|
@@ -85,15 +200,19 @@ ride), long run and long ride on the weekend, swim on. In order:
 | **3** — wizard latency | solve gated + deferred; Q-215 double-solve deleted | yes (`807216b8`) | not by these sessions | **NO** |
 | **6** — compromise channel | the no-rest-day note was blind on 25,088 weeks; fixed | yes (`b68c2d5c`) | not by these sessions | **NO** |
 | **4b** — run + swim intent | the outstanding half; `AthleteWeeklyIntent` is complete | **NO — uncommitted** | no | **NO** |
+| **Standing Plan 1** | the endurance session library | **NO — untracked** | no | **NO** |
+| **Standing Plan 2** | the strength grid | **NO — untracked** | no | **NO** |
 
-⛔ **PUSHED IS NOT DEPLOYED.** These stages touch `strength-primary-plan.ts`,
+⛔ **PUSHED IS NOT DEPLOYED.** Those stages touch `strength-primary-plan.ts`,
 `create-goal-and-materialize-plan`, `generate-strength-plan`, `_shared/week-model/` and the client.
 Check what is actually live rather than assuming the push carried it.
 
 **Notes, one per stage:** `NOTES-stage1-session-wrapper-2026-08-20.md` ·
 `NOTES-stage4-ride-intent-2026-08-21.md` · `NOTES-stage5-delete-the-dead-engines-2026-08-21.md` ·
 `NOTES-stage2-sport-adjacency-2026-08-21.md` · `NOTES-stage3-wizard-latency-2026-08-21.md` ·
-`NOTES-stage6-compromise-channel-2026-08-22.md` · `NOTES-stage4-run-swim-intent-2026-08-22.md`
+`NOTES-stage6-compromise-channel-2026-08-22.md` · `NOTES-stage4-run-swim-intent-2026-08-22.md` ·
+**`NOTES-stage1-endurance-session-library-2026-08-22.md`** ·
+**`NOTES-stage2-strength-grid-2026-08-22.md`**
 
 ### ⛔ ONE BEHAVIOUR CHANGE AWAITING A LOOK (2026-08-22)
 
@@ -118,6 +237,10 @@ direction — so this was left alone and both literals are named in the lint.
 - **Q-215 is deleted, not re-expressed.** *"Keeping heavy leg days apart is already done live by
   `bunching`. Rebuilding it means two owners for one fact."*
 - **Swim stays minimal** (D-323 §5 — booked, not coached). Its count is consolidated and nothing else.
+- **Asymmetrical is a MODIFIER, not a category** (2026-08-21, page-by-page check). Stage 2 implements
+  it as `isAsymmetrical()` over `isUnilateral`. There is no sixth movement list.
+- **Olympic lifting is out of scope** (Michael, 2026-08-21). HEAVY/REP/SKILL/GROOVE are not built and
+  stage 2 refuses them as intents.
 
 ### ⛔ THINGS A NEXT SESSION WILL TRIP OVER
 
@@ -131,33 +254,43 @@ direction — so this was left alone and both literals are named in the lint.
 - **`place-week.ts` places nothing**; **`interleaving` and `clustering` no longer exist**.
 - **`sportAdjacency` is weighted 4, and 5 breaks the barbell week** (measured).
 - ⚠️ **The two `taken={{}}` rows in `NonRaceBuilder` disagree ON PURPOSE.**
+- ⚠️ **`getExerciseConfig` FUZZY-MATCHES and says so loudly.** "Hack Squat" borrows `squat` at ratio
+  1.0. Stage 2's grid only ever offers names that resolve EXACTLY, and asserts it — hold that line.
 
 ### ⛔ THE METHOD LESSON THIS WORK ORDER KEEPS PAYING FOR
 
 **The 61-shape sweep is a regression net, not a detector.** Every shape in it is a sensible week:
 - the compromise channel read "silent on 61 of 61" while 10,080 of 10,976 hand-built shapes carried one;
 - the no-rest-day note was broken for months — silent on 25,088 of 25,088 full weeks — and could never
-  have fired on any of the 61.
+  have fired on any of the 61;
+- and it **cannot see the Standing Plan at all** — that plan type does not exist yet. Stage 1's
+  evidence is 300 generated athlete shapes; stage 2's is 13 equipment subsets × every grid cell.
 
-⚠️ **Build test weeks from the shape space.** And when a mutation SURVIVES, work out whether the test
-is weak or the mutant equivalent, and WRITE DOWN WHICH — three sessions found real gaps that way, and
-one found a weight of 100 passing a test whose only job was bounding the weight.
+⚠️ **Build test cases from the shape space.** And when a mutation SURVIVES, work out whether the test
+is weak or the mutant equivalent, and WRITE DOWN WHICH — five sessions have now found real gaps that
+way, and stage 2 found a guard that was protecting nothing at all.
 
 ### ⚠️ FOUR PRE-EXISTING RED TESTS, AND NONE ARE THIS WORK'S
 
 `_shared/anchor-resolver-lint.test.ts` (`lthr::TrainingBaselines.tsx` off the ledger),
 `src/lib/club-anchor.test.ts` ×1, `src/lib/non-race-goal-seeds.test.ts` ×2. All stash-verified.
+⚠️ Plus one pre-existing TYPE error, `_shared/state-trend/assemble.ts:1134` — it reaches `deno check`
+on anything that transitively imports `planning-context.ts`, including stage 1's module. It is on
+`main` already. **Stage 2's module type-checks clean (0 errors).**
 
 ⚠️ **The client suite does not run in this repo.** `npx vitest run` fails on all 363 files;
-`deno test src/` runs 722; React components run under neither. Stage 3's changes and the wizard
-pickers are guarded by a SOURCE LINT, which proves the call is written and not that the screen
-behaves. ⛔ If your change lands in that gap, say so — do not claim coverage.
+`deno test src/` runs 722; React components run under neither. ⛔ If your change lands in that gap,
+say so — do not claim coverage.
 
 ### Current test state
 
+`_shared/endurance-library/` **28 passed, 0 failed** (stage 1) ·
+`_shared/strength-grid/` **25 passed, 0 failed** (stage 2) ·
 `shared/strength-system/` **584 passed, 0 failed** · `_shared/` **1863 passed, 1 failed** ·
 `src/` under deno **719 passed, 3 failed** · sweep **61 built, 0 failed, byte-identical** ·
 `npx vite build` clean · `tsc --noEmit` **312 errors, identical to a clean tree**.
+⚠️ Stages 1 and 2 changed no existing file, so every count above except the first two is inherited,
+not re-measured.
 
 ## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 
