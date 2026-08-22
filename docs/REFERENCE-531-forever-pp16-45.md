@@ -181,6 +181,79 @@ waves at 70/80/90, A/B full-body days, assistance circuits) belong to that templ
 - Plateau advice above the BBB header (p.45): moving to another template is a legitimate answer
   to a plateau.
 
+---
+
+# ADDENDUM — pp.185–191, the two RUNNING-INTEGRATED templates (read 2026-08-21)
+
+**Page images kept this time:** `~/Efforts_Local_Folder/book-sources/wendler-531-forever/` —
+`p185.jpg` … `p191.jpg`, named by page, with an `INDEX.md`. ⛔ **Local only, never committed.**
+
+**Why these:** they are the closest published relatives of Strong Focus. Michael shot them asking
+*"I believe this is our program."*
+
+## Bodybuild the Upper / Athlete the Lower (p.185), + Anchor (p.186)
+
+- Bullets (p.185): *"great for athletes or people who think they are athletes"* · good for those
+  facing a physical test involving running and basic strength work · **85% TM** · **not** for
+  beginners or anyone with no history of jumping and running.
+- **Leader, 4 days:** Mon press · Tue squat · Thu bench · Fri deadlift. Every day: warm-up/mobility,
+  jumps/throws, main lift **5s PRO**, supplemental **FSL**, assistance, then conditioning.
+  Supplemental differs by lift: press 5×10 FSL · squat 3×5 FSL · bench 5×10 FSL · deadlift 10×5 FSL.
+  Jumps/throws 10 total on the upper days, **20 total on the lower days**.
+- Conditioning: running 1600m total Mon and Thu · prowler 10×40 @75% Tue · sled 5×40 forward +
+  5×40 backward @75% Fri · Air Dyne 20 min + recovery/mobility Wed and Sun · running 2400m Sat.
+- **Anchor (p.186):** press stays **5s PRO + 4×8 FSL**; squat and deadlift become **5/3/1 with a PR
+  set and NO supplemental work**. Running rises (Mon 2400m). *"The Leader template is generally done
+  for 2–3 cycles… The Anchor template is a little more running intensive."* And explicitly:
+  **"this is not a challenge template… designed to make you better."**
+
+## Strength and Conditioning (pp.187–189), + Anchor (pp.190–191)
+
+- Bullets (p.187): law enforcement or similar · comprehensive physical test of running, strength and
+  bodyweight movements · **must have a background of running and lifting** · also good for athletes ·
+  **"a full five-week program; includes all phases of training. Follow it exactly as presented."** ·
+  **85% TM**.
+- *"Lifting three days/week but training every single day. Designed to be programmed as 2 Leader
+  templates followed by a single Anchor template (2/1)."*
+- **Leader weeks 1–2 (p.188):** Mon/Wed/Fri, **two main lifts per day**, both **5s PRO with SSL**
+  (Second Set Last) — the first lift 3×5 SSL, the second 5×5 SSL. Pairs rotate: W1 Mon squat+bench ·
+  Wed deadlift+press · Fri squat+bench; W2 flips (deadlift+press · squat+bench · deadlift+press).
+  Jumps/throws 10 total every day. Prowler 4×50 @75% and sled 2×50 fwd / 2×50 bwd @75% alternate.
+- Running: **1600m total Tue/Thu/Sat**, Air Dyne 20 min + recovery/mobility Sunday.
+- ⛔ *"Do this for two total cycles. **It is imperative you begin with an 85% TM or this will catch
+  up to you quickly.**"* Then the **7th Week Protocol, Deload** (week three, p.189).
+- **Anchor weeks 4–5 (pp.190–191):** *"After the deload, we will adjust the training maxes for each
+  lift, just like every single 5/3/1 program ever written."* Main lifts become **PR sets**; the
+  second lift of the day keeps **3×5 FSL**. Running increases: 2400m Tue/Thu, **3600m Sat**.
+
+## ⛔ THE ASSISTANCE NUMBERS — THIS CORRECTS WHAT THE CODE SAYS
+
+The repo's `src/lib/assistance-menu.ts` records our 25–50 band as **ours**, a *"deliberate step below
+Wendler"*, on the grounds that his base is 50–100 per category (p.24) and 25–50 is only the seventh
+week's number (p.23). **These pages show that is not the whole picture.**
+
+| Context | Push | Pull | Single leg / core |
+|---|---|---|---|
+| BB Upper/Athlete Lower — **Mon & Thu, the two RUNNING days** (p.185) | **25–50** | **25–50** | **25–50** |
+| BB Upper/Athlete Lower — Tue & Fri, prowler/sled days, no run (p.185) | 50–100 | 50–100 | 50–100 |
+| S&C leader — bench days (p.189) | 10-min push-up test | **25–50** | **25–50** |
+| S&C leader — press days (p.189) | **25–50** | 10-min pull-up test | **25–50** |
+| S&C **7th-week protocol** (p.190) | **0–25** | **0–25** | **0–25** |
+| S&C **anchor**, every training day (p.191) | 5-min push-up test | 5-min pull-up test | **25–50** |
+
+**What this means.** In Wendler's own running-integrated templates, **25–50 per category is his
+number for the days that carry a run**, and 50–100 appears only on days with no running. The
+seventh week drops to **0–25**.
+
+⛔ **So our band is not "below Wendler" — it sits inside his own running-day range**, and our
+light-week 15 sits inside his 7th-week 0–25. The design call was right; its stated justification was
+too apologetic. **Do not re-raise our numbers toward 50–100 on the strength of p.24 alone** — p.24 is
+general guidance for a lifter with no endurance load, and these pages are the case that matches us.
+
+⚠️ Still ours: the **axis**. Scaling the band by how many hard endurance days the week carries is not
+in the book — Wendler keys it to the day's own content (running day vs sled day). Keep citing the
+axis as our design.
+
 ## Cross-references
 
 - Consumed by `docs/WORKORDER-strong-focus-forever-alignment-2026-08-15.md` (the alignment

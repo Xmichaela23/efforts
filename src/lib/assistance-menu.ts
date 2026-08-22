@@ -79,10 +79,26 @@ export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
  * 75-100), scaled UP into the anchor per Forever p.18. Correct for a lifter whose whole recovery
  * budget goes to the barbell; wrong for this athlete.
  *
- * ⛔ **MICHAEL'S CALL, 2026-08-16, AND IT IS A DELIBERATE STEP BELOW WENDLER.** His base is 50-100
- * per category per session (p.24). *"For an athlete carrying an endurance load, pushing 100 reps of
+ * ⛔ **MICHAEL'S CALL, 2026-08-16.** *"For an athlete carrying an endurance load, pushing 100 reps of
  * accessory volume will fry their central nervous system. Cap it at 50, even in the easier months."*
- * **Cite 25-50 as OURS.** On the page, 25-50 is the seventh week's number (p.23), not a general one.
+ *
+ * ⚠️ **THIS USED TO SAY "A DELIBERATE STEP BELOW WENDLER" AND THAT WAS TOO APOLOGETIC — corrected
+ * 2026-08-21 against Forever pp.185-191** (images now kept at
+ * `~/Efforts_Local_Folder/book-sources/wendler-531-forever/`; addendum in
+ * `docs/REFERENCE-531-forever-pp16-45.md`). In Wendler's own RUNNING-INTEGRATED templates,
+ * **25-50 per category is HIS number for the days that carry a run** — Bodybuild the Upper/Athlete
+ * the Lower prescribes 25-50 on Mon and Thu (the running days) and 50-100 only on Tue and Fri (sled
+ * and prowler, no run), and Strength & Conditioning uses 25-50 throughout its leader, dropping to
+ * **0-25** in the seventh week. p.24's 50-100 is general guidance for a lifter with **no endurance
+ * load**; pp.185-191 are the case that actually matches this athlete.
+ *
+ * ⛔ **So 25-50 is defensible AS WENDLER'S for a running week, and our light-week floor of 15 sits
+ * inside his 0-25 seventh week. Do not re-raise these numbers toward 50-100 on the strength of p.24
+ * alone.**
+ *
+ * ⚠️ **WHAT IS STILL OURS IS THE AXIS, NOT THE NUMBERS.** Wendler keys the band to the DAY's own
+ * content (running day vs sled day). We key it to how many hard endurance days the WEEK carries.
+ * That is our design and must be cited as ours.
  *
  * ⛔ **AND THE AXIS CHANGED, NOT JUST THE NUMBERS.** What decides the band is how much hard
  * endurance the week carries — the thing actually competing for recovery:
