@@ -4790,25 +4790,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       if (rideShortfallNote && !placementCompromises.some((c) => c.text === rideShortfallNote)) {
         placementCompromises.push({ kind: 'cost', text: rideShortfallNote });
       }
-      // ⛔ AND IF THE REST DAY WAS THE THING THAT PAID FOR IT, THAT IS THE BIGGER SENTENCE.
-      //
-      // The rest day now yields to a session the athlete asked for (Michael, 2026-08-05). A week with
-      // no full rest day is a real recovery cost on a block whose whole premise is manageable
-      // fatigue, so it is named — the athlete traded it, and they should know they did. ⚠️ This is
-      // the one compromise in this file where silence would be worst: everything else costs a day's
-      // arrangement, this costs the recovery the block is built around.
-      // ⚠️ ASKED OF THE WEEK, NOT OF ONE VARIABLE. An earlier version tested whether the rides had
-      // taken `restReserved`, which stopped meaning anything once the rest day became a leftover
-      // rather than a slot — the runs could just as easily have taken it. Count the days that carry
-      // something and let the answer come from the week itself.
-      const occupied = new Set<string>([
-        ...strengthDays, pickedLong, ...easyRunDays, ...rideDays,
-      ].filter(Boolean) as string[]);
-      const restSpent = DAYS.every((d) => occupied.has(d));
-      const restNote = `Your ${rideIntent.daysAfterHard} ride days and ${runFreq} run days fill all seven — this week has no full rest day.`;
-      if (restSpent && !placementCompromises.some((c) => c.text === restNote)) {
-        placementCompromises.push({ kind: 'cost', text: restNote });
-      }
+      // ⛔ THE NO-REST-DAY CHECK MOVED OUT OF THIS BLOCK (stage 6, 2026-08-22). It stood here, inside
+      // `if (rideIntent.declared)`, and asked a hand-listed subset of day sources. It is now asked of
+      // the finished week, below the swim emitter — see the note there for what it was missing and
+      // how many weeks it missed.
       // ⛔ THE HARD RIDE IS INSIDE THE WEEK'S HOURS, NOT AN EXTRA ON TOP (2026-07-29).
       //
       // This is the run side's 2026-07-28 defect, one discipline over, and it was still here: the
@@ -4916,6 +4901,60 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       const taken = new Set(weekSessions.map((x) => x.day));
       const free = DAYS.filter((d) => !taken.has(d));
       swimSessions(free, args.swimDays!).forEach((x) => weekSessions.push(x));
+    }
+
+    /**
+     * ⛔⛔ THE REST DAY, ASKED OF THE FINISHED WEEK — AND UNTIL TODAY IT WAS ASKED OF A LIST
+     * (stage 6, 2026-08-22).
+     *
+     * **The defect, measured.** Across 37,632 shapes with 3-4 runs and 3-4 rides, **25,088 built a
+     * week with no rest day at all — and this note stayed silent on every one of them.** Not once in
+     * 25,088.
+     *
+     * ⛔ TWO CAUSES, AND BOTH ARE THE SAME MISTAKE. The check sat inside the ride pass and read
+     * `new Set([...strengthDays, pickedLong, ...easyRunDays, ...rideDays])` — a hand-listed subset of
+     * where sessions come from:
+     *   1. **It could not see a HARD day or a SWIM day.** A week whose seventh square carries the
+     *      hard run, or the swim, counted that square as empty. The measured misses are mostly a
+     *      Sunday swim.
+     *   2. **It only ran when the athlete kept a BIKE.** A runner with no bike could fill all seven
+     *      days and never be told, because the whole block is gated on `rideIntent.declared`.
+     *
+     * ⚠️ AND THE OLD COMMENT ALREADY SAID THE RIGHT THING, which is why this is a fix and not a
+     * redesign: *"ASKED OF THE WEEK, NOT OF ONE VARIABLE … Count the days that carry something and
+     * let the answer come from the week itself."* It then counted four variables. A list of sources
+     * is one variable wearing a wider coat — it can only ever be as complete as the last person to
+     * remember to add to it, and swim and the hard days were added to the week after it was written.
+     *
+     * ⛔ SO IT READS `weekSessions`, HERE, AFTER EVERY EMITTER INCLUDING THE SWIM. There is nothing
+     * left to forget: if a day carries anything at all it is not a rest day, whatever put it there.
+     *
+     * **Why it matters more than the other notes** — the composer's own words, and they are right:
+     * *"this is the one compromise in this file where silence would be worst: everything else costs a
+     * day's arrangement, this costs the recovery the block is built around."* D-325 §7 is *state the
+     * cost, never refuse*; after stage 5 the engine never refuses, so the stating is the whole of it.
+     */
+    const restDayCount = DAYS.filter((d) => !weekSessions.some((x) => x.day === d)).length;
+    if (restDayCount === 0) {
+      const perType = (t: string) => new Set(
+        weekSessions.filter((x) => x.type === t).map((x) => x.day),
+      ).size;
+      /**
+       * ⚠️ THE COUNTS COME OFF THE WEEK TOO, not off the ask. The sentence this replaced read
+       * *"Your N ride days and M run days fill all seven"* using the REQUESTED numbers — so on the
+       * day it did fire it could have named a count the calendar did not show. And it named only two
+       * disciplines, which is the same blindness one layer up.
+       */
+      const parts = [
+        [perType('run'), 'running'], [perType('ride'), 'riding'],
+        [perType('swim'), 'swimming'], [perType('strength'), 'lifting'],
+      ].filter(([n]) => (n as number) > 0).map(([n, w]) => `${n} ${w}`);
+      const restNote = `Every day this week carries a session — ${parts.join(', ')} — so there is no `
+        + 'full rest day. That is the one cost here that is not about arrangement: the block is built '
+        + 'around a day with nothing on it.';
+      if (!placementCompromises.some((c) => c.text === restNote)) {
+        placementCompromises.push({ kind: 'cost', text: restNote });
+      }
     }
 
     weekSessions.sort((a, b) => {

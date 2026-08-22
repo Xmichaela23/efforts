@@ -23,125 +23,129 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-21 — **stages 2, 3, 4 (rides) and 5 are BUILT, NOT PUSHED. Your job is STAGE 6, the last one.** One banner, owned by ONE chat.)
+## 🧭 NEXT SESSION — START HERE (2026-08-22 — **the six-stage work order is COMPLETE. Nothing has been seen on a device. The next job is Michael's, not a stage 7.**)
 
-### ⛔ FIRST: FOUR STAGES OF UNPUSHED WORK ARE IN THE TREE AND NONE IS YOURS TO REDO
+### ⛔ THE JOB: MICHAEL BUILDS A BLOCK IN THE APP
 
-`docs/NOTES-stage2-sport-adjacency-2026-08-21.md` · `docs/NOTES-stage3-wizard-latency-2026-08-21.md`
-`docs/NOTES-stage4-ride-intent-2026-08-21.md` · `docs/NOTES-stage5-delete-the-dead-engines-2026-08-21.md`
+That one action closes stage 1's outstanding device verification **and every stage since**. Until it
+happens, everything below is claimed on tests, probes and the sweep — not on a phone.
 
-All four are **BUILT, NOT PUSHED, NOT DEPLOYED, NOT VERIFIED ON A DEVICE.**
+⚠️ **DEPLOY FIRST OR THE CHECK MEANS NOTHING.** Stages 2–5 are pushed (`807216b8`) and, as far as
+these sessions know, **not deployed** — so a block built right now would exercise stage 1 and the
+OLD engine for everything after it.
 
-- **Stage 4 (rides).** `_shared/athlete-weekly-intent.ts` owns the ride ask; nine ride names gone from
-  the composer; all five hops wired. Sweep: 0 of 61.
-- **Stage 5.** ⛔ *"No dropping sessions. Always build the week the athlete asked for and tell them what
-  it costs."* The hard-day yield loop is DELETED; thirteen dead branches gone; `place-week.ts` cut
-  436→126 lines. Sweep: 0 of 61.
-- **Stage 2.** `sportAdjacency` replaces `interleaving` and `clustering`. **58 of 61 moved, 51
-  improved, 0 worsened, 0 rest days lost**; adjacency 1419→471 across 732 week-instances.
-- **Stage 3 + three rulings.** The wizard solve is gated and deferred; the Q-215 double-solve is
-  deleted (and a third redundant solve with it); both remaining ride pickers raised to 4;
-  `RIDE_HOURS_DEFAULT` documented to Viada p239. Sweep: 0 of 61.
+**Build a Strong Focus block.** ⚠️ The shape that exercises the most of it at once: **keep run AND
+bike, four runs, two rides, two hard days (one run, one ride), long run and long ride on the
+weekend, swim on.** What to look at, in order:
 
-### ⛔ THE THING STAGE 3 COULD NOT VERIFY, AND IT IS THE FIRST DEVICE CHECK OWED
-
-Every stage-3 change except the Q-215 deletion lives in React, and **React does not run in this
-repo.** The tap-paints-first behaviour, the schedule card's first paint, and the long-day lock are
-asserted at the SOURCE and never executed.
-
-⛔ **The check:** keep run + bike, four runs, two rides, two hard days, and tap the ride-count chip on
-the VOLUME step. It should be instant. **It was 922 ms on a desktop** before this stage — three to
-five times that on a phone — for a suggestion nobody reads until two screens later.
-
-### ⛔ WHAT THE OTHER STAGES CHANGED THAT YOU WILL TRIP OVER
-
-- **`interleaving` and `clustering` no longer exist** — anything reaching for them wants
-  `sportAdjacency`. `score` and `sportAdjacency` are EXPORTED for tests: measure against the real
-  scorer, do not copy the file the way the trace report had to.
-- ⛔ **`sportAdjacency` is weighted 4, and 5 breaks the barbell week** (measured). Do not re-open the
-  weight war without new evidence.
-- **The composer runs exactly ONE solve now.** The lift-only pre-solve and the Q-215 second solve are
-  both gone; `flexibleAvoid` is inert and always was.
-- **`solveWithWeekModel` returns `WeekModelResult`** — `status === 'unsolvable'` no longer compiles
-  against that adapter.
-- **`place-week.ts` places nothing**; **the ride ask is `rideIntent`**; **`steps_preset[0]` is the
-  warm-up, not the work.**
-- ⚠️ **The two `taken={{}}` rows in `NonRaceBuilder` disagree ON PURPOSE.** The long-day rows lock; the
-  hard-day row does not, and that is a ruling with a test guarding it. Do not "make them consistent".
+1. **A quality session has a warm-up** (stage 1). Flat Sprints especially — six maximal 12-second
+   efforts used to reach the watch cold.
+2. **The ride-count chip on the VOLUME step responds instantly** (stage 3). It cost **922 ms** on a
+   desktop before this work — three to five times that on a phone — for a suggestion nobody reads
+   until two screens later.
+3. **Four rides is offered and survives** (stage 4 + the 2026-08-21 ruling). Tap 4 on the volume card
+   and confirm the built plan has four ride days.
+4. **The long run and the long ride cannot both take Sunday** (stage 3). The second one should render
+   the first's day as taken.
+5. **The week does not clump** (stage 2) — runs and rides should alternate rather than block up.
+6. **The rest day survives**, and if the week genuinely fills, the plan SAYS so (stage 6).
 
 ---
 
-## YOUR JOB — STAGE 6: DOES THE APP STILL SAY WHEN IT HAD TO COMPROMISE
+### THE SIX STAGES, AND THE THREE STATES FOR EACH
 
-`docs/WORKORDER-finish-the-swaps-2026-08-20.md` stage 6. Evidence:
-`docs/REPORT-session-structure-and-clumping-2026-08-20.md` §2.3 — **and read the correction below
-before you trust it.**
+| stage | what shipped into the tree | pushed | deployed | verified on a device |
+|---|---|---|---|---|
+| **1** — session wrapper | warm-ups; one owner of a session's length | **yes** (`024d9152`) | **yes** 2026-08-21 | **NO** |
+| **4** — ride intent | `_shared/athlete-weekly-intent.ts`; nine ride names gone | **yes** (`807216b8`) | **not by this session** | **NO** |
+| **5** — dead engines | 13 dead branches; the hard-day yield deleted; `place-week` 436→126 | **yes** (`807216b8`) | **not by this session** | **NO** |
+| **2** — clumping | `sportAdjacency` replaces `interleaving` + `clustering` | **yes** (`807216b8`) | **not by this session** | **NO** |
+| **3** — wizard latency | solve gated + deferred; Q-215 double-solve deleted | **yes** (`807216b8`) | **not by this session** | **NO** |
+| **6** — compromise channel | the no-rest-day note fixed | **NO — uncommitted** | **no** | **NO** |
 
-### ⛔ THE REPORT'S PREMISE IS HALF WRONG, AND STAGE 5 MEASURED IT
+⚠️ **Michael committed and pushed stages 2–5 himself as `807216b8` on 2026-08-21**; `main` is level
+with `origin/main`. **Stage 6 is uncommitted and waiting for him**, per work order rule 8.
 
-§2.3 says *"THE ENTIRE COMPROMISE CHANNEL IS SILENT — MEASURED, 61 OF 61."* **True of the sweep,
-false of the space.** Stage 5 built 10,976 shapes by hand: **10,080 carried a compromise.** The breach
-channel is loud and correct. The 61 sweep shapes simply contain no crowded week — every one places
-its long and hard days sensibly.
+⛔ **PUSHED IS NOT DEPLOYED.** Stages 2–5 change `strength-primary-plan.ts`,
+`create-goal-and-materialize-plan`, `generate-strength-plan`, `_shared/week-model/` and the client —
+**none of those edge functions were deployed by any of these sessions**, and the client has not gone to
+Netlify. Whoever deploys should check what is actually live rather than assume the push carried it.
 
-⛔ **So do not build your over-subscribed week out of the sweep.** Use anchor shapes with the long
-run, long ride and hard days on colliding or near-colliding days; `docs/NOTES-stage5-...` has the
-probe shapes and the breach tally.
+**The notes files, one per stage:**
+`NOTES-stage1-session-wrapper-2026-08-20.md` · `NOTES-stage4-ride-intent-2026-08-21.md` ·
+`NOTES-stage5-delete-the-dead-engines-2026-08-21.md` · `NOTES-stage2-sport-adjacency-2026-08-21.md` ·
+`NOTES-stage3-wizard-latency-2026-08-21.md` · `NOTES-stage6-compromise-channel-2026-08-22.md`
 
-### What is genuinely still unobserved
+### ⛔ THE RULINGS MICHAEL MADE, SO NOBODY RE-OPENS THEM
 
-1. **The ride-shortfall note.** ⚠️ Its mechanism is gone: stage 5 found the reduction ladder in
-   `solveWithFlexible` was a `for` loop that always returned on the first pass, and the note depended
-   on it. It was **left in place deliberately for you** — deleting it as well would remove the only
-   thing that could ever tell an athlete a session did not fit. **Decide: make it reachable, or
-   delete it and say the engine never drops a session.** ⛔ The second reads on Michael's stage 5
-   ruling; the first does not, because nothing drops.
-2. **The no-rest-day note.** Stage 2 measured 0 of 61 shapes losing a blank day, so this has no
-   observed firing either.
-3. **The hard-day yield note** is gone for good — nothing yields (stage 5 ruling).
+- **Nothing yields, ever** (stage 5). *"Always build the week the athlete asked for and tell them what
+  it costs."* `week-solver.ts:299` said it first. Do not reintroduce a drop under any name.
+- **The day off outranks symmetry** (2026-08-19, re-confirmed by stage 2 at 0 of 61 rest days lost).
+- **The ride count is 4** — six statements of that range, one constant.
+- **`RIDE_HOURS_DEFAULT = 2` is Viada p239's Level 1 dose**, not a round number.
+- **Q-215 is deleted, not re-expressed.** *"Keeping heavy leg days apart is already done live by
+  `bunching`. Rebuilding it means two owners for one fact."*
 
-**Do:** build one deliberately over-subscribed week by hand and see whether it speaks. If it does not,
-find out why. `D-325 §7` is *state the cost, never refuse* — and after stage 5 the engine never
-refuses, so the whole doctrine now rests on the stating.
+### ⚠️ WHAT IS STILL OWED, AND IT IS NOT PART OF THIS WORK ORDER
 
-⚠️ **Stage 5 rewrote the tight-week disclosure** (`tightWeekCompromises`) and it DOES fire — pinned in
-`shared/strength-system/hard-day-no-yield.test.ts`. That is the half that works; the two notes above
-are the half that does not.
+- ⛔ **Stage 4 covered RIDES ONLY.** The run's four loose top-level scalars and the swim's bare count
+  are untouched, and `AthleteWeeklyIntent` has **no `run` or `swim` key** — deliberately, because a
+  field with no reader is the starved-input pattern. The chain is mapped in the trace report §2.0.
+- **The ride-shortfall note cannot fire today and is kept on purpose** (stage 6). The collapse it
+  guards is reachable in the resolver but not from the composer, because `easyWanted` caps the
+  flexible ride count. Raise the ride ceiling past 4 and it comes back.
+- ⚠️ **`AUDIT-plan-generators-2026-08-07` §2's router session (Q-267) is still the standing job** after
+  this — ~2,000 lines of scattered routing gates in `create-goal-and-materialize-plan`.
 
-**Gate: the sweep. Say how many of the 61 moved and why.**
-`~/.deno/bin/deno run --no-check --allow-read --allow-write scripts/dump-plans.ts`
+### ⛔ THINGS A NEXT SESSION WILL TRIP OVER
 
-### ⚠️ FOUR PRE-EXISTING RED TESTS, AND NONE ARE YOURS
+- **`steps_preset[0]` is the WARM-UP, not the work.** Six test files use a `workTokenOf` helper.
+- **The ride ask is `rideIntent`** — read `_shared/athlete-weekly-intent.ts` before touching anything
+  ride-shaped in the composer.
+- **The composer runs exactly ONE solve.** `flexibleAvoid` is inert and always was.
+- **`solveWithWeekModel` returns `WeekModelResult`** — `status === 'unsolvable'` no longer compiles
+  against that adapter. Deliberate: the loose type is what kept 13 dead branches looking live.
+- **`place-week.ts` places nothing** — types and two constants.
+- **`interleaving` and `clustering` no longer exist.** `sportAdjacency` is weighted **4**, and **5
+  breaks the barbell week** (measured). Do not re-open the weight war without new evidence.
+- ⚠️ **The two `taken={{}}` rows in `NonRaceBuilder` disagree ON PURPOSE** — the long-day rows lock,
+  the hard-day row does not. A test guards it. Do not "make them consistent".
 
-`_shared/anchor-resolver-lint.test.ts` (`lthr::TrainingBaselines.tsx` off the ledger),
-`src/lib/club-anchor.test.ts` ×1, `src/lib/non-race-goal-seeds.test.ts` ×2. All stash-verified.
+### ⛔ AND THE ONE METHOD LESSON WORTH KEEPING
 
-⚠️ **The client suite does not run here.** `npx vitest run` fails on all 363 files. `deno test src/`
-runs 720 of them; anything importing `@shared/*` runs under neither, and React components under
-neither. **If your change lands in that gap, say so — do not claim coverage.**
+**The 61-shape sweep is a regression net, not a detector.** Every shape in it is a sensible week, so:
+- the compromise channel read "silent on 61 of 61" while **10,080 of 10,976** hand-built shapes carried
+  one;
+- the no-rest-day note was broken for months — **silent on 25,088 of 25,088** full weeks — and could
+  never have fired on any of the 61.
 
-### ⛔ HOW YOU CLOSE — AND `CLAUDE.md` CONTRADICTS THIS, SO READ IT
+⚠️ **Build test weeks from the shape space, not from the sweep.** The probes are described in the
+stage 5 and stage 6 notes.
 
-**`CLAUDE.md` says "the user does NOT deploy… `git push origin main`." ⛔ OVERRIDDEN.** Work order
-rule 8: **edits are free; commit, push and deploy WAIT FOR HIM. Every time.**
+### ⚠️ FOUR PRE-EXISTING RED TESTS, AND NONE BELONG TO THIS WORK ORDER
 
-**What you owe:**
-1. **Your own dated notes file in `docs/`.**
-2. **Replace this banner.** ⚠️ Stage 6 is the LAST stage — the next banner is the one that hands over
-   four stages of unpushed, undeployed, unverified work and the device checks each is waiting on.
-   Make that list complete and make it the first thing on the page.
-3. **Report the three states separately — never "shipped":** pushed · deployed · verified on a device.
-4. **Say what the sweep did.**
-5. **Mutation-test every new test**, and when a mutant SURVIVES write down whether the test was weak
-   or the mutant equivalent. ⚠️ Stage 2 had three tests survive their first draft — one had a weight
-   of **100** passing a test whose only job was bounding the weight.
-6. ⚠️ **Docs are deliberately light.** A `D-NNN` only for a real decision.
+`_shared/anchor-resolver-lint.test.ts` (`lthr::TrainingBaselines.tsx` reads an anchor raw and is not
+on the ledger), `src/lib/club-anchor.test.ts` ×1, `src/lib/non-race-goal-seeds.test.ts` ×2. All
+verified pre-existing by stashing.
 
-### ⚠️ THE PRODUCT DIRECTION BEHIND ALL OF THIS
+⚠️ **The client suite does not run in this repo.** `npx vitest run` fails on all 363 files — its ESM
+loader rejects the `https:` deno-std imports the shared modules use, and there is no vitest config or
+`test` script. `deno test src/` runs 720 of them; anything importing `@shared/*`, and every React
+component, runs under neither. ⛔ Stage 3's changes live entirely in that gap and are guarded by a
+SOURCE LINT, which proves the call is written and not that the screen behaves.
+
+### Current test state (all six stages in the tree)
+
+`shared/strength-system/` **580 passed, 0 failed** · `_shared/` **1855 passed, 1 failed** ·
+`src/` under deno **717 passed, 3 failed** · sweep **61 built, 0 failed, budget-equals-built 0
+violations** · `npx vite build` clean · `tsc --noEmit` **312 errors, identical to a clean tree**.
+
+### ⚠️ THE PRODUCT DIRECTION THIS WAS ALL FOR
 
 A new base plan — **The Standing Plan** — is going to be built on this engine: *"whatever supports the
-build so we aren't crazy glue and taping it together."*
-⚠️ **Nothing about it is built or specced yet. Do not start on it.**
+build so we aren't crazy glue and taping it together."* The six stages were the "so we aren't gluing
+it together" half.
+⚠️ **Nothing about the Standing Plan is built or specced yet. Do not start on it from this banner.**
 
 ## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 
