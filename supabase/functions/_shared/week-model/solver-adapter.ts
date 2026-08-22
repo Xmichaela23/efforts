@@ -77,7 +77,24 @@ const SPORT_FOR_KIND: Partial<Record<MatrixSessionKind, Sport>> = {
 
 const dayIndexOf = (d: SolverDay): number => SOLVER_DAYS.indexOf(d);
 
-export function solveWithWeekModel(input: SolverInput): SolverResult {
+/**
+ * ⛔ THE RETURN TYPE NOW SAYS WHAT THE FUNCTION DOES (stage 5, 2026-08-21). It was declared
+ * `SolverResult`, whose union carries an `unsolvable` arm this adapter has never returned — a fact
+ * its own comment below states in prose and the TYPE contradicted.
+ *
+ * ⚠️ THAT GAP IS NOT COSMETIC: IT IS WHAT KEPT THIRTEEN DEAD BRANCHES COMPILING. Because the type
+ * admitted `unsolvable`, every `if (r.status === 'unsolvable')` in `strength-primary-plan.ts`
+ * type-checked, narrowed correctly, and looked live — including the hard-day yield loop, a rule
+ * Michael had made and which had not run once since the swap. Narrowing here is what makes a
+ * fourteenth impossible: writing that test now fails to compile.
+ *
+ * ⛔ THE `unsolvable` ARM STAYS IN `SolverResult` ITSELF. The real `week-solver` still returns it
+ * and `assign-days-solver` / `strength-system/placement` still read it. It is this ADAPTER that
+ * cannot produce one.
+ */
+export type WeekModelResult = Extract<SolverResult, { status: 'solved' } | { status: 'compromised' }>;
+
+export function solveWithWeekModel(input: SolverInput): WeekModelResult {
   const sessions: Session[] = [];
   const pins: Record<string, number> = {};
 

@@ -14,7 +14,9 @@ import {
   isBodyweightName,
   jumpsFor,
 } from './strength-primary-plan.ts';
-import { placeLiftingWeek } from './place-week.ts';
+// ⛔ WAS `placeLiftingWeek` (stage 5, 2026-08-21). The old placer is deleted; the descent invariant
+// below now enumerates through the engine the composer actually calls.
+import { solveWithWeekModel } from '../../_shared/week-model/solver-adapter.ts';
 import { ASSISTANCE_CATALOG } from '../../../../src/lib/assistance-catalog.ts';
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 
@@ -604,31 +606,48 @@ Deno.test('the descent asks the 48h eccentric cell, not quality_run 24h', () => 
   assertEquals(descentIsJogged('Monday', ['Sunday']), false, 'Sunday to Monday is 24h');
 });
 
-Deno.test('⛔ at four lifts the descent is ALWAYS walked — an invariant, not an evaluation', () => {
+Deno.test('⛔ the descent is ALWAYS walked — an invariant, not an evaluation', () => {
   // ⚠️ THIS ENUMERATES THROUGH THE PLACER, NOT THROUGH HAND-PICKED HEAVY PAIRS. The first version of
-  // this test listed heavy-day pairs by hand and failed on `Monday+Wednesday`, which `place-week`
+  // this test listed heavy-day pairs by hand and failed on `Monday+Wednesday`, which the placer
   // never produces for a Friday hill day. A test that asserts against combinations the engine cannot
   // reach is testing an assumption, not the engine.
   //
   // Two heavy days sit >=48h apart, which leaves exactly one day clearing BOTH by 48h, and a long-day
   // anchor always occupies it. If this ever fails, the copy that states "walk the descents" as a fact
   // has become a claim the engine no longer guarantees — fix the copy, not the test.
-  const LIFTS4 = [
-    { lift: 'Bench Press', isLower: false }, { lift: 'Back Squat', isLower: true },
-    { lift: 'Overhead Press', isLower: false }, { lift: 'Deadlift', isLower: true },
+  //
+  // ⛔ RE-POINTED AT THE LIVE ENGINE (stage 5, 2026-08-21) AND IT WAS STALE TWICE OVER. It ran
+  // through `placeLiftingWeek`, which stage 5 deleted as unreachable — so it was enumerating an
+  // engine that has not built a week since the swap — and it enumerated FOUR separate lifts, a shape
+  // deleted on 2026-08-16 when every block became three days. It now asks the solver the composer
+  // actually calls, with the lifts the composer actually sends.
+  // ⚠️ THE INVARIANT SURVIVED THE ENGINE CHANGE, measured: 0 of 10 shapes would jog. The live model
+  // usually places a heavy day ON the hill day as an ordered stack, which guarantees it outright.
+  const LIFTS3 = [
+    { name: 'Back Squat', isLower: true },
+    { name: 'Bench Press', isLower: false },
+    { name: 'Deadlift + Overhead Press', isLower: true },
   ];
+  const capDay = (d: string) => d.charAt(0).toUpperCase() + d.slice(1);
   let checked = 0;
-  for (const longRide of ['Saturday', 'Sunday'] as const) {
-    const longRun = longRide === 'Saturday' ? 'Sunday' : 'Saturday';
-    for (const hill of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const) {
-      const week = placeLiftingWeek(LIFTS4, [
-        { day: longRide, kind: 'long_ride', label: 'long ride' },
-        { day: longRun, kind: 'long_run', label: 'long run' },
-        { day: hill, kind: 'quality_run', label: 'hard run' },
-      ] as any);
-      const heavy = week.slots.filter((s) => s.isLower).map((s) => s.day as string);
+  for (const longRide of ['saturday', 'sunday'] as const) {
+    const longRun = longRide === 'saturday' ? 'sunday' : 'saturday';
+    for (const hill of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const) {
+      const r = solveWithWeekModel({
+        anchors: [
+          { day: longRide, kind: 'long_ride', label: 'long ride' },
+          { day: longRun, kind: 'long_run', label: 'long run' },
+          { day: hill, kind: 'quality_run', label: 'hard run' },
+        ],
+        lifts: LIFTS3,
+      } as never);
+      const heavy = r.week.lifts.filter((l) => l.isLower).map((l) => capDay(l.day));
+      // ⚠️ ASSERTED SO THE CASE CANNOT PASS VACUOUSLY. An engine that returned no lifts would make
+      // `every()` true and `descentIsJogged` false, and the invariant would read as held while
+      // nothing was placed at all.
+      assertEquals(heavy.length, 2, `expected two heavy days, got ${heavy.join('+') || 'none'}`);
       assertEquals(
-        descentIsJogged(hill, heavy), false,
+        descentIsJogged(capDay(hill), heavy), false,
         `ride ${longRide} / run ${longRun} / hill ${hill} placed heavy on ${heavy.join('+')} and jogged`,
       );
       checked++;
@@ -718,21 +737,41 @@ Deno.test('⛔ THE LONG RUN NEVER LANDS ON THE RESERVED REST DAY', () => {
   }
 });
 
-Deno.test('run and ride ALTERNATE across the free days rather than the runs taking them all', () => {
+Deno.test('run and ride SPREAD across the free days rather than the runs taking them all', () => {
   // ⚠️ A COMPOSER PREFERENCE, NOT A CLEARANCE — `easy_run × easy_run` is rated 0h with no penalty
   // and this claims nothing about physiology. See the block comment on `easyRunDays`. What it pins
   // is that the ALLOCATION consults both disciplines instead of the run pass running first and
   // taking every open day, which is what produced Tue-run/Wed-run with the rides stacked elsewhere.
+  //
+  // ⛔⛔ REWRITTEN 2026-08-21 (stage 2), AND THE OLD ASSERTION WAS THE BUG IN TEST FORM. It asked
+  // whether a ride falls strictly BETWEEN the first and last run — which is `interleaving()`, the
+  // resolver term the trace report proved cannot tell a clumped week from an alternating one. Both
+  // scored 54 on every term. A test written on a blind measure inherits the blindness: it PASSED on
+  // `runs Wed/Fri/Sat + rides Thu/Fri` (the rides adjacent to each other) and FAILED on
+  // `runs Wed/Fri/Sat + rides Mon/Wed` (the rides two days apart), which is the better week by any
+  // reading of what this test says it is for.
+  //
+  // ⛔ IT NOW ASKS THE MEASURE THE ENGINE ACTUALLY USES — cyclic consecutive same-sport days,
+  // `sportAdjacency` in `_shared/week-model/resolve.ts`. Same intent, stated so it cannot be
+  // satisfied by a clump.
   const plan = MIX({ enduranceSport: 'run', enduranceFrequency: 3, targetWeeklyMiles: 20, bike: { hours: 3, days: 2 } });
   const wk = plan.sessions_by_week['1'] ?? [];
   const dayOf = (t: string) => wk.filter((s: any) => s.type === t).map((s: any) => DAY_NAMES.indexOf(s.day)).sort((a: number, b: number) => a - b);
   const runs = dayOf('run');
   const rides = dayOf('ride');
   assert(runs.length >= 2 && rides.length >= 2, `fixture should carry both: ${runs.length} runs, ${rides.length} rides`);
-  // At least one ride sits BETWEEN two run days — the property "the runs were not handed every
-  // open day first" expressed as something observable on the calendar.
-  const between = rides.some((r: number) => r > runs[0] && r < runs[runs.length - 1]);
-  assert(between, `no ride falls between the first and last run: runs ${runs}, rides ${rides}`);
+  // ⚠️ CYCLIC, because the week repeats — Sunday into Monday is back-to-back training however the
+  // calendar is drawn.
+  const adjacent = (days: number[]) =>
+    days.filter((d) => days.includes((d + 1) % 7)).length;
+  const rideAdjacency = adjacent(rides);
+  assertEquals(rideAdjacency, 0,
+    `the rides are stacked on consecutive days: runs ${runs}, rides ${rides}`);
+  // The runs may keep ONE adjacency — with three runs and a long day pinned to the weekend there is
+  // not always a fully alternating answer, and forcing one would be the spread term outbidding the
+  // athlete's own long day.
+  assert(adjacent(runs) <= 1,
+    `the runs took a contiguous block: runs ${runs}, rides ${rides}`);
 });
 
 /**

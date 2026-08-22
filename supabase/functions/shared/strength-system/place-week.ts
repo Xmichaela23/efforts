@@ -1,4 +1,27 @@
 // ============================================================================
+// ⛔⛔ THIS FILE NO LONGER PLACES ANYTHING. WHAT IS LEFT IS THE VOCABULARY (stage 5, 2026-08-21).
+//
+// `placeLiftingWeek` and its machinery — `requiredClearanceHours`, `clearanceHours`,
+// `lowerDayPenalty`, `resolveStacking`, `stackGapHours`, `MAX_ACTIVE_DAYS`, `LiftSlot`,
+// `StackResolution`, `PlacedWeek`, ~330 lines — were DELETED here. Placement moved to
+// `_shared/week-model/` in the engine swap, and the composer's one remaining call sat behind
+// `solved.status === 'unsolvable'` — a status the adapter has two returns and cannot produce.
+// Proven per symbol before removal: every one had zero production readers, and the only references
+// outside this file were in `place-week.test.ts` (deleted with them) and in COMMENTS.
+//
+// ⚠️ THE LAW DID NOT LIVE HERE AND STILL DOES NOT. `requiredClearanceHours` was a one-line wrapper
+// over `requiredAdjacencyHours('lower_body_strength', kind)` in
+// `_shared/schedule-session-constraints.ts`, which is the authority and is unchanged. The clearance
+// assertions that used to reach the table through the deleted placer now run against it directly,
+// in `_shared/schedule-session-constraints.clearances.test.ts`.
+//
+// ⛔ WHAT REMAINS IS IMPORTED AND LIVE: `DayName`, `DAYS`, `EndurancePin`, `MIN_STACK_GAP_H`, all
+// read by `strength-primary-plan.ts`. The rest-day rule the deleted `MAX_ACTIVE_DAYS` stated is
+// live too — it is `resolve(units, { minRestDays: 1 })` in `week-model/solver-adapter.ts`. The
+// constant was the OLD engine's statement of it and had no code readers left.
+//
+// ── the original header, kept because the reasoning is still the block's ─────────────────────────
+//
 // PLACING THE LIFTING WEEK AROUND THE ATHLETE'S ENDURANCE ABSOLUTES.
 //
 // Michael, 2026-07-25: *"we build around them, that's the whole point — we need strength to build
@@ -28,12 +51,9 @@
 // this comment exists to prevent.
 // ============================================================================
 
-import {
-  type MatrixSessionKind,
-  requiredAdjacencyHours,
-  SAME_DAY_COMPATIBLE,
-  stackNeedsRecoveryGap,
-} from '../../_shared/schedule-session-constraints.ts';
+// ⚠️ `requiredAdjacencyHours`, `SAME_DAY_COMPATIBLE` and `stackNeedsRecoveryGap` are no longer
+// imported — they belonged to the deleted placer, and the live engine reads them directly.
+import type { MatrixSessionKind } from '../../_shared/schedule-session-constraints.ts';
 
 export type DayName =
   | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
@@ -104,333 +124,3 @@ export type EndurancePin = {
  * number distorted the whole scheduling argument. Do not reinstate it.)
  */
 export const MIN_STACK_GAP_H = 6;
-
-/**
- * Six days of work, one full rest day. Everything about the resolution below is this number.
- *
- * The arithmetic is deliberately the ONLY argument the athlete is given: fixed endurance days plus
- * four separate lifting days is more than seven, and seven is all there is. No contested physiology,
- * nothing a coach can dispute. (An earlier draft justified this with an interference claim that this
- * repo's own citation register had already struck — Schumann 2022 found no interference for maximal
- * strength or size. Arithmetic needs no citation.)
- */
-export const MAX_ACTIVE_DAYS = 6;
-
-export type LiftSlot = {
-  lift: string;
-  isLower: boolean;
-  day: DayName;
-  /** Present when this lift shares its day with a pinned endurance session. */
-  stackedWith?: { label: string; gapHours: number };
-};
-
-/** What the intake must resolve before a week can be built. */
-export type StackResolution = {
-  /** Fixed endurance days + lifting days. */
-  activeSessions: number;
-  /** How many lifting sessions must share a day to protect one full rest day. 0 = nothing to ask. */
-  stacksRequired: number;
-  /** Pins the same-day matrix permits to carry a lift. ⛔ The LAW's answer, not the athlete's. */
-  eligiblePins: EndurancePin[];
-  /** True when `stacksRequired` exceeds the pins that can legally carry a lift. */
-  unresolvable: boolean;
-};
-
-export type PlacedWeek = {
-  slots: LiftSlot[];
-  /** Days carrying neither a lift nor a pin — where easy endurance goes. */
-  freeDays: DayName[];
-  /** Days with nothing at all. */
-  restDays: DayName[];
-  resolution: StackResolution;
-  /**
-   * Every clearance that could not be honoured, in plain words. ⛔ NEVER SILENTLY SWALLOWED — a week
-   * that had to break a rule must say which one. Quietly producing a worse plan is how a scheduler
-   * loses trust, and the athlete's own pins can make a clean week impossible.
-   */
-  compromises: string[];
-};
-
-const dayIndex = (d: DayName): number => DAYS.indexOf(d);
-
-/** Days between two weekdays, wrapping the week — Sunday to Monday is 1, not 6. */
-function gapDays(a: DayName, b: DayName): number {
-  const raw = Math.abs(dayIndex(a) - dayIndex(b));
-  return Math.min(raw, 7 - raw);
-}
-
-/**
- * Hours of clearance a LOWER-BODY lifting day needs from a pinned endurance session.
- *
- * Straight from `SCHEDULING-RULES.md` §4.2/§4.3 via the shared kind lists, so a change to the law
- * lands here without an edit:
- *   long run                   → 48h  (glycogen depletion + muscle damage on top of the signalling window)
- *   quality ride / quality run → 24h  (same prime movers loaded at intensity)
- *   LONG RIDE                  → 0h   ⚠️ NOT 48h — see below
- *   easy anything              → 0h   (an easy run stacks with lifting; lift first)
- *
- * ⛔ **THE LONG RIDE IS 0h, AND THIS COMMENT SAID 48h UNTIL 2026-08-09.** It read
- * "long ride / long run → 48h", pairing them — while the function beneath it delegates to
- * `ADJACENCY_HOURS_ROWS`, where `lower_body_strength × long_ride` is **0** and has been, deliberately.
- * The table states its own reason: *"Concentric, no impact transient. Long in DURATION, not in
- * damage… a long ride does not cost the week a leg day"* (§8.4).
- *
- * ⚠️ THE PROSE WAS THE STALE HALF, NOT THE TABLE — and reading it as the law produced a confident
- * wrong finding on 2026-08-09 ("the matrix contradicts its own doctrine"). It does not; this comment
- * contradicted the matrix. **The table is the law. This list is a convenience copy and convenience
- * copies rot** — if they disagree again, believe the table.
- *
- * ⚠️ WHETHER 0 IS THE RIGHT NUMBER IS A SEPARATE, OPEN QUESTION and is deliberately NOT settled here.
- * The damage half of the argument is well supported (cycling is concentric-dominant; running's
- * plyometric loading causes greater muscle damage). The "therefore zero cost" half is stronger than
- * the literature: there is no consensus on which modality interferes less, and some studies find
- * cycling's effect on lower-body strength LARGER than running's [Fyfe 2016; Doma review]. A long ride
- * is a real glycogen and central-fatigue load even with no muscle damage. Changing it is a design
- * decision with wide placement ripples, not a typo fix — it needs its own D-entry and its own sweep.
- *
- * ⛔ UPPER-BODY DAYS NEED NONE OF THIS, and that is not a convenience — it is why the stacked lift is
- * always a press or a bench. The constraint is about SHARED PRIME MOVERS. Pressing does not compete
- * with running legs, so an upper day beside a hard run costs nothing, where a squat day costs a lot.
- * The engine is not being generous when it picks the upper lift to stack; it is picking the only one
- * that is free. Say so in the copy — the athlete should know why it is safe.
- */
-export function requiredClearanceHours(kind: MatrixSessionKind): number {
-  // 2026-07-27: was two `includes` checks against LEG_LONG_KINDS / LEG_QUALITY_KINDS. Those lists
-  // are LOWER-BODY-RELATIVE BY ACCIDENT — they only ever answered "how far from a lift", which is
-  // the one row of a grid that has seven. This now reads that row OUT of the adjacency table, so
-  // there is one authority instead of a list that can drift from it. Same answers, one source.
-  return requiredAdjacencyHours('lower_body_strength', kind);
-}
-
-function clearanceHours(liftDay: DayName, pin: EndurancePin): number {
-  return gapDays(liftDay, pin.day) * 24;
-}
-
-/** How badly a LOWER day on this candidate would violate the pins. 0 = clean. */
-function lowerDayPenalty(candidate: DayName, pins: EndurancePin[]): number {
-  let penalty = 0;
-  for (const pin of pins) {
-    const required = requiredClearanceHours(pin.kind);
-    if (required === 0) continue;
-    const actual = clearanceHours(candidate, pin);
-    if (actual < required) penalty += (required - actual);
-  }
-  return penalty;
-}
-
-/**
- * THE ARITHMETIC, run before the athlete sees anything.
- *
- * `stacksRequired = (pins + lifting days) − 6`. Two pins and four lifts is six active days, so a rest
- * day already exists and the athlete is never asked. Three pins needs one stack; four needs two. The
- * resolution screen fires only when the maths demands it, and asks for as many stacks as it demands
- * — asking once and calling it done is how someone with four pins ends up with no rest day anyway.
- */
-export function resolveStacking(
-  pins: EndurancePin[],
-  liftCount: number,
-  /**
-   * How many of those lifts are UPPER. ⛔ THE REAL CEILING once the matrix stopped gating on
-   * `canSplitDay`: only an upper lift may be stacked, so two upper lifts is at most two stacks no
-   * matter how many endurance days are legal hosts. Defaults to `liftCount` for callers that do not
-   * know the split; `placeLiftingWeek` always passes the true count.
-   */
-  upperLiftCount: number = liftCount,
-): StackResolution {
-  const activeSessions = pins.length + liftCount;
-  const stacksRequired = Math.max(0, activeSessions - MAX_ACTIVE_DAYS);
-  // ⛔ ELIGIBILITY IS THE LAW'S ANSWER, NOT THE ATHLETE'S. Rewritten 2026-07-27: this used to be
-  // `p.canSplitDay === true`, which gated a free stack behind a question most people answer no to and
-  // then declared solvable weeks unsolvable. The real question is whether the same-day pair is legal,
-  // and that is the matrix — the one source this module was stacking without ever consulting.
-  //
-  // The stacked lift is always UPPER (see `placeLiftingWeek` step 2), so upper is what we ask about.
-  const eligiblePins = pins.filter((p) => SAME_DAY_COMPATIBLE[p.kind]?.upper_body_strength === true);
-  return {
-    activeSessions,
-    stacksRequired,
-    eligiblePins,
-    unresolvable: stacksRequired > Math.min(eligiblePins.length, upperLiftCount),
-  };
-}
-
-/**
- * Hours between the endurance session and the lift stacked onto it.
- *
- * Six only when they genuinely compete, per `stackNeedsRecoveryGap`. Otherwise zero — one session
- * block, lift first. `canSplitDay` upgrades a non-competing stack to a real gap for the athlete who
- * does train twice; it never blocks one.
- */
-export function stackGapHours(pin: EndurancePin, liftIsLower: boolean): number {
-  const liftKind: MatrixSessionKind = liftIsLower ? 'lower_body_strength' : 'upper_body_strength';
-  if (stackNeedsRecoveryGap(pin.kind, liftKind)) return MIN_STACK_GAP_H;
-  return pin.canSplitDay === true ? MIN_STACK_GAP_H : 0;
-}
-
-/**
- * Solve the lifting week.
- *
- * Order of operations is the design:
- *   1. Pins come out of the candidate pool first. They are absolutes.
- *   2. STACKS are assigned next, and always to UPPER lifts — the only ones that do not share prime
- *      movers with a leg-loaded endurance session.
- *   3. The remaining LOWER days are placed on what is furthest from leg-loaded pins. They are the
- *      constrained ones; placing the free upper days first would strand them.
- *   4. Lower days are also held apart from each other — heavy legs never run back to back.
- *   5. Remaining upper days take what is left, spread as evenly as possible.
- *
- * ⚠️ A lift keeps its day for the whole block. 5/3/1 runs the same lift on the same day every week
- * and the athlete should never have to look up which day squats are on.
- */
-export function placeLiftingWeek(
-  lifts: Array<{ lift: string; isLower: boolean }>,
-  pins: EndurancePin[],
-): PlacedWeek {
-  const compromises: string[] = [];
-  const upperLifts = lifts.filter((l) => !l.isLower);
-  const lowerLifts = lifts.filter((l) => l.isLower);
-  const resolution = resolveStacking(pins, lifts.length, upperLifts.length);
-  const pinnedDays = new Set(pins.map((p) => p.day));
-
-  // ── 2. Stacks: upper lifts onto matrix-legal pinned days ────────────────────────────────────
-  const stackCount = Math.min(resolution.stacksRequired, resolution.eligiblePins.length, upperLifts.length);
-  // Cheapest first: the SMALLEST day carries the lift. A quality session is a shorter day than a long
-  // one, so stacking onto it costs the athlete less than stacking onto their long run.
-  //
-  // ⛔ This used to sort by `requiredClearanceHours`, using leg-clearance as a proxy for day size.
-  // That broke on 2026-07-27 when long_ride's clearance went to 0 — the LONGEST day in the week
-  // suddenly sorted as the cheapest. Day size is a DURATION question and it now says so directly.
-  const isLongDay = (k: MatrixSessionKind) => k === 'long_run' || k === 'long_ride';
-  const stackTargets = [...resolution.eligiblePins]
-    .sort((a, b) =>
-      Number(isLongDay(a.kind)) - Number(isLongDay(b.kind)) ||
-      requiredClearanceHours(a.kind) - requiredClearanceHours(b.kind) ||
-      dayIndex(a.day) - dayIndex(b.day))
-    .slice(0, stackCount);
-
-  const stackedByLift = new Map<string, EndurancePin>();
-  stackTargets.forEach((pin, i) => {
-    const lift = upperLifts[i];
-    if (lift) stackedByLift.set(lift.lift, pin);
-  });
-
-  if (resolution.unresolvable) {
-    // ⛔ The honest arithmetic choice, not an error and not an override button. The athlete owns it.
-    compromises.push(
-      `${pins.length} fixed endurance days and ${lifts.length} lifting days is ${resolution.activeSessions} active days. ` +
-      `Protecting one full rest day needs ${resolution.stacksRequired} stacked day${resolution.stacksRequired === 1 ? '' : 's'}, ` +
-      `and ${resolution.eligiblePins.length} of the fixed days can legally carry a lift. ` +
-      `Either one lifting day comes out, or the week runs with no full rest day.`,
-    );
-  }
-
-  // Days still open for a lift that is NOT stacked.
-  let candidates = DAYS.filter((d) => !pinnedDays.has(d));
-  const unstackedCount = lifts.length - stackedByLift.size;
-  if (candidates.length < unstackedCount) {
-    compromises.push(
-      `${pins.length} fixed endurance days leaves ${candidates.length} open for ${unstackedCount} unstacked lifting days.`,
-    );
-    candidates = DAYS.slice();
-  }
-
-  // ── 3 + 4. Lower days: cleanest first, then held apart from each other ───────────────────────
-  const lowerDays: DayName[] = [];
-  for (const _ of lowerLifts) {
-    const ranked = candidates
-      .filter((d) => !lowerDays.includes(d))
-      .map((d) => ({
-        day: d,
-        penalty: lowerDayPenalty(d, pins) + lowerDays.reduce(
-          // Two heavy leg days back to back is its own problem, independent of any endurance session.
-          (acc, other) => acc + Math.max(0, 48 - gapDays(d, other) * 24),
-          0,
-        ),
-        /**
-         * ⛔ MORE THAN THE MINIMUM IS BETTER, AND THE PENALTY ALONE CANNOT SAY SO.
-         *
-         * `max(0, 48 - gap)` goes to zero at 48h and stays there — so 48h and 72h TIE, and the
-         * `dayIndex` tiebreak below then picks the earlier day. With no pins that produced lower
-         * days on Monday and Wednesday: legal, minimum, and worse than the hardcoded grid it
-         * replaced, which gave Tuesday/Friday at 72h.
-         *
-         * The solver was not wrong — it was obedient. It was told "at least 48" and it delivered
-         * exactly 48. Wanting daylight past the floor has to be said out loud.
-         *
-         * Ranked AFTER `penalty`, so this never buys spread by breaking a real clearance: it only
-         * decides between arrangements the rules already accept. Same shape as the upper-day
-         * placement below, which has always maximised spread.
-         */
-        spread: lowerDays.length === 0
-          ? 0
-          : Math.min(...lowerDays.map((other) => gapDays(d, other))),
-      }))
-      .sort((a, b) => a.penalty - b.penalty || b.spread - a.spread || dayIndex(a.day) - dayIndex(b.day));
-    if (ranked.length === 0) break;
-    lowerDays.push(ranked[0].day);
-  }
-
-  for (const day of lowerDays) {
-    for (const pin of pins) {
-      const required = requiredClearanceHours(pin.kind);
-      if (required === 0) continue;
-      const actual = clearanceHours(day, pin);
-      if (actual < required) {
-        compromises.push(
-          `${day}'s heavy lower-body work sits ${actual}h from ${pin.label} (${pin.day}); the clearance for that is ${required}h.`,
-        );
-      }
-    }
-  }
-
-  // ── 5. Remaining upper days ──────────────────────────────────────────────────────────────────
-  const remaining = candidates.filter((d) => !lowerDays.includes(d));
-  const upperDays: DayName[] = [];
-  const unstackedUpper = upperLifts.filter((l) => !stackedByLift.has(l.lift));
-  for (const _ of unstackedUpper) {
-    const ranked = remaining
-      .filter((d) => !upperDays.includes(d))
-      .map((d) => ({
-        day: d,
-        spread: Math.min(...[...lowerDays, ...upperDays].map((o) => gapDays(d, o)), 7),
-      }))
-      .sort((a, b) => b.spread - a.spread || dayIndex(a.day) - dayIndex(b.day));
-    if (ranked.length === 0) break;
-    upperDays.push(ranked[0].day);
-  }
-
-  const lowerQueue = [...lowerDays].sort((a, b) => dayIndex(a) - dayIndex(b));
-  const upperQueue = [...upperDays].sort((a, b) => dayIndex(a) - dayIndex(b));
-  const slots: LiftSlot[] = lifts.map((l) => {
-    const stacked = stackedByLift.get(l.lift);
-    if (stacked) {
-      return {
-        lift: l.lift,
-        isLower: l.isLower,
-        day: stacked.day,
-        stackedWith: { label: stacked.label, gapHours: stackGapHours(stacked, l.isLower) },
-      };
-    }
-    return {
-      lift: l.lift,
-      isLower: l.isLower,
-      day: (l.isLower ? lowerQueue.shift() : upperQueue.shift()) ?? DAYS[0],
-    };
-  });
-
-  const used = new Set<DayName>([...slots.map((s) => s.day), ...pinnedDays]);
-  const restDays = DAYS.filter((d) => !used.has(d));
-  const freeDays = DAYS.filter((d) => !slots.some((s) => s.day === d) && !pinnedDays.has(d));
-
-  if (restDays.length === 0 && !resolution.unresolvable) {
-    compromises.push('Every day carries work — no full rest day survived once the fixed sessions and the lifting days were placed.');
-  }
-
-  return {
-    slots: slots.sort((a, b) => dayIndex(a.day) - dayIndex(b.day)),
-    freeDays,
-    restDays,
-    resolution,
-    compromises,
-  };
-}

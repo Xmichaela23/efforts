@@ -12,6 +12,7 @@
 
 import {
   type Load,
+  type Sport,
   type SystemId,
   type Unit,
   COST,
@@ -201,7 +202,13 @@ export function stressorStreakExcess(placements: Placement[]): number {
  * spread rather than bunched. A long list of tie-breakers here would rebuild the thing
  * this model replaced.
  */
-function score(placements: Placement[]): number {
+/**
+ * ⛔ EXPORTED FOR TESTS ONLY (stage 2, 2026-08-21), and the reason is in the trace report: to measure
+ * the clumping defect at all it had to run *"the real `resolve.ts` — a copy with the private terms
+ * exported; the repo is untouched."* A finding that needs a modified copy of the file to reproduce
+ * is a finding nobody can pin. ⚠️ Nothing in production calls this — `resolve` is the entry point.
+ */
+export function score(placements: Placement[]): number {
   /**
    * ⛔ REST IS A FLOOR, NOT A SCORE THAT KEEPS PAYING — and getting that wrong stacked an athlete's
    * whole week onto one day. An uncapped `rest * 4` made four rest days worth +16, which outbid the
@@ -252,15 +259,48 @@ function score(placements: Placement[]): number {
   let bunching = 0;
   for (let i = 1; i < heavyDays.length; i++) bunching += Math.max(0, 3 - (heavyDays[i] - heavyDays[i - 1]));
 
+  /**
+   * ⛔⛔ `sportAdjacency` IS WEIGHTED 4, AND THE CEILING IS NOT THE DAY OFF — IT IS THE BARBELL WEEK.
+   *
+   * **The brief said `2w < 40`** (moving one session into a blank day removes at most two
+   * adjacencies, and the blank day is worth 40) — the 2026-08-19 rule that stops a tidier-looking
+   * week buying itself out of the athlete's only rest day. That bound is real and 4 satisfies it
+   * with room to spare.
+   *
+   * ⛔ IT IS NOT THE BINDING CONSTRAINT. `resolve` scores the WHOLE week, so a spread term can pay
+   * to move a LIFT, and the terms holding the lifting week's shape are far weaker than 40:
+   * `bunching` — heavy legs preferring more than the 48h floor — is weighted **1**. Measured across
+   * the weight range with everything else untouched:
+   *
+   * ```
+   *   w = 2, 3, 4   57/61 shapes improve, 0 worsen, 0 rest days lost, the bar NEVER MOVES
+   *   w = 5+        the bar starts moving: Wendler's L·U·L three-day week (2nd ed. p.11) came back
+   *                 L·L·U, and heavy legs went from 72h apart to 48h — one adjacency bought for one
+   *                 point of `bunching`
+   * ```
+   *
+   * ⚠️ SO THE CLIFF IS BETWEEN 4 AND 5, AND IT IS MEASURED, NOT REASONED. The report proposed 6 on
+   * the `2w < 40` bound alone; 6 breaks the barbell week. **4 is the highest weight at which this
+   * term can only ever choose between weeks that place the bar identically** — which is what "a
+   * preference that sits below the law" is supposed to mean, and what every other shape term here
+   * already is.
+   *
+   * ⛔ RAISING `bunching` TO PROTECT THE BAR INSTEAD WAS TRIED AND IS WORSE. At `bunching * 8` the
+   * alternation comes back and a week loses its second rest day to crowding; escalating it
+   * (`** 2 * 6`, the `crowding` shape) does the same. Every variant traded one regression for
+   * another. ⛔ Do not re-open the weight war without new evidence — the answer was to make THIS
+   * term weak enough, not the others stronger.
+   *
+   * At 4 the two weeks in the report separate by 12 points where they used to tie at 54.
+   */
   return recovery * 4 + blank * 40 - crowding - bunching
-    - clustering(placements) * 2
+    - sportAdjacency(placements) * 4
     - sameSportDoubles(placements) * 20
     - longDoubles(placements) * 25
     - overCap(placements) * 60
     - lockedDayExtras(placements) * 24
     - stressorStreakExcess(placements) * 8
-    + longOnWeekend(placements) * 5
-    + interleaving(placements) * 3;
+    + longOnWeekend(placements) * 5;
 }
 
 /**
@@ -306,21 +346,14 @@ const REST_FLOOR = 1;
  * a long run is a standard shakeout.** There is nothing to protect, so there is nothing to score.
  * ⛔ Do not reintroduce it as a preference; it was measured and ruled on.
  *
- * Same-sport easy sessions on back-to-back days. ⚠️ SPREAD, NOT SEPARATION — this is what stops an
- * athlete's three easy runs landing Fri/Sat/Sun with Tuesday empty. It is shape, not law.
+ * ⛔⛔ AND `clustering` IS GONE TOO (stage 2, 2026-08-21) — ABSORBED, NOT DELETED. It counted
+ * back-to-back same-sport days between units whose sessions were **all `easy`**, which made a hard
+ * Tuesday invisible to it and let `runs Mon-Tue-Wed` score zero. `sportAdjacency` below counts the
+ * same thing with the load filter removed, so every case `clustering` caught is still caught and the
+ * ones it missed now are too. ⚠️ Its NAME is why nobody looked further for three months — the
+ * obvious word was taken by something narrower. Do not reintroduce a second spread term under a
+ * third name.
  */
-function clustering(placements: Placement[]): number {
-  let n = 0;
-  const easy = placements.filter((p) => p.unit.sessions.every((s) => s.load === 'easy'));
-  for (const a of easy) {
-    for (const b of easy) {
-      if (a === b) continue;
-      const sportA = a.unit.sessions[0].sport;
-      if (sportA && sportA === b.unit.sessions[0].sport && (b.day - a.day + 7) % 7 === 1) n++;
-    }
-  }
-  return n;
-}
 
 /**
  * ⛔ A LONG EFFORT PREFERS THE WEEKEND — AND THIS IS AVAILABILITY, NOT PHYSIOLOGY (2026-08-18).
@@ -387,24 +420,63 @@ function longDoubles(placements: Placement[]): number {
 }
 
 /**
- * ⛔ THE DISCIPLINES INTERLEAVE — the runs do not take a contiguous block and leave the rides the
- * scraps. This is the old engine's alternator, kept as a SHAPE term rather than as a pass of its own.
+ * ⛔⛔ CONSECUTIVE SAME-SPORT DAYS, COUNTED CYCLICALLY — THE MEASURE THAT WAS MISSING (stage 2,
+ * 2026-08-21). Evidence: §1 of `docs/REPORT-session-structure-and-clumping-2026-08-20.md`.
  *
- * ⚠️ IT MEASURES THE OUTCOME, NOT THE ALGORITHM: how many of a sport's sessions sit inside the span
- * of another sport's. An interleaved week scores high; "runs Mon-Wed, rides Fri-Sat" scores zero and
- * loses. ⛔ It is a preference and sits far below the law — it can only choose between legal weeks.
+ * **The defect.** The week came out `runs Mon-Tue-Wed, rides Fri-Sat` and the resolver did not
+ * prefer the alternating week over it. Not "preferred it weakly" — the report ran the real scorer
+ * and **every term in the vector came out the same, 54 against 54**:
+ *
+ * ```
+ * as built     runs [Mon,Tue,Wed,Sun]  rides [Fri,Sat]   interleaving 2  clustering 0  SCORE 54
+ * alternating  runs [Mon,Wed,Fri,Sun]  rides [Tue,Sat]   interleaving 2  clustering 0  SCORE 54
+ * ```
+ *
+ * ⛔ SO THERE WAS NOTHING TO TUNE. Which week an athlete got was decided by enumeration order.
+ *
+ * **Why the two terms that looked like they covered it did not.**
+ *   • `interleaving` asked *"is one sport bracketed by the other"*. A week with an easy run early
+ *     and the long run on Sunday answers YES for every ride placement except Monday and Sunday, so
+ *     the clumped week scored the maximum. It measured a span, and clumping is about NEIGHBOURS.
+ *   • `clustering` only saw units whose sessions are **all** `easy`. Tuesday's hard session made
+ *     Mon-Tue-Wed invisible to it. ⚠️ Its name is why nobody looked further.
+ *
+ * ⛔ BOTH ARE ABSORBED INTO THIS, NOT LEFT BESIDE IT — the report's own instruction, and the reason
+ * is this file's founding rule: *three terms all trying to say "spread the disciplines", two of them
+ * measuring something they do not mean, is the doubled disease.* `clustering` is a strict subset of
+ * what this counts (same sport, back-to-back, cyclic) with the load filter removed;
+ * `interleaving`'s intent is what this states directly.
+ *
+ * **What it counts:** for each sport, the DAYS carrying at least one endurance session of it, then
+ * the cyclically adjacent pairs among those days. Per day, not per session — two runs on one
+ * Tuesday is one run-day, and `sameSportDoubles` is the term that owns that case.
+ *
+ * ```
+ * as built     runs {Mon,Tue,Wed,Sun} rides {Fri,Sat}  ->  (Mon,Tue)(Tue,Wed)(Sun,Mon)(Fri,Sat) = 4
+ * alternating  runs {Mon,Wed,Fri,Sun} rides {Tue,Sat}  ->  (Sun,Mon)                            = 1
+ * ```
+ *
+ * ⚠️ CYCLIC, because the week repeats. Sunday into Monday is back-to-back training however the
+ * calendar is drawn, and a term blind to the wrap would rate `Sat-Sun-Mon` as two separate singles.
+ * The same shape `stressorStreakExcess` already uses, one field over.
  */
-function interleaving(placements: Placement[]): number {
-  const daysOf = (sport: string) => placements
-    .filter((p) => p.unit.sessions.some((s) => s.sport === sport
-      && isEndurance(s.load)))
-    .map((p) => p.day).sort((a, b) => a - b);
-  const runs = daysOf('run');
-  const rides = daysOf('bike');
-  if (runs.length < 2 || rides.length === 0) return 0;
-  const lo = runs[0], hi = runs[runs.length - 1];
-  return rides.filter((d) => d > lo && d < hi).length;
+export function sportAdjacency(placements: Placement[]): number {
+  const daysBySport = new Map<Sport, Set<number>>();
+  for (const p of placements) {
+    for (const s of p.unit.sessions) {
+      if (!s.sport || !isEndurance(s.load)) continue;
+      const set = daysBySport.get(s.sport) ?? new Set<number>();
+      set.add(p.day);
+      daysBySport.set(s.sport, set);
+    }
+  }
+  let n = 0;
+  for (const days of daysBySport.values()) {
+    for (const d of days) if (days.has((d + 1) % 7)) n++;
+  }
+  return n;
 }
+
 
 export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Resolution {
   const minRest = opts.minRestDays ?? 1;

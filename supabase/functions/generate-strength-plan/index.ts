@@ -15,6 +15,19 @@ import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMax
 import { describeThresholdBasis, resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+/**
+ * ⛔ THE RIDE-COUNT RULE HAS ONE OWNER NOW (stage 4, 2026-08-21). This file held its own
+ * `Math.min(3, …)` — the range was raised to 4 on 2026-08-19 in the composer (twice) and in
+ * `create-goal-and-materialize-plan`, and THIS copy was missed. An athlete who tapped `4` had it
+ * rewritten to `3` here, silently, one hop after the validator that had just accepted it.
+ * See `_shared/athlete-weekly-intent.ts`.
+ */
+import {
+  normalizeRideDays,
+  normalizeRideHours,
+  RIDE_DAYS_DEFAULT,
+  RIDE_HOURS_DEFAULT,
+} from '../_shared/athlete-weekly-intent.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,6 +66,37 @@ Deno.serve(async (req: Request) => {
     } = body as Record<string, unknown>;
 
     if (!user_id) return json({ success: false, error: 'user_id is required' }, 400);
+
+    /**
+     * ⛔ THE RIDE ASK, NORMALISED AT THE DOOR AND ANNOUNCED WHEN IT FALLS BACK (stage 4,
+     * 2026-08-21). §2.0 of `REPORT-session-structure-and-clumping-2026-08-20.md` measured THREE
+     * independent "default to 2" clauses on this chain and **only one of them logged when it
+     * fired** — so a dropped answer never appeared as missing, it appeared as a plausible plan
+     * built on a number nobody chose. This is the second of the three learning to speak.
+     *
+     * ⚠️ IT ANNOUNCES, IT DOES NOT SUBSTITUTE. The default itself is applied in exactly one place
+     * (the composer's `rideIntent`); absent is forwarded as absent. A door that filled the gap in
+     * would be the fourth clause.
+     */
+    const rideDaysAsked = normalizeRideDays(
+      bike && typeof bike === 'object' ? (bike as Record<string, unknown>).days : undefined,
+    );
+    const rideHoursAsked = normalizeRideHours(
+      bike && typeof bike === 'object' ? (bike as Record<string, unknown>).hours : undefined,
+      target_weekly_ride_hours,
+    );
+    const rideDeclared = !!bike || rideHoursAsked != null;
+    if (rideDeclared) {
+      const fellBack: string[] = [];
+      if (rideDaysAsked == null) fellBack.push(`ride days -> ${RIDE_DAYS_DEFAULT}`);
+      if (rideHoursAsked == null) fellBack.push(`ride hours -> ${RIDE_HOURS_DEFAULT}`);
+      if (fellBack.length > 0) {
+        console.log(
+          `[strength-plan] the athlete kept a bike and one of their answers did not arrive — ` +
+          `falling back to OUR number for: ${fellBack.join(', ')}`,
+        );
+      }
+    }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -329,18 +373,19 @@ Deno.serve(async (req: Request) => {
       })(),
       fiveKPaceSecPerMi: fiveKResolved.sec_per_mi,
       // Bike hours (D-323 §6) — hours, never miles. Used on the bike-PRIMARY path.
-      targetWeeklyRideHours: Number(target_weekly_ride_hours) > 0
-        ? Number(target_weekly_ride_hours) : undefined,
+      // ⚠️ `?? undefined`, not `?? 0` — absent must stay absent all the way to the composer, which
+      // is the only place a default for it may be applied (and it says so when it does).
+      targetWeeklyRideHours: rideHoursAsked ?? undefined,
       // ⛔ THE BIKE ALONGSIDE THE RUN. Validated here rather than trusted: a malformed block is
       // treated as absent, because a bike the composer cannot place is worse than no bike.
       bike: bike && typeof bike === 'object'
         ? {
-            hours: Number((bike as Record<string, unknown>).hours) > 0
-              ? Number((bike as Record<string, unknown>).hours) : undefined,
+            hours: normalizeRideHours((bike as Record<string, unknown>).hours, undefined) ?? undefined,
             longRideDay: typeof (bike as Record<string, unknown>).long_ride_day === 'string'
               ? (bike as Record<string, unknown>).long_ride_day as string : undefined,
-            days: Number((bike as Record<string, unknown>).days) >= 1
-              ? Math.min(3, Math.round(Number((bike as Record<string, unknown>).days))) : undefined,
+            // ⛔ ONE STATEMENT OF THE 1-4 RANGE. The `Math.min(3, …)` that stood here is the whole
+            // reason `_shared/athlete-weekly-intent.ts` exists — see the import at the top.
+            days: normalizeRideDays((bike as Record<string, unknown>).days) ?? undefined,
           }
         : null,
       // ⛔ THE ATHLETE'S ASSISTANCE PICKS — TWELVE NOW, NOT THREE (D-407). Passed through RAW and

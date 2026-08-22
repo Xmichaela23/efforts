@@ -64,7 +64,10 @@ export const SESSION_PRIME_MOVER: Record<MatrixSessionKind, 'leg' | 'upper' | 'n
 /**
  * ⛔ `LEG_QUALITY_KINDS`, `LEG_LONG_KINDS` and `isLegLoadedAtIntensity` were DELETED 2026-07-27.
  * They are the adjacency table's `lower_body_strength` row and nothing more — read it there.
- * Verified zero importers at deletion; `place-week`'s `requiredClearanceHours` now reads the table.
+ * Verified zero importers at deletion; `place-week`'s `requiredClearanceHours` read the table from
+ * then on. ⚠️ THAT WRAPPER IS ITSELF GONE NOW (stage 5, 2026-08-21) — deleted with the old placer.
+ * Every reader comes straight to `requiredAdjacencyHours`, and the assertions that used to reach
+ * this table through the wrapper live in `schedule-session-constraints.clearances.test.ts`.
  *
  * The two facts worth keeping from them:
  *   • `long_ride` was dropped from the 48h list because THIS FILE CONTRADICTED ITSELF — `ROWS` said

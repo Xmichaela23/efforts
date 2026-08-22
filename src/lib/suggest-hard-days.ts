@@ -13,6 +13,13 @@
  */
 import { type Session, type Unit, buildUnits, DAY_NAMES } from '@shared/week-model/model.ts';
 import { type Placement, resolve, restDaysOf, unmetNeeds } from '@shared/week-model/resolve.ts';
+/**
+ * ⛔ THE EASY-SESSION SUBTRACTION IS THE COMPOSER'S, NOT A COPY OF IT (stage 4, 2026-08-21). This
+ * file held its own `total - long - hard`, which is the same rule the block builder applies — and
+ * this file's own header forbids a second opinion about the athlete's week. They happened to agree;
+ * nothing made them.
+ */
+import { easySessionsWanted } from '@shared/athlete-weekly-intent.ts';
 
 /** Lowercase weekday, the shape the wizard stores. */
 export type WizardDay =
@@ -107,11 +114,16 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
   long('lr', 'Long Run', 'run', input.longRunDay, hasRun);
   long('lb', 'Long Ride', 'bike', input.longRideDay, hasRide);
 
+  // ⚠️ THE `n <= 0` GUARD IS THIS FILE'S OWN AND STAYS. Zero here means *"the athlete has not
+  // answered yet"* — the wizard's counts start at 0 and the card renders before anything is picked
+  // — so the week must show no easy sessions rather than a default number of them. That is the
+  // opposite of what the wire door does with the same 0, and deliberately so: a half-filled screen
+  // is not a built plan.
   const easyCount = (total: number | null | undefined, sport: 'run' | 'bike', hasLong: boolean) => {
     const n = Number(total);
     if (!Number.isFinite(n) || n <= 0) return 0;
     const hard = slots.filter((h) => h.discipline === sport).length;
-    return Math.max(0, Math.round(n) - (hasLong ? 1 : 0) - hard);
+    return easySessionsWanted(Math.round(n), hasLong, hard);
   };
   const easyRuns = easyCount(input.runDays, 'run', !!DAY_INDEX[String(input.longRunDay ?? '').toLowerCase()]);
   const easyRides = easyCount(input.rideDays, 'bike', !!DAY_INDEX[String(input.longRideDay ?? '').toLowerCase()]);

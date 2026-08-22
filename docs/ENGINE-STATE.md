@@ -23,230 +23,125 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-20 — **stage 1 of the six-stage swap plan is BUILT, NOT PUSHED.** Your job is STAGE 2. One banner, owned by ONE chat.)
+## 🧭 NEXT SESSION — START HERE (2026-08-21 — **stages 2, 3, 4 (rides) and 5 are BUILT, NOT PUSHED. Your job is STAGE 6, the last one.** One banner, owned by ONE chat.)
 
-### ⛔ THE PLAN YOU ARE IN
+### ⛔ FIRST: FOUR STAGES OF UNPUSHED WORK ARE IN THE TREE AND NONE IS YOURS TO REDO
 
-`docs/WORKORDER-finish-the-swaps-2026-08-20.md` — **six stages, one terminal session each, in
-order.** Its evidence is `docs/REPORT-session-structure-and-clumping-2026-08-20.md`. Read the work
-order first; it is the sequence, not the findings.
+`docs/NOTES-stage2-sport-adjacency-2026-08-21.md` · `docs/NOTES-stage3-wizard-latency-2026-08-21.md`
+`docs/NOTES-stage4-ride-intent-2026-08-21.md` · `docs/NOTES-stage5-delete-the-dead-engines-2026-08-21.md`
 
-**Stage 1 is done and its notes are `docs/NOTES-stage1-session-wrapper-2026-08-20.md`.**
-⛔ **PUSHED — yes (`024d9152`). DEPLOYED — yes (2026-08-21, `generate-strength-plan` + `materialize-plan`). VERIFIED ON A DEVICE — no.** What would settle it is §9 of the stage 1 notes; it needs a NEW block built.
+All four are **BUILT, NOT PUSHED, NOT DEPLOYED, NOT VERIFIED ON A DEVICE.**
 
-### YOUR JOB — STAGE 2: THE SPORTS STOP CLUMPING
+- **Stage 4 (rides).** `_shared/athlete-weekly-intent.ts` owns the ride ask; nine ride names gone from
+  the composer; all five hops wired. Sweep: 0 of 61.
+- **Stage 5.** ⛔ *"No dropping sessions. Always build the week the athlete asked for and tell them what
+  it costs."* The hard-day yield loop is DELETED; thirteen dead branches gone; `place-week.ts` cut
+  436→126 lines. Sweep: 0 of 61.
+- **Stage 2.** `sportAdjacency` replaces `interleaving` and `clustering`. **58 of 61 moved, 51
+  improved, 0 worsened, 0 rest days lost**; adjacency 1419→471 across 732 week-instances.
+- **Stage 3 + three rulings.** The wizard solve is gated and deferred; the Q-215 double-solve is
+  deleted (and a third redundant solve with it); both remaining ride pickers raised to 4;
+  `RIDE_HOURS_DEFAULT` documented to Viada p239. Sweep: 0 of 61.
 
-The week builds three runs Monday-Wednesday, then two rides Friday-Saturday. The term meant to
-prevent that **scores a clumped week and a perfectly alternating week identically — 54 against 54,
-every term in the vector the same.** The winner is decided by enumeration order.
+### ⛔ THE THING STAGE 3 COULD NOT VERIFY, AND IT IS THE FIRST DEVICE CHECK OWED
 
-**The three facts you need to start:**
+Every stage-3 change except the Q-215 deletion lives in React, and **React does not run in this
+repo.** The tap-paints-first behaviour, the schedule card's first paint, and the long-day lock are
+asserted at the SOURCE and never executed.
 
-1. `interleaving()` (`_shared/week-model/resolve.ts:397`) asks *"is one sport bracketed by the
-   other"*. A week with an easy run early and the long run on Sunday answers YES to every ride
-   placement except Monday and Sunday, so it fires at full strength on a fully clumped week.
-2. ⚠️ **`clustering()` LOOKS LIKE IT ALREADY COVERS THIS AND DOES NOT** — it only sees back-to-back
-   days between units whose sessions are ALL `easy` and the same sport, so a hard Tuesday is
-   invisible to it. ⛔ **Read both before writing a third; the obvious name is taken by something
-   narrower.**
-3. The measure that separates them is **cyclic adjacent same-sport days** — measured at **4 against
-   1** between the two weeks, which at weight 6 is 30 against 48.
+⛔ **The check:** keep run + bike, four runs, two rides, two hard days, and tap the ride-count chip on
+the VOLUME step. It should be instant. **It was 922 ms on a desktop** before this stage — three to
+five times that on a phone — for a suggestion nobody reads until two screens later.
 
-⛔ **WEIGHT IT BELOW THE DAY OFF.** The ordering ruled on 2026-08-19 is `overCap 60` > `blank 40` >
-`lockedDayExtras 24 + crowding 6`. A spread term that outbids 40 starts eating rest days — the exact
-mistake made and caught that day. Moving one session into a blank day can remove at most 2
-adjacencies, so the term must satisfy `2w < 40`.
+### ⛔ WHAT THE OTHER STAGES CHANGED THAT YOU WILL TRIP OVER
 
-**Gate:** the sweep. Say how many of the 61 moved and show one before/after.
+- **`interleaving` and `clustering` no longer exist** — anything reaching for them wants
+  `sportAdjacency`. `score` and `sportAdjacency` are EXPORTED for tests: measure against the real
+  scorer, do not copy the file the way the trace report had to.
+- ⛔ **`sportAdjacency` is weighted 4, and 5 breaks the barbell week** (measured). Do not re-open the
+  weight war without new evidence.
+- **The composer runs exactly ONE solve now.** The lift-only pre-solve and the Q-215 second solve are
+  both gone; `flexibleAvoid` is inert and always was.
+- **`solveWithWeekModel` returns `WeekModelResult`** — `status === 'unsolvable'` no longer compiles
+  against that adapter.
+- **`place-week.ts` places nothing**; **the ride ask is `rideIntent`**; **`steps_preset[0]` is the
+  warm-up, not the work.**
+- ⚠️ **The two `taken={{}}` rows in `NonRaceBuilder` disagree ON PURPOSE.** The long-day rows lock; the
+  hard-day row does not, and that is a ruling with a test guarding it. Do not "make them consistent".
 
-### ⛔ WHAT STAGE 1 CHANGED THAT YOU WILL TRIP OVER
+---
 
-- **`steps_preset[0]` IS NOW THE WARM-UP, NOT THE WORK.** Every quality session is
-  `[warmup, work, cooldown]`. Six test files were updated for this and use a `workTokenOf` helper;
-  copy it rather than indexing 0.
-- **A session builder can no longer state a duration.** It declares a core and spreads
-  `...wrapped.fields` from `shared/strength-system/quality-session.ts`.
-- **The sweep now needs `--no-check`** and asserts budget-equals-built on every session of every
-  week. `~/.deno/bin/deno run --no-check --allow-read --allow-write scripts/dump-plans.ts`.
-  ⛔ **It exits non-zero on a violation. If it goes red, that is you.**
-- Stage 1 moved **40 of 61 shapes**, all of them hard-session durations. **Zero easy or long
-  sessions moved.** Stage 2 is a PLACEMENT change and should move different shapes for different
-  reasons — if you see a hard session's duration move, something is wrong.
+## YOUR JOB — STAGE 6: DOES THE APP STILL SAY WHEN IT HAD TO COMPROMISE
 
-### ⚠️ ONE PRE-EXISTING RED TEST, AND IT IS NOT YOURS
+`docs/WORKORDER-finish-the-swaps-2026-08-20.md` stage 6. Evidence:
+`docs/REPORT-session-structure-and-clumping-2026-08-20.md` §2.3 — **and read the correction below
+before you trust it.**
 
-`_shared/anchor-resolver-lint.test.ts` **fails on a clean tree** — `lthr::src/components/TrainingBaselines.tsx`
-reads an anchor raw and is not on the ledger. Verified pre-existing by stashing. It matters because
-the item 5 claim below says that ledger "MAY ONLY SHRINK and the test enforces it" — **the test is
-red, so it is enforcing nothing.** Nobody has claimed it.
+### ⛔ THE REPORT'S PREMISE IS HALF WRONG, AND STAGE 5 MEASURED IT
 
-### ⛔ STILL OWED FROM BEFORE THE SWAP PLAN
+§2.3 says *"THE ENTIRE COMPROMISE CHANNEL IS SILENT — MEASURED, 61 OF 61."* **True of the sweep,
+false of the space.** Stage 5 built 10,976 shapes by hand: **10,080 carried a compromise.** The breach
+channel is loud and correct. The 61 sweep shapes simply contain no crowded week — every one places
+its long and hard days sensibly.
 
-- **The Strong Focus intake acceptance pass** — the matrix at the top of `POLISH-PUNCH-LIST.md`.
-- **`analyze-running-workout`** — 5,002 lines, zero test files. Two defects found in passing, one
-  live by code trace: a memory-saving step blanks `computed.best_efforts` / `power_curve` /
-  `raw_laps` in memory (`:585`) and a rare legacy duration-repair path writes that same object back
-  to the DB (`:2146`). ⚠️ **Hypothesis, not a finding** — it fires only when `duration_s_moving` is
-  off by ≥3× and has not been observed.
-- **Docs:** DECISIONS-LOG / OPEN-QUESTIONS / TRUTH-MAP / CAPABILITY-MAP entries for the 08-19 and
-  08-20 work are NOT written. Michael is deliberately keeping doc overhead low; this banner and the
-  per-stage notes are the record until then.
+⛔ **So do not build your over-subscribed week out of the sweep.** Use anchor shapes with the long
+run, long ride and hard days on colliding or near-colliding days; `docs/NOTES-stage5-...` has the
+probe shapes and the breach tally.
 
-### ⛔ WHAT SHIPPED 2026-08-20 — PUSHED + DEPLOYED (30 functions), NOT VERIFIED
+### What is genuinely still unobserved
 
-**Nothing from the 2026-08-20 pace-truth job has been seen working on a device.** Thirty edge
-functions are live and every claim below is code-traced and fixture-backed — not verified.
+1. **The ride-shortfall note.** ⚠️ Its mechanism is gone: stage 5 found the reduction ladder in
+   `solveWithFlexible` was a `for` loop that always returned on the first pass, and the note depended
+   on it. It was **left in place deliberately for you** — deleting it as well would remove the only
+   thing that could ever tell an athlete a session did not fit. **Decide: make it reachable, or
+   delete it and say the engine never drops a session.** ⛔ The second reads on Michael's stage 5
+   ruling; the first does not, because nothing drops.
+2. **The no-rest-day note.** Stage 2 measured 0 of 61 shapes losing a blank day, so this has no
+   observed firing either.
+3. **The hard-day yield note** is gone for good — nothing yields (stage 5 ruling).
 
-Commit `3966bd2f`. Read it — the message is the record, and it names every file.
+**Do:** build one deliberately over-subscribed week by hand and see whether it speaks. If it does not,
+find out why. `D-325 §7` is *state the cost, never refuse* — and after stage 5 the engine never
+refuses, so the whole doctrine now rests on the stating.
 
-1. **The bound** (`src/lib/run-threshold-from-easy.ts`). An INFERRED threshold must sit in the band a
-   MEASURED easy pace implies — `easy ÷ 1.19`, ±4% — and still be faster than easy. Ratio measured off
-   the app's own `PACE_TABLE` (1.1880–1.1961, 0.69% spread); tolerance is the existing
-   `RUN_PACE_DIVERGENCE_THRESHOLD`, now **exported** from `generate-combined-plan/science.ts` rather
-   than copied. ⛔ Bounds inferences ONLY — never a measurement, never a number the athlete typed.
-2. **The measurement** (`src/lib/run-critical-speed.ts`). Threshold FITTED from best efforts at
-   3/6/12/20/35 min — the run twin of the bike's power curve and the swim's CSS fit. Six gates, all
-   abstaining: 92% of threshold HR, ≤1% net descent, ≥2 duration bands, monotonic, R² ≥ 0.95, faster
-   than measured easy. New tier in the learner ABOVE the whole-activity averaging read; the old tiers
-   stay under it. ⚠️ **NO BACKFILL (Michael's call)** — needs 2 hard efforts in different bands before
-   it publishes anything.
-3. **The three states** (`describeThresholdBasis`). measured · worked out from your easy pace · worked
-   out from your 5K · you entered this · not enough data. The baselines card used to VANISH when the
-   learner abstained, so "not enough data" was silence.
-4. **The 5K retest flag** (`buildFiveKNudge`). Was silent in the direction that matters — a typed 5K
-   FASTER than the training data returned `should_prompt: false`. Also starved (needed a MEASURED
-   threshold, the value that abstains) and used a flat `0.82` 5K:threshold ratio that is 0.96 at vdot
-   30. Now bidirectional, resolver-fed, computed through `estimateVdotFromPace` + `getTargetTime`.
-5. **One owner per anchor.** `_shared/anchor-resolver-lint.test.ts` — 49 raw readers found and frozen;
-   **now 32 (26 legitimate, 6 swim).** The ledger MAY ONLY SHRINK and the test enforces it.
-6. **Per-sport heart rate.** `resolveCurrentLthr` gained a `sport` option (the pattern
-   `resolve-current-max-hr` already set). The bike had no owner and three private chains.
-7. **Per-sport HR ZONES, and this mattered most.** One `zones` array built from `runLTHR || rideLTHR`
-   was **priority 1 in `compute-workout-analysis` for every sport**, above every resolver. Rides were
-   binned against RUNNING zones — threshold work counted as tempo, and the time-in-zone the 80/20 read
-   rests on was wrong for the bike.
-8. **The bike learns its threshold.** Verified on the real account: 20 rides, high-confidence max HR,
-   **ZERO** threshold candidates, and `90% of observed max (estimated)` published at `sample_count: 0`.
-   The filter needed a WHOLE RIDE to average 85–95% of max, which real riding never does. The effort
-   was already identified — `power_curve['20min']` is what FTP comes from — so the power curve now
-   carries the HR **during** each window. ⚠️ No backfill: needs new rides.
+⚠️ **Stage 5 rewrote the tight-week disclosure** (`tightWeekCompromises`) and it DOES fire — pinned in
+`shared/strength-system/hard-day-no-yield.test.ts`. That is the half that works; the two notes above
+are the half that does not.
 
-### ⚠️ WHAT IS TRUE ABOUT THE SHARED HR FIELD — read this exactly as written
+**Gate: the sweep. Say how many of the 61 moved and why.**
+`~/.deno/bin/deno run --no-check --allow-read --allow-write scripts/dump-plans.ts`
 
-**`configured_hr_zones.threshold_heart_rate` is CLOSED FOR READERS, OPEN AS A DATA MODEL.**
+### ⚠️ FOUR PRE-EXISTING RED TESTS, AND NONE ARE YOURS
 
-- **Closed for readers:** nothing bike-related touches it. `resolveCurrentLthr` refuses it for
-  `sport: 'ride'`, and `compute-workout-analysis` prefers `zones_ride`.
-- **OPEN as a model:** `TrainingBaselines.tsx` **still writes it**. It is now written only when ONE
-  sport has an anchor (so it cannot be the wrong sport's), but the field is still there, still filled
-  from the run number in the single-sport case, waiting for the next thing that trusts it.
-- ⛔ **Do not shorten this to "closed."** The next session reads "closed" and stops looking. The real
-  fix is the WRITER emitting per-sport fields only — not a guard on a reader.
+`_shared/anchor-resolver-lint.test.ts` (`lthr::TrainingBaselines.tsx` off the ledger),
+`src/lib/club-anchor.test.ts` ×1, `src/lib/non-race-goal-seeds.test.ts` ×2. All stash-verified.
 
-### ⚠️ UNVERIFIED — and what would settle each
+⚠️ **The client suite does not run here.** `npx vitest run` fails on all 363 files. `deno test src/`
+runs 720 of them; anything importing `@shared/*` runs under neither, and React components under
+neither. **If your change lands in that gap, say so — do not claim coverage.**
 
-| claim | how to settle |
-|---|---|
-| Michael's threshold now reads ~10:34/mi, basis "worked out from your easy pace" | open Baselines → Run after the next Garmin/Strava ingest |
-| The bike HR card drops from a false 158 to an age estimate, then to a measured value | open Baselines → Cycle; then again after 2 rides with a 20-min effort |
-| Rides bin against ride zones | any new ride's analysis; the log line now names `zones_ride` vs `zones` |
-| The retest flag fires on the stale 5K | Baselines → Run, the 5K nudge |
-| The `analyze-running-workout` null-write | **hypothesis only.** Needs a workout with `duration_s_moving` ≥3× off |
+### ⛔ HOW YOU CLOSE — AND `CLAUDE.md` CONTRADICTS THIS, SO READ IT
 
-### ⛔ STILL OWED, UNCHANGED
+**`CLAUDE.md` says "the user does NOT deploy… `git push origin main`." ⛔ OVERRIDDEN.** Work order
+rule 8: **edits are free; commit, push and deploy WAIT FOR HIM. Every time.**
 
-- **The Strong Focus intake acceptance pass** — the matrix at the top of `POLISH-PUNCH-LIST.md`.
-- **`AthleteWeeklyIntent` refactor** — nine variables for "how many rides did the athlete ask for".
-- **Docs:** DECISIONS-LOG / OPEN-QUESTIONS / TRUTH-MAP / CAPABILITY-MAP entries for the above are NOT
-  written. Michael is deliberately keeping doc overhead low; this banner is the record until then.
+**What you owe:**
+1. **Your own dated notes file in `docs/`.**
+2. **Replace this banner.** ⚠️ Stage 6 is the LAST stage — the next banner is the one that hands over
+   four stages of unpushed, undeployed, unverified work and the device checks each is waiting on.
+   Make that list complete and make it the first thing on the page.
+3. **Report the three states separately — never "shipped":** pushed · deployed · verified on a device.
+4. **Say what the sweep did.**
+5. **Mutation-test every new test**, and when a mutant SURVIVES write down whether the test was weak
+   or the mutant equivalent. ⚠️ Stage 2 had three tests survive their first draft — one had a weight
+   of **100** passing a test whose only job was bounding the weight.
+6. ⚠️ **Docs are deliberately light.** A `D-NNN` only for a real decision.
 
-### ⛔ DELIBERATE GAPS — do not "fix" these
+### ⚠️ THE PRODUCT DIRECTION BEHIND ALL OF THIS
 
-- **Swim has no resolver and is not getting one.** Six ledger entries. The reason is DATA QUALITY, not
-  priority: pool distance comes from wrist-motion turn detection, open-water distance is interpolated
-  between surfacing strokes, and optical HR is unreliable wet. `swim-css-learner.ts` already carries
-  five gates — that is evidence of how dirty the input is, not a template to extend.
-- **Wrist optical HR can cadence-lock** and feed a jog into the run fit as a hard effort. The monotonic
-  and R² gates would *probably* catch the result. **Unproven** — worth a cadence-lock-shaped fixture.
-- **The typed 5K has no honest date.** `effort_updated_at` is refreshed by a recompute, so it dates the
-  recompute. If added, it must be a RACE date the athlete enters, not an auto-stamp — an auto-stamp
-  calls a 2019 PB fresh, which is worse than no date.
-
-### ⛔ WHAT SHIPPED 2026-08-19 — DO NOT RE-LITIGATE
-
-Nine commits, `141e0e6c` → `e3968435`. **Full detail, with per-item verification state, is PART 1 of
-the handoff doc.** The short version:
-
-- **The scheduler counts STRESSORS, not calendar days or placements** (`dc916b56`). `upper` and
-  `easy` are not stressors — that is the unlock. Weight ordering is a ruling: `overCap 60` > `blank
-  40` > `lock 24 + crowding 6`. Gap-filling buys 30 and the day off costs 40, so a press moves into a
-  dead zone ONLY when the alternative is a capped day. ⛔ No `COST` cell moved; Layer 1's 18 tests
-  still pass. 3 of 61 shapes changed. **DEPLOYED** (`generate-strength-plan`).
-- **The High intensity row could not be opened** (`6386df81`). One expression held both the DEFAULT
-  rule and the CHOICE rule; `!== 'hard'` refused a deliberate tap, so neither hard session's day
-  picker was reachable from the Schedule step. Split into `src/lib/schedule-ask.ts`. **VERIFIED by
-  Michael on screen** — both pickers now reachable and independently settable.
-- **The week grid hid the days of the week** (`adbeba56`). Day names were dimmer than the rest-day
-  dash. **VERIFIED by Michael.**
-- **The ride shortfall note was FALSE on 27 of 61 shapes** (`76e66f4a`). `wantDays` counted the hard
-  ride, `rideDays` did not. Also capped the fill loop, so the inflated ask could build a FOURTH ride.
-  **DEPLOYED** (`generate-strength-plan`).
-- **The paired lift day leaked both main lifts into the accessory line** (`76e66f4a`, client only).
-- **Threshold pace slower than easy now publishes nothing** (`fe0d8b0f`). **DEPLOYED**
-  (`learn-fitness-profile`). ⚠️ The stored bad value does not correct until the learner runs again —
-  next Garmin/Strava ingest.
-- **Docs: four ghost-clearing commits.** `CLAUDE.md` named the WRONG scheduler as sole authority
-  (`36d8283a`), both `SCHEDULING-RULES*.md` now say which engine they describe (`4d869eac`),
-  `CAPABILITY-MAP` cited six files that do not exist (`965cad3a`), `SPEC-week-solver` said "not
-  built" (`141e0e6c`).
-
-### ⚠️ WHAT IS UNVERIFIED, AND WHAT WOULD SETTLE IT
-
-⛔ **THE STRONG FOCUS INTAKE ACCEPTANCE PASS IS STILL OWED** — 61 commits from 2026-08-18/19, four
-edge functions live, and the matrix at the top of `POLISH-PUNCH-LIST.md` is still mostly unrun. Items
-1-4 were partly walked today. **Settled by:** building a block and tapping through it.
-
-⚠️ **Four of today's six code fixes have not been seen on a screen** — the solver's new week shape,
-the ride note, the accessory line, and the threshold abstention. **Settled by:** one built block.
-
-⚠️ **THE SOLVER'S CAP AND STREAK TERMS ARE DORMANT.** They never fire on any shape the composer can
-emit — the three-day Wendler structure never puts three stressors on one day. Their arithmetic is
-pinned by direct unit tests; their WEIGHTS are not, and nothing would catch a future retune. Accepted
-deliberately; the composer's own limits are the wall.
-
-⚠️ **THE RIDE SHORTFALL NOTE MAY NOW BE UNREACHABLE.** Across the sweep and six hand-built
-over-subscribed weeks, every shape builds every ride day asked for. Not deleted — an invariant test
-guards it: whenever it fires, the number must match the calendar.
-
-### ⛔ MUTATION-TEST ANY NEW TEST BEFORE BELIEVING IT
-
-**Two of today's three new test files were VACUOUS on the first pass and passed anyway.** The solver
-tests passed with every new weight zeroed (`crowding` and Layer 1 were already producing the asserted
-outcome); a threshold-pace guard was written, and mutation showed removing it broke nothing because
-it was unreachable behind the filter in front of it. Both were rewritten. **A test that passes with
-the code deleted is not evidence.**
-
-### THE QUEUE AFTER THE PACE JOB (Michael-approved, none urgent)
-
-1. **The `AthleteWeeklyIntent` refactor**, as its own engineer session. In `strength-primary-plan.ts`
-   the single concept "how many rides did the athlete ask for" exists as NINE variables — `rideDays`
-   15×, `hardRideCount` 8×, `wantDays` 6×, `askedRideDays` 6×, `ridesWanted` 5×, `rideHasLongDay` 5×,
-   `solvedRideDays` 4×, `rideHours` 2×, `bike.days` 1× — plus five more for runs. **Three of today's
-   five bugs were cross-representation errors in that file.** One typed object, computed once at the
-   wizard boundary with hard days already subtracted, read-only downstream. One discipline at a time,
-   61-shape sweep as the gate. ⛔ Not a rewrite.
-2. **Running best-effort (critical speed) fit** — the durable answer to the pace question.
-   `_shared/swim/swim-css-learner.ts` already does exactly this for swimming, abstention included.
-3. The router session (Q-267 core), Slice b auto-recalibrate, the logger colour pass — all still open
-   from the 2026-08-13 banner below.
-
-### ⛔ THE PATTERN WORTH CARRYING FORWARD
-
-**Four of today's five bugs were the same shape: code comparing two different representations of one
-concept.** Ride days counted two ways. Crowding counting placements while meaning stressors. An
-accessory filter matching a joined name against individual lifts. One expression holding both a
-default rule and a choice rule. The fifth was a derived value with **no invariant** — nothing asserted
-that threshold is faster than easy. **A guard fixes one case; an invariant makes a class impossible.**
+A new base plan — **The Standing Plan** — is going to be built on this engine: *"whatever supports the
+build so we aren't crazy glue and taping it together."*
+⚠️ **Nothing about it is built or specced yet. Do not start on it.**
 
 ## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 

@@ -1,6 +1,24 @@
 # Finish the swaps — the plan, 2026-08-20
 
-Six stages. One terminal session each. They run in order.
+> ## ⛔ RE-ORDERED 2026-08-21 — THE RUN ORDER IS NOW **1 · 4 · 5 · 2 · 3 · 6**
+>
+> **Stage 1 shipped. Stages 4 and 5 now come before 2 and 3.** Michael's ruling: *"whatever supports
+> the build so we aren't crazy glue and taping it together."*
+>
+> **Why.** A new base plan — **The Standing Plan** — is going to be built on this engine, so
+> "finished" now means *fit to build a new composer on*, not just *the eight bugs are closed*.
+> - **Stage 4** must land first: writing a new composer while "how many rides" travels under nine
+>   names bakes that mess into the engine we are calling final.
+> - **Stage 5** must land before or with the new composer: adding one while four dead placement
+>   engines are still reachable makes it six.
+> - **Stages 2 and 3 are deferred, not dropped.** The Standing Plan prescribes which endurance
+>   session sits on which day, so the scorer carries less weight for the base than it did for Strong
+>   Focus. Still needed for pivots and for athlete day-shuffling.
+>
+> ⚠️ **The product direction is not specced and not started.** Nothing in this work order changes
+> except the order. Do not begin new-plan work from this banner.
+
+Six stages. One terminal session each. **They run in the re-ordered sequence above.**
 
 **The evidence for all of it is `docs/REPORT-session-structure-and-clumping-2026-08-20.md`.**
 Read that first. This file is the sequence, not the findings.
@@ -30,7 +48,12 @@ one, and the pick is invisible.
 
 ## The rules, all six stages
 
-1. **Each stage is one terminal session.** Do not start the next one.
+0. ⛔ **THE ORDER IS 1 · 4 · 5 · 2 · 3 · 6** (re-ordered 2026-08-21 — see the banner at the top).
+1. **ONE STAGE AT A TIME. Finish it, stop, write the notes, then take the next instruction.**
+   ⚠️ **Revised 2026-08-21 (Michael): a single terminal may carry several stages** — it does not have
+   to be a fresh session each time. What is NOT optional is the pair above: **one stage at a time,
+   and the notes written before the next one starts.** The notes exist to put facts on disk before a
+   context window loses them; a long-running session needs that discipline MORE, not less.
 2. **Each terminal writes its own notes** — findings, what shipped, what is still unverified — into
    its own dated file in `docs/`. Do not edit another stage's file.
 3. **When your stage ships, replace the banner at the top of `docs/ENGINE-STATE.md`** with the next

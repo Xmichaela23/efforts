@@ -95,16 +95,30 @@ import {
 // ⛔ Placement is NOT this file's job any more. `place-week.ts` owns "what day does the bar go on",
 // reading its clearances from `_shared/schedule-session-constraints.ts` — the same law the race-side
 // optimizer reads. This file states the lifts and the endurance underneath; the solver states the days.
+// ⛔ `placeLiftingWeek` IS NO LONGER IMPORTED (stage 5, 2026-08-21). It was the fallback for a
+// solver status that cannot occur, so the whole second placer came into this bundle for a branch
+// that never ran. What is still imported from that file is types and two constants.
 import {
   type DayName,
   DAYS as PLACEMENT_DAYS,
   type EndurancePin,
   MIN_STACK_GAP_H,
-  placeLiftingWeek,
 } from './place-week.ts';
 import { requiredAdjacencyHours } from '../../_shared/schedule-session-constraints.ts';
-// ⛔ THE OPTIMIZER'S OWN SPACING MEASURE, not a second one. See the run-day ranking below.
-import { easyRunAnchorAdjacencyPenalty } from '../../_shared/week-optimizer.ts';
+/**
+ * ⛔ ONE SHAPE FOR WHAT THE ATHLETE ASKED FOR (stage 4, 2026-08-21). The ride ask used to be eight
+ * separate `const`s derived across 1,900 lines of this file — `hasBike`, `bikeSelected`,
+ * `longRidePin`, `askedRideDays`, `rideHasLongDay`, `ridesWanted`, `wantDays`, `rideHours` — plus a
+ * ninth (`weeklyRideHours`) that resolved the same hours a second way. It is one object now. The
+ * file that owns it carries the full account of what that cost.
+ */
+import { buildRideIntent } from '../../_shared/athlete-weekly-intent.ts';
+// ⛔ `easyRunAnchorAdjacencyPenalty` IS NO LONGER IMPORTED (stage 5, 2026-08-21). It was imported
+// here and NEVER CALLED — the four other mentions in this file are comments recording that the
+// second scorer it belonged to was deleted. The import alone pulled all 2,434 lines of
+// `_shared/week-optimizer.ts` into the strength bundle, for nothing.
+// ⚠️ THE FUNCTION IS NOT DELETED. `week-optimizer` is live on the race/triathlon/combined path and
+// the export has readers there; only this file's dead reference goes.
 // ⛔ STEP 1 OF THE COLLAPSE (SPEC-week-solver §7). Placement now comes from the ONE solver rather
 // than from `place-week`'s filter-and-take-first-legal-answer. `place-week` still owns the
 // arithmetic screens the intake shows; only the PLACEMENT half moved.
@@ -2932,12 +2946,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     const s = String(v ?? '').trim().toLowerCase();
     return (PLACEMENT_DAYS as readonly string[]).find((d) => d.toLowerCase() === s) as DayName ?? null;
   };
-  // ⛔ HOURS FROM EITHER SOURCE COUNT AS "HAS A BIKE" (2026-07-29). A bike-primary athlete whose
-  // hours arrived as `targetWeeklyRideHours` with no `bike{}` object failed this test, so the pass
-  // that turns hours into rides never ran and the fallback emitter handed them 2×45min — 1.5h
-  // against a 6h ask. The gate asked whether an OBJECT was present; the question is whether the
-  // athlete gave us hours.
-  const hasBike = !!args.bike || Number(args.targetWeeklyRideHours) > 0;
+  // ⛔ THE RIDE ASK IS NOT DERIVED ON THIS LINE ANY MORE (stage 4, 2026-08-21). `hasBike` stood
+  // here and seven more ride variables grew out of it over the next 1,900 lines. They are one
+  // object now — `rideIntent`, built once below, AFTER `hardRideCount`, because a hard ride is one
+  // of the picked ride days and that subtraction happens exactly once.
   /**
    * ═══ THE FLOW SETS THE WEEK. THIS FILE DOES NOT SECOND-GUESS IT (2026-08-08) ═══
    *
@@ -2965,7 +2977,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ceiling wearing a different name, and it has now been built and retired twice.
    *
    * ⚠️ WHAT SURVIVED FROM THE INFERENCE PASS is the part that was never about priority: `runSelected`
-   * / `bikeSelected`. A sport the athlete chose must never silently vanish, and knowing which sports
+   * / `rideIntent.selected`. A sport the athlete chose must never silently vanish, and knowing which
    * were chosen is what makes that checkable. Selection needs a POSITIVE signal — `enduranceFrequency`
    * arrives from `create-goal` with a default of 2 even for a bike-only athlete, so reading it as
    * selection invents a sport nobody asked for.
@@ -3146,7 +3158,19 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const hardRideCount = gatedHardDays.filter((h) => h.discipline === 'bike').length;
   const runSelected = enduranceSport === 'run' || askedRunMiles > 0 || !!asDay(args.longRunDay)
     || hardRunCount > 0;
-  const bikeSelected = hasBike || enduranceSport === 'bike';
+  /**
+   * ⛔ THE RIDE ASK, RESOLVED ONCE (stage 4, 2026-08-21). Every ride site below reads THIS.
+   *
+   * Built HERE and not earlier because `seatRideIntent` needs `hardRideCount`: a hard ride is one of
+   * the picked ride days, and the object's contract is that the subtraction is already done by the
+   * time anyone reads it. ⚠️ Nothing above this line needs a ride fact — checked, not assumed.
+   */
+  const rideIntent = buildRideIntent<DayName>({
+    bike: args.bike,
+    targetWeeklyRideHours: args.targetWeeklyRideHours,
+    primaryIsBike: enduranceSport === 'bike',
+    resolveDay: asDay,
+  }, hardRideCount);
 
   const longRunPin = runSelected ? asDay(args.longRunDay) : null;
   if (longRunPin) pins.push({ day: longRunPin, kind: 'long_run', label: 'your long run' });
@@ -3154,7 +3178,6 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // clearance from heavy lower-body work as the long run (`schedule-session-constraints.ts`). Until
   // now it was collected at intake, written to the goal, and never forwarded — so the bar was placed
   // as though the athlete's biggest ride of the week did not exist.
-  const longRidePin = hasBike ? asDay(args.bike?.longRideDay) : null;
   // ⛔ NO `!pins.some(day === …)` GUARD ANY MORE — REMOVED 2026-08-09. It read as harmless dedupe and
   // was silent pin ABSORPTION: two anchors on one day meant the SECOND ONE VANISHED, before the
   // solver ever saw it. `week-solver` has a typed refusal for exactly this
@@ -3165,8 +3188,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⛔ THE REAL FIX IS AT INPUT — the day picker greys out and locks a day another anchor already
   // holds, so the collision is never entered. This is the BACKSTOP: anything that still arrives
   // collided now reaches the solver, which answers properly instead of the composer hiding it.
-  if (longRidePin) {
-    pins.push({ day: longRidePin, kind: 'long_ride', label: 'your long ride' });
+  if (rideIntent.longDay) {
+    pins.push({ day: rideIntent.longDay, kind: 'long_ride', label: 'your long ride' });
   }
   /**
    * ⛔ THE LONG RUN IS AN ANCHOR EVEN WHEN THE ATHLETE DID NOT NAME ONE (2026-08-08).
@@ -3403,29 +3426,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const runHasLongDay = runSelected && runFreq > 0;
   const easyRunsWanted = runSelected ? Math.max(0, runFreq - (runHasLongDay ? 1 : 0)) : 0;
   /**
-   * ⛔ RIDE COUNT, EXACTLY AS PICKED — AND THE CEILING IS 4 NOW (2026-08-19). It was 3 while the
-   * picker offered 1/2/3; the picker offers 1/2/3/4 for both sports, and a cap the screen does not
-   * know about silently discards an answer.
+   * ⛔ THE RIDE COUNTS ARE NOT DERIVED HERE ANY MORE (stage 4, 2026-08-21). `askedRideDays`,
+   * `rideHasLongDay` and `ridesWanted` stood on these lines; they are `rideIntent.askedDays`,
+   * `.hasLongDay` and `.easyWanted`, resolved once beside the hard-day counts above. Their reasoning — the
+   * 1-4 ceiling, the long ride needing a session left over, the hard ride counting as one of the
+   * picked days — moved WITH them into `_shared/athlete-weekly-intent.ts`, unchanged.
    */
-  const askedRideDays = bikeSelected ? Math.max(1, Math.min(4, Math.round(Number(args.bike?.days) || 2))) : 0;
-  /**
-   * ⛔ A LONG RIDE NEEDS A SESSION LEFT OVER — the same fix the runs just took. `!!longRidePin`
-   * alone meant an athlete with ONE ride and a hard ride got the hard session PLUS a long ride:
-   * two sessions against an answer of one. The pin says they WANT a long ride; it cannot say there
-   * is room for one.
-   */
-  const rideHasLongDay = bikeSelected && !!longRidePin
-    && askedRideDays > hardRideCount;
-  /**
-   * The long ride is a pin/anchor, so only the EASY rides are flexible — and when the hard day is a
-   * RIDE it is one of the picked ride days too, exactly as the hard run is one of the run days.
-   */
-  // ⛔ THE COUNT, NOT A BOOLEAN (§1i) — same fix as the runs above, one discipline over.
-  // ⚠️ READS `rideHasLongDay`, NOT `longRidePin` — otherwise a pin with no room still subtracts a
-  // session that is never built, and the week comes back one ride short of the ask.
-  const ridesWanted = bikeSelected
-    ? Math.max(0, askedRideDays - (rideHasLongDay ? 1 : 0) - hardRideCount)
-    : 0;
 
   /**
    * ⛔ THE EASY SESSIONS GO INTO THE SAME SOLVE AS THE BAR (2026-08-08). Michael: *"Strong Focus
@@ -3460,7 +3466,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       kind: h.discipline === 'bike' ? ('quality_bike' as const) : ('quality_run' as const),
     })),
     ...Array.from({ length: easyRunsWanted }, (_, i) => ({ name: `easy_run:${i}`, kind: 'easy_run' as const })),
-    ...Array.from({ length: ridesWanted }, (_, i) => ({ name: `easy_bike:${i}`, kind: 'easy_bike' as const })),
+    ...Array.from({ length: rideIntent.easyWanted }, (_, i) => ({ name: `easy_bike:${i}`, kind: 'easy_bike' as const })),
   ];
 
   /**
@@ -3492,103 +3498,59 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * would move when an athlete adds an easy run, and the test is what would catch it.
    */
   /**
-   * ⛔ WHEN THE WEEK CANNOT HOLD EVERYTHING, A HARD DAY YIELDS — THE BAR DOES NOT (audit 2026-08-17,
-   * defect #0). `week-solver` now REFUSES to breach the 48h between heavy legs and the long run
-   * (`isUnbreachable`), so an over-subscribed week comes back unsolvable instead of arriving with a
-   * squat the morning after the long run and a note apologising for it.
+   * ⛔⛔ NOTHING YIELDS. THE WEEK THE ATHLETE ASKED FOR IS ALWAYS BUILT, AND THE COST IS STATED
+   * (Michael, 2026-08-21 — the stage 5 ruling, and it settles the question §2.2 of the trace report
+   * raised).
    *
-   * ⛔ THIS LAYER IS THE ONLY ONE THAT KNOWS WHICH SESSION IS LESSER. The solver sees anchors and
-   * lifts; it cannot know that a hard day is OPTIONAL (§1i — the block is complete without one)
-   * while the lifting is the block's entire spine. So the yield is decided here: drop hard days from
-   * the end, one at a time, until the week is legal — and say which one went and why.
+   * **What stood here.** A loop that dropped hard days from the end, one at a time, until the week
+   * came back legal — *"when the week cannot hold everything, a hard day yields, the bar does not"*
+   * (audit 2026-08-17). It was written against the SLOT solver, which returned `unsolvable` for a
+   * week it could not place strictly, and `unsolvable` meant **no legal week exists**.
    *
-   * ⚠️ THE LONG RUN AND LONG RIDE NEVER YIELD. They are the doctrine's two pins and the reason the
-   * athlete picked those days; dropping one to make room for a lift would be the engine rearranging
-   * the athlete's life around its own convenience.
-   * ⚠️ MEASURED, NOT SUPPOSED: Michael's own week (hard ride Tue, hard run Fri, long ride Sat, long
-   * run Sun) is exactly this case. A heavy lower lift may not share a day with `quality_bike`,
-   * `quality_run` or `long_run`, and must clear the long run by 48h — which leaves Wednesday and
-   * Thursday for TWO lower lifts that need 48h from each other. Impossible. Dropping the second hard
-   * day frees Tuesday and the week solves strictly.
+   * ⛔ THE SIGNAL IT WAITED ON CANNOT ARRIVE. `solveWithWeekModel` has exactly two `return`
+   * statements — `solved` and `compromised` — and no `throw` anywhere in `week-model/`. So the loop
+   * has not run once since the engine swap, `yieldedHardDays` was always `[]`, and no athlete has
+   * ever been told a hard day went missing, because none ever did.
+   *
+   * ⛔ AND IT IS NOT REVIVED, WHICH WAS A DECISION AND NOT AN OVERSIGHT. Re-pointing it at the live
+   * `compromised` status looks like a one-word fix and is a different product: under the debt model
+   * a breach is the NORMAL outcome of a crowded week, not an impossibility. Measured over every
+   * distinct-day anchor shape on the three-day lift week — 840 with two hard days, 210 with one —
+   * a revived loop would delete a hard session the athlete chose in **57%** of two-hard-day weeks,
+   * and in **280 of 840** it would drop BOTH of them. Every breach in that space is an 18h or 24h
+   * residual; not one is the 48h impossibility the old copy described.
+   *
+   * ⚠️ AND IT DROPPED FROM THE END, NOT FROM THE CAUSE. Long run Mon, long ride Tue, hard run Wed,
+   * hard ride Sat: the breach is the squat against the long RIDE, and the loop would take the
+   * Saturday ride and then the Wednesday run — neither of them implicated.
+   *
+   * **The rule now, both ways.** Michael's 2026-08-17 ruling — *"the engine's job is to warn them of
+   * the biological cost, not physically block them"* — was made about days the ATHLETE pinned. It
+   * now covers days the ENGINE chose too: *"always build the week the athlete asked for and tell
+   * them what it costs."* The telling is `tightWeekCompromises` below plus the resolver's own
+   * per-breach lines. ⛔ Do not reintroduce a drop here under any name.
    */
-  const hardAnchorLabels = new Set(
-    pinnedHardDays.map((h) => (h.discipline === 'bike' ? 'your hard ride' : 'your hard run')),
-  );
-  const yieldedHardDays: string[] = [];
-  let solverAnchorsUsed: SolverAnchor[] = solverAnchors;
-  let liftOnlySolve = solveWeek({ anchors: solverAnchorsUsed, lifts: solverLifts });
-  while (liftOnlySolve.status === 'unsolvable') {
-    // ⚠️ FROM THE END. The first hard day is the VO2 session §7 calls the quality easy volume cannot
-    // hold; the second is the addition. Yielding the addition first is the smaller loss.
-    const lastHard = [...solverAnchorsUsed].reverse()
-      .find((a) => a.kind === 'quality_run' || a.kind === 'quality_bike');
-    if (!lastHard) break;   // nothing left to yield — the refusal stands and is surfaced as-is
-    solverAnchorsUsed = solverAnchorsUsed.filter((a) => a !== lastHard);
-    yieldedHardDays.push(lastHard.label);
-    liftOnlySolve = solveWeek({ anchors: solverAnchorsUsed, lifts: solverLifts });
-  }
-  const heavyLegDaysForAvoid: SolverDay[] = liftOnlySolve.status === 'unsolvable'
-    ? []
-    : liftOnlySolve.week.lifts.filter((l) => l.isLower).map((l) => l.day);
-
   /**
-   * ⛔ Q-215 IS A TIE-BREAK, AND PASSING IT AS `flexibleAvoid` MADE IT AN OVERRIDE (fixed 2026-08-08).
+   * ⛔⛔ THE LIFT-ONLY PRE-SOLVE IS GONE TOO (Michael, 2026-08-21, with the Q-215 deletion below).
    *
-   * `week-solver`'s score ranks `avoided` ABOVE `selfAdjacent`, deliberately — that ordering carries
-   * the run generator's day-before-long-run rest rule, and a test caught the opposite ordering
-   * spending both recovery days at once. Correct there, wrong for this preference: Q-215's own words
-   * are *"a leg day that genuinely scores better still wins"*, and routing it through `avoided`
-   * meant it beat spreading instead of breaking ties within it.
+   * It existed for ONE reason: Q-215 needed the heavy-leg days before it could ask for them to be
+   * avoided, and the lift days only come out of a solve. So the composer solved the week WITHOUT the
+   * easy sessions, read the lower days off the answer, and then solved twice more with them.
    *
-   * ⚠️ MEASURED, NOT THEORISED. Eyeball case 3 (4 runs, long run Wednesday): Friday carries the squat,
-   * so the avoid pushed the third easy run to Sunday and produced a **Saturday+Sunday** cluster.
-   * Tue/Fri/Sun was available and clusters nothing.
+   * **Three solves for every composed block. Two of them changed nothing** — the adapter ignores
+   * `flexibleAvoid`, measured at 0 of 126 shapes. ⛔ AND THE WIZARD RUNS THIS SAME PLACER
+   * SYNCHRONOUSLY ON THE RENDER PATH (stage 3), so the athlete paid for all three between a tap and
+   * the paint.
    *
-   * ⛔ SO IT IS SOLVED BOTH WAYS AND THE SPREAD DECIDES. The avoided answer is taken only when it
-   * costs no extra adjacency — which is precisely "when they otherwise tie". ⚠️ Not done by
-   * reordering the solver's score: that vector is shared with the marathon path and `avoided` is
-   * load-bearing there for a different rule.
+   * ⚠️ The no-flexible case still needs a lift-only solve and still gets one — inside
+   * `solveWithFlexible`, where it is the answer rather than a lookup.
    */
-  const selfAdjacentCount = (r: ReturnType<typeof solveWeek>): number => {
-    if (r.status === 'unsolvable') return Number.MAX_SAFE_INTEGER;
-    const byKind = new Map<string, number[]>();
-    for (const f of r.week.flexible) {
-      const arr = byKind.get(f.kind) ?? [];
-      arr.push(SOLVER_DAY_ORDER.indexOf(f.day));
-      byKind.set(f.kind, arr);
-    }
-    let n = 0;
-    for (const days of byKind.values()) {
-      for (let i = 0; i < days.length; i++) {
-        for (let j = i + 1; j < days.length; j++) {
-          const raw = Math.abs(days[i] - days[j]);
-          if (Math.min(raw, 7 - raw) <= 1) n++;
-        }
-      }
-    }
-    return n;
-  };
-
-  /**
-   * How many impact sessions land the morning after a long run. The engine's modality-aware recovery
-   * preference lives in `week-solver`; this is the composer reading the same property back so its own
-   * tie-breaks cannot quietly undo it.
-   */
-  const impactAfterLongRun = (r: ReturnType<typeof solveWeek>): number => {
-    if (r.status === 'unsolvable') return Number.MAX_SAFE_INTEGER;
-    const dayAfter = new Set(
-      solverAnchors.filter((a) => a.kind === 'long_run')
-        .map((a) => (SOLVER_DAY_ORDER.indexOf(a.day) + 1) % 7),
-    );
-    return r.week.flexible.filter(
-      (f) => f.kind === 'easy_run' && dayAfter.has(SOLVER_DAY_ORDER.indexOf(f.day)),
-    ).length;
-  };
 
   const solveWithFlexible = () => {
-    for (let n = flexibleWanted.length; n >= 0; n--) {
-      const flexible = flexibleWanted.slice(0, n);
-      if (flexible.length === 0) return liftOnlySolve;
+    {
+      const flexible = flexibleWanted;
+      // ⚠️ NO EASY SESSIONS TO PLACE — the lifts and anchors ARE the week. One solve either way.
+      if (flexible.length === 0) return solveWeek({ anchors: solverAnchors, lifts: solverLifts });
       /**
        * ⛔ `separation-first` — THIS BLOCK PLACES EASY ENDURANCE AMONG LIFTS, NOT AMONG RUNS
        * (2026-08-16). The solver's default ranking reads `streak`/`gaps` and the two recovery rules
@@ -3604,45 +3566,38 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * candidate single ordering was measured and none satisfies both suites.
        */
       const base = {
-        anchors: solverAnchorsUsed, lifts: solverLifts, flexible,
+        anchors: solverAnchors, lifts: solverLifts, flexible,
         flexibleRanking: 'separation-first' as const,
       };
-      const plain = solveWeek(base);
-      if (heavyLegDaysForAvoid.length === 0) {
-        if (plain.status !== 'unsolvable') return plain;
-        continue;
-      }
-      const avoided = solveWeek({
-        ...base,
-        flexibleAvoid: {
-          days: heavyLegDaysForAvoid,
-          owner: 'strength-primary-plan (Q-215)',
-          reason: 'an easy session on a press day competes with nothing; on a squat or '
-            + 'deadlift day it is the same legs twice, so a clean upper day is preferred when '
-            + 'they otherwise tie — allowed, never banned',
-        },
-      });
       /**
-       * ⛔ AND IT MUST NOT BUY ITSELF A WORSE RECOVERY DAY EITHER (2026-08-08).
+       * ⛔⛔ THE Q-215 DOUBLE-SOLVE IS DELETED (Michael, 2026-08-21). ONE SOLVE, ONE ANSWER.
        *
-       * Q-215 is "prefer a clean upper day over a heavy-leg day"; the day-after-the-long-run rule is
-       * about impact through damaged tissue. When they pull apart, the tissue rule wins — it is the
-       * one the clearance table gives heavy legs 48h for, and Q-215's own words are that it yields
-       * to anything that genuinely scores better.
+       * **What stood here.** The week was solved twice: once plainly, once again with the heavy leg
+       * days handed back as `flexibleAvoid` — *"an easy session on a press day competes with
+       * nothing; on a squat or deadlift day it is the same legs twice"* — and a comparison
+       * (`takeAvoided`) picked between the two on `selfAdjacentCount` and `impactAfterLongRun`.
        *
-       * ⚠️ MEASURED. On long-ride Sat / long-run Sun / 4 runs + 2 rides the solver correctly put the
-       * easy runs on Tue/Thu/Fri and the easy RIDE on Monday — and this comparison then threw that
-       * away, because the avoided variant tied on adjacency and won the tie. Monday came back with a
-       * run on it, the morning after the long run, with a free ride sitting elsewhere in the week.
+       * ⛔ IT HAD NO EFFECT AND HAS HAD NONE SINCE THE ENGINE SWAP. `week-model/solver-adapter.ts`
+       * IGNORES `flexibleAvoid` — its own header says so outright (*"`flexibleRanking`,
+       * `flexibleAvoid`, `preferredClearance` … have no equivalent here and are IGNORED, not
+       * emulated"*). Measured 2026-08-21: **`flexibleAvoid` changed the answer in 0 of 126 shapes.**
+       * So `avoided` was byte-identical to `plain`, `takeAvoided` was always true, and the composer
+       * paid for a second full solve to return the week it already had.
+       *
+       * ⛔ AND IT IS NOT RE-EXPRESSED AS A RESOLVER TERM, WHICH WAS THE OFFER AND MICHAEL DECLINED
+       * IT: *"What it was trying to do — keep heavy leg days apart — is already done live by
+       * `bunching`. Rebuilding it means two owners for one fact, which is the disease this work
+       * order exists to cure."* ⛔ Do not add a term for this.
+       *
+       * ⚠️ TWO TESTS ASSERT THE OLD PREFERENCE AND PASS BY COINCIDENCE — `run-placement.test.ts` and
+       * `easy-session-spread.test.ts`. They are rewritten to state what the engine actually
+       * guarantees rather than to keep the coincidence alive.
+       *
+       * ⚠️ AND THE DELETION IS HALF THE LATENCY FIX (stage 3). The wizard runs this same placer
+       * synchronously on the render path; halving the solves halves what a tap costs.
        */
-      const takeAvoided = avoided.status !== 'unsolvable'
-        && selfAdjacentCount(avoided) <= selfAdjacentCount(plain)
-        && impactAfterLongRun(avoided) <= impactAfterLongRun(plain);
-      // The preference is taken only when it buys nothing worse. Ties go to the preference.
-      if (takeAvoided) return avoided;
-      if (plain.status !== 'unsolvable') return plain;
+      return solveWeek(base);
     }
-    return liftOnlySolve;
   };
 
   const solved = solveWithFlexible();
@@ -3665,50 +3620,42 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    */
   // ⚠️ THE ROLE IS TAKEN BY POSITION IN `gatedHardDays`, which is the list `assignHardRoles` scored —
   // so it is carried across here rather than re-derived from the placed day.
-  // ⚠️ A YIELDED HARD DAY IS NOT BUILT. Its anchor is gone from the solve, so emitting the session
-  // would put it on a day the placer never reserved — the pin-and-empty-day failure inverted.
-  const yieldedLabels = new Set(yieldedHardDays);
-  const wasYielded = (h: { discipline: 'run' | 'bike' }) =>
-    yieldedLabels.has(h.discipline === 'bike' ? 'your hard ride' : 'your hard run');
+  // ⛔ EVERY GATED HARD DAY IS BUILT (stage 5, 2026-08-21). A filter stood here that skipped the
+  // ones the yield loop had dropped; nothing is dropped any more, so a hard day the athlete asked
+  // for and the §7 gate admitted always reaches a session.
   gatedHardDays.forEach((h, i) => {
-    if (h.day != null && wasYielded(h) && yieldedLabels.size > 0) {
-      // Only the LAST of a discipline yields; an earlier one of the same discipline stays.
-      const sameKind = gatedHardDays.filter((x) => x.discipline === h.discipline && x.day != null);
-      if (sameKind.indexOf(h) >= sameKind.length - yieldedHardDays.filter((l) =>
-        l === (h.discipline === 'bike' ? 'your hard ride' : 'your hard run')).length) return;
-    }
     const role = hardRoles[i];
     if (h.day != null) { hardDays.push({ ...h, day: h.day, role }); return; }
-    if (solved.status === 'unsolvable') return;
     const placed = solved.week.flexible.find((f) => f.name === `hard:${proposedHardDays.indexOf(h)}`);
     const day = placed ? asDay(placed.day) : null;
     if (!day || hardDays.some((x) => x.day === day)) return;
     hardDays.push({ ...h, day, role });
   });
 
-  // ⛔ A REFUSAL IS NOT A CRASH AND IT IS NOT A SILENT FALLBACK (§5.2). The solver names the anchors
-  // that bound it and what would free them; those words go to the athlete. The block is still built
-  // — on `place-week`'s answer — so the athlete is never left with nothing while being told why.
+  /**
+   * ⛔ THE `place-week` FALLBACK IS GONE (stage 5, 2026-08-21). This read
+   * `solved.status === 'unsolvable' ? placeLiftingWeek(...) : {...}` — a whole second placement
+   * engine standing by for a status the adapter cannot return. It has not run since the swap, and
+   * keeping it meant every reader of this file had to hold two placement laws in their head to
+   * know which one built the week in front of them.
+   *
+   * ⚠️ `solverRefusal` WENT WITH IT. Its breach arm was the same unreachable status; its else arm
+   * was `solved.notes`, and the adapter returns `notes: []` on BOTH of its returns — so it was the
+   * empty array either way, spread into `placementCompromises` and contributing nothing. That is
+   * §0f in its purest form: a disclosure channel that is wired, spread, documented, and empty.
+   */
   const cap = (d: string) => d.charAt(0).toUpperCase() + d.slice(1);
-  const placedWeek = solved.status === 'unsolvable'
-    ? placeLiftingWeek(MAIN_LIFTS.map((l) => ({ lift: l.name, isLower: l.isLower })), pins)
-    : {
-        slots: solved.week.lifts.map((l) => ({
-          lift: l.lift,
-          isLower: l.isLower,
-          day: cap(l.day) as DayName,
-          ...(l.stackedWith ? { stackedWith: l.stackedWith } : {}),
-        })),
-        freeDays: solved.week.restDays.map((d) => cap(d) as DayName),
-        restDays: solved.week.restDays.map((d) => cap(d) as DayName),
-        compromises: solved.status === 'compromised' ? solved.compromises : [],
-      };
-  const solverRefusal: Array<{ kind: 'breach' | 'cost'; text: string }> = solved.status === 'unsolvable'
-    ? [{ kind: 'breach', text: `${solved.message} ${solved.options.join(' ')}` }]
-    // ⛔ NOTES MUST REACH THE ATHLETE OR THEY ARE THE §0f LOSS AGAIN — a cost computed and never
-    // said. They are not rule breaches, so they do not make the week "compromised"; they ride the
-    // same channel because that channel is the one the plan already surfaces.
-    : solved.notes;   // already tagged by the solver
+  const placedWeek = {
+    slots: solved.week.lifts.map((l) => ({
+      lift: l.lift,
+      isLower: l.isLower,
+      day: cap(l.day) as DayName,
+      ...(l.stackedWith ? { stackedWith: l.stackedWith } : {}),
+    })),
+    freeDays: solved.week.restDays.map((d) => cap(d) as DayName),
+    restDays: solved.week.restDays.map((d) => cap(d) as DayName),
+    compromises: solved.status === 'compromised' ? solved.compromises : [],
+  };
   // Lift name → the day the solver gave it. Falls back to the lift's legacy grid day only if the
   // solver somehow omitted it, so a placement bug degrades to the old behaviour rather than to no day.
   // ⛔ THE PAIRED SLOT EXPANDS BACK INTO ITS TWO LIFTS. The solver placed one upper day; both upper
@@ -3730,11 +3677,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const dayForLift = expandSlots(placedWeek.slots as never);
   // ⛔ THE TEST WEEK HAS ITS OWN MAP. Week 3 puts every lift on its own day, so the days MOVE between
   // a normal week and the test week — that is the whole point of the mode, not a bug to reconcile.
-  const dayForLiftTest = solvedTest.status !== 'unsolvable'
-    ? expandSlots(solvedTest.week.lifts.map((l) => ({
-        lift: l.lift, isLower: l.isLower, day: cap(l.day) as DayName,
-      })))
-    : dayForLift;
+  const dayForLiftTest = expandSlots(solvedTest.week.lifts.map((l) => ({
+    lift: l.lift, isLower: l.isLower, day: cap(l.day) as DayName,
+  })));
   // Where the heavy legs actually landed — the hill session's descent is prescribed off this.
   // ⚠️ Taken from the NORMAL week: the endurance sessions are authored once for the block, and the
   // lower days do not move between layouts anyway (only the upper pair splits).
@@ -3820,17 +3765,40 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     text: `You put two hard sessions on ${day}. The plan builds one — two on a single day is a `
       + `double, which is a different session with a different cost, not a second hard day.`,
   }));
-  const hardYieldCompromises = [...new Set(yieldedHardDays)].map((label) => ({
-    kind: 'cost' as const,
-    text: `${label.replace(/^your /, 'Your ')} was left out this block: with your long run, long ride `
-      + 'and the other hard day fixed, there was no day left that kept heavy legs 48h clear of the '
-      + 'long run. The lifting keeps its spacing; the hard session is the one that gives way.',
-  }));
+  /**
+   * ⛔ WHAT IS TIGHT, AND WHY — REPLACING THE LINE THAT SAID A SESSION WAS LEFT OUT (Michael,
+   * 2026-08-21, with the stage 5 ruling).
+   *
+   * The copy that stood here opened *"Your hard run was left out this block"* and closed *"the hard
+   * session is the one that gives way."* Both halves are now false by construction: nothing is
+   * dropped, so nothing is left out and nothing gives way. ⚠️ It was also never printed — it was fed
+   * by `yieldedHardDays`, which the dead yield loop never filled — so no athlete has read either
+   * sentence. Rewriting it rather than deleting it is the point of the ruling: the week is built
+   * whole and the cost is stated.
+   *
+   * ⛔ IT NAMES THE SITUATION, NOT THE NUMBERS, AND THAT IS DELIBERATE. The per-breach lines
+   * immediately after it carry the unit, the outstanding hours and the day it clears — they come
+   * from the resolver, which owns those facts. This line could only restate them by parsing its own
+   * prose, and `strength-focus-copy.ts` carries the scar from exactly that: a dedup keyed on wording
+   * broke silently the day the wording was tightened. ⛔ Do not regex the breach text to fill a slot
+   * here; if this line ever needs a number, give the adapter a structured field.
+   *
+   * ⚠️ FIRST IN THE LIST, so the athlete reads the frame before the detail. The renderer joins these
+   * in order under one "What this week costs" paragraph.
+   */
+  const tightWeekCompromises = solved.status === 'compromised' && placedWeek.compromises.length > 0
+    ? [{
+        kind: 'cost' as const,
+        text: 'Everything you asked for is built this week, and it is tight. Your long days and hard '
+          + 'days are where you put them, so the lifting sits closer to them than its clearances ask '
+          + 'for — each shortfall is named with the hours outstanding and the day it clears. Nothing '
+          + 'was dropped to make the week fit.',
+      }]
+    : [];
   const placementCompromises: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }> = [
-    ...solverRefusal,
+    ...tightWeekCompromises,
     ...placedWeek.compromises.map((text) => ({ kind: 'breach' as const, text })),
     ...hardGateCompromises,
-    ...hardYieldCompromises,
     ...doubledHardCompromises,
   ];
   // ⛔ A BLOCK-LEVEL `assistanceRows(args.assistancePicks)` STOOD HERE AND NOTHING READ IT.
@@ -3853,7 +3821,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
 
   // ⚠️ THE RUN/RIDE COUNTS ARE DERIVED ABOVE, BEFORE THE SOLVE (2026-08-08) — they are an input to
   // it now, not a consequence of it. See `askedRunDays` / `runFreq` / `easyRunsWanted` /
-  // `ridesWanted` beside the anchors.
+  // `rideIntent.easyWanted` beside the anchors.
   const upperLiftDays = MAIN_LIFTS.filter((l) => !l.isLower).map(liftDay);
   // ⛔ THE Sat/Sun COERCION IS GONE (2026-07-26). It read:
   //     pickedLong = longRunDay === 'sunday' ? 'Sunday' : 'Saturday'
@@ -3978,11 +3946,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    *     explicit relaxation rung — the same "held back, yielded only if the week genuinely cannot
    *     hold the ask" semantics, enforced in one place instead of four.
    *
-   * ⚠️ WHAT DID NOT MOVE: the COUNTS. `easyRunsWanted` / `ridesWanted` are still this composer's,
+   * ⚠️ WHAT DID NOT MOVE: the COUNTS. `easyRunsWanted` / `rideIntent.easyWanted` are still the ask,
    * still derived from the athlete's answers, and still reported when the week cannot seat them.
    * The solver was given a placement job, not a dosing one.
    */
-  const solvedFlexible = solved.status === 'unsolvable' ? [] : solved.week.flexible;
+  const solvedFlexible = solved.week.flexible;
   const capDay = (d: string) => d.charAt(0).toUpperCase() + d.slice(1);
   const easyRunDays: string[] = solvedFlexible
     .filter((f) => f.kind === 'easy_run')
@@ -4199,9 +4167,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const weeklyRunHours = Number(args.targetWeeklyMiles) > 0 && Number(args.easyPaceMinPerMile) > 0
     ? (Number(args.targetWeeklyMiles) * Number(args.easyPaceMinPerMile)) / 60
     : null;
-  const weeklyRideHours = Number(args.bike?.hours) > 0
-    ? Number(args.bike!.hours)
-    : (Number(args.targetWeeklyRideHours) > 0 ? Number(args.targetWeeklyRideHours) : null);
+  // ⛔ THE HOURS, AS STATED — `null` means never stated, not zero. This resolved them a SECOND way
+  // (the ride pass 500 lines down had its own copy with a default of 2 bolted on), so one athlete's
+  // hours had two owners that agreed only by accident. `rideIntent.hours` is the stated number and
+  // `rideIntent.hoursOrDefault` is the number with our default applied — one resolution, two named
+  // readings, and the reader has to say which one it means.
+  const weeklyRideHours = rideIntent.hours;
   /**
    * ⛔ ZERO IS KNOWABLE AND `null` IS NOT THE SAME ANSWER. An athlete with `enduranceSport: null`
    * and no bike is a STRENGTH-ONLY block — that is a measured zero, and reading it as "we have not
@@ -4209,8 +4180,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * Tier 3 exists for. `null` is reserved for the genuinely unknown: a declared runner whose weekly
    * miles never arrived.
    */
-  const enduranceDeclared = args.enduranceSport != null || !!args.bike
-    || Number(args.targetWeeklyRideHours) > 0;
+  const enduranceDeclared = args.enduranceSport != null || rideIntent.declared;
   const totalEnduranceHours = !enduranceDeclared
     ? 0
     : (weeklyRunHours == null && weeklyRideHours == null
@@ -4694,9 +4664,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
                 { weekInCycle, cycleKind, cycleIndex: bw.cycleIndex }, h.goal),
         );
       }
-    } else if (enduranceSport === 'bike' && !hasBike) {
+    } else if (enduranceSport === 'bike' && !rideIntent.declared) {
       // ⛔ TWO EMITTERS WERE AUTHORING RIDES AND NOTHING SUBTRACTED (found 2026-07-29 by the combo
-      // sweep). For a bike-primary athlete this fallback fired AND the `hasBike` pass below fired.
+      // sweep). For a bike-primary athlete this fallback fired AND the declared-bike pass below fired.
       // The pass built the hours correctly — 6h asked came out as 103 + 154 + 103 minutes, exactly
       // 360 — and then this line added its own two fixed 45-minute rides on top. Measured: 6h asked
       // → 7.5h built, 8h → 9.5h. Twenty-five percent over, on the discipline a maintenance block
@@ -4709,7 +4679,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // ⛔ THIS IS THE SAME DEFECT THE RUN SIDE FIXED ON 2026-07-28 — the hill session counted toward
       // the run-day COUNT and not the MILES, so every plan built the typed number and added the hard
       // session after. Michael rejected that at 27%. Same class, same answer: one owner per volume.
-      // When the athlete gave bike hours, the `hasBike` pass owns every ride and this fallback is
+      // When the athlete gave bike hours, the declared-bike pass owns every ride and this fallback is
       // silent. It still fires for a bike athlete who gave no hours, where it is the only emitter.
       // ⛔ THE SOLVER'S DAYS, NOT THE RUN PIPELINE'S (2026-08-08). This walked `enduranceDays`,
       // which is the RUN day list — fine while every block had a run in it, empty the moment a
@@ -4725,7 +4695,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // the whole story: an athlete with run AND bike on `maintain` got run and silently lost the
     // bike — posture, long-ride day and weekly hours all collected and discarded, twelve weeks with
     // an empty Saturday. Everything the intake asks for now reaches a session or is not asked.
-    if (hasBike) {
+    if (rideIntent.declared) {
       // ⛔ Days that already carry ENDURANCE, not days that carry anything. `weekSessions` holds the
       // four lifts by this point, so testing "has a session" marked every upper day taken and killed
       // all stacking. An upper lift + an easy ride is the stacked day we WANT; an upper lift + a run
@@ -4741,9 +4711,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       // bike athlete who gave hours on the primary path got the fixed 2×45min default instead.
       // Measured: 6h asked, 1.5h built. Collected and dropped, the same shape as `hardDay` and
       // `quality_run` before it. `bike.hours` still wins; this is the fallback, not a second owner.
-      const rideHours = Number(args.bike?.hours) > 0
-        ? Number(args.bike!.hours)
-        : (Number(args.targetWeeklyRideHours) > 0 ? Number(args.targetWeeklyRideHours) : 2);
+      // ⛔ AND IT IS THE SAME RESOLUTION THE HEADLINE HOURS USE (stage 4, 2026-08-21). This line
+      // held the second copy — identical arithmetic with `2` on the end instead of `null` — so the
+      // block's stated weekly hours and the hours it actually built from were two answers to one
+      // question. `hoursOrDefault` is that `2`, named as ours.
       // ⛔ THE ATHLETE'S ANSWER, not a guess. Asking "how many days to ride" is what the run step has
       // always done and the bike never did — without it this code held a weekly total and split it
       // by an invented ratio, so 20 hours produced ONE 1,200-minute ride.
@@ -4759,18 +4730,18 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * FORGOT (2026-08-19, found on Michael's export).
        *
        * `rideDays` below holds the LONG ride and the EASY rides. The hard ride is NOT in it — it is
-       * placed separately as a hard-day anchor. `askedRideDays` DOES include it. So this compared a
+       * placed separately as a hard-day anchor. `rideIntent.askedDays` DOES include it. So this compared a
        * list of 2 against an ask of 3 and reported a shortfall that did not exist: a real week with
        * `Wed Easy Ride · Fri Threshold Ride · Sat Long Ride` — three ride days, exactly the answer —
        * carried *"You asked for 3 ride days; the week had room for 2."* on the plan description.
        *
        * ⚠️ EVERY OTHER COUNT IN THIS FILE ALREADY SUBTRACTS. `runFreq` (`:3142`) takes
        * `askedRunDays - hardRunCount` — Michael's rule, *"one of the runs is the hill session."*
-       * `ridesWanted` (`:3168`) takes `askedRideDays - long - hardRideCount`, and the comment above
+       * `rideIntent.easyWanted` takes `askedDays - long - hardCount`, and the account above
        * it states this rule outright: *"when the hard day is a RIDE it is one of the picked ride
        * days too, exactly as the hard run is one of the run days."*
        *
-       * ⛔ AND IT WAS NOT ONLY THE NOTE. `wantDays` also caps the fill loop below, so an inflated
+       * ⛔ AND IT WAS NOT ONLY THE NOTE. `daysAfterHard` also caps the fill loop below, so an inflated
        * ask let it take an extra day from `solvedRideDays` — the long ride, an easy ride, ANOTHER
        * easy ride, plus the hard ride: four sessions against an answer of three. It did not fire on
        * this export only because the solver had one flexible ride day to give, not two.
@@ -4778,7 +4749,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * ⚠️ THE HARD-RUN CASE IS UNCHANGED AND ITS NOTE MUST STILL FIRE. `hardRideCount` is 0 there,
        * so a genuine ride shortfall still says so. Both are pinned in `ride-count-note.test.ts`.
        */
-      const wantDays = Math.max(0, askedRideDays - hardRideCount);
+      // ⛔ AND THE SUBTRACTION IS THE OBJECT'S NOW (stage 4, 2026-08-21). `wantDays` was the third
+      // site that took the hard rides out of the ask, and the first two disagreed with it for a
+      // while — see `daysAfterHard` in `_shared/athlete-weekly-intent.ts`.
       /**
        * ⛔ THE RIDE DAYS COME OUT OF THE SAME SOLVE AS THE RUNS AND THE BAR (2026-08-08).
        *
@@ -4792,25 +4765,25 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * so it is not in the flexible list and cannot be spread — the athlete named that day.
        */
       const rideDays: string[] = [];
-      // ⚠️ `rideHasLongDay`, NOT `longRidePin` — the pin says they WANT a long ride; it cannot say
+      // ⚠️ `hasLongDay`, NOT `longDay` — the pin says they WANT a long ride; it cannot say
       // there is room for one. With one ride and a hard ride, pushing it here built two sessions
       // against an answer of one.
-      if (rideHasLongDay) rideDays.push(longRidePin!);
+      if (rideIntent.hasLongDay) rideDays.push(rideIntent.longDay!);
       for (const d of solvedRideDays) {
-        if (rideDays.length >= wantDays) break;
+        if (rideDays.length >= rideIntent.daysAfterHard) break;
         if (rideDays.includes(d)) continue;
         rideDays.push(d);
       }
       // ⚠️ If nothing is free the long ride still lands — an athlete who named a day gets that day.
       // ⚠️ THE LAST-RESORT PIN STILL FIRES when nothing else was placeable AND no hard ride is
       // already carrying the discipline — otherwise it reintroduces the extra session above.
-      if (rideDays.length === 0 && longRidePin && hardRideCount === 0) rideDays.push(longRidePin);
+      if (rideDays.length === 0 && rideIntent.longDay && rideIntent.hardCount === 0) rideDays.push(rideIntent.longDay);
       // ⛔ AND IF THE WEEK STILL CANNOT HOLD WHAT THEY ASKED FOR, SAY SO. Never silently fewer.
       // ⚠️ ONCE, not twelve times. This block runs inside the week loop, so an unguarded push
       // repeated the same sentence for every week in the block — the shape is identical every week,
       // so the compromise is a property of the WEEK, not of week 7.
-      const rideShortfallNote = rideDays.length < wantDays
-        ? `You asked for ${wantDays} ride days; the week had room for ${rideDays.length} once the lifting and your fixed days were placed.`
+      const rideShortfallNote = rideDays.length < rideIntent.daysAfterHard
+        ? `You asked for ${rideIntent.daysAfterHard} ride days; the week had room for ${rideDays.length} once the lifting and your fixed days were placed.`
         : null;
       // A ride day the week had no room for is a COST, not a broken rule — nothing in the law was
       // violated, the athlete simply asked for more days than the week held once the pins landed.
@@ -4832,7 +4805,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
         ...strengthDays, pickedLong, ...easyRunDays, ...rideDays,
       ].filter(Boolean) as string[]);
       const restSpent = DAYS.every((d) => occupied.has(d));
-      const restNote = `Your ${wantDays} ride days and ${runFreq} run days fill all seven — this week has no full rest day.`;
+      const restNote = `Your ${rideIntent.daysAfterHard} ride days and ${runFreq} run days fill all seven — this week has no full rest day.`;
       if (restSpent && !placementCompromises.some((c) => c.text === restNote)) {
         placementCompromises.push({ kind: 'cost', text: restNote });
       }
@@ -4866,16 +4839,17 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
             BIKE_QUALITY_ALLOWANCE_MIN,
             'bike',
           )), 0);
-      const totalMins = Math.max(30, Math.round(rideHours * 60) - hardRideMins);
+      const totalMins = Math.max(30, Math.round(rideIntent.hoursOrDefault * 60) - hardRideMins);
       // ⛔ EVEN SPLIT, then the long day takes what the others give up. `LONG_RIDE_SHARE` is the one
       // authored number left in this block and it is marked as such: a long ride that is the same
       // length as the others is not a long ride, and 1.5× is the smallest multiplier that reads as
       // one. It is a product decision, not a finding — do not dress it up as physiology.
       const LONG_RIDE_SHARE = 1.5;
       const others = Math.max(0, rideDays.length - 1);
-      const unitMins = totalMins / (others + (longRidePin && rideDays.includes(longRidePin) ? LONG_RIDE_SHARE : 1));
+      const unitMins = totalMins
+        / (others + (rideIntent.longDay && rideDays.includes(rideIntent.longDay) ? LONG_RIDE_SHARE : 1));
       rideDays.forEach((day) => {
-        const isLong = day === longRidePin;
+        const isLong = day === rideIntent.longDay;
         const mins = Math.max(20, Math.round(unitMins * (isLong ? LONG_RIDE_SHARE : 1)));
         // ⛔ IF THE RIDE LANDED ON A HEAVY-LEG DAY, THE 6h GAP HAS TO BE SAID. Opening those days
         // (2026-07-28) was correct — the law permits the pair — but what the law actually asks for is

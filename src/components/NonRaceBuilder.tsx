@@ -105,6 +105,26 @@ import WeekGrid from '@/components/WeekGrid';
 // are the same rule on all three intake cards, so the rule cannot live on any one of them.
 import { roundMiles, roundRideMinutes, splitNote, weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
 import { defaultScheduleAsk, resolveScheduleAsk, type ScheduleRowKey } from '@/lib/schedule-ask';
+/**
+ * ⛔ THE NO-OPINION ANSWER, AND ITS IDENTITY IS STABLE ON PURPOSE. Off the `schedule` step the solve
+ * does not run, and this stands in for it. A fresh object literal here would change identity on every
+ * render and re-fire the pre-fill effects that depend on it — which is the loop this file already
+ * paid for once (see the `touchedUnits` note). Same shape `solveWizardWeek` returns from its own
+ * catch: no suggestion is a legal answer, and it is better than a wrong one.
+ */
+const IDLE_WIZARD_WEEK = {
+  hardDays: [] as Array<string | null>,
+  longRun: null as string | null,
+  longRide: null as string | null,
+  health: { ok: true, collisions: [] as string[] },
+};
+/**
+ * ⛔ THE RIDE-COUNT RANGE HAS ONE OWNER (stage 4, 2026-08-21). It was written out FIVE times — two
+ * pickers here, a validator in `create-goal-and-materialize-plan`, a clamp in
+ * `generate-strength-plan`, and a clamp in the composer — and three of the five were still capped
+ * at 3 after the ceiling was raised to 4. The file this comes from carries the full account.
+ */
+import { RIDE_DAYS_CHOICES } from '../../supabase/functions/_shared/athlete-weekly-intent';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -1993,8 +2013,41 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * over the same week on every tap. On a browser that reads as buttons not responding.
    * ⚠️ It also means the three can no longer disagree: they are literally the same placement.
    */
-  const wizardWeek = React.useMemo(
-    () => solveWizardWeek({
+  /**
+   * ⛔⛔ THE SOLVE IS GATED TO THE ONE STEP THAT READS IT, AND DEFERRED OFF THE PAINT (stage 3,
+   * 2026-08-21). Michael: *"long run and ride sorta linger until they are clicked a couple of
+   * times."* It is not a state bug — the taps register. This memo ran the exhaustive placer
+   * SYNCHRONOUSLY between the tap and the paint.
+   *
+   * **Re-measured 2026-08-21, desktop V8, on his shape (2 hard days, 4 runs, 2 rides):**
+   * ```
+   *   nothing picked        457.7 ms      long run picked   50.5 ms
+   *   both long days         5.0 ms       fully pinned       0.1 ms
+   * ```
+   * ⚠️ Essentially unchanged from the 472 ms the trace report measured — stages 2, 4 and 5 did NOT
+   * help here, and neither did deleting the composer's Q-215 double-solve. Those were SERVER-side
+   * solves; this one is the client's own call into `week-model/resolve`. A phone is 3–5× these.
+   *
+   * ⛔ THE REAL DEFECT WAS THE DEPENDENCY LIST, NOT THE COST. Nothing outside the `schedule` step
+   * reads this — the two long-day pre-fills, the hard-day pre-fill and the health badge are all
+   * gated to it. But the memo was ungated, and its deps include `runDays`, `rideDays` and
+   * `swimDays`. So **tapping a ride-count chip on the VOLUME step ran a 457 ms exhaustive solve
+   * whose answer nobody reads until two screens later.** That is the chip that "lingers".
+   *
+   * ⚠️ AND WHY THE UNPINNED CASE IS THE EXPENSIVE ONE: `resolve` searches only the units that can
+   * break the law, and with nothing picked that is three lifts + two hard days + both long days —
+   * seven free constrained units, 7^7 candidates. Pin the long run and it is 7^6 and 50 ms. The card
+   * opens with nothing picked, so the FIRST solve is always the worst one.
+   *
+   * ⛔ DEFERRED, NOT DEBOUNCED. `useDeferredValue` re-renders with the PREVIOUS input first — the tap
+   * paints immediately with the last suggestion — and schedules the new solve at low priority. A
+   * debounce would make the answer arrive late by a fixed delay whether or not it was needed;
+   * this makes it arrive as soon as the browser is free. ⚠️ It does not make the solve itself
+   * interruptible: React cannot slice a synchronous `useMemo`. What it buys is that the TAP is never
+   * behind it.
+   */
+  const wizardSolveInput = React.useMemo(
+    () => ({
       hardDays: state.hardDays.map((h) => ({
         discipline: h.discipline, day: h.day, ownership: h.ownership,
       })),
@@ -2006,6 +2059,33 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     }),
     [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
       state.swimDays, state.posture?.swim],
+  );
+  /**
+   * ⛔ AND THE FIRST RENDER OF THE STEP IS ARMED ON THE NEXT FRAME, WHICH `useDeferredValue` ALONE
+   * DOES NOT DO. On React 18 it returns the value UNCHANGED on the initial render — there is no
+   * previous value to fall back to — so arriving at the schedule step would still pay the full
+   * unpinned solve before the card's first paint. (React 19's `initialValue` argument exists for
+   * exactly this; this project is on 18.3.)
+   *
+   * ⚠️ SO THE CARD PAINTS ONCE WITH NO SUGGESTION AND THE DAYS FILL IN ON THE NEXT FRAME. That is
+   * the right trade and not a compromise: these are SUGGESTIONS, the athlete can override every one
+   * of them, and the alternative is a frozen screen for as long as the solve takes — on his shape
+   * 457 ms on a desktop, and a phone is 3-5× that.
+   */
+  const [solveArmed, setSolveArmed] = useState(false);
+  React.useEffect(() => {
+    if (currentStep !== 'schedule') { setSolveArmed(false); return; }
+    const id = requestAnimationFrame(() => setSolveArmed(true));
+    return () => cancelAnimationFrame(id);
+  }, [currentStep]);
+  // ⚠️ `null` OFF THE SCHEDULE STEP, not a cheaper input — the answer is unused there, and computing
+  // one anyway is what this change exists to stop.
+  const deferredSolveInput = React.useDeferredValue(
+    currentStep === 'schedule' && solveArmed ? wizardSolveInput : null,
+  );
+  const wizardWeek = React.useMemo(
+    () => (deferredSolveInput ? solveWizardWeek(deferredSolveInput) : IDLE_WIZARD_WEEK),
+    [deferredSolveInput],
   );
   const suggestedHardDays = wizardWeek.hardDays;
   const suggestedLongDays = { run: wizardWeek.longRun, ride: wizardWeek.longRide };
@@ -4289,8 +4369,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   <span className="text-white/70 text-sm">across</span>
                   {/* ⚠️ 1/2/3/4 ON BOTH SPORTS. The ride cap was 3 in TWO places in the composer —
                       the hoisted count and a second re-derivation 1300 lines later — and raising
-                      only the picker would have silently discarded a 4. */}
-                  {[1, 2, 3, 4].map((n) => {
+                      only the picker would have silently discarded a 4.
+                      ⛔ AND IT DID, FOR TWO MORE DAYS (stage 4, 2026-08-21). `generate-strength-plan`
+                      held a FIFTH copy of this range, still `Math.min(3, …)`, so a 4 tapped here was
+                      rewritten one hop past the validator that had just accepted it — silently, with
+                      nothing logged. The range has ONE statement now and this row reads it.
+                      See `supabase/functions/_shared/athlete-weekly-intent.ts`. */}
+                  {RIDE_DAYS_CHOICES.map((n) => {
                     const on = (state.rideDays === n);
                     return (
                       <button
@@ -4767,11 +4852,32 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 own anchor, which is what leaves that anchor releasable —
                                 `anchor-days.ts` answers this for all three, so the lock is not
                                 re-derived here. A day another anchor holds renders NAMED ("Sat is
-                                your long ride"), never merely dead. */}
+                                your long ride"), never merely dead.
+
+                                ⛔⛔ AND IT WAS PASSING `{}` — the comment above described a lock the
+                                code did not apply (stage 3, 2026-08-21). That is why the long run
+                                and the long ride could both read Sunday. `anchorDaysTaken` exists,
+                                has six tests, and is already passed by the `DayPicker` calls on the
+                                standalone run and bike steps in this same file; this row was the one
+                                that dropped it.
+
+                                ⚠️ IT IS A BUG HERE AND NOT ON THE HARD-DAY ROW ABOVE, and the two
+                                must not be "made consistent". That row passes `{}` DELIBERATELY —
+                                *"two hard sessions on one day still builds as one, and the PLAN says
+                                so."* Two hard days sharing a date is a legal week the composer
+                                reports on. Two LONG days sharing one is the pin collision
+                                `strength-primary-plan.ts` keeps a backstop for, whose own comment
+                                says *"the real fix is at input — the day picker greys out and locks
+                                a day another anchor already holds, so the collision is never
+                                entered."* This is that input.
+
+                                ⚠️ `taken` LOCKS AS WELL AS LABELS (`WeekDayRow`: `off = disabled ||
+                                !!heldBy`), and the active question's own day is never in it, so the
+                                athlete can always release what they chose. */}
                             <WeekDayRow
                               selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
                               roles={scheduleRoles}
-                              taken={{}}
+                              taken={anchorDaysTaken(state, row.key === 'long' ? 'long run' : 'long ride')}
                               disabled={[]}
                               onTap={(d) => {
                                 touch(row.key === 'long' ? 'longRun' : 'longRide');
@@ -4787,7 +4893,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         ) : (
                           // COUNTS — the athlete says how many, `week-optimizer` says which days.
                           <div className="flex items-center gap-1.5">
-                            {(row.key === 'runs' ? [2, 3, 4] : [1, 2, 3]).map((n) => {
+                            {/* ⛔ THE RIDE ROW OFFERS 1/2/3/4, LIKE EVERY OTHER STATEMENT OF THIS
+                                RANGE (Michael, 2026-08-21). It said 1/2/3 while the volume card said
+                                1/2/3/4 and the wire validator accepted 4 — so an athlete could tap
+                                four rides on one screen and have this row quietly rewrite it to
+                                three on the next. ⚠️ HIS RULING WAS THAT THIS IS AN INTERNAL
+                                CONTRADICTION, NOT A DESIGN CHANGE: the ceiling was already 4
+                                everywhere that mattered, and Viada's own cycling programs run five
+                                or six rides a week — four is not a stretch, it was a stale cap.
+                                ⛔ It reads `RIDE_DAYS_CHOICES` now. One statement of the range. */}
+                            {(row.key === 'runs' ? [2, 3, 4] : RIDE_DAYS_CHOICES).map((n) => {
                               const sport = row.key === 'runs' ? 'run' : 'bike';
                               const on = (row.key === 'runs' ? state.runDays : state.rideDays) === n;
                               return (
@@ -5601,8 +5716,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 "6h40 each" and the mistake is obvious in a way the label alone was not. */}
             <div>
               <p className="text-white/85 text-sm mb-2">How many days to ride</p>
-              <div className="grid grid-cols-3 gap-1.5 max-w-[220px]">
-                {[1, 2, 3].map((n) => (
+              {/* ⛔ 1/2/3/4 (Michael, 2026-08-21) — the fifth and last statement of this range to be
+                  brought into line. It said 1/2/3 while the strength path's volume card said
+                  1/2/3/4, with one `state.rideDays` behind both. See
+                  `supabase/functions/_shared/athlete-weekly-intent.ts` for the full account of what
+                  six copies of one rule cost. */}
+              <div className="grid grid-cols-4 gap-1.5 max-w-[220px]">
+                {RIDE_DAYS_CHOICES.map((n) => (
                   <button
                     key={n} type="button" onClick={() => setState((s) => ({ ...s, rideDays: n }))}
                     className={`py-2 rounded-xl text-sm ${state.rideDays === n ? 'bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.16)] text-white border border-[rgb(var(--wiz-accent-rgb,236,233,227))]' : 'bg-white/[0.04] text-white/75 border border-white/12'}`}

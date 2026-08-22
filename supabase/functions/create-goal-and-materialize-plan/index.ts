@@ -38,6 +38,12 @@ import { TIER_SEEDS, type IntakeTier } from '../../../src/lib/run-volume-tables.
 import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
+/**
+ * ⛔ ONE STATEMENT OF THE RIDE-COUNT RANGE (stage 4, 2026-08-21). The inline `>= 1 && <= 4` that
+ * stood at the `gsRideDays` line below was the third of five copies of that rule; two of the five
+ * were still capped at 3. See `_shared/athlete-weekly-intent.ts`.
+ */
+import { normalizeRideDays, normalizeRideHours } from '../_shared/athlete-weekly-intent.ts';
 import {
   anchoredSwimSlotsForFocusPromotion,
   deriveRestDaysForBudget,
@@ -2550,8 +2556,9 @@ Deno.serve(async (req: Request) => {
             // spread); the bike now travels beside it instead of competing for the same slot.
             const gsSport = gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null;
             const gsBikeKept = gsPosture?.bike === 'maintain' && gsSport !== 'bike';
-            const gsRideHours = Number(gsTp.target_weekly_ride_hours) > 0
-              ? Number(gsTp.target_weekly_ride_hours) : undefined;
+            // ⛔ ONE OWNER FOR THE RIDE ASK (stage 4, 2026-08-21) — `_shared/athlete-weekly-intent.ts`.
+            // Hours, never miles (D-323 §6).
+            const gsRideHours = normalizeRideHours(undefined, gsTp.target_weekly_ride_hours) ?? undefined;
             const gsLongRide = (gsTp.preferred_days as Record<string, string> | undefined)?.long_ride;
             // How many days the ride hours spread across. Absent → the composer's own default.
             /**
@@ -2560,9 +2567,13 @@ Deno.serve(async (req: Request) => {
              * `undefined` here and fell back to the composer's default of 2. Their answer did not
              * survive the wire. ⚠️ The composer's own cap was `Math.min(3, …)` in TWO places and
              * both moved in the same change; this was the third.
+             *
+             * ⛔⛔ AND A FOURTH WAS STILL AT 3 UNTIL 2026-08-21 — `generate-strength-plan`, the very
+             * next hop. Raising the number in four files and missing the fifth is not a mistake a
+             * more careful session avoids; it is what an unowned rule does. The range now has ONE
+             * statement (`RIDE_DAYS_CHOICES`) and this line reads it.
              */
-            const gsRideDays = Number(gsTp.ride_days) >= 1 && Number(gsTp.ride_days) <= 4
-              ? Number(gsTp.ride_days) : undefined;
+            const gsRideDays = normalizeRideDays(gsTp.ride_days) ?? undefined;
             // Maintenance-endurance band (run only): the athlete's typed weekly miles + their learned easy
             // pace → the composer clamps to the science band. sec/km → min/mi = ×1.609344 ÷ 60. Absent
             // either → the composer falls to its fixed default (no band, no friction).
