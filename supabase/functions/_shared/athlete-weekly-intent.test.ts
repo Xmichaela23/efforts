@@ -21,13 +21,25 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import {
   buildRideIntent,
+  buildRunIntent,
+  normalizeRunDays,
+  normalizeRunMiles,
+  normalizeSwimDays,
+  resolveRunAsk,
+  resolveSwimAsk,
+  RUN_DAYS_CHOICES,
+  RUN_DAYS_DEFAULT,
+  SWIM_DAYS_CHOICES,
+  SWIM_DAYS_MAX,
   normalizeRideDays,
   normalizeRideHours,
   resolveRideAsk,
   RIDE_DAYS_CHOICES,
   RIDE_DAYS_DEFAULT,
   RIDE_HOURS_DEFAULT,
+  FALLBACK_EASY_MIN_PER_MILE,
   seatRideIntent,
+  seatRunIntent,
   suppliedDefaults,
 } from './athlete-weekly-intent.ts';
 
@@ -230,4 +242,178 @@ Deno.test('⛔ BYTE-IDENTICAL: the object agrees with the code it replaced, on e
   // passing vacuously — the exact way two of the three test files written on 2026-08-19 lied.
   assertEquals(checked, bikeShapes.length * 3 * 2 * 4);
   assertEquals(checked, 432);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE RUN (stage 4 run half, 2026-08-22) — same shape, same gate, same table.
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ ONE RUN A WEEK IS A LEGAL ANSWER — the floor was a hard 2 and overrode it', () => {
+  // Michael, 2026-08-19. The floor was `Math.max(DEFAULT_ENDURANCE_SESSIONS, …)`, so an athlete who
+  // asked for ONE run got TWO built and the screen and the plan disagreed about the week the athlete
+  // had described. 2 is Hickson's maintenance dose — an argument for what to RECOMMEND, never for
+  // overwriting a stated answer.
+  assertEquals(normalizeRunDays(1), 1);
+  for (const n of RUN_DAYS_CHOICES) assertEquals(normalizeRunDays(n), n);
+  assertEquals(normalizeRunDays(9), 4);
+  assertEquals(normalizeRunDays(-3), 1);
+});
+
+Deno.test('⛔ RUN "not an answer" is null — 0 is malformed, not "no running"', () => {
+  // ⚠️ ZERO RUNS IS `selected: false`, decided by the four positive signals — never by a 0 in the
+  // count. The composer's own comment said exactly this before the function existed.
+  for (const raw of [undefined, null, '', 0, NaN, 'three', {}]) {
+    assertEquals(normalizeRunDays(raw), null, `expected no answer from ${JSON.stringify(raw)}`);
+  }
+});
+
+Deno.test('⛔ SELECTION NEEDS A POSITIVE SIGNAL — never the defaulted frequency', () => {
+  // `enduranceFrequency` arrives from `create-goal` with a default of 2 even for a bike-only
+  // athlete, so reading THAT as selection invents a sport nobody asked for.
+  const bikeOnly = resolveRunAsk({ enduranceFrequency: 2, primaryIsRun: false, hasHardRun: false, resolveDay: asDay });
+  assertEquals(bikeOnly.selected, false, 'a defaulted frequency selected the run');
+  assertEquals(bikeOnly.askedDays, 0);
+  assertEquals(bikeOnly.longDay, null);
+  // Each of the four signals selects on its own.
+  assert(resolveRunAsk({ primaryIsRun: true, hasHardRun: false, resolveDay: asDay }).selected, 'primary sport');
+  assert(resolveRunAsk({ targetWeeklyMiles: 18, primaryIsRun: false, hasHardRun: false, resolveDay: asDay }).selected, 'typed miles');
+  assert(resolveRunAsk({ longRunDay: 'sunday', primaryIsRun: false, hasHardRun: false, resolveDay: asDay }).selected, 'a long-run day');
+  assert(resolveRunAsk({ primaryIsRun: false, hasHardRun: true, resolveDay: asDay }).selected, 'a hard run');
+});
+
+Deno.test('⛔ THE LONG RUN IS A SESSION, NOT AN EXTRA — the 2026-08-19 table, row by row', () => {
+  const ask = (days: number) =>
+    resolveRunAsk({ enduranceFrequency: days, primaryIsRun: true, hasHardRun: true, resolveDay: asDay });
+  const seat = (days: number, hard: number) => seatRunIntent(ask(days), hard);
+  // asked 1, hard 0 -> 1 long
+  assertEquals(seat(1, 0).daysAfterHard, 1); assert(seat(1, 0).hasLongDay); assertEquals(seat(1, 0).easyWanted, 0);
+  // asked 1, hard 1 -> 1 hard, and the single session carries the role
+  assertEquals(seat(1, 1).daysAfterHard, 0); assertEquals(seat(1, 1).hasLongDay, false); assertEquals(seat(1, 1).easyWanted, 0);
+  // asked 2, hard 1 -> long + hard
+  assertEquals(seat(2, 1).daysAfterHard, 1); assert(seat(2, 1).hasLongDay); assertEquals(seat(2, 1).easyWanted, 0);
+  // asked 2, hard 2 -> 2 hard. ⛔ This built THREE before the fix.
+  assertEquals(seat(2, 2).daysAfterHard, 0); assertEquals(seat(2, 2).hasLongDay, false); assertEquals(seat(2, 2).easyWanted, 0);
+  // asked 3, hard 1 -> long + easy + hard
+  assertEquals(seat(3, 1).daysAfterHard, 2); assert(seat(3, 1).hasLongDay); assertEquals(seat(3, 1).easyWanted, 1);
+});
+
+Deno.test('⛔ THE RUN AND THE RIDE DISAGREE ON `hasLongDay`, AND BOTH ARE RIGHT', () => {
+  // A long RIDE exists only when the athlete PINNED a day — the engine never invents one. A long RUN
+  // exists whenever a session is left over, pinned or not, because an unpinned long run falls to
+  // `DEFAULT_LONG_DAY`. ⚠️ Making them agree would either invent a long ride nobody asked for or
+  // delete the long run of every athlete who never answered that question.
+  const runNoPin = buildRunIntent({ enduranceFrequency: 3, primaryIsRun: true, hasHardRun: false, resolveDay: asDay }, 0);
+  assertEquals(runNoPin.longDay, null);
+  assertEquals(runNoPin.hasLongDay, true, 'an unpinned long run stopped existing');
+  const rideNoPin = buildRideIntent({ bike: { days: 3 }, primaryIsBike: false, resolveDay: asDay }, 0);
+  assertEquals(rideNoPin.longDay, null);
+  assertEquals(rideNoPin.hasLongDay, false, 'an unpinned long ride was invented');
+});
+
+Deno.test('⛔ MILES ARE MILES AND THE PACE FALLBACK IS NAMED AS OURS', () => {
+  const typed = resolveRunAsk({
+    targetWeeklyMiles: 18, easyPaceMinPerMile: 9, primaryIsRun: true, hasHardRun: false, resolveDay: asDay,
+  });
+  assertEquals(typed.miles, 18);
+  assertEquals(typed.milesSource, 'answered');
+  assertEquals(typed.easyPaceMinPerMile, 9);
+  assertEquals(typed.paceSource, 'answered');
+  assertEquals(typed.paceOrFallback, 9);
+  const unlearned = resolveRunAsk({ targetWeeklyMiles: 18, primaryIsRun: true, hasHardRun: false, resolveDay: asDay });
+  // ⚠️ `null` IS NOT SLOW. An unlearned pace is "we have not asked", and the two readings are named
+  // separately so the copy the athlete sees and the arithmetic cannot drift.
+  assertEquals(unlearned.easyPaceMinPerMile, null);
+  assertEquals(unlearned.paceSource, 'default');
+  assertEquals(unlearned.paceOrFallback, FALLBACK_EASY_MIN_PER_MILE);
+  assertEquals(normalizeRunMiles(0), null);
+  assertEquals(normalizeRunMiles(undefined), null);
+});
+
+// ── THE SWIM — consolidation only ───────────────────────────────────────────────────────────────
+
+Deno.test('⛔ THE SWIM IS A COUNT AND NOTHING ELSE (D-323 §5 — booked, not coached)', () => {
+  const two = resolveSwimAsk({ swimDays: 2 });
+  assertEquals(two, { selected: true, askedDays: 2, askedDaysSource: 'answered' });
+  // ⛔ NO DEFAULT IS SUPPLIED, and that is the standing decision: an unanswered swim is no swim, and
+  // the app never books a session the athlete did not ask for.
+  assertEquals(resolveSwimAsk({}).selected, false);
+  assertEquals(resolveSwimAsk({}).askedDays, 0);
+  assertEquals(resolveSwimAsk({ swimDays: 0 }).askedDays, 0);
+  // ⚠️ The screen offers 1/2/3; the WIRE has always accepted 4, which is the safe direction — it is
+  // how a goal row stored under an older picker still rebuilds.
+  assertEquals(SWIM_DAYS_CHOICES[SWIM_DAYS_CHOICES.length - 1], 3);
+  assertEquals(normalizeSwimDays(4), SWIM_DAYS_MAX);
+  assertEquals(normalizeSwimDays(9), 4, 'the wire clamp is no longer SWIM_DAYS_MAX');
+});
+
+/**
+ * ⛔ THE BYTE-IDENTICAL GATE FOR THE RUN. Same method as the ride's: keep the composer's originals
+ * and run both. Copied verbatim from `strength-primary-plan.ts` before the swap:
+ *
+ *   askedRunMiles  = Number(args.targetWeeklyMiles) > 0 ? Number(args.targetWeeklyMiles) : 0
+ *   runSelected    = enduranceSport === 'run' || askedRunMiles > 0 || !!asDay(args.longRunDay)
+ *                    || hardRunCount > 0
+ *   longRunPin     = runSelected ? asDay(args.longRunDay) : null
+ *   askedRunDays   = runSelected ? Math.max(1, Math.min(4, Math.round(Number(args.enduranceFrequency) || 2))) : 0
+ *   runFreq        = runSelected ? Math.max(0, askedRunDays - hardRunCount) : 0
+ *   runHasLongDay  = runSelected && runFreq > 0
+ *   easyRunsWanted = runSelected ? Math.max(0, runFreq - (runHasLongDay ? 1 : 0)) : 0
+ *   weeklyRunHours = miles > 0 && pace > 0 ? (miles * pace) / 60 : null
+ */
+// deno-lint-ignore no-explicit-any
+function composerRunOriginal(args: any, primaryIsRun: boolean, hardRunCount: number) {
+  const askedRunMiles = Number(args.targetWeeklyMiles) > 0 ? Number(args.targetWeeklyMiles) : 0;
+  const runSelected = primaryIsRun || askedRunMiles > 0 || !!asDay(args.longRunDay)
+    || hardRunCount > 0;
+  const longRunPin = runSelected ? asDay(args.longRunDay) : null;
+  const askedRunDays = runSelected
+    ? Math.max(1, Math.min(4, Math.round(Number(args.enduranceFrequency) || 2)))
+    : 0;
+  const runFreq = runSelected ? Math.max(0, askedRunDays - hardRunCount) : 0;
+  const runHasLongDay = runSelected && runFreq > 0;
+  const easyRunsWanted = runSelected ? Math.max(0, runFreq - (runHasLongDay ? 1 : 0)) : 0;
+  const weeklyRunHours = Number(args.targetWeeklyMiles) > 0 && Number(args.easyPaceMinPerMile) > 0
+    ? (Number(args.targetWeeklyMiles) * Number(args.easyPaceMinPerMile)) / 60
+    : null;
+  return { askedRunMiles, runSelected, longRunPin, askedRunDays, runFreq, runHasLongDay, easyRunsWanted, weeklyRunHours };
+}
+
+Deno.test('⛔ BYTE-IDENTICAL: the run object agrees with the code it replaced, on every shape', () => {
+  let checked = 0;
+  for (const targetWeeklyMiles of [undefined, 0, 7, 18, 30]) {
+    for (const easyPaceMinPerMile of [undefined, 0, 9]) {
+      for (const longRunDay of [undefined, 'sunday', 'Saturday', 'nonsense']) {
+        for (const enduranceFrequency of [undefined, 0, 1, 2, 4, 9, 0.4]) {
+          for (const primaryIsRun of [false, true]) {
+            for (const hardRunCount of [0, 1, 2]) {
+              const args = { targetWeeklyMiles, easyPaceMinPerMile, longRunDay, enduranceFrequency };
+              const was = composerRunOriginal(args, primaryIsRun, hardRunCount);
+              const now = buildRunIntent(
+                { ...args, primaryIsRun, hasHardRun: hardRunCount > 0, resolveDay: asDay },
+                hardRunCount,
+              );
+              const where = `miles=${targetWeeklyMiles} pace=${easyPaceMinPerMile} long=${longRunDay} `
+                + `freq=${enduranceFrequency} primary=${primaryIsRun} hard=${hardRunCount}`;
+              assertEquals(now.selected, was.runSelected, `selected · ${where}`);
+              assertEquals(now.longDay, was.longRunPin, `longDay · ${where}`);
+              assertEquals(now.askedDays, was.askedRunDays, `askedDays · ${where}`);
+              assertEquals(now.daysAfterHard, was.runFreq, `daysAfterHard · ${where}`);
+              assertEquals(now.hasLongDay, was.runHasLongDay, `hasLongDay · ${where}`);
+              assertEquals(now.easyWanted, was.easyRunsWanted, `easyWanted · ${where}`);
+              // The miles reading: `null` here is the old `0`, and both mean "never stated".
+              assertEquals(now.miles ?? 0, was.askedRunMiles, `miles · ${where}`);
+              const nowHours = now.miles != null && now.easyPaceMinPerMile != null
+                ? (now.miles * now.easyPaceMinPerMile) / 60
+                : null;
+              assertEquals(nowHours, was.weeklyRunHours, `weeklyRunHours · ${where}`);
+              checked++;
+            }
+          }
+        }
+      }
+    }
+  }
+  // ⚠️ Asserted so a future edit that empties the table fails rather than passing vacuously.
+  assertEquals(checked, 5 * 3 * 4 * 7 * 2 * 3);
+  assertEquals(checked, 2520);
 });

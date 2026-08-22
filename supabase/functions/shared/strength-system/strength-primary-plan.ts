@@ -112,7 +112,11 @@ import { requiredAdjacencyHours } from '../../_shared/schedule-session-constrain
  * ninth (`weeklyRideHours`) that resolved the same hours a second way. It is one object now. The
  * file that owns it carries the full account of what that cost.
  */
-import { buildRideIntent } from '../../_shared/athlete-weekly-intent.ts';
+import {
+  buildRideIntent,
+  buildRunIntent,
+  resolveSwimAsk,
+} from '../../_shared/athlete-weekly-intent.ts';
 // ⛔ `easyRunAnchorAdjacencyPenalty` IS NO LONGER IMPORTED (stage 5, 2026-08-21). It was imported
 // here and NEVER CALLED — the four other mentions in this file are comments recording that the
 // second scorer it belonged to was deleted. The import alone pulled all 2,434 lines of
@@ -2976,13 +2980,16 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * screen says so and the number still stands. ⛔ Do not reintroduce a cap here; that is D-222's
    * ceiling wearing a different name, and it has now been built and retired twice.
    *
-   * ⚠️ WHAT SURVIVED FROM THE INFERENCE PASS is the part that was never about priority: `runSelected`
-   * / `rideIntent.selected`. A sport the athlete chose must never silently vanish, and knowing which
+   * ⚠️ WHAT SURVIVED FROM THE INFERENCE PASS is the part that was never about priority:
+   * `runIntent.selected` / `rideIntent.selected`. A sport the athlete chose must never silently vanish, and knowing which
    * were chosen is what makes that checkable. Selection needs a POSITIVE signal — `enduranceFrequency`
    * arrives from `create-goal` with a default of 2 even for a bike-only athlete, so reading it as
    * selection invents a sport nobody asked for.
    */
-  const askedRunMiles = Number(args.targetWeeklyMiles) > 0 ? Number(args.targetWeeklyMiles) : 0;
+  // ⛔ `askedRunMiles` STOOD HERE (stage 4 run half, 2026-08-22). The typed miles, the easy pace,
+  // the run count and the long-run day were four loose reads of `args` scattered across 1,200 lines;
+  // they are one object now — `runIntent`, built below beside the ride's, for the same reason and
+  // with the same contract. See `_shared/athlete-weekly-intent.ts`.
   /**
    * ⛔ THE WEEK'S HARD DAYS, RESOLVED ONCE (§1i, 2026-08-17). Every site below reads THIS, not
    * `args.hardDays` — the raw input is athlete-supplied and the guarantees the rest of the file
@@ -3156,8 +3163,29 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   /** Counts are known before placement — a hard day costs its discipline a slot wherever it lands. */
   const hardRunCount = gatedHardDays.filter((h) => h.discipline === 'run').length;
   const hardRideCount = gatedHardDays.filter((h) => h.discipline === 'bike').length;
-  const runSelected = enduranceSport === 'run' || askedRunMiles > 0 || !!asDay(args.longRunDay)
-    || hardRunCount > 0;
+  /**
+   * ⛔ THE RUN ASK, RESOLVED ONCE (stage 4 run half, 2026-08-22). Every run site below reads THIS.
+   *
+   * Built HERE and not earlier for the same reason the ride's is: `seatRunIntent` needs
+   * `hardRunCount`, and the object's contract is that the subtraction is already done by the time
+   * anyone reads it. ⚠️ The run needs the hard count for SELECTION too, not only for seating — a
+   * hard run means the athlete runs, whatever else they did or did not type — which is why the ask
+   * takes `hasHardRun` rather than deriving it.
+   */
+  const runIntent = buildRunIntent<DayName>({
+    targetWeeklyMiles: args.targetWeeklyMiles,
+    easyPaceMinPerMile: args.easyPaceMinPerMile,
+    enduranceFrequency: args.enduranceFrequency,
+    longRunDay: args.longRunDay,
+    primaryIsRun: enduranceSport === 'run',
+    hasHardRun: hardRunCount > 0,
+    resolveDay: asDay,
+  }, hardRunCount);
+  /**
+   * ⛔ THE SWIM IS A COUNT AND STAYS ONE (D-323 §5 — booked, not coached). This object consolidates
+   * where that count is stored and adds nothing: no long day, no volume, no session template.
+   */
+  const swimIntent = resolveSwimAsk({ swimDays: args.swimDays });
   /**
    * ⛔ THE RIDE ASK, RESOLVED ONCE (stage 4, 2026-08-21). Every ride site below reads THIS.
    *
@@ -3172,8 +3200,9 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     resolveDay: asDay,
   }, hardRideCount);
 
-  const longRunPin = runSelected ? asDay(args.longRunDay) : null;
-  if (longRunPin) pins.push({ day: longRunPin, kind: 'long_run', label: 'your long run' });
+  if (runIntent.longDay) {
+    pins.push({ day: runIntent.longDay, kind: 'long_run', label: 'your long run' });
+  }
   // ⛔ THE LONG RIDE PINS TOO. It is a leg-dominant LONG session, so the law gives it the same 48h
   // clearance from heavy lower-body work as the long run (`schedule-session-constraints.ts`). Until
   // now it was collected at intake, written to the goal, and never forwarded — so the bar was placed
@@ -3207,11 +3236,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    */
   // ⚠️ ONLY A LEADING SPORT GETS A DEFAULT LONG DAY. A sport held at maintenance is easy volume by
   // definition — inventing a long run for it would be the engine adding a session nobody asked for.
-  // A long day the athlete PINNED is still honoured either way (`longRunPin`, above).
+  // A long day the athlete PINNED is still honoured either way (`runIntent.longDay`, above).
   // ⚠️ THIS GUARD STAYS, AND IT IS NOT THE ABSORPTION BUG. The others dropped a day the ATHLETE
   // CHOSE; this one declines to invent a DEFAULT on a day already spoken for. Never adding an
   // unrequested session is the opposite failure from silently removing a requested one.
-  if (!longRunPin && runSelected && !pins.some((p) => p.day === DEFAULT_LONG_DAY)) {
+  if (!runIntent.longDay && runIntent.selected && !pins.some((p) => p.day === DEFAULT_LONG_DAY)) {
     pins.push({ day: DEFAULT_LONG_DAY as DayName, kind: 'long_run', label: 'your long run' });
   }
   // ⛔ GUARD REMOVED (2026-08-09) — same absorption. The hard day was LAST in this order, so it lost
@@ -3358,7 +3387,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       ];
   // ⛔ THE HARD DAY IS ONE OF THE RUN DAYS, NOT AN EXTRA ONE.
   //
-  // `runFreq` counted only the EASY runs and the hill session was pushed on top, so an athlete who
+  // The run count once counted only the EASY runs and the hill session was pushed on top, so an athlete who
   // asked for three run days got four: three easy runs plus hills. It also over-spent the mileage —
   // the typed weekly miles were distributed across all three easy runs and then a fourth running
   // session was added outside the budget entirely.
@@ -3367,7 +3396,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // run. The block carries ONE hard aerobic session (D-327), so when it is a run it consumes one of
   // the days the athlete asked for rather than arriving beside them.
   //
-  // ⚠️ Floor of 1 easy run: even at runFreq 2 with a hard day, the long run survives. The doctrine's
+  // ⚠️ Floor of 1 easy run: even at 2 run days with a hard day, the long run survives. The doctrine's
   // precondition is easy volume (parent §4) — a week of nothing but the hard session is the one
   // shape it explicitly rules out.
   /**
@@ -3378,53 +3407,13 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * 2/3/4 runs and 1/2/3 rides are wizard answers and this file's job is to seat them.
    */
   /**
-   * ⛔ ONE SESSION A WEEK IS A LEGAL ANSWER (Michael, 2026-08-19). The floor was
-   * `Math.max(DEFAULT_ENDURANCE_SESSIONS, …)` — a hard 2 — so an athlete who asked for ONE run got
-   * TWO built, and the screen and the plan disagreed about the week the athlete had described.
-   *
-   * ⚠️ THE FLOOR WAS NOT ARBITRARY: 2 is the maintenance dose the aerobic base holds on (Hickson).
-   * But that is an argument for what to RECOMMEND, not for overriding a stated answer — the same
-   * "the picked count is built, full stop" rule the comment above already states for 2/3/4.
-   *
-   * ⚠️ `|| DEFAULT` STILL CATCHES 0 AND NaN, and that is correct here rather than the usual trap:
-   * zero runs is expressed by `runSelected` being false, not by a 0 in this field, so a 0 arriving
-   * here is a malformed input rather than an answer.
+   * ⛔ THE RUN COUNTS ARE NOT DERIVED HERE ANY MORE (stage 4 run half, 2026-08-22). `askedRunDays`,
+   * `runFreq`, `runHasLongDay` and `easyRunsWanted` stood on these lines; they are
+   * `runIntent.askedDays`, `.daysAfterHard`, `.hasLongDay` and `.easyWanted`, resolved once beside
+   * the hard-day counts above. Their reasoning moved WITH them into
+   * `_shared/athlete-weekly-intent.ts`, unchanged — the 1-4 range and why 1 is a real answer, the
+   * hard run being one of the picked days, and the long run being a session rather than an extra.
    */
-  const askedRunDays = runSelected
-    ? Math.max(1, Math.min(4, Math.round(Number(args.enduranceFrequency) || DEFAULT_ENDURANCE_SESSIONS)))
-    : 0;
-  /**
-   * ⛔ THE HARD SESSIONS ARE DAYS THEY PICKED, NOT EXTRA ONES. Three run days with one hard run
-   * means one hard and two easy — never three easy plus a hill session on top, which is the +27%
-   * overage this file already fixed once for the miles.
-   *
-   * ⛔ AND IT SUBTRACTS THE COUNT NOW, NOT A BOOLEAN (§1i). `hardDayIsRun` was `true`/`false` and
-   * this subtracted exactly 1; two hard runs would have booked one of them on top of the athlete's
-   * asked-for count — the same overage, arriving through the door that was just widened.
-   * ⚠️ FLOORED AT 1 so a 2-run week with two hard runs still leaves a run to be long.
-   */
-  /**
-   * ⛔⛔ THE FLOOR-AT-1 WAS ITSELF AN OVERAGE (found 2026-08-19, opening the count to 1).
-   *
-   * It read `Math.max(1, askedRunDays - hardRunCount)` so that *"a 2-run week with two hard runs
-   * still leaves a run to be long"* — which is exactly the +1 it was written to prevent one line
-   * up. Two asked, two hard, and the block built THREE: a long run nobody had room for. The same
-   * arithmetic gave an athlete asking for ONE run a long run PLUS a hill session.
-   *
-   * ⛔ THE LONG RUN IS A SESSION, NOT AN EXTRA. There is one only when a session is left over after
-   * the hard days are seated. `runFreq` is now that leftover, floored at ZERO, and the long day
-   * exists only when it is positive.
-   *
-   *   asked 1, hard 0  ->  1 long
-   *   asked 1, hard 1  ->  1 hard          (the single session carries the role)
-   *   asked 2, hard 1  ->  long + hard
-   *   asked 2, hard 2  ->  2 hard          (was long + 2 hard = 3)
-   *   asked 3, hard 1  ->  long + easy + hard
-   */
-  const runFreq = runSelected ? Math.max(0, askedRunDays - hardRunCount) : 0;
-  /** A long day exists when a session is left over after the hard ones are seated. */
-  const runHasLongDay = runSelected && runFreq > 0;
-  const easyRunsWanted = runSelected ? Math.max(0, runFreq - (runHasLongDay ? 1 : 0)) : 0;
   /**
    * ⛔ THE RIDE COUNTS ARE NOT DERIVED HERE ANY MORE (stage 4, 2026-08-21). `askedRideDays`,
    * `rideHasLongDay` and `ridesWanted` stood on these lines; they are `rideIntent.askedDays`,
@@ -3465,7 +3454,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
       name: `hard:${i}`,
       kind: h.discipline === 'bike' ? ('quality_bike' as const) : ('quality_run' as const),
     })),
-    ...Array.from({ length: easyRunsWanted }, (_, i) => ({ name: `easy_run:${i}`, kind: 'easy_run' as const })),
+    ...Array.from({ length: runIntent.easyWanted }, (_, i) => ({ name: `easy_run:${i}`, kind: 'easy_run' as const })),
     ...Array.from({ length: rideIntent.easyWanted }, (_, i) => ({ name: `easy_bike:${i}`, kind: 'easy_bike' as const })),
   ];
 
@@ -3820,7 +3809,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   const FALLBACK_EASY_MIN_PER_MILE = FALLBACK_EASY_MIN_PER_MILE_SHARED;
 
   // ⚠️ THE RUN/RIDE COUNTS ARE DERIVED ABOVE, BEFORE THE SOLVE (2026-08-08) — they are an input to
-  // it now, not a consequence of it. See `askedRunDays` / `runFreq` / `easyRunsWanted` /
+  // it now, not a consequence of it. See `runIntent.askedDays` / `.daysAfterHard` / `.easyWanted` /
   // `rideIntent.easyWanted` beside the anchors.
   const upperLiftDays = MAIN_LIFTS.filter((l) => !l.isLower).map(liftDay);
   // ⛔ THE Sat/Sun COERCION IS GONE (2026-07-26). It read:
@@ -3847,7 +3836,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // day. Otherwise put the long run on an upper-lift day and let it stack, which is what the working
   // weeks were silently doing all along.
   const defaultLong = DEFAULT_LONG_DAY;
-  const easyRunsNeeded = Math.max(0, runFreq - 1); // the long run is one of `runFreq`
+  const easyRunsNeeded = Math.max(0, runIntent.daysAfterHard - 1); // the long run is one of them
   // ⛔ THE LONG RUN KEEPS ITS DAY; THE EASY RUNS ARE WHAT STACK. Corrected 2026-08-05.
   //
   // A first version of this reversed the priority: when free days were tight it moved the LONG run
@@ -3860,8 +3849,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // athlete gets their longest session mid-week. The easy run carries no such expectation, and the
   // stacking fallback below already exists for it.
   //
-  // ⚠️ AND IT ONLY EVER APPLIED TO THE UNPINNED CASE — `longRunPin` has always won outright.
-  const pickedLong = longRunPin ?? defaultLong;
+  // ⚠️ AND IT ONLY EVER APPLIED TO THE UNPINNED CASE — `runIntent.longDay` has always won outright.
+  const pickedLong = runIntent.longDay ?? defaultLong;
   // ⛔ ONE FULL REST DAY IS RESERVED BEFORE ANY EASY RUN IS PLACED, and this is not a detail.
   //
   // `placedWeek.freeDays` means "carries neither a lift nor a pin" — it is NOT "spare". An earlier
@@ -3946,7 +3935,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    *     explicit relaxation rung — the same "held back, yielded only if the week genuinely cannot
    *     hold the ask" semantics, enforced in one place instead of four.
    *
-   * ⚠️ WHAT DID NOT MOVE: the COUNTS. `easyRunsWanted` / `rideIntent.easyWanted` are still the ask,
+   * ⚠️ WHAT DID NOT MOVE: the COUNTS. `runIntent.easyWanted` / `rideIntent.easyWanted` are still the ask,
    * still derived from the athlete's answers, and still reported when the week cannot seat them.
    * The solver was given a placement job, not a dosing one.
    */
@@ -3969,10 +3958,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * model computed and the count the week authored disagreed, silently, in the athlete's favour by
    * one session.
    *
-   * ⚠️ A PINNED long day still counts: `runHasLongDay` is true whenever the athlete named one, so
+   * ⚠️ A PINNED long day still counts: `runIntent.hasLongDay` is true whenever the athlete named one, so
    * their choice is honoured at maintenance too — it is only the ENGINE'S default that is withheld.
    */
-  const enduranceDays: string[] = runHasLongDay ? [pickedLong, ...easyRunDays] : [...easyRunDays];
+  const enduranceDays: string[] = runIntent.hasLongDay ? [pickedLong, ...easyRunDays] : [...easyRunDays];
   const runDayList: string[] = [...enduranceDays];
   // ⛔ THE HARD DAY IS ALREADY A RUN. Fixed 2026-07-27, surfaced the moment the solver started
   // stacking onto the hard-run day: an upper lift landed on Tuesday, Tuesday was therefore an
@@ -4048,7 +4037,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ⚠️ A SHORTFALL IS STILL POSSIBLE AND IS STILL REPORTED. `solveWithFlexible` reduces the ask one
    * session at a time when the week genuinely cannot hold it; the note below is what says so.
    */
-  const runShortfall = Math.max(0, easyRunsWanted - easyRunDays.length);
+  const runShortfall = Math.max(0, runIntent.easyWanted - easyRunDays.length);
 
   const longRunDay = pickedLong;
 
@@ -4058,12 +4047,15 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
   // ⛔ SELECTION, NOT PRIMACY (2026-08-08). This read `enduranceSport === 'run'`, so a bike-primary
   // athlete's typed miles were never turned into minutes and every run they asked for came out
   // unsized — which is why the run pass below could drop them without anything noticing.
-  if (runSelected && (args.targetWeeklyMiles ?? 0) > 0 && runDayList.length > 0) {
-    const paceKnown = (args.easyPaceMinPerMile ?? 0) > 0;
-    const pace = paceKnown ? args.easyPaceMinPerMile! : FALLBACK_EASY_MIN_PER_MILE;
+  if (runIntent.selected && runIntent.miles != null && runDayList.length > 0) {
+    // ⛔ ONE RESOLUTION, TWO NAMED READINGS (stage 4 run half, 2026-08-22). `paceKnown` was a fifth
+    // read of `args.easyPaceMinPerMile` and the fallback was applied here; both live on the intent
+    // now, so the number the copy admits to and the number the arithmetic uses cannot drift.
+    const paceKnown = runIntent.paceSource === 'answered';
+    const pace = runIntent.paceOrFallback;
     // Soft reference band — NOT a clamp. HONOR the athlete's typed miles; surface the tradeoff
     // client-side (volume_state), never cap or bump. Easy-intensity guardrail stays.
-    const asked = Math.round(args.targetWeeklyMiles!);
+    const asked = Math.round(runIntent.miles);
     const held = Math.max(1, asked);
     volume_state = volumeStateForMiles(asked, pace);
     if (!paceKnown) {
@@ -4164,8 +4156,12 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
    * ⚠️ AND UNDEFINED IS NOT ZERO. An athlete with no volume figure lands in `survival`, not
    * `strength` — §0h: unknown is "we have not asked", never "they do nothing".
    */
-  const weeklyRunHours = Number(args.targetWeeklyMiles) > 0 && Number(args.easyPaceMinPerMile) > 0
-    ? (Number(args.targetWeeklyMiles) * Number(args.easyPaceMinPerMile)) / 60
+  // ⛔ THE STATED MILES AGAINST THE STATED PACE — never the fallback. `null` here means "we cannot
+  // say", and §0h is explicit that unknown is *"we have not asked"* and never *"they do nothing"*:
+  // an athlete with no figure lands in `survival`, not `strength`. Using `paceOrFallback` would turn
+  // a missing pace into a confident number and move them a tier.
+  const weeklyRunHours = runIntent.miles != null && runIntent.easyPaceMinPerMile != null
+    ? (runIntent.miles * runIntent.easyPaceMinPerMile) / 60
     : null;
   // ⛔ THE HOURS, AS STATED — `null` means never stated, not zero. This resolved them a SECOND way
   // (the ride pass 500 lines down had its own copy with a default of 2 bolted on), so one athlete's
@@ -4193,7 +4189,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     totalHours: totalEnduranceHours,
   });
   /** ⛔ ANY swimming at all, never a yardage — see `AssistanceScaleInputs.swimming`. */
-  const isSwimming = (args.swimDays ?? 0) > 0;
+  const isSwimming = swimIntent.selected;
 
   // ── The weeks ─────────────────────────────────────────────────────────────
   const sessions_by_week: Record<string, PlanSession[]> = {};
@@ -4569,7 +4565,7 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     // assumption at its last and most damaging point: whatever the priority model decided, a
     // non-run-primary block emitted no runs at all. A sport the athlete selected always reaches a
     // session; if it genuinely cannot fit, that is the refusal below, not a silent omission.
-    if (runSelected) {
+    if (runIntent.selected) {
       runDayList.forEach((day) => {
         // ⛔ CITATION REMOVED 2026-07-26. This read "...back-to-back is fine [Petré 2021]." Petré 2021
         // is a strength-development meta-analysis BY TRAINING STATUS — it says nothing about session
@@ -4602,11 +4598,11 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
           : (runStackedWithLift
             ? ` Shares the day with the lift: the lift goes first. The run is easy, so back to back is fine.`
             : undefined);
-        // ⚠️ A MAINTENANCE RUN HAS NO LONG SESSION — `runHasLongDay` is false unless the run leads
+        // ⚠️ A MAINTENANCE RUN HAS NO LONG SESSION — `runIntent.hasLongDay` is false unless the run leads
         // or the athlete pinned a long day, and then every day of it is easy by definition.
         weekSessions.push(enduranceSession(
           'run', day, runMinutesByDay[day], note,
-          runHasLongDay && day === longRunDay ? 'long' : 'easy', isStandalone,
+          runIntent.hasLongDay && day === longRunDay ? 'long' : 'easy', isStandalone,
         ));
       });
       // ⛔ THE HARD DAY GETS FILLED. Until now the pin reserved a day and nothing was authored for
@@ -4735,8 +4731,8 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
        * `Wed Easy Ride · Fri Threshold Ride · Sat Long Ride` — three ride days, exactly the answer —
        * carried *"You asked for 3 ride days; the week had room for 2."* on the plan description.
        *
-       * ⚠️ EVERY OTHER COUNT IN THIS FILE ALREADY SUBTRACTS. `runFreq` (`:3142`) takes
-       * `askedRunDays - hardRunCount` — Michael's rule, *"one of the runs is the hill session."*
+       * ⚠️ EVERY OTHER COUNT IN THIS FILE ALREADY SUBTRACTS. `runIntent.daysAfterHard` takes
+       * `askedDays - hardCount` — Michael's rule, *"one of the runs is the hill session."*
        * `rideIntent.easyWanted` takes `askedDays - long - hardCount`, and the account above
        * it states this rule outright: *"when the hard day is a RIDE it is one of the picked ride
        * days too, exactly as the hard run is one of the run days."*
@@ -4897,10 +4893,10 @@ export function composeStrengthPrimaryPlan(args: StrengthPrimaryArgs): {
     }
 
     // Swim last, so it only takes days nothing else wanted.
-    if ((args.swimDays ?? 0) > 0) {
+    if (swimIntent.selected) {
       const taken = new Set(weekSessions.map((x) => x.day));
       const free = DAYS.filter((d) => !taken.has(d));
-      swimSessions(free, args.swimDays!).forEach((x) => weekSessions.push(x));
+      swimSessions(free, swimIntent.askedDays).forEach((x) => weekSessions.push(x));
     }
 
     /**

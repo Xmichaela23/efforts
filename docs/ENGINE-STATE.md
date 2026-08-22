@@ -23,129 +23,141 @@ A current snapshot of what's load-bearing, what's known broken, and what's belie
 > ⛔ **When you supersede an entry — including an archived one — GO BACK AND ANNOTATE IT.** See `CLAUDE.md`.
 
 ---
-## 🧭 NEXT SESSION — START HERE (2026-08-22 — **the six-stage work order is COMPLETE. Nothing has been seen on a device. The next job is Michael's, not a stage 7.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-22 — **the swaps are finished. The next job is THE STANDING PLAN, starting with the endurance session library.**)
 
-### ⛔ THE JOB: MICHAEL BUILDS A BLOCK IN THE APP
+### ⛔ THE JOB: THE ENDURANCE SESSION LIBRARY WITH LEVELS
 
-That one action closes stage 1's outstanding device verification **and every stage since**. Until it
-happens, everything below is claimed on tests, probes and the sweep — not on a phone.
+`docs/DECISIONS-2026-08-21-standing-plan.md` §4, item 1 — **the highest-leverage item, and the one
+everything else waits on.** It feeds the base plan *and* every pivot.
 
-⚠️ **DEPLOY FIRST OR THE CHECK MEANS NOTHING.** Stages 2–5 are pushed (`807216b8`) and, as far as
-these sessions know, **not deployed** — so a block built right now would exercise stage 1 and the
-OLD engine for everything after it.
+> *"The mirror of `wendler-531.ts`."*
 
-**Build a Strong Focus block.** ⚠️ The shape that exercises the most of it at once: **keep run AND
-bike, four runs, two rides, two hard days (one run, one ride), long run and long ride on the
-weekend, swim on.** What to look at, in order:
+⛔ **BUILD IT AS A GENERATOR, NOT A TRANSCRIPTION.** Methods are not ownable and should be cited
+freely; the specific session tables and movement lists are the authors' expression. **Generate
+sessions from the RULES against the athlete's own thresholds.** ⚠️ This is also the better
+engineering, and it matters commercially: Michael intends to write to both authors.
 
-1. **A quality session has a warm-up** (stage 1). Flat Sprints especially — six maximal 12-second
+⛔ **THE TEST FOR "THE LAST ENGINE": if this work produces a `generate-all-rounder` function, it
+failed.** `TARGET-ARCHITECTURE.md` is one history-aware path. The Standing Plan's composer should
+become *the* composer that other plans are configurations of — not a fifth sibling beside four dead
+ones.
+
+**Read before building:** §3 (the science settled), §3b (hard days CONVERT a session, they do not ADD
+one), §3c (the PROGRAM owns the count, the ATHLETE owns sport and level), §3d (session lengths capped
+at the book's numbers). `docs/SOURCE-viada-hybrid-athlete.md` is the corpus.
+
+**Then, in dependency order** (§4): the strength grid → accessory rework → the composer → levels in
+the builder → stage 6's new compromise truths alongside it.
+
+---
+
+### ⛔ FIRST, THE THING NOBODY HAS DONE: MICHAEL BUILDS A BLOCK
+
+⚠️ **Nothing from any of this has been seen on a device.** That check closes stage 1's outstanding
+verification and every stage since, and it is worth doing before a new composer is built on top.
+
+⛔ **DEPLOY FIRST OR IT MEANS NOTHING.** Stages 2–5 are pushed (`807216b8`), stage 6 is pushed
+(`b68c2d5c`), and as far as these sessions know **none of it is deployed** — so a block built right
+now exercises stage 1 and the OLD engine for everything after it.
+
+**Build a Strong Focus block:** keep run AND bike, four runs, two rides, two hard days (one run, one
+ride), long run and long ride on the weekend, swim on. In order:
+
+1. **A quality session has a warm-up** (stage 1) — Flat Sprints especially; six maximal 12-second
    efforts used to reach the watch cold.
 2. **The ride-count chip on the VOLUME step responds instantly** (stage 3). It cost **922 ms** on a
-   desktop before this work — three to five times that on a phone — for a suggestion nobody reads
-   until two screens later.
-3. **Four rides is offered and survives** (stage 4 + the 2026-08-21 ruling). Tap 4 on the volume card
-   and confirm the built plan has four ride days.
-4. **The long run and the long ride cannot both take Sunday** (stage 3). The second one should render
-   the first's day as taken.
-5. **The week does not clump** (stage 2) — runs and rides should alternate rather than block up.
+   desktop before this work, for a suggestion nobody reads until two screens later.
+3. **Four rides is offered and survives** (stage 4) — tap 4, confirm the plan has four ride days.
+4. **The long run and long ride cannot both take Sunday** (stage 3).
+5. **The week does not clump** (stage 2) — runs and rides alternate rather than block up.
 6. **The rest day survives**, and if the week genuinely fills, the plan SAYS so (stage 6).
 
 ---
 
-### THE SIX STAGES, AND THE THREE STATES FOR EACH
+### THE WORK ORDER, COMPLETE — AND WHAT EACH STATE ACTUALLY IS
 
-| stage | what shipped into the tree | pushed | deployed | verified on a device |
+| stage | what | pushed | deployed | verified |
 |---|---|---|---|---|
-| **1** — session wrapper | warm-ups; one owner of a session's length | **yes** (`024d9152`) | **yes** 2026-08-21 | **NO** |
-| **4** — ride intent | `_shared/athlete-weekly-intent.ts`; nine ride names gone | **yes** (`807216b8`) | **not by this session** | **NO** |
-| **5** — dead engines | 13 dead branches; the hard-day yield deleted; `place-week` 436→126 | **yes** (`807216b8`) | **not by this session** | **NO** |
-| **2** — clumping | `sportAdjacency` replaces `interleaving` + `clustering` | **yes** (`807216b8`) | **not by this session** | **NO** |
-| **3** — wizard latency | solve gated + deferred; Q-215 double-solve deleted | **yes** (`807216b8`) | **not by this session** | **NO** |
-| **6** — compromise channel | the no-rest-day note fixed | **NO — uncommitted** | **no** | **NO** |
+| **1** — session wrapper | warm-ups; one owner of a session's length | yes (`024d9152`) | **yes** 2026-08-21 | **NO** |
+| **4** — ride intent | `_shared/athlete-weekly-intent.ts`; nine ride names gone | yes (`807216b8`) | not by these sessions | **NO** |
+| **5** — dead engines | 13 dead branches; the yield deleted; `place-week` 436→126 | yes (`807216b8`) | not by these sessions | **NO** |
+| **2** — clumping | `sportAdjacency` replaces `interleaving` + `clustering` | yes (`807216b8`) | not by these sessions | **NO** |
+| **3** — wizard latency | solve gated + deferred; Q-215 double-solve deleted | yes (`807216b8`) | not by these sessions | **NO** |
+| **6** — compromise channel | the no-rest-day note was blind on 25,088 weeks; fixed | yes (`b68c2d5c`) | not by these sessions | **NO** |
+| **4b** — run + swim intent | the outstanding half; `AthleteWeeklyIntent` is complete | **NO — uncommitted** | no | **NO** |
 
-⚠️ **Michael committed and pushed stages 2–5 himself as `807216b8` on 2026-08-21**; `main` is level
-with `origin/main`. **Stage 6 is uncommitted and waiting for him**, per work order rule 8.
+⛔ **PUSHED IS NOT DEPLOYED.** These stages touch `strength-primary-plan.ts`,
+`create-goal-and-materialize-plan`, `generate-strength-plan`, `_shared/week-model/` and the client.
+Check what is actually live rather than assuming the push carried it.
 
-⛔ **PUSHED IS NOT DEPLOYED.** Stages 2–5 change `strength-primary-plan.ts`,
-`create-goal-and-materialize-plan`, `generate-strength-plan`, `_shared/week-model/` and the client —
-**none of those edge functions were deployed by any of these sessions**, and the client has not gone to
-Netlify. Whoever deploys should check what is actually live rather than assume the push carried it.
+**Notes, one per stage:** `NOTES-stage1-session-wrapper-2026-08-20.md` ·
+`NOTES-stage4-ride-intent-2026-08-21.md` · `NOTES-stage5-delete-the-dead-engines-2026-08-21.md` ·
+`NOTES-stage2-sport-adjacency-2026-08-21.md` · `NOTES-stage3-wizard-latency-2026-08-21.md` ·
+`NOTES-stage6-compromise-channel-2026-08-22.md` · `NOTES-stage4-run-swim-intent-2026-08-22.md`
 
-**The notes files, one per stage:**
-`NOTES-stage1-session-wrapper-2026-08-20.md` · `NOTES-stage4-ride-intent-2026-08-21.md` ·
-`NOTES-stage5-delete-the-dead-engines-2026-08-21.md` · `NOTES-stage2-sport-adjacency-2026-08-21.md` ·
-`NOTES-stage3-wizard-latency-2026-08-21.md` · `NOTES-stage6-compromise-channel-2026-08-22.md`
+### ⛔ ONE BEHAVIOUR CHANGE AWAITING A LOOK (2026-08-22)
 
-### ⛔ THE RULINGS MICHAEL MADE, SO NOBODY RE-OPENS THEM
+`run_days` shipped from the wizard only when `posture.strength === 'develop'` while
+`target_weekly_miles` beside it shipped ungated — a routing key used as a discipline gate (trace
+report §2.5a). The failure it allowed is silent: the miles arrive, the count does not, and the
+athlete's typed mileage is divided across the DEFAULT two runs instead of the four they picked. **Now
+gated on whether the athlete answered it.** It can only ADD the field where it was being dropped.
 
-- **Nothing yields, ever** (stage 5). *"Always build the week the athlete asked for and tell them what
-  it costs."* `week-solver.ts:299` said it first. Do not reintroduce a drop under any name.
-- **The day off outranks symmetry** (2026-08-19, re-confirmed by stage 2 at 0 of 61 rest days lost).
-- **The ride count is 4** — six statements of that range, one constant.
-- **`RIDE_HOURS_DEFAULT = 2` is Viada p239's Level 1 dose**, not a round number.
+⚠️ **And one screen question that is Michael's, not a consistency fix:** the schedule row's run arm
+and the standalone run step both offer **2/3/4** while the wire accepts and the composer builds **1**.
+A screen offering FEWER than the wire accepts rewrites nothing — the ride's defect was the opposite
+direction — so this was left alone and both literals are named in the lint.
+
+### ⛔ THE RULINGS, SO NOBODY RE-OPENS THEM
+
+- **Nothing yields, ever.** *"Always build the week the athlete asked for and tell them what it
+  costs."* `week-solver.ts:299` said it first.
+- **The day off outranks symmetry** (2026-08-19; stage 2 re-confirmed at 0 of 61 rest days lost).
+- **The ride count is 4**; **`RIDE_HOURS_DEFAULT = 2` is Viada p239's Level 1 dose**;
+  **`RUN_DAYS_DEFAULT = 2` is Hickson's maintenance dose** — both named, both announced when they fire.
 - **Q-215 is deleted, not re-expressed.** *"Keeping heavy leg days apart is already done live by
   `bunching`. Rebuilding it means two owners for one fact."*
-
-### ⚠️ WHAT IS STILL OWED, AND IT IS NOT PART OF THIS WORK ORDER
-
-- ⛔ **Stage 4 covered RIDES ONLY.** The run's four loose top-level scalars and the swim's bare count
-  are untouched, and `AthleteWeeklyIntent` has **no `run` or `swim` key** — deliberately, because a
-  field with no reader is the starved-input pattern. The chain is mapped in the trace report §2.0.
-- **The ride-shortfall note cannot fire today and is kept on purpose** (stage 6). The collapse it
-  guards is reachable in the resolver but not from the composer, because `easyWanted` caps the
-  flexible ride count. Raise the ride ceiling past 4 and it comes back.
-- ⚠️ **`AUDIT-plan-generators-2026-08-07` §2's router session (Q-267) is still the standing job** after
-  this — ~2,000 lines of scattered routing gates in `create-goal-and-materialize-plan`.
+- **Swim stays minimal** (D-323 §5 — booked, not coached). Its count is consolidated and nothing else.
 
 ### ⛔ THINGS A NEXT SESSION WILL TRIP OVER
 
+- **`AthleteWeeklyIntent` has all three keys** — `run`, `bike`, `swim`. Read
+  `_shared/athlete-weekly-intent.ts` before touching any "how much / how often / which day is long"
+  question. ⚠️ The run has no `declared` and `hasLongDay` means something different per sport; both
+  are deliberate and both are pinned by tests.
 - **`steps_preset[0]` is the WARM-UP, not the work.** Six test files use a `workTokenOf` helper.
-- **The ride ask is `rideIntent`** — read `_shared/athlete-weekly-intent.ts` before touching anything
-  ride-shaped in the composer.
 - **The composer runs exactly ONE solve.** `flexibleAvoid` is inert and always was.
-- **`solveWithWeekModel` returns `WeekModelResult`** — `status === 'unsolvable'` no longer compiles
-  against that adapter. Deliberate: the loose type is what kept 13 dead branches looking live.
-- **`place-week.ts` places nothing** — types and two constants.
-- **`interleaving` and `clustering` no longer exist.** `sportAdjacency` is weighted **4**, and **5
-  breaks the barbell week** (measured). Do not re-open the weight war without new evidence.
-- ⚠️ **The two `taken={{}}` rows in `NonRaceBuilder` disagree ON PURPOSE** — the long-day rows lock,
-  the hard-day row does not. A test guards it. Do not "make them consistent".
+- **`solveWithWeekModel` returns `WeekModelResult`** — `status === 'unsolvable'` no longer compiles.
+- **`place-week.ts` places nothing**; **`interleaving` and `clustering` no longer exist**.
+- **`sportAdjacency` is weighted 4, and 5 breaks the barbell week** (measured).
+- ⚠️ **The two `taken={{}}` rows in `NonRaceBuilder` disagree ON PURPOSE.**
 
-### ⛔ AND THE ONE METHOD LESSON WORTH KEEPING
+### ⛔ THE METHOD LESSON THIS WORK ORDER KEEPS PAYING FOR
 
-**The 61-shape sweep is a regression net, not a detector.** Every shape in it is a sensible week, so:
-- the compromise channel read "silent on 61 of 61" while **10,080 of 10,976** hand-built shapes carried
-  one;
-- the no-rest-day note was broken for months — **silent on 25,088 of 25,088** full weeks — and could
-  never have fired on any of the 61.
+**The 61-shape sweep is a regression net, not a detector.** Every shape in it is a sensible week:
+- the compromise channel read "silent on 61 of 61" while 10,080 of 10,976 hand-built shapes carried one;
+- the no-rest-day note was broken for months — silent on 25,088 of 25,088 full weeks — and could never
+  have fired on any of the 61.
 
-⚠️ **Build test weeks from the shape space, not from the sweep.** The probes are described in the
-stage 5 and stage 6 notes.
+⚠️ **Build test weeks from the shape space.** And when a mutation SURVIVES, work out whether the test
+is weak or the mutant equivalent, and WRITE DOWN WHICH — three sessions found real gaps that way, and
+one found a weight of 100 passing a test whose only job was bounding the weight.
 
-### ⚠️ FOUR PRE-EXISTING RED TESTS, AND NONE BELONG TO THIS WORK ORDER
+### ⚠️ FOUR PRE-EXISTING RED TESTS, AND NONE ARE THIS WORK'S
 
-`_shared/anchor-resolver-lint.test.ts` (`lthr::TrainingBaselines.tsx` reads an anchor raw and is not
-on the ledger), `src/lib/club-anchor.test.ts` ×1, `src/lib/non-race-goal-seeds.test.ts` ×2. All
-verified pre-existing by stashing.
+`_shared/anchor-resolver-lint.test.ts` (`lthr::TrainingBaselines.tsx` off the ledger),
+`src/lib/club-anchor.test.ts` ×1, `src/lib/non-race-goal-seeds.test.ts` ×2. All stash-verified.
 
-⚠️ **The client suite does not run in this repo.** `npx vitest run` fails on all 363 files — its ESM
-loader rejects the `https:` deno-std imports the shared modules use, and there is no vitest config or
-`test` script. `deno test src/` runs 720 of them; anything importing `@shared/*`, and every React
-component, runs under neither. ⛔ Stage 3's changes live entirely in that gap and are guarded by a
-SOURCE LINT, which proves the call is written and not that the screen behaves.
+⚠️ **The client suite does not run in this repo.** `npx vitest run` fails on all 363 files;
+`deno test src/` runs 722; React components run under neither. Stage 3's changes and the wizard
+pickers are guarded by a SOURCE LINT, which proves the call is written and not that the screen
+behaves. ⛔ If your change lands in that gap, say so — do not claim coverage.
 
-### Current test state (all six stages in the tree)
+### Current test state
 
-`shared/strength-system/` **580 passed, 0 failed** · `_shared/` **1855 passed, 1 failed** ·
-`src/` under deno **717 passed, 3 failed** · sweep **61 built, 0 failed, budget-equals-built 0
-violations** · `npx vite build` clean · `tsc --noEmit` **312 errors, identical to a clean tree**.
-
-### ⚠️ THE PRODUCT DIRECTION THIS WAS ALL FOR
-
-A new base plan — **The Standing Plan** — is going to be built on this engine: *"whatever supports the
-build so we aren't crazy glue and taping it together."* The six stages were the "so we aren't gluing
-it together" half.
-⚠️ **Nothing about the Standing Plan is built or specced yet. Do not start on it from this banner.**
+`shared/strength-system/` **584 passed, 0 failed** · `_shared/` **1863 passed, 1 failed** ·
+`src/` under deno **719 passed, 3 failed** · sweep **61 built, 0 failed, byte-identical** ·
+`npx vite build` clean · `tsc --noEmit` **312 errors, identical to a clean tree**.
 
 ## 🧭 Prior handoff (2026-08-13 NIGHT — the strength ENTRY MODEL shipped in an evening interjection session: 65 lb gate + per-lift 45/35 bar floor + light-bar flag [D-431], the build-time assistance equipment gate [D-430], the logger blank-set guard and bar chip, GHR band-assist. All pushed + deployed; device checks pending. The router session below is STILL the standing job.)
 

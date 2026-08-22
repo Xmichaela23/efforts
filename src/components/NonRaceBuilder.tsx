@@ -124,7 +124,11 @@ const IDLE_WIZARD_WEEK = {
  * `generate-strength-plan`, and a clamp in the composer — and three of the five were still capped
  * at 3 after the ceiling was raised to 4. The file this comes from carries the full account.
  */
-import { RIDE_DAYS_CHOICES } from '../../supabase/functions/_shared/athlete-weekly-intent';
+import {
+  RIDE_DAYS_CHOICES,
+  RUN_DAYS_CHOICES,
+  SWIM_DAYS_CHOICES,
+} from '../../supabase/functions/_shared/athlete-weekly-intent';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import {
   seedFromGoal,
@@ -1282,7 +1286,25 @@ function assemblePayload(
           // ⚠️ `>= 1` (2026-08-19) — this sent `run_days` only at 2+, so a 1-run answer was
           // dropped on the floor and the engine fell back to its default of 2. The screen
           // offered an option the payload refused to carry.
-          ...(state.posture?.strength === 'develop' && state.runDays >= 1 ? { run_days: state.runDays } : {}),
+          //
+          // ⛔⛔ AND THE `strength === 'develop'` HALF IS GONE (stage 4 run half, 2026-08-22). It was
+          // a ROUTING KEY BEING USED AS A DISCIPLINE GATE — flagged in the trace report §2.5a, which
+          // could neither find a path to the bad state nor prove there wasn't one:
+          //
+          //   *"`run_days` ships only when `state.posture?.strength === 'develop'`, while
+          //    `target_weekly_miles` beside it ships UNGATED. On Strong Focus strength is always
+          //    `develop`, so it works — by coincidence, not by construction."*
+          //
+          // ⛔ THE FAILURE IT ALLOWS IS SILENT AND EXPENSIVE: the miles arrive and the count does
+          // not, so the athlete's typed mileage is divided across the DEFAULT two runs instead of
+          // the four they picked. Nothing anywhere reports it — the plan just looks plausible.
+          //
+          // ⚠️ THE COUNT IS ITS OWN GATE. `state.runDays` is only ever set by the strength path's
+          // own cards, so `>= 1` already means "the athlete answered this question", which is the
+          // thing worth gating on. Strength posture is not a fact about running.
+          // ⚠️ THIS CAN ONLY ADD THE FIELD WHERE IT WAS BEING DROPPED — it never removes it, and
+          // `create-goal` reads `run_days` on the Get Strong branch alone, so it is inert elsewhere.
+          ...(state.runDays >= 1 ? { run_days: state.runDays } : {}),
           // Strength Focus: the three assistance picks. The composer validates each name against the
           // shared menu, so a stale one falls back to the default rather than reaching a session.
           // ⛔ ALWAYS SENT NOW, and that is the migration working rather than a widened condition.
@@ -4275,7 +4297,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   {/* ⛔ 1 IS A LEGAL ANSWER (Michael, 2026-08-19). The engine's floor was
                       `Math.max(2, …)`, so an athlete who could only run once a week had no way to
                       say it — and the engine would have built two if they had. Both are fixed. */}
-                  {[1, 2, 3, 4].map((n) => {
+                  {RUN_DAYS_CHOICES.map((n) => {
                     const on = (state.runDays === n);
                     return (
                       <button
@@ -4446,7 +4468,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-white/70 text-sm">across</span>
-                  {[1, 2, 3].map((n) => (
+                  {/* ⛔ 1/2/3, AND THE WIRE ACCEPTS 4 — the safe direction, and deliberate. The swim
+                      stays minimal by standing decision (D-323 §5, booked not coached); this reads
+                      the constant so the count has one owner, and adds nothing else. */}
+                  {SWIM_DAYS_CHOICES.map((n) => (
                     <button
                       key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
                       // ⚠️ SWIM BLUE, NOT THE BLOCK ACCENT. Run miles wear gold and ride hours wear
@@ -4902,6 +4927,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 everywhere that mattered, and Viada's own cycling programs run five
                                 or six rides a week — four is not a stretch, it was a stale cap.
                                 ⛔ It reads `RIDE_DAYS_CHOICES` now. One statement of the range. */}
+                            {/* ⚠️ THE RUN ARM STAYS 2/3/4 AND THAT IS NOT THE RIDE'S BUG INVERTED.
+                                One run a week is a legal ANSWER the wire accepts and the composer
+                                builds (2026-08-19), but the range a SCREEN offers is a product
+                                question, and this row has never offered 1. ⛔ A screen offering
+                                FEWER than the wire accepts loses nothing — nothing is rewritten;
+                                the ride's defect was a screen offering MORE than a hop downstream
+                                took. Raising it is Michael's call, not a consistency fix.
+                                See `_shared/athlete-weekly-intent.ts`. */}
                             {(row.key === 'runs' ? [2, 3, 4] : RIDE_DAYS_CHOICES).map((n) => {
                               const sport = row.key === 'runs' ? 'run' : 'bike';
                               const on = (row.key === 'runs' ? state.runDays : state.rideDays) === n;
@@ -5786,7 +5819,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <div>
             <p className="text-white/85 text-sm mb-2">Swims per week</p>
             <div className="flex gap-1.5 max-w-[240px]">
-              {[1, 2, 3].map((n) => (
+              {SWIM_DAYS_CHOICES.map((n) => (
                 <button
                   key={n} type="button" onClick={() => setState((st) => ({ ...st, swimDays: n }))}
                   className={`flex-1 py-2 rounded-xl text-sm border ${state.swimDays === n ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)] text-white' : 'border-white/12 text-white/75'}`}

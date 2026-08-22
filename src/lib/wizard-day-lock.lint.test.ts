@@ -104,3 +104,43 @@ Deno.test('⛔ EVERY RIDE-DAY PICKER READS THE ONE RANGE — no hardcoded 1/2/3 
     );
   }
 });
+
+Deno.test('⛔ THE RUN AND SWIM PICKERS READ THEIR RANGES — no hardcoded literals left', () => {
+  // ⛔ SAME RULE AS THE RIDE'S, one sport over (stage 4 run half, 2026-08-22). The test is "no
+  // literal", not "the value is N" — pinning the number here would be another statement of the range.
+  //
+  // ⚠️ TWO LITERALS SURVIVE ON PURPOSE AND ARE NAMED, so this test cannot be satisfied by deleting
+  // the constants:
+  //   · the schedule row's RUN arm is `[2, 3, 4]` — the wire accepts 1 and the composer builds it,
+  //     but this row has never OFFERED 1. A screen offering fewer than the wire accepts rewrites
+  //     nothing; the ride's defect was the other direction. Raising it is Michael's call.
+  //   · the standalone run step is `[2, 3, 4]` for the same reason.
+  const runVolumeCard = /\{RUN_DAYS_CHOICES\.map\(\(n\) => \{\s*\n\s*const on = \(state\.runDays === n\);/;
+  assert(runVolumeCard.test(SRC), 'the volume card\'s run picker stopped reading RUN_DAYS_CHOICES');
+
+  const swimWrites = [...SRC.matchAll(/swimDays: n \}/g)];
+  assert(swimWrites.length >= 2, `expected at least two swim pickers, found ${swimWrites.length}`);
+  for (const m of swimWrites) {
+    const before = SRC.slice(Math.max(0, m.index! - 700), m.index!);
+    assert(
+      /SWIM_DAYS_CHOICES/.test(before),
+      `a swim picker does not read SWIM_DAYS_CHOICES: ...${before.slice(-160)}`,
+    );
+  }
+});
+
+Deno.test('⛔ `run_days` IS NOT GATED ON STRENGTH POSTURE — a routing key is not a discipline gate', () => {
+  // ⛔ THE DEFECT (trace report §2.5a, unresolved until 2026-08-22). `run_days` shipped only when
+  // `state.posture?.strength === 'develop'` while `target_weekly_miles` beside it shipped UNGATED.
+  // The report could neither find a path to the bad state nor prove there wasn't one — and the
+  // failure it allows is silent: the miles arrive, the count does not, and the athlete's typed
+  // mileage is divided across the DEFAULT two runs instead of the four they picked.
+  assert(
+    /\.\.\.\(state\.runDays >= 1 \? \{ run_days: state\.runDays \} : \{\}\)/.test(SRC),
+    'run_days is gated on something other than whether the athlete answered it',
+  );
+  assert(
+    !/posture\?\.strength === 'develop' && state\.runDays/.test(SRC),
+    'the strength-posture coupling on run_days came back',
+  );
+});

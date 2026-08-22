@@ -23,10 +23,15 @@ import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
  * See `_shared/athlete-weekly-intent.ts`.
  */
 import {
+  normalizeEasyPace,
   normalizeRideDays,
   normalizeRideHours,
+  normalizeRunDays,
+  normalizeRunMiles,
+  normalizeSwimDays,
   RIDE_DAYS_DEFAULT,
   RIDE_HOURS_DEFAULT,
+  RUN_DAYS_DEFAULT,
 } from '../_shared/athlete-weekly-intent.ts';
 
 const corsHeaders = {
@@ -85,6 +90,28 @@ Deno.serve(async (req: Request) => {
       bike && typeof bike === 'object' ? (bike as Record<string, unknown>).hours : undefined,
       target_weekly_ride_hours,
     );
+    /**
+     * ⛔ THE RUN AND SWIM ASKS, NORMALISED AT THE SAME DOOR AND ANNOUNCED THE SAME WAY (stage 4 run
+     * half, 2026-08-22). Q-270 measured a FOUR-deep default chain on the run count — here, at
+     * `create-goal`, again below in the rebuild body, and the composer's own floor — of which only
+     * `create-goal` ever said anything. Two of those four are this file's, and they speak now.
+     *
+     * ⚠️ THE SWIM HAS NO DEFAULT TO ANNOUNCE, deliberately: an unanswered swim is no swim, and the
+     * app never books a session nobody asked for. It is normalised here only so the clamp has one
+     * owner.
+     */
+    const runDaysAsked = normalizeRunDays(endurance_frequency);
+    const runMilesAsked = normalizeRunMiles(target_weekly_miles);
+    // ⚠️ SELECTION IS THE COMPOSER'S — it needs the gated hard days, which this door has not resolved.
+    // What the door CAN see is whether a run-shaped answer arrived at all, which is what it reports.
+    const runShaped = endurance_sport === 'run' || runMilesAsked != null
+      || typeof long_run_day === 'string';
+    if (runShaped && runDaysAsked == null) {
+      console.log(
+        `[strength-plan] a run-shaped block arrived with no run count — endurance_frequency was `
+        + `${JSON.stringify(endurance_frequency)}; falling back to OUR number, ${RUN_DAYS_DEFAULT}.`,
+      );
+    }
     const rideDeclared = !!bike || rideHoursAsked != null;
     if (rideDeclared) {
       const fellBack: string[] = [];
@@ -155,7 +182,7 @@ Deno.serve(async (req: Request) => {
     // conversion and its own unit-sniffing regex. A private copy of a shared decision is exactly the disease
     // `resolveCurrentFtp` was written to cure, and it chose a DIFFERENT answer than the plan and the workout
     // card did. Routed through the ONE resolver, which owns the units and honours the athlete's Q-174 choice.
-    let easyPaceMin: number | undefined = Number(easy_pace_min_per_mile) > 0 ? Number(easy_pace_min_per_mile) : undefined;
+    let easyPaceMin: number | undefined = normalizeEasyPace(easy_pace_min_per_mile) ?? undefined;
     if (easyPaceMin === undefined) {
       try {
         const resolved = resolveCurrentRunEasyPace(ub as any);
@@ -211,9 +238,15 @@ Deno.serve(async (req: Request) => {
         overheadPress: maxes.overheadPress,
       },
       enduranceSport: sport,
-      enduranceFrequency: Number.isFinite(Number(endurance_frequency)) ? Number(endurance_frequency) : 2,
+      // ⛔ THE `: 2` HERE WAS LAYER 2 AND 3 OF Q-270's FOUR-DEEP DEFAULT CHAIN. It is the shared
+      // constant now, and the announcement below is what makes a dropped answer visible.
+      // ⚠️ `?? RUN_DAYS_DEFAULT` rather than `?? undefined`, because the composer's arg is required
+      // and a missing value has to become the default SOMEWHERE — this is the door that says so.
+      enduranceFrequency: runDaysAsked ?? RUN_DAYS_DEFAULT,
       goalName: typeof goal_name === 'string' ? goal_name : undefined,
-      targetWeeklyMiles: Number(target_weekly_miles) > 0 ? Number(target_weekly_miles) : undefined,
+      // ⚠️ `?? undefined`, not `?? 0` — absent must stay absent, because `null` miles and `0` miles
+      // reach different branches of `runSelected` downstream.
+      targetWeeklyMiles: runMilesAsked ?? undefined,
       easyPaceMinPerMile: easyPaceMin,
       longRunDay: typeof long_run_day === 'string' ? long_run_day : undefined,
       blockShape,
@@ -398,7 +431,10 @@ Deno.serve(async (req: Request) => {
       // rest from the same category's pool, loadable gear first, bands last. See StrengthPrimaryArgs.
       athleteEquipment: equipmentStrength,
       // Swim is BOOKED, not coached — the athlete says how many; the app holds the time (D-323 §5).
-      swimDays: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
+      // ⛔ ONE STATEMENT OF THE SWIM CLAMP. The `Math.min(4, …)` that stood here is `SWIM_DAYS_MAX`
+      // in `_shared/athlete-weekly-intent.ts`; the screen offers 1/2/3 and the wire has always
+      // accepted 4, which is the safe direction (see the constant).
+      swimDays: normalizeSwimDays(swim_days) ?? 0,
     });
     console.log(
       `[strength-plan] composed: ${plan.name} (${plan.duration_weeks}wk, ${sport ?? 'strength-only'}) ` +
@@ -441,7 +477,7 @@ Deno.serve(async (req: Request) => {
           strength_frequency: 4,          // SPEC §1 — four days, locked. No 3-day option in V1.
           strength_tier: 'barbell',
           endurance_sport: sport,
-          endurance_frequency: Number(endurance_frequency ?? 2),
+          endurance_frequency: runDaysAsked ?? RUN_DAYS_DEFAULT,
           phase_structure: plan.phaseStructure,
           // ⛔ THE WORKING NUMBERS, STORED. They ratchet +5 upper / +10 lower per cycle on their own
           // schedule. Derived instead of stored, the AMRAP write-back that lifts `performance_numbers`
@@ -449,7 +485,7 @@ Deno.serve(async (req: Request) => {
           training_max: plan.training_max,
           one_rep_maxes_at_build: maxes, // provenance: what the working numbers were computed from
           assistance_picks: assistance_picks ?? null, // what the athlete chose, per day (D-407)
-          swim_days: Number(swim_days) > 0 ? Math.min(4, Math.round(Number(swim_days))) : 0,
+          swim_days: normalizeSwimDays(swim_days) ?? 0,
           volume_notes: plan.volume_notes ?? null, // pace-estimate disclosure only (cap logic retired)
           volume_state: plan.volume_state ?? null, // above|below|in_band → client renders the tradeoff copy
           // ⛔ SLICE 4a — THE CEILING SURVIVES THE INSERT. Which lifts pin at 90% of their max on

@@ -43,7 +43,14 @@ import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shar
  * stood at the `gsRideDays` line below was the third of five copies of that rule; two of the five
  * were still capped at 3. See `_shared/athlete-weekly-intent.ts`.
  */
-import { normalizeRideDays, normalizeRideHours } from '../_shared/athlete-weekly-intent.ts';
+import {
+  normalizeRideDays,
+  normalizeRideHours,
+  normalizeRunDays,
+  normalizeRunMiles,
+  normalizeSwimDays,
+  RUN_DAYS_DEFAULT,
+} from '../_shared/athlete-weekly-intent.ts';
 import {
   anchoredSwimSlotsForFocusPromotion,
   deriveRestDaysForBudget,
@@ -2584,7 +2591,9 @@ Deno.serve(async (req: Request) => {
             // owns the sec/km → sec/mi conversion (the unit footgun this file was hand-rolling).
             const gsEasy = resolveCurrentRunEasyPace(gsBaseline as any);
             const gsEasyPaceMinPerMile = gsEasy.sec_per_mi != null ? gsEasy.sec_per_mi / 60 : undefined;
-            const gsTargetWeeklyMiles = Number(gsTp.target_weekly_miles) > 0 ? Number(gsTp.target_weekly_miles) : undefined;
+            // ⛔ ONE OWNER FOR THE RUN ASK TOO (stage 4 run half, 2026-08-22) — MILES, never hours;
+            // the bike is hours (D-323 §6) and the two units must not meet in one field.
+            const gsTargetWeeklyMiles = normalizeRunMiles(gsTp.target_weekly_miles) ?? undefined;
             // ── THE VERDICT SUPPLIER (D-326 layer 2) ─────────────────────────────────────────
             //
             // ⛔ ONLY MEANINGFUL ON A REBUILD. `create-goal` is the sole caller of
@@ -2735,7 +2744,15 @@ Deno.serve(async (req: Request) => {
              * ⛔ THE WARN BELOW IS UNCHANGED AND STILL EARNS ITS KEEP: it fires on a genuinely
              * absent or out-of-range value, which is what it was written to detect.
              */
-            const gsRunDaysGiven = Number(gsTp.run_days) >= 1 && Number(gsTp.run_days) <= 4;
+            /**
+             * ⛔⛔ AND IT READS THE SHARED RANGE NOW (stage 4 run half, 2026-08-22). The inline
+             * `>= 1 && <= 4` is `RUN_DAYS_CHOICES` — the same constant the composer clamps to and
+             * `create-goal` validates against, so the layer that can REJECT a legal answer and the
+             * layer that would BUILD it cannot disagree again. ⚠️ That disagreement is not
+             * hypothetical: the ride's identical pair drifted for two days in August and silently
+             * rewrote a 4 to a 3.
+             */
+            const gsRunDaysGiven = normalizeRunDays(gsTp.run_days) != null;
             if (!gsRunDaysGiven && gsSport === 'run') {
               console.warn(
                 `[create-goal] endurance_frequency DEFAULTED to 2 — run_days was ${JSON.stringify(gsTp.run_days)} `
@@ -2749,7 +2766,7 @@ Deno.serve(async (req: Request) => {
               duration_weeks: Number((resolvedGoal as any)?.target_weeks) || 12,
               endurance_sport: gsSport,         // sport-agnostic maintenance (run / bike / none)
               // run frequency from intake (2/3/4); engine spreads miles + stacks extras onto upper lift days
-              endurance_frequency: gsRunDaysGiven ? Number(gsTp.run_days) : 2,
+              endurance_frequency: normalizeRunDays(gsTp.run_days) ?? RUN_DAYS_DEFAULT,
               goal_name: String(resolvedGoal?.name || 'Strength Focus'),
               ...(gsTargetWeeklyMiles ? { target_weekly_miles: gsTargetWeeklyMiles } : {}),
               ...(gsEasyPaceMinPerMile ? { easy_pace_min_per_mile: gsEasyPaceMinPerMile } : {}),
@@ -2757,8 +2774,11 @@ Deno.serve(async (req: Request) => {
               // the Adjust tab, where they REPLACE one of the session's three assistance slots rather
               // than stacking on top of the block.
               // Swim slots, only when the athlete kept swim for this block. Booked, not coached.
-              ...(gsPosture?.swim === 'maintain' && Number(gsTp.swim_days) > 0
-                ? { swim_days: Number(gsTp.swim_days) } : {}),
+              // ⛔ ONE STATEMENT OF THE SWIM CLAMP. ⚠️ THE POSTURE GATE STAYS — it is not the count's
+              // rule, it is whether the athlete kept swim for this block at all, and only the intake
+              // knows that.
+              ...(gsPosture?.swim === 'maintain' && normalizeSwimDays(gsTp.swim_days) != null
+                ? { swim_days: normalizeSwimDays(gsTp.swim_days)! } : {}),
               // The athlete's three assistance picks from the build flow. Absent → the composer's
               // bodyweight defaults, so skipping that card still yields a complete block.
               ...(gsTp.assistance_picks && typeof gsTp.assistance_picks === 'object'
