@@ -17,12 +17,16 @@
 import { FRAMES, type FrameId } from './frames.ts';
 
 export type FramePosition = {
-  /** The PRIMARY endurance sport the athlete is holding. `null` = strength only. */
+  /**
+   * The PRIMARY endurance sport the athlete is holding. `null` = strength only.
+   *
+   * ⛔ A KEPT BIKE OR SWIM NO LONGER REFUSES THIS FRAME (slice 4). Both used to, because every
+   * endurance slot in `strength_5k` was a `run_*` family and routing a bike-keeping athlete here
+   * would have deleted twelve weeks of riding silently. `sport-slots.ts` assigns a sport per slot
+   * now, so those two refusals — and the `bikeKept` / `swimDays` fields they read — are **deleted
+   * whole** rather than left behind a flag.
+   */
   enduranceSport: 'run' | 'bike' | null;
-  /** ⚠️ A BIKE TRAVELLING BESIDE THE PRIMARY SPORT — see `bikeKept` in the refusal below. */
-  bikeKept?: boolean;
-  /** Swim slots the athlete kept. Booked, not coached (D-323 §5). */
-  swimDays?: number | null;
 };
 
 export type FrameResolution =
@@ -30,29 +34,24 @@ export type FrameResolution =
   | { frame: null; reason: string };
 
 /**
- * ⛔ RUN-ONLY, AND THE REFUSALS ARE THE POINT.
+ * ⛔ THE FRAME NOW HOLDS A MIXED WEEK, AND THE TWO SPORT REFUSALS ARE GONE (slice 4).
  *
- * Strength + 5K (p246) is a RUNNING frame: four endurance slots, every one of them a `run_*` family.
- * Pivot §2 gives us permission to assign a sport per slot — *"any power-metered non-impact
- * modality"*, p275 — but **that assignment is not built** (slice 1's frames are run families end to
- * end). Until it is, an athlete who kept a bike or a swim and is routed here would find both gone
- * from a twelve-week block, silently: the exact "collected at intake and then discarded" pattern
- * `create-goal` has now fixed three times.
+ * `strength_5k` (p246) is transcribed with run families in every endurance slot, but a slot is a
+ * SESSION TYPE and the sport is assigned — pivot §2, on his p275 permission for any power-metered
+ * non-impact modality and for a ride standing in for the long run. `sport-slots.ts` does that
+ * assignment, so a kept bike or a kept swim routes INTO this frame instead of away from it.
  *
- * ⛔ SO A KEPT BIKE OR SWIM REFUSES THE FRAME rather than dropping the sport. Get Stronger already
- * travels the bike beside the run (`generate-strength-plan`'s `bike` argument, 2026-07-27) and books
- * the swim, so the fallback is strictly better for that athlete than a frame that cannot hold them.
- * ⚠️ This is a SLICE 2 boundary, not a ruling: sport-slot assignment is pivot §2's own work and it
- * opens this gate the moment it lands.
+ * ⚠️ WHAT STILL REFUSES, and it is only the dial positions that have no frame built: a cyclist with
+ * no running at all (Cycling: Base, p278/p280) and an athlete holding no endurance at all. Every
+ * frame is a hybrid week, so the second is not a plan this file can serve.
+ *
+ * ⚠️ ⛔ A BIKE-ONLY ATHLETE IS STILL REFUSED EVEN THOUGH THE SLOTS COULD NOW ALL BE RIDES, and that
+ * is deliberate. `strength_5k`'s SHAPE is built around running — four endurance sessions, the plyo
+ * day, and a lower-body haircut whose stated cause is a run — and handing a pure cyclist a week cut
+ * to a runner's page would be a different program wearing this one's slot count. His cycling
+ * programs are their own pages and are the next frames to build.
  */
 export function resolveFrame(position: FramePosition): FrameResolution {
-  const swim = Number(position.swimDays);
-  if (Number.isFinite(swim) && swim > 0) {
-    return { frame: null, reason: 'the athlete kept swim slots and no frame carries a swim yet (pivot §2, sport-slot assignment)' };
-  }
-  if (position.bikeKept) {
-    return { frame: null, reason: 'the athlete kept a bike and no frame carries a ride yet (pivot §2, sport-slot assignment)' };
-  }
   if (position.enduranceSport === 'run') {
     return { frame: 'strength_5k', cite: FRAMES.strength_5k.cite };
   }

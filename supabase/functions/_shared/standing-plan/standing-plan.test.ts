@@ -22,7 +22,9 @@ import {
   LOWER_HAIRCUT_INITIAL,
   LOWER_HAIRCUT_PHASE_OUT_WEEKS,
   lowerBodyHaircut,
+  MATERIALIZER_RIDE_PATTERNS,
   MATERIALIZER_RUN_PATTERNS,
+  MATERIALIZER_SWIM_PATTERNS,
   PLYO_DOSE,
   predictedTrue1RM,
   prescribedLoad,
@@ -478,7 +480,9 @@ Deno.test('no screen learns a new word', () => {
       const wk = composeWeek({ ...BASE_ARGS, equipment: kit.equipment, week, column });
       for (const s of wk.sessions) {
         for (const token of s.steps_preset ?? []) {
-          const known = MATERIALIZER_RUN_PATTERNS.some((re) => re.test(token.toLowerCase()));
+          const known = [
+            ...MATERIALIZER_RUN_PATTERNS, ...MATERIALIZER_RIDE_PATTERNS, ...MATERIALIZER_SWIM_PATTERNS,
+          ].some((re) => re.test(token.toLowerCase()));
           assert(known, `[${kit.label} wk${week}] "${token}" is not a token the materializer parses`);
           const shaped = EMITTED_TOKEN_SHAPES.some((t) => t.shape.test(token));
           assert(shaped, `[${kit.label} wk${week}] "${token}" is not a shape this edge declares`);
@@ -488,10 +492,19 @@ Deno.test('no screen learns a new word', () => {
       }
     }
   }
-  // The declared shapes are self-consistent — each example matches its own regex and a materializer one.
+  // The declared shapes are self-consistent — each example matches its own regex and a materializer
+  // one. ⛔ THREE SPORTS NOW (slice 4): the run list alone stopped being the whole answer the moment
+  // the frame could emit a ride, and checking a bike token against the run patterns would have
+  // failed for the right reason and the wrong one.
+  const ALL_MATERIALIZER_PATTERNS = [
+    ...MATERIALIZER_RUN_PATTERNS,
+    ...MATERIALIZER_RIDE_PATTERNS,
+    ...MATERIALIZER_SWIM_PATTERNS,
+  ];
   for (const t of EMITTED_TOKEN_SHAPES) {
     assert(t.shape.test(t.example), `${t.example} does not match its own shape`);
-    assert(MATERIALIZER_RUN_PATTERNS.some((re) => re.test(t.example)), `${t.example} is not parsed downstream`);
+    assert(ALL_MATERIALIZER_PATTERNS.some((re) => re.test(t.example.toLowerCase())),
+      `${t.example} is not parsed downstream`);
   }
 });
 

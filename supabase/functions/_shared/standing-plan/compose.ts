@@ -38,7 +38,8 @@ import {
   type StrengthSlot,
 } from './frames.ts';
 import { weekdayForFrameDay, type Weekday } from './day-map.ts';
-import { prescribedLoad } from './progression.ts';
+import { assignSports, assignedSlot, type SportMix } from './sport-slots.ts';
+import { HAIRCUT_CAUSE_IS_OURS, prescribedLoad } from './progression.ts';
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import {
   isTestWeek,
@@ -117,6 +118,12 @@ export type ComposeArgs = {
    * Frame day 1 lands this many days after Monday. Absent = 0 = the Monday-start week.
    */
   dayOffset?: number;
+  /**
+   * ⛔ THE ATHLETE'S SPORT MIX (slice 4) — how many runs, how many rides, swim kept or not. It sets a
+   * RATIO over the frame's own slot count and never changes how many sessions the week holds.
+   * Absent = all runs, which is the week slices 1-3 built.
+   */
+  sportMix?: SportMix;
   /**
    * ⛔ SKIP WEEK ONE'S TEST — offered ONLY when logged history already carries a trustworthy max
    * (Michael, 2026-08-23). ⚠️ Never a bare athlete preference: the caller must have derived
@@ -238,6 +245,8 @@ function exerciseForSlot(
   slot: StrengthSlot,
   args: ComposeArgs,
   notes: ComposeNote[],
+  /** ⛔ IS THE HAIRCUT'S STATED CAUSE PRESENT — a hard RUN on day 1. See `prescribedLoad`. */
+  hardRunBeforeLower: boolean,
   /** ⛔ ALREADY ON THIS DAY. Two slots resolving to the same movement is a real outcome of the grid
    *  — a hip thrust satisfies both `primary press_lower` and `secondary hinge_lower` — and it reads
    *  as an engine that lost its place. The later slot takes the next option instead. */
@@ -343,10 +352,16 @@ function exerciseForSlot(
     frame: args.frame,
     week: args.week,
     isLower,
+    hardRunBeforeLower,
     pctOfWorkingNumber: pct,
     roundTo: args.roundTo ?? 5,
   });
 
+  if (isLower && !hardRunBeforeLower && !notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS)) {
+    // ⛔ SAID OUT LOUD, BECAUSE IT IS OUR READING. The lower-body weights are NOT reduced this block,
+    // and the reason is that the hard session moved to the bike.
+    notes.push({ kind: 'ours', text: HAIRCUT_CAUSE_IS_OURS });
+  }
   if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text.includes('lower-body'))) {
     notes.push({
       kind: 'source',
@@ -484,6 +499,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const testWeek = isTestWeek(args.week) && !skipping;
   const anchors = resolveEnduranceAnchors(args.baselines);
 
+  /**
+   * ⛔ THE SPORT PER SLOT, DECIDED ONCE FOR THE WHOLE COLUMN (slice 4). It has to be column-wide:
+   * "the hard sessions go on the bike" and "the running keeps its long session" are statements about
+   * the WEEK, and deciding them slot by slot inside the day loop could not see either.
+   */
+  const sportAssignment = assignSports(days, args.sportMix ?? {});
+  for (const n of sportAssignment.notes) {
+    if (!notes.some((x) => x.text === n.text)) {
+      notes.push({ kind: n.kind === 'source' ? 'source' : n.kind === 'warning' ? 'warning' : 'ours', text: n.text, cite: n.cite });
+    }
+  }
+
   for (const day of days) {
     if (day.rest) continue;
 
@@ -515,7 +542,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const dosed: DosingSession['sets'] = [];
         const takenToday = new Set<string>();
         for (const slot of day.strength) {
-          const { exercise, movement, sets } = exerciseForSlot(slot, args, notes, takenToday);
+          const { exercise, movement, sets } = exerciseForSlot(
+            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
         }
@@ -540,17 +568,29 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     }
 
     // ── endurance ─────────────────────────────────────────────────────────────────────────────
-    for (const slot of day.endurance) {
-      const level = (args.levelOverrides?.[slot.family] as Level | undefined) ?? slot.level;
+    //
+    // ⛔ THE SLOT IS A SESSION TYPE; THE SPORT IS ASSIGNED (slice 4, pivot §2). `assignSports` has
+    // already decided the whole column — hard slots to the bike when a bike is in the mix, the long
+    // slot kept by the running athlete, one easy slot to a kept swim. This loop builds what it was
+    // told to and decides nothing.
+    day.endurance.forEach((slot, i) => {
+      const assigned = assignedSlot(sportAssignment, day.day, i, slot);
+      const level = (args.levelOverrides?.[assigned.family] as Level | undefined) ?? assigned.level;
       const built = buildEnduranceSession({
-        family: slot.family,
+        family: assigned.family,
         level,
-        archetype: slot.archetype,
+        archetype: assigned.archetype,
         anchors,
       });
-      const row = translateEnduranceSession(built, { raceTempo: slot.raceTempo });
-      sessions.push({ day: dayNameFor(args, day.day), ...row });
-    }
+      const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
+      sessions.push({
+        day: dayNameFor(args, day.day),
+        ...row,
+        // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a reader
+        // can still find the row on the page it came from.
+        ...(assigned.substituted ? { tags: [...row.tags, 'sport_assigned'] } : {}),
+      });
+    });
   }
 
   // ── the advanced tier: a PROGRAM tier, gated on demonstrated history ──────────────────────────

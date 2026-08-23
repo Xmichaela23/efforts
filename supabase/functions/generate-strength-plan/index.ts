@@ -301,24 +301,7 @@ Deno.serve(async (req: Request) => {
      * Stronger is the answer for all of them and its composer is not touched by this stage.
      * ═══════════════════════════════════════════════════════════════════════════════════════════
      */
-    const framePosition = {
-      enduranceSport: sport,
-      /**
-       * ⚠️ THE BIKE AND THE SWIM REFUSE THE FRAME rather than being dropped from it — see
-       * `resolveFrame`.
-       *
-       * ⛔ THE TEST IS THE `bike` OBJECT AND ONLY THAT, NOT `rideDeclared` BELOW. Those two answer
-       * different questions and conflating them costs the athlete the plan: `create-goal` forwards
-       * `target_weekly_ride_hours` off the goal's prefs **unconditionally**, whatever the bike's
-       * posture, so a runner who typed ride hours into some earlier block still carries the number
-       * on a run-only goal. Reading that as "kept a bike" would refuse the frame for them on the
-       * strength of a stale answer. ⚠️ Nothing is lost by ignoring it here: on a run-sport block
-       * `targetWeeklyRideHours` is inert in the Get Stronger composer too — it serves the
-       * bike-PRIMARY path, which `resolveFrame` refuses on `enduranceSport` before this line matters.
-       */
-      bikeKept: !!bike && typeof bike === 'object',
-      swimDays: normalizeSwimDays(swim_days) ?? 0,
-    };
+    const framePosition = { enduranceSport: sport };
     const frameResolution = resolveFrame(framePosition);
 
     if (frameResolution.frame) {
@@ -477,6 +460,22 @@ Deno.serve(async (req: Request) => {
           baselines: ub as never,
           equipment: equipmentStrength,
           demonstratedWeeklyMiles: demonstrated.weeklyMiles,
+          /**
+           * ⛔ THE ATHLETE'S SPORT MIX (slice 4). ⚠️ A RATIO, NOT A COUNT — pivot §2: *"the program
+           * owns session count; athlete owns sport + level."* The frame holds four endurance slots
+           * and these numbers decide which sport fills each one, never how many there are. Reading
+           * them as counts is the ask-15-get-20 defect the work order exists to kill.
+           *
+           * ⛔ RIDES COME FROM THE NORMALISED DAY COUNT, NOT FROM RIDE HOURS. `create-goal` forwards
+           * `target_weekly_ride_hours` off the goal's prefs with no posture gate, so a runner who
+           * typed ride hours into an earlier block still carries the number; reading that as "wants
+           * rides" would put riding into a week nobody asked for. `bike.days` is the ask.
+           */
+          sportMix: {
+            runs: runDaysAsked ?? RUN_DAYS_DEFAULT,
+            rides: rideDaysAsked ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
+            swimDays: normalizeSwimDays(swim_days) ?? 0,
+          },
           roundTo: 5,
         },
         weeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,

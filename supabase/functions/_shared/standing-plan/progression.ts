@@ -47,6 +47,23 @@ export const LOWER_HAIRCUT_PHASE_OUT_WEEKS = 9;
 export const LOWER_HAIRCUT_CITE = 'Viada p247';
 
 /**
+ * ⛔ WHY THE HAIRCUT ASKS WHAT DAY 1 ACTUALLY IS, and which half of that is ours.
+ *
+ * HIS: the reduction, its size, its phase-out rate and its length — and its CAUSE, named on the page
+ * as Monday's run landing before Tuesday's ME lower.
+ *
+ * ⚠️ OURS: that a bike-heavy mix does not inherit it. He states the haircut once, for this frame's
+ * run layout, and the corpus contains nothing about the substituted case. What points our way is his
+ * OWN reasoning for the substitution (p280 — hard riding does not land on the legs the way running
+ * does), which is why the inference is stated rather than silent.
+ */
+export const HAIRCUT_CAUSE_IS_OURS =
+  'The source ties the lower-body reduction to the hard RUN that lands the day before the heavy leg '
+  + 'session, and says nothing about what happens when that session is a ride. Dropping the reduction '
+  + 'for a week whose hard work is on the bike is our reading of his own reason for moving it there — '
+  + 'riding hard does not land on the legs the way running does.';
+
+/**
  * What fraction of the working number a LOWER-body slot uses in a given week.
  *
  * Week 1 starts at 1 − 3.5%. Every three weeks it recovers 2 percentage points, and after nine weeks
@@ -76,13 +93,35 @@ export function prescribedLoad(args: {
   frame: FrameId;
   week: number;
   isLower: boolean;
+  /**
+   * ⛔⛔ THE HAIRCUT'S STATED CAUSE, ASKED RATHER THAN ASSUMED (slice 4, 2026-08-23).
+   *
+   * p247, and the subject of the sentence is the RUN: *"**Monday's run is fairly challenging**, given
+   * that there is an ME lower session the next day… a 3 to 4 percent reduction in working 1RM should
+   * be assumed here."* Until sport-slot assignment existed, day 1's session was always a run and this
+   * was always true, so the haircut keyed on `isLower` alone and was right by accident.
+   *
+   * ⛔ IT IS NOT RIGHT ONCE THE HARD SESSION CAN BE A RIDE. His own p280 reasoning for putting
+   * intensity on the bike is that **no impact means it does not tax the lifts** — so taking three and
+   * a half per cent off the squat for a session he says does not tax the lifts would be the plan
+   * contradicting itself one page apart.
+   *
+   * ⚠️ **AND THE SUBSTITUTED CASE IS OURS.** The source states the haircut once, for this frame's run
+   * layout, and never says what happens when day 1 is a ride. Reading "no run before the leg day" as
+   * "no lingering fatigue to allow for" is our inference — see `HAIRCUT_CAUSE_IS_OURS`.
+   *
+   * ⚠️ ABSENT DEFAULTS TO TRUE, which is the run layout and the pre-slice-4 behaviour exactly. A
+   * caller that has not thought about it gets the conservative arm.
+   */
+  hardRunBeforeLower?: boolean;
   /** Percent of the working number the intent asks for — stage 2 owns these. */
   pctOfWorkingNumber: number;
   /** ⛔ Steps land on real plates. The athlete's smallest plate pair, doubled. */
   roundTo: number;
 }): { weight: number; haircut: number; risen: number } {
   const risen = 1 + scheduledRise(args.frame, Math.max(0, args.week - 1));
-  const haircut = args.isLower ? lowerBodyHaircut(args.week) : 1;
+  const causePresent = args.hardRunBeforeLower !== false;
+  const haircut = args.isLower && causePresent ? lowerBodyHaircut(args.week) : 1;
   const raw = args.working.workingNumber * risen * haircut * args.pctOfWorkingNumber;
   const step = Number.isFinite(args.roundTo) && args.roundTo > 0 ? args.roundTo : 5;
   return { weight: Math.round(raw / step) * step, haircut, risen };

@@ -61,37 +61,26 @@ const ROW_ARGS = {
 // A — THE FORK: WHO GETS THE STANDING PLAN, AND WHO KEEPS GET STRONGER
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('a strength-leading runner resolves the frame; everyone else keeps Get Stronger', () => {
-  const runner = resolveFrame({ enduranceSport: 'run', bikeKept: false, swimDays: 0 });
+Deno.test('a strength-leading runner resolves the frame; a position with no frame keeps Get Stronger', () => {
+  const runner = resolveFrame({ enduranceSport: 'run' });
   assertEquals(runner.frame, 'strength_5k');
 
-  // ⛔ EVERY REFUSAL CARRIES A REASON. A silent null is how a routing decision becomes unexplainable
-  // — the caller logs this, and Get Stronger builds the block unchanged.
+  /**
+   * ⛔ EVERY REFUSAL CARRIES A REASON. A silent null is how a routing decision becomes unexplainable
+   * — the caller logs this, and Get Stronger builds the block unchanged.
+   *
+   * ⚠️ THE TWO SPORT REFUSALS ARE GONE (slice 4). A kept bike and a kept swim used to refuse this
+   * frame because every endurance slot was a run; `sport-slots.ts` assigns a sport per slot now, so
+   * they route INTO the frame. What is left refusing is only the dial positions with no frame built.
+   */
   for (const position of [
-    { enduranceSport: 'bike' as const, bikeKept: false, swimDays: 0 },
-    { enduranceSport: null, bikeKept: false, swimDays: 0 },
-    { enduranceSport: 'run' as const, bikeKept: true, swimDays: 0 },
-    { enduranceSport: 'run' as const, bikeKept: false, swimDays: 2 },
+    { enduranceSport: 'bike' as const },
+    { enduranceSport: null },
   ]) {
     const r = resolveFrame(position);
     assertEquals(r.frame, null, `${JSON.stringify(position)} was routed to a frame`);
     assert('reason' in r && r.reason.length > 10, 'a refusal with no reason');
   }
-});
-
-Deno.test('a kept bike or swim refuses the frame rather than being dropped from the block', () => {
-  // ⛔ THIS IS THE ASSERTION THAT MATTERS. Every endurance slot in `strength_5k` is a RUN family, so
-  // routing a bike-keeping athlete here would delete twelve weeks of riding they asked for and said
-  // nothing — the "collected at intake and then discarded" pattern `create-goal` has fixed three
-  // times. Get Stronger carries the bike, so the fallback is strictly better for that athlete.
-  const withBike = resolveFrame({ enduranceSport: 'run', bikeKept: true, swimDays: 0 });
-  assertEquals(withBike.frame, null);
-  assert('reason' in withBike && /bike/i.test(withBike.reason));
-
-  const block = composeBlock({ ...ROW_ARGS.compose, weeks: 2, taperWeeks: [] });
-  const kinds = new Set(block.flatMap((w) => w.sessions.map((s) => s.type)));
-  assert(!kinds.has('ride'), 'the frame emitted a ride — the refusal above is no longer needed');
-  assert(!kinds.has('swim'), 'the frame emitted a swim — the refusal above is no longer needed');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
@@ -534,27 +523,28 @@ Deno.test('the block records which number gated its tier and where that number c
 // H — THE WIRING ITSELF
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('a stale ride-hours number on the goal does not cost the athlete the frame', async () => {
+Deno.test('a stale ride-hours number on the goal does not put rides in the week', async () => {
   /**
    * ⛔ `create-goal` FORWARDS `target_weekly_ride_hours` WHATEVER THE BIKE'S POSTURE — it reads
    * `gsTp.target_weekly_ride_hours` with no posture gate — so a runner who answered that question in
-   * some earlier block still carries the number on a run-only goal. Reading it as "kept a bike"
-   * would refuse the frame on the strength of a stale answer, and the athlete would silently get the
-   * other plan.
+   * some earlier block still carries the number on a run-only goal.
+   *
+   * ⚠️ WHAT THE STALE ANSWER COSTS HAS CHANGED, AND THE TEST SURVIVES THE CHANGE. Before slice 4 it
+   * would have REFUSED the frame; now it would put riding into a week nobody asked for. Same stale
+   * field, same reason not to read it, a different consequence.
    */
   const src = await Deno.readTextFile(
     new URL('../../generate-strength-plan/index.ts', import.meta.url).pathname,
   );
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  const line = code.split('\n').find((l) => l.includes('bikeKept:'))!;
-  assert(line, 'the fork no longer states whether a bike was kept');
+  const line = code.split('\n').find((l) => l.includes('rides:'))!;
+  assert(line, 'the fork no longer reads how many rides the athlete asked for');
   assert(!/rideHoursAsked/.test(line),
-    'the fork reads the forwarded ride HOURS as a kept bike — a stale answer would refuse the frame');
-  assert(/\bbike\b/.test(line), 'the fork does not read the bike object');
+    'the fork reads ride HOURS as a ride COUNT — a stale hours answer would put rides in the week');
+  assert(/rideDaysAsked/.test(line), 'the fork does not read the normalised ride count');
 
-  // And the resolver still refuses a genuinely kept bike.
-  assertEquals(resolveFrame({ enduranceSport: 'run', bikeKept: true, swimDays: 0 }).frame, null);
-  assertEquals(resolveFrame({ enduranceSport: 'run', bikeKept: false, swimDays: 0 }).frame, 'strength_5k');
+  // ⚠️ AND THE FRAME NO LONGER TURNS A BIKE AWAY (slice 4) — it carries it.
+  assertEquals(resolveFrame({ enduranceSport: 'run' }).frame, 'strength_5k');
 });
 
 Deno.test('the edge function forks and keeps the Get Stronger path whole', async () => {

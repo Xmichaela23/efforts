@@ -97,12 +97,54 @@ function repShape(session: EnduranceSession): { reps: number; repSeconds: number
  * them here would send a maximal effort to the watch cold — the defect the previous work order's
  * stage 1 existed to kill.
  */
-function wrapperTokens(session: EnduranceSession): { pre: string[]; post: string[] } {
+function wrapperTokens(session: EnduranceSession, sport: SessionType): { pre: string[]; post: string[] } {
   const warm = session.warmup.reduce((a, s) => a + (s.seconds ?? 0), 0);
   const cool = session.cooldown.reduce((a, s) => a + (s.seconds ?? 0), 0);
+  /**
+   * ⛔ THE WRAPPER IS PER SPORT (slice 4). It emitted `warmup_run_…` for everything, which was right
+   * while the frame was run-only and would have put a run warm-up on a ride. Each of these is a token
+   * the materializer already parses — `warmup_bike_quality_…` at `:1936`, `cooldown_bike_…` at
+   * `:1950`, `swim_warmup_…` / `swim_cooldown_…` at `:2773`.
+   *
+   * ⚠️ THE SWIM WRAPPER IS DISTANCE-PRESCRIBED, not clocked, because that is what its expander reads.
+   * The distance is the session's own warm-up metres — stage 1 built them; nothing here invents one.
+   */
+  if (sport === 'ride') {
+    return {
+      pre: warm > 0 ? [`warmup_bike_quality_${minutes(warm)}min_fastpedal`] : [],
+      post: cool > 0 ? [`cooldown_bike_${minutes(cool)}min`] : [],
+    };
+  }
+  if (sport === 'swim') {
+    const m = (steps: typeof session.warmup) =>
+      Math.round(steps.reduce((a, s) => a + (s.meters ?? 0), 0) / 50) * 50;
+    const wm = m(session.warmup);
+    const cm = m(session.cooldown);
+    return {
+      pre: wm > 0 ? [`swim_warmup_${wm}m`] : [],
+      post: cm > 0 ? [`swim_cooldown_${cm}m`] : [],
+    };
+  }
   return {
     pre: warm > 0 ? [`warmup_run_${minutes(warm)}min_easy`] : [],
     post: cool > 0 ? [`cooldown_run_${minutes(cool)}min_easy`] : [],
+  };
+}
+
+/** ⛔ THE SPORT A FAMILY BELONGS TO, read off its own prefix — the library's own naming, not a table. */
+export function sportForFamily(family: FamilyId): SessionType {
+  if (String(family).startsWith('ride_')) return 'ride';
+  if (String(family).startsWith('swim_')) return 'swim';
+  return 'run';
+}
+
+/** Work reps and their length in MINUTES, rounded to the minute the bike tokens are written in. */
+function repMinutes(session: EnduranceSession): { reps: number; workMin: number; restMin: number } {
+  const { reps, repSeconds, restSeconds } = repShape(session);
+  return {
+    reps: Math.max(1, reps),
+    workMin: Math.max(1, Math.round(repSeconds / 60)),
+    restMin: Math.max(1, Math.round(restSeconds / 60)),
   };
 }
 
@@ -111,6 +153,11 @@ const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
   run_near_threshold: 'Threshold Run',
   run_vt1: 'Easy Run',
   run_lsd: 'Long Run',
+  // ⛔ SLICE 4 — the ride and swim slots. Plain names in the app's existing register; nothing here
+  // says "sweet spot" or "MLSS" at an athlete, and the description carries the intensity.
+  ride_sweet_spot: 'Hard Ride',
+  ride_endurance: 'Ride',
+  swim_endurance: 'Easy Swim',
 };
 
 /**
@@ -123,9 +170,10 @@ export function translateEnduranceSession(
   session: EnduranceSession,
   opts?: { raceTempo?: boolean },
 ): TranslatedSession {
-  const { pre, post } = wrapperTokens(session);
+  const sport = sportForFamily(session.family);
+  const { pre, post } = wrapperTokens(session, sport);
   const totalMin = minutes(session.totals.clockedSeconds);
-  const tags = ['standing_plan', `family:${session.family}`, `level:${session.level}`];
+  const tags = ['standing_plan', `family:${session.family}`, `level:${session.level}`, `sport:${sport}`];
   let work: string[];
 
   switch (session.family) {
@@ -178,17 +226,64 @@ export function translateEnduranceSession(
       break;
     }
 
+    /**
+     * ⛔ SLICE 4 — THE RIDE SLOTS. Same edge, same rule: every token below is one
+     * `expandBikeToken` already parses, checked against its own regexes on 2026-08-23.
+     *
+     * ⚠️ THE BAND IS THE TOKEN'S, AND THE EQUIVALENCE PICKED THE TOKEN. `bike_ss_` is 85-95% of FTP
+     * and `bike_thr_` is 95-105%; `sport-slots.ts` maps an MLSS slot to the sweet-spot `medium`
+     * archetype, whose own work band is 0.95-1.00, so the threshold token is the honest carrier for
+     * it and the sweet-spot token for the softer archetypes. ⛔ `bike_vo2_` (110-120%) is never
+     * emitted by this plan — it is HARDER than any run slot it would replace.
+     */
+    case 'ride_sweet_spot': {
+      const { reps, workMin, restMin } = repMinutes(session);
+      // The archetype decides which side of threshold this sits on — `medium` is his 95-100% work.
+      const atThreshold = session.archetype === 'medium';
+      work = [`bike_${atThreshold ? 'thr' : 'ss'}_${reps}x${workMin}min_R${restMin}min`];
+      break;
+    }
+
+    case 'ride_endurance': {
+      // ⛔ CONTINUOUS. `bike_endurance_{n}min` is 65-75% of FTP, which is his "below 75%" (p239).
+      work = [`bike_endurance_${Math.max(1, minutes(workSeconds(session) || session.totals.clockedSeconds))}min`];
+      break;
+    }
+
+    /**
+     * ⛔ SLICE 4 — THE SWIM, AND IT IS ONE SESSION (Michael, 2026-08-23): easy laps and technique.
+     * `swim_endurance` at level 1 is the only swim this plan can reach — `sport-slots.ts` assigns
+     * nothing else and a lint holds it — so this case does not branch on level.
+     *
+     * ⚠️ DISTANCE-PRESCRIBED, because the swim expander (`:2889`) reads distances, not clocks. The
+     * metres are stage 1's own; nothing here invents one.
+     */
+    case 'swim_endurance': {
+      const { reps } = repShape(session);
+      const metres = session.blocks
+        .flatMap((b) => b.steps)
+        .filter((st) => st.role === 'work' && st.meters != null)
+        .map((st) => st.meters as number);
+      const per = metres.length > 0
+        ? Math.max(50, Math.round(metres[0] / 50) * 50)
+        : 200;
+      const { restSeconds } = repShape(session);
+      work = [`swim_aerobic_${reps}x${per}m_r${Math.max(10, Math.round(restSeconds))}`];
+      break;
+    }
+
     default:
-      // ⛔ THE STANDING PLAN'S RUNNER FRAME USES FOUR FAMILIES. Anything else reaching here is a
-      // frame this edge has not been taught, and it must fail loudly rather than emit a token the
-      // materializer will silently drop.
+      // ⛔ ANY FAMILY THIS EDGE HAS NOT BEEN TAUGHT FAILS LOUDLY rather than emitting a token the
+      // materializer will silently drop. ⚠️ That deliberately includes `ride_vo2`, `ride_anaerobic`,
+      // `ride_sprints`, `swim_speed` and `swim_open_water`: none of them is reachable from this
+      // plan's assignment, and a throw here is the tripwire if one ever becomes reachable by accident.
       throw new Error(`no session-vocabulary translation for family: ${session.family}`);
   }
 
-  const label = FAMILY_LABEL[session.family] ?? 'Run';
+  const label = FAMILY_LABEL[session.family] ?? (sport === 'ride' ? 'Ride' : sport === 'swim' ? 'Swim' : 'Run');
   const raceTempo = opts?.raceTempo === true;
   return {
-    type: 'run',
+    type: sport,
     name: raceTempo ? `${label} (race tempo)` : label,
     description: describeSession(session, raceTempo),
     duration: totalMin,
@@ -234,6 +329,32 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^longrun_\d+min_easypace$/, example: 'longrun_90min_easypace' },
   { shape: /^cruise_\d+x[\d.]+mi_threshold$/, example: 'cruise_4x1mi_threshold' },
   { shape: /^interval_\d+x\d+m_5kpace_R\d+s$/, example: 'interval_6x800m_5kpace_R90s' },
+  // ⛔ SLICE 4 — the ride and swim tokens, all of them already parsed by the materializer.
+  { shape: /^warmup_bike_quality_\d+min_fastpedal$/, example: 'warmup_bike_quality_15min_fastpedal' },
+  { shape: /^cooldown_bike_\d+min$/, example: 'cooldown_bike_10min' },
+  { shape: /^bike_ss_\d+x\d+min_R\d+min$/, example: 'bike_ss_3x12min_R4min' },
+  { shape: /^bike_thr_\d+x\d+min_R\d+min$/, example: 'bike_thr_4x8min_R5min' },
+  { shape: /^bike_endurance_\d+min$/, example: 'bike_endurance_90min' },
+  { shape: /^swim_warmup_\d+m$/, example: 'swim_warmup_300m' },
+  { shape: /^swim_cooldown_\d+m$/, example: 'swim_cooldown_200m' },
+  { shape: /^swim_aerobic_\d+x\d+m_r\d+$/, example: 'swim_aerobic_6x200m_r20' },
+];
+
+/**
+ * ⛔ THE MATERIALIZER'S BIKE AND SWIM PATTERNS, COPIED FROM `expandBikeToken` (`:1925`) AND THE SWIM
+ * EXPANDERS (`:2773`+) ON 2026-08-23. ⚠️ A CACHE of those functions, exactly like the run list above;
+ * if their regexes move, this list is stale and the gate that reads it is the tripwire.
+ */
+export const MATERIALIZER_RIDE_PATTERNS: RegExp[] = [
+  /warmup_bike_quality_\d+min_fastpedal/,
+  /cooldown_bike_\d+min/,
+  /bike_ss_(\d+)x(\d+)min_r(\d+)min/i,
+  /bike_thr_(\d+)x(\d+)min_r(\d+)min/i,
+  /bike_endurance_(\d+)min/,
+];
+export const MATERIALIZER_SWIM_PATTERNS: RegExp[] = [
+  /swim_(warmup|cooldown)_(\d+)(yd|m)/,
+  /^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/,
 ];
 
 /**

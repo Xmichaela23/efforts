@@ -141,6 +141,12 @@ Deno.serve(async (req: Request) => {
        * built; the calendar cannot. `day_offset` is what this block actually ran on.
        */
       dayOffset: Number(sp.day_offset) || 0,
+      /**
+       * ⛔ THE BLOCK'S OWN SPORT MIX, READ BACK — same rule as the rotation above. A restate that
+       * re-derived the mix from the athlete's CURRENT answers would compose a different week (a ride
+       * where the calendar has a run) and match nothing, reporting the whole block as unmatched.
+       */
+      ...(sp.sport_mix ? { sportMix: sp.sport_mix } : {}),
       // ⚠️ A SKIPPED BLOCK HAS NO TEST WEEK AND MUST NOT GROW ONE ON A RESTATE. It also has nothing
       // to restate — `readTestWeek` finds no week-one test sets and this function abstains above —
       // but carrying the flag keeps the re-composition identical to the block that was built.

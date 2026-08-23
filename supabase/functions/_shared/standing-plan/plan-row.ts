@@ -111,6 +111,14 @@ export type StandingPlanConfig = {
   test_skipped: boolean;
   /** What the skip was read off, per lift: the set, its date, and the number it produced. */
   skip_evidence: Record<string, unknown> | null;
+  /**
+   * ⛔ THE SPORT MIX THE BLOCK WAS BUILT ON (slice 4). Stored for the same reason `day_offset` is:
+   * a restate re-composes this block and must reach the identical week. Re-deriving it from the
+   * athlete's current answers would rebuild a DIFFERENT week against the calendar that exists.
+   */
+  sport_mix: { runs: number; rides: number; swimDays: number } | null;
+  /** How many of the frame's endurance slots each sport actually got. Surfacing and provenance. */
+  sport_counts: { run: number; ride: number; swim: number } | null;
 };
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -190,6 +198,24 @@ export function buildStandingPlanRow(args: {
       test_skipped: args.compose.skipTestWeek === true
         && Object.keys(args.compose.workingNumbers ?? {}).length > 0,
       skip_evidence: args.skipEvidence ?? null,
+      sport_mix: args.compose.sportMix
+        ? {
+            runs: Math.max(0, Math.round(Number(args.compose.sportMix.runs) || 0)),
+            rides: Math.max(0, Math.round(Number(args.compose.sportMix.rides) || 0)),
+            swimDays: Math.max(0, Math.round(Number(args.compose.sportMix.swimDays) || 0)),
+          }
+        : null,
+      sport_counts: (() => {
+        // ⚠️ COUNTED OFF THE BUILT WEEK, not off the ask. What the athlete asked for is a ratio;
+        // what the week holds is the answer, and only the second is worth storing as a fact.
+        const wk = blocks.find((b) => !b.isTestWeek) ?? blocks[0];
+        if (!wk) return null;
+        const c = { run: 0, ride: 0, swim: 0 };
+        for (const s of wk.sessions) {
+          if (s.type === 'run' || s.type === 'ride' || s.type === 'swim') c[s.type] += 1;
+        }
+        return c;
+      })(),
     },
     notes,
     /**
