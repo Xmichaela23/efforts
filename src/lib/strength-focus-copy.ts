@@ -137,8 +137,12 @@ export function strengthFocusSections(opts: {
 export function strengthFocusBrief(opts: { weeks?: number } = {}): string {
   const weeks = opts.weeks ?? STRENGTH_FOCUS_WEEKS;
   return (
-    `Strength leads for ${weeks} weeks. Three lifting days, placed around the endurance you keep — ` +
-    `held easy, enough to hold your base. Speed and distance blocks unlock when this one closes.`
+    // ⛔ REWRITTEN 2026-08-24. The old line said "Three lifting days … held easy" — both halves
+    // described Strong Focus and both are wrong for the new engine (four lifting days; up to two
+    // hard endurance sessions). No day count and no "easy" promise: this card serves whichever
+    // engine the posture routes to, so it may only say what is true for both.
+    `Strength leads for ${weeks} weeks. Lifting days placed around the endurance you keep — ` +
+    `enough to hold what you've built. Speed and distance blocks unlock when this one closes.`
   );
 }
 

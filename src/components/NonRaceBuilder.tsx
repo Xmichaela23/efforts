@@ -2989,7 +2989,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'tier' && (
         <StepLayout
           step={stepNo('tier')} totalSteps={steps.length} title={eyeTitle('Strength')}
-          subtitle="Same lifts, same 5/3/1 loading. What changes is the work around them."
+          subtitle="Your main lifts, loaded off your tested numbers. What changes is the work around them."
           onBack={back} onContinue={next} canContinue={state.strengthTier != null}
           hideContinue hideProgress
         >
@@ -3477,10 +3477,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </button>
               );
             })}
-            {/* ⛔ KEEP THE CAVEAT, DROP THE REPEAT. The brief above already says the endurance is
-                held easy; what it does not say is what this block will NOT hold, and that is the
-                half an athlete needs before choosing. */}
-            <p className="text-white/50 text-xs">Speed and threshold are not maintained by this block.</p>
+            {/* ⛔ KEEP THE CAVEAT, DROP THE REPEAT. The brief above says what the block holds; this
+                line is the half an athlete needs before choosing: what is NOT held. Rewritten
+                2026-08-24 — the old line ("speed and threshold are not maintained") described Strong
+                Focus and INVERTS for the new engine, which assigns up to two hard sessions
+                (bike-first when strength leads). What's true now: the cap, and its consequence. */}
+            <p className="text-white/50 text-xs">Two hard sessions at most. A sport without one holds its base, not its top end.</p>
           </div>
         </StepLayout>
       )}
