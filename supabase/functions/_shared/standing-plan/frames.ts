@@ -1,0 +1,342 @@
+// ============================================================================
+// THE FRAMES — one Viada program whole, per dial position. This slice ships ONE.
+//
+// Source: `SOURCE-viada-hybrid-athlete.md` Part E1 (pp.246-247, both read directly 2026-08-23).
+// Design: `DECISIONS-2026-08-22-standing-plan-pivot.md` §1.
+//
+// ⛔ THE FRAME TABLE IS THE LAW. The program owns every count — lifting days, endurance slots, which
+// day carries what. The athlete owns sport, level, equipment and exercise choice. **Convert, never
+// add** (pivot §2): an intensity choice tags a session the frame already has; it never creates one.
+//
+// ⛔ AND NO WEEK MIXES TWO AUTHORS' STRUCTURES (pivot §1). This is Viada's week end to end.
+// ============================================================================
+
+import type { ViadaCategory, ViadaIntent, ViadaPattern } from '../strength-grid/index.ts';
+import type { FamilyId, Level } from '../endurance-library/index.ts';
+
+export type FrameId = 'strength_5k';
+
+export type ColumnKind = 'standard' | 'taper';
+
+/**
+ * ⛔ "ACCESSORY:" IS A ROLE PREFIX, NOT A CATEGORY — p247, and nothing else in the corpus records it:
+ *
+ * > *"The 'accessory' notation refers to movements that specifically focus on **noncompetition lifts
+ * > with similar gross movement patterns** — for example, paused deadlifts, box squats, Larsen
+ * > presses."*
+ *
+ * His three examples straddle two of his own categories (paused deadlift and box squat are PRIMARY,
+ * p219; Larsen press is SECONDARY, p220), which is the proof that the prefix is a ROLE and the words
+ * after it name the pattern.
+ *
+ * ⛔ **A composer that reads `Accessory: primary pull` as "the primary-pull category" puts the
+ * competition lift into a slot that exists precisely to avoid it.** So this is a filter applied on
+ * top of stage 2's grid, never a change to it: exclude the athlete's named competition movements,
+ * then take the grid's answer.
+ */
+export type SlotRole =
+  /** The competition lift itself. Day-opening slots are always this — *"All first lifts of the day
+   *  should be a competition movement"* (p247). */
+  | 'competition'
+  /** A noncompetition variant in the same gross pattern. */
+  | 'accessory';
+
+export type StrengthSlot = {
+  intent: ViadaIntent;
+  role: SlotRole;
+  category: ViadaCategory;
+  pattern: ViadaPattern;
+  /**
+   * ⛔ THE WEEKLY ME/DE ROTATION, AND HE STATES THE CADENCE — p247:
+   *
+   * > *"the ME lift will rotate week to week, with one week consisting of **ME squat and DE
+   * > deadlift**, and the next week the reverse."*
+   *
+   * This is what the table's *"(rotate with primary push)"* means. On an odd week the slot takes its
+   * own pattern; on an even week it swaps with its partner. ⚠️ **`pivot §8` listed rotation cadence
+   * as a gap to fill from field practice. It is not a gap — he wrote it, and nothing here is ours.**
+   */
+  rotatesWith?: ViadaPattern;
+  /**
+   * ⚠️ AMBIGUOUS IN THE SOURCE, RESOLVED CONSERVATIVELY AND LABELLED (Michael, 2026-08-23).
+   * `1 x HYP: Accessory: accessory lower` on days 2 and 5 names *"accessory lower"*, which is not a
+   * category anywhere in pp.218-223. Read as: a lower-body noncompetition movement, category left to
+   * stage 2's substitution ladder. Recorded in Part E1b as ambiguous rather than resolved.
+   */
+  ambiguousNotation?: string;
+  /** What the page prints, kept verbatim so a reader can find the row. */
+  sourceText: string;
+};
+
+export type EnduranceSlot = {
+  family: FamilyId;
+  level: Level;
+  /** ⚠️ p247's own refinement of the slot, where it gives one. */
+  archetype?: string;
+  /** Taper only — *"NT (race tempo)"*: race pace with recoveries 25% longer (p247). */
+  raceTempo?: boolean;
+  sourceText: string;
+};
+
+export type FrameDay = {
+  day: number;
+  label: string | null;
+  strength: StrengthSlot[];
+  endurance: EnduranceSlot[];
+  /** Day 3 only. p227 governs the dose; see `PLYO_DOSE`. */
+  plyo?: boolean;
+  rest?: boolean;
+};
+
+export type Frame = {
+  id: FrameId;
+  /** ⛔ NEVER SHOWN TO AN ATHLETE (pivot §1). Internal only. */
+  sourceName: string;
+  cite: string;
+  /** ⛔ THE PROGRAM OWNS THIS (pivot §6). Not an athlete dial. */
+  liftingDays: number;
+  columns: Record<ColumnKind, FrameDay[]>;
+  /** His rate anchor for THIS frame — see `RATE_ANCHOR`. */
+  workingNumberRatePerWeek: number;
+};
+
+// ── the slot vocabulary, spelled once ───────────────────────────────────────────────────────────
+
+const S = (
+  intent: ViadaIntent,
+  role: SlotRole,
+  category: ViadaCategory,
+  pattern: ViadaPattern,
+  sourceText: string,
+  extra?: Partial<StrengthSlot>,
+): StrengthSlot => ({ intent, role, category, pattern, sourceText, ...extra });
+
+const E = (family: FamilyId, level: Level, sourceText: string, extra?: Partial<EnduranceSlot>): EnduranceSlot =>
+  ({ family, level, sourceText, ...extra });
+
+/**
+ * ⛔ STRENGTH + 5K (p246), TRANSCRIBED FROM THE PAGE.
+ *
+ * Four lifting days — two ME, two DE — a plyo-only day 3, an endurance-only day 6, one rest day.
+ * Four endurance sessions in standard, three in taper.
+ *
+ * ⚠️ p247 says the lifting days *"focus on the big three if powerlifting is the goal: training bench
+ * twice a week and the squat and deadlift each once a week."* That falls out of the table: bench is
+ * the primary push on days 1 and 4, and days 2 and 5 carry squat and deadlift with the ME/DE roles
+ * swapping weekly.
+ */
+const STRENGTH_5K_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME: Upper',
+    strength: [
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),
+      S('ME', 'accessory', 'primary', 'pull_upper', '1 x ME: Accessory: primary pull'),
+      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: Accessory: secondary push'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
+    ],
+    endurance: [E('run_mlss', 2, '1 x MLSS+ (level 2)')],
+  },
+  {
+    day: 2,
+    label: 'ME: Lower',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
+      S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Accessory: secondary hinge lower'),
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 X HYP: Accessory: accessory lower', {
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [],
+  },
+  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 3, 'NT (level 3)', { archetype: 'below_threshold' })], plyo: true },
+  {
+    day: 4,
+    label: 'DE: Upper',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
+      S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
+      S('HYP', 'accessory', 'secondary', 'push_upper', '1 x HYP: Accessory: secondary push'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
+    ],
+    endurance: [E('run_vt1', 1, 'VT1 (level 1)')],
+  },
+  {
+    day: 5,
+    label: 'DE: Lower',
+    strength: [
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower (rotate with primary push lower)', { rotatesWith: 'press_lower' }),
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: secondary push lower'),
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Accessory: focused push lower'),
+    ],
+    endurance: [],
+  },
+  { day: 6, label: null, strength: [], endurance: [E('run_lsd', 2, 'LSD (level 2)', { archetype: 'long_with_inserts' })] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔ THE TAPER/DELOAD COLUMN, AND IT IS A SUBSTITUTION AS MUCH AS A CUT. Days 1 and 2 turn their
+ * SECOND ME slot into a DE slot; every endurance level drops to 1; day 4 loses its endurance
+ * entirely; the LSD is gone and a VT1 takes day 6.
+ *
+ * ⛔ IT IS ALSO THE FRAME'S HOLD VARIANT (pivot §1: *"Holding — the taper/deload column of the
+ * current frame. Not a separate plan."*) and its race handling: p247 says to switch to the deload
+ * version **two weeks out from a powerlifting meet or a 5K**.
+ */
+const STRENGTH_5K_TAPER: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME: Upper',
+    strength: [
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),
+      S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
+    ],
+    endurance: [E('run_mlss', 1, '1 x MLSS+ (level 1)')],
+  },
+  {
+    day: 2,
+    label: 'ME: Lower',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate)', { rotatesWith: 'press_lower' }),
+      S('DE', 'accessory', 'primary', 'press_lower', '1 x DE: Accessory: primary push lower'),
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [],
+  },
+  {
+    day: 3,
+    label: null,
+    strength: [],
+    endurance: [E('run_near_threshold', 1, 'NT (race tempo) (level 1)', { archetype: 'below_threshold', raceTempo: true })],
+    plyo: true,
+  },
+  {
+    day: 4,
+    label: 'DE: Upper',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
+      S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
+    ],
+    endurance: [],
+  },
+  {
+    day: 5,
+    label: 'DE: Lower',
+    strength: [
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate)', { rotatesWith: 'hinge_lower' }),
+      S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower'),
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [],
+  },
+  { day: 6, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1)')] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔ HIS RATE ANCHOR, AND IT IS PER-FRAME RATHER THAN PER-ATHLETE (corrected 2026-08-23).
+ *
+ * p247, for Strength + 5K: *"slow gradual increases in the calculated 1RM taking place every 3 to 4
+ * weeks (**assume 1 percent every 3 weeks as a starting point**)."*
+ *
+ * ⚠️ `DECISIONS-2026-08-22-standing-plan-pivot.md` §4 read this as "~1%/3wk general, ~1%/4wk when
+ * running is real" — a global switch on running. **It is not.** Strength + 5K carries four endurance
+ * sessions including two hard ones and still runs at 1%/3wk; the 1%/4wk figure is p251's, for
+ * Strength + Half-Marathon. More running, slower rate — **per frame**. Michael ruled the page wins,
+ * 2026-08-23.
+ */
+export const RATE_ANCHOR: Record<FrameId, { perWeek: number; cite: string }> = {
+  strength_5k: { perWeek: 0.01 / 3, cite: 'Viada p247 — 1% every 3 weeks' },
+};
+
+export const FRAMES: Record<FrameId, Frame> = {
+  strength_5k: {
+    id: 'strength_5k',
+    sourceName: 'Strength + 5K',
+    cite: 'Viada pp246-247',
+    liftingDays: 4,
+    columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
+  },
+};
+
+/**
+ * ⛔ THE ADVANCED-RUNNER TIER — A PROGRAM TIER, NOT AN ATHLETE DIAL (Michael, 2026-08-23).
+ *
+ * p247: *"More advanced runners may see a benefit to additional running volume, and I recommend
+ * adding one or two VT1 sessions initially to test recovery."*
+ *
+ * ⚠️ THIS SAT AGAINST PIVOT §2's *"convert, never add"* and was raised rather than reconciled. The
+ * ruling: §2 stands, and this is not a violation of it, because **the athlete never self-selects
+ * into volume they do not already hold.** The frame has a base count; the engine gates the tier on
+ * DEMONSTRATED running history and then the count is fixed again. Within either tier, intensity
+ * still converts and never adds.
+ *
+ * ⛔ THE ADDED SESSIONS ARE EASY ONLY. His words are VT1 sessions, and the tier exists *"to test
+ * recovery"* — adding a hard session would test something else.
+ */
+export const ADVANCED_TIER_VT1_SESSIONS = { min: 1, max: 2, cite: 'Viada p247' };
+
+/**
+ * ⛔ THE GATE IS DEMONSTRATED HISTORY, AND THE THRESHOLD IS OURS.
+ *
+ * He says "more advanced runners" and defines nothing. The gate therefore cannot be his, and it is
+ * labelled: **an athlete qualifies when their own recent running already carries the volume** — the
+ * tier adds sessions they are shown to be doing, never sessions they hope to do.
+ *
+ * ⚠️ 25 MILES A WEEK IS OURS, from the customer definition rather than from the book: the Standing
+ * Plan's stated audience is 10-30 miles a week (`DECISIONS-2026-08-21-standing-plan.md` §1), so the
+ * top third of that band is where "more advanced" begins for this product. **Fixed number, labelled,
+ * one line — the pivot §8 discipline.**
+ */
+export const ADVANCED_TIER_MIN_WEEKLY_MILES = 25;
+export const ADVANCED_TIER_GATE_IS_OURS =
+  'The source says "more advanced runners" and defines nothing. Twenty-five miles a week is ours — '
+  + 'the top third of this plan\'s stated 10-to-30-mile audience — and it gates on running the '
+  + 'athlete already does, never on running they intend to do.';
+
+export function advancedTierSessions(demonstratedWeeklyMiles: number | null | undefined): number {
+  const miles = Number(demonstratedWeeklyMiles);
+  if (!Number.isFinite(miles) || miles < ADVANCED_TIER_MIN_WEEKLY_MILES) return 0;
+  // ⚠️ One session at the gate, two once the athlete is clear of it by the same margin again.
+  return miles >= ADVANCED_TIER_MIN_WEEKLY_MILES * 2
+    ? ADVANCED_TIER_VT1_SESSIONS.max
+    : ADVANCED_TIER_VT1_SESSIONS.min;
+}
+
+/**
+ * ⛔ PLYO DOSE — the drill count and the stop rule are HIS; the effort count is OURS (pivot §8).
+ *
+ * p227: *"Throwing more than three or four plyometric movements together on a given day is likely a
+ * waste of time. Each drill should be performed multiple times with ample rest… until the movement
+ * is optimized for the day and the athlete develops confidence in it; then they move on. Fatigue,
+ * poor form, and imprecise movements are all absolute no-no's."*
+ *
+ * So: **3 drills** (the low end of his own 3-4, because sets start low everywhere else in his
+ * system), and the stop rule is his — quality, not a rep count. ⚠️ **The number of efforts per drill
+ * is OURS**: he says "multiple times" and gives no figure. Three to five efforts is the field
+ * standard for low-amplitude plyometrics and it is written here as a fixed, labelled number rather
+ * than a range the engine picks from.
+ */
+export const PLYO_DOSE = {
+  drillsPerDay: 3,
+  effortsPerDrill: 4,
+  drillCountIsHis: 'Viada p227 — more than three or four is likely a waste of time',
+  effortCountIsOurs:
+    'The source says each drill is performed "multiple times with ample rest" and gives no number. '
+    + 'Four efforts is ours, from field practice for low-amplitude plyometrics.',
+  stopRule:
+    'Stop each drill when the movement is optimised for the day and it feels confident — not on a '
+    + 'rep count. Fatigue, poor form and imprecise movements are the signal to move on.',
+  stopRuleIsHis: 'Viada p227',
+};
