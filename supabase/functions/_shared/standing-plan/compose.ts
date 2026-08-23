@@ -43,6 +43,8 @@ import {
   isTestWeek,
   pretestSession,
   TEST_DAY_LIFTS,
+  TESTED_LIFTS,
+  testedLiftName,
   type TestedLift,
   type WorkingNumber,
 } from './working-number.ts';
@@ -59,6 +61,8 @@ export type StrengthExercise = {
   percent_1rm?: number;
   load_prescribed?: boolean;
   notes?: string;
+  /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
+  target_rir?: number;
   set_plan?: PlannedSet[];
 };
 
@@ -118,6 +122,31 @@ function patternForWeek(slot: StrengthSlot, week: number): ViadaPattern {
   return week % 2 === 1 ? slot.pattern : slot.rotatesWith;
 }
 
+
+/**
+ * ⛔ HIS REPS-IN-RESERVE, STAMPED ON THE ROW — and NOT stamped where he says there is none.
+ *
+ * p218 gives a reserve for three of the four intents (DE and SKILL 3-4, HYP 0-2) and says of ME, in
+ * as many words, that there is **no RIR target**. `materialize-plan:2335` honours a row's own
+ * `target_rir` above everything else (`getTargetRir` precedence 1), so stamping it here is how his
+ * number reaches the logger instead of a protocol-wide average standing in for four different ones.
+ *
+ * ⚠️ MIDPOINT OF HIS BAND, rounded to the half. The band is his; picking a single number out of it
+ * is ours, and it is the only choice in this function.
+ *
+ * ⚠️ AND AN ME ROW STILL RECEIVES A DERIVED TARGET DOWNSTREAM. `protocolUsesRir` is a
+ * protocol-wide flag, not a per-slot one, so `materialize-plan` reads a target off the RPE chart for
+ * any row that carries none. On an ME row (90-100%, 1-5 reps) that lands at essentially zero
+ * reserve, which restates the prescription rather than contradicting it — but it is not the same as
+ * p218's "no target". ⛔ RECORDED AS A GAP for the slice that touches the RIR seam; it is not fixed
+ * by widening a shared flag on this stage's account.
+ */
+function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | null {
+  const p = prescribe(intent, 'barbell');
+  if (p.kind !== 'barbell' || !p.rir) return null;
+  return Math.round(((p.rir.lo + p.rir.hi) / 2) * 2) / 2;
+}
+
 /** ⛔ Percent of the working number, per intent. Stage 2 owns the bands; this only picks the top. */
 function pctForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | null {
   const p = prescribe(intent, 'barbell');
@@ -133,6 +162,45 @@ const LIFT_FOR_PATTERN: Record<ViadaPattern, TestedLift> = {
 };
 
 const LOWER_PATTERNS: ViadaPattern[] = ['hinge_lower', 'press_lower'];
+
+/**
+ * ⛔ WHICH PATTERN'S COMPETITION LIFT IS THIS TESTED LIFT — and the `null` is the load-bearing half.
+ *
+ * ⚠️ IT IS NOT THE INVERSE OF `LIFT_FOR_PATTERN`, deliberately. That map answers *"if this pattern
+ * carried a number, whose would it be"*; `pull_upper` answers `bench` there because a pull slot
+ * shares no tested lift of its own. Inverting it would seed a competition lift onto `pull_upper` and
+ * hand a barbell row the bench press's working number — `pull up @ 205 lb`, the first defect the
+ * composer's own smoke run found, re-entering through the name table.
+ *
+ * ⚠️ AND OVERHEAD PRESS RESOLVES TO `null`. Neither column of `strength_5k` carries a `push_upper`
+ * competition slot the athlete would fill with a press rather than a bench, so the frame tests the
+ * press and never spends its number. p246 is the law; inventing a slot for it would be authorship.
+ */
+export const PATTERN_FOR_TESTED_LIFT: Record<TestedLift, ViadaPattern | null> = {
+  bench: 'push_upper',
+  squat: 'press_lower',
+  deadlift: 'hinge_lower',
+  overheadPress: null,
+};
+
+/**
+ * ⛔ THE ONE TABLE OF WHAT EACH TESTED LIFT IS CALLED IN THIS BLOCK — written by the test session,
+ * read back by whatever reads the test.
+ *
+ * ⚠️ SLICE 2 FOUND THE ROUND TRIP BROKEN. The test session named its exercises by the raw key
+ * (`overheadPress`), so the athlete saw a key on a card and the reader could not find the one set
+ * every weight in the block depends on. The name is resolved once, here, and both ends use it.
+ */
+export function testWeekLiftNames(
+  competitionLifts: Partial<Record<ViadaPattern, string>>,
+): Record<TestedLift, string> {
+  const out = {} as Record<TestedLift, string>;
+  for (const lift of TESTED_LIFTS) {
+    const pattern = PATTERN_FOR_TESTED_LIFT[lift];
+    out[lift] = testedLiftName(lift, pattern ? competitionLifts[pattern] : null);
+  }
+  return out;
+}
 
 /**
  * ⛔ ONE STRENGTH SLOT → ONE EXERCISE ROW.
@@ -226,6 +294,8 @@ function exerciseForSlot(
   // ⛔ HYP CARRIES NO PERCENTAGE (p218 gives it reps, tempo and RIR and no load), so a HYP row states
   // the movement and the reps and NOTHING about the weight — the same `load_prescribed: false`
   // contract the app already has for auto-regulated work.
+  const targetRir = targetRirForIntent(slot.intent);
+
   if (!working || pct == null) {
     return {
       exercise: {
@@ -234,6 +304,7 @@ function exerciseForSlot(
         reps,
         weight: 'By feel',
         load_prescribed: false,
+        ...(targetRir != null ? { target_rir: targetRir } : {}),
         notes: slot.sourceText,
       },
       movement,
@@ -267,6 +338,7 @@ function exerciseForSlot(
       reps,
       weight,
       percent_1rm: pct,
+      ...(targetRir != null ? { target_rir: targetRir } : {}),
       set_plan: Array.from({ length: sets }, () => ({
         weight,
         reps: p.kind === 'barbell' ? p.reps.hi : 1,
@@ -285,6 +357,8 @@ function exerciseForSlot(
 function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]): PlanSession | null {
   const lifts = TEST_DAY_LIFTS[day.day];
   if (!lifts) return null;
+  // ⛔ THE TEST TESTS THE MOVEMENT THE BLOCK WILL PRESCRIBE — see `testWeekLiftNames`.
+  const names = testWeekLiftNames(args.competitionLifts);
   const exercises: StrengthExercise[] = [];
   for (const lift of lifts) {
     const seed = args.seed1RMs?.[lift];
@@ -292,7 +366,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
     if (!steps) {
       // ⛔ NO SEED IS NOT A REASON TO SKIP THE TEST. It is a reason to run it by feel and say so.
       exercises.push({
-        name: lift,
+        name: names[lift],
         reps: '6, 5, max',
         weight: 'By feel',
         load_prescribed: false,
@@ -301,7 +375,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
       continue;
     }
     exercises.push({
-      name: lift,
+      name: names[lift],
       sets: steps.length,
       reps: steps.map((s) => s.reps).join(', '),
       weight: steps[steps.length - 1].weight,

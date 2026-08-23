@@ -126,7 +126,16 @@ Deno.test("Get Stronger's composer is untouched by this stage", async () => {
 
 Deno.test('the Standing Plan never reaches into the live strength path', async () => {
   const dir = new URL('.', import.meta.url).pathname;
-  const names = ['working-number.ts', 'frames.ts', 'session-vocabulary.ts', 'progression.ts', 'compose.ts', 'index.ts'];
+  // ⛔⛔ THE DIRECTORY, NOT A HAND-WRITTEN LIST (widened 2026-08-23, slice 2). This enumerated six
+  // filenames, so slice 2's five new files — the frame resolver, the row builder, the restater and
+  // the history reader among them — would have been added to the module and never linted. A lint
+  // with a list has to be maintained to keep working, which is the same disease as the three
+  // hand-maintained routing tables in `CLAUDE.md`.
+  const names: string[] = [];
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) names.push(entry.name);
+  }
+  assert(names.length >= 6, 'the module lint found almost no files — it is not reading the directory');
   for (const name of names) {
     const src = await Deno.readTextFile(dir + name);
     const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
@@ -231,7 +240,9 @@ Deno.test('week one is the test week, upper on day 1 and lower on day 2', () => 
   assertEquals(mon.name, 'Test: Upper');
   assertEquals(tue.name, 'Test: Lower');
   // The last step is taken for max reps — that is the set the block reads.
-  const bench = mon.strength_exercises!.find((e) => e.name === 'bench')!;
+  // ⛔ AND IT IS NAMED FOR THE MOVEMENT THE BLOCK WILL PRESCRIBE, not for the internal key. The
+  // fixture's competition push is 'bench press', so that is what week one tests.
+  const bench = mon.strength_exercises!.find((e) => e.name === 'bench press')!;
   assert(bench.set_plan!.some((s) => s.amrap === true), 'the test has no max-rep set');
   // ⛔ AIMED BY THE SEED: 75% of the stored 200 is 150.
   assertEquals(bench.set_plan![0].weight, 150);
@@ -621,7 +632,14 @@ Deno.test('an unknown frame or column is refused, not guessed', () => {
 
 Deno.test('the module carries nothing that would break in a browser', async () => {
   const dir = new URL('.', import.meta.url).pathname;
-  for (const name of ['working-number.ts', 'frames.ts', 'session-vocabulary.ts', 'progression.ts', 'compose.ts', 'index.ts']) {
+  // ⛔⛔ THE DIRECTORY, NOT A LIST (widened 2026-08-23, slice 2) — same reason as the lint above:
+  // five files were added to this module and a hand-written list would have let all five past.
+  const names: string[] = [];
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) names.push(entry.name);
+  }
+  assert(names.length >= 6, 'the browser lint found almost no files — it is not reading the directory');
+  for (const name of names) {
     const src = await Deno.readTextFile(dir + name);
     assert(!/\bDeno\./.test(src), `${name} touches Deno`);
     assert(!/from ['"]https:/.test(src), `${name} imports over https`);

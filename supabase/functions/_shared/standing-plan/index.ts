@@ -13,3 +13,7 @@ export * from './frames.ts';
 export * from './session-vocabulary.ts';
 export * from './progression.ts';
 export * from './compose.ts';
+export * from './frame-resolver.ts';
+export * from './demonstrated-history.ts';
+export * from './plan-row.ts';
+export * from './restate.ts';

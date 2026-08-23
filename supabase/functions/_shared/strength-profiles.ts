@@ -20,7 +20,8 @@ export type StrengthProtocolId =
   | 'triathlon_performance'
   | 'minimum_dose'
   | 'strength_primary'
-  | 'five_by_five';
+  | 'five_by_five'
+  | 'standing_plan';
 
 /**
  * What a protocol reads to judge how hard a session was. See `readsEffortAs` below for why this is a
@@ -187,6 +188,35 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
   // every call site. This entry ends the instance; `strength-protocol-registry.test.ts` and
   // the fallback log line below end the class.
   five_by_five: {
+    defaultTargetRir: { lower: 2, upper: 2 },
+    progression: { minDeviation: 0.25, minGainPct: 0.02 },
+    deload:      { maxDeviation: -0.5, minSessions: 2 },
+  },
+
+  // ⛔ THE STANDING PLAN (Viada), registered 2026-08-23 IN THE SAME CHANGE THAT STARTED EMITTING IT
+  // — which is this file's own rule (see `leader`/`anchor` and `tm test` in `normalizePhaseKey`):
+  // an unrecognised id is indistinguishable from a deliberate choice at every call site, falls
+  // through to `durability`'s flat RIR 2.5, and reads as `protocolKnown: false` in
+  // `block-identity.ts` — which silences every effort-aware surface without saying so.
+  //
+  // ⛔ IT AUTO-REGULATES, and that is the difference from `strength_primary` sitting above it.
+  // 5/3/1 fixes the working number and the reps in advance and measures one all-out set. This block
+  // prescribes REP RANGES at a stated reserve — p218 gives DE and SKILL 3-4 RIR and HYP 0-2 — and
+  // progresses when the athlete holds the top of the range at that reserve (double progression,
+  // ours, `standing-plan/progression.ts`). Reps-in-reserve is the signal, so `readsEffortAs: 'rir'`.
+  //
+  // ⚠️ THE DEFAULTS BELOW ARE THE FALLBACK, NOT THE PRESCRIPTION. The composer stamps `target_rir`
+  // per row from the intent's own band, and `getTargetRir` honours a row's own target above
+  // everything else. What reaches this default is an accessory the muscle floor added, which is
+  // hypertrophy work — so 2, the top of his HYP band, is the conservative end of the one band that
+  // can apply. He gives no upper/lower split, so neither does this.
+  //
+  // ⚠️ ME CARRIES NO RIR TARGET IN THE SOURCE (p218, in as many words) and `usesRir` is a
+  // protocol-wide flag, so an ME row with no stamp still resolves one off the RPE chart downstream.
+  // At 90-100% for 1-5 reps that lands at essentially zero reserve — a restatement of the
+  // prescription rather than a contradiction of it — but it is not "no target". Filed, not widened.
+  standing_plan: {
+    readsEffortAs: 'rir',
     defaultTargetRir: { lower: 2, upper: 2 },
     progression: { minDeviation: 0.25, minGainPct: 0.02 },
     deload:      { maxDeviation: -0.5, minSessions: 2 },

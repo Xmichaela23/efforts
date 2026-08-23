@@ -27,6 +27,27 @@
 // ============================================================================
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-primary-plan.ts';
+/**
+ * ⛔ THE STANDING PLAN — stage 4 slice 2, the wiring. `DECISIONS-2026-08-22-standing-plan-pivot.md` §9.
+ *
+ * ⚠️ THE PIVOT DOC SAYS "wire through `generate-strength-plan`'s GATE" AND THIS FILE HAS NO GATE.
+ * The posture gate — strength `develop`, no endurance `develop` — lives one hop upstream at
+ * `create-goal-and-materialize-plan/index.ts:2493` and decides which BUILDER is invoked. This file
+ * decides which COMPOSER builds the block, which is the other half of the same dial. Putting the
+ * frame resolver upstream would mean two files carrying the same condition — the disease the
+ * ride-count banner below is a monument to.
+ *
+ * ⛔ THE FALLBACK IS THE WHOLE POINT. A position with no frame — a cyclist, an athlete keeping a
+ * bike or a swim, strength alone — takes the Get Stronger path below, unchanged. That path is not
+ * edited by this stage and is pinned byte-identical by `standing-plan.test.ts`.
+ */
+import {
+  buildStandingPlanRow,
+  defaultCompetitionLifts,
+  demonstratedRunVolume,
+  resolveFrame,
+  STANDING_PLAN_PROTOCOL_ID,
+} from '../_shared/standing-plan/index.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
 import { describeThresholdBasis, resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
@@ -146,7 +167,11 @@ Deno.serve(async (req: Request) => {
     // ONE baselines read, serving the maxes, the easy pace, and the assistance equipment gate.
     const { data: ub } = await supabase
       .from('user_baselines')
-      .select('learned_fitness, performance_numbers, effort_paces, equipment')
+      // ⚠️ `units` ADDED 2026-08-23 (stage 4 slice 2). `resolveEnduranceAnchors` DECLARES it and this
+      // door never fetched it — the SELECT-projection footgun this repo has hit repeatedly. It feeds
+      // the swim anchor only, so the run frame is unaffected either way; a resolver is fed what it
+      // asks for rather than what today's caller happens to need.
+      .select('learned_fitness, performance_numbers, effort_paces, equipment, units')
       .eq('user_id', String(user_id))
       .maybeSingle();
 
@@ -244,6 +269,194 @@ Deno.serve(async (req: Request) => {
     const blockShape = {
       strengthPosture: typeof gsPosture === 'string' ? gsPosture : 'develop',
     };
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════════════════════
+     * ⛔ THE STANDING PLAN FORK (stage 4 slice 2, 2026-08-23). Pivot §9.
+     *
+     * ⛔ EVERYTHING ABOVE THIS POINT IS SHARED AND UNCHANGED — the baselines read, the four 1RMs,
+     * the entry refusals, the equipment, the three pace/FTP resolvers. Both composers need exactly
+     * those inputs, so the fork is here rather than at the door: a second door would be a second
+     * copy of the entry gate, and the entry gate is the thing this file and `create-goal` already
+     * share a reader for so they cannot drift.
+     *
+     * ⛔ AND IT IS A FORK, NOT A REPLACEMENT. `resolveFrame` returns `null` WITH A REASON for every
+     * position this build cannot serve, and the reason is logged rather than swallowed. Get
+     * Stronger is the answer for all of them and its composer is not touched by this stage.
+     * ═══════════════════════════════════════════════════════════════════════════════════════════
+     */
+    const framePosition = {
+      enduranceSport: sport,
+      /**
+       * ⚠️ THE BIKE AND THE SWIM REFUSE THE FRAME rather than being dropped from it — see
+       * `resolveFrame`.
+       *
+       * ⛔ THE TEST IS THE `bike` OBJECT AND ONLY THAT, NOT `rideDeclared` BELOW. Those two answer
+       * different questions and conflating them costs the athlete the plan: `create-goal` forwards
+       * `target_weekly_ride_hours` off the goal's prefs **unconditionally**, whatever the bike's
+       * posture, so a runner who typed ride hours into some earlier block still carries the number
+       * on a run-only goal. Reading that as "kept a bike" would refuse the frame for them on the
+       * strength of a stale answer. ⚠️ Nothing is lost by ignoring it here: on a run-sport block
+       * `targetWeeklyRideHours` is inert in the Get Stronger composer too — it serves the
+       * bike-PRIMARY path, which `resolveFrame` refuses on `enduranceSport` before this line matters.
+       */
+      bikeKept: !!bike && typeof bike === 'object',
+      swimDays: normalizeSwimDays(swim_days) ?? 0,
+    };
+    const frameResolution = resolveFrame(framePosition);
+
+    if (frameResolution.frame) {
+      const frameId = frameResolution.frame;
+      /**
+       * ⛔ THE ADVANCED TIER IS GATED ON WHAT THE ATHLETE RAN, NOT ON WHAT THEY SAID (ruled
+       * 2026-08-23). So this is a workouts read, not a baselines read — `current_volume.run` is the
+       * athlete's typed intention and is precisely what the ruling excludes.
+       *
+       * ⚠️ IT ABSTAINS RATHER THAN GUESSING. A failed read leaves `weeklyMiles` null,
+       * `advancedTierSessions(null)` is 0, and the athlete gets the BASE tier — which is the same
+       * block every athlete gets today. A reader that cannot read must never add volume.
+       */
+      let demonstrated: { weeklyMiles: number | null; runs: number; source: string } = {
+        weeklyMiles: null, runs: 0, source: 'the run history could not be read',
+      };
+      try {
+        const asOf = (typeof start_date === 'string' && start_date.trim())
+          ? String(start_date).slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+        const from = new Date(Date.parse(`${asOf}T00:00:00Z`) - 35 * 24 * 60 * 60 * 1000)
+          .toISOString().slice(0, 10);
+        const { data: runRows } = await supabase
+          .from('workouts')
+          .select('type, date, distance')
+          .eq('user_id', String(user_id))
+          .eq('type', 'run')
+          .gte('date', from)
+          .lte('date', asOf);
+        demonstrated = demonstratedRunVolume(runRows as never, asOf);
+      } catch (e) {
+        console.warn('[standing-plan] demonstrated run volume unreadable; base tier:', (e as Error)?.message);
+      }
+
+      /**
+       * ⚠️ THE FRAME OWNS THE WEEKDAYS AND THE ATHLETE'S PINNED LONG DAY IS NOT HONOURED YET.
+       *
+       * The work order is explicit that *"the day order is not the law, the pairings are"* and that
+       * the composer should anchor on the athlete's fixed points — that is stage 4's gap 1 and it is
+       * NOT built: `compose.ts` maps frame day N straight onto weekday N, so the long run is always
+       * Saturday. ⛔ An athlete who pinned Sunday is told, rather than silently moved. This is a
+       * note, not a refusal: every other day of the frame is correct for them.
+       */
+      const wiringNotes: { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string }[] = [];
+      if (typeof long_run_day === 'string' && long_run_day.trim()
+        && long_run_day.trim().toLowerCase() !== 'saturday') {
+        wiringNotes.push({
+          kind: 'warning',
+          text: `The long run sits on Saturday in this block. You asked for ${long_run_day}, and this `
+            + 'version of the plan cannot move it yet.',
+        });
+      }
+      if (runMilesAsked != null) {
+        wiringNotes.push({
+          kind: 'source',
+          text: 'The programme owns how many runs the week carries and how long they are, so the '
+            + 'weekly mileage you typed is not what sets them.',
+          cite: 'Viada p246',
+        });
+      }
+
+      const row = buildStandingPlanRow({
+        compose: {
+          frame: frameId,
+          // ⛔ THE ATHLETE HAS NOT BEEN ASKED YET (stage 5). Seeded from the four lifts the entry
+          // gate already demanded — see `defaultCompetitionLifts` for why it is three, not four.
+          competitionLifts: defaultCompetitionLifts(),
+          // ⛔ ABSENT, ALWAYS, AT BUILD TIME. The test is in week one and this row is written before
+          // it. The numbers land when the test is read back.
+          workingNumbers: undefined,
+          seed1RMs: {
+            bench: maxes.bench,
+            squat: maxes.squat,
+            deadlift: maxes.deadlift,
+            overheadPress: maxes.overheadPress,
+          },
+          baselines: ub as never,
+          equipment: equipmentStrength,
+          demonstratedWeeklyMiles: demonstrated.weeklyMiles,
+          roundTo: 5,
+        },
+        weeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,
+        // ⛔ NO SCHEDULED TAPER — p120. The deload column is a tool you deploy (a race two weeks
+        // out, p247), never a recovery week on a timer. This block has no race in it.
+        taperWeeks: [],
+        goalName: typeof goal_name === 'string' ? goal_name : undefined,
+        demonstratedMilesSource: demonstrated.source,
+        extraNotes: wiringNotes,
+      });
+
+      console.log(
+        `[standing-plan] composed: ${row.name} (${row.duration_weeks}wk, frame ${frameId}) — `
+        + `test week ${row.config.test_week}, demonstrated ${demonstrated.weeklyMiles ?? 'unknown'} mi/wk `
+        + `(${demonstrated.source}); no working numbers until the test is read.`,
+      );
+
+      if (preview === true) {
+        return json({ success: true, plan_id: null, plan: row, phase_structure: row.phaseStructure }, 200);
+      }
+
+      const { data: spInserted, error: spError } = await supabase
+        .from('plans')
+        .insert({
+          user_id,
+          name: row.name,
+          description: row.description,
+          duration_weeks: row.duration_weeks,
+          current_week: 1,
+          status: 'active',
+          plan_type: 'generated',
+          config: {
+            // ⛔ IT SAYS WHAT IT IS IN BOTH DIALECTS, for the same reason Q-230 made Get Stronger do
+            // it: `block-identity.ts` reads `strength_protocol` first and falls back to `source`,
+            // and a block that answers only one of them reads as a stranger to half the app.
+            source: STANDING_PLAN_PROTOCOL_ID,
+            strength_protocol: STANDING_PLAN_PROTOCOL_ID,
+            plan_version: 'standing_plan_v1',
+            program: 'standing_plan',
+            endurance_sport: sport,
+            phase_structure: row.phaseStructure,
+            /**
+             * ⛔⛔ THERE IS NO `training_max` KEY ON THIS ROW, AND ITS ABSENCE IS THE DESIGN
+             * (pivot §3). That key is Wendler's 85% of a TRUE 1RM and has three live readers. This
+             * block's number is Viada's 96% of a FRESH prediction (p215). Writing one into the
+             * other's key is the conversion the whole `working-number.ts` module exists to make
+             * impossible — and a reader that found a number there would spend it as if it were the
+             * other quantity.
+             */
+            standing_plan: row.config,
+            one_rep_maxes_at_build: maxes,   // provenance: what aimed the test's warm-ups
+            standing_plan_notes: row.notes,  // surfacing only — sources, gaps and what we could not honour
+            user_selected_start_date: start_date ?? null,
+          },
+          sessions_by_week: row.sessions_by_week,
+          notes_by_week: {},
+          weeks: [],
+        })
+        .select('id')
+        .single();
+
+      if (spError || !spInserted) {
+        console.error('[standing-plan] insert failed:', spError?.message);
+        return json({ success: false, error: spError?.message || 'Failed to save the plan' }, 500);
+      }
+      return json({
+        success: true, plan_id: spInserted.id, sport: 'strength', combined: false,
+        strength_days: row.strength_days,
+      }, 200);
+    }
+
+    console.log(
+      `[strength-plan] no Standing Plan frame for this position (${frameResolution.reason}) — `
+      + 'building the Get Stronger block, unchanged.',
+    );
 
     const plan = composeStrengthPrimaryPlan({
       durationWeeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,

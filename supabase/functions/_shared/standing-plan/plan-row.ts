@@ -1,0 +1,190 @@
+// ============================================================================
+// THE PLAN ROW — a composed block becomes the row shape this app already stores.
+//
+// ⛔ IT INVENTS NO STORAGE. `plans.sessions_by_week`, `plans.config.phase_structure` and
+// `plans.duration_weeks` are the columns every other builder writes, and `PlanSession` here is
+// field-for-field `strength-primary-plan.ts:559`'s. What is NEW is one config key
+// (`standing_plan`) — and it exists precisely so the working number never has to borrow
+// `config.training_max`.
+//
+// ⛔ THE WORKING NUMBER NEVER TOUCHES `config.training_max` (pivot §3). That key is Wendler's, 85%
+// of a TRUE 1RM, with three live readers, and this block's number is 96% of a fresh prediction. A
+// row that wrote both would be the conversion this module exists to make impossible.
+// ============================================================================
+
+import {
+  composeBlock,
+  testWeekLiftNames,
+  type ComposeArgs,
+  type ComposedWeek,
+  type PlanSession,
+} from './compose.ts';
+import { FRAMES, type FrameId } from './frames.ts';
+import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
+import type { ViadaPattern } from '../strength-grid/index.ts';
+
+/** The app's existing phase shape — `strength-primary-plan.ts` writes the same one. */
+export type ArcPhase = { name: string; start_week: number; end_week: number; weeks_in_phase: number };
+
+/**
+ * ⛔ THE PROTOCOL STAMP. `plans.config.strength_protocol`, which `block-identity.ts:246` reads as the
+ * app's ONE answer to *"which protocol is this block on"*.
+ *
+ * ⚠️ IT MUST HAVE A `PROTOCOL_PROFILES` ENTRY IN THE SAME CHANGE THAT STARTS EMITTING IT.
+ * `strength-profiles.ts:408` falls an unknown id back to `durability` — a flat RIR 2.5 for twelve
+ * weeks — and logs it, and `block-identity.ts:380` reads `protocolKnown: false`, which silences every
+ * effort-aware surface. That file's own comment says why: *"an unrecognised name resolves to the
+ * default silently, and that silence is Q-192's whole failure mode."*
+ */
+export const STANDING_PLAN_PROTOCOL_ID = 'standing_plan';
+
+/**
+ * ⛔ NO SCHEDULED DELOAD, AND THAT IS SOURCED RATHER THAN OMITTED (p120, corpus §"why
+ * overreach-to-deload is rejected").
+ *
+ * > *"this 'overreach to deload' will always be suboptimal for at least one discipline, and it may
+ * > result in slower progress at best and overtraining/stagnation at worst."*
+ *
+ * His standard week is built to be run indefinitely, and the taper/deload column is **a tool you
+ * deploy** — a race two weeks out (p247), or a break — not a scheduled recovery from accumulated
+ * damage. So a block with no race in it carries no taper week, and adding a light week every fourth
+ * would be inverting his model on his own page.
+ */
+export const NO_SCHEDULED_DELOAD_CITE = 'Viada p120';
+
+export type StandingPlanRow = {
+  name: string;
+  description: string;
+  duration_weeks: number;
+  sessions_by_week: Record<string, PlanSession[]>;
+  phaseStructure: { phases: ArcPhase[]; recovery_weeks: number[] };
+  /** Lowercase weekday names carrying a strength session — the same contract `strength_days` has. */
+  strength_days: string[];
+  /** ⛔ EVERYTHING THIS BLOCK NEEDS TO BE READ BACK. Written to `plans.config.standing_plan`. */
+  config: StandingPlanConfig;
+  /** Every note the composer raised, deduped across the block. Surfacing only. */
+  notes: ComposedWeek['notes'];
+};
+
+export type StandingPlanConfig = {
+  frame: FrameId;
+  cite: string;
+  /** ⛔ WHAT THE BLOCK PRESCRIBES FROM. Absent until week one's test is read back. */
+  working_numbers: Partial<Record<TestedLift, WorkingNumber>> | null;
+  /** ⛔ WHICH MOVEMENT EACH PATTERN'S COMPETITION SLOT CARRIES — and what the test week measured. */
+  competition_lifts: Partial<Record<ViadaPattern, string>>;
+  /** The names week one's test used, per lift. The reader needs exactly these. */
+  test_lift_names: Record<TestedLift, string>;
+  /** Provenance: what aimed the test's warm-ups. ⛔ Never the working number (p215). */
+  seed_one_rep_maxes: Partial<Record<TestedLift, number>>;
+  /** The week the pretest runs. */
+  test_week: number;
+  /** Demonstrated weekly miles the advanced tier was gated on, and where the number came from. */
+  demonstrated_weekly_miles: number | null;
+  demonstrated_miles_source: string | null;
+  /** ⛔ TRUE ONCE THE TEST HAS BEEN READ AND THE FUTURE WEEKS REWRITTEN FROM IT. */
+  test_read: boolean;
+};
+
+const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+/**
+ * ⛔ ONE BLOCK → ONE PLAN ROW.
+ *
+ * ⚠️ `weeks` IS THE ATHLETE'S ASK, UNROUNDED. Get Stronger rounds down to whole four-week Wendler
+ * cycles because its wave is four weeks long; this block has no wave, so ten weeks means ten weeks.
+ */
+export function buildStandingPlanRow(args: {
+  compose: Omit<ComposeArgs, 'week' | 'column'>;
+  weeks: number;
+  /** ⛔ DEPLOYED, NEVER SCHEDULED — see `NO_SCHEDULED_DELOAD_CITE`. Empty on a block with no race. */
+  taperWeeks?: number[];
+  goalName?: string | null;
+  demonstratedMilesSource?: string | null;
+  /** Surfacing only: the athlete pinned a long day the frame cannot honour yet. */
+  extraNotes?: ComposedWeek['notes'];
+}): StandingPlanRow {
+  const weeks = Math.max(1, Math.round(args.weeks));
+  const blocks = composeBlock({ ...args.compose, weeks, taperWeeks: args.taperWeeks ?? [] });
+
+  const sessions_by_week: Record<string, PlanSession[]> = {};
+  for (const wk of blocks) sessions_by_week[String(wk.week)] = wk.sessions;
+
+  // ⚠️ DEDUPED BY TEXT ACROSS THE BLOCK. Every week raises the same source notes; twelve copies of
+  // "the first week is the test" is not more honest than one.
+  const seen = new Set<string>();
+  const notes: ComposedWeek['notes'] = [];
+  for (const n of [...(args.extraNotes ?? []), ...blocks.flatMap((b) => b.notes)]) {
+    if (seen.has(n.text)) continue;
+    seen.add(n.text);
+    notes.push(n);
+  }
+
+  const strengthDays = new Set<string>();
+  for (const wk of blocks) {
+    for (const s of wk.sessions) {
+      if (s.type === 'strength') strengthDays.add(s.day.toLowerCase());
+    }
+  }
+
+  const frame = FRAMES[args.compose.frame];
+  return {
+    name: (args.goalName ?? '').trim() || 'Strength, with running',
+    description: describeBlock(weeks, notes),
+    duration_weeks: weeks,
+    sessions_by_week,
+    phaseStructure: phasesFor(weeks, args.taperWeeks ?? []),
+    strength_days: [...strengthDays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b)),
+    config: {
+      frame: args.compose.frame,
+      cite: frame.cite,
+      // ⛔ ABSENT AT BUILD TIME, ALWAYS. The test is in week one and the block is written before it.
+      working_numbers: args.compose.workingNumbers ?? null,
+      competition_lifts: args.compose.competitionLifts,
+      test_lift_names: testWeekLiftNames(args.compose.competitionLifts),
+      seed_one_rep_maxes: args.compose.seed1RMs ?? {},
+      test_week: TEST_WEEK_INDEX,
+      demonstrated_weekly_miles: args.compose.demonstratedWeeklyMiles ?? null,
+      demonstrated_miles_source: args.demonstratedMilesSource ?? null,
+      test_read: args.compose.workingNumbers != null,
+    },
+    notes,
+  };
+}
+
+/**
+ * ⛔ WEEK ONE IS A TEST WEEK AND SAYS SO; everything else is base work.
+ *
+ * ⚠️ BOTH NAMES ARE ALREADY REGISTERED IN `normalizePhaseKey` (`strength-profiles.ts:433-454`) —
+ * `test` resolves to `taper` (arrive rested, do not tighten the target into it) and `base` to
+ * `base`. Emitting a name that file has not heard of resolves to the default silently, which is
+ * Q-192's failure mode; these two were checked before they were emitted.
+ */
+export function phasesFor(weeks: number, taperWeeks: number[]): { phases: ArcPhase[]; recovery_weeks: number[] } {
+  const taper = new Set(taperWeeks.filter((w) => w >= 1 && w <= weeks));
+  const phases: ArcPhase[] = [{ name: 'Test', start_week: 1, end_week: 1, weeks_in_phase: 1 }];
+  let cursor = 2;
+  while (cursor <= weeks) {
+    const isTaper = taper.has(cursor);
+    let end = cursor;
+    while (end + 1 <= weeks && taper.has(end + 1) === isTaper) end += 1;
+    phases.push({
+      name: isTaper ? 'Taper' : 'Base',
+      start_week: cursor,
+      end_week: end,
+      weeks_in_phase: end - cursor + 1,
+    });
+    cursor = end + 1;
+  }
+  // ⛔ NO RECOVERY WEEKS, AND THAT IS A SOURCED ANSWER RATHER THAN AN EMPTY FIELD (p120).
+  return { phases, recovery_weeks: [] };
+}
+
+function describeBlock(weeks: number, notes: ComposedWeek['notes']): string {
+  const sourced = notes.filter((n) => n.kind === 'source').slice(0, 3).map((n) => n.text);
+  return [
+    `${weeks} weeks. Four lifting days, four runs and a plyometric day, with one full rest day.`,
+    'Week one is a test week: two guided sessions set the numbers the rest of the block is built on.',
+    ...sourced,
+  ].join(' ');
+}

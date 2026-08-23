@@ -27,6 +27,44 @@ export const TESTED_LIFTS: TestedLift[] = ['bench', 'squat', 'deadlift', 'overhe
 export const WORKING_MAX_FRACTION = 0.96;
 
 /**
+ * ⛔ THE NAME THE ATHLETE SEES, AND THE NAME THE READER LOOKS FOR — one table, both jobs.
+ *
+ * ⚠️ THIS WAS A DEFECT FOUND AT THE WIRING (slice 2). `testDaySession` wrote `name: lift` — the raw
+ * key — so the test session showed an exercise called `overheadPress`, and the reader that has to
+ * find that set again could not: the block's every weight depends on one logged set, and it was
+ * being logged under a name nothing could resolve.
+ *
+ * ⛔ THESE ARE THE APP'S EXISTING FOUR NAMES, not new ones — the same strings `MAIN_LIFTS`
+ * (`strength-primary-plan.ts`) and `rematerialize-strength-block`'s `LIFTS` already use, so a lift
+ * carries one name across every plan this app builds.
+ */
+export const TESTED_LIFT_NAME: Record<TestedLift, string> = {
+  bench: 'Bench Press',
+  squat: 'Back Squat',
+  deadlift: 'Deadlift',
+  overheadPress: 'Overhead Press',
+};
+
+/**
+ * ⛔ THE TEST TESTS THE MOVEMENT THE ATHLETE WILL ACTUALLY DO.
+ *
+ * When the athlete has named a competition lift for a pattern (pivot §6, his p275 permission), that
+ * is the movement week one measures — not a canonical stand-in. It has to be: `exerciseForSlot`
+ * only prescribes a weight when the movement IS the named competition lift, so testing "Back Squat"
+ * and prescribing "Safety Bar Squat" would produce a working number nothing spends.
+ *
+ * ⚠️ OVERHEAD PRESS HAS NO PATTERN IN THIS FRAME and therefore no override — see `TESTED_LIFT_NAME`.
+ */
+export function testedLiftName(
+  lift: TestedLift,
+  competitionName: string | null | undefined,
+): string {
+  const named = typeof competitionName === 'string' ? competitionName.trim() : '';
+  return named !== '' ? named : TESTED_LIFT_NAME[lift];
+}
+
+
+/**
  * ⛔ THE PRETEST, AS HE WRITES IT (p215). Warm up to roughly 75% of the PREDICTED max, then three
  * steps.
  *
@@ -150,3 +188,114 @@ export const TEST_DAY_LIFTS: Record<number, TestedLift[]> = {
   1: ['bench', 'overheadPress'],
   2: ['squat', 'deadlift'],
 };
+
+// ── READING THE TEST BACK ────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⛔ THE HOLE SLICE 1 LEFT, AND THE ONE THIS FILE NOW CLOSES: *"nothing stores it, and the test
+ * week's results have nowhere to land."*
+ *
+ * ⛔ THE READER CANNOT LIVE IN THE COMPOSER, and that is structural rather than stylistic. The
+ * composer authors all twelve weeks at build time, so the test has not happened when the block is
+ * written — every week after the first would compose with no working number and prescribe nothing.
+ * Something has to come back afterwards and read what the athlete actually did.
+ * `rematerialize-strength-block` exists for the identical reason on the Get Stronger side, states
+ * the identical rule in its own header, and the two never meet: that one reads a Wendler AMRAP at
+ * 95% of a training max, this one reads a p215 pretest. No function accepts both.
+ *
+ * ⚠️ DB SHAPE, DELIBERATELY LOOSE. This is what a stored `workouts` row looks like to a reader, not
+ * a type this module owns.
+ */
+export type LoggedWorkoutRowish = {
+  strength_exercises?: unknown;
+  week_number?: number | null;
+  workout_date?: string | null;
+};
+
+export type TestWeekReading = {
+  working: Partial<Record<TestedLift, WorkingNumber>>;
+  /** ⛔ WHAT COULD NOT BE READ, AND WHY. Never a silent absence — see `TEST_READ_ABSTAINS`. */
+  missing: { lift: TestedLift; reason: string }[];
+};
+
+/**
+ * ⛔ SILENCE IS NOT A NUMBER. A lift whose test set is absent, uncompleted, or unprovable comes back
+ * in `missing` with the reason spelled out. The caller states it; nothing here substitutes.
+ */
+export const TEST_READ_ABSTAINS =
+  'A lift with no completed test set keeps no working number, and the block leaves its slots on the '
+  + '"by feel" contract rather than prescribing off a set nobody proved was taken.';
+
+/**
+ * Pull the working numbers out of week one's logged sessions.
+ *
+ * @param rows        stored `workouts` rows for this plan.
+ * @param liftForName the movement names the block actually prescribed, per lift — the SAME table the
+ *                    test session was written from (`testedLiftName`). ⛔ Exact, case-insensitive
+ *                    name matching rather than a regex: the composer wrote the name, so the reader
+ *                    may demand it back verbatim, and a second fuzzy matcher is a second authority
+ *                    on what a lift is called.
+ *
+ * ⛔ THE `amrap` FLAG IS THE SIGNAL. `testDaySession` stamps it on exactly one set per lift — the
+ * last pretest step, taken for max reps. Inferring "the heaviest set" instead would promote an
+ * ordinary warm-up into a measurement.
+ *
+ * ⛔ AND IT MUST BE PROVABLY THE TEST WEEK. A row with no `week_number` cannot be shown to be week
+ * one, and twelve weeks of prescription off an unprovable set is the failure this codebase keeps
+ * finding. Unprovable is treated as absent, loudly, not as evidence.
+ */
+export function readTestWeek(
+  rows: LoggedWorkoutRowish[] | null | undefined,
+  liftForName: Partial<Record<TestedLift, string>>,
+): TestWeekReading {
+  const wanted = new Map<string, TestedLift>();
+  for (const lift of TESTED_LIFTS) {
+    const name = liftForName[lift];
+    if (typeof name === 'string' && name.trim() !== '') wanted.set(name.trim().toLowerCase(), lift);
+  }
+
+  const best = new Map<TestedLift, { weight: number; reps: number }>();
+  for (const row of rows ?? []) {
+    // ⛔ PROVABLY WEEK ONE, or it is not the test.
+    if (Number(row?.week_number) !== TEST_WEEK_INDEX) continue;
+    const exercises = Array.isArray(row?.strength_exercises) ? row.strength_exercises : [];
+    for (const ex of exercises as Record<string, unknown>[]) {
+      const lift = wanted.get(String(ex?.name ?? '').trim().toLowerCase());
+      if (!lift) continue;
+      const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+      for (const set of sets as Record<string, unknown>[]) {
+        if (set?.amrap !== true) continue;
+        // ⚠️ COMPLETED ONLY. An untouched set carries whatever the prefill left in it, and reading
+        // that as a measurement prescribes a block off a number nobody lifted.
+        if (set?.completed !== true) continue;
+        const weight = Number(set?.weight);
+        const reps = Number(set?.reps);
+        if (!Number.isFinite(weight) || weight <= 0) continue;
+        if (!Number.isInteger(reps) || reps < 1) continue;
+        // ⚠️ THE LAST ATTEMPT WINS. An athlete who retook the test meant the second answer.
+        best.set(lift, { weight, reps });
+      }
+    }
+  }
+
+  const working: Partial<Record<TestedLift, WorkingNumber>> = {};
+  const missing: { lift: TestedLift; reason: string }[] = [];
+  for (const lift of TESTED_LIFTS) {
+    if (!wanted.has(String(liftForName[lift] ?? '').trim().toLowerCase())) {
+      missing.push({ lift, reason: 'this block never prescribed a movement for it' });
+      continue;
+    }
+    const measured = best.get(lift);
+    if (!measured) {
+      missing.push({ lift, reason: 'no completed test set in week one' });
+      continue;
+    }
+    const wn = workingNumberFromTest(lift, measured);
+    if (!wn) {
+      missing.push({ lift, reason: `the logged set (${measured.weight} x ${measured.reps}) is not a strength test` });
+      continue;
+    }
+    working[lift] = wn;
+  }
+  return { working, missing };
+}
