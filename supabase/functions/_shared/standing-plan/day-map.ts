@@ -76,6 +76,20 @@ export function anchorDaysFor(frame: FrameId, column: ColumnKind = 'standard'): 
 export type DayPins = {
   /** The athlete's long-run day. The block's primary anchor everywhere in this app. */
   longRunDay?: string | null;
+  /**
+   * ⛔ THE LONG-RIDE DAY — AND THE FRAME HAS ONLY ONE LONG SLOT (the compromise wire, 2026-08-24).
+   *
+   * An athlete who keeps both sports can pin both long days. `strength_5k` carries **one** long
+   * session, so at most one of those pins is servable, and until now the other was **dropped in
+   * silence** — the case that escaped on 2026-08-24. Which pin is live depends on which sport the
+   * assigner gave the long slot; the other one becomes a stated cost, never a deletion.
+   */
+  longRideDay?: string | null;
+  /**
+   * Which sport `assignSports` put on the long slot. ⚠️ Absent means run, which is the frame as
+   * transcribed and the answer for every athlete with any running in the mix.
+   */
+  longSlotSport?: 'run' | 'ride' | 'swim';
   /** Days they pinned a hard session to. */
   hardDays?: (string | null | undefined)[];
   /**
@@ -132,7 +146,18 @@ function startWeekdayIndex(iso: string | null | undefined): number | null {
  */
 export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind = 'standard'): DayMap {
   const anchors = anchorDaysFor(frame, column);
-  const longPin = titleCaseDay(pins.longRunDay);
+  /**
+   * ⛔ THE LIVE LONG PIN IS THE ONE MATCHING THE LONG SLOT'S SPORT. One long session, possibly two
+   * pins; the sport decides which is servable and the other is reported below.
+   */
+  const longSlotSport = pins.longSlotSport ?? 'run';
+  const longRunPin = titleCaseDay(pins.longRunDay);
+  const longRidePin = titleCaseDay(pins.longRideDay);
+  const longPin = longSlotSport === 'ride' ? longRidePin : longRunPin;
+  /** The pin the frame cannot serve at all, because it names the sport the long slot is not. */
+  const orphanPin = longSlotSport === 'ride'
+    ? { day: longRunPin, sport: 'run' as const }
+    : { day: longRidePin, sport: 'ride' as const };
   const hardPins = [...new Set((pins.hardDays ?? []).map(titleCaseDay).filter((d) => d !== ''))];
   const startIdx = startWeekdayIndex(pins.startDateIso);
   // The frame days the test week uses. ⛔ Read from the source of that rule, not restated here.
@@ -180,6 +205,22 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
       kind: 'cost',
       text: `The hard session is on ${actual.join(' and ')} rather than ${p}. The week's order is `
         + `fixed and the long day is placed first, so ${p} could not also be reached.`,
+    });
+  }
+  /**
+   * ⛔ THE PIN THE FRAME HAS NO SESSION FOR — STATED, NEVER DROPPED (2026-08-24).
+   *
+   * This is the case that escaped: an athlete keeping both sports pins a long run AND a long ride,
+   * the frame carries one long session, and the pin that does not match its sport used to vanish
+   * with nothing said. One sentence, through the channel the preview already renders.
+   */
+  if (orphanPin.day !== '') {
+    const kept = longSlotSport === 'ride' ? 'ride' : 'run';
+    compromises.push({
+      kind: 'cost',
+      text: `This week has one long session and it is a ${kept}, so the long `
+        + `${orphanPin.sport} pinned to ${orphanPin.day} is not in it. The sport mix decides which `
+        + 'one the long day is.',
     });
   }
   if (!chosen.testSafe) {

@@ -1816,6 +1816,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return barSpeedLineFor({
       isWarmup: set?.setType === 'warmup',
       isAmrap: set?.amrap === true,
+      /**
+       * ⛔ THE STANDING PLAN'S PRETEST IS NOT WENDLER'S AMRAP, AND THEY SHARE A FLAG (2026-08-24).
+       * Both stamp `amrap: true`, so this screen showed *"Grind it out"* on a set whose entire job
+       * is a clean measurement. ⚠️ KEYED ON THE SESSION'S OWN TAG rather than on a new field: the
+       * composer already tags that session `test_week`, and adding a set-level flag would put a
+       * second answer to "which kind of set is this" into stored JSON.
+       */
+      isPretest: Array.isArray(scheduledWorkout?.tags)
+        && scheduledWorkout.tags.some((t: unknown) => String(t) === 'test_week'),
       isDeload: /deload/i.test(String(scheduledWorkout?.name || '')),
       // isValiditySet: intentionally omitted — see the note above.
     });

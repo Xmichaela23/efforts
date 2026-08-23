@@ -2915,6 +2915,24 @@ Deno.serve(async (req: Request) => {
                * Standing Plan frame does not resolve for those athletes anyway.
                */
               ...(gsTp.skip_test_week === true ? { skip_test_week: true } : {}),
+              /**
+               * ⛔ THE ATHLETE'S PER-SLOT SPORT ANSWER (endurance-week screen, 2026-08-24). Counts
+               * alone cannot say WHICH slot is which, and the engine re-derives the assignment when
+               * they are all it gets — so an athlete's "Hard 1 = Run, Long = Ride" became its
+               * opposite. ⚠️ Validated rather than trusted: each value must be `run` or `ride`, and
+               * a malformed map is dropped whole so the dial's own assignment stands rather than a
+               * half-applied one.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).endurance_slots;
+                if (!raw || typeof raw !== 'object') return {};
+                const out: Record<string, string> = {};
+                for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                  if (v !== 'run' && v !== 'ride') return {};
+                  out[k] = v;
+                }
+                return Object.keys(out).length > 0 ? { endurance_slots: out } : {};
+              })(),
               ...(bodyPreview ? { preview: true } : {}),
             };
             console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);

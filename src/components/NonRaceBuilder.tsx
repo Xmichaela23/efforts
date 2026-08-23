@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
+// ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
+import EnduranceWeekCard from './EnduranceWeekCard';
+import {
+  SLOT_KEYS,
+  defaultSlotSports,
+  type SlotKey,
+  type SlotSport,
+} from '@/lib/standing-plan-week-copy';
+import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
@@ -746,6 +755,12 @@ type NonRaceState = {
   /** ⛔ Standing Plan only: the athlete took the offer to open on logged numbers instead of a test
    *  week. Absent/false is the default and the default is the test. */
   skipTestWeek?: boolean;
+  /**
+   * ⛔ WHICH SPORT FILLS EACH OF THE FRAME'S FOUR ENDURANCE SLOTS (2026-08-24). The athlete's ONLY
+   * endurance-shape choice on the Standing Plan — the program owns the count, so `runDays` and
+   * `rideDays` are DERIVED from this rather than asked. See `EnduranceWeekCard.tsx`.
+   */
+  slotSports?: Record<SlotKey, SlotSport>;
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
   raceDate: string;
@@ -817,6 +832,17 @@ type StepKey =
   | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
   | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
+  /**
+   * ⛔ THE ENDURANCE WEEK — ONE SCREEN, REPLACING `volume` + `hardday` ON THE STRENGTH PATH
+   * (Michael's flow, 2026-08-24). Those two asked one question in two places: how much, then how
+   * many of each, then which were hard. **The program owns the count** (8-21 §3c) — the frame has
+   * four endurance slots, always — so the count pickers asked the athlete to decide something the
+   * plan had already decided. What is theirs is which SPORT fills each slot. See
+   * `EnduranceWeekCard.tsx`.
+   * ⚠️ `volume` and `hardday` still exist for every OTHER goal; only the strength path stops using
+   * them.
+   */
+  | 'endurance'
   // ⛔ STRENGTH, ON ITS OWN CARD (2026-08-06) — one primary decision per screen. It was the fifth
   // question on "Your week" and got missed on a device.
   | 'strength'
@@ -885,11 +911,13 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
    * The calendar is the last thing because it is the only step that depends on all of the others.
    */
   if (isStrengthFocus && (kept('run') || kept('bike'))) {
-    out.push('volume');
-    // ⛔ HOW HARD, BEFORE WHAT TO BUILD, BEFORE WHEN. The hard-day COUNT is the second input to the
-    // endurance tier, so it has to be answered before the accessory card can state its rep totals —
-    // the same data dependency that moved `accessory` after `volume`.
-    out.push('hardday');
+    // ⛔ ONE SCREEN NOW (2026-08-24). `volume` + `hardday` were two cards asking one question; see
+    // the `endurance` StepKey. They are untouched for every other goal.
+    out.push('endurance');
+    // ⚠️ `hardday` IS GONE FROM THIS PATH. Its two jobs — which sessions are hard, and their flavour
+    // — moved into the endurance screen's slot cards, where each sits inside the session it is
+    // about. The accessory card's data dependency is unchanged: it still runs after the endurance
+    // answer, which is now one step instead of two.
     if (strengthDevelop) out.push('accessory');
     out.push('schedule');
   } else {
@@ -1035,6 +1063,19 @@ function assemblePayload(
    * already does. This slice deliberately does not change that routing.
    */
   const isRace = !!state.raceDate;
+  /**
+   * ⛔ THE COUNTS, DERIVED FROM THE SLOTS ON THE STRENGTH PATH (2026-08-24). The program owns the
+   * count (8-21 §3c), so "how many runs" is "how many of the four endurance slots are runs" — one
+   * control, one answer. ⚠️ Computed HERE rather than passed in, because this function is the single
+   * place the payload is assembled and a second derivation upstream is how two numbers drift.
+   */
+  const isStrengthFocusPath = state.goal === 'get_stronger';
+  const derivedCounts = (() => {
+    const bikeKept = state.posture?.bike != null && state.posture.bike !== 'out';
+    const slots = state.slotSports ?? defaultSlotSports(bikeKept);
+    const runs = SLOT_KEYS.filter((k) => slots[k] === 'run').length;
+    return { runs, rides: SLOT_KEYS.length - runs, slots: slotsForEngine(slots) };
+  })();
   return {
     summary: isRace
       ? `${GOAL_LABELS[goal]} — ${state.raceDate}`
@@ -1307,7 +1348,22 @@ function assemblePayload(
           // thing worth gating on. Strength posture is not a fact about running.
           // ⚠️ THIS CAN ONLY ADD THE FIELD WHERE IT WAS BEING DROPPED — it never removes it, and
           // `create-goal` reads `run_days` on the Get Strong branch alone, so it is inert elsewhere.
-          ...(state.runDays >= 1 ? { run_days: state.runDays } : {}),
+          /**
+           * ⛔⛔ ON THE STRENGTH PATH THIS COMES FROM THE SLOTS (2026-08-24), not from a picker.
+           * The program owns the count, so "how many runs" is "how many of the four endurance slots
+           * are runs" — and there is exactly one control that answers it. ⚠️ Every OTHER goal still
+           * reads `state.runDays`; those flows keep their own cards and their own gate.
+           */
+          ...(isStrengthFocusPath
+            ? { run_days: derivedCounts.runs }
+            : (state.runDays >= 1 ? { run_days: state.runDays } : {})),
+          /**
+           * ⛔⛔ THE PER-SLOT ANSWER ITSELF, NOT JUST ITS TOTALS (2026-08-24). Counts alone do not
+           * carry which slot is which, so the engine re-derived it from its own rule and an athlete
+           * who chose "Hard 1 = Run, Long = Ride" got "Hard 1 = Ride, Long = Run" — the same mix, a
+           * different week, nothing said. The wizard's own agreement test caught it.
+           */
+          ...(isStrengthFocusPath ? { endurance_slots: derivedCounts.slots } : {}),
           // Strength Focus: the three assistance picks. The composer validates each name against the
           // shared menu, so a stale one falls back to the default rather than reaching a session.
           // ⛔ ALWAYS SENT NOW, and that is the migration working rather than a widened condition.
@@ -1336,8 +1392,12 @@ function assemblePayload(
           ...(state.posture?.bike === 'maintain' && Number(state.rideHours) > 0
             ? { target_weekly_ride_hours: Number(state.rideHours) } : {}),
           // How many days those hours spread across (1/2/3). Without it the engine guessed.
-          ...(state.posture?.bike === 'maintain' && state.rideDays > 0
-            ? { ride_days: state.rideDays } : {}),
+          // ⛔ SAME SOURCE AS THE RUNS on the strength path — see `run_days` above. A ride count and
+          // a run count derived from two different controls is what let the two old screens disagree.
+          ...(isStrengthFocusPath
+            ? (derivedCounts.rides > 0 ? { ride_days: derivedCounts.rides } : {})
+            : (state.posture?.bike === 'maintain' && state.rideDays > 0
+              ? { ride_days: state.rideDays } : {})),
         },
       },
     ],
@@ -1576,7 +1636,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false,
+    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -1713,7 +1773,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       if (!uid) { if (!cancelled) setPaceChecked(true); return; }
       const { data } = await supabase
         .from('user_baselines')
-        .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness')
+        // ⛔ `performance_numbers` ADDED 2026-08-24 for the endurance-week screen: the ride caps
+        // resolve against the athlete's FTP and the rate line prints pounds off their squat. Both
+        // live in that column, and a SELECT that omits it is the projection footgun this repo has
+        // hit repeatedly — the resolver would abstain and the screen would show no ride cap at all.
+        .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness, performance_numbers')
         .eq('user_id', uid).maybeSingle();
       if (cancelled) return;
       setPaceRow(data as PaceBenchmarkRow);
@@ -1722,6 +1786,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     return () => { cancelled = true; };
   }, []);
   const paceOnFile = paceChecked && hasPaceBenchmark(paceRow);
+  /**
+   * ⛔ THE BASELINES THE ENDURANCE-WEEK CAPS RESOLVE AGAINST. Same row, same shape the engine's
+   * `resolveEnduranceAnchors` reads — run pace, ride watts. ⚠️ Null until the fetch lands, and the
+   * card renders no cap rather than one computed off nothing.
+   */
+  const baselinesRow = paceRow as unknown;
+  /** The squat on file, for the rate line's pounds. ⚠️ Absent → the sentence stands without it. */
+  const squat1RMNow = (() => {
+    const pn = (paceRow as { performance_numbers?: Record<string, unknown> } | null)?.performance_numbers;
+    const v = Number(pn?.squat ?? (pn as Record<string, unknown> | undefined)?.squat1RM);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  })();
   /** The typed calibration, if it is coherent. Drives the preview and the save. */
   const calResult = calibrationFromPaces({
     easyPace: state.calEasy, fiveKPace: state.calFiveK, isMetric: unit === 'km',
@@ -2663,6 +2739,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   });
 
   // One place builds the payload, so the week previewed and the week built cannot disagree.
+  /**
+   * ⛔ THE FOUR SLOTS, RESOLVED. Untouched by the athlete means the pre-fill: strength leading with a
+   * bike kept puts both hard slots on the bike (p280 — no impact, so the intensity does not tax the
+   * lifts); with no bike every slot is a run and the screen is a read-out.
+   */
+  const bikeKeptNow = state.posture?.bike != null && state.posture.bike !== 'out';
+  const slotSportsNow: Record<SlotKey, SlotSport> = state.slotSports ?? defaultSlotSports(bikeKeptNow);
+
+  /**
+   * ⛔⛔ `runDays` / `rideDays` ARE DERIVED FROM THE SLOTS, NOT ASKED (2026-08-24). The program owns
+   * the count (8-21 §3c), so the only honest reading of "how many runs" is HOW MANY SLOTS ARE RUNS.
+   *
+   * ⚠️ THIS IS WHY THE COUNT PICKERS COULD BE DELETED RATHER THAN HIDDEN. Two controls writing one
+   * pair of numbers is what let the old screens contradict each other — an athlete could tap four
+   * rides on "How much" and have the next card quietly rewrite it to three (2026-08-21). One source
+   * cannot disagree with itself.
+   */
+  const derivedCounts = (() => {
+    const runs = SLOT_KEYS.filter((k) => slotSportsNow[k] === 'run').length;
+    return { runs, rides: SLOT_KEYS.length - runs };
+  })();
+
   const payloadNow = () => {
     // canonicalize the typed mileage (display unit → miles) before it leaves the client
     const canonMiles = typeof state.targetMiles === 'number' && state.targetMiles > 0
@@ -4247,6 +4345,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             </div>
             <p className="text-white/70 text-sm leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
           </div>
+        </StepLayout>
+      )}
+
+      {/* ⛔ THE ENDURANCE WEEK — ONE SCREEN (Michael's flow, 2026-08-24), replacing `volume` and
+          `hardday` on the strength path. Both of those still render for every other goal; this step
+          simply is not in their flow. See `EnduranceWeekCard.tsx` for why one screen. */}
+      {currentStep === 'endurance' && (
+        <StepLayout
+          step={stepNo('endurance')} totalSteps={steps.length} title="Your endurance week"
+          // ⚠️ NO SUBTITLE. Michael's header is the first thing on the card and it is verbatim; a
+          // subtitle above it would be the app talking over him.
+          onBack={back} onContinue={next} canContinue
+        >
+          <EnduranceWeekCard
+            slots={slotSportsNow}
+            onSlotChange={(key, sport) => setState((st) => ({
+              ...st,
+              slotSports: { ...(st.slotSports ?? defaultSlotSports(bikeKeptNow)), [key]: sport },
+            }))}
+            baselines={baselinesRow}
+            easyPaceSecPerMi={paceMinPerMile ? paceMinPerMile * 60 : null}
+            squat1RM={squat1RMNow}
+            runVolume={state.targetMiles === '' ? '' : String(state.targetMiles)}
+            onRunVolume={(v) => setState((st) => ({
+              ...st, targetMiles: v === '' ? '' : Number(v), targetTouched: true,
+            }))}
+            rideHours={state.rideHours}
+            onRideHours={(v) => setState((st) => ({ ...st, rideHours: v }))}
+            unit={unit === 'km' ? 'km' : 'mi'}
+          />
         </StepLayout>
       )}
 

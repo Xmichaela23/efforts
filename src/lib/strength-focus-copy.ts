@@ -324,6 +324,19 @@ export type BarSpeedMoment =
   | 'warmup'
   | 'work_set'      // prescribed reps — 5×5, triples, doubles. A quality check.
   | 'amrap'         // the "+" set. A stop rule.
+  /**
+   * ⛔ THE STANDING PLAN'S PRETEST SET — A DIFFERENT SET WITH THE SAME `amrap` FLAG (2026-08-24).
+   *
+   * Both are taken for max reps and both stamp `amrap: true`, so the logger showed Wendler's line on
+   * Viada's test. They are not the same instruction. Wendler's "+" set is TRAINING and grinding reps
+   * are part of the dose — *"grind it out, not to failure"* (2nd ed. p.24). p215's pretest is a
+   * MEASUREMENT, and its whole output is a predicted 1RM: a ground rep with a rounded back is not
+   * the same rep as a clean one, so counting it prices the block's twelve weeks off a number the
+   * athlete cannot repeat.
+   *
+   * ⚠️ WENDLER'S LINE IS UNCHANGED and still fires on Get Stronger's own AMRAP.
+   */
+  | 'pretest'
   | 'rest'
   | 'deload'
   | 'validity_set'; // week 3 of a cycle: the 95% set that decides the working number
@@ -338,6 +351,10 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   // ⚠️ REVERSED 2026-08-01 from "Slow rep = last rep." — see the doctrine note above. Grinding reps
   // are real reps; the ceiling is failure, not slowness.
   amrap: 'Grind it out. Stop before failure.',
+  // ⛔ MAX CLEAN REPS, AND THE STOP RULE IS FORM — not failure, and not grinding. This set sets the
+  // number the whole block is prescribed from (p215), so a rep the athlete could not repeat with the
+  // same shape is a rep that makes every weight after it wrong.
+  pretest: 'As many clean reps as possible. The set ends when the form changes.',
   rest: "Rest until the speed's back.",
   // ⚠️ REWRITTEN 2026-08-01 (Michael), from "Nothing to prove. Move it fast anyway." The old line
   // conceded something first ("nothing to prove", "anyway") and the concession is the part an
@@ -407,10 +424,15 @@ export function barSpeedLineFor(set: {
   isDeload?: boolean;
   /** True only on the 95% set — week 3 of a cycle. `wendler-531.ts` VALIDITY_CHECK_PCT. */
   isValiditySet?: boolean;
+  /** ⛔ The Standing Plan's week-one pretest (p215). Wins over `isAmrap` — see `pretest`. */
+  isPretest?: boolean;
 }): string {
   if (set.isValiditySet) return BAR_SPEED_COPY.validity_set;
   if (set.isDeload) return BAR_SPEED_COPY.deload;
   if (set.isWarmup) return BAR_SPEED_COPY.warmup;
+  // ⛔ BEFORE THE AMRAP BRANCH, because a pretest set carries `amrap` too — that shared flag is the
+  // whole reason this line was wrong.
+  if (set.isPretest) return BAR_SPEED_COPY.pretest;
   if (set.isAmrap) return BAR_SPEED_COPY.amrap;
   return BAR_SPEED_COPY.work_set;
 }

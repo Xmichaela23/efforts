@@ -46,9 +46,12 @@ import {
   chooseDayMap,
   defaultCompetitionLifts,
   demonstratedRunVolume,
+  assignSports,
   evidenceForSkip,
   evidenceWorkingNumbers,
   EVIDENCE_WINDOW_DAYS,
+  FRAMES,
+  isLongSlot,
   resolveFrame,
   STANDING_PLAN_PROTOCOL_ID,
   testWeekLiftNames,
@@ -368,8 +371,49 @@ Deno.serve(async (req: Request) => {
        * ⛔ IT NEVER REFUSES. A pin that cannot be reached is stated through the compromise channel
        * the athlete already reads, and the week is still built (D-325 §7).
        */
+      /**
+       * ⛔ THE LONG SLOT'S SPORT DECIDES WHICH LONG PIN IS LIVE (the compromise wire, 2026-08-24).
+       * Computed here, before the day map, because the frame has ONE long session and an athlete
+       * keeping both sports can pin two long days. The unservable one is reported, not dropped.
+       */
+      const mixForFrame = {
+        runs: runDaysAsked ?? RUN_DAYS_DEFAULT,
+        rides: rideDaysAsked ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
+        swimDays: normalizeSwimDays(swim_days) ?? 0,
+        /**
+         * ⛔ THE ATHLETE'S OWN PER-SLOT ANSWER, when the wizard collected one. Counts alone do not
+         * say WHICH slot is which — see `SportMix.slots`. ⚠️ Validated here rather than trusted, the
+         * same discipline every other field on this body uses: an unrecognised value drops the whole
+         * map, so the dial assigns rather than a half-applied answer taking effect.
+         */
+        slots: (() => {
+          const raw = (body as Record<string, unknown>).endurance_slots;
+          if (!raw || typeof raw !== 'object') return null;
+          const out: Record<string, 'run' | 'ride'> = {};
+          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            if (v !== 'run' && v !== 'ride') return null;
+            out[k] = v;
+          }
+          return Object.keys(out).length > 0 ? out : null;
+        })(),
+      };
+      const longSlotSport = (() => {
+        const a = assignSports(FRAMES[frameId].columns.standard, mixForFrame);
+        const long = Object.entries(a.byKey).find(([k]) => {
+          const [d, i] = k.split(':').map(Number);
+          const slot = FRAMES[frameId].columns.standard.find((x) => x.day === d)?.endurance[i];
+          return slot ? isLongSlot(slot) : false;
+        });
+        return long?.[1]?.sport ?? 'run';
+      })();
+
       const dayMap = chooseDayMap(frameId, {
         longRunDay: typeof long_run_day === 'string' ? long_run_day : null,
+        longRideDay: bike && typeof bike === 'object'
+          && typeof (bike as Record<string, unknown>).long_ride_day === 'string'
+          ? (bike as Record<string, unknown>).long_ride_day as string
+          : null,
+        longSlotSport,
         // ⚠️ The hard days the caller validated above, not the raw body — one reader for what a
         // well-formed hard day is.
         hardDays: (Array.isArray(hard_days) ? hard_days : [])
@@ -471,11 +515,9 @@ Deno.serve(async (req: Request) => {
            * typed ride hours into an earlier block still carries the number; reading that as "wants
            * rides" would put riding into a week nobody asked for. `bike.days` is the ask.
            */
-          sportMix: {
-            runs: runDaysAsked ?? RUN_DAYS_DEFAULT,
-            rides: rideDaysAsked ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
-            swimDays: normalizeSwimDays(swim_days) ?? 0,
-          },
+          // ⚠️ THE SAME OBJECT THE LONG-SLOT SPORT WAS RESOLVED FROM. Two derivations of one mix is
+          // how a preview and a plan start disagreeing about which day is the long one.
+          sportMix: mixForFrame,
           roundTo: 5,
         },
         weeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,

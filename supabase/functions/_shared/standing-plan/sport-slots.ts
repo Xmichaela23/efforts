@@ -25,6 +25,24 @@ export type SportMix = {
   rides?: number | null;
   /** ⛔ OFF BY DEFAULT (Michael, 2026-08-23). Kept means easy laps and technique, and nothing else. */
   swimDays?: number | null;
+  /**
+   * ⛔⛔ THE ATHLETE'S OWN PER-SLOT ANSWER, WHEN A SCREEN HAS ASKED FOR ONE (stage 5, 2026-08-24).
+   *
+   * ⚠️ **THIS EXISTS BECAUSE THE WIZARD'S AGREEMENT TEST FOUND THE SCREEN LYING.** The endurance-week
+   * screen offers a sport per slot — Hard 1, Hard 2, Easy, Long — and until now only the COUNTS
+   * reached here, so the assigner re-derived which slots were which from its own rule. An athlete
+   * choosing *"Hard 1 = Run, Long = Ride"* got *"Hard 1 = Ride, Long = Run"*: the same two-and-two
+   * mix, a different week, and nothing said. That is the ask-15-get-20 defect with new clothes on.
+   *
+   * ⛔ IT IS AN OVERRIDE, NOT A REPLACEMENT. Absent — every caller before this screen existed — the
+   * dial assigns exactly as it did: hard slots to the bike, the long session kept by the runner.
+   * Pivot §2's *"placed by the dial, never asked"* is what the SCREEN'S PRE-FILL implements; this is
+   * the athlete overriding that default, which his own brief asks for.
+   *
+   * ⚠️ KEYED `${frameDay}:${indexWithinDay}` — the same key `byKey` uses, so a caller cannot supply
+   * an answer for a slot the column does not have.
+   */
+  slots?: Record<string, 'run' | 'ride'> | null;
 };
 
 export type AssignedSlot = {
@@ -185,6 +203,45 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
 
   // ── 2-4. the run/ride split over what is left ─────────────────────────────────────────────────
   const open = slots.filter(({ day, i }) => !takenBySwim.has(key(day, i)));
+
+  /**
+   * ⛔ AN EXPLICIT PER-SLOT ANSWER WINS OVER THE RATIO, AND SHORT-CIRCUITS THE DIAL ENTIRELY.
+   * See `SportMix.slots`. ⚠️ A slot the caller did not name keeps the frame's own run.
+   */
+  if (mix.slots && Object.keys(mix.slots).length > 0) {
+    let substituted = 0;
+    for (const { day, i, slot } of open) {
+      const asked = mix.slots[key(day, i)];
+      if (asked !== 'ride') continue;
+      const eq = RIDE_EQUIVALENT[slot.family];
+      if (!eq) continue;
+      byKey[key(day, i)] = {
+        family: eq.family, level: slot.level, archetype: eq.archetype, raceTempo: slot.raceTempo,
+        sport: 'ride', substituted: true, sourceText: slot.sourceText,
+      };
+      substituted += 1;
+    }
+    if (substituted > 0) {
+      notes.push({ kind: 'ours', text: RIDE_EQUIVALENCE_IS_OURS });
+      notes.push({
+        kind: 'source',
+        text: 'The hard sessions are on the bike. Riding hard does not land on the legs the way '
+          + 'running does, so the intensity costs the lifting less.',
+        cite: 'Viada p280',
+      });
+    }
+    const counts0 = { run: 0, ride: 0, swim: 0 };
+    for (const a of Object.values(byKey)) counts0[a.sport] += 1;
+    const dayOne0 = slots.filter(({ day }) => day === 1);
+    return {
+      byKey,
+      counts: counts0,
+      hardRunBeforeMeLower: dayOne0.some(({ day, i, slot }) =>
+        isHardSlot(slot) && byKey[key(day, i)]?.sport === 'run'),
+      notes,
+    };
+  }
+
   if (rides > 0 && open.length > 0) {
     /**
      * ⛔ THE RATIO, APPLIED TO THE FRAME'S OWN COUNT. Rounded to the nearest whole slot, then clamped

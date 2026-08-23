@@ -149,3 +149,41 @@ Deno.test('AMRAP is exempt from the rep-chasing lint, and the prescribed lines s
       `${key} must not mention failure: ${BAR_SPEED_COPY[key]}`);
   }
 });
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE STANDING PLAN'S PRETEST — a different set with the same `amrap` flag (2026-08-24)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('the pretest set gets its own cue, and Wendler\'s AMRAP keeps his', () => {
+  /**
+   * ⛔ THE DEFECT: both sets stamp `amrap: true`, so the logger printed *"Grind it out. Stop before
+   * failure."* on Viada's p215 pretest. They are not the same instruction. Wendler's "+" set is
+   * TRAINING and grinding reps are part of the dose; the pretest is a MEASUREMENT whose whole output
+   * is a predicted 1RM, so a ground rep prices twelve weeks off a number the athlete cannot repeat.
+   */
+  assertEquals(barSpeedLineFor({ isPretest: true, isAmrap: true }), BAR_SPEED_COPY.pretest);
+  // ⛔ AND IT WINS OVER `isAmrap`, because a pretest set carries that flag too.
+  assertEquals(barSpeedLineFor({ isAmrap: true }), BAR_SPEED_COPY.amrap);
+  assert(barSpeedLineFor({ isPretest: true, isAmrap: true }) !== BAR_SPEED_COPY.amrap,
+    'the pretest still shows Wendler\'s grind line');
+
+  // ⛔ THE CUE ITSELF: max CLEAN reps, and the stop rule is FORM — not failure, and not grinding.
+  assert(/clean reps/i.test(BAR_SPEED_COPY.pretest), BAR_SPEED_COPY.pretest);
+  assert(/form/i.test(BAR_SPEED_COPY.pretest), BAR_SPEED_COPY.pretest);
+  assert(!/grind/i.test(BAR_SPEED_COPY.pretest), BAR_SPEED_COPY.pretest);
+  // ⚠️ WENDLER'S LINE IS UNCHANGED — Get Stronger's own AMRAP still says what it always said.
+  assertEquals(BAR_SPEED_COPY.amrap, 'Grind it out. Stop before failure.');
+});
+
+Deno.test('the logger keys the pretest cue on the session\'s own tag, not a new stored field', async () => {
+  // ⚠️ The composer already tags that session `test_week`; a set-level flag would put a second answer
+  // to "which kind of set is this" into stored JSON.
+  const src = await Deno.readTextFile(
+    new URL('../components/StrengthLogger.tsx', import.meta.url).pathname,
+  );
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert(/isPretest:\s*Array\.isArray\(scheduledWorkout\?\.tags\)/.test(code),
+    'the logger does not pass the pretest flag');
+  assert(/'test_week'/.test(code), 'the logger keys the pretest cue on something other than the tag');
+});
