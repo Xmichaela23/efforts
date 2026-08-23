@@ -69,7 +69,47 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-23 — **stages 1, 2 and 3 of the Standing Plan are built. Your job is STAGE 4: the composer.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-23 — **stage 4 slice 1 IS BUILT: the composer, strength-leading runner frame. Your job is SLICE 2.**)
+
+### ⛔ WHAT EXISTS NOW — `supabase/functions/_shared/standing-plan/` (uncommitted at time of writing)
+
+Seven files: `frames.ts` (p246 as data — THE LAW), `working-number.ts` (Viada's 96%, p215, image
+pending in folder — gap G-7), `progression.ts` (per-frame rate anchors + the p247 lower-body
+haircut + double progression labelled OURS — gap G-8), `session-vocabulary.ts` (the ONE
+translation edge — stage 1 family names → the tokens every screen already speaks),
+`compose.ts` (frame + athlete + the three stage libraries → one week; no fetch, no persist,
+no routing). **30 tests, 44/44 mutations killed. Get Stronger proven byte-identical
+(eb1d6796) with and without the new modules present.** Notes:
+`docs/NOTES-stage4-composer-strength5k-2026-08-23.md`.
+
+### ⛔ SLICE 2 — THE JOB: the EDGE WIRING + the TEST WEEK
+
+1. **Wire the composer through `generate-strength-plan`'s gate** (pivot §9): strength=develop +
+   no endurance develop routes to the Standing Plan composer when the athlete's frame resolves;
+   Get Stronger's existing path stays byte-identical (prove again after wiring, not before only).
+2. **The test week** (RULED, Michael 2026-08-23): week 1 of a block runs the p215 pretest as
+   guided sessions inside the lifting days — upper test day 1, lower day 2. Stored baseline 1RMs
+   SEED the test's warm-up weights ("predicted max" = the number on file) and are never the
+   working number. First fully prescribed weights land week 2.
+3. **The VT1 tier** (RULED): a PROGRAM variant (+1–2 easy VT1 sessions) gated on demonstrated
+   running history — never an athlete dial. Composer already carries it; the wiring must feed it
+   real history, not a question.
+
+⛔ Rules that stand: convert-never-add · the working number NEVER touches
+`plans.config.training_max` · emit only the existing session vocabulary · every invented number
+labelled OURS at the site · read the pivot doc + `NOTES-stage4-…` before writing a line.
+⛔ Do NOT commit, push or deploy. At close: dated notes, this banner → slice 3, report
+pushed / deployed / verified separately.
+
+### Open gaps (corpus): G-7 `p215.jpg` not yet in the folder (numbers verified off Michael's
+photo in the planning chat) · G-8 "circle of reps" undefined in capture — double progression
+stays labelled ours until the defining page is photographed.
+
+---
+
+### 📦 SUPERSEDED (2026-08-23) — the stage-4 slice-1 job below was COMPLETED this date
+
+## 🧭 DONE — (2026-08-23 — stages 1, 2 and 3 built; stage 4 slice 1 was this job, now complete)
 
 ### ⛔ THE JOB: COMPOSE A WEEK — FROM THE PIVOT'S FRAMES, NOT FROM THE ALL ROUNDER
 

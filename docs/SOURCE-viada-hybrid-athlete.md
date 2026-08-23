@@ -766,14 +766,16 @@ zipper/fingertip drag. *(A full drill catalogue is out of the book's scope.)*
 STANDARD and TAPER/DELOAD columns, seven days, a strength column and an endurance column — followed
 by a **notes page** (prose, then Strength Notes and Running/Conditioning/Cycling Notes).
 
-⛔ **Only the All Rounder is transcribed below.** The other seventeen stay as images deliberately —
-transcribing eighteen dense tables invites exactly the errors this file's changelog records.
-**Transcribe one when it is being built, from the page.**
+⛔ **Two are transcribed below — the All Rounder (Part E) and Strength + 5K (Part E1).** The other
+sixteen stay as images deliberately: transcribing eighteen dense tables invites exactly the errors
+this file's changelog records. **Transcribe one when it is being built, from the page.**
+⚠️ Strength + 5K was transcribed 2026-08-23 because stage 4 builds it; its notes page had never been
+read and carried four things nothing else here records — see Part E1.
 
 | Program | Table | Notes | For whom |
 |---|---|---|---|
 | Hypertrophy + 5K | p244 | p245 | *"hybrid training at its most basic"* — ⭐ **the book's own recommended first program** |
-| Strength + 5K | p246 | p247 | powerlifting-compatible; bench 2×/wk, squat and deadlift 1× each |
+| ⭐ **Strength + 5K** | p246 | p247 | **the strength-leading runner frame** — powerlifting-compatible; bench 2×/wk, squat and deadlift 1× each. **Transcribed in Part E1.** |
 | Strength + Speed | p248 | p249 | team-sport / field athletes; barbell-heavy, sprint-biased |
 | Strength + Half-Marathon | p250 | p251 | assumes 5K/10K progress already; also usable for marathon |
 | Hypertrophy + Half-Marathon | p252 | p253 | size / body composition while training half or full marathon |
@@ -889,6 +891,169 @@ adjustment of 1RM and threshold as you improve."*
 
 ---
 
+# PART E1 — STRENGTH + 5K (Chapter 10, pp.246–247)
+
+**Transcribed 2026-08-23 from `p246.jpg` and `p247.jpg`, both read directly.** This is the frame the
+Standing Plan's *strength-leading, runner* dial position builds
+(`DECISIONS-2026-08-22-standing-plan-pivot.md` §1). ⚠️ **p247 had never been read before this
+session** — the pivot doc flagged it UNREAD and it turned out to carry four things nothing else in
+this corpus records.
+
+## E1a. The week (p246) — verified against the image
+
+| Day | STANDARD strength | STANDARD endurance | TAPER/DELOAD strength | TAPER/DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **ME: Upper** — 1 × ME: Primary push · 1 × ME: Accessory: primary pull · 1 × DE: Accessory: secondary push · 1 × HYP: Accessory: focused pull, focused push | 1 × MLSS+ (level 2) | **ME: Upper** — 1 × ME: Primary push · 1 × DE: Accessory: primary pull · 1 × HYP: Accessory: focused pull, focused push | 1 × MLSS+ (level 1) |
+| **2** | **ME: Lower** — 1 × ME: Primary hinge lower *(rotate with primary push)* · 1 × ME: Accessory: primary push lower *(rotate with primary hinge)* · 1 × DE: Accessory: secondary hinge lower · 1 × HYP: Accessory: accessory lower | *(none)* | **ME: Lower** — 1 × ME: Primary hinge lower *(rotate)* · 1 × DE: Accessory: primary push lower · 1 × HYP: Accessory: accessory lower | *(none)* |
+| **3** | Plyo warm-up | NT (level 3) | Plyo warm-up | NT (race tempo) (level 1) |
+| **4** | **DE: Upper** — 1 × DE: Primary push · 1 × DE: Accessory: primary pull · 1 × HYP: Accessory: secondary push · 1 × HYP: Accessory: focused pull, focused push | VT1 (level 1) | **DE: Upper** — 1 × DE: Primary push · 1 × DE: Accessory: primary pull · 1 × HYP: Accessory: focused pull, focused push | *(none)* |
+| **5** | **DE: Lower** — 1 × DE: Primary push lower *(rotate with primary hinge)* · 1 × DE: Accessory: primary hinge lower *(rotate with primary push lower)* · 1 × HYP: Accessory: secondary push lower · 1 × HYP: Accessory: focused push lower | *(none)* | **DE: Lower** — 1 × DE: Primary push lower *(rotate)* · 1 × DE: Accessory: primary hinge lower · 1 × HYP: Accessory: accessory lower | *(none)* |
+| **6** | — | LSD (level 2) | — | VT1 (level 1) |
+| **7** | **REST** | | **REST** | |
+
+**What the table settles:**
+
+- **Four lifting days** (1, 2, 4, 5), a **plyo-only day 3**, an endurance-only day 6, one full rest
+  day. Two ME days and two DE days. Confirms the pivot's §1 reading.
+- **Four endurance sessions in standard** — MLSS+ (2), NT (3), VT1 (1), LSD (2). **Three in taper** —
+  MLSS+ (1), NT at race tempo (1), VT1 (1). ⚠️ The taper LOSES the LSD and gains a VT1 on day 6.
+- ⛔ **Every day opens on a PRIMARY movement.** p247 says so in terms: *"All first lifts of the day
+  should be a competition movement."*
+- **Taper is a substitution, not only a volume cut:** day 1's second ME becomes DE, day 2's second ME
+  becomes DE, the endurance levels drop to 1, and day 4 loses its endurance entirely.
+
+## E1b. ⛔ "ACCESSORY:" IS A ROLE PREFIX, NOT A CATEGORY — and nothing else in this corpus records it
+
+p247, read directly:
+
+> *"The 'accessory' notation refers to movements that specifically focus on **noncompetition lifts
+> with similar gross movement patterns** — for example, paused deadlifts, box squats, Larsen presses."*
+
+**So a slot reading `1 × ME: Accessory: primary pull` is not asking for Part A2's PRIMARY category by
+a different name.** It is asking for a movement in that gross pattern which is *not the athlete's
+competition lift*. His three examples split across two of his own categories — paused deadlift and
+box squat are in the PRIMARY list (p219), Larsen press is in the SECONDARY list (p220) — which is the
+proof that the prefix is a ROLE and the word after it is the pattern/category.
+
+⛔ **A composer that reads `Accessory: primary pull` as "the primary pull category" will put the
+competition lift in a slot that exists precisely to avoid it.**
+
+⚠️ **`1 × HYP: Accessory: accessory lower` (days 2 and 5) is genuinely ambiguous.** *"Accessory
+lower"* is not a category anywhere in pp.218–223. The only defensible reading is *a lower-body
+movement that is not a competition lift*, category unspecified. **Recorded as ambiguous rather than
+resolved.**
+
+## E1c. Strength notes (p247)
+
+- ⛔ **THE BIG THREE, AND THE FREQUENCIES:** *"The lifting days here should focus on the big three if
+  powerlifting is the goal: **training bench twice a week and the squat and deadlift each once a
+  week**."*
+- ⛔ **THE ME LIFT ROTATES WEEKLY — HE STATES THE CADENCE:** *"Note that the ME lift will rotate week
+  to week, with **one week consisting of ME squat and DE deadlift, and the next week the reverse**."*
+  This is what the table's *"(rotate with primary push)"* / *"(rotate with primary hinge)"* means:
+  day 2 and day 5 swap which of squat/deadlift carries ME and which carries DE, every week.
+  ⛔ **`DECISIONS-2026-08-22-standing-plan-pivot.md` §8 lists "rotation cadence for the ME lift pair"
+  as a gap to fill from field practice. It is not a gap. He wrote it.**
+- **All first lifts of the day should be a competition movement.**
+- ⛔ **PROGRESSION — his own rate anchor for THIS program:** *"Progress here should be through the
+  circle of reps, with slow gradual increases in the calculated 1RM taking place **every 3 to 4
+  weeks (assume 1 percent every 3 weeks as a starting point)**."*
+  ⚠️ **"The circle of reps" is not defined on this page** and appears nowhere else in this corpus.
+  Do not assume it means double progression without finding his definition.
+- **Primary movements rotate SPARINGLY** (main text): higher background fatigue than an obligate
+  lifting program means slower skill acquisition, and *"spreading yourself too thin across multiple
+  movements may return inferior results."*
+
+## E1d. Running notes (p247)
+
+- ⛔ **A 3–4% LOWER-BODY HAIRCUT, WITH A STATED PHASE-OUT, AND NOTHING ELSE IN THIS CORPUS HAS IT:**
+  > *"Monday's run is fairly challenging, given that there is an ME lower session the next day. For
+  > the first few weeks, you may notice that the ME lower session is slightly hindered by lingering
+  > fatigue. As such, **a 3 to 4 percent reduction in working 1RM should be assumed here.** As long as
+  > progression is maintained week to week and month to month, this reduction can be **gradually
+  > phased out in eight to ten weeks** (that is, **increasing lower body estimated 1RM by about 2
+  > percent every three weeks for the first nine weeks**)."*
+
+  ⚠️ **This is a FRAME-SPECIFIC haircut caused by the running schedule, not a second statement of the
+  working-max derivation.** It applies to the lower body only, it is caused by Monday's run landing
+  before Tuesday's ME lower, and it phases out. The working max (p215) is a general derivation with
+  no phase-out. **They are different layers and compose — but see Part G, because p215 is not
+  photographed and that 96% figure is unverified in this corpus.**
+- **Wednesday's NT is the hardest session of the week:** *"I recommend NT workouts with **5- to
+  8-minute work intervals**. If within six weeks of a race, **increase the pace here to race pace,
+  but extend recovery periods by 25 percent**."* (This is what the taper column's *"NT (race
+  tempo)"* means.)
+- **Saturday's LSD ideally mixed terrain.** *"Mileage will be dictated by experience level, with more
+  proficient runners looking at runs up to **90 to 100 minutes** here with an emphasis on **LT
+  intervals**, and less experienced runners opting for **shorter fartlek variations**."*
+- ⚠️ **AND ONE LINE THAT SITS AGAINST A PIVOT RULING** (main text): *"More advanced runners may see a
+  benefit to additional running volume, and I recommend **adding one or two VT1 sessions** initially
+  to test recovery."*
+  ⛔ `DECISIONS-2026-08-22-standing-plan-pivot.md` §2 says **"Convert, never add. The program owns
+  session count."** This is the author offering an optional volume addition for an advanced tier.
+  **Raised, not reconciled — see the stage 4 notes.**
+
+## E1e. Race and meet handling (p247, main text)
+
+- ⛔ **Two weeks out from a powerlifting meet OR a 5K, switch to the deload version.**
+- **Powerlifting meet:** practise openers (a single rep at your 3RM) **7 to 8 days before the meet**,
+  in a single session. In the week before the meet, Monday and Wednesday running can be maintained,
+  though *"larger athletes who experience more wear and tear from running may want to convert the
+  Wednesday session into a cross-training VT1 session."*
+- **5K race:** *"eliminate the DE lifting sessions on race week and focus on race pace repeats on
+  your tempo days both taper weeks."*
+
+## E1f. Who it is for (p247, main text)
+
+*"Similar in design to the Hypertrophy + 5K program and should be accessible and useful for athletes
+of most skill levels. The lifting component is perfectly acceptable for competitive powerlifters,
+while the running program can be of use for even advanced intermediate runners."* Strength here
+**assumes task-specific strength** — powerlifting or specific barbell strength is the goal, and there
+are several specific movements the athlete wants to improve.
+
+---
+
+# PART H — THE WORKING NUMBER AND THE PRETEST (p215)
+
+⚠️ **READ 2026-08-22 OFF THE PAGE; THE IMAGE IS PENDING IN `book-sources/`.** Every figure below was
+verified against that photograph in the planning chat. Until `p215.jpg` lands this is the one part of
+the corpus that cannot be re-checked against an image in the folder — see Part G item 7.
+
+## H1. The pretest protocol
+
+Warm up to roughly **75% of the predicted max**, then:
+
+| step | load | reps |
+|---|---|---|
+| 1 | ~75% of predicted max | 6 |
+| 2 | +10% | 5 |
+| 3 | +5% more | max reps |
+
+⛔ **"PREDICTED MAX" IS THE NUMBER ALREADY ON FILE.** The athlete's stored 1RM is what sets the
+warm-up weights — it is the SEED for the test, never the answer to it.
+
+## H2. The working max
+
+- The final set's load and reps go through **BOTH Epley and Brzycki, and the two are AVERAGED** —
+  ⛔ **because the formulas diverge as the rep count changes**, so neither alone is trustworthy across
+  the range this protocol produces.
+- **The working max is roughly 96% of that predicted true 1RM.**
+
+⛔ **THIS IS NOT WENDLER'S TRAINING MAX AND THE TWO MUST NEVER CONVERT INTO EACH OTHER.** Wendler's
+is 85% of a true 1RM and has three live readers in this app (`plans.config.training_max`). Viada's is
+96% of a freshly tested predicted max. Same English word, two different numbers, two different
+programs. **No function may accept both.**
+
+## H3. Where it composes, and where it does not
+
+⛔ **p247's 3-4% lower-body reduction (Part E1d) is a SEPARATE LAYER and composes with this one — it
+never multiplies into the derivation.** The working max is how a number is derived from a test. The
+haircut is a temporary, lower-body-only, frame-specific allowance for Monday's run landing before
+Tuesday's ME lower, and it phases out over eight to ten weeks. Folding the haircut into the 96%
+would make it permanent and would make the phase-out unexpressible.
+
+---
+
 # PART F — WENDLER × VIADA (how the two sources combine)
 
 **They sit at different layers.** Wendler is a **progression rule for a lift**; Viada is a **session
@@ -959,7 +1124,14 @@ they are equivalent.
    numbers are believed right and were stated consistently across two sessions, but they are one
    generation removed from the book. Re-shoot pp.69–125 before they become code constants.
 5. ✅ **CLOSED — all eighteen Ch.10 programs are captured as images** (pp.244–284, see Part E0).
-   Seventeen are untranscribed **by choice**, not by gap.
+   Sixteen are untranscribed **by choice**, not by gap.
+7. ⚠️ **p215 IS READ AND VERIFIED; ITS IMAGE IS PENDING IN THE FOLDER** (raised and closed
+   2026-08-23). The page was photographed 2026-08-22 and read in the planning chat; the file has not
+   yet landed in `book-sources/`, so this corpus cannot re-verify it until it does. **The numbers are
+   in Part H and are built against.** ⚠️ Gap closes when `p215.jpg` lands.
+8. ⚠️ **"The circle of reps" is used and never defined** (p247, Part E1c). He prescribes progression
+   "through the circle of reps" for Strength + 5K and the term appears nowhere else in this capture.
+   Do not assume it means double progression without finding his definition.
 
 ---
 
