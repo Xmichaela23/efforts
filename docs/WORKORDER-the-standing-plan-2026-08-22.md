@@ -211,6 +211,63 @@ slot count never varies, and no session exceeds its cap.
 
 ## Stage 5 — the wizard
 
+### ⛔ SUPERSEDED IN PART (2026-08-24, Michael's flow). The screens below this addendum stand where
+### they don't conflict; the FLOW and the METER are the law now.
+
+**The flow (strength-leading shown; speed mirrors it):**
+
+1. **Train Focus** opens the wizard.
+2. **Lifting experience** — new (under a year) / a couple of years / many years. ⛔ THIS ANSWER SETS
+   THE BASELINE STRENGTH-GAIN DISPLAY for every later screen. Lifting is always in the plan — it is
+   the product, never a question.
+3. **Focus** — strength / speed. Two cards, tradeoff bullets under each (copy drafted in chat
+   2026-08-24: fact-first, no imperatives, conditional consequences; the new-lifter line is
+   experience-gated). Choosing strength continues this flow.
+4. **What you keep** — sports in the week. Swim off by default; if kept, easy laps + technique only,
+   NEVER a hard slot (Michael's ruling 2026-08-23).
+5. **Your endurance week — ONE screen, was two.** Volume number bounded both ends (cap = what the
+   slots hold) + the week's sessions listed per sport + tap-to-tag which are hard (cap 2). Legal
+   because intensity CONVERTS a session (8-21 §3b) — so size and hard-tagging are one decision
+   surface, not two screens.
+6. **Strength** — lifts you want numbers on (they take the heavy slots) + focus areas over the
+   stage 3 floor.
+7. **Schedule** — pinned days (clubs, long ride/run), days you cannot train. day-map rotation
+   honours pins; impossible pins state their cost.
+8a. **Lifting experience lives in BASELINES, not the wizard** (Michael, 2026-08-24): asked once at
+   first Train Focus, stored beside the other baselines, shown as an editable chip thereafter —
+   Train Focus is a pivot point and re-asks only what changes block to block. Self-report is a SEED:
+   once months of logged lifting exist, history grades the tier and overrides the stored answer
+   (same philosophy as the test skip — typed answers seed, logs decide). ⛔ INTERIM: a plain
+   editable field on the Baselines screen ships BEFORE the wizard exists, so the value can be set
+   ahead of the first real block.
+
+8b. **Review** — the test-week notice ("week one finds your working numbers"), skip offered only on
+   fresh logged evidence (42-day window, slice 3).
+
+### ⛔ THE METER — the wizard's one live number, and the education IS the moment of choice
+
+The experience answer sets the baseline; every endurance choice moves it, visibly, as they toggle:
+
+- **Anchors are HIS frame rates, never a formula of ours:** hard-on-bike week ≈ 1%/3wk (p247's
+  class), hard-run week ≈ 1%/4wk (p251), two hard RUN days = the stated floor ("slowest lane for
+  the bar"). Between anchors show a RANGE. ⛔ NO invented precision, NO endurance-improvement
+  percentages anywhere (no source gives one — direction words only).
+- **New-to-lifting overrides the meter's tone:** gains come fast for months regardless of the mix —
+  the knock-down display applies to the experienced tiers.
+- **Two lines, not one: the bench line barely moves with running choices; the squat line is the one
+  that pays.** Showing the split is honest and it is the motivating fact.
+- Render pounds where possible ("~3 lb per step on a 300 lb squat"), sourced rates only.
+
+### ⛔ ONE WIZARD FOR ALL NON-RACE PLANS — this flow supersedes the Get Stronger entry DOOR (the
+engine underneath is untouched). When that surface is rebuilt, the "5/3/1" label in
+`StrengthPlansView.tsx:108` dies with it (trademark, pivot §5). In-app posture pivots ride the same
+wizard at block boundaries: new frame, held numbers carry, fresh evidence skips the re-test.
+
+---
+
+### The original stage 5 section (screens that still stand where they don't conflict):
+
+
 **Nine screens become about five: plan → which sports → your week → size → accessories → build.**
 
 - ⛔ **The "how many runs / how many miles" screen goes.** The program owns the count.
