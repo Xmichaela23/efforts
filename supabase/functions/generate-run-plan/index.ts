@@ -1,3 +1,16 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// ⛔ CLOSED FOR REPAIRS (2026-08-22). Do not build on this path.
+//
+// It runs and it ships plans. It is not trusted, and the Standing Plan work is
+// expected to replace or repair it. Known defect, from
+// `DECISIONS-2026-08-21-standing-plan.md` §3b: a hard session is ADDED to the
+// week rather than CONVERTING one the athlete already asked for, so the built
+// week overshoots what was requested (15 miles asked, ~20 built).
+//
+// If you are here to add a feature: stop, and read
+// `WORKORDER-the-standing-plan-2026-08-22.md`. Repairs land through that work,
+// not as patches here.
+// ══════════════════════════════════════════════════════════════════════════════
 // Edge Function: generate-run-plan
 // 
 // Purpose: Generate personalized run training plans based on user parameters

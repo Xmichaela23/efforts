@@ -1,3 +1,19 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// 🟢 THE ACTIVE SURFACE (2026-08-22). This is the ONE plan path still open.
+//
+// The marathon and triathlon builders are CLOSED FOR REPAIRS — see the banners on
+// `generate-run-plan/index.ts`, `generate-triathlon-plan/index.ts` and
+// `generate-combined-plan/index.ts`, and `ENGINE-STATE.md`.
+//
+// ⚠️ RECOMMENDED, NOT RULED: the audit of 2026-08-22 proposes the Standing Plan
+// work wire in HERE first, because its gate — strength set to `develop`, no endurance discipline
+// set to `develop` — already means "strength leading, endurance held," which is the
+// position the new plan shapes are built around.
+//
+// ⚠️ "Strong Focus" as a SEPARATE SHIPPED PLAN was set aside 2026-08-22. What is
+// active is this BUILDER, not that plan concept. Do not resurrect the plan on the
+// strength of this banner.
+// ══════════════════════════════════════════════════════════════════════════════
 // ============================================================================
 // generate-strength-plan — STRENGTH FOCUS (BARBELL, 4-DAY). Wendler 5/3/1.
 //
