@@ -69,41 +69,67 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-23 — **stage 4 slice 1 IS BUILT: the composer, strength-leading runner frame. Your job is SLICE 2.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-23 — **stage 4 slices 1 AND 2 ARE BUILT. Your job is SLICE 3.**)
 
-### ⛔ WHAT EXISTS NOW — `supabase/functions/_shared/standing-plan/` (uncommitted at time of writing)
+### ⛔ WHAT EXISTS NOW — `supabase/functions/_shared/standing-plan/` + the wiring (uncommitted)
 
-Seven files: `frames.ts` (p246 as data — THE LAW), `working-number.ts` (Viada's 96%, p215, image
-pending in folder — gap G-7), `progression.ts` (per-frame rate anchors + the p247 lower-body
-haircut + double progression labelled OURS — gap G-8), `session-vocabulary.ts` (the ONE
-translation edge — stage 1 family names → the tokens every screen already speaks),
-`compose.ts` (frame + athlete + the three stage libraries → one week; no fetch, no persist,
-no routing). **30 tests, 44/44 mutations killed. Get Stronger proven byte-identical
-(eb1d6796) with and without the new modules present.** Notes:
-`docs/NOTES-stage4-composer-strength5k-2026-08-23.md`.
+**Slice 1, the composer** (notes: `docs/NOTES-stage4-composer-strength5k-2026-08-23.md`): seven files
+— `frames.ts` (p246 as data, THE LAW), `working-number.ts` (Viada's 96%, p215), `progression.ts`
+(per-frame rate anchors + the p247 lower-body haircut + double progression labelled OURS),
+`session-vocabulary.ts` (the ONE translation edge), `compose.ts`.
 
-### ⛔ SLICE 2 — THE JOB: the EDGE WIRING + the TEST WEEK
+**Slice 2, the edge wiring + the test week** (notes:
+`docs/NOTES-stage4-wiring-slice2-2026-08-23.md` — **read it before touching any of this**):
 
-1. **Wire the composer through `generate-strength-plan`'s gate** (pivot §9): strength=develop +
-   no endurance develop routes to the Standing Plan composer when the athlete's frame resolves;
-   Get Stronger's existing path stays byte-identical (prove again after wiring, not before only).
-2. **The test week** (RULED, Michael 2026-08-23): week 1 of a block runs the p215 pretest as
-   guided sessions inside the lifting days — upper test day 1, lower day 2. Stored baseline 1RMs
-   SEED the test's warm-up weights ("predicted max" = the number on file) and are never the
-   working number. First fully prescribed weights land week 2.
-3. **The VT1 tier** (RULED): a PROGRAM variant (+1–2 easy VT1 sessions) gated on demonstrated
-   running history — never an athlete dial. Composer already carries it; the wiring must feed it
-   real history, not a question.
+- **The fork lives in `generate-strength-plan/index.ts`, not in `create-goal`.** ⚠️ The pivot doc
+  says *"wire through `generate-strength-plan`'s gate"* and **that file has no gate** — the posture
+  gate is `create-goal-and-materialize-plan/index.ts:2493` and decides which BUILDER runs. This
+  decides which COMPOSER runs. `resolveFrame` → frame, or `null` **with a logged reason** → Get
+  Stronger, unchanged.
+- ⛔ **A kept bike or a kept swim REFUSES the frame** rather than being dropped from the block —
+  every endurance slot in `strength_5k` is a run family and sport-slot assignment (pivot §2) is not
+  built. **That gate opens the moment §2 lands.**
+- **The test week is closed end to end**: `readTestWeek` → re-`composeBlock` → `restateFromTest` →
+  `rematerialize-standing-block` (**proposes**; `apply: true` writes; only weeks after the live one).
+- ⛔ **No `training_max` key exists on a Standing Plan row.** The working number lives at
+  `plans.config.standing_plan.working_numbers`. A test asserts the whole row is free of the string.
+- **59 tests, 35/35 mutations killed. Get Stronger proven byte-identical AFTER the wiring**
+  (`f7ece1aa…`, three athlete shapes, worktree-at-HEAD vs working tree). Client-reachable: a 232 kB
+  esbuild bundle RUN — bench at 205 lb in week two off a 185×5 test.
+
+### ⛔ SLICE 3 — THE JOB, in this order
+
+1. ⛔ **NOTHING CALLS `rematerialize-standing-block`.** It is written, gated and tested and no
+   surface offers the tap. **Until it is placed, a Standing Plan block runs its test week and then
+   eleven weeks of "By feel".** This is the first thing: after week one, ask the athlete whether to
+   fill the block in, and show them what the test produced.
+2. ⛔ **THE FRAME OWNS THE WEEKDAYS AND THE ATHLETE'S PINNED LONG DAY IS IGNORED** — stage 4's gap 1.
+   `compose.ts` maps frame day N onto weekday N, so the long run is always Saturday. The work order
+   is explicit that *"the day order is not the law, the pairings are"* and the composer should anchor
+   on the athlete's fixed points. The wiring TELLS the athlete when their pinned day cannot be
+   honoured; it does not move it.
+3. **Sport-slot assignment (pivot §2)** — the thing that opens the bike/swim gate above.
 
 ⛔ Rules that stand: convert-never-add · the working number NEVER touches
 `plans.config.training_max` · emit only the existing session vocabulary · every invented number
-labelled OURS at the site · read the pivot doc + `NOTES-stage4-…` before writing a line.
-⛔ Do NOT commit, push or deploy. At close: dated notes, this banner → slice 3, report
+labelled OURS at the site · read the pivot doc + BOTH `NOTES-stage4-…` files before writing a line.
+⛔ Do NOT commit, push or deploy. At close: dated notes, this banner → slice 4, report
 pushed / deployed / verified separately.
 
-### Open gaps (corpus): G-7 `p215.jpg` not yet in the folder (numbers verified off Michael's
-photo in the planning chat) · G-8 "circle of reps" undefined in capture — double progression
-stays labelled ours until the defining page is photographed.
+### Open gaps (corpus): G-7 `p215.jpg` not yet in the folder · G-8 "circle of reps" undefined, so
+double progression stays labelled ours.
+
+### ⚠️ FOUND IN PASSING, NOT FIXED (slice 2) — worth a Q-entry each
+- ⛔ **`athlete_snapshot.workload_by_discipline.run` HAS TWO LIVE READERS THAT DISAGREE BY 10×.**
+  `_shared/end-plan-core.ts:88` treats it as MILES; `_shared/planning-context.ts:389` divides it by
+  10 to get miles. One of them is wrong and every number either produces is suspect. The Standing
+  Plan's tier gate deliberately reads raw `workouts.distance` instead, where the unit IS settled.
+- ⚠️ **An ME row still receives a derived RIR target downstream.** p218 says "no RIR target" for ME;
+  the composer stamps none, but `protocolUsesRir` is protocol-wide so `materialize-plan` reads one
+  off the RPE chart. Lands near zero reserve, so it restates rather than contradicts — but it is not
+  "no target".
+- ⚠️ **Overhead press is tested in week one and never loaded** — no `push_upper` competition slot in
+  either column of `strength_5k` would carry a press. A fact of the frame (p246 is the law).
 
 ---
 
