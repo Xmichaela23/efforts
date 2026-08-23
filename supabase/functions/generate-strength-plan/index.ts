@@ -43,11 +43,27 @@ import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-p
  */
 import {
   buildStandingPlanRow,
+  chooseDayMap,
   defaultCompetitionLifts,
   demonstratedRunVolume,
+  evidenceForSkip,
+  evidenceWorkingNumbers,
+  EVIDENCE_WINDOW_DAYS,
   resolveFrame,
   STANDING_PLAN_PROTOCOL_ID,
+  testWeekLiftNames,
+  PATTERN_FOR_TESTED_LIFT,
 } from '../_shared/standing-plan/index.ts';
+/**
+ * ⛔ THE ONE OWNER OF THE TRUSTED-REP CEILING (`wendler-531.ts:605-655`) — 8 reps general, 5 on the
+ * deadlift, with LeSuer 1997 / Reynolds 2006 / Mayhew 2008 written out at the site. The skip check
+ * needs it and the Standing Plan module may not import that file (its own source lint keeps the two
+ * loading systems apart), so it is supplied from here as an argument.
+ *
+ * ⚠️ IT IS NOT WENDLER'S NUMBER. It is the app's e1RM trust ceiling, which happens to live in that
+ * file; a second copy in the new module would be the doubled disease.
+ */
+import { trustedMaxRepsFor } from '../shared/strength-system/loading/wendler-531.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
 import { describeThresholdBasis, resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
@@ -338,23 +354,17 @@ Deno.serve(async (req: Request) => {
       }
 
       /**
-       * ⚠️ THE FRAME OWNS THE WEEKDAYS AND THE ATHLETE'S PINNED LONG DAY IS NOT HONOURED YET.
+       * ⛔ THE PINNED-LONG-DAY WARNING THAT STOOD HERE IS GONE, BECAUSE THE PIN IS HONOURED NOW.
        *
-       * The work order is explicit that *"the day order is not the law, the pairings are"* and that
-       * the composer should anchor on the athlete's fixed points — that is stage 4's gap 1 and it is
-       * NOT built: `compose.ts` maps frame day N straight onto weekday N, so the long run is always
-       * Saturday. ⛔ An athlete who pinned Sunday is told, rather than silently moved. This is a
-       * note, not a refusal: every other day of the frame is correct for them.
+       * Slice 2 told the athlete *"the long run sits on Saturday, you asked for Sunday, and this
+       * version cannot move it"* — stage 4's gap 1, stated rather than fixed. `chooseDayMap` below
+       * rotates the frame so the pin lands, and the ONLY case that still costs anything is two pins
+       * that no single rotation can both reach. That case goes down `dayMap.compromises` into
+       * `placement_compromises`, which is the channel the athlete already reads.
+       * ⛔ Do not reinstate a second sentence about days here — two owners of one message is how a
+       * screen ends up saying both.
        */
       const wiringNotes: { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string }[] = [];
-      if (typeof long_run_day === 'string' && long_run_day.trim()
-        && long_run_day.trim().toLowerCase() !== 'saturday') {
-        wiringNotes.push({
-          kind: 'warning',
-          text: `The long run sits on Saturday in this block. You asked for ${long_run_day}, and this `
-            + 'version of the plan cannot move it yet.',
-        });
-      }
       if (runMilesAsked != null) {
         wiringNotes.push({
           kind: 'source',
@@ -364,15 +374,100 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      /**
+       * ⛔ THE ATHLETE'S PINNED DAYS, HONOURED BY ROTATING THE FRAME (job 2, slice 3).
+       *
+       * The frame owns the ORDER and the SPACING; it names no weekday anywhere (p246 numbers its
+       * days 1-7). So a pin is satisfied by rotating the whole week, which moves every day by the
+       * same amount and leaves every pairing, every gap and the rest day exactly where the page puts
+       * them. ⚠️ The old fixed Monday start was itself a rotation — offset zero — that nobody chose.
+       *
+       * ⛔ IT NEVER REFUSES. A pin that cannot be reached is stated through the compromise channel
+       * the athlete already reads, and the week is still built (D-325 §7).
+       */
+      const dayMap = chooseDayMap(frameId, {
+        longRunDay: typeof long_run_day === 'string' ? long_run_day : null,
+        // ⚠️ The hard days the caller validated above, not the raw body — one reader for what a
+        // well-formed hard day is.
+        hardDays: (Array.isArray(hard_days) ? hard_days : [])
+          .map((h) => (h && typeof h === 'object' ? (h as Record<string, unknown>).day : null))
+          .map((d) => (typeof d === 'string' ? d : null)),
+        startDateIso: typeof start_date === 'string' ? start_date : null,
+      });
+
+      /**
+       * ⛔ THE TEST-WEEK SKIP — OFFERED ON EVIDENCE, NEVER ON A PREFERENCE (Michael, 2026-08-23).
+       *
+       * ⛔ THE DEFAULT IS THE TEST. `skip_test_week` has to arrive true AND the evidence has to be
+       * there; either alone builds the test week. An absent answer is an answer: run the test.
+       *
+       * ⛔ AND THE NUMBER COMES FROM THE LOGGED SET, NOT FROM `performance_numbers`. That is what
+       * makes "a typed-in max never skips" true by construction rather than by a rule — the stored
+       * figure is never read on this path at all. `wendler-531.ts:244` records that a typed number
+       * and a tested one are the same shape on disk, so provenance cannot be asked of the value.
+       */
+      const competitionLifts = defaultCompetitionLifts();
+      // ⛔ ONLY THE LIFTS THIS BLOCK PRESCRIBES FROM. The overhead press is tested and never loaded
+      // in this frame (no `push_upper` competition slot would carry a press), so demanding evidence
+      // for it would refuse the skip for no benefit to anybody.
+      const allNames = testWeekLiftNames(competitionLifts);
+      const prescribedFrom: Record<string, string> = {};
+      for (const [lift, name] of Object.entries(allNames)) {
+        if (PATTERN_FOR_TESTED_LIFT[lift as keyof typeof PATTERN_FOR_TESTED_LIFT]) {
+          prescribedFrom[lift] = name;
+        }
+      }
+      const skipAsked = (body as Record<string, unknown>).skip_test_week === true;
+      let skipOffer: ReturnType<typeof evidenceForSkip> = {
+        available: false, evidence: {}, missing: [], summary: '',
+      };
+      try {
+        const asOf = (typeof start_date === 'string' && start_date.trim())
+          ? String(start_date).slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+        const from = new Date(Date.parse(`${asOf}T00:00:00Z`) - (EVIDENCE_WINDOW_DAYS + 1) * 86400000)
+          .toISOString().slice(0, 10);
+        const { data: liftRows } = await supabase
+          .from('workouts')
+          .select('workout_date, date, strength_exercises')
+          .eq('user_id', String(user_id))
+          .eq('type', 'strength')
+          .gte('date', from)
+          .lte('date', asOf);
+        skipOffer = evidenceForSkip({
+          rows: liftRows as never,
+          liftForName: prescribedFrom as never,
+          trustedMaxRepsFor,
+          asOfIso: asOf,
+        });
+      } catch (e) {
+        // ⚠️ A READER THAT CANNOT READ DOES NOT SKIP A TEST. The offer stays unavailable and the
+        // block runs the test week, which is the safe direction and the default anyway.
+        console.warn('[standing-plan] skip evidence unreadable; the test week stands:', (e as Error)?.message);
+      }
+      const skipping = skipAsked && skipOffer.available;
+      if (skipAsked && !skipOffer.available) {
+        console.log(
+          '[standing-plan] a skip was asked for and the evidence is not there — building the test '
+          + `week: ${skipOffer.missing.map((m) => `${m.lift}: ${m.reason}`).join('; ')}`,
+        );
+      }
+
       const row = buildStandingPlanRow({
         compose: {
           frame: frameId,
           // ⛔ THE ATHLETE HAS NOT BEEN ASKED YET (stage 5). Seeded from the four lifts the entry
           // gate already demanded — see `defaultCompetitionLifts` for why it is three, not four.
-          competitionLifts: defaultCompetitionLifts(),
-          // ⛔ ABSENT, ALWAYS, AT BUILD TIME. The test is in week one and this row is written before
-          // it. The numbers land when the test is read back.
-          workingNumbers: undefined,
+          competitionLifts,
+          /**
+           * ⛔ ABSENT UNLESS THE SKIP WAS TAKEN. On the default path the test is in week one and this
+           * row is written before it, so there is nothing to put here and the numbers land when the
+           * test is read back. On the skip path they come from the logged sets — the same 96%-of-a-
+           * two-formula-average quantity (p215) the test would have produced, so nothing downstream
+           * can tell which route a block took by looking at its numbers.
+           */
+          workingNumbers: skipping ? evidenceWorkingNumbers(skipOffer) : undefined,
+          skipTestWeek: skipping,
           seed1RMs: {
             bench: maxes.bench,
             squat: maxes.squat,
@@ -390,6 +485,8 @@ Deno.serve(async (req: Request) => {
         taperWeeks: [],
         goalName: typeof goal_name === 'string' ? goal_name : undefined,
         demonstratedMilesSource: demonstrated.source,
+        dayMap,
+        skipEvidence: skipping ? (skipOffer.evidence as Record<string, unknown>) : null,
         extraNotes: wiringNotes,
       });
 
@@ -400,7 +497,26 @@ Deno.serve(async (req: Request) => {
       );
 
       if (preview === true) {
-        return json({ success: true, plan_id: null, plan: row, phase_structure: row.phaseStructure }, 200);
+        /**
+         * ⛔ THE PREVIEW CARRIES THE OFFER, so a surface can put it in front of the athlete before
+         * they commit. `NonRaceBuilder.tsx:2716` already reads `plan.placement_compromises` off this
+         * payload; `skip_test_week` rides beside it rather than inside the plan, because it is a
+         * question about the block, not a property of it.
+         *
+         * ⚠️ IT REPORTS THE OFFER EVEN WHEN THE ANSWER WAS NO. `available` plus `missing` is what
+         * lets a screen say *"we could start from your logged sets"* — or say nothing, honestly,
+         * because the sets are not there.
+         */
+        return json({
+          success: true, plan_id: null, plan: row, phase_structure: row.phaseStructure,
+          skip_test_week: {
+            available: skipOffer.available,
+            taken: skipping,
+            summary: skipOffer.summary,
+            missing: skipOffer.missing,
+            window_days: EVIDENCE_WINDOW_DAYS,
+          },
+        }, 200);
       }
 
       const { data: spInserted, error: spError } = await supabase

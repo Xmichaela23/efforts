@@ -129,6 +129,22 @@ Deno.serve(async (req: Request) => {
       seed1RMs: sp.seed_one_rep_maxes ?? {},
       equipment: Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null,
       demonstratedWeeklyMiles: sp.demonstrated_weekly_miles ?? null,
+      /**
+       * ⛔⛔ THE BLOCK'S OWN ROTATION, READ BACK FROM ITS CONFIG — NOT RE-DERIVED FROM THE PINS.
+       *
+       * `restateFromTest` matches a composed session to a calendar row on week + WEEKDAY + movement.
+       * Re-composing at offset zero against a block that runs on offset one would put every session
+       * on the wrong weekday, match nothing, and report the whole block as `unmatched` — a silent
+       * no-op that looks like "the test produced nothing".
+       *
+       * ⚠️ AND IT IS READ, NOT RECOMPUTED. The athlete's pinned days can change after the block was
+       * built; the calendar cannot. `day_offset` is what this block actually ran on.
+       */
+      dayOffset: Number(sp.day_offset) || 0,
+      // ⚠️ A SKIPPED BLOCK HAS NO TEST WEEK AND MUST NOT GROW ONE ON A RESTATE. It also has nothing
+      // to restate — `readTestWeek` finds no week-one test sets and this function abstains above —
+      // but carrying the flag keeps the re-composition identical to the block that was built.
+      skipTestWeek: sp.test_skipped === true,
       roundTo: 5,
     });
 

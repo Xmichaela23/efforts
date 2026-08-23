@@ -743,6 +743,9 @@ type NonRaceState = {
    *  Stored on the goal; nothing reads it yet — see the swim block on the volume card. */
   swimVolume: number | '';
   startDate: string; // Week 1 start (YYYY-MM-DD); plans are Monday-based so this snaps to that week server-side
+  /** ⛔ Standing Plan only: the athlete took the offer to open on logged numbers instead of a test
+   *  week. Absent/false is the default and the default is the test. */
+  skipTestWeek?: boolean;
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
   raceDate: string;
@@ -1314,6 +1317,15 @@ function assemblePayload(
           // needs the week either way, since `normalizeAssistancePrefs` produces the same default
           // from nothing. Sending it makes the goal a record of what was actually built.
           ...(state.posture?.strength === 'develop' ? { assistance_picks: state.assistancePicks } : {}),
+          /**
+           * ⛔ THE TEST-WEEK SKIP (Standing Plan, slice 3). Forwarded ONLY when the athlete took the
+           * offer, and the offer only appears when the preview said the evidence is there.
+           *
+           * ⚠️ THE ANSWER, NOT THE PERMISSION. `generate-strength-plan` re-reads the logged sets
+           * server-side and builds the test week anyway when they are not there — a stale client
+           * answer cannot skip a test.
+           */
+          ...(state.skipTestWeek === true ? { skip_test_week: true } : {}),
           ...(state.posture?.swim === 'maintain' && state.swimDays > 0 ? { swim_days: state.swimDays } : {}),
           // ⚠️ STORED, NOT YET READ. The engine books off `swim_days`; this is the athlete's own
           // number so the swim can stop being a guess without asking them again later.
@@ -1403,6 +1415,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   /** ⛔ Distinguishes "the preview could not be built" from "the week is empty". They are not the same. */
   const [previewFailed, setPreviewFailed] = React.useState(false);
   const [previewNotes, setPreviewNotes] = React.useState<string[]>([]);
+  /** ⛔ Standing Plan only: whether this block COULD open without a test week, and why not. */
+  const [previewSkip, setPreviewSkip] = React.useState<
+    { available: boolean; summary: string; window_days: number } | null
+  >(null);
   const [previewing, setPreviewing] = React.useState(false);
   const { arc } = useArcSetupContext();
 
@@ -1560,7 +1576,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(),
+    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -2712,6 +2728,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // result, and the athlete cannot tell the difference.
     setPreviewFailed(!Array.isArray(wk1) || wk1.length === 0);
     setPreviewWeek(Array.isArray(wk1) ? wk1 : []);
+    /**
+     * ⛔ THE OFFER, WHEN THERE IS ONE. Only a Standing Plan preview carries it; every other block
+     * leaves it null and the panel renders nothing, which is the honest answer for a plan with no
+     * test week to skip.
+     */
+    const skip = (plan as { _skip_test_week?: { available?: boolean; summary?: string; window_days?: number } } | null)
+      ?._skip_test_week;
+    setPreviewSkip(
+      skip && skip.available === true
+        ? { available: true, summary: String(skip.summary ?? ''), window_days: Number(skip.window_days) || 42 }
+        : null,
+    );
     setPreviewNotes(
       Array.isArray(plan?.placement_compromises)
         // Tolerate the old flat-string shape while any cached plan still carries it.
@@ -5979,6 +6007,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
               )}
             </div>
+            {/* ⛔ THE TEST-WEEK OFFER (Standing Plan, slice 3). Michael's ruling, 2026-08-23: the test
+                can be skipped ONLY when the number on file is evidence-backed and fresh — read from
+                logged sets inside the window, never a typed-in max — and **the skip is offered, the
+                default stays the test**. So this renders only when the server said the evidence is
+                there, it is off until tapped, and the server re-checks the evidence on the build.
+                ⚠️ Stage 5 rebuilds this wizard; this is the seam, not its final form. */}
+            {previewSkip?.available ? (
+              <label className="flex items-start gap-3 rounded-xl border border-white/12 bg-white/[0.03] p-3">
+                <input
+                  type="checkbox"
+                  checked={state.skipTestWeek === true}
+                  onChange={(e) => setState((p) => ({ ...p, skipTestWeek: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 accent-white/80"
+                />
+                <span className="text-white/80 text-sm leading-snug">
+                  Start without a test week
+                  <span className="block text-white/50 text-xs mt-1">{previewSkip.summary}</span>
+                </span>
+              </label>
+            ) : null}
             {/* ⛔ TWO FALSEHOODS ON THIS LINE, both created when the engine changed under it.
                 • "ending in a retest" — Strength Focus has NO retest week. The last set of every
                   third week is the test (5/3/1); weeks 9, 10 and 11 are the measurement. The

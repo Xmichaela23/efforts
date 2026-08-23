@@ -35,6 +35,29 @@ import {
   CALIBRATION_UNDO_LABEL,
   calibrationLine,
 } from '@/lib/strength-calibration-copy';
+// ⛔ SLICE 3 — the Standing Plan's own sentences. A DIFFERENT EVENT from the calibration above (a
+// hole filled, not a bar moved), which is why it has its own file and no Undo. See that header.
+import {
+  STANDING_TEST_APPLIED_HEADING,
+  STANDING_TEST_DONE_LABEL,
+  STANDING_TEST_SCOPE_NOTE,
+  standingFilledLine,
+  standingWorkingNumberLine,
+} from '@/lib/standing-plan-copy';
+
+/** What either rematerializer returns. ⚠️ Loose on purpose — an edge payload, not a type we own. */
+type RematerializeResult = {
+  success?: boolean;
+  changes?: unknown[];
+  working_numbers?: Record<string, unknown>;
+};
+/** One lift's working number as `rematerialize-standing-block` returns it. */
+type StandingWorkingNumber = {
+  lift?: string;
+  workingNumber?: number;
+  measured?: { weight?: number; reps?: number };
+};
+type StandingFillResult = RematerializeResult & { _saved?: unknown };
 // D-208's role table — the app's one answer to "is this a main lift or assistance work".
 import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
 // [Step 3] The logger's two private classifiers, moved out of this file and beside the shared type
@@ -1146,6 +1169,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    *  self-audit, not by a test: no test can see that a value is never displayed. */
   /** The rematerializer's dry run: what the next cycles WOULD become. Null on an ordinary session. */
   const [pendingRework, setPendingRework] = useState<any | null>(null);
+  /** ⛔ THE STANDING PLAN'S TEST WEEK FILLING THE BLOCK IN — a different event, a different sheet.
+   *  See `standing-plan-copy.ts` for why it carries no Undo. */
+  const [pendingStandingFill, setPendingStandingFill] = useState<StandingFillResult | null>(null);
   /** Lifts the athlete undid from the applied sheet — drives the struck-through line. Slice b. */
   const [undoneLifts, setUndoneLifts] = useState<string[]>([]);
   const [applyingRework, setApplyingRework] = useState(false);
@@ -4287,14 +4313,42 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // fires on a single session (p33), and the sheet below is unmissable and reversible.
     //
     // ⚠️ Silent on an ordinary session: no all-out set, or nothing ahead moves, and no sheet appears.
+    /**
+     * ⛔ TWO BLOCKS, TWO REMATERIALIZERS, ONE TRIGGER (stage 4 slice 3, 2026-08-23).
+     *
+     * The Standing Plan has the identical problem this call was written for and needed the identical
+     * trigger: it authors twelve weeks up front and its pretest is in WEEK ONE, so until something
+     * comes back and reads the test, the block runs eleven weeks on "by feel".
+     *
+     * ⛔ BOTH ARE ASKED, AND EACH REFUSES THE OTHER'S BLOCK. `rematerialize-strength-block` answers
+     * `not_a_strength_block` on a Standing Plan and `rematerialize-standing-block` answers
+     * `not_a_standing_plan_block` on a Get Stronger one — the same shape `useStrengthCalibration`
+     * already relies on, where a refusal is the common case and renders nothing. Asking first which
+     * block this is would be a third round trip and a second place that decides.
+     *
+     * ⚠️ IN PARALLEL, because they are independent and a saved workout must not wait on two serial
+     * round trips. ⚠️ `allSettled`, because a rejection on either must not cost the athlete the
+     * other's sheet — or the save.
+     *
+     * ⚠️ AND THEY CANNOT BOTH HAVE SOMETHING TO SAY. A plan is one block or the other, so at most one
+     * returns changes. The Get Stronger sheet is checked first only to keep that path byte-identical
+     * in behaviour.
+     */
     try {
-      const { data: rm } = await supabase.functions.invoke('rematerialize-strength-block', {
-        body: { apply: true },
-      });
+      const [gs, sp] = await Promise.allSettled([
+        supabase.functions.invoke('rematerialize-strength-block', { body: { apply: true } }),
+        supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } }),
+      ]);
+      const rm = gs.status === 'fulfilled' ? (gs.value as { data?: RematerializeResult })?.data : null;
       if (rm?.success && Array.isArray(rm.changes) && rm.changes.length > 0) {
         // ⚠️ Carry the saved row with it — the sheet owns the close, and the navigation callback
         // needs the workout it is navigating TO. Passing null here dropped the athlete nowhere.
         setPendingRework({ ...rm, _saved: saved || completedWorkout });
+        return;   // the sheet owns the close from here
+      }
+      const st = sp.status === 'fulfilled' ? (sp.value as { data?: RematerializeResult })?.data : null;
+      if (st?.success && Array.isArray(st.changes) && st.changes.length > 0) {
+        setPendingStandingFill({ ...st, _saved: saved || completedWorkout });
         return;   // the sheet owns the close from here
       }
     } catch { /* graceful: a supplier that cannot read must never block a saved workout */ }
@@ -6347,6 +6401,57 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </button>
           </div>
         </div>
+        );
+      })()}
+      {/* ⛔ THE STANDING PLAN'S TEST WEEK LANDED (stage 4 slice 3). A DIFFERENT EVENT FROM THE SHEET
+          ABOVE, and it must not borrow that sheet: there, a bar the athlete was already lifting
+          moved and each line carries an Undo. Here nothing moved — the block opened on "by feel"
+          because its test is in week one, and this is the hole being filled. Undoing would mean
+          putting eleven weeks back to no prescription. The correction path is retaking the test,
+          and the scope note says so. Copy: `src/lib/standing-plan-copy.ts`. */}
+      {pendingStandingFill && (() => {
+        const wn = (pendingStandingFill.working_numbers ?? {}) as Record<string, StandingWorkingNumber>;
+        const changes: Array<{ week?: number }> = Array.isArray(pendingStandingFill.changes)
+          ? pendingStandingFill.changes : [];
+        // ⚠️ WEEKS, NOT CHANGES. One lift moving rewrites dozens of rows, so a change count would
+        // report the size of the diff rather than the size of the thing that happened.
+        const weeks = new Set(changes.map((c) => Number(c?.week)).filter((n) => Number.isFinite(n))).size;
+        const closeSheet = () => {
+          const done = pendingStandingFill?._saved ?? null;
+          setPendingStandingFill(null);
+          if (onWorkoutSaved && done) onWorkoutSaved(done); else onClose();
+        };
+        return (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-[#141414] p-5 pb-8">
+              <p className="text-[11px] uppercase tracking-wider text-white/45 mb-3">
+                {STANDING_TEST_APPLIED_HEADING}
+              </p>
+              <div className="space-y-2 mb-4">
+                {Object.values(wn).map((v, i) => (
+                  <p key={i} className="text-sm text-white/85 tabular-nums">
+                    {standingWorkingNumberLine({
+                      // ⚠️ The movement the BLOCK prescribes, which is what the athlete just tested —
+                      // `testWeekLiftNames` keeps those the same string on purpose.
+                      movement: String(v?.lift ?? ''),
+                      weight: Number(v?.measured?.weight) || 0,
+                      reps: Number(v?.measured?.reps) || 0,
+                      workingNumber: Number(v?.workingNumber) || 0,
+                    })}
+                  </p>
+                ))}
+              </div>
+              <p className="text-[12px] text-white/55 mb-1 leading-snug">{standingFilledLine(weeks)}</p>
+              <p className="text-[12px] text-white/45 mb-4 leading-snug">{STANDING_TEST_SCOPE_NOTE}</p>
+              <button
+                type="button"
+                onClick={closeSheet}
+                className="w-full py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium"
+              >
+                {STANDING_TEST_DONE_LABEL}
+              </button>
+            </div>
+          </div>
         );
       })()}
       {downWriteReview && (

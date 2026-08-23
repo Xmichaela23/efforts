@@ -165,7 +165,19 @@ export function useArcSetupComplete() {
           ? notes.map((a) => String(a?.message ?? '')).filter(Boolean)
           : [],
       );
-      return (data as { plan?: Record<string, unknown> }).plan ?? null;
+      /**
+       * ⛔ THE SKIP OFFER TRAVELS WITH THE PLAN, NOT INSIDE IT (Standing Plan, slice 3). It is a
+       * question about the block — *"the sets are on file, so the test week could be skipped"* —
+       * and the builder needs it to render the offer at all.
+       *
+       * ⚠️ ATTACHED TO THE RETURNED OBJECT rather than added to this function's return TYPE, because
+       * every other caller of `preview()` reads `sessions_by_week` and `placement_compromises` off a
+       * plan and must be untouched by this. Absent on every path but the Standing Plan.
+       */
+      const plan = (data as { plan?: Record<string, unknown> }).plan ?? null;
+      const skip = (data as { skip_test_week?: unknown }).skip_test_week;
+      if (plan && skip && typeof skip === 'object') plan._skip_test_week = skip;
+      return plan;
     },
     [],
   );

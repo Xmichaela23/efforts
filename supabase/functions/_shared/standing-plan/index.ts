@@ -17,3 +17,5 @@ export * from './frame-resolver.ts';
 export * from './demonstrated-history.ts';
 export * from './plan-row.ts';
 export * from './restate.ts';
+export * from './day-map.ts';
+export * from './test-skip.ts';

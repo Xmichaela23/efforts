@@ -37,6 +37,7 @@ import {
   type FrameId,
   type StrengthSlot,
 } from './frames.ts';
+import { weekdayForFrameDay, type Weekday } from './day-map.ts';
 import { prescribedLoad } from './progression.ts';
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import {
@@ -77,7 +78,20 @@ export type PlanSession = {
   tags: string[];
 };
 
-const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+/**
+ * ⛔ THE FRAME'S DAY NUMBER → A CALENDAR WEEKDAY, AND IT IS NO LONGER HARD-WIRED.
+ *
+ * This was `DAY_NAMES[day.day - 1]` — frame day 1 always Monday, so the long run was Saturday for
+ * every athlete alive. **That was itself a rotation, offset zero, that nobody chose.** The work
+ * order: *"THE DAY ORDER IS NOT THE LAW. THE PAIRINGS ARE"* — p246 numbers its days and names no
+ * weekday anywhere. A rotation moves every day by the same amount, so the pairings, the gaps and the
+ * rest day's position all survive exactly; only the calendar day the block opens on changes.
+ *
+ * ⚠️ ABSENT `dayOffset` IS OFFSET ZERO, so an athlete who pinned nothing gets the identical week.
+ */
+function dayNameFor(args: ComposeArgs, frameDay: number): Weekday {
+  return weekdayForFrameDay(frameDay, args.dayOffset ?? 0);
+}
 
 export type ComposeArgs = {
   frame: FrameId;
@@ -98,6 +112,18 @@ export type ComposeArgs = {
   demonstratedWeeklyMiles?: number | null;
   roundTo?: number;
   smallestPlatePairLb?: number | null;
+  /**
+   * ⛔ WHICH CALENDAR DAY THE FRAME OPENS ON — `chooseDayMap` decides it from the athlete's pins.
+   * Frame day 1 lands this many days after Monday. Absent = 0 = the Monday-start week.
+   */
+  dayOffset?: number;
+  /**
+   * ⛔ SKIP WEEK ONE'S TEST — offered ONLY when logged history already carries a trustworthy max
+   * (Michael, 2026-08-23). ⚠️ Never a bare athlete preference: the caller must have derived
+   * `workingNumbers` from evidence (`evidenceWorkingNumbers`) before setting this, and a block with
+   * this true and no working numbers would prescribe nothing at all. Default is the test.
+   */
+  skipTestWeek?: boolean;
 };
 
 export type ComposeNote = { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string };
@@ -399,7 +425,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
     });
   }
   return {
-    day: DAY_NAMES[day.day - 1],
+    day: dayNameFor(args, day.day),
     type: 'strength',
     name: day.day === 1 ? 'Test: Upper' : 'Test: Lower',
     description: 'Work up in three steps. The last set is max clean reps and it is what the block reads.',
@@ -410,13 +436,13 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
 }
 
 /** ⛔ THE PLYO DAY. Drill count and stop rule are his (p227); the effort count is ours. */
-function plyoSession(day: FrameDay, notes: ComposeNote[]): PlanSession {
+function plyoSession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]): PlanSession {
   if (!notes.some((n) => n.text === PLYO_DOSE.effortCountIsOurs)) {
     notes.push({ kind: 'ours', text: PLYO_DOSE.effortCountIsOurs });
     notes.push({ kind: 'source', text: PLYO_DOSE.stopRule, cite: PLYO_DOSE.stopRuleIsHis });
   }
   return {
-    day: DAY_NAMES[day.day - 1],
+    day: dayNameFor(args, day.day),
     type: 'strength',
     name: 'Plyometrics',
     description: PLYO_DOSE.stopRule,
@@ -443,7 +469,19 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const notes: ComposeNote[] = [];
   const sessions: PlanSession[] = [];
   const dosing: DosingSession[] = [];
-  const testWeek = isTestWeek(args.week);
+  /**
+   * ⛔ WEEK ONE IS THE TEST WEEK — UNLESS THE ATHLETE TOOK THE SKIP (Michael, 2026-08-23), and the
+   * skip is only offerable when logged history already carries a trustworthy max for every lift the
+   * block prescribes from. `skipTestWeek` is not a preference the composer honours on its own: the
+   * caller must have derived the working numbers from that evidence first.
+   *
+   * ⚠️ A SKIP WITH NO WORKING NUMBERS IS REFUSED HERE rather than obeyed. That combination would
+   * drop the test AND prescribe nothing — twelve weeks of "By feel" with no way to fix it — which is
+   * a worse outcome than either branch alone. Falling back to the test is the safe direction.
+   */
+  const skipping = args.skipTestWeek === true
+    && Object.keys(args.workingNumbers ?? {}).length > 0;
+  const testWeek = isTestWeek(args.week) && !skipping;
   const anchors = resolveEnduranceAnchors(args.baselines);
 
   for (const day of days) {
@@ -451,7 +489,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 
     // ── strength ──────────────────────────────────────────────────────────────────────────────
     if (day.plyo) {
-      sessions.push(plyoSession(day, notes));
+      sessions.push(plyoSession(day, args, notes));
     } else if (day.strength.length > 0) {
       const test = testWeek ? testDaySession(day, args, notes) : null;
       if (test) {
@@ -489,7 +527,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           });
         }
         sessions.push({
-          day: DAY_NAMES[day.day - 1],
+          day: dayNameFor(args, day.day),
           type: 'strength',
           name: day.label ?? 'Strength',
           description: '',
@@ -511,7 +549,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         anchors,
       });
       const row = translateEnduranceSession(built, { raceTempo: slot.raceTempo });
-      sessions.push({ day: DAY_NAMES[day.day - 1], ...row });
+      sessions.push({ day: dayNameFor(args, day.day), ...row });
     }
   }
 
@@ -523,7 +561,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (let i = 0; i < extraVt1 && i < targets.length; i++) {
       const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors });
       const row = translateEnduranceSession(built);
-      sessions.push({ day: DAY_NAMES[targets[i].day - 1], ...row, tags: [...row.tags, 'advanced_tier'] });
+      sessions.push({ day: dayNameFor(args, targets[i].day), ...row, tags: [...row.tags, 'advanced_tier'] });
     }
     notes.push({
       kind: 'source',

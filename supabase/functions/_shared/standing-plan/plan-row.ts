@@ -21,6 +21,7 @@ import {
 } from './compose.ts';
 import { FRAMES, type FrameId } from './frames.ts';
 import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
+import { type DayMap } from './day-map.ts';
 import type { ViadaPattern } from '../strength-grid/index.ts';
 
 /** The app's existing phase shape — `strength-primary-plan.ts` writes the same one. */
@@ -64,6 +65,17 @@ export type StandingPlanRow = {
   config: StandingPlanConfig;
   /** Every note the composer raised, deduped across the block. Surfacing only. */
   notes: ComposedWeek['notes'];
+  /**
+   * ⛔ THE EXISTING COMPROMISE CHANNEL, AND IT IS NOT A NEW ONE. `NonRaceBuilder.tsx:2716` renders
+   * this off the preview and `strength-focus-copy.ts:237` folds it into the plan's description —
+   * both already, for the Get Stronger block. Slice 2 put the Standing Plan's warnings in
+   * `config.standing_plan_notes`, which nothing renders: *"a cost the athlete pays and cannot see is
+   * not disclosed"* (that file's own sentence).
+   *
+   * ⚠️ `kind: 'cost'` — a pin that could not be honoured broke no rule. `'breach'` is for a week
+   * that is actually compromised, and `'ceiling'` is dropped by the copy layer.
+   */
+  placement_compromises?: Array<{ kind: 'breach' | 'cost' | 'ceiling'; text: string }>;
 };
 
 export type StandingPlanConfig = {
@@ -84,6 +96,21 @@ export type StandingPlanConfig = {
   demonstrated_miles_source: string | null;
   /** ⛔ TRUE ONCE THE TEST HAS BEEN READ AND THE FUTURE WEEKS REWRITTEN FROM IT. */
   test_read: boolean;
+  /**
+   * ⛔ FRAME DAY 1 LANDS THIS MANY DAYS AFTER MONDAY. Stored so a rebuild, a restate, or any surface
+   * asking "which day is this session on" gets the block's own answer rather than re-deriving it
+   * from pins that may since have changed.
+   */
+  day_offset: number;
+  /** Which pins the chosen rotation honoured. Surfacing and provenance. */
+  pins_honoured: { longRun: boolean; hardDays: number };
+  /**
+   * ⛔ TRUE WHEN THE ATHLETE TOOK THE SKIP. The block opened on numbers read from logged sets rather
+   * than from a test week. ⚠️ Never a bare preference — see `evidenceForSkip`.
+   */
+  test_skipped: boolean;
+  /** What the skip was read off, per lift: the set, its date, and the number it produced. */
+  skip_evidence: Record<string, unknown> | null;
 };
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -101,11 +128,22 @@ export function buildStandingPlanRow(args: {
   taperWeeks?: number[];
   goalName?: string | null;
   demonstratedMilesSource?: string | null;
-  /** Surfacing only: the athlete pinned a long day the frame cannot honour yet. */
+  /** ⛔ THE ROTATION AND WHAT IT COST — `chooseDayMap`. Absent = the Monday-start week, no pins. */
+  dayMap?: DayMap;
+  /** What the skip was read off, when the athlete took it. Provenance only. */
+  skipEvidence?: Record<string, unknown> | null;
+  /** Surfacing only. */
   extraNotes?: ComposedWeek['notes'];
 }): StandingPlanRow {
   const weeks = Math.max(1, Math.round(args.weeks));
-  const blocks = composeBlock({ ...args.compose, weeks, taperWeeks: args.taperWeeks ?? [] });
+  const blocks = composeBlock({
+    ...args.compose,
+    // ⛔ THE ROTATION REACHES THE COMPOSER HERE AND NOWHERE ELSE. A caller that set `dayOffset`
+    // directly AND passed a `dayMap` would have two answers to one question; the map wins.
+    ...(args.dayMap ? { dayOffset: args.dayMap.offset } : {}),
+    weeks,
+    taperWeeks: args.taperWeeks ?? [],
+  });
 
   const sessions_by_week: Record<string, PlanSession[]> = {};
   for (const wk of blocks) sessions_by_week[String(wk.week)] = wk.sessions;
@@ -130,7 +168,7 @@ export function buildStandingPlanRow(args: {
   const frame = FRAMES[args.compose.frame];
   return {
     name: (args.goalName ?? '').trim() || 'Strength, with running',
-    description: describeBlock(weeks, notes),
+    description: describeBlock(weeks, notes, blocks[0]?.isTestWeek === true),
     duration_weeks: weeks,
     sessions_by_week,
     phaseStructure: phasesFor(weeks, args.taperWeeks ?? []),
@@ -147,8 +185,25 @@ export function buildStandingPlanRow(args: {
       demonstrated_weekly_miles: args.compose.demonstratedWeeklyMiles ?? null,
       demonstrated_miles_source: args.demonstratedMilesSource ?? null,
       test_read: args.compose.workingNumbers != null,
+      day_offset: args.dayMap?.offset ?? args.compose.dayOffset ?? 0,
+      pins_honoured: args.dayMap?.honoured ?? { longRun: false, hardDays: 0 },
+      test_skipped: args.compose.skipTestWeek === true
+        && Object.keys(args.compose.workingNumbers ?? {}).length > 0,
+      skip_evidence: args.skipEvidence ?? null,
     },
     notes,
+    /**
+     * ⛔ THE COST, WHERE THE ATHLETE ALREADY LOOKS. Two sources, one channel: the rotation's own
+     * unhonoured pins, and any `warning` note the composer or the wiring raised. ⚠️ Absent when
+     * nothing was compromised — never `[]` for "we did not look".
+     */
+    ...(() => {
+      const out = [
+        ...(args.dayMap?.compromises ?? []),
+        ...notes.filter((n) => n.kind === 'warning').map((n) => ({ kind: 'cost' as const, text: n.text })),
+      ];
+      return out.length > 0 ? { placement_compromises: out } : {};
+    })(),
   };
 }
 
@@ -180,11 +235,17 @@ export function phasesFor(weeks: number, taperWeeks: number[]): { phases: ArcPha
   return { phases, recovery_weeks: [] };
 }
 
-function describeBlock(weeks: number, notes: ComposedWeek['notes']): string {
+function describeBlock(weeks: number, notes: ComposedWeek['notes'], hasTestWeek: boolean): string {
   const sourced = notes.filter((n) => n.kind === 'source').slice(0, 3).map((n) => n.text);
   return [
     `${weeks} weeks. Four lifting days, four runs and a plyometric day, with one full rest day.`,
-    'Week one is a test week: two guided sessions set the numbers the rest of the block is built on.',
+    // ⛔ THE DESCRIPTION SAYS WHICH BLOCK THIS IS. A skipped test with the test sentence still on it
+    // would describe a week the athlete does not have — and week one looks different enough that
+    // they would notice and have no way to find out why.
+    hasTestWeek
+      ? 'Week one is a test week: two guided sessions set the numbers the rest of the block is built on.'
+      : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
+        + 'from the first session.',
     ...sourced,
   ].join(' ');
 }

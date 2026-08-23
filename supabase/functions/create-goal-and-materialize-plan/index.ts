@@ -2898,6 +2898,23 @@ Deno.serve(async (req: Request) => {
               // The posture the block was built under — `develop` is the only one that earns an
               // anchor-weighted shape (2026-07-28).
               ...(gsPosture?.strength ? { strength_posture: gsPosture.strength } : {}),
+              /**
+               * ⛔ THE TEST-WEEK SKIP, FORWARDED (Standing Plan, stage 4 slice 3, 2026-08-23).
+               *
+               * The Standing Plan's first week is a pretest; the athlete may skip it ONLY when
+               * logged sets already carry a trustworthy max. ⚠️ **This forwards the ANSWER, not the
+               * permission.** `generate-strength-plan` re-reads the evidence server-side and builds
+               * the test week anyway when it is not there — the same reason the maxes, the equipment
+               * and the paces are all resolved there rather than trusted from a caller.
+               *
+               * ⚠️ ONLY `true` IS FORWARDED. Absent, false, or anything else is the default, and the
+               * default is the test. That is the allowlist discipline every other field on this body
+               * already uses.
+               *
+               * ⚠️ INERT ON A GET STRONGER BLOCK. That builder does not read the field, and a
+               * Standing Plan frame does not resolve for those athletes anyway.
+               */
+              ...(gsTp.skip_test_week === true ? { skip_test_week: true } : {}),
               ...(bodyPreview ? { preview: true } : {}),
             };
             console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);
@@ -2906,6 +2923,15 @@ Deno.serve(async (req: Request) => {
               return new Response(JSON.stringify({
                 success: true, mode, goal_id: createdGoalId, preview: true, sport: 'strength', combined: false,
                 plan: gsGen?.plan ?? null,
+                /**
+                 * ⛔ THE SKIP OFFER RIDES OUT WITH THE PREVIEW (Standing Plan, slice 3). The builder
+                 * cannot offer to skip the test week unless it is told whether the evidence for it
+                 * exists, and only the builder function can see that — it is the one reading the
+                 * logged sets. ⚠️ Absent on a Get Stronger preview, which has no test week to skip.
+                 * ⚠️ It is a question ABOUT the block, not a property OF it, so it travels beside
+                 * `plan` rather than inside it.
+                 */
+                ...(gsGen?.skip_test_week ? { skip_test_week: gsGen.skip_test_week } : {}),
               }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
             const gsPlanId = gsGen?.plan_id;
