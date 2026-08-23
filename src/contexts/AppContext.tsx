@@ -99,6 +99,9 @@ interface BaselineData {
     bench?: number;
     overheadPress1RM?: number;
     pullupMaxReps?: number; // rep-based bodyweight lift — max clean reps (integer), NOT %1RM; 0 valid (Q-102)
+    /** Self-reported lifting history (stage 5 §8a). Set on the Baselines screen; seeds the wizard's
+     *  strength-gain display until logged lifting history can grade the tier. */
+    liftingExperience?: 'new' | 'couple_years' | 'many_years';
   };
   injuryHistory: string;
   injuryRegions: string[];

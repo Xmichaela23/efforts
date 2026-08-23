@@ -50,6 +50,14 @@ performanceNumbers: {
     bench?: number;
     overheadPress1RM?: number;
     pullupMaxReps?: number; // rep-based bodyweight lift — max clean reps (integer), NOT %1RM; 0 is valid (Q-102)
+    /**
+     * Self-reported lifting history. Stage 5 §8a of WORKORDER-the-standing-plan-2026-08-22: it lives
+     * in baselines, not the wizard — asked once, edited here after. It seeds the wizard's baseline
+     * strength-gain display; once months of logged lifting exist, history grades the tier and
+     * overrides this answer (typed answers seed, logs decide). Rides in `performance_numbers` jsonb
+     * so it needs no column and round-trips through the existing save/load spread.
+     */
+    liftingExperience?: 'new' | 'couple_years' | 'many_years';
 };
 
   // Equipment (only for swimming and strength)
@@ -1261,6 +1269,32 @@ return (
                           <option value="metric" className="bg-[#1a1a1a]">kg</option>
                         </select>
                         </div>
+                      {/*
+                        Lifting experience — stage 5 §8a. Sits in Basic Information, not the Strength
+                        sport panel, because that panel only renders once the athlete taps the sport
+                        tile and this has to be settable before a first block. Lifting is in every
+                        plan, so it is never sport-gated.
+                      */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-white/60 whitespace-nowrap">Lifting experience</label>
+                        <select
+                          value={data.performanceNumbers?.liftingExperience || ''}
+                          onChange={(e) => setData(prev => ({
+                            ...prev,
+                            performanceNumbers: {
+                              ...prev.performanceNumbers,
+                              liftingExperience: (e.target.value || undefined) as any
+                            }
+                          }))}
+                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                        >
+                          <option value="" className="bg-[#1a1a1a]">-</option>
+                          <option value="new" className="bg-[#1a1a1a]">new to lifting (under a year)</option>
+                          <option value="couple_years" className="bg-[#1a1a1a]">a couple of years</option>
+                          <option value="many_years" className="bg-[#1a1a1a]">many years</option>
+                        </select>
+                      </div>
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-white/60">Ht</label>
                         <input
