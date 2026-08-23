@@ -69,21 +69,15 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-23 — **STAGE 4 IS COMPLETE, ALL FOUR SLICES. The next step is the DEPLOY, not stage 5.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-24 — **stage 4 complete; stage 5's endurance week built. The next step is STILL the DEPLOY.**)
 
 ### ⛔ THE ONE THING TO KNOW FIRST
 
-**The Standing Plan block is FINISHED IN CODE and startable-for-real the moment it is deployed.**
-Nothing is pushed, nothing is deployed, **no device has ever seen any of it**. Four slices of engine
-are stacked with zero device verification.
-
+**Nothing is pushed. Nothing is deployed. No device has seen any of it.**
 ⛔ **`rematerialize-standing-block` IS A NEW EDGE FUNCTION THAT HAS NEVER BEEN DEPLOYED**, and
 `StrengthLogger.tsx` calls it on every strength save. Until it exists the call errors, the error is
-caught and swallowed by design (the save is safe), and **the block never fills its weights in** — it
-runs its test week and then eleven weeks of "by feel". That is the single biggest gap between this
-code and a working plan, and it is a deploy, not a build.
-
-### ⛔ THE JOB: DEPLOY, THEN VERIFY ON A DEVICE
+caught and swallowed by design (the save is safe), and **the block runs its test week and then eleven
+weeks of "by feel"**. That is still the largest gap between this code and a working plan.
 
 ```
 supabase functions deploy \
@@ -91,78 +85,71 @@ supabase functions deploy \
   compute-snapshot analyze-strength-workout coach materialize-plan adapt-plan \
   --project-ref yyriamwvtvzlkumqrvpm
 ```
+⚠️ The last five carry their own frozen copy of `_shared/strength-profiles.ts`, which slice 2 changed.
 
-⚠️ **The last five are there because SLICE 2 touched `_shared/strength-profiles.ts`** (the
-`standing_plan` protocol entry) and each carries its own frozen copy. Until they are redeployed they
-resolve the new protocol to `durability` — a flat RIR 2.5 for twelve weeks — and read
-`protocolKnown: false`. That is the `_shared` deploy trap in `CLAUDE.md`.
+### ⛔ WHAT EXISTS — five dated notes, read them in order
 
-**Then a human, on a phone.** Build a block with a bike kept and a pinned Sunday long run. Check the
-calendar shows hard RIDES and a Sunday long run. Log the two test sessions and watch the sheet appear
-and the remaining weeks fill in. **Nothing below that counts as verified.**
+`NOTES-stage4-composer-strength5k-2026-08-23.md` · `NOTES-stage4-wiring-slice2-2026-08-23.md` ·
+`NOTES-stage4-live-slice3-2026-08-23.md` · `NOTES-stage4-sportslots-slice4-2026-08-23.md` ·
+**`NOTES-stage5-endurance-week-2026-08-24.md`** (this session).
 
-### ⛔ WHAT EXISTS — read the four notes before touching any of it
+**Stage 5's endurance-week screen is built** — `EnduranceWeekCard.tsx` +
+`src/lib/standing-plan-week-{copy,bounds}.ts`, mounted as the `endurance` step, replacing
+`volume` + `hardday` **on the strength path only**:
 
-`NOTES-stage4-composer-strength5k-2026-08-23.md` (slice 1, the composer: p246 as data, the p215
-working number, the progression) · `NOTES-stage4-wiring-slice2-2026-08-23.md` (slice 2, the edge fork
-+ the test week) · `NOTES-stage4-live-slice3-2026-08-23.md` (slice 3, the call, pinned weekdays, the
-evidence-gated skip) · `NOTES-stage4-sportslots-slice4-2026-08-23.md` (slice 4, runs and rides in one
-week).
+- Michael's header verbatim; four slot controls (Hard 1 / Hard 2 / Easy / Long, Run|Ride); the
+  **count pickers deleted** — `run_days`/`ride_days` are derived from the slots.
+- Volume inputs bounded both ends by `sessionDurationBandSeconds`, recomputing with the mix.
+- A live lifting-rate line from **his** anchors (1%/3wk hard-on-bike p247 · 1%/4wk one hard run p251 ·
+  "about 1% a month" both hard runs — ⚠️ the TIERS are ours, the rates are his).
+  ⛔ **No endurance-improvement percentage anywhere**, held by a test.
+- **The compromise wire**: a long ride pinned alongside a long run now reaches the athlete as one
+  sentence through `placement_compromises`, instead of vanishing.
+- The p215 pretest gets its own cue ("as many clean reps as possible; the set ends when the form
+  changes"); ⛔ **Wendler's AMRAP line is untouched**.
 
-**Slice 4 closed sport-slot assignment (pivot §2):**
+**123 engine tests + 39 client copy tests, 30/30 mutations killed, Get Stronger byte-identical
+(`f7ece1aa…`).** ⛔ **The screen was DRIVEN IN A BROWSER** (Vite on 8081; the wizard's login wall was
+bypassed with a temporary route that has been deleted) and the caps were proven to bracket what the
+composer builds across five sport mixes — the ask-15-get-20 guarantee.
 
-- **A kept bike or swim now routes INTO the frame.** The slice-2 refusal is **deleted whole** — its
-  branches, its copy, its `bikeKept`/`swimDays` fields and its tests.
-- **The mix is a RATIO, not a count** (pivot §2: the program owns session count). The frame keeps its
-  four endurance slots at every mix; the athlete's numbers decide which sport fills each.
-- **Hard sessions go on the bike, placed by the dial and never asked** (p280: no impact, so the
-  intensity does not tax the lifts). **The running keeps its long session and loses its hard one**,
-  and the copy states that cost.
-- ⛔ **The equivalence is matched on each family's stated `workFloorPct`** — and `ride_vo2` (floor
-  1.10) is deliberately NEVER the hard slot's answer, because it is HARDER than the run slot it
-  replaces. Substituting it would add intensity while claiming to convert.
-- **Swim: off by default; kept means `swim_endurance` level 1 only.** The all-out speed sets and the
-  open-water sighting work are unreachable, asserted.
-- ⛔ **The p247 lower-body haircut now asks whether day 1 is actually a RUN.** His sentence's subject
-  is the run; keying it on `isLower` alone was right by accident while every frame day was a run.
-  ⚠️ **The bike-mix behaviour is OUR reading and ships labelled** — the source never addresses the
-  substituted case. Measured: squat week 2 is **260 lb** on an all-run mix, **270 lb** on a bike mix.
+### ⛔ THE DEFECT THIS SESSION FOUND, AND THE ONE ENGINE CHANGE IT FORCED
 
-**109 tests, 31/31 mutations killed, Get Stronger byte-identical (`f7ece1aa…`, unchanged across all
-four slices).** Client-reachable and RUN: a 241 kB bundle building three mixes with hard rides, a
-pinned Sunday long run, an easy swim, and zero endurance on the heavy leg day.
+The agreement test failed on *"Hard 1 = Run, Long = Ride"*: **only the COUNTS reached the engine**, so
+`assignSports` re-derived which slot was which from its own dial and handed the athlete the opposite
+week, silently. `SportMix` now takes an optional per-slot `slots` map that **overrides** the dial;
+absent, the dial assigns exactly as before. Wired through `training_prefs.endurance_slots` and
+validated at both hops. ⚠️ This is the one place this session went past "do not touch the engine" —
+without it the new screen is a lie.
 
-### ⛔ AFTER THE DEPLOY — STAGE 5, THE WIZARD
+### ⛔ WHAT STAGE 5 STILL OWES (none of it blocking the deploy)
 
-`WORKORDER-the-standing-plan-2026-08-22.md` stage 5. ⚠️ **It already has one debt waiting:** the
-builder still asks *"how many runs a week"* as a COUNT and the engine reads it as a RATIO. For any ask
-that fits four slots they agree; for an athlete asking five runs they do not, and nothing on screen
-says so. **That is stage 5's own first bullet** — the count screen goes because the program owns the
-count.
+1. **Screens 2/3 and 6/7** of the addendum's flow — lifting experience, focus, strength, schedule.
+2. ⚠️ **THE SCHEDULE SCREEN CONTRADICTS THE NEW ONE.** It still asks for a long RUN day and a long
+   RIDE day as two independent pins, which can now disagree with the slot answer. The athlete gets
+   the compromise sentence rather than the day they wanted. **It should ask for THE LONG DAY, once,
+   and know which sport it is.**
+3. **The meter's experience-gated tone** ("new to lifting overrides the meter") — the rate line ships
+   without it because the experience answer is someone else's work in progress.
 
-⚠️ **SOMEONE ELSE HAS UNCOMMITTED STAGE-5 WORK IN THE TREE** — `src/components/TrainingBaselines.tsx`,
-`src/contexts/AppContext.tsx` and the work order carry a `liftingExperience` field (§8a). **Untouched
-by slice 4.** Do not sweep it into a commit unexamined.
+⚠️ **SOMEONE ELSE HAS UNCOMMITTED STAGE-5 WORK IN THE TREE** — `TrainingBaselines.tsx`,
+`AppContext.tsx` and the work order carry a `liftingExperience` field (addendum §8a). **Untouched by
+this session.** Do not sweep it into a commit unexamined.
 
 ### Open gaps (corpus): G-7 `p215.jpg` not yet in the folder · G-8 "circle of reps" undefined, so
 double progression stays labelled ours.
 
 ### ⚠️ FOUND IN PASSING, NOT FIXED — worth a Q-entry each
-- ⛔ **`athlete_snapshot.workload_by_discipline.run` HAS TWO LIVE READERS THAT DISAGREE BY 10×.**
-  `_shared/end-plan-core.ts:88` treats it as MILES; `_shared/planning-context.ts:389` divides by 10.
-  One is wrong and every number either produces is suspect. The Standing Plan reads raw
-  `workouts.distance` instead, where the unit IS settled.
-- ⚠️ **`activate-plan:441` SILENTLY DROPS week-one sessions dated before the block's start.** On a
-  mid-week start that can delete the test week outright. Not reachable from the live builder
-  (`planWeekStartISO()` always sends a Monday); the rotation chooser prefers an offset that survives
-  and states the cost when none is free. The underlying silent drop is untouched.
-- ⚠️ **An ME row still receives a derived RIR target downstream.** p218 says "no RIR target" for ME;
-  the composer stamps none, but `protocolUsesRir` is protocol-wide so `materialize-plan` reads one off
-  the RPE chart. Lands near zero reserve, so it restates rather than contradicts.
-- ⚠️ **Overhead press is tested in week one and never loaded** — no `push_upper` competition slot in
-  either column of `strength_5k` would carry a press. A fact of the frame (p246 is the law).
+- ⛔ **`athlete_snapshot.workload_by_discipline.run` HAS TWO LIVE READERS THAT DISAGREE BY 10×** —
+  `_shared/end-plan-core.ts:88` treats it as MILES, `_shared/planning-context.ts:389` divides by 10.
+- ⚠️ **`voiceViolation` bans `focus` as an imperative** and cannot tell it from the noun. Michael's
+  header uses it correctly; the gate is exempted for his verbatim copy and still runs over everything
+  the app generates.
+- ⚠️ **`activate-plan:441` silently drops week-one sessions dated before the block's start.**
+- ⚠️ **An ME row still receives a derived RIR target downstream** (p218 says none for ME).
+- ⚠️ **Overhead press is tested in week one and never loaded** — a fact of the frame (p246).
 - ⚠️ **A bike-ONLY athlete is still refused the frame**, deliberately: `strength_5k`'s shape is built
-  around running. His cycling programs (p278/p280) are their own pages and the next frames to build.
+  around running. His cycling programs (p278/p280) are the next frames to build.
 
 ---
 
