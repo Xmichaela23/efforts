@@ -509,10 +509,10 @@ function WeekDayRow({
               className="leading-none text-[9px] font-medium"
               style={off || !role ? undefined : { color: letterColour[role] }}
             >{heldBy ? '—' : (role ?? '\u00A0')}</span>
-            {/* The stack dot: this day carries more than the letter shows. */}
+            {/* ×2 — this day carries two sessions (Michael, 2026-08-24: clearer than a dot). */}
             {stacked.includes(d) && !off ? (
-              <span aria-hidden className="w-1 h-1 rounded-full bg-white/40 mt-0.5" />
-            ) : <span aria-hidden className="w-1 h-1 mt-0.5" />}
+              <span aria-hidden className="leading-none text-[8px] text-white/50 mt-0.5">×2</span>
+            ) : <span aria-hidden className="leading-none text-[8px] mt-0.5">{'\u00A0'}</span>}
           </button>
         );
       })}
@@ -6045,7 +6045,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <span style={{ color: `rgb(${getDisciplineColorRgb('bike')})` }}>LB</span> long ·{' '}
                 <span style={{ color: `rgba(${getDisciplineColorRgb('run')},0.75)` }}>E</span>/
                 <span style={{ color: `rgba(${getDisciplineColorRgb('bike')},0.75)` }}>B</span> easy run/ride ·{' '}
-                <span className="text-white/60">S</span> lifting only · dot = more that day
+                <span className="text-white/60">S</span> lifting only · ×2 = two sessions
               </p>
             )}
             {(state.hardDays.length > 0 || state.longRunDay || state.longRideDay) && (
