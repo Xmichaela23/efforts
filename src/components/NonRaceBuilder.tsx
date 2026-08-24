@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Target, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
+import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
@@ -19,6 +19,11 @@ import {
 import { hardSlotDefault, hardSlotTitle } from '@/lib/hard-slot-choices';
 import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
+import { useAppContext } from '@/contexts/AppContext';
+// ⛔ THE SAME functions the SERVER's tier gate runs — client-reachable by design, so the line the
+// wizard shows and the tier the composer builds cannot disagree (item 8, 2026-08-24).
+import { demonstratedRunVolume } from '../../supabase/functions/_shared/standing-plan/demonstrated-history.ts';
+import { advancedTierSessions } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 // ONE band, shared with the composer — what the athlete is told while typing and what the plan
@@ -290,13 +295,29 @@ const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
  * key, and the readers would not know which they had. Pick the name when the field is actually
  * needed (when Heavy or Definition ships), not now while Strong is a no-op.
  */
-type StrengthTierId = 'strong' | 'heavy' | 'definition';
-const TIER_ORDER: StrengthTierId[] = ['strong', 'heavy', 'definition'];
+/** ⛔ DEFINITION IS GONE, RULED 2026-08-24 (Michael): its job is the focus chips ("shape where you
+ *  choose" is literally the picker), and there is no page behind it — Strong maps to Strength+5K
+ *  (p246), Heavy to Hypertrophy+5K (p244, the book's own recommended first program), Definition to
+ *  nothing. This screen's earlier comment already called it: three names for one block. */
+type StrengthTierId = 'strong' | 'heavy';
+const TIER_ORDER: StrengthTierId[] = ['strong', 'heavy'];
 const TIER_COPY: Record<StrengthTierId, { label: string; blurb: string; Icon: CardIcon; live: boolean }> = {
   strong: { label: 'Strong', blurb: 'Stronger, not bigger.', Icon: Dumbbell, live: true },
   heavy: { label: 'Heavy', blurb: 'Build muscle.', Icon: Weight, live: false },
-  definition: { label: 'Definition', blurb: 'Shape where you choose.', Icon: Target, live: false },
 };
+
+/** Michael's entry note, verbatim (2026-08-24) — the voice gate pins these rather than flagging. */
+const TIER_ENTRY_NOTE = [
+  'Riding takes a smaller toll on your body than running.',
+  'Be honest about your running miles — the plan holds what you enter.',
+] as const;
+/** The reality-check bands are field practice (the novice/intermediate norms the big running apps
+ *  and Higdon-class programs use), OURS, not the source's. A reality check, never a gate. */
+const RUNNER_MILEAGE_CHART = [
+  { label: 'Newer runner', miles: '5–10 mi a week' },
+  { label: 'Regular runner', miles: '10–20 mi' },
+  { label: 'High-mileage', miles: '20–30+ mi' },
+] as const;
 
 /** Race distances this card offers. One for now — the rest come behind the same machinery. */
 const RACE_DISTANCES = ['Marathon'] as const;
@@ -646,6 +667,9 @@ type NonRaceState = {
    * see `TIER_COPY`. Held in state so the card reads as chosen and Back returns to it.
    */
   strengthTier: StrengthTierId | null;
+  /** Easy-swim add-on count (Michael, 2026-08-24): 0 = none, 1–2 = easy/technique swims appended
+   *  outside the four endurance slots. Cap 2 — past that the athlete wants a tri plan. */
+  swimEasySessions?: 0 | 1 | 2;
   goal: NonRaceGoalId | null;
   discipline: Discipline | undefined;
   posture: Partial<Record<Discipline, Posture>>;
@@ -1370,6 +1394,11 @@ function assemblePayload(
            * different week, nothing said. The wizard's own agreement test caught it.
            */
           ...(isStrengthFocusPath ? { endurance_slots: derivedCounts.slots } : {}),
+          /** Easy-swim add-on (Michael, 2026-08-24): 1–2 easy/technique swims OUTSIDE the four
+           *  slots. 0/absent = none. The composer appends them; they never take a session spot. */
+          ...(isStrengthFocusPath && (state.posture.swim ?? 'out') === 'maintain' && (state.swimEasySessions ?? 0) > 0
+            ? { swim_easy_sessions: Math.min(2, state.swimEasySessions ?? 1) }
+            : {}),
           // Strength Focus: the three assistance picks. The composer validates each name against the
           // shared menu, so a stale one falls back to the default rather than reaching a session.
           // ⛔ ALWAYS SENT NOW, and that is the migration working rather than a widened condition.
@@ -1962,8 +1991,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * writing to a discipline that is no longer in the plan. Falls back to the hard day, which every
    * Strong Focus week has.
    */
-  const scheduleRunShown = state.posture?.run != null && state.posture?.run !== 'out';
-  const scheduleRideShown = state.posture?.bike === 'maintain';
+  /**
+   * ⛔ THE STRENGTH PATH DERIVES THIS SCREEN FROM THE SLOT ANSWERS (B1, 2026-08-24). The week has
+   * ONE long session and the slot screen already said which sport it is — so exactly one long row
+   * renders, the other's pin is cleared (the phantom "Long Run: sunday" on a long-ride week came
+   * from here), and the count rows do not exist: counts derive from the slots.
+   */
+  const longSlotSport = isStrengthFocus ? ((state.slotSports ?? emptySlotSports()).long ?? null) : null;
+  const scheduleRunShown = isStrengthFocus
+    ? longSlotSport === 'run'
+    : state.posture?.run != null && state.posture?.run !== 'out';
+  const scheduleRideShown = isStrengthFocus
+    ? longSlotSport === 'ride'
+    : state.posture?.bike === 'maintain';
   /**
    * THE SCHEDULER'S FIVE QUESTIONS, as a disclosure list: one line each when closed, showing its
    * ANSWER, and its controls only while open.
@@ -2031,14 +2071,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       kind: 'count' as const,
       label: 'Runs a week',
       answer: state.runDays > 0 ? String(state.runDays) : 'Pick one',
-      shown: scheduleRunShown,
+      // ⛔ NOT ON THE STRENGTH PATH — the program owns the counts and the slots already said them.
+      shown: !isStrengthFocus && scheduleRunShown,
     },
     {
       key: 'rides' as const,
       kind: 'count' as const,
       label: 'Rides a week',
       answer: state.rideDays > 0 ? String(state.rideDays) : 'Pick one',
-      shown: scheduleRideShown,
+      shown: !isStrengthFocus && scheduleRideShown,
     },
     {
       /**
@@ -2071,7 +2112,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // ⛔ SORTED BY THE SHARED ORDER, NOT BY POSITION IN THIS ARRAY. Declaration order is easy to
     // edit without noticing what it means; `SCHEDULE_ROW_ORDER` is pinned by a fixture.
     .sort((x, y) => SCHEDULE_ROW_ORDER.indexOf(x.key) - SCHEDULE_ROW_ORDER.indexOf(y.key))
-    .map((r) => ({ ...r, optional: SCHEDULE_OPTIONAL_ROWS.has(r.key) }));
+    // ⛔ ON THE STRENGTH PATH THE HARD SESSIONS ARE PRESCRIBED, NOT OPTIONAL (B1, 2026-08-24) —
+    // the slot screen already answered them; only their DAY is asked here. The OPTIONAL chip
+    // survives on the race path, where the club night genuinely is declinable.
+    .map((r) => ({ ...r, optional: !isStrengthFocus && SCHEDULE_OPTIONAL_ROWS.has(r.key) }));
   /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Four of the five rows are posture-gated,
    * and posture is editable on an earlier step — so walking Back, dropping the bike, and walking
@@ -2700,8 +2744,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     rideShown: scheduleRideShown,
     longRunDay: state.longRunDay,
     longRideDay: state.longRideDay,
-    runDays: state.runDays,
-    rideDays: state.rideDays,
+    // ⛔ Strength path: the counts are the SLOTS' — the gate must never demand a number the
+    // athlete was never asked (the count rows are hidden there). Read off state directly: the
+    // component-scope `derivedCounts` declares later in this function body.
+    runDays: isStrengthFocus
+      ? SLOT_KEYS.filter((k) => (state.slotSports ?? emptySlotSports())[k] === 'run').length
+      : state.runDays,
+    rideDays: isStrengthFocus
+      ? SLOT_KEYS.filter((k) => (state.slotSports ?? emptySlotSports())[k] === 'ride').length
+      : state.rideDays,
     targetMiles: state.targetMiles,
     rideHours: state.rideHours,
     qualityDays: state.qualityDays,
@@ -2756,6 +2807,50 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * slots on the bike before the athlete had said anything.
    */
   const slotSportsNow: SlotSelection = state.slotSports ?? emptySlotSports();
+
+  /**
+   * ⛔ THE ATHLETE-TYPE ANSWER PRE-SHAPES THE SLOT SCREEN (Michael, 2026-08-24). "Run only" never
+   * renders Ride chips; with one sport allowed every slot is auto-assigned to it — the choice
+   * screen only exists for the mixed athlete. Swim is never a slot sport (add-on ruling).
+   */
+  const allowedSlotSports: SlotSport[] = [
+    ...((state.posture.run ?? 'out') === 'maintain' ? (['run'] as const) : []),
+    ...((state.posture.bike ?? 'out') === 'maintain' ? (['ride'] as const) : []),
+  ];
+  /**
+   * ⛔ THE TIER LINE (item 8, 2026-08-24): when logged history unlocks the +1-2 easy-run tier, the
+   * volume step SAYS so — a fact, not a question. Same functions the server's gate runs, fed the
+   * workouts already in context, so the line and the built tier cannot disagree.
+   */
+  const { workouts: ctxWorkouts } = useAppContext();
+  const tierLine = useMemo(() => {
+    const vol = demonstratedRunVolume((ctxWorkouts ?? []) as never);
+    const extra = advancedTierSessions(vol.weeklyMiles);
+    if (extra <= 0) return null;
+    return `Your history supports a ${4 + extra}-session endurance week — ${extra} extra easy `
+      + `run${extra === 1 ? '' : 's'} (${vol.source}).`;
+  }, [ctxWorkouts]);
+
+  /** ⛔ ONE LONG SESSION, ONE PIN (B1). When the long slot is a ride, a stale long-RUN pin is the
+   *  phantom pref that reached a built goal ("Long Run: sunday" on a week with no long run). */
+  useEffect(() => {
+    if (!isStrengthFocus) return;
+    if (longSlotSport === 'ride' && state.longRunDay) setState((st) => ({ ...st, longRunDay: '' }));
+    if (longSlotSport === 'run' && state.longRideDay) setState((st) => ({ ...st, longRideDay: '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStrengthFocus, longSlotSport, state.longRunDay, state.longRideDay]);
+
+  useEffect(() => {
+    if (currentStep !== 'endurance' || allowedSlotSports.length !== 1) return;
+    const only = allowedSlotSports[0];
+    const cur = state.slotSports ?? emptySlotSports();
+    if (Object.values(cur).every((s) => s === only)) return;
+    setState((st) => {
+      const slots = { hard1: only, hard2: only, easy: only, long: only } as SlotSelection;
+      return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, allowedSlotSports.join(','), state.slotSports]);
 
   /**
    * ⛔ THE HARD SLOT'S SESSION CHOICES, RESTORED (Michael's screenshot review, 2026-08-24).
@@ -3166,6 +3261,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           hideContinue hideProgress
         >
           <div className="space-y-2">
+            {/* Michael's note + the mileage reality check, at the door — before any choice. */}
+            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 mb-1">
+              {TIER_ENTRY_NOTE.map((line) => (
+                <p key={line} className="text-white/75 text-sm leading-relaxed">{line}</p>
+              ))}
+              <div className="mt-2 pt-2 border-t border-white/10">
+                {RUNNER_MILEAGE_CHART.map((row) => (
+                  <div key={row.label} className="flex justify-between text-xs text-white/55 py-0.5">
+                    <span>{row.label}</span>
+                    <span>{row.miles}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             {TIER_ORDER.map((t) => {
               const { label, blurb, Icon, live } = TIER_COPY[t];
               return (
@@ -3626,34 +3735,72 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 explanation was pushing the question it explains below the fold. Same source numbers,
                 so the card and the plan cannot promise different blocks. */}
             <p className="text-white/75 text-sm leading-relaxed">{strengthFocusBrief({})}</p>
-            <p className="text-white/85 text-sm pt-1">Which endurance are you keeping?</p>
-            {(['run', 'bike', 'swim'] as const).map((d) => {
-              const color = getDisciplineColor(d);
-              const Icon = DISCIPLINE_ICONS[d];
-              const keeping = (state.posture[d] ?? 'out') === 'maintain';
+            {/* ⛔ RELABELLED 2026-08-24 (Michael): three cards NAMING THE ATHLETE, not a quiz about
+                "keeping". The answer pre-shapes the slot screen — run-only never renders Ride chips.
+                Posture underneath is unchanged: the card writes run/bike maintain-or-out. */}
+            <p className="text-white/85 text-sm pt-1">Who are you this block?</p>
+            {([
+              { id: 'run_only', label: 'Run only', run: true, bike: false },
+              { id: 'ride_only', label: 'Ride only', run: false, bike: true },
+              { id: 'run_ride', label: 'Run + ride', run: true, bike: true },
+            ] as const).map((card) => {
+              const selected =
+                ((state.posture.run ?? 'out') === 'maintain') === card.run &&
+                ((state.posture.bike ?? 'out') === 'maintain') === card.bike;
               return (
                 <button
-                  key={d} type="button"
-                  onClick={() => setPosture(d, keeping ? 'out' : 'maintain')}
-                  className={`w-full rounded-xl border p-3 flex items-center justify-between ${keeping ? 'border-white/25 bg-white/[0.06]' : 'border-white/12 bg-white/[0.02]'}`}
+                  key={card.id} type="button"
+                  onClick={() => {
+                    setPosture('run', card.run ? 'maintain' : 'out');
+                    setPosture('bike', card.bike ? 'maintain' : 'out');
+                  }}
+                  className={`w-full rounded-xl border p-3 flex items-center justify-between ${selected ? 'border-white/25 bg-white/[0.06]' : 'border-white/12 bg-white/[0.02]'}`}
                 >
-                  <span className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" style={{ color }} />
-                    <span className="font-medium" style={{ color: keeping ? color : 'rgba(255,255,255,0.45)' }}>
-                      {DISCIPLINE_LABEL[d]}
-                    </span>
+                  <span className="flex items-center gap-2.5">
+                    {card.run && <Footprints className="h-4 w-4" style={{ color: getDisciplineColor('run') }} />}
+                    {card.bike && <Bike className="h-4 w-4" style={{ color: getDisciplineColor('bike') }} />}
+                    <span className={`font-medium ${selected ? 'text-white' : 'text-white/60'}`}>{card.label}</span>
                   </span>
-                  <span className={`text-sm ${keeping ? 'text-white/85' : 'text-white/45'}`}>
-                    {keeping ? 'Keeping' : 'Not this block'}
-                  </span>
+                  {selected && <Check className="h-4 w-4 text-white/70" />}
                 </button>
               );
             })}
-            {/* ⛔ KEEP THE CAVEAT, DROP THE REPEAT. The brief above says what the block holds; this
-                line is the half an athlete needs before choosing: what is NOT held. Rewritten
-                2026-08-24 — the old line ("speed and threshold are not maintained") described Strong
-                Focus and INVERTS for the new engine, which assigns up to two hard sessions
-                (bike-first when strength leads). What's true now: the cap, and its consequence. */}
+            {/* ⛔ SWIM IS AN ADD-ON, NEVER A SLOT (Michael, 2026-08-24): easy laps + technique only,
+                1 or 2 a week, off by default. Cap 2 — past that the athlete wants a tri plan. The
+                hard swim families are never prescribed by this plan (standing ruling). */}
+            <div className="rounded-xl border border-white/12 bg-white/[0.02] p-3">
+              <button
+                type="button"
+                onClick={() => setState((s) => ({
+                  ...s,
+                  posture: { ...s.posture, swim: (s.posture.swim ?? 'out') === 'maintain' ? 'out' : 'maintain' },
+                  swimEasySessions: (s.posture.swim ?? 'out') === 'maintain' ? 0 : 1,
+                }))}
+                className="w-full flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Waves className="h-4 w-4" style={{ color: getDisciplineColor('swim') }} />
+                  <span className={`font-medium ${(state.posture.swim ?? 'out') === 'maintain' ? 'text-white' : 'text-white/60'}`}>
+                    Add easy swims
+                  </span>
+                </span>
+                {(state.posture.swim ?? 'out') === 'maintain' && <Check className="h-4 w-4 text-white/70" />}
+              </button>
+              <p className="text-white/50 text-xs mt-1.5">
+                Technique and easy laps, for feel. Doesn't take a session spot, costs your lifting nothing.
+              </p>
+              {(state.posture.swim ?? 'out') === 'maintain' && (
+                <div className="flex gap-1.5 mt-2">
+                  {([1, 2] as const).map((n) => (
+                    <button
+                      key={n} type="button"
+                      onClick={() => setState((s) => ({ ...s, swimEasySessions: n }))}
+                      className={`px-3.5 py-1.5 rounded-lg text-sm border ${(state.swimEasySessions ?? 1) === n ? 'border-white/40 bg-white/[0.08] text-white' : 'border-white/12 text-white/55'}`}
+                    >{n} a week</button>
+                  ))}
+                </div>
+              )}
+            </div>
             <p className="text-white/50 text-xs">Two hard sessions at most. A sport without one holds its base, not its top end.</p>
           </div>
         </StepLayout>
@@ -4127,7 +4274,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     },
                   }))}
                 >Balanced</GalaxyButton>
-                {FOCUS_CHIPS.map((chip) => {
+                {/* ⛔ CORE IS A STANDING-PLAN CHIP ONLY (B2, 2026-08-24). Get Stronger's own
+                    `isFocusChip` filters it — that path's stated migration — and it is stripped
+                    before `buildDefaultWeek`, whose category map has no core row. On the Standing
+                    Plan the composer reads it and biases HYP slots toward core movements. */}
+                {([...FOCUS_CHIPS, ...(isStrengthFocus ? (['core'] as unknown as FocusChip[]) : [])]).map((chip) => {
                   const on = state.assistancePicks.focus.includes(chip);
                   const atCap = !on && state.assistancePicks.focus.length >= FOCUS_CAP;
                   return (
@@ -4150,11 +4301,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           assistancePicks: {
                             ...st.assistancePicks,
                             focus: next as FocusChip[],
-                            by_day: buildDefaultWeek(next as FocusChip[], strengthEquipment),
+                            by_day: buildDefaultWeek((next as string[]).filter((f) => f !== 'core') as FocusChip[], strengthEquipment),
                           },
                         };
                       })}
-                    >{FOCUS_LABEL[chip]}</GalaxyButton>
+                    >{(chip as string) === 'core' ? 'Core' : FOCUS_LABEL[chip]}</GalaxyButton>
                   );
                 })}
               </div>
@@ -4191,7 +4342,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 choose it. */}
 
 
-            <div
+            {/* ⛔ NOT ON THE STRENGTH-FOCUS PATH (Michael, 2026-08-24): the new plan trains
+                pull-ups as a MAIN lift — heavy Monday, fast Thursday, the earn ladder, progression
+                off the tested max. A daily-chins add-on on top would double-load the pull pattern
+                and add volume the set ledger cannot see. The toggle stays on Get Stronger, where
+                daily chins is Wendler's own medicine. */}
+            {!isStrengthFocus && <div
               className="rounded-lg border transition"
               style={state.assistancePicks.performance_focus === 'pullups'
                 ? { borderColor: `${getDisciplineColor('strength')}66`, backgroundColor: `${getDisciplineColor('strength')}14` }
@@ -4283,7 +4439,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   continuous tension on the lats and shoulder capsule. Proceed with caution.
                 </p>
               )}
-            </div>
+            </div>}
 
             {/* ── THE FOUR DAY CARDS ────────────────────────────────────────────────────────────
                 ⛔ COLLAPSIBLE, MATCHING `StrengthLogger.tsx`'s accordion. Twelve dropdowns stacked
@@ -4446,7 +4602,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
            */
           footer={<EnduranceWeekRate slots={slotSportsNow} squat1RM={squat1RMNow} />}
         >
+          {tierLine ? (
+            <p className="text-white/55 text-xs mb-3" data-testid="tier-line">{tierLine}</p>
+          ) : null}
           <EnduranceWeekCard
+            allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
             onSlotChange={(key, sport) => setState((st) => {
               const slots = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
@@ -5722,7 +5882,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     : <AlertTriangle className="h-4 w-4 shrink-0 text-white/70" />}
                   <span className="text-white/85 text-sm">
                     {scheduleHealthState.ok
-                      ? 'Optimal schedule'
+                      // ⛔ "Optimal schedule" OVERCLAIMED (work order stage 5): the check is a
+                      // collision scan, not an optimiser. Say what is true.
+                      ? 'No scheduling conflicts'
                       : `High fatigue risk: ${scheduleHealthState.collisions.length} collision${scheduleHealthState.collisions.length === 1 ? '' : 's'}`}
                   </span>
                   {!scheduleHealthState.ok && (

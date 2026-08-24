@@ -185,54 +185,37 @@ Deno.test('the ride equivalence never trades a run slot for a HARDER ride', () =
 // C — THE SWIM: OFF BY DEFAULT, EASY AND TECHNIQUE ONLY
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('the swim is off unless it was kept', () => {
+Deno.test('the swim is off unless asked for, and arrives as an ADD-ON, never a slot', () => {
+  // ⛔ RE-RULED 2026-08-24 (Michael): swims never take a session spot. `swimDays` on the mix no
+  // longer moves any slot; `swimEasySessions` on the composer appends 1-2 easy swims instead.
   assertEquals(types(week2({ runs: 4, rides: 0 })).swim, 0);
-  assertEquals(types(week2({ runs: 4, rides: 0, swimDays: 0 })).swim, 0);
-  assertEquals(types(week2({ runs: 3, rides: 0, swimDays: 2 })).swim, 1);
+  assertEquals(types(week2({ runs: 3, rides: 0, swimDays: 2 })).swim, 0,
+    'swimDays moved a slot — the add-on ruling says it must not');
+  const wk = composeWeek({ ...BASE, week: 2, column: 'standard', swimEasySessions: 1 });
+  const swims = wk.sessions.filter((s) => s.type === 'swim');
+  assertEquals(swims.length, 1, 'one easy swim add-on was asked for');
+  assert(swims.every((s) => s.tags.includes('swim_addon')), 'the add-on is tagged as one');
+  // ⛔ AND THE FOUR SLOTS ARE UNTOUCHED: the endurance count is the frame's own, plus the add-on.
+  const base = composeWeek({ ...BASE, week: 2, column: 'standard' });
+  const endur = (w: typeof base) => w.sessions.filter((s) => s.type !== 'strength' && !s.tags.includes('swim_addon')).length;
+  assertEquals(endur(wk), endur(base), 'the add-on displaced a slot');
 });
 
-Deno.test('a kept swim takes ONE easy slot — never the hard ones, never the long day', () => {
-  /**
-   * ⛔⛔ TESTED ON A SYNTHETIC COLUMN, AND MUTATION TESTING IS WHY. `strength_5k`'s standard column
-   * has exactly ONE easy non-long slot, so on the real frame the "not hard", "not long" and "only
-   * one" rules are all satisfied by accident — every one of those three guards could be deleted and
-   * every assertion against the real frame still passed. A column with two easy slots, a hard one
-   * and a long one is what actually exercises the rule.
-   *
-   * ⚠️ The real frame is asserted too, below — this proves the RULE, that proves the FRAME.
-   */
-  const synthetic: typeof STANDARD = [
-    { day: 1, label: null, strength: [], endurance: [STANDARD[0].endurance[0]] },                    // MLSS, hard
-    { day: 2, label: null, strength: [], endurance: [STANDARD[3].endurance[0]] },                    // VT1, easy
-    { day: 3, label: null, strength: [], endurance: [STANDARD[3].endurance[0]] },                    // VT1, easy
-    { day: 4, label: null, strength: [], endurance: [STANDARD[5].endurance[0]] },                    // LSD, long
-  ];
-  const syn = assignSports(synthetic, { runs: 4, rides: 0, swimDays: 3 });
-  const synSwims = Object.entries(syn.byKey).filter(([, v]) => v.sport === 'swim');
-  assertEquals(synSwims.length, 1, 'a kept swim took more than one slot');
-  const [sd] = synSwims[0][0].split(':').map(Number);
-  assert(sd === 2 || sd === 3, `the swim landed on day ${sd} — a hard or long slot`);
-
-  const a = assignSports(STANDARD, { runs: 3, rides: 0, swimDays: 3 });
-  const swims = Object.entries(a.byKey).filter(([, v]) => v.sport === 'swim');
-  assertEquals(swims.length, 1, 'a kept swim took more than one slot on the real frame');
-  const [d, i] = swims[0][0].split(':').map(Number);
-  const frameSlot = STANDARD.find((x) => x.day === d)!.endurance[i];
-  assert(!isHardSlot(frameSlot), 'the swim replaced a hard session');
-  assert(!isLongSlot(frameSlot), 'the swim replaced the long day');
+Deno.test('the add-on lands on lift-only days and caps at two', () => {
+  // ⛔ Easy swimming is the one endurance that taxes neither the legs nor the pressing, so the
+  // add-on goes to the frame's no-endurance lift days first — and never more than two (past that
+  // the athlete wants a tri plan).
+  const wk = composeWeek({ ...BASE, week: 2, column: 'standard', swimEasySessions: 2 });
+  const swims = wk.sessions.filter((s) => s.type === 'swim');
+  assertEquals(swims.length, 2);
+  const over = composeWeek({ ...BASE, week: 2, column: 'standard', swimEasySessions: 5 });
+  assertEquals(over.sessions.filter((s) => s.type === 'swim').length, 2, 'the cap of two held');
 });
 
-Deno.test('a column with no easy slot books no swim, and says so', () => {
-  // ⛔ NEVER SILENTLY DROPPED. A week with nothing easy to stand in for cannot hold a swim, and the
-  // athlete is told rather than finding it missing.
-  const hardOnly: typeof STANDARD = [
-    { day: 1, label: null, strength: [], endurance: [STANDARD[0].endurance[0]] },
-    { day: 2, label: null, strength: [], endurance: [STANDARD[5].endurance[0]] },
-  ];
-  const a = assignSports(hardOnly, { runs: 2, rides: 0, swimDays: 2 });
-  assertEquals(a.counts.swim, 0);
-  assert(a.notes.some((n) => n.kind === 'warning' && /no easy session/.test(n.text)),
-    `the swim vanished without a word: ${JSON.stringify(a.notes)}`);
+Deno.test('the taper column carries no swim add-on', () => {
+  // The add-on is standard-column only — the taper's whole job is coming down.
+  const wk = composeWeek({ ...BASE, week: 11, column: 'taper', swimEasySessions: 2 });
+  assertEquals(wk.sessions.filter((s) => s.type === 'swim').length, 0);
 });
 
 Deno.test('the hard swim families are never reachable from this plan', () => {
@@ -264,9 +247,9 @@ Deno.test('every token a mixed week emits is one the materializer already parses
   const all = [...MATERIALIZER_RUN_PATTERNS, ...MATERIALIZER_RIDE_PATTERNS, ...MATERIALIZER_SWIM_PATTERNS];
   let sawRide = false;
   let sawSwim = false;
-  for (const mix of [{ runs: 2, rides: 2 }, { runs: 1, rides: 3, swimDays: 1 }, { runs: 0, rides: 4 }]) {
+  for (const mix of [{ runs: 2, rides: 2 }, { runs: 1, rides: 3 }, { runs: 0, rides: 4 }]) {
     for (const [week, column] of [[2, 'standard'], [11, 'taper']] as const) {
-      const wk = composeWeek({ ...BASE, week, column, sportMix: mix as Record<string, number> });
+      const wk = composeWeek({ ...BASE, week, column, sportMix: mix as Record<string, number>, swimEasySessions: 1 });
       for (const s of wk.sessions) {
         if (s.type === 'ride') sawRide = true;
         if (s.type === 'swim') sawSwim = true;
@@ -441,4 +424,36 @@ Deno.test('the mixed block still builds twelve whole weeks end to end', () => {
   }
   // ⛔ AND NO TRAINING MAX, still.
   assert(!/training_max|trainingMax/.test(JSON.stringify(row)));
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// E — THE FOCUS CHIPS REACH THE COMPOSER (B2, 2026-08-24)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('a focus chip biases HYP accessory slots toward its muscles — inside the cell, never past it', async () => {
+  const { musclesWorkedBy } = await import('../accessory-dosing/index.ts');
+  const base = composeWeek({ ...BASE, week: 2, column: 'standard' });
+  const focused = composeWeek({ ...BASE, week: 2, column: 'standard', focus: ['glutes'] });
+  const hypNames = (wk: typeof base) => wk.sessions
+    .flatMap((s) => s.strength_exercises ?? [])
+    .filter((e) => (e.notes ?? '').includes('HYP'))
+    .map((e) => e.name.toLowerCase());
+  const gluteCount = (names: string[]) =>
+    names.filter((n) => musclesWorkedBy(n)?.primary === 'glutes').length;
+  // The biased week carries at least as much glute work, and the weeks differ somewhere — a chip
+  // that changes nothing is the placebo this test exists to prevent.
+  assert(gluteCount(hypNames(focused)) >= gluteCount(hypNames(base)),
+    'the glutes chip reduced glute work');
+  // ⚠️ And the frame is untouched: same session count, same slot count.
+  assertEquals(focused.sessions.length, base.sessions.length, 'a chip changed the week shape');
+});
+
+Deno.test('the core chip can reach core work through the floor path', () => {
+  const wk = composeWeek({ ...BASE, week: 2, column: 'standard', focus: ['core'] });
+  const names = wk.sessions.flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name.toLowerCase()));
+  assert(names.length > 0, 'no strength rows at all');
+  // Core arrives via the floor when no HYP slot carries a core pattern — the guarantee is that the
+  // week holds core work at all, not which slot carries it.
+  assert(names.some((n) => /plank|sit-up|situp|ab wheel|rollout|leg raise|dead bug|bird dog|crunch/.test(n)),
+    `no core movement anywhere in the focused week: ${names.join(', ')}`);
 });

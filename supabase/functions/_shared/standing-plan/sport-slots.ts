@@ -178,31 +178,14 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
     return { byKey, counts: { run: 0, ride: 0, swim: 0 }, hardRunBeforeMeLower: false, notes };
   }
 
-  // ── 1. the swim, at most one easy slot ────────────────────────────────────────────────────────
-  const takenBySwim = new Set<string>();
-  if (swimKept) {
-    const easiest = [...slots]
-      .filter(({ slot }) => !isLongSlot(slot) && !isHardSlot(slot))
-      .sort((a, b) => (HARDNESS[a.slot.family] ?? 0) - (HARDNESS[b.slot.family] ?? 0))[0];
-    if (easiest) {
-      byKey[key(easiest.day, easiest.i)] = {
-        family: SWIM_SLOT.family, level: SWIM_SLOT.level,
-        sport: 'swim', substituted: true, sourceText: easiest.slot.sourceText,
-      };
-      takenBySwim.add(key(easiest.day, easiest.i));
-      notes.push({ kind: 'ours', text: SWIM_IS_EASY_ONLY });
-    } else {
-      // ⛔ NEVER SILENTLY DROPPED. A column with no easy slot cannot hold a swim, and the athlete is
-      // told rather than finding the swim missing.
-      notes.push({
-        kind: 'warning',
-        text: 'This week has no easy session for a swim to stand in for, so no swim is booked in it.',
-      });
-    }
-  }
+  // ── 1. SWIM NEVER TAKES A SLOT — RULED 2026-08-24 (Michael), superseding slice 4's easy-slot
+  //      substitution: "Add easy swims … Doesn't take a session spot, costs your lifting nothing."
+  //      Swims are an ADD-ON, appended by the composer OUTSIDE the four slots (`swimEasySessions`).
+  //      `swimKept` no longer moves any slot; it is read only so an old goal shape stays harmless.
+  void swimKept;
 
-  // ── 2-4. the run/ride split over what is left ─────────────────────────────────────────────────
-  const open = slots.filter(({ day, i }) => !takenBySwim.has(key(day, i)));
+  // ── 2-4. the run/ride split over the slots ────────────────────────────────────────────────────
+  const open = slots;
 
   /**
    * ⛔ AN EXPLICIT PER-SLOT ANSWER WINS OVER THE RATIO, AND SHORT-CIRCUITS THE DIAL ENTIRELY.

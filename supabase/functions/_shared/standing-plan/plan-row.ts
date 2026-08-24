@@ -117,6 +117,9 @@ export type StandingPlanConfig = {
    * athlete's current answers would rebuild a DIFFERENT week against the calendar that exists.
    */
   sport_mix: { runs: number; rides: number; swimDays: number } | null;
+  /** The easy-swim ADD-ON count the block was built on (Michael, 2026-08-24) — stored so a restate
+   *  re-composes the identical week. 0/absent = none. */
+  swim_easy_sessions: number | null;
   /** How many of the frame's endurance slots each sport actually got. Surfacing and provenance. */
   sport_counts: { run: number; ride: number; swim: number } | null;
   /**
@@ -219,6 +222,7 @@ export function buildStandingPlanRow(args: {
             swimDays: Math.max(0, Math.round(Number(args.compose.sportMix.swimDays) || 0)),
           }
         : null,
+      swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,
       accessory_picks: (args.compose.accessoryPicks ?? []).length > 0
         ? [...(args.compose.accessoryPicks as string[])]
         : null,

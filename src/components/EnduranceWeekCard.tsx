@@ -44,7 +44,7 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { boundsLine, weekBounds } from '@/lib/standing-plan-week-bounds';
+import { boundsLine, weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
@@ -64,6 +64,12 @@ export type EnduranceWeekCardProps = {
   renderHardFlavor?: (key: 'hard1' | 'hard2') => React.ReactNode;
   /** What the slot currently is, for the collapsed row. Hard slots only; others need no session. */
   hardSessionTitle?: (key: 'hard1' | 'hard2') => string | null;
+  /**
+   * ⛔ THE ATHLETE-TYPE ANSWER PRE-SHAPES THIS SCREEN (Michael, 2026-08-24): "Run only" never
+   * renders Ride chips, "Ride only" never renders Run. With one sport allowed, every slot is
+   * auto-assigned to it — the four-choices screen only exists for the mixed athlete.
+   */
+  allowedSports?: SlotSport[];
 };
 
 /**
@@ -88,7 +94,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   });
   const rate = liftingRateLine(props.slots, props.squat1RM);
   const split = upperLowerSplitLine(props.slots);
-  const runLine = boundsLine(bounds.runMiles, props.unit === 'km' ? 'km a week' : 'miles a week');
+  const runLine = boundsLine(bounds.runMilesInput, props.unit === 'km' ? 'km a week' : 'miles a week');
   const rideLine = boundsLine(bounds.rideHours, 'hours a week');
 
   return (
@@ -199,7 +205,9 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   {/* The sport, as two chips. Selected carries the sport colour; unselected neutral —
                       colouring both would read as two chosen answers. */}
                   <div className="flex items-center gap-2">
-                    {SLOT_OPTIONS[key].map((opt) => {
+                    {SLOT_OPTIONS[key].filter((opt) =>
+                      !props.allowedSports || props.allowedSports.includes(opt.value)
+                    ).map((opt) => {
                       const on = sport === opt.value;
                       const c = getDisciplineColor(SPORT_DISCIPLINE[opt.value]);
                       return (
@@ -253,24 +261,30 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       {/* ⛔ THE VOLUME QUESTION ARRIVES WHEN THE WEEK DOES. Its caps are summed from the slots, so
           before all four are answered it would show a bound for a week the athlete has not described
           — and it would move under them as they answered. */}
-      {allSlotsChosen(props.slots) && (bounds.runMiles || bounds.rideHours) ? (
+      {allSlotsChosen(props.slots) && (bounds.runMilesInput || bounds.rideHours) ? (
         <div className="flex flex-wrap gap-4">
-          {bounds.runMiles ? (
+          {bounds.runMilesInput ? (
             <div className="flex-1 min-w-[150px]">
               <p className="text-white/80 text-[13px] mb-2">Weekly running to hold</p>
               <div className="flex items-baseline gap-2">
                 <input
                   type="number" inputMode="numeric"
-                  min={bounds.runMiles.min} max={bounds.runMiles.max}
+                  min={bounds.runMilesInput.min} max={bounds.runMilesInput.max}
                   data-testid="run-volume"
                   value={props.runVolume}
                   onChange={(e) => props.onRunVolume(e.target.value)}
-                  placeholder={String(Math.round((bounds.runMiles.min + bounds.runMiles.max) / 2))}
+                  placeholder={String(Math.round((bounds.runMilesInput.min + bounds.runMilesInput.max) / 2))}
                   className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums"
                 />
                 <span className="text-white/50 text-sm">{props.unit === 'km' ? 'km' : 'mi'}</span>
               </div>
               {runLine ? <p className="text-white/40 text-xs mt-1.5" data-testid="run-bounds">{runLine}</p> : null}
+              {/* ⛔ THE 20-MILE CEILING'S SIGNAGE (Michael, 2026-08-24): typing above the block's
+                  running cap gets one factual line, not a refusal — and a link when the
+                  endurance-leading frame exists. */}
+              {Number(props.runVolume) > RUN_MILES_BLOCK_CAP ? (
+                <p className="text-white/55 text-xs mt-1.5" data-testid="over-cap">{OVER_CAP_LINE}</p>
+              ) : null}
             </div>
           ) : null}
 

@@ -163,6 +163,8 @@ Deno.serve(async (req: Request) => {
        * where the calendar has a run) and match nothing, reporting the whole block as unmatched.
        */
       ...(sp.sport_mix ? { sportMix: sp.sport_mix } : {}),
+      // ⛔ The swim add-on rides the same restate contract: re-compose the identical week.
+      ...(sp.swim_easy_sessions ? { swimEasySessions: Number(sp.swim_easy_sessions) } : {}),
       // ⚠️ A SKIPPED BLOCK HAS NO TEST WEEK AND MUST NOT GROW ONE ON A RESTATE. It also has nothing
       // to restate — `readTestWeek` finds no week-one test sets and this function abstains above —
       // but carrying the flag keeps the re-composition identical to the block that was built.

@@ -2933,6 +2933,11 @@ Deno.serve(async (req: Request) => {
                 }
                 return Object.keys(out).length > 0 ? { endurance_slots: out } : {};
               })(),
+              /** ⛔ The easy-swim ADD-ON (Michael, 2026-08-24): 1-2, outside the slots. Validated. */
+              ...(() => {
+                const n = Math.round(Number((gsTp as Record<string, unknown>).swim_easy_sessions));
+                return Number.isFinite(n) && n >= 1 ? { swim_easy_sessions: Math.min(2, n) } : {};
+              })(),
               ...(bodyPreview ? { preview: true } : {}),
             };
             console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);

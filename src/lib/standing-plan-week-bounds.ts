@@ -68,8 +68,11 @@ export function slotsForEngine(slots: SlotSelection): Record<string, SlotSport> 
 }
 
 export type WeekBounds = {
-  /** Weekly running the run slots can hold, in MILES. Null when no easy pace is on file. */
+  /** Weekly running the run slots can hold, in MILES. Null when no easy pace is on file.
+   *  ⚠️ RAW band — the engine-agreement quantity. The input field ranges over `runMilesInput`. */
   runMiles: { min: number; max: number } | null;
+  /** The INPUT's range: the raw band clamped at the block's ruled 20-mile ceiling. */
+  runMilesInput: { min: number; max: number } | null;
   /** Weekly riding the ride slots can hold, in HOURS. */
   rideHours: { min: number; max: number } | null;
   /** ⚠️ True when a slot's own total is a lower bound — some recoveries carry no stated duration. */
@@ -130,8 +133,19 @@ export function weekBounds(
   return {
     // ⚠️ ROUNDED OUTWARD — floor down, cap up — so a bound never refuses a number the engine would
     // in fact have built. A cap that rounds IN is a cap that lies about the week.
+    // ⚠️ `runMiles` stays the RAW slot band — it is the engine-agreement quantity (the built week
+    // must land inside it). The RULED 20-mile ceiling (Michael, 2026-08-24) clamps the INPUT, not
+    // the band: `runMilesInput` below is what the volume field ranges over.
     runMiles: anyRun && paceOk
       ? { min: Math.floor(runShort / pace), max: Math.ceil(runLong / pace) }
+      : null,
+    // ⛔ RULED 2026-08-24: this block's running ASK caps at 20 — the regular-runner band. Above
+    // that, running leads, which is a different block. The slot floor still applies underneath.
+    runMilesInput: anyRun && paceOk
+      ? {
+        min: Math.min(Math.floor(runShort / pace), RUN_MILES_BLOCK_CAP),
+        max: Math.min(Math.ceil(runLong / pace), RUN_MILES_BLOCK_CAP),
+      }
       : null,
     rideHours: anyRide
       ? { min: Math.floor((rideShort / 3600) * 10) / 10, max: Math.ceil((rideLong / 3600) * 10) / 10 }
@@ -139,6 +153,15 @@ export function weekBounds(
     isLowerBound,
   };
 }
+
+/** ⛔ The block's running ceiling, RULED 2026-08-24 (Michael): cap at the regular-runner band.
+ *  High mileage links to the endurance-leading block when it exists. OURS — the band edges come
+ *  from field practice (the chart on the entry screen), not a page. */
+export const RUN_MILES_BLOCK_CAP = 20;
+
+/** The line shown when the athlete types above the block's running ceiling. Signage, not a nag —
+ *  the link lights up when the endurance-leading frame ships. */
+export const OVER_CAP_LINE = 'Above 20 miles a week, running leads. That\'s a different block — coming.';
 
 /** The sentence under a bounded input. ⚠️ States the cap as a fact, never as a refusal. */
 export function boundsLine(b: { min: number; max: number } | null, unit: string): string | null {

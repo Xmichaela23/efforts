@@ -128,7 +128,7 @@ Deno.serve(async (req: Request) => {
     const {
       user_id, duration_weeks,
       endurance_sport, endurance_frequency, goal_name, start_date, preview,
-      target_weekly_miles, easy_pace_min_per_mile, long_run_day, assistance_picks, swim_days,
+      target_weekly_miles, easy_pace_min_per_mile, long_run_day, assistance_picks, swim_days, swim_easy_sessions,
       // Added 2026-07-26 — the doctrine's second pin and the bike volume. Both were collected at
       // intake, stored on the goal, and dropped at `create-goal-and-materialize-plan` before this
       // function ever saw them.
@@ -497,10 +497,11 @@ Deno.serve(async (req: Request) => {
        * three and placing a pick by what it TRAINS is the only honest reading. Full reasoning on
        * `ComposeArgs.accessoryPicks`.
        *
-       * ⚠️ THE FOCUS CHIPS ARE NOT CONSUMED HERE AND THAT IS NOT AN OVERSIGHT. `prefs.focus` biases
-       * WHICH movement fills a Wendler category; the Standing Plan's slots are already named by
-       * pattern and category from p246, so a chip has no slot to re-point. ⛔ Wiring the chips is
-       * SESSION B's B2 and it is listed there — do not add a second reader for them here.
+       * ⛔ AND THE FOCUS CHIPS NOW TRAVEL TOO (B2, 2026-08-24). A chip cannot re-point a slot —
+       * the slots are named by pattern and category from p246 — so a chip biases WHICH movement
+       * fills a HYP slot: among the cell's own options, one whose prime mover the athlete asked
+       * for wins. `core` is a chip only this engine reads; Get Stronger's `isFocusChip` filters it,
+       * which is that path's own stated migration.
        */
       const accessoryPicks = (() => {
         const raw = (body as Record<string, unknown>).assistance_picks;
@@ -515,11 +516,20 @@ Deno.serve(async (req: Request) => {
         }
         return out.length > 0 ? out : undefined;
       })();
+      const focusChips = (() => {
+        const raw = (body as Record<string, unknown>).assistance_picks;
+        const focus = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).focus : null;
+        if (!Array.isArray(focus)) return undefined;
+        const known = ['arms', 'chest', 'shoulders', 'glutes', 'core'];
+        const out = focus.map((f) => String(f)).filter((f) => known.includes(f));
+        return out.length > 0 ? out : undefined;
+      })();
 
       const row = buildStandingPlanRow({
         compose: {
           frame: frameId,
           ...(accessoryPicks ? { accessoryPicks } : {}),
+          ...(focusChips ? { focus: focusChips } : {}),
           // ⛔ THE ATHLETE HAS NOT BEEN ASKED YET (stage 5). Seeded from the four lifts the entry
           // gate already demanded — see `defaultCompetitionLifts` for why it is three, not four.
           competitionLifts,
@@ -555,6 +565,8 @@ Deno.serve(async (req: Request) => {
           // ⚠️ THE SAME OBJECT THE LONG-SLOT SPORT WAS RESOLVED FROM. Two derivations of one mix is
           // how a preview and a plan start disagreeing about which day is the long one.
           sportMix: mixForFrame,
+          /** ⛔ The easy-swim ADD-ON (Michael, 2026-08-24) — outside the four slots, cap 2. */
+          swimEasySessions: Math.min(2, Math.max(0, Math.round(Number(swim_easy_sessions) || 0))),
           roundTo: 5,
         },
         weeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,

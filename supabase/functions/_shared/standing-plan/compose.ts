@@ -38,7 +38,7 @@ import {
   type StrengthSlot,
 } from './frames.ts';
 import { weekdayForFrameDay, type Weekday } from './day-map.ts';
-import { assignSports, assignedSlot, type SportMix } from './sport-slots.ts';
+import { assignSports, assignedSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix } from './sport-slots.ts';
 import {
   HAIRCUT_CAUSE_IS_OURS,
   INTENSITY_STARTS_LOW_IS_OURS,
@@ -53,6 +53,7 @@ import {
   PLYO_FAMILY_MIX_IS_OURS,
 } from './plyo.ts';
 import { foldExerciseName } from '../../../../src/lib/exercise-config.ts';
+import { musclesWorkedBy } from '../accessory-dosing/index.ts';
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import {
   isTestWeek,
@@ -138,6 +139,12 @@ export type ComposeArgs = {
    */
   sportMix?: SportMix;
   /**
+   * ⛔ THE EASY-SWIM ADD-ON (Michael, 2026-08-24): 1–2 easy/technique swims appended OUTSIDE the
+   * frame's four endurance slots — "doesn't take a session spot, costs your lifting nothing." This
+   * supersedes slice 4's swim-takes-the-easy-slot substitution. Cap 2; 0/absent = none.
+   */
+  swimEasySessions?: number | null;
+  /**
    * ⛔ SKIP WEEK ONE'S TEST — offered ONLY when logged history already carries a trustworthy max
    * (Michael, 2026-08-23). ⚠️ Never a bare athlete preference: the caller must have derived
    * `workingNumbers` from evidence (`evidenceWorkingNumbers`) before setting this, and a block with
@@ -163,6 +170,13 @@ export type ComposeArgs = {
    * `unplacedPickNote`.
    */
   accessoryPicks?: string[] | null;
+  /**
+   * ⛔ THE FOCUS CHIPS (B2, 2026-08-24). A chip never re-points a slot — the slots are p246's — it
+   * biases WHICH movement fills a HYP accessory slot: among the cell's own options, one whose prime
+   * mover the athlete asked for wins over the default. `core` reaches only this engine; Get
+   * Stronger's `isFocusChip` filters it out, which is that path's stated migration.
+   */
+  focus?: string[] | null;
   /**
    * ⛔ HOW MANY SETS EACH PATTERN'S ME SLOT HAS EARNED — 1, 2 or 3 (device finding A2, 2026-08-24).
    *
@@ -372,6 +386,20 @@ function pickPool(names: string[] | null | undefined): PickPool {
  * The `Accessory:` role is a FILTER on top of stage 2, exactly as p247 defines it: exclude the
  * athlete's competition movement for that pattern, then take the grid's answer.
  */
+/** Chip → the muscles it names, in the accessory-dosing vocabulary. OURS, one place. */
+const FOCUS_MUSCLES: Record<string, string[]> = {
+  arms: ['biceps', 'triceps'],
+  chest: ['chest'],
+  shoulders: ['deltoids'],
+  glutes: ['glutes'],
+  core: ['core'],
+};
+function focusMuscleSet(focus: string[] | null | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const chip of focus ?? []) for (const m of FOCUS_MUSCLES[chip] ?? []) out.add(m);
+  return out;
+}
+
 function exerciseForSlot(
   slot: StrengthSlot,
   args: ComposeArgs,
@@ -384,6 +412,8 @@ function exerciseForSlot(
   takenToday: Set<string>,
   /** ⛔ THE ATHLETE'S UNPLACED PICKS. A HYP slot offers itself to them before the grid answers. */
   picks: PickPool,
+  /** The focus chips, as muscles — see `focusMuscleSet`. Empty = no bias. */
+  focusMuscles: Set<string> = new Set(),
 ): { exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern } {
   const pattern = patternForWeek(slot, args.week);
   const competition = args.competitionLifts[pattern] ?? null;
@@ -436,7 +466,17 @@ function exerciseForSlot(
       : resolved.options)
       // ⛔ AND NOT A MOVEMENT THE ATHLETE'S OWN PICK ALREADY HOLDS — see `PickPool.placed`.
       .filter((o) => !picks.placed.has(foldExerciseName(o.name)));
-    let fresh = options.find((o) => !takenToday.has(o.name.toLowerCase()));
+    /**
+     * ⛔ THE FOCUS BIAS (B2, 2026-08-24), HYP accessory slots only: among THIS CELL'S OWN options,
+     * one whose prime mover the athlete's chips name wins over the default. It can never widen the
+     * cell, change the pattern, or touch ME/DE — a chip is a preference inside the frame's choice,
+     * exactly like a pick, one step weaker.
+     */
+    const focused = slot.intent === 'HYP' && slot.role === 'accessory' && focusMuscles.size > 0
+      ? options.find((o) => !takenToday.has(o.name.toLowerCase())
+        && focusMuscles.has(musclesWorkedBy(o.name)?.primary ?? ''))
+      : undefined;
+    let fresh = focused ?? options.find((o) => !takenToday.has(o.name.toLowerCase()));
 
     /**
      * ⛔ IF THE CELL IS EXHAUSTED, WIDEN THE CATEGORY — NOT THE PATTERN.
@@ -724,6 +764,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * offered to the muscle floor, and whatever is left goes down the compromise channel.
    */
   const picks = pickPool(args.accessoryPicks);
+  const focusMuscles = focusMuscleSet(args.focus);
   if (picks.byFold.size > 0 && !notes.some((n) => n.text === PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN)) {
     notes.push({ kind: 'ours', text: PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN });
   }
@@ -777,7 +818,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const takenToday = new Set<string>();
         for (const slot of day.strength) {
           const { exercise, movement, sets, pattern } = exerciseForSlot(
-            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday, picks);
+            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday, picks, focusMuscles);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
           if (slot.intent === 'ME') {
@@ -844,6 +885,24 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         ...(assigned.substituted ? { tags: [...row.tags, 'sport_assigned'] } : {}),
       });
     });
+  }
+
+  // ── the easy-swim add-on: OUTSIDE the four slots, never displacing one ────────────────────────
+  //
+  // ⛔ RULED 2026-08-24 (Michael): swims are an ADD-ON — easy laps and technique for feel, 1 or 2 a
+  // week, appended to the lift-only days (the frame's no-endurance days, where easy swimming is the
+  // one endurance that taxes neither the legs nor the pressing). The hard swim families are never
+  // prescribed by this plan. Supersedes slice 4's easy-slot substitution.
+  const swimAddOns = Math.min(2, Math.max(0, Math.round(Number(args.swimEasySessions) || 0)));
+  if (swimAddOns > 0 && args.column === 'standard') {
+    const liftOnlyDays = days.filter((d) => !d.rest && d.endurance.length === 0 && d.strength.length > 0);
+    const swimTargets = liftOnlyDays.length > 0 ? liftOnlyDays : days.filter((d) => !d.rest);
+    for (let i = 0; i < swimAddOns && i < swimTargets.length; i++) {
+      const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors });
+      const row = translateEnduranceSession(built);
+      sessions.push({ day: dayNameFor(args, swimTargets[i].day), ...row, tags: [...row.tags, 'swim_addon'] });
+    }
+    notes.push({ kind: 'ours', text: SWIM_IS_EASY_ONLY });
   }
 
   // ── the advanced tier: a PROGRAM tier, gated on demonstrated history ──────────────────────────

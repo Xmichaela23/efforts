@@ -129,10 +129,13 @@ export default function WeekGrid({
                 )}
                 {/* ⚠️ THE SWAPS ARE THE PART THE ATHLETE CANNOT PREDICT, and at `white/35` they were
                     close to invisible on a phone. Lifted to `/55` — still secondary to the named
-                    session above them, no longer a texture. `truncate` stays: the row is one line
-                    by design and the ellipsis is the honest end of a list that does not fit. */}
+                    session above them, no longer a texture.
+                    ⛔ `truncate` REMOVED (Michael, 2026-08-24, device finding B3): the ellipsis
+                    always ate the SAME movements — the athlete's own picks and the floors land last
+                    in the list, so the work he went looking for ("where are my abs?") was exactly
+                    the work the cut hid. The line wraps; a taller row is cheaper than a lying one. */}
                 {accessories.length > 0 && (
-                  <span className="block text-white/55 truncate">{accessories.join(' · ')}</span>
+                  <span className="block text-white/55">{accessories.join(' · ')}</span>
                 )}
               </span>
             </div>
