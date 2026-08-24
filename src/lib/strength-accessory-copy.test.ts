@@ -22,7 +22,7 @@
  * lifters make with the programme.
  */
 import { assert, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { ACCESSORY_SET_CUE, BAR_SPEED_COPY } from './strength-focus-copy.ts';
+import { ACCESSORY_SET_CUE, BAR_SPEED_COPY, STANDING_ACCESSORY_SET_CUE } from './strength-focus-copy.ts';
 
 Deno.test('accessory cue — states BOTH halves of the instruction: split the sets, stop short', () => {
   // Half 1: the rep total is not one set.
@@ -50,6 +50,36 @@ Deno.test('accessory cue — it is NOT one of the bar-speed lines (different obj
   const barSpeedLines = Object.values(BAR_SPEED_COPY);
   assert(!barSpeedLines.includes(ACCESSORY_SET_CUE),
     'the accessory cue must stay out of BAR_SPEED_COPY — it would fail that table\'s vocabulary lint');
+});
+
+/**
+ * STANDING_ACCESSORY_SET_CUE (2026-08-24) — the standing plan's version. Its rows prescribe
+ * discrete sets, so the Wendler "split these" clause must NOT appear; what must appear is the
+ * weight-finding rule, which is Viada's hypertrophy dose (Part B2: 1–2 reps in reserve, never to
+ * failure) — HYP carries no load percentage anywhere in the source.
+ */
+Deno.test('standing cue — states the missing weight and the finding rule, in that order', () => {
+  const s = STANDING_ACCESSORY_SET_CUE.toLowerCase();
+  assertStringIncludes(s, 'no weight is prescribed');
+  assertStringIncludes(s, 'in reserve');
+  assertStringIncludes(s, 'never to failure');
+});
+
+Deno.test('standing cue — no "split these": the rows prescribe discrete sets', () => {
+  const s = STANDING_ACCESSORY_SET_CUE.toLowerCase();
+  // The failure mode this guards: someone merges the two cues back into one and the standing plan
+  // regains the freedom-to-split sentence its rows contradict — the exact device finding.
+  assert(!s.includes('split') && !s.includes('as many sets'),
+    `standing cue must not carry the Wendler split clause: ${STANDING_ACCESSORY_SET_CUE}`);
+});
+
+Deno.test('standing cue — failure appears only as the stop rule; no rep-chasing vocabulary', () => {
+  const s = STANDING_ACCESSORY_SET_CUE.toLowerCase();
+  assert(!/\b(to|until)\s+failure\b/.test(s.replace(/never to failure/g, '')),
+    `"failure" may appear only inside "never to failure": ${STANDING_ACCESSORY_SET_CUE}`);
+  for (const banned of ['heavier', 'add weight', 'push hard', 'max']) {
+    assert(!s.includes(banned), `standing cue must not contain "${banned}": ${STANDING_ACCESSORY_SET_CUE}`);
+  }
 });
 
 Deno.test('deload line — states the fact before the instruction, and concedes nothing', () => {

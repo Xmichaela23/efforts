@@ -397,6 +397,22 @@ export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
 export const ACCESSORY_SET_CUE = 'Split these into as many sets as you need. Leave a rep or two — never to failure.';
 
 /**
+ * ⛔ THE STANDING PLAN'S OWN CUE (2026-08-24, Michael on device, day one of his block). The Wendler
+ * line above is FALSE on a standing-plan workout: those accessory rows prescribe DISCRETE sets
+ * (3 × 8–10), so "split these into as many sets as you need" describes a freedom the block did not
+ * grant. The logger picks between the two by the session's `standing_plan` tag.
+ *
+ * **Basis: Viada.** HYP work carries no load percentage anywhere in the source — p218's intent
+ * table gives it none — so the weight is the athlete's to find, and the finding rule is his
+ * hypertrophy dose (SOURCE-viada-hybrid-athlete.md Part B2): *"1–2 reps in reserve — never to
+ * failure."* Both clauses are his; stating the missing weight first is ours.
+ *
+ * Same lint note as ACCESSORY_SET_CUE: "failure" appears only inside the stop rule, pinned by
+ * `strength-accessory-copy.test.ts`. Do not widen the bar-speed lint over this constant.
+ */
+export const STANDING_ACCESSORY_SET_CUE = 'No weight is prescribed — find the load where the target reps leave a rep or two in reserve, never to failure.';
+
+/**
  * ⛔ GATED ON `verdictFrom95Set` BEING WIRED. Do not render until the composer reads the verdict
  * instead of advancing by calendar. Both lines state the mechanism that exists — reps at 95% — and
  * neither claims speed decides anything.
