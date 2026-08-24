@@ -5,12 +5,15 @@ import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
 import EnduranceWeekCard from './EnduranceWeekCard';
+// ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
+import HardSlotChoices from './HardSlotChoices';
 import {
   SLOT_KEYS,
   defaultSlotSports,
   type SlotKey,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
+import { hardSlotDefault } from '@/lib/hard-slot-choices';
 import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
@@ -2748,6 +2751,57 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const slotSportsNow: Record<SlotKey, SlotSport> = state.slotSports ?? defaultSlotSports(bikeKeptNow);
 
   /**
+   * ⛔ THE HARD SLOT'S SESSION CHOICES, RESTORED (Michael's screenshot review, 2026-08-24).
+   *
+   * The endurance screen shipped with the sport toggle and nothing under it, so picking Ride on a
+   * hard slot revealed no session — the choices the old "High intensity days" card carried had no
+   * control on the new one. ⛔ **THE PLUMBING WAS NEVER THE PROBLEM.** `state.hardDays` already
+   * holds `{discipline, role, goal, ownership}` per slot and `create-goal` already forwards it; what
+   * was missing was the buttons. These write the SAME fields the old card wrote.
+   *
+   * ⚠️ HARD 1 IS `hardDays[0]`, HARD 2 IS `hardDays[1]` — positional, because the frame's two hard
+   * slots are positional and the composer caps at two and dedupes by day.
+   */
+  const HARD_SLOT_INDEX: Record<'hard1' | 'hard2', number> = { hard1: 0, hard2: 1 };
+
+  /**
+   * ⛔ THE DEFAULT SESSION PER SPORT (Michael, 2026-08-24): a ride defaults to **sustained
+   * threshold**, a run to **VO2**. ⚠️ Both are the option the existing tables already mark
+   * "Recommended" for their discipline, so the pre-selection is not a new opinion.
+   */
+  const hardDefaultsFor = (sport: SlotSport) => ({
+    discipline: (sport === 'ride' ? 'bike' : 'run') as 'run' | 'bike',
+    // ⛔ ONE OWNER FOR THE DEFAULT — `hardSlotDefault` in `src/lib/hard-slot-choices.ts`, which is
+    // also what the card highlights. Two statements of "a ride defaults to threshold" is how the
+    // pre-selected chip and the stored answer start disagreeing.
+    ...hardSlotDefault(sport),
+  });
+
+  /**
+   * Keep `hardDays` in step with the two hard slots. ⚠️ CHANGING THE SPORT RESETS THAT SLOT'S
+   * SESSION, deliberately: a run's "VO2 incline" is not a thing a ride can be, and carrying the old
+   * role across would leave the card showing a session the new sport does not offer.
+   */
+  const syncHardDays = (
+    st: NonRaceState,
+    slots: Record<SlotKey, SlotSport>,
+  ): NonRaceState['hardDays'] => (['hard1', 'hard2'] as const).map((k) => {
+    const i = HARD_SLOT_INDEX[k];
+    const prev = st.hardDays[i];
+    const want = hardDefaultsFor(slots[k]);
+    // ⚠️ THE DAY AND THE CLUB ANSWER SURVIVE A SPORT CHANGE — they are the athlete's, not the
+    // session's. Only the session identity is reset.
+    if (prev && prev.discipline === want.discipline) return prev;
+    return {
+      discipline: want.discipline,
+      day: (prev?.day ?? '') as DayName | '',
+      ownership: prev?.ownership ?? 'prescribed',
+      role: want.role,
+      ...(want.goal ? { goal: want.goal } : {}),
+    };
+  });
+
+  /**
    * ⛔⛔ `runDays` / `rideDays` ARE DERIVED FROM THE SLOTS, NOT ASKED (2026-08-24). The program owns
    * the count (8-21 §3c), so the only honest reading of "how many runs" is HOW MANY SLOTS ARE RUNS.
    *
@@ -4360,10 +4414,37 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         >
           <EnduranceWeekCard
             slots={slotSportsNow}
-            onSlotChange={(key, sport) => setState((st) => ({
-              ...st,
-              slotSports: { ...(st.slotSports ?? defaultSlotSports(bikeKeptNow)), [key]: sport },
-            }))}
+            onSlotChange={(key, sport) => setState((st) => {
+              const slots = { ...(st.slotSports ?? defaultSlotSports(bikeKeptNow)), [key]: sport };
+              // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
+              // card would offer ride sessions on a slot the engine still had down as a run.
+              return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
+            })}
+            /**
+             * ⛔ THE SESSION CHOICES, INSIDE THE SLOT THEY BELONG TO (restored 2026-08-24). Same
+             * option tables the old "High intensity days" card used — `singleSlotOptions` for the
+             * ride, `RUN_GROUND_OPTIONS` for the run — writing the same `role`/`goal`/`ownership`
+             * fields on the same `hardDays` entries. Nothing about the plumbing is new.
+             */
+            renderHardFlavor={(key) => {
+              const i = HARD_SLOT_INDEX[key];
+              const sport = slotSportsNow[key];
+              const h = state.hardDays[i] ?? hardDefaultsFor(sport);
+              return (
+                <HardSlotChoices
+                  slotKey={key}
+                  sport={sport}
+                  value={{ role: h.role, goal: h.goal, ownership: h.ownership }}
+                  onChange={(patch) => setState((st) => {
+                    const next = syncHardDays(st, slotSportsNow);
+                    // ⚠️ SPREAD THE PATCH LAST so an explicit `goal: undefined` CLEARS a stale one —
+                    // a threshold slot carrying a leftover "speed" is a session nobody picked.
+                    next[i] = { ...next[i], ...patch } as NonRaceState['hardDays'][number];
+                    return { ...st, hardDays: next };
+                  })}
+                />
+              );
+            }}
             baselines={baselinesRow}
             easyPaceSecPerMi={paceMinPerMile ? paceMinPerMile * 60 : null}
             squat1RM={squat1RMNow}

@@ -31,6 +31,7 @@ import {
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { boundsLine, weekBounds } from '@/lib/standing-plan-week-bounds';
+import { getDisciplineColor } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
   slots: Record<SlotKey, SlotSport>;
@@ -49,7 +50,20 @@ export type EnduranceWeekCardProps = {
   renderHardFlavor?: (key: 'hard1' | 'hard2') => React.ReactNode;
 };
 
-const SPORT_RGB: Record<SlotSport, string> = { run: '239,138,98', ride: '120,180,255' };
+/**
+ * ⛔ THE APP'S OWN SPORT COLOURS, NOT NEW ONES (Michael's screenshot review, 2026-08-24).
+ *
+ * This shipped with two invented hues — an orange for the run and a blue for the ride — which
+ * matched nothing on any other screen and read as a third colour system. `SPORT_COLORS` is the one
+ * table (`context-utils.ts:27`): **run `#FFD700`, bike/ride `#50C878`**, and the "Which endurance are
+ * you keeping" screen already paints those exact words with `getDisciplineColor` two steps earlier in
+ * this same wizard.
+ *
+ * ⚠️ `ride` MAPS TO `bike` ON THE WAY IN. The slot vocabulary says "ride"; the colour table keys on
+ * the discipline and carries `ride` as an alias, so either works — going through the discipline name
+ * keeps this reading like every other call site.
+ */
+const SPORT_DISCIPLINE: Record<SlotSport, string> = { run: 'run', ride: 'bike' };
 
 export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const bounds = weekBounds(props.slots, {
@@ -105,10 +119,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       data-testid={`slot-${key}-${opt.value}`}
                       onClick={() => props.onSlotChange(key, opt.value)}
                       className="px-3 py-1.5 rounded-xl text-sm border whitespace-nowrap"
+                      // ⛔ THE SELECTED CHIP CARRIES THE SPORT COLOUR; UNSELECTED STAYS NEUTRAL.
+                      // Colouring both would make the row read as two chosen answers.
                       style={on
                         ? {
-                            borderColor: `rgb(${SPORT_RGB[opt.value]})`,
-                            backgroundColor: `rgba(${SPORT_RGB[opt.value]},0.16)`,
+                            borderColor: getDisciplineColor(SPORT_DISCIPLINE[opt.value]),
+                            backgroundColor: `${getDisciplineColor(SPORT_DISCIPLINE[opt.value])}29`,
                             color: '#fff',
                           }
                         : {
@@ -133,9 +149,16 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       </div>
 
       {/* ⛔ VOLUME STAYS, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the
-          sports change, because the slots they are summed from just did. */}
+          sports change, because the slots they are summed from just did.
+
+          ⛔ THE TWO INPUTS SHARE ONE ROW (Michael's screenshot review, 2026-08-24). Stacked, they
+          read as two separate questions and pushed the second one toward the fold on a phone — the
+          same accretion the hard-day screen lost three layouts to. They are one question in two
+          units, so they sit side by side. ⚠️ `flex-wrap` with a `min-w` basis, not a fixed
+          two-column grid: a narrow viewport stacks them rather than crushing both. */}
+      <div className="flex flex-wrap gap-4">
       {bounds.runMiles ? (
-        <div>
+        <div className="flex-1 min-w-[168px]">
           <p className="text-white/85 text-sm mb-2">Weekly running to hold</p>
           <div className="flex items-center gap-2">
             <input
@@ -153,7 +176,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       ) : null}
 
       {bounds.rideHours ? (
-        <div>
+        <div className="flex-1 min-w-[168px]">
           <p className="text-white/85 text-sm mb-2">Weekly riding to hold</p>
           <div className="flex items-center gap-2">
             <input
@@ -170,6 +193,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           {rideLine ? <p className="text-white/45 text-xs mt-1.5" data-testid="ride-bounds">{rideLine}</p> : null}
         </div>
       ) : null}
+      </div>
 
       {/* ⚠️ SAID WHEN IT IS TRUE, not always. Some sessions carry recoveries the source gives no
           duration for, so their totals are floors — and a cap built on a floor is a floor too. */}

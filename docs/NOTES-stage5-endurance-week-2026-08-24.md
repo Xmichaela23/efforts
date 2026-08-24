@@ -216,3 +216,59 @@ takes the sport per slot; the schedule screen still asks for a long RUN day and 
 independent pins. They can now disagree with the slot answer, and when they do the athlete gets the
 compromise sentence rather than the day they wanted. That is honest but it is not finished — the
 schedule screen should ask for **the long day**, once, and know which sport it is.
+
+---
+
+# PART 5 — SCREENSHOT-REVIEW FIXES (Michael, 2026-08-24, same day)
+
+Optics only. **No engine, no wire, no copy changed.**
+
+## 5.1 The sport colours were invented
+
+The card shipped with `run: '239,138,98'` (an orange) and `ride: '120,180,255'` (a blue) — hardcoded
+RGB that matched nothing else in the app and read as a third colour system. ⛔ **`SPORT_COLORS`
+(`context-utils.ts:27`) is the one table: run `#FFD700`, bike/ride `#50C878`** — and the "Which
+endurance are you keeping" screen paints those exact words with `getDisciplineColor` two steps
+earlier in this same wizard. The chips read it now. Selected carries the sport colour; unselected
+stays neutral, because colouring both makes the row read as two chosen answers.
+
+**Verified in the browser:** run chip `rgb(255, 215, 0)`, ride chip `rgb(80, 200, 120)`, unselected
+`rgba(255,255,255,0.12)`.
+
+## 5.2 The hard slots had no session under them
+
+Picking Ride revealed nothing. ⛔ **The plumbing was never missing** — `state.hardDays` already holds
+`{discipline, role, goal, ownership}` per slot and `create-goal` already forwards it. The buttons
+were. Restored off the existing tables (`singleSlotOptions` for the ride, `RUN_GROUND_OPTIONS` for
+the run), writing the same fields:
+
+| sport | options | default |
+|---|---|---|
+| ride | Top-end intensity (Helgerud 4 × 4) · Sustained threshold (4 × 5 min → 2 × 10 at 95-105% FTP) · club | **sustained threshold** |
+| run | VO2 max focus (incline) · Speed focus (flat) · club | **VO2** |
+
+⛔ **Extracted to `HardSlotChoices.tsx` + `src/lib/hard-slot-choices.ts`** rather than left inline:
+sixty lines of JSX inside a six-thousand-line file is how the screen it came from lost three layouts,
+and a shared component is what let the browser check drive **the real thing** instead of a replica.
+
+⚠️ **Changing a slot's sport resets that slot's session**, deliberately — a run's "VO2 incline" is not
+a thing a ride can be. The day and the club answer survive, because those are the athlete's rather
+than the session's.
+⚠️ **`goal` is written every time, including as `undefined`** — a threshold slot carrying a leftover
+`speed` is a session nobody picked reaching the composer.
+
+## 5.3 The two volume inputs were stacked
+
+Now one row: `flex-wrap` with a `min-w-[168px]` basis, each keeping its own "holds X-Y" line beneath.
+⚠️ Not a fixed two-column grid — a narrow viewport stacks them rather than crushing both.
+**Verified in the browser:** side by side at full width (same `y`, 268 px apart), stacked at 300 px.
+
+## 5.4 The gate
+
+152 tests green · Get Stronger byte-identical (`f7ece1aa…`) · `npm run build` passes · lint unchanged
+(`NonRaceBuilder` 2 pre-existing; the two new files clean).
+
+⚠️ **Driven in a browser again** (Vite on 8080) through the same temporary route, **deleted after** —
+`git status` is clean of it. Every slot flipped, both sports' option lists read, the defaults
+confirmed pre-selected, the colours read off computed style, and the volume row measured at two
+widths.
