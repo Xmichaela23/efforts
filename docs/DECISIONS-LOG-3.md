@@ -543,3 +543,43 @@ was already identified — `power_curve['20min']` is what FTP comes from — so 
 carries the HR **during** each window, and FTP and threshold describe one ride.
 
 ⚠️ And the card says when an FTP rests on easy riding, reusing that same already-computed signal.
+
+## D-442 — The Standing Plan: one week, a what's-leading dial, each frame one author's table whole (2026-08-22 → 24)
+
+**The consolidated record of the pivot + build weekend.** Full rulings:
+`DECISIONS-2026-08-21-standing-plan.md`, `DECISIONS-2026-08-22-standing-plan-pivot.md` (+ p247
+corrections recorded there), `DEVICE-FINDINGS-standing-plan-2026-08-24.md`. This entry is the
+one-page version so the number exists.
+
+- **The All Rounder is OUT as the base** (hardest to software — no primary lifts, every weight
+  through the ratio table outside its stated range — and "for the ambivalent"). The product is one
+  week with a WHAT'S-LEADING dial over Viada's own program tables: Strength + 5K (strength-leading,
+  BUILT), Strength + Half-Marathon (endurance-leading, future), Cycling: Base (bike, future).
+  Holding = the frame's own taper column. No week ever blends two authors' structures.
+- **One working number, Viada's** — 96% of a two-formula-average predicted 1RM (p215), NEW config
+  key, never touching `training_max` (85%, three live readers). Week 1 IS the test (p215 as guided
+  sessions, seeded from baselines); skip only on logged evidence ≤42 days; typed maxes never skip.
+- **Progression = double progression on his ranges + field-standard stall handling** (hold on miss,
+  ~10% back-off on confirmed stall). NOT Wendler's signature system: the wave, TM and AMRAP are out
+  of these plans. Wendler keeps three jobs: verdict machinery, the beginner rung, deload permission.
+  Rate anchors are PER-FRAME (p247 1%/3wk, p251 1%/4wk). ME loads at 90% of the working number,
+  reps open 1-5 (inverse pairing; reps.hi × pct.hi is pinned impossible). ME sets ladder 1→2→3,
+  earned (N=2 clean), OURS.
+- **Sport-slot assignment** (his p275 permission, our cross-frame transfer): 4 slots, athlete
+  assigns sport per slot; hard-on-bike when strength leads (p280); athlete's per-slot answer AND
+  variant picks travel and are STORED on the plan (restate identity). Within-family variants are
+  the athlete's, from the library's own archetypes; engine default genuinely rotates weekly (OURS).
+- **Swim = ADD-ON, never a slot** (1-2 easy/technique, cap 2, off by default) — supersedes slice
+  4's easy-slot substitution. **Run ask caps at 20 mi** (regular-runner band; above it links to the
+  future endurance-leading block). **Program owns lifting-day count**; athlete owns exercises.
+  Focus chips (+ Core, standing path only) bias HYP slots; picks placed by what they train (day
+  groupings dropped — flat Preferred-movements list on this path). Pull-up progression toggle
+  hidden here: pull-ups are a main lift in this frame.
+- **The old generators are CLOSED FOR REPAIRS** (banners on generate-run/tri/combined);
+  `generate-strength-plan` is the open path. "Definition" tier deleted; "5/3/1" and "Wendler"
+  removed from athlete-facing copy on this path (trademark + no longer true).
+
+**Verified:** wizard end-to-end by Michael (browser, three exports); engine by 213+ tests,
+mutation-tested through session A; Get Stronger byte-identical (f7ece1aa) across every slice.
+**He is training on the block (started 2026-08-24). The test-save → weeks-fill chain on a device is
+the one remaining acceptance step.**

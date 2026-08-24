@@ -4,6 +4,28 @@
 
 **Read `START-HERE.md` → `LIFECYCLE.md` → `CAPABILITY-MAP.md` first. Then this.**
 
+> ## ⛔ 2026-08-24 — THE STANDING PLAN SHIPPED. THE PLAN IS: MICHAEL TRAINS ON IT.
+>
+> The pivot + build weekend (2026-08-22 → 24) replaced the phase below. **D-442** is the one-page
+> record; the rulings live in `DECISIONS-2026-08-22-standing-plan-pivot.md` and
+> `DEVICE-FINDINGS-standing-plan-2026-08-24.md`; the current job is the `ENGINE-STATE.md` banner.
+>
+> Built, deployed, wizard verified end-to-end by Michael: the strength-leading frame (Viada's
+> Strength + 5K whole) — test week off p215, sport-slot assignment with per-slot variant choices,
+> swim add-on, muscle floors, ME set ladder, named rotating plyos, the rebuilt wizard screens.
+> Get Stronger untouched and byte-identical throughout.
+>
+> **The sequence from here:** (1) the acceptance run — Michael is ON the block (started
+> 2026-08-24); the test-save → weeks-fill chain on a device is the one unverified link.
+> (2) The Q-279..283 punch list. (3) The next frames: Cycling: Base (his fastest strength — the
+> bike athlete's real home), then Strength + Half-Marathon (endurance-leading). (4) Stage 5's
+> remaining wizard polish + the strength-gain meter (spec in the work order's stage 5 addendum).
+> (5) Get Stronger becomes the beginner rung; the frames become the main line.
+>
+> ⚠️ The scheduling-engine phase below (2026-08-19) was OVERTAKEN, not finished — Layer 2's weights
+> are still hand-picked and unswept (Q-272), and the Strong Focus intake acceptance pass it wanted
+> has been superseded by the Standing Plan's own acceptance run. Revisit after the frames.
+
 > ## ⛔ 2026-08-19 — THE NEXT PHASE IS THE DEFAULT SCHEDULING ENGINE
 >
 > Michael: *"we need to optimize the default scheduling engine and I'd like fresh eyes on this whole

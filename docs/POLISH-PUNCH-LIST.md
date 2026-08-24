@@ -8,6 +8,19 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE STANDING PLAN ACCEPTANCE (2026-08-24, everything PUSHED + DEPLOYED; wizard verified; **the test-save chain is the one unverified link**)
+
+He is ON the block (started 2026-08-24, test week live). What to look for:
+- [ ] Save **Test: Upper** → a sheet should announce weeks 2-12 filling with weights priced off the
+      test (96% working number, ME at 90% × 1-5). If the sheet never appears or weeks stay "By
+      feel", the logger→`rematerialize-standing-block` call is the suspect.
+- [ ] Week 2's bench ME weight should look like ~90% of (96% of ~157 est) ≈ mid-130s — sane, not
+      a grinder.
+- [ ] The ME set ladder: after two clean ME sessions on a pattern, the calendar's later weeks gain
+      a second set. Watch it appear (or not) around week 4.
+- [ ] Q-279..283 (export week-skip, "Taper" label, stale prefs echo, duplicate picks, session-B
+      mutation pass) — logged, none block training.
+
 ## ⏳ AWAITING MICHAEL — THE STRONG FOCUS INTAKE (2026-08-19, PUSHED `9d49db9a`; four edge functions DEPLOYED `12:23`; **ZERO of it device-verified**)
 
 **61 commits over 2026-08-18/19 rebuilding the Strong Focus intake.** Suites are green — 556

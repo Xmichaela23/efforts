@@ -872,3 +872,29 @@ filled from the run number in the single-sport case, waiting for the next reader
 
 **The real fix is the WRITER emitting per-sport fields only** — not another guard on a reader.
 ⛔ Do not record this as "closed"; the next session reads closed and stops looking.
+
+## Q-279 — The export tool skips a week (2026-08-24)
+
+`strong-focus-3.md` jumped Week 6 → Week 8; the calendar shows week 7 fully populated, so the PLAN
+is whole and the export/download path drops a page. Cosmetic until someone shares an export.
+
+## Q-280 — Week 1 wears a "Taper" label on the home header (2026-08-24)
+
+The Standing Plan's test week renders "Week 1 • Taper" — old phase-labeling machinery misreading a
+week that is neither. Cosmetic. Trace where the home header derives its phase word.
+
+## Q-281 — Stale goal prefs echo on Standing Plan goals (2026-08-24)
+
+The goal records `Long Run: sunday`, `Hard Days: friday; tuesday` etc. from old wizard drafts on a
+block whose built week has neither — the week is right, the record lies about its inputs. Also the
+plan description repeats the test-week sentence twice. Provenance hygiene, not behavior.
+
+## Q-282 — The accessory picker accepts duplicate movements (2026-08-24)
+
+A second `Chin-Up` pick buys nothing (the composer places each movement once). The picker should
+refuse or flag the duplicate instead of silently wasting the slot.
+
+## Q-283 — Session B's new tests are not mutation-tested (2026-08-24)
+
+Stated exception during the live-review batch (screens + engine wires: swim add-on, focus bias,
+archetype overrides, 20-mi cap, chips). The suites are green; the mutation pass is owed.
