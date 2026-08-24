@@ -4493,6 +4493,53 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 open is four screens of scrolling on a phone, and the athlete loses the shape of the
                 week entirely. First day open, the rest collapsed to their one-line summary — the
                 same pattern, so the two screens do not teach two different interactions. */}
+            {/* ⛔ THE STANDING PLAN GETS A FLAT LIST (Michael, 2026-08-24: "this is not 4 days of
+                work and doesn't reflect the work"). The day cards are Wendler's three days, and on
+                this plan the day grouping is a LIE — the composer drops it and places every pick by
+                what it trains. Same storage (by_day) so the payload flattening is untouched; the
+                screen just stops pretending the groupings schedule anything. */}
+            {isStrengthFocus ? (
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
+                <p className="text-white/85 text-sm">Preferred movements</p>
+                <p className="text-white/50 text-xs -mt-1.5">
+                  Nine picks, placed by what they train. The plan decides which day each lands on.
+                </p>
+                {LIFT_DAYS.flatMap((day) =>
+                  ASSISTANCE_CATEGORIES.map((category) => {
+                    const opts = optionsFor(category, strengthEquipment, day);
+                    const value = state.assistancePicks.by_day[day][category];
+                    const muscle = opts.find((o) => o.name === value)?.muscle ?? '';
+                    return (
+                      <div key={`${day}-${category}`}>
+                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                          <span className="text-white/70 text-xs">{CATEGORY_LABEL[category]}</span>
+                          {muscle && <span className="text-white/45 text-xs">{muscle}</span>}
+                        </div>
+                        <select
+                          value={value}
+                          onChange={(e) => setState((st) => ({
+                            ...st,
+                            assistancePicks: {
+                              ...st.assistancePicks,
+                              by_day: {
+                                ...st.assistancePicks.by_day,
+                                [day]: { ...st.assistancePicks.by_day[day], [category]: e.target.value },
+                              },
+                            },
+                          }))}
+                          className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                          style={{ fontSize: '16px' }}
+                          aria-label={`Preferred ${CATEGORY_LABEL[category]} movement`}
+                        >
+                          {opts.map((o) => (
+                            <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }))}
+              </div>
+            ) : (
             <div className="space-y-2">
               {LIFT_DAYS.map((day) => {
                 const picks = state.assistancePicks.by_day[day];
@@ -4620,6 +4667,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               })}
             </div>
+            )}
             {/* ⛔ The rep-total guidance is Wendler's model. The Standing Plan doses accessories
                 as SETS with reps in reserve (stage 3) — its line says that instead. */}
             <p className="text-white/70 text-sm leading-relaxed">
