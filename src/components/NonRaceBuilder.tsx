@@ -4256,15 +4256,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 chips, and one word for one concept beats a synonym per surface. ⛔ Do not "fix" it
                 to satisfy the lint without asking. */}
             <ul className="space-y-1 list-disc list-outside ml-5 marker:text-white/30">
-              <li className="text-white/70 text-sm leading-relaxed pl-1">
-                Three lifting days, each with a push, a pull and a single-leg or core movement.
-              </li>
-              <li className="text-white/70 text-sm leading-relaxed pl-1">
-                Pick a focus and the days fill in.
-              </li>
-              <li className="text-white/70 text-sm leading-relaxed pl-1">
-                Change to preferred movements below, or swap on the day.
-              </li>
+              {/* ⛔ TWO PLANS SHARE THIS PICKER, AND THEY ARE DIFFERENT WEEKS (2026-08-24). The old
+                  copy described Wendler's three days to a Standing Plan athlete whose block has
+                  FOUR, whose core has its own budget, and whose picks are placed by what they
+                  train, not by the picker's day groupings. Each path reads its own truth. */}
+              {isStrengthFocus ? (
+                <>
+                  <li className="text-white/70 text-sm leading-relaxed pl-1">
+                    Four lifting days. Your picks are placed by what they train — the groupings below
+                    are the picker&rsquo;s, not the week&rsquo;s.
+                  </li>
+                  <li className="text-white/70 text-sm leading-relaxed pl-1">
+                    Pick a focus and the slots fill in. Every muscle keeps its minimum either way.
+                  </li>
+                  <li className="text-white/70 text-sm leading-relaxed pl-1">
+                    Change to preferred movements below, or swap on the day.
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="text-white/70 text-sm leading-relaxed pl-1">
+                    Three lifting days, each with a push, a pull and a single-leg or core movement.
+                  </li>
+                  <li className="text-white/70 text-sm leading-relaxed pl-1">
+                    Pick a focus and the days fill in.
+                  </li>
+                  <li className="text-white/70 text-sm leading-relaxed pl-1">
+                    Change to preferred movements below, or swap on the day.
+                  </li>
+                </>
+              )}
             </ul>
 
             {/* ── FOCUS CHIPS ───────────────────────────────────────────────────────────────────
@@ -4599,7 +4620,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               })}
             </div>
-            <p className="text-white/70 text-sm leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
+            {/* ⛔ The rep-total guidance is Wendler's model. The Standing Plan doses accessories
+                as SETS with reps in reserve (stage 3) — its line says that instead. */}
+            <p className="text-white/70 text-sm leading-relaxed">
+              {isStrengthFocus
+                ? 'Accessories are sets of 6–12 with a rep or two left in the tank. Going to failure costs the next main lift.'
+                : ASSISTANCE_GUIDANCE}
+            </p>
           </div>
         </StepLayout>
       )}
@@ -5192,13 +5219,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           REVERSES — the club holds the sustained slot by its nature, so what is
                           added beside it takes the TOP END. Pinned in `intent-allocation.test.ts`. */}
                       <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
-                        Add speed, VO2 max, or threshold work. None is a valid answer.
+                        {/* ⛔ On the Standing Plan the hard sessions are PRESCRIBED — the slot
+                            screen answered them; only the day moves here. "None is a valid answer"
+                            belongs to the race path's optional club night. */}
+                        {isStrengthFocus
+                          ? 'Your two hard sessions, placed. Tap a day to move one.'
+                          : 'Add speed, VO2 max, or threshold work. None is a valid answer.'}
                       </p>
                       <ul className="px-3 pt-1.5 space-y-1 list-disc list-outside ml-7 marker:text-white/30">
-                        <li className="text-white/70 text-sm leading-relaxed pl-1">
-                          Each hard day cuts your accessory lifting volume — that&rsquo;s the trade to
-                          protect your strength gains.
-                        </li>
+                        {!isStrengthFocus && (
+                          <li className="text-white/70 text-sm leading-relaxed pl-1">
+                            Each hard day cuts your accessory lifting volume — that&rsquo;s the trade to
+                            protect your strength gains.
+                          </li>
+                        )}
                         <li className="text-white/70 text-sm leading-relaxed pl-1">
                           A club ride or run counts as a high intensity day.
                         </li>
@@ -5346,9 +5380,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           ) : (
                           <>
                             {/* Tap-to-pick cue, contextual to the open question. */}
-                            <p className="text-xs" style={{ color: rowSportRgb ? `rgba(${rowSportRgb},0.85)` : 'rgba(var(--wiz-accent-rgb,236,233,227),0.85)' }}>
-                              {row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
-                            </p>
+                            {/* ⛔ The cue is for an UNANSWERED question — instructing over a chosen
+                                day reads as a nag (Michael's screenshot, 2026-08-24). */}
+                            {!(row.key === 'long' ? state.longRunDay : state.longRideDay) && (
+                              <p className="text-xs" style={{ color: rowSportRgb ? `rgba(${rowSportRgb},0.85)` : 'rgba(var(--wiz-accent-rgb,236,233,227),0.85)' }}>
+                                {row.key === 'long' ? 'Tap your long-run day' : 'Tap your long-ride day'}
+                              </p>
+                            )}
                             {/* ⛔ ONE ROW, EVERY DAY QUESTION. `taken` excludes the OPEN question's
                                 own anchor, which is what leaves that anchor releasable —
                                 `anchor-days.ts` answers this for all three, so the lock is not
