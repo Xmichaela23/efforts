@@ -63,6 +63,26 @@ Deno.serve(async (req) => {
       )
     }
 
+    // ⛔ CLEAR THE BACK-LINKS BEFORE THE ROWS GO (2026-08-24, Michael on device). `workouts.planned_id`
+    // points at these rows; deleting them without clearing it leaves every completed workout
+    // "attached" to a ghost — the detail screen renders Unattach against a row that no longer
+    // exists, and the athlete has to unattach/re-attach by hand before a new plan's reader
+    // (auto-attach, the test-week restate) can see the workout as free.
+    const { data: doomedRows } = await supabase
+      .from('planned_workouts')
+      .select('id')
+      .or(`training_plan_id.eq.${planId},template_id.eq.${planId}`)
+    const doomedIds = (doomedRows ?? []).map((r) => String(r.id))
+    if (doomedIds.length) {
+      const { error: lErr } = await supabase
+        .from('workouts')
+        .update({ planned_id: null })
+        .in('planned_id', doomedIds)
+      // ⚠️ Non-fatal: a failed clear leaves exactly the ghost that existed before this fix, and the
+      // teardown itself still succeeds. Loud so it can be chased.
+      if (lErr) console.warn('[delete-plan] clear workout back-links:', lErr.message)
+    }
+
     // Delete planned rows first to avoid FK blocks and UI ghosts
     const { error: pErr } = await supabase
       .from('planned_workouts')
