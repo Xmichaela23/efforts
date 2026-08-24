@@ -264,6 +264,32 @@ Deno.serve(async (req: Request) => {
     // where its numbers came from, and saying so beats failing the whole call.
     if (cfgErr) console.warn(`[standing-restate] working numbers not stored: ${cfgErr.message}`);
 
+    // ⛔ THE LOGGER READS `computed`, NOT `strength_exercises` (Q-285, 2026-08-24). `computed.steps`
+    // is materialize-plan's expansion of `strength_exercises`, written once at build time — so a
+    // restate that rewrites the rows without refreshing it leaves every prefill surface (the
+    // logger's Pick planned, get-week's `planned.steps`) showing the weights the block was BUILT
+    // with, which for a Standing Plan is no weight at all. The athlete saw the sheet announce the
+    // numbers and then opened week 2 to a blank box.
+    //
+    // ⛔ MATERIALIZE OWNS `computed`, SO IT IS RE-ASKED RATHER THAN RE-IMPLEMENTED HERE — the same
+    // idiom adapt-plan uses after a strength relayout. Its numeric pass-through keeps the restated
+    // weight verbatim (`isPreResolvedNumeric` → `resolved_from: 'pre_resolved'`), and it does not
+    // write `strength_exercises` back, so this cannot drag the rows it is refreshing from.
+    // ⚠️ LOUD BUT NOT FATAL: get-week re-materializes a MISSING computed on its own, but a STALE one
+    // is never re-checked — which is exactly why this call cannot be skipped silently.
+    let computedRefreshed = false;
+    if (written > 0) {
+      try {
+        const { error: matErr } = await supabase.functions.invoke('materialize-plan', {
+          body: { training_plan_id: plan.id },
+        });
+        computedRefreshed = !matErr;
+        if (matErr) console.warn(`[standing-restate] computed refresh failed: ${matErr.message}`);
+      } catch (e) {
+        console.warn(`[standing-restate] computed refresh failed: ${(e as Error)?.message ?? String(e)}`);
+      }
+    }
+
     console.log(
       `[standing-restate] plan=${plan.id} week=${currentWeek} lifts=${found.join(',')} `
       + `rows=${written}/${restated.rows.length} changes=${restated.changes.length} `
@@ -278,6 +304,7 @@ Deno.serve(async (req: Request) => {
       changes: restated.changes, unmatched: restated.unmatched,
       me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
       config_written: !cfgErr,
+      computed_refreshed: computedRefreshed,
     });
   } catch (e) {
     const status = (e as { status?: number })?.status === 401 ? 401 : 500;

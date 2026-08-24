@@ -380,12 +380,35 @@ Deno.serve(async (req) => {
       if (cfgErr) console.warn(`[rematerialize] calibration log not written: ${cfgErr.message}`);
     }
 
+    // ⛔ THE LOGGER READS `computed`, NOT `strength_exercises` (Q-285, 2026-08-24 — found on the
+    // Standing Plan, and this path has the identical hole). `computed.steps` is materialize-plan's
+    // expansion of `strength_exercises`, written at build time; a cycle verdict or an undo that
+    // rewrites the rows without refreshing it leaves every prefill surface (Pick planned, get-week's
+    // `planned.steps`) prescribing the weights the block was BUILT with. Materialize owns
+    // `computed`, so it is re-asked rather than re-implemented — the adapt-plan relayout idiom. Its
+    // numeric pass-through keeps the rewritten weight verbatim and it does not write
+    // `strength_exercises` back. ⚠️ Loud but not fatal: get-week only re-materializes a MISSING
+    // computed, never a stale one.
+    let computedRefreshed = false;
+    if (written > 0) {
+      try {
+        const { error: matErr } = await supabase.functions.invoke('materialize-plan', {
+          body: { training_plan_id: plan.id },
+        });
+        computedRefreshed = !matErr;
+        if (matErr) console.warn(`[rematerialize] computed refresh failed: ${matErr.message}`);
+      } catch (e) {
+        console.warn(`[rematerialize] computed refresh failed: ${(e as Error)?.message ?? String(e)}`);
+      }
+    }
+
     console.log(
       `[rematerialize] plan=${plan.id} week=${currentWeek} rows=${written}/${rowUpdates.length} ` +
       `changes=${changes.length} events=${newEvents.length}${undoLift ? ` undo=${undoLift}` : ''}`,
     );
     return json({
       success: true, applied: true, rows_written: written,
+      computed_refreshed: computedRefreshed,
       current_week: currentWeek, current_cycle: currentCycle,
       per_lift: perLift, changes,
       events: newEvents,
