@@ -269,6 +269,8 @@ export type FloorAddition = {
   category: ViadaCategory;
   /** Which session it was added to. */
   session: string;
+  /** ⛔ TRUE WHEN THIS IS THE ATHLETE'S OWN PICK filling the gap — see `fillMuscleFloor`'s `prefer`. */
+  fromAthletePick?: boolean;
 };
 
 export type FloorResult = {
@@ -292,9 +294,23 @@ export type FloorResult = {
  * the muscle is reported `unfilled` with that reason rather than being forced in — a floor that
  * breaks the ceiling has just moved the problem.
  */
+/**
+ * ⛔ THE ATHLETE'S OWN MOVEMENTS, OFFERED TO THE FLOOR FIRST (device finding A1, 2026-08-24).
+ *
+ * This module's header already says what it is — *"a floor beneath the athlete's picks and never a
+ * replacement for them"* — and until now it could only be the first half of that. The Standing Plan
+ * composer never saw the accessory picker at all, so an athlete who chose ab work got `plank` with
+ * the reason *"core had nothing else this week"*: the engine recording that it had seen no core
+ * from the athlete, on a week where the athlete had asked for it by name.
+ *
+ * ⚠️ IT IS A PREFERENCE, NOT AN OVERRIDE. A preferred movement is used only where it genuinely
+ * reaches the muscle that is short — the candidate list is still built by `candidatesFor`, so
+ * equipment, category order and the prime-mover test all still hold, and a pick that trains
+ * something else simply does not win this slot.
+ */
 export function fillMuscleFloor(
   week: PlannedSession[],
-  opts?: { equipment?: string[] | null; setPosition?: number },
+  opts?: { equipment?: string[] | null; setPosition?: number; prefer?: string[] | null },
 ): FloorResult {
   const sessions: PlannedSession[] = week.map((s) => ({ label: s.label, sets: [...s.sets] }));
   const setsPerSlot = muscleFloorSets(opts?.setPosition);
@@ -304,6 +320,11 @@ export function fillMuscleFloor(
     { kind: 'source', text: HYPERTROPHY_PREFERS_ISOLATION, cite: 'Viada p86' },
   ];
 
+  // ⚠️ FOLDED ONCE, CASE-INSENSITIVELY. The picker stores display names (`Chin-Up`) and the grid is
+  // keyed off the catalogue's own spellings (`chin up`); an exact-string set would silently prefer
+  // nothing at all and look exactly like an athlete who picked nothing.
+  const preferSet = new Set((opts?.prefer ?? []).map((n) => String(n ?? '').trim().toLowerCase()));
+
   const gaps = ledgerFor(sessions, { setPosition: opts?.setPosition }).belowFloor;
   /** ⚠️ What the week already prescribes — a floor slot should widen the week, not repeat it. */
   const alreadyPrescribed = new Set(sessions.flatMap((s) => s.sets.map((x) => x.movement)));
@@ -312,10 +333,15 @@ export function fillMuscleFloor(
     // Which movement — through stage 2's grid, so the equipment ladder and the ranking are not
     // re-implemented here. The first option whose PRIME MOVER is this muscle wins.
     const forMuscle = candidatesFor(muscle, opts?.equipment ?? null);
+    // ⛔ THE ATHLETE'S OWN CHOICE FIRST, where it reaches this muscle and the week does not already
+    // hold it. `preferred` is matched against the SAME candidate list, so a pick can only win a slot
+    // it was already eligible for — nothing here widens the equipment gate or the prime-mover test.
+    const preferred = forMuscle.find((o) =>
+      preferSet.has(o.name.toLowerCase()) && !alreadyPrescribed.has(o.name));
     // ⚠️ A MOVEMENT THE WEEK DOES NOT ALREADY HAVE, where one exists. Filling a gap by repeating a
     // movement already prescribed adds sets without adding variety, and the source encourages
     // rotation. Falls back to a repeat rather than leaving the muscle at zero.
-    const pick = forMuscle.find((o) => !alreadyPrescribed.has(o.name)) ?? forMuscle[0];
+    const pick = preferred ?? forMuscle.find((o) => !alreadyPrescribed.has(o.name)) ?? forMuscle[0];
     const chosen = pick ? { movement: pick.name, category: pick.category } : null;
     if (!chosen) {
       unfilled.push({ muscle, reason: 'No movement in the catalogue reaches this muscle with the declared equipment.' });
@@ -345,6 +371,10 @@ export function fillMuscleFloor(
       sets: setsPerSlot,
       category: chosen.category,
       session: sessions[target.i].label,
+      // ⛔ SO THE ROW CAN SAY WHOSE MOVEMENT IT IS. "Floor: core had nothing else this week" is the
+      // right sentence for a movement the engine picked and the wrong one for a movement the athlete
+      // asked for — and printing the wrong one is the defect this whole flag exists to close.
+      fromAthletePick: preferred != null,
     });
   }
 

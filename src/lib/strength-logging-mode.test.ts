@@ -24,7 +24,12 @@ import { EXERCISE_CONFIG } from './exercise-config.ts';
  */
 function legacyGetExerciseType(exerciseName: string): string {
   const name = String(exerciseName || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
-  if (/\b(jump|hop|bound|plyo|skater)\w*/.test(name)) return 'plyo';
+  // ⚠️ THE FOUR 2026-08-24 DRILL WORDS ARE HERE TOO, AND THAT IS NOT A TIDY-UP. This function
+  // reproduces the routing of a classifier that was deleted before Viada's drill names existed, so
+  // there is no legacy answer for `A-Skip` to be faithful to. Left un-extended it would assert that
+  // a movement added this week MUST be misrouted to `barbell`, which is the opposite of what the
+  // yardstick is for. It is still an independent implementation — do not make it call the real one.
+  if (/\b(jump|hop|bound|plyo|skater|shuffle|ladder|[ab]?skip|stifflegged)\w*/.test(name)) return 'plyo';
   if (name.includes('core circuit') || name.includes('core work') || name.includes('calf raise')) return 'bodyweight';
   if (name.includes('band') || name.includes('banded') || name.includes('clamshell')) return 'band';
   if (name.includes('lateral lunge') || name.includes('goblet squat')) return 'goblet';

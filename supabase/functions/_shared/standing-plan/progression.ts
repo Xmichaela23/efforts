@@ -212,3 +212,206 @@ export function advanceStep(isLower: boolean, smallestPlatePairLb: number | null
   if (!Number.isFinite(pair) || pair <= 0) return nominal;
   return Math.max(nominal, Math.ceil(nominal / pair) * pair);
 }
+
+// ── OURS: THE INTENSITY STARTS LOW, EXACTLY AS THE SETS DO ──────────────────────────────────────
+
+/**
+ * ⛔⛔ A SLOT PRESCRIBES THE LOW END OF ITS PERCENT BAND — AND THE BUG THIS FIXES WAS ARITHMETIC.
+ *
+ * p218 gives ME **1 to 5 reps at 90 to 100%**. Those are the two ends of one inverse relationship:
+ * a single is the hundred-per-cent rep and five reps is the ninety-per-cent set. The composer was
+ * taking the TOP of both bands at once — `pctOf1RM.hi` for the weight and `reps.hi` for the set plan
+ * — so every ME row read *five reps at 100% of the working number*. The working number is itself 96%
+ * of a predicted max (p215), so that is five reps at ninety-six per cent of a one-rep max: a
+ * prescription nobody can complete, on every ME slot, for twelve weeks.
+ *
+ * ⛔ MICHAEL'S RULING, 2026-08-24: **start at the low end of the intensity band**, leave the rep
+ * target open across his range, and stop short of failure. As the working number climbs at his rate
+ * anchor the achieved reps slide down the band on their own — *"the inverse pairing expressing
+ * itself without a table"* — so no second table is invented and nothing here contradicts p218.
+ *
+ * ⚠️ **THE EXTENSION IS OURS AND THE PRINCIPLE IS HIS.** p218's first sentence is *"sets should
+ * always remain on the lower end when starting a program, increasing only if the athlete is finding
+ * that they are progressing well and seem to have recovery to spare."* He writes it about SETS. He
+ * gives a band for intensity and no starting point inside it; reading his own instruction across to
+ * the other axis is ours, and it is the conservative direction on both.
+ *
+ * ⛔ **AND IT IS AN INVARIANT, NOT A DEFAULT.** No row anywhere may carry `reps.hi` and `pctOf1RM.hi`
+ * together. `standing-plan-dose.test.ts` walks every slot of every week of both columns and fails on
+ * one. Do not "restore" a top-of-band percentage for a single intent without deleting that test, and
+ * do not delete that test.
+ */
+export const INTENSITY_STARTS_LOW_IS_OURS =
+  'Each lift opens at the bottom of the intensity band the source gives it, with the rep target left '
+  + 'open across his range and every set stopped short of failure. He states that principle for sets '
+  + '— start low, add only when recovery is spare — and gives intensity a band with no starting '
+  + 'point in it; carrying his instruction across to intensity is ours. As the working number climbs, '
+  + 'the reps you get at the same percentage come down on their own.';
+
+// ── OURS: THE ME SET LADDER — 1 to 2 to 3, EARNED ───────────────────────────────────────────────
+
+/**
+ * ⛔ WHY A LADDER EXISTS AT ALL, AND IT IS A DOSE THE PLAN WAS MISSING.
+ *
+ * `setsFor` returns the low end of every band unless a caller says otherwise, and nothing ever did —
+ * so every ME slot prescribed **one** set of 1-5 for all twelve weeks. p084's own dose for maximal
+ * work is **4 to 6 reps above 90% per movement pattern per week**; a single set of one to five reps
+ * sits at or below that floor permanently, and no amount of progression moves it, because the thing
+ * that is short is the SET COUNT and nothing in the engine could ever change it.
+ *
+ * ⛔ HIS RANGE IS 1-3 SETS (p218) AND HIS CONDITION IS IN WORDS: *"increasing only if the athlete is
+ * finding that they are progressing well and seem to have recovery to spare."* That is gap #11 of
+ * the twelve — a condition no engine can evaluate as written. What follows is the field-standard
+ * reading of it, and every number in it is OURS.
+ */
+export const ME_SET_LADDER_IS_OURS =
+  'The heavy lift starts at one set and can earn a second and a third. Two clean sessions in a row '
+  + 'on the same pattern add a set; a missed set or a set ground out to failure takes one back. The '
+  + 'range of one to three sets is the source\'s; when a set is earned and when it is lost are ours, '
+  + 'from field practice — he states the condition in words ("progressing well, with recovery to '
+  + 'spare") and gives no rule.';
+
+/** ⛔ TWO IN A ROW, NEVER ONE. The same deadband `STALL_CONFIRMATIONS` states for the other direction. */
+export const ME_CLEAN_SESSIONS_TO_EARN = 2;
+
+/**
+ * ⛔ HOW CLOSE TO THE TOP OF HIS REP BAND COUNTS AS CLEAN — one rep, so 4 or 5 of his 1-5.
+ *
+ * Michael, 2026-08-24: *"clean session for the earn rule = the top of the rep band (4-5 reps)
+ * completed with stop-short quality, no miss."* At the low end of the intensity band that is a
+ * reachable session, which is the whole point: a threshold nobody clears is a ladder that never
+ * moves, and the frozen single-set slot is exactly what this replaces.
+ */
+export const ME_CLEAN_REPS_WITHIN_TOP = 1;
+
+/** One logged set of an ME slot, as the workouts table carries it. */
+export type LoggedMeSet = {
+  reps?: number | null;
+  weight?: number | null;
+  /** ⚠️ ABSENT IS LEGAL AND MEANS THE ATHLETE DID NOT SAY (D-324). Never read as zero. */
+  rir?: number | null;
+  completed?: boolean | null;
+};
+
+export type MeSessionOutcome =
+  /** Top of the rep band on every prescribed set, stopped short. Earns toward the next set. */
+  | 'clean'
+  /** A missed set, or one ground out to failure. Takes an earned set back. */
+  | 'setback'
+  /** Completed, stopped short, but landing mid-band. Neither earns nor costs; breaks the run. */
+  | 'mid_band'
+  /** ⛔ NOTHING LOGGED IS NOT A FAILURE. Silence holds — the count and the run both stand. */
+  | 'no_evidence';
+
+/**
+ * ⛔ WHAT ONE LOGGED ME SESSION ON ONE PATTERN WAS.
+ *
+ * @param sets            what the athlete logged for that movement.
+ * @param prescribedSets  how many sets the row asked for. A short session is a miss, not a clean
+ *                        session with fewer sets in it.
+ * @param repBand         his band for the intent — 1 to 5 for ME. The top is read off it, never
+ *                        hard-coded, so a band change cannot leave this asserting the old number.
+ * @param prescribedWeight the weight on the row, when it carried one. ⚠️ `null` during the weeks
+ *                        before the test is read, where the row says "by feel" and there is no
+ *                        number to fall short of.
+ *
+ * ⛔ `rir === 0` IS THE GRIND AND IT IS THE ONLY QUALITY SIGNAL READ. p218 gives ME **no RIR
+ * target** and says in the same breath that each set *"stops short of failure — technical breakdown
+ * here is counterproductive"*. So a logged 0 is the athlete reporting the one thing his instruction
+ * forbids. ⚠️ An ABSENT rir is not a grind: absent means they did not say (D-324), and inferring
+ * failure from silence would take a set away from every athlete who skips the field.
+ */
+export function meSessionOutcome(args: {
+  sets: LoggedMeSet[] | null | undefined;
+  prescribedSets: number;
+  repBand: { lo: number; hi: number };
+  prescribedWeight?: number | null;
+}): MeSessionOutcome {
+  const logged = (args.sets ?? []).filter((s) => s?.completed === true);
+  if (logged.length === 0) return 'no_evidence';
+
+  // ⛔ A SET GROUND OUT TO FAILURE IS A SETBACK WHATEVER THE REPS SAY — checked before the reps,
+  // because five reps taken to zero in reserve is the session his instruction rules out, and reading
+  // it as clean would earn a second set off the evidence that the first one was too much.
+  if (logged.some((s) => s.rir === 0)) return 'setback';
+
+  // ⛔ A SHORT SESSION IS A MISS. Fewer completed sets than the row asked for is the athlete not
+  // finishing the prescription, and it is the plainest reading of "a miss" there is.
+  if (logged.length < Math.max(1, Math.round(args.prescribedSets))) return 'setback';
+
+  /**
+   * ⚠️ ONLY WHERE A WEIGHT WAS PRESCRIBED. Before the test is read every row says "by feel", so there
+   * is no number to fall short of.
+   *
+   * ⛔ AND THE GUARD EARNS ITS KEEP ON THE **UNWEIGHTED LOG**, WHICH IS THE HALF MUTATION TESTING
+   * NEARLY DELETED. Against a prescribed weight, a set logged with no weight at all is a miss — the
+   * athlete cannot have made a number they never entered. Against NO prescribed weight it is the
+   * ordinary shape of a by-feel session, and firing there would call every pre-test week a setback
+   * and walk the ladder to its floor before the block had begun.
+   */
+  const want = Number(args.prescribedWeight);
+  if (Number.isFinite(want) && want > 0) {
+    if (logged.some((s) => !Number.isFinite(Number(s.weight)) || Number(s.weight) < want)) return 'setback';
+  }
+
+  const cleanFrom = args.repBand.hi - ME_CLEAN_REPS_WITHIN_TOP;
+  if (logged.every((s) => Number(s.reps) >= cleanFrom)) return 'clean';
+  // ⛔ BELOW THE BAND'S FLOOR IS A MISS, NOT A MID-BAND SESSION. One rep is the bottom of ME; a set
+  // that did not reach it did not happen.
+  if (logged.some((s) => Number(s.reps) < args.repBand.lo)) return 'setback';
+  return 'mid_band';
+}
+
+export type MeLadderState = {
+  /** Sets the slot currently earns. Always inside his 1-3 band. */
+  sets: number;
+  /** Clean sessions since the last change. Never shown; it is why the next one moves. */
+  cleanRun: number;
+};
+
+/**
+ * ⛔ ONE SESSION MOVES THE LADDER ONE STEP AT MOST — in either direction.
+ *
+ * ⚠️ `no_evidence` RETURNS THE STATE UNCHANGED, RUN INCLUDED. Pivot §4: *"nothing logged = no
+ * evidence = hold (never zero)."* A skipped week is not a broken run and it is not a lost set; it is
+ * the plan having nothing to read. ⛔ Do not "reset the streak on a gap" — that is acting on absence,
+ * which is the failure mode this codebase names in three other files.
+ */
+export function meLadderStep(
+  state: MeLadderState,
+  outcome: MeSessionOutcome,
+  band: { lo: number; hi: number },
+): MeLadderState {
+  if (outcome === 'no_evidence') return state;
+  if (outcome === 'setback') return { sets: Math.max(band.lo, state.sets - 1), cleanRun: 0 };
+  if (outcome === 'mid_band') return { sets: state.sets, cleanRun: 0 };
+  const run = state.cleanRun + 1;
+  if (run < ME_CLEAN_SESSIONS_TO_EARN) return { sets: state.sets, cleanRun: run };
+  // ⚠️ AT THE CAP THE RUN IS KEPT RATHER THAN SPENT, so an athlete already at three sets does not
+  // have to re-earn the run from zero the moment one setback drops them to two.
+  if (state.sets >= band.hi) return { sets: band.hi, cleanRun: run };
+  return { sets: state.sets + 1, cleanRun: 0 };
+}
+
+/** Walk a pattern's ME sessions in order and report what it has earned. */
+export function meSetsFromHistory(
+  outcomes: MeSessionOutcome[] | null | undefined,
+  band: { lo: number; hi: number },
+): MeLadderState {
+  let state: MeLadderState = { sets: band.lo, cleanRun: 0 };
+  for (const o of outcomes ?? []) state = meLadderStep(state, o, band);
+  return state;
+}
+
+/**
+ * ⛔ A SET COUNT BACK INTO STAGE 2'S OWN POSITION ARGUMENT, so the band stays owned in one place.
+ *
+ * `setsFor(band, position)` interpolates from `lo` to `hi`; this is its inverse. Passing the count
+ * straight through would be a second owner of "how many sets is an ME slot", which is the fact
+ * `strength-grid/intents.ts` exists to hold.
+ */
+export function setPositionForCount(count: number, band: { lo: number; hi: number }): number {
+  if (band.hi <= band.lo) return 0;
+  const clamped = Math.min(band.hi, Math.max(band.lo, Math.round(count)));
+  return (clamped - band.lo) / (band.hi - band.lo);
+}

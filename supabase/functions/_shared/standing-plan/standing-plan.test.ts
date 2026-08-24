@@ -599,17 +599,28 @@ Deno.test('the ledger sees the strength sets, and no week breaks the ceiling or 
   }
 });
 
-Deno.test('the plyo day is his drill count and stop rule, and our effort count', () => {
-  // ⛔ p227 gives the count ("more than three or four … is likely a waste of time") and the stop rule
-  // (quality, not reps). ⚠️ THE EFFORTS PER DRILL ARE OURS — he says "multiple times" and no number.
+Deno.test('the plyo drills are his, and the dose labels survive', () => {
+  // ⛔ p227 gives the per-day count ("more than three or four … is likely a waste of time") and the
+  // stop rule (quality, not reps). ⚠️ THE EFFORTS PER DRILL ARE OURS — he says "multiple times" and
+  // no number. The full A3 gate — named drills, three placements, no generic row — is
+  // `standing-plan-plyo.test.ts`; this holds the dose labels the composer still reads.
   assertEquals(PLYO_DOSE.drillsPerDay, 3);
   assert(PLYO_DOSE.drillCountIsHis.includes('p227'));
   assert(/ours/i.test(PLYO_DOSE.effortCountIsOurs));
   const wk = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard' });
-  const plyo = wk.sessions.find((s) => s.tags.includes('plyo'))!;
-  assertEquals(plyo.day, 'Wednesday');
-  assertEquals(plyo.strength_exercises![0].sets, 3);
-  assertEquals(plyo.strength_exercises![0].load_prescribed, false);
+  const plyo = wk.sessions.filter((s) => s.tags.includes('plyo'));
+  // ⛔ ONE PLYO SESSION, ON THE FRAME'S OWN DAY, carrying his three drills.
+  assertEquals(plyo.length, 1);
+  assertEquals(plyo[0].day, 'Wednesday');
+  assertEquals(plyo[0].strength_exercises!.length, PLYO_DOSE.drillsPerDay);
+  for (const s of plyo) {
+    for (const ex of s.strength_exercises ?? []) {
+      // ⛔ ONE ROW, ONE DRILL, no load. A `sets: 3` row would be the placeholder back again.
+      assertEquals(ex.sets, 1);
+      assertEquals(ex.reps, PLYO_DOSE.effortsPerDrill);
+      assertEquals(ex.load_prescribed, false);
+    }
+  }
   assert(wk.notes.some((n) => n.kind === 'ours' && /multiple times/.test(n.text)));
 });
 

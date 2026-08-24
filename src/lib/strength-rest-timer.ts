@@ -35,7 +35,12 @@ import { isMain531Lift } from './exercise-role.ts';
  */
 export const isPlyometricMovement = (exerciseName: string): boolean => {
   const name = String(exerciseName || '').toLowerCase();
-  return /jump|bound|hop|box jump|bench jump|broad jump|depth jump|squat jump|tuck jump|split jump|plyo|explosive/.test(name);
+  // ⛔ `skip|shuffle|ladder drill|stiff legged run` ADDED 2026-08-24 for Viada's named drills (p227).
+  // His own rule for them is *"ample rest"* and stopping on movement quality, so a skip that routed
+  // to the 90-second default was being rested like an accessory. Mirrors `equipmentForExercise` and
+  // `isBodyweightMove`, extended in the same change.
+  // ⚠️ THIS ONE ONLY LOWERCASES — hyphens survive, so the stems are spelt with them.
+  return /jump|bound|hop|box jump|bench jump|broad jump|depth jump|squat jump|tuck jump|split jump|plyo|skip|shuffle|ladder drill|stiff-legged|explosive/.test(name);
 };
 
 /**

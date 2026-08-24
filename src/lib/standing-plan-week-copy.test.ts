@@ -366,3 +366,69 @@ Deno.test('no shorthand beside its own longhand in a React style object', async 
     }
   }
 });
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// A4 — THE HARD SLOT'S SESSION IS THE FRAME'S FACT, NOT A CHOICE (Michael, 2026-08-24)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ THE FRAME\'S FACT IS STATED PER SLOT AND PER SPORT, and the two slots differ', async () => {
+  /**
+   * ⛔ THE RULING. The card offered top-end versus sustained as buttons and the athlete never owned
+   * that decision: p246 fixes the two hard slots as different families — `run_mlss` on frame day 1,
+   * `run_near_threshold` on day 3 — and the composer builds those whatever the card writes.
+   *
+   * ⚠️ THE FACT COMES OFF `hardSlotDefault`, the same owner the wizard sends from, so the sentence
+   * the screen states and the value that reaches the composer cannot come apart.
+   */
+  const { hardSlotFact, hardSlotDefault, HARD_SLOT_FACT_NOTE } = await import('./hard-slot-choices.ts');
+  for (const sport of ['run', 'ride'] as const) {
+    const one = hardSlotFact(sport, 'hard1');
+    const two = hardSlotFact(sport, 'hard2');
+    assert(one && two, `${sport}: a slot has no session to state`);
+    assert(one!.title !== two!.title, `${sport}: both hard slots state the same session`);
+    // ⛔ SLOT TWO IS THE SUSTAINED ONE ON EITHER SPORT — `run_near_threshold` / the sweet-spot blocks.
+    assertEquals(two!.title, 'Sustained threshold');
+    // ⚠️ AND THE FACT MATCHES WHAT THE WIZARD ACTUALLY SENDS.
+    assertEquals(hardSlotDefault(sport, 'hard2').role, 'threshold');
+    assertEquals(hardSlotDefault(sport, 'hard1').role, 'intensity');
+  }
+  // ⛔ AND THE ATHLETE IS TOLD WHO DECIDED. A fact with no explanation reads as a control that broke.
+  assert(/programme/i.test(HARD_SLOT_FACT_NOTE));
+  assert(/sport/i.test(HARD_SLOT_FACT_NOTE) && /club/i.test(HARD_SLOT_FACT_NOTE),
+    'the note does not say what IS still the athlete\'s');
+});
+
+Deno.test('⛔ THE CHOICE CONTROL IS GONE FROM THE CARD, AND THE CLUB CONTROL IS NOT', async () => {
+  /**
+   * ⚠️ A SOURCE LINT, because no unit test renders this component. What is checkable is the shape:
+   * the option list is no longer mapped into buttons, and the club checkbox still is.
+   *
+   * ⛔ THE FAILURE IT CATCHES IS A REVERT. A future session restoring `hardSlotOptions(...).map(...)`
+   * here would silently reinstate a control over a decision the programme owns — which is the defect
+   * this card has now been rebuilt around three times.
+   */
+  const src = await Deno.readTextFile(new URL('../components/HardSlotChoices.tsx', import.meta.url).pathname);
+  assert(!/hardSlotOptions/.test(src), 'the session option list is being mapped into controls again');
+  assert(!/opts\.map/.test(src), 'the card renders a list of session buttons');
+  assert(/hardSlotFact/.test(src), 'the card no longer states the frame\'s session');
+  assert(/hard-\$\{props\.slotKey\}-club/.test(src), 'the club control was removed with the choices');
+  assert(/ownership: club \? 'prescribed' : 'club'/.test(src), 'the club control stopped replacing the slot');
+});
+
+Deno.test('⛔ THE WIZARD RE-STAMPS THE FRAME\'S SESSION, so a stale role cannot travel', async () => {
+  /**
+   * ⛔ `syncHardDays` USED TO RETURN `prev` UNTOUCHED when the discipline matched, which was right
+   * while the athlete could pick the session — their answer had to survive. With the picker gone the
+   * frame's fact is the only legal value, and returning `prev` would leave a stale `role`, or a
+   * leftover `goal` from an earlier draft, travelling to the composer as an allocation nobody made.
+   *
+   * ⚠️ SOURCE LINT AGAIN — the function is a closure inside a six-thousand-line component. What is
+   * checkable is that the early return is gone and `goal` is written unconditionally.
+   */
+  const src = await Deno.readTextFile(new URL('../components/NonRaceBuilder.tsx', import.meta.url).pathname);
+  const fn = src.split('const syncHardDays')[1]?.split('const derivedCounts')[0] ?? '';
+  assert(fn.length > 100, 'syncHardDays could not be found — it moved or was renamed');
+  assert(!/if \(prev && prev\.discipline === want\.discipline\) return prev;/.test(fn),
+    'a slot with an unchanged sport keeps whatever role was already on it');
+  assert(/goal: want\.goal,/.test(fn), 'goal is not written every time, so a stale one can survive');
+});

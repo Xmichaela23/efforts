@@ -44,7 +44,16 @@ export type RestatedChange = {
   movement: string;
   /** ⛔ `null` FROM means the row carried no weight at all — the "by feel" contract it opened on. */
   from: number | null;
-  to: number;
+  /** ⛔ `null` TO means the weight did not move — this change is a SET COUNT, not a load. */
+  to: number | null;
+  /**
+   * ⛔ THE ME SET LADDER'S MOVE, WHEN THIS ROW EARNED OR LOST ONE (A2, 2026-08-24).
+   *
+   * ⚠️ IT IS ITS OWN FIELD RATHER THAN A SECOND MEANING FOR `from`/`to`. A surface listing the
+   * proposed changes has to be able to say *"the squat goes up ten pounds"* and *"the squat gains a
+   * second set"* as different sentences; overloading one pair of numbers is how they become one.
+   */
+  sets?: { from: number; to: number };
 };
 
 export type Restatement = {
@@ -61,6 +70,24 @@ export function weekdayOf(dateIso: string | null | undefined): string | null {
   const t = Date.parse(`${String(dateIso ?? '').slice(0, 10)}T00:00:00Z`);
   if (!Number.isFinite(t)) return null;
   return DAY_NAMES[new Date(t).getUTCDay()];
+}
+
+/**
+ * ⛔ HOW MANY WORK SETS A ROW PRESCRIBES — `set_plan` first, because that is what the logger draws.
+ *
+ * ⚠️ WARM-UPS ARE NOT COUNTED, the same rule p147 states for the dosing ledger. A row whose plan is
+ * three warm-ups and one work set prescribes ONE set, and reading four here would tell the ladder a
+ * pattern is at its cap when it is at its floor.
+ */
+function setCountOf(ex: StrengthExercise | null | undefined): number | null {
+  if (!ex) return null;
+  const plan = Array.isArray(ex.set_plan) ? ex.set_plan as PlannedSet[] : null;
+  if (plan) {
+    const work = plan.filter((s) => !s?.warmup).length;
+    if (work > 0) return work;
+  }
+  const n = Number(ex.sets);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
 function topWorkWeight(ex: StrengthExercise | null | undefined): number | null {
@@ -92,11 +119,24 @@ export function restateFromTest(args: {
   planned: PlannedRowish[] | null | undefined;
   afterWeek: number;
 }): Restatement {
+  /**
+   * ⛔⛔ IT ACCUMULATES; IT USED TO OVERWRITE, AND THAT BECAME A SILENT NO-OP ON 2026-08-24.
+   *
+   * `bySlot.set(...)` was correct while a day held at most one strength session. The three-day plyo
+   * placement (A3) puts a `type: 'strength'` drill session on frame day 1 **beside the lift** — so
+   * the second write replaced `ME: Upper`'s exercises with a skip, and every ME row on that day
+   * stopped being restated. Nothing would have failed: the diff would simply have come back short,
+   * which is the exact "the test produced nothing" silence this file warns about at the bottom.
+   *
+   * ⚠️ CONCATENATING IS SAFE because the match below is on NAME as well as week and day, so two
+   * sessions' rows sharing one bucket cannot cross-match.
+   */
   const bySlot = new Map<string, StrengthExercise[]>();
   for (const wk of args.composed) {
     for (const s of wk.sessions) {
       if (s.type !== 'strength') continue;
-      bySlot.set(`${wk.week}|${s.day}`, s.strength_exercises ?? []);
+      const key = `${wk.week}|${s.day}`;
+      bySlot.set(key, [...(bySlot.get(key) ?? []), ...(s.strength_exercises ?? [])]);
     }
   }
 
@@ -137,17 +177,44 @@ export function restateFromTest(args: {
        * `topWorkWeight` already returns null for all of them. A branch that cannot change an answer
        * is the dead guard this codebase keeps deleting (`lowerBodyHaircut` lost one the same way).
        */
-      if (to == null) return ex;
       const from = topWorkWeight(ex);
-      if (from === to) return ex;
+      /**
+       * ⛔ THE SET COUNT MOVES ON ITS OWN AXIS (A2, 2026-08-24). The ME ladder can add a set in a week
+       * where the weight is unchanged, and the weight can move in a week where the count is not — so
+       * a single `touched` test on the weight would silently drop every set change that landed on a
+       * flat week. ⚠️ It is computed from `fresh` vs `ex` rather than from the ladder, so a row the
+       * composer no longer authors cannot have its count rewritten by a pattern it does not belong to.
+       */
+      const toSets = setCountOf(fresh);
+      const fromSets = setCountOf(ex);
+      const setsMove = toSets != null && fromSets != null && toSets !== fromSets;
+      const weightMoves = to != null && from !== to;
+      if (!weightMoves && !setsMove) return ex;
       touched = true;
-      changes.push({ week, day, movement: String(fresh.name), from, to });
+      changes.push({
+        week,
+        day,
+        movement: String(fresh.name),
+        from,
+        to: weightMoves ? to : null,
+        ...(setsMove ? { sets: { from: fromSets as number, to: toSets as number } } : {}),
+      });
+      /**
+       * ⚠️ ONLY A PRESCRIBED WEIGHT REPLACES A WEIGHT. A HYP row carries no percentage by design
+       * (p218) and stays "By feel" forever — so a set-count-only change leaves the load fields alone
+       * rather than stamping `load_prescribed: true` over an auto-regulated row.
+       */
       return {
         ...ex,
-        weight: fresh.weight,
-        ...(fresh.percent_1rm != null ? { percent_1rm: fresh.percent_1rm } : {}),
-        ...(fresh.set_plan ? { set_plan: fresh.set_plan } : {}),
-        load_prescribed: true,
+        ...(weightMoves
+          ? {
+            weight: fresh.weight,
+            ...(fresh.percent_1rm != null ? { percent_1rm: fresh.percent_1rm } : {}),
+            load_prescribed: true,
+          }
+          : {}),
+        ...(setsMove ? { sets: toSets as number } : {}),
+        ...((weightMoves || setsMove) && fresh.set_plan ? { set_plan: fresh.set_plan } : {}),
       };
     });
     if (touched) rows.push({ id: String(row.id), week, day, strength_exercises: next });

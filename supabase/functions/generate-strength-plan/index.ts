@@ -67,6 +67,17 @@ import {
  * file; a second copy in the new module would be the doubled disease.
  */
 import { trustedMaxRepsFor } from '../shared/strength-system/loading/wendler-531.ts';
+/**
+ * ⛔ THE ONE OWNER OF THE STORED PICK SHAPE (A1, 2026-08-24). `normalizeAssistancePrefs` migrates the
+ * v1 flat shape, drops unrecognised keys and never returns a partial week — everything a second
+ * reader of `training_prefs.assistance_picks` would have to reimplement and eventually get wrong.
+ *
+ * ⚠️ IT IS IMPORTED HERE AND NOT IN THE STANDING-PLAN MODULE, DELIBERATELY.
+ * `standing-plan.test.ts`'s module lint forbids that directory from importing `assistance-catalog`
+ * at all — it is Wendler's model and the Standing Plan may not reach into it. So the flattening
+ * happens at the WIRE, and the composer takes plain movement names.
+ */
+import { normalizeAssistancePrefs } from '../../../src/lib/assistance-catalog.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
 import { describeThresholdBasis, resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
@@ -480,9 +491,35 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      /**
+       * ⛔ THE ATHLETE'S ACCESSORY PICKS, FLATTENED (A1, 2026-08-24). Twelve per-day choices become a
+       * deduped list of movement names, because this frame's four days do not map onto the picker's
+       * three and placing a pick by what it TRAINS is the only honest reading. Full reasoning on
+       * `ComposeArgs.accessoryPicks`.
+       *
+       * ⚠️ THE FOCUS CHIPS ARE NOT CONSUMED HERE AND THAT IS NOT AN OVERSIGHT. `prefs.focus` biases
+       * WHICH movement fills a Wendler category; the Standing Plan's slots are already named by
+       * pattern and category from p246, so a chip has no slot to re-point. ⛔ Wiring the chips is
+       * SESSION B's B2 and it is listed there — do not add a second reader for them here.
+       */
+      const accessoryPicks = (() => {
+        const raw = (body as Record<string, unknown>).assistance_picks;
+        if (!raw || typeof raw !== 'object') return undefined;
+        const prefs = normalizeAssistancePrefs(raw);
+        const out: string[] = [];
+        for (const day of Object.values(prefs.by_day ?? {})) {
+          for (const movement of Object.values(day ?? {})) {
+            const name = String(movement ?? '').trim();
+            if (name && !out.some((x) => x.toLowerCase() === name.toLowerCase())) out.push(name);
+          }
+        }
+        return out.length > 0 ? out : undefined;
+      })();
+
       const row = buildStandingPlanRow({
         compose: {
           frame: frameId,
+          ...(accessoryPicks ? { accessoryPicks } : {}),
           // ⛔ THE ATHLETE HAS NOT BEEN ASKED YET (stage 5). Seeded from the four lifts the entry
           // gate already demanded — see `defaultCompetitionLifts` for why it is three, not four.
           competitionLifts,

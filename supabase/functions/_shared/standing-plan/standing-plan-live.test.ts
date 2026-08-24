@@ -187,7 +187,11 @@ Deno.test('the block records the rotation it ran on, so nothing has to re-derive
   const row = buildStandingPlanRow({ compose: COMPOSE, weeks: 4, taperWeeks: [], dayMap: map });
   assertEquals(row.config.day_offset, 1);
   assertEquals(row.config.pins_honoured.longRun, true);
-  // The lifting days moved with it.
+  // The lifting days moved with it. Four lifting days plus the frame's plyometric day.
+  // ⚠️ FIVE, AND IT STAYED FIVE THROUGH THE 2026-08-24 DRILL WORK. A three-day plyo spread was built
+  // and reverted the same day — it belongs to the half-marathon frame (p250), and p246 prints "Plyo
+  // warm-up" on day 3 alone. ⛔ Had it stood, this would read SIX, with the sixth holding no lift at
+  // all, and `adapt-plan` and the optimizer read this field as the week's picture.
   assertEquals(row.strength_days, ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday']);
 });
 

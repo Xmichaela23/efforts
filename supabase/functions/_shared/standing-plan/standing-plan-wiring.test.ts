@@ -276,7 +276,10 @@ Deno.test('there is no scheduled deload, and that is his answer rather than an o
 
 Deno.test('the block reports the lifting days it actually used', () => {
   const row = buildStandingPlanRow(ROW_ARGS);
-  // Four lifting days plus the plyometric day, in weekday order.
+  // Four lifting days plus the frame's plyometric day, in weekday order.
+  // ⚠️ FIVE, AND THE 2026-08-24 DRILL WORK DID NOT MOVE IT. A three-day plyo spread was built and
+  // reverted the same day; it would have added Saturday, a day holding no lift, to a field
+  // `adapt-plan` and the optimizer read as the week's picture.
   assertEquals(row.strength_days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 });
 

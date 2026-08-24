@@ -39,7 +39,20 @@ import {
 } from './frames.ts';
 import { weekdayForFrameDay, type Weekday } from './day-map.ts';
 import { assignSports, assignedSlot, type SportMix } from './sport-slots.ts';
-import { HAIRCUT_CAUSE_IS_OURS, prescribedLoad } from './progression.ts';
+import {
+  HAIRCUT_CAUSE_IS_OURS,
+  INTENSITY_STARTS_LOW_IS_OURS,
+  ME_SET_LADDER_IS_OURS,
+  prescribedLoad,
+  setPositionForCount,
+} from './progression.ts';
+import {
+  drillForWeek,
+  PLYO_FAMILIES,
+  PLYO_FAMILIES_PER_DAY,
+  PLYO_FAMILY_MIX_IS_OURS,
+} from './plyo.ts';
+import { foldExerciseName } from '../../../../src/lib/exercise-config.ts';
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import {
   isTestWeek,
@@ -131,9 +144,57 @@ export type ComposeArgs = {
    * this true and no working numbers would prescribe nothing at all. Default is the test.
    */
   skipTestWeek?: boolean;
+  /**
+   * ⛔ THE ATHLETE'S ACCESSORY PICKS, FLATTENED TO MOVEMENT NAMES (device finding A1, 2026-08-24).
+   *
+   * The picker survives whole (pivot §6) and until now it wrote to a shape only Get Stronger read.
+   * Michael added ab and single-leg work and the built week came back with `plank — "Floor: core had
+   * nothing else this week"`: the engine recording that it had seen no core from the athlete, on a
+   * week where the athlete had named one.
+   *
+   * ⛔ FLAT, AND THE DAY IS DELIBERATELY DROPPED — that is OURS and it is stated rather than assumed.
+   * The picker's keys are Wendler's three lifting days (`squat` / `bench` / `deadlift`); this frame's
+   * days are ME:Upper, ME:Lower, DE:Upper and DE:Lower. There is no honest mapping between the two,
+   * so a pick is placed by what it TRAINS — its pattern for a HYP slot, its prime mover for a floor —
+   * and never by which of another programme's days it was chosen on.
+   *
+   * ⚠️ A PICK IS A PREFERENCE, NEVER A NEW SLOT. Convert, never add: it fills a slot the frame
+   * already has, or a floor the week already needs. One that fits neither is REPORTED — see
+   * `unplacedPickNote`.
+   */
+  accessoryPicks?: string[] | null;
+  /**
+   * ⛔ HOW MANY SETS EACH PATTERN'S ME SLOT HAS EARNED — 1, 2 or 3 (device finding A2, 2026-08-24).
+   *
+   * Absent is one set, which is his own "start at the low end" default and the block every athlete
+   * opens on. The count is derived from logged history by `earnedMeSets` and reaches a built block
+   * only through the restater, so a block is never authored on a number the athlete has not yet
+   * earned. See `ME_SET_LADDER_IS_OURS`.
+   */
+  meSetsByPattern?: Partial<Record<ViadaPattern, number>> | null;
 };
 
 export type ComposeNote = { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string };
+
+/**
+ * ⛔ ONE ME ROW, AND WHOSE PATTERN IT BELONGS TO — the earn rule's index (A2, 2026-08-24).
+ *
+ * ⚠️ IT IS IN MEMORY AND IT IS NOT A STORED FIELD, deliberately. The alternative was stamping
+ * `viada_pattern` onto `StrengthExercise`, which travels into `plans.sessions_by_week` and then into
+ * `planned_workouts.strength_exercises` — a persisted shape change for a fact the composer can hand
+ * back for free, on a path (`materialize-plan`) that rebuilds each exercise object field by field and
+ * would drop it anyway. `earnedMeSets` reads this off a fresh compose; nothing on disk changes.
+ */
+export type MeRowIndex = {
+  week: number;
+  day: string;
+  movement: string;
+  pattern: ViadaPattern;
+  /** How many sets the row asked for. A short session is measured against this. */
+  sets: number;
+  /** The prescribed weight, or `null` on the "by feel" weeks before the test is read. */
+  weight: number | null;
+};
 
 export type ComposedWeek = {
   frame: FrameId;
@@ -143,6 +204,8 @@ export type ComposedWeek = {
   sessions: PlanSession[];
   /** ⛔ THE DOSING LEDGER FOR THE WHOLE WEEK, strength sets included — p147's bucket. */
   ledger: DoseLedger;
+  /** ⛔ THE ME ROWS THIS WEEK PRESCRIBED — see {@link MeRowIndex}. Empty in the test week. */
+  meRows: MeRowIndex[];
   notes: ComposeNote[];
 };
 
@@ -180,11 +243,32 @@ function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | nul
   return Math.round(((p.rir.lo + p.rir.hi) / 2) * 2) / 2;
 }
 
-/** ⛔ Percent of the working number, per intent. Stage 2 owns the bands; this only picks the top. */
+/**
+ * ⛔ HIS ME SET BAND — 1 to 3, p218 — READ OFF STAGE 2 RATHER THAN RESTATED HERE.
+ *
+ * The ladder in `progression.ts` clamps to it and `exerciseForSlot` interpolates inside it. Writing
+ * `{ lo: 1, hi: 3 }` in either place would be a second owner of a number `strength-grid/intents.ts`
+ * already holds, and the two would part company the first time the band moved.
+ */
+export const ME_SETS_BAND: { lo: number; hi: number } = (() => {
+  const p = prescribe('ME', 'barbell');
+  return p.kind === 'barbell' ? p.setsBand : { lo: 1, hi: 1 };
+})();
+
+/**
+ * ⛔ PERCENT OF THE WORKING NUMBER, PER INTENT — AND IT IS THE BOTTOM OF THE BAND, NOT THE TOP.
+ *
+ * ⚠️ THIS RETURNED `pctOf1RM.hi` UNTIL 2026-08-24 AND THAT WAS AN ARITHMETIC ERROR, not a policy
+ * choice. Paired with the set plan's `reps.hi` it prescribed **five reps at 100% of the working
+ * number** on every ME slot — and the working number is already 96% of a predicted max, so the row
+ * asked for five reps at ninety-six per cent of a one-rep max. Stage 2 owns the bands; picking a
+ * point inside one is this function's only decision, and it now takes the end the source's own
+ * "start low" instruction points at. Full reasoning and Michael's ruling: `INTENSITY_STARTS_LOW_IS_OURS`.
+ */
 function pctForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | null {
   const p = prescribe(intent, 'barbell');
   if (p.kind !== 'barbell' || !p.pctOf1RM) return null;
-  return p.pctOf1RM.hi;
+  return p.pctOf1RM.lo;
 }
 
 const LIFT_FOR_PATTERN: Record<ViadaPattern, TestedLift> = {
@@ -236,6 +320,53 @@ export function testWeekLiftNames(
 }
 
 /**
+ * ⛔ THE ATHLETE'S PICKS, HELD FOR THE WHOLE WEEK — because "was this one used yet" is a question
+ * about the WEEK and a day loop cannot see it.
+ *
+ * ⚠️ FOLDED KEYS, NOT RAW ONES. The picker stores display names (`Chin-Up`, `Weighted Sit-Up`) and
+ * both the grid and the muscle classifier are keyed off the catalogue's own spellings (`chin up`).
+ * An exact-string comparison matches almost nothing and is indistinguishable from an athlete who
+ * picked nothing at all — which is the shape of the defect this whole path exists to close.
+ */
+export const PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN =
+  'Your accessory choices are placed by what they train, not by the day you chose them on. The '
+  + 'picker asks per lifting day for a three-day programme; this week has four differently shaped '
+  + 'ones, so a choice goes wherever the week has a slot for that movement pattern, or fills the gap '
+  + 'for the muscle it works.';
+
+type PickPool = {
+  /** folded name → the athlete's own spelling, for the row and for the compromise line. */
+  byFold: Map<string, string>;
+  /** Folded names not yet placed anywhere in the week. */
+  unplaced: Set<string>;
+  /**
+   * ⛔ FOLDED NAMES ALREADY PLACED THIS WEEK — the A1 ruling's *"dedupe against the week"*.
+   *
+   * ⚠️ IT GUARDS THE **GRID'S** PATH, NOT THE PICK'S. Two slots can resolve to the same movement on
+   * different days: `strength_5k` day 2's ambiguous lower slot and day 5's focused lower slot both
+   * land on the split squat for a barbell athlete, and they did so before picks existed. That is
+   * tolerable when the engine chose both — it is not when one of them is the athlete's stated choice,
+   * because the week then reads as *"we heard you, and we also did it again"*. The later slot takes
+   * the next option instead.
+   *
+   * ⛔ IT IS DELIBERATELY NARROW. A general week-wide dedupe would change every week this composer
+   * has ever built, for a defect nobody has reported. This changes only weeks that carry picks.
+   */
+  placed: Set<string>;
+};
+
+function pickPool(names: string[] | null | undefined): PickPool {
+  const byFold = new Map<string, string>();
+  for (const raw of names ?? []) {
+    const name = String(raw ?? '').trim();
+    if (!name) continue;
+    const fold = foldExerciseName(name);
+    if (fold && !byFold.has(fold)) byFold.set(fold, name);
+  }
+  return { byFold, unplaced: new Set(byFold.keys()), placed: new Set() };
+}
+
+/**
  * ⛔ ONE STRENGTH SLOT → ONE EXERCISE ROW.
  *
  * The `Accessory:` role is a FILTER on top of stage 2, exactly as p247 defines it: exclude the
@@ -251,7 +382,9 @@ function exerciseForSlot(
    *  — a hip thrust satisfies both `primary press_lower` and `secondary hinge_lower` — and it reads
    *  as an engine that lost its place. The later slot takes the next option instead. */
   takenToday: Set<string>,
-): { exercise: StrengthExercise; movement: string; sets: number } {
+  /** ⛔ THE ATHLETE'S UNPLACED PICKS. A HYP slot offers itself to them before the grid answers. */
+  picks: PickPool,
+): { exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern } {
   const pattern = patternForWeek(slot, args.week);
   const competition = args.competitionLifts[pattern] ?? null;
 
@@ -263,15 +396,46 @@ function exerciseForSlot(
   });
 
   let movement: string;
-  if (slot.role === 'competition' && competition) {
+  /**
+   * ⛔ A HYP ACCESSORY SLOT GOES TO THE ATHLETE'S PICK WHEN THE PICK FITS IT (A1, 2026-08-24).
+   *
+   * ⚠️ **FITS** IS `resolveSlot`'s OWN ANSWER, NOT A SECOND TEST. The pick must already be one of the
+   * options this cell offers — same pattern, same category, same equipment gate — so honouring it
+   * can never put a movement in a slot the frame did not ask for, and it can never widen the gear
+   * gate. A pick that fits nowhere in the frame falls through to the muscle floor, and one that fits
+   * neither is reported through `placement_compromises`.
+   *
+   * ⛔ HYP ONLY. ME and DE slots carry the frame's competition and accessory prescriptions; those
+   * are the programme's, not the athlete's, and pivot §6 puts the athlete's choice in the exercises
+   * the frame leaves open — which is what the hypertrophy slots are.
+   */
+  const fromPick = slot.intent === 'HYP' && slot.role === 'accessory'
+    ? resolved.options.find((o) => {
+      const fold = foldExerciseName(o.name);
+      return picks.unplaced.has(fold)
+        && !takenToday.has(o.name.toLowerCase())
+        && (!competition || o.name.toLowerCase() !== competition.toLowerCase());
+    })
+    : undefined;
+
+  if (fromPick) {
+    // ⚠️ THE ATHLETE'S OWN SPELLING IS WHAT THE ROW SHOWS. They typed `Chin-Up`; printing the
+    // catalogue's `chin up` back at them reads as the app having ignored the choice and picked
+    // something similar.
+    movement = picks.byFold.get(foldExerciseName(fromPick.name)) ?? fromPick.name;
+    picks.unplaced.delete(foldExerciseName(fromPick.name));
+    picks.placed.add(foldExerciseName(fromPick.name));
+  } else if (slot.role === 'competition' && competition) {
     // ⛔ *"All first lifts of the day should be a competition movement"* (p247). The athlete named it,
     // and it is never deduped away — the frame asks for it by name.
     movement = competition;
   } else {
     // ⛔ THE ROLE FILTER. A noncompetition variant in the same gross pattern.
-    const options = slot.role === 'accessory' && competition
+    const options = (slot.role === 'accessory' && competition
       ? resolved.options.filter((o) => o.name.toLowerCase() !== competition.toLowerCase())
-      : resolved.options;
+      : resolved.options)
+      // ⛔ AND NOT A MOVEMENT THE ATHLETE'S OWN PICK ALREADY HOLDS — see `PickPool.placed`.
+      .filter((o) => !picks.placed.has(foldExerciseName(o.name)));
     let fresh = options.find((o) => !takenToday.has(o.name.toLowerCase()));
 
     /**
@@ -289,6 +453,7 @@ function exerciseForSlot(
         const wider = resolveSlot({ category: alt, pattern, intent: slot.intent, equipment: args.equipment ?? null });
         fresh = wider.options.find((o) =>
           !takenToday.has(o.name.toLowerCase())
+          && !picks.placed.has(foldExerciseName(o.name))
           && (!competition || o.name.toLowerCase() !== competition.toLowerCase()));
         if (fresh) break;
       }
@@ -303,7 +468,25 @@ function exerciseForSlot(
     notes.push({ kind: 'gap', text: slot.ambiguousNotation, cite: 'Viada p246' });
   }
 
-  const p = prescribe(slot.intent, 'barbell');
+  /**
+   * ⛔ THE ME SLOT'S SET COUNT IS EARNED (A2, 2026-08-24) — and it still comes out of stage 2's band.
+   *
+   * Every ME slot prescribed ONE set of 1-5 for twelve weeks, because `setsFor` returns the low end
+   * of a band unless a caller says otherwise and no caller ever did. p084 asks for **4 to 6 reps
+   * above 90% per movement pattern per week**, and a single set of one to five sits at or below that
+   * floor permanently — the thing that was short was the set COUNT, and nothing in the engine could
+   * move it. `meSetsByPattern` carries what the pattern has earned; the band, and the interpolation
+   * inside it, stay owned by `strength-grid/intents.ts`.
+   *
+   * ⚠️ ABSENT IS ONE SET, which is his own default and the block every athlete opens on. A block is
+   * never AUTHORED on an earned count — the count arrives through the restater, after the sessions
+   * that earned it were logged.
+   */
+  const earnedMe = slot.intent === 'ME' ? Number(args.meSetsByPattern?.[pattern]) : NaN;
+  const setPosition = Number.isFinite(earnedMe)
+    ? setPositionForCount(earnedMe, ME_SETS_BAND)
+    : undefined;
+  const p = prescribe(slot.intent, 'barbell', setPosition);
   const sets = p.kind === 'barbell' ? p.sets : 1;
   const reps = p.kind === 'barbell' ? `${p.reps.lo}-${p.reps.hi}` : '';
   const isLower = LOWER_PATTERNS.includes(pattern);
@@ -344,6 +527,7 @@ function exerciseForSlot(
       },
       movement,
       sets,
+      pattern,
     };
   }
 
@@ -388,6 +572,7 @@ function exerciseForSlot(
     },
     movement,
     sets,
+    pattern,
   };
 }
 
@@ -450,26 +635,54 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
   };
 }
 
-/** ⛔ THE PLYO DAY. Drill count and stop rule are his (p227); the effort count is ours. */
-function plyoSession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]): PlanSession {
+/**
+ * ⛔ THE PLYO DAY'S ROWS — NAMED DRILLS, ONE ROW EACH (A3, 2026-08-24).
+ *
+ * ⚠️ WHAT THIS REPLACES: a single row reading `Plyometric drills 3×4`. That is the name of a category
+ * with a set count attached, and p227's very first instruction is that **all drills are done
+ * SEPARATELY** — a claim one row cannot express and an athlete cannot follow.
+ *
+ * ⛔ THE DRILLS, THE FAMILIES, THE PER-DAY CAP AND THE STOP RULE ARE ALL HIS. What is ours is the
+ * efforts-per-drill figure (`PLYO_DOSE.effortCountIsOurs`) and taking one drill from each family
+ * (`PLYO_FAMILY_MIX_IS_OURS`); both say so on the block.
+ */
+function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
   if (!notes.some((n) => n.text === PLYO_DOSE.effortCountIsOurs)) {
     notes.push({ kind: 'ours', text: PLYO_DOSE.effortCountIsOurs });
     notes.push({ kind: 'source', text: PLYO_DOSE.stopRule, cite: PLYO_DOSE.stopRuleIsHis });
+    notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
+  return PLYO_FAMILIES_PER_DAY.map((family) => ({
+    name: drillForWeek(family, args.week),
+    // ⛔ ONE ROW, ONE DRILL, and the efforts sit in `reps` because a plyometric row shows reps and
+    // nothing else (D-3452) — there is no load to record and no plate calculator to draw.
+    sets: 1,
+    reps: PLYO_DOSE.effortsPerDrill,
+    weight: 'Bodyweight',
+    load_prescribed: false,
+    notes: `About ${PLYO_DOSE.effortsPerDrill} efforts, full rest between. `
+      + `${PLYO_FAMILIES[family].benefit}. Stop when the movement stops being crisp.`,
+  }));
+}
+
+/**
+ * ⛔ THE FRAME'S PLYO DAY — ITS OWN SESSION, ON THE DAY p246 MARKS AND ON NO OTHER.
+ *
+ * ⚠️ THE WEEK'S SESSION COUNT IS UNCHANGED BY THE DRILL WORK. What changed on 2026-08-24 is that the
+ * session names its drills instead of carrying one row called *"Plyometric drills"*; where it sits
+ * and how long it takes are exactly what they were.
+ *
+ * ⛔ AND THE DRILLS NEVER ENTER `dosing`. They are not barbell work sets: counting them would inflate
+ * the day against p086's fourteen-set ceiling and push the muscle floor onto a different session.
+ */
+function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[]): PlanSession {
   return {
     day: dayNameFor(args, day.day),
     type: 'strength',
     name: 'Plyometrics',
     description: PLYO_DOSE.stopRule,
     duration: 20,
-    strength_exercises: [{
-      name: 'Plyometric drills',
-      sets: PLYO_DOSE.drillsPerDay,
-      reps: PLYO_DOSE.effortsPerDrill,
-      weight: 'Bodyweight',
-      load_prescribed: false,
-      notes: `${PLYO_DOSE.drillsPerDay} drills, about ${PLYO_DOSE.effortsPerDrill} efforts each, full rest between.`,
-    }],
+    strength_exercises: rows,
     tags: ['standing_plan', 'plyo'],
   };
 }
@@ -484,6 +697,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const notes: ComposeNote[] = [];
   const sessions: PlanSession[] = [];
   const dosing: DosingSession[] = [];
+  /** ⛔ THE EARN RULE'S INDEX — see {@link MeRowIndex}. Never persisted. */
+  const meRows: MeRowIndex[] = [];
   /**
    * ⛔ WEEK ONE IS THE TEST WEEK — UNLESS THE ATHLETE TOOK THE SKIP (Michael, 2026-08-23), and the
    * skip is only offerable when logged history already carries a trustworthy max for every lift the
@@ -504,6 +719,15 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * "the hard sessions go on the bike" and "the running keeps its long session" are statements about
    * the WEEK, and deciding them slot by slot inside the day loop could not see either.
    */
+  /**
+   * ⛔ THE ATHLETE'S PICKS, POOLED FOR THE WHOLE WEEK (A1). Consumed by the HYP slots first, then
+   * offered to the muscle floor, and whatever is left goes down the compromise channel.
+   */
+  const picks = pickPool(args.accessoryPicks);
+  if (picks.byFold.size > 0 && !notes.some((n) => n.text === PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN)) {
+    notes.push({ kind: 'ours', text: PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN });
+  }
+
   const sportAssignment = assignSports(days, args.sportMix ?? {});
   for (const n of sportAssignment.notes) {
     if (!notes.some((x) => x.text === n.text)) {
@@ -514,10 +738,20 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   for (const day of days) {
     if (day.rest) continue;
 
+    // ── plyometrics ───────────────────────────────────────────────────────────────────────────
+    //
+    // ⛔ THE FRAME OWNS THE DAY. `FrameDay.plyo` marks it in both columns and `plyo.ts` holds no day
+    // number of its own, so the two cannot disagree. ⚠️ A three-day spread stood here for one
+    // afternoon on 2026-08-24 and was reverted — that layout is the half-marathon frame's (p250), not
+    // this one's, and p246 prints "Plyo warm-up" on day 3 alone.
+    //
+    // ⚠️ IT IS ITS OWN SESSION RATHER THAN ROWS APPENDED TO A LIFT, which matters if a future frame
+    // ever marks a lifting day: the drills must not enter `dosing`, and p247's *"all first lifts of
+    // the day should be a competition movement"* would not survive a skip at the top of the list.
+    const drills = day.plyo ? plyoRows(args, notes) : [];
+
     // ── strength ──────────────────────────────────────────────────────────────────────────────
-    if (day.plyo) {
-      sessions.push(plyoSession(day, args, notes));
-    } else if (day.strength.length > 0) {
+    if (day.strength.length > 0) {
       const test = testWeek ? testDaySession(day, args, notes) : null;
       if (test) {
         sessions.push(test);
@@ -542,10 +776,25 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const dosed: DosingSession['sets'] = [];
         const takenToday = new Set<string>();
         for (const slot of day.strength) {
-          const { exercise, movement, sets } = exerciseForSlot(
-            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday);
+          const { exercise, movement, sets, pattern } = exerciseForSlot(
+            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday, picks);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
+          if (slot.intent === 'ME') {
+            const top = Array.isArray(exercise.set_plan) && exercise.set_plan.length > 0
+              ? Number(exercise.set_plan[exercise.set_plan.length - 1].weight)
+              : NaN;
+            meRows.push({
+              week: args.week,
+              day: dayNameFor(args, day.day),
+              movement,
+              pattern,
+              sets,
+              // ⚠️ `null` ON THE "BY FEEL" WEEKS. A row with no prescribed weight has no number for a
+              // logged set to fall short of, and the outcome test must not invent one.
+              weight: Number.isFinite(top) && top > 0 ? top : null,
+            });
+          }
         }
         if (testWeek && !notes.some((n) => n.text.includes('by feel this week'))) {
           notes.push({
@@ -566,6 +815,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         dosing.push({ label: day.label ?? `day ${day.day}`, sets: dosed });
       }
     }
+
+    // ⚠️ AFTER THE STRENGTH BRANCH, so a day that ever does lift still LEADS on its lift. Order
+    // inside a day is what the calendar renders.
+    if (drills.length > 0) sessions.push(plyoSession(day, args, drills));
 
     // ── endurance ─────────────────────────────────────────────────────────────────────────────
     //
@@ -615,20 +868,38 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   //
   // ⛔ THE LEDGER SEES THE STRENGTH SETS TOO. p147 puts high-intensity work sets from strength work
   // in the same bucket as accessory sets; a ledger fed only accessories under-reports every session.
-  const filled = fillMuscleFloor(dosing, { equipment: args.equipment ?? null });
+  //
+  // ⛔ AND THE FLOOR IS OFFERED THE ATHLETE'S UNPLACED PICKS FIRST (A1). A pick that fits no HYP slot
+  // in the frame — every ab movement, for one, since no slot in `strength_5k` carries a core pattern
+  // — still reaches the week here, filling the very gap the engine was about to fill for it.
+  const filled = fillMuscleFloor(dosing, {
+    equipment: args.equipment ?? null,
+    prefer: [...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),
+  });
   const ledger = ledgerFor(filled.sessions);
   for (const add of filled.added) {
     const target = sessions.find((s) => s.type === 'strength' && (s.name === add.session || s.day === add.session));
     if (!target) continue;
+    if (add.fromAthletePick) {
+      picks.unplaced.delete(foldExerciseName(add.movement));
+      picks.placed.add(foldExerciseName(add.movement));
+    }
     target.strength_exercises = [
       ...(target.strength_exercises ?? []),
       {
-        name: add.movement,
+        name: add.fromAthletePick
+          ? (picks.byFold.get(foldExerciseName(add.movement)) ?? add.movement)
+          : add.movement,
         sets: add.sets,
         reps: '8-10',
         weight: 'By feel',
         load_prescribed: false,
-        notes: `Floor: ${add.muscle} had nothing else this week.`,
+        // ⛔ THE ROW SAYS WHOSE MOVEMENT IT IS, AND THAT IS THE WHOLE DEVICE FINDING. `Floor: core had
+        // nothing else this week` printed under a movement the athlete had asked for by name is the
+        // engine stating, on the plan, that it never saw the choice.
+        notes: add.fromAthletePick
+          ? `Your pick for ${add.muscle}.`
+          : `Floor: ${add.muscle} had nothing else this week.`,
       },
     ];
   }
@@ -637,7 +908,28 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     notes.push({ kind: 'warning', text: `${u.muscle}: ${u.reason}` });
   }
 
-  return { frame: args.frame, week: args.week, column: args.column, isTestWeek: testWeek, sessions, ledger, notes };
+  /**
+   * ⛔ A PICK THAT COULD NOT BE HONOURED SAYS SO — the A1 ruling's second half, and it is a `warning`
+   * because `buildStandingPlanRow` turns every warning into a `placement_compromises` entry, which
+   * is the channel the athlete already reads (`NonRaceBuilder.tsx:2716`).
+   *
+   * ⚠️ NAMED, NOT COUNTED. *"One of your choices did not fit"* is a sentence nobody can act on; the
+   * movement's own name is what lets them pick something else or declare the kit for it.
+   */
+  if (picks.unplaced.size > 0) {
+    const names = [...picks.unplaced].map((f) => picks.byFold.get(f) ?? f).sort();
+    notes.push({
+      kind: 'warning',
+      text: `Not placed this week: ${names.join(', ')}. The programme owns how many slots the week `
+        + 'holds, and every slot that suits these was already filled — by another of your choices, or '
+        + 'by the movement the week was short of.',
+    });
+  }
+
+  return {
+    frame: args.frame, week: args.week, column: args.column, isTestWeek: testWeek,
+    sessions, ledger, meRows, notes,
+  };
 }
 
 /** Every week of a block. ⛔ Week one is the test week; the taper column is the hold variant. */

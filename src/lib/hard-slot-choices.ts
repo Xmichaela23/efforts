@@ -71,3 +71,46 @@ export function hardSlotTitle(sport: 'run' | 'ride', value: HardSlotValue): stri
     : value.role === o.role && !value.goal));
   return hit?.title ?? null;
 }
+
+/**
+ * ⛔⛔ THE SLOT'S SESSION IS THE FRAME'S FACT, NOT A CHOICE (Michael, 2026-08-24 — A4).
+ *
+ * The card offered top-end / sustained as buttons. **It was never the athlete's to pick.** `p246`
+ * fixes the two hard slots as different families — `run_mlss` on frame day 1 and
+ * `run_near_threshold` on day 3 — and the composer builds those whatever the card writes. So the
+ * buttons were a control over a decision the programme had already made: tap one, and either the
+ * screen or the plan was lying.
+ *
+ * ⛔ WHAT STAYS A REAL CONTROL IS THE CLUB SESSION, and it stays because it genuinely REPLACES the
+ * slot rather than re-labelling it (his own Crit rule, work order §club). And the SPORT stays the
+ * athlete's, on the slot screen. What is gone is the middle question that was never one.
+ *
+ * ⚠️ WITHIN-FAMILY VARIANT SELECTION IS THE ENGINE'S AND STAYS THERE (gap #5, deferred by the same
+ * ruling). Which VO2 shape a hard run takes, which sweet-spot block a hard ride takes, is not asked
+ * anywhere — so `RUN_GROUND_OPTIONS`' speed-versus-hill question does not reappear here.
+ *
+ * ⛔ THE FACT IS READ OFF THE SAME TABLES THE CARD USED TO OFFER, through `hardSlotDefault`. One
+ * owner: the sentence the screen states and the value the wizard sends cannot come apart, which is
+ * the failure this card has now been rebuilt three times to fix.
+ */
+export function hardSlotFact(
+  sport: 'run' | 'ride',
+  slot: HardSlotKey,
+): { title: string; body: string } | null {
+  const want = hardSlotDefault(sport, slot);
+  const hit = hardSlotOptions(sport).find((o) => (o.goal
+    ? want.goal === o.goal && want.role === o.role
+    : want.role === o.role && !want.goal));
+  return hit ? { title: hit.title, body: hit.body } : null;
+}
+
+/**
+ * ⛔ WHY THE ATHLETE IS BEING TOLD RATHER THAN ASKED — one line, under the fact.
+ *
+ * ⚠️ IT NAMES THE PROGRAMME, NOT THE APP. *"The programme owns which session this is"* is the same
+ * sentence the block already uses for the mileage it does not take (`generate-strength-plan`'s
+ * wiring note), and it is true: the count and the family both come off p246.
+ */
+export const HARD_SLOT_FACT_NOTE =
+  'The programme sets which session this is. Your choice here is the sport, and whether a club '
+  + 'session takes the slot instead.';

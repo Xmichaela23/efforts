@@ -22,6 +22,26 @@ stage 4/5 notes before either.
 
 ## SESSION A — ENGINE
 
+> ## ✅ SESSION A IS DONE (2026-08-24 evening) — **A1, A2, A3 and A4 are all built in the tree.**
+> Not pushed, not deployed, not seen on a device. Write-up:
+> **`docs/NOTES-session-a-device-fixes-2026-08-24.md`**. Everything below is the ORIGINAL finding,
+> kept as written. Three things a reader of this file needs before trusting it:
+>
+> 1. ⛔ **A2 sat on a defect this file did not know about.** The composer prescribed the top of BOTH
+>    of Viada's bands at once — `reps.hi` at `pctOf1RM.hi` — so ME rows read *five reps at 100% of a
+>    working number that is already 96% of a predicted max*. The earn rule could never have fired.
+>    Michael ruled the slot opens at the **bottom** of the intensity band. **ME and DE weights moved
+>    on every block.**
+> 2. ⛔ **A3's "three placements" line below is WRONG and was retracted the same evening.** The
+>    1/3/6 layout is the **half-marathon frame's (p250)**; this doc conflated it with p246, which
+>    places the plyo warm-up on **day 3 alone**, both columns
+>    (`SOURCE-viada-hybrid-athlete.md` Part E1a, off `p246.jpg`, verified 2026-08-23). It was built,
+>    measured — the week went 9 sessions → 11 and `strength_days` 5 days → 6 — and **reverted**.
+>    **What A3 correctly asked for shipped: named drills, no generic row.**
+> 3. ⚠️ **B2 cannot be verified as written.** The focus chips reach no standing-plan composer at all,
+>    so adding the Core chip is necessary and not sufficient — B2 has to build the wire too.
+
+
 ### A1. The accessory picker's additions never reach the composer ⛔ (the placebo disease, third instance)
 
 Michael added ab and single-leg movements on the accessory screen. The built
@@ -53,12 +73,14 @@ Wire through the same restater path that already moves weights.
 
 ### A3. Plyos are a placeholder, and underdelivered vs the frame ⛔
 
-Built: "Plyometric drills 3×4", Wednesday only. The frame (p246) places plyo
-on THREE days — day 1 ×1, day 3 ×2, day 6 ×1 — and the corpus (Part A4, p227)
+Built: "Plyometric drills 3×4", Wednesday only. ⛔ **THE NEXT CLAUSE IS RETRACTED — see the box at
+the top of this file.** The frame (p246) places plyo
+on ~~THREE days — day 1 ×1, day 3 ×2, day 6 ×1~~ **day 3 alone** — and the corpus (Part A4, p227)
 names the three drill families (bounding/skip · ground-contact · footspeed)
 with the stop-on-quality rule already in the copy.
 
-Fix: (a) restore the frame's placements; (b) prescribe NAMED drills — pick
+Fix: ~~(a) restore the frame's placements;~~ **(a) is retracted — the placement was already right.**
+(b) prescribe NAMED drills — pick
 per-day from the families (bounding family always present for runners;
 rotate within family week to week per his variety note), each drill its own
 row, "~4 efforts, full rest, stop when crisp" (ours, labelled). No generic

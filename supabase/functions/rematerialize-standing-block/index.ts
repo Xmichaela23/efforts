@@ -25,6 +25,7 @@ import { requireUser } from '../_shared/require-user.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
   composeBlock,
+  earnedMeSets,
   readTestWeek,
   restateFromTest,
   STANDING_PLAN_PROTOCOL_ID,
@@ -87,9 +88,14 @@ Deno.serve(async (req: Request) => {
       .eq('training_plan_id', plan.id)
       .eq('user_id', userId);
 
-    const weekById = new Map<string, number>();
+    // ⛔ THE PLANNED ROW CARRIES THE WEEK **AND THE DATE**. The date was added 2026-08-24 for the ME
+    // ladder: `earnedMeSets` matches on week + WEEKDAY + movement, the same three keys the restater
+    // uses, and a logged workout carries neither the plan week nor the plan's weekday of its own.
+    const weekById = new Map<string, { week: number; date: string | null }>();
     for (const r of plannedRows ?? []) {
-      if (r?.id && typeof r.week_number === 'number') weekById.set(String(r.id), r.week_number);
+      if (r?.id && typeof r.week_number === 'number') {
+        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null });
+      }
     }
     const { data: doneRows } = await supabase
       .from('workouts')
@@ -100,7 +106,8 @@ Deno.serve(async (req: Request) => {
     // ⚠️ THE WEEK NUMBER COMES FROM THE PLANNED ROW, not from the workout. `readTestWeek` refuses a
     // set it cannot prove is week one, and a logged workout carries no plan week of its own.
     const joined = (doneRows ?? []).map((w: Record<string, unknown>) => ({
-      week_number: weekById.get(String(w?.planned_id)) ?? null,
+      week_number: weekById.get(String(w?.planned_id))?.week ?? null,
+      date: weekById.get(String(w?.planned_id))?.date ?? null,
       strength_exercises: w?.strength_exercises ?? null,
     }));
 
@@ -120,10 +127,19 @@ Deno.serve(async (req: Request) => {
     //
     // ⛔ THE SAME COMPOSER THAT WROTE THE BLOCK, with one argument filled in. A rewrite that carried
     // its own percentage table would be a different programme wearing this one's name.
-    const composed = composeBlock({
+    /**
+     * ⛔⛔ THE BLOCK'S OWN ACCESSORY PICKS, READ BACK FROM ITS CONFIG (A1) — same law as the rotation
+     * and the sport mix below. `restateFromTest` matches a composed row to a calendar row on the
+     * MOVEMENT NAME; re-composing from the athlete's current picks would put a different movement in
+     * the same slot, match nothing, and report the block as unmatched — a silent no-op that reads as
+     * "the test produced nothing".
+     */
+    const blockPicks = Array.isArray(sp.accessory_picks) ? sp.accessory_picks as string[] : null;
+
+    const composeBase = {
       frame: sp.frame,
       weeks,
-      taperWeeks: [],
+      taperWeeks: [] as number[],
       competitionLifts: sp.competition_lifts ?? {},
       workingNumbers: reading.working,
       seed1RMs: sp.seed_one_rep_maxes ?? {},
@@ -151,7 +167,34 @@ Deno.serve(async (req: Request) => {
       // to restate — `readTestWeek` finds no week-one test sets and this function abstains above —
       // but carrying the flag keeps the re-composition identical to the block that was built.
       skipTestWeek: sp.test_skipped === true,
+      ...(blockPicks ? { accessoryPicks: blockPicks } : {}),
       roundTo: 5,
+    };
+
+    /**
+     * ⛔ TWO COMPOSITIONS, AND THE FIRST ONE IS NOT WASTE (A2, 2026-08-24).
+     *
+     * The ME set ladder is read off logged sessions, and finding those sessions needs to know which
+     * rows WERE the ME rows — which movement, on which day, at which prescribed weight. That index
+     * comes from the composer itself (`ComposedWeek.meRows`), so the shape has to exist before the
+     * ladder can be read, and the ladder has to be read before the block can be composed WITH it.
+     *
+     * ⚠️ THE PROBE COMPOSES AT THE BLOCK'S AUTHORED SET COUNTS, which is exactly what the athlete
+     * trained against — so the movements, the days and the prescribed weights it reports are the ones
+     * on their calendar. Composing the probe with the earned counts would be circular.
+     */
+    const probe = composeBlock(composeBase);
+    const ladder = earnedMeSets({
+      composed: probe,
+      logged: joined,
+      // ⛔ HISTORY AND THE LIVE WEEK ARE EVIDENCE; THE FUTURE IS NOT. The same boundary the restater
+      // draws for writing, drawn here for reading.
+      throughWeek: currentWeek,
+    });
+
+    const composed = composeBlock({
+      ...composeBase,
+      ...(Object.keys(ladder.sets).length > 0 ? { meSetsByPattern: ladder.sets } : {}),
     });
 
     const restated = restateFromTest({
@@ -166,6 +209,9 @@ Deno.serve(async (req: Request) => {
         success: true, applied: false, current_week: currentWeek,
         working_numbers: reading.working, missing: reading.missing,
         changes: restated.changes, unmatched: restated.unmatched,
+        // ⛔ WHAT THE HEAVY SETS HAVE EARNED, AND OFF WHAT. A surface offering the athlete this diff
+        // has to be able to say why a second set appeared, or it is a number they never agreed to.
+        me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
       });
     }
 
@@ -189,7 +235,15 @@ Deno.serve(async (req: Request) => {
       .update({
         config: {
           ...config,
-          standing_plan: { ...sp, working_numbers: reading.working, test_read: true },
+          standing_plan: {
+            ...sp,
+            working_numbers: reading.working,
+            test_read: true,
+            // ⛔ WHAT THE PATTERNS HAVE EARNED, STORED BESIDE THE NUMBERS (A2). The next restate reads
+            // it back for provenance; the composition itself is re-derived from history every time,
+            // so a stale value can never prescribe anything.
+            me_sets_by_pattern: Object.keys(ladder.sets).length > 0 ? ladder.sets : null,
+          },
         },
       })
       .eq('id', plan.id)
@@ -201,7 +255,8 @@ Deno.serve(async (req: Request) => {
     console.log(
       `[standing-restate] plan=${plan.id} week=${currentWeek} lifts=${found.join(',')} `
       + `rows=${written}/${restated.rows.length} changes=${restated.changes.length} `
-      + `unmatched=${restated.unmatched.length}`,
+      + `unmatched=${restated.unmatched.length} `
+      + `me_sets=${JSON.stringify(ladder.sets)} me_unread=${ladder.unread}`,
     );
 
     return json({
@@ -209,6 +264,7 @@ Deno.serve(async (req: Request) => {
       current_week: currentWeek,
       working_numbers: reading.working, missing: reading.missing,
       changes: restated.changes, unmatched: restated.unmatched,
+      me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
       config_written: !cfgErr,
     });
   } catch (e) {

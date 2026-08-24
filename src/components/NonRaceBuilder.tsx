@@ -2772,9 +2772,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const HARD_SLOT_INDEX: Record<'hard1' | 'hard2', number> = { hard1: 0, hard2: 1 };
 
   /**
-   * ⛔ THE DEFAULT SESSION PER SPORT (Michael, 2026-08-24): a ride defaults to **sustained
-   * threshold**, a run to **VO2**. ⚠️ Both are the option the existing tables already mark
-   * "Recommended" for their discipline, so the pre-selection is not a new opinion.
+   * ⛔ THE SLOT'S SESSION, WHICH IS THE FRAME'S FACT AND NOT A DEFAULT (Michael's A4 ruling,
+   * 2026-08-24). Slot one is the top-end session and slot two the sustained one, on either sport —
+   * `p246`'s own two hard days in order. ⚠️ THE WORD "DEFAULT" IS WRONG HERE NOW: there is nothing to
+   * default away from, because the card that offered the alternative has been removed.
    */
   const hardDefaultsFor = (sport: SlotSport, slot: 'hard1' | 'hard2' = 'hard1') => ({
     discipline: (sport === 'ride' ? 'bike' : 'run') as 'run' | 'bike',
@@ -2785,9 +2786,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   });
 
   /**
-   * Keep `hardDays` in step with the two hard slots. ⚠️ CHANGING THE SPORT RESETS THAT SLOT'S
-   * SESSION, deliberately: a run's "VO2 incline" is not a thing a ride can be, and carrying the old
-   * role across would leave the card showing a session the new sport does not offer.
+   * Keep `hardDays` in step with the two hard slots.
+   *
+   * ⛔⛔ IT NOW RE-STAMPS THE FRAME'S SESSION EVERY TIME, NOT ONLY ON A SPORT CHANGE (A4,
+   * 2026-08-24). It used to return `prev` untouched when the discipline matched, which was right
+   * while the athlete could pick the session: their answer had to survive. **With the picker gone
+   * the frame's fact is the only legal value**, and returning `prev` would leave a stale `role` or a
+   * leftover `goal` — from an earlier draft, or from a slot that was never answered at all — sitting
+   * in `hardDays` and travelling to the composer as an allocation nobody made.
+   *
+   * ⚠️ THE DAY AND THE CLUB ANSWER STILL SURVIVE. Those two are genuinely the athlete's; the session
+   * identity is not.
    */
   const syncHardDays = (
     st: NonRaceState,
@@ -2800,15 +2809,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     const sport = slots[k];
     if (!sport) return prev ?? { discipline: 'run' as const, day: '' as const, ownership: 'prescribed' as const };
     const want = hardDefaultsFor(sport, k);
-    // ⚠️ THE DAY AND THE CLUB ANSWER SURVIVE A SPORT CHANGE — they are the athlete's, not the
-    // session's. Only the session identity is reset.
-    if (prev && prev.discipline === want.discipline) return prev;
     return {
+      ...(prev ?? {}),
       discipline: want.discipline,
       day: (prev?.day ?? '') as DayName | '',
       ownership: prev?.ownership ?? 'prescribed',
       role: want.role,
-      ...(want.goal ? { goal: want.goal } : {}),
+      // ⚠️ `goal` IS WRITTEN EVERY TIME, INCLUDING AS `undefined`. A threshold slot carrying a
+      // leftover `speed` charges the week a 48-hour clearance for a session that is not a sprint.
+      goal: want.goal,
     };
   });
 

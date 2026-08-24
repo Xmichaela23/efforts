@@ -119,6 +119,20 @@ export type StandingPlanConfig = {
   sport_mix: { runs: number; rides: number; swimDays: number } | null;
   /** How many of the frame's endurance slots each sport actually got. Surfacing and provenance. */
   sport_counts: { run: number; ride: number; swim: number } | null;
+  /**
+   * ⛔ THE ACCESSORY PICKS THE BLOCK WAS BUILT ON (A1, 2026-08-24). Stored for exactly the reason
+   * `sport_mix` and `day_offset` are: a restate RE-COMPOSES this block and has to reach the identical
+   * week. Re-reading the athlete's CURRENT picks would compose a different week — a different movement
+   * on the calendar's row — and `restateFromTest` matches on the movement NAME, so every row would
+   * report as unmatched and the restate would look like a no-op.
+   */
+  accessory_picks: string[] | null;
+  /**
+   * ⛔ WHAT EACH PATTERN'S ME SLOT HAD EARNED WHEN THIS VERSION WAS WRITTEN (A2, 2026-08-24).
+   * ⚠️ ABSENT AT BUILD TIME, ALWAYS — a set is earned by logged sessions and a block is authored
+   * before any of them exist. It arrives through the restate, beside the working numbers.
+   */
+  me_sets_by_pattern: Partial<Record<ViadaPattern, number>> | null;
 };
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -205,6 +219,10 @@ export function buildStandingPlanRow(args: {
             swimDays: Math.max(0, Math.round(Number(args.compose.sportMix.swimDays) || 0)),
           }
         : null,
+      accessory_picks: (args.compose.accessoryPicks ?? []).length > 0
+        ? [...(args.compose.accessoryPicks as string[])]
+        : null,
+      me_sets_by_pattern: args.compose.meSetsByPattern ?? null,
       sport_counts: (() => {
         // ⚠️ COUNTED OFF THE BUILT WEEK, not off the ask. What the athlete asked for is a ratio;
         // what the week holds is the answer, and only the second is worth storing as a fact.

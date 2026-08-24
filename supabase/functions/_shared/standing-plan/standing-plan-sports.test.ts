@@ -94,6 +94,9 @@ Deno.test('no rides asked for is the run-only week slices 1-3 built', () => {
 });
 
 Deno.test('a mixed ask puts both sports in the week, in the athlete\'s proportion', () => {
+  // ⚠️ `strength: 5` IS FOUR LIFTS PLUS THE FRAME'S ONE PLYOMETRIC DAY, and it is asserted here even
+  // though this test is about the ENDURANCE count: the 2026-08-24 drill work briefly took it to 7 by
+  // spreading plyo across three days, and carrying the number is how that cannot happen unnoticed.
   assertEquals(types(week2({ runs: 2, rides: 2 })), { run: 2, ride: 2, swim: 0, strength: 5 });
   assertEquals(types(week2({ runs: 3, rides: 1 })), { run: 3, ride: 1, swim: 0, strength: 5 });
   assertEquals(types(week2({ runs: 1, rides: 3 })), { run: 1, ride: 3, swim: 0, strength: 5 });

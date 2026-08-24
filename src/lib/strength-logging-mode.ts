@@ -98,7 +98,22 @@ export function equipmentForExercise(exerciseName: string): ExerciseEquipment {
   // a plate calculator AND a bar-speed cue). A jump has no external load to record, no bar to load,
   // and no bar-speed conversation — the intent is maximal every rep by definition.
   // ⚠️ CHECKED FIRST, ABOVE EVERY OTHER PATTERN.
-  if (/\b(jump|hop|bound|plyo|skater)\w*/.test(name)) return 'plyo';
+  //
+  // ⛔ FOUR WORDS ADDED 2026-08-24 FOR VIADA'S NAMED DRILLS (p227), AND THE LEGACY YARDSTICK IN
+  // `strength-logging-mode.test.ts` GAINED THE SAME FOUR IN THE SAME CHANGE. The Standing Plan now
+  // prescribes `A-Skip`, `Ickey Shuffle`, `Ladder Drills` and `Stiff-Legged Run` by name; none of
+  // them carries a jump/hop/bound word, so every one fell through to the `barbell` default and the
+  // logger would have drawn a bar and a plate calculator over a skip — the exact 2026-08-01 defect,
+  // re-entering through new vocabulary rather than through a rule change.
+  // ⚠️ `stiff legged run` IS ITS OWN EXACT TEST, NOT A `stiff` ALTERNATIVE. `stiff leg deadlift` is a
+  // real barbell lift in this catalogue and a `stiff` stem would route it to plyo.
+  // ⚠️ `[ab]?skip` AND `stifflegged` ARE SPELT FOR **THIS** NORMALIZER, AND A TEST CAUGHT IT.
+  // `normalizeExerciseNameForMatch` DELETES the hyphen rather than replacing it with a space, so
+  // `A-Skip` arrives as `askip` and `Stiff-Legged Run` as `stifflegged run`. A plain `\bskip` can
+  // never match `askip` — there is no boundary in front of it — and the drill fell straight through
+  // to the barbell default. ⛔ Each of the three private plyo lists normalizes differently; spell the
+  // stem for the list you are editing and let the tests prove it.
+  if (/\b(jump|hop|bound|plyo|skater|shuffle|ladder|[ab]?skip|stifflegged)\w*/.test(name)) return 'plyo';
 
   // Bodyweight / core exercises (no equipment needed)
   if (name.includes('core circuit') || name.includes('core work') || name.includes('calf raise')) return 'bodyweight';

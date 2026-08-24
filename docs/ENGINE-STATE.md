@@ -69,7 +69,7 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-24 — **stage 4 complete; stage 5's endurance week built. The next step is STILL the DEPLOY.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-24 evening — **Session A's engine fixes are in the tree. The next step is STILL the DEPLOY, and now SESSION B.**)
 
 ### ⛔ THE ONE THING TO KNOW FIRST
 
@@ -77,7 +77,7 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 ⛔ **`rematerialize-standing-block` IS A NEW EDGE FUNCTION THAT HAS NEVER BEEN DEPLOYED**, and
 `StrengthLogger.tsx` calls it on every strength save. Until it exists the call errors, the error is
 caught and swallowed by design (the save is safe), and **the block runs its test week and then eleven
-weeks of "by feel"**. That is still the largest gap between this code and a working plan.
+weeks of "by feel"** — and now also never earns an ME set, because the ladder is read on that path.
 
 ```
 supabase functions deploy \
@@ -85,66 +85,87 @@ supabase functions deploy \
   compute-snapshot analyze-strength-workout coach materialize-plan adapt-plan \
   --project-ref yyriamwvtvzlkumqrvpm
 ```
-⚠️ The last five carry their own frozen copy of `_shared/strength-profiles.ts`, which slice 2 changed.
+⚠️ Those five tail functions carry their own frozen copy of `_shared/strength-profiles.ts`.
+⚠️ **This session also changed `src/lib/exercise-config.ts` and `_shared/accessory-dosing/ledger.ts`,
+which many more functions bundle.** Run the importer grep in `CLAUDE.md` before deploying.
 
-### ⛔ WHAT EXISTS — five dated notes, read them in order
+### ⛔ YOUR JOB: SESSION B — the wizard and the screens
 
-`NOTES-stage4-composer-strength5k-2026-08-23.md` · `NOTES-stage4-wiring-slice2-2026-08-23.md` ·
-`NOTES-stage4-live-slice3-2026-08-23.md` · `NOTES-stage4-sportslots-slice4-2026-08-23.md` ·
-**`NOTES-stage5-endurance-week-2026-08-24.md`** (this session).
+`docs/DEVICE-FINDINGS-standing-plan-2026-08-24.md` **B1 · B2 · B3**. Session A (the engine half) is
+done and written up in **`docs/NOTES-session-a-device-fixes-2026-08-24.md`** — read it before B2.
 
-**Stage 5's endurance-week screen is built** — `EnduranceWeekCard.tsx` +
-`src/lib/standing-plan-week-{copy,bounds}.ts`, mounted as the `endurance` step, replacing
-`volume` + `hardday` **on the strength path only**:
+⛔ **B2 SAYS "verify a core focus biases the built week." IT CANNOT TODAY.** Traced this session: the
+focus chips (`assistance_picks.focus`) reach **no standing-plan composer at all** — `compose.ts`
+contains no reader for them. Adding the Core chip is necessary and not sufficient; B2 has to build
+the wire as well, and the accessory-pick wire A1 just built
+(`ComposeArgs.accessoryPicks`, `generate-strength-plan/index.ts:~505`) is the shape to copy.
 
-- Michael's header verbatim; four slot controls (Hard 1 / Hard 2 / Easy / Long, Run|Ride); the
-  **count pickers deleted** — `run_days`/`ride_days` are derived from the slots.
-- Volume inputs bounded both ends by `sessionDurationBandSeconds`, recomputing with the mix.
-- A live lifting-rate line from **his** anchors (1%/3wk hard-on-bike p247 · 1%/4wk one hard run p251 ·
-  "about 1% a month" both hard runs — ⚠️ the TIERS are ours, the rates are his).
-  ⛔ **No endurance-improvement percentage anywhere**, held by a test.
-- **The compromise wire**: a long ride pinned alongside a long run now reaches the athlete as one
-  sentence through `placement_compromises`, instead of vanishing.
-- The p215 pretest gets its own cue ("as many clean reps as possible; the set ends when the form
-  changes"); ⛔ **Wendler's AMRAP line is untouched**.
+### ⛔ WHAT SESSION A SHIPPED INTO THE TREE — do not re-litigate
 
-**123 engine tests + 39 client copy tests, 30/30 mutations killed, Get Stronger byte-identical
-(`f7ece1aa…`).** ⛔ **The screen was DRIVEN IN A BROWSER** (Vite on 8081; the wizard's login wall was
-bypassed with a temporary route that has been deleted) and the caps were proven to bracket what the
-composer builds across five sport mixes — the ask-15-get-20 guarantee.
+Full detail in the notes; the three facts a fresh session needs:
 
-### ⛔ THE DEFECT THIS SESSION FOUND, AND THE ONE ENGINE CHANGE IT FORCED
+1. **ME and DE weights MOVED, on every block.** The composer was prescribing the top of BOTH of
+   Viada's bands at once — `reps.hi` at `pctOf1RM.hi`, i.e. five reps at 100% of a working number
+   that is already 96% of a predicted max. Michael ruled the slot opens at the **bottom** of the
+   intensity band with the rep target left open. Bench ME 200 → **180**; DE 160 → **140**.
+   ⛔ **It is an invariant now**: `standing-plan-me-sets.test.ts` walks every prescribed row of every
+   week of both columns and fails if any carries `reps.hi` at `pct.hi`. Do not delete that test.
+2. **The week's SHAPE is unchanged — 9 sessions, `strength_days` five days.** What changed is that
+   the plyometric session **names its drills** (A3): three rows, one from each of Viada's three
+   families, rotating weekly, instead of one row reading `Plyometric drills 3×4`.
+   ⚠️ A three-day plyo spread was built and **reverted the same day** — see the next block.
+3. **Accessory picks now reach the composer** and a floor row filled by a pick says *"Your pick for
+   core"* instead of *"Floor: core had nothing else this week"*. A pick that fits nowhere is named in
+   `placement_compromises`. `config.standing_plan.accessory_picks` stores what the block was built
+   on, because the restater re-composes and matches on the movement name.
 
-The agreement test failed on *"Hard 1 = Run, Long = Ride"*: **only the COUNTS reached the engine**, so
-`assignSports` re-derived which slot was which from its own dial and handed the athlete the opposite
-week, silently. `SportMix` now takes an optional per-slot `slots` map that **overrides** the dial;
-absent, the dial assigns exactly as before. Wired through `training_prefs.endurance_slots` and
-validated at both hops. ⚠️ This is the one place this session went past "do not touch the engine" —
-without it the new screen is a lie.
+### ⛔ THE PLYO SPREAD THAT WAS BUILT AND REVERTED — do not reintroduce it by accident
+
+`DEVICE-FINDINGS` A3 said the frame places plyometrics on **day 1 ×1, day 3 ×2, day 6 ×1**. It was
+built to that and **reverted the same day**: the 1/3/6 layout belongs to the **half-marathon frame
+(p250)**, and the findings doc had conflated the two frames (Michael, 2026-08-24 evening).
+
+⛔ **p246 places the plyo warm-up on day 3 and nowhere else**, in both columns
+(`SOURCE-viada-hybrid-athlete.md` Part E1a, off `p246.jpg`, verified 2026-08-23). p274 matches; p275
+puts it at *"one to three plyometric skills."*
+
+**The guard is structural, not a number in a test.** `plyo.ts` owns the FAMILIES; `frames.ts` owns
+the DAY via `FrameDay.plyo`. A test lints `plyo.ts` for a `day:` key and fails on one, so a second
+owner cannot reappear. ⚠️ **What the spread cost while it was in the tree, measured:** the week went
+9 sessions → 11, `strength_days` five days → six (the sixth holding no lift), and it silently broke
+`restateFromTest`, which assumed one strength session per day. **That fix is kept** and pinned by its
+own fixture — the shape is coming back with the cycling frames (p278/p280), which merge speed days.
 
 ### ⛔ WHAT STAGE 5 STILL OWES (none of it blocking the deploy)
 
 1. **Screens 2/3 and 6/7** of the addendum's flow — lifting experience, focus, strength, schedule.
-2. ⚠️ **THE SCHEDULE SCREEN CONTRADICTS THE NEW ONE.** It still asks for a long RUN day and a long
-   RIDE day as two independent pins, which can now disagree with the slot answer. The athlete gets
-   the compromise sentence rather than the day they wanted. **It should ask for THE LONG DAY, once,
-   and know which sport it is.**
-3. **The meter's experience-gated tone** ("new to lifting overrides the meter") — the rate line ships
-   without it because the experience answer is someone else's work in progress.
+2. ⚠️ **THE SCHEDULE SCREEN CONTRADICTS THE ENDURANCE-WEEK SCREEN.** It still asks for a long RUN day
+   and a long RIDE day as two independent pins, which can disagree with the slot answer. **This is
+   B1** — it should ask for THE LONG DAY, once, and know which sport it is.
+3. **The meter's experience-gated tone** — waiting on the `liftingExperience` answer.
 
 ⚠️ **SOMEONE ELSE HAS UNCOMMITTED STAGE-5 WORK IN THE TREE** — `TrainingBaselines.tsx`,
 `AppContext.tsx` and the work order carry a `liftingExperience` field (addendum §8a). **Untouched by
 this session.** Do not sweep it into a commit unexamined.
 
 ### Open gaps (corpus): G-7 `p215.jpg` not yet in the folder · G-8 "circle of reps" undefined, so
-double progression stays labelled ours.
+double progression stays labelled ours · gap #5 (within-family variant selection) stays the engine's,
+deferred by A4's ruling.
 
 ### ⚠️ FOUND IN PASSING, NOT FIXED — worth a Q-entry each
+- ⛔ **A PRE-EXISTING TYPE ERROR BREAKS `deno check` FOR HALF THE MODULE TREE** —
+  `_shared/state-trend/assemble.ts:1134` writes `lead:` into a `StateTrendsV1['bike']` that has no
+  such property. Any file transitively importing it fails to type-check. Reproduced on a stashed
+  clean tree; **not caused by this work and not fixed here.** The suites run `--no-check`, which is
+  why nothing has noticed.
 - ⛔ **`athlete_snapshot.workload_by_discipline.run` HAS TWO LIVE READERS THAT DISAGREE BY 10×** —
   `_shared/end-plan-core.ts:88` treats it as MILES, `_shared/planning-context.ts:389` divides by 10.
-- ⚠️ **`voiceViolation` bans `focus` as an imperative** and cannot tell it from the noun. Michael's
-  header uses it correctly; the gate is exempted for his verbatim copy and still runs over everything
-  the app generates.
+- ⚠️ **THREE PRIVATE PLYOMETRIC NAME-LISTS WITH THREE DIFFERENT NORMALIZERS** —
+  `equipmentForExercise`, `isBodyweightMove` (inline in `StrengthLogger.tsx`) and
+  `isPlyometricMovement`. A stem spelt for one does not match in the others; this cost a real test
+  failure this session. `strength-rest-timer.ts`'s header already calls it "the eighth private list".
+- ⚠️ **`Ladder Drills` needs an agility ladder and nothing gates it.** One week in three.
+- ⚠️ **`voiceViolation` bans `focus` as an imperative** and cannot tell it from the noun.
 - ⚠️ **`activate-plan:441` silently drops week-one sessions dated before the block's start.**
 - ⚠️ **An ME row still receives a derived RIR target downstream** (p218 says none for ME).
 - ⚠️ **Overhead press is tested in week one and never loaded** — a fact of the frame (p246).

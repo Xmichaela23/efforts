@@ -1150,6 +1150,139 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: true
   },
+
+  // ============================================================================
+  // ⛔ VIADA'S NAMED PLYOMETRIC DRILLS (p227) — ADDED 2026-08-24, DEVICE FINDING A3.
+  //
+  // The Standing Plan used to prescribe one row reading `Plyometric drills 3×4`. It now names the
+  // drill, and a prescribed name the catalogue does not hold is D-322's disease: `getExerciseConfig`
+  // returns null, the fuzzy matcher borrows a neighbour's ratio, and `equipmentForExercise` falls
+  // through to `barbell` — a plate calculator over an A-skip. Every drill the composer can emit has
+  // an entry here, and `standing-plan-plyo.test.ts` walks the families and asserts it.
+  //
+  // ⚠️ ALL BODYWEIGHT, ratio 0, no primary reference — a jump has no external load and no 1RM to
+  // ride, which is the same shape every other entry in this section already carries.
+  // ============================================================================
+
+  'a skip': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'a skips': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'b skip': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'b skips': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'stiff legged run': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'single leg hop': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'single leg hops': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'rebound jump': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'rebound jumps': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'lunge hop': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'lunge hops': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: true
+  },
+  'pogo hop': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'pogo hops': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'ladder drill': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'ladder drills': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'ickey shuffle': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
+  'hopscotch': {
+    pattern: 'plyometric',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'bodyweight',
+    isUnilateral: false
+  },
   
   // ============================================================================
   // BAND EXERCISES

@@ -1,12 +1,19 @@
 /**
- * THE HARD SLOT'S SESSION CHOICES — what a Hard 1 / Hard 2 slot actually is.
+ * THE HARD SLOT'S SESSION — STATED, NOT ASKED — AND THE ONE CONTROL THAT REMAINS.
  *
- * ⛔ RESTORED, NOT REBUILT (Michael's screenshot review, 2026-08-24). The endurance-week screen
- * shipped with the sport toggle and nothing under it, so picking Ride on a hard slot revealed no
- * session at all. **The plumbing was never the problem:** `state.hardDays` already holds
- * `{discipline, role, goal, ownership}` per slot and `create-goal` already forwards it. What was
- * missing was the buttons, and these write the same fields the old "High intensity days" card wrote,
- * off the same option tables (`singleSlotOptions`, `RUN_GROUND_OPTIONS`).
+ * ⛔ THE CHOICE CONTROL IS GONE (Michael's A4 ruling, 2026-08-24). This card offered top-end versus
+ * sustained as buttons and **the athlete never owned that decision**: p246 fixes the two hard slots
+ * as different families — `run_mlss` on frame day 1, `run_near_threshold` on day 3 — and the composer
+ * builds those whatever the card writes. A button over a settled decision means the screen and the
+ * plan disagree the moment it is tapped, which is the defect this file has now been rebuilt around
+ * three times.
+ *
+ * ⛔ WHAT IS STILL A REAL CONTROL: **a club session, because it REPLACES the slot** (his own Crit
+ * rule, work order §club) — and the SPORT, which lives on the row above this component. Everything
+ * else on this card is a read-out.
+ *
+ * ⚠️ WITHIN-FAMILY VARIANT SELECTION STAYS THE ENGINE'S (gap #5, deferred by the same ruling). Which
+ * VO2 shape a hard run takes is not asked here or anywhere else.
  *
  * ⚠️ ITS OWN FILE so the wizard and a browser probe can render the SAME component. Sixty lines of
  * JSX inline in a six-thousand-line file is also how the screen it came from lost three layouts.
@@ -14,54 +21,44 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { hardSlotOptions, type HardSlotValue } from '@/lib/hard-slot-choices';
+import { HARD_SLOT_FACT_NOTE, hardSlotFact, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
 
 export type HardSlotChoicesProps = {
   /** The slot's sport, as the endurance screen has it. */
   sport: 'run' | 'ride';
   value: HardSlotValue;
   onChange: (patch: HardSlotValue) => void;
-  /** For the test ids — `hard1` / `hard2`. */
-  slotKey: string;
+  /** ⛔ `hard1` / `hard2` — the frame's two hard slots are POSITIONAL and carry different sessions. */
+  slotKey: HardSlotKey;
 };
 
 export default function HardSlotChoices(props: HardSlotChoicesProps) {
   const club = props.value.ownership === 'club';
   const color = getDisciplineColor(props.sport === 'ride' ? 'bike' : 'run');
-  const opts = hardSlotOptions(props.sport);
-  /**
-   * ⚠️ AN OPTION IS CHOSEN WHEN BOTH FIELDS MATCH. Matching on `role` alone would light two run
-   * options at once — VO2 and speed are both `intensity`, and the `goal` is the whole difference.
-   */
-  const chosen = (o: { role: string; goal?: string }) =>
-    !club && (o.goal ? props.value.goal === o.goal && props.value.role === o.role
-      : props.value.role === o.role && !props.value.goal);
+  const fact = hardSlotFact(props.sport, props.slotKey);
 
   return (
     <div className="space-y-1.5">
-      {opts.map((o) => {
-        const on = chosen(o);
-        return (
-          <button
-            key={o.id}
-            type="button"
-            data-testid={`hard-${props.slotKey}-${o.id}`}
-            aria-pressed={on}
-            // ⚠️ `goal` IS WRITTEN EVERY TIME, including as `undefined` — leaving a stale one on a
-            // threshold slot is how the composer ends up hearing "speed" for a session nobody picked.
-            onClick={() => props.onChange({ ownership: 'prescribed', role: o.role, goal: o.goal })}
-            className="w-full text-left px-2.5 py-2 rounded-xl border"
-            style={on
-              ? { borderColor: color, backgroundColor: `${color}29` }
-              : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)' }}
-          >
-            <span className="block text-white/90 text-sm">{o.title}</span>
-            <span className="block text-white/50 text-xs leading-snug mt-0.5">{o.body}</span>
-          </button>
-        );
-      })}
+      {/* ⛔ THE SESSION, AS A FACT. No border colour, no pressed state, no tap target — a panel that
+          looked pressable would be the control this ruling removed, wearing different paint.
+          ⚠️ DIMMED WHILE A CLUB SESSION HOLDS THE SLOT, not hidden: the athlete should be able to see
+          what they are replacing, and a row that vanishes on tap is a row they cannot compare. */}
+      {fact && (
+        <div
+          data-testid={`hard-${props.slotKey}-fact`}
+          className="px-2.5 py-2 rounded-xl border border-white/10 bg-white/[0.03]"
+          style={club ? { opacity: 0.45 } : undefined}
+        >
+          <span className="block text-white/90 text-sm">{fact.title}</span>
+          <span className="block text-white/50 text-xs leading-snug mt-0.5">{fact.body}</span>
+        </div>
+      )}
+      <span className="block text-white/35 text-[11px] leading-snug px-0.5">{HARD_SLOT_FACT_NOTE}</span>
       {/* ⛔ A CLUB SESSION REPLACES A SLOT, NEVER ADDS ONE (work order stage 5, his own Crit rule).
-          Same control the old card carried, same `ownership` field. */}
+          Same control the card has always carried, same `ownership` field.
+          ⚠️ UN-CHECKING RETURNS THE SLOT TO `prescribed` AND NOTHING ELSE — the role and goal are the
+          frame's now and `syncHardDays` writes them, so sending them from here would be a second
+          owner of a fact that has one. */}
       <button
         type="button"
         data-testid={`hard-${props.slotKey}-club`}

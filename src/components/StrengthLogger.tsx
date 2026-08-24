@@ -922,7 +922,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     try {
       const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
       // Include plyometrics as bodyweight (jumps, bounds, hops), calf raises, core work
-      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo|calfraise|corecircuit|corework/.test(n);
+      // ⛔ `skip|shuffle|ladderdrill|stiffleggedrun` ADDED 2026-08-24 for Viada's named plyometric
+      // drills (p227). This normalizer strips spaces AND hyphens, so `A-Skip` arrives as `askip` and
+      // `Stiff-Legged Run` as `stiffleggedrun`. Without them the drills fell through and the row
+      // rendered a load column. Mirrors `equipmentForExercise` and `isPlyometricMovement`, which
+      // gained the same words in the same change — three private lists, one vocabulary.
+      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo|skip|shuffle|ladderdrill|stiffleggedrun|calfraise|corecircuit|corework/.test(n);
     } catch { return false; }
   };
 
