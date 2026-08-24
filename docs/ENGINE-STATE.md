@@ -69,41 +69,59 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-24 night — **EVERYTHING IS DEPLOYED. Michael is TRAINING ON THE PLAN. Your job: support the acceptance run, then the punch list below.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-24 midday, day one on the block — **THE ACCEPTANCE MOMENT HAPPENED. The test-save chain is VERIFIED on a device.**)
 
-### THE STATE, three ways
-- **PUSHED + DEPLOYED:** sessions A and B in full, plus the evening's live-review batch (all in
-  main up to `d80ccb71`; edge functions `generate-strength-plan`,
-  `create-goal-and-materialize-plan`, `rematerialize-standing-block` redeployed 2026-08-24; client
-  on Netlify). The eight-function deploy from the morning stands.
-- **VERIFIED:** the WIZARD, end to end, by Michael in a browser — he built and exported three
-  plans and signed off ("it's a pretty great flow"). The plan CONTENT verified against the export:
-  named rotating plyos, his picks labelled ("Your pick for core"), slots honoured, floors correct.
-- **NOT YET VERIFIED — the one thing left:** the TEST-SAVE chain on a device. Michael rebuilt his
-  block (start 2026-08-24) and is training on it. When he saves Test: Upper, the logger calls
-  `rematerialize-standing-block` and weeks 2-12 must fill with weights off the p215 math. NOBODY
-  HAS SEEN THIS HAPPEN. If he reports the sheet, that is the acceptance moment.
+### THE ACCEPTANCE, seen with his own eyes
+Michael saved **Test: Upper** on his phone and the chain fired end to end: the sheet announced
+**bench 135 × 5 → block at 149 lb** and **overheadPress 90 × 6 → block at 102 lb**, and the
+remaining 11 weeks now carry prescribed weights instead of "by feel". The one unverified link from
+the night banner is CLOSED. He is training on the numbers.
 
-### ⚠️ OPEN QUESTION FROM HIS EXPORT (strong-focus-3.md): WEEK 7 IS MISSING — the file jumps
+### The save surfaced three device defects — ALL FIXED, PUSHED, DEPLOYED same hour
+(commits `8ea5e84c`, `ca4eabf6`; `rematerialize-standing-block` redeployed 2026-08-24; client on
+Netlify. No `_shared` file touched, so nothing else needed redeploying.)
+1. **The Wendler assistance cue leaked onto the standing plan.** "Split these into as many sets as
+   you need" over rows that prescribe discrete 3×8-10. Fixed: `STANDING_ACCESSORY_SET_CUE`
+   (`src/lib/strength-focus-copy.ts`) — Viada Part B2, "no weight is prescribed — find the load
+   where the target reps leave a rep or two in reserve, never to failure" — picked by the session's
+   own `standing_plan` tag (same idiom as the pretest gate). A `plyo`-tagged session gets NO cue
+   (the Box Jump mistake otherwise). Pinned in `strength-accessory-copy.test.ts` (8 green).
+2. **The screen LOCKED after the test save.** The early `return` that hands the close to the
+   numbers sheet skipped the "Saved!" modal's auto-close, and that modal (z-200) sat over the
+   sheet's Done button (z-60) forever. Fixed: both sheet takeovers (`pendingRework` AND
+   `pendingStandingFill`, `StrengthLogger.tsx` ~4358) now `setShowSessionRPE(false)` first. The
+   Get Stronger sheet had the identical latent trap.
+3. **The sheet printed raw lift keys** (`overheadPress`, `bench`). Fixed at the owner: the edge
+   function's RESPONSE now enriches each working number with `movement` read off
+   `sp.test_lift_names` (competition overrides included); stored config keeps the raw shape; the
+   client prefers `movement` and falls back to the key against an older server.
+
+### NOT YET VERIFIED about those fixes
+Fix 1 shows on his next workout with accessories — easy. Fixes 2–3 render only on a future
+test-save (fresh test or next block), a rare path; they are code-traced and test-covered, not
+device-seen. All 160 standing-plan tests green at `ca4eabf6` (19 apparent failures without
+`--allow-read` are the source-lint tests needing file access — not real).
+
+### Answered from code this session (device questions, don't re-derive)
+- **Accessory weight persistence:** the logger prefetches the last 10 strength sessions, matches by
+  normalized movement name, fills PREVIOUS + prefills untouched sets (`StrengthLogger.tsx:2419`).
+  The weight the athlete finds today is in the box next time.
+- **Ab work placement:** ab picks fit no HYP slot in `strength_5k` (no core pattern), so they enter
+  via the once-a-week core floor — ONE session in the week, not necessarily day 1. If his plank
+  never appears this week, THAT is a bug; not yet confirmed either way.
+
+### ⚠️ STILL OPEN FROM HIS EXPORT (strong-focus-3.md): WEEK 7 IS MISSING — the file jumps
 Week 6 → Week 8 (11 weeks, not 12). Could be the export tool or a real gap in sessions_by_week.
 Michael was asked to check the app calendar. If the calendar also skips week 7, trace
 `buildStandingPlanRow`'s week loop FIRST.
 
-### The evening's live-review batch (Michael walking the flow, each shipped same-hour):
-keep-screen effect lines (his copy) · hard-slot variants = the library's own archetypes with plain
-bodies + REAL weekly rotation (was: first archetype every week wearing a rotation's label) · the
-fact card reads the library not the old tables · stale copy killed on accessory + scheduler screens
-("Three lifting days", "None is a valid answer", "Optimal schedule", "of Wendler 5/3/1" — all gone
-on this path) · flat Preferred-movements list (day cards were Wendler's; the composer drops days) ·
-schedule chips: letters from the BUILT WEEK (engine 'Monday' vs chips 'monday' had blanked them),
-H/LR/LB/E/B/S vocabulary + ×2 stack marker + legend.
-
-### Punch list, in rough order
+### Punch list, in rough order (unchanged from the night banner)
 1. Week 7 (above). 2. Stale goal prefs echo (Long Run: sunday etc. recorded on a week that has no
 long run — provenance lie, cosmetic). 3. Duplicate test-week sentence in the plan description.
 4. Picker should refuse duplicate movement picks (second Chin-Up buys nothing). 5. The session-B
 new tests are NOT mutation-tested (stated exception). 6. Pre-existing: state-trend/assemble.ts
-type error under strict check; anchor-resolver-lint failure — both confirmed at HEAD.
+type error under strict check; anchor-resolver-lint failure; `StrengthLogger.tsx` `warmup`
+property tsc error (~line 2311) — all confirmed at HEAD.
 
 ### Standing docs: DEVICE-FINDINGS-standing-plan-2026-08-24.md (all items done or superseded),
 DECISIONS-2026-08-22-standing-plan-pivot.md (+ p247 corrections), work order stage 5 addendum.

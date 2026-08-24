@@ -8,12 +8,14 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE STANDING PLAN ACCEPTANCE (2026-08-24, everything PUSHED + DEPLOYED; wizard verified; **the test-save chain is the one unverified link**)
+## ⏳ AWAITING MICHAEL — THE STANDING PLAN ACCEPTANCE (2026-08-24, everything PUSHED + DEPLOYED; wizard verified; **test-save chain now VERIFIED**)
 
 He is ON the block (started 2026-08-24, test week live). What to look for:
-- [ ] Save **Test: Upper** → a sheet should announce weeks 2-12 filling with weights priced off the
-      test (96% working number, ME at 90% × 1-5). If the sheet never appears or weeks stay "By
-      feel", the logger→`rematerialize-standing-block` call is the suspect.
+- [x] **(2026-08-24 midday — SEEN ON DEVICE.)** Save **Test: Upper** → the sheet announced bench
+      135×5 → 149 and overheadPress 90×6 → 102; weeks 2-12 filled. Three cosmetic/UX defects the
+      save surfaced (Wendler cue leak, locked Saved! modal, raw lift keys on the sheet) were fixed,
+      pushed and deployed the same hour — `8ea5e84c`, `ca4eabf6`. The modal + lift-name fixes only
+      render on a FUTURE test-save; the cue fix shows on his next accessory workout.
 - [ ] Week 2's bench ME weight should look like ~90% of (96% of ~157 est) ≈ mid-130s — sane, not
       a grinder.
 - [ ] The ME set ladder: after two clean ME sessions on a pattern, the calendar's later weeks gain
