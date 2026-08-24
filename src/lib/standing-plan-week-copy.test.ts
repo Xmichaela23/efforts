@@ -410,7 +410,12 @@ Deno.test('⛔ THE CHOICE CONTROL IS GONE FROM THE CARD, AND THE CLUB CONTROL IS
   const src = await Deno.readTextFile(new URL('../components/HardSlotChoices.tsx', import.meta.url).pathname);
   assert(!/hardSlotOptions/.test(src), 'the session option list is being mapped into controls again');
   assert(!/opts\.map/.test(src), 'the card renders a list of session buttons');
-  assert(/hardSlotFact/.test(src), 'the card no longer states the frame\'s session');
+  // ⛔ Widened 2026-08-24: the fact now reads the LIBRARY (`slotFamilyFact`) — the old tables' copy
+  // said "VO2 max focus" over an MLSS slot. The card still STATES the session; the only choice
+  // beside club is the WITHIN-FAMILY variant (Michael's ruling), whose options are the library's
+  // own archetypes (`slotVariantOptions`), never the old session-type buttons.
+  assert(/slotFamilyFact/.test(src), 'the card no longer states the frame\'s session');
+  assert(/slotVariantOptions/.test(src), 'the variant options stopped reading the library');
   assert(/hard-\$\{props\.slotKey\}-club/.test(src), 'the club control was removed with the choices');
   assert(/ownership: club \? 'prescribed' : 'club'/.test(src), 'the club control stopped replacing the slot');
 });
