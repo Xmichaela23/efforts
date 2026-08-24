@@ -9,7 +9,7 @@ import { getDisciplineColorRgb } from '@/lib/context-utils';
 const UNIVERSAL_RGB = '236, 233, 227';
 
 export function StepLayout({
-  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false, accent, blockedReason,
+  step, totalSteps, title, subtitle, onBack, children, onContinue, canContinue, continueLabel = 'Continue', saving = false, hideContinue = false, hideProgress = false, accent, blockedReason, footer,
 }: {
   // ⚠️ `title` widened string → ReactNode (2026-08-05) so the Focus screens can set the eye mark
   // beside their heading. Every existing caller passes a plain string and is unaffected.
@@ -29,6 +29,18 @@ export function StepLayout({
    *  reason and the dead button are one glance — never a silently-disabled control with the cause
    *  scrolled off-screen. Only renders while Continue is disabled (canContinue false, not saving). */
   blockedReason?: React.ReactNode;
+  /**
+   * ⛔ A STRIP THAT STAYS PUT, BETWEEN THE SCROLLING BODY AND THE CONTINUE KEY (2026-08-24).
+   *
+   * For the one thing on a step that must remain visible while the body is scrolled — the endurance
+   * week's live lifting rate, which only teaches if you see it change. ⚠️ **It lives in the CHROME,
+   * not in the body.** A `sticky` element inside `children` lifts up over its own siblings the moment
+   * the content is taller than the port, and it parked on top of the volume inputs; no amount of
+   * spacing fixes that, because the overlap is what sticky is for.
+   *
+   * ⚠️ Omit it and the layout is byte-identical to before — every other step passes nothing.
+   */
+  footer?: React.ReactNode;
   /** Sport that tints the chrome — a Discipline ('run'|'bike'|'swim'|'strength') resolves to its
    *  SPORT_COLORS hue; omit (or 'universal') for the sport-agnostic warm-bone chrome. The progress
    *  bar and the Continue key take this color; content inside a step tints itself. */
@@ -96,6 +108,11 @@ export function StepLayout({
       <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-24 space-y-3 break-words">
         {children}
       </div>
+
+      {/* A step's own pinned strip, if it has one — see `footer`. Above the key, below the scroll. */}
+      {footer && (
+        <div className="shrink-0 px-4 pb-1 min-w-0">{footer}</div>
+      )}
 
       {/* Continue — instrument key, backlit by the accent; the final (commit) step also shimmers */}
       {!hideContinue && (

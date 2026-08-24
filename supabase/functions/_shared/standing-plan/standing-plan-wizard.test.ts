@@ -19,7 +19,15 @@ import {
 } from './index.ts';
 import { hardSlotDefault, hardSlotOptions, hardSlotTitle } from '../../../../src/lib/hard-slot-choices.ts';
 import { slotsForEngine, weekBounds } from '../../../../src/lib/standing-plan-week-bounds.ts';
-import { SLOT_KEYS, defaultSlotSports, type SlotKey, type SlotSport } from '../../../../src/lib/standing-plan-week-copy.ts';
+import { SLOT_KEYS, type SlotKey, type SlotSport } from '../../../../src/lib/standing-plan-week-copy.ts';
+
+/**
+ * ⚠️ THE PRE-FILL IS GONE (Michael, 2026-08-24) — every row on the screen now starts neutral. These
+ * two are the mixes the old `defaultSlotSports(false|true)` produced, written out as fixtures so the
+ * agreement checks below still cover a run-only week and a bike-kept one.
+ */
+const ALL_RUN: Record<SlotKey, SlotSport> = { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' };
+const BIKE_KEPT: Record<SlotKey, SlotSport> = { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' };
 
 const BASELINES = {
   learned_fitness: {
@@ -60,8 +68,8 @@ Deno.test('the cap the wizard shows brackets the week the composer actually buil
    * band doing its job.
    */
   const mixes: Record<SlotKey, SlotSport>[] = [
-    defaultSlotSports(false),
-    defaultSlotSports(true),
+    ALL_RUN,
+    BIKE_KEPT,
     { hard1: 'ride', hard2: 'ride', easy: 'ride', long: 'ride' },
     { hard1: 'run', hard2: 'ride', easy: 'run', long: 'ride' },
     { hard1: 'ride', hard2: 'run', easy: 'ride', long: 'run' },
@@ -97,8 +105,8 @@ Deno.test('the cap the wizard shows brackets the week the composer actually buil
 });
 
 Deno.test('the caps move with the sport mix — a screen showing one number for every mix is broken', () => {
-  const allRun = weekBounds(defaultSlotSports(false), { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
-  const mixed = weekBounds(defaultSlotSports(true), { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
+  const allRun = weekBounds(ALL_RUN, { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
+  const mixed = weekBounds(BIKE_KEPT, { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
   assert(allRun.runMiles && mixed.runMiles);
   assert(allRun.runMiles!.max > mixed.runMiles!.max,
     'moving two slots to the bike did not lower the running cap');
@@ -110,7 +118,7 @@ Deno.test('the wizard reads the same slot count the frame has — four, always',
   // ⛔ THE PROGRAM OWNS THE COUNT (8-21 §3c). The screen's four controls and the frame's four
   // endurance slots are the same four; a screen with a fifth control would be asking about a session
   // the plan does not have.
-  for (const slots of [defaultSlotSports(false), defaultSlotSports(true)]) {
+  for (const slots of [ALL_RUN, BIKE_KEPT]) {
     const wk = composeWeek({ ...COMPOSE, week: 2, column: 'standard', sportMix: mixFrom(slots) });
     assertEquals(wk.sessions.filter((s) => s.type !== 'strength').length, SLOT_KEYS.length);
   }

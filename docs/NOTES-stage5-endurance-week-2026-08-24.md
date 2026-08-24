@@ -415,3 +415,62 @@ next slice.**
 lint unchanged.** Verified in the browser inside a real `StepLayout`: collapsed rows now read
 differently, every row keeps its edge through open/close and a sport flip, the preamble renders, and
 at full scroll the rate is pinned above Continue with the club option fully visible.
+
+---
+
+# PART 8 — THE NEUTRAL START (Michael's ruling, 2026-08-24 — supersedes the pre-fill)
+
+## 8.1 What changed
+
+- **Row labels are numbered again**: `Hard session 1` · `Hard session 2` · `Recovery session` ·
+  `Long session`. ⚠️ **This supersedes the same day's "never show Hard 1/2"** — and it is right once
+  the rows start empty: with no sport and no session on either, *"Hard session"* twice is two
+  identical rows and nothing to tell the athlete which one they are opening. The numbers are also
+  real: slot one is the top-end session, slot two the sustained one.
+- **Every row starts neutral.** No sport, no sport colour. ⛔ **The pre-fill is DELETED, not
+  disabled** — it put both hard slots on the bike before the athlete had said anything, so a screen
+  full of decisions looked like a screen full of answers, and anyone who scrolled past it had a mix
+  nobody chose. `hardSlotDefault` still applies the SESSION once a sport is picked; what is gone is
+  guessing the sport.
+- **Continue is gated** on all four rows having a sport (`allSlotsChosen`), with a blocked line that
+  names what is missing and shrinks as they answer.
+- **The rate says which fact is missing** until both hard slots have a sport — `RATE_PENDING_LINE`,
+  no number. The screen's one live number must never be a placeholder an athlete could read as an
+  answer.
+- **Volume appears when the week does.** Its caps are summed from the slots, so before all four are
+  answered it would show a bound for a week nobody has described, and it would move underneath them
+  as they answered.
+
+## 8.2 ⛔ AND THE PINNED RATE MOVED OUT OF THE SCROLL AREA ENTIRELY
+
+`sticky` inside the body was wrong twice over, and the second time cost real time:
+
+1. `sticky top-0` covered the preamble and the first row's edge as soon as anything scrolled
+   (Part 7.3).
+2. `sticky bottom-0` **lifted up over the volume inputs** the moment the content passed the port
+   height. `mt-auto`, a `min-h-full` column and a measured spacer were each tried and each failed —
+   because the overlap is not a spacing bug, **it is what sticky is for**.
+
+⛔ **So it is not in the body any more.** `StepLayout` gained one optional `footer` slot — a strip
+between the scrolling body and the Continue key, in the non-scrolling chrome. `EnduranceWeekRate` is
+rendered there. It cannot overlap anything by construction, and it stays visible while the slots
+change, which was the whole reason to pin it. ⚠️ Every other step passes nothing and is unchanged.
+
+## 8.3 Verified at 390 px inside the real `StepLayout`
+
+| state | what was read |
+|---|---|
+| **neutral** | four rows, labels only, all edges `rgba(255,255,255,0.1)`; rate reads *"The lifting rate appears once both hard sessions have a sport."*; no volume; **Continue disabled**, blocked line naming all four |
+| **one pick** | `Hard session 1 · Ride · Top-end intensity`; still gated |
+| **three picks** | rate becomes real (*1% every 3 weeks*); still gated; still no volume |
+| **all four** | edges green/green/yellow/yellow; **Continue enabled**; volume row appears |
+| **hard 1 → Run** | row turns yellow, `VO2 max focus`, rate moves to *1% every 4 weeks*, split line appears |
+
+⛔ **And the rate is below the scroll port in every state** (`rateBelowScroll: true`), so nothing it
+could cover is inside the scroll at all.
+
+## 8.4 The gate
+
+**156 tests green · 9/9 mutations killed · Get Stronger byte-identical (`f7ece1aa…`) · build passes ·
+lint unchanged** (`NonRaceBuilder`'s 2 pre-existing; the four other files clean). The temporary probe
+route was deleted — `git status` is clean of it.

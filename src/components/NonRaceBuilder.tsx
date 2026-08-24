@@ -4,13 +4,16 @@ import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
-import EnduranceWeekCard from './EnduranceWeekCard';
+import EnduranceWeekCard, { EnduranceWeekRate } from './EnduranceWeekCard';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
 import HardSlotChoices from './HardSlotChoices';
 import {
   SLOT_KEYS,
-  defaultSlotSports,
+  allSlotsChosen,
+  emptySlotSports,
+  unansweredLine,
   type SlotKey,
+  type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { hardSlotDefault, hardSlotTitle } from '@/lib/hard-slot-choices';
@@ -763,7 +766,7 @@ type NonRaceState = {
    * endurance-shape choice on the Standing Plan — the program owns the count, so `runDays` and
    * `rideDays` are DERIVED from this rather than asked. See `EnduranceWeekCard.tsx`.
    */
-  slotSports?: Record<SlotKey, SlotSport>;
+  slotSports?: SlotSelection;
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
   raceDate: string;
@@ -1074,10 +1077,10 @@ function assemblePayload(
    */
   const isStrengthFocusPath = state.goal === 'get_stronger';
   const derivedCounts = (() => {
-    const bikeKept = state.posture?.bike != null && state.posture.bike !== 'out';
-    const slots = state.slotSports ?? defaultSlotSports(bikeKept);
+      const slots = state.slotSports ?? emptySlotSports();
     const runs = SLOT_KEYS.filter((k) => slots[k] === 'run').length;
-    return { runs, rides: SLOT_KEYS.length - runs, slots: slotsForEngine(slots) };
+    const rides = SLOT_KEYS.filter((k) => slots[k] === 'ride').length;
+    return { runs, rides, slots: slotsForEngine(slots) };
   })();
   return {
     summary: isRace
@@ -2747,8 +2750,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * bike kept puts both hard slots on the bike (p280 — no impact, so the intensity does not tax the
    * lifts); with no bike every slot is a run and the screen is a read-out.
    */
-  const bikeKeptNow = state.posture?.bike != null && state.posture.bike !== 'out';
-  const slotSportsNow: Record<SlotKey, SlotSport> = state.slotSports ?? defaultSlotSports(bikeKeptNow);
+  /**
+   * ⛔ EVERY ROW STARTS NEUTRAL (Michael, 2026-08-24). No sport, no colour, and Continue disabled
+   * until all four are answered — see `allSlotsChosen`. ⚠️ The pre-fill this replaced put both hard
+   * slots on the bike before the athlete had said anything.
+   */
+  const slotSportsNow: SlotSelection = state.slotSports ?? emptySlotSports();
 
   /**
    * ⛔ THE HARD SLOT'S SESSION CHOICES, RESTORED (Michael's screenshot review, 2026-08-24).
@@ -2784,11 +2791,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const syncHardDays = (
     st: NonRaceState,
-    slots: Record<SlotKey, SlotSport>,
+    slots: SlotSelection,
   ): NonRaceState['hardDays'] => (['hard1', 'hard2'] as const).map((k) => {
     const i = HARD_SLOT_INDEX[k];
     const prev = st.hardDays[i];
-    const want = hardDefaultsFor(slots[k], k);
+    // ⚠️ AN UNANSWERED HARD SLOT KEEPS WHATEVER WAS THERE. Nothing reaches the engine until Continue
+    // opens, and Continue is gated on every row having a sport.
+    const sport = slots[k];
+    if (!sport) return prev ?? { discipline: 'run' as const, day: '' as const, ownership: 'prescribed' as const };
+    const want = hardDefaultsFor(sport, k);
     // ⚠️ THE DAY AND THE CLUB ANSWER SURVIVE A SPORT CHANGE — they are the athlete's, not the
     // session's. Only the session identity is reset.
     if (prev && prev.discipline === want.discipline) return prev;
@@ -4410,12 +4421,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           step={stepNo('endurance')} totalSteps={steps.length} title="Your endurance week"
           // ⚠️ NO SUBTITLE. Michael's header is the first thing on the card and it is verbatim; a
           // subtitle above it would be the app talking over him.
-          onBack={back} onContinue={next} canContinue
+          onBack={back} onContinue={next}
+          /**
+           * ⛔ CONTINUE IS GATED ON EVERY ROW HAVING A SPORT (Michael, 2026-08-24). The rows start
+           * neutral, so an ungated Continue would build a week off four unanswered slots — which is
+           * exactly what the deleted pre-fill did silently.
+           */
+          canContinue={allSlotsChosen(slotSportsNow)}
+          blockedReason={tintedReason(unansweredLine(slotSportsNow) ?? undefined)}
+          /**
+           * ⛔ THE LIVE RATE SITS IN THE CHROME, NOT IN THE BODY. It has to stay visible while the
+           * slots below it change — a number that moves off-screen teaches nobody — and a `sticky`
+           * element inside the scroll lifts over its own siblings the moment the content passes the
+           * port height, which is how it ended up on top of the volume inputs.
+           */
+          footer={<EnduranceWeekRate slots={slotSportsNow} squat1RM={squat1RMNow} />}
         >
           <EnduranceWeekCard
             slots={slotSportsNow}
             onSlotChange={(key, sport) => setState((st) => {
-              const slots = { ...(st.slotSports ?? defaultSlotSports(bikeKeptNow)), [key]: sport };
+              const slots = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
               // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
               // card would offer ride sessions on a slot the engine still had down as a run.
               return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
@@ -4428,13 +4453,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              */
             /** ⛔ WHAT THE COLLAPSED ROW SHOWS AFTER THE SPORT — the option table's own title. */
             hardSessionTitle={(key) => {
+              const sport = slotSportsNow[key];
+              // ⛔ NO SPORT, NO SESSION. The row shows its label alone until the athlete picks.
+              if (!sport) return null;
               const h = state.hardDays[HARD_SLOT_INDEX[key]];
-              if (!h) return hardSlotTitle(slotSportsNow[key], hardSlotDefault(slotSportsNow[key], key));
-              return hardSlotTitle(slotSportsNow[key], { role: h.role, goal: h.goal, ownership: h.ownership });
+              if (!h) return hardSlotTitle(sport, hardSlotDefault(sport, key));
+              return hardSlotTitle(sport, { role: h.role, goal: h.goal, ownership: h.ownership });
             }}
             renderHardFlavor={(key) => {
               const i = HARD_SLOT_INDEX[key];
               const sport = slotSportsNow[key];
+              // ⛔ THE SESSION CHOICES APPEAR WITH THE SPORT — there is nothing to choose between
+              // before one is picked, and two empty option lists is the form this screen stopped being.
+              if (!sport) return null;
               const h = state.hardDays[i] ?? hardDefaultsFor(sport, key);
               return (
                 <HardSlotChoices

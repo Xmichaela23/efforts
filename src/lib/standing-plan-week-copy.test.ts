@@ -22,7 +22,11 @@ import {
   ENDURANCE_WEEK_PREAMBLE,
   RUN_TAX_LINES,
   slotSummary,
-  defaultSlotSports,
+  allSlotsChosen,
+  emptySlotSports,
+  unansweredLine,
+  unansweredSlots,
+  RATE_PENDING_LINE,
   liftingRateLine,
   liftingRateTier,
   upperLowerSplitLine,
@@ -71,18 +75,19 @@ Deno.test('the four slots are the four the frame has, labelled as the athlete se
    * ⛔ NEVER "Hard 1 / Hard 2" ON A SCREEN (Michael, 2026-08-24). Those are internal keys; an athlete
    * has two hard sessions, not a first and a second. The labels are the ones his own preamble uses.
    */
-  assertEquals(SLOT_LABEL.hard1, 'Hard session');
-  assertEquals(SLOT_LABEL.hard2, 'Hard session');
+  // ⛔ NUMBERED (Michael, 2026-08-24 — supersedes the earlier "never show Hard 1/2"). With the rows
+  // starting empty, two identical labels are two identical rows.
+  assertEquals(SLOT_LABEL.hard1, 'Hard session 1');
+  assertEquals(SLOT_LABEL.hard2, 'Hard session 2');
   assertEquals(SLOT_LABEL.easy, 'Recovery session');
   assertEquals(SLOT_LABEL.long, 'Long session');
-  for (const k of SLOT_KEYS) {
-    assert(!/\b(hard|slot)\s*[12]\b/i.test(SLOT_LABEL[k]), `an internal key leaked onto a label: ${SLOT_LABEL[k]}`);
-  }
-
   // ⛔ A COLLAPSED ROW STATES ITS WHOLE ANSWER — the screen opens finished.
-  assertEquals(slotSummary('hard1', 'ride', 'Sustained threshold'), 'Hard session · Ride · Sustained threshold');
+  assertEquals(slotSummary('hard1', 'ride', 'Sustained threshold'), 'Hard session 1 · Ride · Sustained threshold');
   assertEquals(slotSummary('easy', 'run'), 'Recovery session · Run');
   assertEquals(slotSummary('long', 'ride'), 'Long session · Long ride');
+  // ⛔ AN UNANSWERED ROW IS ITS LABEL ALONE — no sport, and nothing invented to fill the gap.
+  assertEquals(slotSummary('hard1', null), 'Hard session 1');
+  assertEquals(slotSummary('long', null), 'Long session');
   // ⛔ THE LONG SLOT OFFERS BOTH, and its own note says so — p275's permission.
   assertEquals(SLOT_OPTIONS.long.map((o) => o.label), ['Long run', 'Long ride']);
 });
@@ -91,25 +96,49 @@ Deno.test('the four slots are the four the frame has, labelled as the athlete se
 // B — THE PRE-FILL AND THE DERIVED MIX
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('strength leading with a bike kept pre-fills both hard slots on the bike', () => {
-  // ⛔ PLACED BY THE DIAL, NEVER ASKED (pivot §2, p280: no impact, so it does not tax the lifts).
-  const withBike = defaultSlotSports(true);
-  assertEquals(withBike.hard1, 'ride');
-  assertEquals(withBike.hard2, 'ride');
-  // ⛔ AND THE RUNNING KEEPS ITS LONG SESSION AND ITS EASY ONE.
-  assertEquals(withBike.easy, 'run');
-  assertEquals(withBike.long, 'run');
-  // No bike in the mix → every slot is a run and the screen is a read-out.
-  assertEquals(defaultSlotSports(false), { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' });
+Deno.test('every row starts neutral, and Continue is gated on all four', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-24 — **supersedes the pre-fill**. It put both hard slots on the bike before
+   * the athlete had said anything, which made a screen full of decisions look like a screen full of
+   * answers; an athlete who scrolled past it had a mix nobody chose.
+   */
+  const empty = emptySlotSports();
+  assertEquals(empty, { hard1: null, hard2: null, easy: null, long: null });
+  assert(!allSlotsChosen(empty), 'an untouched screen let Continue through');
+  assertEquals(unansweredSlots(empty), SLOT_KEYS);
+
+  const partial = { ...empty, hard1: 'ride' as const, easy: 'run' as const };
+  assert(!allSlotsChosen(partial), 'two answered rows let Continue through');
+  assertEquals(unansweredSlots(partial), ['hard2', 'long']);
+
+  const full = { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' } as const;
+  assert(allSlotsChosen(full));
+  assertEquals(unansweredLine(full), null, 'a finished week still named something missing');
 });
 
-Deno.test('the default option is the one shown first, on every slot', () => {
-  // ⚠️ THE ORDER STATES THE DEFAULT before anything is tapped — a screen whose first chip is not the
-  // pre-filled one reads as though nothing is chosen.
-  const withBike = defaultSlotSports(true);
-  for (const key of SLOT_KEYS) {
-    assertEquals(SLOT_OPTIONS[key][0].value, withBike[key], `${key}'s first option is not its default`);
+Deno.test('the blocked line names what is missing, and nothing else', () => {
+  const one = unansweredLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null })!;
+  assert(/long session/i.test(one), one);
+  assert(/has no sport yet/.test(one), one);
+  const two = unansweredLine({ hard1: 'ride', hard2: null, easy: null, long: 'run' })!;
+  assert(/have no sport yet/.test(two), two);
+  assert(/hard session 2/i.test(two) && /recovery session/i.test(two), two);
+  // ⚠️ VOICE: it states the fact, it does not instruct.
+  for (const line of [one, two]) {
+    assertEquals(voiceViolation(line), null, line);
+    assert(!/^(Pick|Choose|Select|Set|Tap)\b/i.test(line), `imperative: ${line}`);
   }
+});
+
+Deno.test('the rate says which fact is missing rather than showing a number that is not true', () => {
+  // ⛔ THE RATE IS A FUNCTION OF THE TWO HARD SLOTS. Until both have a sport there is no rate, and
+  // the screen's one live number must never be a placeholder an athlete could read as an answer.
+  assertEquals(liftingRateLine(emptySlotSports(), 300), RATE_PENDING_LINE);
+  assertEquals(liftingRateLine({ hard1: 'ride', hard2: null, easy: 'run', long: 'run' }, 300), RATE_PENDING_LINE);
+  assertEquals(upperLowerSplitLine({ hard1: 'run', hard2: null, easy: 'run', long: 'run' }), null);
+  assert(!/%/.test(RATE_PENDING_LINE), 'the pending line carries a number');
+  // And the moment both are answered it is a real rate again.
+  assert(/1% every 3 weeks/.test(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' })));
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
@@ -240,7 +269,7 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
    * ⚠️ Mutation testing found the composer's own week still landing inside a tightened band, so the
    * direction is asserted against the raw arithmetic rather than only against a built week.
    */
-  const slots = defaultSlotSports(false);
+  const slots = { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' } as const;
   const b = weekBounds(slots, { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
   assert(b.runMiles);
   // ⛔ AGAINST THE RAW ARITHMETIC, not against its own rounding. `min === floor(min)` is true of a
@@ -258,7 +287,7 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
     `the floor rounded IN: ${b.runMiles!.min} > ${(rawShort / PACE).toFixed(2)}`);
   assert(b.runMiles!.max >= rawLong / PACE - 1e-9,
     `the cap rounded IN: ${b.runMiles!.max} < ${(rawLong / PACE).toFixed(2)}`);
-  const tight = weekBounds(defaultSlotSports(true), { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
+  const tight = weekBounds({ hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' }, { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
   assert(tight.runMiles && tight.runMiles.max < b.runMiles!.max,
     'moving slots to the bike did not lower the running cap');
 });
@@ -269,7 +298,7 @@ Deno.test('no easy pace on file means no running cap — never one computed off 
    * conversion."* A cap derived from an invented pace is a number the athlete would plan against.
    */
   for (const pace of [null, undefined, 0, -1, NaN]) {
-    const b = weekBounds(defaultSlotSports(false), {
+    const b = weekBounds({ hard1: 'run', hard2: 'run', easy: 'run', long: 'run' }, {
       baselines: BASELINES as never, easyPaceSecPerMi: pace as never,
     });
     assertEquals(b.runMiles, null, `a running cap was invented from a pace of ${String(pace)}`);
@@ -285,7 +314,7 @@ Deno.test('no easy pace on file means no running cap — never one computed off 
 Deno.test('a slot the athlete did not answer keeps the frame\'s own session', () => {
   // ⛔ THE OVERRIDE IS PER SLOT AND PARTIAL BY DESIGN. A map naming three slots must not silently
   // decide the fourth — mutation testing showed the loop treating "unnamed" and "run" alike.
-  const full = slotsForEngine(defaultSlotSports(true));
+  const full = slotsForEngine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' });
   assertEquals(Object.keys(full).sort(), Object.values(SLOT_FRAME_KEY).sort());
   assertEquals(full[SLOT_FRAME_KEY.hard1], 'ride');
   assertEquals(full[SLOT_FRAME_KEY.long], 'run');

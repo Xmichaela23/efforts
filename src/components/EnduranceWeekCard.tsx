@@ -39,14 +39,16 @@ import {
   liftingRateLine,
   slotSummary,
   upperLowerSplitLine,
+  allSlotsChosen,
   type SlotKey,
+  type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { boundsLine, weekBounds } from '@/lib/standing-plan-week-bounds';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
-  slots: Record<SlotKey, SlotSport>;
+  slots: SlotSelection;
   onSlotChange: (key: SlotKey, sport: SlotSport) => void;
   /** The athlete's baselines row — the caps resolve every session against their own anchors. */
   baselines?: unknown;
@@ -125,7 +127,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       <div className="flex flex-col gap-2">
         {SLOT_KEYS.map((key) => {
           const sport = props.slots[key];
-          const color = getDisciplineColor(SPORT_DISCIPLINE[sport]);
+          /**
+           * ⛔ NO SPORT, NO COLOUR (Michael, 2026-08-24). A row the athlete has not answered carries
+           * the neutral edge — the colour is what says "you chose this", so painting it before they
+           * chose is the screen answering its own question.
+           */
+          const color = sport ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
           const isOpen = open === key;
           const session = (key === 'hard1' || key === 'hard2')
             ? props.hardSessionTitle?.(key) ?? null
@@ -154,10 +161,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                  * ⚠️ Longhands only. A shorthand beside its own longhand in a React style object is
                  * a latent version of this bug wherever it appears.
                  */
-                borderTopColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
-                borderRightColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
-                borderBottomColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
-                borderLeftColor: color,
+                borderTopColor: isOpen && color ? `${color}66` : 'rgba(255,255,255,0.10)',
+                borderRightColor: isOpen && color ? `${color}66` : 'rgba(255,255,255,0.10)',
+                borderBottomColor: isOpen && color ? `${color}66` : 'rgba(255,255,255,0.10)',
+                // ⛔ THE EDGE APPEARS WITH THE PICK. Unanswered rows read neutral, all four alike.
+                borderLeftColor: color ?? 'rgba(255,255,255,0.10)',
                 borderLeftWidth: 3,
                 backgroundColor: isOpen ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.02)',
               }}
@@ -242,7 +250,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           ⛔ ONE ROW (Michael, 2026-08-24). Stacked, they read as two separate questions and pushed the
           second toward the fold. ⚠️ `flex-wrap` with a `min-w` basis, not a fixed two-column grid: a
           narrow viewport stacks them rather than crushing both. */}
-      {bounds.runMiles || bounds.rideHours ? (
+      {/* ⛔ THE VOLUME QUESTION ARRIVES WHEN THE WEEK DOES. Its caps are summed from the slots, so
+          before all four are answered it would show a bound for a week the athlete has not described
+          — and it would move under them as they answered. */}
+      {allSlotsChosen(props.slots) && (bounds.runMiles || bounds.rideHours) ? (
         <div className="flex flex-wrap gap-4">
           {bounds.runMiles ? (
             <div className="flex-1 min-w-[150px]">
@@ -292,28 +303,29 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
         </p>
       ) : null}
 
-      {/**
-        * ⛔⛔ THE RATE IS PINNED TO THE BOTTOM, NOT THE TOP — and that is a bug fix, not a preference
-        * (Michael's phone screenshot, 2026-08-24 evening).
-        *
-        * It was `sticky top-0` with an opaque backdrop, directly under the preamble. On a desktop
-        * column nothing scrolls and it looked right; on a phone the content is taller than the
-        * viewport, so **the moment anything scrolled it covered what passed beneath it** — the
-        * preamble first (*"title goes straight to the rate card"*), then the top edge of the first
-        * slot row (*"the FIRST hard row is missing its colored sport edge"*). One cause, both
-        * defects, and neither could reproduce in a probe that rendered the card without a scroll port.
-        *
-        * ⛔ THE WORK ORDER ALLOWS EITHER PLACE — *"under the header or above Continue"* — and only one
-        * of them can be pinned on a short screen without hiding something. Pinned to the bottom it
-        * covers nothing: the content ends above it, and it sits directly over the Continue key, which
-        * is where the athlete's eye already is when they decide.
-        */}
-      <div className="sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[#050505] via-[#050505]/95 to-transparent">
-        <div className="instrument-card !p-3.5">
-          <p className="text-white text-[13px] leading-snug tabular-nums" data-testid="lifting-rate">{rate}</p>
-          {split ? <p className="text-white/50 text-[11px] leading-snug mt-1">{split}</p> : null}
-        </div>
-      </div>
+    </div>
+  );
+}
+
+
+/**
+ * ⛔ THE LIVE RATE, RENDERED IN THE STEP'S CHROME RATHER THAN IN ITS BODY (2026-08-24).
+ *
+ * It is the only thing on this screen that TEACHES — it moves when a slot moves, and a number that
+ * changes off-screen has taught nobody anything. ⚠️ It was `sticky` inside the scrolling body and
+ * lifted up over the volume inputs the moment the content passed the port height; `StepLayout`'s
+ * `footer` slot is outside the scroll, so it cannot overlap anything by construction.
+ */
+export function EnduranceWeekRate(props: {
+  slots: SlotSelection;
+  squat1RM?: number | null;
+}) {
+  const rate = liftingRateLine(props.slots, props.squat1RM);
+  const split = upperLowerSplitLine(props.slots);
+  return (
+    <div className="instrument-card !p-3.5">
+      <p className="text-white text-[13px] leading-snug tabular-nums" data-testid="lifting-rate">{rate}</p>
+      {split ? <p className="text-white/50 text-[11px] leading-snug mt-1">{split}</p> : null}
     </div>
   );
 }

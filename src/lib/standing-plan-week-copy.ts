@@ -46,9 +46,18 @@ export const LONG_SLOT_NOTE = 'one per week, run or ride';
  * ⚠️ BOTH HARD SLOTS CARRY THE SAME LABEL, deliberately. What tells them apart on a collapsed row is
  * the sport and the session — which is what the athlete actually chose — not an ordinal nobody set.
  */
+/**
+ * ⛔ THE ROW LABELS (Michael, 2026-08-24 — **supersedes** the "never show Hard 1 / Hard 2" ruling of
+ * the same day). The two hard sessions are NUMBERED now, and that is the right call once the rows
+ * start empty: with no sport and no session on either, *"Hard session"* twice is two identical rows
+ * and nothing to tell the athlete which one they are opening.
+ *
+ * ⚠️ THE NUMBERS ARE ALSO REAL. Slot one is the top-end session and slot two the sustained one — the
+ * frame's own two hard days, in order (`hardSlotDefault`).
+ */
 export const SLOT_LABEL: Record<SlotKey, string> = {
-  hard1: 'Hard session',
-  hard2: 'Hard session',
+  hard1: 'Hard session 1',
+  hard2: 'Hard session 2',
   easy: 'Recovery session',
   long: 'Long session',
 };
@@ -70,7 +79,9 @@ export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]
  * default path is read, glance at the rate, Continue. ⚠️ The parts are joined with a middle dot
  * rather than punctuation, because they are three facts of equal weight and not a sentence.
  */
-export function slotSummary(key: SlotKey, sport: SlotSport, session?: string | null): string {
+export function slotSummary(key: SlotKey, sport: SlotSport | null, session?: string | null): string {
+  // ⛔ AN UNANSWERED ROW SAYS SO — it is the label alone, and the row carries no sport colour either.
+  if (!sport) return SLOT_LABEL[key];
   const sportWord = key === 'long'
     ? (sport === 'ride' ? 'Long ride' : 'Long run')
     : (sport === 'ride' ? 'Ride' : 'Run');
@@ -94,14 +105,42 @@ export const RUN_TAX_LINES: string[] = [
 export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 5);
 
 /**
- * ⛔ THE PRE-FILL. Strength leading with a bike kept puts BOTH hard slots on the bike; the easy and
- * long slots stay running, which is what "a held sport keeps its long session" means (pivot §2).
- * With no bike in the mix every slot is a run and the screen is a read-out rather than a choice.
+ * ⛔ EVERY ROW STARTS NEUTRAL (Michael, 2026-08-24 — **supersedes the pre-fill**). No sport is
+ * chosen, no sport colour is on screen, and Continue is disabled until all four are answered.
+ *
+ * ⚠️ THE PRE-FILL IS DELETED, NOT DISABLED. It put both hard slots on the bike before the athlete
+ * had said anything, which made a screen full of decisions look like a screen full of answers —
+ * and an athlete who scrolled past it had a mix nobody chose. `hardSlotDefault` still applies the
+ * SESSION once a sport is picked; what is gone is guessing the sport.
  */
-export function defaultSlotSports(bikeKept: boolean): Record<SlotKey, SlotSport> {
-  return bikeKept
-    ? { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' }
-    : { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' };
+export type SlotSelection = Record<SlotKey, SlotSport | null>;
+
+export function emptySlotSports(): SlotSelection {
+  return { hard1: null, hard2: null, easy: null, long: null };
+}
+
+/** ⛔ CONTINUE IS GATED ON THIS. A week with an unanswered slot is not a week. */
+export function allSlotsChosen(slots: SlotSelection): boolean {
+  return SLOT_KEYS.every((k) => slots[k] === 'run' || slots[k] === 'ride');
+}
+
+/** The rows still waiting, in screen order — for the line above a disabled Continue. */
+export function unansweredSlots(slots: SlotSelection): SlotKey[] {
+  return SLOT_KEYS.filter((k) => slots[k] !== 'run' && slots[k] !== 'ride');
+}
+
+/**
+ * ⛔ WHAT THE SCREEN SAYS WHILE IT IS STILL BEING ANSWERED. Fact-first, no imperative — it names
+ * what is missing and nothing else.
+ */
+export function unansweredLine(slots: SlotSelection): string | null {
+  const left = unansweredSlots(slots);
+  if (left.length === 0) return null;
+  const names = left.map((k) => SLOT_LABEL[k].toLowerCase());
+  const named = names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${named} ${names.length === 1 ? 'has' : 'have'} no sport yet.`;
 }
 
 // ── THE LIFTING RATE, FROM HIS ANCHORS ONLY ─────────────────────────────────────────────────────
@@ -160,11 +199,20 @@ export const RATE_CITE: Record<LiftingRateTier, string> = {
  * ⚠️ NO ENDURANCE FIGURE. What the running costs on the other side is the header's business, in
  * direction words, and no source gives a percentage for it.
  */
+/**
+ * ⛔ THE RATE IS A FUNCTION OF THE TWO HARD SLOTS, so it cannot be stated until both have a sport.
+ * ⚠️ It says which fact is missing rather than showing a number that is not yet true — the screen's
+ * one live number must never be a placeholder the athlete could read as an answer.
+ */
+export const RATE_PENDING_LINE =
+  'The lifting rate appears once both hard sessions have a sport.';
+
 export function liftingRateLine(
-  slots: Record<SlotKey, SlotSport>,
+  slots: SlotSelection,
   squat1RM?: number | null,
 ): string {
-  const tier = liftingRateTier(slots);
+  if (!slots.hard1 || !slots.hard2) return RATE_PENDING_LINE;
+  const tier = liftingRateTier(slots as Record<SlotKey, SlotSport>);
   const rate = RATE_TEXT[tier];
   const squat = Number(squat1RM);
   if (!Number.isFinite(squat) || squat <= 0) {
@@ -184,8 +232,9 @@ export function liftingRateLine(
  * ⚠️ DIRECTION WORDS, NO NUMBER. The split is p247's own reasoning — the reduction it prescribes is
  * LOWER BODY ONLY — and the corpus gives no figure for how much less the upper body is affected.
  */
-export function upperLowerSplitLine(slots: Record<SlotKey, SlotSport>): string | null {
-  if (liftingRateTier(slots) === 'hard_on_bike') return null;
+export function upperLowerSplitLine(slots: SlotSelection): string | null {
+  if (!slots.hard1 || !slots.hard2) return null;
+  if (liftingRateTier(slots as Record<SlotKey, SlotSport>) === 'hard_on_bike') return null;
   return 'The running lands on the legs, so the squat and deadlift carry the cost; the presses are '
     + 'largely unaffected.';
 }

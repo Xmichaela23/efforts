@@ -22,7 +22,7 @@ import {
 // for the same thing for the same reason: an import that only one toolchain can follow is a module
 // only one toolchain can check.
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
-import type { SlotKey, SlotSport } from './standing-plan-week-copy';
+import type { SlotKey, SlotSelection, SlotSport } from './standing-plan-week-copy';
 
 /**
  * ⛔ THE FRAME'S OWN SLOTS, in the order the screen shows them. Kept as a literal rather than read
@@ -55,9 +55,15 @@ export const SLOT_FRAME_KEY: Record<SlotKey, string> = {
 };
 
 /** The athlete's four answers, in the shape `SportMix.slots` takes. */
-export function slotsForEngine(slots: Record<SlotKey, SlotSport>): Record<string, SlotSport> {
+export function slotsForEngine(slots: SlotSelection): Record<string, SlotSport> {
   const out: Record<string, SlotSport> = {};
-  for (const key of Object.keys(SLOT_FRAME_KEY) as SlotKey[]) out[SLOT_FRAME_KEY[key]] = slots[key];
+  for (const key of Object.keys(SLOT_FRAME_KEY) as SlotKey[]) {
+    // ⚠️ AN UNANSWERED SLOT IS OMITTED, not defaulted. `assignSports` treats a slot the map does not
+    // name as the frame's own run — and Continue is gated on all four being answered, so a complete
+    // map is what actually reaches the engine.
+    const v = slots[key];
+    if (v) out[SLOT_FRAME_KEY[key]] = v;
+  }
   return out;
 }
 
@@ -79,7 +85,7 @@ export type WeekBounds = {
  *   `end-plan-core.ts` makes: *"if we do not know the pace we CANNOT do this conversion."*
  */
 export function weekBounds(
-  slots: Record<SlotKey, SlotSport>,
+  slots: SlotSelection,
   opts: { baselines?: EnduranceBaselines; easyPaceSecPerMi?: number | null },
 ): WeekBounds {
   let runShort = 0;
@@ -93,6 +99,9 @@ export function weekBounds(
   for (const key of Object.keys(SLOT_FAMILY) as SlotKey[]) {
     const base = SLOT_FAMILY[key];
     const sport = slots[key];
+    // ⛔ AN UNANSWERED SLOT HOLDS NOTHING YET. Counting it as a run would show a cap for a week the
+    // athlete has not described.
+    if (!sport) continue;
     if (sport === 'ride') {
       // ⛔ THE COMPOSER'S OWN EQUIVALENCE. A second table here is how a preview and a plan diverge.
       const eq = RIDE_EQUIVALENT[base.family];
