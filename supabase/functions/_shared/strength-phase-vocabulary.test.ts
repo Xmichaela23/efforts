@@ -15,7 +15,7 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildBlockPhases } from '../shared/strength-system/strength-primary-plan.ts';
-import { normalizePhaseKey, PHASE_RULES } from './strength-profiles.ts';
+import { normalizePhaseKey, phaseDisplayWord, PHASE_RULES } from './strength-profiles.ts';
 import { phaseNameToWeekIntent, resolvePlanPhase } from './plan-phase.ts';
 
 const PHASES = buildBlockPhases(12);
@@ -75,4 +75,18 @@ Deno.test('⛔ A TEST WEEK TAPERS AND A DELOAD RECOVERS — different postures, 
   const anchor = PHASE_RULES[normalizePhaseKey('Anchor')!];
   assertEquals(test.targetRirOffset > anchor.targetRirOffset, true);
   assertEquals(test.allowProgress, false, 'a test week never auto-progresses load');
+});
+
+Deno.test('⛔ A TEST WEEK IS RULED AS TAPER BUT PRINTED AS "TEST" (2026-08-24)', () => {
+  // `normalizePhaseKey` answers "which effort rule governs this week"; `phaseDisplayWord` answers
+  // "what do we call this week out loud". They diverge ONLY on the test family — week 1 of a Strong
+  // Focus block read "Taper" on the Today card because the rules word was being printed.
+  for (const name of ['Test', 'TM Test', 'tm_test', 'Retest']) {
+    assertEquals(normalizePhaseKey(name), 'taper', `"${name}" must still be ruled as taper`);
+    assertEquals(phaseDisplayWord(name), 'test', `"${name}" must be printed as test`);
+  }
+  // Everything outside the test family prints its rules word — including the race family.
+  for (const name of ['Leader', 'Anchor', 'Deload', 'Base', 'Taper', 'race_week']) {
+    assertEquals(phaseDisplayWord(name), normalizePhaseKey(name), `"${name}" display drifted from its rule`);
+  }
 });

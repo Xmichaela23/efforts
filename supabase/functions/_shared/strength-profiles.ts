@@ -484,6 +484,21 @@ export function normalizePhaseKey(phaseTag: string | null | undefined): PlanPhas
   return null;
 }
 
+/**
+ * The word a screen prints for a phase. Same table as `normalizePhaseKey`, different question:
+ * that function answers "which effort rule governs this week", this one answers "what do we call
+ * this week out loud". They agree everywhere except the test family — a test week is RULED as
+ * taper (arrive rested, loosen the target) but it is not a taper to the athlete, and week 1 of a
+ * fresh block reading "Taper" on the Today card is how that divergence surfaced (2026-08-24).
+ * Race-family names ('race', 'race_week', 'peak_taper') stay "taper" — that IS the right word
+ * to print for them.
+ */
+export function phaseDisplayWord(phaseTag: string | null | undefined): string | null {
+  const raw = String(phaseTag ?? '').toLowerCase().trim();
+  if (raw === 'retest' || raw === 'test' || raw === 'tm test' || raw === 'tm_test') return 'test';
+  return normalizePhaseKey(phaseTag);
+}
+
 export function resolvePhaseRule(phaseTag: string | null | undefined): PhaseRule {
   if (!phaseTag) return DEFAULT_PHASE_RULE;
   const key = normalizePhaseKey(phaseTag);

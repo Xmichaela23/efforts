@@ -183,7 +183,10 @@ Deno.test('⛔ A TM-TEST WEEK IS READ AS A TEST, AND ITS TOP SET IS THE GATE', (
   assertEquals(c.isMeasurementWeek, true, 'the TM single is at 100% — past the 95% validity mark');
   assertEquals(c.topSetPct, 1.00);
   assertEquals(c.phase, 'TM Test');
-  assertEquals(c.phaseWord, 'taper', 'a test week is arrived at rested, not unloaded');
+  // ⛔ RULED as taper (arrive rested — `normalizePhaseKey` still says 'taper'), PRINTED as test
+  // (2026-08-24): the card's phaseWord is the word a screen shows, and week 1 of a Strong Focus
+  // block was reading "Taper" on the Today card.
+  assertEquals(c.phaseWord, 'test', 'a test week prints as a test, not a taper');
 });
 
 Deno.test('⛔ THE NEW MAP\u2019S CYCLE WEEKS STILL RESOLVE — including week 3 of a cycle', () => {

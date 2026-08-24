@@ -1279,7 +1279,7 @@ Deno.serve(async (req)=>{
               // date" (block-identity.ts). It is pure — config + date in, card out — so calling it
               // here cannot disagree with the coach payload's block card, which is built from the
               // same function. `phaseWord` is already the plain athlete-facing word (base / build /
-              // peak / taper / recovery) via `normalizePhaseKey`, so this surface must NOT translate
+              // peak / taper / recovery / test) via `phaseDisplayWord`, so this surface must NOT translate
               // it — that is exactly the per-screen lookup table the accessor exists to prevent.
               //
               // ⛔ NO PHASE WORD → NO LABEL (2026-08-15, Michael: "it should do nothing if there is
@@ -1389,6 +1389,36 @@ Deno.serve(async (req)=>{
             focus = focus.trim();
           } else {
             focus = null; // Explicitly set to null if missing/empty
+          }
+
+          // ⛔ A CACHED BARE PHASE WORD IS RE-RESOLVED LIVE, NOT TRUSTED (2026-08-24). The
+          // summaries this function generates above are persisted into plan config, so a fix to
+          // the phase vocabulary never reaches an already-cached label — week 1 of a Strong Focus
+          // block kept reading "Taper" (the RULES word for a test week) after the display word
+          // became "Test". The resolver is pure and the config is already in hand, so when the
+          // cached focus is nothing but a phase word — a label only this generator mints —
+          // recompute it from the same authority instead. Composer-written focus text that says
+          // anything richer than a phase word is left alone.
+          const barePhaseWords = new Set(['base', 'build', 'peak', 'taper', 'recovery', 'test']);
+          if (!focus || barePhaseWords.has(focus.toLowerCase())) {
+            const liveLabel = (() => {
+              try {
+                const startIso = String(config?.user_selected_start_date || config?.start_date || '').slice(0, 10);
+                if (!startIso) return null;
+                const d = new Date(`${startIso}T12:00:00Z`);
+                d.setUTCDate(d.getUTCDate() + (currentWeek - 1) * 7);
+                return resolveBlockIdentity({
+                  planId: trainingPlanId,
+                  planName: planData?.name ?? null,
+                  planConfig: config,
+                  durationWeeks: planData?.duration_weeks ?? null,
+                  onDateIso: d.toISOString().slice(0, 10),
+                }).phaseWord;
+              } catch { return null; }
+            })();
+            if (liveLabel) {
+              focus = liveLabel.charAt(0).toUpperCase() + liveLabel.slice(1);
+            }
           }
           
           // Extract notes - same handling

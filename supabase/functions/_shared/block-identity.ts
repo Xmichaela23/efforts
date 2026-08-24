@@ -48,7 +48,7 @@ import {
 } from './plan-phase.ts';
 import {
   PROTOCOL_PROFILES,
-  normalizePhaseKey,
+  phaseDisplayWord,
   protocolEffortRead,
   type EffortReadMode,
   type StrengthProtocolId,
@@ -181,12 +181,13 @@ export type BlockIdentity = {
    * already called base/build/peak/taper) gets whatever the table's fallback happens to be.
    *
    * ⚠️ THIS IS AN ACCESSOR OVER THE VOCABULARY THAT ALREADY EXISTS, NOT A SECOND ONE.
-   * `normalizePhaseKey` (D-322, `strength-profiles.ts`) already maps every phase name any composer
-   * emits onto five plain words — base / build / peak / taper / recovery — and
-   * `strength-phase-vocabulary.test.ts` fails if a composer ever emits a name it does not cover.
-   * Two questions, one table: that function answers *"which effort rule governs this week"*, and
-   * this field answers *"what do we call this week out loud"*. They must not drift apart, which is
-   * exactly why this reads through it rather than beside it.
+   * It reads `phaseDisplayWord` (`strength-profiles.ts`), which shares one table with
+   * `normalizePhaseKey` (D-322) — the table `strength-phase-vocabulary.test.ts` pins against every
+   * composer's emitted names. Two questions, one table: `normalizePhaseKey` answers *"which effort
+   * rule governs this week"* (five words: base / build / peak / taper / recovery), and this field
+   * answers *"what do we call this week out loud"* — identical everywhere except the test family,
+   * which is RULED as taper but PRINTED as "test" (a week-1 test reading "Taper" on the Today card
+   * was the divergence, 2026-08-24).
    */
   phaseWord: string | null;
   /** Where the phase came from. `'unknown'` is a real signal, not a silent null. */
@@ -423,7 +424,7 @@ export function resolveBlockIdentity(input: BlockIdentityInput): BlockIdentity {
     weekIndex,
     blockWeeks,
     phase,
-    phaseWord: normalizePhaseKey(phase),
+    phaseWord: phaseDisplayWord(phase),
     phaseSource: phase_source,
     weekIntent,
     cycle,
