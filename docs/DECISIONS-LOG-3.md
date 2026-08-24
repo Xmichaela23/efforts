@@ -583,3 +583,22 @@ one-page version so the number exists.
 mutation-tested through session A; Get Stronger byte-identical (f7ece1aa) across every slice.
 **He is training on the block (started 2026-08-24). The test-save → weeks-fill chain on a device is
 the one remaining acceptance step.**
+
+## D-449 — A test week is RULED as taper but PRINTED as "test" (2026-08-24)
+
+Week 1 of the Strong Focus block read "Week 1 • Taper" on the Today header and "week 1 of 12 ·
+taper" on State. Cause: `normalizePhaseKey` (D-322) maps the test family (`test`/`retest`/`tm
+test`) to `taper` — correct for BEHAVIOR (arrive rested, loosen targets, no progression) — and
+every surface printed that rules word.
+
+**The split:** `phaseDisplayWord` (`_shared/strength-profiles.ts`), beside `normalizePhaseKey`,
+same table, other question: what to call the week out loud. Diverges ONLY on the test family
+('test'); race-family names still print 'taper'. `resolveBlockIdentity().phaseWord` now reads
+through it, so get-week, workout-detail and coach all correct from one source. Pinned in
+`strength-phase-vocabulary.test.ts` + `block-identity.test.ts`.
+
+**Two cache consequences, both handled:** (1) get-week persists generated `weekly_summaries` into
+plan config, so a cached bare-phase-word focus is now RE-RESOLVED live at read time (composer-
+written richer focus text untouched) — no DB write needed; (2) coach payloads cache the word, so
+COACH_PAYLOAD_VERSION bumped to 170. Commits `efb4e3f2`, `4c2c125c`; all 12 `_shared` importers
+redeployed. Device-verified on Today header + workout detail; State pending one fresh open.

@@ -69,7 +69,52 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-24 midday, day one on the block — **THE ACCEPTANCE MOMENT HAPPENED. The test-save chain is VERIFIED on a device.**)
+## 🧭 NEXT SESSION — START HERE (2026-08-24 afternoon — **phase word fixed everywhere; a strength-propagation audit is the open job**)
+
+### THE JOB: finish the "how does a logged strength session populate the app" map
+Michael wants the guts traced: every store a logger save touches and every surface that reads an
+e1RM, with the drops named. Trace 1 (logger save path) LANDED — headline findings, verify before
+citing as fact (code-traced by a search agent, not device-tested):
+- **The chain never writes `performance_numbers`** — auto path writes `learned_fitness.strength_1rms`
+  (compute-facts:1946, fire-and-forget); promotion needs an athlete tap (AthleticRecordPage:411 or
+  "Save as baseline"). Q-284: the test sheet still SAYS "updated" without writing.
+- **THREE e1RM formulas coexist:** compute-adaptation-metrics (Epley + RIR inflation) vs
+  compute-facts/exercise_log (Wendler 0.0333) vs standing-plan working-number (Epley+Brzycki mean
+  × 0.96). Different consumers read different ones — a candidate "score that lies" fracture.
+- **Two races:** learned-fitness write un-awaited before compute-snapshot reads it; athlete_memory
+  fires from a client setTimeout(3000).
+- **Rematerializers fire ONLY from the logger** (StrengthLogger:4356-57) — a strength workout via
+  Garmin/Strava/import never re-reads the test week or re-walks block numbers.
+- **resolve-exercise-weight + standing-plan accessory pricing read `performance_numbers`** — i.e.
+  the stale 150/100, not the test's 155/110, prices prefills until the athlete adopts.
+Trace 2 (e1RM consumers per surface) still pending at banner time. Three device exhibits drove
+this, all still open:
+1. **Training Baselines still shows bench 150 / OHP 100** while the test produced e1RM 155 / 110
+   (State card and workout detail both show the new numbers). By design (athlete-entered,
+   adopt-gated like FTP) or a missed write? UNKNOWN — that is the trace's question.
+2. **The week-2 ME: Upper sheet rendered blank weights + the "no weight is prescribed" accessory
+   cue at session level** — yet the midday acceptance verified the test wrote block numbers
+   (bench 149 / OHP 102) and weeks 2–12 carry prescribed weights. Possible artifact of opening
+   next Monday's session early via Pick planned, dated today. Q-285. **Ask before alarming: is it
+   starved, absent, or just opened early?**
+3. **State's strength card said "week 1 of 12 · taper" for a test week** — FIXED, see below.
+
+### What shipped this afternoon (don't re-litigate) — pushed AND deployed
+- **The phase word split (D-449).** Test weeks are RULED as taper but now PRINT as "test".
+  `phaseDisplayWord` (`_shared/strength-profiles.ts`) beside `normalizePhaseKey`; block-identity's
+  `phaseWord` reads through it; get-week re-resolves a cached bare-phase-word focus live (no DB
+  write needed). Commit `efb4e3f2`; all 12 importers of the touched `_shared` files redeployed.
+  **VERIFIED on device:** Today header + workout detail read "test". **Coach payload bumped to 170**
+  (commit `4c2c125c`, coach redeployed) to flush the cached "taper" — State should read "test" on
+  next open; **that last render is NOT yet device-seen.**
+
+### Still open from the midday banner (unchanged, see it below for detail)
+Week 7 missing from the plan export (calendar check pending) · stale goal-prefs echo · duplicate
+test-week sentence · picker allows duplicate movement picks · fixes 2–3 from the morning are
+code-traced, not device-seen.
+
+### 📦 SUPERSEDED same day — the midday banner below still carries the acceptance detail
+## 🧭 DONE — was START HERE (2026-08-24 midday, day one on the block — **THE ACCEPTANCE MOMENT HAPPENED. The test-save chain is VERIFIED on a device.**)
 
 ### THE ACCEPTANCE, seen with his own eyes
 Michael saved **Test: Upper** on his phone and the chain fired end to end: the sheet announced

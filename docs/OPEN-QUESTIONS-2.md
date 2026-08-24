@@ -898,3 +898,25 @@ refuse or flag the duplicate instead of silently wasting the slot.
 
 Stated exception during the live-review batch (screens + engine wires: swim add-on, focus bias,
 archetype overrides, 20-mi cap, chips). The suites are green; the mutation pass is owed.
+
+## Q-284 — Baselines still shows the pre-test 1RMs; the test sheet said "updated" (2026-08-24)
+
+Training Baselines shows bench 150 / OHP 100 while the week-1 test produced e1RM 155 / 110 (State
+and workout detail show the new numbers). Trace (2026-08-24) says this is DESIGN, with one lying
+surface: nothing in the logger save chain writes `performance_numbers` — the chain writes
+`learned_fitness.strength_1rms` (auto), and promotion to `performance_numbers` requires the
+athlete's tap (`AthleticRecordPage.tsx:411` confirm, or the separate "Save as baseline" button /
+`save-baseline-test`). BUT `analyze-strength-workout:801-805` stamps `outcome: 'updated'` by
+COMPARING against `performance_numbers` without writing, so `StrengthTestResult.tsx:37` prints
+"updated to N" while the stored number is unchanged. The outcome word, not the write policy, is
+the defect candidate.
+
+## Q-285 — Week-2 ME: Upper sheet rendered blank weights + the "no weight prescribed" cue (2026-08-24)
+
+Screenshot, same day as the test save: "Log: ME: Upper" dated 08/24 shows the accessory cue ("No
+weight is prescribed — find the load…") at session level and blank LB on Bench (target 1-5),
+despite the acceptance verifying the test wrote working numbers (bench 149 / OHP 102) and
+`rematerialize-standing-block` restating weeks 2-12. Unresolved: artifact of opening next Monday's
+session early via Pick planned, or a real starvation (sheet not reading the restated
+`planned_workouts.strength_exercises`, or ME rows never stamped). A LEAD, not a verified bug —
+check what next Monday's session shows on-date before touching anything.
