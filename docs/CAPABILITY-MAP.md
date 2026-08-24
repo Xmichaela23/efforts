@@ -236,7 +236,7 @@ still open, including the intake's shape and the owed solver collapse.
 |---|---|---|
 | **Strength weight auto-progression / deload** | ⛔ **DELETED 2026-07-23 (D-315).** The silent auto-write on every ingest is gone (consent-first, extends D-285). Weights now change ONLY on the athlete's tap: State adjust modal, `adapt-plan` accept, or a swap/add. The `suggest` path still computes the progression signal (now phase-aware, matching the stamped target); the State strength row surfaces it; the athlete applies it. | **YES — always asked now.** |
 | Strength week relayout | `adapt-plan:750` on plan-JSON fingerprint change | NO on auto; YES on suggest→accept |
-| Manual 1RM override | `StrengthAdjustmentModal.tsx:82` → `materialize-plan` | **YES** — athlete initiates. Mounted at `StateTab.tsx:1370`. |
+| Manual 1RM override | ⛔ STALE (re-verified 2026-08-24): `StrengthAdjustmentModal.tsx` has zero importers (D-434); StateTab no longer mounts it. Live adjust paths: logger swap/add + adapt-plan `str_tm_*` tap. | dead code, not a capability |
 | Drag-reschedule | `WorkoutCalendar.tsx:397` | PARTLY (see above) |
 | Sweep | on week load | NO (idempotent) |
 | Pause / End | athlete or `GoalsScreen.tsx:911/971` (auto) | YES / **NO on the auto path** |

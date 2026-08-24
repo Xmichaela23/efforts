@@ -87,8 +87,20 @@ citing as fact (code-traced by a search agent, not device-tested):
   Garmin/Strava/import never re-reads the test week or re-walks block numbers.
 - **resolve-exercise-weight + standing-plan accessory pricing read `performance_numbers`** — i.e.
   the stale 150/100, not the test's 155/110, prices prefills until the athlete adopts.
-Trace 2 (e1RM consumers per surface) still pending at banner time. Three device exhibits drove
-this, all still open:
+Trace 2 (e1RM consumers per surface) LANDED same day — additions to the above:
+- **D-231 is the declared authority** (typed wins; learned gap-fills + suggests; raw
+  `exercise_log.estimated_1rm` is never truth) but the resolver (`capacity-resolver.ts:125`) is
+  wired on the JUDGE path only (coach) — prescribe paths read `performance_numbers` directly.
+- **FOUR read-trails**: typed `performance_numbers` / `learned_fitness.strength_1rms` /
+  `exercise_log.estimated_1rm` / raw `workouts.strength_exercises` (all-out card, test read,
+  AMRAP catch-up, resolve-exercise-weight branch b). TRUTH-MAP fracture #1 confirmed live.
+- **Baselines screen has NO strength adopt flow** (FTP + easy pace have one); the only strength
+  adopt is Athletic Record's SuggestionLine (gates: ≥3 samples, ≥medium conf, ≤42d, ≥5% drift).
+- **`user_baselines` writes invalidate no cache** — a typed 1RM change refreshes neither
+  coach_cache nor the snapshot.
+- **adapt-plan `strength_progression`/`strength_deload` remain client-unreachable** (D-434 holds).
+- CAPABILITY-MAP:239 (StrengthAdjustmentModal row) was stale — corrected 2026-08-24.
+Three device exhibits drove the traces, status:
 1. **Training Baselines still shows bench 150 / OHP 100** while the test produced e1RM 155 / 110
    (State card and workout detail both show the new numbers). By design (athlete-entered,
    adopt-gated like FTP) or a missed write? UNKNOWN — that is the trace's question.
