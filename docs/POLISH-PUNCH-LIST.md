@@ -67,9 +67,11 @@ One day's UI campaign, driven live by Michael, all browser-verified only. What t
   assistance neutral rim; nebula card grounds. Warm-up label dim-orange (was sky blue).
 - **State:** readout plates + nebula + the grid texture on every data card; per-lift cards; discipline
   cards ranked by 90-day session count (swim pinned last); numbers AND labels in the discipline's colour.
-- **Home:** LOAD + week totals in one bottom-lit "nova" card — gold top-left, blue low-left, green
-  rising bottom-right (the header's warm-left/cool-right run). Bike lines up with the verdict word.
-- **Nova drift:** `--nova-dx/dy/hue` roll once per app LAUNCH (`src/main.tsx`); header and LOAD card
+- **Home:** ~~LOAD + week totals in one bottom-lit "nova" card~~ **SUPERSEDED 2026-08-24, phone-verified
+  by Michael:** the glow moved OFF the card onto the chrome — tabbar = header mirrored verbatim,
+  page background bridges both edges, LOAD card is a dark clear instrument (the orange strength
+  number was drowning in the in-card gold). Recipe + traps: `docs/REFERENCE-nova-field.md`.
+- **Nova drift:** `--nova-dx/dy/hue` roll once per app LAUNCH (`src/main.tsx`); header and tabbar
   drift together so no two opens look identical. ⚠️ If the background ever twitches mid-session,
   something re-rolled per render — that is the bug to look for.
 - **LOAD verdict:** "balanced" is white now; caution/alarm escalate on #FF5A5F (non-discipline red).

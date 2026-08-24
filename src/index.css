@@ -546,6 +546,16 @@
       radial-gradient(ellipse at 50% 0%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 62%),
       radial-gradient(ellipse at 86% 0%, rgba(74, 158, 255, 0.09) 0%, rgba(74, 158, 255, 0.0) 62%),
       radial-gradient(ellipse at 78% 18%, rgba(80, 200, 120, 0.05) 0%, rgba(80, 200, 120, 0.0) 66%),
+      /* ⛔ THE NOVA IS THE SAME BRIDGE, MIRRORED (2026-08-24, Michael: "it should just be the
+         mirror of the top" + "fill under the load box, leave the load box clear"). The bottom
+         glow lives HERE on the screen chrome — the exact five layers above, y flipped, same
+         alphas — NOT painted inside the LOAD card. The card stays a dark clear instrument on
+         top of it, the way the Today card sits on the header's spill. */
+      radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 58%),
+      radial-gradient(ellipse at 14% 100%, rgba(255, 215, 0, 0.07) 0%, rgba(255, 215, 0, 0.0) 62%),
+      radial-gradient(ellipse at 50% 100%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 62%),
+      radial-gradient(ellipse at 86% 100%, rgba(74, 158, 255, 0.09) 0%, rgba(74, 158, 255, 0.0) 62%),
+      radial-gradient(ellipse at 78% 82%, rgba(80, 200, 120, 0.05) 0%, rgba(80, 200, 120, 0.0) 66%),
       #000000;
   }
   
@@ -630,55 +640,68 @@
     isolation: isolate; /* keep blend modes from affecting children */
   }
 
-  /* Spectrum lighting + diamond-grid texture (match header, keep subtle) */
+  /* ⛔ THE TABBAR IS THE HEADER'S MIRROR, VERBATIM (2026-08-24, Michael: "it should just be the
+     mirror of the top"). Both pseudo-elements below are `.mobile-header::before`/`::after`
+     copied value-for-value with only the y-positions flipped — the earlier "keep subtle"
+     half-strength version is what made the bottom read dimmer than the top. Any future change
+     to the header's field gets copied down here as-is, mirrored y only. */
   .mobile-tabbar::before {
     content: "";
     position: absolute;
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    opacity: 0.55;
+    opacity: 0.94;
     mix-blend-mode: soft-light;
-    background-color: rgba(0, 0, 0, 0.16);
+    background-color: rgba(0, 0, 0, 0.08);
     background-image:
-      /* Match the header’s “supernova” field so the tabbar feels like the same backdrop */
-      radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.10) 0%, transparent 60%),
-      radial-gradient(ellipse at 82% 38%, rgba(74, 158, 255, 0.08) 0%, transparent 60%),
-      radial-gradient(ellipse at 18% 42%, rgba(183, 148, 246, 0.08) 0%, transparent 60%),
-      /* subtle cross-channel bloom */
-      radial-gradient(ellipse at 58% 60%, rgba(80, 200, 120, 0.06) 0%, transparent 62%),
-      radial-gradient(ellipse at 44% 62%, rgba(255, 140, 66, 0.06) 0%, transparent 62%),
-      linear-gradient(45deg, rgba(255,255,255,0.20) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
-      linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-      linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-    background-size: cover, cover, cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
-    background-position: center, center, center, center, center, center, center, center, center;
-    background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
+      radial-gradient(ellipse at 14% 82%, rgba(255, 215, 0, 0.06) 0%, transparent 62%),
+      radial-gradient(ellipse at 50% 90%, rgba(183, 148, 246, 0.18) 0%, transparent 62%),
+      radial-gradient(ellipse at 86% 82%, rgba(74, 158, 255, 0.12) 0%, transparent 62%),
+      radial-gradient(ellipse at 78% 66%, rgba(80, 200, 120, 0.07) 0%, transparent 64%),
+      radial-gradient(ellipse at 32% 64%, rgba(239, 68, 68, 0.04) 0%, transparent 66%),
+      radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),
+      linear-gradient(45deg, rgba(255,255,255,0.36) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.28) 1px, transparent 1px),
+      linear-gradient(45deg, rgba(255,255,255,0.16) 1px, transparent 1px),
+      linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px);
+    background-size:
+      cover, cover, cover, cover, cover,
+      16px 16px,
+      cover, cover,
+      22px 22px, 22px 22px, 44px 44px, 44px 44px;
+    background-position: center, center, center, center, center, center, center, center, center, center, center, center;
+    background-blend-mode:
+      screen, screen, screen, screen, screen,
+      soft-light,
+      soft-light, soft-light,
+      soft-light, soft-light, soft-light, soft-light;
+    filter: blur(0.12px) saturate(1.16) contrast(1.12) hue-rotate(var(--nova-hue, 0deg));
   }
 
-  /* Gentle “up-light” so the tabbar reads energized */
+  /* Glow field rising from the bottom edge — `.mobile-header::after` flipped */
   .mobile-tabbar::after {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
-    top: -28px;
-    height: 96px;
+    top: -92px;
+    height: 190px;
     z-index: 0;
     pointer-events: none;
     mix-blend-mode: screen;
     background-image:
-      /* Match header spill: diffuse “glow field” that feels continuous */
-      radial-gradient(140px 70px at 14% 55%, rgba(255, 215, 0, 0.42) 0%, rgba(255, 215, 0, 0.0) 72%),
-      radial-gradient(160px 80px at 32% 60%, rgba(255, 140, 66, 0.32) 0%, rgba(255, 140, 66, 0.0) 74%),
-      radial-gradient(160px 80px at 50% 58%, rgba(183, 148, 246, 0.30) 0%, rgba(183, 148, 246, 0.0) 74%),
-      radial-gradient(160px 80px at 68% 60%, rgba(74, 158, 255, 0.28) 0%, rgba(74, 158, 255, 0.0) 74%),
-      radial-gradient(140px 70px at 86% 55%, rgba(80, 200, 120, 0.24) 0%, rgba(80, 200, 120, 0.0) 72%),
-      /* vignette so the shelf sits behind controls */
-      linear-gradient(to bottom, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.70) 100%);
-    opacity: 0.58;
-    filter: blur(22px) saturate(1.10);
+      radial-gradient(140px 70px at 14% 65%, rgba(255, 215, 0, 0.40) 0%, rgba(255, 215, 0, 0.0) 70%),
+      radial-gradient(160px 80px at 32% 55%, rgba(255, 140, 66, 0.34) 0%, rgba(255, 140, 66, 0.0) 72%),
+      radial-gradient(170px 90px at 50% 56%, rgba(239, 68, 68, 0.24) 0%, rgba(239, 68, 68, 0.0) 74%),
+      radial-gradient(160px 80px at 50% 60%, rgba(183, 148, 246, 0.36) 0%, rgba(183, 148, 246, 0.0) 72%),
+      radial-gradient(160px 80px at 68% 55%, rgba(74, 158, 255, 0.38) 0%, rgba(74, 158, 255, 0.0) 72%),
+      radial-gradient(140px 70px at 86% 65%, rgba(80, 200, 120, 0.30) 0%, rgba(80, 200, 120, 0.0) 70%),
+      linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.65) 100%);
+    opacity: 0.90;
+    filter: blur(26px) saturate(1.16);
     transform: translateZ(0);
   }
 
@@ -1076,31 +1099,15 @@ body.wizard-active { --tabbar-h: 0px; }
    screen. The header's colours show because they sit on ITS base layer at normal blend. Same here
    now: green, blue and gold painted directly, at strength, under the grid. */
 .readout-texture--nova.galaxy-card::before {
-  /* ⛔ THE VISIBLE HEADER FIELD IS `.mobile-header::after` — the six-blob glow spill — NOT the
-     soft-light spectral wash (2026-08-24). The first nova pass matched the wash and could never
-     converge: different palette weights, plus the galaxy purple base and the orange accent bloom
-     underneath. This is the header's own glow recipe — same six hues, same gold→orange→red/
-     purple→blue→green left-to-right order, comparable alphas — mirrored to the card's BOTTOM
-     edge, over the header's near-black ground. Wide soft radials stand in for the header's
-     26px blur (a filter here would blur the stars and ground too). */
+  /* ⛔ THE CARD CARRIES NO COLOUR (2026-08-24, Michael: "it should just be the mirror of the
+     top" + "fill under the load box, leave the load box clear for the numbers"). The bottom
+     glow lives on `.mobile-main-content`'s background — the header bridge mirrored, see there —
+     and this card sits ON it as a dark clear instrument, exactly like the Today card on the
+     header's spill. Two failed passes painted the glow inside this card (first the wrong layer —
+     the soft-light wash, not the visible `.mobile-header::after` blobs — then retuned puffs);
+     both drowned the strength number. Dark bed + stars only; the grid comes from `::after`. */
   background-color: #050505;
   background-image:
-    /* SMOKE, NOT A BAND (2026-08-24, Michael: "equally as smoky similar shapes"). The header
-       reads cloudy because its blobs are SMALL, staggered in height, and unevenly bright —
-       the first pass here used wall-to-wall ellipses on one baseline, which fused into a
-       smooth sunset strip. Same hue order, now as staggered puffs + dim high wisps. */
-    radial-gradient(28% 70% at calc(10% + var(--nova-dx, 0%)) calc(96% + var(--nova-dy, 0%)), rgba(255, 215, 0, 0.32), transparent 70%),
-    radial-gradient(18% 46% at calc(22% - var(--nova-dx, 0%)) calc(76% + var(--nova-dy, 0%)), rgba(255, 215, 0, 0.13), transparent 72%),
-    radial-gradient(30% 74% at calc(30% - var(--nova-dx, 0%)) calc(106% + var(--nova-dy, 0%)), rgba(255, 140, 66, 0.28), transparent 72%),
-    radial-gradient(24% 56% at calc(41% + var(--nova-dx, 0%)) calc(92% - var(--nova-dy, 0%)), rgba(239, 68, 68, 0.17), transparent 74%),
-    radial-gradient(28% 70% at calc(52% + var(--nova-dx, 0%)) calc(98% - var(--nova-dy, 0%)), rgba(183, 148, 246, 0.28), transparent 72%),
-    radial-gradient(17% 42% at calc(58% - var(--nova-dx, 0%)) calc(70% + var(--nova-dy, 0%)), rgba(183, 148, 246, 0.11), transparent 72%),
-    radial-gradient(29% 72% at calc(68% - var(--nova-dx, 0%)) calc(104% - var(--nova-dy, 0%)), rgba(74, 158, 255, 0.30), transparent 72%),
-    radial-gradient(19% 48% at calc(79% + var(--nova-dx, 0%)) calc(80% - var(--nova-dy, 0%)), rgba(74, 158, 255, 0.12), transparent 74%),
-    radial-gradient(26% 66% at calc(90% + var(--nova-dx, 0%)) calc(97% - var(--nova-dy, 0%)), rgba(80, 200, 120, 0.25), transparent 70%),
-    /* dim full-width haze so the valleys between puffs aren't pure black (the header's blobs
-       overlap on a faintly lit chassis; without this the card reads as islands) */
-    linear-gradient(to top, rgba(150, 135, 175, 0.10) 0%, rgba(150, 135, 175, 0.04) 34%, transparent 58%),
     radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.65), transparent),
     radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.5), transparent),
     radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.55), transparent),
