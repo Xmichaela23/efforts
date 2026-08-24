@@ -21,7 +21,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { HARD_SLOT_FACT_NOTE, hardSlotFact, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
+import { HARD_SLOT_FACT_NOTE, hardSlotFact, slotVariantOptions, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
 
 export type HardSlotChoicesProps = {
   /** The slot's sport, as the endurance screen has it. */
@@ -53,6 +53,34 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           <span className="block text-white/50 text-xs leading-snug mt-0.5">{fact.body}</span>
         </div>
       )}
+      {/* ⛔ THE VARIANT IS A CHOICE (Michael, 2026-08-24 — "missing are the speed drills we had").
+          The family is the frame's fact above; WHICH of the family's own page-cited workouts fills
+          it is the athlete's. Options come from the library's archetypes — one list, no copy.
+          "Engine's pick" is the default and rotates week to week. */}
+      {!club && (() => {
+        const variants = slotVariantOptions(props.slotKey, props.sport);
+        if (variants.length < 2) return null;
+        return (
+          <div className="space-y-1.5" data-testid={`hard-${props.slotKey}-variants`}>
+            {[{ id: '', label: "Engine's pick — rotates week to week" }, ...variants].map((v) => {
+              const on = (props.value.archetype ?? '') === v.id;
+              return (
+                <button
+                  key={v.id || 'engine'}
+                  type="button"
+                  aria-pressed={on}
+                  data-testid={`hard-${props.slotKey}-variant-${v.id || 'engine'}`}
+                  onClick={() => props.onChange({ archetype: v.id || undefined })}
+                  className="w-full text-left px-2.5 py-2 rounded-xl border text-sm"
+                  style={on
+                    ? { borderColor: color, backgroundColor: `${color}1F`, color: '#fff' }
+                    : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.70)' }}
+                >{v.label}</button>
+              );
+            })}
+          </div>
+        );
+      })()}
       <span className="block text-white/35 text-[11px] leading-snug px-0.5">{HARD_SLOT_FACT_NOTE}</span>
       {/* ⛔ A CLUB SESSION REPLACES A SLOT, NEVER ADDS ONE (work order stage 5, his own Crit rule).
           Same control the card has always carried, same `ownership` field.

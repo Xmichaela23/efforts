@@ -10,6 +10,10 @@ export type HardSlotValue = {
   role?: 'intensity' | 'threshold';
   goal?: 'speed' | 'vo2';
   ownership?: 'prescribed' | 'club';
+  /** ⛔ THE WITHIN-FAMILY VARIANT (Michael, 2026-08-24 — "missing are the speed drills we had").
+   *  The slot's FAMILY is the frame's fact (A4); WHICH of the family's own workouts fills it is
+   *  the athlete's. Values are the library's own archetype ids; absent = the engine's pick. */
+  archetype?: string;
 };
 
 /**
@@ -114,3 +118,28 @@ export function hardSlotFact(
 export const HARD_SLOT_FACT_NOTE =
   'The programme sets which session this is. Your choice here is the sport, and whether a club '
   + 'session takes the slot instead.';
+
+
+// ── the within-family variants (gap #5, opened to the athlete 2026-08-24) ───────────────────────
+//
+// ⛔ THE OPTIONS ARE THE LIBRARY'S OWN ARCHETYPES — page-cited workouts, one list, no copy of it
+// here. The slot's family is p246's (frames.ts); a ride reads the family through RIDE_EQUIVALENT,
+// the same table the composer uses, so the card can never offer a workout the week cannot build.
+import { FAMILIES, type FamilyId } from '../../supabase/functions/_shared/endurance-library/index.ts';
+import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
+
+/** p246: frame day 1's hard slot is MLSS+, day 3's is near-threshold. One place, cite kept. */
+export const HARD_SLOT_RUN_FAMILY: Record<HardSlotKey, FamilyId> = {
+  hard1: 'run_mlss',
+  hard2: 'run_near_threshold',
+};
+
+export type SlotVariantOption = { id: string; label: string };
+
+export function slotVariantOptions(key: HardSlotKey, sport: 'run' | 'ride'): SlotVariantOption[] {
+  const runFam = HARD_SLOT_RUN_FAMILY[key];
+  const fam = sport === 'ride' ? (RIDE_EQUIVALENT[runFam]?.family ?? runFam) : runFam;
+  const rules = FAMILIES[fam];
+  if (!rules) return [];
+  return rules.archetypes.map((a) => ({ id: a.id, label: a.label }));
+}

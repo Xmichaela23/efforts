@@ -407,6 +407,17 @@ Deno.serve(async (req: Request) => {
           }
           return Object.keys(out).length > 0 ? out : null;
         })(),
+        /** ⛔ The variant picks — validated shape only; the assigner validates the ids. */
+        archetypes: (() => {
+          const raw = (body as Record<string, unknown>).endurance_slot_archetypes;
+          if (!raw || typeof raw !== 'object') return null;
+          const out: Record<string, string> = {};
+          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            if (typeof v !== 'string' || !v) return null;
+            out[k] = v;
+          }
+          return Object.keys(out).length > 0 ? out : null;
+        })(),
       };
       const longSlotSport = (() => {
         const a = assignSports(FRAMES[frameId].columns.standard, mixForFrame);

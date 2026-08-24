@@ -724,6 +724,9 @@ type NonRaceState = {
      * every draft made before today carries. `hardRoleOf` holds both paths.
      */
     role?: 'intensity' | 'threshold';
+    /** ⛔ THE WITHIN-FAMILY VARIANT (2026-08-24) — the library's archetype id for this slot, the
+     *  athlete's pick; absent = the engine's rotation. See `slotVariantOptions`. */
+    archetype?: string;
     /**
      * ⛔ THE ONE GROUND QUESTION LEFT, AND IT IS ASKED AS A GOAL. Flat sprints or hill repeats —
      * the eccentric/concentric fork, the only ground choice that reaches Layer 1. Run slots holding
@@ -1396,6 +1399,20 @@ function assemblePayload(
           ...(isStrengthFocusPath ? { endurance_slots: derivedCounts.slots } : {}),
           /** Easy-swim add-on (Michael, 2026-08-24): 1–2 easy/technique swims OUTSIDE the four
            *  slots. 0/absent = none. The composer appends them; they never take a session spot. */
+          /** ⛔ THE VARIANT PICKS, keyed the engine's way (same keys as endurance_slots). Only the
+           *  hard slots carry one; absent = the engine's rotation. */
+          ...(() => {
+            if (!isStrengthFocusPath) return {};
+            // ⚠️ Indices inlined (hard1=0, hard2=3:0's entry=1) — the component-scope
+            // HARD_SLOT_INDEX declares later in this body and a closure here must not TDZ on it.
+            const slots: Array<{ i: number; key: string }> = [{ i: 0, key: '1:0' }, { i: 1, key: '3:0' }];
+            const out: Record<string, string> = {};
+            slots.forEach(({ i, key }) => {
+              const a = state.hardDays[i]?.archetype;
+              if (a) out[key] = a;
+            });
+            return Object.keys(out).length > 0 ? { endurance_slot_archetypes: out } : {};
+          })(),
           ...(isStrengthFocusPath && (state.posture.swim ?? 'out') === 'maintain' && (state.swimEasySessions ?? 0) > 0
             ? { swim_easy_sessions: Math.min(2, state.swimEasySessions ?? 1) }
             : {}),
@@ -4649,7 +4666,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <HardSlotChoices
                   slotKey={key}
                   sport={sport}
-                  value={{ role: h.role, goal: h.goal, ownership: h.ownership }}
+                  value={{ role: h.role, goal: h.goal, ownership: h.ownership, archetype: (h as { archetype?: string }).archetype }}
                   onChange={(patch) => setState((st) => {
                     const next = syncHardDays(st, slotSportsNow);
                     // ⚠️ SPREAD THE PATCH LAST so an explicit `goal: undefined` CLEARS a stale one —

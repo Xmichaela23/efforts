@@ -377,7 +377,9 @@ Deno.test('the block stores the mix it was built on, so a restate reaches the sa
     compose: { ...BASE, sportMix: { runs: 2, rides: 2, swimDays: 0 } },
     weeks: 12, taperWeeks: [],
   });
-  assertEquals(row.config.sport_mix, { runs: 2, rides: 2, swimDays: 0 });
+  // ⛔ Widened 2026-08-24: the per-slot answers and variant picks ride along in the stored mix —
+  // a restate without them would rebuild the dial's own week over the athlete's calendar.
+  assertEquals(row.config.sport_mix, { runs: 2, rides: 2, swimDays: 0, slots: null, archetypes: null });
   assertEquals(row.config.sport_counts, { run: 2, ride: 2, swim: 0 });
 });
 
@@ -456,4 +458,17 @@ Deno.test('the core chip can reach core work through the floor path', () => {
   // week holds core work at all, not which slot carries it.
   assert(names.some((n) => /plank|sit-up|situp|ab wheel|rollout|leg raise|dead bug|bird dog|crunch/.test(n)),
     `no core movement anywhere in the focused week: ${names.join(', ')}`);
+});
+
+Deno.test('a variant pick fills the slot with that archetype; an invalid one is ignored', () => {
+  // ⛔ Michael, 2026-08-24 — "missing are the speed drills we had": the slot's FAMILY is the
+  // frame's fact, WHICH of the family's own workouts fills it is the athlete's.
+  const picked = assignSports(STANDARD, {
+    runs: 4, rides: 0,
+    archetypes: { '1:0': 'descending', '3:0': 'not_a_real_archetype' },
+  });
+  const hard1 = picked.byKey['1:0'];
+  assertEquals(hard1.archetype, 'descending', 'the valid pick did not land');
+  const hard2 = picked.byKey['3:0'];
+  assert(hard2.archetype !== 'not_a_real_archetype', 'an invalid archetype id was accepted');
 });

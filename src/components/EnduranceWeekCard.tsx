@@ -233,10 +233,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   {/* ⛔ THE TAX LINE, AT THE MOMENT IT IS ABOUT (2026-08-24). His two sentences left
                       the preamble — where they were read before there was anything to apply them to —
                       and appear here, once, when a hard slot is set to Run. **Same words, unedited.** */}
+                  {/* ⛔ NOT A PILL (Michael, 2026-08-24): boxed, the info read as a selectable
+                      option among the real choices. Plain text — information looks like
+                      information. */}
                   {isHard && sport === 'run' ? (
                     <div
-                      className="rounded-lg px-3 py-2.5 space-y-1"
-                      style={{ backgroundColor: `${color}14`, border: `1px solid ${color}2E` }}
+                      className="px-1 py-1 space-y-1"
                       data-testid={`tax-${key}`}
                     >
                       {RUN_TAX_LINES.map((line, i) => (

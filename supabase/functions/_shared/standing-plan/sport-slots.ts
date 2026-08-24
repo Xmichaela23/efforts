@@ -15,6 +15,7 @@
 // tax the lifts. A held sport keeps its LONG session and loses its hard one.
 // ============================================================================
 
+import { FAMILIES } from '../endurance-library/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
 import type { EnduranceSlot, FrameDay } from './frames.ts';
 
@@ -43,6 +44,13 @@ export type SportMix = {
    * an answer for a slot the column does not have.
    */
   slots?: Record<string, 'run' | 'ride'> | null;
+  /**
+   * ⛔ THE WITHIN-FAMILY VARIANT PICKS (Michael, 2026-08-24 — "the speed drills"). Keyed like
+   * `slots`; values are the library's archetype ids. A pick that is not one of the ASSIGNED
+   * family's own archetypes is ignored — the athlete chooses among the family's page-cited
+   * workouts, never past them. Absent = the engine's rotation.
+   */
+  archetypes?: Record<string, string> | null;
 };
 
 export type AssignedSlot = {
@@ -299,6 +307,16 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
   const dayOne = slots.filter(({ day }) => day === 1);
   const hardRunBeforeMeLower = dayOne.some(({ day, i, slot }) =>
     isHardSlot(slot) && byKey[key(day, i)]?.sport === 'run');
+
+  // ── the athlete's variant picks, validated against the assigned family ───────────────────────
+  for (const [k, want] of Object.entries(mix.archetypes ?? {})) {
+    const assigned = byKey[k];
+    if (!assigned || typeof want !== 'string' || !want) continue;
+    const fam = FAMILIES[assigned.family];
+    if (fam?.archetypes.some((a) => a.id === want)) {
+      byKey[k] = { ...assigned, archetype: want };
+    }
+  }
 
   return { byKey, counts, hardRunBeforeMeLower, notes };
 }

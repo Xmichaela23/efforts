@@ -116,7 +116,14 @@ export type StandingPlanConfig = {
    * a restate re-composes this block and must reach the identical week. Re-deriving it from the
    * athlete's current answers would rebuild a DIFFERENT week against the calendar that exists.
    */
-  sport_mix: { runs: number; rides: number; swimDays: number } | null;
+  sport_mix: {
+    runs: number; rides: number; swimDays: number;
+    /** ⛔ The per-slot answers and variant picks RIDE ALONG (2026-08-24): a restate re-composes
+     *  this block, and a mix stored without them would rebuild the dial's own week — a different
+     *  calendar than the one that exists. */
+    slots?: Record<string, string> | null;
+    archetypes?: Record<string, string> | null;
+  } | null;
   /** The easy-swim ADD-ON count the block was built on (Michael, 2026-08-24) — stored so a restate
    *  re-composes the identical week. 0/absent = none. */
   swim_easy_sessions: number | null;
@@ -220,6 +227,8 @@ export function buildStandingPlanRow(args: {
             runs: Math.max(0, Math.round(Number(args.compose.sportMix.runs) || 0)),
             rides: Math.max(0, Math.round(Number(args.compose.sportMix.rides) || 0)),
             swimDays: Math.max(0, Math.round(Number(args.compose.sportMix.swimDays) || 0)),
+            slots: args.compose.sportMix.slots ?? null,
+            archetypes: args.compose.sportMix.archetypes ?? null,
           }
         : null,
       swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,
