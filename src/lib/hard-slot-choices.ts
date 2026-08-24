@@ -143,3 +143,46 @@ export function slotVariantOptions(key: HardSlotKey, sport: 'run' | 'ride'): Slo
   if (!rules) return [];
   return rules.archetypes.map((a) => ({ id: a.id, label: a.label }));
 }
+
+
+/**
+ * ⛔ WHAT EACH VARIANT IS, IN PLAIN WORDS — OURS (2026-08-24), one line each, describing the
+ * library's own page-cited workouts. Keys are archetype ids; a variant with no line here still
+ * renders, label-only, so a new archetype can never be hidden by missing copy.
+ */
+export const VARIANT_BODY: Record<string, string> = {
+  // run_mlss (pp231-232)
+  surge_float: 'Surges above threshold with a hard float between, in sets.',
+  descending: 'Repeats that shrink as you go — recovery shrinks with them.',
+  // run_near_threshold (pp233-234)
+  short_above: 'Short repeats just above threshold, controlled recoveries.',
+  race_repeats: 'Repeats at your race pace.',
+  below_threshold: 'Longer repeats just under threshold — steady quality, less sting.',
+  surge_embedded: 'A threshold block with a surge buried inside it.',
+  // ride_sweet_spot (pp238-239)
+  minute_surge: 'Sweet-spot blocks with a short surge on every minute.',
+  medium: 'Medium repeats just under threshold.',
+  long: 'Long repeats just under threshold — the classic sweet spot.',
+  tempo: 'Steady tempo blocks.',
+};
+
+/**
+ * ⛔ THE FACT CARD READS THE LIBRARY, NOT THE OLD TABLES (Michael's screenshot, 2026-08-24: the
+ * card said "VO2 max focus — 3-minute climbs" over a slot whose session is MLSS work; the old
+ * engine's copy had survived over the new engine's truth). Title = the library's own label; the
+ * body is OURS, plain; the cite is the library's.
+ */
+const FAMILY_FACT_BODY: Partial<Record<FamilyId, string>> = {
+  run_mlss: 'Maximum time at the hardest pace you can hold, with fatigue controlled.',
+  run_near_threshold: 'Maximum quality time near threshold without digging a hole.',
+  ride_sweet_spot: 'As close to threshold as possible without going over — lots of time in the zone.',
+};
+
+export function slotFamilyFact(key: HardSlotKey, sport: 'run' | 'ride'):
+  { title: string; body: string; cite: string } | null {
+  const runFam = HARD_SLOT_RUN_FAMILY[key];
+  const fam = sport === 'ride' ? (RIDE_EQUIVALENT[runFam]?.family ?? runFam) : runFam;
+  const rules = FAMILIES[fam];
+  if (!rules) return null;
+  return { title: rules.label, body: FAMILY_FACT_BODY[fam] ?? rules.intent, cite: rules.cite };
+}

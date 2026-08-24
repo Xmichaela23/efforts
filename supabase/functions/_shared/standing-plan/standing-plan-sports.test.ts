@@ -472,3 +472,24 @@ Deno.test('a variant pick fills the slot with that archetype; an invalid one is 
   const hard2 = picked.byKey['3:0'];
   assert(hard2.archetype !== 'not_a_real_archetype', 'an invalid archetype id was accepted');
 });
+
+Deno.test("the engine's default genuinely rotates — two weeks, two shapes; a pick pins it", () => {
+  // ⛔ The label says "rotates week to week"; before 2026-08-24 the library took its first
+  // archetype every week. Twelve identical workouts wearing a rotation's label.
+  const w2 = composeWeek({ ...BASE, week: 2, column: 'standard' });
+  const w3 = composeWeek({ ...BASE, week: 3, column: 'standard' });
+  const mlss = (wk: typeof w2) => wk.sessions.find((s) =>
+    s.type === 'run' && s.tags.some((t) => t === 'family:run_mlss'))?.steps_preset?.join('|');
+  assert(mlss(w2) && mlss(w3), 'the MLSS session was not found in both weeks');
+  assert(mlss(w2) !== mlss(w3), 'week 2 and week 3 built the identical MLSS workout — no rotation');
+  // And a pick pins it: the same archetype both weeks.
+  const pin = (week: number) => composeWeek({
+    ...BASE, week, column: 'standard',
+    sportMix: { runs: 4, rides: 0, archetypes: { '1:0': 'descending' } },
+  });
+  assertEquals(
+    pin(2).sessions.find((s) => s.tags.includes('family:run_mlss'))?.steps_preset?.join('|'),
+    pin(3).sessions.find((s) => s.tags.includes('family:run_mlss'))?.steps_preset?.join('|'),
+    'a pinned variant still rotated',
+  );
+});

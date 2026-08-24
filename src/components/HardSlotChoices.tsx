@@ -21,7 +21,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { HARD_SLOT_FACT_NOTE, hardSlotFact, slotVariantOptions, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
+import { HARD_SLOT_FACT_NOTE, slotFamilyFact, slotVariantOptions, VARIANT_BODY, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
 
 export type HardSlotChoicesProps = {
   /** The slot's sport, as the endurance screen has it. */
@@ -35,7 +35,7 @@ export type HardSlotChoicesProps = {
 export default function HardSlotChoices(props: HardSlotChoicesProps) {
   const club = props.value.ownership === 'club';
   const color = getDisciplineColor(props.sport === 'ride' ? 'bike' : 'run');
-  const fact = hardSlotFact(props.sport, props.slotKey);
+  const fact = slotFamilyFact(props.slotKey, props.sport);
 
   return (
     <div className="space-y-1.5">
@@ -51,6 +51,7 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
         >
           <span className="block text-white/90 text-sm">{fact.title}</span>
           <span className="block text-white/50 text-xs leading-snug mt-0.5">{fact.body}</span>
+          <span className="block text-white/30 text-[10px] mt-1">{fact.cite}</span>
         </div>
       )}
       {/* ⛔ THE VARIANT IS A CHOICE (Michael, 2026-08-24 — "missing are the speed drills we had").
@@ -75,7 +76,14 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
                   style={on
                     ? { borderColor: color, backgroundColor: `${color}1F`, color: '#fff' }
                     : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.70)' }}
-                >{v.label}</button>
+                >
+                  <span className="block">{v.label}</span>
+                  {VARIANT_BODY[v.id] ? (
+                    <span className="block text-xs mt-0.5" style={{ color: on ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.45)' }}>
+                      {VARIANT_BODY[v.id]}
+                    </span>
+                  ) : null}
+                </button>
               );
             })}
           </div>

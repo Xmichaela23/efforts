@@ -54,6 +54,16 @@ import {
 } from './plyo.ts';
 import { foldExerciseName } from '../../../../src/lib/exercise-config.ts';
 import { musclesWorkedBy } from '../accessory-dosing/index.ts';
+import { FAMILIES } from '../endurance-library/index.ts';
+
+/** The default rotation: the family's offered archetypes at this level, alternated by week. OURS. */
+function rotatedArchetype(family: string, level: number, week: number): string | undefined {
+  const rules = (FAMILIES as Record<string, { archetypes: Array<{ id: string; levels?: number[] }> }>)[family];
+  if (!rules) return undefined;
+  const offered = rules.archetypes.filter((a) => !a.levels || a.levels.includes(level));
+  if (offered.length < 2) return undefined;
+  return offered[(Math.max(1, week) - 1) % offered.length].id;
+}
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import {
   isTestWeek,
@@ -870,10 +880,16 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     day.endurance.forEach((slot, i) => {
       const assigned = assignedSlot(sportAssignment, day.day, i, slot);
       const level = (args.levelOverrides?.[assigned.family] as Level | undefined) ?? assigned.level;
+      /**
+       * ⛔ "ENGINE'S PICK — ROTATES WEEK TO WEEK" MUST BE TRUE (Michael, 2026-08-24). With no
+       * athlete pick, the library took its first archetype every week — twelve identical
+       * workouts wearing a rotation's label. OURS: alternate the family's own offered shapes by
+       * week; his variety principle, applied inside his own option set.
+       */
       const built = buildEnduranceSession({
         family: assigned.family,
         level,
-        archetype: assigned.archetype,
+        archetype: assigned.archetype ?? rotatedArchetype(assigned.family, level, args.week),
         anchors,
       });
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });

@@ -16,7 +16,7 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { hardSlotDefault, hardSlotTitle } from '@/lib/hard-slot-choices';
+import { hardSlotDefault, slotFamilyFact, slotVariantOptions } from '@/lib/hard-slot-choices';
 import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useAppContext } from '@/contexts/AppContext';
@@ -4652,8 +4652,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               // ⛔ NO SPORT, NO SESSION. The row shows its label alone until the athlete picks.
               if (!sport) return null;
               const h = state.hardDays[HARD_SLOT_INDEX[key]];
-              if (!h) return hardSlotTitle(sport, hardSlotDefault(sport, key));
-              return hardSlotTitle(sport, { role: h.role, goal: h.goal, ownership: h.ownership });
+              if (h?.ownership === 'club') return 'Club session';
+              // ⛔ THE TITLE READS THE LIBRARY (2026-08-24): the chosen variant's label when one is
+              // picked, the family's own label otherwise — never the old tables' copy.
+              const variant = h?.archetype
+                ? slotVariantOptions(key, sport).find((v) => v.id === h.archetype)?.label
+                : null;
+              return variant ?? slotFamilyFact(key, sport)?.title ?? null;
             }}
             renderHardFlavor={(key) => {
               const i = HARD_SLOT_INDEX[key];
