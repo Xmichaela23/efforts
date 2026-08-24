@@ -113,6 +113,16 @@ Deno.serve(async (req: Request) => {
 
     const reading = readTestWeek(joined, sp.test_lift_names);
     const found = Object.keys(reading.working);
+    // ⛔ THE RESPONSE CARRIES THE NAME THE ATHLETE SEES (2026-08-24, Michael on device: the sheet
+    // printed `overheadPress`). `working` is keyed by lift for the composer; the sheet needs the
+    // tested DISPLAY name, and `sp.test_lift_names` — the block's own record of what week one
+    // prescribed, competition overrides included — is the one owner of that string. Only the
+    // RESPONSE is enriched; the config write below stores the raw shape the restate reads back.
+    const workingNamed = Object.fromEntries(
+      Object.entries(reading.working).map(([k, v]) => [
+        k, { ...(v as Record<string, unknown>), movement: (sp.test_lift_names as Record<string, string>)?.[k] ?? k },
+      ]),
+    );
     if (found.length === 0) {
       // ⛔ ABSTAIN, LOUDLY. No completed test set means no working number, and the block keeps the
       // "by feel" contract it was written with rather than being prescribed off a guess.
@@ -209,7 +219,7 @@ Deno.serve(async (req: Request) => {
     if (!willWrite) {
       return json({
         success: true, applied: false, current_week: currentWeek,
-        working_numbers: reading.working, missing: reading.missing,
+        working_numbers: workingNamed, missing: reading.missing,
         changes: restated.changes, unmatched: restated.unmatched,
         // ⛔ WHAT THE HEAVY SETS HAVE EARNED, AND OFF WHAT. A surface offering the athlete this diff
         // has to be able to say why a second set appeared, or it is a number they never agreed to.
@@ -264,7 +274,7 @@ Deno.serve(async (req: Request) => {
     return json({
       success: true, applied: true, rows_written: written,
       current_week: currentWeek,
-      working_numbers: reading.working, missing: reading.missing,
+      working_numbers: workingNamed, missing: reading.missing,
       changes: restated.changes, unmatched: restated.unmatched,
       me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
       config_written: !cfgErr,

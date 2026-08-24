@@ -25,6 +25,7 @@ import {
   topSetIndex,
   barSpeedLineFor,
   ACCESSORY_SET_CUE,
+  STANDING_ACCESSORY_SET_CUE,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
 // ⛔ SLICE b — the calibration sentences, shared with State and Performance. One signal, three
@@ -54,6 +55,8 @@ type RematerializeResult = {
 /** One lift's working number as `rematerialize-standing-block` returns it. */
 type StandingWorkingNumber = {
   lift?: string;
+  /** The tested display name ('Overhead Press'), server-supplied; `lift` is the raw key. */
+  movement?: string;
   workingNumber?: number;
   measured?: { weight?: number; reps?: number };
 };
@@ -4357,11 +4360,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (rm?.success && Array.isArray(rm.changes) && rm.changes.length > 0) {
         // ⚠️ Carry the saved row with it — the sheet owns the close, and the navigation callback
         // needs the workout it is navigating TO. Passing null here dropped the athlete nowhere.
+        // ⛔ AND THE RPE MODAL MUST GO NOW (2026-08-24, Michael on device, "stay locked"). This
+        // early return skips the auto-close below, and that modal sits at z-[200] over a z-[60]
+        // sheet — "Saved!" stayed up forever, on top of the sheet's own Done button.
+        setShowSessionRPE(false);
         setPendingRework({ ...rm, _saved: saved || completedWorkout });
         return;   // the sheet owns the close from here
       }
       const st = sp.status === 'fulfilled' ? (sp.value as { data?: RematerializeResult })?.data : null;
       if (st?.success && Array.isArray(st.changes) && st.changes.length > 0) {
+        setShowSessionRPE(false);   // same lock as above — the sheet owns the screen from here
         setPendingStandingFill({ ...st, _saved: saved || completedWorkout });
         return;   // the sheet owns the close from here
       }
@@ -4943,12 +4951,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               Basis: Wendler 5/3/1 2nd ed. p.24 / p.102 — assistance runs across as many sets as it
               takes and is explicitly not taken to failure; too much of it is the most common mistake
               with the programme. See ACCESSORY_SET_CUE for why this line may carry words the
-              bar-speed lint bans. */}
+              bar-speed lint bans.
+              ⛔ THE LINE IS PICKED BY THE SESSION'S OWN TAG (2026-08-24, Michael on device). On a
+              `standing_plan` session the Wendler line is false — those rows prescribe discrete sets,
+              not a total to split — so it gets STANDING_ACCESSORY_SET_CUE (Viada Part B2). Same
+              tag-not-new-field idiom as the pretest gate above. A `plyo` session gets NO cue: every
+              drill row is load_prescribed:false, but "find the load" over a bodyweight A-Skip is the
+              Box Jump mistake again — the drill rows carry their own stop rule in `notes`. */}
           {!isBaselineTestWorkout(scheduledWorkout || {})
+            && !(Array.isArray(scheduledWorkout?.tags)
+              && scheduledWorkout.tags.some((t: unknown) => String(t) === 'plyo'))
             && isAssistanceRow(exercise)
             && exercises.findIndex((e) => isAssistanceRow(e)) === exerciseIndex && (
             <p className="mx-3 mb-1.5 mt-2 text-[11px] font-medium text-white/45 leading-snug">
-              {ACCESSORY_SET_CUE}
+              {Array.isArray(scheduledWorkout?.tags)
+                && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
+                ? STANDING_ACCESSORY_SET_CUE
+                : ACCESSORY_SET_CUE}
             </p>
           )}
           {/* ⛔ THE ACCENT MEANS "THIS IS THE PRESCRIPTION" (2026-08-14, Michael: "we keep big lift
@@ -6445,9 +6464,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {Object.values(wn).map((v, i) => (
                   <p key={i} className="text-sm text-white/85 tabular-nums">
                     {standingWorkingNumberLine({
-                      // ⚠️ The movement the BLOCK prescribes, which is what the athlete just tested —
-                      // `testWeekLiftNames` keeps those the same string on purpose.
-                      movement: String(v?.lift ?? ''),
+                      // ⚠️ `movement` is the tested display name the server reads off the block's own
+                      // `test_lift_names` (added 2026-08-24 — `v.lift` is the raw key, and the sheet
+                      // printed `overheadPress`). The key stays as fallback against an older server.
+                      movement: String(v?.movement ?? v?.lift ?? ''),
                       weight: Number(v?.measured?.weight) || 0,
                       reps: Number(v?.measured?.reps) || 0,
                       workingNumber: Number(v?.workingNumber) || 0,
