@@ -19,6 +19,9 @@ import {
   SLOT_KEYS,
   SLOT_LABEL,
   SLOT_OPTIONS,
+  ENDURANCE_WEEK_PREAMBLE,
+  RUN_TAX_LINES,
+  slotSummary,
   defaultSlotSports,
   liftingRateLine,
   liftingRateTier,
@@ -50,12 +53,36 @@ Deno.test("the header is Michael's copy, word for word", () => {
     'Cycling is more forgiving when working concurrently with strength.',
   ]);
   assertEquals(LONG_SLOT_NOTE, 'one per week, run or ride');
+
+  /**
+   * ⛔ THE PREAMBLE TIGHTENED AND THE TWO SENTENCES MOVED — **not rewritten** (Michael, 2026-08-24).
+   * They are the same strings, taken from the header rather than retyped, so his verbatim copy above
+   * is still the one source and a trim to either place fails this test rather than the screen.
+   */
+  assertEquals(ENDURANCE_WEEK_PREAMBLE, ENDURANCE_WEEK_HEADER.slice(0, 5));
+  assertEquals(RUN_TAX_LINES, [ENDURANCE_WEEK_HEADER[5], ENDURANCE_WEEK_HEADER[6]]);
+  assertEquals([...ENDURANCE_WEEK_PREAMBLE, ...RUN_TAX_LINES], ENDURANCE_WEEK_HEADER,
+    'a line was lost or invented when the preamble was split');
 });
 
 Deno.test('the four slots are the four the frame has, labelled as the athlete sees them', () => {
   assertEquals(SLOT_KEYS, ['hard1', 'hard2', 'easy', 'long']);
-  assertEquals(SLOT_LABEL.hard1, 'Hard 1');
-  assertEquals(SLOT_LABEL.long, 'Long');
+  /**
+   * ⛔ NEVER "Hard 1 / Hard 2" ON A SCREEN (Michael, 2026-08-24). Those are internal keys; an athlete
+   * has two hard sessions, not a first and a second. The labels are the ones his own preamble uses.
+   */
+  assertEquals(SLOT_LABEL.hard1, 'Hard session');
+  assertEquals(SLOT_LABEL.hard2, 'Hard session');
+  assertEquals(SLOT_LABEL.easy, 'Recovery session');
+  assertEquals(SLOT_LABEL.long, 'Long session');
+  for (const k of SLOT_KEYS) {
+    assert(!/\b(hard|slot)\s*[12]\b/i.test(SLOT_LABEL[k]), `an internal key leaked onto a label: ${SLOT_LABEL[k]}`);
+  }
+
+  // ⛔ A COLLAPSED ROW STATES ITS WHOLE ANSWER — the screen opens finished.
+  assertEquals(slotSummary('hard1', 'ride', 'Sustained threshold'), 'Hard session · Ride · Sustained threshold');
+  assertEquals(slotSummary('easy', 'run'), 'Recovery session · Run');
+  assertEquals(slotSummary('long', 'ride'), 'Long session · Long ride');
   // ⛔ THE LONG SLOT OFFERS BOTH, and its own note says so — p275's permission.
   assertEquals(SLOT_OPTIONS.long.map((o) => o.label), ['Long run', 'Long ride']);
 });

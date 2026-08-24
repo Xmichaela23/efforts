@@ -45,3 +45,18 @@ export function hardSlotDefault(sport: 'run' | 'ride'): HardSlotValue {
     : { role: 'intensity', goal: 'vo2', ownership: 'prescribed' };
 }
 
+
+/**
+ * ⛔ WHAT THIS HARD SLOT CURRENTLY IS, in one phrase — what a collapsed row shows after the sport.
+ *
+ * ⚠️ THE TITLES ARE THE OPTION TABLES' OWN, so the collapsed row and the expanded button say the
+ * same words. A club session outranks the session identity because it IS the answer: the athlete is
+ * telling us the slot is already spoken for.
+ */
+export function hardSlotTitle(sport: 'run' | 'ride', value: HardSlotValue): string | null {
+  if (value.ownership === 'club') return 'Club session';
+  const hit = hardSlotOptions(sport).find((o) => (o.goal
+    ? value.goal === o.goal && value.role === o.role
+    : value.role === o.role && !value.goal));
+  return hit?.title ?? null;
+}

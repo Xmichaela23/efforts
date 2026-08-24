@@ -13,7 +13,7 @@ import {
   type SlotKey,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { hardSlotDefault } from '@/lib/hard-slot-choices';
+import { hardSlotDefault, hardSlotTitle } from '@/lib/hard-slot-choices';
 import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
@@ -4426,6 +4426,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              * ride, `RUN_GROUND_OPTIONS` for the run — writing the same `role`/`goal`/`ownership`
              * fields on the same `hardDays` entries. Nothing about the plumbing is new.
              */
+            /** ⛔ WHAT THE COLLAPSED ROW SHOWS AFTER THE SPORT — the option table's own title. */
+            hardSessionTitle={(key) => {
+              const h = state.hardDays[HARD_SLOT_INDEX[key]];
+              if (!h) return hardSlotTitle(slotSportsNow[key], hardSlotDefault(slotSportsNow[key]));
+              return hardSlotTitle(slotSportsNow[key], { role: h.role, goal: h.goal, ownership: h.ownership });
+            }}
             renderHardFlavor={(key) => {
               const i = HARD_SLOT_INDEX[key];
               const sport = slotSportsNow[key];

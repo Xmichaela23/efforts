@@ -35,11 +35,22 @@ export const ENDURANCE_WEEK_HEADER: string[] = [
 /** The label under the long-session control. His own permission, p275: the long one may be a ride. */
 export const LONG_SLOT_NOTE = 'one per week, run or ride';
 
+/**
+ * ⛔ WHAT THE SLOT IS, IN THE HEADER'S OWN WORDS — never "Hard 1 / Hard 2" (Michael, 2026-08-24).
+ *
+ * Those were internal keys leaking onto a screen: an athlete has no first and second hard session,
+ * they have two hard sessions. The names here are the ones his own preamble already uses — *"2
+ * sessions to maintain speed, VO2 max or power · 1 recovery session · 1 long session"* — so the list
+ * above the slots and the slots themselves say the same words.
+ *
+ * ⚠️ BOTH HARD SLOTS CARRY THE SAME LABEL, deliberately. What tells them apart on a collapsed row is
+ * the sport and the session — which is what the athlete actually chose — not an ordinal nobody set.
+ */
 export const SLOT_LABEL: Record<SlotKey, string> = {
-  hard1: 'Hard 1',
-  hard2: 'Hard 2',
-  easy: 'Easy',
-  long: 'Long',
+  hard1: 'Hard session',
+  hard2: 'Hard session',
+  easy: 'Recovery session',
+  long: 'Long session',
 };
 
 /** The two options a slot offers, in the order they are shown. ⛔ The default sits FIRST. */
@@ -51,6 +62,36 @@ export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]
   easy: [{ value: 'run', label: 'Run' }, { value: 'ride', label: 'Ride' }],
   long: [{ value: 'run', label: 'Long run' }, { value: 'ride', label: 'Long ride' }],
 };
+
+/**
+ * ⛔ THE SCREEN OPENS FINISHED, AND THIS IS THE LINE THAT SAYS SO (Michael, 2026-08-24).
+ *
+ * A collapsed row states its whole answer — *"Hard session · Ride · Sustained threshold"* — so the
+ * default path is read, glance at the rate, Continue. ⚠️ The parts are joined with a middle dot
+ * rather than punctuation, because they are three facts of equal weight and not a sentence.
+ */
+export function slotSummary(key: SlotKey, sport: SlotSport, session?: string | null): string {
+  const sportWord = key === 'long'
+    ? (sport === 'ride' ? 'Long ride' : 'Long run')
+    : (sport === 'ride' ? 'Ride' : 'Run');
+  return [SLOT_LABEL[key], sportWord, session].filter(Boolean).join(' · ');
+}
+
+/**
+ * ⛔ THE TWO SENTENCES THAT LEFT THE PREAMBLE (Michael, 2026-08-24) — **his words, unedited**.
+ *
+ * They were lines 6 and 7 of the header, read once before the athlete had anything to apply them to.
+ * They belong at the moment a hard slot is set to Run, which is the only moment either is a fact
+ * about a decision being made. ⛔ Moved, not rewritten: these are the same strings, still exported
+ * from `ENDURANCE_WEEK_HEADER` for the test that pins his copy verbatim.
+ */
+export const RUN_TAX_LINES: string[] = [
+  ENDURANCE_WEEK_HEADER[5],
+  ENDURANCE_WEEK_HEADER[6],
+];
+
+/** ⛔ THE PREAMBLE THE SCREEN SHOWS — the focus sentence and the session list, and nothing else. */
+export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 5);
 
 /**
  * ⛔ THE PRE-FILL. Strength leading with a bike kept puts BOTH hard slots on the bike; the easy and

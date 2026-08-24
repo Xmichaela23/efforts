@@ -272,3 +272,66 @@ Now one row: `flex-wrap` with a `min-w-[168px]` basis, each keeping its own "hol
 `git status` is clean of it. Every slot flipped, both sports' option lists read, the defaults
 confirmed pre-selected, the colours read off computed style, and the volume row measured at two
 widths.
+
+---
+
+# PART 6 — THE REDESIGN (Michael, 2026-08-24: *"it just needs to be much better UI"*)
+
+Presentation only. **Nothing changed about what the screen says, what it writes to state, or what
+reaches the engine** — the copy is the same strings, moved; the wire is untouched.
+
+## 6.1 The screen opens finished
+
+It read as a long form because it WAS one: four stacked blocks with every option on screen at once,
+under a seven-line preamble. Now every slot is **one collapsed row stating its whole answer** —
+*"Hard session · Ride · Sustained threshold"* — and the default path is **read, glance at the rate,
+Continue**. Accordion: tapping a row opens it and closes the rest, so the screen never grows past a
+phone. ⚠️ **Nothing is open on arrival**, because the screen's whole claim is that it is already
+answered.
+
+**Measured at 390 px: the resting screen ends at 644 px.** It fits, with room for the Continue key.
+
+## 6.2 "Hard 1 / Hard 2" never reaches an athlete
+
+Those were internal keys leaking onto a screen. The labels are the ones **his own preamble already
+uses** — *"2 sessions to maintain speed, VO2 max or power · 1 recovery session · 1 long session"* —
+so the list above the slots and the slots themselves say the same words: **Hard session · Recovery
+session · Long session**. ⚠️ Both hard slots carry the same label deliberately; what tells them apart
+on a collapsed row is the sport and the session, which is what the athlete actually chose.
+
+## 6.3 The rate is pinned
+
+`sticky` under the preamble, in an `instrument-card`. ⛔ **It is the only thing on the screen that
+teaches**, and a number that changes off-screen has taught nobody anything.
+
+## 6.4 The two sentences moved to the moment
+
+The running-tax and cycling-forgiving lines left the preamble — where they were read before the
+athlete had anything to apply them to — and now appear **inside a hard slot, when Run is selected**.
+⛔ **Moved, not rewritten:** `RUN_TAX_LINES` is `ENDURANCE_WEEK_HEADER[5..6]` by reference, and a test
+asserts `[...PREAMBLE, ...RUN_TAX_LINES]` still equals his verbatim header — so a trim to either
+place fails the test rather than the screen.
+
+⚠️ **"4 sessions:" WAS BRIEFLY LOST** in the first cut of the preamble and put back as the list's own
+label. It carries the count, which is the half of the sentence that tells the athlete the week is
+fixed.
+
+## 6.5 Craft
+
+`instrument-card` and `instrument-divider` — the app's own classes, not new ones. A **coloured left
+edge** carries the sport on every row (`getDisciplineColor` only: run `#FFD700`, ride `#50C878`);
+everything else stays neutral so there is one accent per row and the selected state reads across the
+room. Volume stays one row; `pb-8` on the column so the club option can never sit under the Continue
+key again.
+
+## 6.6 Verified in the browser, every state
+
+At 390 px, each screenshotted and read: **collapsed** (four self-describing rows, nothing open) ·
+**expanded** (sport chips + the session options) · **run-selected** (row edge turns yellow, tax lines
+appear, rate moves to 1%/4wk, split line appears, summary becomes *"Hard session · Run · VO2 max
+focus"*) · **club checked** (summary becomes *"Hard session · Run · Club session"*) · **accordion
+exclusivity** (opening Long closed Hard 1; exactly one open). The temporary route used to get past
+the login wall was deleted — `git status` is clean of it.
+
+**152 tests green · Get Stronger byte-identical (`f7ece1aa…`) · build passes · lint unchanged**
+(`NonRaceBuilder`'s 2 pre-existing; the four other files clean).
