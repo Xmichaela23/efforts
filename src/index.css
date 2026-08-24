@@ -1076,27 +1076,37 @@ body.wizard-active { --tabbar-h: 0px; }
    screen. The header's colours show because they sit on ITS base layer at normal blend. Same here
    now: green, blue and gold painted directly, at strength, under the grid. */
 .readout-texture--nova.galaxy-card::before {
+  /* ⛔ THE VISIBLE HEADER FIELD IS `.mobile-header::after` — the six-blob glow spill — NOT the
+     soft-light spectral wash (2026-08-24). The first nova pass matched the wash and could never
+     converge: different palette weights, plus the galaxy purple base and the orange accent bloom
+     underneath. This is the header's own glow recipe — same six hues, same gold→orange→red/
+     purple→blue→green left-to-right order, comparable alphas — mirrored to the card's BOTTOM
+     edge, over the header's near-black ground. Wide soft radials stand in for the header's
+     26px blur (a filter here would blur the stars and ground too). */
+  background-color: #050505;
   background-image:
-    /* `--nova-dx/dy` are rolled once per app LAUNCH in main.tsx, so the sky is never quite the same
-       twice; the header reads the same two vars and drifts with it. */
-    /* Gold LEFT, green RIGHT — mirroring the header, which runs warm on the left and cools to
-       green/teal on the right (Michael 2026-08-15: "invert the green in the left corner with the
-       yellow bubbling up from the right"). Green now rises from the bottom-right corner. */
-    radial-gradient(90% 70% at calc(10% + var(--nova-dx, 0%)) calc(14% + var(--nova-dy, 0%)), rgba(255, 215, 0, 0.30), transparent 62%),
-    radial-gradient(85% 70% at calc(6% - var(--nova-dx, 0%)) calc(92% + var(--nova-dy, 0%)), rgba(74, 158, 255, 0.36), transparent 62%),
-    radial-gradient(90% 72% at calc(94% + var(--nova-dx, 0%)) calc(96% - var(--nova-dy, 0%)), rgba(80, 200, 120, 0.36), transparent 64%),
-    radial-gradient(70% 60% at calc(38% - var(--nova-dx, 0%)) calc(78% - var(--nova-dy, 0%)), rgba(183, 148, 246, 0.26), transparent 62%),
-    radial-gradient(135% 105% at 50% 110%, rgba(var(--card-accent-rgb, 255,140,66), var(--card-accent-a, 0.30)), transparent 66%),
-    radial-gradient(82% 54% at 8% 100%, rgba(255,188,84,0.12), transparent 60%),
-    radial-gradient(76% 58% at 97% 80%, rgba(138,104,230,0.17), transparent 60%),
-    radial-gradient(80% 60% at 50% -18%, rgba(56,112,206,0.10), transparent 62%),
-    radial-gradient(44% 34% at 85% 10%, rgba(232,78,156,0.06), transparent 64%),
+    /* SMOKE, NOT A BAND (2026-08-24, Michael: "equally as smoky similar shapes"). The header
+       reads cloudy because its blobs are SMALL, staggered in height, and unevenly bright —
+       the first pass here used wall-to-wall ellipses on one baseline, which fused into a
+       smooth sunset strip. Same hue order, now as staggered puffs + dim high wisps. */
+    radial-gradient(28% 70% at calc(10% + var(--nova-dx, 0%)) calc(96% + var(--nova-dy, 0%)), rgba(255, 215, 0, 0.32), transparent 70%),
+    radial-gradient(18% 46% at calc(22% - var(--nova-dx, 0%)) calc(76% + var(--nova-dy, 0%)), rgba(255, 215, 0, 0.13), transparent 72%),
+    radial-gradient(30% 74% at calc(30% - var(--nova-dx, 0%)) calc(106% + var(--nova-dy, 0%)), rgba(255, 140, 66, 0.28), transparent 72%),
+    radial-gradient(24% 56% at calc(41% + var(--nova-dx, 0%)) calc(92% - var(--nova-dy, 0%)), rgba(239, 68, 68, 0.17), transparent 74%),
+    radial-gradient(28% 70% at calc(52% + var(--nova-dx, 0%)) calc(98% - var(--nova-dy, 0%)), rgba(183, 148, 246, 0.28), transparent 72%),
+    radial-gradient(17% 42% at calc(58% - var(--nova-dx, 0%)) calc(70% + var(--nova-dy, 0%)), rgba(183, 148, 246, 0.11), transparent 72%),
+    radial-gradient(29% 72% at calc(68% - var(--nova-dx, 0%)) calc(104% - var(--nova-dy, 0%)), rgba(74, 158, 255, 0.30), transparent 72%),
+    radial-gradient(19% 48% at calc(79% + var(--nova-dx, 0%)) calc(80% - var(--nova-dy, 0%)), rgba(74, 158, 255, 0.12), transparent 74%),
+    radial-gradient(26% 66% at calc(90% + var(--nova-dx, 0%)) calc(97% - var(--nova-dy, 0%)), rgba(80, 200, 120, 0.25), transparent 70%),
+    /* dim full-width haze so the valleys between puffs aren't pure black (the header's blobs
+       overlap on a faintly lit chassis; without this the card reads as islands) */
+    linear-gradient(to top, rgba(150, 135, 175, 0.10) 0%, rgba(150, 135, 175, 0.04) 34%, transparent 58%),
     radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.65), transparent),
     radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.5), transparent),
     radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.55), transparent),
     radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.45), transparent),
     radial-gradient(1.4px 1.4px at calc(88% - var(--card-star-x, 0%)) 46%, rgba(255,245,220,0.5), transparent),
-    radial-gradient(ellipse at center, #14132b 0%, #0d0c20 58%, #060512 100%);
+    radial-gradient(ellipse at 50% 100%, #0c0c0e 0%, #060607 55%, #010102 100%);
 }
 .readout-texture--nova::after {
   background-image:
