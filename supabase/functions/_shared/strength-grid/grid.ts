@@ -34,7 +34,7 @@ import {
   type ViadaPattern,
 } from './taxonomy.ts';
 import { foldExerciseName, resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
-import { LAST_RESORT_RANK_FLOOR } from '../../../../src/lib/strength-gear.ts';
+import { LAST_RESORT_RANK_FLOOR, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 
 export type SlotNote = {
   kind: 'source' | 'inferred' | 'ours' | 'gap';
@@ -128,18 +128,56 @@ export const SUBSTITUTION_LADDER: Record<ViadaCategory, ViadaCategory[]> = {
 const OFFERABLE = (m: GridMovement) => !OFFER_STOPLIST.has(m.name);
 
 /**
- * Best equipment fit first, then catalogue order.
+ * ⛔ IS THIS MOVEMENT'S LOAD THE ATHLETE'S OWN BODY — asked of `displayFormat`, the field that
+ * already answers it, and not of a new flag.
+ *
+ * `ExerciseConfig.displayFormat` is how the logger decides what box to draw: `perHand` and `total`
+ * draw a weight, `bodyweight` draws none because there is none. That IS the question here — a
+ * movement drawn with no weight box carries no external load — so it is read rather than re-derived.
+ *
+ * ⚠️ `band` IS NOT BODYWEIGHT and is deliberately not folded in. A band is a real external load,
+ * badly steppable, and {@link LAST_RESORT_RANK_FLOOR} already ranks it where it belongs. Two
+ * judgements, two mechanisms, and merging them would demote a band twice.
+ */
+function isBodyweightLoad(name: string): boolean {
+  return resolveExerciseConfig(name).config?.displayFormat === 'bodyweight';
+}
+
+/**
+ * Best equipment fit first, then loaded before bodyweight, then catalogue order.
  *
  * ⚠️ `equipmentFitRank` IS THE EXISTING OWNER of "which of these does this athlete reach most
  * naturally", and it already knows that a banded route is a last resort. Nothing is re-derived.
+ *
+ * ⛔ AND THE TIEBREAK UNDERNEATH IT IS THE 2026-08-24 DEVICE FINDING'S SECOND HALF. An UNTAGGED
+ * movement has no route, so `equipmentFitRank` returns 0 for every one of them — a dumbbell rear
+ * delt fly and `reverse flyes (bodyweight)` tie at zero, and **the catalogue's key order** decides.
+ * That is not a decision, it is an accident, and it put a bodyweight fallback in a focused-pull slot
+ * on a gym with dumbbells in it. `reverse flyes (bodyweight)`'s own config comment says what it is:
+ * *"a BODYWEIGHT fallback — the thing the engine reaches for when the athlete owns nothing"*.
+ *
+ * ⚠️ IT ONLY FIRES FOR AN ATHLETE WHO OWNS SOMETHING TO LOAD WITH — {@link ownsLoadingImplement}.
+ * A bodyweight athlete's whole catalogue is bodyweight, and demoting it would sort their real
+ * options behind movements they cannot load at all. An athlete nobody asked is untouched (§0h).
+ *
+ * ⚠️ AND IT IS A TIEBREAK, NEVER A GATE. It moves nothing between fit tiers: a band-tier movement
+ * still sorts below every loadable one whichever way it is drawn, and nothing is excluded.
  */
 function rank(movements: GridMovement[], equipment: string[] | null | undefined): GridMovement[] {
+  const demoteBodyweight = ownsLoadingImplement(equipment);
   return movements
-    .map((m, i) => ({ m, i, r: equipmentFitRank(m.name, equipment) }))
+    .map((m, i) => ({
+      m,
+      i,
+      r: equipmentFitRank(m.name, equipment),
+      bw: demoteBodyweight && isBodyweightLoad(m.name) ? 1 : 0,
+    }))
     .sort((a, b) => {
       const ar = a.r == null ? Number.MAX_SAFE_INTEGER : a.r;
       const br = b.r == null ? Number.MAX_SAFE_INTEGER : b.r;
-      return ar === br ? a.i - b.i : ar - br;
+      if (ar !== br) return ar - br;
+      if (a.bw !== b.bw) return a.bw - b.bw;
+      return a.i - b.i;
     })
     .map((x) => x.m);
 }

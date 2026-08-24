@@ -25,6 +25,12 @@ import {
   type MuscleVerdict,
   type SessionVerdict,
 } from './dose.ts';
+/**
+ * ⛔ THE SERVER'S CANONICALIZER — the app's one owner of "are these two names the same lift". The
+ * client mirror in `src/lib` lacks the Q-197 plural rule that makes `Bulgarian Split Squats` and
+ * `bulgarian split squat` one movement.
+ */
+import { canonicalize } from '../canonicalize.ts';
 import {
   ATTRIBUTION_IS_APPROXIMATE,
   MUSCLE_GROUPS,
@@ -320,14 +326,30 @@ export function fillMuscleFloor(
     { kind: 'source', text: HYPERTROPHY_PREFERS_ISOLATION, cite: 'Viada p86' },
   ];
 
-  // ⚠️ FOLDED ONCE, CASE-INSENSITIVELY. The picker stores display names (`Chin-Up`) and the grid is
-  // keyed off the catalogue's own spellings (`chin up`); an exact-string set would silently prefer
-  // nothing at all and look exactly like an athlete who picked nothing.
-  const preferSet = new Set((opts?.prefer ?? []).map((n) => String(n ?? '').trim().toLowerCase()));
+  /**
+   * ⛔ CANONICALIZED, NOT LOWERCASED (2026-08-24). The picker stores display names (`Chin-Up`,
+   * `Bulgarian Split Squats`) and the grid is keyed off the catalogue's own spellings (`chin up`,
+   * `bulgarian split squat`); a lowercase set matches the first pair and MISSES the second, because
+   * lowercasing does not know that a plural is the same lift. A pick that misses here does not
+   * quietly do nothing — it stays unplaced and the floor adds a movement the week already has under
+   * its other spelling, which is the session duplicate reported on 2026-08-24.
+   */
+  const preferSet = new Set(
+    (opts?.prefer ?? []).map((n) => canonicalize(String(n ?? '').trim())).filter((k) => k && k !== 'unknown'),
+  );
 
   const gaps = ledgerFor(sessions, { setPosition: opts?.setPosition }).belowFloor;
-  /** ⚠️ What the week already prescribes — a floor slot should widen the week, not repeat it. */
-  const alreadyPrescribed = new Set(sessions.flatMap((s) => s.sets.map((x) => x.movement)));
+  /**
+   * ⚠️ What the week already prescribes — a floor slot should widen the week, not repeat it.
+   *
+   * ⛔ COMPARED CANONICALLY for the same reason `preferSet` is. A raw-name set makes `pull up` and
+   * `pullup`, or `overhead press` and `military press`, two different movements to this check — 17
+   * such collision groups exist in the grid's own index — so the floor would "widen" a week by
+   * adding a lift it already holds under another name.
+   */
+  const alreadyPrescribed = new Set(
+    sessions.flatMap((s) => s.sets.map((x) => canonicalize(String(x.movement ?? '')))),
+  );
 
   for (const muscle of gaps) {
     // Which movement — through stage 2's grid, so the equipment ladder and the ranking are not
@@ -337,11 +359,11 @@ export function fillMuscleFloor(
     // hold it. `preferred` is matched against the SAME candidate list, so a pick can only win a slot
     // it was already eligible for — nothing here widens the equipment gate or the prime-mover test.
     const preferred = forMuscle.find((o) =>
-      preferSet.has(o.name.toLowerCase()) && !alreadyPrescribed.has(o.name));
+      preferSet.has(canonicalize(o.name)) && !alreadyPrescribed.has(canonicalize(o.name)));
     // ⚠️ A MOVEMENT THE WEEK DOES NOT ALREADY HAVE, where one exists. Filling a gap by repeating a
     // movement already prescribed adds sets without adding variety, and the source encourages
     // rotation. Falls back to a repeat rather than leaving the muscle at zero.
-    const pick = preferred ?? forMuscle.find((o) => !alreadyPrescribed.has(o.name)) ?? forMuscle[0];
+    const pick = preferred ?? forMuscle.find((o) => !alreadyPrescribed.has(canonicalize(o.name))) ?? forMuscle[0];
     const chosen = pick ? { movement: pick.name, category: pick.category } : null;
     if (!chosen) {
       unfilled.push({ muscle, reason: 'No movement in the catalogue reaches this muscle with the declared equipment.' });
@@ -364,7 +386,7 @@ export function fillMuscleFloor(
     }
     const target = ordered[0];
     sessions[target.i].sets.push({ movement: chosen.movement, intent: 'HYP', sets: setsPerSlot });
-    alreadyPrescribed.add(chosen.movement);
+    alreadyPrescribed.add(canonicalize(chosen.movement));
     added.push({
       muscle,
       movement: chosen.movement,

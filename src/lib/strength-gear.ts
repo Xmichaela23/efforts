@@ -454,6 +454,39 @@ export function hasLoadableFit(
   return r != null && r < LAST_RESORT_RANK_FLOOR;
 }
 
+/**
+ * ⛔ THE KEYS THAT ADD EXTERNAL LOAD. Not "gear the athlete owns" — gear that puts WEIGHT in their
+ * hands, which is a different question from either of this file's two existing maps.
+ *
+ * ⚠️ A RACK, A BENCH AND A PULL-UP BAR ARE DELIBERATELY ABSENT. They SUPPORT a movement; they do not
+ * load one. An athlete with a bench and no dumbbells is still a bodyweight athlete, and treating a
+ * bench as an implement would tell {@link ownsLoadingImplement} the opposite.
+ *
+ * ⚠️ SO ARE BANDS, and for the reason {@link LAST_RESORT_KEYS} already states once: a band's tension
+ * cannot be measured or stepped. A bands-only athlete is not an athlete with weights.
+ */
+const LOADING_KEYS: ReadonlySet<string> = new Set(['barbell', 'dumbbells', 'kettlebell', 'cable']);
+
+/**
+ * ⛔ DOES THIS ATHLETE OWN SOMETHING THEY CAN PUT WEIGHT ON — the question the GRID's ordering has
+ * and neither {@link canPerform} nor {@link equipmentFitRank} answers.
+ *
+ * `equipmentFitRank` ranks by ROUTE, and an untagged movement has no route: it returns 0 for every
+ * one of them, so a bodyweight fallback and a dumbbell movement tie and the CATALOGUE'S ORDER breaks
+ * it. That is how `reverse flyes (bodyweight)` — a name `materialize-plan` emits precisely BECAUSE
+ * the athlete owns nothing — can be offered to somebody with a rack full of dumbbells.
+ *
+ * ⚠️ FALSE FOR AN ATHLETE NOBODY ASKED, which is the §0h rule again: unknown inventory means "we
+ * have not asked", so no claim about implements can be made and nothing is reordered.
+ */
+export function ownsLoadingImplement(athleteEquipment: string[] | null | undefined): boolean {
+  const chips = Array.isArray(athleteEquipment) ? athleteEquipment.filter((c) => String(c || '').trim()) : [];
+  if (chips.length === 0) return false;
+  const owned = athleteEquipmentToKeys(chips);
+  for (const k of owned) if (LOADING_KEYS.has(k)) return true;
+  return false;
+}
+
 export function canPerform(exerciseName: string, athleteEquipment: string[] | null | undefined): boolean {
   const chips = Array.isArray(athleteEquipment) ? athleteEquipment.filter((c) => String(c || '').trim()) : [];
   if (chips.length === 0) return true;

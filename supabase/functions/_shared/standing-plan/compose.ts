@@ -52,7 +52,13 @@ import {
   PLYO_FAMILIES_PER_DAY,
   PLYO_FAMILY_MIX_IS_OURS,
 } from './plyo.ts';
-import { foldExerciseName } from '../../../../src/lib/exercise-config.ts';
+/**
+ * ⛔ THE SERVER'S CANONICALIZER, NOT THE CLIENT MIRROR, AND THE DIFFERENCE IS THE BUG.
+ * `src/lib/canonicalize.ts` is a simplified copy for UI trend lookups; only THIS one carries the
+ * Q-197 plural fallback and the Q-210 parenthetical/hyphen ladder — the two rules that make
+ * `Bulgarian Split Squats` and `bulgarian split squat` one movement instead of two.
+ */
+import { canonicalize } from '../canonicalize.ts';
 import { musclesWorkedBy } from '../accessory-dosing/index.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 
@@ -359,12 +365,21 @@ export const PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN =
   + 'for the muscle it works.';
 
 type PickPool = {
-  /** folded name → the athlete's own spelling, for the row and for the compromise line. */
+  /**
+   * canonical name → the athlete's own spelling, for the row and for the compromise line.
+   *
+   * ⛔ CANONICAL, NOT FOLDED, SINCE 2026-08-24, AND THE PLURAL IS WHY. `foldExerciseName` strips
+   * punctuation and nothing else, so the picker's `Bulgarian Split Squats` folded to
+   * `bulgarian split squats` and the catalogue's entry folds to `bulgarian split squat` — **two
+   * keys for one movement.** The pick therefore matched no option, stayed unplaced, and the week
+   * printed the athlete's spelling BESIDE the engine's in the same session. `canonicalize` is the
+   * app's one owner of "are these two names the same lift" and carries the plural rule (Q-197).
+   */
   byFold: Map<string, string>;
-  /** Folded names not yet placed anywhere in the week. */
+  /** Canonical names not yet placed anywhere in the week. */
   unplaced: Set<string>;
   /**
-   * ⛔ FOLDED NAMES ALREADY PLACED THIS WEEK — the A1 ruling's *"dedupe against the week"*.
+   * ⛔ CANONICAL NAMES ALREADY PLACED THIS WEEK — the A1 ruling's *"dedupe against the week"*.
    *
    * ⚠️ IT GUARDS THE **GRID'S** PATH, NOT THE PICK'S. Two slots can resolve to the same movement on
    * different days: `strength_5k` day 2's ambiguous lower slot and day 5's focused lower slot both
@@ -384,8 +399,8 @@ function pickPool(names: string[] | null | undefined): PickPool {
   for (const raw of names ?? []) {
     const name = String(raw ?? '').trim();
     if (!name) continue;
-    const fold = foldExerciseName(name);
-    if (fold && !byFold.has(fold)) byFold.set(fold, name);
+    const key = canonicalize(name);
+    if (key && key !== 'unknown' && !byFold.has(key)) byFold.set(key, name);
   }
   return { byFold, unplaced: new Set(byFold.keys()), placed: new Set() };
 }
@@ -451,10 +466,10 @@ function exerciseForSlot(
    */
   const fromPick = slot.intent === 'HYP' && slot.role === 'accessory'
     ? resolved.options.find((o) => {
-      const fold = foldExerciseName(o.name);
-      return picks.unplaced.has(fold)
-        && !takenToday.has(o.name.toLowerCase())
-        && (!competition || o.name.toLowerCase() !== competition.toLowerCase());
+      const key = canonicalize(o.name);
+      return picks.unplaced.has(key)
+        && !takenToday.has(key)
+        && (!competition || key !== canonicalize(competition));
     })
     : undefined;
 
@@ -462,9 +477,9 @@ function exerciseForSlot(
     // ⚠️ THE ATHLETE'S OWN SPELLING IS WHAT THE ROW SHOWS. They typed `Chin-Up`; printing the
     // catalogue's `chin up` back at them reads as the app having ignored the choice and picked
     // something similar.
-    movement = picks.byFold.get(foldExerciseName(fromPick.name)) ?? fromPick.name;
-    picks.unplaced.delete(foldExerciseName(fromPick.name));
-    picks.placed.add(foldExerciseName(fromPick.name));
+    movement = picks.byFold.get(canonicalize(fromPick.name)) ?? fromPick.name;
+    picks.unplaced.delete(canonicalize(fromPick.name));
+    picks.placed.add(canonicalize(fromPick.name));
   } else if (slot.role === 'competition' && competition) {
     // ⛔ *"All first lifts of the day should be a competition movement"* (p247). The athlete named it,
     // and it is never deduped away — the frame asks for it by name.
@@ -472,10 +487,10 @@ function exerciseForSlot(
   } else {
     // ⛔ THE ROLE FILTER. A noncompetition variant in the same gross pattern.
     const options = (slot.role === 'accessory' && competition
-      ? resolved.options.filter((o) => o.name.toLowerCase() !== competition.toLowerCase())
+      ? resolved.options.filter((o) => canonicalize(o.name) !== canonicalize(competition))
       : resolved.options)
       // ⛔ AND NOT A MOVEMENT THE ATHLETE'S OWN PICK ALREADY HOLDS — see `PickPool.placed`.
-      .filter((o) => !picks.placed.has(foldExerciseName(o.name)));
+      .filter((o) => !picks.placed.has(canonicalize(o.name)));
     /**
      * ⛔ THE FOCUS BIAS (B2, 2026-08-24), HYP accessory slots only: among THIS CELL'S OWN options,
      * one whose prime mover the athlete's chips name wins over the default. It can never widen the
@@ -483,10 +498,10 @@ function exerciseForSlot(
      * exactly like a pick, one step weaker.
      */
     const focused = slot.intent === 'HYP' && slot.role === 'accessory' && focusMuscles.size > 0
-      ? options.find((o) => !takenToday.has(o.name.toLowerCase())
+      ? options.find((o) => !takenToday.has(canonicalize(o.name))
         && focusMuscles.has(musclesWorkedBy(o.name)?.primary ?? ''))
       : undefined;
-    let fresh = focused ?? options.find((o) => !takenToday.has(o.name.toLowerCase()));
+    let fresh = focused ?? options.find((o) => !takenToday.has(canonicalize(o.name)));
 
     /**
      * ⛔ IF THE CELL IS EXHAUSTED, WIDEN THE CATEGORY — NOT THE PATTERN.
@@ -502,9 +517,9 @@ function exerciseForSlot(
         if (alt === slot.category) continue;
         const wider = resolveSlot({ category: alt, pattern, intent: slot.intent, equipment: args.equipment ?? null });
         fresh = wider.options.find((o) =>
-          !takenToday.has(o.name.toLowerCase())
-          && !picks.placed.has(foldExerciseName(o.name))
-          && (!competition || o.name.toLowerCase() !== competition.toLowerCase()));
+          !takenToday.has(canonicalize(o.name))
+          && !picks.placed.has(canonicalize(o.name))
+          && (!competition || canonicalize(o.name) !== canonicalize(competition)));
         if (fresh) break;
       }
     }
@@ -522,7 +537,14 @@ function exerciseForSlot(
      */
     movement = bandRouteName(movement, args.equipment ?? null);
   }
-  takenToday.add(movement.toLowerCase());
+  /**
+   * ⛔ CANONICAL, NOT LOWERCASED, AND THAT IS THE SESSION-DUPLICATE FIX (2026-08-24). A raw
+   * `.toLowerCase()` makes `pull up` and `pullup`, `overhead press` and `military press`,
+   * `bulgarian split squat` and `Bulgarian Split Squats` **different movements to this Set** — 17
+   * such collision groups exist in the grid's own index — so two slots on one day could print the
+   * same lift twice under two spellings. `canonicalize` is the app's owner of that comparison.
+   */
+  takenToday.add(canonicalize(movement));
 
   if (slot.ambiguousNotation && !notes.some((n) => n.text === slot.ambiguousNotation)) {
     notes.push({ kind: 'gap', text: slot.ambiguousNotation, cite: 'Viada p246' });
@@ -966,8 +988,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const target = sessions.find((s) => s.type === 'strength' && (s.name === add.session || s.day === add.session));
     if (!target) continue;
     if (add.fromAthletePick) {
-      picks.unplaced.delete(foldExerciseName(add.movement));
-      picks.placed.add(foldExerciseName(add.movement));
+      picks.unplaced.delete(canonicalize(add.movement));
+      picks.placed.add(canonicalize(add.movement));
     }
     target.strength_exercises = [
       ...(target.strength_exercises ?? []),
@@ -975,7 +997,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // ⛔ THE FLOOR'S OWN PICKS GET THE SAME BAND LABEL as a slot's — see `bandRouteName`. The
         // athlete's own pick keeps their spelling.
         name: add.fromAthletePick
-          ? (picks.byFold.get(foldExerciseName(add.movement)) ?? add.movement)
+          ? (picks.byFold.get(canonicalize(add.movement)) ?? add.movement)
           : bandRouteName(add.movement, args.equipment ?? null),
         sets: add.sets,
         reps: '8-10',
