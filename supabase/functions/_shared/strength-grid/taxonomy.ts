@@ -187,6 +187,45 @@ const BRACED_RE =
   /\b(machine|smith|hack squat|leg press|lever|pulldown|pull down|cable|assisted|pec deck|chest supported|chest-supported|ghd|back extension|hyperextension|hyper|glute ham|glute-ham)\b/;
 
 /**
+ * ⛔ DOES THE NAME READ AS MACHINE-BRACED — the same axis {@link BRACED_RE} already owns, asked a
+ * different question.
+ *
+ * `viadaCategoryOf` cannot answer this one. Its order is deliberate — single-joint is tested BEFORE
+ * bracing so a pec deck files under FOCUSED — so a `lat pulldown` comes back `focused` and a
+ * `leg extension` comes back `focused`, and neither category tells a caller whether the movement
+ * needs a machine to exist. That is the question the equipment gate has, and it is asked here.
+ *
+ * ⚠️ IT IS A NAME TEST AND IT IS DELIBERATELY COARSE. It exists to stop an UNTAGGED movement being
+ * handed to an athlete who declared a home gym — `leg press`, `hack squat`, `chest supported row`,
+ * `GHD back extension`. A movement with a real {@link ASSISTANCE_GEAR} tag never reaches it: a tag
+ * is a better answer than a regex, and `canPerform` reads it.
+ *
+ * ⚠️ NO NEW GEAR KEY. The stage-2 notes asked for a `machine` key in the equipment vocabulary; this
+ * is not it, and it does not pretend to be. It is a local reading of a name, in the one place that
+ * needs it, so the vocabulary is not grown for a single caller.
+ */
+export function readsAsMachineBraced(exerciseName: string): boolean {
+  const key = foldExerciseName(String(exerciseName ?? ''));
+  return BRACED_RE.test(key) && !MACHINE_BRACED_EXCLUDE_RE.test(key);
+}
+
+/**
+ * ⛔ A MOVEMENT THAT NAMES ITS OWN IMPLEMENT IS NOT A MACHINE, and without this the guard ejects two
+ * movements that need nothing but a band.
+ *
+ * `band pull down` matches `BRACED_RE` on *"pull down"* and `band assisted pull up` matches it on
+ * *"assisted"* — both correctly, for the classifier's purpose: they ARE externally braced in Viada's
+ * sense. Neither is a machine, and neither is untagged by accident: `band pull down` is a real
+ * `EXERCISE_CONFIG` entry with `displayFormat: 'band'`, and `band assisted pull up`'s own config note
+ * says the band is ASSISTANCE, not load. Ejecting them takes two movements away from a bands-owning
+ * athlete for having the word "band" in the name — the false exclusion the gate exists to avoid.
+ *
+ * ⚠️ IT DOES NOT LOOSEN THE CATEGORY. `viadaCategoryOf` still calls both `braced`; this exclusion is
+ * read only by {@link readsAsMachineBraced}, which asks the equipment question and nothing else.
+ */
+const MACHINE_BRACED_EXCLUDE_RE = /\bband\b/;
+
+/**
  * ⛔ CONTEST LIFT — the PRIMARY test, and it is derived from OUR data rather than from his list.
  *
  * His definition has two halves: *compound, barbell or bar, cardinal plane* AND *contest- or

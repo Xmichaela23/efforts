@@ -262,6 +262,29 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // half the athletes cannot do.
   'face pull': [['cable'], ['bands']],
   'band face pulls': [['bands']],
+  /**
+   * ⛔ THE THREE BAND-NAMED KEYS THE STANDING PLAN'S BAND LABEL DEPENDS ON (2026-08-24).
+   *
+   * `bandRouteName` (`_shared/strength-grid/grid.ts`) renames a pick that only a band reaches — `lat
+   * pulldown` becomes `band pull down`, `tricep pushdown` becomes `band tricep pushdown` — so the
+   * plan says what the athlete will actually be holding. That rename puts the renamed key into the
+   * grid's own movement pool, and an UNTAGGED movement is treated as "needs nothing": rank 0, the
+   * best possible fit, ahead of the dumbbell work it should sit behind. Measured: `band tricep
+   * pushdown` won a home gym's triceps slot on catalogue order alone.
+   *
+   * ⚠️ A BAND IS A LAST RESORT, and `LAST_RESORT_KEYS` already says so — but only for a movement
+   * whose tag names the band. These three name it, so the ranking they were always supposed to get
+   * is the ranking they now get, and an athlete with no bands is no longer offered one.
+   *
+   * ⚠️ THIS IS NOT THE BULK TAGGING PASS, and it is deliberately not. Nine more band-named movements
+   * in the catalogue are still untagged and still rank 0 — `band row`, `band overhead press`,
+   * `band lateral raise`, `band pull apart`, `resistance band row`, `band face pull` (singular),
+   * `band lateral walk` / `lateral band walk`, `band leg curl`. They are a pre-existing gap, they
+   * are read by the Get Stronger picker as well as by this grid, and closing them is its own change.
+   */
+  'band pull down': [['bands']],
+  'band tricep pushdown': [['bands']],
+  'band triceps pushdown': [['bands']],
   'bent over reverse flyes': [['dumbbells']],
   'dumbbell curl': [['dumbbells']],
   'hammer curl': [['dumbbells']],

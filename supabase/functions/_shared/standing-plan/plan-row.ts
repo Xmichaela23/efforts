@@ -138,6 +138,21 @@ export type StandingPlanConfig = {
    */
   accessory_picks: string[] | null;
   /**
+   * ⛔ THE EQUIPMENT THE BLOCK WAS COMPOSED AGAINST (2026-08-24). Same law as `sport_mix`,
+   * `day_offset` and `accessory_picks`: a restate RE-COMPOSES this block and has to reach the
+   * identical week.
+   *
+   * ⚠️ IT WAS READ BY `rematerialize-standing-block` AND WRITTEN BY NOTHING. The build passed the
+   * athlete's kit into the composer and the row stored none of it, so every restate re-composed
+   * UNGATED — a different movement in the same slot, on a calendar that carries the gated one. And
+   * `restateFromTest` matches a composed row to a calendar row on the MOVEMENT NAME, so those rows
+   * matched nothing and silently missed the weight restate: the exact no-op `restate.ts` warns about.
+   *
+   * ⚠️ NULL MEANS THE ATHLETE DECLARED NOTHING — the §0h case, "we have not asked", which the gate
+   * treats as ungated. It is never `[]` for "owns nothing".
+   */
+  athlete_equipment: string[] | null;
+  /**
    * ⛔ WHAT EACH PATTERN'S ME SLOT HAD EARNED WHEN THIS VERSION WAS WRITTEN (A2, 2026-08-24).
    * ⚠️ ABSENT AT BUILD TIME, ALWAYS — a set is earned by logged sessions and a block is authored
    * before any of them exist. It arrives through the restate, beside the working numbers.
@@ -235,6 +250,12 @@ export function buildStandingPlanRow(args: {
       accessory_picks: (args.compose.accessoryPicks ?? []).length > 0
         ? [...(args.compose.accessoryPicks as string[])]
         : null,
+      // ⛔ THE KIT THE WEEK WAS BUILT AGAINST — see `athlete_equipment` for why a restate is a
+      // silent no-op without it. Empty declares as null: absent means "not asked", never "owns nothing".
+      athlete_equipment: (() => {
+        const kit = (args.compose.equipment ?? []).filter((c) => String(c ?? '').trim());
+        return kit.length > 0 ? [...kit] : null;
+      })(),
       me_sets_by_pattern: args.compose.meSetsByPattern ?? null,
       sport_counts: (() => {
         // ⚠️ COUNTED OFF THE BUILT WEEK, not off the ask. What the athlete asked for is a ratio;

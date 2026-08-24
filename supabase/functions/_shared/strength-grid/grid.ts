@@ -28,10 +28,13 @@ import {
   equipmentFitRank,
   isGearTagged,
   movementsIn,
+  readsAsMachineBraced,
   type GridMovement,
   type ViadaCategory,
   type ViadaPattern,
 } from './taxonomy.ts';
+import { foldExerciseName, resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
+import { LAST_RESORT_RANK_FLOOR } from '../../../../src/lib/strength-gear.ts';
 
 export type SlotNote = {
   kind: 'source' | 'inferred' | 'ours' | 'gap';
@@ -142,9 +145,31 @@ function rank(movements: GridMovement[], equipment: string[] | null | undefined)
 }
 
 /**
- * ⛔ REACHABLE MEANS TAGGED **AND** PERFORMABLE — see `isGearTagged` for why the second half is not
- * enough on its own. An untagged movement is not "free"; it is unknown, and the grid will not spend
- * a declared-equipment athlete's slot on an unknown.
+ * ⛔ REACHABLE IS `canPerform`, PLUS ONE GUARD FOR THE UNTAGGED — and the version that stood here
+ * before (tagged **and** performable) was a bug with a device report behind it.
+ *
+ * ⚠️ THE DEFECT, IN ONE LINE: **declaring MORE equipment bought a WORSE pick.** `ASSISTANCE_GEAR`
+ * tags 52 of the ~316 catalogued movements, so requiring a tag emptied every cell of its untagged
+ * rivals — `rear delt fly`, `chest fly`, most curls and extensions — and left whatever WAS tagged to
+ * win by default. `lat pulldown` is tagged `[['cable'], ['bands']]`; a home-gym athlete with bands
+ * and no cable stack therefore got a BAND-tier pulldown in a slot where a dumbbell movement was
+ * sitting untagged and unconsidered (Michael, on device, 2026-08-24). With `equipment: null` the
+ * same slot filled correctly, because the gate never ran.
+ *
+ * ⛔ STAGE 3 ALREADY SETTLED THIS ONE RUNG OVER, and this is the same ruling arriving on the slot
+ * path: `accessory-dosing/ledger.ts:candidatesFor` gates on `canPerform` and ranks with
+ * `equipmentFitRank`, after routing through the strict rule left CALVES unfillable for a
+ * commercial-gym athlete (every calf movement is untagged). Its note — *"untagged movements pass
+ * every real equipment gate"* — is the finding; the slot path had not been given it.
+ *
+ * ⚠️ AND THE ONE THING THE STRICT RULE WAS RIGHT ABOUT IS KEPT. Deleting the tag test outright
+ * re-opens the case it existed for: an untagged `leg press` or `hack squat` prescribed to somebody
+ * with a barbell in a garage, which the materialize backstop has a rule for only sometimes. So an
+ * untagged movement is free UNLESS its NAME reads as machine-braced — {@link readsAsMachineBraced},
+ * the taxonomy's own `BRACED_RE` asked a second question. Those stay ejected.
+ *
+ * ⚠️ A TAGGED MOVEMENT NEVER REACHES THE NAME TEST. A real gear tag is a better answer than a
+ * regex, and `canPerform` is the one owner of reading it.
  *
  * ⚠️ UNDECLARED EQUIPMENT IS THE §0h CASE and short-circuits to true: unknown inventory means "we
  * have not asked", never "owns nothing".
@@ -152,7 +177,9 @@ function rank(movements: GridMovement[], equipment: string[] | null | undefined)
 function reachable(name: string, equipment: string[] | null | undefined): boolean {
   const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
   if (!declared) return true;
-  return isGearTagged(name) && canPerform(name, equipment);
+  if (!canPerform(name, equipment)) return false;
+  if (isGearTagged(name)) return true;
+  return !readsAsMachineBraced(name);
 }
 
 function poolFor(
@@ -334,6 +361,50 @@ export function resolveSlot(req: SlotRequest): ResolvedSlot {
 
   return { request: req, prescription, options, chosen: options[0], substitution, notes };
 }
+
+/**
+ * ⛔ A MOVEMENT THE ATHLETE CAN ONLY REACH WITH A BAND SAYS SO ON THE PLAN.
+ *
+ * `equipmentFitRank` already knows the answer — a rank at or above {@link LAST_RESORT_RANK_FLOOR}
+ * means every route this athlete satisfies runs through a band — and until now nothing said it out
+ * loud. The row printed `lat pulldown` to somebody with no cable stack, which reads as an engine
+ * that ignored the declared gym rather than one that found the only route left.
+ *
+ * ⛔ THE RENAMED STRING MUST RESOLVE EXACTLY, AND THAT IS D-322 (`GridMovement.name`'s own rule). A
+ * name that only fuzzy-matches silently borrows another movement's ratio and display — `band tricep
+ * pushdown` with no key of its own is priced at 0.56 of a BENCH PRESS. So a rename is only made when
+ * `resolveExerciseConfig` answers `exact` or `folded`; anything else leaves the name alone, because
+ * a mispriced row is worse than an unlabelled one.
+ *
+ * ⚠️ IT RENAMES NOTHING ELSE. Undeclared equipment, a loadable route, or a name that already says
+ * band, and the movement comes back untouched.
+ */
+export function bandRouteName(name: string, equipment: string[] | null | undefined): string {
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return name;
+  const rank = equipmentFitRank(name, equipment);
+  if (rank == null || rank < LAST_RESORT_RANK_FLOOR) return name;
+  const key = foldExerciseName(name);
+  if (/\bband\b/.test(key)) return name;
+  for (const candidate of [BAND_NAME[key], `band ${name}`]) {
+    if (!candidate) continue;
+    const via = resolveExerciseConfig(candidate).via;
+    if (via === 'exact' || via === 'folded') return candidate;
+  }
+  return name;
+}
+
+/**
+ * ⚠️ WHERE `band ` + THE NAME IS NOT WHAT THE CATALOGUE CALLS IT. A banded pulldown is already in
+ * `EXERCISE_CONFIG` as `band pull down`; minting `band lat pulldown` beside it would be a second
+ * entry for one movement, which is the duplication this codebase keeps deleting. Everything not
+ * listed here takes the `band ` prefix, and only if that resolves.
+ */
+const BAND_NAME: Record<string, string> = {
+  'lat pulldown': 'band pull down',
+  'lat pull down': 'band pull down',
+  'lat pulldowns': 'band pull down',
+};
 
 /** Every cell of the grid, for a caller that wants to see the whole thing. */
 export function gridCells(): { category: ViadaCategory; pattern: ViadaPattern | null; count: number }[] {

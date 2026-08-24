@@ -21,7 +21,7 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { prescribe, resolveSlot, type ViadaPattern } from '../strength-grid/index.ts';
+import { bandRouteName, prescribe, resolveSlot, type ViadaPattern } from '../strength-grid/index.ts';
 import {
   fillMuscleFloor,
   ledgerFor,
@@ -511,6 +511,16 @@ function exerciseForSlot(
     // ⚠️ AND ONLY THEN A REPEAT. A duplicated movement is worse than nothing only until it is the
     // difference between a slot and a hole.
     movement = (fresh ?? options[0] ?? resolved.chosen).name;
+    /**
+     * ⛔ AND IF THE ONLY ROUTE LEFT IS A BAND, THE ROW SAYS BAND (2026-08-24). `lat pulldown` on a
+     * home gym with no cable stack reads as an engine that ignored the declared equipment; `band
+     * pull down` reads as the movement it actually is. {@link bandRouteName} owns the rule and
+     * renames only when the new string resolves exactly in `EXERCISE_CONFIG` (D-322).
+     *
+     * ⚠️ THE ENGINE'S OWN PICKS ONLY. The athlete's pick keeps THEIR spelling (see `fromPick`) and a
+     * competition lift is named by the athlete — neither is ours to relabel.
+     */
+    movement = bandRouteName(movement, args.equipment ?? null);
   }
   takenToday.add(movement.toLowerCase());
 
@@ -962,9 +972,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     target.strength_exercises = [
       ...(target.strength_exercises ?? []),
       {
+        // ⛔ THE FLOOR'S OWN PICKS GET THE SAME BAND LABEL as a slot's — see `bandRouteName`. The
+        // athlete's own pick keeps their spelling.
         name: add.fromAthletePick
           ? (picks.byFold.get(foldExerciseName(add.movement)) ?? add.movement)
-          : add.movement,
+          : bandRouteName(add.movement, args.equipment ?? null),
         sets: add.sets,
         reps: '8-10',
         weight: 'By feel',

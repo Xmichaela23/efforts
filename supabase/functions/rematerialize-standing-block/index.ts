@@ -153,7 +153,23 @@ Deno.serve(async (req: Request) => {
       competitionLifts: sp.competition_lifts ?? {},
       workingNumbers: reading.working,
       seed1RMs: sp.seed_one_rep_maxes ?? {},
-      equipment: Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null,
+      /**
+       * ⛔⛔ THE BLOCK'S OWN EQUIPMENT, READ BACK FROM ITS CONFIG — the same law as the rotation, the
+       * sport mix and the accessory picks below, and it was the one that had no writer.
+       *
+       * This line read `config.athlete_equipment` and **nothing in the app ever wrote that key**, so
+       * every restate re-composed UNGATED: a different movement in the same slot from the one the
+       * calendar carries, matched on name by `restateFromTest`, matching nothing — the silent no-op
+       * that reads as "the test produced nothing". `plan-row.ts` now stores the kit on the block
+       * itself (`standing_plan.athlete_equipment`), which is where the rest of the re-composition
+       * arguments live and the one place that owns it.
+       *
+       * ⚠️ THE OLD TOP-LEVEL KEY IS STILL READ, second. It costs a line, and a block written by
+       * anything that does put it there still restates gated.
+       */
+      equipment: Array.isArray(sp?.athlete_equipment)
+        ? sp.athlete_equipment
+        : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null),
       demonstratedWeeklyMiles: sp.demonstrated_weekly_miles ?? null,
       /**
        * ⛔⛔ THE BLOCK'S OWN ROTATION, READ BACK FROM ITS CONFIG — NOT RE-DERIVED FROM THE PINS.

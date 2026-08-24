@@ -1875,6 +1875,29 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'The movement the existing `lateral band walk` covers, written the other way round.',
   },
+  // ⛔ THE TWO SPELLINGS OF A BANDED PUSHDOWN, added 2026-08-24 for the same reason every entry above
+  // was: without a key of its own, `band tricep pushdown` fuzzy-matched `tricep pushdown` and was
+  // priced at 0.56 of the athlete's BENCH PRESS — a barbell-derived number, on a movement whose load
+  // is a rubber band. The Standing Plan's slot resolver renames a pick that only a band route
+  // reaches, and D-322's rule is that the renamed string has to resolve EXACTLY or the rename is
+  // worse than the thing it fixed. ⚠️ Both spellings, because `triceps …` does not fuzzy-match
+  // `tricep …` at all — neither string contains the other, as the note at `triceps pushdown` records.
+  'band tricep pushdown': {
+    pattern: 'horizontal_push',
+    armIsolation: true,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
+  'band triceps pushdown': {
+    pattern: 'horizontal_push',
+    armIsolation: true,
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
 
   // ── BODYWEIGHT with no entry ─────────────────────────────────────────────────────────────────
   'band assisted pull up': {

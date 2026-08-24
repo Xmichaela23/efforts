@@ -215,22 +215,37 @@ Deno.test("the source's own rotation is preferred to our inference, and is cited
 Deno.test('our inference is labelled as ours, never as his', () => {
   // ⛔ THE OTHER HALF. Extending his asymmetrical rotation to whole categories is OUR reading, and a
   // slot that fires it says so — the cycling-percentage-basis rule from stage 1, one subsystem over.
-  let sawOurs = false;
+  //
+  // ⚠️ AND WHAT CHANGED ON 2026-08-24, BECAUSE THIS ASSERTION MOVED AND THE REASON MATTERS. It used
+  // to demand that our OWN rung fired somewhere in this matrix, so the label had a subject. It no
+  // longer fires anywhere — not in these 260 resolutions and not in the full category x pattern x
+  // intent x kit sweep either (measured: 352 rotations, 392 asymmetrical drops, **0** cross-category
+  // inferences, 0 ungated). That is the equipment-gate fix landing, not the rung going dead: an
+  // untagged movement is now performable unless it reads as machine-braced, so a cell that used to
+  // empty of everything untagged now fills at its OWN rung and never reaches for a neighbour's.
+  //
+  // ⛔ SO THE SUBJECT IS NOW HIS ROTATION, and the per-hit label assertions below are unchanged —
+  // whichever rung fires still has to say whose it is. If a future catalogue or gate change makes
+  // our rung reachable again, the `ours` branch here catches it the first time it fires.
+  let sawCrossCategory = false;
   for (const kit of KITS) {
     for (const slot of ALL_ROUNDER_SLOTS) {
       const r = resolveSlot({ ...slot.req, equipment: kit.equipment });
       const s = r.substitution;
       if (!s || s.toCategory === s.fromCategory) continue;
+      sawCrossCategory = true;
       const hisRotation = (s.fromCategory === 'braced' && s.toCategory === 'secondary')
         || (s.fromCategory === 'secondary' && s.toCategory === 'braced');
-      if (hisRotation) continue;
-      sawOurs = true;
+      if (hisRotation) {
+        assertEquals(s.cite, 'Viada p275', `${slot.label} [${kit.label}]: his rotation is cited as "${s.cite}"`);
+        continue;
+      }
       assert(s.cite.includes('ours'), `${slot.label} [${kit.label}]: our inference is cited as "${s.cite}"`);
       assert(r.notes.some((n) => n.kind === 'inferred' || n.kind === 'ours'),
         `${slot.label} [${kit.label}]: substituted across categories with no inference note`);
     }
   }
-  assert(sawOurs, 'no cross-category substitution fired anywhere — the label has no subject');
+  assert(sawCrossCategory, 'no cross-category substitution fired anywhere — the label has no subject');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
