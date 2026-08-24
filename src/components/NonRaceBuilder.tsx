@@ -476,7 +476,10 @@ function WeekDayRow({
   return (
     <div className="grid grid-cols-7 gap-1 min-w-0">
       {DAYS.map((d) => {
-        const role = roles[d] ?? 'R';
+        // ⛔ A DAY WITH NOTHING GETS NO LETTER (Michael, 2026-08-24: "there shouldn't be a
+        // letter in a day with nothing — honestly the letters are confusing"). The 'R' fallback
+        // lettered every empty day, which drowned the four letters that meant something.
+        const role = roles[d];
         const active = selected.includes(d);
         // ⚠️ THE ACTIVE QUESTION'S OWN DAY IS NEVER LOCKED, or it could not be released.
         const heldBy = active ? undefined : taken[d];
@@ -487,7 +490,7 @@ function WeekDayRow({
             type="button"
             disabled={off}
             onClick={() => !off && onTap(d)}
-            title={heldBy ? `${DAY_SHORT[d]} is your ${heldBy}` : (active ? 'Tap again to clear' : DAY_ROLE_TITLE[role])}
+            title={heldBy ? `${DAY_SHORT[d]} is your ${heldBy}` : (active ? 'Tap again to clear' : (role ? DAY_ROLE_TITLE[role] : DAY_SHORT[d]))}
             aria-label={heldBy
               ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
               : (active ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
@@ -500,8 +503,8 @@ function WeekDayRow({
             {/* ⛔ THE LETTER IS WHERE THE SPORT SHOWS. Neutral box, coloured mark. */}
             <span
               className="leading-none text-[9px] font-medium"
-              style={off ? undefined : { color: letterColour[role] }}
-            >{heldBy ? '—' : role}</span>
+              style={off || !role ? undefined : { color: letterColour[role] }}
+            >{heldBy ? '—' : (role ?? '\u00A0')}</span>
           </button>
         );
       })}
@@ -2471,7 +2474,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * precisely the "invents an answer" failure `weekDayRoles` documents. So the row fills in as the
    * three anchors are picked and every other chip stays blank until the week is built.
    */
-  const scheduleRoles = weekDayRoles({
+  /**
+   * ⛔ ON THE STRENGTH PATH THE LETTERS COME FROM THE BUILT WEEK (Michael's screenshot, 2026-08-24:
+   * Tuesday wore an "H" over a day whose only session is the lower-body test — the chips were
+   * reading stale wizard state while the preview below showed the composer's real week; two
+   * answers to one question on one screen). The preview IS the placed week, so the chips read it.
+   */
+  const strengthRoles = useMemo<Partial<Record<DayName, DayRole>>>(() => {
+    if (!isStrengthFocus || !previewWeek?.length) return {};
+    const out: Partial<Record<DayName, DayRole>> = {};
+    for (const sRaw of previewWeek) {
+      const sess = sRaw as { name?: string; type?: string; day?: string; duration?: number };
+      const d = sess.day as DayName | undefined;
+      if (!d) continue;
+      const name = String(sess.name ?? '');
+      if (/Hard|Hill|Threshold|Intervals|Repeat|Club/i.test(name)) out[d] = 'H';
+      else if (/Long Run/i.test(name)) out[d] = out[d] ?? 'LR';
+      else if (sess.type === 'ride' && Number(sess.duration ?? 0) >= 90) out[d] = out[d] ?? 'LB';
+    }
+    return out;
+  }, [isStrengthFocus, previewWeek]);
+
+  const scheduleRoles = isStrengthFocus ? strengthRoles : weekDayRoles({
     trainingDays: [],
     longRunDay: state.longRunDay || undefined,
     longRideDay: state.longRideDay || undefined,
