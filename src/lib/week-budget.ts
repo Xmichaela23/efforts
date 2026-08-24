@@ -96,10 +96,13 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
  * blank, which is the unpinned rule above doing exactly what it was written for: the row fills in as
  * anchors are picked and never invents an easy day the athlete has not been asked about.
  */
-export type DayRole = 'R' | 'E' | 'LR' | 'C' | 'H' | 'LB';
+export type DayRole = 'R' | 'E' | 'LR' | 'C' | 'H' | 'LB' | 'B' | 'S';
 
 export const DAY_ROLE_TITLE: Record<DayRole, string> = {
   R: 'Rest', E: 'Easy run', LR: 'Long run', C: 'Standing session', H: 'Hard day', LB: 'Long ride',
+  // ⛔ Added 2026-08-24 so the strength path's chips can READ as a week (Michael: "it's really not
+  // clearly telling you where the hard days are, easy days, stacks").
+  B: 'Easy ride', S: 'Lifting only',
 };
 
 export function weekDayRoles(input: {

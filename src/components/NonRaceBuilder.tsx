@@ -412,8 +412,10 @@ const DAY_SHORT: Record<DayName, string> = {
  * Here it is a badge on the chip beside the one being tapped.
  */
 function WeekDayRow({
-  selected, disabled = [], roles = {}, taken = {}, onTap,
+  selected, disabled = [], roles = {}, taken = {}, onTap, stacked = [],
 }: {
+  /** Days carrying MORE than one session — a small dot under the letter says "there's more here". */
+  stacked?: DayName[];
   /** The day(s) answering the ACTIVE question — ringed, not filled. */
   selected: DayName[];
   disabled?: DayName[];
@@ -466,9 +468,11 @@ function WeekDayRow({
   const NEUTRAL = 'bg-white/[0.04] border-white/15';
   const letterColour: Record<DayRole, string> = {
     R: `rgba(${getDisciplineColorRgb('run')},0.55)`,
-    E: 'rgba(255,255,255,0.55)',
+    E: `rgba(${getDisciplineColorRgb('run')},0.65)`,
     LR: `rgb(${getDisciplineColorRgb('run')})`,
     LB: `rgb(${getDisciplineColorRgb('bike')})`,
+    B: `rgba(${getDisciplineColorRgb('bike')},0.65)`,
+    S: 'rgba(255,255,255,0.45)',
     H: 'rgb(251,191,36)',
     C: 'rgb(251,191,36)',
   };
@@ -505,6 +509,10 @@ function WeekDayRow({
               className="leading-none text-[9px] font-medium"
               style={off || !role ? undefined : { color: letterColour[role] }}
             >{heldBy ? '—' : (role ?? '\u00A0')}</span>
+            {/* The stack dot: this day carries more than the letter shows. */}
+            {stacked.includes(d) && !off ? (
+              <span aria-hidden className="w-1 h-1 rounded-full bg-white/40 mt-0.5" />
+            ) : <span aria-hidden className="w-1 h-1 mt-0.5" />}
           </button>
         );
       })}
@@ -2480,19 +2488,35 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * reading stale wizard state while the preview below showed the composer's real week; two
    * answers to one question on one screen). The preview IS the placed week, so the chips read it.
    */
-  const strengthRoles = useMemo<Partial<Record<DayName, DayRole>>>(() => {
-    if (!isStrengthFocus || !previewWeek?.length) return {};
-    const out: Partial<Record<DayName, DayRole>> = {};
+  const { roles: strengthRoles, stacked: strengthStacked } = useMemo<{
+    roles: Partial<Record<DayName, DayRole>>; stacked: DayName[];
+  }>(() => {
+    if (!isStrengthFocus || !previewWeek?.length) return { roles: {}, stacked: [] };
+    const roles: Partial<Record<DayName, DayRole>> = {};
+    const perDay: Record<string, number> = {};
+    /** Higher wins on a shared day: hard > long > easy endurance > lifting-only. */
+    const RANK: Record<string, number> = { H: 4, LR: 3, LB: 3, E: 2, B: 2, S: 1 };
     for (const sRaw of previewWeek) {
       const sess = sRaw as { name?: string; type?: string; day?: string; duration?: number };
-      const d = sess.day as DayName | undefined;
+      // ⚠️ The engine speaks 'Monday'; the chips speak 'monday'. The first cut of this map kept the
+      // engine's casing and every chip went blank — silence instead of the stale letters it replaced.
+      const d = String(sess.day ?? '').toLowerCase() as DayName;
       if (!d) continue;
+      perDay[d] = (perDay[d] ?? 0) + 1;
       const name = String(sess.name ?? '');
-      if (/Hard|Hill|Threshold|Intervals|Repeat|Club/i.test(name)) out[d] = 'H';
-      else if (/Long Run/i.test(name)) out[d] = out[d] ?? 'LR';
-      else if (sess.type === 'ride' && Number(sess.duration ?? 0) >= 90) out[d] = out[d] ?? 'LB';
+      let role: DayRole | null = null;
+      if (/Hard|Hill|Threshold|Intervals|Repeat|Club/i.test(name)) role = 'H';
+      else if (/Long Run/i.test(name)) role = 'LR';
+      else if (sess.type === 'ride' && Number(sess.duration ?? 0) >= 90) role = 'LB';
+      else if (sess.type === 'run') role = 'E';
+      else if (sess.type === 'ride') role = 'B';
+      else if (sess.type === 'swim') role = null; // add-on; the dot carries it
+      else role = 'S';
+      if (role && (RANK[role] ?? 0) > (RANK[roles[d] ?? ''] ?? 0)) roles[d] = role;
     }
-    return out;
+    const stacked = (Object.entries(perDay) as Array<[DayName, number]>)
+      .filter(([, n]) => n > 1).map(([d]) => d);
+    return { roles, stacked };
   }, [isStrengthFocus, previewWeek]);
 
   const scheduleRoles = isStrengthFocus ? strengthRoles : weekDayRoles({
@@ -5411,6 +5435,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     <WeekDayRow
                                       selected={dayVal ? [dayVal as DayName] : []}
                                       roles={scheduleRoles}
+                                      stacked={isStrengthFocus ? strengthStacked : []}
                                       taken={{}}
                                       /* ⛔ NOTHING IS DISABLED. The other slot's day is NOT locked:
                                          two hard sessions on one day still builds as one, and the
@@ -5488,6 +5513,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <WeekDayRow
                               selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
                               roles={scheduleRoles}
+                              stacked={isStrengthFocus ? strengthStacked : []}
                               taken={anchorDaysTaken(state, row.key === 'long' ? 'long run' : 'long ride')}
                               disabled={[]}
                               onTap={(d) => {
@@ -6010,6 +6036,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 ⚠️ A COUNT, NEVER A PERCENTAGE. A week either breaches a clearance or it does not,
                 so a score would be a number with no scale behind it — the "score that lies" this
                 codebase keeps deleting. It says how many, and tapping shows exactly which. */}
+            {/* ⛔ THE LEGEND (Michael, 2026-08-24: the chips weren't "clearly telling you where
+                the hard days are, easy days, stacks"). One line, so the letters read themselves. */}
+            {isStrengthFocus && Object.keys(scheduleRoles).length > 0 && (
+              <p className="text-white/45 text-[11px] leading-snug px-1">
+                <span style={{ color: 'rgb(251,191,36)' }}>H</span> hard ·{' '}
+                <span style={{ color: `rgb(${getDisciplineColorRgb('run')})` }}>LR</span>/
+                <span style={{ color: `rgb(${getDisciplineColorRgb('bike')})` }}>LB</span> long ·{' '}
+                <span style={{ color: `rgba(${getDisciplineColorRgb('run')},0.75)` }}>E</span>/
+                <span style={{ color: `rgba(${getDisciplineColorRgb('bike')},0.75)` }}>B</span> easy run/ride ·{' '}
+                <span className="text-white/60">S</span> lifting only · dot = more that day
+              </p>
+            )}
             {(state.hardDays.length > 0 || state.longRunDay || state.longRideDay) && (
               <button
                 type="button"
