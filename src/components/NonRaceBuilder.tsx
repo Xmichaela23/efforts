@@ -247,7 +247,9 @@ const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, buil
  * would open exactly the unfinished flow the July rule exists to keep shut.
  */
 type TrainCardId = 'run' | 'ride' | 'strength' | 'athletic';
-const TRAIN_ORDER: TrainCardId[] = ['run', 'ride', 'strength', 'athletic'];
+// ⛔ STRENGTH LEADS (Michael, 2026-08-24) — it is the one card that is actually buildable today,
+// so it goes first rather than sitting third under two dimmed ones.
+const TRAIN_ORDER: TrainCardId[] = ['strength', 'run', 'ride', 'athletic'];
 type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 /**
  * ⛔ THEY ARE "<DISCIPLINE> FOCUS", NOT THE BARE DISCIPLINE (Michael, 2026-08-05). "Run" is a thing
@@ -263,11 +265,10 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
   ride: { label: 'Ride Focus', blurb: 'FTP and endurance', Icon: Bike, color: getDisciplineColor('ride') },
   strength: {
     label: 'Strength Focus',
-    // Michael's wording, 2026-08-13 — who it's for, no number. The gate (65, barbell-maxes.ts)
-    // refuses the true beginners with its own copy; the 65-84 band builds with the women's-bar
-    // flag in the plan description. The card stopped carrying the threshold when the threshold
-    // stopped being the whole story.
-    blurb: 'Barbell compounds on Wendler\'s 5/3/1 — for strong beginners and intermediates who know the lifts.',
+    // 2026-08-24: the card now fronts the Standing Plan (Viada), not Wendler — the Wendler line
+    // described a block this flow no longer builds. Same rule as before: who it's for, no number.
+    // The gate (65, barbell-maxes.ts) still refuses true beginners with its own copy.
+    blurb: 'Barbell compounds, heavy and fast, with run, ride or both held around them — based on Alex Viada\'s method.',
     Icon: Dumbbell,
     color: getDisciplineColor('strength'),
   },
