@@ -3740,9 +3740,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 Posture underneath is unchanged: the card writes run/bike maintain-or-out. */}
             <p className="text-white/85 text-sm pt-1">Who are you this block?</p>
             {([
-              { id: 'run_only', label: 'Run only', run: true, bike: false },
-              { id: 'ride_only', label: 'Ride only', run: false, bike: true },
-              { id: 'run_ride', label: 'Run + ride', run: true, bike: true },
+              // ⛔ THE EFFECT LINE UNDER EACH CARD (Michael, 2026-08-24): what the choice does to
+              // the lifting, his anchors, flat. "smaller toll" is his approved phrasing — riding
+              // is not zero-cost, it just doesn't pound the legs.
+              { id: 'run_only', label: 'Run only', run: true, bike: false,
+                effect: 'All four sessions run. The slowest lane for your lifts — about 1% a month.' },
+              { id: 'ride_only', label: 'Ride only', run: false, bike: true,
+                effect: 'All four sessions ride. The fastest lifting in this block — riding takes a smaller toll than running.' },
+              { id: 'run_ride', label: 'Run + ride', run: true, bike: true,
+                effect: "You assign each session's sport next. Hard sessions on the bike cost your lifting least." },
             ] as const).map((card) => {
               const selected =
                 ((state.posture.run ?? 'out') === 'maintain') === card.run &&
@@ -3754,14 +3760,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     setPosture('run', card.run ? 'maintain' : 'out');
                     setPosture('bike', card.bike ? 'maintain' : 'out');
                   }}
-                  className={`w-full rounded-xl border p-3 flex items-center justify-between ${selected ? 'border-white/25 bg-white/[0.06]' : 'border-white/12 bg-white/[0.02]'}`}
+                  className={`w-full rounded-xl border p-3 ${selected ? 'border-white/25 bg-white/[0.06]' : 'border-white/12 bg-white/[0.02]'}`}
                 >
-                  <span className="flex items-center gap-2.5">
-                    {card.run && <Footprints className="h-4 w-4" style={{ color: getDisciplineColor('run') }} />}
-                    {card.bike && <Bike className="h-4 w-4" style={{ color: getDisciplineColor('bike') }} />}
-                    <span className={`font-medium ${selected ? 'text-white' : 'text-white/60'}`}>{card.label}</span>
+                  <span className="flex items-center justify-between">
+                    <span className="flex items-center gap-2.5">
+                      {card.run && <Footprints className="h-4 w-4" style={{ color: getDisciplineColor('run') }} />}
+                      {card.bike && <Bike className="h-4 w-4" style={{ color: getDisciplineColor('bike') }} />}
+                      <span className={`font-medium ${selected ? 'text-white' : 'text-white/60'}`}>{card.label}</span>
+                    </span>
+                    {selected && <Check className="h-4 w-4 text-white/70" />}
                   </span>
-                  {selected && <Check className="h-4 w-4 text-white/70" />}
+                  <span className="block text-left text-white/50 text-xs mt-1.5 leading-relaxed">{card.effect}</span>
                 </button>
               );
             })}
