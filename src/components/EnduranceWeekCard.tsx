@@ -33,6 +33,8 @@ import {
   ENDURANCE_WEEK_PREAMBLE,
   LONG_SLOT_NOTE,
   RUN_TAX_LINES,
+  VOLUME_HONESTY_LINES,
+  runnerMileageLine,
   SLOT_KEYS,
   SLOT_LABEL,
   SLOT_OPTIONS,
@@ -88,6 +90,25 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    */
   const [open, setOpen] = React.useState<SlotKey | null>(null);
 
+  /**
+   * ⛔ THE VOLUME SECTION ANNOUNCES ITSELF (Michael, 2026-08-24 evening: "the miles and hours are
+   * getting lost"). It only renders once all four slots are answered — which on a phone is below
+   * the fold, so it appeared silently and the athlete never saw the question arrive. When it
+   * mounts, scroll it into view once. `chosen` gates the effect so it fires on the transition,
+   * not on every re-render while the athlete edits a number.
+   */
+  const volumeRef = React.useRef<HTMLDivElement | null>(null);
+  const chosen = allSlotsChosen(props.slots);
+  React.useEffect(() => {
+    if (!chosen) return;
+    // ⚠️ next frame — the section renders in this commit; scrolling in the same tick measures
+    // the layout before it exists.
+    const t = window.setTimeout(() => {
+      volumeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [chosen]);
+
   const bounds = weekBounds(props.slots, {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
@@ -108,26 +129,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       className="flex flex-col gap-5"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
     >
-      {/* ⛔ THE PREAMBLE, TIGHTENED (2026-08-24): the focus sentence and the session list. The
-          running-tax and cycling-forgiving sentences moved to the moment they are about — see
-          `RUN_TAX_LINES` and the hard rows below. Michael's words either way, unedited. */}
-      <div>
-        <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_PREAMBLE[0]}</p>
-        {/* ⚠️ "4 sessions:" IS THE LIST'S OWN LABEL, not a bullet — it counts the three lines under
-            it. Slicing it away with them lost the count, which is the half of the sentence that
-            tells the athlete the week is fixed. */}
-        <p className="mt-3 text-white/45 text-[11px] uppercase tracking-[0.12em]">
-          {ENDURANCE_WEEK_PREAMBLE[1]?.replace(/:$/, '')}
-        </p>
-        <ul className="mt-1.5 space-y-1">
-          {ENDURANCE_WEEK_PREAMBLE.slice(2).map((line, i) => (
-            <li key={i} className="flex items-baseline gap-2.5 text-white/55 text-[13px] leading-snug">
-              <span aria-hidden className="shrink-0 w-1 h-1 rounded-full bg-white/30 translate-y-[-2px]" />
-              {line}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {/* ⛔ THE PREAMBLE IS ONE SENTENCE (Michael, 2026-08-24 evening). The session list left with
+          it — the four rows below carry the same words as their labels, and the list's height is
+          what pushed the fourth row off a phone screen. The running-tax sentences stay at the
+          moment they are about — `RUN_TAX_LINES`, inside the hard rows. */}
+      <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_PREAMBLE[0]}</p>
 
       {/* ⛔ THE FOUR SLOTS, EACH ONE ROW UNTIL ASKED. */}
       <div className="flex flex-col gap-2">
@@ -264,7 +270,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           before all four are answered it would show a bound for a week the athlete has not described
           — and it would move under them as they answered. */}
       {allSlotsChosen(props.slots) && (bounds.runMilesInput || bounds.rideHours) ? (
-        <div className="flex flex-wrap gap-4">
+        <div ref={volumeRef}>
+          {/* ⛔ THE HONESTY NOTE, BESIDE THE NUMBER IT IS ABOUT (moved off the tier screen,
+              Michael, 2026-08-24 evening). His words, verbatim. */}
+          <div className="mb-3 space-y-0.5">
+            {VOLUME_HONESTY_LINES.map((line) => (
+              <p key={line} className="text-white/70 text-[13px] leading-snug">{line}</p>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-4">
           {bounds.runMilesInput ? (
             <div className="flex-1 min-w-[150px]">
               <p className="text-white/80 text-[13px] mb-2">Weekly running to hold</p>
@@ -287,6 +301,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               {Number(props.runVolume) > RUN_MILES_BLOCK_CAP ? (
                 <p className="text-white/55 text-xs mt-1.5" data-testid="over-cap">{OVER_CAP_LINE}</p>
               ) : null}
+              {/* ⛔ THE REALITY CHECK, ONE LINE, UNDER THE NUMBER IT CHECKS (moved off the tier
+                  screen, 2026-08-24 evening). A three-row table here would re-create the height
+                  problem it arrived to fix. */}
+              <p className="text-white/40 text-xs mt-1.5" data-testid="mileage-check">
+                {runnerMileageLine(props.unit)}
+              </p>
             </div>
           ) : null}
 
@@ -308,6 +328,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               {rideLine ? <p className="text-white/40 text-xs mt-1.5" data-testid="ride-bounds">{rideLine}</p> : null}
             </div>
           ) : null}
+          </div>
         </div>
       ) : null}
 

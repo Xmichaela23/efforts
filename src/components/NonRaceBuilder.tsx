@@ -307,18 +307,9 @@ const TIER_COPY: Record<StrengthTierId, { label: string; blurb: string; Icon: Ca
   heavy: { label: 'Heavy', blurb: 'Build muscle.', Icon: Weight, live: false },
 };
 
-/** Michael's entry note, verbatim (2026-08-24) — the voice gate pins these rather than flagging. */
-const TIER_ENTRY_NOTE = [
-  'Riding takes a smaller toll on your body than running.',
-  'Be honest about your running miles — the plan holds what you enter.',
-] as const;
-/** The reality-check bands are field practice (the novice/intermediate norms the big running apps
- *  and Higdon-class programs use), OURS, not the source's. A reality check, never a gate. */
-const RUNNER_MILEAGE_CHART = [
-  { label: 'Newer runner', miles: '5–10 mi a week' },
-  { label: 'Regular runner', miles: '10–20 mi' },
-  { label: 'High-mileage', miles: '20–30+ mi' },
-] as const;
+// ⛔ TIER_ENTRY_NOTE and RUNNER_MILEAGE_CHART MOVED to `standing-plan-week-copy.ts` (2026-08-24
+// evening, Michael) — they render beside the miles input on the endurance-week screen now, the
+// moment the number they are about is typed. See `VOLUME_HONESTY_LINES` / `RUNNER_MILEAGE_CHART`.
 
 /** Race distances this card offers. One for now — the rest come behind the same machinery. */
 const RACE_DISTANCES = ['Marathon'] as const;
@@ -3327,20 +3318,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           hideContinue hideProgress
         >
           <div className="space-y-2">
-            {/* Michael's note + the mileage reality check, at the door — before any choice. */}
-            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 mb-1">
-              {TIER_ENTRY_NOTE.map((line) => (
-                <p key={line} className="text-white/75 text-sm leading-relaxed">{line}</p>
-              ))}
-              <div className="mt-2 pt-2 border-t border-white/10">
-                {RUNNER_MILEAGE_CHART.map((row) => (
-                  <div key={row.label} className="flex justify-between text-xs text-white/55 py-0.5">
-                    <span>{row.label}</span>
-                    <span>{row.miles}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* ⛔ THE HONESTY NOTE + MILEAGE CHECK LEFT THIS SCREEN (Michael, 2026-08-24 evening).
+                They are about the running VOLUME, which is typed on the endurance-week screen — so
+                they render there, beside the miles box (`EnduranceWeekCard`), not at the tier door
+                where there is nothing to apply them to. Copy now lives in
+                `standing-plan-week-copy.ts` (`VOLUME_HONESTY_LINES`, `RUNNER_MILEAGE_CHART`). */}
             {TIER_ORDER.map((t) => {
               const { label, blurb, Icon, live } = TIER_COPY[t];
               return (
@@ -3801,10 +3783,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 explanation was pushing the question it explains below the fold. Same source numbers,
                 so the card and the plan cannot promise different blocks. */}
             <p className="text-white/75 text-sm leading-relaxed">{strengthFocusBrief({})}</p>
-            {/* ⛔ RELABELLED 2026-08-24 (Michael): three cards NAMING THE ATHLETE, not a quiz about
-                "keeping". The answer pre-shapes the slot screen — run-only never renders Ride chips.
-                Posture underneath is unchanged: the card writes run/bike maintain-or-out. */}
-            <p className="text-white/85 text-sm pt-1">Who are you this block?</p>
+            {/* ⛔ "Who are you this block?" CUT (Michael, 2026-08-24 evening) — the four cards ARE
+                the question, and the heading's line of height is what kept the swim card below the
+                fold. The cards still pre-shape the slot screen exactly as before. */}
             {([
               // ⛔ THE EFFECT LINE UNDER EACH CARD (Michael, 2026-08-24): what the choice does to
               // the lifting, his anchors, flat. "smaller toll" is his approved phrasing — riding

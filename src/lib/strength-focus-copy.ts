@@ -141,8 +141,11 @@ export function strengthFocusBrief(opts: { weeks?: number } = {}): string {
     // described Strong Focus and both are wrong for the new engine (four lifting days; up to two
     // hard endurance sessions). No day count and no "easy" promise: this card serves whichever
     // engine the posture routes to, so it may only say what is true for both.
+    // ⛔ "Speed and distance blocks unlock when this one closes" CUT (Michael, 2026-08-24 evening) —
+    // neither block exists (this file's own §"unlock … IS A DEBT" note), and the line cost height on
+    // the screen that must fit four athlete cards unscrolled.
     `Strength leads for ${weeks} weeks. Lifting days placed around the endurance you keep — ` +
-    `enough to hold what you've built. Speed and distance blocks unlock when this one closes.`
+    `enough to hold what you've built.`
   );
 }
 

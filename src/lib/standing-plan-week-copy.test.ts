@@ -59,14 +59,13 @@ Deno.test("the header is Michael's copy, word for word", () => {
   assertEquals(LONG_SLOT_NOTE, 'one per week, run or ride');
 
   /**
-   * ⛔ THE PREAMBLE TIGHTENED AND THE TWO SENTENCES MOVED — **not rewritten** (Michael, 2026-08-24).
-   * They are the same strings, taken from the header rather than retyped, so his verbatim copy above
-   * is still the one source and a trim to either place fails this test rather than the screen.
+   * ⛔ THE PREAMBLE IS ONE SENTENCE (Michael, 2026-08-24 evening — supersedes the same-day split).
+   * Lines 1–4 (the "4 sessions" list) are RETIRED from the screen on his instruction: the four slot
+   * rows carry the same words as their labels, so the list was the rows said twice. The header above
+   * stays whole as the one verbatim source; the tax lines still render inside the hard rows.
    */
-  assertEquals(ENDURANCE_WEEK_PREAMBLE, ENDURANCE_WEEK_HEADER.slice(0, 5));
+  assertEquals(ENDURANCE_WEEK_PREAMBLE, ENDURANCE_WEEK_HEADER.slice(0, 1));
   assertEquals(RUN_TAX_LINES, [ENDURANCE_WEEK_HEADER[5], ENDURANCE_WEEK_HEADER[6]]);
-  assertEquals([...ENDURANCE_WEEK_PREAMBLE, ...RUN_TAX_LINES], ENDURANCE_WEEK_HEADER,
-    'a line was lost or invented when the preamble was split');
 });
 
 Deno.test('the four slots are the four the frame has, labelled as the athlete sees them', () => {

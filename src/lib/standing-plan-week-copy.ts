@@ -101,8 +101,47 @@ export const RUN_TAX_LINES: string[] = [
   ENDURANCE_WEEK_HEADER[6],
 ];
 
-/** ⛔ THE PREAMBLE THE SCREEN SHOWS — the focus sentence and the session list, and nothing else. */
-export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 5);
+/**
+ * ⛔ THE PREAMBLE IS ONE SENTENCE NOW (Michael, 2026-08-24 evening). The "4 sessions" list left the
+ * screen — the four slot rows below it carry the same words as their labels, so the list was the
+ * rows said twice, and its height is what pushed the fourth row toward the fold. Lines 1–4 of the
+ * header are retired from the screen on his instruction; the header above stays whole so his copy
+ * still has one verbatim source.
+ */
+export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 1);
+
+/**
+ * ⛔ THE HONESTY NOTE, MOVED FROM THE TIER SCREEN (Michael, 2026-08-24 evening) — his words,
+ * verbatim, unchanged from `TIER_ENTRY_NOTE`. They are about the running volume, so they render
+ * beside the miles box, the moment the number they are about is typed — not at the tier door.
+ */
+export const VOLUME_HONESTY_LINES = [
+  'Riding takes a smaller toll on your body than running.',
+  'Be honest about your running miles — the plan holds what you enter.',
+] as const;
+
+/** The reality-check bands are field practice (the novice/intermediate norms the big running apps
+ *  and Higdon-class programs use), OURS, not the source's. A reality check, never a gate.
+ *  ⚠️ Rendered as ONE line under the miles input — a three-row table was the height that got the
+ *  volume section lost below the fold on the tier screen's successor. */
+export const RUNNER_MILEAGE_CHART = [
+  { label: 'Newer runner', miles: '5–10' },
+  { label: 'Regular runner', miles: '10–20' },
+  { label: 'High-mileage', miles: '20–30+' },
+] as const;
+
+export function runnerMileageLine(unit: 'mi' | 'km'): string {
+  // ⚠️ The bands are stated in miles; a metric athlete gets the same bands converted coarsely
+  // (×1.6, rounded to the nearest 5) rather than a false-precision translation.
+  const u = unit === 'km' ? 'km' : 'mi';
+  const rows = RUNNER_MILEAGE_CHART.map((r) => {
+    const miles = r.miles;
+    if (u === 'mi') return `${r.label} ${miles}`;
+    const km = miles.replace(/\d+/g, (n) => String(Math.round((Number(n) * 1.60934) / 5) * 5));
+    return `${r.label} ${km}`;
+  });
+  return `${rows.join(' · ')} ${u}/wk`;
+}
 
 /**
  * ⛔ EVERY ROW STARTS NEUTRAL (Michael, 2026-08-24 — **supersedes the pre-fill**). No sport is
