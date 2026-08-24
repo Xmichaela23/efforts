@@ -6464,7 +6464,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           // that card the week grid cannot show, and dropping it silently would have lost it.
           subtitle={isRaceGoal
             ? `${state.raceDistance} — ${state.raceDate}${planWeeks !== null ? `, about ${planWeeks} weeks` : ''}.`
-            : `${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks${isStrengthFocus ? ' of Wendler 5/3/1' : ''}.`}
+            /* ⛔ "of Wendler 5/3/1" DELETED (2026-08-24): his trademark on the final commit
+               screen, and no longer true — the block is the Standing Plan engine, not 5/3/1. */
+            : `${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
