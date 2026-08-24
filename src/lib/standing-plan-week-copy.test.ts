@@ -290,3 +290,50 @@ Deno.test('a slot the athlete did not answer keeps the frame\'s own session', ()
   assertEquals(full[SLOT_FRAME_KEY.hard1], 'ride');
   assertEquals(full[SLOT_FRAME_KEY.long], 'run');
 });
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// E — THE INLINE-STYLE TRAP THAT COST THE FIRST ROW ITS EDGE
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('no shorthand beside its own longhand in a React style object', async () => {
+  /**
+   * ⛔ MICHAEL'S PHONE SCREENSHOT, 2026-08-24 EVENING: *"the FIRST hard row is missing its colored
+   * sport edge; the second has it."*
+   *
+   * The row's style object carried `borderColor` AND `borderLeftColor`. React diffs inline styles key
+   * by key and applies only what CHANGED — so when a row opened and closed, the shorthand changed,
+   * the longhand did not, and React set `border-color` alone. **A shorthand rewrites all four edges,
+   * including the one it was not asked about**, and the longhand was never re-applied. Only a row
+   * whose open state had changed lost its edge, which is why exactly one row was wrong.
+   *
+   * ⚠️ A BROWSER-ONLY FAILURE THAT A SOURCE LINT CAN STILL HOLD. Nothing in a unit test renders CSS;
+   * what IS checkable is the shape that causes it.
+   */
+  const files = ['../components/EnduranceWeekCard.tsx', '../components/HardSlotChoices.tsx'];
+  const PAIRS: [string, string[]][] = [
+    ['borderColor', ['borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor']],
+    ['borderWidth', ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth']],
+    ['border', ['borderColor', 'borderWidth', 'borderLeftColor', 'borderLeftWidth']],
+    ['padding', ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']],
+    ['margin', ['marginTop', 'marginRight', 'marginBottom', 'marginLeft']],
+  ];
+  for (const rel of files) {
+    const src = await Deno.readTextFile(new URL(rel, import.meta.url).pathname);
+    // Each `style={{ … }}` object, taken on its own — a shorthand in one object and a longhand in
+    // another is not the bug.
+    for (const m of src.matchAll(/style=\{\{([\s\S]*?)\}\}/g)) {
+      const obj = m[1];
+      for (const [shorthand, longhands] of PAIRS) {
+        const hasShort = new RegExp(`(^|[\\s,{])${shorthand}\\s*:`).test(obj);
+        if (!hasShort) continue;
+        for (const lh of longhands) {
+          const hasLong = new RegExp(`(^|[\\s,{])${lh}\\s*:`).test(obj);
+          assert(!hasLong,
+            `${rel}: \`${shorthand}\` sits beside \`${lh}\` in one style object — React will apply `
+            + 'the shorthand alone on an update and silently reset the longhand.');
+        }
+      }
+    }
+  }
+});

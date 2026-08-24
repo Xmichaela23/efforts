@@ -2769,12 +2769,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * threshold**, a run to **VO2**. ⚠️ Both are the option the existing tables already mark
    * "Recommended" for their discipline, so the pre-selection is not a new opinion.
    */
-  const hardDefaultsFor = (sport: SlotSport) => ({
+  const hardDefaultsFor = (sport: SlotSport, slot: 'hard1' | 'hard2' = 'hard1') => ({
     discipline: (sport === 'ride' ? 'bike' : 'run') as 'run' | 'bike',
     // ⛔ ONE OWNER FOR THE DEFAULT — `hardSlotDefault` in `src/lib/hard-slot-choices.ts`, which is
     // also what the card highlights. Two statements of "a ride defaults to threshold" is how the
     // pre-selected chip and the stored answer start disagreeing.
-    ...hardSlotDefault(sport),
+    ...hardSlotDefault(sport, slot),
   });
 
   /**
@@ -2788,7 +2788,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   ): NonRaceState['hardDays'] => (['hard1', 'hard2'] as const).map((k) => {
     const i = HARD_SLOT_INDEX[k];
     const prev = st.hardDays[i];
-    const want = hardDefaultsFor(slots[k]);
+    const want = hardDefaultsFor(slots[k], k);
     // ⚠️ THE DAY AND THE CLUB ANSWER SURVIVE A SPORT CHANGE — they are the athlete's, not the
     // session's. Only the session identity is reset.
     if (prev && prev.discipline === want.discipline) return prev;
@@ -4429,13 +4429,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             /** ⛔ WHAT THE COLLAPSED ROW SHOWS AFTER THE SPORT — the option table's own title. */
             hardSessionTitle={(key) => {
               const h = state.hardDays[HARD_SLOT_INDEX[key]];
-              if (!h) return hardSlotTitle(slotSportsNow[key], hardSlotDefault(slotSportsNow[key]));
+              if (!h) return hardSlotTitle(slotSportsNow[key], hardSlotDefault(slotSportsNow[key], key));
               return hardSlotTitle(slotSportsNow[key], { role: h.role, goal: h.goal, ownership: h.ownership });
             }}
             renderHardFlavor={(key) => {
               const i = HARD_SLOT_INDEX[key];
               const sport = slotSportsNow[key];
-              const h = state.hardDays[i] ?? hardDefaultsFor(sport);
+              const h = state.hardDays[i] ?? hardDefaultsFor(sport, key);
               return (
                 <HardSlotChoices
                   slotKey={key}

@@ -90,9 +90,16 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const rideLine = boundsLine(bounds.rideHours, 'hours a week');
 
   return (
-    // ⚠️ `pb-8` ON THE COLUMN. `StepLayout` already clears its own Continue key, and the last row on
-    // this screen is a control the athlete taps — the club option sat half under the bar.
-    <div className="flex flex-col gap-5 pb-8">
+    /**
+     * ⚠️ `StepLayout`'s own `pb-24` IS NOT ENOUGH ON A PHONE. Its Continue bar adds
+     * `env(safe-area-inset-bottom)` on top of a 52 px key and its padding, so on a device with a home
+     * indicator the bar is taller than the padding meant to clear it — which is why the club option
+     * sat half under it. This adds the inset explicitly rather than guessing a bigger number.
+     */
+    <div
+      className="flex flex-col gap-5"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+    >
       {/* ⛔ THE PREAMBLE, TIGHTENED (2026-08-24): the focus sentence and the session list. The
           running-tax and cycling-forgiving sentences moved to the moment they are about — see
           `RUN_TAX_LINES` and the hard rows below. Michael's words either way, unedited. */}
@@ -114,16 +121,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
         </ul>
       </div>
 
-      {/* ⛔ THE RATE, PINNED. It is the one live number on the screen and the only thing that
-          teaches; sticky so it is still on screen when a slot below it changes. ⚠️ `z-10` over the
-          rows, and an opaque backdrop, or the rows scroll through it. */}
-      <div className="sticky top-0 z-10 -mx-1 px-1 pt-1 pb-2 bg-[#050505]/95 backdrop-blur-sm">
-        <div className="instrument-card !p-4">
-          <p className="text-white text-sm leading-snug tabular-nums" data-testid="lifting-rate">{rate}</p>
-          {split ? <p className="text-white/50 text-xs leading-snug mt-1.5">{split}</p> : null}
-        </div>
-      </div>
-
       {/* ⛔ THE FOUR SLOTS, EACH ONE ROW UNTIL ASKED. */}
       <div className="flex flex-col gap-2">
         {SLOT_KEYS.map((key) => {
@@ -139,9 +136,27 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               key={key}
               className="rounded-xl border overflow-hidden transition-colors"
               style={{
-                // ⛔ A COLOURED EDGE ON THE ROW, READABLE ACROSS THE ROOM. The left border carries
-                // the sport; everything else stays neutral so the screen has one accent per row.
-                borderColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
+                /**
+                 * ⛔ A COLOURED EDGE ON THE ROW, READABLE ACROSS THE ROOM. The left border carries
+                 * the sport; the other three stay neutral so the screen has one accent per row.
+                 *
+                 * ⛔⛔ **NO `borderColor` SHORTHAND HERE, AND THAT IS A BUG FIX** (Michael's phone
+                 * screenshot, 2026-08-24 evening: *"the FIRST hard row is missing its colored sport
+                 * edge; the second has it"*).
+                 *
+                 * This object carried `borderColor` AND `borderLeftColor`. React diffs inline styles
+                 * key by key and only patches what CHANGED — so when a row opened and closed, the
+                 * shorthand changed, the longhand did not, and React applied `border-color` alone.
+                 * **The shorthand rewrites all four edges, including the left one it was not asked
+                 * about**, and the longhand was never re-applied. Only a row whose open state had
+                 * changed lost its edge, which is exactly the row Michael had tapped.
+                 *
+                 * ⚠️ Longhands only. A shorthand beside its own longhand in a React style object is
+                 * a latent version of this bug wherever it appears.
+                 */
+                borderTopColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
+                borderRightColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
+                borderBottomColor: isOpen ? `${color}66` : 'rgba(255,255,255,0.10)',
                 borderLeftColor: color,
                 borderLeftWidth: 3,
                 backgroundColor: isOpen ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.02)',
@@ -276,6 +291,29 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           Some sessions carry recoveries with no stated length, so these are the shortest the week can be.
         </p>
       ) : null}
+
+      {/**
+        * ⛔⛔ THE RATE IS PINNED TO THE BOTTOM, NOT THE TOP — and that is a bug fix, not a preference
+        * (Michael's phone screenshot, 2026-08-24 evening).
+        *
+        * It was `sticky top-0` with an opaque backdrop, directly under the preamble. On a desktop
+        * column nothing scrolls and it looked right; on a phone the content is taller than the
+        * viewport, so **the moment anything scrolled it covered what passed beneath it** — the
+        * preamble first (*"title goes straight to the rate card"*), then the top edge of the first
+        * slot row (*"the FIRST hard row is missing its colored sport edge"*). One cause, both
+        * defects, and neither could reproduce in a probe that rendered the card without a scroll port.
+        *
+        * ⛔ THE WORK ORDER ALLOWS EITHER PLACE — *"under the header or above Continue"* — and only one
+        * of them can be pinned on a short screen without hiding something. Pinned to the bottom it
+        * covers nothing: the content ends above it, and it sits directly over the Continue key, which
+        * is where the athlete's eye already is when they decide.
+        */}
+      <div className="sticky bottom-0 -mx-1 px-1 pt-2 pb-1 bg-gradient-to-t from-[#050505] via-[#050505]/95 to-transparent">
+        <div className="instrument-card !p-3.5">
+          <p className="text-white text-[13px] leading-snug tabular-nums" data-testid="lifting-rate">{rate}</p>
+          {split ? <p className="text-white/50 text-[11px] leading-snug mt-1">{split}</p> : null}
+        </div>
+      </div>
     </div>
   );
 }

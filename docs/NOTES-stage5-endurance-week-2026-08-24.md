@@ -335,3 +335,83 @@ the login wall was deleted — `git status` is clean of it.
 
 **152 tests green · Get Stronger byte-identical (`f7ece1aa…`) · build passes · lint unchanged**
 (`NonRaceBuilder`'s 2 pre-existing; the four other files clean).
+
+---
+
+# PART 7 — THREE PHONE DEFECTS (Michael's screenshot, 2026-08-24 evening)
+
+## 7.1 The two hard slots defaulted to the same session — and the engine says they are opposite
+
+Both rows read *"Hard session · Ride · Sustained threshold"*. ⛔ **Checked against the composer, not
+against an opinion**, and the frame's two hard days are distinct families that stay distinct through
+the ride substitution:
+
+| frame day | family | ride equivalent | token | run version |
+|---|---|---|---|---|
+| **1** | `run_mlss` | `ride_sweet_spot/medium` | `bike_thr_7x3min_R2min` (95-105% FTP) | `interval_..._5kpace` — "Hard Run" |
+| **3** | `run_near_threshold` | `ride_sweet_spot/long` | `bike_ss_4x10min_R4min` (85-95% FTP) | `cruise_..._threshold` — "Threshold Run" |
+
+⛔ **So slot ONE is the top-end session and slot TWO is the sustained one — the opposite of what slot
+one was defaulting to.** `hardSlotDefault` now takes the slot, and the rows read *"Top-end
+intensity"* and *"Sustained threshold"*.
+
+⛔ **AND THE RUN LIST HAD NO THRESHOLD LABEL AT ALL.** It read `RUN_GROUND_OPTIONS` — VO2 and speed —
+while slot two on a run IS a threshold session. Whatever the athlete picked, the row described a
+week the composer does not build. Both sports read `singleSlotOptions` now, which carries all three.
+
+## 7.2 The first row lost its coloured edge — a React inline-style trap
+
+The row's style object carried **`borderColor` and `borderLeftColor` together**. React diffs inline
+styles key by key and applies only what CHANGED: when a row opened and closed, the shorthand changed
+and the longhand did not, so React set `border-color` alone — **and a shorthand rewrites all four
+edges, including the one it was not asked about.** Only a row whose open state had changed lost its
+edge, which is why exactly one row was wrong: the one Michael had tapped.
+
+Longhands only now, and **a source lint holds the shape** (`no shorthand beside its own longhand in a
+React style object`) across both components and five shorthand families — a browser-only failure that
+a unit test can still catch by its cause.
+
+## 7.3 The preamble vanished — the sticky rate card was covering it
+
+It was `sticky top-0` with an opaque backdrop, directly under the preamble. On a desktop column
+nothing scrolls and it looked right; **on a phone the content is taller than the viewport, so the
+moment anything scrolled it covered what passed beneath** — the preamble first, then the top of the
+first slot row. ⛔ **One cause, and it explains 7.2's other half too.**
+
+The work order allows either place — *"under the header or above Continue"* — and only one can be
+pinned on a short screen without hiding something. It is **pinned to the bottom** now: content ends
+above it, nothing is covered, and it sits over the Continue key where the eye already is.
+
+⚠️ **Bottom padding now adds `env(safe-area-inset-bottom)` explicitly.** `StepLayout`'s `pb-24` is
+short of its own Continue bar once the home-indicator inset is added, which is why the club option
+sat half under it.
+
+## 7.4 ⛔ WHY A PROBE MISSED ALL THREE, AND WHAT CHANGED
+
+**The earlier probe rendered the card standalone; the phone renders it inside `StepLayout`.** No
+scroll port, no Continue bar, no re-render of a row's open state — so none of the three could
+reproduce. The probe now mounts a **real `StepLayout`**, and 7.2 reproduced in the DOM within a
+minute of doing so.
+
+⚠️ **And `getComputedStyle` lied about the border while the inline style was correct.** The pixels
+were checked with a zoomed screenshot instead — hard1 yellow on Run, hard2 green on Ride. **The
+screenshot is the ground truth here, and it is what Michael read.**
+
+## 7.5 ⛔ A FINDING THAT IS NOT A DEFECT, AND IS NOT FIXED
+
+**On the Standing Plan path the composer never reads the hard-session choice.** The fork passes
+`hard_days` to `chooseDayMap` for the DAY only; the session identity (`role` / `goal` / `ownership`)
+is read by Get Stronger's composer and by nothing on this path — **the frame decides what each hard
+slot is.**
+
+So the labels are now TRUE by default, and changing them changes nothing about the built week. That
+is a control offering a choice the engine does not honour. ⚠️ Fixing it means either removing the
+control or teaching the composer to take it, and both are past three UI defects. **Flagged for the
+next slice.**
+
+## 7.6 The gate
+
+**155 tests green · 4/4 mutations killed · Get Stronger byte-identical (`f7ece1aa…`) · build passes ·
+lint unchanged.** Verified in the browser inside a real `StepLayout`: collapsed rows now read
+differently, every row keeps its edge through open/close and a sport flip, the preamble renders, and
+at full scroll the rate is pinned above Continue with the club option fully visible.

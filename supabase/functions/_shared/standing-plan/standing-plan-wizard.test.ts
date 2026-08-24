@@ -12,8 +12,12 @@ import {
   chooseDayMap,
   composeWeek,
   defaultCompetitionLifts,
+  FRAMES,
+  isHardSlot,
   resolveFrame,
+  RIDE_EQUIVALENT,
 } from './index.ts';
+import { hardSlotDefault, hardSlotOptions, hardSlotTitle } from '../../../../src/lib/hard-slot-choices.ts';
 import { slotsForEngine, weekBounds } from '../../../../src/lib/standing-plan-week-bounds.ts';
 import { SLOT_KEYS, defaultSlotSports, type SlotKey, type SlotSport } from '../../../../src/lib/standing-plan-week-copy.ts';
 
@@ -292,4 +296,68 @@ Deno.test('the count pickers are gone from the payload, and the slots answer ins
   assert(/isStrengthFocusPath\s*\n?\s*\?\s*\{\s*run_days:\s*derivedCounts\.runs\s*\}/.test(code),
     'the strength path still sends a picked run count');
   assert(/derivedCounts\.rides/.test(code), 'the strength path still sends a picked ride count');
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// D — ⛔ THE TWO HARD SLOTS ARE DIFFERENT SESSIONS, AND THE SCREEN MUST SAY SO
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s defaults match them', () => {
+  /**
+   * ⛔ MICHAEL'S PHONE SCREENSHOT, 2026-08-24 EVENING: both hard rows read *"Hard session · Ride ·
+   * Sustained threshold"*. The frame does not build two of those, so the screen misstated the week.
+   *
+   * ⛔ CHECKED AGAINST THE COMPOSER, NOT AGAINST AN OPINION. Day 1 is the top-end session and day 3
+   * is the sustained one — on either sport — so slot ONE defaults to top-end and slot TWO to
+   * threshold. ⚠️ That is the OPPOSITE of what slot one had.
+   */
+  const days = FRAMES.strength_5k.columns.standard;
+  const hard = days.filter((d) => d.endurance.some((e) => isHardSlot(e)));
+  assertEquals(hard.map((d) => d.day), [1, 3]);
+  assertEquals(hard[0].endurance[0].family, 'run_mlss');
+  assertEquals(hard[1].endurance[0].family, 'run_near_threshold');
+  // ⛔ AND THEY STAY DISTINCT THROUGH THE RIDE SUBSTITUTION — different archetypes, different tokens.
+  assertEquals(RIDE_EQUIVALENT.run_mlss?.archetype, 'medium');
+  assertEquals(RIDE_EQUIVALENT.run_near_threshold?.archetype, 'long');
+
+  const wk = composeWeek({
+    ...COMPOSE, week: 2, column: 'standard', sportMix: { runs: 0, rides: 4, swimDays: 0 },
+  });
+  const byDay = (d: string) => wk.sessions.find((s) => s.day === d && s.type === 'ride');
+  // Frame day 1 → Monday at offset zero; day 3 → Wednesday.
+  const slot1 = (byDay('Monday')?.steps_preset ?? []).join(' ');
+  const slot2 = (byDay('Wednesday')?.steps_preset ?? []).join(' ');
+  assert(/bike_thr_/.test(slot1), `slot one is not the threshold-token session: ${slot1}`);
+  assert(/bike_ss_/.test(slot2), `slot two is not the sweet-spot session: ${slot2}`);
+  assert(slot1 !== slot2, 'the two hard slots built the same session');
+
+  // ⛔ THE DEFAULTS THE SCREEN SHOWS, against those two.
+  assertEquals(hardSlotDefault('ride', 'hard1').role, 'intensity');
+  assertEquals(hardSlotDefault('ride', 'hard2').role, 'threshold');
+  assertEquals(hardSlotDefault('run', 'hard1').goal, 'vo2');
+  assertEquals(hardSlotDefault('run', 'hard2').role, 'threshold');
+  // ⛔ AND THE ROWS READ DIFFERENTLY — the defect was two identical rows.
+  const row1 = hardSlotTitle('ride', hardSlotDefault('ride', 'hard1'));
+  const row2 = hardSlotTitle('ride', hardSlotDefault('ride', 'hard2'));
+  assertEquals(row1, 'Top-end intensity');
+  assertEquals(row2, 'Sustained threshold');
+  assert(row1 !== row2, 'both hard rows still say the same thing');
+});
+
+Deno.test('the run option list carries a threshold label, because slot two IS a threshold run', () => {
+  /**
+   * ⛔ THE RUN ARM READ `RUN_GROUND_OPTIONS` — VO2 and speed only. The frame's second hard slot is
+   * `run_near_threshold`; the composer builds it as `cruise_..._threshold` and names it "Threshold
+   * Run". So whatever the athlete picked, the row described a session the week does not contain.
+   */
+  const titles = hardSlotOptions('run').map((o) => o.title);
+  assert(titles.includes('Sustained threshold'), `no threshold label for a threshold slot: ${titles}`);
+  assert(titles.includes('VO2 max focus'), titles.join(', '));
+
+  const wk = composeWeek({
+    ...COMPOSE, week: 2, column: 'standard', sportMix: { runs: 4, rides: 0, swimDays: 0 },
+  });
+  const wed = wk.sessions.find((s) => s.day === 'Wednesday' && s.type === 'run')!;
+  assert(/cruise_.*_threshold/.test((wed.steps_preset ?? []).join(' ')),
+    'slot two is not a threshold run after all — re-check the default');
 });
