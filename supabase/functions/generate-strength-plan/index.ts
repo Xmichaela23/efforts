@@ -56,6 +56,8 @@ import {
   STANDING_PLAN_PROTOCOL_ID,
   testWeekLiftNames,
   PATTERN_FOR_TESTED_LIFT,
+  flattenViadaPicks,
+  normalizeViadaPrefs,
 } from '../_shared/standing-plan/index.ts';
 /**
  * ⛔ THE ONE OWNER OF THE TRUSTED-REP CEILING (`wendler-531.ts:605-655`) — 8 reps general, 5 on the
@@ -514,7 +516,33 @@ Deno.serve(async (req: Request) => {
        * for wins. `core` is a chip only this engine reads; Get Stronger's `isFocusChip` filters it,
        * which is that path's own stated migration.
        */
+      /**
+       * ⛔ AND SINCE 2026-08-24 THERE ARE TWO SHAPES IN THAT ENVELOPE, ONE PER SCREEN.
+       *
+       * The Standing Plan's own accessory screen writes a `viada` block — seven picks named after
+       * THIS frame's slots, plus the Dial chips. Get Stronger keeps writing `by_day`. Which
+       * block a goal carries is how this reader knows which screen the athlete saw, so no flag is
+       * needed and no goal has to be migrated.
+       *
+       * ⚠️ THE `by_day` FLATTENING RUNS ONLY WHEN THERE IS NO `viada` BLOCK. Running both would
+       * feed the floor nine Wendler movements the athlete never chose on this path — the balanced
+       * default, which this screen leaves untouched precisely because it does not ask about it.
+       */
+      const viadaPrefs = normalizeViadaPrefs(
+        (body as Record<string, unknown>).assistance_picks
+          && typeof (body as Record<string, unknown>).assistance_picks === 'object'
+          ? ((body as Record<string, unknown>).assistance_picks as Record<string, unknown>).viada
+          : null,
+        equipmentStrength,
+      );
       const accessoryPicks = (() => {
+        // ⛔ THE STANDING PLAN'S OWN PICKS, FLATTENED FOR THE FLOOR. The slot picks reach their
+        // cells through `slotPicks`; this list is what carries the core pick and the Dial
+        // rows to `fillMuscleFloor`'s `prefer`, which is the only route those two have.
+        if (viadaPrefs) {
+          const named = flattenViadaPicks(viadaPrefs);
+          return named.length > 0 ? named : undefined;
+        }
         const raw = (body as Record<string, unknown>).assistance_picks;
         if (!raw || typeof raw !== 'object') return undefined;
         const prefs = normalizeAssistancePrefs(raw);
@@ -528,6 +556,10 @@ Deno.serve(async (req: Request) => {
         return out.length > 0 ? out : undefined;
       })();
       const focusChips = (() => {
+        // ⛔ SUPERSEDED ON THIS PATH. The Dial moves volume; the focus chips biased a
+        // cell's choice. Sending both would have the two arguing inside one slot — see
+        // `exerciseForSlot`'s own note, where the bias stands down.
+        if (viadaPrefs) return undefined;
         const raw = (body as Record<string, unknown>).assistance_picks;
         const focus = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).focus : null;
         if (!Array.isArray(focus)) return undefined;
@@ -541,6 +573,9 @@ Deno.serve(async (req: Request) => {
           frame: frameId,
           ...(accessoryPicks ? { accessoryPicks } : {}),
           ...(focusChips ? { focus: focusChips } : {}),
+          ...(viadaPrefs ? { slotPicks: viadaPrefs.picks } : {}),
+          ...(viadaPrefs && viadaPrefs.dial.length > 0
+            ? { dial: viadaPrefs.dial } : {}),
           // ⛔ THE ATHLETE HAS NOT BEEN ASKED YET (stage 5). Seeded from the four lifts the entry
           // gate already demanded — see `defaultCompetitionLifts` for why it is three, not four.
           competitionLifts,

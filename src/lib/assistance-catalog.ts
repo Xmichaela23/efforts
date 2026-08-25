@@ -32,6 +32,12 @@
  */
 
 import { canPerform, equipmentFitRank, hasLoadableFit } from './strength-gear.ts';
+/**
+ * ⛔ TYPE-ONLY, AND THAT IS LOAD-BEARING. `accessory-picks.ts` reaches the strength grid, which
+ * reaches this file's neighbours; a runtime import would build a cycle for a shape this file only
+ * carries. The type is erased at build, so nothing here depends on that module at run time.
+ */
+import type { ViadaAccessoryPrefs } from '../../supabase/functions/_shared/standing-plan/accessory-picks.ts';
 
 /** Wendler's three categories. One movement each, every lifting day. Forever p.24. */
 export type AssistanceCategory = 'push' | 'pull' | 'single_leg_core';
@@ -532,6 +538,24 @@ export type AssistanceWeekPrefs = {
    * ⚠️ Absent/null is the norm — this is opt-in, and the balanced week is unaffected by it.
    */
   performance_focus?: PerformanceFocus | null;
+  /**
+   * ⛔ THE STANDING PLAN'S OWN BLOCK, CARRIED BESIDE WENDLER'S — NOT INSTEAD OF IT (2026-08-24).
+   *
+   * The Viada frame's accessory screen asks six questions about ITS OWN slots
+   * (`_shared/standing-plan/accessory-picks.ts`), which the nine `by_day` keys cannot express: this
+   * week has four differently shaped lifting days, no core slot, and no open compound-pull slot.
+   * Its answers live here.
+   *
+   * ⛔ `by_day` IS NOT MIGRATED AND MUST NOT BE. Every existing goal carries it, Get Stronger reads
+   * it, and that screen is untouched. Two paths, two blocks, one envelope — and which block a goal
+   * carries is how a reader knows which screen it came from without being told.
+   *
+   * ⚠️ PASSED THROUGH UNVALIDATED BY {@link normalizeAssistancePrefs}, deliberately.
+   * `normalizeViadaPrefs` owns this shape and it needs the athlete's equipment to check a pick
+   * against its own pool — which this function does not have and is not going to grow a parameter
+   * for. One owner per shape.
+   */
+  viada?: ViadaAccessoryPrefs | null;
 };
 
 /** The tracked performance goals. One today; the type exists so a second cannot be bolted on as a
@@ -634,7 +658,12 @@ export function normalizeAssistancePrefs(raw: unknown): AssistanceWeekPrefs {
   const pf = obj?.performance_focus;
   const performance_focus: PerformanceFocus | null = pf === 'pullups' ? 'pullups' : null;
 
-  return { version: 2, by_day, focus: focusOf(obj?.focus), performance_focus };
+  // ⚠️ CARRIED, NOT PARSED — see `AssistanceWeekPrefs.viada`. Dropping an unrecognised block here
+  // would strand a Standing Plan athlete's six picks the first time this function ran over them.
+  const viada = obj?.viada && typeof obj.viada === 'object' && !Array.isArray(obj.viada)
+    ? obj.viada as ViadaAccessoryPrefs
+    : null;
+  return { version: 2, by_day, focus: focusOf(obj?.focus), performance_focus, ...(viada ? { viada } : {}) };
 }
 
 /**

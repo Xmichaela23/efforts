@@ -546,6 +546,16 @@ carries the HR **during** each window, and FTP and threshold describe one ride.
 
 ## D-442 — The Standing Plan: one week, a what's-leading dial, each frame one author's table whole (2026-08-22 → 24)
 
+> **⚠️ ONE BULLET BELOW IS SUPERSEDED BY [D-450](#d-450--dial-his-bands-our-dial--the-standing-plan-accessory-screen-2026-08-24) (2026-08-24, same day).**
+> The accessory half of the "Program owns lifting-day count" bullet — *"Focus chips (+ Core,
+> standing path only) bias HYP slots; picks placed by what they train (day groupings dropped — flat
+> Preferred-movements list on this path)"* — **no longer describes this path.** That screen was still
+> Wendler's nine picks with the groupings hidden, and three of them could never place in this frame.
+> It is replaced by six picks named after the frame's own cells (`ComposeArgs.slotPicks`) and an
+> **Dial** that moves VOLUME instead of biasing a cell; the B2 cell-bias stands down
+> whenever the Dial is set and the `core` focus chip is deleted from the Get Stronger screen.
+> Everything else in this entry stands, and Get Stronger's own picker is unchanged.
+
 **The consolidated record of the pivot + build weekend.** Full rulings:
 `DECISIONS-2026-08-21-standing-plan.md`, `DECISIONS-2026-08-22-standing-plan-pivot.md` (+ p247
 corrections recorded there), `DEVICE-FINDINGS-standing-plan-2026-08-24.md`. This entry is the
@@ -602,3 +612,134 @@ plan config, so a cached bare-phase-word focus is now RE-RESOLVED live at read t
 written richer focus text untouched) — no DB write needed; (2) coach payloads cache the word, so
 COACH_PAYLOAD_VERSION bumped to 170. Commits `efb4e3f2`, `4c2c125c`; all 12 `_shared` importers
 redeployed. Device-verified on Today header + workout detail; State pending one fresh open.
+
+## D-450 — "Dial": his bands, our dial — the Standing Plan's accessory screen (2026-08-24)
+
+Decided by Michael in chat and built, renamed and committed the same day. ⚠️ **This entry is the
+only record — the `HANDOFF-` spec it was built from and the `WIP-` restart note were deleted on
+commit, per the spec lifecycle.** It replaces the accessory step on the Strong
+Focus / Standing Plan path only. **Get Stronger's screen is untouched** — the two now live in two
+separate `StepLayout` blocks in `NonRaceBuilder.tsx` rather than in one card with five
+`isStrengthFocus ?` forks inside it.
+
+**What was wrong.** The screen was Wendler's taxonomy — push / pull / single-leg-core across three
+lifting days — serving a Viada frame that does not share it. Read off `frames.ts` (p246): the week
+carries **seven HYP accessory slots, no core slot, and no open compound-pull slot**. So three of the
+nine picks could essentially never place, every ab pick could only ride the muscle floor, and the
+Glutes and Core focus chips could never fire at all, because `compose.ts`'s `FOCUS_MUSCLES` bias only
+searches a cell's own options and no cell offers a glute- or core-prime movement.
+
+**The seven picks** (`_shared/standing-plan/accessory-picks.ts`, `VIADA_PICKS`) are named after the
+frame's own cells and the day tags are **read out of `FRAMES` at call time**, not transcribed beside
+it: Dumbbell press (thursday), Isolation push (monday), Isolation pull ×2 (monday, thursday),
+Single-leg (tuesday · friday), Quad isolation (friday), Core movement (no slot — it names what the
+week's core minimum is filled with). A pick with no `frameDay` fills its cell on **every** day the
+frame carries it, so `ComposeArgs.slotPicks` is a different mechanism from the flat `accessoryPicks`
+pool rather than a tidier spelling of it — the pool's `unplaced` set is single-use by construction
+and could not express a cell that occurs twice. The flat pipe still travels alongside; it is what
+carries the core pick and the Dial rows to `fillMuscleFloor`'s `prefer`.
+
+### The name, and the working title it replaced
+
+**The row is called "Dial."** Michael ruled it 2026-08-24, **after the build and before the first
+commit**. It was built as **"Aesthetics" — a working title only.** ⚠️ Nothing had persisted: no goal
+carried a `viada` block yet, so the storage keys were renamed with it (`dial`, `dial_rows`) rather
+than left as a legacy spelling to read forever. **That was the cheap moment and it was taken; a
+migration would have been the alternative.** If "aesthetic" appears anywhere on this path now, it is
+a miss rather than a compat shim. *(The `Upper Aesthetics` PROTOCOL under
+`shared/strength-system/protocols/` is a different, older thing and keeps its name.)*
+
+The supporting line is **"Dial in the areas you want to focus on."** — Michael's wording, verbatim.
+⚠️ **It trips the voice lint on `focus` and ships anyway**, on the standing override already on
+record for "Speed focus" / "VO2 max focus". The override is **pinned as an expected violation** in
+`strength-focus-copy.voice.test.ts`, not left as a comment — a comment cannot run, which is the
+lesson that file exists to carry. The gate stays live for every other line, and a reword of this one
+fails the test rather than sliding through. The word collision the rename was worried about is with
+the endurance screens' focus **control**; a verb in a supporting line is not that control.
+
+### Isolation pull is TWO picks, and the principle behind it
+
+Michael's ruling, 2026-08-24, on the sub-question the handoff left open. `focused pull_upper` falls
+on **day 1 and day 4** and each day now carries **its own pick with its own default** — rear delt fly
+on monday, curls on thursday (`iso_pull_a` / `iso_pull_b`, scoped by `ViadaPickSpec.slot.frameDay`,
+resolved by `pickKeyForSlot(category, pattern, frameDay)`).
+
+**The principle, and it generalises past this screen: the default layout is balanced by itself. The
+Dial is a fine-tuning layer on top of a balanced week, never the source of balance.**
+(`LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`.) One pick answering both days put one movement on both — a
+week that trained rear delts twice and biceps not at all, or the reverse, off a single dropdown. The
+athlete who taps nothing must still get a week that covers what the frame's slots are for; a gap
+covered by a chip default is a gap the athlete can re-open by turning the chip off.
+
+**The chips are split with the picks for the same reason:** `shoulders` reaches the day-1 pick and
+`arms` the day-4 one, so a chip re-points **one** of the two. Serving both chips from both picks
+would let a tap on Arms open curls on both days and hand the balance problem straight back through
+the dial.
+
+⚠️ **`single_leg` is deliberately NOT split** — it stays one pick across tuesday and friday, where one
+movement twice is the same answer twice rather than two different jobs. It is the same shape as
+isolation pull and the opposite call, so `frameDay` is optional by design: **omitted means the pick
+owns every day its cell falls on.** If a later reading says the two lower days want different
+movements too, the change is one table row plus a default — not a mechanism.
+
+The per-day coverage gate in `standing-plan-accessory-picks.test.ts` now asserts every HYP accessory
+cell is owned **on every day it occurs**, which the old per-cell check could not see: a half-done
+split — owned on monday, orphaned on thursday — passed it.
+
+### His vs ours
+
+**HIS:** the 3-to-4 set band a hypertrophy slot sits in (p218); the 8-to-12 solid and 18-to-20
+overreaching weekly bands and the 6-to-8 / 14-plus session ceiling (p086); the 3 × 8-10 at 1-2 RIR
+accessory dose (p086); the core movement list (p223); every category and pattern the picks name
+(pp218-223).
+
+**OURS:** **using those bands as a steerable dial at all.** Viada defines no focus feature — his
+bands describe where volume sits, not a control an athlete turns (`AESTHETICS_DIAL_IS_OURS`). Also
+ours: the glutes as a muscle group of their own (`GLUTES_IS_OURS`, pre-existing), the muscle floor
+this dial is built on top of (`MUSCLE_FLOOR_IS_ONE_SLOT`, pre-existing), and **which weeks the added
+volume comes out of** (`AESTHETIC_PULLBACK_IS_OURS`).
+
+**A tapped chip does three things**, capped at two chips: (1) the picks that can reach the muscle
+open on a movement that trains it; (2) that muscle's HYP slots go to **four** sets — the top of his
+3-4 band, via `setsFor`, never a fifth; (3) extra 3 × 8-10 rows where the week has room —
+`fillMuscleFloor` given a `target` instead of only a floor. Mechanism 3 is what makes **Glutes and
+Core real chips at all**; they reach no cell, so an extra row is the only honest way to train them.
+
+**The pull-back moves the TARGET, not the session ceiling, and that was measured.** The first build
+held added rows to his six-to-eight "recovers" line on a heavy running week. This frame's lifting
+days already carry eight to eleven counted work sets, so no session could take a three-set row and
+stay under it — **the chip silently bought zero for exactly the athlete it was written to protect.**
+It now aims at two accessory slots instead of the solid band (`dialDose`), and the taper column
+gets no added rows at all. A second build let two chips take one session to **exactly** fourteen work
+sets, the number p086 names as costly; the target loop is now strictly under it, the same line the
+floor already respected. Both are pinned as REGRESSION tests in
+`standing-plan-accessory-picks.test.ts`.
+
+**No day tag on a Dial row, and that is a decision** (`DIAL_ROW_DAY_IS_THE_COMPOSERS`).
+The handoff asked for one — *"glute focus · tuesday"*. Two projections of it were built and both were
+wrong the moment two chips competed for the same room: the composer places a row on the lightest
+session **at the moment it places it**, after the muscle floor has run, and how many floor rows there
+are depends on the picks, the equipment and the chips. Reproducing that outside the composer means
+running the composer, and `NonRaceBuilder.tsx`'s own `hardRoleOf` already rules that out in as many
+words. The screen names the rule instead; the day is on the plan one screen later, where it is the
+composer's answer rather than a guess about it.
+
+**Storage.** A `viada` block sits **beside** `by_day` in `goals.training_prefs.assistance_picks` —
+not instead of it. Get Stronger keeps writing `by_day` and every existing goal carries it, so nothing
+is migrated, and **which block a goal carries is how `generate-strength-plan` knows which screen the
+athlete saw** without a flag. `normalizeViadaPrefs` validates each pick against its own pool and
+falls back **per slot**, so one stale name cannot wipe the other five.
+
+**Superseded on this path:** the B2 focus cell-bias (D-442's slice). `exerciseForSlot`'s bias stands
+down whenever the Dial is set, and `generate-strength-plan` stops sending `focus` when a
+`viada` block is there — a chip that moves volume does not also need to nudge a cell. The
+`core` focus chip is deleted from the Get Stronger screen; it existed only for this path and
+`isFocusChip` never accepted it there, so that screen is unchanged. `PICKS_ARE_PLACED_BY_WHAT_THEY_
+TRAIN` and the unplaced-pick warning go quiet on the slot path — both explain an inference that is no
+longer performed.
+
+**Ripple:** `_shared/accessory-dosing/ledger.ts` (`fillMuscleFloor` grew `target`; `candidatesFor` is
+now the exported `movementsForMuscle`; `FloorAddition.reason` splits floor rows from asked-for ones so
+the plan never prints *"had nothing else this week"* under a movement somebody named),
+`_shared/standing-plan/compose.ts`, `generate-strength-plan`, `rematerialize-standing-block` (imports
+the composer), `src/lib/assistance-catalog.ts` (carries the block, does not parse it).

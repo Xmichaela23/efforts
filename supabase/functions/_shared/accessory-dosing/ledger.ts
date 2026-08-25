@@ -17,6 +17,8 @@ import {
   COUNTED_INTENTS,
   effectiveRepsFor,
   SESSION_CEILING_NOTE,
+  SESSION_SETS_COSTLY,
+  WEEKLY_SETS_SOLID,
   UNCLASSIFIED_INTENTS,
   UNCLASSIFIED_INTENTS_NOTE,
   verdictForSessionSets,
@@ -253,7 +255,7 @@ const CATEGORY_PREFERENCE: ViadaCategory[] = ['focused', 'braced', 'secondary', 
  * athlete has the kit for still beats one they do not. Category order is p086's: isolation and
  * braced work for hypertrophy, compounds reserved for strength.
  */
-function candidatesFor(muscle: MuscleGroup, equipment: string[] | null | undefined): GridMovement[] {
+export function movementsForMuscle(muscle: MuscleGroup, equipment: string[] | null | undefined): GridMovement[] {
   return allGridMovements()
     .filter((m) => musclesWorkedBy(m.name)?.primary === muscle)
     .filter((m) => canPerform(m.name, equipment))
@@ -277,6 +279,16 @@ export type FloorAddition = {
   session: string;
   /** ⛔ TRUE WHEN THIS IS THE ATHLETE'S OWN PICK filling the gap — see `fillMuscleFloor`'s `prefer`. */
   fromAthletePick?: boolean;
+  /**
+   * ⛔ WHY THE ROW EXISTS, AND IT DECIDES WHAT THE PLAN SAYS ABOUT IT.
+   *
+   * `floor` — the muscle was at ZERO and the week owed it one slot. That is this module's original
+   * job and its note reads *"had nothing else this week"*.
+   * `target` — the athlete asked for this muscle by name and the week is carrying it toward the
+   * source's own solid band. Same machinery, opposite direction, and a row that says *"nothing
+   * else reached it"* under a movement somebody asked for is the A1 defect with a new face.
+   */
+  reason: 'floor' | 'target';
 };
 
 export type FloorResult = {
@@ -316,7 +328,23 @@ export type FloorResult = {
  */
 export function fillMuscleFloor(
   week: PlannedSession[],
-  opts?: { equipment?: string[] | null; setPosition?: number; prefer?: string[] | null },
+  opts?: {
+    equipment?: string[] | null;
+    setPosition?: number;
+    prefer?: string[] | null;
+    /**
+     * ⛔ MUSCLES THE CALLER WANTS CARRIED ABOVE THE FLOOR, AND HOW FAR (2026-08-24).
+     *
+     * The floor answers *"is this muscle at zero"*. This answers *"the athlete asked for this one"*
+     * — the same search, the same equipment gate, the same prime-mover test, run again until the
+     * muscle reaches the target instead of stopping at one slot.
+     *
+     * ⚠️ CLAMPED TO {@link WEEKLY_SETS_SOLID}. A caller asking for thirty sets of chest gets twelve:
+     * the source's own solid band is the ceiling, and {@link WEEKLY_SETS_OVERREACHING} is a
+     * description of where overreaching starts, never a target to aim at.
+     */
+    target?: Partial<Record<MuscleGroup, number>> | null;
+  },
 ): FloorResult {
   const sessions: PlannedSession[] = week.map((s) => ({ label: s.label, sets: [...s.sets] }));
   const setsPerSlot = muscleFloorSets(opts?.setPosition);
@@ -354,7 +382,7 @@ export function fillMuscleFloor(
   for (const muscle of gaps) {
     // Which movement — through stage 2's grid, so the equipment ladder and the ranking are not
     // re-implemented here. The first option whose PRIME MOVER is this muscle wins.
-    const forMuscle = candidatesFor(muscle, opts?.equipment ?? null);
+    const forMuscle = movementsForMuscle(muscle, opts?.equipment ?? null);
     // ⛔ THE ATHLETE'S OWN CHOICE FIRST, where it reaches this muscle and the week does not already
     // hold it. `preferred` is matched against the SAME candidate list, so a pick can only win a slot
     // it was already eligible for — nothing here widens the equipment gate or the prime-mover test.
@@ -374,7 +402,7 @@ export function fillMuscleFloor(
     const lines = ledgerFor(sessions, { setPosition: opts?.setPosition }).perSession;
     const ordered = lines
       .map((l, i) => ({ l, i }))
-      .filter((x) => x.l.countedSets + setsPerSlot < 14)
+      .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
       .sort((a, b) => a.l.countedSets - b.l.countedSets);
     if (ordered.length === 0) {
       unfilled.push({
@@ -397,14 +425,84 @@ export function fillMuscleFloor(
       // right sentence for a movement the engine picked and the wrong one for a movement the athlete
       // asked for — and printing the wrong one is the defect this whole flag exists to close.
       fromAthletePick: preferred != null,
+      reason: 'floor',
     });
   }
 
-  if (added.length > 0) {
+  // ── the Dial: the same search, aimed at a target instead of at zero ────────────────
+  //
+  // ⛔ IT RUNS AFTER THE FLOOR, DELIBERATELY. Every muscle gets its minimum before any muscle gets
+  // its extra — a chip must never be able to spend the last room in the week on chest and leave the
+  // quads at zero. Ordering IS the guarantee here; there is no second rule enforcing it.
+  const targets = Object.entries(opts?.target ?? {})
+    .map(([muscle, want]) => ({
+      muscle: muscle as MuscleGroup,
+      // ⛔ HIS BAND IS THE CEILING. See the `target` option's own note.
+      want: Math.min(WEEKLY_SETS_SOLID.hi, Math.max(0, Math.round(Number(want) || 0))),
+    }))
+    .filter((t) => t.want > 0 && MUSCLE_GROUPS.includes(t.muscle));
+  for (const { muscle, want } of targets) {
+    const forMuscle = movementsForMuscle(muscle, opts?.equipment ?? null);
+    /**
+     * ⚠️ A BOUNDED LOOP, NOT A `while`. Each pass adds one slot, so the target is reachable in
+     * `ceil(want / setsPerSlot)` passes and the guard is that number — a loop whose exit depends on
+     * `ledgerFor` agreeing with the arithmetic is a loop that spins the day they disagree.
+     */
+    const passes = Math.ceil(want / Math.max(1, setsPerSlot));
+    for (let pass = 0; pass < passes; pass++) {
+      const led = ledgerFor(sessions, { setPosition: opts?.setPosition });
+      const have = led.perMuscle.find((l) => l.muscle === muscle)?.sets ?? 0;
+      if (have >= want) break;
+      // ⛔ THE ATHLETE'S OWN CHOICE FIRST here too, then a movement the week does not already hold.
+      const preferred = forMuscle.find((o) =>
+        preferSet.has(canonicalize(o.name)) && !alreadyPrescribed.has(canonicalize(o.name)));
+      const pick = preferred ?? forMuscle.find((o) => !alreadyPrescribed.has(canonicalize(o.name)));
+      if (!pick) {
+        // ⚠️ NOT `unfilled`. The muscle is above its floor — the week simply has no further
+        // movement for it that it is not already doing, which is a stop, not a failure.
+        break;
+      }
+      const ordered = led.perSession
+        .map((l, i) => ({ l, i }))
+        /**
+         * ⛔ THE SAME LINE THE FLOOR RESPECTS, AND STRICTLY UNDER IT — measured, not assumed. This
+         * read `<= 14` for one build and two chips took `ME: Upper` to exactly fourteen work sets,
+         * which is the number p086 names as costing up to three days of other-discipline
+         * performance. A ceiling you are allowed to land on is not a ceiling.
+         */
+        .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
+        .sort((a, b) => a.l.countedSets - b.l.countedSets);
+      if (ordered.length === 0) break;
+      const target = ordered[0];
+      sessions[target.i].sets.push({ movement: pick.name, intent: 'HYP', sets: setsPerSlot });
+      alreadyPrescribed.add(canonicalize(pick.name));
+      added.push({
+        muscle,
+        movement: pick.name,
+        sets: setsPerSlot,
+        category: pick.category,
+        session: sessions[target.i].label,
+        fromAthletePick: preferred != null,
+        reason: 'target',
+      });
+    }
+  }
+
+  if (added.some((a) => a.reason === 'floor')) {
     notes.push({
       kind: 'ours',
-      text: `Added one slot each for ${added.map((a) => a.muscle).join(', ')}, which the week left at `
-        + 'zero. Every movement the athlete chose is untouched.',
+      text: 'Added one slot each for '
+        + `${[...new Set(added.filter((a) => a.reason === 'floor').map((a) => a.muscle))].join(', ')}`
+        + ', which the week left at zero. Every movement the athlete chose is untouched.',
+    });
+  }
+  if (added.some((a) => a.reason === 'target')) {
+    notes.push({
+      kind: 'ours',
+      text: 'Extra sets of 8 to 10 for '
+        + `${[...new Set(added.filter((a) => a.reason === 'target').map((a) => a.muscle))].join(', ')}`
+        + ', because you asked for them. They go on the lifting days with the most room left, and '
+        + 'they stop at the source\'s own eight-to-twelve weekly range.',
     });
   }
   if (unfilled.length > 0) {

@@ -54,6 +54,35 @@ import {
   normalizeAssistancePrefs,
   optionsFor,
 } from '@/lib/assistance-catalog';
+/**
+ * ⛔ THE STANDING PLAN'S OWN ACCESSORY TABLE (2026-08-24) — seven picks named after the frame's real
+ * slots, and the Dial. ONE table, read here and by the composer, so this screen cannot
+ * offer a movement the engine will not place.
+ *
+ * ⚠️ `assistance-catalog` IS STILL IMPORTED ABOVE AND STILL USED — by the Get Stronger branch, which
+ * is untouched. The two screens sit in one file and read two different tables on purpose.
+ */
+import {
+  DIAL_CAP,
+  DIAL_CHIPS,
+  DIAL_LABEL,
+  DIAL_OWNERSHIP,
+  DIAL_PULLBACK_LINE,
+  dialRowKey,
+  dialRowOptions,
+  dialSentence,
+  DIAL_ROW_DAY_IS_THE_COMPOSERS,
+  chipHasFrameSlot,
+  CORE_IS_NOT_A_FRAME_SLOT,
+  daysForPick,
+  defaultViadaPicks,
+  pickOptions,
+  VIADA_PICK_KEYS,
+  VIADA_PICKS,
+  type DialChip,
+  type ViadaAccessoryPrefs,
+  type ViadaPickKey,
+} from '@shared/standing-plan/accessory-picks.ts';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import {
   PULLUP_TEST_PROMPT, pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor,
@@ -1782,6 +1811,91 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // `posture.strength === 'develop'`. An assumed answer that never reaches the payload is the same
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
+  // ── THE STANDING PLAN'S ACCESSORY ANSWERS ────────────────────────────────────────────────────
+  //
+  // ⛔ SEEDED PRE-FILLED, AND THAT IS THE POINT OF THE SCREEN (Michael, 2026-08-24): the picks open
+  // on the grid's own defaults and a zero-touch Continue builds a complete week. An empty shape here
+  // would make "did they answer?" the composer's problem again, which is the A1 defect's shape.
+  //
+  // ⚠️ THE EFFECT ONLY EVER SEEDS. It never re-runs over an athlete's own answers — equipment can
+  // change under it (they edit the Arc mid-wizard) and re-deriving would silently discard the picks.
+  // A pick the kit no longer reaches is caught by `normalizeViadaPrefs` at the wire, per slot.
+  const viadaPrefs = state.assistancePicks.viada ?? null;
+  useEffect(() => {
+    if (!isStrengthFocus || viadaPrefs) return;
+    setState((st) => (st.assistancePicks.viada ? st : {
+      ...st,
+      assistancePicks: {
+        ...st.assistancePicks,
+        viada: {
+          version: 1,
+          picks: defaultViadaPicks(strengthEquipment, []),
+          dial: [],
+          dial_rows: {},
+        } as ViadaAccessoryPrefs,
+      },
+    }));
+  }, [isStrengthFocus, viadaPrefs, strengthEquipment]);
+  /**
+   * ⛔ THE EXTRA-ROW PICKERS — ONE PER CHIP THAT REACHES NO FRAME SLOT (Glutes, Core).
+   *
+   * For those two the extra rows are not a bonus, they ARE the mechanism: no cell in `strength_5k`
+   * offers a glute- or core-prime movement, which is exactly why the old focus chips for them could
+   * never fire. Chest, Shoulders and Arms need no picker — their re-pointing is visible in the
+   * picks below.
+   *
+   * ⚠️ NO DAY TAG, AND THAT IS A DECISION — see `DIAL_ROW_DAY_IS_THE_COMPOSERS`. Two
+   * projections of the day were built and both were wrong the moment two chips competed for the
+   * same room; reproducing the composer's placement means running the composer, which this file
+   * already rules out for the hard-day roles one screen over.
+   *
+   * ⚠️ ONE PICKER, NOT ONE PER ROW. How MANY rows a chip buys is the composer's answer too — it
+   * depends on what the muscle already gets — so the athlete names the movement and the engine uses
+   * it for the first row it places (`fillMuscleFloor`'s `prefer`), exactly as the core pick works.
+   */
+  const dialRowChips = useMemo(
+    () => (viadaPrefs?.dial ?? []).filter((c) => !chipHasFrameSlot(c)),
+    [viadaPrefs],
+  );
+
+  /**
+   * ⛔ THE THREE WRITERS FOR THE STANDING PLAN'S BLOCK. Every one of them writes the WHOLE block,
+   * because a partially-updated `viada` is a shape the wire has to guess about.
+   */
+  const patchViada = (patch: Partial<ViadaAccessoryPrefs>) => setState((st) => {
+    const cur = st.assistancePicks.viada ?? {
+      version: 1 as const,
+      picks: defaultViadaPicks(strengthEquipment, []),
+      dial: [] as DialChip[],
+      dial_rows: {},
+    };
+    return { ...st, assistancePicks: { ...st.assistancePicks, viada: { ...cur, ...patch } } };
+  });
+  /**
+   * ⛔ CHANGING THE CHIPS REBUILDS EVERY PICK, and it is the same ruling the Get Stronger screen
+   * already carries: the alternative needs a per-slot "did they choose this" flag, and a
+   * half-applied dial is worse than an honest one — the athlete taps Chest and reads picks that
+   * are mostly not chest.
+   * ⚠️ AND ROWS FOR A DROPPED CHIP ARE DROPPED WITH IT. A stored `glutes:1` under no glutes chip is
+   * a movement nothing will ever place.
+   */
+  const setViadaDial = (next: DialChip[]) => {
+    const rows = Object.fromEntries(
+      Object.entries(viadaPrefs?.dial_rows ?? {})
+        .filter(([k]) => next.some((c) => k.startsWith(`${c}:`))),
+    );
+    patchViada({
+      dial: next,
+      picks: defaultViadaPicks(strengthEquipment, next),
+      dial_rows: rows,
+    });
+  };
+  const setViadaPick = (key: ViadaPickKey, name: string) => patchViada({
+    picks: { ...(viadaPrefs?.picks ?? defaultViadaPicks(strengthEquipment, viadaPrefs?.dial ?? [])), [key]: name },
+  });
+  const setViadaRow = (key: string, name: string) => patchViada({
+    dial_rows: { ...(viadaPrefs?.dial_rows ?? {}), [key]: name },
+  });
   const isRaceGoal = state.goal === 'marathon';
   /** The discipline the race develops. Everything else is held or parked (Michael, 2026-08-04). */
   const raceDiscipline: Discipline = RACE_DISCIPLINE[state.raceDistance] ?? 'run';
@@ -4237,7 +4351,188 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           core for unilateral stability without adding spinal load that would cost recovery.
           Michael, 2026-07-25 — the title is "Accessory work", not "When can you train?" (that heading
           belonged to the old stacked step and described none of this). */}
-      {currentStep === 'accessory' && (
+      {/* ⛔⛔ THE STANDING PLAN'S ACCESSORY SCREEN (Michael, 2026-08-24 — D-450 in
+          `docs/DECISIONS-LOG-3.md`). Seven picks named after the frame's own
+          slots, real day tags, everything pre-filled.
+
+          ⛔ IT IS A SEPARATE `StepLayout`, NOT A THIRD BRANCH INSIDE THE OLD ONE. The card below had
+          five `isStrengthFocus ?` forks in it — intro copy, chips, the pull-up row, the day cards,
+          the dose line — and every one of them was a Wendler control being talked out of applying.
+          Get Stronger's screen is now literally untouched by this path.
+
+          ⛔ WHAT THE OLD SHAPE GOT WRONG, so nobody merges them back: it asked for NINE movements
+          across Wendler's three lifting days. This frame has FOUR differently shaped days, seven HYP
+          accessory slots, no core slot and no open compound-pull slot — so three of the nine picks
+          could essentially never place, and the Glutes and Core focus chips could never fire at all
+          because no cell in the grid offers a glute- or core-prime movement. */}
+      {currentStep === 'accessory' && isStrengthFocus && (
+        <StepLayout
+          step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
+          // ⛔ NOT "Three short slots after the main lift" — that is Wendler's week, and it is three
+          // slots on three days rather than seven across four.
+          subtitle="The programme owns the slots. You pick what fills them."
+          onBack={back} onContinue={next} canContinue
+        >
+          <div className="space-y-4">
+            {/* ── DIAL ─────────────────────────────────────────────────────────────────────
+                ⛔ THE WORD IS THE DECISION, AND IT IS NOT "FOCUS" (Michael, 2026-08-24). It was
+                built as "Aesthetics" and renamed before the first commit — working title only, no
+                row ever persisted, so `dial` is the only spelling in storage. What these chips do is
+                not what a focus chip did: a focus chip re-pointed which movement filled a cell, this
+                moves VOLUME. One word, one idea.
+                ⚠️ THE SUPPORTING LINE IS MICHAEL'S WORDING, VERBATIM, AND IT TRIPS THE VOICE LINT ON
+                `focus` — shipped anyway on the same standing override already on record for "Speed
+                focus" / "VO2 max focus". It is pinned in `strength-focus-copy.voice.test.ts` as an
+                EXPECTED violation, so a future edit of it fails the gate rather than sliding through.
+                ⛔ Do not reword it to satisfy the lint. The collision the rename fixed is with the
+                endurance screens' focus CONTROL; a verb in a supporting line is not that control.
+                ⛔ CAP TWO, AND THE SCREEN SAYS WHY IN ITS OWN LINE. The upper days already carry
+                seven to nine counted work sets and p086's ceiling is the binding constraint. */}
+            <div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-white/85 text-sm">Dial</span>
+                <span className="text-white/50 text-xs">
+                  {(viadaPrefs?.dial ?? []).length}/{DIAL_CAP}
+                </span>
+              </div>
+              <p className="text-white/55 text-xs leading-relaxed mb-2">
+                Dial in the areas you want to focus on.
+              </p>
+              {/* Same 3-column grid as the Get Stronger chips, and for the measured reason recorded
+                  there: five chips in a flex-wrap orphan the fifth on its own line. */}
+              <div className="grid grid-cols-3 gap-2">
+                <GalaxyButton
+                  shape="chip"
+                  variant={(viadaPrefs?.dial ?? []).length === 0 ? 'primary' : 'secondary'}
+                  onClick={() => setViadaDial([])}
+                >Balanced</GalaxyButton>
+                {DIAL_CHIPS.map((chip) => {
+                  const on = (viadaPrefs?.dial ?? []).includes(chip);
+                  const atCap = !on && (viadaPrefs?.dial ?? []).length >= DIAL_CAP;
+                  return (
+                    <GalaxyButton
+                      key={chip}
+                      shape="chip"
+                      variant={on ? 'primary' : 'secondary'}
+                      disabled={atCap}
+                      onClick={() => setViadaDial(on
+                        ? (viadaPrefs?.dial ?? []).filter((c) => c !== chip)
+                        : [...(viadaPrefs?.dial ?? []), chip].slice(0, DIAL_CAP))}
+                    >{DIAL_LABEL[chip]}</GalaxyButton>
+                  );
+                })}
+              </div>
+              {/* ⛔ ONE FACTUAL SENTENCE PER TAPPED CHIP — days added, then the pull-back. The
+                  pull-back half is not optional: a deload week, or an athlete whose running earns
+                  the extra easy session, gets visibly less than this screen promised, and unsaid
+                  that reads as the control being broken. */}
+              {(viadaPrefs?.dial ?? []).map((chip) => (
+                <p key={chip} className="text-white/65 text-xs mt-2 leading-relaxed">
+                  {dialSentence(chip, { equipment: strengthEquipment })}{' '}{DIAL_PULLBACK_LINE}
+                </p>
+              ))}
+              {(viadaPrefs?.dial ?? []).length >= DIAL_CAP && (
+                <p className="text-white/45 text-xs mt-2 leading-relaxed">
+                  Two at a time. The upper lifting days already carry seven to nine work sets, and past
+                  fourteen in a session the next day&rsquo;s run is measurably down for up to three days.
+                </p>
+              )}
+            </div>
+
+            {/* ── THE ROWS A CHIP ADDS ───────────────────────────────────────────────────────────
+                ⛔ ONLY FOR THE CHIPS THAT REACH NO SLOT — Glutes and Core. For those two the extra
+                rows are not a bonus, they ARE the mechanism, so the athlete names the movement
+                rather than being handed one. Chest, Shoulders and Arms are already visible in the
+                picks below, which is where their re-pointing shows up. */}
+            {dialRowChips.length > 0 && (
+              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
+                {dialRowChips.map((chip) => {
+                  const opts = dialRowOptions(chip, strengthEquipment);
+                  const key = dialRowKey(chip, 0);
+                  const value = viadaPrefs?.dial_rows?.[key] ?? opts[0]?.name ?? '';
+                  return (
+                    <div key={key}>
+                      <div className="flex items-baseline justify-between gap-2 mb-1">
+                        <span className="text-white/85 text-sm">
+                          {DIAL_OWNERSHIP[chip]} focus
+                        </span>
+                        <span className="text-white/45 text-xs">3 &times; 8&ndash;10, by feel</span>
+                      </div>
+                      <select
+                        value={value}
+                        onChange={(e) => setViadaRow(key, e.target.value)}
+                        className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                        style={{ fontSize: '16px' }}
+                        aria-label={`${DIAL_OWNERSHIP[chip]} focus movement`}
+                      >
+                        {opts.map((o) => (
+                          <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+                {/* ⛔ THE DAY IS THE COMPOSER'S ANSWER, NOT THIS SCREEN'S. Said once, under the rows
+                    it is about, rather than guessed at per row. */}
+                <p className="text-white/45 text-xs leading-relaxed">
+                  {DIAL_ROW_DAY_IS_THE_COMPOSERS}
+                </p>
+              </div>
+            )}
+
+            {/* ── THE SEVEN ──────────────────────────────────────────────────────────────────────
+                ⛔ THE DAY TAGS ARE REAL DAYS, READ OFF THE FRAME. The week is fixed (p246) and the
+                calendar question comes one screen later, so there is nothing to hedge about: these
+                are the days the block opens on. ⚠️ Pinning a long-run day on the next screen rotates
+                the whole week, which moves every one of these by the same amount.
+                ⚠️ ONE PICK FOR ISOLATION PULL AND ONE FOR SINGLE-LEG, EACH USED ON BOTH ITS DAYS.
+                The frame carries those two cells twice; the athlete answers the SLOT, not the day. */}
+            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
+              {VIADA_PICK_KEYS.map((key) => {
+                const spec = VIADA_PICKS[key];
+                const opts = pickOptions(key, strengthEquipment);
+                const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
+                const days = daysForPick(key);
+                return (
+                  <div key={key}>
+                    <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <span className="text-white/85 text-sm">{spec.label}</span>
+                      <span className="text-white/45 text-xs">
+                        {days.length > 0
+                          ? days.map((d) => d.toLowerCase()).join(' · ')
+                          : 'fills the week\u2019s core minimum'}
+                      </span>
+                    </div>
+                    <select
+                      value={value}
+                      onChange={(e) => setViadaPick(key, e.target.value)}
+                      className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                      style={{ fontSize: '16px' }}
+                      aria-label={`${spec.label} movement`}
+                    >
+                      {opts.map((o) => (
+                        <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+              {/* ⛔ THE CORE PICK'S OWN CAVEAT, ONCE, UNDER THE FIELD IT IS ABOUT. It is the one pick
+                  with no slot behind it, and an athlete who reads "fills the week's core minimum"
+                  deserves the reason. */}
+              <p className="text-white/45 text-xs leading-relaxed">{CORE_IS_NOT_A_FRAME_SLOT}</p>
+            </div>
+
+            {/* ⛔ THE DOSE, IN THIS PLAN'S UNIT. Wendler's rep totals are the other screen's model. */}
+            <p className="text-white/70 text-sm leading-relaxed">
+              Accessories are sets of 6&ndash;12 with a rep or two left in the tank. Going to failure
+              costs the next main lift.
+            </p>
+          </div>
+        </StepLayout>
+      )}
+
+      {currentStep === 'accessory' && !isStrengthFocus && (
         <StepLayout
           step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
           subtitle="Three short slots after the main lift. Yours to direct."
@@ -4286,36 +4581,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 chips, and one word for one concept beats a synonym per surface. ⛔ Do not "fix" it
                 to satisfy the lint without asking. */}
             <ul className="space-y-1 list-disc list-outside ml-5 marker:text-white/30">
-              {/* ⛔ TWO PLANS SHARE THIS PICKER, AND THEY ARE DIFFERENT WEEKS (2026-08-24). The old
-                  copy described Wendler's three days to a Standing Plan athlete whose block has
-                  FOUR, whose core has its own budget, and whose picks are placed by what they
-                  train, not by the picker's day groupings. Each path reads its own truth. */}
-              {isStrengthFocus ? (
-                <>
-                  <li className="text-white/70 text-sm leading-relaxed pl-1">
-                    Four lifting days. Your picks are placed by what they train — the groupings below
-                    are the picker&rsquo;s, not the week&rsquo;s.
-                  </li>
-                  <li className="text-white/70 text-sm leading-relaxed pl-1">
-                    Pick a focus and the slots fill in. Every muscle keeps its minimum either way.
-                  </li>
-                  <li className="text-white/70 text-sm leading-relaxed pl-1">
-                    Change to preferred movements below, or swap on the day.
-                  </li>
-                </>
-              ) : (
-                <>
-                  <li className="text-white/70 text-sm leading-relaxed pl-1">
-                    Three lifting days, each with a push, a pull and a single-leg or core movement.
-                  </li>
-                  <li className="text-white/70 text-sm leading-relaxed pl-1">
-                    Pick a focus and the days fill in.
-                  </li>
-                  <li className="text-white/70 text-sm leading-relaxed pl-1">
-                    Change to preferred movements below, or swap on the day.
-                  </li>
-                </>
-              )}
+              {/* ⛔ THE STANDING PLAN'S FORK IS GONE FROM HERE (2026-08-24) — it has its own card
+                  now, above. This copy is Wendler's week and it is true of Wendler's week. */}
+              <li className="text-white/70 text-sm leading-relaxed pl-1">
+                Three lifting days, each with a push, a pull and a single-leg or core movement.
+              </li>
+              <li className="text-white/70 text-sm leading-relaxed pl-1">
+                Pick a focus and the days fill in.
+              </li>
+              <li className="text-white/70 text-sm leading-relaxed pl-1">
+                Change to preferred movements below, or swap on the day.
+              </li>
             </ul>
 
             {/* ── FOCUS CHIPS ───────────────────────────────────────────────────────────────────
@@ -4351,11 +4627,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     },
                   }))}
                 >Balanced</GalaxyButton>
-                {/* ⛔ CORE IS A STANDING-PLAN CHIP ONLY (B2, 2026-08-24). Get Stronger's own
-                    `isFocusChip` filters it — that path's stated migration — and it is stripped
-                    before `buildDefaultWeek`, whose category map has no core row. On the Standing
-                    Plan the composer reads it and biases HYP slots toward core movements. */}
-                {([...FOCUS_CHIPS, ...(isStrengthFocus ? (['core'] as unknown as FocusChip[]) : [])]).map((chip) => {
+                {/* ⛔ THE `core` CHIP IS GONE FROM HERE (2026-08-24). It existed for the Standing
+                    Plan alone — B2's cell bias — and that path now has the Dial on its
+                    own card, where Core moves volume instead of nudging a cell. `isFocusChip` never
+                    accepted it on this screen, so nothing about Get Stronger changes. */}
+                {FOCUS_CHIPS.map((chip) => {
                   const on = state.assistancePicks.focus.includes(chip);
                   const atCap = !on && state.assistancePicks.focus.length >= FOCUS_CAP;
                   return (
@@ -4419,12 +4695,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 choose it. */}
 
 
-            {/* ⛔ NOT ON THE STRENGTH-FOCUS PATH (Michael, 2026-08-24): the new plan trains
+            {/* ⛔ AND IT IS NOT ON THE STANDING PLAN AT ALL (Michael, 2026-08-24): that plan trains
                 pull-ups as a MAIN lift — heavy Monday, fast Thursday, the earn ladder, progression
-                off the tested max. A daily-chins add-on on top would double-load the pull pattern
-                and add volume the set ledger cannot see. The toggle stays on Get Stronger, where
-                daily chins is Wendler's own medicine. */}
-            {!isStrengthFocus && <div
+                off the tested max — so a daily-chins add-on would double-load the pull pattern and
+                add volume the set ledger cannot see. Its screen simply does not carry this row; the
+                gate that used to say so here is gone with the fork. */}
+            <div
               className="rounded-lg border transition"
               style={state.assistancePicks.performance_focus === 'pullups'
                 ? { borderColor: `${getDisciplineColor('strength')}66`, backgroundColor: `${getDisciplineColor('strength')}14` }
@@ -4516,60 +4792,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   continuous tension on the lats and shoulder capsule. Proceed with caution.
                 </p>
               )}
-            </div>}
+            </div>
 
             {/* ── THE FOUR DAY CARDS ────────────────────────────────────────────────────────────
                 ⛔ COLLAPSIBLE, MATCHING `StrengthLogger.tsx`'s accordion. Twelve dropdowns stacked
                 open is four screens of scrolling on a phone, and the athlete loses the shape of the
                 week entirely. First day open, the rest collapsed to their one-line summary — the
                 same pattern, so the two screens do not teach two different interactions. */}
-            {/* ⛔ THE STANDING PLAN GETS A FLAT LIST (Michael, 2026-08-24: "this is not 4 days of
-                work and doesn't reflect the work"). The day cards are Wendler's three days, and on
-                this plan the day grouping is a LIE — the composer drops it and places every pick by
-                what it trains. Same storage (by_day) so the payload flattening is untouched; the
-                screen just stops pretending the groupings schedule anything. */}
-            {isStrengthFocus ? (
-              <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
-                <p className="text-white/85 text-sm">Preferred movements</p>
-                <p className="text-white/50 text-xs -mt-1.5">
-                  Nine picks, placed by what they train. The plan decides which day each lands on.
-                </p>
-                {LIFT_DAYS.flatMap((day) =>
-                  ASSISTANCE_CATEGORIES.map((category) => {
-                    const opts = optionsFor(category, strengthEquipment, day);
-                    const value = state.assistancePicks.by_day[day][category];
-                    const muscle = opts.find((o) => o.name === value)?.muscle ?? '';
-                    return (
-                      <div key={`${day}-${category}`}>
-                        <div className="flex items-baseline justify-between gap-2 mb-1">
-                          <span className="text-white/70 text-xs">{CATEGORY_LABEL[category]}</span>
-                          {muscle && <span className="text-white/45 text-xs">{muscle}</span>}
-                        </div>
-                        <select
-                          value={value}
-                          onChange={(e) => setState((st) => ({
-                            ...st,
-                            assistancePicks: {
-                              ...st.assistancePicks,
-                              by_day: {
-                                ...st.assistancePicks.by_day,
-                                [day]: { ...st.assistancePicks.by_day[day], [category]: e.target.value },
-                              },
-                            },
-                          }))}
-                          className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
-                          style={{ fontSize: '16px' }}
-                          aria-label={`Preferred ${CATEGORY_LABEL[category]} movement`}
-                        >
-                          {opts.map((o) => (
-                            <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  }))}
-              </div>
-            ) : (
+            {/* ⛔ THE STANDING PLAN'S FLAT NINE-PICK LIST IS GONE FROM HERE (2026-08-24) AND MUST
+                NOT COME BACK. It was this screen's last attempt at serving both plans: the day cards
+                are Wendler's three lifting days, and on the Viada frame the grouping was a LIE, so
+                the fix was to drop the grouping and show nine dropdowns in a column.
+                ⛔ THAT WAS STILL THE WRONG NINE. The picks themselves were Wendler's categories —
+                three of them could never place in that frame at all — which is why the whole screen
+                moved rather than the layout. See the Standing Plan card above. */}
             <div className="space-y-2">
               {LIFT_DAYS.map((day) => {
                 const picks = state.assistancePicks.by_day[day];
@@ -4697,14 +4933,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               })}
             </div>
-            )}
-            {/* ⛔ The rep-total guidance is Wendler's model. The Standing Plan doses accessories
-                as SETS with reps in reserve (stage 3) — its line says that instead. */}
-            <p className="text-white/70 text-sm leading-relaxed">
-              {isStrengthFocus
-                ? 'Accessories are sets of 6–12 with a rep or two left in the tank. Going to failure costs the next main lift.'
-                : ASSISTANCE_GUIDANCE}
-            </p>
+            {/* ⛔ THE REP-TOTAL GUIDANCE IS WENDLER'S MODEL AND THIS IS WENDLER'S SCREEN. The
+                Standing Plan doses accessories as SETS with reps in reserve (stage 3) and says so
+                on its own card. */}
+            <p className="text-white/70 text-sm leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
           </div>
         </StepLayout>
       )}

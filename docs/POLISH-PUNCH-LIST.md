@@ -8,6 +8,21 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE DIAL SCREEN, DEPLOYED AND UNSEEN (2026-08-24 night)
+
+Pushed and deployed (four functions). **Nobody has opened it.** Strength Focus wizard → accessory step:
+- [ ] **Seven picks**, all pre-filled, each with a real weekday tag — and **two rows called
+      "Isolation pull"**, one tagged monday, one tagged thursday.
+- [ ] Those two must hold **different** movements out of the box: rear delt fly (mon), barbell curl
+      (thu). Same movement on both days = the split is not reaching the phone.
+- [ ] The **Dial** row: label "Dial", line *"Dial in the areas you want to focus on."*, chips
+      Chest · Shoulders · Arms · Glutes · Core plus Balanced, capped at 2.
+- [ ] Tap **Glutes** → a factual sentence plus a movement picker for the added rows.
+- [ ] Build a block and read the built week's accessory rows.
+
+⚠️ The Dial's extra rows carry **no day tag** — that is a decision (`DIAL_ROW_DAY_IS_THE_COMPOSERS`,
+D-450), not a bug. The day is on the plan one screen later.
+
 ## ⏳ AWAITING MICHAEL — TOMORROW'S TEST: LOWER SAVE (2026-08-24 night; block REBUILT on the fixed engine)
 
 The first block was deleted and rebuilt after the equipment-gate + computed-refresh fixes (see the

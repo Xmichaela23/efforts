@@ -22,3 +22,4 @@ export * from './me-history.ts';
 export * from './day-map.ts';
 export * from './test-skip.ts';
 export * from './sport-slots.ts';
+export * from './accessory-picks.ts';

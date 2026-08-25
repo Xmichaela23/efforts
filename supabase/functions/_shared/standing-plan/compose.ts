@@ -26,8 +26,21 @@ import {
   fillMuscleFloor,
   ledgerFor,
   type DoseLedger,
+  type MuscleGroup,
   type PlannedSession as DosingSession,
 } from '../accessory-dosing/index.ts';
+import {
+  DIAL_CAP,
+  DIAL_OWNERSHIP,
+  DIAL_IS_OURS,
+  DIAL_PULLBACK_IS_OURS,
+  dialDose,
+  chipForMuscle,
+  isDialChip,
+  musclesForChips,
+  pickKeyForSlot,
+  type ViadaPickKey,
+} from './accessory-picks.ts';
 import {
   advancedTierSessions,
   FRAMES,
@@ -193,6 +206,31 @@ export type ComposeArgs = {
    * Stronger's `isFocusChip` filters it out, which is that path's stated migration.
    */
   focus?: string[] | null;
+  /**
+   * ⛔ THE ATHLETE'S PICK FOR EACH OF THE FRAME'S OWN OPEN SLOTS (2026-08-24, Michael's ruling —
+   * D-450 in `docs/DECISIONS-LOG-3.md`).
+   *
+   * ⚠️ THIS IS THE HONEST VERSION OF `accessoryPicks`, NOT A SECOND ONE. The flat list exists
+   * because the picker was Wendler's and its day keys mapped onto nothing here, so a pick had to be
+   * placed by what it TRAINS. The Standing Plan's own picker asks per FRAME SLOT — `secondary
+   * push_upper`, `focused pull_upper` — so the placement is no longer an inference: the athlete
+   * named the movement for that cell and it goes in that cell, on every day the frame carries it.
+   *
+   * ⛔ THE FLAT LIST STILL TRAVELS ALONGSIDE, and it is what carries the core pick and any extra
+   * Dial rows down to the muscle floor. Neither shape is authoritative over the other: this
+   * one owns slots, that one owns the floor.
+   */
+  slotPicks?: Partial<Record<ViadaPickKey, string>> | null;
+  /**
+   * ⛔ THE DIAL — at most two muscles run toward the source's solid weekly band instead
+   * of their three-set minimum. See `accessory-picks.ts` for what is his and what is ours.
+   *
+   * ⚠️ IT SUPERSEDES `focus` ON THIS PATH. A focus chip biased which movement filled a cell and
+   * could not reach glutes or core at all, because no cell in this frame offers a glute- or
+   * core-prime movement. When `dial` is present the cell bias stands down and this runs
+   * instead; `focus` is untouched for every caller that still sends it.
+   */
+  dial?: string[] | null;
   /**
    * ⛔ HOW MANY SETS EACH PATTERN'S ME SLOT HAS EARNED — 1, 2 or 3 (device finding A2, 2026-08-24).
    *
@@ -439,6 +477,18 @@ function exerciseForSlot(
   picks: PickPool,
   /** The focus chips, as muscles — see `focusMuscleSet`. Empty = no bias. */
   focusMuscles: Set<string> = new Set(),
+  /**
+   * ⛔ THE DIAL MUSCLES — the ones the athlete asked to run toward the solid band. A HYP slot
+   * whose movement's prime mover is one of these takes FOUR sets instead of three: the top of his
+   * 3-4 band (p218) rather than the bottom his "start low" instruction otherwise picks.
+   */
+  dialMuscles: Set<MuscleGroup> = new Set(),
+  /**
+   * ⛔ THE FRAME DAY THIS SLOT SITS ON — required for the day-scoped picks. `focused pull_upper`
+   * falls on day 1 and day 4 and each day has its OWN pick, so resolving by cell alone would hand
+   * both days the same answer. ⚠️ Frame day, not weekday: it does not rotate.
+   */
+  frameDay: number | null = null,
 ): { exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern } {
   const pattern = patternForWeek(slot, args.week);
   const competition = args.competitionLifts[pattern] ?? null;
@@ -464,14 +514,43 @@ function exerciseForSlot(
    * are the programme's, not the athlete's, and pivot §6 puts the athlete's choice in the exercises
    * the frame leaves open — which is what the hypertrophy slots are.
    */
-  const fromPick = slot.intent === 'HYP' && slot.role === 'accessory'
+  /**
+   * ⛔ THE SLOT'S OWN PICK, AND IT IS TRIED BEFORE THE FLAT POOL (2026-08-24). The Standing Plan's
+   * picker asks per frame slot, so there is nothing to infer: this cell has a name on it.
+   *
+   * ⛔ IT IS NOT CONSUMED. `secondary press_lower` occurs on days 2 and 5 and ONE pick fills both,
+   * because the athlete answered the SLOT and the slot happens twice. The flat pool's `unplaced` set
+   * is single-use by construction and could not express that — which is why routing by slot is a
+   * different mechanism rather than a tidier spelling of the same one. ⚠️ `takenToday` still
+   * applies, so it can never print twice in one session.
+   *
+   * ⚠️ `focused pull_upper` ALSO OCCURS TWICE (days 1 and 4) AND IS THE OTHER CASE: it carries two
+   * day-scoped picks, one each, because rear-delt work and arm work are different answers and one
+   * dropdown covering both left the week training one of them twice. `pickKeyForSlot` is given
+   * `frameDay` so the right one answers — see `LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`.
+   *
+   * ⚠️ AND IT STILL HAS TO FIT. The name is matched against `resolveSlot`'s own options for this
+   * cell — the picker built its dropdown from that same call — so honouring it can never widen the
+   * equipment gate or put a movement in a slot the frame did not ask for.
+   */
+  const slotKey = slot.intent === 'HYP' && slot.role === 'accessory'
+    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined)
+    : null;
+  const named = slotKey ? String(args.slotPicks?.[slotKey] ?? '').trim() : '';
+  const fromSlotPick = named !== ''
+    ? resolved.options.find((o) => canonicalize(o.name) === canonicalize(named)
+      && !takenToday.has(canonicalize(o.name))
+      && (!competition || canonicalize(o.name) !== canonicalize(competition)))
+    : undefined;
+
+  const fromPick = fromSlotPick ?? (slot.intent === 'HYP' && slot.role === 'accessory'
     ? resolved.options.find((o) => {
       const key = canonicalize(o.name);
       return picks.unplaced.has(key)
         && !takenToday.has(key)
         && (!competition || key !== canonicalize(competition));
     })
-    : undefined;
+    : undefined);
 
   if (fromPick) {
     // ⚠️ THE ATHLETE'S OWN SPELLING IS WHAT THE ROW SHOWS. They typed `Chin-Up`; printing the
@@ -480,6 +559,11 @@ function exerciseForSlot(
     movement = picks.byFold.get(canonicalize(fromPick.name)) ?? fromPick.name;
     picks.unplaced.delete(canonicalize(fromPick.name));
     picks.placed.add(canonicalize(fromPick.name));
+    /**
+     * ⚠️ AND A SLOT PICK IS NOT REPORTED AS UNPLACED WHEN A LATER DAY RE-USES IT. `unplaced` is the
+     * flat pool's bookkeeping; deleting the key here is what keeps the compromise line honest for a
+     * pick that travelled down both pipes.
+     */
   } else if (slot.role === 'competition' && competition) {
     // ⛔ *"All first lifts of the day should be a competition movement"* (p247). The athlete named it,
     // and it is never deduped away — the frame asks for it by name.
@@ -497,7 +581,13 @@ function exerciseForSlot(
      * cell, change the pattern, or touch ME/DE — a chip is a preference inside the frame's choice,
      * exactly like a pick, one step weaker.
      */
-    const focused = slot.intent === 'HYP' && slot.role === 'accessory' && focusMuscles.size > 0
+    /**
+     * ⚠️ AND IT STANDS DOWN WHERE THE DIAL IS RUNNING (2026-08-24). The two answer the
+     * same question with different force — a chip that MOVES VOLUME does not also need to nudge a
+     * cell's choice, and the pick defaults are already re-pointed by the picker itself.
+     */
+    const focused = dialMuscles.size === 0
+      && slot.intent === 'HYP' && slot.role === 'accessory' && focusMuscles.size > 0
       ? options.find((o) => !takenToday.has(canonicalize(o.name))
         && focusMuscles.has(musclesWorkedBy(o.name)?.primary ?? ''))
       : undefined;
@@ -565,9 +655,22 @@ function exerciseForSlot(
    * that earned it were logged.
    */
   const earnedMe = slot.intent === 'ME' ? Number(args.meSetsByPattern?.[pattern]) : NaN;
+  /**
+   * ⛔ THE DIAL FOURTH SET (2026-08-24) — the second of the dial's three mechanisms, and it is
+   * the only one that touches a slot the frame already owns.
+   *
+   * p218 gives HYP a 3-to-4 set band and his own instruction is to open at the low end. A muscle the
+   * athlete named runs at the TOP of that band instead. ⛔ It is a position inside HIS band, never a
+   * fifth set: `setsFor` clamps, and nothing here can leave the page.
+   *
+   * ⚠️ HYP ACCESSORY ONLY. An ME or DE slot is the programme's prescription, and a chip about how a
+   * muscle looks has no business moving the load on a competition lift.
+   */
+  const dialSlot = slot.intent === 'HYP' && slot.role === 'accessory'
+    && dialMuscles.has((musclesWorkedBy(movement)?.primary ?? '') as MuscleGroup);
   const setPosition = Number.isFinite(earnedMe)
     ? setPositionForCount(earnedMe, ME_SETS_BAND)
-    : undefined;
+    : (dialSlot ? 1 : undefined);
   const p = prescribe(slot.intent, 'barbell', setPosition);
   const sets = p.kind === 'barbell' ? p.sets : 1;
   const reps = p.kind === 'barbell' ? `${p.reps.lo}-${p.reps.hi}` : '';
@@ -807,7 +910,40 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   const picks = pickPool(args.accessoryPicks);
   const focusMuscles = focusMuscleSet(args.focus);
-  if (picks.byFold.size > 0 && !notes.some((n) => n.text === PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN)) {
+  /**
+   * ⛔ THE DIAL CHIPS, AS MUSCLES. Capped and validated by `musclesForChips`, so an unknown
+   * string reaches nothing rather than aiming volume at a muscle group that does not exist.
+   */
+  const dialChips = (args.dial ?? []).filter(isDialChip).slice(0, DIAL_CAP);
+  const dialMuscles = musclesForChips(dialChips);
+  /**
+   * ⛔ THE PICKS ARE PLACED BY SLOT ON THIS PATH, SO THE EXPLANATION GOES QUIET (2026-08-24).
+   *
+   * `PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN` exists to explain an inference — *"the picker asks per
+   * lifting day for a three-day programme; this week has four differently shaped ones"*. When
+   * `slotPicks` is present there is no inference: the athlete answered the frame's own slots. A
+   * plan that keeps apologising for a mapping it no longer performs is worse than silence.
+   */
+  const picksAreBySlot = Object.values(args.slotPicks ?? {}).some((v) => String(v ?? '').trim() !== '');
+  /**
+   * ⛔ A SLOT PICK IS OFF THE ENGINE'S OWN MENU FROM THE START (2026-08-24), and this line is a
+   * measured fix rather than tidiness.
+   *
+   * `PickPool.placed` filters the grid's choices so the engine never re-uses a movement the athlete
+   * already has. It could only ever hold picks placed EARLIER IN THE WEEK, and a slot pick is known
+   * before the loop runs — so day 1's DE secondary-push slot took `dumbbell bench press` off the
+   * grid, and day 4's HYP secondary-push slot then placed the athlete's identical pick. One
+   * movement, twice, on two days, one of them the engine's own choice.
+   *
+   * ⚠️ IT DOES NOT BLOCK THE PICK ITSELF. The slot-routed branch reads `resolveSlot`'s unfiltered
+   * options, so seeding this set steers the ENGINE away and leaves the ATHLETE's cell untouched.
+   */
+  for (const name of Object.values(args.slotPicks ?? {})) {
+    const key = canonicalize(String(name ?? '').trim());
+    if (key && key !== 'unknown') picks.placed.add(key);
+  }
+  if (!picksAreBySlot && picks.byFold.size > 0
+    && !notes.some((n) => n.text === PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN)) {
     notes.push({ kind: 'ours', text: PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN });
   }
 
@@ -860,7 +996,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const takenToday = new Set<string>();
         for (const slot of day.strength) {
           const { exercise, movement, sets, pattern } = exerciseForSlot(
-            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday, picks, focusMuscles);
+            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday, picks, focusMuscles,
+            dialMuscles, day.day);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
           if (slot.intent === 'ME') {
@@ -979,10 +1116,34 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   // ⛔ AND THE FLOOR IS OFFERED THE ATHLETE'S UNPLACED PICKS FIRST (A1). A pick that fits no HYP slot
   // in the frame — every ab movement, for one, since no slot in `strength_5k` carries a core pattern
   // — still reaches the week here, filling the very gap the engine was about to fill for it.
+  /**
+   * ⛔ THE DIAL'S THIRD MECHANISM — the floor's own machinery, aimed at a target instead
+   * of at zero. This is what makes GLUTES and CORE real chips: neither has a cell in this frame, so
+   * re-pointing a pick and adding a fourth set both buy them nothing, and an extra row is the only
+   * honest way to train them at all.
+   *
+   * ⛔ AND THE PULL-BACK IS APPLIED HERE, NOT DESCRIBED HERE. `dialDose` owns both halves: no
+   * added rows at all on the taper column, and the near session ceiling rather than the far one for
+   * an athlete whose own running earns the advanced tier's extra easy sessions.
+   */
+  const dose = dialDose({
+    column: args.column,
+    advancedTierSessions: advancedTierSessions(args.demonstratedWeeklyMiles),
+  });
+  const dialTarget: Partial<Record<MuscleGroup, number>> = {};
+  if (dose.targetSets != null) {
+    for (const m of dialMuscles) dialTarget[m] = dose.targetSets;
+  }
   const filled = fillMuscleFloor(dosing, {
     equipment: args.equipment ?? null,
     prefer: [...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),
+    ...(Object.keys(dialTarget).length > 0 ? { target: dialTarget } : {}),
   });
+  if (dialChips.length > 0) {
+    notes.push({ kind: 'ours', text: DIAL_IS_OURS, cite: 'Viada p86, p218 — the bands are his' });
+    notes.push({ kind: 'ours', text: DIAL_PULLBACK_IS_OURS, cite: 'Viada p86' });
+    if (dose.pullBack) notes.push({ kind: 'ours', text: dose.pullBack });
+  }
   const ledger = ledgerFor(filled.sessions);
   for (const add of filled.added) {
     const target = sessions.find((s) => s.type === 'strength' && (s.name === add.session || s.day === add.session));
@@ -1006,9 +1167,17 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // ⛔ THE ROW SAYS WHOSE MOVEMENT IT IS, AND THAT IS THE WHOLE DEVICE FINDING. `Floor: core had
         // nothing else this week` printed under a movement the athlete had asked for by name is the
         // engine stating, on the plan, that it never saw the choice.
-        notes: add.fromAthletePick
-          ? `Your pick for ${add.muscle}.`
-          : `Floor: ${add.muscle} had nothing else this week.`,
+        /**
+         * ⛔ THREE DIFFERENT ROWS, THREE DIFFERENT SENTENCES, AND MIXING THEM IS THE A1 DEFECT.
+         * `Floor: core had nothing else this week` under a movement the athlete asked for is the
+         * engine stating on the plan that it never saw the choice — and the same sentence under an
+         * Dial row says the opposite of what happened.
+         */
+        notes: add.reason === 'target'
+          ? `Your ${DIAL_OWNERSHIP[chipForMuscle(add.muscle) ?? 'core']} focus.`
+          : add.fromAthletePick
+            ? `Your pick for ${add.muscle}.`
+            : `Floor: ${add.muscle} had nothing else this week.`,
       },
     ];
   }
@@ -1025,7 +1194,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⚠️ NAMED, NOT COUNTED. *"One of your choices did not fit"* is a sentence nobody can act on; the
    * movement's own name is what lets them pick something else or declare the kit for it.
    */
-  if (picks.unplaced.size > 0) {
+  /**
+   * ⚠️ AND IT GOES QUIET WHERE THE PICKS ARE PLACED BY SLOT (2026-08-24). Every one of those fits by
+   * construction — the picker built its dropdown from the same `resolveSlot` call the composer
+   * fills the cell with — so the only thing this line could report there is the core pick and the
+   * Dial rows, which reach the week through the floor rather than through a slot and are not
+   * "unplaced" in any sense the athlete can act on.
+   */
+  if (!picksAreBySlot && picks.unplaced.size > 0) {
     const names = [...picks.unplaced].map((f) => picks.byFold.get(f) ?? f).sort();
     notes.push({
       kind: 'warning',

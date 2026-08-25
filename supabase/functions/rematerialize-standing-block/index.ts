@@ -145,6 +145,20 @@ Deno.serve(async (req: Request) => {
      * "the test produced nothing".
      */
     const blockPicks = Array.isArray(sp.accessory_picks) ? sp.accessory_picks as string[] : null;
+    /**
+     * ⛔⛔ AND THE BLOCK'S OWN PER-SLOT PICKS AND DIAL CHIPS (D-450) — same law, larger blast
+     * radius. `slotPicks` decides which movement fills five cells across six days and `dial`
+     * changes SET COUNTS as well as adding rows, so a restate that re-composed without them would
+     * build a week whose movements and set counts both differ from the calendar's. `restateFromTest`
+     * matches on the movement NAME: every row would report unmatched and the whole restate would
+     * read as "the test produced nothing".
+     *
+     * ⚠️ ABSENT ON EVERY BLOCK BUILT BEFORE THIS SHIPPED, which composes exactly as it did.
+     */
+    const blockSlotPicks = sp.slot_picks && typeof sp.slot_picks === 'object' && !Array.isArray(sp.slot_picks)
+      ? sp.slot_picks as Record<string, string>
+      : null;
+    const blockDial = Array.isArray(sp.dial) ? sp.dial as string[] : null;
 
     const composeBase = {
       frame: sp.frame,
@@ -196,6 +210,8 @@ Deno.serve(async (req: Request) => {
       // but carrying the flag keeps the re-composition identical to the block that was built.
       skipTestWeek: sp.test_skipped === true,
       ...(blockPicks ? { accessoryPicks: blockPicks } : {}),
+      ...(blockSlotPicks ? { slotPicks: blockSlotPicks } : {}),
+      ...(blockDial ? { dial: blockDial } : {}),
       roundTo: 5,
     };
 

@@ -77,6 +77,28 @@ Deno.test('the on-card lines are clean', () => {
   }
 });
 
+/**
+ * ⛔ THE ONE STANDING OVERRIDE, PINNED SO IT CANNOT DRIFT (Michael, 2026-08-24).
+ *
+ * The Dial row's supporting line on the Standing Plan accessory step is Michael's wording, verbatim,
+ * and `focus` is a banned imperative — so it trips the gate and ships anyway, on the same override
+ * already on record for "Speed focus" / "VO2 max focus".
+ *
+ * ⚠️ AN OVERRIDE THAT IS ONLY A COMMENT IS NOT AN OVERRIDE — that is the exact failure this whole
+ * file was written to end. It is asserted as an EXPECTED violation instead: the line is exempt, the
+ * gate is not disabled, and any edit to the wording fails here rather than sliding through unread.
+ * If the line is ever reworded off `focus`, this test is what tells you to move it into CARD_LINES.
+ */
+Deno.test('the Dial supporting line is the one line exempted, and only on `focus`', () => {
+  const DIAL_SUPPORTING_LINE = 'Dial in the areas you want to focus on.';
+  assertEquals(voiceViolation(DIAL_SUPPORTING_LINE), 'focus', 'the exemption is for `focus` alone');
+  // ⛔ AND NOTHING ELSE RIDES IN ON THE EXEMPTION. Strip the one allowed word and the rest of the
+  // sentence must pass the gate unaided — an override on one token is not a licence for the line.
+  assertEquals(voiceViolation(DIAL_SUPPORTING_LINE.replace(/\bfocus\b/, 'settle')), null);
+  // The row's NAME carries no exemption at all — "Dial" is the decision precisely so the label is clean.
+  assertEquals(voiceViolation('Dial'), null);
+});
+
 Deno.test('the gate is actually live — a known-bad line still fails', () => {
   // The exact draft recorded as failing in 2026-08-05: "keep" is a banned imperative. If this ever
   // returns null the check has been neutered and every assertion above is worthless.

@@ -1,5 +1,70 @@
 # Engine State
 
+## 🧭 NEXT SESSION — START HERE (written 2026-08-24, night — after the Dial commit)
+
+### Your job: **VERIFY THE DIAL SCREEN ON A DEVICE.** It is pushed and deployed and nobody has seen it.
+
+Open the Strength Focus wizard → **accessory step**. Confirm, in this order:
+
+1. **Seven picks**, each pre-filled, each tagged with a real weekday: Dumbbell press (thursday),
+   Isolation push (monday), **Isolation pull ×2 — one tagged monday, one tagged thursday**, Single-leg
+   (tuesday · friday), Quad isolation (friday), Core movement (no day; "fills the week's core minimum").
+2. The **Dial** row — label "Dial", the line *"Dial in the areas you want to focus on."*, five chips
+   (Chest · Shoulders · Arms · Glutes · Core) plus Balanced, capped at 2.
+3. Tap **Glutes**. A factual sentence appears, plus a movement picker for the added rows.
+4. **Build a block** and read the accessory rows on the built week.
+
+**What settles it:** the two isolation-pull rows must hold **different** movements — rear delt fly on
+monday, barbell curl on thursday. That is the whole point of the split, and it is the one thing a
+green test suite cannot prove is reaching the phone.
+
+### What shipped, so you do not re-litigate it
+
+- **D-450 is the only record.** The `HANDOFF-` spec and the `WIP-` restart note were **deleted on
+  commit** per the spec lifecycle. Everything is in D-450 in `DECISIONS-LOG-3.md`.
+- **The row is called "Dial."** It was built as "Aesthetics" — working title, renamed before the first
+  commit, storage keys renamed with it (`dial`, `dial_rows`). Nothing had persisted, so there is no
+  legacy spelling. ⚠️ `Upper Aesthetics` under `shared/strength-system/protocols/` is a **different,
+  older thing** and keeps its name — do not "finish" the rename onto it.
+- **The supporting line trips the voice lint on `focus` and ships anyway** — Michael's wording,
+  verbatim, on the standing override already on record for "Speed focus" / "VO2 max focus". It is
+  pinned as an EXPECTED violation in `src/lib/strength-focus-copy.voice.test.ts`. **Do not reword it
+  to make the gate green** — the gate is already green; the exception is the assertion.
+- **Isolation pull is TWO picks, one per day** (`iso_pull_a` day 1, `iso_pull_b` day 4), scoped by
+  `ViadaPickSpec.slot.frameDay` and resolved by `pickKeyForSlot(category, pattern, frameDay)`. The
+  principle behind it — `LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT` — is the one to carry forward: **the
+  default layout is balanced by itself; the Dial is fine-tuning on top of a balanced week, never the
+  source of balance.**
+- **`single_leg` is deliberately NOT split** — same shape, opposite call: one movement across tuesday
+  and friday is the same answer twice. `frameDay` is optional by design. ⚠️ If a later reading says
+  the two lower days want different movements, that is **one table row plus a default**, not a
+  mechanism — and it is the nearest open question on this screen.
+- Three defects the live fixtures caught, all pinned as tests in
+  `standing-plan-accessory-picks.test.ts`: a pick spent on the wrong day so one lift printed twice;
+  the advanced-tier pull-back buying **zero** sets for exactly the athlete it protects (it now moves
+  the TARGET, not the session ceiling); two chips taking one session to exactly 14 work sets, the
+  number p086 calls costly.
+
+### Verification state, stated honestly
+
+| | |
+|---|---|
+| **PUSHED** | ✅ on `main` |
+| **DEPLOYED** | ✅ four functions — `generate-strength-plan`, `rematerialize-standing-block`, `create-goal-and-materialize-plan`, `materialize-plan` |
+| **VERIFIED** | ❌ **nobody has opened the screen** |
+
+**Tests:** 2720 shared pass. **Two failures are PRE-EXISTING and unrelated — do not chase either:**
+the `lthr` anchor lint on `src/components/TrainingBaselines.tsx` (untouched file), and
+`shared/strength-system/hard-run-terrain.test.ts`, which needs `--allow-net` because it pulls in
+`materialize-plan` and that calls `Deno.serve` at top level. `npm run build` clean; `tsc` at **315
+errors, the same 315 as before this work**. Three back-to-back 12-week `composeBlock` runs are
+byte-identical. ⚠️ Deno is at `~/.deno/bin/deno`, not on `PATH`.
+
+⚠️ **A green suite proves the code is right, not that it is on the phone.** Nothing below the deploy
+line has been seen by a human.
+
+---
+
 # ⛔ IT HAS BEEN BUILT. IT MAY NOT WORK — BUT IT HAS PROBABLY BEEN BUILT, MAYBE MORE THAN ONCE.
 
 **"It doesn't work" is NOT evidence that "it doesn't exist."** The dominant failure mode in this codebase is a **well-built system STARVED of its inputs** — it exists, it is spec'd, it is fixtured, and it never fires because something upstream is null. It looks *missing*. **It is not missing. It is hungry.**

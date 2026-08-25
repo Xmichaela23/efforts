@@ -23,6 +23,7 @@ import { FRAMES, type FrameId } from './frames.ts';
 import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
 import { type DayMap } from './day-map.ts';
 import type { ViadaPattern } from '../strength-grid/index.ts';
+import type { ViadaPickKey } from './accessory-picks.ts';
 
 /** The app's existing phase shape — `strength-primary-plan.ts` writes the same one. */
 export type ArcPhase = { name: string; start_week: number; end_week: number; weeks_in_phase: number };
@@ -138,6 +139,20 @@ export type StandingPlanConfig = {
    */
   accessory_picks: string[] | null;
   /**
+   * ⛔ THE PER-SLOT PICKS AND THE DIAL CHIPS THE BLOCK WAS BUILT ON (2026-08-24, D-450).
+   *
+   * ⚠️ SAME LAW AS `accessory_picks`, AND WITHOUT THEM THE RESTATE IS THE SILENT NO-OP AGAIN — this
+   * time worse, because these two change MORE of the week than the flat list ever did. `slotPicks`
+   * decides which movement fills five cells on six days, and `dial` changes set COUNTS and adds
+   * rows. A restate that re-composed without them would produce a week whose movements and set counts
+   * both differ from the calendar's, and `restateFromTest` matches on the movement NAME.
+   *
+   * ⚠️ NULL ON EVERY GET STRONGER BLOCK AND EVERY BLOCK BUILT BEFORE THIS SHIPPED, which composes
+   * exactly as it did — absent is the old behaviour by construction.
+   */
+  slot_picks: Partial<Record<ViadaPickKey, string>> | null;
+  dial: string[] | null;
+  /**
    * ⛔ THE EQUIPMENT THE BLOCK WAS COMPOSED AGAINST (2026-08-24). Same law as `sport_mix`,
    * `day_offset` and `accessory_picks`: a restate RE-COMPOSES this block and has to reach the
    * identical week.
@@ -249,6 +264,14 @@ export function buildStandingPlanRow(args: {
       swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,
       accessory_picks: (args.compose.accessoryPicks ?? []).length > 0
         ? [...(args.compose.accessoryPicks as string[])]
+        : null,
+      // ⛔ THE STANDING PLAN'S OWN ANSWERS — see the field docs for why a restate is a silent no-op
+      // without them. Absent stays absent, so nothing existing composes differently.
+      slot_picks: Object.keys(args.compose.slotPicks ?? {}).length > 0
+        ? { ...args.compose.slotPicks }
+        : null,
+      dial: (args.compose.dial ?? []).length > 0
+        ? [...(args.compose.dial as string[])]
         : null,
       // ⛔ THE KIT THE WEEK WAS BUILT AGAINST — see `athlete_equipment` for why a restate is a
       // silent no-op without it. Empty declares as null: absent means "not asked", never "owns nothing".
