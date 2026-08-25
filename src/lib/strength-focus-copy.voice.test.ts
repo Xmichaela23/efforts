@@ -90,7 +90,7 @@ Deno.test('the on-card lines are clean', () => {
  * If the line is ever reworded off `focus`, this test is what tells you to move it into CARD_LINES.
  */
 Deno.test('the Dial supporting line is the one line exempted, and only on `focus`', () => {
-  const DIAL_SUPPORTING_LINE = 'Dial in the areas you want to focus on.';
+  const DIAL_SUPPORTING_LINE = 'Dial in the 2 areas you want to focus on.';
   assertEquals(voiceViolation(DIAL_SUPPORTING_LINE), 'focus', 'the exemption is for `focus` alone');
   // ⛔ AND NOTHING ELSE RIDES IN ON THE EXEMPTION. Strip the one allowed word and the rest of the
   // sentence must pass the gate unaided — an override on one token is not a licence for the line.

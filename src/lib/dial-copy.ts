@@ -38,6 +38,7 @@
  * ============================================================================
  */
 import {
+  DIAL_CAP,
   DIAL_LABEL,
   DIAL_OWNERSHIP,
   VIADA_PICKS,
@@ -60,8 +61,18 @@ import { WEEKDAYS } from '../../supabase/functions/_shared/standing-plan/day-map
 export const ACCESSORY_SUBTITLE =
   'Every day focuses on a compound lift. The additional accessory fine-tunes the muscle work.';
 
-/** The Dial's sub-line. Michael's wording, verbatim; trips the voice lint on `focus` by design. */
-export const DIAL_SUBLINE = 'Dial in the areas you want to focus on.';
+/**
+ * ⛔ THE DIAL'S SUB-LINE. Michael's wording, verbatim; trips the voice lint on `focus` by design.
+ *
+ * ⛔ THE NUMBER IS INTERPOLATED FROM `DIAL_CAP`, NOT TYPED (2026-08-25). The line now states the cap
+ * — "the 2 areas" — and the chip row prints `n/2` from the same constant one element away. A copy
+ * string carrying its own hand-written 2 is the "score that lies" shape this repo keeps finding: the
+ * day the cap moves, the sentence goes on confidently naming the old one.
+ *
+ * ⚠️ IT RESOLVES TO EXACTLY MICHAEL'S SENTENCE TODAY, and a test pins that string as well as the
+ * derivation, so this is not a licence to reword it.
+ */
+export const DIAL_SUBLINE = `Dial in the ${DIAL_CAP} areas you want to focus on.`;
 
 /**
  * ⛔ THE CAP NOTE, WITHOUT ITS ARITHMETIC (Michael, 2026-08-24). It used to read *"The upper lifting

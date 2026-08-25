@@ -20,7 +20,7 @@ import {
   DIAL_SUBLINE,
   dialChipLine,
 } from './dial-copy.ts';
-import { DIAL_CHIPS } from '../../supabase/functions/_shared/standing-plan/accessory-picks.ts';
+import { DIAL_CAP, DIAL_CHIPS } from '../../supabase/functions/_shared/standing-plan/accessory-picks.ts';
 
 const EQUIPMENT = ['barbell', 'dumbbell', 'bench', 'rack', 'cable', 'bodyweight'];
 
@@ -43,7 +43,10 @@ Deno.test('the sub-line is the one exemption, and only on `focus`', () => {
   // ⛔ MICHAEL'S WORDING, VERBATIM, SHIPPED ON THE STANDING OVERRIDE (see
   // `strength-focus-copy.voice.test.ts`, which pins the same line). Asserted as an EXPECTED
   // violation so a reword fails here rather than sliding through.
-  assertEquals(DIAL_SUBLINE, 'Dial in the areas you want to focus on.');
+  assertEquals(DIAL_SUBLINE, 'Dial in the 2 areas you want to focus on.');
+  // ⛔ AND THE NUMBER TRACKS THE CAP rather than being typed into the sentence — the chip row prints
+  // `n/2` from `DIAL_CAP` one element away, and the two must not be able to disagree.
+  assertEquals(DIAL_SUBLINE.includes(String(DIAL_CAP)), true, 'the sub-line lost its link to the cap');
   assertEquals(voiceViolation(DIAL_SUBLINE), 'focus');
   assertEquals(voiceViolation(DIAL_SUBLINE.replace(/\bfocus\b/, 'settle')), null);
 });
