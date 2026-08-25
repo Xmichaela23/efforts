@@ -5893,13 +5893,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <div key={`hard-card-${i}`} className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-white/85 text-sm">{label}</span>
-                    <span className="text-xs" style={{ color: `rgba(${rgb},0.85)` }}>
-                      {/* ⚠️ THE CUE NAMES WHOSE ANSWER IT IS, not just which day. "Yours" is the
-                          word that makes the filled chip mean something. */}
-                      {dayVal
-                        ? `${DAY_SHORT[dayVal as DayName]}${
-                          h.ownership === 'club' ? ' — club' : isPinned(i) ? ' — yours' : ' — placed'}`
-                        : (h.ownership === 'club' ? 'Which day does it meet?' : 'Tap a day')}
+                    {/* ⚠️ THE CUE NAMES WHOSE ANSWER IT IS, not just which day. "Yours" is the
+                        word that makes the filled chip mean something. */}
+                    <span className="text-xs flex items-baseline gap-1 min-w-0" style={{ color: `rgba(${rgb},0.85)` }}>
+                      <span className="shrink-0">
+                        {dayVal
+                          ? `${DAY_SHORT[dayVal as DayName]}${
+                            h.ownership === 'club' ? ' — club' : isPinned(i) ? ' — yours' : ' — placed'}`
+                          : (h.ownership === 'club' ? 'Which day does it meet?' : 'Tap a day')}
+                      </span>
+                      {/* ⛔ THE TAP CUE, ON THE ENGINE'S DAYS ONLY (Michael, 2026-08-25). A placed
+                          chip looks answered, so nothing said the athlete could take it — the pinned
+                          and club states already read as theirs and need no invitation.
+
+                          ⛔ IT DROPS FIRST WHEN THE LINE IS TIGHT, and that is what `truncate` on
+                          THIS span and `shrink-0` on the status above it buy: the day and who owns
+                          it are the load-bearing half and survive every width; the cue is the half
+                          that can go. ⚠️ No breakpoint — a hardcoded width would guess at a device.
+                          ⚠️ ZERO NEW VERTICAL SPACE: same line, same row, no new element box. */}
+                      {dayVal && h.ownership !== 'club' && !isPinned(i) && (
+                        <span className="truncate text-white/45">· tap to change</span>
+                      )}
                     </span>
                   </div>
                   <WeekDayRow
@@ -6115,7 +6129,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     {scheduleHealthState.ok
                       // ⛔ "Optimal schedule" OVERCLAIMED (work order stage 5): the check is a
                       // collision scan, not an optimiser. Say what is true.
-                      ? 'No scheduling conflicts'
+                      /**
+                       * ⛔ IT SAYS WHICH CHECKS PASSED, NOT THAT NOTHING IS WRONG (Michael,
+                       * 2026-08-25). "No scheduling conflicts" is an absence, and an absence reads
+                       * as "we found nothing" rather than as a result — the athlete could not tell
+                       * whether the week had been checked or merely not complained about.
+                       * ⚠️ COPY-VOICE: the two rule families this badge actually runs are named —
+                       * spacing (the `COST` clearances) and recovery (the rest floor). No praise
+                       * word: "balanced" describes the week's shape, not the athlete's choices.
+                       * ⚠️ ZERO-VIOLATIONS STATE ONLY. The collision and note states below are
+                       * untouched.
+                       */
+                      ? 'Balanced week — spacing and recovery rules all met.'
                       : `High fatigue risk: ${scheduleHealthState.collisions.length} collision${scheduleHealthState.collisions.length === 1 ? '' : 's'}`}
                   </span>
                   {!scheduleHealthState.ok && (
