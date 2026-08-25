@@ -567,6 +567,34 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'jump lunge': 'plyo',
   'skater hop': 'plyo',
   'bounding': 'plyo',
+  /**
+   * ⛔ THE NAMED DRILLS AND THE FOOTWORK LADDER (added 2026-08-25, closing the drift `6c3f61f2`
+   * opened). These landed in `exercise-config.ts` with `pattern: 'plyometric'`, `ratio: 0` and
+   * `displayFormat: 'bodyweight'` and never got a row here — so `typeForExercise` defaulted all of
+   * them to `loaded_accessory` and the two tables actively contradicted each other: the config drew
+   * a bodyweight drill, this table priced it `load: 'external'` and the logger asked for weight ×
+   * reps. An A-skip with a weight field, sitting in the same session as a Box Jump that resolved
+   * correctly.
+   *
+   * ⚠️ PLURALS ARE NOT LISTED. `canonical()` depluralizes the last word, so `a skip` covers
+   * "A Skips" and `canonicalize()`'s `a_skip` / `a_skips` alike. Adding both spellings here would
+   * start the second vocabulary this table exists to prevent.
+   *
+   * ⚠️ THE AGILITY DRILLS ARE `plyo` AND THAT IS THE CONFIG'S CALL, NOT A NEW ONE. A ladder drill
+   * is footwork rather than a jump, but `exercise-config` already files it `plyometric`, and the
+   * fixture demands the two vocabularies agree. The capability profile is the right one either way
+   * — reps, no external load, no bar-speed cue.
+   */
+  'a skip': 'plyo',
+  'b skip': 'plyo',
+  'stiff legged run': 'plyo',
+  'single leg hop': 'plyo',
+  'rebound jump': 'plyo',
+  'lunge hop': 'plyo',
+  'pogo hop': 'plyo',
+  'ladder drill': 'plyo',
+  'ickey shuffle': 'plyo',
+  'hopscotch': 'plyo',
 
   // ── ISOMETRIC: held, logged as time ─────────────────────────────────────────────────────────
   'plank': 'isometric',
@@ -617,6 +645,22 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   // `clamshell` to its band branch (`strength-logging-mode.ts`). Typed to match what the app does
   // today rather than to what the word looks like; Step 3 has to reproduce that behavior.
   'clamshell': 'band',
+  /**
+   * ⛔ BOTH SPELLINGS OF THE BANDED PUSHDOWN (added 2026-08-25 alongside the plyo rows above, same
+   * `6c3f61f2` / `c59ad88b` drift). `exercise-config` gives them `displayFormat: 'band'` and
+   * `ratio: 0`; with no row here they defaulted to `loaded_accessory`, i.e. `load: 'external'` and
+   * `loggedAs: 'weight_x_reps'` — a rubber band multiplied by reps, which is the exact failure the
+   * `band leg curl` note above was written to prevent.
+   *
+   * ⚠️ `band` IS CORRECT BY THE DISCRIMINATOR, NOT BY THE WORD. `bandMeansAssistance` answers false
+   * for both — the band IS the load here, not help, unlike `band assisted pull up`.
+   *
+   * ⚠️ TWO ROWS, NOT ONE. `triceps …` does not fold to `tricep …` (neither string contains the
+   * other, and depluralization only touches the LAST word), so the config carries both spellings
+   * and so must this table.
+   */
+  'band tricep pushdown': 'band',
+  'band triceps pushdown': 'band',
 };
 
 /** Names already warned about, so the tripwire fires once per name instead of once per render. */
