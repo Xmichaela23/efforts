@@ -92,10 +92,18 @@ Deno.test('⛔ THE DELETED PHRASES STAY DELETED', () => {
 Deno.test('one line per chip — every chip, same shape, no paragraphs', () => {
   for (const chip of DIAL_CHIPS) {
     const line = dialChipLine(chip, { equipment: EQUIPMENT });
-    // ⛔ TWO SENTENCES MAXIMUM: what changes, then the honest caveat. A third is a paragraph.
+    // ⛔ THREE SENTENCES, FIXED (2026-08-25): what changes, whose movement it is, then the caveat.
+    // ⚠️ IT WAS TWO UNTIL THE OWNERSHIP SENTENCE WAS ADDED. Michael raised the count deliberately —
+    // the line names a movement and nothing said the row below could change it. A FOURTH is a
+    // paragraph, which is the thing this whole gate exists to stop coming back.
     const sentences = line.split(/(?<=\.)\s+/).filter(Boolean);
-    assertEquals(sentences.length, 2, `${chip} is ${sentences.length} sentences: "${line}"`);
-    assert(line.length <= 130, `${chip} is ${line.length} chars, too long for one line: "${line}"`);
+    assertEquals(sentences.length, 3, `${chip} is ${sentences.length} sentences: "${line}"`);
+    assert(line.length <= 165, `${chip} is ${line.length} chars, too long for one line: "${line}"`);
+    // ⛔ THE OWNERSHIP SENTENCE, SINGULAR WHERE ONE MOVEMENT IS NAMED AND PLURAL WHERE THE CHIP
+    // RE-POINTS THE PICKS. It must be declarative — "change the movement below" is an instruction.
+    assert(/The movements? (is|are) yours to change below\./.test(line),
+      `${chip} does not say the movement is changeable: "${line}"`);
+    assert(!/^(Change|Pick|Tap|Choose)\b/m.test(line), `${chip} issues an instruction: "${line}"`);
     // The fixed shape: it opens with the muscle, states the band, and carries the pull-back.
     assert(line.startsWith(`${chip[0].toUpperCase()}`), `${chip} does not open with its label`);
     assert(/toward 8-12 a\s+week/.test(line), `${chip} does not state the band`);
@@ -139,7 +147,10 @@ Deno.test('the day-reaching chips name real days, read off the frame', () => {
   for (const chip of ['glutes', 'core'] as const) {
     const line = dialChipLine(chip, { equipment: EQUIPMENT });
     assert(!/Monday|Tuesday|Thursday|Friday/.test(line), `${chip} invented a day: "${line}"`);
-    assert(line.includes('on your lifting days'), `${chip}: "${line}"`);
+    // ⚠️ "on your lifting days" WAS ASSERTED HERE UNTIL 2026-08-25 — Michael's rewording dropped the
+    // clause ("extra Hip Thrust sets, toward 8-12 a week"). What must hold is that these chips name
+    // a MOVEMENT and no day; which day is the composer's answer, one screen later.
+    assert(/extra .+ sets/.test(line), `${chip} names no movement: "${line}"`);
   }
 });
 

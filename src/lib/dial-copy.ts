@@ -101,7 +101,11 @@ export const ACCESSORY_DOSE_LINE =
  * slots, how the extra rows are dosed, and the pull-back — and with two chips tapped the screen
  * showed two paragraphs. The shape is now fixed and identical for every chip:
  *
- *     `{Muscle} — {what changes}, toward {8-12} a week. Light weeks carry less.`
+ *     `{Muscle} — {what changes}, toward {8-12} a week. {whose movement it is}. Light weeks carry less.`
+ *
+ * ⛔ THE MIDDLE SENTENCE IS THE 2026-08-25 ADDITION and it is not filler: the line NAMES a movement,
+ * and on a device that read as the app's decision rather than as its opening offer. The row that
+ * changes it is directly below and nothing said so.
  *
  * ⚠️ "Light weeks carry less" IS THE PULL-BACK, AND IT IS NOT DECORATION. A deload week, or an
  * athlete whose logged running has already earned an extra easy session, gets visibly fewer added
@@ -134,12 +138,20 @@ export function dialChipLine(
     // in the sentence this replaced and was dropped in the rewrite; the copy gate caught it.
     .sort((a, b) => WEEKDAYS.indexOf(a) - WEEKDAYS.indexOf(b));
 
+  // ⛔ THE OWNERSHIP SENTENCE (Michael, 2026-08-25, from a device screenshot). The line names a
+  // movement, and without this it reads as the app's decision rather than as its opening offer —
+  // an athlete who wanted a different one had no reason to think the row below would change it.
+  // ⚠️ PLURAL FOR THE DAY-REACHING CHIPS: Chest, Shoulders and Arms name no single movement, they
+  // re-point the picks. Singular where exactly one movement is named. Declarative in both — "change
+  // the movement below" would be an instruction, and this app names trades rather than issuing them.
+  const yoursSingular = 'The movement is yours to change below.';
+  const yoursPlural = 'The movements are yours to change below.';
+
   if (days.length > 0) {
-    // ⚠️ SINGULAR — `DIAL_OWNERSHIP`, not the chip's plural label. "more shoulders work" and "more
-    // arms work" read as typos, and this is the same singular the plan rows use, so the screen and
-    // the built block name the thing identically.
+    // ⚠️ SINGULAR MUSCLE WORD — `DIAL_OWNERSHIP`, not the chip's plural label. "more shoulders work"
+    // and "more arms work" read as typos, and this is the same singular the plan rows use.
     return `${label} — more ${DIAL_OWNERSHIP[chip]} work on ${joinDays(days)}, toward ${band} a `
-      + 'week. Light weeks carry less.';
+      + `week. ${yoursPlural} Light weeks carry less.`;
   }
 
   // ⚠️ THE MOVEMENT IS NAMED BECAUSE THE ATHLETE CHOSE IT one control below. "Extra sets" is vague
@@ -152,7 +164,7 @@ export function dialChipLine(
     || dialRowOptions(chip, opts.equipment ?? null)[0]?.name
     || '';
   const named = chosen ? `${movementLabel(chosen)} ` : '';
-  return `${label} — extra ${named}sets on your lifting days, toward ${band} a week. `
+  return `${label} — extra ${named}sets, toward ${band} a week. ${yoursSingular} `
     + 'Light weeks carry less.';
 }
 
