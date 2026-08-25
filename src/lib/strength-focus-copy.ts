@@ -144,8 +144,10 @@ export function strengthFocusBrief(opts: { weeks?: number } = {}): string {
     // ⛔ "Speed and distance blocks unlock when this one closes" CUT (Michael, 2026-08-24 evening) —
     // neither block exists (this file's own §"unlock … IS A DEBT" note), and the line cost height on
     // the screen that must fit four athlete cards unscrolled.
-    `Strength leads for ${weeks} weeks. Lifting days placed around the endurance you keep — ` +
-    `enough to hold what you've built.`
+    // ⛔ MICHAEL'S WORDING (2026-08-24 evening), verbatim shape: hold endurance, build strength,
+    // and the one-clause truth about concurrent training — you can't push both.
+    `Strength leads for ${weeks} weeks. Lifting days placed around endurance. The goal is to hold ` +
+    `your endurance while you build strength — you can't push both.`
   );
 }
 

@@ -111,13 +111,19 @@ export const RUN_TAX_LINES: string[] = [
 export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 1);
 
 /**
- * ⛔ THE HONESTY NOTE, MOVED FROM THE TIER SCREEN (Michael, 2026-08-24 evening) — his words,
- * verbatim, unchanged from `TIER_ENTRY_NOTE`. They are about the running volume, so they render
- * beside the miles box, the moment the number they are about is typed — not at the tier door.
+ * ⛔ THE VOLUME NOTE (Michael, 2026-08-24 evening — supersedes the moved TIER_ENTRY_NOTE the same
+ * day). His first sentence verbatim; the second is the honesty-checked version of his draft: "any
+ * reduction on the bike benefits your strength" was not supported (Schumann 2022 — cycling barely
+ * interferes, which is why this block's hard sessions ride), so it says what the research does.
+ * The athlete decides their endurance; no governor, no prefill (his ruling, same conversation).
  */
 export const VOLUME_HONESTY_LINES = [
-  'Riding takes a smaller toll on your body than running.',
-  'Be honest about your running miles — the plan holds what you enter.',
+  'Add the miles you currently hold comfortably — this is not the time for road PRs.',
+  'More running will slow your strength progress; riding is much more forgiving.',
+  // ⛔ "re-dial" IS A DEBT (2026-08-24 evening, flagged at the time): no mid-block volume edit
+  // exists today — the wizard is the only place these numbers are typed. The line ships on
+  // Michael's call; the control it promises is owed. Same pattern as the retired "unlock" line.
+  'Start on the lower end if unsure — give it a month before re-dialing your endurance numbers.',
 ] as const;
 
 /** The reality-check bands are field practice (the novice/intermediate norms the big running apps
@@ -254,13 +260,16 @@ export function liftingRateLine(
   const tier = liftingRateTier(slots as Record<SlotKey, SlotSport>);
   const rate = RATE_TEXT[tier];
   const squat = Number(squat1RM);
+  // ⛔ PRESCRIPTION, NOT PROPHECY (Michael, 2026-08-24 evening: "that feels like an overconfidence
+  // number"). The rates are his published program rates — what the PLAN advances the bar by. "The
+  // lifting climbs" promised the athlete's own response; the plan advancing is the fact.
   if (!Number.isFinite(squat) || squat <= 0) {
-    return `On this mix the lifting climbs ${rate}.`;
+    return `On this mix the plan advances the bar ${rate}.`;
   }
   // ⚠️ ONE PER CENT OF THE NUMBER ON FILE, ROUNDED TO THE NEAREST FIVE — the plate grid the block
   // already prescribes on. A pound-exact figure would be precision the plates cannot express.
   const step = Math.max(5, Math.round((squat * 0.01) / 5) * 5);
-  return `On this mix the lifting climbs ${rate} — about ${step} lb a step on a ${Math.round(squat)} lb squat.`;
+  return `On this mix the plan advances the bar ${rate} — about ${step} lb a step on a ${Math.round(squat)} lb squat.`;
 }
 
 /**

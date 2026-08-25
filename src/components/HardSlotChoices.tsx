@@ -43,10 +43,14 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           looked pressable would be the control this ruling removed, wearing different paint.
           ⚠️ DIMMED WHILE A CLUB SESSION HOLDS THE SLOT, not hidden: the athlete should be able to see
           what they are replacing, and a row that vanishes on tap is a row they cannot compare. */}
+      {/* ⛔ UNBOXED (Michael, 2026-08-24 evening) — same ruling as the tax lines: boxed, the fact
+          read as the FIRST OPTION above the real choices, so "Engine's pick" looked second. Plain
+          text — information looks like information, and the first bordered row below is the first
+          choice. */}
       {fact && (
         <div
           data-testid={`hard-${props.slotKey}-fact`}
-          className="px-2.5 py-2 rounded-xl border border-white/10 bg-white/[0.03]"
+          className="px-1 py-1"
           style={club ? { opacity: 0.45 } : undefined}
         >
           <span className="block text-white/90 text-sm">{fact.title}</span>

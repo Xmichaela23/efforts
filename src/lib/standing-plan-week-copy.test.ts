@@ -179,7 +179,7 @@ Deno.test('⛔ NO ENDURANCE-IMPROVEMENT PERCENTAGE APPEARS ANYWHERE', () => {
     for (const p of pcts) {
       // The only percentage any of these may carry is the lifting rate's own "1%".
       assertEquals(p.replace(/\s/g, ''), '1%', `a percentage that is not the lifting rate: "${p}" in "${line}"`);
-      assert(/lifting climbs/.test(String(line)), `a percentage outside the rate line: "${line}"`);
+      assert(/plan advances the bar/.test(String(line)), `a percentage outside the rate line: "${line}"`);
     }
   }
 });

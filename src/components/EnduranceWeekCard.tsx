@@ -46,7 +46,7 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { boundsLine, weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
+import { weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
@@ -115,8 +115,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   });
   const rate = liftingRateLine(props.slots, props.squat1RM);
   const split = upperLowerSplitLine(props.slots);
-  const runLine = boundsLine(bounds.runMilesInput, props.unit === 'km' ? 'km a week' : 'miles a week');
-  const rideLine = boundsLine(bounds.rideHours, 'hours a week');
 
   return (
     /**
@@ -294,7 +292,9 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 />
                 <span className="text-white/50 text-sm">{props.unit === 'km' ? 'km' : 'mi'}</span>
               </div>
-              {runLine ? <p className="text-white/40 text-xs mt-1.5" data-testid="run-bounds">{runLine}</p> : null}
+              {/* ⛔ "This week holds X to Y" CUT (Michael, 2026-08-24 evening: "it's confusing").
+                  The input keeps its min/max and placeholder; the mileage bands below are the
+                  guidance. `boundsLine` still exists for the engine's own tests. */}
               {/* ⛔ THE 20-MILE CEILING'S SIGNAGE (Michael, 2026-08-24): typing above the block's
                   running cap gets one factual line, not a refusal — and a link when the
                   endurance-leading frame exists. */}
@@ -325,7 +325,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 />
                 <span className="text-white/50 text-sm">h</span>
               </div>
-              {rideLine ? <p className="text-white/40 text-xs mt-1.5" data-testid="ride-bounds">{rideLine}</p> : null}
+              {/* ⛔ Same cut as the run side — no "holds X to Y" line. */}
             </div>
           ) : null}
           </div>
