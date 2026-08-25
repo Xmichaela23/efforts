@@ -493,7 +493,15 @@ export const FAMILIES: Record<FamilyId, {
 
   run_mlss: {
     sport: 'run',
-    label: 'Maximal lactate steady state',
+    /**
+     * ⛔ THE FAMILY'S DISPLAY NAME IS THE FIELD'S, NOT THE BOOK'S (Michael, 2026-08-25).
+     * "Maximal lactate steady state" is the source's own section heading (pp231-232) and it is what
+     * the closed row shows an athlete — "Hard session 1 · Run · Maximal lactate steady state".
+     * ⚠️ COPY-VOICE rule 9: plain words for every metric. ⚠️ THE KEY `run_mlss` IS UNCHANGED, and
+     * so are `intent` and `cite` — the physiology is still the physiology, and the citation still
+     * points at the page this came from.
+     */
+    label: 'Threshold',
     workFloorPct: 1.0,
     intent: 'Maximum time in zone 4 with equalised fatigue.',
     cite: 'Viada pp231-232',
@@ -501,7 +509,17 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'surge_float',
         shape: 'intervals',
-        label: 'Surge and float',
+        /**
+         * ⛔ THE DISPLAY NAME IS THE FIELD'S, NOT THE BOOK'S (Michael, 2026-08-25). "Surge and
+         * float" is Viada's phrasing, lifted verbatim; "over-unders" is what this session is called
+         * everywhere an athlete would have met it — TrainerRoad, Fast Talk, any coach's plan.
+         * ⚠️ THE ID IS UNCHANGED AND IS WHAT EVERYTHING MATCHES ON — `VARIANT_BODY`, the athlete's
+         * stored `archetype` pick, the composer's `archetypes` map. Renaming the id would strand
+         * every draft and every built plan that carries the old one.
+         * ⚠️ THE DESCRIPTION LINE IS UNCHANGED TOO (`hard-slot-choices.ts` `VARIANT_BODY`) — it
+         * describes the session, and the session did not change.
+         */
+        label: 'Over-unders',
         repBand: { lo: 10, hi: 45 },
         repsBand: { lo: 6, hi: 12 },
         work: pct(1.25, 1.30),
@@ -513,7 +531,9 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'descending',
         shape: 'descending',
-        label: 'Descending ladder',
+        // ⛔ FIELD-STANDARD NAME, same call as `surge_float` above — "descending ladder" is the
+        // book's words; "cut-downs" is the one a runner would recognise. Id and body unchanged.
+        label: 'Cut-downs',
         repBand: { lo: 30, hi: 180 },
         work: pct(1.20),
         recovery: { kind: 'proportional', factor: 0.67, intensity: pct(0.60) },
@@ -582,7 +602,12 @@ export const FAMILIES: Record<FamilyId, {
 
   run_vt1: {
     sport: 'run',
-    label: 'VT1',
+    /**
+     * ⛔ VT1 IS LAB VOCABULARY (Michael, 2026-08-25) — the first ventilatory threshold, which is the
+     * book's term and a physiologist's, not a word an athlete uses about their own week.
+     * ⚠️ COPY-VOICE rule 9 names exactly this class. The key `run_vt1` is unchanged.
+     */
+    label: 'Easy',
     workFloorPct: 0,
     intent: 'Any run at or below VT1. The level refers almost strictly to the duration.',
     cite: 'Viada p235',
@@ -590,7 +615,13 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'continuous',
         shape: 'continuous',
-        label: 'Continuous VT1 run',
+        /**
+         * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
+         * 2026-08-25). ⚠️ THE ID IS UNTOUCHED and is what everything matches on: the athlete's
+         * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
+         * and `cite` lines below are unchanged — the session did not change, only its name.
+         */
+        label: 'Steady easy run',
         repBand: { lo: 25 * 60, hi: 90 * 60 },
         work: vt1,
         recovery: { kind: 'open' },
@@ -610,7 +641,13 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'long_with_inserts',
         shape: 'continuous_with_inserts',
-        label: 'Long VT1 run with inserted sets',
+        /**
+         * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
+         * 2026-08-25). ⚠️ THE ID IS UNTOUCHED and is what everything matches on: the athlete's
+         * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
+         * and `cite` lines below are unchanged — the session did not change, only its name.
+         */
+        label: 'Long easy run with inserted sets',
         repBand: { lo: 30, hi: 240 },
         work: pct(0.95, 1.15),
         recovery: { kind: 'stated', band: { lo: 30, hi: 60 }, intensity: vt1 },
@@ -622,7 +659,13 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'race_pace_finish',
         shape: 'continuous_with_finish',
-        label: 'Long VT1 run with a race-pace finish',
+        /**
+         * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
+         * 2026-08-25). ⚠️ THE ID IS UNTOUCHED and is what everything matches on: the athlete's
+         * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
+         * and `cite` lines below are unchanged — the session did not change, only its name.
+         */
+        label: 'Long easy run with a race-pace finish',
         repBand: { lo: 5 * 60, hi: 15 * 60 },
         work: { kind: 'race_pace' },
         recovery: { kind: 'open' },
@@ -631,7 +674,13 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'fartlek',
         shape: 'continuous_with_inserts',
-        label: 'VT1 fartlek',
+        /**
+         * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
+         * 2026-08-25). ⚠️ THE ID IS UNTOUCHED and is what everything matches on: the athlete's
+         * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
+         * and `cite` lines below are unchanged — the session did not change, only its name.
+         */
+        label: 'Easy fartlek',
         repBand: { lo: 180, hi: 240 },
         work: pct(0.85),
         recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
@@ -643,7 +692,13 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'hike',
         shape: 'continuous',
-        label: 'Mixed-terrain hike or VT1 jog',
+        /**
+         * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
+         * 2026-08-25). ⚠️ THE ID IS UNTOUCHED and is what everything matches on: the athlete's
+         * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
+         * and `cite` lines below are unchanged — the session did not change, only its name.
+         */
+        label: 'Mixed-terrain hike or easy jog',
         repBand: { lo: 60 * 60, hi: 300 * 60 },
         work: vt1,
         recovery: { kind: 'open' },
@@ -924,7 +979,12 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'out_and_across',
         shape: 'intervals',
-        label: 'Out and across, sighting on a fixed interval',
+        /**
+         * ⛔ THE BOOK'S OWN SENTENCE, REPLACED WITH A NAME (Michael, 2026-08-25). "Out and across,
+         * sighting on a fixed interval" is p749/754 verbatim, and it reads as an instruction rather
+         * than a label. ⚠️ The id `out_and_across` is unchanged.
+         */
+        label: 'Open-water sighting intervals',
         // ⚠️ LEVELS 1 AND 2 ONLY. His level 3 open-water session is the straight distance below;
         // there is no level 3 out-and-across on the page, so the library does not offer one.
         levels: [1, 2],

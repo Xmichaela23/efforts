@@ -501,8 +501,11 @@ function buildContinuousWithInserts(ctx: BuildContext): Block[] {
   return [
     {
       repeat: 1,
-      label: sport === 'ride' ? 'Steady endurance' : 'Steady at VT1',
-      steps: [step('work', sport === 'ride' ? 'Steady' : 'VT1', steadySeconds, steadyIntensity, sport, anchor)],
+      // ⛔ THE BLOCK AND STEP NAMES FOLLOW THE ARCHETYPE'S (2026-08-25) — the same double-naming
+      // trap `Cut-downs` had: the menu said one word and the built workout said the book's.
+      // ⚠️ `{ kind: 'vt1' }` BELOW IS AN INTENSITY ANCHOR, NOT A DISPLAY STRING, and stays.
+      label: sport === 'ride' ? 'Steady endurance' : 'Steady easy',
+      steps: [step('work', sport === 'ride' ? 'Steady' : 'Easy', steadySeconds, steadyIntensity, sport, anchor)],
       restBetween: null,
     },
     {
@@ -521,8 +524,8 @@ function buildContinuousWithFinish(ctx: BuildContext): Block[] {
   return [
     {
       repeat: 1,
-      label: 'Steady at VT1',
-      steps: [step('work', 'VT1', steadySeconds, { kind: 'vt1' }, sport, anchor)],
+      label: 'Steady easy',
+      steps: [step('work', 'Easy', steadySeconds, { kind: 'vt1' }, sport, anchor)],
       restBetween: null,
     },
     {
@@ -551,7 +554,9 @@ function buildDescending(ctx: BuildContext): Block[] {
     const rest = recoveryStep(a, work, sport, anchor);
     if (rest && i < rungs - 1) steps.push(rest);
   }
-  return [{ repeat: 1, label: `Descending ladder, ${rungs} rungs`, steps, restBetween: null }];
+  // ⚠️ THE BLOCK LABEL FOLLOWS THE ARCHETYPE'S (2026-08-25). It is the same session named twice —
+  // the menu said "Cut-downs" and the built workout said "Descending ladder, 5 rungs".
+  return [{ repeat: 1, label: `Cut-downs, ${rungs} rungs`, steps, restBetween: null }];
 }
 
 // ── totals ──────────────────────────────────────────────────────────────────────────────────────
