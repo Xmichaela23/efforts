@@ -678,6 +678,23 @@ reads as *"here is your week, and also…"*. The kinds stay separate; what chang
 leads. ⚠️ The added cards sit BETWEEN the copy line and the add control: below the button they read
 as the next empty one.
 
+### The dismiss is on the card header (Michael, from a device screenshot)
+
+*"+ Add a hard session costs a curiosity tap too much."* The only exit was a text link at the BOTTOM
+of the expanded card, so an athlete who tapped Add to see what it was had to open the card, scroll it
+and read for the way out. The dismiss is now an **X on the card's header row, visible whether the
+card is expanded or collapsed**, and the bottom link is deleted.
+
+⛔ **It is a sibling of the disclosure button, not inside it.** A button nested in a button is invalid
+HTML and the inner click would toggle the row on its way out — the card would collapse and vanish in
+one frame, which reads as a glitch rather than a dismissal. The header is a flex row holding both.
+
+⚠️ **"Returns to exactly its pre-tap state" includes which row was open.** Adding a session opens it,
+which collapses whatever the athlete already had open; dismissing straight back out would have left
+that card closed — a curiosity tap quietly costing them their place. `restoreOnDismiss` remembers the
+previously-open row and re-opens it, and is cleared the moment the athlete touches any row, so it can
+never restore a stale one later.
+
 ### The UX: Add / Remove, not tap-to-clear
 
 Michael asked whether a second tap on the chosen sport should clear the slot. **It should not.** It

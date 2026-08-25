@@ -28,7 +28,7 @@
  * improvement percentage appears anywhere** — the work order forbids it and no source gives one.
  */
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import {
   ENDURANCE_WEEK_PREAMBLE,
   LONG_SLOT_NOTE,
@@ -98,6 +98,16 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * ⚠️ NOTHING IS OPEN ON ARRIVAL: the screen's whole claim is that it is already answered.
    */
   const [open, setOpen] = React.useState<SlotKey | null>(null);
+  /**
+   * ⛔ WHAT WAS OPEN WHEN "+ Add" WAS TAPPED, so dismissing that card puts the screen back EXACTLY
+   * as it was (Michael, 2026-08-25). Adding a session opens it, which collapses whatever the athlete
+   * already had open; X-ing straight back out would otherwise leave that card closed — a curiosity
+   * tap that quietly costs them their place. ⚠️ Cleared once the added card is dismissed or the
+   * athlete opens anything else, so it can never restore a stale row much later.
+   */
+  const [restoreOnDismiss, setRestoreOnDismiss] = React.useState<
+    { added: SlotKey; prevOpen: SlotKey | null } | null
+  >(null);
 
   /**
    * ⛔ THE VOLUME SECTION ANNOUNCES ITSELF (Michael, 2026-08-24 evening: "the miles and hours are
@@ -175,28 +185,74 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 backgroundColor: isOpen ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.02)',
               }}
             >
-              <button
-                type="button"
-                data-testid={`slot-row-${key}`}
-                aria-expanded={isOpen}
-                onClick={() => setOpen(isOpen ? null : key)}
-                className="w-full text-left px-4 py-3.5 flex items-center justify-between gap-3"
-              >
-                <span className="min-w-0">
-                  {/* ⛔ THE ROW STATES ITS WHOLE ANSWER — never "Hard 1". See `slotSummary`. */}
-                  <span className="block text-white/90 text-sm leading-snug truncate">
-                    {slotSummary(key, sport, session)}
+              {/* ⛔⛔ THE DISMISS SITS ON THE HEADER, BESIDE THE CHEVRON (Michael, from a device
+                  screenshot 2026-08-25): *"+ Add a hard session costs a curiosity tap too much"*.
+                  The only exit used to be a text link at the bottom of the EXPANDED card, so an
+                  athlete who tapped Add to see what it was had to open the card, scroll it and read
+                  for the way out. **Tapping Add and immediately X-ing out returns the screen to
+                  exactly its pre-tap state.**
+
+                  ⛔ IT IS A SIBLING OF THE DISCLOSURE BUTTON, NOT INSIDE IT. A button nested in a
+                  button is invalid HTML and the inner click would toggle the row on its way out —
+                  the card would collapse and vanish in one frame, which reads as a glitch rather
+                  than as a dismissal. The header is a flex row holding both controls. */}
+              <div className="flex items-stretch">
+                <button
+                  type="button"
+                  data-testid={`slot-row-${key}`}
+                  aria-expanded={isOpen}
+                  onClick={() => {
+                    // ⚠️ TOUCHING ANY ROW ENDS THE UNDO. The restore only means "this add was a
+                    // curiosity tap"; once the athlete has worked the screen it is stale.
+                    setRestoreOnDismiss(null);
+                    setOpen(isOpen ? null : key);
+                  }}
+                  className="flex-1 min-w-0 text-left pl-4 pr-2 py-3.5 flex items-center justify-between gap-3"
+                >
+                  <span className="min-w-0">
+                    {/* ⛔ THE ROW STATES ITS WHOLE ANSWER — never "Hard 1". See `slotSummary`. */}
+                    <span className="block text-white/90 text-sm leading-snug truncate">
+                      {slotSummary(key, sport, session)}
+                    </span>
+                    {key === 'long' ? (
+                      <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
+                    ) : null}
                   </span>
-                  {key === 'long' ? (
-                    <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
-                  ) : null}
-                </span>
-                <ChevronDown
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 text-white/35 transition-transform"
-                  style={isOpen ? { transform: 'rotate(180deg)' } : undefined}
-                />
-              </button>
+                  <ChevronDown
+                    aria-hidden
+                    className="h-4 w-4 shrink-0 text-white/35 transition-transform"
+                    style={isOpen ? { transform: 'rotate(180deg)' } : undefined}
+                  />
+                </button>
+                {/* ⚠️ VISIBLE WHETHER THE CARD IS OPEN OR CLOSED — the exit must not be something
+                    you have to expand the card to find. ⛔ Hard slots only: recovery and long are
+                    the frame's own and are not dismissible. */}
+                {isHard ? (
+                  <button
+                    type="button"
+                    data-testid={`dismiss-hard-${key}`}
+                    aria-label="Remove this hard session"
+                    onClick={() => {
+                      props.onSlotChange(key, null);
+                      // ⛔ BACK TO THE PRE-TAP STATE. If this is the card "+ Add" just opened, the
+                      // row that was open before it re-opens; otherwise the dismissal only closes
+                      // this one. ⚠️ A blanket `setOpen(null)` would close somebody else's expanded
+                      // card as a side effect of dismissing this one.
+                      if (restoreOnDismiss?.added === key) {
+                        setOpen(restoreOnDismiss.prevOpen);
+                        setRestoreOnDismiss(null);
+                      } else if (isOpen) {
+                        setOpen(null);
+                      }
+                    }}
+                    /* A 44px-wide target — the row is already tall enough, and a 16px icon alone is
+                       under the thumb minimum this wizard uses everywhere else. */
+                    className="shrink-0 w-11 flex items-center justify-center text-white/35"
+                  >
+                    <X aria-hidden className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
 
               {isOpen ? (
                 <div className="px-4 pb-4 space-y-3">
@@ -242,18 +298,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       choices. `RUN_TAX_LINES` stays exported — the copy tests pin his sentences. */}
                   {isHard && props.renderHardFlavor ? props.renderHardFlavor(key) : null}
 
-                  {/* ⛔ THE INVERSE OF ADD, AND IT IS EXPLICIT. See the add block below for why this
-                      is a Remove rather than a second tap on the chosen sport chip. ⚠️ It closes the
-                      row as it clears it — leaving an open disclosure over a row that no longer
-                      exists is how the list ends up with a hole in it. */}
-                  {isHard ? (
-                    <button
-                      type="button"
-                      data-testid={`remove-hard-${key}`}
-                      onClick={() => { props.onSlotChange(key, null); setOpen(null); }}
-                      className="text-white/45 text-xs underline underline-offset-2"
-                    >Remove this hard session</button>
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -299,7 +343,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           two different intents: *"I want the other sport"* and *"I do not want this session at all"*.
           A chip that clears on a second tap also loses the session to a mis-tap, with no undo and no
           warning — and it leaves no affordance saying removal is possible, so an athlete who wants
-          zero has to guess. An explicit Remove is the inverse of an explicit Add, which is the
+          zero has to guess. An explicit dismiss is the inverse of an explicit Add, which is the
           pattern the rest of this wizard already uses ("+ Add a run"), and it keeps the sport chips
           doing exactly one thing. */}
       <div className="flex flex-col gap-2">
@@ -324,7 +368,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               // for one commit and handed a mixed athlete Run, because that array is built run-first
               // by the POSTURE step and its order carries no preference.
               const lead = defaultSportForAddedSlot(next, props.allowedSports);
-              if (lead) { props.onSlotChange(next, lead); setOpen(next); }
+              if (!lead) return;
+              props.onSlotChange(next, lead);
+              setRestoreOnDismiss({ added: next, prevOpen: open });
+              setOpen(next);
             }}
             className="w-full px-4 py-3 rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-white/70 text-sm text-left"
           >
