@@ -280,7 +280,8 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   data-testid="run-volume"
                   value={props.runVolume}
                   onChange={(e) => props.onRunVolume(e.target.value)}
-                  placeholder={String(Math.round((bounds.runMilesInput.min + bounds.runMilesInput.max) / 2))}
+                  /* ⛔ NO NUMBER IN AN EMPTY BOX (Michael, 2026-08-24 night). A grey midpoint read
+                     as a suggestion — the athlete types their own week or nothing. */
                   className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums"
                 />
                 <span className="text-white/50 text-sm">{props.unit === 'km' ? 'km' : 'mi'}</span>
@@ -313,7 +314,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   data-testid="ride-hours"
                   value={props.rideHours}
                   onChange={(e) => props.onRideHours(e.target.value)}
-                  placeholder={String(bounds.rideHours.max)}
+                  /* ⛔ Same — no suggested hours in the empty box. */
                   className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums"
                 />
                 <span className="text-white/50 text-sm">h</span>
