@@ -98,8 +98,12 @@ Deno.test('the strength choice is offered rather than assumed, with three real a
     /strength: k === 'none' \? 'out' : 'maintain'/.test(SRC),
     'the strength control no longer writes posture.strength — the default is unaskable again',
   );
-  assert(/Keep me together/.test(SRC), 'the durability option is gone');
-  assert(/Keep lifting heavy/.test(SRC), 'the heavy option is gone — the card is back to two answers');
+  // ⚠️ LABELS REWORDED 2026-08-25 to match the shipped card (a2d772ee reworded them and this pin was
+  // not updated): "Keep lifting heavy" → "Keep it heavy", "Keep me together" → "Keep it together".
+  // The pin is on the THREE ANSWERS EXISTING, not on the wording — matched loosely so the next copy
+  // pass does not fail a test about routing.
+  assert(/Keep it together/.test(SRC), 'the durability option is gone');
+  assert(/Keep it heavy/.test(SRC), 'the heavy option is gone — the card is back to two answers');
   assert(/Running only/.test(SRC), 'the "None" option is gone; strength is mandatory again');
 });
 

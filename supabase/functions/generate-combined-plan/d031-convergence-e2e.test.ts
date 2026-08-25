@@ -25,6 +25,26 @@
  *   4. After up to 12 passes + 1 deep pass, assert convergence.
  *   5. Assert no week-over-week ramp exceeds the 20% guardrail.
  *
+ * ⛔⛔ THE FIXTURE IS PINNED AGAINST THE 20% CAP IT WAS SEARCHED AT, NOT THE LIVE ONE (2026-08-25).
+ * D-068 (2026-05-26) raised `WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI` from 0.20 to 0.24 to absorb the
+ * swim/strength sessions D-064/D-066 restored. The reproducer still produces its documented
+ * `Week 8: 22.9%` spike — that number has not moved — but 22.9% is legal under a 24% cap, so the
+ * initial generation came back `ok=true`, `passes=0`, and all three assertions here failed on a
+ * test that was no longer exercising anything.
+ *
+ * ⚠️ A REPLACEMENT FIXTURE DOES NOT EXIST. A 960-point sweep (ctl 55-85 × 9-15 hr/wk × sprint /
+ * olympic / 70.3 × advanced / intermediate × race_peak / balanced × 12-20 wk) tops out at a 23.8%
+ * same-phase ramp — nothing in the reachable space clears 24%. So the throttle path cannot be
+ * reached black-box any more, and deleting the file would leave `tightenPhaseBlocksForFloorRebuild`
+ * with no coverage at all.
+ *
+ * ⚠️ SO THE CAP IS INJECTED, NOT THE PLAN BENT. `validateTrainingFloors` already accepts
+ * `opts.weekOverWeekRampMax` (:172) — the rebuild loop is driven at `REBUILD_CAP = 0.20` so the
+ * mechanism is exercised end-to-end exactly as it was on the day it was verified. Production keeps
+ * whatever D-068 decided; this file pins the MACHINE, not the threshold. The separate "every ramp
+ * is within the limit" test below still reads the LIVE constant, so a future cap change is still
+ * covered where it belongs.
+ *
  * Run from repo root:
  *   deno test --no-check --no-lock --allow-all \
  *     supabase/functions/generate-combined-plan/d031-convergence-e2e.test.ts
@@ -40,6 +60,13 @@ import {
   WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI,
 } from './validate-training-floors.ts';
 import type { AthleteState, GeneratedWeek, GoalInput, PhaseBlock } from './types.ts';
+
+/**
+ * The tri WoW cap this fixture was searched against, before D-068 raised the live one to 0.24.
+ * Injected into every `validateTrainingFloors` call in THIS file so the reproducer keeps
+ * reproducing and the rebuild loop keeps being exercised. See the header note.
+ */
+const REBUILD_CAP = 0.20;
 
 /**
  * The reproducer fixture — high-budget Olympic athlete with a close race date.
@@ -160,7 +187,7 @@ function runRebuildLoop(
     return out;
   };
 
-  const floorOpts = { hasTri: hasTriGoal };
+  const floorOpts = { hasTri: hasTriGoal, weekOverWeekRampMax: REBUILD_CAP };
   let longDayFloorOpts = {
     hasTri: hasTriGoal,
     primaryDistance: (goals.find((g) => g.priority === 'A') ?? goals[0])!.distance,
@@ -215,7 +242,7 @@ Deno.test('D-031 e2e HEADLINE: spike-reproducer fixture triggers WoW violation A
     recentLongestRideHr: 0,
     phaseBlocks: initialBlocks,
   });
-  const initialFloors = validateTrainingFloors(initialWeeks, { hasTri: true });
+  const initialFloors = validateTrainingFloors(initialWeeks, { hasTri: true, weekOverWeekRampMax: REBUILD_CAP });
   assert(
     !initialFloors.ok,
     `Fixture must reproduce the pre-fix failure mode (initial generation should fail WoW). ` +

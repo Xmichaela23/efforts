@@ -135,9 +135,18 @@ Deno.test('⛔ `run_days` IS NOT GATED ON STRENGTH POSTURE — a routing key is 
   // The report could neither find a path to the bad state nor prove there wasn't one — and the
   // failure it allows is silent: the miles arrive, the count does not, and the athlete's typed
   // mileage is divided across the DEFAULT two runs instead of the four they picked.
+  // ⚠️ REGEX WIDENED 2026-08-25. The `...(` used to sit directly on this ternary; the 2026-08-24
+  // slot refactor wrapped it in `isStrengthFocusPath ? { run_days: derivedCounts.runs } : (…)`, so
+  // the old anchored pattern failed on a change that did not touch the rule. Both arms are pinned
+  // instead — the strength path ships the count unconditionally from the slots, every other path
+  // gates on `runDays >= 1` (i.e. "did the athlete answer"), and neither reads strength posture.
   assert(
-    /\.\.\.\(state\.runDays >= 1 \? \{ run_days: state\.runDays \} : \{\}\)/.test(SRC),
+    /state\.runDays >= 1 \? \{ run_days: state\.runDays \} : \{\}/.test(SRC),
     'run_days is gated on something other than whether the athlete answered it',
+  );
+  assert(
+    /isStrengthFocusPath\s*\n?\s*\? \{ run_days: derivedCounts\.runs \}/.test(SRC),
+    'the strength path stopped shipping run_days from the endurance slots',
   );
   assert(
     !/posture\?\.strength === 'develop' && state\.runDays/.test(SRC),

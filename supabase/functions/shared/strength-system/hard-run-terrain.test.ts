@@ -16,7 +16,14 @@
 //      stripped from the flat session, where it is the one legitimate anchor of the four.
 //   5. The 40-second format coming back. It was built 2026-08-06 and reverted the same day (Q-260).
 //
-// Run: ~/.deno/bin/deno test --no-check supabase/functions/shared/strength-system/hard-run-terrain.test.ts
+// ⚠️ `--allow-net` IS NOT OPTIONAL, and it is not this test's doing. `expandRunToken` is imported
+// from `materialize-plan/index.ts`, which calls `Deno.serve` at top level (:3319) — importing the
+// module for its pure helpers starts an HTTP listener, and without net permission the whole file
+// dies as an uncaught error before a single case runs. Every `materialize-plan/*` and
+// `learn-fitness-profile/*` test has the same import shape. Left as a permission flag rather than
+// gating the `Deno.serve` behind `import.meta.main`, which would be a production change.
+//
+// Run: ~/.deno/bin/deno test --no-check --allow-read --allow-env --allow-net supabase/functions/shared/strength-system/hard-run-terrain.test.ts
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {

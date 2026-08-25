@@ -167,6 +167,13 @@ const LEDGER: Record<string, Reason> = {
 
   // ── lthr ─────────────────────────────────────────────────────────────────
   'lthr::supabase/functions/learn-fitness-profile/index.ts': 'writer',
+  // ⚠️ THE RECEIPT ONLY, NOT THE VALUE (added 2026-08-25 for the 2026-08-20 FTP caveat at
+  // `TrainingBaselines:1850`). It reads `ride_threshold_hr.is_estimate` — the provenance flag
+  // `analyzeRides` writes when it finds no hard rides — to say out loud that the FTP beside it
+  // rests on easy riding. The NUMBER is never touched; the file already routes lthr through
+  // `resolveCurrentLthr` (:18). Same shape as the three `receipt` rows this file already carries
+  // for run easy pace, run threshold pace and ftp.
+  'lthr::src/components/TrainingBaselines.tsx': 'receipt',
 
   // ── swim css (no owner by design — tracked, not chased) ──────────────────
   'swim css::supabase/functions/learn-fitness-profile/index.ts': 'writer',
@@ -265,7 +272,11 @@ Deno.test('the ledger reports how much work is left, and it must not grow', asyn
   console.log(`[anchor ledger] ${total} readers — ${resting} legitimate, ${blocked} blocked (no resolver for that sport), ${open} still to route`);
 
   if (open > 6) throw new Error(`anchor debt ROSE to ${open} (frozen at 36, now 6). Route it, do not list it.`);
-  if (total > 32) throw new Error(`ledger GREW to ${total} (frozen at 49, now 32). A new raw reader was added.`);
+  // ⚠️ RAISED 32 → 33 ON 2026-08-25, and only because the added row is a `receipt`. `open` — the
+  // count this ratchet actually protects — is unchanged at 6; no new reader of a raw VALUE landed.
+  // A rise driven by `debt`/`unreviewed` is still the failure this exists to catch, and the `open`
+  // ratchet above catches it independently of this total.
+  if (total > 33) throw new Error(`ledger GREW to ${total} (frozen at 49, now 33). A new raw reader was added.`);
 });
 
 /**

@@ -3,7 +3,7 @@
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   seedFromGoal, derivePlanShape, developCount, canSetDevelop, athleteDisciplinesFromBaselines,
-  floorForGoal, hoursForTier, buildPreferredDays,
+  floorForGoal, hoursForTier, buildPreferredDays, buildStrengthDefaultSlots,
   type Discipline,
 } from './non-race-goal-seeds.ts';
 
@@ -120,7 +120,12 @@ Deno.test('buildPreferredDays — posture-gated; out → no long day; anchor →
   assertEquals(pd.long_run, 'sunday');
   assertEquals(pd.long_ride, 'saturday');
   assertEquals(pd.quality_run, 'tuesday');          // anchor present → quality day
-  assertEquals(pd.strength, ['monday', 'thursday']);
+  // ⛔ `preferred_days.strength` IS GONE BY DESIGN (§0g). `preferred_days` means "the athlete chose
+  // this" and no path on this screen asks for strength days, so the engine default moved to
+  // `buildStrengthDefaultSlots` → `strength_optimizer_slots` ("scheduled by app"). The pin follows
+  // the value to its new channel rather than asserting a field that must stay absent.
+  assertEquals(pd.strength, undefined);
+  assertEquals(buildStrengthDefaultSlots(tri), ['monday', 'thursday']);
 
   // bike out → no long_ride; an anchor on the out discipline is omitted
   const runOnly = { swim: 'out', bike: 'out', run: 'develop', strength: 'maintain' };
@@ -136,6 +141,7 @@ Deno.test('buildPreferredDays — posture-gated; out → no long day; anchor →
 
   // strength out → no strength days
   assertEquals(buildPreferredDays({ run: 'develop', strength: 'out' }, {}).strength, undefined);
+  assertEquals(buildStrengthDefaultSlots({ run: 'develop', strength: 'out' }), null);
 });
 
 Deno.test('buildPreferredDays — qualityDays: BOTH a club run and a hard ride survive; out disciplines do not', () => {
@@ -148,7 +154,11 @@ Deno.test('buildPreferredDays — qualityDays: BOTH a club run and a hard ride s
   });
   assertEquals(pd.quality_run, 'tuesday');
   assertEquals(pd.quality_bike, 'wednesday');
-  assertEquals(pd.strength, ['monday', 'tuesday', 'thursday', 'friday']); // develop = the 4-day arc
+  // ⛔ SAME §0g MOVE, and `develop` returns null on purpose: the solver places Strength Focus's four
+  // days from the athlete's own anchors and `create-goal` writes the PLACED days back after the plan
+  // exists. A guess here would be overwritten, and wrong in the meantime.
+  assertEquals(pd.strength, undefined);
+  assertEquals(buildStrengthDefaultSlots(tri), null);
 
   // Posture still gates it — a hard ride for someone who dropped the bike is a leftover, not a day.
   const runOnly = { swim: 'out', bike: 'out', run: 'maintain', strength: 'develop' };
