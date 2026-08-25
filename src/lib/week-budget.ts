@@ -17,6 +17,13 @@ export type WeekSession = {
   duration?: number;
   /** The session's rows. The grid shows the accessory names so the swaps are visible at intake. */
   strength_exercises?: Array<{ name: string }>;
+  /**
+   * ⛔ THE COMPOSER'S OWN TAGS, carried so a reader can tell two `type: 'strength'` sessions apart.
+   * ⚠️ THE CASE THAT FORCED IT: the plyo day is emitted as `type: 'strength'` with `tags: ['plyo']`
+   * and no barbell in it, so counting strength rows called a four-lift week five. Matching on the
+   * NAME would be a display-string match — the exact coupling the label renames just broke twice.
+   */
+  tags?: string[];
 };
 
 export const WEEK_DAYS = [

@@ -153,6 +153,7 @@ import {
 } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
+import { liftingCommitmentLine, liftingDaysForFrame } from '@/lib/lifting-commitment';
 import {
   PLACEMENT_RULES, ruleWarning, tierOf, type RuleId,
 } from '@/lib/week-rules-copy';
@@ -4172,6 +4173,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 explanation was pushing the question it explains below the fold. Same source numbers,
                 so the card and the plan cannot promise different blocks. */}
             <p className="text-white/75 text-sm leading-relaxed">{strengthFocusBrief({})}</p>
+            {/* ⛔ WHAT IS OWED, BEFORE THE DAY PICKER (Michael, 2026-08-25). The lifting days are
+                what define this block and they were not named until step 7's week list — the last
+                screen before Build, three steps after the athlete committed to the shape.
+                ⛔ DERIVED FROM THE FRAME, NOT TYPED HERE — `liftingCommitmentLine` counts the days
+                the frame's own column carries barbell work, so a frame with a different count says
+                a different number without anyone editing this line. ⚠️ COPY-VOICE: the fact and its
+                consequence, no imperative and no reassurance. */}
+            {liftingCommitmentLine() && (
+              <p className="text-white/75 text-sm leading-relaxed">{liftingCommitmentLine()}</p>
+            )}
             {/* ⛔ "Who are you this block?" CUT (Michael, 2026-08-24 evening) — the four cards ARE
                 the question, and the heading's line of height is what kept the swim card below the
                 fold. The cards still pre-shape the slot screen exactly as before. */}

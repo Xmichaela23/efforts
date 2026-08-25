@@ -80,11 +80,37 @@ export default function WeekGrid({
 
   const activeDays = new Set(sessions.map((s) => s.day)).size;
   const mins = sessions.reduce((a, s) => a + (Number(s.duration) || 0), 0);
+  /**
+   * ⛔ THE LIFTING COUNT IN THE SUMMARY (Michael, 2026-08-25) — the commitment the block is built
+   * around, stated where the week is totalled rather than only inferable by reading seven rows.
+   *
+   * ⛔ COUNTED OFF THE WEEK IN FRONT OF THE ATHLETE, NOT OFF THE FRAME. `lifting-commitment.ts`
+   * derives the FRAME's number for the choosing step, where there is no built week yet; here there
+   * IS one, and the honest number is what this grid is actually showing. If the two ever disagree,
+   * this line is right and the mismatch is the finding.
+   * ⚠️ DAYS, NOT SESSIONS. Two strength rows can share one day, and "4 lifts" means four lifting
+   * DAYS — the thing the athlete is committing to.
+   *
+   * ⛔⛔ THE PLYO DAY IS `type: 'strength'` AND IS NOT A LIFTING DAY (found on the dev preview,
+   * 2026-08-25). `compose.ts` `plyoSession` emits the frame's day-3 plyo block as a strength
+   * session carrying A-Skips and hops — no barbell — so counting `type === 'strength'` read a
+   * four-lift week as "5 lifts", two lines under a step that had just promised four.
+   * ⚠️ EXCLUDED BY ITS TAG, NOT BY ITS NAME. `tags: ['standing_plan', 'plyo']` is stable; the name
+   * is a display string, and matching on one is what the label renames just had to unpick twice.
+   */
+  const liftDays = new Set(
+    sessions
+      .filter((s) => s.type === 'strength' && !(s.tags ?? []).includes('plyo'))
+      .map((s) => s.day),
+  ).size;
 
   return (
     <div className={`space-y-2 ${className}`}>
       <p className="text-white/75 text-sm">
         {activeDays} training {activeDays === 1 ? 'day' : 'days'}, {7 - activeDays} rest
+        {/* ⚠️ SILENT ON A WEEK WITH NO LIFTING — the grid also serves run-only plans, and "0 lifts"
+            there is a fact about a discipline that is not in the block. */}
+        {liftDays > 0 ? <>{' · '}{liftDays} {liftDays === 1 ? 'lift' : 'lifts'}</> : null}
         {' · '}about {Math.floor(mins / 60)}h{mins % 60 ? String(mins % 60).padStart(2, '0') : ''} a week
       </p>
 
