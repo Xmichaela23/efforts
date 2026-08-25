@@ -40,6 +40,16 @@ existing wire shape (ownership: "club") stays; what's new is that ownership can 
 slot. If the club ride's typical duration falls short of the plan's long-ride target, that is one
 informed note ("your long ride comes up ~50m short of the week's target"), not a block.
 
+**Club = pinned anchor (Michael's ruling, 2026-08-25).** A club session's day is fixed by the
+world, not preference — the club meets when it meets. So ticking club makes that session a pinned
+anchor automatically: the day it's set to is a pin the engine never moves, and the week is built
+around it exactly like a tapped pin. UI: the same "Club session" toggle on each session card's
+expansion (hard cards keep "Replaces this hard session."; the long card's line is "This is your
+long ride"); when club is ticked, that session's day question becomes "which day does it meet?"
+and step 7 renders the chip as pinned ("yours"-style, club-labeled), not engine-placed. Club on
+the long card does not consume a hard slot. Informed notes still apply (spacing costs, long-ride
+shortfall).
+
 **Slice 3 — copy.** Warning lines per tier, sourced from the rule that fired (the eight
 "How the week is put together" sentences are the same constants — keep them in agreement).
 

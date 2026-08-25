@@ -2914,6 +2914,17 @@ Deno.serve(async (req: Request) => {
                * ⚠️ INERT ON A GET STRONGER BLOCK. That builder does not read the field, and a
                * Standing Plan frame does not resolve for those athletes anyway.
                */
+              /**
+               * ⛔ THE LONG SESSION IS A CLUB RIDE (slice 2b, 2026-08-25). Forwarded on its own key,
+               * NOT folded into `hard_days` — that array's length is "how many hard sessions" and a
+               * long entry in it would charge the block for one. ⚠️ Absent means the app writes the
+               * long session, which is every block built before this field.
+               */
+              ...((gsTp as Record<string, unknown>).long_session
+                && typeof (gsTp as Record<string, unknown>).long_session === 'object'
+                && ((gsTp as Record<string, Record<string, unknown>>).long_session.ownership === 'club')
+                ? { long_session: { ownership: 'club' } }
+                : {}),
               ...(gsTp.skip_test_week === true ? { skip_test_week: true } : {}),
               /**
                * ⛔ THE ATHLETE'S PER-SLOT SPORT ANSWER (endurance-week screen, 2026-08-24). Counts

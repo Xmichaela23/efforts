@@ -72,9 +72,10 @@ export type EnduranceWeekCardProps = {
   onRideHours: (v: string) => void;
   unit: 'mi' | 'km';
   /** Rendered inside the open hard-slot row — VO2 vs speed, club session. */
-  renderHardFlavor?: (key: 'hard1' | 'hard2') => React.ReactNode;
+  /** ⚠️ WIDENED FOR THE LONG SLOT (slice 2b) — the club toggle is not hard-only. */
+  renderHardFlavor?: (key: 'hard1' | 'hard2' | 'long') => React.ReactNode;
   /** What the slot currently is, for the collapsed row. Hard slots only; others need no session. */
-  hardSessionTitle?: (key: 'hard1' | 'hard2') => string | null;
+  hardSessionTitle?: (key: 'hard1' | 'hard2' | 'long') => string | null;
   /**
    * ⛔ THE ATHLETE-TYPE ANSWER PRE-SHAPES THIS SCREEN (Michael, 2026-08-24): "Run only" never
    * renders Ride chips, "Ride only" never renders Run. With one sport allowed, every slot is
@@ -149,10 +150,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            */
           const color = sport ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
           const isOpen = open === key;
-          const session = (key === 'hard1' || key === 'hard2')
+          const isHard = key === 'hard1' || key === 'hard2';
+          /**
+           * ⛔ THE LONG SLOT SHOWS ITS SESSION TITLE TOO (slice 2b, 2026-08-25). It was hard-only,
+           * so a long slot the athlete had marked as their club ride showed the sport and nothing
+           * else — the one fact they had just entered was the one the closed row did not carry.
+           */
+          const session = (isHard || key === 'long')
             ? props.hardSessionTitle?.(key) ?? null
             : null;
-          const isHard = key === 'hard1' || key === 'hard2';
           return (
             <div
               key={key}
@@ -296,7 +302,13 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       carries the same fact ("More running will slow your strength progress…"), so
                       here they were the message said twice, standing between the chips and the
                       choices. `RUN_TAX_LINES` stays exported — the copy tests pin his sentences. */}
-                  {isHard && props.renderHardFlavor ? props.renderHardFlavor(key) : null}
+                  {/* ⛔ THE LONG SLOT GETS THE EXPANSION TOO (slice 2b). A club ride can BE the
+                      long ride — Michael, after field research: a 2.5-3h weekend club ride is
+                      routinely an athlete's long day. So the club toggle is not a property of hard
+                      sessions, it is a property of a session whose day the world fixes. */}
+                  {(isHard || key === 'long') && props.renderHardFlavor
+                    ? props.renderHardFlavor(key)
+                    : null}
 
                 </div>
               ) : null}

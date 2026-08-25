@@ -137,7 +137,7 @@ Deno.serve(async (req: Request) => {
       // Added 2026-07-26 — the doctrine's second pin and the bike volume. Both were collected at
       // intake, stored on the goal, and dropped at `create-goal-and-materialize-plan` before this
       // function ever saw them.
-      hard_days, target_weekly_ride_hours,
+      hard_days, long_session, target_weekly_ride_hours,
       // The bike, travelling beside the primary sport (2026-07-27). `{ hours, long_ride_day }`.
       bike,
     } = body as Record<string, unknown>;
@@ -471,6 +471,14 @@ Deno.serve(async (req: Request) => {
         const d = titleCaseDay(raw);
         return isWeekday(d) ? d : null;
       };
+      /**
+       * ⛔ A CLUB LONG SESSION IS A PIN BY ITS NATURE (slice 2b, 2026-08-25). Its day is fixed by
+       * the world, so the composer must not treat it as a preference the rotation may miss. The DAY
+       * itself already arrives as `long_run_day` / `long_ride_day`; this only says who owns it.
+       * ⚠️ IT NEVER ENTERS `hard_days`, so it cannot be counted as a hard session anywhere.
+       */
+      const longIsClub = !!long_session && typeof long_session === 'object'
+        && (long_session as Record<string, unknown>).ownership === 'club';
       const endurancePins = {
         long: asWeekday(longSlotSport === 'ride'
           ? (bike && typeof bike === 'object' ? (bike as Record<string, unknown>).long_ride_day : null)

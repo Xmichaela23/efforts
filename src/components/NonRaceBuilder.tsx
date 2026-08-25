@@ -866,6 +866,22 @@ type NonRaceState = {
   /** The days the athlete can train. Empty = unanswered; rest is the remainder. */
   trainingDays: DayName[];
   longRunDay: DayName | '';
+  /**
+   * ⛔ THE LONG SESSION IS A CLUB RIDE (slice 2b, 2026-08-25). Ownership on the LONG slot, kept out
+   * of `hardDays` so it cannot be counted as a hard session — `hardDays.length` is what the
+   * endurance tier and the composer read, and the handoff is explicit that club on the long card
+   * does not consume a hard slot.
+   * ⚠️ ITS DAY IS STILL `longRunDay` / `longRideDay`. Club changes who owns the day, not where the
+   * day is stored — a second home for it is how the two would drift.
+   */
+  longClub: boolean;
+  /**
+   * ⛔ HOW LONG THE CLUB RIDE ACTUALLY RUNS, in minutes (slice 2b). The one fact only the athlete
+   * has — the app cannot derive it, and without it the shortfall note has nothing to compare.
+   * ⚠️ EMPTY IS "NOT ASKED", NOT ZERO. An unanswered duration produces no note at all rather than a
+   * note claiming the ride is 0 minutes short.
+   */
+  longClubMinutes: number | '';
   longRideDay: DayName | '';
   /** The hard day the athlete already owns — a club run, a track night, a chaingang — PER DISCIPLINE.
    *  Was a single `anchorDiscipline` + `anchorDay`, which forced a runner who also rides to pick one
@@ -1504,6 +1520,17 @@ function assemblePayload(
           // places it in the same solve that places the bar.
           // ⚠️ A CLUB DAY WITHOUT A DAY IS STILL DROPPED: only the athlete knows when the club meets,
           // and the engine declines to invent an appointment (it drops it server-side too).
+          /**
+           * ⛔ THE LONG SESSION'S OWNERSHIP, ON ITS OWN KEY (slice 2b, 2026-08-25). It does NOT ride
+           * in `hard_days`: that array's LENGTH is what the composer and the endurance tier read as
+           * "how many hard sessions", and a long entry inside it would charge the block for one.
+           * The handoff is explicit — club on the long card does not consume a hard slot.
+           * ⚠️ THE DAY IS NOT REPEATED HERE. It is already `preferred_days.long_run` /
+           * `.long_ride`; sending it twice is two answers to one question.
+           * ⚠️ OMITTED WHEN FALSE, like every other key in this payload — absent means "the app
+           * writes this session", which is what every block before this field did.
+           */
+          ...(state.longClub ? { long_session: { ownership: 'club' as const } } : {}),
           ...(state.hardDays.some((h) => h.ownership !== 'club' || !!h.day)
             ? {
                 hard_days: state.hardDays
@@ -1891,7 +1918,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined,
+    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -2578,7 +2605,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
   /** A day the athlete tapped, as opposed to one the engine chose. Drives the chip's own styling. */
   const isPinned = (i: number): boolean =>
-    !!touchedUnits[`hard:${i}`] && !!state.hardDays[i]?.day;
+    // ⛔ A CLUB SESSION IS PINNED BY ITS NATURE (slice 2b) — its day is the world's, not a
+    // preference, so it reads as the athlete's answer whether or not they tapped the chip.
+    (state.hardDays[i]?.ownership === 'club' || !!touchedUnits[`hard:${i}`])
+    && !!state.hardDays[i]?.day;
 
 
   /**
@@ -2601,6 +2631,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       seen.add(text);
       out.push({ tier: tierOf(rule), text });
     };
+
+    /**
+     * ⛔ THE CLUB RIDE COMES UP SHORT (slice 2b, 2026-08-25) — ONE informed note, never a block.
+     *
+     * ⚠️ THE TARGET IS THE PLAN'S OWN, READ OFF THE BUILT WEEK. The long session's duration in
+     * `previewWeek` is what the block actually asks for; a number invented here would be the screen
+     * holding the athlete to a target the plan does not have.
+     * ⚠️ SILENT UNTIL BOTH NUMBERS EXIST. No duration answered, or no long session in the week yet,
+     * means there is nothing to compare — and a note about a 0-minute shortfall is the kind of
+     * confident wrong answer this codebase keeps deleting.
+     * ⚠️ ROUNDED TO 5 MINUTES. A club ride's "usually about two hours" is not a stopwatch reading,
+     * and reporting "47 minutes short" off it would be precision the input does not carry.
+     */
+    if (state.longClub && typeof state.longClubMinutes === 'number' && state.longClubMinutes > 0) {
+      /**
+       * ⚠️ THE SPORTS HAVE TO MATCH, and this was caught on the dev preview. The sport mix can put
+       * the frame's one long slot on the RUN while the athlete's club is a ride — the engine then
+       * reports the orphaned pin itself. Comparing a club ride's duration against a long RUN's
+       * target would be a shortfall note about two different sessions.
+       */
+      const wantType = scheduleRunShown ? 'run' : 'ride';
+      const longSession = (previewWeek ?? []).find((x) =>
+        /Long/i.test(String((x as { name?: string }).name ?? ''))
+        && String((x as { type?: string }).type ?? '') === wantType);
+      const target = Number((longSession as { duration?: number } | undefined)?.duration ?? 0);
+      const shortBy = target - state.longClubMinutes;
+      if (target > 0 && shortBy > 0) {
+        add('club_long_short', { shortMinutes: Math.round(shortBy / 5) * 5 });
+      }
+    }
 
     // ⚠️ A LIFT ON A DAY THE ATHLETE BLOCKED — the one cost the frame cannot absorb.
     for (const d of unavailableDays) {
@@ -2627,7 +2687,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       out.push({ tier: 'tradeoff', text: t });
     }
     return out;
-  }, [previewWeek, previewNotes, unavailableDays]);
+  }, [previewWeek, previewNotes, unavailableDays, state.longClub, state.longClubMinutes, scheduleRunShown]);
 
   const breachNotes = weekNotes.filter((n) => n.tier === 'breach');
 
@@ -5223,6 +5283,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const sport = slotSportsNow[key];
               // ⛔ NO SPORT, NO SESSION. The row shows its label alone until the athlete picks.
               if (!sport) return null;
+              // ⚠️ THE LONG SLOT READS ITS OWN FIELD — see `renderHardFlavor` for why its club
+              // answer is not in `hardDays`. Its only session answer is whether it is the club ride.
+              if (key === 'long') return state.longClub ? 'Club ride' : null;
               const h = hardEntry(state, key);
               if (h?.ownership === 'club') return 'Club session';
               // ⛔ THE TITLE READS THE LIBRARY (2026-08-24): the chosen variant's label when one is
@@ -5237,6 +5300,60 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               // ⛔ THE SESSION CHOICES APPEAR WITH THE SPORT — there is nothing to choose between
               // before one is picked, and two empty option lists is the form this screen stopped being.
               if (!sport) return null;
+              /**
+               * ⛔ THE LONG SLOT'S CLUB ANSWER LIVES IN ITS OWN FIELD, NOT IN `hardDays` (slice 2b,
+               * 2026-08-25). `hardDays` means "the hard sessions this athlete added" and its LENGTH
+               * is what the endurance tier and the composer count — pushing a long entry into it
+               * would charge the week for a hard day nobody asked for, which the handoff forbids
+               * outright ("club on the long card does not consume a hard slot").
+               */
+              if (key === 'long') {
+                return (
+                  <div className="space-y-2">
+                    <HardSlotChoices
+                    slotKey="long"
+                    sport={sport}
+                    value={{ ownership: state.longClub ? 'club' : 'prescribed' }}
+                    onChange={(patch) => setState((st) => {
+                      if (patch.ownership == null) return st;
+                      const club = patch.ownership === 'club';
+                      /**
+                       * ⛔ TICKING CLUB PINS THE DAY (Michael's ruling, 2026-08-25). A club session's
+                       * day is fixed by the world, not chosen — so the moment it is marked club, the
+                       * day stops being the engine's to propose. `touch` is the same flag a tap sets,
+                       * which is what makes step 7 render the chip as the athlete's rather than the
+                       * engine's, and what stops the pre-fill effect writing over it.
+                       */
+                      if (club) touch(scheduleRunShown ? 'longRun' : 'longRide');
+                      return { ...st, longClub: club };
+                    })}
+                    />
+                    {/* ⛔ HOW LONG IT RUNS — asked only once club is ticked, because it is only a
+                        question about a session the app is not writing. The plan's own long-ride
+                        target is compared against it on the week step; a club ride that comes up
+                        short is ONE note there, never a block. */}
+                    {state.longClub && (
+                      <label className="flex items-center justify-between gap-3 px-2.5 py-2 rounded-xl border border-white/12 bg-white/[0.03]">
+                        <span className="text-white/85 text-sm">Usually runs about</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            value={state.longClubMinutes === '' ? '' : String(state.longClubMinutes)}
+                            onChange={(e) => setState((st) => ({
+                              ...st,
+                              longClubMinutes: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)),
+                            }))}
+                            className="w-20 text-right bg-transparent border-b border-white/20 text-white text-sm py-0.5 focus:outline-none focus:border-white/60"
+                          />
+                          <span className="text-white/55 text-sm">min</span>
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                );
+              }
               const h = hardEntry(state, key) ?? hardDefaultsFor(sport, key);
               return (
                 <HardSlotChoices
@@ -5252,6 +5369,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     // ⚠️ SPREAD THE PATCH LAST so an explicit `goal: undefined` CLEARS a stale one —
                     // a threshold slot carrying a leftover "speed" is a session nobody picked.
                     next[j] = { ...next[j], ...patch } as NonRaceState['hardDays'][number];
+                    /**
+                     * ⛔ CLUB PINS THE DAY (Michael's ruling, 2026-08-25) — the club meets when it
+                     * meets, so its day is the world's answer and not the engine's to propose. Same
+                     * `touch` a tap sets, so the chip reads as the athlete's and the pre-fill stops
+                     * writing over it. ⚠️ Un-ticking does NOT release the pin: the day is still a day
+                     * they answered, and silently handing it back to the engine would be the unpick
+                     * this file has removed twice.
+                     */
+                    if (patch.ownership === 'club') touch(`hard:${j}`);
                     return { ...st, hardDays: next };
                   })}
                 />
@@ -5712,15 +5838,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {longRowShown && (
               <div className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-white/85 text-sm">{scheduleRunShown ? 'Long run' : 'Long ride'}</span>
+                  <span className="text-white/85 text-sm">
+                    {scheduleRunShown ? 'Long run' : 'Long ride'}
+                    {state.longClub && <span className="text-white/45"> — club ride</span>}
+                  </span>
+                  {/* ⛔ A CLUB SESSION IS NOT ASKED WHERE IT SHOULD GO (slice 2b). Only the athlete
+                      knows when the club meets, so the question changes from a choice to a fact. */}
                   <span className="text-xs" style={{ color: `rgba(${longRowRgb},0.85)` }}>
-                    {longRowDay ? DAY_SHORT[longRowDay as DayName] : 'Tap a day'}
+                    {longRowDay
+                      ? `${DAY_SHORT[longRowDay as DayName]}${state.longClub ? ' — club' : ' — yours'}`
+                      : (state.longClub ? 'Which day does it meet?' : 'Tap a day')}
                   </span>
                 </div>
                 <WeekDayRow
                   selected={longRowDay ? [longRowDay as DayName] : []}
                   plain
-                  pinned={!!touchedUnits[scheduleRunShown ? 'longRun' : 'longRide'] && !!longRowDay}
+                  pinned={(state.longClub || !!touchedUnits[scheduleRunShown ? 'longRun' : 'longRide']) && !!longRowDay}
                   accentRgb={longRowRgb}
                   roles={{}}
                   stacked={[]}
@@ -5753,8 +5886,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       {/* ⚠️ THE CUE NAMES WHOSE ANSWER IT IS, not just which day. "Yours" is the
                           word that makes the filled chip mean something. */}
                       {dayVal
-                        ? (isPinned(i) ? `${DAY_SHORT[dayVal as DayName]} — yours` : `${DAY_SHORT[dayVal as DayName]} — placed`)
-                        : 'Tap a day'}
+                        ? `${DAY_SHORT[dayVal as DayName]}${
+                          h.ownership === 'club' ? ' — club' : isPinned(i) ? ' — yours' : ' — placed'}`
+                        : (h.ownership === 'club' ? 'Which day does it meet?' : 'Tap a day')}
                     </span>
                   </div>
                   <WeekDayRow

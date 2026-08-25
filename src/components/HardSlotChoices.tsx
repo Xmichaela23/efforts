@@ -29,7 +29,12 @@ export type HardSlotChoicesProps = {
   value: HardSlotValue;
   onChange: (patch: HardSlotValue) => void;
   /** ⛔ `hard1` / `hard2` — the frame's two hard slots are POSITIONAL and carry different sessions. */
-  slotKey: HardSlotKey;
+  /**
+   * ⛔ WIDENED FOR THE LONG SLOT (slice 2b, 2026-08-25). Club is a property of a session whose day
+   * the WORLD fixes, not a property of a hard session — a weekend club ride is routinely the
+   * athlete's long ride.
+   */
+  slotKey: HardSlotKey | 'long';
 };
 
 export default function HardSlotChoices(props: HardSlotChoicesProps) {
@@ -51,7 +56,9 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           The family is the frame's fact above; WHICH of the family's own page-cited workouts fills
           it is the athlete's. Options come from the library's archetypes — one list, no copy.
           "Engine's pick" is the default and rotates week to week. */}
-      {!club && (() => {
+      {/* ⚠️ THE LONG SLOT HAS NO VARIANT MENU. Its family is the LSD session and the frame owns its
+          shape; the only question on this card for a long slot is whether it is a club ride. */}
+      {!club && props.slotKey !== 'long' && (() => {
         const variants = slotVariantOptions(props.slotKey, props.sport);
         if (variants.length < 2) return null;
         return (
@@ -108,7 +115,13 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
         </span>
         <span className="min-w-0">
           <span className="block text-white/85 text-sm leading-snug">A club session I already attend</span>
-          <span className="block text-white/45 text-xs leading-snug mt-0.5">Replaces this hard session.</span>
+          {/* ⛔ THE SUB-LABEL FOLLOWS THE ROW (Michael, slice 2b). On a hard slot the club REPLACES
+              the session the app would have written. On the long slot it does not replace anything
+              and does not consume a hard slot — it IS the long ride, so the line says that instead
+              of borrowing the hard row's sentence. */}
+          <span className="block text-white/45 text-xs leading-snug mt-0.5">
+            {props.slotKey === 'long' ? 'This is your long ride' : 'Replaces this hard session.'}
+          </span>
         </span>
       </button>
     </div>
