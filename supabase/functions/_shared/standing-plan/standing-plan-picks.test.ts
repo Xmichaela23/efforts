@@ -29,9 +29,14 @@ const rows = (wk: ReturnType<typeof week>) =>
 
 Deno.test('⛔ AN AB PICK REACHES THE WEEK, AND THE ROW STOPS SAYING NOBODY ASKED FOR CORE', () => {
   // ⛔ THE DEVICE FINDING ITSELF, AS A FIXTURE.
+  // ⚠️ IT USED TO PIN `e.name === 'plank'` HERE AND THAT WAS THE OTHER DEVICE DEFECT (2026-08-24):
+  // the floor filled the core gap with a STATIC HOLD and the row printed "3 x 8-10" under it. The
+  // floor now prefers a rep-prescribable movement (`isRepPrescribable`), so what this test needs is
+  // an un-picked core floor row of ANY movement — its subject is the SENTENCE, never the plank.
   const without = rows(week());
-  const core = without.find((e) => /had nothing else this week/.test(String(e.notes ?? '')) && e.name === 'plank');
-  assert(core, 'the un-picked week no longer produces the plank floor this test is about');
+  const core = without.find((e) => /had nothing else this week/.test(String(e.notes ?? '')));
+  assert(core, 'the un-picked week no longer produces the core floor this test is about');
+  assert(core!.name !== 'plank', 'the floor is back to filling core with a static hold');
 
   const wk = week(['Hanging Leg Raise']);
   const mine = rows(wk).find((e) => e.name === 'Hanging Leg Raise');
@@ -40,7 +45,10 @@ Deno.test('⛔ AN AB PICK REACHES THE WEEK, AND THE ROW STOPS SAYING NOBODY ASKE
   assert(!/had nothing else this week/.test(String(mine!.notes ?? '')),
     'the row still says the athlete asked for no core');
   assert(/your pick/i.test(String(mine!.notes ?? '')), 'the row does not say whose movement it is');
-  assert(!rows(wk).some((e) => e.name === 'plank'), 'the engine filled core twice');
+  // ⚠️ CORE'S floor row specifically — the week legitimately carries floor rows for biceps, triceps
+  // and calves, and asserting on the sentence alone would fail on those.
+  assert(!rows(wk).some((e) => /Floor: core had nothing else/.test(String(e.notes ?? ''))),
+    'the engine filled core twice');
 });
 
 Deno.test('a pick that fits a hypertrophy slot fills it, in the athlete\'s own spelling', () => {

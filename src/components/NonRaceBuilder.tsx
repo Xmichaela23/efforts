@@ -1858,8 +1858,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * depends on what the muscle already gets — so the athlete names the movement and the engine uses
    * it for the first row it places (`fillMuscleFloor`'s `prefer`), exactly as the core pick works.
    */
+  /**
+   * ⛔ AND `core` IS EXCLUDED, THOUGH IT REACHES NO FRAME SLOT EITHER (Michael, 2026-08-24, from a
+   * device screenshot). It already has a control on this very screen — the "Core movement" pick —
+   * and a second core dropdown produced exactly what you would expect: the pick said one movement,
+   * the Dial row defaulted to another, and the built week carried BOTH. **A third core movement the
+   * athlete never asked for.**
+   *
+   * ⛔ SO THE CORE CHIP EXTENDS THE CORE PICK instead of naming its own movement. The pick already
+   * travels to `fillMuscleFloor`'s `prefer` through `flattenViadaPicks`, so the added rows open on
+   * it by construction; where the target needs a second row, `alreadyPrescribed` blocks a repeat and
+   * the next rep-based movement in the pool becomes the complement. One control, one muscle.
+   */
   const dialRowChips = useMemo(
-    () => (viadaPrefs?.dial ?? []).filter((c) => !chipHasFrameSlot(c)),
+    () => (viadaPrefs?.dial ?? []).filter((c) => !chipHasFrameSlot(c) && c !== 'core'),
     [viadaPrefs],
   );
 
@@ -4445,7 +4457,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <p key={chip} className="text-white/65 text-[13px] mt-2 leading-relaxed">
                   {dialChipLine(chip, {
                     equipment: strengthEquipment,
-                    movement: viadaPrefs?.dial_rows?.[dialRowKey(chip, 0)] ?? null,
+                    // ⛔ CORE READS THE "Core movement" PICK, not a row of its own — it has no row
+                    // picker any more, and the line must name what the athlete actually chose.
+                    movement: chip === 'core'
+                      ? (viadaPrefs?.picks?.core ?? null)
+                      : (viadaPrefs?.dial_rows?.[dialRowKey(chip, 0)] ?? null),
                   })}
                 </p>
               ))}

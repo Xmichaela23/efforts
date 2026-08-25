@@ -144,6 +144,10 @@ export function dialChipLine(
 
   // ⚠️ THE MOVEMENT IS NAMED BECAUSE THE ATHLETE CHOSE IT one control below. "Extra sets" is vague
   // where "extra Hip Thrust sets" is the same length and answers the question.
+  //
+  // ⛔ FOR `core` THAT CONTROL IS THE "Core movement" PICK, NOT A ROW PICKER (2026-08-24). The chip
+  // extends what they already chose; naming anything else here would advertise the third movement
+  // the row picker used to create. The caller passes `picks.core`.
   const chosen = opts.movement?.trim()
     || dialRowOptions(chip, opts.equipment ?? null)[0]?.name
     || '';

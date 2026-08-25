@@ -20,6 +20,7 @@
 // ============================================================================
 
 import {
+  isRepPrescribable,
   movementsForMuscle,
   muscleFloorSets,
   musclesWorkedBy,
@@ -654,8 +655,50 @@ export function dialRowOptions(
       out.push({ name: m.name, display: movementLabel(m.name), muscle });
     }
   }
-  return out;
+
+  // ⛔ A STATIC HOLD CANNOT CARRY THIS ROW'S PRESCRIPTION, SO IT IS NOT OFFERED FOR IT (2026-08-24,
+  // Michael, from a device screenshot). Every row this picker feeds is dosed 3 x 8-10 by feel, and
+  // the core pool's own ranking leads with plank, side plank, copenhagen plank and two entries
+  // literally named "core work" — so the control opened on a movement that cannot express its own
+  // prescription. `isRepPrescribable` reads `exercise-role.ts`, which has answered this since the
+  // strength language spec; nothing new is being classified here.
+  //
+  // ⚠️ FALLS BACK TO THE UNFILTERED POOL RATHER THAN OFFERING NOTHING. No equipment case reaches it
+  // today; it exists so a future catalogue edit degrades to a bad option instead of an empty select.
+  const repBased = out.filter((o) => isRepPrescribable(o.name));
+  const pool = repBased.length > 0 ? repBased : out;
+
+  // ⛔ HIS OWN LIST LEADS, IN HIS ORDER — the same `leadWith` device the seven picks use, and for the
+  // same reason: the grid ranks by equipment fit, which is right and is blind to what the row is FOR.
+  const lead = DIAL_ROW_LEAD[chip] ?? [];
+  const leadKeys = lead.map((n) => canonicalize(n));
+  const rank = (o: PickOption): number => {
+    const i = leadKeys.indexOf(canonicalize(o.name));
+    return i === -1 ? leadKeys.length : i;
+  };
+  return pool
+    .map((o, i) => ({ o, i, r: rank(o) }))
+    .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
+    .map(({ o }) => o);
 }
+
+/**
+ * ⛔ WHAT AN ADDED ROW OPENS ON, IN THE SOURCE'S OWN ORDER — an ordering hint, never a filter.
+ *
+ * ⛔ CORE IS p223 VERBATIM: hanging leg raises, crunches, V-ups, dynamic plank variants, ab wheel
+ * rollouts. **Hanging Leg Raise leads because Michael ruled it** (2026-08-24) — rep-based,
+ * progressive, and first on the source's own list. ⚠️ "Dynamic plank variants" is the only entry of
+ * his that could resolve to a hold, and `isRepPrescribable` already keeps the static ones out; the
+ * shoulder-tap variant survives because it is counted in reps.
+ *
+ * ⛔ GLUTES IS OURS, like the muscle group itself (`GLUTES_IS_OURS`) — he names no glute list. The
+ * order is the ordinary loaded-first one the grid would give anyway; it is written down so the
+ * default is stable rather than a side effect of catalogue insertion order.
+ */
+const DIAL_ROW_LEAD: Partial<Record<DialChip, string[]>> = {
+  core: ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap', 'ab rollout'],
+  glutes: ['hip thrust', 'glute bridge', 'cable pull through', 'hip abduction'],
+};
 
 // ── THE PERSISTED SHAPE ──────────────────────────────────────────────────────────────────────────
 
@@ -709,7 +752,14 @@ export function normalizeViadaPrefs(
   const dial_rows: Record<string, string> = {};
   for (const [k, v] of Object.entries(rowsRaw)) {
     const name = String(v ?? '').trim();
-    if (name) dial_rows[k] = name;
+    if (!name) continue;
+    // ⛔ THE CORE CHIP HAS NO ROW OF ITS OWN, AND A STORED ONE IS DROPPED (2026-08-24). The "Core
+    // movement" pick is the athlete's one core control; a second core name here is how the built
+    // week ended up carrying a movement nobody chose. ⚠️ Dropped on READ rather than migrated —
+    // nothing has persisted a `viada` block yet, so there is no stored row to preserve, and this
+    // exists so a block written by an older bundle cannot resurrect the defect.
+    if (k.startsWith('core')) continue;
+    dial_rows[k] = name;
   }
   return { version: 1, picks, dial, dial_rows };
 }

@@ -657,6 +657,57 @@ lesson that file exists to carry. The gate stays live for every other line, and 
 fails the test rather than sliding through. The word collision the rename was worried about is with
 the endurance screens' focus **control**; a verb in a supporting line is not that control.
 
+### The hold defect — a row may not prescribe a dose its movement cannot express (2026-08-24)
+
+**Seen on a device: the Core focus rows opened on Plank and the plan printed "3 x 8-10" under it.**
+A static hold has no reps. It is not a copy slip — the row asked the athlete for something the
+movement cannot express.
+
+**The axis already existed and was not being asked.** `src/lib/exercise-role.ts` has classified this
+since the strength language spec: `isometric` → `loggedAs: 'time'`, `mobility` → `'done_or_time'`,
+`carry` → `'distance_or_time'`. The fix is a new **accessor over that vocabulary**, `isRepPrescribable`
+in `accessory-dosing/ledger.ts`, sitting next to `movementsForMuscle` — **not** an `isHold` flag on
+`EXERCISE_CONFIG`, which is the second-vocabulary failure CLAUDE.md opens with. ⚠️ An unmapped name
+resolves to `loaded_accessory` → rep-based → **stays offered**; the predicate excludes only what is
+known to be measured in time.
+
+**Four places had to change, and finding the fourth is the lesson:**
+
+1. `dialRowOptions` — the picker offered the raw pool, whose core ranking leads with plank, side
+   plank, copenhagen plank and two entries literally named "core work". Now filtered to rep-based and
+   ordered by **`DIAL_ROW_LEAD`**, which is p223 verbatim for core (hanging leg raises, crunches,
+   V-ups, dynamic plank variants, ab wheel rollouts) and ours for glutes.
+2. `fillMuscleFloor`'s **floor** loop — prefers a rep-prescribable candidate. ⚠️ A **preference, not a
+   filter**: a muscle whose only reachable movement is a hold still gets filled, and
+   `FloorAddition.repPrescribable` travels with the row.
+3. `compose.ts` — `reps: add.repPrescribable ? '8-10' : HOLD_PRESCRIPTION`. **30-45s is ours**; p223
+   lists "dynamic plank variants" and prescribes no duration anywhere.
+4. ⛔ **`fillMuscleFloor`'s TARGET loop had its own copy of the choice and did not get the fix when
+   the floor did** — so *"Plank — 3 x 30-45s. Your core focus."* survived a full round of this. Two
+   searches over one candidate list, thirty lines apart. Both now carry a pointer to the other.
+
+**Hanging Leg Raise leads the core list only where the athlete declared a pull-up bar** — it gates on
+`pull_up_bar` and is correctly absent otherwise, where Crunch (also p223) leads. ⚠️ Worth recording
+because it cost time twice: `canPerform` takes the **UI equipment labels** ("Pull-up Bar"), not the
+raw gear tokens, so a fixture written with `'pullup_bar'` silently owns nothing and every gated
+movement vanishes.
+
+### The Core chip extends the core pick — it never introduces a third movement (Michael)
+
+The screen had **two core controls** — the "Core movement" pick and a Dial row picker — and the built
+week carried both answers plus a floor row: **three core movements, two of which the athlete never
+chose.** The Dial row picker is removed for `core` (`dialRowChips` excludes it), a stored
+`dial_rows['core:*']` is dropped on read, and the chip line names `picks.core`.
+
+**And the composer's target loop is capped at two distinct movements per muscle: the pick, plus at
+most one complement, then repeats on other days.** ⚠️ The cap alone was not enough — the counter had
+to be **seeded from what the week already holds**, because the floor runs first and places the pick;
+an empty counter meant the target loop believed the muscle had nothing and added two more on top.
+⚠️ `alreadyPrescribed` forcing variety is **right for the floor** (filling a gap by repeating adds no
+variety) and **wrong aimed at a target** — "more of what I asked for" is what the control says it
+does. Applied to every chip, not just core: the same sentence reads true of Glutes, and a rule that
+held on one chip only is the asymmetry that invites a third movement back.
+
 ### The copy pattern — this screen's standing rule (Michael, 2026-08-24, from device screenshots)
 
 **(a) Inline copy is ONE LINE PER ELEMENT — what it does, never how it works.** Any deeper

@@ -33,6 +33,7 @@ import {
  * `bulgarian split squat` one movement.
  */
 import { canonicalize } from '../canonicalize.ts';
+import { capabilitiesForExercise } from '../../../../src/lib/exercise-role.ts';
 import {
   ATTRIBUTION_IS_APPROXIMATE,
   MUSCLE_GROUPS,
@@ -270,9 +271,48 @@ export function movementsForMuscle(muscle: MuscleGroup, equipment: string[] | nu
     .map((x) => x.m);
 }
 
+/**
+ * ⛔ CAN THIS MOVEMENT HONESTLY CARRY A REP PRESCRIPTION — a second question over the SAME vocabulary
+ * `movementsForMuscle` ranks, sitting next to it on purpose (2026-08-24).
+ *
+ * ⛔ THE DEFECT IT CLOSES, seen on a device: the Core focus rows opened on **Plank** and the plan
+ * printed **"3 x 8-10"** under it. A static hold has no reps. It is not a rounding error in the copy
+ * — the row asks the athlete to do something the movement cannot express.
+ *
+ * ⛔ AND IT IS NOT A NEW TAXONOMY. `src/lib/exercise-role.ts` has answered this since the strength
+ * language spec: `isometric` → `loggedAs: 'time'`, `mobility` → `'done_or_time'`, `carry` →
+ * `'distance_or_time'`. That table is the authority and this is an accessor over it. ⚠️ Do NOT add
+ * an `isHold` flag to `EXERCISE_CONFIG`; that is the second-vocabulary failure CLAUDE.md opens with.
+ *
+ * ⚠️ THE DEFAULT DIRECTION IS DELIBERATE. An unmapped name resolves to `loaded_accessory` →
+ * `weight_x_reps` → **true**, so a movement nobody has typed yet stays OFFERED rather than silently
+ * vanishing from a picker. This predicate excludes only what is KNOWN to be measured in time.
+ */
+export function isRepPrescribable(name: string): boolean {
+  const logged = capabilitiesForExercise(String(name ?? '')).loggedAs;
+  return logged !== 'time' && logged !== 'done_or_time' && logged !== 'distance_or_time';
+}
+
+/**
+ * ⛔ WHAT A HOLD'S ROW PRINTS INSTEAD OF REPS. Michael's ruling, 2026-08-24: the floor may still
+ * reach for a plank when nothing else in the catalogue reaches a muscle — but then the row must say
+ * so honestly. **Never "x 8-10" on a hold.**
+ *
+ * ⚠️ 30-45 SECONDS IS A PRESCRIPTION AND IT IS OURS, not the source's — p223 lists "dynamic plank
+ * variants" among his core movements and prescribes no hold duration anywhere. It is the field's
+ * ordinary working range for a trunk isometric, and it is here rather than inline so there is one
+ * of it.
+ */
+export const HOLD_PRESCRIPTION = '30-45s';
+
 export type FloorAddition = {
   muscle: MuscleGroup;
   movement: string;
+  /**
+   * ⛔ FALSE = THE ROW MUST NOT PRINT REPS. A static hold (plank, dead hang) cannot express "8-10",
+   * and printing it anyway is what put "Plank — 3 x 8-10" on a device. Use `HOLD_PRESCRIPTION`.
+   */
+  repPrescribable: boolean;
   sets: number;
   category: ViadaCategory;
   /** Which session it was added to. */
@@ -391,7 +431,17 @@ export function fillMuscleFloor(
     // ⚠️ A MOVEMENT THE WEEK DOES NOT ALREADY HAVE, where one exists. Filling a gap by repeating a
     // movement already prescribed adds sets without adding variety, and the source encourages
     // rotation. Falls back to a repeat rather than leaving the muscle at zero.
-    const pick = preferred ?? forMuscle.find((o) => !alreadyPrescribed.has(canonicalize(o.name))) ?? forMuscle[0];
+    // ⛔ A REP-PRESCRIBABLE MOVEMENT BEFORE A HOLD (2026-08-24). Every row this function adds is
+    // dosed in SETS x REPS, so a plank winning the core gap produced "3 x 8-10" under a static hold.
+    // ⚠️ IT IS A PREFERENCE, NOT A FILTER: a muscle whose only reachable movement is a hold still
+    // gets filled — `repPrescribable: false` travels with the row and the plan prints a hold instead.
+    // Leaving the muscle at zero would be a worse answer than an honestly-labelled plank.
+    const fresh = forMuscle.filter((o) => !alreadyPrescribed.has(canonicalize(o.name)));
+    const pick = preferred
+      ?? fresh.find((o) => isRepPrescribable(o.name))
+      ?? fresh[0]
+      ?? forMuscle.find((o) => isRepPrescribable(o.name))
+      ?? forMuscle[0];
     const chosen = pick ? { movement: pick.name, category: pick.category } : null;
     if (!chosen) {
       unfilled.push({ muscle, reason: 'No movement in the catalogue reaches this muscle with the declared equipment.' });
@@ -418,6 +468,9 @@ export function fillMuscleFloor(
     added.push({
       muscle,
       movement: chosen.movement,
+      // ⛔ RESOLVED HERE, WHERE THE MOVEMENT IS CHOSEN, so the plan builder never re-derives it and
+      // the two cannot disagree about the same row.
+      repPrescribable: isRepPrescribable(chosen.movement),
       sets: setsPerSlot,
       category: chosen.category,
       session: sessions[target.i].label,
@@ -444,6 +497,35 @@ export function fillMuscleFloor(
   for (const { muscle, want } of targets) {
     const forMuscle = movementsForMuscle(muscle, opts?.equipment ?? null);
     /**
+     * ⛔ A CHIP EXTENDS WHAT THE ATHLETE CHOSE — IT NEVER INTRODUCES A THIRD MOVEMENT (Michael,
+     * 2026-08-24, ruled on core and applied to every chip).
+     *
+     * ⛔ THE DEFECT: `alreadyPrescribed` forces VARIETY, which is right for the FLOOR — filling a
+     * gap by repeating adds sets without adding variety, and the source encourages rotation. Aimed
+     * at a TARGET it is wrong: tapping Core on an athlete whose core pick was `crunch` built a week
+     * of crunch + dead bug + bird dog, two of which they never chose. *"More of what I asked for"*
+     * is what the control says it does.
+     *
+     * ⚠️ SO: THE PICK, PLUS AT MOST ONE COMPLEMENT, THEN REPEATS ON OTHER DAYS. Two distinct
+     * movements is Michael's line — a complement is variety, a third is the engine picking for them.
+     * ⚠️ Applied to every chip and not just core: the same sentence reads true of Glutes ("extra hip
+     * thrust sets"), and a rule that held on one chip only is the asymmetry that invites a third.
+     */
+    const MAX_DISTINCT_PER_TARGET = 2;
+    /**
+     * ⛔ SEEDED FROM WHAT THE WEEK ALREADY HOLDS FOR THIS MUSCLE, INCLUDING THE FLOOR'S OWN ROW —
+     * and that seeding is the whole fix, not a detail. The floor runs FIRST and places the athlete's
+     * pick; an empty counter here meant the target loop believed the muscle had nothing, could not
+     * re-select the pick (`alreadyPrescribed` holds it), and added TWO more movements on top. Three
+     * distinct core movements, exactly what the cap exists to prevent.
+     */
+    const usedForMuscle: string[] = [...new Set(
+      sessions
+        .flatMap((sn) => sn.sets.map((x) => String(x.movement ?? '')))
+        .filter((n) => n && musclesWorkedBy(n)?.primary === muscle)
+        .map((n) => canonicalize(n)),
+    )];
+    /**
      * ⚠️ A BOUNDED LOOP, NOT A `while`. Each pass adds one slot, so the target is reachable in
      * `ceil(want / setsPerSlot)` passes and the guard is that number — a loop whose exit depends on
      * `ledgerFor` agreeing with the arithmetic is a loop that spins the day they disagree.
@@ -456,7 +538,20 @@ export function fillMuscleFloor(
       // ⛔ THE ATHLETE'S OWN CHOICE FIRST here too, then a movement the week does not already hold.
       const preferred = forMuscle.find((o) =>
         preferSet.has(canonicalize(o.name)) && !alreadyPrescribed.has(canonicalize(o.name)));
-      const pick = preferred ?? forMuscle.find((o) => !alreadyPrescribed.has(canonicalize(o.name)));
+      // ⛔ REP-PRESCRIBABLE BEFORE A HOLD, THE SAME RULE THE FLOOR ABOVE FOLLOWS (2026-08-24). This
+      // loop had its own copy of the choice and did NOT get the fix when the floor did — which is
+      // how "Plank — 3 x 30-45s. Your core focus." survived one round of it. ⚠️ Two searches over
+      // one candidate list: if you change the preference here, change it there.
+      const freshT = forMuscle.filter((o) => !alreadyPrescribed.has(canonicalize(o.name)));
+      // Once the muscle is at its cap, REPEAT one of its own movements rather than reach for a new
+      // one. ⚠️ The repeat still lands on a session that does not already hold it — see `ordered`.
+      const atCap = usedForMuscle.length >= MAX_DISTINCT_PER_TARGET;
+      const repeat = atCap
+        ? forMuscle.find((o) => usedForMuscle.includes(canonicalize(o.name)))
+        : undefined;
+      const pick = preferred
+        ?? repeat
+        ?? (atCap ? undefined : (freshT.find((o) => isRepPrescribable(o.name)) ?? freshT[0]));
       if (!pick) {
         // ⚠️ NOT `unfilled`. The muscle is above its floor — the week simply has no further
         // movement for it that it is not already doing, which is a stop, not a failure.
@@ -471,14 +566,20 @@ export function fillMuscleFloor(
          * performance. A ceiling you are allowed to land on is not a ceiling.
          */
         .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
+        // ⚠️ AND NOT ONTO A SESSION THAT ALREADY HOLDS THIS MOVEMENT. Two rows of one lift in one
+        // session reads as the engine losing its place — the same defect `takenToday` guards in the
+        // slot path. A repeat goes on a DIFFERENT day or it does not go.
+        .filter((x) => !sessions[x.i].sets.some((y) => canonicalize(String(y.movement ?? '')) === canonicalize(pick.name)))
         .sort((a, b) => a.l.countedSets - b.l.countedSets);
       if (ordered.length === 0) break;
       const target = ordered[0];
       sessions[target.i].sets.push({ movement: pick.name, intent: 'HYP', sets: setsPerSlot });
       alreadyPrescribed.add(canonicalize(pick.name));
+      if (!usedForMuscle.includes(canonicalize(pick.name))) usedForMuscle.push(canonicalize(pick.name));
       added.push({
         muscle,
         movement: pick.name,
+        repPrescribable: isRepPrescribable(pick.name),
         sets: setsPerSlot,
         category: pick.category,
         session: sessions[target.i].label,

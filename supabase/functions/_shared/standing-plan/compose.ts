@@ -23,6 +23,7 @@ import {
 } from '../endurance-library/index.ts';
 import { bandRouteName, prescribe, resolveSlot, type ViadaPattern } from '../strength-grid/index.ts';
 import {
+  HOLD_PRESCRIPTION,
   fillMuscleFloor,
   ledgerFor,
   type DoseLedger,
@@ -1161,7 +1162,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           ? (picks.byFold.get(canonicalize(add.movement)) ?? add.movement)
           : bandRouteName(add.movement, args.equipment ?? null),
         sets: add.sets,
-        reps: '8-10',
+        // ⛔ A HOLD DOES NOT GET REPS (2026-08-24, seen on a device as "Plank — 3 x 8-10"). The row
+        // is dosed in sets either way; what changes is the unit of the second number, and
+        // `repPrescribable` was resolved where the movement was chosen so this never re-derives it.
+        reps: add.repPrescribable ? '8-10' : HOLD_PRESCRIPTION,
         weight: 'By feel',
         load_prescribed: false,
         // ⛔ THE ROW SAYS WHOSE MOVEMENT IT IS, AND THAT IS THE WHOLE DEVICE FINDING. `Floor: core had

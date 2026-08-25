@@ -18,6 +18,7 @@ import {
   DIAL_CAP,
   DIAL_CHIPS,
   dialDose,
+  dialRowOptions,
   chipHasFrameSlot,
   daysForPick,
   defaultViadaPicks,
@@ -34,7 +35,8 @@ import { composeBlock, composeWeek, type ComposeArgs } from './compose.ts';
 import { buildStandingPlanRow } from './plan-row.ts';
 import { FRAMES } from './frames.ts';
 import { canonicalize } from '../canonicalize.ts';
-import { WEEKLY_SETS_SOLID } from '../accessory-dosing/index.ts';
+import { WEEKLY_SETS_SOLID, isRepPrescribable, musclesWorkedBy } from '../accessory-dosing/index.ts';
+import { allGridMovements } from '../strength-grid/index.ts';
 
 /** A commercial-gym athlete. ⚠️ Declared equipment is the case the grid gates on. */
 const EQUIPMENT = ['barbell', 'rack', 'bench', 'dumbbells', 'pullup_bar'];
@@ -354,6 +356,114 @@ Deno.test('the extra rows carry his accessory dose — 3 x 8-10, by feel', () =>
  * indicative pull-back sentence the BUILT BLOCK prints, and it is covered by the pull-back
  * regressions above.
  */
+
+// ── ⛔ NO ROW PRESCRIBES A DOSE ITS MOVEMENT CANNOT EXPRESS ─────────────────────────────────────
+
+/**
+ * ⛔ THE DEVICE DEFECT, AS A FIXTURE (Michael, 2026-08-24): the Core focus rows opened on **Plank**
+ * and the plan printed **"3 x 8-10"** under it. A static hold has no reps — the row asked for
+ * something the movement cannot express.
+ *
+ * ⚠️ THIS IS THE WHOLE CLASS, NOT THE ONE INSTANCE. Michael asked for every chip to be checked, so
+ * these run over every chip, every default, and several equipment cases rather than pinning plank.
+ */
+
+const EQ_LABELS = ['Barbell', 'Dumbbells', 'Bench', 'Squat Rack', 'Cable Machine', 'Pull-up Bar'];
+const EQ_CASES: Array<string[] | null> = [
+  EQ_LABELS,
+  ['Barbell', 'Dumbbells', 'Bench', 'Squat Rack', 'Cable Machine'], // no bar — no hanging work
+  ['Bodyweight'],
+  [],
+  null,
+];
+
+Deno.test('⛔ EVERY focus-row default is rep-based and on the catalogue', () => {
+  for (const equipment of EQ_CASES) {
+    for (const chip of DIAL_CHIPS) {
+      const opts = dialRowOptions(chip, equipment);
+      assert(opts.length > 0, `${chip} offers nothing for ${JSON.stringify(equipment)}`);
+      const first = opts[0];
+      // ⛔ REP-BASED. The row is dosed 3 x 8-10 by feel; a hold cannot carry that.
+      assert(isRepPrescribable(first.name),
+        `${chip} defaults to "${first.name}", which is measured in time, for ${JSON.stringify(equipment)}`);
+      // ⛔ ON THE CATALOGUE. A name the grid does not hold is D-322's disease — it resolves to
+      // nothing downstream and the control silently does nothing.
+      assert(allGridMovements().some((m) => canonicalize(m.name) === canonicalize(first.name)),
+        `${chip} defaults to "${first.name}", which is not in the grid catalogue`);
+    }
+  }
+});
+
+Deno.test('⛔ NO OFFERED focus-row option is a static hold', () => {
+  // Not just the default — an athlete scrolling the list must not be able to choose a plank for a
+  // row that will print reps at them.
+  for (const equipment of EQ_CASES) {
+    for (const chip of DIAL_CHIPS) {
+      for (const o of dialRowOptions(chip, equipment)) {
+        assert(isRepPrescribable(o.name),
+          `${chip} offers "${o.name}" (time-based) for ${JSON.stringify(equipment)}`);
+      }
+    }
+  }
+});
+
+Deno.test('⛔ NO ROW IN A BUILT WEEK PRINTS REPS ON A HOLD', () => {
+  // The end-to-end version: whatever the floor and the Dial place, a time-based movement never
+  // carries a rep range. This is what was on the screen.
+  const picks = defaultViadaPicks(EQ_LABELS, []);
+  for (const dial of [[], ['core'], ['glutes'], ['glutes', 'core']] as never[]) {
+    const w = week({ slotPicks: picks, dial, equipment: EQ_LABELS });
+    for (const s of w.sessions.filter((x) => x.type === 'strength')) {
+      for (const e of (s.strength_exercises ?? [])) {
+        if (isRepPrescribable(e.name)) continue;
+        assert(!/^\d+\s*-\s*\d+$/.test(String(e.reps ?? '')),
+          `"${e.name}" is measured in time and the row says reps "${e.reps}"`);
+      }
+    }
+  }
+});
+
+Deno.test('⛔ THE CORE CHIP NEVER INTRODUCES A THIRD MOVEMENT', () => {
+  /**
+   * ⛔ MICHAEL'S RULING, 2026-08-24. The screen had TWO core controls — the "Core movement" pick and
+   * a Dial row picker — and the built week carried both answers. The chip must extend the pick, or
+   * add a complement, never announce a movement the athlete never chose.
+   */
+  // ⚠️ BOTH PIPES, BECAUSE THE REAL PATH SENDS BOTH. `slotPicks` fills the frame's cells;
+  // `accessoryPicks` is what carries the core pick into `fillMuscleFloor`'s `prefer`, and without it
+  // this test would assert on a week the app never builds.
+  const picks = { ...defaultViadaPicks(EQ_LABELS, []), core: 'v up' };
+  const w = week({
+    slotPicks: picks,
+    dial: ['core'],
+    equipment: EQ_LABELS,
+    accessoryPicks: flattenViadaPicks({ version: 1, picks, dial: ['core'], dial_rows: {} }),
+  });
+  const coreRows = w.sessions
+    .filter((s) => s.type === 'strength')
+    .flatMap((s) => s.strength_exercises ?? [])
+    .filter((e) => musclesWorkedBy(e.name)?.primary === 'core');
+  assert(coreRows.length > 0, 'the core chip bought nothing');
+  // ⛔ THE ATHLETE'S OWN PICK IS AMONG THEM — the chip extended what they chose.
+  assert(coreRows.some((e) => canonicalize(e.name) === canonicalize('v up')),
+    `the core pick never reached the week: ${coreRows.map((e) => e.name).join(', ')}`);
+  // ⛔ AND THE WEEK HOLDS AT MOST TWO DISTINCT CORE MOVEMENTS: the pick, plus at most one complement.
+  const distinct = new Set(coreRows.map((e) => canonicalize(e.name)));
+  assert(distinct.size <= 2,
+    `${distinct.size} distinct core movements in one week: ${[...distinct].join(', ')}`);
+});
+
+Deno.test('a stored core row from an older bundle is dropped, not honoured', () => {
+  // ⚠️ Nothing has persisted a `viada` block yet, so this guards a bundle skew rather than real
+  // data: an older client writing `dial_rows['core:0']` must not resurrect the third movement.
+  const prefs = normalizeViadaPrefs({
+    picks: defaultViadaPicks(EQ_LABELS, []),
+    dial: ['core'],
+    dial_rows: { 'core:0': 'plank', 'glutes:0': 'hip thrust' },
+  }, EQ_LABELS);
+  assertEquals(prefs!.dial_rows['core:0'], undefined, 'the core row survived');
+  assertEquals(prefs!.dial_rows['glutes:0'], 'hip thrust', 'the glutes row was dropped with it');
+});
 
 // ── the persisted shape ──────────────────────────────────────────────────────────────────────────
 
