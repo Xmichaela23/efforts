@@ -1,67 +1,78 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-24, night — after the Dial commit)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-25 — after the Dial / opt-in / TYPE_TABLE arc)
 
-### Your job: **VERIFY THE DIAL SCREEN ON A DEVICE.** It is pushed and deployed and nobody has seen it.
+### Your job: **BUILD A BLOCK AND READ THE ACCESSORY ROWS.** Four things to confirm, then you are done with this screen.
 
-Open the Strength Focus wizard → **accessory step**. Confirm, in this order:
+Everything below is **PUSHED and DEPLOYED and version-verified.** The wizard screens Michael has now
+seen; **the BUILT WEEK is what nobody has read.** Build a Strength Focus block and check the
+accessory rows on the generated week:
 
-1. **Seven picks**, each pre-filled, each tagged with a real weekday: Dumbbell press (thursday),
-   Isolation push (monday), **Isolation pull ×2 — one tagged monday, one tagged thursday**, Single-leg
-   (tuesday · friday), Quad isolation (friday), Core movement (no day; "fills the week's core minimum").
-2. The **Dial** row — label "Dial", the line *"Dial in the areas you want to focus on."*, five chips
-   (Chest · Shoulders · Arms · Glutes · Core) plus Balanced, capped at 2.
-3. Tap **Glutes**. A factual sentence appears, plus a movement picker for the added rows.
-4. **Build a block** and read the accessory rows on the built week.
+1. **Core = his pick plus at most ONE complement.** Not three. The cap is in `fillMuscleFloor`'s
+   target loop and the counter is seeded from what the week already holds — an unseeded counter was
+   the bug (D-450). If a third core movement appears, that seeding is where to start.
+2. **The two "Isolation pull" rows hold DIFFERENT movements** — rear delt fly (monday), barbell curl
+   (thursday). Same movement twice = the day-scoping is not reaching the phone.
+3. **The two "Single-leg" rows hold DIFFERENT movements** — Bulgarian Split Squat (tuesday), Walking
+   Lunge (friday). New this session; same mechanism as the pull pair.
+4. **An A-skip row asks REPS ONLY — no weight box.** New this session. If it asks for weight × reps,
+   `typeForExercise` is not resolving and the row fell to `loaded_accessory`.
 
-**What settles it:** the two isolation-pull rows must hold **different** movements — rear delt fly on
-monday, barbell curl on thursday. That is the whole point of the split, and it is the one thing a
-green test suite cannot prove is reaching the phone.
+**Verified facts to start from, file:line, not vibes:**
+
+- The two lower picks are `single_leg_a` (`slot.frameDay: 2`) and `single_leg_b` (`frameDay: 5`) in
+  `_shared/standing-plan/accessory-picks.ts` → `VIADA_PICKS`. `daysForPick` returns `['Tuesday']` and
+  `['Friday']` respectively at offset 0.
+- The type rows are in `src/lib/exercise-role.ts` → `TYPE_TABLE`, plyo and band sections.
+  `capabilitiesForExercise('a skip')` → `{ load: 'none', loggedAs: 'reps' }`.
+- ⚠️ **Deno is at `~/.deno/bin/deno`, not on `PATH`.** Run the suite with **`-A`**, not
+  `--allow-read --allow-env` — several tests import an edge function's `index.ts`, which calls
+  `Deno.serve` at top level and dies without net permission. Under-permissioned runs **hide real
+  failures**: they masked three D-031 convergence failures this session.
 
 ### What shipped, so you do not re-litigate it
 
-- **D-450 is the only record.** The `HANDOFF-` spec and the `WIP-` restart note were **deleted on
-  commit** per the spec lifecycle. Everything is in D-450 in `DECISIONS-LOG-3.md`.
-- **The row is called "Dial."** It was built as "Aesthetics" — working title, renamed before the first
-  commit, storage keys renamed with it (`dial`, `dial_rows`). Nothing had persisted, so there is no
-  legacy spelling. ⚠️ `Upper Aesthetics` under `shared/strength-system/protocols/` is a **different,
-  older thing** and keeps its name — do not "finish" the rename onto it.
-- **The supporting line trips the voice lint on `focus` and ships anyway** — Michael's wording,
-  verbatim, on the standing override already on record for "Speed focus" / "VO2 max focus". It is
-  pinned as an EXPECTED violation in `src/lib/strength-focus-copy.voice.test.ts`. **Do not reword it
-  to make the gate green** — the gate is already green; the exception is the assertion.
-- **Isolation pull is TWO picks, one per day** (`iso_pull_a` day 1, `iso_pull_b` day 4), scoped by
-  `ViadaPickSpec.slot.frameDay` and resolved by `pickKeyForSlot(category, pattern, frameDay)`. The
-  principle behind it — `LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT` — is the one to carry forward: **the
-  default layout is balanced by itself; the Dial is fine-tuning on top of a balanced week, never the
-  source of balance.**
-- **`single_leg` is deliberately NOT split** — same shape, opposite call: one movement across tuesday
-  and friday is the same answer twice. `frameDay` is optional by design. ⚠️ If a later reading says
-  the two lower days want different movements, that is **one table row plus a default**, not a
-  mechanism — and it is the nearest open question on this screen.
-- Three defects the live fixtures caught, all pinned as tests in
-  `standing-plan-accessory-picks.test.ts`: a pick spent on the wrong day so one lift printed twice;
-  the advanced-tier pull-back buying **zero** sets for exactly the athlete it protects (it now moves
-  the TARGET, not the session ceiling); two chips taking one session to exactly 14 work sets, the
-  number p086 calls costly.
+- **The endurance-week screen is VERIFIED ON DEVICE** (Michael, 2026-08-25): the opt-in model, the
+  add / X controls, the block order, the copy. **D-451 is closed.** Do not redesign this screen.
+- **The Dial accessory screen is D-450**, and that entry is the only record — the `HANDOFF-` spec and
+  the `WIP-` note were deleted on commit per the spec lifecycle.
+- **`single_leg` IS NOW SPLIT** (`single_leg_a` / `single_leg_b`). ⚠️ **The previous banner and D-450
+  both said it was deliberately NOT split — that is superseded, and D-450 is back-annotated.** The
+  grounding is *the day*, not the muscle: both cells are the same `secondary press_lower`, but day 2
+  is the ME lower day and day 5 is the DE lower day. **It buys movement variety, not muscle
+  coverage** — every option in that cell is quadriceps. Do not re-derive the pull split's balance
+  argument here; it does not apply.
+- **The balance principle stands and generalises** (`LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`): the default
+  week is balanced on its own; the Dial is fine-tuning on top of it, never the source of balance.
+- **The copy pattern is a standing rule for this screen** (D-450): inline copy is ONE LINE PER
+  ELEMENT — what it does, never how it works. Anything deeper goes behind an (i) or an expandable,
+  and when one is built its content is **authored, static and page-cited — never LLM-generated.**
+  ⚠️ The (i) is **not built.** Do not write a paragraph inline because the drawer does not exist yet.
+- **19 exercise names were typing as `loaded_accessory`** and are now correct: 10 plyo rows
+  (a/b skip, stiff legged run, single leg hop, rebound jump, lunge hop, pogo hop, ladder drill,
+  ickey shuffle, hopscotch) and 2 band rows (both pushdown spellings). 12 rows cover 19 names —
+  `canonical()` depluralizes, so `'a skip'` also answers `a skips` / `a_skip` / `a_skips`.
+- **The test suite was triaged: 8 stale pins retired, 1 real bug found and fixed.** Do not re-open
+  any of them. The stale ones failed on reworded copy, a deliberately deleted field (`§0g` removed
+  `preferred_days.strength`), an over-anchored regex, a missing ledger row, a missing permission
+  flag, and a decayed fixture (**D-068 raised the tri WoW cap 0.20 → 0.24, so the D-031 reproducer's
+  22.9% spike became legal**; the loop is now driven at 0.20 via the validator's own
+  `weekOverWeekRampMax` option, because a 960-point sweep found no fixture that clears 24%).
 
 ### Verification state, stated honestly
 
 | | |
 |---|---|
-| **PUSHED** | ✅ on `main` |
-| **DEPLOYED** | ✅ four functions — `generate-strength-plan`, `rematerialize-standing-block`, `create-goal-and-materialize-plan`, `materialize-plan` |
-| **VERIFIED** | ❌ **nobody has opened the screen** |
+| **PUSHED** | ✅ all of it on `main` |
+| **DEPLOYED** | ✅ **36 functions at 10:33 UTC** (every importer of `src/lib/exercise-role.ts`, traced two ways), plus `generate-strength-plan` **v140** and `rematerialize-standing-block` **v18** at 10:44. All version-verified against a before/after listing. |
+| **VERIFIED** | ⚠️ **PARTIAL.** The endurance-week screen: ✅ seen on device. The built-block accessory rows: ❌ **nobody has read one.** That is the job above. |
 
-**Tests:** 2720 shared pass. **Two failures are PRE-EXISTING and unrelated — do not chase either:**
-the `lthr` anchor lint on `src/components/TrainingBaselines.tsx` (untouched file), and
-`shared/strength-system/hard-run-terrain.test.ts`, which needs `--allow-net` because it pulls in
-`materialize-plan` and that calls `Deno.serve` at top level. `npm run build` clean; `tsc` at **315
-errors, the same 315 as before this work**. Three back-to-back 12-week `composeBlock` runs are
-byte-identical. ⚠️ Deno is at `~/.deno/bin/deno`, not on `PATH`.
+**Tests: 4357 passed, 0 failed — the whole suite, `src/lib` + `src/utils` + `supabase/functions`.**
+**Keep it that way.** `tsc` at **315 errors, all pre-existing**, none in any file this arc touched
+(diffed against `HEAD` to confirm). `lint:provenance` clean.
 
-⚠️ **A green suite proves the code is right, not that it is on the phone.** Nothing below the deploy
-line has been seen by a human.
+⚠️ **A green suite proves the code is right, not that it is on the phone.** Nothing in the VERIFIED
+row above marked ❌ has been seen by a human.
 
 ---
 
@@ -134,7 +145,7 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-24 night — **the block reprices itself now; tomorrow's lower-test save is the acceptance run**)
+## 🧭 Prior handoff (2026-08-24 night) — the block reprices itself; the lower-test save is the acceptance run. ⚠️ **SUPERSEDED AS START-HERE by the 2026-08-25 banner at the top of this file** (demoted 2026-08-25 — it was still titled START HERE and a fresh session would have read it as the current job). **Content still valid**; the lower-save acceptance item is live on `POLISH-PUNCH-LIST.md`.
 
 ### THE JOB: verify tomorrow's Test: Lower save end to end, then pick up the debts
 
@@ -1254,7 +1265,7 @@ exists.** A knowingly-taken debt; a test asserts the line is present to keep it 
 ---
 
 
-## 🧭 NEXT SESSION — START HERE (roadmap as of 2026-07-13 — the app LEARNS numbers and does not READ them back)
+## 🧭 Prior roadmap (2026-07-13) — the app LEARNS numbers and does not READ them back. ⚠️ **SUPERSEDED AS START-HERE by the 2026-08-25 banner at the top of this file** (demoted 2026-08-25). **Read it as history, not as a plan** — the Standing Plan pivot (2026-08-22) replaced this sequence; see `GAME-PLAN.md`.
 
 > ## 2026-07-13 — FOUR STARVED READS ROOT-CAUSED. ONE PATTERN: the app learns a number, then doesn't read it.
 >

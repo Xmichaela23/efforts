@@ -8,20 +8,43 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE DIAL SCREEN, DEPLOYED AND UNSEEN (2026-08-24 night)
+## ⏳ AWAITING MICHAEL — THE BUILT BLOCK'S ACCESSORY ROWS (2026-08-25)
 
-Pushed and deployed (four functions). **Nobody has opened it.** Strength Focus wizard → accessory step:
-- [ ] **Seven picks**, all pre-filled, each with a real weekday tag — and **two rows called
-      "Isolation pull"**, one tagged monday, one tagged thursday.
-- [ ] Those two must hold **different** movements out of the box: rear delt fly (mon), barbell curl
-      (thu). Same movement on both days = the split is not reaching the phone.
-- [ ] The **Dial** row: label "Dial", line *"Dial in the areas you want to focus on."*, chips
-      Chest · Shoulders · Arms · Glutes · Core plus Balanced, capped at 2.
-- [ ] Tap **Glutes** → a factual sentence plus a movement picker for the added rows.
-- [ ] Build a block and read the built week's accessory rows.
+**Deployed and version-verified** (`generate-strength-plan` v140, `rematerialize-standing-block` v18,
+2026-08-25 10:44 UTC). The wizard screens are seen; **the BUILT WEEK is not.** Generate a Strength
+Focus block and read the accessory rows:
+- [ ] **Core = his pick plus at most ONE complement.** Not three. If a third appears, start at the
+      target loop's counter seeding in `fillMuscleFloor` (D-450 — an unseeded counter was the bug).
+- [ ] **The two "Isolation pull" rows hold DIFFERENT movements** — rear delt fly (mon), barbell curl
+      (thu). Same movement on both days = the day-scoping is not reaching the phone.
+- [ ] **The two "Single-leg" rows hold DIFFERENT movements** — Bulgarian Split Squat (tue), Walking
+      Lunge (fri). New 2026-08-25, same mechanism as the pull pair.
+- [ ] **An A-skip row asks REPS ONLY — no weight box.** New 2026-08-25. A weight field means
+      `typeForExercise` is not resolving and the row fell to `loaded_accessory`.
 
 ⚠️ The Dial's extra rows carry **no day tag** — that is a decision (`DIAL_ROW_DAY_IS_THE_COMPOSERS`,
 D-450), not a bug. The day is on the plan one screen later.
+
+- [x] **(2026-08-25 — VERIFIED ON DEVICE.)** The endurance-week screen: opt-in model, add / X
+      controls, block order, copy. **D-451 closed.**
+- [x] **(2026-08-24/25 — the Dial WIZARD screen was seen.)** Seven-then-eight picks pre-filled with
+      weekday tags, the Dial row and its chips, the Glutes sentence and row picker.
+
+### ⛔ NEW STANDING ITEMS FROM THIS ARC (2026-08-25)
+
+- [ ] **No mid-block "re-dial" control exists.** Endurance volume and hard sessions are answerable in
+      the **wizard only**, so an athlete who wants to add a hard session in week 6 has nowhere to do
+      it. This predates the opt-in work; what changed is that D-451's screen now advertises a choice
+      the athlete cannot revisit. **Standing debt, now user-visible.**
+- [ ] **`fillMuscleFloor` runs TWO searches over ONE candidate list** — the floor loop and the target
+      loop, ~30 lines apart in `_shared/accessory-dosing/ledger.ts`. They have already drifted once:
+      the hold fix landed on the floor loop and the target loop kept its own copy, so
+      *"Plank — 3 x 30-45s"* survived a full round (D-450). **Cross-pointers exist at both sites; the
+      merge was not done.** Drift risk, not a live defect.
+- [ ] **DO NOT "FIX": day 5 carries two quad movements (Single-leg + Quad isolation) and day 2
+      carries none.** Checked against p246 — **it is the book's own layout**, not a bug in the split.
+      Recorded because the 2026-08-25 single-leg split makes it easy to mistake for one. If it is ever
+      changed it is a training decision of Michael's, not a correction.
 
 ## ⏳ AWAITING MICHAEL — TOMORROW'S TEST: LOWER SAVE (2026-08-24 night; block REBUILT on the fixed engine)
 

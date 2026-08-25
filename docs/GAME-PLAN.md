@@ -15,6 +15,12 @@
 > swim add-on, muscle floors, ME set ladder, named rotating plyos, the rebuilt wizard screens.
 > Get Stronger untouched and byte-identical throughout.
 >
+> ⛔ **2026-08-25 UPDATE.** Two rulings landed on top of this and are PUSHED + DEPLOYED: **D-450**
+> (the Dial accessory screen — the Standing Plan's accessory step is no longer Wendler's taxonomy)
+> and **D-451** (hard endurance sessions are opt-in, max two, default zero). **D-451 is VERIFIED on
+> device.** D-450 is verified as far as the wizard; the BUILT WEEK's accessory rows are the one thing
+> unread, and that is step (1) below. Order otherwise unchanged.
+>
 > **The sequence from here:** (1) the acceptance run — Michael is ON the block (started
 > 2026-08-24); the test-save → weeks-fill chain on a device is the one unverified link.
 > (2) The Q-279..283 punch list. (3) The next frames: Cycling: Base (his fastest strength — the

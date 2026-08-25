@@ -735,6 +735,18 @@ run on day one still causes the haircut, a hard ride still does not.
 
 **DEPLOY SET (2):** `generate-strength-plan`, `rematerialize-standing-block`.
 
+### ✅ COMPLETE — PUSHED, DEPLOYED, VERIFIED ON DEVICE (2026-08-25)
+
+**All three states are true for this entry, which is rare enough to say plainly.** Michael opened the
+endurance-week screen on a device and confirmed the opt-in model, the add / X controls, the block
+order and the copy. **This screen is closed — do not redesign it.**
+
+⚠️ **ONE PIECE OF STANDING DEBT THIS RULING MADE USER-VISIBLE, and it is not a defect in the above:**
+there is no mid-block **re-dial**. Endurance volume and hard sessions are answerable in the wizard
+only, so an athlete who wants to add a hard session in week 6 has no control for it. That predates
+this work; what changed is that the opt-in screen now advertises a choice the athlete cannot revisit.
+Filed on `POLISH-PUNCH-LIST.md`.
+
 ---
 
 ## D-450 — "Dial": his bands, our dial — the Standing Plan's accessory screen (2026-08-24)
@@ -898,6 +910,38 @@ covered by a chip default is a gap the athlete can re-open by turning the chip o
 would let a tap on Arms open curls on both days and hand the balance problem straight back through
 the dial.
 
+> ### ⛔ SUPERSEDED 2026-08-25 — `single_leg` **IS** SPLIT. Everything in this paragraph is history.
+>
+> Michael ruled the opposite the next day. The two lower picks are now **`single_leg_a`
+> (`slot.frameDay: 2`, tuesday, default Bulgarian Split Squat)** and **`single_leg_b`
+> (`frameDay: 5`, friday, default Walking Lunge)** in `_shared/standing-plan/accessory-picks.ts`.
+>
+> **The paragraph below was right about the MECHANISM and it is the reason this cost one table row:**
+> `frameDay` was optional by design, `pickKeyForSlot` already resolved day-scoped over day-agnostic,
+> `daysForPick` already filtered, the composer already passed `frameDay`, and the gate already
+> asserted a day-scoped pick names a day its cell carries. One row plus a `leadWith` head, exactly as
+> predicted. No mechanism was built.
+>
+> **What it was WRONG about is the grounding, and the correction matters:** the reason is **the day**,
+> not the movement being "the same answer twice". Both cells are the same `secondary press_lower` —
+> they are not different cells. What differs is what they sit under: day 2 is the ME lower day (the
+> cell follows a competition deadlift and a heavy primary `press_lower`); day 5 is the DE lower day
+> (it follows a dynamic squat and a primary hinge, and also carries `quad_iso`).
+>
+> ⚠️ **AND THE SPLIT BUYS MOVEMENT VARIETY, NOT MUSCLE COVERAGE — do not carry the pull split's
+> argument over.** Every option in this cell is `quadriceps`, checked against the resolved grid pool,
+> all 16. Unlike `iso_pull_a` / `iso_pull_b` — where p222-223 files rear-delt work and arm work
+> separately and one dropdown genuinely left a muscle untrained — **no muscle was missed before and
+> none is newly covered.** Neither row serves a Dial chip, so there is no chip half to keep in step.
+>
+> **Pinned both halves:** the two rows default to different movements, AND the mix is unchanged —
+> same row count, same per-muscle set ledger, same pattern-per-day shape as the one-pick week
+> (`standing-plan-accessory-picks.test.ts`, "⛔ THE PIN"). Legacy `slot_picks.single_leg` is orphaned
+> by the rename and falls back cleanly to the new defaults; nothing had persisted a `viada` block, so
+> nothing was migrated.
+>
+> *Everything below is history.*
+
 ⚠️ **`single_leg` is deliberately NOT split** — it stays one pick across tuesday and friday, where one
 movement twice is the same answer twice rather than two different jobs. It is the same shape as
 isolation pull and the opposite call, so `frameDay` is optional by design: **omitted means the pick
@@ -965,3 +1009,29 @@ now the exported `movementsForMuscle`; `FloorAddition.reason` splits floor rows 
 the plan never prints *"had nothing else this week"* under a movement somebody named),
 `_shared/standing-plan/compose.ts`, `generate-strength-plan`, `rematerialize-standing-block` (imports
 the composer), `src/lib/assistance-catalog.ts` (carries the block, does not parse it).
+
+### ✅ COMPLETE AS A BUILD — PUSHED + DEPLOYED, ONE DEVICE CHECK OUTSTANDING (2026-08-25)
+
+**The screen is done and the rulings below are settled.** What is NOT done is reading a BUILT WEEK:
+`generate-strength-plan` **v140** and `rematerialize-standing-block` **v18** are live and
+version-verified, and nobody has generated a block and looked at the accessory rows. Four things
+settle it — core = pick + at most one complement, the two Isolation pull rows differ, the two
+Single-leg rows differ, and an A-skip row asks reps only. On the `ENGINE-STATE` banner and
+`POLISH-PUNCH-LIST`.
+
+**The three rulings in this entry are standing and carry past this screen:**
+
+1. **The name and the copy pattern.** The row is **"Dial"** (renamed from the "Aesthetics" working
+   title before the first commit; storage keys renamed with it, nothing had persisted). **Inline copy
+   is ONE LINE PER ELEMENT — what it does, never how it works.** Anything deeper lives behind an (i)
+   or an expandable row. ⚠️ **When a drawer is built, its content is AUTHORED, STATIC and
+   PAGE-CITED — never LLM-generated, never training-blog filler. If a fact cannot be cited it does
+   not go in.** The (i) is not built; that is not a place to park a paragraph.
+2. **The balance principle** (`LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`): **the default week is balanced on
+   its own; the Dial is fine-tuning on top of a balanced week, never the source of balance.** A gap
+   covered by a chip default is a gap the athlete re-opens by turning the chip off.
+3. **Both twice-occurring cells are day-scoped.** `focused pull_upper` → `iso_pull_a` / `iso_pull_b`
+   (days 1/4, split on MUSCLE — rear delt vs arms, p222-223). `secondary press_lower` →
+   `single_leg_a` / `single_leg_b` (days 2/5, split on the DAY — ME lower vs DE lower, and it buys
+   movement variety, not muscle coverage). ⚠️ **See the superseded block above** — this entry
+   originally recorded the opposite call on `single_leg`.
