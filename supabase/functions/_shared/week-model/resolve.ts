@@ -38,6 +38,13 @@ const isEndurance = (l: Load): boolean => isLong(l) || l === 'easy' || l === 'ha
 
 export type Unmet = {
   unit: string;
+  /**
+   * ⛔ THE LOAD OF THE SESSION THAT WAS BLOCKED (pins-win, 2026-08-25). Added so the tier layer can
+   * name WHICH rule fired without re-deriving it from a label: `heavy_lower` needing `long_effort`
+   * is a different sentence from `long_run` needing `heavy_legs`, and the two are indistinguishable
+   * from `system` alone. ⚠️ Additive — every existing reader destructures by name.
+   */
+  load: Load;
   system: SystemId;
   /** The unit whose debt is still outstanding. */
   blockedBy: string;
@@ -78,6 +85,7 @@ export function unmetNeeds(placements: Placement[]): Unmet[] {
           if (gap >= d.hours) continue;
           out.push({
             unit: session.label,
+            load: session.load,
             system,
             blockedBy: d.from,
             shortBy: d.hours - gap,
@@ -478,8 +486,231 @@ export function sportAdjacency(placements: Placement[]): number {
 }
 
 
-export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Resolution {
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   PINS WIN, INFORMED — Michael's ruling, 2026-08-25: *"user choice always wins, it's just
+   informed."* See `docs/HANDOFF-your-week-pins-win-2026-08-25.md`.
+
+   ⛔ THIS SUPERSEDES "THE BIOLOGICAL RULE IS NEVER BENT" IN THIS FILE'S OWN HEADER, and only for
+   the pinned path. Nothing here relaxes a rule the engine chose on its own: the default week is
+   still built to break none of them. What changed is what happens when the ATHLETE puts a session
+   somewhere the law dislikes — the week is built as asked and the cost is named, rather than the
+   engine quietly placing it elsewhere and explaining afterwards.
+
+   ⛔ THREE OUTCOMES, AND ONLY ONE OF THEM IS A REFUSAL:
+     • STRUCTURAL  — the week cannot be EXPRESSED (a session pinned to a day the athlete also marked
+       unavailable; nowhere left to put anything). There is no trade-off to describe, because there
+       is no week. This is the only thing that is not simply built.
+     • BREACH      — a clearance in `COST` is unmet. The law says these carry injury risk, so they
+       are named plainly and loudly, and the week is still built exactly as pinned.
+     • TRADE-OFF   — the week is legal by Layer 1 and pays a Layer 2 shape cost: no day off, three
+       stressors stacked, a run of hard days. Recovery is thinner; nothing is unsafe.
+
+   ⚠️ THE TIER IS READ OFF THE LAYER, NOT HAND-ASSIGNED PER RULE. Layer 1 (`COST` in model.ts) rules
+   a week LEGAL; Layer 2 (`score` above) picks among legal weeks. So an unmet `needs` is a breach by
+   construction and a score term is a trade-off by construction, and a rule added to either layer
+   gets the right tier without anybody remembering to classify it.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/** Which layer the rule that fired belongs to. Never a colour, never a severity number. */
+export type ViolationTier = 'breach' | 'tradeoff';
+
+/**
+ * ⛔ A STABLE ID PER RULE, AND THE COPY LAYER KEYS OFF THIS AND NEVER OFF PROSE. The screen writes
+ * one sentence per id; matching on a rendered string is how the two drift apart the first time a
+ * word changes.
+ */
+export type RuleId =
+  /* breaches — Layer 1, the `COST` clearances */
+  | 'heavy_legs_clearance'
+  | 'long_effort_clearance'
+  | 'long_run_needs_legs'
+  /* trade-offs — Layer 2, the shape terms in `score` */
+  | 'no_rest_day'
+  | 'no_recovery_day'
+  | 'day_overloaded'
+  | 'stressor_streak'
+  | 'two_long_days'
+  | 'same_sport_back_to_back';
+
+export type Violation = {
+  tier: ViolationTier;
+  rule: RuleId;
+  /** The athlete-facing label of the session the rule is about. */
+  subject: string;
+  /** The session on the other side of it, where a rule has two sides. */
+  against?: string;
+  /** Hours of clearance still outstanding. Breaches only. */
+  shortBy?: number;
+  /** Days the violation sits on, 0-6. */
+  days: number[];
+};
+
+/**
+ * ⛔ WHICH BREACH IS IT — read off the blocked session's LOAD and the system it needed, which is
+ * exactly the `COST` row that failed. ⚠️ A row added to `COST` without a case here returns null and
+ * the breach is dropped silently, which is the one failure mode worth watching: the default arm
+ * therefore reports `heavy_legs_clearance` rather than nothing, so a new rule is loud, not lost.
+ */
+function ruleForUnmet(load: Load, system: SystemId): RuleId {
+  if (load === 'long_run' && system === 'heavy_legs') return 'long_run_needs_legs';
+  if (system === 'long_effort') return 'long_effort_clearance';
+  return 'heavy_legs_clearance';
+}
+
+/** Which day each session label sits on, for the `days` field. */
+function daysByLabel(placements: Placement[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const p of placements) for (const s of p.unit.sessions) out.set(s.label, p.day);
+  return out;
+}
+
+/**
+ * ⛔ EVERY RULE THE PLACED WEEK BREAKS, TIERED. Computed FROM the week, never during the search —
+ * the search already minimises them through `score` and the `unmet.length * 1000` penalty, and a
+ * second opinion computed on the way in is how the report and the week come to disagree.
+ *
+ * ⚠️ DEDUPED BY RULE + SUBJECT + COUNTERPART. `unmetNeeds` reports one row per (session, system,
+ * debt) triple, so a squat blocked by two long days is two rows and reads as two problems.
+ */
+export function violationsOf(placements: Placement[], opts: { minRestDays?: number } = {}): Violation[] {
   const minRest = opts.minRestDays ?? 1;
+  const at = daysByLabel(placements);
+  const out: Violation[] = [];
+  const seen = new Set<string>();
+  const push = (v: Violation) => {
+    const key = `${v.rule}|${v.subject}|${v.against ?? ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(v);
+  };
+
+  // ── BREACHES — Layer 1. The week is built anyway; these are the injury-risk sentences.
+  for (const u of unmetNeeds(placements)) {
+    push({
+      tier: 'breach',
+      rule: ruleForUnmet(u.load, u.system),
+      subject: u.unit,
+      against: u.blockedBy,
+      shortBy: u.shortBy,
+      days: [at.get(u.unit), at.get(u.blockedBy)].filter((d): d is number => d != null),
+    });
+  }
+
+  // ── TRADE-OFFS — Layer 2. Legal weeks that cost the athlete something.
+  // ⚠️ `restDaysOf` is the genuinely BLANK day; `recoveryDaysOf` is the wider "no stressor" set.
+  // They are two different promises and the screen makes both, so both are reported.
+  const rest = restDaysOf(placements);
+  if (rest.length === 0) push({ tier: 'tradeoff', rule: 'no_rest_day', subject: 'the week', days: [] });
+  const recovery = recoveryDaysOf(placements);
+  if (recovery.length < minRest) {
+    push({ tier: 'tradeoff', rule: 'no_recovery_day', subject: 'the week', days: [] });
+  }
+
+  // A day carrying three or more stressors — `overCap`'s own threshold, read per day so the
+  // sentence can name the day rather than a count.
+  const perDay = [0, 1, 2, 3, 4, 5, 6].map((d) =>
+    placements.filter((p) => p.day === d).reduce((n, p) => n + stressorsOf(p.unit), 0));
+  for (let d = 0; d < 7; d++) {
+    if (perDay[d] >= 3) push({ tier: 'tradeoff', rule: 'day_overloaded', subject: DAY_NAMES[d], days: [d] });
+  }
+
+  // Stressor days running back to back past the streak the score tolerates.
+  if (stressorStreakExcess(placements) > 0) {
+    push({ tier: 'tradeoff', rule: 'stressor_streak', subject: 'the week', days: [] });
+  }
+  if (longDoubles(placements) > 0) {
+    push({ tier: 'tradeoff', rule: 'two_long_days', subject: 'the week', days: [] });
+  }
+  if (sameSportDoubles(placements) > 0) {
+    push({ tier: 'tradeoff', rule: 'same_sport_back_to_back', subject: 'the week', days: [] });
+  }
+  return out;
+}
+
+/**
+ * ⛔ A WEEK THAT CANNOT BE EXPRESSED — and there is nothing to warn about, because there is no week.
+ * Distinct from every rule above: those are weeks the athlete may have, at a stated cost. These are
+ * contradictions in the ANSWERS themselves, and only the athlete can resolve them.
+ */
+export type StructuralConflict =
+  /** A session pinned onto a day also marked "cannot train". */
+  | { kind: 'pin_on_unavailable_day'; unit: string; day: number }
+  /** Every day marked unavailable, with sessions still to place. */
+  | { kind: 'no_day_left' };
+
+export function structuralConflicts(
+  units: Unit[],
+  opts: { unavailableDays?: number[] } = {},
+): StructuralConflict[] {
+  const blocked = new Set(opts.unavailableDays ?? []);
+  const out: StructuralConflict[] = [];
+  for (const u of units) {
+    if (u.pinnedDay != null && blocked.has(u.pinnedDay)) {
+      out.push({ kind: 'pin_on_unavailable_day', unit: u.label, day: u.pinnedDay });
+    }
+  }
+  if (units.length > 0 && blocked.size >= 7) out.push({ kind: 'no_day_left' });
+  return out;
+}
+
+export type PinnedWeek = {
+  /** The week as asked for. Present even when it breaks rules — that is the ruling. */
+  placements: Placement[];
+  restDays: number[];
+  violations: Violation[];
+  /** Non-empty only when the answers contradict each other; `placements` is then a best effort. */
+  structural: StructuralConflict[];
+};
+
+/**
+ * ⛔ THE PINS-WIN ENTRY POINT. The week is ALWAYS returned.
+ *
+ * ⛔⛔ IT DELEGATES THE SEARCH TO `resolve` RATHER THAN REIMPLEMENTING IT, AND THAT IS THE WHOLE
+ * SAFETY ARGUMENT. `resolve` already (a) never moves a pinned unit — `fixed` is excluded from the
+ * walk and the local-improvement sweep starts at `firstFree` — and (b) minimises violations while
+ * placing the remainder, through `score` and the `unmet.length * 1000` term. So with no pins this
+ * returns byte-identical placements to today BY CONSTRUCTION, not by a test that has to be kept in
+ * agreement. ⛔ Do not fork the search to "handle pins properly"; it already does.
+ *
+ * ⚠️ WHAT CHANGED IS ONLY THE VERDICT. `resolve` reports `ok: false` when a rule is unmet and hands
+ * back `best`; that is now read as "here is the week, and here is what it costs" rather than as a
+ * failure the caller has to interpret. The old `Resolution` shape is untouched for the server
+ * composer, which still reads it.
+ */
+export function resolveAroundPins(
+  units: Unit[],
+  opts: { minRestDays?: number; unavailableDays?: number[] } = {},
+): PinnedWeek {
+  const minRest = opts.minRestDays ?? 1;
+  const structural = structuralConflicts(units, opts);
+  const r = resolve(units, opts);
+  const placements = r.ok ? r.placements : r.best;
+  return {
+    placements,
+    restDays: restDaysOf(placements),
+    violations: violationsOf(placements, { minRestDays: minRest }),
+    structural,
+  };
+}
+
+export function resolve(
+  units: Unit[],
+  opts: { minRestDays?: number; unavailableDays?: number[] } = {},
+): Resolution {
+  const minRest = opts.minRestDays ?? 1;
+  /**
+   * ⛔ DAYS THE ATHLETE SAID THEY CANNOT TRAIN (pins-win, 2026-08-25). A rest-day pin is a pin like
+   * any other — it is absolute, and the engine arranges the remainder around it.
+   *
+   * ⚠️ IT CONSTRAINS THE FREE UNITS ONLY, NEVER A PINNED ONE. A session pinned onto a day the
+   * athlete also marked unavailable is a contradiction the athlete entered, and it is the caller's
+   * to report as structurally impossible — silently moving the session would be the engine
+   * overruling a pin, which is the one thing this ruling forbids.
+   * ⚠️ ABSENT OR EMPTY IS TODAY'S BEHAVIOUR EXACTLY. Every day stays a candidate, and the no-pins
+   * default is byte-identical to what this file returned before the field existed.
+   */
+  const blocked = new Set(opts.unavailableDays ?? []);
+  const dayCandidates = [0, 1, 2, 3, 4, 5, 6].filter((d) => !blocked.has(d));
   const fixed = units.filter((u) => u.pinnedDay != null).map((u) => ({ unit: u, day: u.pinnedDay! }));
   const free = units.filter((u) => u.pinnedDay == null);
 
@@ -521,9 +752,9 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
     // engine had: the rest day, the easy-run spread, and the morning after the long run. A private
     // cost function beside the public one is the doubled disease in miniature.
     for (const u of laidIn) {
-      let bestDay = 0;
+      let bestDay = dayCandidates[0] ?? 0;
       let bestScore = -Infinity;
-      for (let d = 0; d < 7; d++) {
+      for (const d of dayCandidates) {
         const sc = rate([...withFree, { unit: u, day: d }]);
         if (sc > bestScore) { bestScore = sc; bestDay = d; }
       }
@@ -550,7 +781,7 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
         const current = withFree[i].day;
         let bestDay = current;
         let bestScore = rate(withFree);
-        for (let d = 0; d < 7; d++) {
+        for (const d of dayCandidates) {
           if (d === current) continue;
           withFree[i] = { unit: withFree[i].unit, day: d };
           const sc = rate(withFree);
@@ -570,7 +801,7 @@ export function resolve(units: Unit[], opts: { minRestDays?: number } = {}): Res
 
   const walk = (i: number, acc: Placement[]): void => {
     if (i === searched.length) { consider(acc); return; }
-    for (let d = 0; d < 7; d++) walk(i + 1, [...acc, { unit: searched[i], day: d }]);
+    for (const d of dayCandidates) walk(i + 1, [...acc, { unit: searched[i], day: d }]);
   };
   walk(0, [...fixed]);
 

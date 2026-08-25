@@ -138,6 +138,43 @@ function dayNameFor(args: ComposeArgs, frameDay: number): Weekday {
   return weekdayForFrameDay(frameDay, args.dayOffset ?? 0);
 }
 
+/**
+ * ⛔ WHICH ANCHOR A SLOT IS — the same test `anchorDaysFor` uses, applied per slot rather than per
+ * day. ⚠️ ONE OWNER: if a family is ever added to the long or hard set there, it must be added
+ * here, or a slot the day map treats as an anchor stops being pinnable and nothing says why.
+ */
+function anchorRoleOf(family: string): 'long' | 'hard' | null {
+  if (family === 'run_lsd') return 'long';
+  if (family === 'run_mlss' || family === 'run_near_threshold') return 'hard';
+  return null;
+}
+
+/**
+ * ⛔ THE WEEKDAY THIS ENDURANCE SLOT LANDS ON — the athlete's pin if they set one, the frame's
+ * rotation otherwise. See `endurancePins`.
+ *
+ * ⚠️ HARD SLOTS ARE MATCHED BY POSITION IN THE FRAME'S OWN ORDER, which is the order the wizard
+ * lists them in and the order `anchorDaysFor` returns them in. Matching by weekday instead would
+ * be circular — the weekday is the thing being decided.
+ */
+function enduranceDayFor(
+  args: ComposeArgs,
+  frameDay: number,
+  family: string,
+  hardIndex: number,
+): Weekday {
+  const role = anchorRoleOf(family);
+  const pins = args.endurancePins;
+  if (pins) {
+    if (role === 'long' && pins.long) return pins.long;
+    if (role === 'hard') {
+      const pinned = pins.hard?.[hardIndex];
+      if (pinned) return pinned;
+    }
+  }
+  return dayNameFor(args, frameDay);
+}
+
 export type ComposeArgs = {
   frame: FrameId;
   week: number;
@@ -162,6 +199,34 @@ export type ComposeArgs = {
    * Frame day 1 lands this many days after Monday. Absent = 0 = the Monday-start week.
    */
   dayOffset?: number;
+  /**
+   * ⛔⛔ THE ATHLETE'S PINNED ENDURANCE DAYS — AND THEY BEAT THE FRAME (Michael, 2026-08-25:
+   * *"user choice always wins, it's just informed."* Fork answered 2026-08-25: option 1.)
+   *
+   * ⛔ WHAT THIS BREAKS, SAID PLAINLY. This file's own law is that the frame owns the ORDER and the
+   * SPACING and the athlete owns only which weekday the block opens on — a whole-week ROTATION,
+   * which costs the frame nothing because every pairing and gap survives it. A pin here does NOT
+   * survive it: one endurance session steps out of the frame order onto the day the athlete chose,
+   * and the pairing it was part of can come apart. That is the ruling, not an oversight.
+   *
+   * ⛔ ENDURANCE ONLY. The lifts keep the frame's order, its spacing and its rest slot, and they are
+   * still placed by the rotation `chooseDayMap` picked — which still scores the pins first, so the
+   * rotation is chosen to REACH as many of them as it can. A pin only overrides the sessions the
+   * rotation could not reach. ⚠️ Do not extend this to `day.strength`: the ME/DE ordering and the
+   * gaps between lifting days are the half of the frame that is load-bearing on its own.
+   *
+   * ⚠️ THE COST IS NOT SILENT. A pin that breaks the squat + hard-run pairing is a BREACH-tier note
+   * on the screen (`week-model/resolve.ts` `violationsOf`), never a refusal and never a quiet move.
+   *
+   * ⚠️ ABSENT IS THE ROTATION, EXACTLY. An athlete who pinned nothing gets the week this file built
+   * before the field existed, byte for byte.
+   */
+  endurancePins?: {
+    /** Weekday for the frame's long slot, whichever sport the mix put on it. */
+    long?: Weekday | null;
+    /** Weekdays for the frame's hard slots, in the frame's own order. */
+    hard?: Array<Weekday | null | undefined>;
+  };
   /**
    * ⛔ THE ATHLETE'S SPORT MIX (slice 4) — how many runs, how many rides, swim kept or not. It sets a
    * RATIO over the frame's own slot count and never changes how many sessions the week holds.
@@ -881,6 +946,20 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const frame = FRAMES[args.frame];
   if (!frame) throw new Error(`unknown frame: ${args.frame}`);
   const days = frame.columns[args.column];
+  /**
+   * ⛔ EACH HARD SLOT'S POSITION IN THE FRAME'S ORDER, so a pin can be matched to the slot it was
+   * made for. Built once over the whole column rather than counted inside the day loop, because the
+   * loop also runs for days with no endurance at all and an inline counter would drift.
+   */
+  const hardSlotIndex = new Map<string, number>();
+  {
+    let n = 0;
+    for (const d of days) {
+      d.endurance.forEach((slot, i) => {
+        if (anchorRoleOf(slot.family) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
+      });
+    }
+  }
   if (!days) throw new Error(`unknown column: ${args.column}`);
 
   const notes: ComposeNote[] = [];
@@ -1067,7 +1146,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       });
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
       sessions.push({
-        day: dayNameFor(args, day.day),
+        // ⛔ THE PIN WINS HERE AND ONLY HERE. Every other `dayNameFor` call in this file is a lift,
+        // a plyo block or an add-on, and those keep the frame's rotation — see `endurancePins`.
+        day: enduranceDayFor(args, day.day, assigned.family, hardSlotIndex.get(`${day.day}:${i}`) ?? 0),
         ...row,
         // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a reader
         // can still find the row on the page it came from.

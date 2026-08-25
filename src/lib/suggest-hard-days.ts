@@ -25,6 +25,18 @@ import { easySessionsWanted } from '@shared/athlete-weekly-intent.ts';
 export type WizardDay =
   'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
+/**
+ * ⛔ THE ATHLETE'S BLOCKED DAYS AS INDEXES — resolved once, used by every solve in this file. Three
+ * copies of the same `.map(DAY_INDEX)` is how two of them end up disagreeing about a Sunday.
+ * ⚠️ AN UNRECOGNISED DAY IS DROPPED, not coerced to Monday: a bad value must mean "no constraint",
+ * never "block a day nobody named".
+ */
+function blockedDayIndexes(input: { unavailableDays?: string[] | null }): number[] {
+  return (input.unavailableDays ?? [])
+    .map((d) => DAY_INDEX[String(d ?? '').toLowerCase()])
+    .filter((i): i is number => typeof i === 'number');
+}
+
 const DAY_INDEX: Record<string, number> = {
   monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6,
 };
@@ -75,6 +87,12 @@ export type WeekInput = {
   runDays?: number | null;
   rideDays?: number | null;
   swimDays?: number | null;
+  /**
+   * ⛔ DAYS THE ATHLETE SAID THEY CANNOT TRAIN (pins-win slice 2, 2026-08-25). Passed straight
+   * through to `resolve`, which keeps the free units off them. ⚠️ Absent or empty is the behaviour
+   * this file had before the field existed — every day stays a candidate.
+   */
+  unavailableDays?: string[] | null;
 };
 
 /**
@@ -209,7 +227,7 @@ export type ScheduleHealth = {
 export function scheduleHealth(input: WeekInput): ScheduleHealth {
   try {
     const units = buildWizardWeek(input);
-    const r = resolve(units, { minRestDays: 1 });
+    const r = resolve(units, { minRestDays: 1, unavailableDays: blockedDayIndexes(input) });
     const placements: Placement[] = r.ok
       ? r.placements
       : (r as Extract<typeof r, { ok: false }>).best;
@@ -289,7 +307,7 @@ export function scheduleHealth(input: WeekInput): ScheduleHealth {
 export function suggestLongDays(input: WeekInput): { run: string | null; ride: string | null } {
   try {
     const units = buildWizardWeek(input);
-    const r = resolve(units, { minRestDays: 1 });
+    const r = resolve(units, { minRestDays: 1, unavailableDays: blockedDayIndexes(input) });
     const placements: Placement[] = r.ok
       ? r.placements
       : (r as Extract<typeof r, { ok: false }>).best;
@@ -327,7 +345,7 @@ export function solveWizardWeek(input: WeekInput): {
   const slots = input.hardDays ?? [];
   try {
     const units = buildWizardWeek(input);
-    const r = resolve(units, { minRestDays: 1 });
+    const r = resolve(units, { minRestDays: 1, unavailableDays: blockedDayIndexes(input) });
     const placements: Placement[] = r.ok
       ? r.placements
       : (r as Extract<typeof r, { ok: false }>).best;

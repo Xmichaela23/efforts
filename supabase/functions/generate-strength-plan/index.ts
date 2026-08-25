@@ -44,6 +44,9 @@ import { composeStrengthPrimaryPlan } from '../shared/strength-system/strength-p
 import {
   buildStandingPlanRow,
   chooseDayMap,
+  isWeekday,
+  titleCaseDay,
+  type Weekday,
   defaultCompetitionLifts,
   demonstratedRunVolume,
   assignSports,
@@ -447,6 +450,37 @@ Deno.serve(async (req: Request) => {
       });
 
       /**
+       * ⛔⛔ THE PINS, FORWARDED TO THE COMPOSER AS ABSOLUTES (pins-win ruling, 2026-08-25).
+       *
+       * `chooseDayMap` above still scores them FIRST — the rotation is chosen to reach as many pins
+       * as it can, and when it reaches them all this changes nothing at all. What this adds is the
+       * remainder: a pin the rotation could not reach now moves its own endurance session, instead
+       * of being reported as a compromise and quietly ignored.
+       *
+       * ⚠️ SAME READS AS THE DAY MAP'S, DELIBERATELY. Two derivations of "which day did the athlete
+       * pin" is how the rotation and the placement come to disagree about the same answer.
+       * ⚠️ ORDER IS THE FRAME'S. `hard` is positional against the frame's own hard slots, which is
+       * the order `anchorDaysFor` returns and the order the wizard lists them in.
+       * ⚠️ TITLE-CASED HERE, because the composer speaks `Monday` and the wire speaks `monday` —
+       * the casing trap this repo has now hit in three files.
+       */
+      // ⚠️ NARROWED, NOT CAST. `titleCaseDay` returns `''` for anything it does not recognise, and
+      // an unrecognised day must degrade to "no pin" rather than to a string the composer will
+      // compare against and never match.
+      const asWeekday = (raw: unknown): Weekday | null => {
+        const d = titleCaseDay(raw);
+        return isWeekday(d) ? d : null;
+      };
+      const endurancePins = {
+        long: asWeekday(longSlotSport === 'ride'
+          ? (bike && typeof bike === 'object' ? (bike as Record<string, unknown>).long_ride_day : null)
+          : long_run_day),
+        hard: (Array.isArray(hard_days) ? hard_days : [])
+          .map((h) => (h && typeof h === 'object' ? (h as Record<string, unknown>).day : null))
+          .map(asWeekday),
+      };
+
+      /**
        * ⛔ THE TEST-WEEK SKIP — OFFERED ON EVIDENCE, NEVER ON A PREFERENCE (Michael, 2026-08-23).
        *
        * ⛔ THE DEFAULT IS THE TEST. `skip_test_week` has to arrive true AND the evidence has to be
@@ -571,6 +605,9 @@ Deno.serve(async (req: Request) => {
       const row = buildStandingPlanRow({
         compose: {
           frame: frameId,
+          // ⛔ THE ATHLETE'S DAYS BEAT THE FRAME ORDER — see `endurancePins` above and the note on
+          // the field in `compose.ts`. Absent pins leave the rotation exactly as it was.
+          endurancePins,
           ...(accessoryPicks ? { accessoryPicks } : {}),
           ...(focusChips ? { focus: focusChips } : {}),
           ...(viadaPrefs ? { slotPicks: viadaPrefs.picks } : {}),
