@@ -913,6 +913,13 @@ the defect candidate.
 
 ## Q-285 — Week-2 ME: Upper sheet rendered blank weights + the "no weight prescribed" cue (2026-08-24)
 
+> **CLOSED 2026-08-24 night — real bug, root-caused and fixed.** The restate wrote weights into
+> `planned_workouts.strength_exercises` but the logger's every prefill path reads
+> `computed.steps` — a build-time cache nothing refreshed. Both rematerializers now re-invoke
+> materialize-plan after writing rows (commit `bdd442f4`, both deployed); Michael's block was
+> patched with a one-time materialize and bench ME **verified at 135 in the logger on device**.
+> Everything below is history.
+
 Screenshot, same day as the test save: "Log: ME: Upper" dated 08/24 shows the accessory cue ("No
 weight is prescribed — find the load…") at session level and blank LB on Bench (target 1-5),
 despite the acceptance verifying the test wrote working numbers (bench 149 / OHP 102) and

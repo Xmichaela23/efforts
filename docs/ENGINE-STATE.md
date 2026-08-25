@@ -69,7 +69,69 @@ Full census: `AUDIT-plan-generators-2026-08-07.md` §4.
 
 ---
 
-## 🧭 NEXT SESSION — START HERE (2026-08-24 afternoon — **phase word fixed everywhere; a strength-propagation audit is the open job**)
+## 🧭 NEXT SESSION — START HERE (2026-08-24 night — **the block reprices itself now; tomorrow's lower-test save is the acceptance run**)
+
+### THE JOB: verify tomorrow's Test: Lower save end to end, then pick up the debts
+
+Michael deleted the first Strong Focus block and rebuilt it on the fixed engine (all fixes below
+deployed). Monday's Test: Upper workout is ATTACHED to the new block's test row (he had to
+unattach/re-attach once — the ghost-link bug that forced that is fixed for next time). When he
+saves tomorrow's Test: Lower, ONE save must do all of it:
+- `rematerialize-standing-block` reads all four week-1 lifts (bench/OHP from the attached Monday
+  workout + the fresh squat/deadlift), writes weights into weeks 2–12, **and now re-invokes
+  materialize-plan itself** so `computed` — the copy every logger prefill reads — is fresh.
+- After that save, ANY future strength session opens with weights in the box (bench ME ≈ 135 off
+  working number 149). If a box is blank after tomorrow's save, that is a real failure — get the
+  screenshot and start at `rematerialize-standing-block/index.ts` (`computed_refreshed` in its
+  response) and the function logs.
+
+### What shipped tonight (don't re-litigate) — ALL PUSHED, ALL DEPLOYED
+1. **Q-285 CLOSED — the blank-logger root cause.** Both rematerializers wrote restated weights
+   into `planned_workouts.strength_exercises` but never refreshed `computed`, which is what every
+   logger prefill path reads (`prefillFromPlanned` reads ONLY `row.computed.steps`; get-week serves
+   `computed.steps` verbatim). Both now re-invoke materialize-plan after writing (the adapt-plan
+   relayout idiom); materialize's numeric pass-through carries restated weights verbatim and does
+   not write `strength_exercises` back. Commit `bdd442f4`; both functions deployed. His old block
+   was patched by a one-time manual materialize (108 rows) and bench ME **verified showing 135 in
+   the logger on device**.
+2. **The equipment-gate regression — fixed by the terminal session** (handoff:
+   `HANDOFF-equipment-gate-regression-2026-08-24.md`, now shipped). Three parts: (a) the grid no
+   longer ejects untagged movements — `canPerform` + a `readsAsMachineBraced()` guard over the
+   existing BRACED_RE, so a home gym gets rear delt fly instead of band-tier lat pulldown; loaded
+   beats bodyweight on rank ties (`ownsLoadingImplement()`); (b) the block now STORES
+   `athlete_equipment` in `plans.config.standing_plan` and the restater reads it (was: read by the
+   restater, written by nothing — every restate composed ungated); (c) band-route picks rename to
+   the existing band catalogue entries; picks/dedup go through `canonicalize()` (17 collision
+   groups). Commits `c59ad88b` + `3b00add9`; eight functions deployed 15:56 local.
+3. **Ghost attach on plan delete — fixed.** `delete-plan` now nulls `workouts.planned_id` for the
+   doomed rows before deleting them (commit `a8fdc905`, deployed). Before: a workout stayed
+   "attached" to a dead row and had to be manually unattach/re-attached.
+4. **Wizard copy/flow round (client, on Netlify + needs `npm run ios` for the phone).** Train
+   picker: Strength Focus first, Viada blurb (no more Wendler). Mix screen: "Who are you this
+   block?" and the unlock sentence cut; four cards fit unscrolled. Tier screen: honesty note +
+   mileage table moved off. Endurance week: one-sentence preamble; open hard row is chips → choices
+   (tax lines and family-fact panel cut — the collapsed row title and the volume note carry them);
+   club toggle says "Replaces this hard session."; volume section auto-scrolls into view when the
+   4th sport lands, copy is three approved lines (hold comfortably / more running slows strength /
+   start low, month before re-dial), rate line reads "the plan advances the bar…" (prescription,
+   not prophecy), "This week holds X–Y" cut, boxes open empty (no placeholder numbers).
+
+### DEBTS AND LEADS (in rough order)
+1. **"Re-dial after a month" promises a control that does not exist** — no mid-block endurance
+   volume edit anywhere; the wizard is the only place the numbers are typed. Flagged in the code
+   (`standing-plan-week-copy.ts`, VOLUME_HONESTY_LINES comment). Build or reword.
+2. **Attach/import never triggers a restate** — only a logger SAVE does (StrengthLogger:4356). An
+   athlete who attaches a test workout and saves nothing waits forever. Small wire.
+3. **Terminal session residuals:** nine band-named catalogue movements still untagged (rank 0,
+   also read by Get Stronger); `leg extension` passes the gate (materialize's backstop substitutes
+   it at render); the exact same-session duplicate pair ("bulgarian split squat" + "Bulgarian Split
+   Squats") was never reproduced from the composer — if it reappears, look at materialize-plan.
+4. **Q-284 still open** (test sheet says "updated" without writing; Baselines has no strength
+   adopt flow). Decided direction in chat: keep consent-first, add the adopt + fix the word.
+5. **Week 7 missing from the OLD export — moot**: the rebuilt block's export carries all 12 weeks.
+
+### 📦 SUPERSEDED (2026-08-24 night) — the afternoon banner below still carries the trace detail
+## 🧭 DONE — was START HERE (2026-08-24 afternoon — **phase word fixed everywhere; a strength-propagation audit is the open job**)
 
 ### THE JOB: finish the "how does a logged strength session populate the app" map
 Michael wants the guts traced: every store a logger save touches and every surface that reads an

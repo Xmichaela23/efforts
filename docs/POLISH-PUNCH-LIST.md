@@ -8,7 +8,17 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE STANDING PLAN ACCEPTANCE (2026-08-24, everything PUSHED + DEPLOYED; wizard verified; **test-save chain now VERIFIED**)
+## ⏳ AWAITING MICHAEL — TOMORROW'S TEST: LOWER SAVE (2026-08-24 night; block REBUILT on the fixed engine)
+
+The first block was deleted and rebuilt after the equipment-gate + computed-refresh fixes (see the
+ENGINE-STATE banner). Monday's Test: Upper is attached to the new block. One save proves it all:
+- [ ] Save **Test: Lower** (Tue) → all four lifts price weeks 2–12, and every future strength
+      session opens with weights in the logger (bench ME ≈ 135). A blank box after this save is a
+      real failure — screenshot it; start at `rematerialize-standing-block` (`computed_refreshed`).
+- [ ] New block's accessories: dumbbell work in the small-muscle slots (no "reverse flyes
+      (bodyweight)"), no lift twice under two spellings, his plural pick placed once.
+
+## ⏳ SUPERSEDED — the first block's acceptance (2026-08-24, block since deleted + rebuilt)
 
 He is ON the block (started 2026-08-24, test week live). What to look for:
 - [x] **(2026-08-24 midday — SEEN ON DEVICE.)** Save **Test: Upper** → the sheet announced bench

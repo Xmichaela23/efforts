@@ -1,5 +1,11 @@
 # HANDOFF — equipment gate regression on the Standing Plan (2026-08-24, evening)
 
+> **SHIPPED same night** — option C built (canPerform + `readsAsMachineBraced()` over BRACED_RE),
+> plus the two small fixes and a second round (loaded-beats-bodyweight tiebreak, canonicalized
+> dedup/picks). Commits `c59ad88b` + `3b00add9`; eight edge functions deployed 15:56 local.
+> Residuals + the unreproduced same-session duplicate are recorded in the ENGINE-STATE banner.
+> This file is now history + the fix's reasoning; delete when a consolidated writeup lands.
+
 **The complaint (Michael, on device):** his Strong Focus block prescribes `lat pulldown` and
 `tricep pushdown` — cable movements — on a declared home gym (barbell+plates, dumbbells, rack,
 flat bench, pull-up bar, bands, ab wheel; **no cable machine**). "Equipment has worked in the past."
