@@ -32,7 +32,6 @@ import { ChevronDown } from 'lucide-react';
 import {
   ENDURANCE_WEEK_PREAMBLE,
   LONG_SLOT_NOTE,
-  RUN_TAX_LINES,
   VOLUME_HONESTY_LINES,
   runnerMileageLine,
   SLOT_KEYS,
@@ -240,17 +239,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   {/* ⛔ NOT A PILL (Michael, 2026-08-24): boxed, the info read as a selectable
                       option among the real choices. Plain text — information looks like
                       information. */}
-                  {isHard && sport === 'run' ? (
-                    <div
-                      className="px-1 py-1 space-y-1"
-                      data-testid={`tax-${key}`}
-                    >
-                      {RUN_TAX_LINES.map((line, i) => (
-                        <p key={i} className="text-white/70 text-xs leading-snug">{line}</p>
-                      ))}
-                    </div>
-                  ) : null}
-
+                  {/* ⛔ THE TAX LINES LEFT THE SLOT ROW (Michael, 2026-08-24 night: "too much
+                      nonsense to get to what you're picking"). The volume note below the slots now
+                      carries the same fact ("More running will slow your strength progress…"), so
+                      here they were the message said twice, standing between the chips and the
+                      choices. `RUN_TAX_LINES` stays exported — the copy tests pin his sentences. */}
                   {isHard && props.renderHardFlavor ? props.renderHardFlavor(key) : null}
                 </div>
               ) : null}

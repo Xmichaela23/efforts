@@ -21,7 +21,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { HARD_SLOT_FACT_NOTE, slotFamilyFact, slotVariantOptions, VARIANT_BODY, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
+import { slotVariantOptions, VARIANT_BODY, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
 
 export type HardSlotChoicesProps = {
   /** The slot's sport, as the endurance screen has it. */
@@ -35,7 +35,6 @@ export type HardSlotChoicesProps = {
 export default function HardSlotChoices(props: HardSlotChoicesProps) {
   const club = props.value.ownership === 'club';
   const color = getDisciplineColor(props.sport === 'ride' ? 'bike' : 'run');
-  const fact = slotFamilyFact(props.slotKey, props.sport);
 
   return (
     <div className="space-y-1.5">
@@ -43,21 +42,11 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           looked pressable would be the control this ruling removed, wearing different paint.
           ⚠️ DIMMED WHILE A CLUB SESSION HOLDS THE SLOT, not hidden: the athlete should be able to see
           what they are replacing, and a row that vanishes on tap is a row they cannot compare. */}
-      {/* ⛔ UNBOXED (Michael, 2026-08-24 evening) — same ruling as the tax lines: boxed, the fact
-          read as the FIRST OPTION above the real choices, so "Engine's pick" looked second. Plain
-          text — information looks like information, and the first bordered row below is the first
-          choice. */}
-      {fact && (
-        <div
-          data-testid={`hard-${props.slotKey}-fact`}
-          className="px-1 py-1"
-          style={club ? { opacity: 0.45 } : undefined}
-        >
-          <span className="block text-white/90 text-sm">{fact.title}</span>
-          <span className="block text-white/50 text-xs leading-snug mt-0.5">{fact.body}</span>
-          <span className="block text-white/30 text-[10px] mt-1">{fact.cite}</span>
-        </div>
-      )}
+      {/* ⛔ THE FACT PANEL IS GONE (Michael, 2026-08-24 night: "too much nonsense to get to what
+          you're picking" — the second cut in one day; unboxing wasn't enough). The family's title
+          still shows on the collapsed row once a sport is picked (`hardSessionTitle` falls back to
+          `slotFamilyFact`), and every variant below carries its own label and body — so the open
+          row is chips, then choices. */}
       {/* ⛔ THE VARIANT IS A CHOICE (Michael, 2026-08-24 — "missing are the speed drills we had").
           The family is the frame's fact above; WHICH of the family's own page-cited workouts fills
           it is the athlete's. Options come from the library's archetypes — one list, no copy.
@@ -93,7 +82,9 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           </div>
         );
       })()}
-      <span className="block text-white/35 text-[11px] leading-snug px-0.5">{HARD_SLOT_FACT_NOTE}</span>
+      {/* ⛔ THE FOOTNOTE IS GONE (Michael, 2026-08-24 night: "I don't know what that nonsense is
+          saying and you can't even see it"). What it was trying to say — a club session REPLACES
+          this hard session — now sits on the club toggle itself, where the choice is made. */}
       {/* ⛔ A CLUB SESSION REPLACES A SLOT, NEVER ADDS ONE (work order stage 5, his own Crit rule).
           Same control the card has always carried, same `ownership` field.
           ⚠️ UN-CHECKING RETURNS THE SLOT TO `prescribed` AND NOTHING ELSE — the role and goal are the
@@ -115,7 +106,10 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
         >
           {club && <Check className="h-3.5 w-3.5 text-white" />}
         </span>
-        <span className="text-white/85 text-sm leading-snug">A club session I already attend</span>
+        <span className="min-w-0">
+          <span className="block text-white/85 text-sm leading-snug">A club session I already attend</span>
+          <span className="block text-white/45 text-xs leading-snug mt-0.5">Replaces this hard session.</span>
+        </span>
       </button>
     </div>
   );
