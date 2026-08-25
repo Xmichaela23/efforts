@@ -18,7 +18,6 @@ import {
   DIAL_CAP,
   DIAL_CHIPS,
   dialDose,
-  dialSentence,
   chipHasFrameSlot,
   daysForPick,
   defaultViadaPicks,
@@ -345,18 +344,16 @@ Deno.test('the extra rows carry his accessory dose — 3 x 8-10, by feel', () =>
   }
 });
 
-Deno.test('every chip\'s sentence states the days and the pull-back', () => {
-  for (const chip of DIAL_CHIPS) {
-    const s = dialSentence(chip, { equipment: EQUIPMENT });
-    assert(s.length > 0);
-    // ⛔ IT MUST NAME WHAT IT BUYS. "Chest runs toward its band" with no days is not actionable.
-    assert(/four sets|extra sets/.test(s), `${chip}: the sentence says nothing about the dose`);
-    const advanced = dialSentence(chip, { equipment: EQUIPMENT, advancedTierSessions: 2 });
-    assert(advanced.includes('two extra slots'), `${chip}: the pull-back is not stated`);
-    const taper = dialSentence(chip, { equipment: EQUIPMENT, column: 'taper' });
-    assert(taper.includes('deload'), `${chip}: the deload is not stated`);
-  }
-});
+/**
+ * ⛔ THE CHIP SENTENCE MOVED TO THE CLIENT (2026-08-24, second copy round). `dialSentence` was cut to
+ * one line per chip and now lives as `dialChipLine` in `src/lib/dial-copy.ts` — no edge function
+ * ever read it. Its assertions moved with it, to `src/lib/dial-copy.test.ts`, which also runs the
+ * whole screen through `voiceViolation`.
+ *
+ * ⚠️ WHAT STAYS ASSERTED HERE IS THE ENGINE'S HALF: `dialDose` still owns the target and the
+ * indicative pull-back sentence the BUILT BLOCK prints, and it is covered by the pull-back
+ * regressions above.
+ */
 
 // ── the persisted shape ──────────────────────────────────────────────────────────────────────────
 

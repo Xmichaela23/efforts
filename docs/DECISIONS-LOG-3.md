@@ -657,6 +657,53 @@ lesson that file exists to carry. The gate stays live for every other line, and 
 fails the test rather than sliding through. The word collision the rename was worried about is with
 the endurance screens' focus **control**; a verb in a supporting line is not that control.
 
+### The copy pattern — this screen's standing rule (Michael, 2026-08-24, from device screenshots)
+
+**(a) Inline copy is ONE LINE PER ELEMENT — what it does, never how it works.** Any deeper
+explanation (progressive overload, why volume moves, the recovery arithmetic) lives behind an **(i)
+info affordance or an expandable row, never inline.** ⚠️ **The (i) is NOT built and was not built
+this round.** It gets built if and when a screen actually needs one — an unbuilt drawer is not a
+place to put a paragraph you did not want to cut.
+
+**(b) When a drawer IS built, its content is AUTHORED and STATIC** — written copy, traceable to a
+page (Viada p086, p218, p223), the same as every other line in the app. **Never LLM-generated, never
+generic training-blog filler. If a fact cannot be cited, it does not go in the drawer.**
+
+**And no engine vocabulary reaches the athlete.** "Slot", "cell", "the muscle floor", "the
+pull-back", "column", "frame" are how this app talks to itself. The screenshots that triggered this
+round had **"slot" in four places**, including a sentence opening *"The week has no glute slot"* — a
+true statement about a data structure and gibberish about training.
+
+**What changed on the screen:**
+
+| element | was | is |
+|---|---|---|
+| subtitle | "The programme owns the slots. You pick what fills them." | "Every day focuses on a compound lift. The additional accessory fine-tunes the muscle work." |
+| "Dial" heading | `text-sm` label weight | `text-[17px] font-semibold` section title, sub-line under it |
+| per active chip | a three-clause paragraph (days, dose, pull-back) — **two chips gave two paragraphs** | one line: *"Glutes — extra Hip Thrust sets on your lifting days, toward 8-12 a week. Light weeks carry less."* |
+| cap note | "…seven to nine work sets, and past fourteen in a session…" | "Two at a time — past that the lifting days get big enough to cost the next day's run." |
+| core note | source + missing slot + "the four movement patterns" | "This pick is the movement your weekly core work uses." |
+| dose line | "sets of 6-12" — **contradicted the rows' "3 x 8-10" one scroll away** | "Accessory sets are 8 to 10 reps with a rep or two left in the tank." |
+
+⚠️ **"Light weeks carry less" is the pull-back and it is not decoration.** A deload week, or an
+athlete whose LOGGED running has already earned an extra easy session, gets visibly fewer added sets
+than the chip implied; unsaid, that reads as a broken control. What was cut from it is the clause
+naming *which* branch — **the wizard cannot know**, because the advanced tier gates on demonstrated
+running the server reads out of logged history and a number typed into an intake box is not that
+fact. The built block still states the branch in the indicative (`dialDose().pullBack`), where it is
+known.
+
+⚠️ **The dose line was kept rather than deleted, and that is a judgement call.** The rows print
+"3 x 8-10" only for the Glutes and Core extra rows, so this is the only place the seven picks' own
+dose is stated; deleting it would have taken the RIR instruction off the screen entirely. Reversible.
+
+**The copy moved to the client.** `dialSentence`, `CORE_IS_NOT_A_FRAME_SLOT` and `DIAL_PULLBACK_LINE`
+lived in `_shared/standing-plan/accessory-picks.ts` and **no edge function ever read one** — so every
+copy tweak was a change to a file four edge functions bundle. They are now
+`src/lib/dial-copy.ts`, gated by `src/lib/dial-copy.test.ts`, which runs every rendered line through
+`voiceViolation`, asserts the one-line-per-chip shape, and **pins the deleted phrases as deleted**.
+`dialDose` stayed shared — it is the engine's answer, read by `compose.ts`.
+
 ### Isolation pull is TWO picks, and the principle behind it
 
 Michael's ruling, 2026-08-24, on the sub-question the handoff left open. `focused pull_upper` falls

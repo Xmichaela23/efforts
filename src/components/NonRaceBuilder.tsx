@@ -67,13 +67,10 @@ import {
   DIAL_CHIPS,
   DIAL_LABEL,
   DIAL_OWNERSHIP,
-  DIAL_PULLBACK_LINE,
   dialRowKey,
   dialRowOptions,
-  dialSentence,
   DIAL_ROW_DAY_IS_THE_COMPOSERS,
   chipHasFrameSlot,
-  CORE_IS_NOT_A_FRAME_SLOT,
   daysForPick,
   defaultViadaPicks,
   pickOptions,
@@ -83,6 +80,14 @@ import {
   type ViadaAccessoryPrefs,
   type ViadaPickKey,
 } from '@shared/standing-plan/accessory-picks.ts';
+import {
+  ACCESSORY_DOSE_LINE,
+  ACCESSORY_SUBTITLE,
+  CORE_PICK_NOTE,
+  DIAL_CAP_NOTE,
+  DIAL_SUBLINE,
+  dialChipLine,
+} from '@/lib/dial-copy';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import {
   PULLUP_TEST_PROMPT, pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor,
@@ -4368,9 +4373,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'accessory' && isStrengthFocus && (
         <StepLayout
           step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
-          // ⛔ NOT "Three short slots after the main lift" — that is Wendler's week, and it is three
-          // slots on three days rather than seven across four.
-          subtitle="The programme owns the slots. You pick what fills them."
+          // ⛔ MICHAEL'S WORDING, VERBATIM (2026-08-24). It replaced "The programme owns the slots.
+          // You pick what fills them." — true, and it taught the athlete a word out of the engine's
+          // vocabulary in the first sentence of the screen. ⛔ THE WORD "SLOT" IS NOT TO APPEAR
+          // ANYWHERE ATHLETE-FACING ON THIS SCREEN; `dial-copy.ts` carries the rule and the reason.
+          subtitle={ACCESSORY_SUBTITLE}
           onBack={back} onContinue={next} canContinue
         >
           <div className="space-y-4">
@@ -4389,14 +4396,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 ⛔ CAP TWO, AND THE SCREEN SAYS WHY IN ITS OWN LINE. The upper days already carry
                 seven to nine counted work sets and p086's ceiling is the binding constraint. */}
             <div>
+              {/* ⛔ SECTION-TITLE WEIGHT, NOT LABEL WEIGHT (Michael, from device screenshots
+                  2026-08-24). At `text-sm` it read as a field label sitting above some chips rather
+                  than as the screen's second section, and the chip row below it looked orphaned.
+                  It sits one step under `StepLayout`'s own `text-[1.3rem]` title, and its sub-line
+                  takes the same treatment StepLayout gives a subtitle — so "Dial" reads as a
+                  section WITH a subtitle, which is what it is. */}
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-white/85 text-sm">Dial</span>
-                <span className="text-white/50 text-xs">
+                <h3 className="text-white text-[17px] font-semibold leading-snug tracking-tight">Dial</h3>
+                <span className="text-white/50 text-xs shrink-0">
                   {(viadaPrefs?.dial ?? []).length}/{DIAL_CAP}
                 </span>
               </div>
-              <p className="text-white/55 text-xs leading-relaxed mb-2">
-                Dial in the areas you want to focus on.
+              <p className="mt-1 mb-3 text-[15px] text-white/55 leading-relaxed">
+                {DIAL_SUBLINE}
               </p>
               {/* Same 3-column grid as the Get Stronger chips, and for the measured reason recorded
                   there: five chips in a flex-wrap orphan the fifth on its own line. */}
@@ -4422,20 +4435,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   );
                 })}
               </div>
-              {/* ⛔ ONE FACTUAL SENTENCE PER TAPPED CHIP — days added, then the pull-back. The
-                  pull-back half is not optional: a deload week, or an athlete whose running earns
-                  the extra easy session, gets visibly less than this screen promised, and unsaid
-                  that reads as the control being broken. */}
+              {/* ⛔ ONE LINE PER ACTIVE CHIP. TWO CHIPS = TWO ONE-LINERS, NEVER TWO PARAGRAPHS
+                  (Michael, from device screenshots 2026-08-24). The shape is fixed in `dialChipLine`
+                  so every chip reads the same; the copy rule that governs it — one line inline, any
+                  deeper explanation behind an (i) that is NOT built yet — is on `dial-copy.ts`.
+                  ⚠️ The named movement is the athlete's own pick from the row below, so the line
+                  says "extra Hip Thrust sets" rather than "extra sets". */}
               {(viadaPrefs?.dial ?? []).map((chip) => (
-                <p key={chip} className="text-white/65 text-xs mt-2 leading-relaxed">
-                  {dialSentence(chip, { equipment: strengthEquipment })}{' '}{DIAL_PULLBACK_LINE}
+                <p key={chip} className="text-white/65 text-[13px] mt-2 leading-relaxed">
+                  {dialChipLine(chip, {
+                    equipment: strengthEquipment,
+                    movement: viadaPrefs?.dial_rows?.[dialRowKey(chip, 0)] ?? null,
+                  })}
                 </p>
               ))}
               {(viadaPrefs?.dial ?? []).length >= DIAL_CAP && (
-                <p className="text-white/45 text-xs mt-2 leading-relaxed">
-                  Two at a time. The upper lifting days already carry seven to nine work sets, and past
-                  fourteen in a session the next day&rsquo;s run is measurably down for up to three days.
-                </p>
+                <p className="text-white/45 text-[13px] mt-2 leading-relaxed">{DIAL_CAP_NOTE}</p>
               )}
             </div>
 
@@ -4517,17 +4532,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   </div>
                 );
               })}
-              {/* ⛔ THE CORE PICK'S OWN CAVEAT, ONCE, UNDER THE FIELD IT IS ABOUT. It is the one pick
-                  with no slot behind it, and an athlete who reads "fills the week's core minimum"
-                  deserves the reason. */}
-              <p className="text-white/45 text-xs leading-relaxed">{CORE_IS_NOT_A_FRAME_SLOT}</p>
+              {/* ⛔ ONE LINE, UNDER THE FIELD IT IS ABOUT. What stood here named the source, the
+                  missing core slot and "the four movement patterns" — sourcing talk and engine
+                  vocabulary, under a dropdown. */}
+              <p className="text-white/45 text-[13px] leading-relaxed">{CORE_PICK_NOTE}</p>
             </div>
 
-            {/* ⛔ THE DOSE, IN THIS PLAN'S UNIT. Wendler's rep totals are the other screen's model. */}
-            <p className="text-white/70 text-sm leading-relaxed">
-              Accessories are sets of 6&ndash;12 with a rep or two left in the tank. Going to failure
-              costs the next main lift.
-            </p>
+            {/* ⛔ IT SAID "sets of 6-12" WHILE THE ROWS ON THIS SAME SCREEN SAID "3 x 8-10"
+                (Michael, from device screenshots 2026-08-24). Two dose claims one scroll apart, and
+                the rows were the right one — p086 prescribes 3 x 8-10 at 1-2 RIR. Kept rather than
+                deleted because the rows print their dose only for the Glutes and Core extra rows,
+                so this is the only place the seven picks' own dose is stated. */}
+            <p className="text-white/70 text-sm leading-relaxed">{ACCESSORY_DOSE_LINE}</p>
           </div>
         </StepLayout>
       )}

@@ -34,7 +34,8 @@ import {
 } from '../strength-grid/index.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
-import { WEEKDAYS, weekdayForFrameDay, type Weekday } from './day-map.ts';
+// ⚠️ `WEEKDAYS` left with `dialSentence` (the week-order sort went to `src/lib/dial-copy.ts`).
+import { weekdayForFrameDay, type Weekday } from './day-map.ts';
 
 // ── THE SEVEN ────────────────────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ export type ViadaPickSpec = {
   /** What the athlete reads. Plain movement language, never the grid's vocabulary. */
   label: string;
   /**
-   * ⛔ THE FRAME SLOT THIS PICK FILLS. `null` on `core` — see {@link CORE_IS_NOT_A_FRAME_SLOT}.
+   * ⛔ THE FRAME SLOT THIS PICK FILLS. `null` on `core` — see the note above `VIADA_PICKS`.
    * Every one of these is a HYP accessory slot: those are the exercises p246 leaves to the athlete,
    * and the ME/DE slots carry the programme's own prescriptions (pivot §6).
    *
@@ -108,11 +109,10 @@ export type ViadaPickSpec = {
  * core as its own heading outside the four patterns. So an ab movement cannot be "placed" the way
  * the other five are. What it CAN do is name the movement the week's core minimum is filled with,
  * which is a real answer the athlete was already giving through a Wendler slot that mapped nowhere.
- */
-export const CORE_IS_NOT_A_FRAME_SLOT =
-  'This plan\'s week has no core slot — the source\'s own week does not carry one, and it files core '
-  + 'work outside the four movement patterns. What you pick here is the movement the week\'s core '
-  + 'minimum is filled with.';
+ *
+ * ⚠️ THE ATHLETE-FACING SENTENCE FOR THIS LIVES IN `src/lib/dial-copy.ts` (`CORE_PICK_NOTE`), not
+ * here. The string that stood in this spot named the source, the missing slot and "the four movement
+ * patterns" — engine vocabulary under a dropdown. This note is for whoever edits the table.
 
 /**
  * ⛔ THE TABLE. Seven rows, six of them a `category × pattern` that exists in `frames.ts` today —
@@ -533,17 +533,17 @@ export const DIAL_PULLBACK_IS_OURS =
   + 'deload, is our reading of that, not something he wrote.';
 
 /**
- * ⛔ THE PULL-BACK AS THE SCREEN CAN HONESTLY STATE IT — a conditional consequence, not a claim.
+ * ⛔ THE SCREEN'S PULL-BACK LINE IS GONE FROM HERE, AND ITS REASONING IS WHY (2026-08-24, second
+ * copy round). It read: *"On the deload weeks the extra sets come out, and if your logged running
+ * already earns the extra easy session the plan holds this to two extra slots."*
  *
- * ⚠️ THE SCREEN CANNOT KNOW WHICH BRANCH IT IS ON, AND SAYING SO IS BETTER THAN GUESSING. The
- * advanced tier gates on DEMONSTRATED running, which the server reads out of logged history
- * (`demonstratedRunVolume`); the wizard has only what the athlete typed, and typing thirty miles is
- * not the same fact. So the picker states the rule and the built plan states which way it went —
- * `dialDose().pullBack` is the same sentence in the indicative, on the block itself.
+ * ⚠️ THE SECOND HALF NAMED A BRANCH THE WIZARD CANNOT KNOW IT IS ON. The advanced tier gates on
+ * DEMONSTRATED running, which the server reads out of logged history (`demonstratedRunVolume`); the
+ * wizard has only what the athlete typed, and typing thirty miles is not the same fact. So the
+ * screen now says "Light weeks carry less" (`dialChipLine` in `src/lib/dial-copy.ts`) and the BUILT
+ * PLAN states which way it actually went — `dialDose().pullBack`, in the indicative, on the block
+ * itself, where the branch is known. That split is the honest one.
  */
-export const DIAL_PULLBACK_LINE =
-  'On the deload weeks the extra sets come out, and if your logged running already earns the extra '
-  + 'easy session the plan holds this to two extra slots.';
 
 export type DialDose = {
   /** Sets per muscle per week to aim at, or `null` when no extra rows are added this week. */
@@ -581,49 +581,17 @@ export function dialDose(opts: {
 }
 
 /**
- * ⛔ THE ONE SENTENCE THE SCREEN SHOWS UNDER A TAPPED CHIP — days added and the pull-back, at build
- * time, in the athlete's own week.
+ * ⛔ `dialSentence` IS GONE FROM HERE (2026-08-24, second copy round). It assembled a paragraph out
+ * of three clauses — which days carry the slots, how the extra rows are dosed, and the pull-back —
+ * and with two chips tapped the screen printed two paragraphs. Michael cut it to ONE LINE PER CHIP.
  *
- * ⚠️ IT MUST NAME THE PULL-BACK. A thin week on the deload column, or a chip that buys three sets
- * instead of nine because the athlete runs thirty miles, reads as a broken control unless the screen
- * said so when it was tapped.
+ * ⛔ ITS REPLACEMENT IS `dialChipLine` IN `src/lib/dial-copy.ts`, and it is CLIENT-SIDE ON PURPOSE:
+ * no edge function ever read this string, so a copy tweak was changing a file four functions
+ * bundle. The table stays shared because the composer needs it; the prose does not.
+ *
+ * ⚠️ `dialDose` STAYS HERE — it is the ENGINE's answer (target sets, and the indicative pull-back
+ * sentence the built block prints), read by `compose.ts`. Do not follow the copy out of this file.
  */
-export function dialSentence(
-  chip: DialChip,
-  opts: {
-    equipment?: string[] | null;
-    column?: ColumnKind;
-    advancedTierSessions?: number | null;
-    frame?: FrameId;
-  } = {},
-): string {
-  const label = DIAL_LABEL[chip].toLowerCase();
-  const dose = dialDose({
-    column: opts.column ?? 'standard',
-    advancedTierSessions: opts.advancedTierSessions,
-  });
-  // Which of the picks this chip re-points, and the real days those slots sit on.
-  const days = [...new Set(
-    VIADA_PICK_KEYS
-      .filter((k) => VIADA_PICKS[k].servesChips.includes(chip))
-      .flatMap((k) => daysForPick(k, opts.frame ?? 'strength_5k', opts.column ?? 'standard')),
-  )]
-    // ⚠️ IN WEEK ORDER, NOT IN PICK-TABLE ORDER. "Thursday and Monday" reads as a mistake.
-    .sort((a, b) => WEEKDAYS.indexOf(a) - WEEKDAYS.indexOf(b));
-  // ⚠️ SINGULAR FOR THE SLOT WORD — "no glutes slot" reads as a typo. `DIAL_OWNERSHIP` is the
-  // same singular the plan rows use, so the screen and the block name the thing identically.
-  const slotHalf = days.length > 0
-    ? `${days.join(' and ')} carry the ${label} slots and go to four sets.`
-    : `The week has no ${DIAL_OWNERSHIP[chip]} slot, so it arrives as extra sets rather than a `
-      + 'bigger one.';
-  const rowHalf = dose.targetSets == null
-    ? ''
-    : ' Extra sets of 8 to 10 go on the lifting days with the most room, toward '
-      + `${dose.targetSets}${dose.targetSets >= WEEKLY_SETS_SOLID.lo ? ` to ${WEEKLY_SETS_SOLID.hi}` : ''}`
-      + ' sets a week.';
-  const pull = dose.pullBack ? ` ${dose.pullBack}` : '';
-  return `${slotHalf}${rowHalf}${pull}`;
-}
 
 /**
  * ⛔ WHY THERE IS NO DAY TAG ON AN DIAL ROW, AND IT IS A DECISION RATHER THAN AN OMISSION.
