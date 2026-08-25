@@ -3857,7 +3857,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
               )}
             </div>
-            <p className="text-white/50 text-xs">Two hard sessions at most. A sport without one holds its base, not its top end.</p>
+            <p className="text-white/50 text-xs">The week has two hard sessions. A sport that doesn't get one keeps its endurance base but not its speed.</p>
           </div>
         </StepLayout>
       )}
