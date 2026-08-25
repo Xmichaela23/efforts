@@ -611,3 +611,42 @@ Deno.test('a block with no Standing Plan answers stores nothing, and composes as
   assertEquals(sp.slot_picks, null);
   assertEquals(sp.dial, null);
 });
+
+/**
+ * ⛔ THE LEG-EXTENSION DUPLICATE, PINNED (Michael's device find, 2026-08-25, strong-focus (21).md).
+ *
+ * `leg extension` was untagged in `strength-gear.ts`, so the composer placed it for a home athlete
+ * and `materialize-plan`'s week-blind equipment swap turned it into "Bulgarian Split Squats" — a
+ * plural-spelling duplicate of the athlete's own Tuesday single-leg pick, every week, on a
+ * device-verified block. The fix is upstream: `leg extension` is gated on `machine` (commercial gym
+ * only), so a home athlete's week never contains it and the swap never fires.
+ */
+Deno.test('a home athlete never composes leg extension, and the single-leg pick is not duplicated', () => {
+  const picks = defaultViadaPicks(EQUIPMENT, []);
+  const rows = rowsOf(week({
+    slotPicks: picks,
+    accessoryPicks: flattenViadaPicks({ version: 1, picks, dial: [], dial_rows: {} }),
+  }));
+
+  // ⛔ No machine movement for an athlete who declared no machine.
+  assert(!rows.some((r) => canonicalize(r.name) === canonicalize('leg extension')),
+    'a home athlete was prescribed a machine movement');
+
+  // ⛔ The original defect's shape: the athlete's single-leg pick appearing a second time under the
+  // engine's own spelling. One pick, one day, one row.
+  const single = String(picks.single_leg_a ?? 'bulgarian split squat');
+  const hits = rows.filter((r) => canonicalize(r.name) === canonicalize(single));
+  assertEquals(hits.length, 1,
+    `the single-leg pick "${single}" appears ${hits.length} times: ${hits.map((h) => h.day).join(', ')}`);
+});
+
+Deno.test('the lower-isolation default sits on each side of the machine gate', () => {
+  // Home gym: leg extension is gated out, calf raise leads (the cell's first performable member).
+  const home = defaultViadaPicks(EQUIPMENT, []);
+  assertEquals(canonicalize(String(home.quad_iso)), canonicalize('calf raise'),
+    'a home athlete\'s lower-isolation default is not performable-first');
+  // Commercial gym: the machine exists, leg extension still leads.
+  const gym = defaultViadaPicks(['Commercial gym'], []);
+  assertEquals(canonicalize(String(gym.quad_iso)), canonicalize('leg extension'),
+    'a gym athlete lost leg extension');
+});

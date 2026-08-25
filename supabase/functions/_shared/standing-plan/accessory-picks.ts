@@ -204,10 +204,16 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   quad_iso: {
     key: 'quad_iso',
-    label: 'Quad isolation',
+    // ⛔ "LOWER ISOLATION", NOT "QUAD ISOLATION" (Michael, 2026-08-25). Leg extension is now gated
+    // on `machine` (commercial gym only) — it was untagged, the composer placed it for home
+    // athletes, and materialize-plan's week-blind swap turned it into a duplicate of their own
+    // single-leg pick on a device-verified block. True single-joint quad work does not exist
+    // without a machine, and the cell's own p222-223 members include calves — so the label says
+    // what the row can honestly offer everyone. Gym athletes still open on leg extension.
+    label: 'Lower isolation',
     slot: { category: 'focused', pattern: 'press_lower' },
-    leadWith: ['leg extension'],
-    leadCite: 'Viada pp222-223 — focused push lower / quads',
+    leadWith: ['leg extension', 'calf raise'],
+    leadCite: 'Viada pp222-223 — focused push lower: quads, calves',
     servesChips: [],
   },
   core: {

@@ -57,7 +57,15 @@ export type GearKey =
   // athlete can declare produces them, and after Slice 7 nothing needs to: a key that gates must be
   // commonly declarable, a key that merely INFORMS need not be.
   | 'box'
-  | 'rings';
+  | 'rings'
+  // ⛔ FIXED-STATION MACHINES — granted ONLY by the commercial-gym chip (2026-08-25). Exists for
+  // `leg extension`, which was untagged and therefore ungated: the composer placed it for home
+  // athletes and `materialize-plan`'s week-blind backstop swapped it to Bulgarian Split Squats —
+  // duplicating the athlete's own single-leg pick on a device-verified block. The leg-curl
+  // precedent above (leave ungated, let substitution swap) does not transfer: leg curl's
+  // substitute collides with nothing, leg extension's collided with a default pick on its own
+  // path. "Commonly declarable" is satisfied — the commercial-gym chip is the declaration.
+  | 'machine';
 
 /** Athlete-facing label per key. Also the vocabulary's roster — a key absent here does not exist. */
 export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
@@ -73,6 +81,7 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   bands: 'Bands',
   box: 'Box',
   rings: 'Rings',
+  machine: 'Machine',
 };
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -184,6 +193,8 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       out.add('pull_up_bar');
       // An adjustable bench is what a commercial gym HAS. ⛔ An ab wheel is not — see `hasAbWheel`.
       out.add('incline_bench');
+      // Fixed-station machines are what a commercial gym IS. Nothing else grants this key.
+      out.add('machine');
     }
   }
   return out;
@@ -312,6 +323,11 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'leg curl': ALWAYS,
   'leg curls': ALWAYS,
   'band leg curls': [['bands']],
+  // ⛔ MACHINE-ONLY, unlike leg curl above — see the `machine` key's note in `GearKey` for why the
+  // two machine movements get opposite calls. A home athlete's quad-isolation slot resolves to a
+  // performable movement in the composer instead of being patched at render.
+  'leg extension': [['machine']],
+  'leg extensions': [['machine']],
   // ⛔ THE KNEEL-AND-LOWER FAMILY NOW ROUTES ON THE BARBELL ALONE (Slice 7), and that is the route
   // most people actually use: feet hooked under a loaded bar.
   //

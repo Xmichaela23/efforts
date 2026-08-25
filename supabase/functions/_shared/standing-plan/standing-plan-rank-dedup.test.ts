@@ -191,10 +191,20 @@ Deno.test('⛔ A BODYWEIGHT ATHLETE IS NOT DEMOTED OUT OF THEIR OWN CATALOGUE', 
   assertEquals(ownsLoadingImplement([]), false);
 
   // ⛔ AND THE ORDER ITSELF IS UNTOUCHED for those two cases — same list, same sequence.
-  for (const equipment of [null, ['Pull-up bar']]) {
-    const r = resolveSlot({ intent: 'HYP', category: 'focused', pattern: 'press_lower', equipment });
+  //
+  // ⚠️ THE TWO HEADS DIVERGED 2026-08-25 when `leg extension` was gated on `machine` (commercial
+  // gym only — see `strength-gear.ts`). An UNDECLARED athlete still sees it lead: §0h, unknown
+  // degrades to ungated. A DECLARED pull-up-bar athlete does not own a machine, so the head is the
+  // first movement they can actually perform. The old pin (`leg extension` for both) was the bug
+  // this closes — it fed materialize-plan's week-blind swap and duplicated an athlete's own
+  // single-leg pick on a device-verified block.
+  for (const [equipment, expectedHead] of [
+    [null, 'leg extension'],
+    [['Pull-up bar'], 'calf raise'],
+  ] as const) {
+    const r = resolveSlot({ intent: 'HYP', category: 'focused', pattern: 'press_lower', equipment: equipment as string[] | null });
     const names = r.options.map((o) => o.name);
-    assertEquals(names[0], 'leg extension', `[${equipment ?? 'undeclared'}] the head of the cell moved`);
+    assertEquals(names[0], expectedHead, `[${equipment ?? 'undeclared'}] the head of the cell moved`);
     assert(names.indexOf('calf raise') < names.indexOf('weighted single leg calf raise'),
       `[${equipment ?? 'undeclared'}] a bodyweight athlete was demoted below dumbbell work`);
   }

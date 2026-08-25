@@ -199,7 +199,12 @@ Deno.test('⛔ THE PICKER LIST AND THE KEY MAP AGREE — a renamed chip is a sil
   // the card for box jumps and ring rows, and naming gear the athlete has not declared is
   // informative, not a gate.
   const fromChips = new Set<string>();
-  for (const chip of PICKER) for (const k of athleteEquipmentToKeys([chip])) fromChips.add(k);
+  // ⚠️ 'Commercial gym' IS a picker chip (`TrainingBaselines.tsx:1159`), kept out of the home-gym
+  // PICKER list above because the first half of this test is about home chips. It still counts as a
+  // declaration for the gate-key half: `machine` (2026-08-25, the leg-extension gate) is granted by
+  // it alone, deliberately — a fixed-station machine is what a commercial gym is, and no home chip
+  // should produce it.
+  for (const chip of [...PICKER, 'Commercial gym']) for (const k of athleteEquipmentToKeys([chip])) fromChips.add(k);
   const gateKeys = new Set<string>();
   for (const routes of Object.values(ASSISTANCE_GEAR)) {
     for (const route of routes) for (const k of route) gateKeys.add(k);
