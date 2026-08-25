@@ -177,6 +177,13 @@ export type Unit = {
   internalGapHours: number;
   /** 0=Mon … 6=Sun. Set when the athlete owns the day (a club night, their long ride). */
   pinnedDay?: number;
+  /**
+   * ⛔ WHICH SESSION'S ANSWER `pinnedDay` IS — the session id, not the unit's. A coupled unit is
+   * `Back Squat + Hard Run` and the athlete tapped ONE of them; when a blocked day releases the pin
+   * (`resolve.ts`, Michael 2026-08-25) the note has to name the session they recognise, not the
+   * pair. ⚠️ Absent whenever `pinnedDay` is absent.
+   */
+  pinnedBy?: string;
 };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -208,10 +215,20 @@ export function buildUnits(sessions: Session[], pins: Record<string, number> = {
       sessions: sessionsInUnit,
       internalGapHours: hard ? COUPLED_GAP_HOURS : 0,
       pinnedDay: pins[lift.id] ?? (hard ? pins[hard.id] : undefined),
+      // ⚠️ SAME ORDER AS THE LINE ABOVE, deliberately — the lift's pin wins, so the lift is what
+      // named the day. Two orders here and the sentence would name a session that did not decide it.
+      pinnedBy: pins[lift.id] != null ? lift.id : (hard && pins[hard.id] != null ? hard.id : undefined),
     });
   }
   for (const s of remaining) {
-    units.push({ id: s.id, label: s.label, sessions: [s], internalGapHours: 0, pinnedDay: pins[s.id] });
+    units.push({
+      id: s.id,
+      label: s.label,
+      sessions: [s],
+      internalGapHours: 0,
+      pinnedDay: pins[s.id],
+      pinnedBy: pins[s.id] != null ? s.id : undefined,
+    });
   }
   return units;
 }

@@ -72,7 +72,8 @@ export const ACCESSORY_SUBTITLE =
  * ⚠️ IT RESOLVES TO EXACTLY MICHAEL'S SENTENCE TODAY, and a test pins that string as well as the
  * derivation, so this is not a licence to reword it.
  */
-export const DIAL_SUBLINE = `Dial in the ${DIAL_CAP} areas you want to focus on.`;
+export const DIAL_SUBLINE =
+  `Swap exercises per your preference or add work for ${DIAL_CAP} areas you want to focus on.`;
 
 /**
  * ⛔ THE CAP NOTE, WITHOUT ITS ARITHMETIC (Michael, 2026-08-24). It used to read *"The upper lifting

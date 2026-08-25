@@ -8,6 +8,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED — STEP 8 CONFIRM SCREEN (Michael, 2026-08-25, "when we get to it")
+
+- [ ] **Color-code the workouts by sport** on the step 8 week list (same sport colors as the
+      master strip). Nothing is missing from the list — the sessions are all there, they just
+      read as a wall of same-colored text (Michael corrected the earlier "missing sessions" read).
+
 ## ⏳ AWAITING MICHAEL — THE BUILT BLOCK'S ACCESSORY ROWS (2026-08-25)
 
 **Deployed and version-verified** (`generate-strength-plan` v140, `rematerialize-standing-block` v18,

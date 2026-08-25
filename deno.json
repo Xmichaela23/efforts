@@ -1,0 +1,6 @@
+{
+  "//": "⛔ DENO'S VIEW OF THE `@shared` ALIAS — the same one `vite.config.ts` gives the client, and it exists so a fixture can run a CLIENT file that imports shared engine code (`src/lib/suggest-hard-days.ts`). Without it `deno test` cannot resolve `@shared/...` and the wizard's own solve had no runnable harness at all. ⚠️ IMPORTS ONLY. No compilerOptions, no lint config, no fmt config — anything else here would silently change how the ~240 existing edge-function fixtures are checked.",
+  "imports": {
+    "@shared/": "./supabase/functions/_shared/"
+  }
+}

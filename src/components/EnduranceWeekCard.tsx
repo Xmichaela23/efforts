@@ -385,7 +385,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               setRestoreOnDismiss({ added: next, prevOpen: open });
               setOpen(next);
             }}
-            className="w-full px-4 py-3 rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-white/70 text-sm text-left"
+            className="w-full px-4 py-3 rounded-xl border border-white/35 bg-white/[0.06] text-white/90 text-sm font-medium text-left"
           >
             + Add a hard session
           </button>

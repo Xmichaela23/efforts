@@ -35,6 +35,8 @@ export type RuleId =
   /** Frame-order costs — `standing-plan/compose.ts`, not week-model. */
   | 'pairing_broken'
   | 'lift_on_unavailable_day'
+  /** A session the athlete tapped onto a day they also marked "cannot train" — moved, and said. */
+  | 'session_moved_off_unavailable_day'
   /** Slice 2b — a club session standing in for the week's long ride. */
   | 'club_long_short';
 
@@ -49,6 +51,10 @@ export type RuleFacts = {
   /** Minutes a club long ride falls short of the plan's target. */
   shortMinutes?: number;
   day?: string;
+  /** The session a blocked day moved, in the athlete's words: "the hard run", "the long ride". */
+  session?: string;
+  /** The day it went to. */
+  movedTo?: string;
 };
 
 type Row = {
@@ -106,7 +112,7 @@ const RULES: Record<RuleId, Row> = {
   },
   no_recovery_day: {
     tier: 'tradeoff',
-    explain: 'Upper-body lifts and easy sessions cost nothing. They fit where there is room.',
+    explain: 'Upper-body lifts and easy sessions fit on any day — they don’t interfere with the legs.',
     warn: () => 'Every day carries a hard session, a long session or heavy legs. Recovery is thin.',
     source: 'resolve.ts recoveryDaysOf + STRESSOR_LOADS',
   },
@@ -132,12 +138,50 @@ const RULES: Record<RuleId, Row> = {
   },
 
   // ── FRAME-ORDER COSTS — standing-plan/compose.ts, not week-model ────────────────────────────
+  /**
+   * ⛔⛔ THE OLD LINE ASSERTED THE WRONG REASON, AND THAT IS WHY THIS ROW CHANGED (2026-08-25).
+   *
+   * It read *"The lifting order is fixed, so it stays"* — true about the ORDER and false as an
+   * explanation, because the order is not the only freedom the week has. The frame names no weekday
+   * (p246 numbers its days), so it has seven ROTATIONS, and nothing had tried the other six: the
+   * lifting sat on the blocked day because the chooser was not looking, not because no arrangement
+   * existed. `chooseDayMap` now scores all seven, so when this fires it is true by construction.
+   *
+   * ⚠️ AND THE ENGINE'S OWN SENTENCE OUTRANKS THIS ONE. `chooseDayMap` knows WHICH pin took the
+   * rotation and names it; this row is the fallback for a week whose notes have not come back yet.
+   * `NonRaceBuilder` suppresses this when the engine has already spoken about that day.
+   */
   lift_on_unavailable_day: {
     tier: 'tradeoff',
-    explain: 'Lifting order and spacing are fixed. A pinned day moves the endurance session onto '
-      + 'it; the lifts hold their order.',
-    warn: (f) => `${f.day ?? 'That day'} carries a lifting day. The lifting order is fixed, so it stays.`,
-    source: 'compose.ts enduranceDayFor — endurance only; the lifts keep the rotation',
+    explain: 'The lifting days keep a fixed order and spacing. The week is rotated to leave a day '
+      + 'off clear, and the endurance moves off it either way.',
+    warn: (f) => `${f.day ?? 'That day'} carries a lifting day. No arrangement of this week's `
+      + 'lifting days clears it alongside the other pinned days.',
+    source: 'day-map.ts chooseDayMap — the rotation is scored for blocked days; compose.ts moves the endurance',
+  },
+
+  /**
+   * ⛔⛔ A DAY OFF MOVED A SESSION THE ATHLETE HAD TAPPED (Michael, 2026-08-25 afternoon).
+   *
+   * *"A blocked day always wins. If a day is both tapped for a session and marked can't-train, the
+   * session is rescheduled off it — the engine re-solves that session as unpinned, and the note says
+   * what moved and why."* Before this, the tapped session stayed put and the athlete was left to
+   * reconcile two of their own answers.
+   *
+   * ⚠️ THE WHY IS THE FIRST CLAUSE, not an explanation bolted on: "Fri is a day off" IS the reason,
+   * and it is the athlete's own answer read back to them. ⚠️ NO APOLOGY AND NO IMPERATIVE
+   * (`docs/COPY-VOICE.md`) — a fact about the week, in the order it happened.
+   * ⚠️ TRADE-OFF, NOT BREACH. Nothing unsafe has happened; if the REARRANGED week breaches a
+   * clearance, that fires as its own note from the layer that owns clearances.
+   */
+  session_moved_off_unavailable_day: {
+    tier: 'tradeoff',
+    explain: 'A day marked "can\u2019t train" is kept clear. A session placed on one moves to the '
+      + 'nearest day that is free.',
+    warn: (f) => (f.day && f.session && f.movedTo
+      ? `${f.day} is a day off — ${f.session} moved to ${f.movedTo}.`
+      : null),
+    source: 'week-model/resolve.ts resolveAroundPins relocations; compose.ts enduranceRelocator',
   },
 
   // ── SLICE 2b — a club ride standing in for the long ride ────────────────────────────────────

@@ -104,7 +104,7 @@ export type StandingPlanConfig = {
    */
   day_offset: number;
   /** Which pins the chosen rotation honoured. Surfacing and provenance. */
-  pins_honoured: { longRun: boolean; hardDays: number };
+  pins_honoured: { longRun: boolean; hardDays: number; unavailableDays?: boolean };
   /**
    * ⛔ TRUE WHEN THE ATHLETE TOOK THE SKIP. The block opened on numbers read from logged sets rather
    * than from a test week. ⚠️ Never a bare preference — see `evidenceForSkip`.
@@ -167,6 +167,14 @@ export type StandingPlanConfig = {
    * treats as ungated. It is never `[]` for "owns nothing".
    */
   athlete_equipment: string[] | null;
+  /**
+   * ⛔ THE DAYS THE ATHLETE COULD NOT TRAIN WHEN THIS BLOCK WAS BUILT (2026-08-25). Same law as
+   * `day_offset`, `sport_mix` and `athlete_equipment`: a restate RE-COMPOSES this block and has to
+   * reach the identical week. Without it a re-composition would put the endurance back on the day
+   * the calendar has clear, match nothing on weekday, and report the block as unmatched.
+   * ⚠️ NULL / EMPTY means no days were blocked, which is every block built before this field.
+   */
+  unavailable_days: string[] | null;
   /**
    * ⛔ WHAT EACH PATTERN'S ME SLOT HAD EARNED WHEN THIS VERSION WAS WRITTEN (A2, 2026-08-24).
    * ⚠️ ABSENT AT BUILD TIME, ALWAYS — a set is earned by logged sessions and a block is authored
@@ -248,7 +256,10 @@ export function buildStandingPlanRow(args: {
       demonstrated_miles_source: args.demonstratedMilesSource ?? null,
       test_read: args.compose.workingNumbers != null,
       day_offset: args.dayMap?.offset ?? args.compose.dayOffset ?? 0,
-      pins_honoured: args.dayMap?.honoured ?? { longRun: false, hardDays: 0 },
+      unavailable_days: (args.compose.unavailableDays ?? [])
+        .map((d) => String(d ?? ''))
+        .filter((d) => d !== ''),
+      pins_honoured: args.dayMap?.honoured ?? { longRun: false, hardDays: 0, unavailableDays: true },
       test_skipped: args.compose.skipTestWeek === true
         && Object.keys(args.compose.workingNumbers ?? {}).length > 0,
       skip_evidence: args.skipEvidence ?? null,

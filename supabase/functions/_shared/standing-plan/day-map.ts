@@ -71,6 +71,25 @@ export function anchorDaysFor(frame: FrameId, column: ColumnKind = 'standard'): 
   return { long, hard: [...new Set(hard)].sort((a, b) => a - b) };
 }
 
+/**
+ * ⛔ WHICH FRAME DAYS CARRY WORK THE ROTATION CANNOT MOVE — read off `FRAMES`, same law as
+ * `anchorDaysFor`. The lifting order, its spacing and the plyo day are the frame; only ENDURANCE
+ * steps out of it (`compose.ts` `enduranceDayFor`). So when the athlete blocks a day, these are the
+ * days that have to be rotated OFF it, and the endurance is not — it moves on its own.
+ */
+export function frameFixedDaysFor(frame: FrameId, column: ColumnKind = 'standard'): {
+  lifting: number[];
+  /** Lifting plus the plyo-only day: everything the rotation carries that is not endurance. */
+  fixed: number[];
+} {
+  const days = FRAMES[frame]?.columns[column] ?? [];
+  const lifting = days.filter((d) => d.strength.length > 0).map((d) => d.day);
+  const fixed = days
+    .filter((d) => d.strength.length > 0 || d.plyo === true)
+    .map((d) => d.day);
+  return { lifting, fixed };
+}
+
 // ── CHOOSING THE ROTATION ────────────────────────────────────────────────────────────────────────
 
 export type DayPins = {
@@ -93,6 +112,21 @@ export type DayPins = {
   /** Days they pinned a hard session to. */
   hardDays?: (string | null | undefined)[];
   /**
+   * ⛔⛔ DAYS THE ATHLETE CANNOT TRAIN — A PIN LIKE ANY OTHER (Michael, 2026-08-25).
+   *
+   * The rule: *"an unavailable day is a hard pin like any other, and the solver must JUGGLE before
+   * it warns."* The lifting frame has seven rotations and one of them may well land the frame's
+   * empty day on the day the athlete blocked — so the chooser TRIES, and lifting sits on a blocked
+   * day only when no rotation can satisfy every pin at once.
+   *
+   * ⚠️ ENDURANCE IS NOT SCORED HERE. It is movable by definition and `compose.ts` steps it off a
+   * blocked day on its own, so scoring it would make the rotation pay for a cost that does not
+   * exist. Only `frameFixedDaysFor` — the lifts and the plyo day — is at stake.
+   * ⚠️ ABSENT OR EMPTY IS TODAY'S ROTATION EXACTLY: every candidate scores zero and the ordering
+   * below is unchanged.
+   */
+  unavailableDays?: (string | null | undefined)[];
+  /**
    * The block's first calendar day, `YYYY-MM-DD`. ⛔ Supplied so the chooser can avoid a rotation
    * that would let `activate-plan` DELETE week one's test — see `startWeekdayIndex`.
    */
@@ -107,7 +141,16 @@ export type DayMap = {
   /** ⛔ EVERY PIN THAT COULD NOT BE HONOURED, in plain words. Never silent. */
   compromises: { kind: 'cost'; text: string }[];
   /** Which pins the chosen rotation did honour — for the notes and for the tests. */
-  honoured: { longRun: boolean; hardDays: number };
+  honoured: {
+    longRun: boolean;
+    hardDays: number;
+    /**
+     * ⛔ TRUE WHEN NO LIFTING DAY LANDS ON A DAY THE ATHLETE BLOCKED. ⚠️ Also true when nothing was
+     * blocked — "nothing to honour" and "honoured" are the same week, and a caller reading this to
+     * decide whether to warn must not warn on the empty case.
+     */
+    unavailableDays: boolean;
+  };
 };
 
 /**
@@ -134,9 +177,22 @@ function startWeekdayIndex(iso: string | null | undefined): number | null {
  * Scoring, in order, and every tie broken deterministically by the smallest offset so the same
  * athlete never gets two different weeks from the same answers:
  *
- *   1. **the long-run pin** — honoured or not. Weighted above everything (see `LONG_RUN_WINS`).
- *   2. **how many pinned hard days land on a frame hard day.**
- *   3. ⚠️ **week one's test days survive the start date.** `activate-plan:441` drops a week-1
+ *   1. ⛔⛔ **NOTHING FRAME-FIXED LANDS ON A DAY THE ATHLETE CANNOT TRAIN** — lifting first, then the
+ *      plyo day (Michael, 2026-08-25 evening: *"blocked days stay untouchable"*). This OUTRANKS the
+ *      long pin, and that reverses `LONG_RUN_WINS` for this one comparison. It is safe to reverse
+ *      because the long pin no longer needs the rotation at all: `compose.ts` `endurancePins` puts
+ *      the long session on the athlete's day whichever way the frame is turned, so a rotation spent
+ *      serving it buys nothing and costs the day off. The lifts are the only thing the rotation can
+ *      still move, so they are what it is scored on.
+ *   2. **the long-run pin** — honoured or not, among the rotations that already clear the days off
+ *      (see `LONG_RUN_WINS` for why it beats the hard days).
+ *   3. **how many pinned hard days land on a frame hard day.**
+ *   4. ⛔ **how much the lifting STACKS onto days that already carry a pinned session** — more is
+ *      better (Michael, 2026-08-25 evening). *"Stacking is the release valve… prefer landing on a
+ *      day that already has training over eating the rest day."* A tie-break, deliberately: on a
+ *      loose week every candidate ties above it and nothing changes, and on a tight one it is what
+ *      keeps the clear days clear instead of spreading four lifting days across four empty ones.
+ *   5. ⚠️ **week one's test days survive the start date.** `activate-plan:441` drops a week-1
  *      session dated before the block's start, so a rotation that puts the two test days early in a
  *      mid-week-started block would DELETE the test and leave eleven weeks on "By feel" with nothing
  *      said. Not reachable from the live builder — `planWeekStartISO()` always sends a Monday — but
@@ -146,24 +202,58 @@ function startWeekdayIndex(iso: string | null | undefined): number | null {
  */
 export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind = 'standard'): DayMap {
   const anchors = anchorDaysFor(frame, column);
+  const frameFixed = frameFixedDaysFor(frame, column);
+  /**
+   * ⛔ THE DAYS THE ATHLETE SAID THEY CANNOT TRAIN. ⚠️ Unrecognised values are dropped rather than
+   * coerced — a bad string must mean "no constraint", never "block a day nobody named".
+   */
+  const blockedDays = new Set(
+    (pins.unavailableDays ?? []).map(titleCaseDay).filter((d) => d !== ''),
+  );
   /**
    * ⛔ THE LIVE LONG PIN IS THE ONE MATCHING THE LONG SLOT'S SPORT. One long session, possibly two
    * pins; the sport decides which is servable and the other is reported below.
    */
   const longSlotSport = pins.longSlotSport ?? 'run';
-  const longRunPin = titleCaseDay(pins.longRunDay);
-  const longRidePin = titleCaseDay(pins.longRideDay);
+  /**
+   * ⛔⛔ A PIN ON A DAY THE ATHLETE BLOCKED IS NOT A PIN (Michael, 2026-08-25 afternoon). The blocked
+   * day always wins, so `compose.ts` moves that session off it — and a rotation still scored toward
+   * the day it left would be spending the week's one degree of freedom on a session that is no
+   * longer there. ⚠️ Applied before every read below, so no scoring term can see the void pin.
+   */
+  const livePin = (raw: unknown): string => {
+    const d = titleCaseDay(raw);
+    return d !== '' && blockedDays.has(d) ? '' : d;
+  };
+  const longRunPin = livePin(pins.longRunDay);
+  const longRidePin = livePin(pins.longRideDay);
   const longPin = longSlotSport === 'ride' ? longRidePin : longRunPin;
   /** The pin the frame cannot serve at all, because it names the sport the long slot is not. */
   const orphanPin = longSlotSport === 'ride'
     ? { day: longRunPin, sport: 'run' as const }
     : { day: longRidePin, sport: 'ride' as const };
-  const hardPins = [...new Set((pins.hardDays ?? []).map(titleCaseDay).filter((d) => d !== ''))];
+  const hardPins = [...new Set((pins.hardDays ?? []).map(livePin).filter((d) => d !== ''))];
   const startIdx = startWeekdayIndex(pins.startDateIso);
   // The frame days the test week uses. ⛔ Read from the source of that rule, not restated here.
   const testDays = [1, 2];
 
-  let best: { offset: number; long: boolean; hard: number; testSafe: boolean } | null = null;
+  /** How many blocked days a rotation puts frame-fixed work on. 0 = the athlete's days off are clear. */
+  const blockedHitsAt = (offset: number, frameDays: number[]): number =>
+    frameDays.filter((d) => blockedDays.has(weekdayForFrameDay(d, offset))).length;
+
+  /**
+   * ⛔ EVERY DAY THE ATHLETE HAS ALREADY SPOKEN FOR — their long day and their hard days, clubs
+   * included. A lifting day landing on one of these STACKS; a lifting day landing anywhere else
+   * spends a day that would otherwise be clear. ⚠️ Blocked days are not in here: they are not
+   * "already training", they are untouchable, and term 1 handles them.
+   */
+  const spokenFor = new Set<string>([longPin, ...hardPins].filter((d) => d !== ''));
+
+  type Cand = {
+    offset: number; long: boolean; blockedLifts: number; blockedFixed: number;
+    hard: number; stacked: number; testSafe: boolean;
+  };
+  const candidates: Cand[] = [];
   for (let offset = 0; offset < 7; offset++) {
     const long = longPin !== '' && anchors.long != null
       && weekdayForFrameDay(anchors.long, offset) === longPin;
@@ -171,20 +261,100 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
       anchors.hard.some((d) => weekdayForFrameDay(d, offset) === p)).length;
     const testSafe = startIdx == null
       || testDays.every((d) => WEEKDAYS.indexOf(weekdayForFrameDay(d, offset)) >= startIdx);
-    const cand = { offset, long, hard, testSafe };
-    if (best == null) { best = cand; continue; }
-    // ⚠️ STRICTLY GREATER, so the FIRST offset reaching a score keeps it — offset 0 wins every tie
-    // and an athlete with no pins gets exactly the week slice 2 built.
-    const better = (a: typeof cand, b: typeof cand) =>
-      (a.long ? 1 : 0) !== (b.long ? 1 : 0) ? (a.long ? 1 : 0) > (b.long ? 1 : 0)
-        : a.hard !== b.hard ? a.hard > b.hard
-        : (a.testSafe ? 1 : 0) > (b.testSafe ? 1 : 0);
-    if (better(cand, best)) best = cand;
+    candidates.push({
+      offset,
+      long,
+      blockedLifts: blockedHitsAt(offset, frameFixed.lifting),
+      blockedFixed: blockedHitsAt(offset, frameFixed.fixed),
+      hard,
+      stacked: frameFixed.lifting
+        .filter((d) => spokenFor.has(weekdayForFrameDay(d, offset))).length,
+      testSafe,
+    });
+  }
+  /**
+   * ⚠️ STRICTLY GREATER, so the FIRST offset reaching a score keeps it — offset 0 wins every tie
+   * and an athlete with no pins gets exactly the week slice 2 built.
+   *
+   * ⛔⛔ THE BLOCKED-DAY TERMS COME FIRST, AHEAD OF THE LONG PIN (Michael, 2026-08-25 evening).
+   * `LONG_RUN_WINS` still governs pin-against-pin; this is pin-against-a-day-that-does-not-exist,
+   * which is a different comparison. See term 1 in the header for why reversing it costs the long
+   * pin nothing.
+   */
+  const better = (a: Cand, b: Cand) =>
+    a.blockedFixed !== b.blockedFixed ? a.blockedFixed < b.blockedFixed
+      : a.blockedLifts !== b.blockedLifts ? a.blockedLifts < b.blockedLifts
+      : (a.long ? 1 : 0) !== (b.long ? 1 : 0) ? (a.long ? 1 : 0) > (b.long ? 1 : 0)
+      : a.hard !== b.hard ? a.hard > b.hard
+      : a.stacked !== b.stacked ? a.stacked > b.stacked
+      : (a.testSafe ? 1 : 0) > (b.testSafe ? 1 : 0);
+  let best: Cand | null = null;
+  for (const cand of candidates) {
+    if (best == null || better(cand, best)) best = cand;
   }
   const chosen = best!;
+  /**
+   * ⛔ WAS THE BLOCKED DAY REACHABLE AT ALL, IGNORING EVERY OTHER PIN? This is what separates *"no
+   * arrangement of this week can clear that day"* from *"an arrangement exists and another pin took
+   * it"* — and it is the difference between a note that explains and the note this replaces, which
+   * asserted the lifting order was the reason when the long pin was.
+   */
+  const clearableAtAll = candidates.some((c) => c.blockedLifts === 0);
+
+  /**
+   * ⛔⛔ A PIN THE ROTATION GAVE UP TO CLEAR A DAY OFF COSTS THE ATHLETE NOTHING, AND MUST NOT BE
+   * REPORTED AS IF IT DID (2026-08-25 evening).
+   *
+   * Reordering the terms above means a reachable long or hard pin is now dropped whenever serving
+   * it would put lifting on a blocked day. The SESSION still lands on the athlete's day —
+   * `compose.ts` `endurancePins` places it there whichever way the frame is turned — so the lines
+   * below would announce a move that never happens. They are suppressed for exactly that case and
+   * for no other: a pin no rotation could reach is still reported, because that one is real.
+   *
+   * ⚠️ THE TEST IS "WAS IT REACHABLE AMONG THE ROTATIONS THAT CLEAR THE DAYS OFF", not "was it
+   * reachable at all" — the second would silence a genuine miss on any week with a day off in it.
+   */
+  const lostToADayOff = (want: (c: Cand) => boolean): boolean =>
+    blockedDays.size > 0
+    && candidates.some((c) => want(c))
+    && !candidates.some((c) =>
+      want(c) && c.blockedFixed === chosen.blockedFixed && c.blockedLifts === chosen.blockedLifts);
 
   const compromises: { kind: 'cost'; text: string }[] = [];
-  if (longPin !== '' && !chosen.long) {
+  /**
+   * ⛔⛔ A DAY OFF THAT STILL CARRIES A LIFTING DAY — AND THE SENTENCE SAYS WHY (Michael, 2026-08-25).
+   *
+   * The line this replaces read *"Fri carries a lifting day. The lifting order is fixed, so it
+   * stays."* — which was the screen asserting a reason that was not the reason. The order is fixed,
+   * but the rotation is not, and until this pass nothing had tried the other six. Now the chooser
+   * has tried all seven, so when this fires it is TRUE by construction: either another pin took the
+   * only rotation that would have cleared the day, or no rotation clears it at all.
+   *
+   * ⚠️ FIRST IN THE LIST. It is the only cost here that is about a day the athlete cannot train at
+   * all; the rest are about which day a session prefers.
+   */
+  if (chosen.blockedLifts > 0) {
+    const hitDays = frameFixed.lifting
+      .map((d) => weekdayForFrameDay(d, chosen.offset))
+      .filter((d) => blockedDays.has(d));
+    const named = [...new Set(hitDays)];
+    const subject = named.length === 1
+      ? `${named[0]} carries a lifting day`
+      : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]} carry lifting days`;
+    const nLifts = frameFixed.lifting.length;
+    compromises.push({
+      kind: 'cost',
+      text: clearableAtAll && longPin !== '' && chosen.long
+        // ⚠️ THE COMPETING PIN IS NAMED, because it is the only thing the athlete can act on. Stated
+        // as the trade it is, with no imperative and no request to change either answer.
+        ? `${subject}. The long ${longSlotSport === 'ride' ? 'ride' : 'run'} is pinned to ${longPin}, `
+          + `and no arrangement of this week's ${nLifts} lifting days honours that pin and leaves `
+          + `${named.join(' and ')} clear at the same time.`
+        : `${subject}. This week has ${nLifts} lifting days in a fixed order, and no arrangement of `
+          + `them leaves every day off clear.`,
+    });
+  }
+  if (longPin !== '' && !chosen.long && !lostToADayOff((c) => c.long)) {
     const actual = anchors.long != null ? weekdayForFrameDay(anchors.long, chosen.offset) : null;
     compromises.push({
       kind: 'cost',
@@ -200,6 +370,8 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
   for (const p of hardPins) {
     const landed = anchors.hard.some((d) => weekdayForFrameDay(d, chosen.offset) === p);
     if (landed) continue;
+    if (lostToADayOff((c) =>
+      anchors.hard.some((d) => weekdayForFrameDay(d, c.offset) === p))) continue;
     const actual = anchors.hard.map((d) => weekdayForFrameDay(d, chosen.offset));
     compromises.push({
       kind: 'cost',
@@ -238,6 +410,10 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
     offset: chosen.offset,
     weekdayFor: (frameDay: number) => weekdayForFrameDay(frameDay, chosen.offset),
     compromises,
-    honoured: { longRun: chosen.long, hardDays: chosen.hard },
+    honoured: {
+      longRun: chosen.long,
+      hardDays: chosen.hard,
+      unavailableDays: chosen.blockedLifts === 0,
+    },
   };
 }

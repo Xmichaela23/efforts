@@ -23,7 +23,7 @@ export const SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
  * Rendered as separate lines so the four-session list reads as a list.
  */
 export const ENDURANCE_WEEK_HEADER: string[] = [
-  'The focus of this block is strength while maintaining your endurance.',
+  'Add your regular weekly endurance here.',
   '4 sessions:',
   '2 sessions to maintain speed, VO2 max or power',
   '1 recovery session',

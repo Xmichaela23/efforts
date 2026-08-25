@@ -53,8 +53,9 @@ Deno.test("the header is Michael's copy, word for word", () => {
    * every other athlete-facing string in this repo goes through a voice gate that would happily
    * "improve" his sentences — and his are the specification.
    */
+  // First line superseded by Michael 2026-08-25: "Add your regular weekly endurance here."
   assertEquals(ENDURANCE_WEEK_HEADER, [
-    'The focus of this block is strength while maintaining your endurance.',
+    'Add your regular weekly endurance here.',
     '4 sessions:',
     '2 sessions to maintain speed, VO2 max or power',
     '1 recovery session',

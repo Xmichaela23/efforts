@@ -45,5 +45,6 @@ const WORD: Record<number, string> = {
 export function liftingCommitmentLine(frameId: keyof typeof FRAMES = 'strength_5k'): string | null {
   const n = liftingDaysForFrame(frameId);
   if (n <= 0) return null;
-  return `${WORD[n] ?? n} lifting days a week. Your endurance fits around them.`;
+  return `${WORD[n] ?? n} lifting days a week. Your endurance fits around them. `
+    + 'Riding has less impact on lift gains than running.';
 }

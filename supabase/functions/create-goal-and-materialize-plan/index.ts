@@ -2925,6 +2925,29 @@ Deno.serve(async (req: Request) => {
                 && ((gsTp as Record<string, Record<string, unknown>>).long_session.ownership === 'club')
                 ? { long_session: { ownership: 'club' } }
                 : {}),
+              /**
+               * ⛔⛔ THE DAYS THE ATHLETE CANNOT TRAIN (2026-08-25). They were written to the goal by
+               * the builder and read by NOTHING under `supabase/functions` — the same shape of gap
+               * that stranded the hard-day pin in 2026-07-26. So the block was composed blind to
+               * them and put a lifting day and an endurance session onto the day off.
+               *
+               * ⚠️ VALIDATED, NOT TRUSTED: only recognised weekday names survive, deduped, lowercase
+               * preserved as stored — `generate-strength-plan` title-cases at the door. A malformed
+               * entry is dropped rather than blocking a day nobody named.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).unavailable_days;
+                if (!Array.isArray(raw)) return {};
+                const ok = new Set([
+                  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                ]);
+                const out: string[] = [];
+                for (const v of raw) {
+                  const d = String(v ?? '').trim().toLowerCase();
+                  if (ok.has(d) && !out.includes(d)) out.push(d);
+                }
+                return out.length > 0 ? { unavailable_days: out } : {};
+              })(),
               ...(gsTp.skip_test_week === true ? { skip_test_week: true } : {}),
               /**
                * ⛔ THE ATHLETE'S PER-SLOT SPORT ANSWER (endurance-week screen, 2026-08-24). Counts

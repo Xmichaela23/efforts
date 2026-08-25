@@ -198,6 +198,15 @@ Deno.serve(async (req: Request) => {
        */
       dayOffset: Number(sp.day_offset) || 0,
       /**
+       * ⛔ THE DAYS THAT WERE BLOCKED WHEN THE BLOCK WAS BUILT, READ BACK — same rule as the
+       * rotation above. The endurance was stepped off them at build time, so a restate that did not
+       * know about them would compose those sessions back onto their frame days, match nothing on
+       * weekday, and report the block as unmatched. ⚠️ Read, never re-derived from the athlete's
+       * current answers: the calendar is what this has to reproduce.
+       */
+      ...(Array.isArray(sp.unavailable_days) && sp.unavailable_days.length > 0
+        ? { unavailableDays: sp.unavailable_days as string[] } : {}),
+      /**
        * ⛔ THE BLOCK'S OWN SPORT MIX, READ BACK — same rule as the rotation above. A restate that
        * re-derived the mix from the athlete's CURRENT answers would compose a different week (a ride
        * where the calendar has a run) and match nothing, reporting the whole block as unmatched.

@@ -169,16 +169,73 @@ Deno.test('⛔ a day marked "cannot train" stays EMPTY — the remainder arrange
   assertEquals(dayOf(w, 'Long Ride'), SAT, 'the pin moved when rest days were added');
 });
 
-Deno.test('⛔ a session pinned onto an unavailable day is STRUCTURAL — not a warning, and not moved', () => {
-  // ⚠️ THE ENGINE DOES NOT RESOLVE THIS. Both answers are the athlete's and they contradict; moving
-  // the session would be the engine overruling a pin, which is the one thing the ruling forbids.
+Deno.test('⛔⛔ A BLOCKED DAY BEATS A PIN — the tapped session is re-solved off it, and reported', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-25 (afternoon), SUPERSEDING THE MORNING RULING THIS TEST USED TO ASSERT:
+   * *"A blocked day always wins. If a day is both tapped for a session and marked can't-train, the
+   * session is rescheduled off it — the engine re-solves that session as unpinned, and the note says
+   * what moved and why."*
+   *
+   * The old assertion was the opposite — the session STAYED and the contradiction was reported as
+   * structural. It is not structural: the engine can resolve it, so it does.
+   */
   const units = buildUnits(SESSIONS, { hardrun: THU });
-  const conflicts = structuralConflicts(units, { unavailableDays: [THU] });
-  assertEquals(conflicts.length, 1);
-  assertEquals(conflicts[0].kind, 'pin_on_unavailable_day');
+  assertEquals(
+    structuralConflicts(units, { unavailableDays: [THU] }).length,
+    0,
+    'a pin on a blocked day is resolvable, so it is no longer a structural conflict',
+  );
+
   const w = resolveAroundPins(units, { minRestDays: 1, unavailableDays: [THU] });
-  assertEquals(dayOf(w, 'Hard Run'), THU, 'the pinned session was moved off the contradicted day');
-  assertEquals(w.structural.length, 1, 'the contradiction was not surfaced');
+  assert(dayOf(w, 'Hard Run') !== THU, 'the tapped session stayed on the day the athlete blocked');
+  assertEquals(w.structural.length, 0);
+
+  // ⛔ AND THE MOVE IS NAMED AT BOTH ENDS — the note needs "from Thu" and "to X", not just "it moved".
+  assertEquals(w.relocations.length, 1, 'the move was made silently');
+  // ⚠️ THE UNIT IS THE PAIR AND THE SESSION IS WHAT THEY TAPPED — the sentence uses the second.
+  assertEquals(w.relocations[0].unit, 'Back Squat + Hard Run');
+  assertEquals(w.relocations[0].session, 'Hard Run');
+  assertEquals(w.relocations[0].sessionId, 'hardrun');
+  assertEquals(w.relocations[0].from, THU);
+  assertEquals(w.relocations[0].to, dayOf(w, 'Hard Run'));
+});
+
+Deno.test('⛔ a pin the athlete can still have is untouched, and reports no move', () => {
+  // ⚠️ THE REGRESSION GUARD FOR THE RULING ABOVE. Releasing a pin is keyed on the BLOCKED DAY and
+  // nothing else; a pin on any other day is as absolute as it ever was.
+  const units = buildUnits(SESSIONS, { hardrun: THU });
+  const w = resolveAroundPins(units, { minRestDays: 1, unavailableDays: [WED] });
+  assertEquals(dayOf(w, 'Hard Run'), THU, 'an unblocked pin moved');
+  assertEquals(w.relocations.length, 0, 'a week where nothing moved reported a move');
+});
+
+Deno.test('⛔ the week the re-solve produces still builds even when it breaks a rule', () => {
+  /**
+   * ⛔ PART 2 OF THE RULING: *"If the arrangement that results isn't sound training, it still builds
+   * — the existing tiered notes carry the warning."* So the relocation is never gated on the week
+   * that comes out of it, and the cost arrives through `violations`, never as a refusal.
+   */
+  const units = buildUnits(SESSIONS, { hardrun: THU, longride: SAT });
+  const w = resolveAroundPins(units, {
+    minRestDays: 1,
+    // ⚠️ FIVE DAYS OFF — the re-solve has two days for the whole week and cannot help but crowd it.
+    unavailableDays: [THU, 0, 1, 2, 4],
+  });
+  assert(w.placements.length > 0, 'a hard week returned no week at all');
+  assert(dayOf(w, 'Hard Run') !== THU, 'the tapped session survived on a blocked day');
+  assert(w.violations.length > 0, 'a crowded week reported no cost — the warning half is missing');
+});
+
+Deno.test('⛔ every day unavailable still returns a week — nothing is silently deleted', () => {
+  /**
+   * ⚠️ THE ONE CASE RELEASING A PIN CANNOT FIX: there is nowhere to move to. Releasing it would have
+   * left the search with no candidate day at all and returned an EMPTY week — sessions deleted in
+   * silence, which is the outcome this whole path forbids.
+   */
+  const units = buildUnits(SESSIONS, { hardrun: THU });
+  const w = resolveAroundPins(units, { minRestDays: 1, unavailableDays: [0, 1, 2, 3, 4, 5, 6] });
+  assertEquals(w.placements.length, units.length, 'sessions vanished when every day was blocked');
+  assert(w.structural.some((c) => c.kind === 'no_day_left'), 'the impossible week was not named');
 });
 
 Deno.test('⛔ every day unavailable is STRUCTURAL — a week with nowhere to put anything', () => {

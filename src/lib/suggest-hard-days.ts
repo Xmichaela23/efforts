@@ -12,7 +12,9 @@
  * and `_shared/week-model/model.ts` for the law itself.
  */
 import { type Session, type Unit, buildUnits, DAY_NAMES } from '@shared/week-model/model.ts';
-import { type Placement, resolve, restDaysOf, unmetNeeds } from '@shared/week-model/resolve.ts';
+import {
+  type Placement, type Relocation, resolve, resolveAroundPins, restDaysOf, unmetNeeds,
+} from '@shared/week-model/resolve.ts';
 /**
  * ⛔ THE EASY-SESSION SUBTRACTION IS THE COMPOSER'S, NOT A COPY OF IT (stage 4, 2026-08-21). This
  * file held its own `total - long - hard`, which is the same rule the block builder applies — and
@@ -52,12 +54,42 @@ const LIFTS: Session[] = [
   { id: 'dl', label: 'Deadlift', load: 'heavy_lower', minutes: 60 },
 ];
 
+/**
+ * ⛔ A RELOCATED SESSION IN THE ATHLETE'S WORDS — "the hard ride", not "Hard bike".
+ *
+ * ⚠️ IT LIVES HERE, BESIDE THE LABELS IT TRANSLATES. `buildWizardWeek` writes `Hard ${discipline}`
+ * and `Long Run` / `Long Ride`; a mapper in the component would be a second table that goes stale
+ * the first time one of those strings changes, and the sentence would quietly name nothing.
+ * ⚠️ `bike` → "ride" IS THE ONLY SUBSTITUTION. The wizard's discipline key is `bike` and every
+ * athlete-facing string in this app says ride.
+ */
+export function relocationPhrase(sessionLabel: string): string {
+  const t = String(sessionLabel ?? '').trim().toLowerCase().replace(/\bbike\b/, 'ride');
+  return t ? `the ${t}` : 'that session';
+}
+
 export type HardSlot = {
   discipline: 'run' | 'bike';
   /** A club session the athlete has already placed. Pinned, never suggested — only they know when
    *  the club meets, and moving it would be the app inventing an appointment. */
   day?: string | null;
   ownership?: 'prescribed' | 'club';
+  /**
+   * ⛔⛔ WHOSE ANSWER THIS DAY IS — and it exists because of a bug that reads as the engine ignoring
+   * a day off (2026-08-25).
+   *
+   * The wizard PRE-FILLS an untouched slot with the engine's own suggestion, and that day is then
+   * read straight back out of state on the next solve. Every day is a pin here (see the note in
+   * `buildWizardWeek`), so the engine's own proposal came back as an absolute — and `resolve` never
+   * moves a pinned unit. Marking that day unavailable afterwards therefore could not dislodge it:
+   * the solve kept returning the blocked day, the pre-fill had nothing better to write, and the chip
+   * read *"Fri — placed"* about a day the athlete had just said they could not train.
+   *
+   * ⚠️ ABSENT MEANS PINNED, deliberately — every existing caller keeps today's behaviour, including
+   * the health badge, whose whole accuracy rests on a moved hard day being handed over as fixed.
+   * Only an explicit `pinned: false` releases it, and only on a blocked day (`buildWizardWeek`).
+   */
+  pinned?: boolean;
 };
 
 /**
@@ -93,6 +125,12 @@ export type WeekInput = {
    * this file had before the field existed — every day stays a candidate.
    */
   unavailableDays?: string[] | null;
+  /**
+   * ⛔ WHOSE ANSWER EACH LONG DAY IS — the same rule as `HardSlot.pinned`, for the two long slots.
+   * ⚠️ Absent means pinned, so every existing caller is unchanged.
+   */
+  longRunPinned?: boolean;
+  longRidePinned?: boolean;
 };
 
 /**
@@ -109,6 +147,25 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
   const slots = input.hardDays ?? [];
   const sessions: Session[] = [...LIFTS];
   const pins: Record<string, number> = {};
+  /**
+   * ⛔⛔ EVERY NAMED DAY IS HANDED OVER AS A PIN, INCLUDING ONE ON A BLOCKED DAY — AND THAT IS THE
+   * POINT (2026-08-25 afternoon).
+   *
+   * A first pass at Michael's *"a blocked day always wins"* dropped the pin HERE, and it made the
+   * engine blind to the very thing it has to report: with no pin on the unit, `resolveAroundPins`
+   * could not see that anything had been released, and `relocations` came back empty — the session
+   * moved and the note said nothing. **`resolve` owns releasing a blocked pin, and it owns it
+   * alone.** This file states the athlete's answers; what survives a contradiction is the engine's.
+   *
+   * ⚠️ THIS IS THE DOUBLED DISEASE IN MINIATURE and it is why the rule lives in one file: two places
+   * deciding which pins hold is how the week and the sentence about the week come to disagree.
+   * ⚠️ `HardSlot.pinned` SURVIVES AND STILL MATTERS, just not here: it is how the screen knows
+   * whether to offer a replacement day for a filled field (see `solveWizardWeek`).
+   */
+  const pinDay = (id: string, day: string | null | undefined) => {
+    const d = DAY_INDEX[String(day ?? '').toLowerCase()];
+    if (d != null) pins[id] = d;
+  };
 
   /**
    * ⛔ AN UNPINNED LONG DAY IS PLACED, NOT OMITTED (2026-08-18). It used to be dropped from the model
@@ -119,11 +176,13 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
    * ⚠️ IT STILL NEEDS A DISCIPLINE TO EXIST FOR. A long run is only real if the athlete runs, and a
    * long ride only if they ride — `hasRun` / `hasRide` come from the volume, not from a default.
    */
-  const long = (id: string, label: string, sport: 'run' | 'bike', day: string | null | undefined, exists: boolean) => {
+  const long = (
+    id: string, label: string, sport: 'run' | 'bike', day: string | null | undefined,
+    exists: boolean,
+  ) => {
     if (!exists) return;
     sessions.push({ id, label, load: sport === 'run' ? 'long_run' : 'long_ride', sport, minutes: 90 });
-    const d = DAY_INDEX[String(day ?? '').toLowerCase()];
-    if (d != null) pins[id] = d;
+    pinDay(id, day);
   };
   const hasRun = Number(input.runDays) > 0 || slots.some((h) => h.discipline === 'run')
     || !!input.longRunDay;
@@ -169,8 +228,13 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
      * ⚠️ THE SUGGESTER IS UNAFFECTED: it only ever fills slots that have no day, so a pinned slot
      * being echoed back as itself is exactly right.
      */
-    const d = DAY_INDEX[String(h.day ?? '').toLowerCase()];
-    if (d != null) pins[id] = d;
+    /**
+     * ⚠️ A CLUB SESSION IS NOT EXEMPT EITHER, and that is the ruling rather than an oversight. Its
+     * day is fixed by the world, so a week the athlete cannot train on that day is a week they miss
+     * the club — the session moves and the note says so, rather than the plan booking them onto a
+     * day they have already said is gone.
+     */
+    pinDay(id, h.day);
   });
 
   return buildUnits(sessions, pins);
@@ -182,7 +246,12 @@ export function suggestHardDays(input: WeekInput): Array<string | null> {
 
   let placed: Array<{ id: string; day: number }> = [];
   try {
-    const r = resolve(buildWizardWeek(input), { minRestDays: 1 });
+    // ⚠️ THE BLOCKED DAYS TRAVEL HERE TOO. They were passed by every other solve in this file and
+    // not by this one, so the standalone suggester could propose a day the badge beside it called
+    // unavailable — two answers to one question, from one file.
+    const r = resolve(buildWizardWeek(input), {
+      minRestDays: 1, unavailableDays: blockedDayIndexes(input),
+    });
     // ⚠️ A COMPROMISED WEEK STILL CARRIES ITS BEST ARRANGEMENT, and that arrangement is still the
     // best answer available. Refusing to suggest because the athlete's own pins already collide
     // would withhold help exactly where it is most needed.
@@ -315,9 +384,14 @@ export function suggestLongDays(input: WeekInput): { run: string | null; ride: s
       const p = placements.find((x) => x.unit.sessions.some((s) => s.id === id));
       return p ? DAY_NAMES[p.day].toLowerCase() : null;
     };
+    const blockedIn = new Set(blockedDayIndexes(input));
+    const kept = (day: string | null | undefined, pinned: boolean): boolean => {
+      const i = DAY_INDEX[String(day ?? '').toLowerCase()];
+      return !!day && pinned && !(i != null && blockedIn.has(i));
+    };
     return {
-      run: input.longRunDay ? null : dayOf('lr'),
-      ride: input.longRideDay ? null : dayOf('lb'),
+      run: kept(input.longRunDay, input.longRunPinned !== false) ? null : dayOf('lr'),
+      ride: kept(input.longRideDay, input.longRidePinned !== false) ? null : dayOf('lb'),
     };
   } catch {
     return { run: null, ride: null };
@@ -341,14 +415,26 @@ export function solveWizardWeek(input: WeekInput): {
   longRun: string | null;
   longRide: string | null;
   health: ScheduleHealth;
+  /**
+   * ⛔ WHAT A DAY OFF MOVED (Michael, 2026-08-25 afternoon). The screen turns each of these into one
+   * sentence — *"Fri is a day off — the hard run moved to Mon"* — and composes no prose of its own.
+   * Empty is the normal week.
+   */
+  relocations: Relocation[];
 } {
   const slots = input.hardDays ?? [];
   try {
     const units = buildWizardWeek(input);
-    const r = resolve(units, { minRestDays: 1, unavailableDays: blockedDayIndexes(input) });
-    const placements: Placement[] = r.ok
-      ? r.placements
-      : (r as Extract<typeof r, { ok: false }>).best;
+    /**
+     * ⛔ `resolveAroundPins` RATHER THAN `resolve`, so the moves come from the ENGINE that made them.
+     * This file could compare its own input days against the placements and reach the same list —
+     * and that is exactly the second opinion its own header forbids, in the one place the athlete
+     * would notice it.
+     */
+    const w = resolveAroundPins(units, {
+      minRestDays: 1, unavailableDays: blockedDayIndexes(input),
+    });
+    const placements: Placement[] = w.placements;
 
     const dayOf = (id: string): string | null => {
       const p = placements.find((x) => x.unit.sessions.some((s) => s.id === id));
@@ -396,14 +482,53 @@ export function solveWizardWeek(input: WeekInput): {
       collisions.push('No rest day left — every day of the week carries a session.');
     }
 
+    /**
+     * ⛔ A LONG DAY THE ENGINE ITSELF WROTE STILL GETS AN OPINION (2026-08-25). This read
+     * `input.longRunDay ? null : …` — "they answered, say nothing" — and the wizard's pre-fill
+     * writes the ENGINE's answer into that same field. So once the engine had filled it there was
+     * no further opinion available, and when the athlete then blocked that day nothing could
+     * propose a different one. `longRunPinned === false` is the wizard saying *"this day is mine,
+     * not theirs"*; absent still means the athlete's, which is every other caller.
+     */
+    /**
+     * ⛔⛔ A FILLED FIELD STILL GETS AN OPINION WHEN ITS DAY IS BLOCKED (2026-08-25 afternoon).
+     *
+     * Silence here means *"they answered, say nothing"*, which is right for a day the athlete owns
+     * and has NOT blocked. A blocked day is no longer theirs to keep, so the screen needs a
+     * replacement to write — without one it would sit on a day the plan will not build.
+     * ⚠️ CLUB IS NOT EXEMPT for the same reason, and only for the same reason: an unblocked club day
+     * still returns null, because only the athlete knows when the club meets.
+     */
+    const blockedIn = new Set(blockedDayIndexes(input));
+    const isBlocked = (d: string | null | undefined): boolean => {
+      const i = DAY_INDEX[String(d ?? '').toLowerCase()];
+      return i != null && blockedIn.has(i);
+    };
+    const keepsItsOwn = (day: string | null | undefined, pinned: boolean): boolean =>
+      !!day && pinned && !isBlocked(day);
+
     return {
-      hardDays: slots.map((h, i) => (h.ownership === 'club' ? null : dayOf(`h${i}`))),
-      longRun: input.longRunDay ? null : dayOf('lr'),
-      longRide: input.longRideDay ? null : dayOf('lb'),
+      /**
+       * ⚠️ A NON-CLUB SLOT ALWAYS GETS THE PLACEMENT BACK, pinned or not — which for an unblocked
+       * pin IS the day they tapped, so nothing changes for them. Club is the exception, and only
+       * until the athlete blocks that day: after that the engine must offer a replacement or the
+       * screen has nothing to write.
+       */
+      hardDays: slots.map((h, i) =>
+        (keepsItsOwn(h.day, h.ownership === 'club') ? null : dayOf(`h${i}`))),
+      longRun: keepsItsOwn(input.longRunDay, input.longRunPinned !== false) ? null : dayOf('lr'),
+      longRide: keepsItsOwn(input.longRideDay, input.longRidePinned !== false) ? null : dayOf('lb'),
       health: { ok: collisions.length === 0, collisions },
+      relocations: w.relocations,
     };
   } catch {
     // ⛔ NEVER LOAD-BEARING. No opinion beats a wrong one, and a build screen must still render.
-    return { hardDays: slots.map(() => null), longRun: null, longRide: null, health: { ok: true, collisions: [] } };
+    return {
+      hardDays: slots.map(() => null),
+      longRun: null,
+      longRide: null,
+      health: { ok: true, collisions: [] },
+      relocations: [],
+    };
   }
 }

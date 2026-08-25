@@ -51,7 +51,9 @@ import {
   type FrameId,
   type StrengthSlot,
 } from './frames.ts';
-import { weekdayForFrameDay, type Weekday } from './day-map.ts';
+import {
+  WEEKDAYS, frameFixedDaysFor, titleCaseDay, weekdayForFrameDay, type Weekday,
+} from './day-map.ts';
 import { assignSports, assignedSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix } from './sport-slots.ts';
 import {
   HAIRCUT_CAUSE_IS_OURS,
@@ -175,6 +177,96 @@ function enduranceDayFor(
   return dayNameFor(args, frameDay);
 }
 
+
+/**
+ * ⛔ WHAT TO CALL AN ENDURANCE SLOT IN A SENTENCE — the athlete's words, not the frame's. The note
+ * reads *"the long ride moved to Mon"*, and `run_lsd` / `run_mlss` are not words anybody says.
+ * ⚠️ THE SPORT IS DELIBERATELY ABSENT: the mix decides it per slot and this file's own long slot can
+ * be a run or a ride. "The long session" is true either way; naming the wrong sport is not.
+ */
+function enduranceLabelFor(role: 'long' | 'hard' | null): string {
+  if (role === 'long') return 'the long session';
+  if (role === 'hard') return 'the hard session';
+  return 'an easy session';
+}
+
+/** A session a blocked day moved: what it is, the day it was on, the day it went to. */
+export type EnduranceRelocation = { session: string; from: Weekday; to: Weekday };
+
+/**
+ * ⛔⛔ STEP THE ENDURANCE OFF A DAY THE ATHLETE CANNOT TRAIN — see `ComposeArgs.unavailableDays`.
+ *
+ * ⛔ INCLUDING A DAY THEY TAPPED (Michael, 2026-08-25 afternoon). The blocked day always wins, so a
+ * pinned session is relocated exactly like a rotated one. What a pin still buys is PRIORITY: the
+ * athlete's own days are relocated FIRST, so they get first choice and an engine-placed session
+ * takes what is left rather than the other way round.
+ *
+ * ⛔⛔ AND IT LANDS ON A DAY THAT IS ALREADY TRAINING (Michael, 2026-08-25 evening). *"Stacking is
+ * the release valve — lifts may share a day with club or other endurance sessions to make the
+ * schedule work… prefer landing on a day that already has training over eating the rest day."*
+ *
+ * So the search runs in two tiers: every occupied day first, nearest outwards, and only then the
+ * clear ones. It is a REVERSAL of what this function did an hour ago, which walked to the nearest
+ * day of any kind and therefore spent a rest day the moment one was closer than a training day.
+ * A doubled-up day is a note; a week with no day off is a week the athlete did not ask for.
+ *
+ * ⚠️ NEAREST WITHIN EACH TIER, FORWARD FIRST. The frame's gaps carry its meaning, so the closest
+ * day preserves the most of them; forward before back breaks the tie the same way every time,
+ * which is what keeps two builds of one answer identical.
+ * ⚠️ EVERY DAY BLOCKED IS NOT AN ERROR HERE. The session keeps its day and the week is still built —
+ * `structuralConflicts` `no_day_left` is where that is reported, and this file never refuses.
+ */
+function enduranceRelocator(args: ComposeArgs): {
+  place: (proposed: Weekday, label: string) => Weekday;
+  moves: EnduranceRelocation[];
+} {
+  const blocked = new Set<Weekday>(
+    (args.unavailableDays ?? [])
+      .map((d) => titleCaseDay(d))
+      .filter((d): d is Weekday => d !== '') as Weekday[],
+  );
+  /**
+   * ⛔ THE DAYS THAT ALREADY CARRY WORK THE ROTATION PUT THERE — the lifting days and the plyo day,
+   * read off the frame at this block's own offset. A relocated session prefers these, because
+   * landing on one costs the week nothing it had not already spent.
+   * ⚠️ `used` GROWS AS SESSIONS ARE PLACED, so a day this pass has already filled counts as
+   * occupied for the next one — the tiers see the week being built, not the frame alone.
+   */
+  const occupied = new Set<Weekday>(
+    frameFixedDaysFor(args.frame, args.column).fixed
+      .map((d) => weekdayForFrameDay(d, args.dayOffset ?? 0)),
+  );
+  const used = new Set<Weekday>();
+  const moves: EnduranceRelocation[] = [];
+  // ⚠️ Forward, then back, widening — `[1,-1,2,-2,…]`, so "nearest" is a real answer and not a
+  // one-directional walk that always drifts a session to the end of the week.
+  const walk: number[] = [];
+  for (let n = 1; n <= 6; n++) { walk.push(n); walk.push(-n); }
+
+  const place = (proposed: Weekday, label: string): Weekday => {
+    if (!blocked.has(proposed)) { used.add(proposed); return proposed; }
+    const from = WEEKDAYS.indexOf(proposed);
+    /** `training` = only days already carrying something; otherwise the first unblocked day. */
+    const pick = (training: boolean): Weekday | null => {
+      for (const step of walk) {
+        const cand = WEEKDAYS[(from + step + 7) % 7];
+        if (blocked.has(cand)) continue;
+        if (training && !occupied.has(cand) && !used.has(cand)) continue;
+        return cand;
+      }
+      return null;
+    };
+    const to = pick(true) ?? pick(false);
+    // ⚠️ NOWHERE TO GO — every day blocked. It keeps its day and reports no move, because a note
+    // saying it moved to the day it is still on would be the screen lying quietly.
+    if (to == null) { used.add(proposed); return proposed; }
+    used.add(to);
+    moves.push({ session: label, from: proposed, to });
+    return to;
+  };
+  return { place, moves };
+}
+
 export type ComposeArgs = {
   frame: FrameId;
   week: number;
@@ -227,6 +319,25 @@ export type ComposeArgs = {
     /** Weekdays for the frame's hard slots, in the frame's own order. */
     hard?: Array<Weekday | null | undefined>;
   };
+  /**
+   * ⛔⛔ DAYS THE ATHLETE CANNOT TRAIN — AND NO ENDURANCE SESSION LANDS ON ONE (Michael, 2026-08-25:
+   * *"Endurance sessions must never be placed on an unavailable day — they are movable by
+   * definition."*).
+   *
+   * ⛔ THE ROTATION HAS ALREADY TRIED. `chooseDayMap` scores the seven rotations to keep the LIFTS
+   * off these days, because a lift can only be moved by rotating the whole frame. This field is the
+   * other half: whatever the rotation could not clear, the endurance steps off by itself — the same
+   * freedom `endurancePins` already gives it.
+   *
+   * ⛔⛔ AND A PIN ONTO A BLOCKED DAY MOVES TOO (Michael, 2026-08-25 afternoon — SUPERSEDES this
+   * file's own note from the same morning, which kept it). *"A blocked day always wins. If a day is
+   * both tapped for a session and marked can't-train, the session is rescheduled off it."* So a
+   * tapped day is absolute against the FRAME and not against a day off; the move is reported, never
+   * silent. ⚠️ The re-arranged week may break a clearance — it still builds, and the tiered notes
+   * carry it (`week-model/resolve.ts` `violationsOf`).
+   * ⚠️ ABSENT OR EMPTY IS THE WEEK THIS FILE BUILT BEFORE THE FIELD EXISTED, day for day.
+   */
+  unavailableDays?: Array<Weekday | string | null | undefined>;
   /**
    * ⛔ THE ATHLETE'S SPORT MIX (slice 4) — how many runs, how many rides, swim kept or not. It sets a
    * RATIO over the frame's own slot count and never changes how many sessions the week holds.
@@ -1031,6 +1142,33 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   }
 
   const sportAssignment = assignSports(days, args.sportMix ?? {});
+  /**
+   * ⛔ ONE RELOCATOR FOR THE WHOLE WEEK — see `enduranceRelocator`. Built here rather than per slot
+   * so the sessions it moves can see each other and never stack onto one free day.
+   *
+   * ⛔⛔ AND THE ATHLETE'S OWN DAYS GO THROUGH IT FIRST (Michael, 2026-08-25 afternoon). A blocked day
+   * beats a pin, but a pin still outranks the frame's rotation for WHICH free day it gets: run in
+   * frame order alone, a rotated easy run could take the day nearest the athlete's blocked long ride
+   * and push their session further out. So the pinned slots are placed in a pre-pass and the loop
+   * below reads their answer rather than asking again.
+   */
+  const { place: relocate, moves: enduranceMoves } = enduranceRelocator(args);
+  /** `${frameDay}:${slotIndex}` → the weekday it ends on. Filled for pinned slots here, the rest below. */
+  const enduranceDays = new Map<string, Weekday>();
+  for (const d of days) {
+    d.endurance.forEach((slot, i) => {
+      const key = `${d.day}:${i}`;
+      const assigned = assignedSlot(sportAssignment, d.day, i, slot);
+      const hardIndex = hardSlotIndex.get(key) ?? 0;
+      const role = anchorRoleOf(assigned.family);
+      const pinned = role === 'long'
+        ? !!args.endurancePins?.long
+        : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
+      if (!pinned) return;
+      const proposed = enduranceDayFor(args, d.day, assigned.family, hardIndex);
+      enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
+    });
+  }
   for (const n of sportAssignment.notes) {
     if (!notes.some((x) => x.text === n.text)) {
       notes.push({ kind: n.kind === 'source' ? 'source' : n.kind === 'warning' ? 'warning' : 'ours', text: n.text, cite: n.cite });
@@ -1148,7 +1286,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       sessions.push({
         // ⛔ THE PIN WINS HERE AND ONLY HERE. Every other `dayNameFor` call in this file is a lift,
         // a plyo block or an add-on, and those keep the frame's rotation — see `endurancePins`.
-        day: enduranceDayFor(args, day.day, assigned.family, hardSlotIndex.get(`${day.day}:${i}`) ?? 0),
+        // ⛔ AND THEN OFF A DAY THE ATHLETE CANNOT TRAIN — the pinned slots already went through the
+        // relocator in the pre-pass above, so this reads their answer rather than re-asking.
+        day: enduranceDays.get(`${day.day}:${i}`) ?? relocate(
+          enduranceDayFor(args, day.day, assigned.family, hardSlotIndex.get(`${day.day}:${i}`) ?? 0),
+          enduranceLabelFor(anchorRoleOf(assigned.family)),
+        ),
         ...row,
         // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a reader
         // can still find the row on the page it came from.
@@ -1170,7 +1313,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (let i = 0; i < swimAddOns && i < swimTargets.length; i++) {
       const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors });
       const row = translateEnduranceSession(built);
-      sessions.push({ day: dayNameFor(args, swimTargets[i].day), ...row, tags: [...row.tags, 'swim_addon'] });
+      // ⚠️ THE ADD-ON IS ENDURANCE TOO, so it obeys the same blocked-day rule as the slots above.
+      sessions.push({
+        day: relocate(dayNameFor(args, swimTargets[i].day), 'the easy swim'),
+        ...row,
+        tags: [...row.tags, 'swim_addon'],
+      });
     }
     notes.push({ kind: 'ours', text: SWIM_IS_EASY_ONLY });
   }
@@ -1183,7 +1331,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (let i = 0; i < extraVt1 && i < targets.length; i++) {
       const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors });
       const row = translateEnduranceSession(built);
-      sessions.push({ day: dayNameFor(args, targets[i].day), ...row, tags: [...row.tags, 'advanced_tier'] });
+      sessions.push({
+        day: relocate(dayNameFor(args, targets[i].day), 'the extra easy run'),
+        ...row,
+        tags: [...row.tags, 'advanced_tier'],
+      });
     }
     notes.push({
       kind: 'source',
@@ -1297,6 +1449,27 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         + 'holds, and every slot that suits these was already filled — by another of your choices, or '
         + 'by the movement the week was short of.',
     });
+  }
+
+  /**
+   * ⛔⛔ WHAT A DAY OFF MOVED, AND WHERE TO (Michael, 2026-08-25 afternoon). *"The note says what
+   * moved and why."* So this is not a cost the athlete has to infer from two chips disagreeing — it
+   * is one sentence naming the day, the session and the day it went to.
+   *
+   * ⚠️ DEDUPED, because a twelve-week block relocates the same session in every week and twelve
+   * identical sentences is not more honest than one. `plan-row.ts` dedupes by text across the block;
+   * this keeps one per session within the week.
+   * ⚠️ NOT A WARNING. `kind: 'ours'` — the engine did this and says so. The question of whether the
+   * REARRANGED week is sound is a different one, answered by the tiered violation notes.
+   */
+  {
+    const said = new Set<string>();
+    for (const m of enduranceMoves) {
+      const text = `${m.from} is a day off — ${m.session} moved to ${m.to}.`;
+      if (said.has(text)) continue;
+      said.add(text);
+      notes.push({ kind: 'ours', text });
+    }
   }
 
   return {

@@ -631,12 +631,44 @@ export function violationsOf(placements: Placement[], opts: { minRestDays?: numb
  * ⛔ A WEEK THAT CANNOT BE EXPRESSED — and there is nothing to warn about, because there is no week.
  * Distinct from every rule above: those are weeks the athlete may have, at a stated cost. These are
  * contradictions in the ANSWERS themselves, and only the athlete can resolve them.
+ *
+ * ⛔⛔ `pin_on_unavailable_day` STOOD HERE AND IS GONE (Michael, 2026-08-25 — SUPERSEDES the
+ * 2026-08-25 morning ruling in this same file).
+ *
+ * It said a session pinned onto a day the athlete also blocked was a contradiction only they could
+ * resolve, so the session STAYED and the caller reported it. **The blocked day now always wins:**
+ * *"If a day is both tapped for a session and marked can't-train, the session is rescheduled off it
+ * — the engine re-solves that session as unpinned, and the note says what moved and why."* So it is
+ * not structural at all any more — it is resolvable, and `resolve` resolves it. What comes back is a
+ * `Relocation`, which is a fact about the week rather than a wall in front of it.
+ *
+ * ⚠️ AND THE RE-SOLVE MAY PRODUCE A WEEK THAT BREAKS A RULE. That is the same ruling as everywhere
+ * else on this path: it still builds, and `violationsOf` carries the cost (clearances, thin
+ * recovery, an overloaded day). Warn, never block.
  */
 export type StructuralConflict =
-  /** A session pinned onto a day also marked "cannot train". */
-  | { kind: 'pin_on_unavailable_day'; unit: string; day: number }
   /** Every day marked unavailable, with sessions still to place. */
-  | { kind: 'no_day_left' };
+  { kind: 'no_day_left' };
+
+/**
+ * ⛔ A SESSION THE BLOCKED DAY MOVED — what it was, where it was, where it went. The note layer
+ * turns this into *"Fri is a day off — the hard run moved to Mon"*; nothing here is prose.
+ */
+export type Relocation = {
+  /** The unit's label — what physically moved. A coupled unit moves whole: `Back Squat + Hard Run`. */
+  unit: string;
+  /**
+   * ⛔ THE SESSION THE ATHLETE TAPPED, which is the one the sentence names. On a coupled unit the
+   * pair moves together but only one of them was answered, and *"Back Squat + Hard Run moved"* is a
+   * true sentence about a thing the athlete never asked for. ⚠️ Falls back to the unit's label when
+   * nothing recorded which session carried the pin.
+   */
+  session: string;
+  /** The pinning session's id — how a caller maps this back to the slot the athlete tapped. */
+  sessionId: string;
+  from: number;
+  to: number;
+};
 
 export function structuralConflicts(
   units: Unit[],
@@ -644,13 +676,19 @@ export function structuralConflicts(
 ): StructuralConflict[] {
   const blocked = new Set(opts.unavailableDays ?? []);
   const out: StructuralConflict[] = [];
-  for (const u of units) {
-    if (u.pinnedDay != null && blocked.has(u.pinnedDay)) {
-      out.push({ kind: 'pin_on_unavailable_day', unit: u.label, day: u.pinnedDay });
-    }
-  }
+  // ⚠️ SEVEN BLOCKED DAYS IS STILL STRUCTURAL, and it is the one case releasing the pin cannot fix:
+  // there is no day to move to. The week is still returned — this names why it looks wrong.
   if (units.length > 0 && blocked.size >= 7) out.push({ kind: 'no_day_left' });
   return out;
+}
+
+/**
+ * ⛔ THE PINS THE BLOCKED DAYS RELEASE — one reader, used by `resolve` to free them and by
+ * `resolveAroundPins` to report them. Two derivations of "which pins were released" is how the week
+ * and the sentence about the week come to disagree.
+ */
+function pinsReleasedBy(units: Unit[], blocked: Set<number>): Unit[] {
+  return units.filter((u) => u.pinnedDay != null && blocked.has(u.pinnedDay));
 }
 
 export type PinnedWeek = {
@@ -660,6 +698,11 @@ export type PinnedWeek = {
   violations: Violation[];
   /** Non-empty only when the answers contradict each other; `placements` is then a best effort. */
   structural: StructuralConflict[];
+  /**
+   * ⛔ EVERY SESSION A BLOCKED DAY MOVED, with the day it was tapped onto and the day it went to.
+   * Empty is the normal week. See `Relocation` and the ruling on `StructuralConflict`.
+   */
+  relocations: Relocation[];
 };
 
 /**
@@ -683,13 +726,36 @@ export function resolveAroundPins(
 ): PinnedWeek {
   const minRest = opts.minRestDays ?? 1;
   const structural = structuralConflicts(units, opts);
+  const blocked = new Set(opts.unavailableDays ?? []);
+  /**
+   * ⛔ READ BEFORE THE SOLVE, because after it the unit no longer carries the day it was tapped
+   * onto — `resolve` hands the released ones over as free and the original answer is gone. The
+   * sentence needs BOTH ends ("Fri … moved to Mon"), so `from` is captured here.
+   */
+  const released = pinsReleasedBy(units, blocked);
   const r = resolve(units, opts);
   const placements = r.ok ? r.placements : r.best;
+  const relocations: Relocation[] = [];
+  for (const u of released) {
+    const landed = placements.find((p) => p.unit === u);
+    // ⚠️ SILENT WHEN NOTHING ACTUALLY MOVED. With every day blocked there is nowhere to go, and a
+    // note saying a session moved to the day it is still on would be the screen lying quietly.
+    if (!landed || landed.day === u.pinnedDay) continue;
+    const pinning = u.sessions.find((x) => x.id === u.pinnedBy);
+    relocations.push({
+      unit: u.label,
+      session: pinning?.label ?? u.label,
+      sessionId: pinning?.id ?? u.id,
+      from: u.pinnedDay!,
+      to: landed.day,
+    });
+  }
   return {
     placements,
     restDays: restDaysOf(placements),
     violations: violationsOf(placements, { minRestDays: minRest }),
     structural,
+    relocations,
   };
 }
 
@@ -702,17 +768,39 @@ export function resolve(
    * ⛔ DAYS THE ATHLETE SAID THEY CANNOT TRAIN (pins-win, 2026-08-25). A rest-day pin is a pin like
    * any other — it is absolute, and the engine arranges the remainder around it.
    *
-   * ⚠️ IT CONSTRAINS THE FREE UNITS ONLY, NEVER A PINNED ONE. A session pinned onto a day the
-   * athlete also marked unavailable is a contradiction the athlete entered, and it is the caller's
-   * to report as structurally impossible — silently moving the session would be the engine
-   * overruling a pin, which is the one thing this ruling forbids.
-   * ⚠️ ABSENT OR EMPTY IS TODAY'S BEHAVIOUR EXACTLY. Every day stays a candidate, and the no-pins
-   * default is byte-identical to what this file returned before the field existed.
+   * ⛔⛔ AND A BLOCKED DAY BEATS A PIN (Michael, 2026-08-25 — SUPERSEDES this file's own earlier
+   * ruling the same day, which read *"it constrains the free units only, never a pinned one"*).
+   *
+   * A session tapped onto a day the athlete then marked "cannot train" used to STAY there and be
+   * reported as a contradiction only they could resolve. It no longer does: **the blocked day always
+   * wins.** The pin is RELEASED — the unit rejoins `free` and is re-solved like any other — and
+   * `resolveAroundPins` reports what moved and where.
+   *
+   * ⚠️ THIS IS NOT THE ENGINE OVERRULING A PIN. It is one absolute answer beating another, and the
+   * athlete gets told which won and what it cost. ⚠️ THE RE-SOLVED WEEK MAY BREAK A RULE — a hard
+   * run landing beside a squat, a thin recovery day. It still builds; `violationsOf` names the cost.
+   * ⚠️ ABSENT OR EMPTY IS TODAY'S BEHAVIOUR EXACTLY. Every day stays a candidate, every pin is fixed,
+   * and the no-pins default is byte-identical to what this file returned before the field existed.
    */
   const blocked = new Set(opts.unavailableDays ?? []);
-  const dayCandidates = [0, 1, 2, 3, 4, 5, 6].filter((d) => !blocked.has(d));
-  const fixed = units.filter((u) => u.pinnedDay != null).map((u) => ({ unit: u, day: u.pinnedDay! }));
-  const free = units.filter((u) => u.pinnedDay == null);
+  const openDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !blocked.has(d));
+  /**
+   * ⛔ EVERY DAY BLOCKED IS NOT A REFUSAL. With no candidate day the search would consider nothing,
+   * `best` would stay null, and the caller would get an EMPTY week — sessions silently deleted,
+   * which is the one outcome this whole path forbids. The week falls back to all seven days and
+   * `structuralConflicts` `no_day_left` says why it looks the way it does.
+   */
+  const dayCandidates = openDays.length > 0 ? openDays : [0, 1, 2, 3, 4, 5, 6];
+  /** A pin the athlete can still have: one that is not on a day they also said they cannot train. */
+  const holds = (u: Unit): boolean => u.pinnedDay != null && !blocked.has(u.pinnedDay);
+  const fixed = units.filter(holds).map((u) => ({ unit: u, day: u.pinnedDay! }));
+  /**
+   * ⚠️ `dayCandidates` IS EMPTY WHEN EVERY DAY IS BLOCKED, and a released unit would then have
+   * nowhere to go at all. That is `structuralConflicts` `no_day_left`; the week is still returned,
+   * and the fallback below keeps the released units on the day they were tapped onto rather than
+   * dropping them.
+   */
+  const free = units.filter((u) => !holds(u));
 
   /**
    * ⛔ ONLY UNITS THAT CAN BREAK THE LAW ARE SEARCHED EXHAUSTIVELY, AND THIS IS WHAT MAKES THE

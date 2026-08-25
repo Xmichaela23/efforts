@@ -104,7 +104,9 @@ Deno.test('no pins is offset zero, so an athlete who asked for nothing gets the 
   const map = chooseDayMap('strength_5k', {});
   assertEquals(map.offset, 0);
   assertEquals(map.compromises.length, 0);
-  assertEquals(map.honoured, { longRun: false, hardDays: 0 });
+  // ⚠️ `unavailableDays: true` WITH NOTHING BLOCKED. "Nothing to honour" and "honoured" are the same
+  // week, and a caller reading this to decide whether to warn must not warn on the empty case.
+  assertEquals(map.honoured, { longRun: false, hardDays: 0, unavailableDays: true });
 });
 
 Deno.test('the anchors are read off the frame, not from a second table naming day numbers', () => {

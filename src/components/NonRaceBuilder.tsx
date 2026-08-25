@@ -30,7 +30,7 @@ import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/l
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
 import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
-import { strengthFocusBrief, STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY, HARD_RIDE_SHAPE, VOLUME_WHY } from '@/lib/strength-focus-copy';
+import { STRENGTH_FOCUS_WEEKS, HARD_DAY_WHY, HARD_RIDE_SHAPE, VOLUME_WHY } from '@/lib/strength-focus-copy';
 // ONE menu, shared with the composer that authors the block (`assistance-menu.ts`). A name this
 // picker offers that the composer does not recognise would fall back to the default — the athlete
 // would pick something and silently get something else.
@@ -102,7 +102,7 @@ import {
   accessoryCostLine, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
-import { solveWizardWeek } from '@/lib/suggest-hard-days';
+import { relocationPhrase, solveWizardWeek } from '@/lib/suggest-hard-days';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
@@ -172,6 +172,7 @@ const IDLE_WIZARD_WEEK = {
   longRun: null as string | null,
   longRide: null as string | null,
   health: { ok: true, collisions: [] as string[] },
+  relocations: [] as Array<{ unit: string; session: string; sessionId: string; from: number; to: number }>,
 };
 /**
  * ⛔ THE RIDE-COUNT RANGE HAS ONE OWNER (stage 4, 2026-08-21). It was written out FIVE times — two
@@ -1292,6 +1293,12 @@ function assemblePayload(
   easyPaceMinPerMile?: number,
   /** Race climb in METRES. Converted at the call site — this function is unit-blind. */
   canonElevationM?: number,
+  /**
+   * ⛔ DAYS THE ATHLETE CANNOT TRAIN — lowercase weekdays, the shape the rest of this payload speaks
+   * (2026-08-25). ⚠️ It is NOT on `NonRaceState`: the chip row owns its own `useState`, so it
+   * arrives as an argument rather than the payload reaching around the screen for it.
+   */
+  unavailableDays?: string[],
 ): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
@@ -1567,6 +1574,20 @@ function assemblePayload(
                   })),
               }
             : {}),
+          /**
+           * ⛔⛔ THE DAYS THE ATHLETE CANNOT TRAIN, ON THE WIRE (2026-08-25).
+           *
+           * It was CLIENT-ONLY until now: the chip row fed the preview's own solve and nothing
+           * else, so the block that was actually built had never heard of it. The screen could show
+           * a clean week and the engine would compose a lifting day and an endurance session onto
+           * the day off — which is exactly what the device showed.
+           *
+           * ⚠️ IT IS A PIN, NOT A PREFERENCE, so it lives beside `hard_days` rather than inside
+           * `preferred_days` — that bag is keyed by sport and holds days a session WANTS, and this
+           * is a day no session may have. ⚠️ OMITTED WHEN EMPTY, like every other key here: absent
+           * means "no days blocked", which is every block built before this field.
+           */
+          ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
           // and `create-goal` writes the real ones back once the plan exists.
@@ -2360,7 +2381,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
      * ⚠️ THE ENGINE'S DAY IS STILL THE FALLBACK for a slot nobody has touched, which is the normal
      * case and the whole point of arriving with the week already arranged.
      */
+    /**
+     * ⛔⛔ A BLOCKED DAY IS RESOLVED HERE, NOT IN STATE (Michael, 2026-08-25 afternoon). The athlete's
+     * answer stays exactly where they put it; what the chip SHOWS is the day the engine re-solved it
+     * onto. A chip still glowing on the day off would be the screen showing a day the plan does not
+     * have — the exact lie the "picked Thu, placed Mon" line was killed for.
+     *
+     * ⚠️ THE CLIENT SOLVE IS READ FIRST HERE, ahead of `placedDays`, and only in this branch. The
+     * placed week is the SERVER's, which is a round trip behind — and in the one moment the athlete
+     * has just blocked a day, being a round trip behind means showing them the day they blocked.
+     */
     const pick = state.hardDays[i]?.day as DayName | '' | undefined;
+    if (pick && isBlockedDay(pick)) {
+      return (suggestedHardDays[i] as DayName | undefined) || placedDays[i] || '';
+    }
     if (touchedUnits[`hard:${i}`] && pick) return pick;
     return placedDays[i] || pick || '';
   };
@@ -2422,7 +2456,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * this screen's row list stopped.
    */
   const longRowShown = scheduleRunShown || scheduleRideShown;
-  const longRowDay = (scheduleRunShown ? state.longRunDay : state.longRideDay) || '';
   const longRowRgb = getDisciplineColorRgb(scheduleRunShown ? 'run' : 'bike');
   /**
    * ⚠️ THE OPEN QUESTION HAS TO BE ONE THE CARD IS SHOWING. Four of the five rows are posture-gated,
@@ -2503,20 +2536,58 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⛔ DAYS THE ATHLETE CANNOT TRAIN — slice 2's rest-day row. A pin like any other: absolute, and
    * the endurance sessions arrange around it.
    *
-   * ⚠️ IT CANNOT MOVE A LIFTING DAY, AND THE SCREEN SAYS SO RATHER THAN PRETENDING. Under the
-   * 2026-08-25 fork the lifts keep the frame's order, spacing and rest slot; only endurance steps
-   * out of it. So a lift landing on a blocked day is reported as a trade-off note, not silently
-   * rearranged and not refused.
+   * ⛔ AND THE SOLVER JUGGLES BEFORE IT WARNS (Michael, 2026-08-25). The endurance never lands on a
+   * blocked day — it is movable by definition — and the LIFTING frame has seven rotations, so
+   * `chooseDayMap` is scored to land the frame's empty day on the one the athlete blocked. A lift
+   * sits on a blocked day only when no rotation can honour every pin at once, and the note then
+   * says which pins collided rather than asserting the order is why.
    */
   const [unavailableDays, setUnavailableDays] = useState<DayName[]>([]);
 
+  // ⚠️ DECLARED ABOVE `wizardSolveInput` (2026-08-25): the solve now reads it to tell the
+  //    athlete's pins from the engine's own placements, and a `const` cannot be read above
+  //    its own declaration.
+  /**
+   * ⛔ PRISTINE VS DIRTY — AND IT IS PRIORITY ZERO, because without it the smart default is a
+   * HOSTAGE SITUATION (Michael, 2026-08-18).
+   *
+   * The pre-fill guarded on "is this field empty", which is a state loop: tapping a chosen day to
+   * release it emptied the field, the solve then produced a suggestion for the now-empty field, and
+   * the effect refilled it. **The athlete could not clear a long day.** To them that reads as the
+   * button not working — the same complaint as the hard-day chips, from a different cause, and
+   * exactly the hostility the whiteboard change was meant to end.
+   *
+   * ⛔ EMPTY IS NOT THE QUESTION. TOUCHED IS. The engine fills a unit once, while nobody has said
+   * anything about it; the moment the athlete touches that unit — including to CLEAR it — it is
+   * theirs and the engine never writes to it again. An empty field they emptied is an answer.
+   *
+   * ⚠️ PER UNIT, NOT PER SCREEN. Clearing the long run must not stop the long ride being suggested;
+   * they are separate decisions and a screen-wide flag would make the first tap silence the rest.
+   * ⚠️ HARD SLOTS ARE KEYED BY INDEX, so removing a slot re-points the flags of the ones after it.
+   * The cost is one stale suggestion on a rebuilt slot, which the athlete can clear; keying on
+   * identity would mean giving slots ids for this alone.
+   */
+  const [touchedUnits, setTouchedUnits] = useState<Record<string, boolean>>({});
+  const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
+
   const wizardSolveInput = React.useMemo(
     () => ({
-      hardDays: state.hardDays.map((h) => ({
+      hardDays: state.hardDays.map((h, i) => ({
         discipline: h.discipline, day: h.day, ownership: h.ownership,
+        /**
+         * ⛔⛔ WHOSE ANSWER THE DAY IS, HANDED TO THE SOLVER (2026-08-25). The pre-fill writes the
+         * engine's own suggestion into `h.day`, and every named day used to come back as a pin — so
+         * the engine's proposal became an absolute the engine could not move, and marking that day
+         * unavailable afterwards changed nothing. `touchedUnits` is the only place that knows the
+         * difference, and it is here.
+         */
+        pinned: h.ownership === 'club' || !!touchedUnits[`hard:${i}`],
       })),
       longRunDay: state.longRunDay,
       longRideDay: state.longRideDay,
+      // ⛔ SAME RULE FOR THE TWO LONG SLOTS. A club long session is pinned by its nature (slice 2b).
+      longRunPinned: !!state.longClub || !!touchedUnits.longRun,
+      longRidePinned: !!state.longClub || !!touchedUnits.longRide,
       runDays: state.runDays,
       rideDays: state.rideDays,
       swimDays: state.posture?.swim === 'maintain' ? state.swimDays : 0,
@@ -2526,7 +2597,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       unavailableDays,
     }),
     [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
-      state.swimDays, state.posture?.swim, unavailableDays],
+      state.swimDays, state.posture?.swim, unavailableDays, touchedUnits, state.longClub],
   );
   /**
    * ⛔ AND THE FIRST RENDER OF THE STEP IS ARMED ON THE NEXT FRAME, WHICH `useDeferredValue` ALONE
@@ -2557,6 +2628,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   );
   const suggestedHardDays = wizardWeek.hardDays;
   const suggestedLongDays = { run: wizardWeek.longRun, ride: wizardWeek.longRide };
+  /**
+   * ⚠️ DECLARED BELOW `suggestedLongDays` AND `unavailableDays`, both of which it reads — a `const`
+   * cannot be evaluated above its own declaration, and this block used to sit 180 lines higher.
+   */
+  /**
+   * ⛔ THE LONG ROW'S DAY, AND A BLOCKED ONE RESOLVES THE SAME WAY THE HARD SLOTS DO (2026-08-25
+   * afternoon) — the athlete's answer stays in state, the chip shows where the engine put it.
+   * ⚠️ `longRowMoved` is what stops the row calling that replacement "yours".
+   */
+  const longRowOwn = (scheduleRunShown ? state.longRunDay : state.longRideDay) || '';
+  const longRowMoved = !!longRowOwn && unavailableDays.includes(String(longRowOwn).toLowerCase() as DayName);
+  const longRowDay = longRowMoved
+    ? ((scheduleRunShown ? suggestedLongDays.run : suggestedLongDays.ride) || longRowOwn)
+    : longRowOwn;
   const scheduleHealthState = wizardWeek.health;
   const [healthOpen, setHealthOpen] = useState(false);
   /** The engine's own list of pins it could not reach — see the override row on the week step. */
@@ -2565,28 +2650,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    *  reference, not a step in the flow. */
   const [rulesOpen, setRulesOpen] = useState(false);
 
-  /**
-   * ⛔ PRISTINE VS DIRTY — AND IT IS PRIORITY ZERO, because without it the smart default is a
-   * HOSTAGE SITUATION (Michael, 2026-08-18).
-   *
-   * The pre-fill guarded on "is this field empty", which is a state loop: tapping a chosen day to
-   * release it emptied the field, the solve then produced a suggestion for the now-empty field, and
-   * the effect refilled it. **The athlete could not clear a long day.** To them that reads as the
-   * button not working — the same complaint as the hard-day chips, from a different cause, and
-   * exactly the hostility the whiteboard change was meant to end.
-   *
-   * ⛔ EMPTY IS NOT THE QUESTION. TOUCHED IS. The engine fills a unit once, while nobody has said
-   * anything about it; the moment the athlete touches that unit — including to CLEAR it — it is
-   * theirs and the engine never writes to it again. An empty field they emptied is an answer.
-   *
-   * ⚠️ PER UNIT, NOT PER SCREEN. Clearing the long run must not stop the long ride being suggested;
-   * they are separate decisions and a screen-wide flag would make the first tap silence the rest.
-   * ⚠️ HARD SLOTS ARE KEYED BY INDEX, so removing a slot re-points the flags of the ones after it.
-   * The cost is one stale suggestion on a rebuilt slot, which the athlete can clear; keying on
-   * identity would mean giving slots ids for this alone.
-   */
-  const [touchedUnits, setTouchedUnits] = useState<Record<string, boolean>>({});
-  const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
 
   /**
    * The athlete's own day when the built week did not use it. Empty when they never picked one, or
@@ -2609,7 +2672,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // ⛔ A CLUB SESSION IS PINNED BY ITS NATURE (slice 2b) — its day is the world's, not a
     // preference, so it reads as the athlete's answer whether or not they tapped the chip.
     (state.hardDays[i]?.ownership === 'club' || !!touchedUnits[`hard:${i}`])
-    && !!state.hardDays[i]?.day;
+    && !!state.hardDays[i]?.day
+    // ⛔ BUT NOT ONCE THEY HAVE BLOCKED THAT DAY (2026-08-25 afternoon). The chip is then showing the
+    // engine's replacement, and labelling it "yours" would credit the athlete with a day they never
+    // picked — the same lie in the opposite direction from the one this cue was built to end.
+    && !isBlockedDay(state.hardDays[i]?.day);
 
 
   /**
@@ -2663,13 +2730,46 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       }
     }
 
-    // ⚠️ A LIFT ON A DAY THE ATHLETE BLOCKED — the one cost the frame cannot absorb.
+    /**
+     * ⛔⛔ WHAT A DAY OFF MOVED, AND WHERE TO (Michael, 2026-08-25 afternoon). *"The note says what
+     * moved and why."*
+     *
+     * ⛔ THE MOVE IS THE ENGINE'S, READ BACK — `solveWizardWeek` returns `relocations` from
+     * `resolveAroundPins`, the same call that placed the week. This screen composes no prose and
+     * decides nothing about which session went where; it renders the fact through the copy table.
+     * ⚠️ THE ENGINE'S OWN SENTENCE WINS when the preview has come back with one, exactly like the
+     * lifting note below — one sentence per day off, and the built week's version is the truer one.
+     */
+    for (const r of wizardWeek.relocations) {
+      const from = DAY_SHORT[DAYS[r.from]];
+      if (previewNotes.some((n) => /is a day off/i.test(n) && new RegExp(`\\b${DAYS[r.from]}\\b`, 'i').test(n))) {
+        continue;
+      }
+      add('session_moved_off_unavailable_day', {
+        day: from,
+        session: relocationPhrase(r.session),
+        movedTo: DAY_SHORT[DAYS[r.to]],
+      });
+    }
+
+    /**
+     * ⚠️ A LIFT ON A DAY THE ATHLETE BLOCKED — and it is now the case the rotation could not solve,
+     * not the case nobody tried (`chooseDayMap` scores all seven rotations as of 2026-08-25).
+     *
+     * ⛔ THE ENGINE'S OWN SENTENCE WINS WHEN IT HAS ONE. `chooseDayMap` knows WHICH pin took the
+     * only rotation that would have cleared the day and names it; this screen cannot know that, and
+     * rendering both would be two sentences about one day, the weaker one first.
+     */
     for (const d of unavailableDays) {
       const lifts = (previewWeek ?? []).filter((x) => {
         const day = String((x as { day?: string }).day ?? '').toLowerCase();
         return day === d && String((x as { type?: string }).type ?? '') === 'strength';
       });
-      if (lifts.length > 0) add('lift_on_unavailable_day', { day: DAY_SHORT[d] });
+      if (lifts.length === 0) continue;
+      const enginesOwn = previewNotes.some((n) =>
+        /carr(?:ies|y) (?:a )?lifting day/i.test(n) && new RegExp(`\\b${d}\\b`, 'i').test(n));
+      if (enginesOwn) continue;
+      add('lift_on_unavailable_day', { day: DAY_SHORT[d] });
     }
 
     /**
@@ -2688,7 +2788,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       out.push({ tier: 'tradeoff', text: t });
     }
     return out;
-  }, [previewWeek, previewNotes, unavailableDays, state.longClub, state.longClubMinutes, scheduleRunShown]);
+  }, [previewWeek, previewNotes, unavailableDays, state.longClub, state.longClubMinutes,
+    scheduleRunShown, wizardWeek.relocations]);
 
   const breachNotes = weekNotes.filter((n) => n.tier === 'breach');
 
@@ -2710,6 +2811,43 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    *
    * ⚠️ THE GUARD IS THE SAME PREDICATE THE ROW USES, deliberately — one owner for "is this
    * discipline's long day a question on this card". A second test here is how they drift apart.
+   */
+  /**
+   * ⛔⛔ AND AN ENGINE-OWNED DAY IS REWRITTEN WHEN THE ATHLETE BLOCKS IT (2026-08-25).
+   *
+   * The guard below is `!st.longRunDay` — fill an EMPTY field once, never overwrite. That is right
+   * for an athlete's answer and wrong for the engine's own, and it is half of the bug that put a
+   * hard run on a day marked "can't train": the engine filled Friday, the athlete blocked Friday,
+   * and the field was no longer empty so nothing rewrote it. `staleEngineDay` is the one exception —
+   * a day nobody touched that the athlete has since said they cannot train.
+   *
+   * ⚠️ THE OTHER HALF IS IN THE SOLVE, and both are needed. Releasing the field here alone would
+   * re-fill it with the same Friday, because `buildWizardWeek` was handing that day back to the
+   * solver as an absolute (`HardSlot.pinned`).
+   */
+  // ⚠️ MEMOISED ON THE ROW IT READS, so the three effects below can name it in their deps without
+  // re-running on every render — a fresh closure each time would make them fire in a loop.
+  const isBlockedDay = React.useCallback(
+    (d: string | null | undefined): boolean =>
+      !!d && unavailableDays.includes(String(d).toLowerCase() as DayName),
+    [unavailableDays],
+  );
+
+  /**
+   * ⛔⛔ A BLOCKED DAY IS NEVER WRITTEN OVER IN STATE — IT IS RESOLVED AT RENDER (2026-08-25 afternoon).
+   *
+   * The first pass at Michael's ruling re-filled the field: the athlete tapped Friday, blocked
+   * Friday, and the effect rewrote `hardDays[0].day` to Monday. It moved the session correctly and
+   * **erased the reason.** On the very next solve the pin was an ordinary unblocked Monday, the
+   * engine had nothing to report, and *"Fri is a day off — the hard run moved to Mon"* appeared for
+   * one frame and vanished. The screen said "Mon — yours" about a day the athlete never picked.
+   *
+   * ⛔ SO THE ATHLETE'S ANSWER STAYS. `dayForSlot` renders the engine's replacement, `isPinned`
+   * stops calling it theirs, and the note keeps firing for as long as the contradiction is real.
+   * ⚠️ AND THE TAP COMES BACK IF THEY UNBLOCK THE DAY, which is the behaviour a re-fill destroyed:
+   * their Friday was gone for good the moment they tried a day off.
+   * ⚠️ THE WIRE CARRIES THE ANSWER, NOT THE WORKAROUND. `hard_days` ships the tapped day and
+   * `unavailable_days` ships beside it; the engine resolves the pair, exactly as it does here.
    */
   React.useEffect(() => {
     if (currentStep !== 'schedule' || !scheduleRunShown || touchedUnits.longRun) return;
@@ -3389,7 +3527,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     const canonElevM = typeof state.raceElevation === 'number' && state.raceElevation > 0
       ? (unit === 'km' ? state.raceElevation : state.raceElevation * 0.3048)
       : undefined;
-    return assemblePayload(state, equipmentTier, canonMiles, canonLongRun, paceMinPerMile, canonElevM);
+    return assemblePayload(
+      state, equipmentTier, canonMiles, canonLongRun, paceMinPerMile, canonElevM, unavailableDays,
+    );
   };
 
   const handleConfirm = () => {
@@ -3650,7 +3790,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'train' && (
         <StepLayout
           step={stepNo('train')} totalSteps={steps.length} title={eyeTitle('Train')}
-          subtitle="What you're building. The rest keeps ticking over underneath."
+          subtitle="Pick an area of focus."
           onBack={back} onContinue={next} canContinue={state.goal != null}
           hideContinue hideProgress
         >
@@ -3703,7 +3843,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'tier' && (
         <StepLayout
           step={stepNo('tier')} totalSteps={steps.length} title={eyeTitle('Strength')}
-          subtitle="Your main lifts, loaded off your tested numbers. What changes is the work around them."
+          subtitle="Hold your endurance while you focus on strength goals."
           onBack={back} onContinue={next} canContinue={state.strengthTier != null}
           hideContinue hideProgress
         >
@@ -4164,15 +4304,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'posture' && isStrengthFocus && (
         <StepLayout
           step={stepNo('posture')} totalSteps={steps.length} title={`${GOAL_LABELS.get_stronger} · ${STRENGTH_FOCUS_WEEKS} weeks`}
-          subtitle="What you're buying, before you commit to it."
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
           <div className="space-y-3">
-            {/* ⛔ THE BLOCK OPENS WITH WHAT IT IS — but in three lines, not four sections. The full
-                version is the PLAN's, where the athlete is reading; here they are choosing, and the
-                explanation was pushing the question it explains below the fold. Same source numbers,
-                so the card and the plan cannot promise different blocks. */}
-            <p className="text-white/75 text-sm leading-relaxed">{strengthFocusBrief({})}</p>
+            {/* ⛔ THE BRIEF PARAGRAPH IS GONE FROM THIS STEP (Michael, 2026-08-25: use the space
+                to get the cards on the phone). The title already says 12 weeks; the commitment
+                line below carries the rest. `strengthFocusBrief` still opens the PLAN. */}
             {/* ⛔ WHAT IS OWED, BEFORE THE DAY PICKER (Michael, 2026-08-25). The lifting days are
                 what define this block and they were not named until step 7's week list — the last
                 screen before Build, three steps after the athlete committed to the shape.
@@ -4191,11 +4328,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               // the lifting, his anchors, flat. "smaller toll" is his approved phrasing — riding
               // is not zero-cost, it just doesn't pound the legs.
               { id: 'run_only', label: 'Run only', run: true, bike: false,
-                effect: 'All four sessions run. The slowest lane for your lifts — about 1% a month.' },
+                effect: 'Get stronger while holding your running base.' },
               { id: 'ride_only', label: 'Ride only', run: false, bike: true,
-                effect: 'All four sessions ride. The fastest lifting in this block — riding takes a smaller toll than running.' },
+                effect: 'Get stronger while holding your riding base.' },
               { id: 'run_ride', label: 'Run + ride', run: true, bike: true,
-                effect: "You assign each session's sport next. Hard sessions on the bike cost your lifting least." },
+                effect: 'Get stronger while holding your running and riding base.' },
             ] as const).map((card) => {
               const selected =
                 ((state.posture.run ?? 'out') === 'maintain') === card.run &&
@@ -5857,14 +5994,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       knows when the club meets, so the question changes from a choice to a fact. */}
                   <span className="text-xs" style={{ color: `rgba(${longRowRgb},0.85)` }}>
                     {longRowDay
-                      ? `${DAY_SHORT[longRowDay as DayName]}${state.longClub ? ' — club' : ' — yours'}`
+                      ? `${DAY_SHORT[longRowDay as DayName]}${
+                        longRowMoved ? ' — placed' : state.longClub ? ' — club' : ' — yours'}`
                       : (state.longClub ? 'Which day does it meet?' : 'Tap a day')}
                   </span>
                 </div>
                 <WeekDayRow
                   selected={longRowDay ? [longRowDay as DayName] : []}
                   plain
-                  pinned={(state.longClub || !!touchedUnits[scheduleRunShown ? 'longRun' : 'longRide']) && !!longRowDay}
+                  pinned={(state.longClub || !!touchedUnits[scheduleRunShown ? 'longRun' : 'longRide'])
+                    && !!longRowDay && !longRowMoved}
                   accentRgb={longRowRgb}
                   roles={{}}
                   stacked={[]}
@@ -5975,11 +6114,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {/* ⛔ DAYS YOU CANNOT TRAIN — the third kind of pin (handoff §3, 2026-08-25). Same chip
                 row, same absoluteness: the endurance sessions arrange around it.
 
-                ⛔ AND IT SAYS WHAT IT CANNOT DO. Under the 2026-08-25 fork the lifting keeps the
-                frame's order, spacing and rest slot — so blocking a day moves the ENDURANCE off it
-                and a lifting day stays put, reported as a trade-off note rather than silently
-                rearranged or refused. A control that pretended to move everything would be the
-                screen promising something the composer does not do.
+                ⛔ AND THE ENGINE JUGGLES BEFORE IT WARNS (Michael, 2026-08-25). Blocking a day
+                moves the ENDURANCE off it outright — it is movable by definition — and the lifting
+                frame is ROTATED to try to land its empty day there, all seven rotations scored. A
+                lifting day sits on a blocked day only when no rotation honours every pin at once,
+                and the note then names the pins that collided.
                 ⚠️ NO SPORT COLOUR — this is the absence of training, not a discipline. */}
             <div className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
               <div className="flex items-baseline justify-between gap-2">
@@ -6174,7 +6313,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               className="w-full text-left rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5"
             >
               <span className="flex items-center gap-2">
-                <span className="text-white/85 text-sm">How the week is put together</span>
+                <span className="text-white/85 text-sm">Use these tips to put your own week together</span>
                 <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 ml-auto transition-transform ${rulesOpen ? 'rotate-180' : ''}`} />
               </span>
               {rulesOpen && (

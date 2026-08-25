@@ -434,6 +434,30 @@ Deno.serve(async (req: Request) => {
         return long?.[1]?.sport ?? 'run';
       })();
 
+      /**
+       * ⛔⛔ THE DAYS THE ATHLETE CANNOT TRAIN — A PIN, AND UNTIL NOW IT NEVER LEFT THE CLIENT
+       * (2026-08-25). The wizard's chip row fed only the preview's own solve, so the block this
+       * function composed had never heard of it and put both a lifting day and an endurance session
+       * onto the day off. It reaches two places from here: the ROTATION (`chooseDayMap`, which
+       * scores all seven to keep the lifts clear) and the COMPOSER (which steps the endurance off).
+       *
+       * ⚠️ VALIDATED, NOT TRUSTED — the same allowlist discipline as every other field on this body.
+       * An unrecognised weekday is dropped rather than coerced: a bad value must mean "no
+       * constraint", never "block a day nobody named".
+       */
+      const unavailableDays: Weekday[] = (() => {
+        const raw = (body as Record<string, unknown>).unavailable_days;
+        if (!Array.isArray(raw)) return [];
+        const out: Weekday[] = [];
+        for (const v of raw) {
+          // ⚠️ NARROWED INLINE. `asWeekday` below does the same job and is declared later in this
+          // scope; a `const` arrow cannot be called above its own declaration.
+          const d = titleCaseDay(v);
+          if (isWeekday(d) && !out.includes(d)) out.push(d);
+        }
+        return out;
+      })();
+
       const dayMap = chooseDayMap(frameId, {
         longRunDay: typeof long_run_day === 'string' ? long_run_day : null,
         longRideDay: bike && typeof bike === 'object'
@@ -446,6 +470,8 @@ Deno.serve(async (req: Request) => {
         hardDays: (Array.isArray(hard_days) ? hard_days : [])
           .map((h) => (h && typeof h === 'object' ? (h as Record<string, unknown>).day : null))
           .map((d) => (typeof d === 'string' ? d : null)),
+        // ⛔ THE ROTATION IS SCORED TO KEEP THE LIFTS OFF THESE DAYS — see `DayPins.unavailableDays`.
+        unavailableDays,
         startDateIso: typeof start_date === 'string' ? start_date : null,
       });
 
@@ -616,6 +642,10 @@ Deno.serve(async (req: Request) => {
           // ⛔ THE ATHLETE'S DAYS BEAT THE FRAME ORDER — see `endurancePins` above and the note on
           // the field in `compose.ts`. Absent pins leave the rotation exactly as it was.
           endurancePins,
+          // ⛔ AND THE ENDURANCE STEPS OFF A BLOCKED DAY BY ITSELF — `ComposeArgs.unavailableDays`.
+          // ⚠️ Sent even when the rotation cleared the lifts: the two are different jobs, and an
+          // endurance slot can land on a blocked day under a rotation that kept every lift clear.
+          ...(unavailableDays.length > 0 ? { unavailableDays } : {}),
           ...(accessoryPicks ? { accessoryPicks } : {}),
           ...(focusChips ? { focus: focusChips } : {}),
           ...(viadaPrefs ? { slotPicks: viadaPrefs.picks } : {}),
