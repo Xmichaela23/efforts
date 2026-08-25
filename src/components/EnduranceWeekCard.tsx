@@ -54,19 +54,6 @@ import {
 import { weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
 import { getDisciplineColor } from '@/lib/context-utils';
 
-/**
- * ⛔ WHICH ROWS THE SCREEN SHOWS, IN ORDER (2026-08-25). The frame's own two are always here; a hard
- * session appears only once it has been ADDED. An unadded one is represented by the add control
- * below the list, not by an empty row — an empty row is a question, and this screen has stopped
- * asking one.
- *
- * ⚠️ HARD SESSIONS RENDER ABOVE EASY AND LONG when they exist, because that is the week's own shape
- * and it is the order the old screen used; what changed is whether they are there at all.
- */
-function ORDERED_SLOT_KEYS(slots: SlotSelection): SlotKey[] {
-  return [...HARD_SLOT_KEYS.filter((k) => !!slots[k]), ...REQUIRED_SLOT_KEYS];
-}
-
 export type EnduranceWeekCardProps = {
   slots: SlotSelection;
   /**
@@ -138,32 +125,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const rate = liftingRateLine(props.slots, props.squat1RM);
   const split = upperLowerSplitLine(props.slots);
 
-  return (
-    /**
-     * ⚠️ `StepLayout`'s own `pb-24` IS NOT ENOUGH ON A PHONE. Its Continue bar adds
-     * `env(safe-area-inset-bottom)` on top of a 52 px key and its padding, so on a device with a home
-     * indicator the bar is taller than the padding meant to clear it — which is why the club option
-     * sat half under it. This adds the inset explicitly rather than guessing a bigger number.
-     */
-    <div
-      className="flex flex-col gap-5"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
-    >
-      {/* ⛔ THE PREAMBLE IS ONE SENTENCE (Michael, 2026-08-24 evening). The session list left with
-          it — the four rows below carry the same words as their labels, and the list's height is
-          what pushed the fourth row off a phone screen. The running-tax sentences stay at the
-          moment they are about — `RUN_TAX_LINES`, inside the hard rows. */}
-      <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_PREAMBLE[0]}</p>
-
-      {/* ⛔ THE FRAME'S OWN SESSIONS FIRST, THEN WHAT THE ATHLETE ADDS (Michael, 2026-08-25).
-          ═══════════════════════════════════════════════════════════════════════════════════════
-          The screen used to render four rows of one kind — four sessions to configure — and the two
-          hard ones opened pre-shaped and could not be got rid of. **Hard sessions are opt-in now,
-          up to two, and the default is zero**, so they are no longer the same kind of thing as the
-          easy and long rows and do not belong in the same list. Easy and long are the week; the
-          hard ones are an addition to it. */}
-      <div className="flex flex-col gap-2">
-        {ORDERED_SLOT_KEYS(props.slots).map((key) => {
+  /**
+   * ⛔ ONE ROW RENDERER, TWO BLOCKS (2026-08-25). The hard sessions lead the screen and the frame's
+   * own two follow, but a row is a row — extracting this is what keeps the added hard cards and the
+   * recovery/long cards from drifting into two slightly different components.
+   */
+  const slotRow = (key: SlotKey) => {
           const sport = props.slots[key];
           /**
            * ⛔ NO SPORT, NO COLOUR (Michael, 2026-08-24). A row the athlete has not answered carries
@@ -291,9 +258,36 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               ) : null}
             </div>
           );
-        })}
-      </div>
+  };
 
+  return (
+    /**
+     * ⚠️ `StepLayout`'s own `pb-24` IS NOT ENOUGH ON A PHONE. Its Continue bar adds
+     * `env(safe-area-inset-bottom)` on top of a 52 px key and its padding, so on a device with a home
+     * indicator the bar is taller than the padding meant to clear it — which is why the club option
+     * sat half under it. This adds the inset explicitly rather than guessing a bigger number.
+     */
+    <div
+      className="flex flex-col gap-5"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+    >
+      {/* ⛔ THE PREAMBLE IS ONE SENTENCE (Michael, 2026-08-24 evening). The session list left with
+          it — the four rows below carry the same words as their labels, and the list's height is
+          what pushed the fourth row off a phone screen. The running-tax sentences stay at the
+          moment they are about — `RUN_TAX_LINES`, inside the hard rows. */}
+      <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_PREAMBLE[0]}</p>
+
+      {/* ⛔⛔ THE DECISION LEADS THE SCREEN (Michael, from a device screenshot 2026-08-25).
+          ═══════════════════════════════════════════════════════════════════════════════════════
+          The hard-session block sits FIRST, directly under the subtitle: his copy line, any added
+          sessions, then the add control. **It is the only decision on this screen.** Recovery and
+          long are passive cards — the frame's own two, a sport tap each — and with them on top the
+          one thing the athlete is here to choose sat underneath them, below the fold on a phone.
+
+          ⚠️ THIS IS THE SECOND TIME THE ORDER HAS MOVED, for a different reason each time. The
+          earlier pass separated the two KINDS of row (opt-in vs the frame's own), which was right;
+          it then put the frame's own first, which reads as "here is your week, and also…". The
+          kinds stay separate — what changed is which block LEADS. */}
       {/* ⛔⛔ THE ADD CONTROLS — HARD SESSIONS ARE OPT-IN (Michael, 2026-08-25).
           ═══════════════════════════════════════════════════════════════════════════════════════
           They sit BELOW the frame's own sessions and read as an addition to the week, which is what
@@ -312,6 +306,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
         <p className="text-white/70 text-[13px] leading-relaxed" data-testid="hard-opt-in">
           {HARD_SESSIONS_OPT_IN_LINE}
         </p>
+        {/* ⛔ THE ADDED SESSIONS SIT BETWEEN THE LINE AND THE ADD CONTROL — the copy explains the
+            choice, the cards are the choices made, and the control adds another. An added card
+            below the "+ Add" button would read as the next empty one. */}
+        {HARD_SLOT_KEYS.filter((k) => !!props.slots[k]).map(slotRow)}
         {hardSessionCount(props.slots) < MAX_HARD_SESSIONS ? (
           <button
             type="button"
@@ -333,6 +331,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             + Add a hard session
           </button>
         ) : null}
+      </div>
+
+
+      {/* ⛔ THE FRAME'S OWN TWO — the passive half of the screen. A sport tap each and nothing to
+          decide beyond that, which is exactly why they no longer lead it. **Hard sessions are
+          opt-in and are not the same kind of thing as these**, which is why they are not in this
+          list. Easy and long are the week; the hard ones are an addition to it. */}
+      <div className="flex flex-col gap-2">
+        {REQUIRED_SLOT_KEYS.map(slotRow)}
       </div>
 
       {/* ⛔ VOLUME, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the sports
@@ -436,6 +443,7 @@ export function EnduranceWeekRate(props: {
 }) {
   const rate = liftingRateLine(props.slots, props.squat1RM);
   const split = upperLowerSplitLine(props.slots);
+
   return (
     <div className="instrument-card !p-3.5">
       <p className="text-white text-[13px] leading-snug tabular-nums" data-testid="lifting-rate">{rate}</p>

@@ -665,6 +665,19 @@ is a quieter version of intensity, and an athlete who declined intensity is aski
 zero hard sessions never buys a thinner band than one or two, and a light week with none reaches
 `strength` (40-50). ⚠️ The hours still bite — nine easy hours is still `survival`.
 
+### The decision leads the screen (Michael, from a device screenshot)
+
+The hard-session block sits **first, directly under the subtitle** — his copy line, any added
+sessions, then the add control. Recovery and long move below it. **It is the only decision on this
+screen**; the other two are passive cards, one sport tap each, and with them on top the one thing the
+athlete is there to choose sat underneath them and below the fold on a phone.
+
+⚠️ **The order has now moved twice, for different reasons.** The first pass separated the two KINDS
+of row — opt-in versus the frame's own — which was right; it then put the frame's own first, which
+reads as *"here is your week, and also…"*. The kinds stay separate; what changed is which block
+leads. ⚠️ The added cards sit BETWEEN the copy line and the add control: below the button they read
+as the next empty one.
+
 ### The UX: Add / Remove, not tap-to-clear
 
 Michael asked whether a second tap on the chosen sport should clear the slot. **It should not.** It
