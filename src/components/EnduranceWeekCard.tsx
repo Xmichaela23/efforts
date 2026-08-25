@@ -41,6 +41,7 @@ import {
   slotSummary,
   upperLowerSplitLine,
   allSlotsChosen,
+  defaultSportForAddedSlot,
   HARD_SESSIONS_OPT_IN_LINE,
   HARD_SLOT_KEYS,
   MAX_HARD_SESSIONS,
@@ -319,12 +320,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               // The first unadded hard slot, in the frame's own order.
               const next = HARD_SLOT_KEYS.find((k) => !props.slots[k]);
               if (!next) return;
-              // ⛔ IT OPENS ON THE FRAME'S LEAD SPORT rather than empty — `SLOT_OPTIONS` puts Ride
-              // first on a hard slot (p280: intensity on the bike does not tax the lifts), and an
-              // added session with no sport would be a fifth unanswered thing on a screen that just
-              // stopped having any. The athlete changes it with one tap in the row that appears.
-              const lead = (props.allowedSports?.[0])
-                ?? SLOT_OPTIONS[next].find((o) => !props.allowedSports || props.allowedSports.includes(o.value))?.value;
+              // ⛔ IT OPENS ON A SPORT THE ATHLETE ACTUALLY HAS — `defaultSportForAddedSlot`, which
+              // is `SLOT_OPTIONS`' own order filtered by the mix. Ride leads a hard slot when riding
+              // is in their week (p280); Run leads when it is not. ⚠️ This read `allowedSports[0]`
+              // for one commit and handed a mixed athlete Run, because that array is built run-first
+              // by the POSTURE step and its order carries no preference.
+              const lead = defaultSportForAddedSlot(next, props.allowedSports);
               if (lead) { props.onSlotChange(next, lead); setOpen(next); }
             }}
             className="w-full px-4 py-3 rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-white/70 text-sm text-left"

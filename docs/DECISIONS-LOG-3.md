@@ -674,8 +674,20 @@ leaving no affordance saying removal is possible at all. An explicit **Remove** 
 explicit **Add**, which is the pattern the wizard already uses ("+ Add a run"), and it keeps the sport
 chips doing exactly one thing.
 
-⚠️ **An added session opens on the frame's lead sport** (Ride on a hard slot, p280) rather than empty:
-a slot with no sport would be a fifth unanswered thing on a screen that just stopped having any.
+⚠️ **An added session opens on a sport the athlete actually has** — `defaultSportForAddedSlot`, which
+is `SLOT_OPTIONS`' own order filtered by the mix (`allowedSlotSports`, derived from the posture step's
+`posture.run` / `posture.bike`). Ride leads a hard slot when riding is in their week (p280); **Run
+leads when it is not, and a run-only athlete is never handed a ride.** It opens on something rather
+than empty because a slot with no sport would be a fifth unanswered thing on a screen that just
+stopped having any.
+
+⛔ **THAT WAS WRONG FOR ONE COMMIT AND MICHAEL CAUGHT IT.** The handler read `allowedSports[0]`, and
+`allowedSlotSports` is built RUN-FIRST — so its order is the POSTURE screen's, not a preference. A
+mixed athlete's added session opened on **Run**, the opposite of the frame's own lead, and a ride-only
+athlete got Ride by luck of the filter rather than by rule. ⚠️ The fix reads the order from
+`SLOT_OPTIONS`, which is also what the card renders its chips in — one owner, so the highlighted chip
+and the stored answer cannot disagree. Pinned four ways, including *"same mix, other input order, same
+answer"*, which is the assertion the bug would have failed.
 
 ⛔ **`hardDays` stopped being positional.** It is now *"the hard sessions the athlete added"* and its
 LENGTH is what the tier reads, so an entry's index no longer says which slot it came from. Each entry

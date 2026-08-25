@@ -89,6 +89,36 @@ export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]
 };
 
 /**
+ * ⛔⛔ WHAT SPORT A NEWLY ADDED HARD SESSION OPENS ON — and it must be one the athlete actually has
+ * (Michael, 2026-08-25).
+ *
+ * ⛔ THE BUG THIS REPLACES, shipped the same day the add control was: the handler read
+ * `allowedSports[0]`, and `allowedSlotSports` is built RUN-FIRST (`posture.run` then `posture.bike`).
+ * So a mixed athlete's added session opened on **Run** — the opposite of the frame's own preference —
+ * while a ride-only athlete got Ride by luck of the filter. The array's order is the POSTURE step's,
+ * and reading a preference out of it was reading meaning into an order that carries none.
+ *
+ * ⛔ THE RULE, AND IT IS `SLOT_OPTIONS`' OWN ORDER FILTERED BY THE MIX: Ride leads a hard slot when
+ * riding is in the athlete's week (p280 — no impact, so the intensity does not tax the lifts), and
+ * Run leads when it is not. **An athlete with no rides is never handed one.**
+ *
+ * ⚠️ ONE OWNER FOR THE ORDER. `SLOT_OPTIONS` already states the lead per slot and the card already
+ * renders its chips in that order; deriving the default anywhere else is how the highlighted chip
+ * and the stored answer start disagreeing.
+ *
+ * @param allowed the sports in the athlete's week — `undefined` means unconstrained.
+ */
+export function defaultSportForAddedSlot(
+  key: SlotKey,
+  allowed?: SlotSport[] | null,
+): SlotSport | null {
+  const offered = SLOT_OPTIONS[key]
+    .map((o) => o.value)
+    .filter((v) => !allowed || allowed.length === 0 || allowed.includes(v));
+  return offered[0] ?? null;
+}
+
+/**
  * ⛔ THE SCREEN OPENS FINISHED, AND THIS IS THE LINE THAT SAYS SO (Michael, 2026-08-24).
  *
  * A collapsed row states its whole answer — *"Hard session · Ride · Sustained threshold"* — so the

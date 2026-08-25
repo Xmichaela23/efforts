@@ -23,6 +23,7 @@ import {
   RUN_TAX_LINES,
   slotSummary,
   allSlotsChosen,
+  defaultSportForAddedSlot,
   HARD_SESSIONS_OPT_IN_LINE,
   HARD_SLOT_KEYS,
   MAX_HARD_SESSIONS,
@@ -495,4 +496,55 @@ Deno.test('⛔ THE WIZARD RE-STAMPS THE FRAME\'S SESSION, so a stale role cannot
   assert(!/if \(prev && prev\.discipline === want\.discipline\) return prev;/.test(fn),
     'a slot with an unchanged sport keeps whatever role was already on it');
   assert(/goal: want\.goal,/.test(fn), 'goal is not written every time, so a stale one can survive');
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ AN ADDED HARD SESSION OPENS ON A SPORT THE ATHLETE HAS (Michael, 2026-08-25)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ A RUN-ONLY ATHLETE IS NEVER HANDED A RIDE', () => {
+  /**
+   * ⛔ THE DEFECT, and it shipped for one commit: the add handler read `allowedSports[0]`, and
+   * `allowedSlotSports` is built RUN-FIRST off the posture step — so the array's order carries the
+   * POSTURE screen's order, not a preference. A mixed athlete's added session opened on Run and a
+   * ride-only athlete got Ride by luck of the filter.
+   */
+  for (const key of HARD_SLOT_KEYS) {
+    assertEquals(defaultSportForAddedSlot(key, ['run']), 'run', `${key}: run-only got a ride`);
+    assertEquals(defaultSportForAddedSlot(key, ['ride']), 'ride', `${key}: ride-only got a run`);
+  }
+});
+
+Deno.test('⛔ RIDE LEADS ONLY WHEN RIDING IS IN THE WEEK', () => {
+  for (const key of HARD_SLOT_KEYS) {
+    // ⛔ MIXED — Ride leads a hard slot. p280: no impact, so the intensity does not tax the lifts.
+    assertEquals(defaultSportForAddedSlot(key, ['run', 'ride']), 'ride', `${key}: mixed did not lead on ride`);
+    // ⚠️ AND THE POSTURE ORDER MUST NOT DECIDE IT — same mix, other order, same answer. This is the
+    // exact assertion the shipped bug would have failed.
+    assertEquals(defaultSportForAddedSlot(key, ['ride', 'run']), 'ride', `${key}: the answer moved with the input order`);
+  }
+});
+
+Deno.test('the default is the chip the card highlights — one owner for the order', () => {
+  // ⚠️ IT MUST BE `SLOT_OPTIONS`' OWN FIRST OFFERED VALUE, because that is the order the row renders
+  // its chips in. A default derived anywhere else is how the highlighted chip and the stored answer
+  // start disagreeing — which is the class of defect this whole screen has been fixing.
+  for (const key of SLOT_KEYS) {
+    for (const allowed of [undefined, ['run'], ['ride'], ['run', 'ride']] as const) {
+      const expected = SLOT_OPTIONS[key]
+        .map((o) => o.value)
+        .filter((v) => !allowed || allowed.includes(v))[0] ?? null;
+      assertEquals(defaultSportForAddedSlot(key, allowed as never), expected, `${key} / ${JSON.stringify(allowed)}`);
+    }
+  }
+});
+
+Deno.test('an unconstrained or empty mix still answers, and never with null', () => {
+  // ⚠️ `allowedSlotSports` is passed as `undefined` when it is empty, and an added session with no
+  // sport would be an unanswered row on a screen that just stopped having any.
+  for (const key of HARD_SLOT_KEYS) {
+    assertEquals(defaultSportForAddedSlot(key, undefined), 'ride');
+    assertEquals(defaultSportForAddedSlot(key, []), 'ride');
+  }
 });
