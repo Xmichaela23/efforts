@@ -48,6 +48,33 @@ export default function WeekGrid({
     .filter((i) => i >= 0);
   const adjacentPressDays = upperIdx.length === 2 && Math.abs(upperIdx[0] - upperIdx[1]) === 1;
 
+  /**
+   * ⛔ WESTSIDE SHORTHAND DOES NOT SHIP TO A LIFTER (punch item 6, 2026-08-25). The Standing
+   * Plan frames title their days `ME: Upper` / `DE: Lower` — max effort and dynamic effort, a
+   * conjugate-method vocabulary a Strong or Hevy user has no reason to have met. The day was
+   * labelled with the METHOD'S name for the intent instead of the intent.
+   *
+   * ⚠️ BOTH HALVES OF THE PAIR, OR NEITHER. Renaming `DE` and leaving `ME` reads as two
+   * different kinds of thing on the same week; they are one axis with two ends.
+   * ⚠️ DISPLAY ONLY. The engine strings are unchanged and stay the thing tests and the
+   * composer match on — this maps at the last moment, where an athlete reads it.
+   * ⚠️ `Test:` IS LEFT ALONE. It is already the plain word for what the day is.
+   */
+  const INTENT_WORD: Record<string, string> = { ME: 'Heavy', DE: 'Speed' };
+  const plainIntent = (name: string) => name.replace(/^(ME|DE):/, (_m, k: string) => `${INTENT_WORD[k]}:`);
+
+  /**
+   * ⛔ ONE CAPITALISATION FOR EVERY MOVEMENT (punch item 5, 2026-08-25). The accessory line read
+   * `Bench Press · … · tricep extensions · glute bridge` — the barbell lifts arrive Title Case
+   * from the competition-lift table and the accessories arrive lowercase from the exercise library,
+   * and printing both raw made the athlete's own picks look like a different class of thing.
+   *
+   * ⚠️ IT ONLY RAISES A LEADING LOWERCASE LETTER, so `DB Bench Press` and `Chin-Up` survive
+   * untouched — a blanket title-case would flatten `DB` to `Db`. Hyphens and slashes count as word
+   * starts, which is what keeps `pull-up` reading as `Pull-Up`.
+   */
+  const titleCase = (n: string) => n.replace(/(^|[\s\-/(])([a-z])/g, (_m, pre: string, c: string) => pre + c.toUpperCase());
+
   /** 41 → "41m"; 126 → "2h06". Same shape as the week total above it. */
   const fmtMins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}m`);
 
@@ -102,7 +129,7 @@ export default function WeekGrid({
            * carries its own duration, which is the number the athlete is actually deciding on.
            */
           const label = (s: WeekGridSession) => {
-            const name = s.type === 'strength' ? s.name.replace('Strength — ', '') : s.name;
+            const name = titleCase(plainIntent(s.type === 'strength' ? s.name.replace('Strength — ', '') : s.name));
             const mins = Number(s.duration) || 0;
             return mins > 0 ? `${name} ${fmtMins(mins)}` : name;
           };
@@ -135,7 +162,7 @@ export default function WeekGrid({
                     in the list, so the work he went looking for ("where are my abs?") was exactly
                     the work the cut hid. The line wraps; a taller row is cheaper than a lying one. */}
                 {accessories.length > 0 && (
-                  <span className="block text-white/55">{accessories.join(' · ')}</span>
+                  <span className="block text-white/55">{accessories.map(titleCase).join(' · ')}</span>
                 )}
               </span>
             </div>

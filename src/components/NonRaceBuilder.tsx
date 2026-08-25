@@ -417,6 +417,28 @@ const DAY_SHORT: Record<DayName, string> = {
 };
 
 /**
+ * ⛔⛔ IT DID NOT MATCH THE SESSIONS THE COMPOSER ACTUALLY EMITS (found on the dev preview,
+ * 2026-08-25) — and that is half of the contradiction Michael photographed.
+ *
+ * The test read `/Hill|Threshold|Intervals|Repeat|Club/i`. The Standing Plan composer names its
+ * two quality sessions **`Hard Run`** and **`Hard Ride`**, which match NONE of those words — so
+ * `proposedDays` came back empty on every Strong Focus week, `dayForSlot` had no engine answer to
+ * fall back to, and the "High intensity days" row printed the club sentence beside a placed week
+ * that plainly showed both sessions. The row and the list read the same `previewWeek` and still
+ * disagreed, because only one of them could recognise it.
+ *
+ * ⚠️ THE SIBLING DERIVATION HAD `Hard` AND THIS ONE NEVER GOT IT. `strengthRoles` (deleted with
+ * the coded strip, above) tested `/Hard|Hill|Threshold|Intervals|Repeat|Club/i` — so the chips
+ * lettered the right days while the row beside them said nothing. Two copies of one rule, one of
+ * them fixed. It is a named constant now so the next reader finds one owner.
+ *
+ * ⚠️ THE OTHER WORDS STAY. `Hill Repeats`, `Threshold Run` and `Bike Intervals` are §7's names
+ * for the same slots and a Club session carries its own; dropping them would trade this bug for
+ * its mirror image.
+ */
+const IS_HARD_SESSION_NAME = /Hard|Hill|Threshold|Intervals|Repeat|Club/i;
+
+/**
  * ⛔ ONE WEEK, MARKED UP ACROSS THREE CARDS (2026-08-06). Michael, on the split: *"one week laid
  * out — how does the user distinguish?"*
  *
@@ -438,8 +460,23 @@ const DAY_SHORT: Record<DayName, string> = {
  * Here it is a badge on the chip beside the one being tapped.
  */
 function WeekDayRow({
-  selected, disabled = [], roles = {}, taken = {}, onTap, stacked = [],
+  selected, disabled = [], roles = {}, taken = {}, onTap, stacked = [], plain = false, accentRgb,
 }: {
+  /**
+   * ⛔ THE SELECTOR VARIANT (2026-08-25 week-screen pass). `plain` strips the role letters and the
+   * ×2 mark and leaves seven day chips that are only a picker — the QUESTION zone. The coded
+   * variant survives untouched on the race path, where the row IS the accumulating week the note
+   * above describes.
+   *
+   * ⚠️ IT IS A VARIANT, NOT A REPLACEMENT, AND THE DIFFERENCE IS WHAT THE ROW IS FOR. Marks on a
+   * control are a report; a report you can tap is two things at once, which is the fusion this
+   * pass split. On the strength path the week is reported ONCE, in words, below.
+   * ⚠️ A HELD DAY IS STILL NAMED HERE — `taken` prints the holder's own words under the day rather
+   * than a dash, because a dash is the puzzle `taken` exists to stop.
+   */
+  plain?: boolean;
+  /** The sport hue the SELECTED chip fills with. Omit for the wizard's own accent. */
+  accentRgb?: string;
   /** Days carrying MORE than one session — a small dot under the letter says "there's more here". */
   stacked?: DayName[];
   /** The day(s) answering the ACTIVE question — ringed, not filled. */
@@ -503,17 +540,32 @@ function WeekDayRow({
     C: 'rgb(251,191,36)',
   };
 
+  /**
+   * ⛔ SELECTED IS FILLED, NOT RINGED (punch item 2, 2026-08-25). The picked day carried a
+   * `ring-2 ring-white/60` over a near-identical surface — on a phone that is a hairline, and a
+   * screenshot of seven chips did not say which one was the answer. A chip is now either the
+   * neutral surface or the sport's own fill; the difference is the whole chip, not its edge.
+   *
+   * ⚠️ SPORT COLOUR IS THE FILL AND NOT A SECOND CODE. It repeats what the row's own label
+   * already says in words, which is the only reason it may be a colour: nothing rides on the hue
+   * alone. That is the same rule the killed letter legend broke.
+   */
+  const A = accentRgb ?? 'var(--wiz-accent-rgb, 236,233,227)';
   return (
     <div className="grid grid-cols-7 gap-1 min-w-0">
       {DAYS.map((d) => {
         // ⛔ A DAY WITH NOTHING GETS NO LETTER (Michael, 2026-08-24: "there shouldn't be a
         // letter in a day with nothing — honestly the letters are confusing"). The 'R' fallback
         // lettered every empty day, which drowned the four letters that meant something.
-        const role = roles[d];
+        // ⛔ AND ON THE PLAIN SELECTOR THERE ARE NO LETTERS AT ALL (2026-08-25). Same finding,
+        // taken to its end: the week is reported once, in words, in the answer zone below.
+        const role = plain ? undefined : roles[d];
         const active = selected.includes(d);
         // ⚠️ THE ACTIVE QUESTION'S OWN DAY IS NEVER LOCKED, or it could not be released.
         const heldBy = active ? undefined : taken[d];
         const off = disabled.includes(d) || !!heldBy;
+        // ⚠️ THE MARKS LINE ONLY RESERVES ITS HEIGHT WHERE SOMETHING CAN FILL IT. On the plain
+        // selector nothing ever does, so reserving it is a blank strip under all seven chips.
         return (
           <button
             key={d}
@@ -524,21 +576,37 @@ function WeekDayRow({
             aria-label={heldBy
               ? `${DAY_SHORT[d]} — unavailable, held by your ${heldBy}`
               : (active ? `${DAY_SHORT[d]} — selected, tap to clear` : DAY_SHORT[d])}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl text-[11px] min-w-0 border text-white/70 focus:outline-none ${
-              off ? 'bg-transparent border-white/5 text-white/15' : NEUTRAL
-            } ${active && !off ? 'ring-2 ring-white/60 bg-white/[0.10] text-white' : ''}`}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] min-w-0 border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+              plain ? 'py-2.5' : 'py-2'
+            } ${
+              off ? 'bg-transparent border-white/5 text-white/15'
+                : active ? 'text-white font-semibold' : `${NEUTRAL} text-white/70`
+            }`}
+            style={active && !off
+              ? { backgroundColor: `rgba(${A},0.22)`, borderColor: `rgb(${A})`, boxShadow: `inset 0 0 0 1px rgb(${A})` }
+              : undefined}
           >
             <span className="leading-none font-medium">{DAY_SHORT[d]}</span>
             {/* Named, not just greyed — an inert square is a puzzle; "long run" is an answer. */}
             {/* ⛔ THE LETTER IS WHERE THE SPORT SHOWS. Neutral box, coloured mark. */}
-            <span
-              className="leading-none text-[9px] font-medium"
-              style={off || !role ? undefined : { color: letterColour[role] }}
-            >{heldBy ? '—' : (role ?? '\u00A0')}</span>
-            {/* ×2 — this day carries two sessions (Michael, 2026-08-24: clearer than a dot). */}
-            {stacked.includes(d) && !off ? (
-              <span aria-hidden className="leading-none text-[8px] text-white/50 mt-0.5">×2</span>
-            ) : <span aria-hidden className="leading-none text-[8px] mt-0.5">{'\u00A0'}</span>}
+            {plain ? (
+              // ⛔ THE HOLDER IS NAMED ON THE CHIP, not in a `title` a thumb cannot reach. This is
+              // the `taken` contract made visible: locked, and here is by what.
+              heldBy ? (
+                <span className="leading-tight text-[8px] text-white/30 text-center px-0.5 break-words">{heldBy}</span>
+              ) : null
+            ) : (
+              <>
+                <span
+                  className="leading-none text-[9px] font-medium"
+                  style={off || !role ? undefined : { color: letterColour[role] }}
+                >{heldBy ? '—' : (role ?? '\u00A0')}</span>
+                {/* ×2 — this day carries two sessions (Michael, 2026-08-24: clearer than a dot). */}
+                {stacked.includes(d) && !off ? (
+                  <span aria-hidden className="leading-none text-[8px] text-white/50 mt-0.5">×2</span>
+                ) : <span aria-hidden className="leading-none text-[8px] mt-0.5">{'\u00A0'}</span>}
+              </>
+            )}
           </button>
         );
       })}
@@ -1315,6 +1383,14 @@ function assemblePayload(
           preferred_days: buildPreferredDays(state.posture, {
             trainingDays: state.trainingDays,
             longRunDay: state.longRunDay, longRideDay: state.longRideDay,
+            /**
+             * ⛔ THE ONE LONG SLOT, SO THE BAG CANNOT WRITE A DAY FOR THE OTHER SPORT (2026-08-25).
+             * `slotSports` is only ever set on the strength path, so passing it is self-gating:
+             * every race and combined goal sends `undefined` here and gets the behaviour it always
+             * had. See the note on `longSlotSport` in `buildPreferredDays` for what it was fixing —
+             * a `'sunday'` long run defaulted onto a week whose only long session is a ride.
+             */
+            longSlotSport: state.slotSports?.long ?? undefined,
             // ⚠️ THE STRONG FOCUS HARD DAYS FEED THIS TOO (§1i) — one per sport, which is all this
             // sport-keyed bag can express. It is the pre-§1i pin and the combined-plan path reads it;
             // `hard_days` below carries the full answer. First slot of each discipline wins here.
@@ -2102,10 +2178,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     if (!previewWeek?.length) return out;
     const byDiscipline: Record<'run' | 'bike', DayName[]> = { run: [], bike: [] };
     for (const s of previewWeek) {
-      const hard = /Hill|Threshold|Intervals|Repeat|Club/i.test(String((s as { name?: string }).name ?? ''));
+      const hard = IS_HARD_SESSION_NAME.test(String((s as { name?: string }).name ?? ''));
       if (!hard) continue;
       const t = String((s as { type?: string }).type ?? '');
-      const d = (s as { day?: string }).day as DayName | undefined;
+      /**
+       * ⛔ THE ENGINE SPEAKS `Monday`; THIS SCREEN SPEAKS `monday` (2026-08-25). `WEEK_DAYS` is
+       * Title Case on the wire and `DAY_SHORT` / `DAYS` are lowercase, so the raw value indexed
+       * nothing: the row read `Run undefined · Ride undefined` and the day chip could not match
+       * its own selection. Same trap the deleted `strengthRoles` had already hit and named.
+       */
+      const d = (String((s as { day?: string }).day ?? '').toLowerCase() || undefined) as DayName | undefined;
       if (!d) continue;
       if (t === 'run') byDiscipline.run.push(d);
       else if (t === 'ride') byDiscipline.bike.push(d);
@@ -2257,13 +2339,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       label: state.hardDays.length > 1 ? 'High intensity days' : 'High intensity day',
       // ⚠️ "pick a day" IS GONE (slice 8) — a prescribed slot always HAS a day, either the athlete's
       // or the engine's. The only dayless state left is a club slot the athlete has not answered.
+      /**
+       * ⛔ ONE SEPARATOR, ONE JOB (punch item 3, 2026-08-25). It read
+       * `Run · Fri  ·  Ride · Tue` — the SAME dot between a sport and its day as between one
+       * session and the next, so the line parsed four ways and none of them were right. The sport
+       * and its day are one phrase; the dot only ever divides sessions.
+       */
       answer: state.hardDays.length === 0
         ? 'None'
         : state.hardDays
           .map((h, i) => {
             const sport = h.discipline === 'run' ? 'Run' : 'Ride';
             const d = dayForSlot(i);
-            return d ? `${sport} · ${DAY_SHORT[d as DayName]}` : `${sport} · when does it meet?`;
+            /**
+             * ⛔ ONLY A CLUB SLOT IS ASKED WHEN IT MEETS (2026-08-25). A PRESCRIBED hard day with no
+             * day yet is the engine's to place — *"ours to write, ours to place"* — so asking the
+             * athlete for its meeting time is the screen describing someone else's session. It read
+             * that way on every Strong Focus week, because the engine's proposal could not reach
+             * this row at all (see `IS_HARD_SESSION_NAME`).
+             */
+            if (d) return `${sport} ${DAY_SHORT[d as DayName]}`;
+            return h.ownership === 'club' ? `${sport} — when does it meet?` : `${sport} — day to be placed`;
           })
           .join('  ·  '),
       shown: true,
@@ -2416,6 +2512,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const suggestedLongDays = { run: wizardWeek.longRun, ride: wizardWeek.longRide };
   const scheduleHealthState = wizardWeek.health;
   const [healthOpen, setHealthOpen] = useState(false);
+  /** The engine's own list of pins it could not reach — see the override row on the week step. */
+  const [overridesOpen, setOverridesOpen] = useState(false);
 
   /**
    * ⛔ PRISTINE VS DIRTY — AND IT IS PRIORITY ZERO, because without it the smart default is a
@@ -2440,20 +2538,38 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [touchedUnits, setTouchedUnits] = useState<Record<string, boolean>>({});
   const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
 
+  /**
+   * ⛔⛔ IT PRE-FILLED A LONG DAY FOR A DISCIPLINE THE CARD IS NOT SHOWING, AND THE ENGINE REPORTED
+   * IT AS A COMPROMISE EVERY SINGLE TIME (found on the dev preview, 2026-08-25).
+   *
+   * On the strength path the week has ONE long session and the slot screen already said which sport
+   * it is — that is why `scheduleRunShown` / `scheduleRideShown` render exactly one long row (B1,
+   * 2026-08-24, the note on `longSlotSport`). These two effects never learned it: on a long-RIDE
+   * week the run effect still wrote `longRunDay = Sunday`, `buildPreferredDays` still shipped it as
+   * `preferred_days.long_run`, and `chooseDayMap` answered — correctly — *"This week has one long
+   * session and it is a ride, so the long run pinned to Sunday is not in it."*
+   *
+   * ⛔ SO EVERY LONG-RIDE ATHLETE CARRIED A PERMANENT FALSE COMPROMISE about a day they were never
+   * shown and never chose. It was invisible until this pass rendered `placement_compromises`; the
+   * screen was discarding them, which is what let a phantom pin sit there unnoticed.
+   *
+   * ⚠️ THE GUARD IS THE SAME PREDICATE THE ROW USES, deliberately — one owner for "is this
+   * discipline's long day a question on this card". A second test here is how they drift apart.
+   */
   React.useEffect(() => {
-    if (currentStep !== 'schedule' || touchedUnits.longRun) return;
+    if (currentStep !== 'schedule' || !scheduleRunShown || touchedUnits.longRun) return;
     setState((st) => {
       if (st.longRunDay || !suggestedLongDays.run) return st;
       return { ...st, longRunDay: suggestedLongDays.run as typeof st.longRunDay };
     });
-  }, [currentStep, suggestedLongDays.run, touchedUnits.longRun]);
+  }, [currentStep, scheduleRunShown, suggestedLongDays.run, touchedUnits.longRun]);
   React.useEffect(() => {
-    if (currentStep !== 'schedule' || touchedUnits.longRide) return;
+    if (currentStep !== 'schedule' || !scheduleRideShown || touchedUnits.longRide) return;
     setState((st) => {
       if (st.longRideDay || !suggestedLongDays.ride) return st;
       return { ...st, longRideDay: suggestedLongDays.ride as typeof st.longRideDay };
     });
-  }, [currentStep, suggestedLongDays.ride, touchedUnits.longRide]);
+  }, [currentStep, scheduleRideShown, suggestedLongDays.ride, touchedUnits.longRide]);
 
   React.useEffect(() => {
     if (currentStep !== 'schedule') return;
@@ -2609,58 +2725,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         : scheduleAsk === 'ride' ? (state.longRideDay || '')
           : '';
   /**
-   * ⛔ NO `trainingDays`, DELIBERATELY — and it is the same call the race row makes for the same
-   * reason. This path gives COUNTS (two runs, one ride), never a list of days; the solver places
-   * them. Passing a fabricated list would letter days the athlete was never asked about, which is
-   * precisely the "invents an answer" failure `weekDayRoles` documents. So the row fills in as the
-   * three anchors are picked and every other chip stays blank until the week is built.
+   * ⛔⛔ `strengthRoles` / `strengthStacked` / `scheduleRoles` STOOD HERE AND ARE DELETED
+   * (2026-08-25). They derived a letter per day — H / LR / LB / E / B / S plus a ×2 mark — out of
+   * the built week, and the ONLY consumer was the coded chip strip on this step. The strip is gone,
+   * so the derivation is gone with it: replace means delete.
+   *
+   * ⚠️ THE 2026-08-24 FINDING THAT CREATED THEM IS NOT REVERSED, IT IS ANSWERED ELSEWHERE. The
+   * letters were moved onto the built week that day because the chips had been reading stale wizard
+   * state — *"two answers to one question on one screen"*. That is still true and still fixed: the
+   * ONE answer is now the worded week below, which reads the same `previewWeek` these did.
+   *
+   * ⚠️ `weekDayRoles` AND `DayRole` ARE STILL LIVE — the RACE path's week card (`weekRoles`) is the
+   * accumulating-marks row those were written for, and this pass does not touch it.
    */
-  /**
-   * ⛔ ON THE STRENGTH PATH THE LETTERS COME FROM THE BUILT WEEK (Michael's screenshot, 2026-08-24:
-   * Tuesday wore an "H" over a day whose only session is the lower-body test — the chips were
-   * reading stale wizard state while the preview below showed the composer's real week; two
-   * answers to one question on one screen). The preview IS the placed week, so the chips read it.
-   */
-  const { roles: strengthRoles, stacked: strengthStacked } = useMemo<{
-    roles: Partial<Record<DayName, DayRole>>; stacked: DayName[];
-  }>(() => {
-    if (!isStrengthFocus || !previewWeek?.length) return { roles: {}, stacked: [] };
-    const roles: Partial<Record<DayName, DayRole>> = {};
-    const perDay: Record<string, number> = {};
-    /** Higher wins on a shared day: hard > long > easy endurance > lifting-only. */
-    const RANK: Record<string, number> = { H: 4, LR: 3, LB: 3, E: 2, B: 2, S: 1 };
-    for (const sRaw of previewWeek) {
-      const sess = sRaw as { name?: string; type?: string; day?: string; duration?: number };
-      // ⚠️ The engine speaks 'Monday'; the chips speak 'monday'. The first cut of this map kept the
-      // engine's casing and every chip went blank — silence instead of the stale letters it replaced.
-      const d = String(sess.day ?? '').toLowerCase() as DayName;
-      if (!d) continue;
-      perDay[d] = (perDay[d] ?? 0) + 1;
-      const name = String(sess.name ?? '');
-      let role: DayRole | null = null;
-      if (/Hard|Hill|Threshold|Intervals|Repeat|Club/i.test(name)) role = 'H';
-      else if (/Long Run/i.test(name)) role = 'LR';
-      else if (sess.type === 'ride' && Number(sess.duration ?? 0) >= 90) role = 'LB';
-      else if (sess.type === 'run') role = 'E';
-      else if (sess.type === 'ride') role = 'B';
-      else if (sess.type === 'swim') role = null; // add-on; the dot carries it
-      else role = 'S';
-      if (role && (RANK[role] ?? 0) > (RANK[roles[d] ?? ''] ?? 0)) roles[d] = role;
-    }
-    const stacked = (Object.entries(perDay) as Array<[DayName, number]>)
-      .filter(([, n]) => n > 1).map(([d]) => d);
-    return { roles, stacked };
-  }, [isStrengthFocus, previewWeek]);
-
-  const scheduleRoles = isStrengthFocus ? strengthRoles : weekDayRoles({
-    trainingDays: [],
-    longRunDay: state.longRunDay || undefined,
-    longRideDay: state.longRideDay || undefined,
-    // ⛔ ALL OF THEM. This took one day and dropped the second hard session out of the preview.
-    hardDay: hardDayValues[0] as DayName | undefined,
-    extraHardDays: hardDayValues.slice(1) as DayName[],
-    days: DAYS,
-  }) as Partial<Record<DayName, DayRole>>;
 
   const clubCollision = (() => {
     if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;
@@ -5455,7 +5532,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             // sits beside the buttons it is about. Two places said it; the subtitle yielded because
             // the card is where the athlete acts.
             ? 'How much intensity the block carries.'
-            : 'Your days. The lifting is placed around them.'}
+            /**
+             * ⛔ IT NAMED HALF THE SCREEN (punch item 7, 2026-08-25). *"Your days. The lifting is
+             * placed around them."* was written when this card asked only about the barbell — but
+             * the long day and the hard days are ENDURANCE anchors, and what gets placed around
+             * them is the lifting AND every easy run and ride. The sentence described one of the
+             * two things the athlete is looking at.
+             * ⚠️ IT ALSO NAMES THE SPLIT the card now has: the days are the question, the rest of
+             * the week is the answer under it.
+             */
+            : 'The days you set. The lifting and the easy sessions are placed around them.'}
           onBack={back} onContinue={next}
           // ⚠️ THE HARD-DAY STEP NEVER BLOCKS. Its own row is optional — "None" is a real answer —
           // and `scheduleCanContinue` is about the per-week COUNTS, which live on the other step.
@@ -5598,32 +5684,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           ⛔ AND IT IS STILL SUPPRESSED BESIDE A CLUB SESSION, where the rule
                           REVERSES — the club holds the sustained slot by its nature, so what is
                           added beside it takes the TOP END. Pinned in `intent-allocation.test.ts`. */}
-                      <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
-                        {/* ⛔ On the Standing Plan the hard sessions are PRESCRIBED — the slot
-                            screen answered them; only the day moves here. "None is a valid answer"
-                            belongs to the race path's optional club night. */}
-                        {isStrengthFocus
-                          ? 'Your two hard sessions, placed. Tap a day to move one.'
-                          : 'Add speed, VO2 max, or threshold work. None is a valid answer.'}
-                      </p>
-                      <ul className="px-3 pt-1.5 space-y-1 list-disc list-outside ml-7 marker:text-white/30">
-                        {!isStrengthFocus && (
-                          <li className="text-white/70 text-sm leading-relaxed pl-1">
-                            Each hard day cuts your accessory lifting volume — that&rsquo;s the trade to
-                            protect your strength gains.
-                          </li>
-                        )}
-                        <li className="text-white/70 text-sm leading-relaxed pl-1">
-                          A club ride or run counts as a high intensity day.
-                        </li>
-                        {state.hardDays.length < 2 && !state.hardDays.some((h) => h.ownership === 'club') && (
-                          <li className="text-white/70 text-sm leading-relaxed pl-1">
-                            A second session defaults to sustained threshold — a block carries one
-                            top-end session, and a bike carries the sustained work at no cost to your
-                            legs. You can switch which sport carries the top-end work.
-                          </li>
-                        )}
-                      </ul>
+                      {/* ⛔ THE ROW'S OWN NAME LEADS IT (2026-08-25). The label sat BELOW the lead
+                          paragraph and the bullets, so an open hard row opened with three lines of
+                          copy hanging under the *previous* row's answer — on screen the text read as
+                          the long ride's explanation. Every other row in this list is
+                          label-then-controls; this one was the exception by accident. */}
                       <div className="w-full flex items-center justify-between gap-3 px-3 py-2.5">
                         <span className="text-sm text-white shrink-0 flex items-center gap-1.5">
                           {row.label}
@@ -5650,6 +5715,32 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             ⚠️ THE ADD BUTTONS MOVED BELOW THE CARDS, where "add another" belongs —
                             they were above a list they append to. */}
                       </div>
+                      <p className="text-white/85 text-sm leading-relaxed px-3 pt-2.5">
+                        {/* ⛔ On the Standing Plan the hard sessions are PRESCRIBED — the slot
+                            screen answered them; only the day moves here. "None is a valid answer"
+                            belongs to the race path's optional club night. */}
+                        {isStrengthFocus
+                          ? 'Your two hard sessions, placed. Tap a day to move one.'
+                          : 'Add speed, VO2 max, or threshold work. None is a valid answer.'}
+                      </p>
+                      <ul className="px-3 pt-1.5 space-y-1 list-disc list-outside ml-7 marker:text-white/30">
+                        {!isStrengthFocus && (
+                          <li className="text-white/70 text-sm leading-relaxed pl-1">
+                            Each hard day cuts your accessory lifting volume — that&rsquo;s the trade to
+                            protect your strength gains.
+                          </li>
+                        )}
+                        <li className="text-white/70 text-sm leading-relaxed pl-1">
+                          A club ride or run counts as a high intensity day.
+                        </li>
+                        {state.hardDays.length < 2 && !state.hardDays.some((h) => h.ownership === 'club') && (
+                          <li className="text-white/70 text-sm leading-relaxed pl-1">
+                            A second session defaults to sustained threshold — a block carries one
+                            top-end session, and a bike carries the sustained work at no cost to your
+                            legs. You can switch which sport carries the top-end work.
+                          </li>
+                        )}
+                      </ul>
                       </>
                     ) : (
                       <button
@@ -5668,7 +5759,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             <span className="text-[10px] uppercase tracking-wide text-white/35">Optional</span>
                           )}
                         </span>
-                        <span className={`text-sm text-right ${needsAnswer || (active && rowSportRgb) ? 'font-medium' : ''}`} style={{ color: answerColor }}>{row.answer}</span>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span className={`text-sm text-right ${needsAnswer || (active && rowSportRgb) ? 'font-medium' : ''}`} style={{ color: answerColor }}>{row.answer}</span>
+                          {/* ⛔ THE ROW SAYS IT IS EDITABLE (punch item 3, 2026-08-25). A label and a
+                              value on a line is a READ-OUT everywhere else in the app; nothing on
+                              this one said the answer could be changed here rather than by walking
+                              back a step. The chevron is the disclosure affordance the row already
+                              had in behaviour and not in appearance. */}
+                          <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-white/30" />
+                        </span>
                       </button>
                     )}
 
@@ -5718,8 +5817,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                     </div>
                                     <WeekDayRow
                                       selected={dayVal ? [dayVal as DayName] : []}
-                                      roles={scheduleRoles}
-                                      stacked={isStrengthFocus ? strengthStacked : []}
+                                      /* ⛔ PLAIN, ON THE STEP THAT ASKS (2026-08-25). The chips
+                                         carried the whole solved week in letters while being the
+                                         control that moves ONE session — a picker and a report in
+                                         one object. The week is reported once, in words, below. */
+                                      plain
+                                      accentRgb={rgb}
+                                      roles={{}}
+                                      stacked={[]}
                                       taken={{}}
                                       /* ⛔ NOTHING IS DISABLED. The other slot's day is NOT locked:
                                          two hard sessions on one day still builds as one, and the
@@ -5796,8 +5901,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 athlete can always release what they chose. */}
                             <WeekDayRow
                               selected={scheduleSelectedDay ? [scheduleSelectedDay as DayName] : []}
-                              roles={scheduleRoles}
-                              stacked={isStrengthFocus ? strengthStacked : []}
+                              /* ⛔ PLAIN (2026-08-25) — see the hard-day row above. The letters
+                                 said what the worded week below says better, and they said it ON
+                                 the control, which is what made the control ambiguous. */
+                              plain
+                              accentRgb={rowSportRgb ?? undefined}
+                              roles={{}}
+                              stacked={[]}
                               taken={anchorDaysTaken(state, row.key === 'long' ? 'long run' : 'long ride')}
                               disabled={[]}
                               onTap={(d) => {
@@ -6320,19 +6430,75 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 ⚠️ A COUNT, NEVER A PERCENTAGE. A week either breaches a clearance or it does not,
                 so a score would be a number with no scale behind it — the "score that lies" this
                 codebase keeps deleting. It says how many, and tapping shows exactly which. */}
-            {/* ⛔ THE LEGEND (Michael, 2026-08-24: the chips weren't "clearly telling you where
-                the hard days are, easy days, stacks"). One line, so the letters read themselves. */}
-            {isStrengthFocus && Object.keys(scheduleRoles).length > 0 && (
-              <p className="text-white/45 text-[11px] leading-snug px-1">
-                <span style={{ color: 'rgb(251,191,36)' }}>H</span> hard ·{' '}
-                <span style={{ color: `rgb(${getDisciplineColorRgb('run')})` }}>LR</span>/
-                <span style={{ color: `rgb(${getDisciplineColorRgb('bike')})` }}>LB</span> long ·{' '}
-                <span style={{ color: `rgba(${getDisciplineColorRgb('run')},0.75)` }}>E</span>/
-                <span style={{ color: `rgba(${getDisciplineColorRgb('bike')},0.75)` }}>B</span> easy run/ride ·{' '}
-                <span className="text-white/60">S</span> lifting only · ×2 = two sessions
-              </p>
+            {/* ⛔⛔ THE LEGEND IS GONE, AND SO ARE THE LETTERS IT DECODED (2026-08-25).
+                It read `H hard · LR/LB long · E/B easy run/ride · S lifting only · ×2 = two
+                sessions` — written 2026-08-24 because the chips were not "clearly telling you where
+                the hard days are, easy days, stacks". That reading was right and the legend was the
+                wrong answer to it: **a legend is the screen admitting its own notation failed.**
+                Nothing decodes now because nothing is encoded — the week is stated once, in words,
+                in the answer zone below, where "Hard Run 41m" needs no key.
+                ⚠️ THE ×2 BADGE IS NOT REDESIGNED, it simply has no chip left to sit on
+                (Michael's call, 2026-08-24 — the wording stands wherever coded chips still render,
+                which is the race path's accumulating week row). */}
+            {/* ⛔⛔ THE ENGINE SAID WHAT IT COULD NOT HONOUR AND THIS SCREEN THREW IT AWAY
+                (traced on the dev preview, 2026-08-25 — task 0 of the handoff).
+
+                **What is actually happening.** The Standing Plan week is a FIXED-ORDER FRAME: which
+                frame day carries a hard session is fixed, and the only freedom `chooseDayMap`
+                (`_shared/standing-plan/day-map.ts`) has is which weekday frame-day-1 lands on. It
+                scores the seven rotations with the long day weighted above everything —
+                `LONG_RUN_WINS`, and its own copy says why — so a long ride pinned to Saturday fixes
+                the rotation, and at that rotation the frame's hard days are Monday and Wednesday.
+                A hard day pinned to Friday is then unreachable.
+
+                ⛔ AND THAT IS NOT A SILENT OVERRIDE — THE ENGINE WRITES THE SENTENCE. Measured on
+                the wire: `plan.placement_compromises` came back with *"The hard session is on Monday
+                and Wednesday rather than Thursday. The week's order is fixed and the long day is
+                placed first, so Thursday could not also be reached."* The screen rendered
+                `<WeekGrid notes={[]} />` and printed none of it. So the athlete saw their day in the
+                row, a different day in the week, and a green tick between them.
+
+                ⚠️ NOT THE SAME QUESTION AS THE HEALTH BADGE, WHICH IS WHY IT IS ITS OWN ROW. That
+                badge is the CLIENT clearance model — biological collisions between sessions. This is
+                the SERVER saying a pin was not reachable. Both can be true, neither implies the
+                other, and folding them into one count would be a number with two meanings.
+
+                ⛔ IT SITS WITH THE SELECTORS, NOT UNDER THE WEEK. Feedback lands where the choice
+                was made — the day chips above are what caused it.
+                ⛔ AND IT IS THE ENGINE'S OWN WORDS, printed verbatim. Re-wording them client-side is
+                how the screen and the plan come to describe the same week differently. */}
+            {previewNotes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setOverridesOpen((v) => !v)}
+                aria-expanded={overridesOpen}
+                className="w-full text-left rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5"
+              >
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-white/70" />
+                  <span className="text-white/85 text-sm">
+                    {previewNotes.length === 1
+                      ? 'One day the week could not honour'
+                      : `${previewNotes.length} days the week could not honour`}
+                  </span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 ml-auto transition-transform ${overridesOpen ? 'rotate-180' : ''}`} />
+                </span>
+                {overridesOpen && (
+                  <span className="block mt-2 space-y-1.5">
+                    {previewNotes.map((n, i) => (
+                      <span key={i} className="block text-white/70 text-sm leading-relaxed">{n}</span>
+                    ))}
+                  </span>
+                )}
+              </button>
             )}
-            {(state.hardDays.length > 0 || state.longRunDay || state.longRideDay) && (
+
+            {/* ⚠️ THE ALL-CLEAR IS GATED ON BOTH ANSWERS NOW. "No scheduling conflicts" is true of
+                the clearance model and was being read as "the week is what you asked for", which it
+                was not — so the badge does not render its tick while a pin is outstanding. It still
+                renders in full whenever it has a collision of its own to report. */}
+            {(state.hardDays.length > 0 || state.longRunDay || state.longRideDay)
+              && !(scheduleHealthState.ok && previewNotes.length > 0) && (
               <button
                 type="button"
                 onClick={() => scheduleHealthState.ok ? undefined : setHealthOpen((v) => !v)}
@@ -6366,20 +6532,56 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </button>
             )}
 
-            {/* ⛔ THE WEEK, NOW BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY.
-                It led this card on the reasoning that the answer must stay on screen while they tap
-                — right in principle, and it reserved nine rems for a sentence that showed no
-                selection at all, which put the controls it was meant to accompany off the screen.
-                The day row above is now what fills in as they tap; this is the solver's answer,
-                read after.
+            {/* ══ THE ANSWER ZONE ════════════════════════════════════════════════════════════
+                ⛔ ONE REPRESENTATION OF THE WEEK, AND IT IS THIS ONE (2026-08-25). Above this line
+                everything is a QUESTION — seven plain day chips per anchor, nothing else riding on
+                them. Below it is the week those answers produce, stated in words. The screen used
+                to do both jobs in one object: the chips were the picker AND a coded report, so
+                every chip meant two things and a legend was needed to say which.
+
+                ⛔ THE WEEK, BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY (kept).
+                It led this card once, and reserved nine rems for a sentence that showed no
+                selection at all — which put the controls it was meant to accompany off screen.
 
                 ⛔ NEVER A SILENT EMPTY SPACE (kept). Running, failed, and never-asked-for are three
                 different states that once all rendered as nothing. Each still says which it is —
                 and the box only reserves height once there is something in it. */}
             {(previewWeek?.length || previewing || previewFailed) ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                {/* ⛔ THE ZONE IS NAMED, because an unlabelled block under a picker reads as more
+                    controls. It says whose answer it is: the same solve that will build the block. */}
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-white/85 text-sm">The week this builds</p>
+                  {/* ⛔⛔ IT SAID NOTHING WHILE IT WAS OUT OF DATE, AND THAT IS THE CONTRADICTION
+                      MICHAEL PHOTOGRAPHED (traced 2026-08-25 — task 0 of the handoff).
+
+                      The high-intensity row reads `state.hardDays`, which fills the instant a chip
+                      is tapped or the client pre-fill writes a suggestion. This grid reads
+                      `previewWeek`, which is the SERVER's composed week and arrives 400 ms of
+                      debounce plus a round trip later. Between the two, the old week kept rendering
+                      at full confidence beside the new answer — the `previewWeek?.length` arm wins
+                      over `previewing`, so "Building your week…" only ever showed on the FIRST
+                      build, never on a refresh.
+
+                      ⛔ THE ENGINE IS NOT MOVING ANYTHING, AND THAT WAS THE OTHER HALF OF THE TRACE.
+                      A pinned hard day becomes a solver ANCHOR (`strength-primary-plan.ts:3258`),
+                      and `week-model/resolve.ts:483` splits units into `fixed` (pinned, kept
+                      verbatim) and `free` (searched) — the local-improvement sweep starts at
+                      `firstFree`, so a pinned day cannot move. `strength-primary-plan.ts:3617`
+                      pushes a pinned entry straight through. The athlete's day is honoured
+                      absolutely; the grid was simply showing the previous answer.
+
+                      ⚠️ SO THE FIX IS A STALENESS CUE, NOT A RECONCILIATION. Nothing here is
+                      re-derived and no placement happens on the client — the grid dims and says it
+                      is catching up, then the real answer lands. */}
+                  {previewing && previewWeek && previewWeek.length > 0 && (
+                    <span className="text-white/45 text-xs shrink-0">Updating</span>
+                  )}
+                </div>
                 {previewWeek && previewWeek.length > 0 ? (
-                  <WeekGrid sessions={previewWeek} notes={[]} />
+                  <div className={previewing ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
+                    <WeekGrid sessions={previewWeek} notes={[]} />
+                  </div>
                 ) : previewing ? (
                   <p className="text-white/50 text-sm">Building your week…</p>
                 ) : (
@@ -6392,6 +6594,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ) : (
               <p className="text-white/35 text-xs">The week appears once your days are in.</p>
             )}
+
+            {/* ⛔ THE LAST ROW IS NOT THE LAST PIXEL (punch item 4, 2026-08-25). Saturday and Sunday
+                sat under the Continue key: `StepLayout`'s scroller carries `pb-24`, and the answer
+                zone is the tallest thing on the card, so on a short viewport the scroll ends with
+                the final day rows still inside the key's own strip. A spacer the height of the key
+                is cheaper than teaching every future step to remember it.
+
+                ⚠️ 32px ON TOP OF `StepLayout`'s EXISTING `pb-24`, NOT INSTEAD OF IT. That padding is
+                the documented mechanism (its own comment: the key is the last flex child of an
+                `h-full` column and iOS's visual viewport is shorter than that column). If a row is
+                still clipped on a device, the number to raise is `pb-24` in `StepLayout` — one
+                owner — rather than growing this spacer step by step. */}
+            <div aria-hidden className="h-8" />
 
           </div>
         </StepLayout>

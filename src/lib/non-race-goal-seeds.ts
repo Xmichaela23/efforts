@@ -113,6 +113,13 @@ export type ScheduleInput = {
   trainingDays?: DayName[];
   longRunDay?: string;
   longRideDay?: string;
+  /**
+   * ⛔ WHICH SPORT THE WEEK'S ONE LONG SESSION IS — strength-primary blocks only. Present means
+   * "this frame has a single long slot and it is a `run` / `ride` / `swim`", and the long day of
+   * every OTHER sport is then not a preference the week can hold. Absent means the caller has no
+   * such constraint and both long days are written exactly as they always were.
+   */
+  longSlotSport?: 'run' | 'ride' | 'swim';
   /** The kept hard session PER DISCIPLINE — a club run AND a chaingang can both be true of one
    *  athlete. `preferred_days` always had room for both (`quality_run` + `quality_bike`); the old
    *  single `anchorDiscipline` + `anchorDay` was the narrower shape and forced a choice the data
@@ -165,7 +172,30 @@ export function buildPreferredDays(
 ): AthletePreferredDays {
   const out: AthletePreferredDays = {};
   const present = (d: Discipline) => posture[d] != null && posture[d] !== 'out';
-  if (present('run')) out.long_run = sched.longRunDay || 'sunday';
+  /**
+   * ⛔⛔ THE HARDCODED `'sunday'` SHIPPED A LONG RUN TO A WEEK THAT HAS NO LONG RUN
+   * (found on the dev preview, 2026-08-25).
+   *
+   * On the strength path the week carries exactly ONE long session and the slot screen says which
+   * sport it is. The wizard already knows this twice over — `scheduleRunShown` hides the row, and a
+   * dedicated effect CLEARS a stale `longRunDay` when the long slot is a ride. This line put it
+   * straight back: running is present in the posture (it is a hybrid block), so `long_run` was
+   * written as `'sunday'` from a default, travelled as `preferred_days.long_run`, and
+   * `chooseDayMap` answered every single build with *"This week has one long session and it is a
+   * ride, so the long run pinned to Sunday is not in it."*
+   *
+   * ⚠️ A DEFAULT IS INDISTINGUISHABLE FROM A CHOICE ONCE IT IS ON THE WIRE — the same finding
+   * as the `quality_run_terrain` stamp (`create-goal…:2806`). Downstream cannot tell that nobody
+   * picked Sunday, so it reports it as an unhonoured pin, which is a true sentence about a
+   * preference that never existed.
+   *
+   * ⚠️ `longSlotSport` IS ABSENT ON EVERY OTHER PATH AND THE BEHAVIOUR THERE IS BYTE-IDENTICAL.
+   * Race and combined goals genuinely have both long days available; only the one-long-session
+   * frame can contradict itself here, and only it passes the field.
+   */
+  const longSlotExcludes = (d: 'run' | 'bike') =>
+    sched.longSlotSport != null && sched.longSlotSport !== (d === 'bike' ? 'ride' : 'run');
+  if (present('run') && !longSlotExcludes('run')) out.long_run = sched.longRunDay || 'sunday';
   /**
    * ⛔ THE DAYS THE ATHLETE CAN TRAIN (2026-08-06). The rest are theirs — rest is the REMAINDER, not
    * a second question, which is why this is one list and not two.
@@ -175,7 +205,7 @@ export function buildPreferredDays(
    * preference and will spend a rest day before it drops a session.
    */
   if (sched.trainingDays && sched.trainingDays.length > 0) out.training_days = [...sched.trainingDays];
-  if (present('bike')) out.long_ride = sched.longRideDay || 'saturday';
+  if (present('bike') && !longSlotExcludes('bike')) out.long_ride = sched.longRideDay || 'saturday';
   // The kept club session = a hard day. Posture-gated both ways: a quality day for a discipline the
   // athlete dropped is not a day, it is a leftover.
   if (sched.anchorDiscipline && sched.anchorDay && present(sched.anchorDiscipline)) {
