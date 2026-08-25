@@ -140,7 +140,7 @@ Deno.test('⛔ MICHAEL\'S OPT-IN LINE, VERBATIM', () => {
   assertEquals(
     HARD_SESSIONS_OPT_IN_LINE,
     'Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and hours '
-    + 'default to easy pace and recovery if none is picked — and may improve your lower body lifts.',
+    + 'default to easy pace and recovery if none is picked — which may improve your lower body lifts.',
   );
   // ⚠️ IT OPENS WITH AN IMPERATIVE ("Pick up to 2") AND STILL PASSES THE GATE UNAIDED — the banned
   // list holds `stay / keep / try / consider / focus`, not `pick`. So this needs NO override, unlike

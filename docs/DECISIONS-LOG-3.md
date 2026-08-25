@@ -620,7 +620,7 @@ hard and both pre-shaped. They are now **something the athlete ADDS**, up to two
 **none** — the week's miles and hours come out at easy pace and recovery.
 
 **His line, verbatim** (`HARD_SESSIONS_OPT_IN_LINE`): *"Pick up to 2 hard sessions a week to maintain
-your top-end fitness. Your miles and hours default to easy pace and recovery if none is picked — and
+your top-end fitness. Your miles and hours default to easy pace and recovery if none is picked — which
 may improve your lower body lifts."* ⚠️ It opens with an imperative and **still passes the voice gate
 unaided** — the banned list holds `stay / keep / try / consider / focus`, not `pick`. It is asserted
 CLEAN rather than exempted; an exemption nobody needs is one that later hides a real violation.

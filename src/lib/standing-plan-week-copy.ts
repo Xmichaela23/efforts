@@ -46,7 +46,7 @@ export const ENDURANCE_WEEK_HEADER: string[] = [
  */
 export const HARD_SESSIONS_OPT_IN_LINE =
   'Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and hours default '
-  + 'to easy pace and recovery if none is picked — and may improve your lower body lifts.';
+  + 'to easy pace and recovery if none is picked — which may improve your lower body lifts.';
 
 /** The label under the long-session control. His own permission, p275: the long one may be a ride. */
 export const LONG_SLOT_NOTE = 'one per week, run or ride';
