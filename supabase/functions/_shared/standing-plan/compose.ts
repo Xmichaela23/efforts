@@ -144,6 +144,20 @@ function dayNameFor(args: ComposeArgs, frameDay: number): Weekday {
  * ⛔ WHICH ANCHOR A SLOT IS — the same test `anchorDaysFor` uses, applied per slot rather than per
  * day. ⚠️ ONE OWNER: if a family is ever added to the long or hard set there, it must be added
  * here, or a slot the day map treats as an anchor stops being pinnable and nothing says why.
+ *
+ * ⛔⛔ IT TAKES THE **FRAME** SLOT'S FAMILY, NEVER THE SPORT-ASSIGNED ONE (Michael, 2026-08-25, after
+ * the fuzz sweep). **The frame slot owns anchor identity and sport assignment never re-points an
+ * anchor.**
+ *
+ * ⚠️ THIS WAS THE BUG, AND IT WAS SILENT ON EVERY BLOCK WITH A BIKE IN IT. The names below are
+ * run-only, and `assignSports` rewrites a substituted slot's family to `ride_sweet_spot` /
+ * `ride_endurance`. Callers were passing the ASSIGNED family, so on a run+ride mix both hard slots
+ * matched nothing, `enduranceDayFor` never applied the pin, and the athlete's tapped hard days —
+ * their CLUB NIGHTS — were dropped by the composer with nothing said. On a ride-only mix the long
+ * pin went the same way. The wizard never showed it: `buildWizardWeek` pins by SESSION ID, which is
+ * the correct model, so the preview honoured pins the built block quietly ignored.
+ * ⛔ Do not "fix" a future sport-assignment need by widening this list to ride families. The frame
+ * slot is the anchor; the sport riding on it is a different question.
  */
 function anchorRoleOf(family: string): 'long' | 'hard' | null {
   if (family === 'run_lsd') return 'long';
@@ -1158,14 +1172,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   for (const d of days) {
     d.endurance.forEach((slot, i) => {
       const key = `${d.day}:${i}`;
-      const assigned = assignedSlot(sportAssignment, d.day, i, slot);
       const hardIndex = hardSlotIndex.get(key) ?? 0;
-      const role = anchorRoleOf(assigned.family);
+      // ⛔ THE FRAME'S FAMILY, matching `hardSlotIndex` above — see `anchorRoleOf`.
+      const role = anchorRoleOf(slot.family);
       const pinned = role === 'long'
         ? !!args.endurancePins?.long
         : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
       if (!pinned) return;
-      const proposed = enduranceDayFor(args, d.day, assigned.family, hardIndex);
+      const proposed = enduranceDayFor(args, d.day, slot.family, hardIndex);
       enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
     });
   }
@@ -1289,8 +1303,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // ⛔ AND THEN OFF A DAY THE ATHLETE CANNOT TRAIN — the pinned slots already went through the
         // relocator in the pre-pass above, so this reads their answer rather than re-asking.
         day: enduranceDays.get(`${day.day}:${i}`) ?? relocate(
-          enduranceDayFor(args, day.day, assigned.family, hardSlotIndex.get(`${day.day}:${i}`) ?? 0),
-          enduranceLabelFor(anchorRoleOf(assigned.family)),
+          enduranceDayFor(args, day.day, slot.family, hardSlotIndex.get(`${day.day}:${i}`) ?? 0),
+          enduranceLabelFor(anchorRoleOf(slot.family)),
         ),
         ...row,
         // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a reader

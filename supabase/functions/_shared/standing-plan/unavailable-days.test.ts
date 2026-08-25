@@ -451,8 +451,11 @@ Deno.test('four days off cannot all be clear of four lifting days, and the note 
 
   const note = map.compromises.find((c) => /carr(?:ies|y) lifting day|carries a lifting day/.test(c.text));
   assert(note, `no note fired: ${map.compromises.map((c) => c.text).join(' | ')}`);
+  // ⚠️ THE COUNT NOW CARRIES THE DRILL DAY TOO (2026-08-25, after the fuzz sweep). The plyo day is
+  // frame-fixed and can land on a day off just as a lifting day can; the sentence used to leave it
+  // out of the arithmetic it was quoting.
   assert(
-    /4 lifting days in a fixed order/i.test(note!.text),
+    /4 lifting days and a drill day in a fixed order/i.test(note!.text),
     `the note does not state the count it turns on: ${note!.text}`,
   );
   // ⚠️ NO COMPETING PIN TO NAME, so it must not invent one.

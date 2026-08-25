@@ -145,9 +145,16 @@ export type DayMap = {
     longRun: boolean;
     hardDays: number;
     /**
-     * ⛔ TRUE WHEN NO LIFTING DAY LANDS ON A DAY THE ATHLETE BLOCKED. ⚠️ Also true when nothing was
-     * blocked — "nothing to honour" and "honoured" are the same week, and a caller reading this to
-     * decide whether to warn must not warn on the empty case.
+     * ⛔ TRUE WHEN NOTHING THE ROTATION CARRIES LANDS ON A DAY THE ATHLETE BLOCKED — the lifting days
+     * AND the plyo day.
+     *
+     * ⚠️ IT READ `blockedLifts === 0` UNTIL THE FUZZ SWEEP FOUND IT (2026-08-25). The scorer already
+     * ranked on `blockedFixed`, which includes the plyo day; this reported on lifting alone. So a
+     * rotation that cleared all four lifting days and dropped the plyo block onto the day off came
+     * back HONOURED with no note at all, and the athlete got a drill session on a day they had said
+     * they could not train, in silence. The scorer and the report now answer the same question.
+     * ⚠️ Also true when nothing was blocked — "nothing to honour" and "honoured" are the same week,
+     * and a caller reading this to decide whether to warn must not warn on the empty case.
      */
     unavailableDays: boolean;
   };
@@ -299,7 +306,7 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
    * it"* — and it is the difference between a note that explains and the note this replaces, which
    * asserted the lifting order was the reason when the long pin was.
    */
-  const clearableAtAll = candidates.some((c) => c.blockedLifts === 0);
+  const clearableAtAll = candidates.some((c) => c.blockedFixed === 0);
 
   /**
    * ⛔⛔ A PIN THE ROTATION GAVE UP TO CLEAR A DAY OFF COSTS THE ATHLETE NOTHING, AND MUST NOT BE
@@ -333,14 +340,43 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
    * ⚠️ FIRST IN THE LIST. It is the only cost here that is about a day the athlete cannot train at
    * all; the rest are about which day a session prefers.
    */
-  if (chosen.blockedLifts > 0) {
-    const hitDays = frameFixed.lifting
-      .map((d) => weekdayForFrameDay(d, chosen.offset))
-      .filter((d) => blockedDays.has(d));
-    const named = [...new Set(hitDays)];
-    const subject = named.length === 1
-      ? `${named[0]} carries a lifting day`
-      : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]} carry lifting days`;
+  if (chosen.blockedFixed > 0) {
+    /**
+     * ⛔ THE PLYO DAY IS NAMED TOO (2026-08-25, after the fuzz sweep). It used to count only the
+     * LIFTING days, so a week whose drill block sat on a day off either said nothing at all or
+     * listed the lifting days and left the plyo day out of its own sentence. Michael's ruling is
+     * informed-always, and this was under-reporting.
+     *
+     * ⚠️ SPLIT BY WHAT THE DAY ACTUALLY CARRIES, because "Friday carries a lifting day" about the
+     * plyo block would be a sentence the calendar contradicts. A day carrying both is a lifting day
+     * — the barbell is the bigger claim on it, and listing the drills beside it adds nothing the
+     * athlete can act on.
+     */
+    const dayOf = (d: number) => weekdayForFrameDay(d, chosen.offset);
+    const liftHits = [...new Set(
+      frameFixed.lifting.map(dayOf).filter((d) => blockedDays.has(d)),
+    )];
+    const plyoOnlyHits = [...new Set(
+      frameFixed.fixed.map(dayOf)
+        .filter((d) => blockedDays.has(d) && !liftHits.includes(d)),
+    )];
+    const list = (xs: string[]) =>
+      xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+    const parts: string[] = [];
+    if (liftHits.length > 0) {
+      parts.push(liftHits.length === 1
+        ? `${liftHits[0]} carries a lifting day`
+        : `${list(liftHits)} carry lifting days`);
+    }
+    if (plyoOnlyHits.length > 0) {
+      // ⚠️ "THE JUMP DRILLS", NOT "PLYOMETRICS" — the row on the calendar is named `Plyometrics` and
+      // the athlete can find it, but a sentence about their week says what it is.
+      parts.push(plyoOnlyHits.length === 1
+        ? `${plyoOnlyHits[0]} carries the jump drills`
+        : `${list(plyoOnlyHits)} carry the jump drills`);
+    }
+    const subject = parts.join(', and ');
+    const named = [...liftHits, ...plyoOnlyHits];
     const nLifts = frameFixed.lifting.length;
     compromises.push({
       kind: 'cost',
@@ -349,9 +385,9 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
         // as the trade it is, with no imperative and no request to change either answer.
         ? `${subject}. The long ${longSlotSport === 'ride' ? 'ride' : 'run'} is pinned to ${longPin}, `
           + `and no arrangement of this week's ${nLifts} lifting days honours that pin and leaves `
-          + `${named.join(' and ')} clear at the same time.`
-        : `${subject}. This week has ${nLifts} lifting days in a fixed order, and no arrangement of `
-          + `them leaves every day off clear.`,
+          + `${list(named)} clear at the same time.`
+        : `${subject}. This week has ${nLifts} lifting days and a drill day in a fixed order, and no `
+          + 'arrangement of them leaves every day off clear.',
     });
   }
   if (longPin !== '' && !chosen.long && !lostToADayOff((c) => c.long)) {
@@ -413,7 +449,7 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
     honoured: {
       longRun: chosen.long,
       hardDays: chosen.hard,
-      unavailableDays: chosen.blockedLifts === 0,
+      unavailableDays: chosen.blockedFixed === 0,
     },
   };
 }
