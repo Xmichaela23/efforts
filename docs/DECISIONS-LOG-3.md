@@ -613,6 +613,88 @@ written richer focus text untouched) — no DB write needed; (2) coach payloads 
 COACH_PAYLOAD_VERSION bumped to 170. Commits `efb4e3f2`, `4c2c125c`; all 12 `_shared` importers
 redeployed. Device-verified on Today header + workout detail; State pending one fresh open.
 
+## D-451 — Hard sessions are opt-in, up to two, default zero (2026-08-25)
+
+Michael's ruling. The endurance-week screen presented **four sessions to configure**, two of them
+hard and both pre-shaped. They are now **something the athlete ADDS**, up to two, and the default is
+**none** — the week's miles and hours come out at easy pace and recovery.
+
+**His line, verbatim** (`HARD_SESSIONS_OPT_IN_LINE`): *"Pick up to 2 hard sessions a week to maintain
+your top-end fitness. Your miles and hours default to easy pace and recovery if none is picked — and
+may improve your lower body lifts."* ⚠️ It opens with an imperative and **still passes the voice gate
+unaided** — the banned list holds `stay / keep / try / consider / focus`, not `pick`. It is asserted
+CLEAN rather than exempted; an exemption nobody needs is one that later hides a real violation.
+
+### The composer: convert, never add
+
+An unpicked hard slot **converts to the frame's own easy session**. The week keeps its four sessions
+— the count is the frame's and nothing here moves it, which is pivot §2 and the same shape the taper
+column already uses (it holds its count and drops the level rather than deleting a day).
+
+`SportMix.slots` gains a third value, and the distinction is load-bearing:
+
+| value | meaning |
+|---|---|
+| **key absent** | nobody asked — the slot keeps the frame's own hard run. Every caller that predates this screen. |
+| **`'run'` / `'ride'`** | the athlete added a hard session there. |
+| **`'none'`** | the screen asked and the athlete added nothing — the slot converts. |
+
+⚠️ **Collapsing absent and `'none'` would strip the intensity out of every plan built by a generator
+that never had this screen.** `slotsForEngine` therefore SENDS `'none'` for an unadded hard slot
+rather than omitting it — omitting would have quietly rebuilt the old week.
+
+⛔ **The conversion target is the column's own easy slot, passed in — not a literal.** A first draft
+hand-wrote `run_vt1 / L1 / 'steady'` and the composer threw *"archetype steady is not offered for
+run_vt1 at level 1"*: family and level right, archetype invented. The library owns which archetypes a
+family offers. ⚠️ And **not** the taper's target — the taper holds the hard family at level 1, which
+is a quieter version of intensity, and an athlete who declined intensity is asking for easy running.
+
+### Two defects the ruling exposed, both of which would have shipped
+
+1. ⛔ **`hardRunBeforeMeLower` read hardness off the FRAME's slot.** Correct while an assignment only
+   ever changed the SPORT; a declined slot changes the **family**, so the frame still called day 1
+   hard after the week had converted it to easy running and the lower-body haircut would have fired
+   on a session that is not in the plan. It now reads the ASSIGNED slot. **Michael asked for this
+   verified in a fixture rather than assumed — assuming would have shipped it.**
+2. ⛔ **The screen's live lifting rate gated on `hard1 && hard2`**, so it would have read *"pending"*
+   forever on exactly the week the ruling makes standard. It now gates on the REQUIRED slots. ⚠️ Zero
+   hard sessions scores the BEST rate (`liftingRateTier` counts hard RUNS → `hard_on_bike`, 1% every
+   3 weeks), which is the same direction his own copy states.
+
+**The accessory tier claim is true and is now pinned** (`endurance-tier.test.ts`): at the same hours,
+zero hard sessions never buys a thinner band than one or two, and a light week with none reaches
+`strength` (40-50). ⚠️ The hours still bite — nine easy hours is still `survival`.
+
+### The UX: Add / Remove, not tap-to-clear
+
+Michael asked whether a second tap on the chosen sport should clear the slot. **It should not.** It
+conflates two intents — *"I want the other sport"* and *"I do not want this session at all"* — and a
+chip that clears on a second tap loses the session to a mis-tap with no undo and no warning, while
+leaving no affordance saying removal is possible at all. An explicit **Remove** is the inverse of an
+explicit **Add**, which is the pattern the wizard already uses ("+ Add a run"), and it keeps the sport
+chips doing exactly one thing.
+
+⚠️ **An added session opens on the frame's lead sport** (Ride on a hard slot, p280) rather than empty:
+a slot with no sport would be a fifth unanswered thing on a screen that just stopped having any.
+
+⛔ **`hardDays` stopped being positional.** It is now *"the hard sessions the athlete added"* and its
+LENGTH is what the tier reads, so an entry's index no longer says which slot it came from. Each entry
+carries `slot`, and `hardEntry` looks up by key. ⚠️ Without that, removing the first hard session left
+`hardDays[0]` holding the SECOND slot's answer and the row rendered the wrong session's day and
+archetype. ⚠️ `syncHardDays` returns `null` for an unadded slot instead of `prev` — returning `prev`
+resurrected the session the athlete had just deleted, day and club answer and all.
+
+**Continue is gated on the easy and long slots only** (`REQUIRED_SLOT_KEYS`). Gating on the hard ones
+would make the default path unreachable and leave the screen naming two rows as missing that the
+athlete deliberately left alone. `unansweredLine` never names a hard session.
+
+**Existing behaviour for athletes who pick 1-2 hard sessions is unchanged**, pinned directly: a hard
+run on day one still causes the haircut, a hard ride still does not.
+
+**DEPLOY SET (2):** `generate-strength-plan`, `rematerialize-standing-block`.
+
+---
+
 ## D-450 — "Dial": his bands, our dial — the Standing Plan's accessory screen (2026-08-24)
 
 Decided by Michael in chat and built, renamed and committed the same day. ⚠️ **This entry is the

@@ -22,6 +22,7 @@ import {
 // for the same thing for the same reason: an import that only one toolchain can follow is a module
 // only one toolchain can check.
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import { HARD_SLOT_KEYS } from './standing-plan-week-copy';
 import type { SlotKey, SlotSelection, SlotSport } from './standing-plan-week-copy';
 
 /**
@@ -54,15 +55,30 @@ export const SLOT_FRAME_KEY: Record<SlotKey, string> = {
   long: '6:0',
 };
 
-/** The athlete's four answers, in the shape `SportMix.slots` takes. */
-export function slotsForEngine(slots: SlotSelection): Record<string, SlotSport> {
-  const out: Record<string, SlotSport> = {};
+/**
+ * The athlete's answers, in the shape `SportMix.slots` takes.
+ *
+ * ⛔⛔ AN UNADDED HARD SESSION IS SENT AS `'none'`, NOT OMITTED (Michael, 2026-08-25). The two are
+ * different answers to `assignSports` and the difference is the whole ruling:
+ *
+ *   - **omitted** — nobody asked; the slot keeps the frame's own hard run. Right for every caller
+ *     that predates this screen.
+ *   - **`'none'`** — this screen asked and the athlete added nothing there; the slot CONVERTS to the
+ *     frame's easy session.
+ *
+ * ⚠️ SO OMITTING IT WOULD SILENTLY BUILD THE OLD WEEK. The athlete adds no hard session, the map
+ * says nothing about that slot, and the engine hands back the intensity they declined — the screen
+ * and the week disagreeing, which is the exact defect `SportMix.slots` was added to end.
+ *
+ * ⚠️ EASY AND LONG ARE STILL OMITTED WHEN UNANSWERED, because they are not opt-in: Continue is gated
+ * on both, so an unanswered one never reaches here in a submitted week.
+ */
+export function slotsForEngine(slots: SlotSelection): Record<string, SlotSport | 'none'> {
+  const out: Record<string, SlotSport | 'none'> = {};
   for (const key of Object.keys(SLOT_FRAME_KEY) as SlotKey[]) {
-    // ⚠️ AN UNANSWERED SLOT IS OMITTED, not defaulted. `assignSports` treats a slot the map does not
-    // name as the frame's own run — and Continue is gated on all four being answered, so a complete
-    // map is what actually reaches the engine.
     const v = slots[key];
-    if (v) out[SLOT_FRAME_KEY[key]] = v;
+    if (v) { out[SLOT_FRAME_KEY[key]] = v; continue; }
+    if (HARD_SLOT_KEYS.includes(key)) out[SLOT_FRAME_KEY[key]] = 'none';
   }
   return out;
 }

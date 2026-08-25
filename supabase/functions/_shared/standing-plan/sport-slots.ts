@@ -42,8 +42,20 @@ export type SportMix = {
    *
    * ⚠️ KEYED `${frameDay}:${indexWithinDay}` — the same key `byKey` uses, so a caller cannot supply
    * an answer for a slot the column does not have.
+   *
+   * ⛔⛔ `'none'` MEANS THE ATHLETE DECLINED A HARD SESSION (Michael's ruling, 2026-08-25: hard
+   * sessions are opt-in, up to two, and the default is ZERO). It is a THIRD state and it is not the
+   * same as omitting the key:
+   *
+   *   - **key absent** — nobody asked. Every caller before the endurance screen existed. The slot
+   *     keeps the frame's own run, exactly as it always did.
+   *   - **`'none'`** — the screen asked and the athlete added no hard session there. The slot
+   *     CONVERTS to the frame's easy session (see `declineHardSlot`).
+   *
+   * ⚠️ THE DISTINCTION IS LOAD-BEARING. Collapsing them would silently strip the intensity out of
+   * every plan built by a generator that never had this screen.
    */
-  slots?: Record<string, 'run' | 'ride'> | null;
+  slots?: Record<string, 'run' | 'ride' | 'none'> | null;
   /**
    * ⛔ THE WITHIN-FAMILY VARIANT PICKS (Michael, 2026-08-24 — "the speed drills"). Keyed like
    * `slots`; values are the library's archetype ids. A pick that is not one of the ASSIGNED
@@ -129,6 +141,55 @@ export function isLongSlot(slot: { family: FamilyId }): boolean {
   return slot.family === 'run_lsd';
 }
 
+/**
+ * ⛔⛔ A DECLINED HARD SLOT BECOMES THE FRAME'S EASY SESSION — CONVERT, NEVER ADD (Michael, 2026-08-25).
+ *
+ * Hard sessions are opt-in, up to two, default ZERO. An athlete who adds none still trains four
+ * sessions: *"Your miles and hours default to easy pace and recovery if none is picked."* So the
+ * slot is REPLACED, never removed — the week's session count is the frame's and nothing here moves
+ * it. That is pivot §2's rule and the same shape the taper column already uses, which holds its own
+ * count and drops the LEVEL rather than deleting a day.
+ *
+ * ⛔⛔ THE TARGET IS THE COLUMN'S OWN EASY SLOT, PASSED IN — NOT A LITERAL. A first draft wrote
+ * `{ family: 'run_vt1', level: 1, archetype: 'steady' }` by hand and the composer threw
+ * **"archetype steady is not offered for run_vt1 at level 1"**: the family and level were right and
+ * the archetype was invented. ⚠️ The library owns which archetypes a family offers at a level, and
+ * a hand-written triple here is a second statement of the frame that is wrong the moment it drifts.
+ * `assignSports` reads the easy slot out of the very column it is assigning and hands it over.
+ *
+ * ⚠️ NOT THE TAPER'S SUBSTITUTION TARGET. The taper holds the hard family at level 1, which is right
+ * for a deload week and wrong here — an athlete who declined intensity is not asking for a quieter
+ * version of it, they are asking for easy running.
+ *
+ * ⚠️ THE CONVERTED SLOT TAKES THE SPORT OF THE EASY SLOT the athlete DID answer, where they answered
+ * one — it has become an easy session, and it reading "Run" beside their "Easy · Ride" would be the
+ * screen and the week disagreeing again.
+ */
+export function declineHardSlot(
+  slot: EnduranceSlot,
+  easySport: 'run' | 'ride' | null,
+  /** ⛔ THE COLUMN'S OWN EASY SLOT. Required — there is no honest default for it here. */
+  easySlot: EnduranceSlot,
+): AssignedSlot {
+  if (easySport === 'ride') {
+    const eq = RIDE_EQUIVALENT[easySlot.family];
+    if (eq) {
+      return {
+        family: eq.family, level: easySlot.level, archetype: eq.archetype, raceTempo: false,
+        sport: 'ride', substituted: true, sourceText: slot.sourceText,
+      };
+    }
+  }
+  return {
+    family: easySlot.family, level: easySlot.level, archetype: easySlot.archetype, raceTempo: false,
+    sport: 'run', substituted: true, sourceText: slot.sourceText,
+  };
+}
+
+export const HARD_SESSIONS_ARE_OPT_IN =
+  'Hard sessions are added, up to two. A week with none still carries its four sessions — the hard '
+  + 'ones become easy running instead, so the miles and hours you set are unchanged.';
+
 /** ⛔ A HARD SLOT — at or above near-threshold. These are the two the dial places. */
 export function isHardSlot(slot: { family: FamilyId }): boolean {
   return (HARDNESS[slot.family] ?? 0) >= 3;
@@ -201,8 +262,34 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
    */
   if (mix.slots && Object.keys(mix.slots).length > 0) {
     let substituted = 0;
+    let declined = 0;
+    // ⚠️ RESOLVED BEFORE THE LOOP so every declined hard slot reads the SAME easy answer, whatever
+    // order the slots come in. The easy slot is the one the athlete did answer.
+    // ⛔ THE COLUMN'S OWN EASY SESSION — read off the frame being assigned, never written down here.
+    const frameEasySlot = open.find(({ slot }) => !isHardSlot(slot) && !isLongSlot(slot))?.slot ?? null;
+    const easySport = ((): 'run' | 'ride' | null => {
+      for (const { day, i, slot } of open) {
+        if (isHardSlot(slot) || isLongSlot(slot)) continue;
+        const a = mix.slots?.[key(day, i)];
+        if (a === 'run' || a === 'ride') return a;
+      }
+      return null;
+    })();
     for (const { day, i, slot } of open) {
       const asked = mix.slots[key(day, i)];
+      // ⛔ DECLINED — the athlete added no hard session here. Convert, never remove. ⚠️ Guarded on
+      // `isHardSlot`: `'none'` on an easy or long slot is meaningless (they are not opt-in) and is
+      // ignored rather than quietly emptying the week.
+      if (asked === 'none') {
+        if (!isHardSlot(slot)) continue;
+        // ⚠️ NO EASY SLOT IN THE COLUMN → NOTHING TO CONVERT TO, so the slot is left as the frame
+        // wrote it rather than replaced with a guess. No column ships this way; the guard exists
+        // because inventing a session is the failure this whole function is built to avoid.
+        if (!frameEasySlot) continue;
+        byKey[key(day, i)] = declineHardSlot(slot, easySport, frameEasySlot);
+        declined += 1;
+        continue;
+      }
       if (asked !== 'ride') continue;
       const eq = RIDE_EQUIVALENT[slot.family];
       if (!eq) continue;
@@ -212,6 +299,7 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
       };
       substituted += 1;
     }
+    if (declined > 0) notes.push({ kind: 'ours', text: HARD_SESSIONS_ARE_OPT_IN });
     if (substituted > 0) {
       notes.push({ kind: 'ours', text: RIDE_EQUIVALENCE_IS_OURS });
       notes.push({
@@ -227,8 +315,19 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
     return {
       byKey,
       counts: counts0,
-      hardRunBeforeMeLower: dayOne0.some(({ day, i, slot }) =>
-        isHardSlot(slot) && byKey[key(day, i)]?.sport === 'run'),
+      /**
+       * ⛔⛔ HARDNESS IS READ OFF THE **ASSIGNED** SLOT, NOT THE FRAME'S (2026-08-25). This said
+       * `isHardSlot(slot)` — the frame's own slot — and that was correct while every assignment
+       * kept the family and changed only the sport. **A declined hard slot changes the FAMILY**, so
+       * the frame still calls day 1 hard after the week has converted it to easy running, and the
+       * lower-body haircut would fire on an intensity session that is no longer in the plan.
+       *
+       * ⚠️ `byKey` is fully populated for every slot before this runs, so there is no ordering risk.
+       */
+      hardRunBeforeMeLower: dayOne0.some(({ day, i }) => {
+        const a = byKey[key(day, i)];
+        return !!a && isHardSlot({ family: a.family }) && a.sport === 'run';
+      }),
       notes,
     };
   }

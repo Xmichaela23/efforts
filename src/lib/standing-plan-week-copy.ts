@@ -32,6 +32,22 @@ export const ENDURANCE_WEEK_HEADER: string[] = [
   'Cycling is more forgiving when working concurrently with strength.',
 ];
 
+/**
+ * ⛔ THE HARD SESSIONS ARE OPT-IN, AND THIS IS MICHAEL'S LINE, VERBATIM (2026-08-25).
+ *
+ * ⚠️ Rendered as two sentences on one control, above the two add rows. The second half is the whole
+ * point of the ruling: a week with no hard session is not a thinner week, it is the same four
+ * sessions at easy pace — and the miles and hours the athlete already set are unchanged.
+ *
+ ⚠️ IT OPENS WITH AN IMPERATIVE ("Pick up to 2") AND STILL PASSES THE VOICE GATE UNAIDED — the banned
+ * list holds `stay / keep / try / consider / focus`, not `pick`. So unlike the Dial's sub-line this
+ * needs no override, and it is asserted CLEAN rather than exempted: an exemption nobody needs is one
+ * that later hides a real violation.
+ */
+export const HARD_SESSIONS_OPT_IN_LINE =
+  'Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and hours default '
+  + 'to easy pace and recovery if none is picked — and may improve your lower body lifts.';
+
 /** The label under the long-session control. His own permission, p275: the long one may be a ride. */
 export const LONG_SLOT_NOTE = 'one per week, run or ride';
 
@@ -164,14 +180,37 @@ export function emptySlotSports(): SlotSelection {
   return { hard1: null, hard2: null, easy: null, long: null };
 }
 
-/** ⛔ CONTINUE IS GATED ON THIS. A week with an unanswered slot is not a week. */
+/**
+ * ⛔ THE TWO SLOTS A WEEK CANNOT DO WITHOUT. Easy and long are the frame's; the two hard sessions are
+ * OPT-IN (Michael, 2026-08-25) and an empty one is a complete answer, not a missing one.
+ */
+export const REQUIRED_SLOT_KEYS: SlotKey[] = ['easy', 'long'];
+
+/** ⛔ THE HARD SLOTS — added, up to two, default zero. */
+export const HARD_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2'];
+
+export const MAX_HARD_SESSIONS = HARD_SLOT_KEYS.length;
+
+/** How many hard sessions the athlete has added. */
+export function hardSessionCount(slots: SlotSelection): number {
+  return HARD_SLOT_KEYS.filter((k) => slots[k] === 'run' || slots[k] === 'ride').length;
+}
+
+/**
+ * ⛔ CONTINUE IS GATED ON THIS, AND IT NO LONGER WAITS ON THE HARD SLOTS (Michael, 2026-08-25).
+ *
+ * It used to read *"a week with an unanswered slot is not a week"* across all four, which was right
+ * while every slot was a session to configure. **Hard sessions are now something the athlete ADDS**,
+ * and the default is zero — so gating Continue on them would make the default path unreachable and
+ * the screen would sit there naming two rows as missing that the athlete deliberately left alone.
+ */
 export function allSlotsChosen(slots: SlotSelection): boolean {
-  return SLOT_KEYS.every((k) => slots[k] === 'run' || slots[k] === 'ride');
+  return REQUIRED_SLOT_KEYS.every((k) => slots[k] === 'run' || slots[k] === 'ride');
 }
 
 /** The rows still waiting, in screen order — for the line above a disabled Continue. */
 export function unansweredSlots(slots: SlotSelection): SlotKey[] {
-  return SLOT_KEYS.filter((k) => slots[k] !== 'run' && slots[k] !== 'ride');
+  return REQUIRED_SLOT_KEYS.filter((k) => slots[k] !== 'run' && slots[k] !== 'ride');
 }
 
 /**
@@ -250,13 +289,23 @@ export const RATE_CITE: Record<LiftingRateTier, string> = {
  * one live number must never be a placeholder the athlete could read as an answer.
  */
 export const RATE_PENDING_LINE =
-  'The lifting rate appears once both hard sessions have a sport.';
+  'The lifting rate appears once the recovery and long sessions have a sport.';
 
 export function liftingRateLine(
   slots: SlotSelection,
   squat1RM?: number | null,
 ): string {
-  if (!slots.hard1 || !slots.hard2) return RATE_PENDING_LINE;
+  /**
+   * ⛔⛔ PENDING ON THE REQUIRED SLOTS, NOT ON THE HARD ONES (2026-08-25). This read
+   * `!slots.hard1 || !slots.hard2` — correct while all four had to be answered, and **wrong the
+   * moment hard sessions became opt-in**: the default path adds none, so the screen's one live
+   * number would have read "pending" forever on exactly the week the ruling makes standard.
+   *
+   * ⚠️ ZERO HARD SESSIONS IS A REAL ANSWER AND IT SCORES THE BEST RATE — `liftingRateTier` counts
+   * hard RUNS, so none gives `hard_on_bike`'s 1% every 3 weeks. That is the same direction as
+   * Michael's own copy: *"may improve your lower body lifts."*
+   */
+  if (!allSlotsChosen(slots)) return RATE_PENDING_LINE;
   const tier = liftingRateTier(slots as Record<SlotKey, SlotSport>);
   const rate = RATE_TEXT[tier];
   const squat = Number(squat1RM);
@@ -281,7 +330,9 @@ export function liftingRateLine(
  * LOWER BODY ONLY — and the corpus gives no figure for how much less the upper body is affected.
  */
 export function upperLowerSplitLine(slots: SlotSelection): string | null {
-  if (!slots.hard1 || !slots.hard2) return null;
+  // ⚠️ Same correction as `liftingRateLine`, and it lands the same way: with no hard runs the tier
+  // is `hard_on_bike` and this returns null anyway — there is no split to explain.
+  if (!allSlotsChosen(slots)) return null;
   if (liftingRateTier(slots as Record<SlotKey, SlotSport>) === 'hard_on_bike') return null;
   return 'The running lands on the legs, so the squat and deadlift carry the cost; the presses are '
     + 'largely unaffected.';

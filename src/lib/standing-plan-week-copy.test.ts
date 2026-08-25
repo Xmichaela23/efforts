@@ -23,6 +23,11 @@ import {
   RUN_TAX_LINES,
   slotSummary,
   allSlotsChosen,
+  HARD_SESSIONS_OPT_IN_LINE,
+  HARD_SLOT_KEYS,
+  MAX_HARD_SESSIONS,
+  REQUIRED_SLOT_KEYS,
+  hardSessionCount,
   emptySlotSports,
   unansweredLine,
   unansweredSlots,
@@ -95,33 +100,82 @@ Deno.test('the four slots are the four the frame has, labelled as the athlete se
 // B — THE PRE-FILL AND THE DERIVED MIX
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('every row starts neutral, and Continue is gated on all four', () => {
+Deno.test('every row starts neutral, and Continue waits only on the frame\'s own two', () => {
   /**
    * ⛔ MICHAEL, 2026-08-24 — **supersedes the pre-fill**. It put both hard slots on the bike before
    * the athlete had said anything, which made a screen full of decisions look like a screen full of
    * answers; an athlete who scrolled past it had a mix nobody chose.
+   *
+   * ⛔⛔ AND MICHAEL, 2026-08-25 — **hard sessions are OPT-IN, up to two, default ZERO.** This test
+   * was called *"Continue is gated on all four"* and that is exactly what had to change: gating on
+   * the hard slots makes the default path unreachable, and the screen would sit naming two rows as
+   * missing that the athlete deliberately left alone. An empty hard slot is a complete answer.
    */
   const empty = emptySlotSports();
   assertEquals(empty, { hard1: null, hard2: null, easy: null, long: null });
   assert(!allSlotsChosen(empty), 'an untouched screen let Continue through');
-  assertEquals(unansweredSlots(empty), SLOT_KEYS);
+  // ⛔ ONLY THE REQUIRED TWO ARE EVER "UNANSWERED". The hard slots are never named as missing.
+  assertEquals(unansweredSlots(empty), REQUIRED_SLOT_KEYS);
+  assert(!unansweredSlots(empty).some((k) => HARD_SLOT_KEYS.includes(k)),
+    'an unadded hard session was reported as a missing answer');
 
   const partial = { ...empty, hard1: 'ride' as const, easy: 'run' as const };
-  assert(!allSlotsChosen(partial), 'two answered rows let Continue through');
-  assertEquals(unansweredSlots(partial), ['hard2', 'long']);
+  assert(!allSlotsChosen(partial), 'a week with no long session let Continue through');
+  assertEquals(unansweredSlots(partial), ['long']);
+
+  // ⛔ THE DEFAULT PATH: no hard sessions at all, and the week is complete.
+  const zeroHard = { hard1: null, hard2: null, easy: 'run', long: 'run' } as const;
+  assert(allSlotsChosen(zeroHard), 'the zero-hard default could not reach Continue');
+  assertEquals(unansweredLine(zeroHard), null, 'the default week named something missing');
+  assertEquals(hardSessionCount(zeroHard), 0);
 
   const full = { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' } as const;
   assert(allSlotsChosen(full));
+  assertEquals(hardSessionCount(full), MAX_HARD_SESSIONS);
   assertEquals(unansweredLine(full), null, 'a finished week still named something missing');
+});
+
+Deno.test('⛔ MICHAEL\'S OPT-IN LINE, VERBATIM', () => {
+  assertEquals(
+    HARD_SESSIONS_OPT_IN_LINE,
+    'Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and hours '
+    + 'default to easy pace and recovery if none is picked — and may improve your lower body lifts.',
+  );
+  // ⚠️ IT OPENS WITH AN IMPERATIVE ("Pick up to 2") AND STILL PASSES THE GATE UNAIDED — the banned
+  // list holds `stay / keep / try / consider / focus`, not `pick`. So this needs NO override, unlike
+  // the Dial's sub-line. Asserted clean rather than exempted: an exemption nobody needs is an
+  // exemption that later hides a real violation.
+  assertEquals(voiceViolation(HARD_SESSIONS_OPT_IN_LINE), null, HARD_SESSIONS_OPT_IN_LINE);
+  assertEquals(MAX_HARD_SESSIONS, 2, 'the line says 2 and the cap must agree');
+  assert(HARD_SESSIONS_OPT_IN_LINE.includes(String(MAX_HARD_SESSIONS)));
+});
+
+Deno.test('the rate is live on the zero-hard default, not stuck on pending', () => {
+  /**
+   * ⛔ THE DEFECT THIS CLOSES. `liftingRateLine` gated on `hard1 && hard2`, which was right while
+   * all four slots had to be answered and **wrong the moment hard sessions became opt-in**: the
+   * screen's one live number would have read "pending" forever on the default path.
+   */
+  const zeroHard = { hard1: null, hard2: null, easy: 'run', long: 'run' } as const;
+  const line = liftingRateLine(zeroHard, 300);
+  assert(line !== RATE_PENDING_LINE, 'the default week shows no rate');
+  // ⚠️ AND IT IS THE BEST RATE — `liftingRateTier` counts hard RUNS, and there are none.
+  assert(/1% every 3 weeks/.test(line), line);
+  // Still pending while the week itself is incomplete.
+  assertEquals(liftingRateLine(emptySlotSports(), 300), RATE_PENDING_LINE);
+  assertEquals(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null }, 300), RATE_PENDING_LINE);
 });
 
 Deno.test('the blocked line names what is missing, and nothing else', () => {
   const one = unansweredLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null })!;
   assert(/long session/i.test(one), one);
   assert(/has no sport yet/.test(one), one);
+  // ⛔ AND IT NEVER NAMES A HARD SESSION (2026-08-25). They are opt-in; an unadded one is not
+  // missing, and telling the athlete it is would be the screen asking a question it stopped asking.
   const two = unansweredLine({ hard1: 'ride', hard2: null, easy: null, long: 'run' })!;
-  assert(/have no sport yet/.test(two), two);
-  assert(/hard session 2/i.test(two) && /recovery session/i.test(two), two);
+  assert(/has no sport yet/.test(two), two);
+  assert(/recovery session/i.test(two), two);
+  assert(!/hard session/i.test(two), `the line named an unadded hard session: ${two}`);
   // ⚠️ VOICE: it states the fact, it does not instruct.
   for (const line of [one, two]) {
     assertEquals(voiceViolation(line), null, line);
@@ -133,8 +187,14 @@ Deno.test('the rate says which fact is missing rather than showing a number that
   // ⛔ THE RATE IS A FUNCTION OF THE TWO HARD SLOTS. Until both have a sport there is no rate, and
   // the screen's one live number must never be a placeholder an athlete could read as an answer.
   assertEquals(liftingRateLine(emptySlotSports(), 300), RATE_PENDING_LINE);
-  assertEquals(liftingRateLine({ hard1: 'ride', hard2: null, easy: 'run', long: 'run' }, 300), RATE_PENDING_LINE);
-  assertEquals(upperLowerSplitLine({ hard1: 'run', hard2: null, easy: 'run', long: 'run' }), null);
+  // ⛔⛔ THIS PINNED THE OLD MODEL (updated 2026-08-25). It read
+  // `liftingRateLine({hard1:'ride', hard2:null, easy:'run', long:'run'}) === RATE_PENDING_LINE` —
+  // correct while both hard slots had to be answered. **One hard session is now a complete week**,
+  // so that case has a real rate; what is still pending is a week missing a REQUIRED slot.
+  assertEquals(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null }, 300), RATE_PENDING_LINE);
+  assert(/1% every 4 weeks/.test(liftingRateLine({ hard1: 'run', hard2: null, easy: 'run', long: 'run' }, 300)),
+    'one hard run is a finished week and scores its own rate');
+  assertEquals(upperLowerSplitLine({ hard1: 'run', hard2: null, easy: 'run', long: null }), null);
   assert(!/%/.test(RATE_PENDING_LINE), 'the pending line carries a number');
   // And the moment both are answered it is a real rate again.
   assert(/1% every 3 weeks/.test(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' })));

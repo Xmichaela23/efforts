@@ -25,6 +25,8 @@ import {
   MATERIALIZER_RUN_PATTERNS,
   MATERIALIZER_SWIM_PATTERNS,
   prescribedLoad,
+  declineHardSlot,
+  HARD_SESSIONS_ARE_OPT_IN,
   RIDE_EQUIVALENCE_IS_OURS,
   RIDE_EQUIVALENT,
   sportForFamily,
@@ -492,4 +494,123 @@ Deno.test("the engine's default genuinely rotates — two weeks, two shapes; a p
     pin(3).sessions.find((s) => s.tags.includes('family:run_mlss'))?.steps_preset?.join('|'),
     'a pinned variant still rotated',
   );
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ HARD SESSIONS ARE OPT-IN, UP TO TWO, DEFAULT ZERO (Michael, 2026-08-25)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** The frame's own slot keys, read off `FRAMES` rather than transcribed. */
+const SLOT_KEYS_BY_ROLE = (() => {
+  const out = { hard: [] as string[], easy: [] as string[], long: [] as string[] };
+  for (const d of STANDARD) {
+    (d.endurance ?? []).forEach((slot, i) => {
+      const k = `${d.day}:${i}`;
+      if (isLongSlot(slot)) out.long.push(k);
+      else if (isHardSlot(slot)) out.hard.push(k);
+      else out.easy.push(k);
+    });
+  }
+  return out;
+})();
+
+/** `slots` for a week where `hardPicked` of the hard slots are taken and the rest declined. */
+function optIn(hardPicked: Array<'run' | 'ride'>, easy: 'run' | 'ride' = 'run') {
+  const slots: Record<string, 'run' | 'ride' | 'none'> = {};
+  SLOT_KEYS_BY_ROLE.hard.forEach((k, i) => { slots[k] = hardPicked[i] ?? 'none'; });
+  for (const k of SLOT_KEYS_BY_ROLE.easy) slots[k] = easy;
+  for (const k of SLOT_KEYS_BY_ROLE.long) slots[k] = 'run';
+  return slots;
+}
+
+Deno.test('⛔ THE CONVERSION TARGET IS THE FRAME\'S OWN EASY SLOT, never a literal', () => {
+  /**
+   * ⛔ THE BUG THIS PINS, and it threw rather than shipped: a first draft hand-wrote
+   * `run_vt1 / L1 / 'steady'` and the composer answered **"archetype steady is not offered for
+   * run_vt1 at level 1"**. Family and level right, archetype invented. The library owns which
+   * archetypes a family offers; a triple written down here is a second statement of the frame.
+   */
+  const hard = STANDARD.flatMap((d) => (d.endurance ?? [])).find((sl) => isHardSlot(sl))!;
+  const easy = STANDARD.flatMap((d) => (d.endurance ?? []))
+    .find((sl) => !isHardSlot(sl) && !isLongSlot(sl))!;
+  const got = declineHardSlot(hard, null, easy);
+  assertEquals(got.family, easy.family);
+  assertEquals(got.level, easy.level);
+  assertEquals(got.archetype, easy.archetype, 'the archetype was not taken from the frame');
+});
+
+Deno.test('⛔ ZERO HARD SESSIONS: the week keeps its four sessions, all easy', () => {
+  const a = assignSports(STANDARD, { slots: optIn([]) });
+  const assigned = Object.values(a.byKey);
+  // ⛔ CONVERT, NEVER ADD — and never REMOVE either. The slot count is the frame's.
+  assertEquals(assigned.length, STANDARD.flatMap((d) => d.endurance ?? []).length,
+    'declining a hard session changed how many sessions the week has');
+  // ⛔ AND NOTHING HARD SURVIVES.
+  const stillHard = assigned.filter((x) => isHardSlot({ family: x.family }));
+  assertEquals(stillHard.length, 0, `hard sessions survived: ${stillHard.map((x) => x.family).join(', ')}`);
+  // The long session is untouched — it was never a hard slot and is not opt-in.
+  assert(assigned.some((x) => isLongSlot({ family: x.family })), 'the long session was converted too');
+  assert(a.notes.some((n) => n.text === HARD_SESSIONS_ARE_OPT_IN), 'the week does not say what happened');
+});
+
+Deno.test('⛔ ZERO HARD SESSIONS: no lower-body haircut — VERIFIED, not assumed', () => {
+  /**
+   * ⛔ AND IT WAS NOT ALREADY TRUE. `hardRunBeforeMeLower` read hardness off the FRAME's slot, which
+   * was right while an assignment only ever changed the SPORT. A declined slot changes the FAMILY,
+   * so the frame still called day 1 hard after the week had converted it to easy running, and the
+   * haircut fired on an intensity session that is not in the plan. Michael asked for this verified
+   * rather than assumed; assuming would have shipped it.
+   */
+  assertEquals(assignSports(STANDARD, { slots: optIn([]) }).hardRunBeforeMeLower, false);
+  // ⛔ AND THE EXISTING BEHAVIOUR IS UNCHANGED FOR 1-2 PICKED SESSIONS.
+  assertEquals(assignSports(STANDARD, { slots: optIn(['run']) }).hardRunBeforeMeLower, true,
+    'a hard RUN on day one no longer causes the haircut');
+  assertEquals(assignSports(STANDARD, { slots: optIn(['ride']) }).hardRunBeforeMeLower, false,
+    'a hard RIDE on day one now causes the haircut');
+});
+
+Deno.test('a declined slot follows the sport the athlete DID answer for easy', () => {
+  const onRide = Object.values(assignSports(STANDARD, { slots: optIn([], 'ride') }).byKey)
+    .filter((x) => !isLongSlot({ family: x.family }));
+  assert(onRide.every((x) => x.sport === 'ride'),
+    `the converted sessions ignored the easy answer: ${onRide.map((x) => `${x.family}/${x.sport}`).join(', ')}`);
+});
+
+Deno.test('⛔ AN ABSENT KEY IS NOT A DECLINE — every older caller is untouched', () => {
+  /**
+   * ⛔ THE DISTINCTION THIS TEST EXISTS FOR. `'none'` means the screen asked and the athlete added
+   * nothing; an ABSENT key means nobody asked. Collapsing them would strip the intensity out of
+   * every plan built by a generator that never had this screen.
+   */
+  const noSlots = assignSports(STANDARD, { runs: 4, rides: 0 });
+  assert(Object.values(noSlots.byKey).some((x) => isHardSlot({ family: x.family })),
+    'a caller that never mentioned slots lost its hard sessions');
+  assert(!noSlots.notes.some((n) => n.text === HARD_SESSIONS_ARE_OPT_IN));
+});
+
+Deno.test('`none` on an easy or long slot is ignored, never an emptied week', () => {
+  const slots = optIn(['run', 'run']);
+  for (const k of [...SLOT_KEYS_BY_ROLE.easy, ...SLOT_KEYS_BY_ROLE.long]) slots[k] = 'none';
+  const a = assignSports(STANDARD, { slots });
+  assertEquals(Object.values(a.byKey).length, STANDARD.flatMap((d) => d.endurance ?? []).length);
+  assert(Object.values(a.byKey).some((x) => isLongSlot({ family: x.family })), 'the long session vanished');
+});
+
+Deno.test('⛔ ZERO HARD SESSIONS: the week still builds four endurance sessions end to end', () => {
+  const wk = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { slots: optIn([]) } });
+  const t = types(wk);
+  assertEquals((t.run ?? 0) + (t.ride ?? 0), STANDARD.flatMap((d) => d.endurance ?? []).length,
+    'the built week lost a session');
+  assert((t.strength ?? 0) > 0, 'the lifting went missing with the intensity');
+});
+
+Deno.test('declineHardSlot keeps the source text of the slot it replaced', () => {
+  // ⚠️ The row still cites the page its slot came from — the week converted a session, it did not
+  // invent one, and the provenance is what says so.
+  const hard = STANDARD.flatMap((d) => (d.endurance ?? [])).find((sl) => isHardSlot(sl))!;
+  const easy = STANDARD.flatMap((d) => (d.endurance ?? []))
+    .find((sl) => !isHardSlot(sl) && !isLongSlot(sl))!;
+  assertEquals(declineHardSlot(hard, null, easy).sourceText, hard.sourceText);
+  assertEquals(declineHardSlot(hard, null, easy).substituted, true);
 });

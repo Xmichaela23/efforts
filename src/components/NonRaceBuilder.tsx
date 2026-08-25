@@ -752,6 +752,16 @@ type NonRaceState = {
    * grounds, and one field cannot hold both.
    */
   hardDays: Array<{
+    /**
+     * ⛔ WHICH HARD SLOT THIS ENTRY IS (2026-08-25). The array used to be POSITIONAL — hard1 at
+     * index 0, hard2 at index 1 — which held only while both slots always existed. **Hard sessions
+     * became removable**, so the array is now "the sessions the athlete added" and its length is
+     * what the tier reads; an entry's index no longer says which slot it came from.
+     *
+     * ⚠️ Absent on drafts made before today. `hardEntry` falls back to the positional read for
+     * those, which is correct for them because they always carried both slots.
+     */
+    slot?: 'hard1' | 'hard2';
     discipline: 'run' | 'bike';
     day: DayName | '';
     ownership: 'prescribed' | 'club';
@@ -3055,6 +3065,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const HARD_SLOT_INDEX: Record<'hard1' | 'hard2', number> = { hard1: 0, hard2: 1 };
 
   /**
+   * ⛔ THE ENTRY FOR A SLOT, BY KEY — NOT BY POSITION (2026-08-25). With hard sessions removable, an
+   * athlete who deletes the first one leaves `hardDays[0]` holding the SECOND slot's answer, and a
+   * positional read hands the wrong session's day and archetype to the row. ⚠️ Falls back to the
+   * positional read for drafts written before `slot` existed, which always carried both entries.
+   */
+  const hardEntry = (st: NonRaceState, k: 'hard1' | 'hard2') =>
+    st.hardDays.find((h) => h.slot === k)
+    ?? (st.hardDays.some((h) => h.slot) ? undefined : st.hardDays[HARD_SLOT_INDEX[k]]);
+
+
+  /**
    * ⛔ THE SLOT'S SESSION, WHICH IS THE FRAME'S FACT AND NOT A DEFAULT (Michael's A4 ruling,
    * 2026-08-24). Slot one is the top-end session and slot two the sustained one, on either sport —
    * `p246`'s own two hard days in order. ⚠️ THE WORD "DEFAULT" IS WRONG HERE NOW: there is nothing to
@@ -3090,10 +3111,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // ⚠️ AN UNANSWERED HARD SLOT KEEPS WHATEVER WAS THERE. Nothing reaches the engine until Continue
     // opens, and Continue is gated on every row having a sport.
     const sport = slots[k];
-    if (!sport) return prev ?? { discipline: 'run' as const, day: '' as const, ownership: 'prescribed' as const };
+    // ⛔⛔ AN UNADDED HARD SLOT IS NULL NOW, NOT "not yet answered" (Michael, 2026-08-25: hard
+    // sessions are opt-in, default zero). It used to return `prev` — right while every slot was a
+    // session being configured and the athlete's draft had to survive a sport change. **With the
+    // slot removable, returning `prev` resurrects the session they just deleted**: the day, the
+    // club answer and the archetype all travel on to the composer as an allocation nobody made.
+    if (!sport) return null;
     const want = hardDefaultsFor(sport, k);
     return {
       ...(prev ?? {}),
+      slot: k,
       discipline: want.discipline,
       day: (prev?.day ?? '') as DayName | '',
       ownership: prev?.ownership ?? 'prescribed',
@@ -3102,7 +3129,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       // leftover `speed` charges the week a 48-hour clearance for a session that is not a sprint.
       goal: want.goal,
     };
-  });
+    // ⛔ NULLS ARE DROPPED, NOT KEPT AS PLACEHOLDERS. `hardDays` is now "the hard sessions this
+    // athlete added" — its LENGTH is what the tier reads and what `create-goal` forwards, so an
+    // empty entry standing in for a removed session would charge the week for it.
+  }).filter((h): h is NonNullable<typeof h> => h != null);
 
   /**
    * ⛔⛔ `runDays` / `rideDays` ARE DERIVED FROM THE SLOTS, NOT ASKED (2026-08-24). The program owns
@@ -5003,6 +5033,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <EnduranceWeekCard
             allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
+            /** ⛔ `sport` IS `null` WHEN A HARD SESSION IS REMOVED (2026-08-25). It clears the slot
+             *  and `syncHardDays` drops the matching `hardDays` entry, so nothing about a session
+             *  the athlete deleted travels to the composer. */
             onSlotChange={(key, sport) => setState((st) => {
               const slots = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
               // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
@@ -5020,7 +5053,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const sport = slotSportsNow[key];
               // ⛔ NO SPORT, NO SESSION. The row shows its label alone until the athlete picks.
               if (!sport) return null;
-              const h = state.hardDays[HARD_SLOT_INDEX[key]];
+              const h = hardEntry(state, key);
               if (h?.ownership === 'club') return 'Club session';
               // ⛔ THE TITLE READS THE LIBRARY (2026-08-24): the chosen variant's label when one is
               // picked, the family's own label otherwise — never the old tables' copy.
@@ -5030,12 +5063,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               return variant ?? slotFamilyFact(key, sport)?.title ?? null;
             }}
             renderHardFlavor={(key) => {
-              const i = HARD_SLOT_INDEX[key];
               const sport = slotSportsNow[key];
               // ⛔ THE SESSION CHOICES APPEAR WITH THE SPORT — there is nothing to choose between
               // before one is picked, and two empty option lists is the form this screen stopped being.
               if (!sport) return null;
-              const h = state.hardDays[i] ?? hardDefaultsFor(sport, key);
+              const h = hardEntry(state, key) ?? hardDefaultsFor(sport, key);
               return (
                 <HardSlotChoices
                   slotKey={key}
@@ -5043,9 +5075,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   value={{ role: h.role, goal: h.goal, ownership: h.ownership, archetype: (h as { archetype?: string }).archetype }}
                   onChange={(patch) => setState((st) => {
                     const next = syncHardDays(st, slotSportsNow);
+                    // ⚠️ INDEX RESOLVED AGAINST `next`, NOT `st` — `syncHardDays` may have dropped a
+                    // removed slot, so the position in the rebuilt array is the only valid one.
+                    const j = next.findIndex((h) => h.slot === key);
+                    if (j < 0) return st;
                     // ⚠️ SPREAD THE PATCH LAST so an explicit `goal: undefined` CLEARS a stale one —
                     // a threshold slot carrying a leftover "speed" is a session nobody picked.
-                    next[i] = { ...next[i], ...patch } as NonRaceState['hardDays'][number];
+                    next[j] = { ...next[j], ...patch } as NonRaceState['hardDays'][number];
                     return { ...st, hardDays: next };
                   })}
                 />

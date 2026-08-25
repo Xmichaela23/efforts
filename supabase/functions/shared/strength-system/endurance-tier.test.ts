@@ -233,3 +233,35 @@ Deno.test('but a DECLARED runner with no mileage figure is still unknown', () =>
   const pull = rowsOf(p, 'Bench Press').find((r: any) => /Row|Chin|Pull/i.test(r.name));
   assertEquals(String(pull?.reps), '40 total', 'an unknown volume bought the ceiling');
 });
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ ZERO HARD SESSIONS BUYS THE FULLER BAND — VERIFIED, NOT ASSUMED (Michael, 2026-08-25)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Hard sessions became opt-in with a default of ZERO, and the claim attached to that ruling was that
+ * the existing wiring already composes correctly at zero — no lower-body haircut (pinned in
+ * `standing-plan-sports.test.ts`) and a fuller accessory band here.
+ *
+ * ⛔ IT IS TRUE AND IT IS ALSO NOT AUTOMATIC. `resolveEnduranceTier` already reads `hardDays`, so
+ * nothing had to change — but "already handled" is the claim this codebase gets wrong most often,
+ * and an untested one is a hypothesis. This is the fixture that makes it a finding.
+ */
+Deno.test('⛔ AT THE SAME HOURS, zero hard sessions never buys a THINNER band than one or two', () => {
+  for (const totalHours of [2, 3, 4, 5, 6, 7, 8, 9, 12]) {
+    const bands = [0, 1, 2].map((hardDays) => TIER_BAND[resolveEnduranceTier({ hardDays, totalHours })]);
+    const [zero, one, two] = bands;
+    assert(zero[0] >= one[0] && one[0] >= two[0],
+      `at ${totalHours}h the bands do not fall with hard days: ${JSON.stringify(bands)}`);
+  }
+});
+
+Deno.test('a light week with no hard sessions reaches the top band', () => {
+  // The concrete case the ruling describes: miles and hours at easy pace, nothing hard added.
+  assertEquals(resolveEnduranceTier({ hardDays: 0, totalHours: 3 }), 'strength');
+  assertEquals(TIER_BAND.strength, [40, 50] as const);
+  // ⚠️ AND THE HOURS STILL BITE. Declining intensity does not buy the ceiling on a big week — an
+  // athlete running nine easy hours is still heavily loaded, which is what `survival` states.
+  assertEquals(resolveEnduranceTier({ hardDays: 0, totalHours: 9 }), 'survival');
+});

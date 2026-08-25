@@ -41,6 +41,11 @@ import {
   slotSummary,
   upperLowerSplitLine,
   allSlotsChosen,
+  HARD_SESSIONS_OPT_IN_LINE,
+  HARD_SLOT_KEYS,
+  MAX_HARD_SESSIONS,
+  REQUIRED_SLOT_KEYS,
+  hardSessionCount,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
@@ -48,9 +53,26 @@ import {
 import { weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
 import { getDisciplineColor } from '@/lib/context-utils';
 
+/**
+ * ⛔ WHICH ROWS THE SCREEN SHOWS, IN ORDER (2026-08-25). The frame's own two are always here; a hard
+ * session appears only once it has been ADDED. An unadded one is represented by the add control
+ * below the list, not by an empty row — an empty row is a question, and this screen has stopped
+ * asking one.
+ *
+ * ⚠️ HARD SESSIONS RENDER ABOVE EASY AND LONG when they exist, because that is the week's own shape
+ * and it is the order the old screen used; what changed is whether they are there at all.
+ */
+function ORDERED_SLOT_KEYS(slots: SlotSelection): SlotKey[] {
+  return [...HARD_SLOT_KEYS.filter((k) => !!slots[k]), ...REQUIRED_SLOT_KEYS];
+}
+
 export type EnduranceWeekCardProps = {
   slots: SlotSelection;
-  onSlotChange: (key: SlotKey, sport: SlotSport) => void;
+  /**
+   * ⛔ `null` CLEARS THE SLOT — it is how a hard session is REMOVED (2026-08-25). Only the two hard
+   * slots are ever cleared; easy and long are the frame's and Continue is gated on both.
+   */
+  onSlotChange: (key: SlotKey, sport: SlotSport | null) => void;
   /** The athlete's baselines row — the caps resolve every session against their own anchors. */
   baselines?: unknown;
   easyPaceSecPerMi?: number | null;
@@ -132,9 +154,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           moment they are about — `RUN_TAX_LINES`, inside the hard rows. */}
       <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_PREAMBLE[0]}</p>
 
-      {/* ⛔ THE FOUR SLOTS, EACH ONE ROW UNTIL ASKED. */}
+      {/* ⛔ THE FRAME'S OWN SESSIONS FIRST, THEN WHAT THE ATHLETE ADDS (Michael, 2026-08-25).
+          ═══════════════════════════════════════════════════════════════════════════════════════
+          The screen used to render four rows of one kind — four sessions to configure — and the two
+          hard ones opened pre-shaped and could not be got rid of. **Hard sessions are opt-in now,
+          up to two, and the default is zero**, so they are no longer the same kind of thing as the
+          easy and long rows and do not belong in the same list. Easy and long are the week; the
+          hard ones are an addition to it. */}
       <div className="flex flex-col gap-2">
-        {SLOT_KEYS.map((key) => {
+        {ORDERED_SLOT_KEYS(props.slots).map((key) => {
           const sport = props.slots[key];
           /**
            * ⛔ NO SPORT, NO COLOUR (Michael, 2026-08-24). A row the athlete has not answered carries
@@ -245,11 +273,65 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       here they were the message said twice, standing between the chips and the
                       choices. `RUN_TAX_LINES` stays exported — the copy tests pin his sentences. */}
                   {isHard && props.renderHardFlavor ? props.renderHardFlavor(key) : null}
+
+                  {/* ⛔ THE INVERSE OF ADD, AND IT IS EXPLICIT. See the add block below for why this
+                      is a Remove rather than a second tap on the chosen sport chip. ⚠️ It closes the
+                      row as it clears it — leaving an open disclosure over a row that no longer
+                      exists is how the list ends up with a hole in it. */}
+                  {isHard ? (
+                    <button
+                      type="button"
+                      data-testid={`remove-hard-${key}`}
+                      onClick={() => { props.onSlotChange(key, null); setOpen(null); }}
+                      className="text-white/45 text-xs underline underline-offset-2"
+                    >Remove this hard session</button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
           );
         })}
+      </div>
+
+      {/* ⛔⛔ THE ADD CONTROLS — HARD SESSIONS ARE OPT-IN (Michael, 2026-08-25).
+          ═══════════════════════════════════════════════════════════════════════════════════════
+          They sit BELOW the frame's own sessions and read as an addition to the week, which is what
+          they are. ⚠️ An unadded hard session is not an unanswered row: nothing is blocked, nothing
+          is highlighted, and Continue is live from the moment easy and long are set.
+
+          ⛔ ADD / REMOVE, NOT TAP-TO-CLEAR ON THE SPORT CHIP. Michael asked whether a second tap on
+          the chosen sport should clear the slot. It should not, and the reason is that it conflates
+          two different intents: *"I want the other sport"* and *"I do not want this session at all"*.
+          A chip that clears on a second tap also loses the session to a mis-tap, with no undo and no
+          warning — and it leaves no affordance saying removal is possible, so an athlete who wants
+          zero has to guess. An explicit Remove is the inverse of an explicit Add, which is the
+          pattern the rest of this wizard already uses ("+ Add a run"), and it keeps the sport chips
+          doing exactly one thing. */}
+      <div className="flex flex-col gap-2">
+        <p className="text-white/70 text-[13px] leading-relaxed" data-testid="hard-opt-in">
+          {HARD_SESSIONS_OPT_IN_LINE}
+        </p>
+        {hardSessionCount(props.slots) < MAX_HARD_SESSIONS ? (
+          <button
+            type="button"
+            data-testid="add-hard-session"
+            onClick={() => {
+              // The first unadded hard slot, in the frame's own order.
+              const next = HARD_SLOT_KEYS.find((k) => !props.slots[k]);
+              if (!next) return;
+              // ⛔ IT OPENS ON THE FRAME'S LEAD SPORT rather than empty — `SLOT_OPTIONS` puts Ride
+              // first on a hard slot (p280: intensity on the bike does not tax the lifts), and an
+              // added session with no sport would be a fifth unanswered thing on a screen that just
+              // stopped having any. The athlete changes it with one tap in the row that appears.
+              const lead = (props.allowedSports?.[0])
+                ?? SLOT_OPTIONS[next].find((o) => !props.allowedSports || props.allowedSports.includes(o.value))?.value;
+              if (lead) { props.onSlotChange(next, lead); setOpen(next); }
+            }}
+            className="w-full px-4 py-3 rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-white/70 text-sm text-left"
+          >
+            + Add a hard session
+          </button>
+        ) : null}
       </div>
 
       {/* ⛔ VOLUME, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the sports
