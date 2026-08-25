@@ -26,8 +26,11 @@ Deno.test('⛔ THE LONG-DAY ROWS LOCK AGAINST THE OTHER ANCHOR — the long run 
   // ⚠️ `strength-primary-plan.ts` keeps a BACKSTOP for that collision and its own comment says where
   // the real fix belongs: *"the day picker greys out and locks a day another anchor already holds,
   // so the collision is never entered."* This is that picker.
+  // ⚠️ THE EXPRESSION MOVED, THE RULE DID NOT (2026-08-25). The disclosure list is gone, so the row
+  // no longer branches on `row.key`; the long picker is its own always-open card and reads the same
+  // helper off `scheduleRunShown`. The test matches the CALL, not the old row plumbing around it.
   assert(
-    /taken=\{anchorDaysTaken\(state, row\.key === 'long' \? 'long run' : 'long ride'\)\}/.test(SRC),
+    /taken=\{anchorDaysTaken\(state, scheduleRunShown \? 'long run' : 'long ride'\)\}/.test(SRC),
     'the long-day WeekDayRow no longer passes anchorDaysTaken — the two long days can collide again',
   );
 });
@@ -44,11 +47,13 @@ Deno.test('⛔ THE HARD-DAY ROW STILL PASSES {} — this is a RULING, not an inc
   const marker = '⛔ NOTHING IS DISABLED. The other slot';
   const at = SRC.indexOf(marker);
   assert(at > 0, `the hard-day ruling comment is gone — it read: "${marker}..."`);
-  // The `taken` prop sits immediately BEFORE that comment, inside the same element.
-  const before = SRC.slice(Math.max(0, at - 300), at);
+  // ⚠️ THE PROP MOVED BELOW THE RULING (2026-08-25). It used to sit immediately before the comment;
+  // in the always-open card the comment introduces the pair and `taken` follows it. Both sides are
+  // searched so the assertion survives the next reshuffle of one element's attribute order.
+  const around = SRC.slice(Math.max(0, at - 300), at + 300);
   assert(
-    /taken=\{\{\}\}/.test(before),
-    `the hard-day WeekDayRow stopped passing an empty \`taken\`: ...${before.slice(-160)}`,
+    /taken=\{\{\}\}/.test(around),
+    `the hard-day WeekDayRow stopped passing an empty \`taken\`: ...${around.slice(-200)}`,
   );
 });
 
