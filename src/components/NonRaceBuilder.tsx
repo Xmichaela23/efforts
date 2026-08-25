@@ -5769,7 +5769,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              * ⚠️ IT ALSO NAMES THE SPLIT the card now has: the days are the question, the rest of
              * the week is the answer under it.
              */
-            : 'The days you set. The lifting and the easy sessions are placed around them.'}
+            : 'Place the days you can’t move — ride and run clubs, long days. The lifting is placed around them.'}
           onBack={back} onContinue={next}
           // ⚠️ THE HARD-DAY STEP NEVER BLOCKS. Its own row is optional — "None" is a real answer —
           // and `scheduleCanContinue` is about the per-week COUNTS, which live on the other step.

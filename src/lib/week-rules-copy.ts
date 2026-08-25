@@ -55,8 +55,8 @@ type Row = {
   tier: ViolationTier;
   /** The abstract statement, for "How the week is put together". Absent = not a listed rule. */
   explain?: string;
-  /** The sentence when this rule fires on the athlete's own week. */
-  warn: (f: RuleFacts) => string;
+  /** The sentence when this rule fires on the athlete's own week. Null = fires silently. */
+  warn: (f: RuleFacts) => string | null;
   /** The code that makes the row true. Comment only — never rendered. */
   source: string;
 };
@@ -65,7 +65,8 @@ const RULES: Record<RuleId, Row> = {
   // ── BREACHES — Layer 1, the `COST` clearances in week-model/model.ts ────────────────────────
   heavy_legs_clearance: {
     tier: 'breach',
-    explain: 'Heavy leg work leaves 48 hours on the legs. A hard run or a hard ride leaves 36.',
+    // No explain (Michael, 2026-08-25): clearance hours are engine internals — the athlete meets
+    // them only as a concrete note when a pick lands inside one. Same for the two rows below.
     warn: (f) =>
       `${f.subject ?? 'Heavy leg work'} starts ${f.shortBy ?? 0} hours before the legs are clear of `
       + `${f.against ?? 'the previous session'}.`,
@@ -73,8 +74,6 @@ const RULES: Record<RuleId, Row> = {
   },
   long_effort_clearance: {
     tier: 'breach',
-    explain: 'A long run or a long ride leaves 48 hours, and heavy leg work starts only once that '
-      + 'is clear.',
     warn: (f) =>
       `${f.subject ?? 'Heavy leg work'} sits ${f.shortBy ?? 0} hours inside the 48 that `
       + `${f.against ?? 'the long day'} leaves behind.`,
@@ -82,8 +81,6 @@ const RULES: Record<RuleId, Row> = {
   },
   long_run_needs_legs: {
     tier: 'breach',
-    explain: 'A long run needs the legs clear of heavy lifting first. A long ride does not — it is '
-      + 'seated and structurally supported.',
     warn: (f) =>
       `${f.subject ?? 'The long run'} starts ${f.shortBy ?? 0} hours before the legs are clear of `
       + `${f.against ?? 'the heavy lifting'}.`,
@@ -91,23 +88,25 @@ const RULES: Record<RuleId, Row> = {
   },
   pairing_broken: {
     tier: 'breach',
-    explain: 'The back squat shares a day with the hard run, and the deadlift with the hard ride. '
-      + 'The barbell comes first, about six hours ahead.',
-    warn: (f) => `${f.subject ?? 'The hard session'} no longer shares a day with its lift.`,
+    // Fully silent (Michael, 2026-08-25): the pairing is engine-internal reasoning. Its real
+    // costs reach the athlete as the concrete clearance and week-shape notes, not as this
+    // mechanism. No explain in the list, no warning when a pin splits a pair.
+    warn: () => null,
     source: 'model.ts PAIRING + COUPLED_GAP_HOURS = 6',
   },
 
   // ── TRADE-OFFS — Layer 2, the shape terms in week-model/resolve.ts `score` ──────────────────
   no_rest_day: {
     tier: 'tradeoff',
-    explain: 'The week keeps one day with nothing on it.',
+    // No explain (Michael, 2026-08-25): a rest day is the default, not doctrine — the book calls
+    // rest days optional, and a full 7-day week is programmable by the engine or the athlete.
+    // The summary's "1 rest" count carries it; the warn below fires when a week has no day off.
     warn: () => 'Every day of the week carries a session. There is no day off in it.',
     source: 'resolve.ts restDaysOf + the `blank * 40` term',
   },
   no_recovery_day: {
     tier: 'tradeoff',
-    explain: 'Upper-body lifting and easy sessions leave nothing outstanding, so they can sit '
-      + 'anywhere the day has room.',
+    explain: 'Upper-body lifts and easy sessions cost nothing. They fit where there is room.',
     warn: () => 'Every day carries a hard session, a long session or heavy legs. Recovery is thin.',
     source: 'resolve.ts recoveryDaysOf + STRESSOR_LOADS',
   },
@@ -135,8 +134,8 @@ const RULES: Record<RuleId, Row> = {
   // ── FRAME-ORDER COSTS — standing-plan/compose.ts, not week-model ────────────────────────────
   lift_on_unavailable_day: {
     tier: 'tradeoff',
-    explain: 'The lifting order and the gaps between lifting days are fixed. A pinned day moves the '
-      + 'endurance session onto it; the lifting stays in its order.',
+    explain: 'Lifting order and spacing are fixed. A pinned day moves the endurance session onto '
+      + 'it; the lifts hold their order.',
     warn: (f) => `${f.day ?? 'That day'} carries a lifting day. The lifting order is fixed, so it stays.`,
     source: 'compose.ts enduranceDayFor — endurance only; the lifts keep the rotation',
   },
@@ -175,13 +174,13 @@ export function ruleWarning(rule: RuleId, facts: RuleFacts = {}): string | null 
  */
 export const PLACEMENT_RULES: string[] = [
   // day-map.ts — the frame's order and spacing, and what a pin does to it.
-  'The lifting order and the gaps between lifting days are fixed. A pinned day moves the endurance '
-  + 'session onto it; the lifting stays in its order.',
+  'The four lifts always run in the same sequence with the same gaps between them.',
   // The ruling itself, stated plainly, because it is the rule that governs all the others.
-  'A day you pick is kept. Where it costs the week something, the cost is named and the week is '
-  + 'still built that way.',
-  ...(['pairing_broken', 'heavy_legs_clearance', 'long_effort_clearance', 'long_run_needs_legs',
-    'no_rest_day', 'no_recovery_day'] as RuleId[])
+  'Picked days are never moved. If a pick causes a problem, the week builds anyway and shows '
+  + 'what it costs.',
+  // Michael's wording, 2026-08-25 — consolidation (SOURCE p130) in plain speech.
+  'Stack the hard days when it helps maximize recovery between lifts and hard sessions.',
+  ...(['no_recovery_day'] as RuleId[])
     .map((id) => RULES[id].explain)
     .filter((s): s is string => !!s),
 ];
