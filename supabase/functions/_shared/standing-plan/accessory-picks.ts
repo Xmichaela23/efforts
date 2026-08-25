@@ -45,12 +45,13 @@ export type ViadaPickKey =
   | 'iso_push'
   | 'iso_pull_a'
   | 'iso_pull_b'
-  | 'single_leg'
+  | 'single_leg_a'
+  | 'single_leg_b'
   | 'quad_iso'
   | 'core';
 
 export const VIADA_PICK_KEYS: ViadaPickKey[] = [
-  'db_press', 'iso_push', 'iso_pull_a', 'iso_pull_b', 'single_leg', 'quad_iso', 'core',
+  'db_press', 'iso_push', 'iso_pull_a', 'iso_pull_b', 'single_leg_a', 'single_leg_b', 'quad_iso', 'core',
 ];
 
 /**
@@ -81,9 +82,14 @@ export type ViadaPickSpec = {
    * and the ME/DE slots carry the programme's own prescriptions (pivot §6).
    *
    * ⛔ `frameDay` NARROWS A PICK TO ONE OCCURRENCE OF A CELL THAT HAPPENS TWICE. Omitted, the pick
-   * owns every day the cell falls on — which is right for `single_leg`, where one movement across
-   * two lower days is the same answer twice, and WRONG for `focused pull_upper`, where the two days
-   * are what makes the week's pull work balanced (see {@link LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT}).
+   * owns every day the cell falls on. BOTH cells that occur twice are now day-scoped — `focused
+   * pull_upper` (days 1/4) and `secondary press_lower` (days 2/5) — so nothing in the table uses the
+   * day-agnostic form today. The fallback stays because it is the right shape for a cell that
+   * genuinely wants one answer, and `pickKeyForSlot` still resolves it.
+   * ⚠️ THE TWO SPLITS ARE NOT THE SAME ARGUMENT. Pull splits on MUSCLE — p222-223 files rear-delt
+   * work and arm work separately, so one dropdown trained one twice and the other never. Single-leg
+   * splits on MOVEMENT: every option in that cell is quadriceps, so the split changes what the week
+   * looks like, not which muscles it covers (see the rows themselves).
    * ⚠️ It is a FRAME day number (`FrameDay.day`), never a weekday: the weekday rotates with the
    * athlete's pinned days and the frame day does not.
    */
@@ -162,12 +168,38 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     leadCite: 'Viada pp222-223 — focused pull, arms',
     servesChips: ['arms'],
   },
-  single_leg: {
-    key: 'single_leg',
+  // ⛔ TWO PICKS, ONE PER LOWER DAY (Michael's ruling, 2026-08-25) — the same shape as the
+  // isolation-pull split above, and reached the same way: one `frameDay` field per row plus its own
+  // `leadWith` head. `secondary press_lower` falls on day 2 and day 5 and one pick answered both, so
+  // the zero-touch week ran the identical single-leg movement twice.
+  //
+  // ⛔ THE GROUNDING IS THE DAY, NOT THE MUSCLE, AND THAT IS THE HONEST DIFFERENCE FROM THE PULL
+  // SPLIT. Both cells are the same `secondary press_lower`; what differs is what they sit under.
+  // Day 2 is the ME lower day — the cell follows a competition deadlift and a heavy primary
+  // press_lower. Day 5 is the DE lower day — it follows a dynamic squat and a primary hinge, and it
+  // ALSO carries `quad_iso` on the same day. So the two slots are the same cell on two very
+  // different days, and the default week should not spend both of them on one movement.
+  //
+  // ⚠️ EVERY OPTION IN THIS CELL IS `quadriceps` — checked against the grid, not assumed. The split
+  // therefore buys MOVEMENT VARIETY, not muscle coverage: unlike the pull pair, no muscle was being
+  // missed before and none is newly covered now. Recorded so nobody later "fixes" this by reaching
+  // for the balance argument that belongs to `iso_pull_a` / `iso_pull_b`.
+  //
+  // ⚠️ NEITHER SERVES A CHIP, so unlike the pull pair there is no dial split to keep in step.
+  single_leg_a: {
+    key: 'single_leg_a',
     label: 'Single-leg',
-    slot: { category: 'secondary', pattern: 'press_lower' },
-    leadWith: ['bulgarian split squat', 'reverse lunge', 'walking lunge', 'step up'],
-    leadCite: 'Viada p220 — secondary press lower',
+    slot: { category: 'secondary', pattern: 'press_lower', frameDay: 2 },
+    leadWith: ['bulgarian split squat', 'reverse lunge', 'step up', 'lateral lunge'],
+    leadCite: 'Viada p220 — secondary press lower (ME lower day)',
+    servesChips: [],
+  },
+  single_leg_b: {
+    key: 'single_leg_b',
+    label: 'Single-leg',
+    slot: { category: 'secondary', pattern: 'press_lower', frameDay: 5 },
+    leadWith: ['walking lunge', 'step up', 'reverse lunge', 'lateral lunge'],
+    leadCite: 'Viada p220 — secondary press lower (DE lower day)',
     servesChips: [],
   },
   quad_iso: {

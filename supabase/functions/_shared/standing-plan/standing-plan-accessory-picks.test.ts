@@ -109,7 +109,10 @@ Deno.test('the day tags are the real days of p246, read off the frame', () => {
   // 1 and 4 and each carries its own control.
   assertEquals(daysForPick('iso_pull_a'), ['Monday']);
   assertEquals(daysForPick('iso_pull_b'), ['Thursday']);
-  assertEquals(daysForPick('single_leg'), ['Tuesday', 'Friday']);
+  // ⛔ AND THE SAME SPLIT ON THE LOWER DAYS (Michael, 2026-08-25). `secondary press_lower` falls on
+  // days 2 and 5 and each now carries its own control, so neither row may claim both days.
+  assertEquals(daysForPick('single_leg_a'), ['Tuesday']);
+  assertEquals(daysForPick('single_leg_b'), ['Friday']);
   assertEquals(daysForPick('quad_iso'), ['Friday']);
   // ⛔ THE CORE PICK HAS NO DAY BECAUSE IT HAS NO SLOT. p246 carries none.
   assertEquals(daysForPick('core'), []);
@@ -130,15 +133,69 @@ Deno.test('every pick offers something, at every equipment subset', () => {
 
 // ── the picks reach the slots ────────────────────────────────────────────────────────────────────
 
-Deno.test('a slot pick fills its cell on EVERY day the frame carries it', () => {
+Deno.test('a day-scoped lower pick fills its OWN day and leaves the other alone', () => {
+  // ⛔ WAS "fills its cell on EVERY day the frame carries it" — the day-agnostic case, which no row
+  // uses any more since the 2026-08-25 split. `secondary press_lower` sits on days 2 and 5 and each
+  // has its own control, so a movement named for Friday must not appear on Tuesday.
   const picks: Partial<Record<ViadaPickKey, string>> = {
     ...defaultViadaPicks(EQUIPMENT, []),
-    single_leg: 'walking lunge',
+    single_leg_a: 'step up',
+    single_leg_b: 'walking lunge',
   };
   const rows = rowsOf(week({ slotPicks: picks }));
-  // `secondary press_lower` sits on days 2 and 5, and ONE pick answers both — the day-agnostic case.
+  assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize('step up')).map((r) => r.day),
+    ['Tuesday'], 'the day-2 single-leg pick left its day');
   assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize('walking lunge')).map((r) => r.day),
-    ['Tuesday', 'Friday']);
+    ['Friday'], 'the day-5 single-leg pick left its day');
+});
+
+Deno.test('⛔ THE PIN: both single-leg rows hold DIFFERENT movements, and the mix is unchanged', () => {
+  /**
+   * ⛔ MICHAEL'S RULING, 2026-08-25 — the pin he asked for, in two halves.
+   *
+   * ⛔ HALF ONE: the zero-touch week opens on two different single-leg movements. This is the same
+   * assertion `iso_pull_a` / `iso_pull_b` carry, for the same reason — the athlete who taps nothing
+   * gets the balanced week, and the Dial never has to create the balance
+   * (`LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`). ⚠️ Neither of these picks serves a chip, so unlike the
+   * pull pair there is no dial half to keep in step.
+   *
+   * ⛔ HALF TWO: SAME MIX. The split must not change WHAT the week is made of — same number of
+   * strength rows, same per-muscle set ledger, same patterns on the same days. Only the two names
+   * differ. A split that quietly added a row or moved a set would be a different week wearing this
+   * ruling's name.
+   */
+  const picks = defaultViadaPicks(EQUIPMENT, []);
+  assert(canonicalize(picks.single_leg_a) !== canonicalize(picks.single_leg_b),
+    `both lower days default to "${picks.single_leg_a}" — the default week is not balanced on its own`);
+
+  const w = week({ slotPicks: picks });
+  const rows = rowsOf(w);
+
+  // Each lands on its own day, once.
+  assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize(picks.single_leg_a)).map((r) => r.day),
+    ['Tuesday']);
+  assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize(picks.single_leg_b)).map((r) => r.day),
+    ['Friday']);
+
+  // ⛔ SAME MIX — measured against the week the OLD single pick produced, which is what one movement
+  // on both lower days looks like. Row count, per-muscle sets and the pattern-per-day shape all hold;
+  // the only difference is the Friday movement's name.
+  const before = rowsOf(week({
+    slotPicks: { ...picks, single_leg_a: picks.single_leg_a, single_leg_b: picks.single_leg_a },
+  }));
+  assertEquals(rows.length, before.length, 'the split changed the number of strength rows');
+  assertEquals(
+    rows.map((r) => `${r.day}/${r.pattern ?? ''}`).sort(),
+    before.map((r) => `${r.day}/${r.pattern ?? ''}`).sort(),
+    'the split moved a pattern off its day',
+  );
+  const ledgerOf = (x: ReturnType<typeof composeWeek>) =>
+    x.ledger.perMuscle.map((l) => `${l.muscle}:${l.sets}`).sort().join(',');
+  assertEquals(
+    ledgerOf(w),
+    ledgerOf(week({ slotPicks: { ...picks, single_leg_b: picks.single_leg_a } })),
+    'the split changed the per-muscle set ledger',
+  );
 });
 
 Deno.test('the two isolation-pull picks land on their own days, and open on DIFFERENT movements', () => {
@@ -224,8 +281,10 @@ Deno.test('a chip re-points the picks it can reach and leaves the rest alone', (
   const shoulders = defaultViadaPicks(EQUIPMENT, ['shoulders']);
   assert(shoulders.db_press !== plain.db_press, 'the dumbbell press did not follow the shoulders chip');
   assert(shoulders.iso_push !== plain.iso_push, 'the isolation push did not follow the shoulders chip');
-  // ⛔ AND A CHIP NEVER REACHES A PICK IT DOES NOT SERVE. `single_leg` and `quad_iso` serve none.
-  assertEquals(shoulders.single_leg, plain.single_leg);
+  // ⛔ AND A CHIP NEVER REACHES A PICK IT DOES NOT SERVE. Both single-leg rows and `quad_iso` serve
+  // none — the lower split is a layout decision, so no chip may move either half of it.
+  assertEquals(shoulders.single_leg_a, plain.single_leg_a);
+  assertEquals(shoulders.single_leg_b, plain.single_leg_b);
   assertEquals(shoulders.quad_iso, plain.quad_iso);
 });
 
@@ -469,12 +528,12 @@ Deno.test('a stored core row from an older bundle is dropped, not honoured', () 
 
 Deno.test('a stale pick falls back per slot, never per screen', () => {
   const prefs = normalizeViadaPrefs({
-    picks: { iso_pull_b: 'a movement that does not exist', single_leg: 'walking lunge' },
+    picks: { iso_pull_b: 'a movement that does not exist', single_leg_b: 'walking lunge' },
     dial: ['glutes', 'core', 'arms'],
     dial_rows: { 'glutes:0': 'hip thrust', 'glutes:1': '' },
   }, EQUIPMENT);
   assert(prefs);
-  assertEquals(prefs!.picks.single_leg, 'walking lunge', 'a good pick was discarded with a bad one');
+  assertEquals(prefs!.picks.single_leg_b, 'walking lunge', 'a good pick was discarded with a bad one');
   assert(pickOptions('iso_pull_b', EQUIPMENT).some((o) => o.name === prefs!.picks.iso_pull_b),
     'the stale pick did not fall back to a real movement');
   // ⛔ CAPPED ON READ. A hand-edited third chip must not reach the composer.

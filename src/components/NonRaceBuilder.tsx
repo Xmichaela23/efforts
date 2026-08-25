@@ -4546,8 +4546,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 calendar question comes one screen later, so there is nothing to hedge about: these
                 are the days the block opens on. ⚠️ Pinning a long-run day on the next screen rotates
                 the whole week, which moves every one of these by the same amount.
-                ⚠️ ONE PICK FOR ISOLATION PULL AND ONE FOR SINGLE-LEG, EACH USED ON BOTH ITS DAYS.
-                The frame carries those two cells twice; the athlete answers the SLOT, not the day. */}
+                ⚠️ ISOLATION PULL AND SINGLE-LEG EACH RENDER TWICE — two rows apiece, one per day.
+                The frame carries both cells twice and each occurrence has its own pick, so the two
+                rows share a label and are told apart by the day tag beside them. This list is driven
+                off VIADA_PICK_KEYS, so a table split shows up here with no change to this file. */}
             <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
               {VIADA_PICK_KEYS.map((key) => {
                 const spec = VIADA_PICKS[key];

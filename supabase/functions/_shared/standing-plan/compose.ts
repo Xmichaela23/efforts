@@ -519,16 +519,19 @@ function exerciseForSlot(
    * ⛔ THE SLOT'S OWN PICK, AND IT IS TRIED BEFORE THE FLAT POOL (2026-08-24). The Standing Plan's
    * picker asks per frame slot, so there is nothing to infer: this cell has a name on it.
    *
-   * ⛔ IT IS NOT CONSUMED. `secondary press_lower` occurs on days 2 and 5 and ONE pick fills both,
-   * because the athlete answered the SLOT and the slot happens twice. The flat pool's `unplaced` set
-   * is single-use by construction and could not express that — which is why routing by slot is a
-   * different mechanism rather than a tidier spelling of the same one. ⚠️ `takenToday` still
-   * applies, so it can never print twice in one session.
+   * ⛔ IT IS NOT CONSUMED. A pick can fill its cell on every day that cell falls on; the flat pool's
+   * `unplaced` set is single-use by construction and could not express that, which is why routing by
+   * slot is a different mechanism rather than a tidier spelling of the same one. ⚠️ `takenToday`
+   * still applies, so one movement can never print twice in a single session.
    *
-   * ⚠️ `focused pull_upper` ALSO OCCURS TWICE (days 1 and 4) AND IS THE OTHER CASE: it carries two
-   * day-scoped picks, one each, because rear-delt work and arm work are different answers and one
-   * dropdown covering both left the week training one of them twice. `pickKeyForSlot` is given
-   * `frameDay` so the right one answers — see `LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`.
+   * ⚠️ BOTH TWICE-OCCURRING CELLS ARE DAY-SCOPED NOW. `focused pull_upper` (days 1 and 4) carries
+   * `iso_pull_a` / `iso_pull_b` because rear-delt work and arm work are different answers;
+   * `secondary press_lower` (days 2 and 5) carries `single_leg_a` / `single_leg_b` because the ME
+   * lower day and the DE lower day are different days and the zero-touch week should not spend both
+   * on one movement (Michael, 2026-08-25). `pickKeyForSlot` is given `frameDay` so the right one
+   * answers — see `LAYOUT_IS_BALANCED_THE_DIAL_IS_NOT`. The day-agnostic fallback in
+   * `pickKeyForSlot` is unused by the table today and kept for the cell that genuinely wants one
+   * answer.
    *
    * ⚠️ AND IT STILL HAS TO FIT. The name is matched against `resolveSlot`'s own options for this
    * cell — the picker built its dropdown from that same call — so honouring it can never widen the
