@@ -21,7 +21,8 @@ import {
   composeWeek, defaultCompetitionLifts, type ComposeArgs, type PlanSession,
 } from './index.ts';
 import {
-  fixedHoursLine, sizeFor, slotSpans, weekVolumeBounds, WEEKLY_HOUR_OPTIONS, type SlotSpan, type SlotSpec,
+  fixedHoursLine, LADDER_CEILING_MIN, sizeFor, slotSpans, weekVolumeBounds, WEEKLY_HOUR_OPTIONS,
+  type SlotSpan, type SlotSpec,
 } from './volume-bounds.ts';
 
 const BASELINES = {
@@ -175,13 +176,25 @@ Deno.test('⛔ HOURS PAST THE FIXED SESSIONS BECOME EASY SESSIONS — the week G
 
   assert(rideMin(asked9) > rideMin(atCap),
     `asking for 9h did not build more than asking for 6h: ${rideMin(asked9)} vs ${rideMin(atCap)} min`);
-  assert(rides(asked9) > rides(atCap),
-    'the extra hours arrived as longer sessions rather than as more of them');
+  /**
+   * ⛔⛔ THIS ASSERTED MORE SESSIONS AND NOW ASSERTS THE OPPOSITE, DELIBERATELY (Michael, 2026-08-26).
+   * The ruling changed under it: **base sessions grow through the book's own sizes first, and extra
+   * days appear only once they are at cap.** p235 makes the growth the book's own — *"the level
+   * refers almost strictly to duration"* — so extra hours arriving as a LONGER easy ride is the
+   * correct answer, and arriving as a second one before the first is full would be the defect.
+   * ⚠️ A green test pinning the old behaviour would have made the ladder look broken.
+   */
+  assertEquals(rides(asked9), rides(atCap),
+    'a day was added while the frame\'s own rides still had room to grow');
 
-  // ⛔ AND THE ADDED WORK IS EASY. The hard and long sessions are the book's and do not move.
-  const added = asked9.sessions.filter((x) => (x.tags ?? []).includes('volume_fill'));
-  assert(added.length > 0, 'nothing was tagged as a volume fill');
-  assert(added.every((x) => !/Hard|Threshold/.test(x.name)), added.map((x) => x.name).join(', '));
+  // ⛔ AND THE GROWTH LANDED ON THE BASE SESSIONS, NOT THE QUALITY ONES. The hard rides are p246's
+  //    and their level does not move; the endurance rides are what carry the extra hours.
+  const longestBase = (wk: ReturnType<typeof build>) => Math.max(
+    ...wk.sessions.filter((x) => x.type === 'ride' && !/Hard/.test(x.name))
+      .map((x) => Number(x.duration) || 0),
+  );
+  assert(longestBase(asked9) > longestBase(atCap),
+    'the extra hours did not land on the base rides');
 
   // ⛔ AND THE WEEK SAYS WHERE THEY WENT — hours were asked for, sessions arrived.
   /**
@@ -191,10 +204,19 @@ Deno.test('⛔ HOURS PAST THE FIXED SESSIONS BECOME EASY SESSIONS — the week G
    * ⛔ AND IT CARRIES HIS OTHER FACT: *"remember they are potentially building days."* More hours is
    * not only more volume; an added session can land on a day that currently carries no endurance.
    */
+  /**
+   * ⚠️ SILENCE IS LEGAL UNDER THE LADDER. An ask can now be met by growing what is already there, so
+   * no day is added and there is nothing to say. The sentence and the sessions must AGREE — a note
+   * about days that were never added would be the copy-lying shape all over again.
+   */
   const added9 = asked9.notes.find((n) => /^The extra hours are added as easy /.test(n.text));
-  assert(added9, `the added sessions were silent: ${asked9.notes.map((n) => n.text).join(' | ')}`);
-  assert(!DAY_NAMES.some((d) => added9!.text.includes(d)), `a weekday leaked in: ${added9!.text}`);
-  assert(/training days/.test(added9!.text), `the days fact is missing: ${added9!.text}`);
+  const fills9 = asked9.sessions.filter((x) => (x.tags ?? []).includes('volume_fill'));
+  assertEquals(!!added9, fills9.length > 0,
+    `sentence and sessions disagree: ${fills9.length} fills, note ${added9 ? 'present' : 'absent'}`);
+  if (added9) {
+    assert(!DAY_NAMES.some((d) => added9.text.includes(d)), `a weekday leaked in: ${added9.text}`);
+    assert(/training days/.test(added9.text), `the days fact is missing: ${added9.text}`);
+  }
 });
 
 Deno.test('⛔ UNDER THE FLOOR: §3c bounds BOTH ends, and the short week says where it lands', () => {
@@ -458,4 +480,167 @@ Deno.test('⛔ THE HOURS SWEEP CROSSED WITH BLOCKED DAYS — the case that was m
     }
   }
   assert(checked >= 80, `the sweep only reached ${checked} builds`);
+});
+
+
+Deno.test('⛔ BASE SESSIONS GROW BEFORE NEW DAYS APPEAR — the ladder, swept', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26: base sessions grow through the book's own sizes to their caps to hold the
+   * asked hours; quality stays locked; when everything is at cap the week is full.
+   *
+   * ⛔ p235 IS WHAT MAKES IT THE BOOK'S LADDER AND NOT A DIAL WE INVENTED: *"the level refers almost
+   * strictly to duration"* — 25-30 / 45-60 / 80-90 min. A longer easy run is a longer dose of the
+   * same session.
+   * ⚠️ SWEPT OVER SHAPES, NOT OVER ONE ATHLETE'S WEEK. Nothing here is gated on a particular
+   * person's numbers; every claim below is about the rule.
+   */
+  const SHAPES: Array<[string, Record<string, string>]> = [
+    ['all run', ALL_RUN],
+    ['all ride', ALL_RIDE],
+    ['hard run + easy run, rest on the bike', { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' }],
+    ['everything but the long day on foot', { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'ride' }],
+  ];
+  let checked = 0;
+  for (const [label, slots] of SHAPES) {
+    for (const sport of ['run', 'ride'] as const) {
+      if (!Object.values(slots).includes(sport)) continue;
+      let previousTotal = -1;
+      let previousFills = -1;
+      for (const hours of WEEKLY_HOUR_OPTIONS[sport]) {
+        const wk = build(slots, sport === 'run' ? hours : undefined, sport === 'ride' ? hours : undefined);
+        checked += 1;
+        const mine = wk.sessions.filter((x) => x.type === sport);
+        const total = mine.reduce((t, x) => t + (Number(x.duration) || 0), 0);
+        const fills = mine.filter((x) => (x.tags ?? []).includes('volume_fill'));
+        const frameSessions = mine.filter((x) => !(x.tags ?? []).includes('volume_fill'));
+
+        // 1 ── MONOTONIC. Asking for more never builds less, and never adds fewer days.
+        assert(total >= previousTotal, `${label}/${sport}: ${hours}h built ${total}m, less than the ask below it`);
+        assert(fills.length >= previousFills, `${label}/${sport}: ${hours}h added fewer days than the ask below it`);
+
+        // 2 ── ⛔ GROWTH FIRST. A fill only exists once the frame's own sessions of that sport have
+        //    stopped growing — that is the whole ruling, and the assertion is that the previous ask
+        //    already had every frame session at the same length or longer.
+        if (fills.length > previousFills && previousFills >= 0) {
+          const prev = build(
+            slots,
+            sport === 'run' ? WEEKLY_HOUR_OPTIONS[sport][WEEKLY_HOUR_OPTIONS[sport].indexOf(hours) - 1] : undefined,
+            sport === 'ride' ? WEEKLY_HOUR_OPTIONS[sport][WEEKLY_HOUR_OPTIONS[sport].indexOf(hours) - 1] : undefined,
+          );
+          const prevFrame = prev.sessions
+            .filter((x) => x.type === sport && !(x.tags ?? []).includes('volume_fill'))
+            .reduce((t, x) => t + (Number(x.duration) || 0), 0);
+          const nowFrame = frameSessions.reduce((t, x) => t + (Number(x.duration) || 0), 0);
+          assert(nowFrame >= prevFrame - 1,
+            `${label}/${sport}: a day was added while the frame's own sessions shrank `
+              + `(${prevFrame}m → ${nowFrame}m)`);
+        }
+        previousTotal = total;
+        previousFills = fills.length;
+
+        // 3 ── ⛔ NEVER PAST A BAND CAP. Every session stays inside a dose the source states —
+        //    §3d, and p275's own concern. The ceilings are Michael's where he set one.
+        for (const x of frameSessions) {
+          const family = (x.tags ?? []).find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? '';
+          const ceiling = LADDER_CEILING_MIN[family];
+          if (ceiling == null) continue;
+          assert(Number(x.duration) <= ceiling + 1,
+            `${label}/${sport}: ${x.name} ran ${x.duration}m, past ${family}'s ${ceiling}m ceiling`);
+        }
+      }
+    }
+  }
+  assert(checked >= 40, `the sweep only reached ${checked} builds`);
+});
+
+Deno.test('⛔ QUALITY SESSIONS NEVER CHANGE LEVEL — only base families climb', () => {
+  /**
+   * ⛔ p246 assigns `run_mlss`, `run_near_threshold` and `ride_sweet_spot` their levels and p247
+   * prices the one adjacency they create. The ladder must not touch them at any ask.
+   * ⚠️ THE LEVEL, NOT THE LENGTH. A quality session's SIZE still moves inside its own band — that is
+   * §3c and predates this — so the assertion is on the `level:` tag, never on the duration.
+   */
+  const QUALITY = ['run_mlss', 'run_near_threshold', 'ride_sweet_spot'];
+  const levelsAt = (hours: number, sport: 'run' | 'ride', slots: Record<string, string>) => {
+    const wk = build(slots, sport === 'run' ? hours : undefined, sport === 'ride' ? hours : undefined);
+    const out = new Map<string, string>();
+    for (const x of wk.sessions) {
+      const family = (x.tags ?? []).find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? '';
+      const level = (x.tags ?? []).find((t) => t.startsWith('level:')) ?? '';
+      if (QUALITY.includes(family)) out.set(`${family}|${x.name}`, level);
+    }
+    return out;
+  };
+  for (const [sport, slots] of [['run', ALL_RUN], ['ride', ALL_RIDE]] as Array<['run' | 'ride', Record<string, string>]>) {
+    const low = levelsAt(WEEKLY_HOUR_OPTIONS[sport][0], sport, slots);
+    const high = levelsAt(WEEKLY_HOUR_OPTIONS[sport][WEEKLY_HOUR_OPTIONS[sport].length - 1], sport, slots);
+    assert(low.size > 0, `${sport}: no quality sessions found to check`);
+    for (const [key, level] of low) {
+      assertEquals(high.get(key), level, `${sport}: ${key} changed level between the smallest and largest ask`);
+    }
+  }
+});
+
+
+Deno.test('⛔ A DOUBLE DAY IS LEGAL AND NEVER SILENT — the spacing is the part the calendar cannot show', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26: keep the double day, state the spacing. The book sanctions it rather
+   * than tolerating it — B3's *"6-8h between two-a-days (4-6h if the morning is a sub-hour VT1
+   * session)"* and rule 5's *"work that benefits from pre-fatigue goes last… you could cut your VT1
+   * run volume by a third or so after a hard leg workout and get the same overall adaptations."*
+   *
+   * ⛔ THE SPACING IS THE WHOLE POINT OF THE SENTENCE. Two sessions on one day are visible on the
+   * grid; the hours between them are not, and they are the condition that makes it safe. A
+   * two-a-day with no gap named is the prescription without its condition.
+   * ⚠️ SWEPT USER-AGNOSTICALLY over boxed-in weeks — several days blocked and a high ask, which is
+   * the only way a fill runs out of clean days.
+   */
+  const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  let sawADouble = false;
+  let checked = 0;
+  for (const slots of [ALL_RUN, ALL_RIDE, { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' }]) {
+    for (const start of [0, 2, 4]) {
+      for (const n of [2, 3]) {
+        const blocked = Array.from({ length: n }, (_, i) => DAY_ORDER[(start + i) % 7]);
+        for (const sport of ['run', 'ride'] as const) {
+          if (!Object.values(slots).includes(sport)) continue;
+          const top = WEEKLY_HOUR_OPTIONS[sport][WEEKLY_HOUR_OPTIONS[sport].length - 1];
+          const wk = composeWeek({
+            ...BASE, week: 2, column: 'standard',
+            sportMix: { runs: 4, rides: 0, swimDays: 0, slots } as never,
+            unavailableDays: blocked,
+            ...(sport === 'run' ? { targetRunHours: top } : { targetRideHours: top }),
+          } as never);
+          checked += 1;
+
+          const perDay = new Map<string, number>();
+          for (const x of wk.sessions.filter((y) => y.type === sport)) {
+            perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
+          }
+          const doubled = [...perDay.values()].some((c) => c > 1);
+          const said = wk.notes.find((nt) => /land on one day/.test(nt.text));
+
+          // ⛔ THE SENTENCE AND THE WEEK AGREE, BOTH WAYS. A silent double is the defect; a sentence
+          //    about a double that was not built is the copy-lying shape all over again.
+          assertEquals(doubled, !!said,
+            `${sport} ${top}h, blocked ${blocked.join(',')} → doubled ${doubled}, note ${said ? 'present' : 'absent'}`);
+
+          if (said) {
+            sawADouble = true;
+            // ⛔ IT NAMES THE HOURS. That is the only actionable half.
+            assert(/six to eight hours/.test(said.text), `no spacing named: ${said.text}`);
+            assert(/four to six/.test(said.text), `the sub-hour case is missing: ${said.text}`);
+            // ⚠️ DAY-AGNOSTIC — this screen runs before the scheduler decides weekdays.
+            assert(!DAY_NAMES.some((d) => said.text.includes(d)), `a weekday leaked in: ${said.text}`);
+            assertEquals(voiceViolation(said.text), null, said.text);
+            // ⚠️ AND IT CARRIES BOTH CITES: B3's bullet has only its chapter, rule 6 has a read page.
+            assert(/69-125/.test(said.cite ?? '') && /139-145/.test(said.cite ?? ''),
+              `the cite overstates or understates: ${said.cite}`);
+          }
+        }
+      }
+    }
+  }
+  assert(checked >= 20, `the sweep only reached ${checked} builds`);
+  assert(sawADouble, 'no boxed-in week produced a double day — the sweep is not reaching the case');
 });

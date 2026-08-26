@@ -12,10 +12,27 @@
 export type Sport = 'run' | 'ride' | 'swim';
 
 /**
- * ⛔ THE LEVEL IS NOT THE ATHLETE-FACING DOSE DIAL (`DECISIONS-2026-08-21-standing-plan.md` §3d).
+ * ⛔ THE LEVEL IS NOT THE DOSE DIAL FOR **QUALITY** FAMILIES (`DECISIONS-2026-08-21` §3d).
  * p275: *"Adjusting intensity and estimated threshold figures is always better than extending
- * distance or increasing level for this program."* A plan ASSIGNS the level per slot; the athlete's
- * dial is `size` below — which option inside the slot — and their own moving threshold.
+ * distance or increasing level for this program."* A plan ASSIGNS the level for `run_mlss`,
+ * `run_near_threshold` and `ride_sweet_spot`, and nothing moves it.
+ *
+ * ⛔⛔ FOR **BASE** FAMILIES THE LEVEL IS THE DOSE, AND THE PAGE SAYS SO (Michael, 2026-08-26).
+ * p235, VT1: *"the level refers almost strictly to duration"* — 25-30 / 45-60 / 80-90 min. So an
+ * easy run holds more hours by becoming a longer easy run before a second one is added, which is
+ * choosing a longer dose of the same session rather than adding difficulty. The ladder is
+ * `standing-plan/volume-bounds.ts` (`ladderOf`, `rungAt`) and it is the ONE owner of it.
+ *
+ * ⚠️ THE p275 SENTENCE IS AMBIGUOUS AND THE READING IS RECORDED RATHER THAN ASSUMED. It names
+ * "increasing level" — but it sits in **The All Rounder's** conditioning notes (p274-275), a
+ * different program from the Strength + 5K frame this builds, and its own subject is intensity
+ * creep: it opens on *"hard work should be hard; easy work should be easy"* and its remedy is
+ * adjusting intensity and thresholds. ⛔ Michael ruled on that ambiguity; it was not resolved from
+ * the page. ⚠️ §3d is untouched: an L3 easy run at 90 minutes does not EXCEED its source — 90
+ * minutes is what p235 specifies for L3.
+ *
+ * ⚠️ AND B3 STILL BOUNDS IT: *"rarely more than 2h of VT1 in one session."* The easy run's
+ * 90-minute ceiling sits well inside that — the check worth remembering if a cap is ever raised.
  */
 export type Level = 1 | 2 | 3;
 

@@ -37,11 +37,57 @@ export type SlotSpec = {
 };
 
 /** What one slot delivers at the two ends of its own dial. */
+/**
+ * ⛔⛔ THE BASE FAMILIES — the ones whose LEVEL is a dose, and the only ones this ladder touches.
+ *
+ * p235, VT1, in terms: *"the level refers almost strictly to duration."* For those families the
+ * level IS the size, so climbing it is choosing a longer dose of the same session — not adding
+ * difficulty. ⛔ QUALITY STAYS LOCKED AT THE FRAME'S LEVEL: p246 assigns `run_mlss`,
+ * `run_near_threshold` and `ride_sweet_spot` their levels and p247 prices the one adjacency they
+ * create. Nothing here touches them.
+ *
+ * ⚠️ THE RIDE'S LADDER RESTS ON A READING, AND IT IS RECORDED HERE BECAUSE THE CODE ACTS ON IT.
+ * p239 says *"each level is intended to be roughly comparable in overall fatigue."* Read as "each
+ * level is comparable to the OTHERS" that sentence denies a ladder — but it cannot mean that on the
+ * page's own numbers: level 1 is 60-100 min and level 3 is 3.5-5h, which are not comparable in
+ * fatigue by any reading. It must mean the two OPTIONS within a level are comparable, which is also
+ * what makes *"do the more intense workouts sparingly"* mean anything, since the second option in
+ * each level is the one with sets in it. ⛔ That resolution is OURS, not the page's.
+ */
+export const BASE_FAMILIES: string[] = ['run_vt1', 'run_lsd', 'ride_endurance'];
+
+export const isBaseFamily = (family: string): boolean => BASE_FAMILIES.includes(family);
+
+/**
+ * ⛔ HOW FAR A BASE SESSION MAY CLIMB, IN MINUTES (Michael, 2026-08-26): *"easy run 25-30 → 45-60 →
+ * 80-90 min (cap 90), long run to 2.5h; easy ride 60-100 → 2h10-3h30, ride caps per the bands."*
+ *
+ * ⚠️ A CEILING ON TOP OF THE LEVELS, not instead of them. The ladder is still the book's own level
+ * bands; this clips it where his ruling is tighter than the top level. `run_lsd` level 3 reaches
+ * 2h37 and his cap is 2h30, so the long run stops inside its own level rather than at the top of it.
+ * ⚠️ B3 BOUNDS IT ANYWAY at *"rarely more than 2h of VT1 in one session"* — the easy run's 90-minute
+ * ceiling sits well inside that, which is the check worth remembering if a cap is ever raised.
+ */
+export const LADDER_CEILING_MIN: Record<string, number> = {
+  run_vt1: 90,
+  run_lsd: 150,
+  ride_endurance: 300,
+};
+
+/** One rung: a level and the minutes it spans, already clipped to the family's ceiling. */
+export type Rung = { level: Level; lo: number; hi: number };
+
 export type SlotSpan = {
   spec: SlotSpec;
   /** Clocked minutes at `size` 0 and 1. ⛔ MINUTES — the only currency this module speaks. */
   minLo: number;
   minHi: number;
+  /**
+   * ⛔ EVERY DOSE THIS SLOT CAN TAKE, in order. One rung for a quality slot — its frame level, and
+   * that is the whole ladder. Several for a base slot: the frame's level and every level above it,
+   * which is what lets an easy run hold more hours without a second easy run appearing.
+   */
+  rungs: Rung[];
 };
 
 const SECONDS_PER_MIN = 60;
@@ -85,29 +131,85 @@ function at(spec: SlotSpec, anchors: EnduranceAnchors, size: number) {
 export function slotSpans(specs: SlotSpec[], anchors: EnduranceAnchors): SlotSpan[] {
   const out: SlotSpan[] = [];
   for (const spec of specs) {
-    /**
-     * ⛔⛔ THE DURATION BAND IS `sessionDurationBandSeconds`', NOT THIS FILE'S. It is stage 1's own
-     * answer to "shortest and longest this slot can be", it is what the wizard's
-     * `standing-plan-week-bounds.ts` already renders the volume field's range from, and a second
-     * sum here is precisely the ask-15-get-20 shape both of those exist to kill. ⚠️ The slot's
-     * ARCHETYPE is passed, so the bound reflects the shape the athlete actually picked rather than
-     * the widest shape the level offers.
-     */
+    const rungs = ladderOf(spec, anchors);
+    if (rungs.length === 0) continue;
+    out.push({
+      spec,
+      minLo: rungs[0].lo,
+      minHi: rungs[rungs.length - 1].hi,
+      rungs,
+    });
+  }
+  return out;
+}
+
+/**
+ * ⛔ THE RUNGS ONE SLOT CAN TAKE — its frame level, and for a BASE family every level above it.
+ *
+ * ⛔⛔ THE DURATION OF EACH RUNG IS `sessionDurationBandSeconds`', NOT THIS FILE'S. That function is
+ * stage 1's own answer to "shortest and longest this slot can be" and is what the wizard's
+ * `standing-plan-week-bounds.ts` already renders; a second sum here is the ask-15-get-20 shape both
+ * of those exist to kill. ⚠️ The slot's ARCHETYPE is passed, so the rung reflects the shape the
+ * athlete actually picked. ⚠️ A level the library refuses for this archetype is skipped rather than
+ * guessed at — the archetype list varies by level and the library owns which is offered.
+ *
+ * ⚠️ CLIMBING STARTS AT THE FRAME'S LEVEL AND ONLY GOES UP. p246 assigns the level; the ladder is
+ * about holding MORE hours, so a slot never drops below the dose the frame prescribed.
+ */
+export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
+  const ceiling = LADDER_CEILING_MIN[spec.family] ?? Infinity;
+  const top: Level = isBaseFamily(spec.family) ? 3 : spec.level;
+  const out: Rung[] = [];
+  for (let level = spec.level; level <= top; level++) {
     const band = (() => {
       try {
-        return sessionDurationBandSeconds(spec.family, spec.level, { anchors, archetype: spec.archetype });
+        return sessionDurationBandSeconds(spec.family, level as Level, {
+          anchors, archetype: spec.archetype,
+        });
       } catch {
         return null;
       }
     })();
     if (!band) continue;
-    out.push({
-      spec,
-      minLo: band.shortest / SECONDS_PER_MIN,
-      minHi: band.longest / SECONDS_PER_MIN,
-    });
+    const lo = band.shortest / SECONDS_PER_MIN;
+    const hi = Math.min(band.longest / SECONDS_PER_MIN, ceiling);
+    // ⚠️ A RUNG THE CEILING HAS SWALLOWED WHOLE IS NOT A RUNG. Its floor is already past the cap,
+    // so offering it would prescribe past the ruling that set the cap.
+    if (hi < lo) continue;
+    out.push({ level: level as Level, lo, hi });
   }
   return out;
+}
+
+/**
+ * ⛔ WHERE A SLOT SITS AT DIAL POSITION `t` — the ladder walked as one continuous dial.
+ *
+ * ⛔⛔ THE RUNGS ARE TRAVERSED BY THEIR OWN LENGTHS, and the jump between them is a JUMP. p235 gives
+ * level 1 as 25-30 min and level 2 as 45-60: there is no 35-minute easy run in the book, so the dial
+ * steps over that gap rather than inventing a dose in it. The function stays monotonic, which is all
+ * the solve needs.
+ * ⚠️ `t` IS ACROSS THE WHOLE LADDER, not within one level — that is what makes a single dial per
+ * sport move a quality slot inside its band and a base slot up its levels at the same time.
+ */
+export function rungAt(rungs: Rung[], t: number): { level: Level; size: number; minutes: number } {
+  const clamped = Math.min(1, Math.max(0, t));
+  const spans = rungs.map((r) => Math.max(0, r.hi - r.lo));
+  const total = spans.reduce((a, b) => a + b, 0);
+  // ⚠️ EVERY RUNG FLAT (a fixed dose at every level) — the dial cannot move it, so it takes the
+  // rung `t` lands in by position rather than by length, and its one length is the answer.
+  if (total <= 0) {
+    const i = Math.min(rungs.length - 1, Math.floor(clamped * rungs.length));
+    return { level: rungs[i].level, size: 0, minutes: rungs[i].lo };
+  }
+  let want = clamped * total;
+  for (let i = 0; i < rungs.length; i++) {
+    const span = spans[i];
+    if (want > span && i < rungs.length - 1) { want -= span; continue; }
+    const size = span > 0 ? Math.min(1, want / span) : 0;
+    return { level: rungs[i].level, size, minutes: rungs[i].lo + size * span };
+  }
+  const last = rungs[rungs.length - 1];
+  return { level: last.level, size: 1, minutes: last.hi };
 }
 
 export type VolumeBound = {
@@ -192,14 +294,13 @@ export function sizeFor(
   target: number | null | undefined,
 ): SizeSolve {
   const mine = spans.filter((s) => s.spec.sport === sport);
-  const lo = mine.reduce((t, s) => t + s.minLo / 60, 0);
-  const hi = mine.reduce((t, s) => t + s.minHi / 60, 0);
+  const at = (t: number) => mine.reduce((sum, s) => sum + rungAt(s.rungs, t).minutes, 0) / 60;
+  const lo = at(0);
+  const hi = at(1);
   const want = Number(target);
   if (mine.length === 0 || !Number.isFinite(want) || want <= 0) {
-    return { size: DEFAULT_SIZE, verdict: 'no_target', expected: lo + (hi - lo) * DEFAULT_SIZE };
+    return { size: DEFAULT_SIZE, verdict: 'no_target', expected: at(DEFAULT_SIZE) };
   }
-  // ⚠️ A SPORT WITH NO RANGE AT ALL — every slot flat, as the level-3 sweet-spot block is. The dial
-  // cannot move it, so the answer is its one length and the verdict says which side of it the ask is.
   if (hi <= lo) {
     return {
       size: DEFAULT_SIZE,
@@ -209,23 +310,28 @@ export function sizeFor(
   }
   if (want >= hi) return { size: 1, verdict: want > hi ? 'over_cap' : 'at_target', expected: hi };
   if (want <= lo) return { size: 0, verdict: want < lo ? 'under_floor' : 'at_target', expected: lo };
-  const size = (want - lo) / (hi - lo);
-  return { size: Math.min(1, Math.max(0, size)), verdict: 'at_target', expected: want };
+  /**
+   * ⛔⛔ BISECTED, NOT INTERPOLATED, AND THE LADDER IS WHY. The old solve divided across one linear
+   * band, which was exact while every slot had a single dose range. A base slot now walks several
+   * levels with a JUMP between them — p235 offers no 35-minute easy run — so the total is a
+   * staircase and a straight line through its ends lands in the risers.
+   *
+   * ⚠️ IT COSTS NOTHING. `rungAt` is arithmetic over numbers `slotSpans` already measured; no session
+   * is built inside this loop. Twenty-four halvings put `t` inside a ten-thousandth, and the only
+   * builds are the ones the composer makes afterwards at the chosen rung.
+   * ⚠️ MONOTONIC BY CONSTRUCTION — every rung's minutes rise with `t` and the rungs are in order — so
+   * the bisection cannot get stuck on a plateau it should have stepped over.
+   */
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (low + high) / 2;
+    if (at(mid) < want) low = mid; else high = mid;
+  }
+  const t = (low + high) / 2;
+  return { size: t, verdict: 'at_target', expected: at(t) };
 }
 
-// ── WHAT THE ATHLETE READS ───────────────────────────────────────────────────────────────────────
-//
-// ⛔ `COPY-VOICE.md`'s grammar: **[observable fact], [conditional consequence]**. Subject is the
-// picks or the week, never "you" (rule 1). No imperatives — the lever is stated, not ordered
-// (rule 7). "About", because the mileage is an estimate and `milesOf` says why (rule 5 wants a
-// number; rule 6 forbids fake precision, and these two meet at "about").
-//
-// ⛔ AND IT NAMES THE LEVER, WHICH IS THE WHOLE POINT (Michael, 2026-08-26): *"these picks hold up
-// to 6 — put the long day on the run."* A ceiling with no way past it is a wall; a ceiling with the
-// lever beside it is a choice. ⛔ The engine never pulls that lever itself — the number sizes the
-// week, it never re-points a slot to another sport.
-
-/** `1.75` → `about 1h45`; `0.83` → `about 50 minutes`. Hours in, always. */
 /**
  * ⛔⛔ THE OPTIONS, AND THEY ARE THE SAME ON BOTH SPORTS (Michael, 2026-08-26, final): *"no time
  * buckets — 1,2,3,4,5,6 hours for both ride and run. If someone runs an hour a week and they only

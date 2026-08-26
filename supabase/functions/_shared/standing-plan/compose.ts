@@ -91,8 +91,8 @@ function rotatedArchetype(family: string, level: number, week: number): string |
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
-  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, REST_DAY_RUNG,
-  sizeFor, slotSpans, weekVolumeBounds,
+  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf, REST_DAY_RUNG,
+  rungAt, sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
 import {
@@ -1260,6 +1260,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
         const a = assignedSlot(sportAssignment, d.day, i, slot);
+        // ⚠️ THE FRAME'S OWN LEVEL, not the dial's answer — `slotSpans` builds the ladder UP from
+        // here, so handing it a climbed level would start the ladder half-spent.
         out.push({ family: a.family, level: (args.levelOverrides?.[a.family] as Level | undefined) ?? a.level, archetype: a.archetype, sport: a.sport });
       });
     }
@@ -1323,9 +1325,39 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       Math.max(0, Math.round((want - bound.cap) / each)),
     );
   };
-  /** ⛔ ONE SIZE PER SPORT — see `sizeFor`. A swim has no typed target and keeps the default. */
-  const sizeForSport = (sport: 'run' | 'ride' | 'swim'): number =>
+  /** ⛔ ONE DIAL POSITION PER SPORT — see `sizeFor`. A swim has no typed target and keeps the default. */
+  const dialForSport = (sport: 'run' | 'ride' | 'swim'): number =>
     sport === 'run' ? volume.run.size : sport === 'ride' ? volume.ride.size : DEFAULT_SIZE;
+  /**
+   * ⛔⛔ WHERE ONE SLOT SITS ON THE DIAL — its LEVEL as well as its size (Michael, 2026-08-26).
+   *
+   * A base session grows through the book's own sizes before a new day is added: an easy run goes
+   * 25-30 → 45-60 → 80-90 (p235, *"the level refers almost strictly to duration"*) rather than
+   * spawning a second easy run at 30 minutes. ⛔ A QUALITY slot has one rung — the frame's level —
+   * so this returns its assigned level unchanged and moves only the size, which is p246's
+   * assignment left exactly where it is.
+   * ⚠️ `levelOverrides` STILL WINS. An explicit caller answer is not a dial position.
+   */
+  const rungForSlot = (
+    family: string, level: Level, archetype: string | undefined, sport: 'run' | 'ride' | 'swim',
+  ): { level: Level; size: number } => {
+    const override = args.levelOverrides?.[family] as Level | undefined;
+    if (override != null) return { level: override, size: dialForSport(sport) };
+    /**
+     * ⛔⛔ NO ANSWER MEANS THE FRAME'S OWN PRESCRIPTION, NOT THE MIDDLE OF THE LADDER.
+     *
+     * The dial defaults to 0.5, and once a base slot spans three levels that midpoint sits in LEVEL
+     * TWO — so an athlete who typed nothing would have got a week half again as long as p246 writes,
+     * climbed by a number they never gave. Absent is not a request for more.
+     * ⚠️ CAUGHT BY THE SWEEP THAT PINS THE UNTARGETED WEEK: it read 7h55 where the frame builds 5h19.
+     */
+    const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
+    if (verdict === 'no_target') return { level, size: DEFAULT_SIZE };
+    const rungs = ladderOf({ family: family as never, level, archetype, sport }, anchors);
+    if (rungs.length === 0) return { level, size: dialForSport(sport) };
+    const at = rungAt(rungs, dialForSport(sport));
+    return { level: at.level, size: at.size };
+  };
 
   const { place: relocate, moves: enduranceMoves } = enduranceRelocator(args);
   /**
@@ -1501,7 +1533,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     // told to and decides nothing.
     day.endurance.forEach((slot, i) => {
       const assigned = assignedSlot(sportAssignment, day.day, i, slot);
-      const level = (args.levelOverrides?.[assigned.family] as Level | undefined) ?? assigned.level;
+      // ⛔ THE LEVEL IS THE DIAL'S ANSWER FOR A BASE SLOT — see `rungForSlot`. Quality is unmoved.
+      const rung = rungForSlot(assigned.family, assigned.level, assigned.archetype, assigned.sport);
+      const level = rung.level;
       /**
        * ⛔ "ENGINE'S PICK — ROTATES WEEK TO WEEK" MUST BE TRUE (Michael, 2026-08-24). With no
        * athlete pick, the library took its first archetype every week — twelve identical
@@ -1514,7 +1548,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         archetype: assigned.archetype ?? rotatedArchetype(assigned.family, level, args.week),
         anchors,
         // ⛔ §3c — the dial the athlete's typed number set. See `volume-bounds.ts`.
-        size: sizeForSport(assigned.sport),
+        size: rung.size,
       });
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
       sessions.push({
@@ -1547,7 +1581,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const liftOnlyDays = days.filter((d) => !d.rest && d.endurance.length === 0 && d.strength.length > 0);
     const swimTargets = liftOnlyDays.length > 0 ? liftOnlyDays : days.filter((d) => !d.rest);
     for (let i = 0; i < swimAddOns && i < swimTargets.length; i++) {
-      const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors, size: sizeForSport('swim') });
+      const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors, size: dialForSport('swim') });
       const row = translateEnduranceSession(built);
       // ⚠️ THE ADD-ON IS ENDURANCE TOO, so it obeys the same blocked-day rule as the slots above.
       sessions.push({
@@ -1566,7 +1600,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const targets = openDays.length > 0 ? openDays : days.filter((d) => !d.rest && d.endurance.length === 0);
     for (let i = 0; i < extraVt1 && i < targets.length; i++) {
       // ⛔ THE TIER'S RUNS TAKE THE RUN DIAL TOO — they are miles in the same week.
-      const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors, size: sizeForSport('run') });
+      const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors, size: dialForSport('run') });
       const row = translateEnduranceSession(built);
       sessions.push({
         day: relocate(dayNameFor(args, targets[i].day), 'the extra easy run'),
@@ -1847,6 +1881,41 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⛔ `capLine` and `volumeLine` ARE now deleted — `fixedHoursLine` replaced them, so keeping a
    * silenced sentence "in case" would just be dead copy.
    */
+
+  /**
+   * ⛔⛔ A DOUBLE DAY IS LEGAL AND SAYS ITS SPACING (Michael, 2026-08-26). The book sanctions the
+   * two-a-day rather than merely tolerating it:
+   *
+   *   · B3: *"6-8h between two-a-days (4-6h if the morning is a sub-hour VT1 session)."*
+   *   · Rule 5: *"work that benefits from pre-fatigue goes last — almost always VT1-intensity
+   *     endurance… you could cut your VT1 run volume by a third or so after a hard leg workout and
+   *     get the same overall adaptations."*
+   *
+   * ⛔ READ OFF THE FINISHED WEEK, NOT OFF THE FILL LOOP. A first draft only noticed doubles a FILL
+   * created and went silent on the ones the relocator made moving the frame's OWN sessions off a
+   * blocked day — which is most of them. Whatever put two sessions of one sport on a day, the
+   * athlete needs the same sentence.
+   * ⛔ AND THE SENTENCE IS THE SPACING, because that is the only part the calendar cannot show. Two
+   * sessions on one day are visible on the grid; the hours between them are the condition that
+   * makes it safe, and a two-a-day without them is the prescription minus its condition.
+   * ⚠️ DAY-AGNOSTIC — this screen runs before the scheduler, so a weekday would be a promise the
+   * next screen breaks.
+   * ⚠️ THE CITE NAMES BOTH PLACES BECAUSE THEY DIFFER IN STANDING. B3's bullet carries only its
+   * chapter (pp.69-125, no page photographed); rule 6 gives the same two figures on a page that WAS
+   * read, in the context of a session before resistance work. Naming one alone would overstate it.
+   */
+  for (const sport of ['run', 'ride'] as const) {
+    const perDay = new Map<string, number>();
+    for (const x of sessions.filter((y) => y.type === sport)) {
+      perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
+    }
+    if (![...perDay.values()].some((n) => n > 1)) continue;
+    const text = `Two ${sport === 'run' ? 'runs' : 'rides'} land on one day. The source leaves six to `
+      + 'eight hours between them, or four to six when the first is under an hour.';
+    if (!notes.some((n) => n.text === text)) {
+      notes.push({ kind: 'warning', text, cite: 'Viada pp.69-125, p139-145' });
+    }
+  }
 
   const conflicts = weekConflicts({
     sessions,
