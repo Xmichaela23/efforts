@@ -981,6 +981,17 @@ type NonRaceState = {
    *  band tells a 40-mile runner and a 10-mile runner the same thing, and it is only true for one. */
   usualMiles: number | '';
   targetMiles: number | ''; // Get Strong: typed maintenance mileage, in the user's display unit; canonicalized to miles at confirm
+  /**
+   * ⛔⛔ THE STANDING PLAN'S WEEKLY RUN HOURS — ITS OWN FIELD, AND IT HAS TO BE (2026-08-26).
+   *
+   * The hours dropdown wrote into `targetMiles` for one commit, and that field is the source of
+   * `target_weekly_miles` — so a pick of "4 hours" shipped as **four MILES** to the coach payload's
+   * upkeep comparison, the State screen's accent, `create-goal`'s seed test, `athlete-weekly-intent`
+   * and the Get Stronger generator, and made the accessory card compute its endurance tier off
+   * `4 × pace / 60`. The exact silent unit change the payload comment warned about, made one layer
+   * higher than the comment was looking. ⛔ Two units never share a field.
+   */
+  targetRunHours: number | '';
   /** ⛔ Has the athlete typed in the hold field THEMSELVES? The seed re-runs until they have.
    *  Emptiness is NOT the test: `onChange` fires per keystroke, so typing "28" seeds off "2" first
    *  (dose 1), and the field is no longer empty when the "8" arrives. The hold then stays at 1 while
@@ -1639,8 +1650,8 @@ function assemblePayload(
            * meanings. ⚠️ Omitted when unanswered: absent means no opinion, and the composer keeps
            * the library's own midpoint.
            */
-          ...(state.targetMiles !== '' && Number(state.targetMiles) > 0
-            ? { target_run_hours: Number(state.targetMiles) } : {}),
+          ...(state.targetRunHours !== '' && Number(state.targetRunHours) > 0
+            ? { target_run_hours: Number(state.targetRunHours) } : {}),
           ...(state.rideHours !== '' && Number(state.rideHours) > 0
             ? { target_ride_hours: Number(state.rideHours) } : {}),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
@@ -1996,7 +2007,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined,
+    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -3248,16 +3259,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * moves with it.
    */
   const accessoryBands = (() => {
-    const miles = typeof state.targetMiles === 'number' && state.targetMiles > 0
-      ? (unit === 'km' ? state.targetMiles / 1.609344 : state.targetMiles)
-      : null;
+    /**
+     * ⛔⛔ THE RUN HOURS ARE ASKED FOR DIRECTLY NOW, NOT DERIVED FROM MILES (2026-08-26). This read
+     * `targetMiles` and converted at the athlete's pace; the field it read stopped holding miles
+     * when the ask became hours, so the band was being computed off `hours × pace / 60` — about a
+     * sixth of the real figure, which drops the tier and hands out accessory volume the week cannot
+     * carry. ⚠️ The conversion is GONE rather than corrected: the screen has the hours.
+     */
+    const miles = null as number | null;
     /**
      * ⚠️ `paceMinPerMile` IS THE SAME NUMBER THE ENGINE RECEIVES — `assemblePayload` sends it as
      * `easyPaceMinPerMile`. That includes its 10:00/mi fallback for an athlete with no learned pace,
      * so the card and the plan agree even in the unmeasured case. ⛔ If the payload ever sends a
      * different figure, this line is the one that starts lying.
      */
-    const runHours = miles != null && paceMinPerMile > 0 ? (miles * paceMinPerMile) / 60 : null;
+    void miles;
+    const runHours = Number(state.targetRunHours) > 0 ? Number(state.targetRunHours) : null;
     const rideHours = Number(state.rideHours) > 0 ? Number(state.rideHours) : null;
     const declared = posturePresent('run') || posturePresent('bike');
     const totalHours = !declared ? 0
@@ -3284,18 +3301,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const volumeCanContinue =
     // ⚠️ `>= 1`, NOT `>= 2` — one run a week is an answer now, and a gate demanding two
     // would refuse the option the picker offers.
-    (!posturePresent('run') || (Number(state.targetMiles) > 0 && state.runDays >= 1)) &&
+    // ⚠️ THE STRENGTH PATH GATES ON HOURS, every other goal still on miles — two fields, two units,
+    // and the gate has to ask the one the screen actually shows.
+    (!posturePresent('run')
+      || (Number(isStrengthFocus ? state.targetRunHours : state.targetMiles) > 0 && state.runDays >= 1)) &&
     (state.posture?.bike !== 'maintain' || (Number(state.rideHours) > 0 && state.rideDays >= 1));
   // Reason shown at the Continue key when blocked — fact-statement, matching the schedule gate's
   // "Runs a week has no number yet" voice (not an imperative).
   const volumeMissing: string[] = [];
-  if (posturePresent('run') && !(Number(state.targetMiles) > 0)) volumeMissing.push('running');
+  if (posturePresent('run') && !(Number(isStrengthFocus ? state.targetRunHours : state.targetMiles) > 0)) volumeMissing.push('running');
   if (state.posture?.bike === 'maintain' && !(Number(state.rideHours) > 0)) volumeMissing.push('riding');
   // ⚠️ THE COUNT IS ITS OWN SENTENCE, in the scheduler's exact words — the athlete may have met one
   // half of the question and not the other, and "Weekly running has no number yet" would be false
   // when the miles are typed and the count is not.
   const volumeCountMissing: string[] = [];
-  if (posturePresent('run') && Number(state.targetMiles) > 0 && state.runDays < 1) {
+  if (posturePresent('run') && Number(isStrengthFocus ? state.targetRunHours : state.targetMiles) > 0 && state.runDays < 1) {
     volumeCountMissing.push('Runs a week has no number yet.');
   }
   if (state.posture?.bike === 'maintain' && Number(state.rideHours) > 0 && state.rideDays < 1) {
@@ -3748,9 +3768,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     if (!state.longRunDay && !state.longRideDay) return;   // nothing to solve around yet
     const t = setTimeout(() => { void runPreview(); }, 400);
     return () => clearTimeout(t);
+    // ⚠️ `targetRunHours` IS IN THE DEPS (2026-08-26). The strength path's running ask moved to its
+    // own field; without it the preview would not rebuild when the athlete changed their hours,
+    // which is the one number this whole screen exists to move.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
-      state.qualityDays, state.hardDays, state.targetMiles, state.rideHours]);
+      state.qualityDays, state.hardDays, state.targetMiles, state.targetRunHours, state.rideHours]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -5667,9 +5690,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             baselines={baselinesRow}
             easyPaceSecPerMi={paceMinPerMile ? paceMinPerMile * 60 : null}
             squat1RM={squat1RMNow}
-            runVolume={state.targetMiles === '' ? '' : String(state.targetMiles)}
+            runVolume={state.targetRunHours === '' ? '' : String(state.targetRunHours)}
             onRunVolume={(v) => setState((st) => ({
-              ...st, targetMiles: v === '' ? '' : Number(v), targetTouched: true,
+              ...st, targetRunHours: v === '' ? '' : Number(v), targetTouched: true,
             }))}
             rideHours={state.rideHours}
             onRideHours={(v) => setState((st) => ({ ...st, rideHours: v }))}
