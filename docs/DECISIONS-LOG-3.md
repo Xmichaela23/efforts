@@ -1172,3 +1172,124 @@ photograph it). ⛔ **Nothing in this entry rests on it** — the anchor is p275
 **Warn, never block, throughout — D-452 unchanged.** The remaining audit classes (34,154
 athlete-caused keystone breaks, 4,616 hard-endurance-on-a-lower-day) are sentences the plan does not
 yet say, not weeks it should refuse to build.
+
+---
+
+## D-454 — The weekly volume number is real, bounded both ends, and base sessions climb the book's own sizes first (2026-08-26)
+
+**What forced it: a number the athlete typed that the engine never read.** The
+`DECISIONS-2026-08-21-standing-plan.md` ruling — *"the volume number stays, bounded both ends"* —
+was written and never built. The wizard collected a weekly figure, and the composer sized every
+endurance session off the frame alone.
+
+### 1. HOURS, and a NEW key — not `target_weekly_miles` renamed
+
+⛔ **The field was already load-bearing as MILES to five readers.** Writing hours into it made
+`target_weekly_miles: 4` mean *four miles*, and the accessory band then computed `hours × pace / 60`.
+The new keys are `target_run_hours` and `target_ride_hours` (`compose.ts` `ComposeArgs`), validated
+onto the `gsBody` allowlist in `create-goal-and-materialize-plan`.
+
+⚠️ **A MODULE-IMPORT GREP CANNOT SEE AN ALLOWLIST.** The wizard calls
+`create-goal-and-materialize-plan`, which builds an explicit `gsBody` and invokes
+`generate-strength-plan`. A key must survive BOTH hops. `target_run_hours` was missing from the
+allowlist and the run dial was dead through two deploys, because the deploy list had been checked
+twice by grepping module importers — the right answer to the wrong question.
+
+### 2. Bounded both ends, from the frame itself
+
+`volume-bounds.ts`: `slotSpans()` delegates duration to `sessionDurationBandSeconds` rather than
+re-deriving it, `weekVolumeBounds()` returns hours for both sports, and `sizeFor()` bisects across
+the ladder. The dial offers only reachable values — `WEEKLY_HOUR_OPTIONS` (run 1–6, ride 1–11).
+
+⚠️ **`Math.round`, NOT `Math.ceil`, in the easy fill.** Ceil bought a 30-minute run to cover an
+11-minute gap and shipped 1h19 against a 1h ask.
+
+### 3. The ladder — HIS sizes, not ours
+
+⛔ **p235: *"the level refers almost strictly to duration."*** So for BASE families (`run_vt1`,
+`run_lsd`, `ride_endurance`) the LEVEL is a dose, and a bigger ask climbs his own rungs before a new
+day is added. For QUALITY families (`run_mlss`, `run_near_threshold`, `ride_sweet_spot`) the level is
+FIXED by p246 and `rungForSlot()` returns the frame's level unchanged. `LADDER_CEILING_MIN` caps the
+climb (`run_vt1: 90, run_lsd: 150, ride_endurance: 300`).
+
+⚠️ A default of 0.5 sitting in level two priced an untargeted week at 7h55 against the frame's own
+5h19. The default must sit where the frame sits.
+
+**Superseded:** the `DECISIONS-2026-08-21-standing-plan.md` volume ruling is now BUILT, not pending.
+
+---
+
+## D-455 — Gate only on gear that is required AND declarable; everything else is dropped from prescribing, never silently offered (2026-08-26, Michael)
+
+**What forced it: a screen.** Michael, on his own plan:
+
+> *"we need to add to equipment list for home gym, should never be just prescribed."*
+
+**Measured before the ruling.** `strength-grid` classifies 211 movements out of `EXERCISE_CONFIG`;
+**160 carried no gear tag.** For a declared home gym (barbell, rack, bench, dumbbells, pull-up bar,
+bands), **148 of those 160 reached the athlete anyway** — `grid.ts:215 reachable` passes an untagged
+movement unless its NAME reads machine-braced. A regex was standing in for a tag across two thirds
+of the catalogue, and a TRX fallout, a sled push and a GHD sit-up were all prescribable to somebody
+who owns none of it.
+
+### 1. Tag the catalogue — 147 rows
+
+⛔ **`ALWAYS` IS AN ANSWER, NOT AN ABSENCE.** A row tagged `ALWAYS` has been read and judged to need
+nothing; an absent row is a movement nobody has looked at. The two used to be indistinguishable,
+which is the whole reason `gearRoutesFor` warns. Guard: `src/lib/strength-gear-catalogue.test.ts`
+asserts the untagged set is now `[]`.
+
+⚠️ **The quieter half was the RANKING.** `equipmentFitRank` has no route to read for an untagged
+movement, so all 160 tied at zero and `EXERCISE_CONFIG`'s key order picked the winner — *"not a
+decision, an accident"*, in `grid.ts`'s own words about the case that surfaced it.
+
+### 2. The thirteen the vocabulary could not express, split by Slice 7's OWN rule
+
+⛔ **The rule is carried through, not bent.** Slice 7 (2026-08-13) cut an itemized picker down to
+*"gate only on gear that is BOTH required AND commonly declarable"*, after granularity drew
+Michael's *"I wouldn't know what that is."*
+
+- **THREE EARNED CHIPS.** `suspension_trainer` and `stability_ball` pass both halves — somebody with
+  a rack and a bar in their garage knows whether they own a TRX or a stability ball, and what Slice 7
+  cut was gear people could not NAME (glute-ham developer, dip bars, leg curl machine). Chips: "TRX /
+  suspension trainer", "Stability ball". Movements: `trx fallout`, `stability ball rollout`,
+  `stir the pot` (either implement — straps or a ball).
+- **TEN WERE DROPPED FROM PRESCRIBING.** `PRESCRIPTION_EXCLUDED` (`strength-grid/taxonomy.ts:374`),
+  filtered inside `allGridMovements()` at line 415: ghd sit up, roman chair sit up, captain's chair
+  knee raise (both spellings), sled push, sled pull, landmine twist, sandbag lunge, backpack carry,
+  ring dips. **Not commonly declarable means not gateable means never prescribed.**
+
+⚠️ **THEY ARE NOT DELETED.** `EXERCISE_CONFIG` still holds them, the library still lists them, and an
+athlete who CHOOSES a sled push can still log one — that is their call and always was. The engine
+simply never makes it for them.
+
+⚠️ **THE EXCLUSION MATCHES ON THE DEDUPE STEM, NOT THE FOLD.** Naming `ring dips` alone dropped the
+plural and handed the dedupe slot to `ring dip` — the catalogue's other spelling of the same
+movement — which then sailed back into the pool untagged. It also runs BEFORE `seen.add`, or an
+excluded spelling would consume the slot and take a legitimate twin down with it.
+
+### 3. Two things the tagging surfaced rather than caused
+
+⛔ **A commercial gym granted no `bands` and no `kettlebell`.** The expansion said *"most fixed
+equipment"* and stopped at things bolted down — which is not the question. `band face pulls` and
+`band leg curls` have carried `[['bands']]` for weeks and were ejected from every gym member's pool,
+before tonight and unrelated to it. Granting a key opens routes and closes none.
+
+⚠️ **THE CATALOGUE HAS NO BODYWEIGHT ARMS MOVEMENT.**
+`movementsForMuscle('biceps', ['Pull-up bar'])` returns nothing; every triceps prime-mover needs
+bands, dumbbells, a barbell, a cable, or something to dip on. Chin-ups and push-ups reach those
+muscles as SECONDARY engagement, which the ledger lists and deliberately never counts. Before the
+tagging this was invisible in the worst way — the arms row offered a BARBELL CURL to an athlete with
+no barbell. **Michael ruled it off the table:** entry-language (rack + bar minimum) is built last, so
+a bodyweight-only kit is not a real case for this plan. It becomes real the day that plan is built.
+
+⛔ **AND THE FLOOR NOW GOES SHORT INSTEAD OF LYING.** Where the catalogue cannot reach a muscle, the
+week says so — *"Could not reach biceps, triceps"* plus a warning per muscle naming the reason. That
+path already existed in `accessory-dosing/ledger.ts` and was simply never reached, because untagged
+movements filled the floor with kit the athlete did not own. Three tests asserted the old, false
+state; each now allows a muscle to be short **only if the engine named it**. Silence is still a
+failure, so a future tag error cannot hide there.
+
+**Superseded:** Slice 7's *"do not re-add a chip here"* is annotated in place in
+`TrainingBaselines.tsx` — the two chips APPLY its rule rather than excepting it, and the note says
+so where the next reader will be standing.

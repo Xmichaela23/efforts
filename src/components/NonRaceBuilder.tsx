@@ -1176,6 +1176,13 @@ function scheduleSteps(state: NonRaceState, isStrengthFocus: boolean, isRaceGoal
    *
    * ⚠️ AND IT GROUPS THE HUMAN DECISIONS: how much you do, then what you want to work on, then when.
    * The calendar is the last thing because it is the only step that depends on all of the others.
+   *
+   * ⚠️ BACK-ANNOTATED 2026-08-26 — THIS ORDER IS NOW A DEFERRAL, NOT A SETTLED RULING. Michael has
+   * queued a SWAP (accessory before endurance) and deferred building it, so the order above is what
+   * currently ships rather than what was last decided. ⛔ The data dependency stated above does not
+   * evaporate if the swap lands: the accessory card's rep totals come from the endurance tier, so a
+   * swap has to move the DEPENDENCY too, not just the screens. Read this whole comment before
+   * reordering anything — the 2026-08-17 reasoning is still the constraint the swap must satisfy.
    */
   if (isStrengthFocus && (kept('run') || kept('bike'))) {
     // ⛔ ONE SCREEN NOW (2026-08-24). `volume` + `hardday` were two cards asking one question; see

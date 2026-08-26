@@ -1,78 +1,151 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-26, early — the "fix the plan generating rules" handoff)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-26, late — the gear-gate + plate-trace handoff)
 
-### Your job: MAKE THE ENGINE ENFORCE VIADA'S PLACEMENT LAWS. Audit first, then fix what the audit finds.
+### Your job: MAKE THE PLAN CLIMB ON WHAT THE ATHLETE LIFTED, NOT ON THE CALENDAR.
 
-Michael's ruling tonight, verbatim thread: the balance claim must be TRUE of the engine, not
-inherited copy — "you are correcting the copy when the engine might be flawed" → "we need to fix the
-plan generating rules." The sequence:
+Two separate investigations landed on the same hole tonight — the wizard sweep's item 1, and the
+plate-increment trace Michael asked for. Both say: **reactive progression is fully built, fully
+tested, and called by nothing.** The plan raises weight on a date.
 
-1. **Write the book's placement rules as checks** in the fuzz harness
-   (`_shared/standing-plan/fuzz-builder.test.ts` — `checkComposer` ~line 154, `checkViolations`
-   ~line 245, 16,832 shapes). The rules, page-cited in `docs/SOURCE-viada-hybrid-athlete.md`:
-   - **The frame's endurance days (p246, §E1a ~line 902):** day 1 MLSS+ sits WITH ME Upper, day 3 NT
-     on the plyo day, day 4 VT1 with DE Upper, day 6 LSD, day 7 rest. **Hard endurance never sits on
-     a lower-body day in the frame.** An UNPINNED build must land hard sessions on frame days.
-   - **p131 keystones (§ ~line 440):** heavy days preceded by the recovery they specifically need
-     ("fresh in the relevant systems, not fresh overall"). This is Q-288 — the rule exists nowhere
-     in code, so no test has ever checked it.
-   - **p247's ONE compensated break (§E1d ~line 966):** hard RUN the day before ME Lower is the
-     book's own layout, absorbed by the 3.5% haircut — `compose.ts` passes `hardRunBeforeLower`
-     into `prescribedLoad`; constants in `standing-plan/progression.ts` (`LOWER_HAIRCUT_*`).
-     The invariant: that adjacency is legal ONLY with the haircut engaged.
-   - **p130 consolidation (§ ~line 423):** judged by what each session REQUIRES; a violated spacing
-     the athlete pinned is legal but must be SAID (Michael's law: choice wins, informed).
-2. **Run the audit.** Every one of the 16,832 weeks either satisfies the rules or carries an
-   on-screen note naming the break. The failures list IS the work order.
-3. **Fix by cause:** the engine's own placement broke it → placement changes; the athlete's pin
-   broke it → the warning must name it (grep `week-model/resolve.ts` rules first — a clearance rule
-   may already cover it and just not fire on this path).
-4. **LAST, with Michael's explicit go: his live block.** It carries the Friday hard run — a phantom
-   seed baked at build (prod read 2026-08-26: "Hard Run" every Friday, the DE Lower day; the book
-   wants it Monday with ME Upper). He is TRAINING on it (week 1, tests done, weights priced). Do not
-   touch it until the rules are fixed and he says go.
+**The trace, verified by reading the code, not by inference:**
 
-**Mechanics:** deno is at `~/.deno/bin/deno`, NOT on PATH; run with `-A --no-check` (type-check
-failures in the standing-plan tests pre-exist; under-permissioned runs hide real failures).
+1. **The weight comes from a calendar formula.** `prescribedLoad`
+   (`_shared/standing-plan/progression.ts:91`) is
+   `workingNumber × (1 + scheduledRise) × haircut × pct`, rounded to `roundTo` (5).
+   `scheduledRise` is `RATE_ANCHOR[frame].perWeek × (week − 1)` — 1% every three weeks, p247,
+   `frames.ts:258` — applied regardless of what the athlete did. Nothing in that path reads a
+   logged set.
+2. **The reps never move.** `compose.ts:942` is
+   `` const reps = p.kind === 'barbell' ? `${p.reps.lo}-${p.reps.hi}` : ''; `` — the slot's own
+   static range. No week term, no history term. Identical in week 1 and week 12.
+3. **The engine that would move them is orphaned.** `progressionVerdict`
+   (`progression.ts:174`) already returns `advance` / `hold_add_reps` / `back_off` / `no_evidence`
+   off logged sets against the rep range, with `STALL_CONFIRMATIONS = 2` as the deadband. Call
+   sites outside its own file: `progressionVerdict` — tests only. `meSetsFromHistory`
+   (`progression.ts:397`) — tests only. `advanceStep` (`progression.ts:209`) — **none at all, not
+   even a test.** ⚠️ There is no `advanceOrHold` anywhere in the repo; if a handoff names one, it
+   is wrong.
 
-### What shipped 2026-08-25/26 (PUSHED + DEPLOYED), so you don't re-litigate it
+**What it costs, measured — 12-week block, 85% of the working number, 5 lb rounding:**
 
-- **Week-2 weights LANDED — the previous banner's job is DONE, VERIFIED ON DEVICE.** The Test:
-  Lower save fired the sheet: bench 149 / squat 117 / deadlift 173 / OHP 102, 11 weeks priced.
-- **Q-287's client half is FIXED (back-annotated in OPEN-QUESTIONS-2):** `assemblePayload`
-  (`NonRaceBuilder.tsx`) ships a hard/long day only when the athlete TAPPED it (`touchedUnits`,
-  threaded as a parameter) or a club owns it; untouched slots ship day-less ("engine, propose one").
-  The race-path long-day tap now records the touch. ⚠️ UNVERIFIED: one untouched preview build
-  post-fix should land hard sessions Mon + Wed (frame days) — nobody has watched it.
-- **Two FALSE compromise sentences DELETED in `day-map.ts`:** the missed-hard-pin and
-  missed-long-pin "rather than" notes described the discarded rotation step — pins are honoured
-  unconditionally downstream (`compose.ts` `enduranceDayFor` ~187-203) — and Michael's screen
-  disproved them live. Survivors rewritten plain ("X is a day off, but the week still puts a
-  lifting day there — N lifting days plus the long ride don't fit any other way" / "Taper weeks
-  have no long run…"). Two stale test pins superseded with dated notes
-  (`standing-plan-live.test.ts`, `unavailable-days.test.ts`). Suite 259/0 incl. fuzz.
-- **WeekGrid:** "Sample week — week 1" label on both wizard previews (the preview IS the test
-  week); sessions colored by sport; the balance-the-stressors line renders ONLY on conflict-free
-  weeks and claims the design's purpose, never per-session freshness.
-- **Deployed 2026-08-26:** `generate-strength-plan`, `rematerialize-standing-block` (day-map
-  bundle). Earlier same night: 7-function batch incl. `materialize-plan` (slot_intent carry),
-  `create-goal-and-materialize-plan` (tri preview-write hole closed), `fetch-strava-route`
-  (requireUser; `bearer-auth.ts` deleted). `strava-refresh` deleted from prod; `Efforts_Summer`
-  secret unset. Client on Netlify; iOS synced, not installed.
-- **The punch-list cleanup is DONE** (2026-08-25 daytime): stale checklists archived to
-  `archive/POLISH-PUNCH-LIST-archive-2026-08-25.md`, three never-run engines resolved, five logger
-  fixes live (blank band prefills, plain ME/DE cues with condition-gated advance rules, slot-text
-  suppressed, delete moved off the header X, advance nudge).
+| lift | week 1 → 12 | distinct weights |
+|---|---|---|
+| 225 lb squat | `190 190 195 195 195 195 195 195 195 195 200 200` | 3 |
+| 315 lb deadlift | `270 270 270 270 270 270 275 275 275 275 275 280` | 3 |
+| 135 lb press | `115 115 115 115 115 115 115 115 120 120 120 120` | **2, with an 8-week identical stretch** |
 
-### Still UNVERIFIED / open (carried)
+⛔ **MICHAEL HAS ALREADY RULED OUT THE WRONG FIX. NO fractional-plate chip; 5 lb rounding stays.**
+His reasoning (2026-08-26): reps carry the progression between bar jumps — the book's own *"progress
+through the circle of reps, with slow gradual increases every 3-4 weeks."* The rounding is not the
+defect. The defect is that nothing carries the reps. Do not reach for smaller plates.
 
-- The audit itself (step 2) — nobody knows yet whether silent breaks exist beyond the seed case.
-- Whether pinned hard-leg-work on/before ME Lower produces ANY warning today.
-- Three-club built plan on a device (pins-win acceptance, carried from 2026-08-25).
-- **Q-286** (deadlift-week Friday vs pairing law) · **Q-287's export-brief half** · **Q-288** (this
-  banner's step 1 encodes it). Hill-descent watch test (send Thursday's Hard Run to Garmin — rests
-  should read 2:00; the 1s-rest bug traced to the deleted pre-08-06 block's stale data).
+⚠️ **AND THE MECHANISM IS LABELLED OURS, DELIBERATELY.** `DOUBLE_PROGRESSION_IS_OURS`
+(`progression.ts`) records that p247 says *"progress here should be through the circle of reps"* and
+**never defines the term** (corpus gap G-8). Double progression is the field-standard reading and may
+well be what he means, but it ships labelled OURS until his definition is photographed. Keep that
+label. Presenting it as his is the silent reconciliation the work order forbids.
+
+**Where to start:** the wiring, not the mechanism. The mechanism has tests
+(`standing-plan.test.ts`, `standing-plan-me-sets.test.ts`). What is missing is a caller — whatever
+reads completed sets and feeds `progressionVerdict`, and a path for `advanceStep` to move the
+printed number. `rematerialize-standing-block` is the function that already rebuilds a block from
+stored state and is the obvious host; read it before designing anything.
+
+**Mechanics:** deno is at `~/.deno/bin/deno`, NOT on PATH. Run
+`~/.deno/bin/deno test -A --no-check --sloppy-imports supabase/functions/ src/` — 4,445 passing at
+handoff. ⛔ `tsc --noEmit -p tsconfig.json` **checks ZERO files** (solution-style config, `files: []`).
+The real command is `-p tsconfig.app.json`; the honest baseline is **316 errors**, all pre-existing.
+Any "tsc clean" claim that does not name that number is a no-op being reported as a pass.
+
+### What shipped 2026-08-26 late (PUSHED — deploy state below), so you don't re-litigate it
+
+- **The wider catalogue is gated on equipment.** `strength-grid` classifies 211 movements out of
+  `EXERCISE_CONFIG`; **160 carried no gear tag**, and measured for a declared home gym (barbell,
+  rack, bench, dumbbells, pull-up bar, bands) **148 of them reached the athlete anyway** —
+  `grid.ts:215 reachable` lets an untagged movement through unless its NAME reads machine-braced,
+  so a regex was doing a tag's job for two thirds of the catalogue. 147 movements tagged in
+  `src/lib/strength-gear.ts`. `ALWAYS` now means *judged to need nothing*; an ABSENT row means
+  *nobody looked*. Guard: `src/lib/strength-gear-catalogue.test.ts` asserts the untagged set is
+  `[]`, so a new untagged movement fails the suite.
+- **Two new chips, ten movements dropped from prescribing (Michael, 2026-08-26).** Slice 7's rule —
+  *gate only on gear that is BOTH required AND commonly declarable* — split the thirteen the
+  vocabulary could not express. `suspension_trainer` and `stability_ball` earned GearKeys and chips
+  ("TRX / suspension trainer", "Stability ball" in `TrainingBaselines.tsx`), because a garage-gym
+  owner knows whether they have one; Slice 7 cut gear people could not NAME. The other ten — ghd
+  sit up, roman chair sit up, captain's chair knee raise (both spellings), sled push, sled pull,
+  landmine twist, sandbag lunge, backpack carry, ring dips — are in `PRESCRIPTION_EXCLUDED`
+  (`strength-grid/taxonomy.ts:374`), filtered inside `allGridMovements()` at line 415. **They stay
+  in the library and remain loggable by an athlete who chooses them; the engine never offers one.**
+  ⚠️ The exclusion matches on the DEDUPE STEM, not the fold — naming `ring dips` alone dropped the
+  plural and handed the dedupe slot to `ring dip`, which sailed back in untagged.
+- **A commercial gym now grants `bands` and `kettlebell`.** It granted neither, and
+  `band face pulls` / `band leg curls` have carried `[['bands']]` for weeks — ejected from every gym
+  member's pool, before tonight and unrelated to it. Granting a key opens routes and closes none.
+- **The bike sentence counts the built week.** "The hard sessions are on the bike" fired whenever
+  ANY slot was substituted to a ride, so a one-run-one-ride week read as false. `hardOnBikeNote`
+  (`standing-plan/sport-slots.ts`) counts the FRAME's hard slots and reads their assigned sport.
+  ⛔ It must count frame slots, not assigned families: `isHardSlot` reads `HARDNESS`, which lists
+  only the RUN families, so asking it about a substituted `ride_sweet_spot` returns false and the
+  count comes back zero on exactly the week the sentence is about. A test pins that.
+- **Six tests were rewritten because they pinned the old mechanism rather than the outcome** — two
+  literally said *"this test is stale"* in their own assertion message once the tag arrived. None
+  were weakened. Where the catalogue genuinely cannot fill a muscle, the week must NAME it with a
+  reason; silence is still a failure.
+- Earlier the same day, already deployed: the typed weekly-volume model + the base-session ladder
+  (D-454), and the 24h/12h fatigue law (D-453).
+
+### Carried forward from the 2026-08-26 EARLY banner (that job is DONE — the placement audit)
+
+The Viada placement audit ran and **drove every class to zero across all 16,832 fuzz shapes**
+(A 38,912→0, B 4,292→0, C 6,688→0, D 4,616→0, E 29→0). ⛔ **Class B collapsed entirely: the
+composer's placement was never wrong** — the LAW was, and D-453 fixed it. Do not re-open "the
+engine places hard sessions badly"; it does not. Also shipped and still true, from that banner:
+
+- **Q-287's client half is FIXED.** `assemblePayload` (`NonRaceBuilder.tsx`) ships a hard/long day
+  only when the athlete TAPPED it (`touchedUnits`) or a club owns it; untouched slots ship day-less.
+  ⚠️ **STILL UNVERIFIED:** one untouched preview build post-fix should land hard sessions Mon + Wed
+  (the frame days). Nobody has watched it.
+- **Two FALSE compromise sentences are DELETED in `day-map.ts`** — the missed-hard-pin and
+  missed-long-pin "rather than" notes described a discarded rotation step; pins are honoured
+  unconditionally downstream (`compose.ts` `enduranceDayFor`). Michael's screen disproved them live.
+- **Michael's live block carries a phantom Friday hard run** baked at build (prod read 2026-08-26:
+  "Hard Run" every Friday, the DE Lower day; the book wants it Monday with ME Upper). He is TRAINING
+  on it. ⛔ Do not touch his block without his explicit go — it is a separate, gated step.
+
+### Still UNVERIFIED / open (carried — do not assume any of these were checked)
+
+- ⛔ **DEPLOY STATE: the gear work is PUSHED (`64509824`) but NOT DEPLOYED.** The deploy was blocked
+  by this session's permission classifier, not skipped by choice. `strength-gear.ts` and
+  `strength-grid/taxonomy.ts` both ride the `_shared` bundle, so **nothing changed server-side until
+  all three redeploy**: `generate-strength-plan`, `rematerialize-standing-block`,
+  `create-goal-and-materialize-plan`. The client half (chips + tags) lands via Netlify.
+  **Verify timestamps before believing any of the above is live.**
+- **Nothing in tonight's work is device-verified.** Suite-green and build-clean only.
+- **`target_weekly_miles` goes UNWRITTEN by the Standing Plan wizard.** So for a new Standing Plan
+  goal the State screen's upkeep line reads the TIER SEED (`TIER_SEEDS[level].weeklyMi`, 20/30/40)
+  rather than anything the athlete typed — see the equality-with-seed inference at
+  `create-goal-and-materialize-plan/index.ts:4068`. The hours dials write `target_run_hours` /
+  `target_ride_hours` instead, deliberately (they are HOURS; that field is load-bearing as MILES to
+  five readers). Nobody has decided what the upkeep line should read for this goal type.
+- **The p280 cite is UNVERIFIED and marked so in place** — `HARD_ON_BIKE_CITE` in `sport-slots.ts`
+  reads *"Viada p280 — UNVERIFIED, page not transcribed in the corpus."* The claim is kept, the cite
+  is not page-backed. Photograph p280 or reword the claim; do not quietly restore a bare "p280".
+- **The active-recovery session is tagged but not renamed** — carried, unresolved.
+- **The fuzz harness's diagnostic COUNTER is unstable** (the pass/fail assertions are not). Do not
+  quote a class count from it as a fact without re-running.
+- **Deferred by Michael, not forgotten:** the wizard step swap (accessory before endurance) and
+  warning-action taps on the scheduler. ⚠️ The 2026-08-17 ordering comment in `NonRaceBuilder.tsx`
+  still describes the CURRENT order as settled; it is now a deferral, not a ruling.
+- **The arms gap is OFF the table by ruling, not by fix.** The catalogue has no bodyweight
+  prime-mover for biceps or triceps — `movementsForMuscle('biceps', ['Pull-up bar'])` returns
+  nothing, so a pull-up-bar-only athlete gets an empty arms row and a muscle floor that reports
+  *"Could not reach biceps, triceps."* Michael: entry-language (rack + bar minimum) is built last,
+  so a bodyweight-only kit is not a real case for this plan. ⚠️ It becomes real the day that plan
+  is built.
+- Carried from the previous banner and still open: **Q-286** (deadlift-week Friday vs pairing law) ·
+  **Q-287's export-brief half** · **Q-288** · the three-club built plan on a device (pins-win
+  acceptance) · the hill-descent watch test.
 
 ## 🧭 SUPERSEDED — was START HERE (2026-08-25 night — the pins-win day; its punch-list job was NOT done, carried in the banner above)
 

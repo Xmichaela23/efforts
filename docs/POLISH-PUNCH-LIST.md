@@ -14,6 +14,45 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE GEAR GATE (2026-08-26, PUSHED `64509824`; **NOT DEPLOYED, NOT DEVICE-VERIFIED**)
+
+⛔ **DEPLOY STATE FIRST, because everything below depends on it.** The commit is on `main`. The three
+edge functions were **NOT** deployed — the deploy was blocked by the session's permission classifier,
+not skipped by choice. `src/lib/strength-gear.ts` and `_shared/strength-grid/taxonomy.ts` both ride
+the `_shared` bundle, so **nothing in this block is live server-side** until all three redeploy:
+
+- [ ] `npx supabase functions deploy generate-strength-plan`
+- [ ] `npx supabase functions deploy rematerialize-standing-block`
+- [ ] `npx supabase functions deploy create-goal-and-materialize-plan`
+- [ ] Verify the timestamps — do not trust this list, read them.
+- [ ] Client half (the two chips + the tags) lands via Netlify on the push. Confirm the build shipped.
+
+**Then, on a device — none of this has been seen by a human:**
+
+- [ ] The equipment picker shows **"TRX / suspension trainer"** and **"Stability ball"** and both
+      persist. ⚠️ The strings are matched by SUBSTRING in `athleteEquipmentToKeys`; renaming either
+      silently removes the capability from every athlete who ticked it.
+- [ ] A home gym that declares NEITHER is never handed `trx fallout`, `stir the pot` or
+      `stability ball rollout`. That is the reported defect — *"should never be just prescribed."*
+- [ ] A sled push / GHD sit-up / captain's chair raise never appears in a generated block. They are
+      dropped from prescribing, **not** from the library — confirm they are still findable and
+      loggable by an athlete who goes looking.
+- [ ] A commercial-gym athlete now gets band and kettlebell work (`band face pulls`, swings, goblet
+      squats). They were being ejected before this, unrelated to tonight's change.
+- [ ] A one-hard-run + one-hard-ride week reads **"One of the hard sessions is on the bike"**, not
+      "The hard sessions are on the bike".
+
+**Suite/build state at handoff:** 4,445 deno tests passing, 0 failing. `tsc -p tsconfig.app.json` =
+**316 errors, baseline 316**, none in any touched file. `npm run build` clean. ⛔ `tsc -p
+tsconfig.json` checks ZERO files — a "clean" from it is a no-op.
+
+**Known and ruled OFF the table, so nobody re-opens it:** the catalogue has no bodyweight arms
+movement, so a pull-up-bar-only athlete gets an empty arms row and a floor that reports *"Could not
+reach biceps, triceps."* Michael: entry-language (rack + bar minimum) is built last, so a
+bodyweight-only kit is not a real case for this plan. Not a bug to fix now.
+
+---
+
 ## ⏳ AWAITING MICHAEL — WEEK-2 WEIGHTS ON HIS LIVE BLOCK (2026-08-25)
 
 The logger's save-time fill did not visibly fire on his Mon/Tue test saves. Deployed fallback:
