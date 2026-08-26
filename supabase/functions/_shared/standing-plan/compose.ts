@@ -477,6 +477,19 @@ function patternForWeek(slot: StrengthSlot, week: number): ViadaPattern {
   return week % 2 === 1 ? slot.pattern : slot.rotatesWith;
 }
 
+/**
+ * ⛔ THE NOTE FOLLOWS THE LIFT, NOT THE SLOT (2026-08-25). `sourceText` is the table row verbatim,
+ * but on an even week the slot carries its partner's pattern, so the verbatim row labels a back
+ * squat *"Primary hinge lower"* — a reader (and one outside AI, same day) takes that as the
+ * programme misclassifying the lift. Swapping the two pattern words makes the note describe the
+ * lift actually in the slot; odd weeks stay verbatim, and the "(rotate with …)" tail survives the
+ * swap, so the p246 row is still findable from either week's text.
+ */
+function noteForWeek(slot: StrengthSlot, week: number): string {
+  if (!slot.rotatesWith || week % 2 === 1) return slot.sourceText;
+  return slot.sourceText.replace(/hinge|push/g, (w) => (w === 'hinge' ? 'push' : 'hinge'));
+}
+
 
 /**
  * ⛔ HIS REPS-IN-RESERVE, STAMPED ON THE ROW — and NOT stamped where he says there is none.
@@ -902,7 +915,7 @@ function exerciseForSlot(
         weight: 'By feel',
         load_prescribed: false,
         ...(targetRir != null ? { target_rir: targetRir } : {}),
-        notes: slot.sourceText,
+        notes: noteForWeek(slot, args.week),
       },
       movement,
       sets,
@@ -947,7 +960,7 @@ function exerciseForSlot(
         weight,
         reps: p.kind === 'barbell' ? p.reps.hi : 1,
       })),
-      notes: slot.sourceText,
+      notes: noteForWeek(slot, args.week),
     },
     movement,
     sets,

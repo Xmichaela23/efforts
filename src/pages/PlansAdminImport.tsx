@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MobileHeader } from '@/components/MobileHeader';
 import WorkloadAdmin from '@/components/WorkloadAdmin';
+import StandingRestateAdmin from '@/components/StandingRestateAdmin';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
 
 
@@ -58,6 +59,7 @@ export default function PlansAdminImport() {
       >
         <div className="w-full max-w-3xl mx-auto px-4 py-4 space-y-8">
           <WorkloadAdmin />
+          <StandingRestateAdmin />
         </div>
       </div>
     </div>

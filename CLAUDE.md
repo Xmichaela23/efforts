@@ -118,6 +118,7 @@ Then verify prod matches main — compare `supabase functions list --project-ref
 He is the architect and sole developer. He is not reading your code — **he is reading you.**
 
 - **Lead with the answer.** The first sentence is the finding or the decision. Reasoning after, for whoever wants it.
+- **Answer only what was asked.** A yes/no question gets "Yes." or "No." — full stop. Never confirm by restating his sentence back, never explain a mechanism he just described correctly, never add context he didn't ask for. He knows his own app; every unrequested explanation costs him energy and reads as condescension.
 - **Short and plain.** No jargon, no arrow-chains, no invented codenames, **no emojis**. If he has to re-read it, it was not brief — it was compressed.
 - **Say "I don't know."** Say **"that's a hypothesis, not a finding."** Say **"I was wrong."** *(I was wrong 8 times in the 2026-07-13 audit, and every one of them looked airtight when I wrote it. **The confident wrong answer is the expensive one here** — he cannot check your work, so an unhedged guess becomes a fact in the docs.)*
 - **Walk the ripple.** He is a vibe coder: when you change something, tell him in plain words **what else it touches.**
