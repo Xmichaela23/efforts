@@ -14,20 +14,16 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE GEAR GATE (2026-08-26, PUSHED `64509824`; **NOT DEPLOYED, NOT DEVICE-VERIFIED**)
+## ⏳ AWAITING MICHAEL — THE GEAR GATE (2026-08-26, PUSHED `64509824`, **DEPLOYED**; NOT DEVICE-VERIFIED)
 
-⛔ **DEPLOY STATE FIRST, because everything below depends on it.** The commit is on `main`. The three
-edge functions were **NOT** deployed — the deploy was blocked by the session's permission classifier,
-not skipped by choice. `src/lib/strength-gear.ts` and `_shared/strength-grid/taxonomy.ts` both ride
-the `_shared` bundle, so **nothing in this block is live server-side** until all three redeploy:
-
-- [ ] `npx supabase functions deploy generate-strength-plan`
-- [ ] `npx supabase functions deploy rematerialize-standing-block`
-- [ ] `npx supabase functions deploy create-goal-and-materialize-plan`
-- [ ] Verify the timestamps — do not trust this list, read them.
+- [x] **Deployed and verified against the API**, 2026-08-26 18:50:23 UTC (commit 18:30:28 UTC):
+      `create-goal-and-materialize-plan` v368→**v369**, `generate-strength-plan` v157→**v158**,
+      `rematerialize-standing-block` v32→**v33**, all ACTIVE. ⚠️ Versions were checked, not just
+      timestamps — both changed files ride the `_shared` bundle, so a function whose VERSION had not
+      moved would still be carrying the old tags.
 - [ ] Client half (the two chips + the tags) lands via Netlify on the push. Confirm the build shipped.
 
-**Then, on a device — none of this has been seen by a human:**
+**Then, on a device — none of this has been seen by a human. Deployed is not verified:**
 
 - [ ] The equipment picker shows **"TRX / suspension trainer"** and **"Stability ball"** and both
       persist. ⚠️ The strings are matched by SUBSTRING in `athleteEquipmentToKeys`; renaming either

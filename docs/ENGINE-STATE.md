@@ -115,13 +115,15 @@ engine places hard sessions badly"; it does not. Also shipped and still true, fr
 
 ### Still UNVERIFIED / open (carried — do not assume any of these were checked)
 
-- ⛔ **DEPLOY STATE: the gear work is PUSHED (`64509824`) but NOT DEPLOYED.** The deploy was blocked
-  by this session's permission classifier, not skipped by choice. `strength-gear.ts` and
-  `strength-grid/taxonomy.ts` both ride the `_shared` bundle, so **nothing changed server-side until
-  all three redeploy**: `generate-strength-plan`, `rematerialize-standing-block`,
-  `create-goal-and-materialize-plan`. The client half (chips + tags) lands via Netlify.
-  **Verify timestamps before believing any of the above is live.**
-- **Nothing in tonight's work is device-verified.** Suite-green and build-clean only.
+- ✅ **DEPLOY STATE: PUSHED (`64509824`) AND DEPLOYED.** Verified against the API rather than the
+  CLI's own output, 2026-08-26 18:50:23 UTC — commit was 18:30:28 UTC, so all three moved 20 minutes
+  after it: `create-goal-and-materialize-plan` v368→**v369**, `generate-strength-plan` v157→**v158**,
+  `rematerialize-standing-block` v32→**v33**, all ACTIVE. ⚠️ Both files ride the `_shared` bundle, so
+  a version that had NOT moved would mean the tags are inert in that function — check versions, not
+  just timestamps. Client half (chips + tags) lands via Netlify.
+- ⛔ **STILL NOT DEVICE-VERIFIED, WHICH IS THE STATE THAT MATTERS NOW.** Deployed is not verified.
+  Suite-green (4,445/0), build-clean, and live — but no human has seen the chips render, or watched a
+  home gym stop being handed a TRX fallout. The check-list is in `POLISH-PUNCH-LIST.md`.
 - **`target_weekly_miles` goes UNWRITTEN by the Standing Plan wizard.** So for a new Standing Plan
   goal the State screen's upkeep line reads the TIER SEED (`TIER_SEEDS[level].weeklyMi`, 20/30/40)
   rather than anything the athlete typed — see the equality-with-seed inference at
