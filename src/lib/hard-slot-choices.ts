@@ -136,12 +136,47 @@ export const HARD_SLOT_RUN_FAMILY: Record<HardSlotKey, FamilyId> = {
 
 export type SlotVariantOption = { id: string; label: string };
 
-export function slotVariantOptions(key: HardSlotKey, sport: 'run' | 'ride'): SlotVariantOption[] {
+/**
+ * ⛔ WHICH FAMILY A SLOT ACTUALLY BUILDS, ONCE ITS SPORT IS KNOWN. The frame fixes the RUN family
+ * per slot; a ride resolves through `RIDE_EQUIVALENT`, the same table the composer uses.
+ *
+ * ⚠️ ON THE BIKE BOTH HARD SLOTS RESOLVE TO **ONE** FAMILY — `run_mlss` and `run_near_threshold`
+ * both map to `ride_sweet_spot`. That is why the two cards can offer the same shape and why
+ * `variantsTakenBy` below exists at all. On the run they are different families and nothing
+ * overlaps, so the same code is a no-op there rather than a special case.
+ */
+export function slotFamilyFor(key: HardSlotKey, sport: 'run' | 'ride'): FamilyId {
   const runFam = HARD_SLOT_RUN_FAMILY[key];
-  const fam = sport === 'ride' ? (RIDE_EQUIVALENT[runFam]?.family ?? runFam) : runFam;
-  const rules = FAMILIES[fam];
+  return sport === 'ride' ? (RIDE_EQUIVALENT[runFam]?.family ?? runFam) : runFam;
+}
+
+export function slotVariantOptions(key: HardSlotKey, sport: 'run' | 'ride'): SlotVariantOption[] {
+  const rules = FAMILIES[slotFamilyFor(key, sport)];
   if (!rules) return [];
   return rules.archetypes.map((a) => ({ id: a.id, label: a.label }));
+}
+
+/**
+ * ⛔⛔ THE SHAPES THE OTHER HARD CARD HAS ALREADY TAKEN (Michael, 2026-08-26): *"the two
+ * hard-session cards must not build the same shape twice — a shape picked on one card greys out on
+ * the other."*
+ *
+ * ⚠️ ONLY WHEN BOTH CARDS BUILD THE SAME FAMILY. On the run they never do, so this returns nothing
+ * and the run cards are untouched. On the bike they always do, which is the whole case.
+ * ⚠️ GREYED, NOT REMOVED — a row that vanishes is a row the athlete cannot compare against the one
+ * they kept, and this card has already lost two layouts to things disappearing on tap.
+ * ⛔ IT REPORTS, IT DOES NOT DECIDE. The engine's own de-collision lives in `sport-slots.ts`
+ * `assignSports`, because a payload can arrive from an older client that never greyed anything.
+ */
+export function variantsTakenBy(
+  thisKey: HardSlotKey,
+  thisSport: 'run' | 'ride',
+  other: { key: HardSlotKey; sport: 'run' | 'ride' | null; archetype?: string } | null,
+): string[] {
+  if (!other || !other.sport || !other.archetype) return [];
+  if (other.key === thisKey) return [];
+  if (slotFamilyFor(thisKey, thisSport) !== slotFamilyFor(other.key, other.sport)) return [];
+  return [other.archetype];
 }
 
 

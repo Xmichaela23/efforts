@@ -28,6 +28,7 @@ import {
   declineHardSlot,
   HARD_SESSIONS_ARE_OPT_IN,
   RIDE_EQUIVALENCE_IS_OURS,
+  WEEKDAYS,
   RIDE_EQUIVALENT,
   sportForFamily,
   SWIM_IS_EASY_ONLY,
@@ -61,6 +62,15 @@ const BASE: Omit<ComposeArgs, 'week' | 'column'> = {
   roundTo: 5,
 };
 const STANDARD = FRAMES.strength_5k.columns.standard;
+/**
+ * ⛔ THE HAIRCUT, READ OFF THE BLOCK'S OWN SENTENCES (2026-08-26). There is no frame-level flag to
+ * assert on any more — `sport-slots.ts` stopped answering a question about a weekday it cannot see.
+ * What a block says is the only answer that exists, and it is also the only one the athlete reads.
+ */
+const haircutSaid = (wk: { notes: Array<{ text: string }> }) => ({
+  reduced: wk.notes.some((n) => n.text.includes('three and a half per cent')),
+  dropped: wk.notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS),
+});
 const week2 = (mix: Record<string, number>) =>
   composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: mix });
 const types = (wk: { sessions: PlanSession[] }) => {
@@ -337,10 +347,10 @@ Deno.test('the lower-body haircut applies when a hard RUN precedes the leg day, 
    * ME lower session the next day… a 3 to 4 percent reduction in working 1RM should be assumed here."*
    * ⚠️ THE SUBSTITUTED CASE IS OURS — the source never addresses it — and it ships labelled.
    */
-  const running = assignSports(STANDARD, { runs: 4, rides: 0 });
-  assert(running.hardRunBeforeMeLower, 'an all-run week lost the haircut');
-  const biking = assignSports(STANDARD, { runs: 1, rides: 3 });
-  assert(!biking.hardRunBeforeMeLower, 'a week whose hard session is a ride still claims a hard run');
+  const running = haircutSaid(composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 4, rides: 0 } }));
+  assert(running.reduced && !running.dropped, 'an all-run week lost the haircut');
+  const biking = haircutSaid(composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 1, rides: 3 } }));
+  assert(biking.dropped && !biking.reduced, 'a week whose hard session is a ride still claims a hard run');
 
   const common = {
     working: WORKING.squat, frame: 'strength_5k' as const, week: 1,
@@ -355,6 +365,104 @@ Deno.test('the lower-body haircut applies when a hard RUN precedes the leg day, 
   assertEquals(prescribedLoad(common).haircut, lowerBodyHaircut(1));
   // And an upper-body slot never sees it either way.
   assertEquals(prescribedLoad({ ...common, isLower: false, hardRunBeforeLower: true }).haircut, 1);
+});
+
+Deno.test('the haircut follows the CALENDAR, not the frame — a pinned-away hard run drops it', () => {
+  /**
+   * ⛔⛔ THE REGRESSION FOR THE 2026-08-26 DEFECT. `hardRunBeforeMeLower` was decided from the
+   * FRAME's day-1 slot (`sport-slots.ts`) and never looked at a weekday, while `endurancePins` can
+   * put that run anywhere in the week. The fuzz harness found 6,688 shapes reducing the lower-body
+   * weights with no run in front of the leg day, and 29 with a hard run in front of it and no
+   * reduction at all.
+   *
+   * ⛔ p247's SUBJECT IS AN ADJACENCY: *"**Monday's run** is fairly challenging, given that there is
+   * an ME lower session **the next day**."* The cause is two days next to each other, so the
+   * question can only be answered after the week is placed — `compose.ts` owns it now.
+   *
+   * ⚠️ THE ATHLETE-VISIBLE COST WAS REAL, not cosmetic: the same block priced the top squat set at
+   * 220 with the reduction and 230 without it, and printed *"the run the day before is still in the
+   * legs"* over a day with no run on it.
+   */
+  const pinnedAway = { long: 'Sunday' as const, hard: ['Thursday' as const, 'Saturday' as const] };
+  const wk = composeWeek({
+    ...BASE, week: 2, column: 'standard',
+    sportMix: { runs: 4, rides: 0 },
+    endurancePins: pinnedAway,
+    // ⚠️ THE ROTATION THAT SERVES THE LONG PIN, read from the chooser rather than written down.
+    dayOffset: chooseDayMap('strength_5k', {
+      longRunDay: pinnedAway.long, longSlotSport: 'run', hardDays: [...pinnedAway.hard],
+    }).offset,
+  });
+  const meLower = wk.sessions.find((x) => x.name === 'ME: Lower');
+  assert(meLower, 'no ME Lower day in the week');
+  const hardRunDays = wk.sessions
+    .filter((x) => x.type === 'run' && /Hard|Threshold/.test(x.name))
+    .map((x) => x.day);
+  const before = WEEKDAYS[(WEEKDAYS.indexOf(meLower!.day as typeof WEEKDAYS[number]) + 6) % 7];
+  assert(!hardRunDays.includes(before),
+    `the fixture is wrong: a hard run still sits on ${before}, the day before ME Lower`);
+
+  // ⛔ AN ALL-RUN MIX, so the frame's day-1 slot IS a hard run — the exact case the deleted
+  //    frame-level reader called "haircut on". The week says the opposite, because the run is not
+  //    the day before the leg day, and that difference is the whole point of the fix.
+  assert(STANDARD.find((d) => d.day === 1)!.endurance.some((sl) => isHardSlot(sl)),
+    'frame day 1 no longer carries a hard slot; this test no longer proves what it claims');
+  assert(wk.notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS),
+    'the reduction was kept for a run that is not the day before the leg day');
+  assert(!wk.notes.some((n) => n.text.includes('three and a half per cent')),
+    'the block still claims the lower-body weights were cut for a run that has moved away');
+
+  // ⛔ AND THE FRAME'S OWN LAYOUT STILL EARNS IT — p247's one compensated break, untouched.
+  const frameWeek = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 4, rides: 0 } });
+  assert(frameWeek.notes.some((n) => n.text.includes('three and a half per cent')),
+    'the untouched frame week lost the reduction p247 asks for');
+
+  // ⛔ THE BAR MOVES, AND BY THE HAIRCUT'S OWN SIZE. A note without a number would be decoration.
+  const topOf = (w: typeof wk) => {
+    const rows = w.sessions.find((x) => x.name === 'ME: Lower')?.strength_exercises ?? [];
+    return Number(rows[0]?.weight);
+  };
+  assert(topOf(wk) > topOf(frameWeek),
+    'dropping the reduction did not raise the prescribed weight');
+});
+
+Deno.test('the description counts the BUILT week — it does not recite "four runs"', () => {
+  /**
+   * ⛔⛔ THE REGRESSION FOR MICHAEL'S EXPORT, 2026-08-26. `describeBlock` opened with the string
+   * literal *"Four lifting days, four runs and a plyometric day, with one full rest day"* — reading
+   * neither the mix nor the frame — and printed it over a week holding ONE run and THREE rides,
+   * because he had assigned three of the frame's four endurance slots to the bike. The plan
+   * described a week the athlete did not have, in the first sentence they read.
+   *
+   * ⚠️ SAME DISEASE AS THE BALANCE SENTENCE deleted the same night: inherited copy asserting a fact
+   * the build disproves. A sentence reads the built week or it does not exist.
+   */
+  const rowFor = (mix: Record<string, unknown>) => buildStandingPlanRow({
+    compose: { ...BASE, sportMix: mix as never, endurancePins: { long: null, hard: [] } },
+    weeks: 12,
+    taperWeeks: [],
+  });
+
+  // HIS SHAPE: one run slot kept, the other three answered as rides.
+  const his = rowFor({ runs: 1, rides: 3, slots: { '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' } });
+  assert(/one run/.test(his.description), his.description);
+  assert(/three rides/.test(his.description), his.description);
+  assert(!/four runs/.test(his.description), `the literal survived: ${his.description}`);
+  // ⛔ AND THE STORED COUNT AGREES WITH THE SENTENCE ABOUT IT — one reading, two readers.
+  assertEquals(his.config.sport_counts, { run: 1, ride: 3, swim: 0 });
+
+  // ⛔ THE ALL-RUN FRAME STILL READS EXACTLY AS IT DID. The fix is a derivation, not a rewording.
+  const running = rowFor({ runs: 4, rides: 0 });
+  assert(running.description.startsWith(
+    '12 weeks. Four lifting days, four runs and a plyometric day, with one full rest day.'),
+    running.description);
+
+  // ⛔ ONE TEST-WEEK SENTENCE, NOT TWO. His export said it twice — once from the fixed line and once
+  //    from the composer's own p215/p247 note, concatenated four clauses apart.
+  assertEquals(running.description.match(/set the numbers/g)?.length, 1, running.description);
+  // ⚠️ AND THE BLOCK STILL DECLARES WHICH OF THE TWO IT IS (`standing-plan-live.test.ts` holds this
+  //    contract; asserted here too because this is the function that nearly broke it).
+  assert(/test week/i.test(running.description), running.description);
 });
 
 Deno.test('a bike-mix block says out loud that the haircut was dropped, and that it is our reading', () => {
@@ -562,11 +670,15 @@ Deno.test('⛔ ZERO HARD SESSIONS: no lower-body haircut — VERIFIED, not assum
    * haircut fired on an intensity session that is not in the plan. Michael asked for this verified
    * rather than assumed; assuming would have shipped it.
    */
-  assertEquals(assignSports(STANDARD, { slots: optIn([]) }).hardRunBeforeMeLower, false);
+  const said = (slots: Record<string, 'run' | 'ride' | 'none'>) =>
+    haircutSaid(composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { slots } }));
+  // ⚠️ NO PINS, so day 1 sits the day before day 2 exactly as p246 prints it — which makes this a
+  // clean test of WHAT the session is rather than of where it landed.
+  assertEquals(said(optIn([])).reduced, false, 'a week with no hard session at all still cut the bar');
   // ⛔ AND THE EXISTING BEHAVIOUR IS UNCHANGED FOR 1-2 PICKED SESSIONS.
-  assertEquals(assignSports(STANDARD, { slots: optIn(['run']) }).hardRunBeforeMeLower, true,
+  assertEquals(said(optIn(['run'])).reduced, true,
     'a hard RUN on day one no longer causes the haircut');
-  assertEquals(assignSports(STANDARD, { slots: optIn(['ride']) }).hardRunBeforeMeLower, false,
+  assertEquals(said(optIn(['ride'])).reduced, false,
     'a hard RIDE on day one now causes the haircut');
 });
 
@@ -613,4 +725,86 @@ Deno.test('declineHardSlot keeps the source text of the slot it replaced', () =>
     .find((sl) => !isHardSlot(sl) && !isLongSlot(sl))!;
   assertEquals(declineHardSlot(hard, null, easy).sourceText, hard.sourceText);
   assertEquals(declineHardSlot(hard, null, easy).substituted, true);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ NO WEEK BUILDS THE SAME SHAPE TWICE (Michael, 2026-08-26)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Both hard slots on the bike, the easy slot on the run — the case where one family holds both. */
+const BOTH_RIDE = { '1:0': 'ride', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } as const;
+const arche = (a: ReturnType<typeof assignSports>, k: string) => a.byKey[k]?.archetype;
+
+Deno.test('⛔ THE ATHLETE\'S VARIANT PICK REACHES THE WEEK ON THE SLOTS PATH — it was dropped', () => {
+  /**
+   * ⛔⛔ THE DEFECT THIS PINS, AND IT WAS ON THE LIVE PATH. `assignSports` has TWO exits, and the
+   * variant-pick loop sat at the bottom — after the `mix.slots` branch had already returned. The
+   * wizard ALWAYS takes that branch, because the endurance screen answers every slot's sport. So
+   * **every within-family variant the athlete picked was silently discarded**: the card offered
+   * Over-unders or Cut-downs, the athlete tapped one, and the week built the engine's rotation.
+   *
+   * ⚠️ THE RATIO BRANCH ALWAYS WORKED, which is why no test caught it — the fixtures that exercised
+   * archetypes passed counts rather than slots.
+   */
+  /**
+   * ⚠️ AN ALL-RUN MIX ON BOTH ARMS, and that is load-bearing rather than tidy. The ratio branch
+   * gives the HARDEST slot to the bike the moment a single ride is asked for, and `descending` is a
+   * `run_mlss` shape — so a mixed fixture would have the pick correctly dropped for a slot that is
+   * no longer a run, and the test would be measuring the substitution rather than the branch.
+   */
+  const picked = assignSports(STANDARD, { runs: 4, rides: 0, archetypes: { '1:0': 'descending' } });
+  assertEquals(arche(picked, '1:0'), 'descending', 'the ratio branch stopped honouring picks');
+
+  const viaSlots = assignSports(STANDARD, {
+    runs: 4, rides: 0,
+    slots: { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'run' },
+    archetypes: { '1:0': 'descending' },
+  });
+  assertEquals(arche(viaSlots, '1:0'), 'descending',
+    'the slots branch dropped the athlete\'s variant pick — the branch the wizard always takes');
+});
+
+Deno.test('⛔ TWO HARD SLOTS NEVER BUILD ONE SHAPE — the unpicked one moves, the pick never does', () => {
+  /**
+   * ⛔ ON THE BIKE BOTH HARD SLOTS RESOLVE TO `ride_sweet_spot`, and an unanswered slot is not left
+   * blank — `RIDE_EQUIVALENT` stamps it `medium` (frame day 1) or `long` (day 3). So picking `long`
+   * on the first card and leaving the second alone produced two identical sweet-spot sessions with
+   * nothing in the week saying so. The card greys the taken shape out; this is the same rule on the
+   * engine, for a payload from a client that never greyed anything.
+   */
+  const base = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE });
+  assertEquals([arche(base, '1:0'), arche(base, '3:0')], ['medium', 'long'],
+    'the frame defaults stopped being distinct');
+
+  // ⛔ THE PICK STAYS PUT AND THE DEFAULT GETS OUT OF ITS WAY — pins-win (D-452).
+  const one = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '1:0': 'long' } });
+  assertEquals(arche(one, '1:0'), 'long', 'the athlete\'s pick was moved');
+  assert(arche(one, '3:0') !== 'long', `both slots built long: ${arche(one, '3:0')}`);
+
+  // ⛔ AND IN THE OTHER DIRECTION, so the rule is not an artefact of slot order.
+  const two = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '3:0': 'medium' } });
+  assertEquals(arche(two, '3:0'), 'medium', 'the athlete\'s pick was moved');
+  assert(arche(two, '1:0') !== 'medium', `both slots built medium: ${arche(two, '1:0')}`);
+
+  // ⚠️ TWO EXPLICIT PICKS OF ONE SHAPE ARE BOTH HONOURED. Both are answers, and overriding one
+  // would be the engine unpicking a choice; the card is what stops this arising at all.
+  const both = assignSports(STANDARD, {
+    runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '1:0': 'tempo', '3:0': 'tempo' },
+  });
+  assertEquals([arche(both, '1:0'), arche(both, '3:0')], ['tempo', 'tempo']);
+});
+
+Deno.test('the RUN slots are untouched by all of it — different families cannot collide', () => {
+  /**
+   * ⚠️ p246 puts `run_mlss` on frame day 1 and `run_near_threshold` on day 3. They share no
+   * archetype ids, so the de-collision is a no-op here — asserted rather than assumed, because a
+   * family-blind version of the rule would silently re-point a run slot that was never in conflict.
+   */
+  const runs = { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'ride' } as const;
+  const a = assignSports(STANDARD, { runs: 3, rides: 1, slots: runs });
+  assertEquals(a.byKey['1:0'].family, 'run_mlss');
+  assertEquals(a.byKey['3:0'].family, 'run_near_threshold');
+  // ⚠️ Day 3's archetype is the FRAME's own (`below_threshold`); day 1's is left to the rotation.
+  assertEquals(arche(a, '3:0'), 'below_threshold');
+  assertEquals(arche(a, '1:0'), undefined);
 });

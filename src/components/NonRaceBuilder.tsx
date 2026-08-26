@@ -16,7 +16,7 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { hardSlotDefault, slotFamilyFact, slotVariantOptions } from '@/lib/hard-slot-choices';
+import { hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy } from '@/lib/hard-slot-choices';
 import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useAppContext } from '@/contexts/AppContext';
@@ -5551,10 +5551,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               }
               const h = hardEntry(state, key) ?? hardDefaultsFor(sport, key);
+              /**
+               * ⛔ WHAT THE OTHER HARD CARD IS ALREADY BUILDING (Michael, 2026-08-26). On the BIKE
+               * both hard slots resolve to `ride_sweet_spot`, so the two cards offer one list and
+               * could build the same session twice; on the run they are different families and
+               * `variantsTakenBy` returns nothing. ⚠️ A club slot holds no shape — its session is
+               * replaced entirely — so it blocks nothing.
+               */
+              const otherKey: 'hard1' | 'hard2' = key === 'hard1' ? 'hard2' : 'hard1';
+              const otherEntry = hardEntry(state, otherKey);
+              const takenByOtherSlot = otherEntry?.ownership === 'club'
+                ? []
+                : variantsTakenBy(key, sport, {
+                    key: otherKey,
+                    sport: slotSportsNow[otherKey],
+                    archetype: (otherEntry as { archetype?: string } | undefined)?.archetype,
+                  });
               return (
                 <HardSlotChoices
                   slotKey={key}
                   sport={sport}
+                  takenByOtherSlot={takenByOtherSlot}
                   value={{ role: h.role, goal: h.goal, ownership: h.ownership, archetype: (h as { archetype?: string }).archetype }}
                   onChange={(patch) => setState((st) => {
                     const next = syncHardDays(st, slotSportsNow);

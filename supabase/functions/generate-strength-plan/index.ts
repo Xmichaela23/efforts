@@ -367,14 +367,20 @@ Deno.serve(async (req: Request) => {
        * screen ends up saying both.
        */
       const wiringNotes: { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string }[] = [];
-      if (runMilesAsked != null) {
-        wiringNotes.push({
-          kind: 'source',
-          text: 'The programme owns how many runs the week carries and how long they are, so the '
-            + 'weekly mileage you typed is not what sets them.',
-          cite: 'Viada p246',
-        });
-      }
+      /**
+       * ⛔⛔ THE INTERIM SENTENCE IS DELETED (§3c shipped, 2026-08-26). It read *"The programme owns
+       * how many runs the week carries and how long they are, so the weekly mileage you typed is not
+       * what sets them"* — true of the code that day, and NOT the ruling. `DECISIONS-2026-08-21`
+       * §3c had already decided the opposite: **the number stays and gets bounded**, and it was
+       * filed as "the first piece of the Standing Plan build". The copy shipped instead of the
+       * feature, and Michael read it back on his own export a year of sessions later.
+       *
+       * ⛔ NOW THE NUMBER IS AN INPUT. `compose.ts` sizes every session toward it inside the book's
+       * own bands, and says so when the picks cannot reach it — `volume-bounds.ts` `volumeLine`,
+       * through the same compromise channel. A sentence here would be a second owner of that.
+       * ⚠️ AND THE RIDE HOURS HAD NO SENTENCE AT ALL, so half the disclosure never existed. Both
+       * sports are answered in one place now.
+       */
 
       /**
        * ⛔ THE ATHLETE'S PINNED DAYS, HONOURED BY ROTATING THE FRAME (job 2, slice 3).
@@ -639,6 +645,16 @@ Deno.serve(async (req: Request) => {
       const row = buildStandingPlanRow({
         compose: {
           frame: frameId,
+          /**
+           * ⛔⛔ §3c — THE TYPED NUMBERS REACH THE COMPOSER (2026-08-26). They were read at `:161`
+           * and `:176` and handed only to `composeStrengthPrimaryPlan` (the Get Stronger path), so
+           * a Standing Plan block had never seen either of them: fifteen miles asked, about four
+           * built, and the ride hours dropped without a word.
+           * ⚠️ `?? undefined`, NOT `?? 0` — absent must stay absent. Zero is an answer ("no running")
+           * and no answer is not; `sizeFor` keeps the library's own midpoint for the second.
+           */
+          targetWeeklyMiles: runMilesAsked ?? undefined,
+          targetWeeklyRideHours: rideHoursAsked ?? undefined,
           // ⛔ THE ATHLETE'S DAYS BEAT THE FRAME ORDER — see `endurancePins` above and the note on
           // the field in `compose.ts`. Absent pins leave the rotation exactly as it was.
           endurancePins,

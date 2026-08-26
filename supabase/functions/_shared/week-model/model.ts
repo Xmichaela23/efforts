@@ -58,6 +58,21 @@ export type Session = {
 export type Cost = {
   /** system -> hours the debt stands after this session ENDS. */
   emits: Partial<Record<SystemId, number>>;
+  /**
+   * ⛔ A PER-SPORT OVERRIDE OF `emits`, AND IT LIVES IN THE TABLE ON PURPOSE (D-453, 2026-08-26).
+   *
+   * The alternative was a second `Load` — `hard_ride` beside `hard_cardio` — and it was rejected
+   * for a measured reason: every construction site in this repo ALREADY carries `sport` on the
+   * session (`S('hb', 'Hard Ride', 'hard_cardio', 'bike')`), so a second load would mean two fields
+   * that must agree, in eighteen places, with nothing checking that they do. It would also have
+   * touched `STRESSOR_LOADS`, `buildUnits`' pairing, `resolve.ts`'s `isEndurance` and
+   * `solver-adapter`'s mapping for a difference none of them care about.
+   *
+   * ⚠️ AND IT IS NOT THE SECOND HIDING PLACE THIS TABLE EXISTS TO PREVENT. A reader looking up what
+   * a hard session costs the legs sees BOTH numbers in the same cell. One helper — `emitsFor` —
+   * reads it, and it lives in this file beside the table.
+   */
+  emitsBySport?: Partial<Record<Sport, Partial<Record<SystemId, number>>>>;
   /** systems that must carry no outstanding debt at this session's START. */
   needs: SystemId[];
 };
@@ -93,19 +108,27 @@ export type Cost = {
  * ride's FORWARD shadow, which is what "leaves no leg shadow" would have meant, changes nothing
  * about the weekend and deletes the injury guard. ⛔ Do not re-apply that version.
  *
- * ⛔ AND `hard_cardio` LEAVES 36h ON THE LEGS — always, not only when uncoupled. Hard
+ * ⛔ AND `hard_cardio` LEAVES 24h ON THE LEGS — always, not only when uncoupled. Hard
  * cardio is systemic fatigue and cannot cost nothing.
  *
- * ⚠️ MICHAEL SAID 24h, AND 24h DOES NOT PRODUCE WHAT HE ASKED FOR — the number is mine
- * and he should overrule it if he disagrees. His effect was *"you cannot place a heavy
- * lower-body lift on the day immediately following an uncoupled hard cardio session."*
- * At day granularity a 24h debt clears a 24h gap exactly, and this model's own convention
- * (set by his week: a Sunday long run clears for a Tuesday deadlift at exactly 48h) is
- * that an exact clearance PASSES. So 24 permits the very day he forbade. Any value in
- * (24, 48] gives his effect; 36 is the midpoint, and it is also what survives the real
- * case a day-granular number hides — an evening threshold run followed by a morning
- * squat is ~12 hours apart, not 24. ⛔ To take him literally instead, set this to 24 and
- * the day-after test below inverts.
+ * ⛔⛔ IT WAS 36h AND MICHAEL OVERRULED IT (2026-08-26, D-453). The 36 was mine, and the note
+ * that stood here invited exactly this: *"the number is mine and he should overrule it if he
+ * disagrees."* The audit is what forced the question — encoding p246's frame as a check showed
+ * that **the book's own printed week breaks this row**: p246 puts a hard session on day 1 and
+ * ME Lower on day 2, and at 36h that adjacency is 12 hours short. A law that calls the source's
+ * own week illegal is the law being wrong, not the week.
+ *
+ * ⚠️ AND THE SOURCE ALREADY PRICES THAT ADJACENCY — p247: *"Monday's run is fairly challenging,
+ * given that there is an ME lower session the next day… a 3 to 4 percent reduction in working
+ * 1RM should be assumed here."* The compensation is the haircut, not a prohibition. So 24h,
+ * which at this model's own convention (an exact clearance PASSES) makes the day-after legal
+ * and anything closer than a full day short.
+ *
+ * ⚠️ WHAT THE 36 WAS PROTECTING IS NOT LOST, IT IS RELOCATED. The case it covered was an evening
+ * threshold run followed by a morning squat — ~12 hours, not 24. This model has no time of day,
+ * so it never measured that; a unit that genuinely couples the two carries `internalGapHours`
+ * and is priced on it. ⛔ Do not restore 36 to reach a within-day case that hours-since-midnight
+ * cannot see.
  *
  * ⚠️ THE COUPLED PAIR IS SAFE BY ARITHMETIC, NOT BY EXEMPTION, AND THAT DISTINCTION IS
  * THE WHOLE POINT. In a coupled unit the barbell runs FIRST and the intervals follow 6h
@@ -117,7 +140,39 @@ export const COST: Record<Load, Cost> = {
   heavy_lower: { emits: { heavy_legs: 48 }, needs: ['heavy_legs', 'long_effort'] },
   long_run: { emits: { long_effort: 48 }, needs: ['heavy_legs'] },
   long_ride: { emits: { long_effort: 48 }, needs: [] },
-  hard_cardio: { emits: { heavy_legs: 36 }, needs: [] },
+  /**
+   * ⛔⛔ THE RIDE COSTS THE LEGS LESS THAN THE RUN, AND THE 12 IS OURS (D-453, Michael 2026-08-26).
+   *
+   * ⚠️ THE SOURCE STATES NO FIGURE — searched, not assumed. What it states is the CRITERION: p275
+   * allows the cycling work on "any modality with a power meter that is **relatively non-impact**"
+   * (rower, ski erg, air bike) while running work on an elliptical still "recommends impact with
+   * the ground on at least one day." Impact is the axis, and p247's 3-4% lower-body reduction names
+   * a RUN as its cause and is written only for the run layout.
+   *
+   * ⛔ THE PRECEDENT IS THIS TABLE'S OWN. The long-effort clearance already splits by sport for the
+   * same reason — `long_run` needs `heavy_legs` clear, `long_ride` needs nothing, because "the
+   * backward shadow makes for a miserable ride, but it doesn't cause structural failure" (Michael,
+   * 2026-08-18). The ride keeps the injury-relevant half and loses the quality half. This row is
+   * that shape applied to intensity.
+   *
+   * ⚠️ 12 AND 24 ARE THE SAME ANSWER AT DAY GRANULARITY, and 12 was still chosen. Any value in
+   * (0, 24] behaves identically once sessions are clocked at `day * 24`: the same day is short, the
+   * next day clears. Only ZERO would change a verdict, and zero would say a hard ride costs the legs
+   * nothing — which contradicts this row's own reason for existing and would make a same-day squat
+   * and hard ride silently legal. Michael: *"we will not stop them but they should know the cost."*
+   * ⛔ So 12 is the honest number written down, and it becomes a DIFFERENT answer the day this model
+   * grows a time of day — which is the case the deleted 36h was reaching for and could never see.
+   *
+   * ⚠️ A "Viada p280" CITE IN `standing-plan/sport-slots.ts` MAKES THE SAME CLAIM AND IS UNVERIFIED
+   * IN THIS CORPUS. p280 is not transcribed in `SOURCE-viada-hybrid-athlete.md`; it appears only in
+   * the program index, as the notes page for the three cycling programs. That shipped copy stands
+   * until the page is read. ⛔ Nothing here rests on it — the anchor above is p275, which IS read.
+   */
+  hard_cardio: {
+    emits: { heavy_legs: 24 },
+    emitsBySport: { bike: { heavy_legs: 12 } },
+    needs: [],
+  },
   upper: { emits: {}, needs: [] },
   easy: { emits: {}, needs: [] },
 };
@@ -233,11 +288,26 @@ export function buildUnits(sessions: Session[], pins: Record<string, number> = {
   return units;
 }
 
+/**
+ * ⛔ WHAT ONE SESSION LEAVES BEHIND — the table's row, with its per-sport cell applied if it has one.
+ *
+ * ⚠️ THE ONLY READER OF `emitsBySport`, and it is here so there is exactly one. `emitsOf` below and
+ * `unmetNeeds` in `resolve.ts` both come through it; two readings of one cell is how the debt a week
+ * is scored on and the debt a sentence describes come apart.
+ * ⚠️ A SPORT WITH NO OVERRIDE TAKES `emits` UNCHANGED, so every load that does not split is
+ * untouched and a sport nobody has ruled on degrades to the conservative arm rather than to zero.
+ */
+export function emitsFor(s: Session): Partial<Record<SystemId, number>> {
+  const cost = COST[s.load];
+  const bySport = s.sport ? cost.emitsBySport?.[s.sport] : undefined;
+  return bySport ?? cost.emits;
+}
+
 /** A unit's debts, merged: the longest debt on each system wins. */
 export function emitsOf(u: Unit): Partial<Record<SystemId, number>> {
   const out: Partial<Record<SystemId, number>> = {};
   for (const s of u.sessions) {
-    for (const [sys, hours] of Object.entries(COST[s.load].emits)) {
+    for (const [sys, hours] of Object.entries(emitsFor(s))) {
       const k = sys as SystemId;
       out[k] = Math.max(out[k] ?? 0, hours as number);
     }
@@ -279,14 +349,15 @@ export function forwardGap(from: number, to: number): number {
 /**
  * ⛔ BOTH SILENCES ARE CLOSED (Michael, 2026-08-17) — recorded so nobody reopens them.
  *
- * 1. **An uncoupled hard day now leaves a 24h heavy-leg debt.** It was zero, which said
- *    a threshold run costs nothing. No heavy lower lift the day after one.
+ * 1. **An uncoupled hard day now leaves a heavy-leg debt.** It was zero, which said a
+ *    threshold run costs nothing. ⚠️ The FIGURE has since moved twice — 24h here, 36h on
+ *    2026-08-17, and back to 24h on 2026-08-26 (D-453). `COST` is the only owner of it.
  * 2. **The long-effort clearance is now symmetric.** It ran forward only, so a heavy
  *    squat the day before a long ride was legal. It is not.
  *
  * Both live in `COST` above and nowhere else.
  */
 export const CLOSED_2026_08_17 = [
-  'uncoupled hard day leaves 36h on the legs (Michael said 24h — see the note in COST)',
+  'uncoupled hard day leaves 24h on the legs (was 36h; Michael overruled 2026-08-26, D-453)',
   'the 48h long-effort clearance runs both directions',
 ] as const;

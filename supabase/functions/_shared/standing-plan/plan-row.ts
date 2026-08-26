@@ -20,6 +20,7 @@ import {
   type PlanSession,
 } from './compose.ts';
 import { FRAMES, type FrameId } from './frames.ts';
+import type { ConflictRule, WeekConflict } from './week-conflicts.ts';
 import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
 import { type DayMap } from './day-map.ts';
 import type { ViadaPattern } from '../strength-grid/index.ts';
@@ -236,9 +237,17 @@ export function buildStandingPlanRow(args: {
   }
 
   const frame = FRAMES[args.compose.frame];
+  /**
+   * ⛔ WHAT THE BLOCK ACTUALLY HOLDS, COUNTED OFF THE BUILT WEEK — one reading, two readers.
+   *
+   * ⚠️ THE REPRESENTATIVE WEEK IS THE FIRST NON-TEST ONE, the same choice `sport_counts` was
+   * already making below. Week one's LIFTING looks different (two of its days are the p215 pretest)
+   * and its endurance does not, so a description drawn from it would misreport the block.
+   */
+  const shape = weekShapeOf(blocks.find((b) => !b.isTestWeek) ?? blocks[0]);
   return {
     name: (args.goalName ?? '').trim() || 'Strength, with running',
-    description: describeBlock(weeks, notes, blocks[0]?.isTestWeek === true),
+    description: describeBlock(weeks, notes, blocks[0]?.isTestWeek === true, shape),
     duration_weeks: weeks,
     sessions_by_week,
     phaseStructure: phasesFor(weeks, args.taperWeeks ?? []),
@@ -291,17 +300,11 @@ export function buildStandingPlanRow(args: {
         return kit.length > 0 ? [...kit] : null;
       })(),
       me_sets_by_pattern: args.compose.meSetsByPattern ?? null,
-      sport_counts: (() => {
-        // ⚠️ COUNTED OFF THE BUILT WEEK, not off the ask. What the athlete asked for is a ratio;
-        // what the week holds is the answer, and only the second is worth storing as a fact.
-        const wk = blocks.find((b) => !b.isTestWeek) ?? blocks[0];
-        if (!wk) return null;
-        const c = { run: 0, ride: 0, swim: 0 };
-        for (const s of wk.sessions) {
-          if (s.type === 'run' || s.type === 'ride' || s.type === 'swim') c[s.type] += 1;
-        }
-        return c;
-      })(),
+      // ⚠️ COUNTED OFF THE BUILT WEEK, not off the ask. What the athlete asked for is a ratio;
+      // what the week holds is the answer, and only the second is worth storing as a fact.
+      // ⛔ THE SAME READING THE DESCRIPTION USES — see `weekShapeOf`. Two counts of one week is how
+      // the stored fact and the sentence about it come to disagree.
+      sport_counts: shape == null ? null : { run: shape.run, ride: shape.ride, swim: shape.swim },
     },
     notes,
     /**
@@ -310,9 +313,30 @@ export function buildStandingPlanRow(args: {
      * nothing was compromised — never `[]` for "we did not look".
      */
     ...(() => {
+      /**
+       * ⛔ A WARNING NOTE THAT CAME FROM A CONFLICT KEEPS THE CONFLICT'S FIELDS. The composer raises
+       * both — the structured object and the sentence — and they are matched here by text, which is
+       * safe because `weekConflicts` is the only thing that authors either.
+       * ⚠️ DEDUPED ACROSS THE BLOCK the same way the notes are: twelve weeks raise the same conflict
+       * twelve times, and twelve identical sentences is not more honest than one.
+       */
+      const byText = new Map<string, WeekConflict>();
+      for (const b of blocks) for (const c of b.conflicts) if (!byText.has(c.text)) byText.set(c.text, c);
       const out = [
         ...(args.dayMap?.compromises ?? []),
-        ...notes.filter((n) => n.kind === 'warning').map((n) => ({ kind: 'cost' as const, text: n.text })),
+        ...notes.filter((n) => n.kind === 'warning').map((n) => {
+          const c = byText.get(n.text);
+          return c
+            ? {
+                kind: 'cost' as const,
+                text: n.text,
+                rule: c.rule,
+                days: [...c.days],
+                sessions: [...c.sessions],
+                ...(c.shortBy != null ? { shortBy: c.shortBy } : {}),
+              }
+            : { kind: 'cost' as const, text: n.text };
+        }),
       ];
       return out.length > 0 ? { placement_compromises: out } : {};
     })(),
@@ -347,15 +371,115 @@ export function phasesFor(weeks: number, taperWeeks: number[]): { phases: ArcPha
   return { phases, recovery_weeks: [] };
 }
 
-function describeBlock(weeks: number, notes: ComposedWeek['notes'], hasTestWeek: boolean): string {
-  const sourced = notes.filter((n) => n.kind === 'source').slice(0, 3).map((n) => n.text);
+/** What one built week holds. ⛔ Every number read off the SESSIONS, never off the frame or the ask. */
+export type WeekShape = {
+  /** Distinct days carrying a barbell session. The plyo block is not one. */
+  lifting: number;
+  run: number;
+  ride: number;
+  swim: number;
+  plyo: boolean;
+  /** Days carrying nothing at all. */
+  rest: number;
+};
+
+/**
+ * ⛔⛔ THE BLOCK'S OWN SHAPE, COUNTED — and the sentence that used to stand in for it was a LITERAL.
+ *
+ * `describeBlock` opened with *"Four lifting days, four runs and a plyometric day, with one full
+ * rest day"*, hardcoded, reading neither the mix nor the frame. Michael's export of 2026-08-26
+ * printed exactly that over a week holding ONE run and THREE rides, because he had assigned three
+ * of the frame's four endurance slots to the bike. The plan described a week the athlete did not
+ * have, in the first sentence they read.
+ *
+ * ⚠️ IT IS THE SAME DISEASE AS THE BALANCE SENTENCE deleted the same night: inherited copy asserting
+ * a fact the build disproves. The cure is the same one — the sentence reads the built week or it
+ * does not exist.
+ */
+export function weekShapeOf(wk: ComposedWeek | undefined): WeekShape | null {
+  if (!wk) return null;
+  const isPlyo = (s: PlanSession) => (s.tags ?? []).includes('plyo');
+  const lifting = new Set<string>();
+  const busy = new Set<string>();
+  const out: WeekShape = { lifting: 0, run: 0, ride: 0, swim: 0, plyo: false, rest: 0 };
+  for (const s of wk.sessions) {
+    busy.add(s.day);
+    if (s.type === 'run' || s.type === 'ride' || s.type === 'swim') out[s.type] += 1;
+    else if (s.type === 'strength') {
+      if (isPlyo(s)) out.plyo = true;
+      else lifting.add(s.day);
+    }
+  }
+  out.lifting = lifting.size;
+  out.rest = DAY_ORDER.filter((d) => ![...busy].some((b) => b.toLowerCase() === d)).length;
+  return out;
+}
+
+/** ⚠️ Words to four, digits past it — the register the rest of this copy is written in. */
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four'];
+const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
+
+
+function describeBlock(
+  weeks: number,
+  notes: ComposedWeek['notes'],
+  hasTestWeek: boolean,
+  shape: WeekShape | null,
+): string {
+  /**
+   * ⛔ ONE TEST-WEEK SENTENCE, NEVER TWO (2026-08-26). The fixed line below and the composer's own
+   * p215/p247 note say the same thing, and both were being concatenated — Michael's export opened
+   * *"Week one is a test week: two guided sessions set the numbers…"* and then, four clauses later,
+   * *"The first week is the test. Two guided sessions set the numbers…"*.
+   *
+   * ⛔ THE FIXED LINE WINS AND THE COMPOSER'S COPY IS DROPPED, WHICH IS THE OPPOSITE OF THE FIRST
+   * DRAFT. Preferring the composer's — richer, and it carries the citation — made the description's
+   * IDENTITY sentence conditional on a note that may or may not be raised, and
+   * `standing-plan-live.test.ts`'s *"the block says which of the two it is"* caught it immediately:
+   * the composer says *"the first week is the test"* and never the words "test week", so a block
+   * with a test week stopped declaring one. The fixed pair is the contract — one sentence for the
+   * tested block, one for the skipped block — and a second owner of it is how they drift.
+   * ⚠️ SO THE ONE FACT THE COMPOSER'S COPY ADDED IS FOLDED INTO THE FIXED LINE instead of lost:
+   * fully prescribed weights start in week two.
+   * ⚠️ MATCHED ACROSS THE WHOLE SOURCE LIST rather than the sliced three, or a block whose test note
+   * fell past the cut would print the duplicate again.
+   */
+  const allSourced = notes.filter((n) => n.kind === 'source').map((n) => n.text);
+  const sourced = allSourced.filter((t) => !t.includes('first week is the test')).slice(0, 3);
+
+  /**
+   * ⚠️ ONE FLAT LIST, JOINED ONCE. A first draft pre-joined the endurance sessions into their own
+   * clause and then handed that clause to the same joiner, which printed "one run and three rides
+   * and a plyometric day" — two conjunctions in one sentence. Every item is a member of the top
+   * list; only the last one takes an "and".
+   */
+  const plural = (n: number, one: string, many: string) => `${countWord(n)} ${n === 1 ? one : many}`;
+  const pieces = shape == null ? [] : [
+    plural(shape.lifting, 'lifting day', 'lifting days'),
+    shape.run > 0 ? plural(shape.run, 'run', 'runs') : '',
+    shape.ride > 0 ? plural(shape.ride, 'ride', 'rides') : '',
+    shape.swim > 0 ? plural(shape.swim, 'swim', 'swims') : '',
+    shape.plyo ? 'a plyometric day' : '',
+  ].filter(Boolean);
+  const restClause = shape == null || shape.rest === 0
+    ? ''
+    : `, with ${shape.rest === 1 ? 'one full rest day' : `${countWord(shape.rest)} full rest days`}`;
+  // ⚠️ CAPITALISED HERE, because it opens a sentence and `countWord` returns lower-case words. The
+  // first draft shipped "12 weeks. four lifting days…" and the suite read it back verbatim.
+  const listed = `${pieces.slice(0, -1).join(', ')}${pieces.length > 1 ? ' and ' : ''}`
+    + `${pieces[pieces.length - 1]}${restClause}.`;
+  const shapeSentence = pieces.length > 0
+    ? `${weeks} weeks. ${listed.charAt(0).toUpperCase()}${listed.slice(1)}`
+    : `${weeks} weeks.`;
+
   return [
-    `${weeks} weeks. Four lifting days, four runs and a plyometric day, with one full rest day.`,
+    shapeSentence,
     // ⛔ THE DESCRIPTION SAYS WHICH BLOCK THIS IS. A skipped test with the test sentence still on it
     // would describe a week the athlete does not have — and week one looks different enough that
     // they would notice and have no way to find out why.
     hasTestWeek
-      ? 'Week one is a test week: two guided sessions set the numbers the rest of the block is built on.'
+      ? 'Week one is a test week: two guided sessions set the numbers the rest of the block is built '
+        + 'on, and fully prescribed weights start in week two.'
       : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
         + 'from the first session.',
     ...sourced,

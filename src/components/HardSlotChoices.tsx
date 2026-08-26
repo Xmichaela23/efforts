@@ -35,6 +35,17 @@ export type HardSlotChoicesProps = {
    * athlete's long ride.
    */
   slotKey: HardSlotKey | 'long';
+  /**
+   * ⛔ SHAPES THE OTHER HARD CARD IS ALREADY BUILDING (Michael, 2026-08-26): *"a shape picked on one
+   * card greys out on the other."* Computed by the caller through `variantsTakenBy`, because only
+   * the screen knows what the other slot holds.
+   *
+   * ⚠️ DISABLED AND STILL VISIBLE, not removed. A row that vanishes is a row the athlete cannot
+   * compare against the one they kept, and this card has already lost two layouts to controls
+   * disappearing on tap. ⚠️ Empty on the run, where the two slots are different families and
+   * nothing can overlap.
+   */
+  takenByOtherSlot?: string[];
 };
 
 export default function HardSlotChoices(props: HardSlotChoicesProps) {
@@ -65,21 +76,45 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           <div className="space-y-1.5" data-testid={`hard-${props.slotKey}-variants`}>
             {[{ id: '', label: "Engine's pick — rotates week to week" }, ...variants].map((v) => {
               const on = (props.value.archetype ?? '') === v.id;
+              /**
+               * ⛔ TAKEN BY THE OTHER CARD — greyed, unpressable, still readable.
+               * ⚠️ "Engine's pick" IS NEVER DISABLED. It is not a shape; it is the absence of one,
+               * and the engine's own de-collision (`sport-slots.ts` `applyVariantPicks`) keeps it
+               * off whatever the other card holds. Greying it would take away the only answer that
+               * is always available.
+               * ⚠️ NOR IS THE ROW THIS CARD IS ALREADY ON. A slot cannot block itself, and a
+               * selected row rendering as disabled is a state the athlete cannot get out of.
+               */
+              const taken = !on && v.id !== '' && (props.takenByOtherSlot ?? []).includes(v.id);
               return (
                 <button
                   key={v.id || 'engine'}
                   type="button"
                   aria-pressed={on}
+                  disabled={taken}
+                  aria-disabled={taken}
                   data-testid={`hard-${props.slotKey}-variant-${v.id || 'engine'}`}
-                  onClick={() => props.onChange({ archetype: v.id || undefined })}
+                  onClick={() => { if (!taken) props.onChange({ archetype: v.id || undefined }); }}
                   className="w-full text-left px-2.5 py-2 rounded-xl border text-sm"
                   style={on
                     ? { borderColor: color, backgroundColor: `${color}1F`, color: '#fff' }
-                    : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.70)' }}
+                    : taken
+                      ? { borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'transparent', color: 'rgba(255,255,255,0.30)', cursor: 'not-allowed' }
+                      : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.70)' }}
                 >
-                  <span className="block">{v.label}</span>
+                  <span className="block">
+                    {v.label}
+                    {/* ⛔ IT SAYS WHY IT IS GREY. A dimmed row with no reason reads as broken, and
+                        the athlete would tap it twice before concluding anything. Fact, no
+                        imperative — the other card holds it, and that is all. */}
+                    {taken ? (
+                      <span className="text-xs" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                        {' '}— on the other hard session
+                      </span>
+                    ) : null}
+                  </span>
                   {VARIANT_BODY[v.id] ? (
-                    <span className="block text-xs mt-0.5" style={{ color: on ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.45)' }}>
+                    <span className="block text-xs mt-0.5" style={{ color: on ? 'rgba(255,255,255,0.70)' : taken ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.45)' }}>
                       {VARIANT_BODY[v.id]}
                     </span>
                   ) : null}

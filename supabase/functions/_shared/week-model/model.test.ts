@@ -1,7 +1,7 @@
 // Michael's law, one test per clause. Run:
 //   ~/.deno/bin/deno test --allow-all --no-check supabase/functions/_shared/week-model/model.test.ts
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { type Session, buildUnits } from './model.ts';
+import { type Session, buildUnits, emitsFor } from './model.ts';
 import { resolve, unmetNeeds } from './resolve.ts';
 
 const S = (id: string, label: string, load: Session['load'], sport?: Session['sport']): Session =>
@@ -150,19 +150,75 @@ Deno.test('⛔ AND THE STANDARD MULTISPORT WEEKEND IS WHAT THE SPLIT BUYS', () =
     unmetNeeds(place([LONG_RIDE, LONG_RUN, BENCH, SQ], { lb: 5, lr: 6, bench: 0, sq: 1 })).length, 0);
 });
 
-Deno.test('⛔ AN UNCOUPLED HARD DAY LEAVES 24h ON THE LEGS', () => {
-  // A standalone threshold run is systemic fatigue; it cannot cost nothing.
-  const units = buildUnits([HARD_RIDE, SQ], { hb: 0, sq: 1 });
-  assert(unmetNeeds(units.map((u) => ({ unit: u, day: u.pinnedDay! }))).length > 0,
-    'a squat landed the day after a standalone hard ride');
-  const ok = buildUnits([HARD_RIDE, SQ], { hb: 0, sq: 2 });
-  assertEquals(unmetNeeds(ok.map((u) => ({ unit: u, day: u.pinnedDay! }))).length, 0, 'two days later is clear');
-  // ⚠️ THE DAY AFTER IS THE WHOLE RULE, and it is the assertion that breaks if the debt
-  // is set back to Michael's literal 24h. See the note in COST.
+Deno.test('⛔ AN UNCOUPLED HARD DAY LEAVES 24h ON THE LEGS — the day after CLEARS, the same day does not', () => {
+  /**
+   * ⛔⛔ THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-26 (D-453), and its own comment named the
+   * assertion that would have to move: *"the day after is the whole rule, and it is the assertion
+   * that breaks if the debt is set back to Michael's literal 24h."* It has been set back, and this
+   * is the break, taken deliberately.
+   *
+   * ⛔ THE AUDIT IS WHAT FORCED IT. p246's printed week puts a hard session on day 1 and ME Lower on
+   * day 2; at 36h that adjacency was 12 hours short, so the law called the source's own week
+   * illegal. p247 does not forbid it — it PRICES it: *"a 3 to 4 percent reduction in working 1RM
+   * should be assumed here."* The compensation is the haircut.
+   *
+   * ⚠️ THE DEBT IS STILL REAL AND STILL BITES, one day closer in. A standalone hard session and a
+   * heavy lower lift on ONE day is short by the full 24h, which is what the two assertions below
+   * hold apart. A rule that cost nothing would be the silence this row exists to end.
+   */
+  const at = (us: ReturnType<typeof buildUnits>) =>
+    unmetNeeds(us.map((u) => ({ unit: u, day: u.pinnedDay! })));
+
+  // SAME DAY, UNCOUPLED — the hard ride pairs with a DEADLIFT, never a squat, so nothing here
+  // couples and both sessions sit at the same hour. Short by the whole debt.
+  assert(at(buildUnits([HARD_RIDE, SQ], { hb: 0, sq: 0 })).length > 0,
+    'a squat shared a day with a standalone hard ride and nothing was reported');
+
+  // THE DAY AFTER — p246's own layout. 24h clears exactly, and an exact clearance PASSES.
+  assertEquals(at(buildUnits([HARD_RIDE, SQ], { hb: 0, sq: 1 })).length, 0,
+    'the book\'s own day-1-hard, day-2-ME-Lower week is being called illegal');
+
+  // AND FURTHER OUT STAYS CLEAR.
+  assertEquals(at(buildUnits([HARD_RIDE, SQ], { hb: 0, sq: 2 })).length, 0, 'two days later is clear');
+});
+
+Deno.test('⛔ THE HARD RIDE COSTS THE LEGS LESS THAN THE HARD RUN — 12h, and it is OURS (D-453)', () => {
+  /**
+   * ⛔ THE SOURCE STATES NO FIGURE. p275 states the CRITERION — the cycling work may be done on any
+   * power-metered modality that is "relatively non-impact", while the running work still "recommends
+   * impact with the ground on at least one day" — and p247's lower-body reduction names a RUN as its
+   * cause. Impact is the axis. The precedent is this table's own long-effort split.
+   *
+   * ⚠️ 12 AND 24 ARE THE SAME ANSWER AT DAY GRANULARITY, so the assertions below cannot tell them
+   * apart and must not pretend to. What they hold is the SHAPE: same day short, next day clear, for
+   * both sports — and that the ride's cell is a real, lower, readable number rather than zero.
+   */
+  const at = (us: ReturnType<typeof buildUnits>) =>
+    unmetNeeds(us.map((u) => ({ unit: u, day: u.pinnedDay! })));
+
+  // ⛔ THE NUMBERS ARE IN THE TABLE, AND THE RIDE'S IS LOWER AND NOT ZERO.
+  assertEquals(emitsFor({ id: 'x', label: 'Hard Run', load: 'hard_cardio', sport: 'run', minutes: 45 }),
+    { heavy_legs: 24 });
+  assertEquals(emitsFor({ id: 'x', label: 'Hard Ride', load: 'hard_cardio', sport: 'bike', minutes: 45 }),
+    { heavy_legs: 12 });
+  // ⚠️ NO SPORT FALLS BACK TO THE ROW, the conservative arm — never to zero.
+  assertEquals(emitsFor({ id: 'x', label: 'Hard', load: 'hard_cardio', minutes: 45 }), { heavy_legs: 24 });
+
+  // ⛔ SAME DAY REPORTS, BOTH SPORTS. Michael: "we will not stop them but they should know the cost."
+  //    ⚠️ The squat pairs with a hard RUN and the deadlift with a hard RIDE, so each pairing is
+  //    broken deliberately here — a coupled unit is safe by arithmetic and would prove nothing.
+  assert(at(buildUnits([HARD_RIDE, SQ], { hb: 3, sq: 3 })).length > 0,
+    'a squat shared a day with a hard ride and nothing was reported');
+  assert(at(buildUnits([HARD_RUN, DL], { hr: 3, dl: 3 })).length > 0,
+    'a deadlift shared a day with a hard run and nothing was reported');
+
+  // ⛔ AND THE DAY AFTER IS CLEAR FOR BOTH — p246's own layout.
+  assertEquals(at(buildUnits([HARD_RIDE, SQ], { hb: 3, sq: 4 })).length, 0, 'the day after a hard ride is short');
+  assertEquals(at(buildUnits([HARD_RUN, DL], { hr: 3, dl: 4 })).length, 0, 'the day after a hard run is short');
 });
 
 Deno.test('⛔ AND THE COUPLED PAIR SURVIVES IT BY ARITHMETIC, NOT BY EXEMPTION', () => {
-  // The barbell runs first; the hard session's 24h debt lands entirely after the lift it
+  // The barbell runs first; the hard session's debt lands entirely after the lift it
   // shares a day with. If a carve-out is ever added for coupling, this test still passes
   // and the one above stops meaning anything — so read them together.
   const units = buildUnits([SQ, HARD_RUN], { sq: 2 });

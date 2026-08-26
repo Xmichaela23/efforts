@@ -54,7 +54,9 @@ import {
 import {
   WEEKDAYS, frameFixedDaysFor, titleCaseDay, weekdayForFrameDay, type Weekday,
 } from './day-map.ts';
-import { assignSports, assignedSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix } from './sport-slots.ts';
+import {
+  assignSports, assignedSlot, isHardSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix,
+} from './sport-slots.ts';
 import {
   HAIRCUT_CAUSE_IS_OURS,
   INTENSITY_STARTS_LOW_IS_OURS,
@@ -87,6 +89,11 @@ function rotatedArchetype(family: string, level: number, week: number): string |
   return offered[(Math.max(1, week) - 1) % offered.length].id;
 }
 import { translateEnduranceSession } from './session-vocabulary.ts';
+import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
+import {
+  DEFAULT_SIZE, sizeFor, slotSpans, volumeLine, weekVolumeBounds,
+  type SizeSolve, type SlotSpec, type WeekVolumeBounds,
+} from './volume-bounds.ts';
 import {
   isTestWeek,
   pretestSession,
@@ -309,6 +316,20 @@ export type ComposeArgs = {
   levelOverrides?: Partial<Record<string, Level>>;
   /** ⛔ DEMONSTRATED, not intended. Gates the advanced tier — see `advancedTierSessions`. */
   demonstratedWeeklyMiles?: number | null;
+  /**
+   * ⛔⛔ THE NUMBERS THE ATHLETE TYPED, AND THEY ARE INPUTS NOW (§3c, 2026-08-26). Until today they
+   * reached `composeStrengthPrimaryPlan` and nothing else, so a Standing Plan block never saw them
+   * and the wizard's two fields died in silence — 15 miles asked, about 4 built, nothing said.
+   *
+   * ⛔ THEY SIZE, THEY NEVER CHOOSE. `volume-bounds.ts` sets every slot's dial so the week lands on
+   * the number where the athlete's own picks can reach it, and reports `over_cap` / `under_floor`
+   * where they cannot. The number never re-points a slot to another sport — Michael, 2026-08-26:
+   * *"these picks hold up to 6 — put the long day on the run."* The sentence names the lever.
+   * ⚠️ ABSENT IS NOT ZERO. No answer means no opinion and the dial stays at the library's own
+   * midpoint, which is what every block before this shipped at.
+   */
+  targetWeeklyMiles?: number | null;
+  targetWeeklyRideHours?: number | null;
   roundTo?: number;
   smallestPlatePairLb?: number | null;
   /**
@@ -477,6 +498,18 @@ export type ComposedWeek = {
   /** ⛔ THE ME ROWS THIS WEEK PRESCRIBED — see {@link MeRowIndex}. Empty in the test week. */
   meRows: MeRowIndex[];
   notes: ComposeNote[];
+  /**
+   * ⛔ WHAT THIS WEEK BREAKS AND WHAT IT COSTS — `week-conflicts.ts`, Q-288's wiring. Structured
+   * rather than prose because a later slice attaches actions to them; the sentence also reaches the
+   * athlete as a `warning` note, which is the channel `placement_compromises` already reads.
+   */
+  conflicts: WeekConflict[];
+  /**
+   * ⛔ WHAT THIS WEEK'S PICKS CAN HOLD, AND WHERE THE ASK LANDED IN IT (§3c). Surfacing and
+   * provenance — the wizard computes its own live copy from the same module as the athlete changes
+   * a sport, and the two must agree.
+   */
+  volume: { bounds: WeekVolumeBounds; run: SizeSolve; ride: SizeSolve };
 };
 
 /**
@@ -953,9 +986,14 @@ function exerciseForSlot(
   if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text.includes('lower-body'))) {
     notes.push({
       kind: 'source',
-      text: 'The lower-body weights start about three and a half per cent under where the test put '
-        + 'them, because the run the day before is still in the legs. That comes back over the first '
-        + 'nine weeks.',
+      // ⛔ IT NAMES THE DAYS (Michael, 2026-08-26). His own wording for this class of sentence is
+      // *"hard run lands the day before heavy legs — squat and deadlift weights reduced 3-4% to
+      // absorb it"*, and the days are what make it checkable against the calendar rather than a
+      // claim the athlete has to take on trust. This is the COMPENSATED break — p247's own layout —
+      // so it is the one sentence here that reports a cost already paid.
+      text: `The hard run lands the day before the heavy leg session, so the lower-body weights `
+        + 'start about three and a half per cent under where the test put them. That comes back over '
+        + 'the first nine weeks.',
       cite: 'Viada p247',
     });
   }
@@ -1192,23 +1230,119 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * and push their session further out. So the pinned slots are placed in a pre-pass and the loop
    * below reads their answer rather than asking again.
    */
+  /**
+   * ⛔⛔ §3c — THE TYPED MILES AND HOURS BECOME THE DIAL. Computed here, before a single session is
+   * built, because every one of them is built at the size this decides.
+   *
+   * ⛔ THE SPECS ARE THE WHOLE WEEK'S ENDURANCE, add-ons included. The easy swims and the advanced
+   * tier's extra easy runs are real sessions in the built week, so a bound that ignored them would
+   * understate the ceiling for exactly the athletes closest to it.
+   * ⚠️ THE TIER'S GATE IS UNCHANGED — `advancedTierSessions` still decides how many, on demonstrated
+   * history. This only counts what it decided.
+   */
+  const enduranceSpecs: SlotSpec[] = (() => {
+    const out: SlotSpec[] = [];
+    for (const d of days) {
+      d.endurance.forEach((slot, i) => {
+        const a = assignedSlot(sportAssignment, d.day, i, slot);
+        out.push({ family: a.family, level: (args.levelOverrides?.[a.family] as Level | undefined) ?? a.level, archetype: a.archetype, sport: a.sport });
+      });
+    }
+    const swims = Math.min(2, Math.max(0, Math.round(Number(args.swimEasySessions) || 0)));
+    if (args.column === 'standard') {
+      for (let i = 0; i < swims; i++) {
+        out.push({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, sport: 'swim' });
+      }
+      for (let i = 0; i < advancedTierSessions(args.demonstratedWeeklyMiles); i++) {
+        out.push({ family: 'run_vt1', level: 1, sport: 'run' });
+      }
+    }
+    return out;
+  })();
+  const volumeSpans = slotSpans(enduranceSpecs, anchors);
+  const volume = {
+    bounds: weekVolumeBounds(enduranceSpecs, anchors),
+    run: sizeFor(volumeSpans, 'run', args.targetWeeklyMiles),
+    ride: sizeFor(volumeSpans, 'ride', args.targetWeeklyRideHours),
+  };
+  /** ⛔ ONE SIZE PER SPORT — see `sizeFor`. A swim has no typed target and keeps the default. */
+  const sizeForSport = (sport: 'run' | 'ride' | 'swim'): number =>
+    sport === 'run' ? volume.run.size : sport === 'ride' ? volume.ride.size : DEFAULT_SIZE;
+
   const { place: relocate, moves: enduranceMoves } = enduranceRelocator(args);
-  /** `${frameDay}:${slotIndex}` → the weekday it ends on. Filled for pinned slots here, the rest below. */
+  /**
+   * `${frameDay}:${slotIndex}` → the weekday it ends on. ⛔ EVERY SLOT, not only the pinned ones
+   * (2026-08-26).
+   *
+   * ⚠️ THE FREE SLOTS USED TO BE RESOLVED LAZILY INSIDE THE DAY LOOP, and that made one fact
+   * unknowable at the moment it was needed: the day loop emits frame day 2's LIFTS before it has
+   * decided where frame day 3's, 4's or 6's endurance lands, so the lower-body slots were priced
+   * against a week the composer had not finished placing. `hardRunBeforeLower` below is exactly
+   * that fact, so it has to be answered before a single barbell row is written.
+   *
+   * ⛔⛔ THE ORDER IS UNCHANGED AND THE ORDER IS THE RULING. Pinned slots go through the relocator
+   * FIRST — Michael, 2026-08-25 afternoon: *"the athlete's own days are relocated first, so they get
+   * first choice and an engine-placed session takes what is left"* — then the free ones in frame
+   * order, then (below, after the day loop) the swim add-ons and the advanced tier. That is the same
+   * sequence this file ran before; only the point at which it runs moved.
+   */
   const enduranceDays = new Map<string, Weekday>();
-  for (const d of days) {
-    d.endurance.forEach((slot, i) => {
-      const key = `${d.day}:${i}`;
-      const hardIndex = hardSlotIndex.get(key) ?? 0;
-      // ⛔ THE FRAME'S FAMILY, matching `hardSlotIndex` above — see `anchorRoleOf`.
-      const role = anchorRoleOf(slot.family);
-      const pinned = role === 'long'
-        ? !!args.endurancePins?.long
-        : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
-      if (!pinned) return;
-      const proposed = enduranceDayFor(args, d.day, slot.family, hardIndex);
-      enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
-    });
+  for (const wantPinned of [true, false]) {
+    for (const d of days) {
+      d.endurance.forEach((slot, i) => {
+        const key = `${d.day}:${i}`;
+        if (enduranceDays.has(key)) return;
+        const hardIndex = hardSlotIndex.get(key) ?? 0;
+        // ⛔ THE FRAME'S FAMILY, matching `hardSlotIndex` above — see `anchorRoleOf`.
+        const role = anchorRoleOf(slot.family);
+        const pinned = role === 'long'
+          ? !!args.endurancePins?.long
+          : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
+        if (pinned !== wantPinned) return;
+        const proposed = enduranceDayFor(args, d.day, slot.family, hardIndex);
+        enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
+      });
+    }
   }
+
+  /**
+   * ⛔⛔ THE HAIRCUT'S CAUSE IS A FACT ABOUT THE CALENDAR, AND IT WAS BEING ASKED OF THE FRAME
+   * (2026-08-26, found by the fuzz harness's criterion 8 — 6,688 shapes with the reduction engaged
+   * and no run in front of it, and 29 with a hard run in front of it and no reduction).
+   *
+   * p247, and the subject of the sentence is a DAY: *"**Monday's run** is fairly challenging, given
+   * that there is an ME lower session **the next day**… a 3 to 4 percent reduction in working 1RM
+   * should be assumed here."* The cause is an ADJACENCY. `sport-slots.ts` answered a different and
+   * narrower question — *"is the frame's day-1 slot a hard run"* — and never looked at a weekday,
+   * which was right while nothing could move a session off its frame day. `endurancePins` can put
+   * that run anywhere in the week, and a pin on the OTHER hard slot can create the adjacency out of
+   * a slot day 1 never held. ⛔ THAT READER IS DELETED, not out-shouted: two answers to one question
+   * is how the plan and the sentence about the plan come to disagree.
+   *
+   * ⛔ SO BOTH DIRECTIONS WERE WRONG, AND BOTH ARE ATHLETE-VISIBLE. The reduction firing with the
+   * run moved away printed *"the run the day before is still in the legs"* over a day with no run on
+   * it — the plan asserting a reason the calendar disproves. The reduction NOT firing when a pinned
+   * hard run did land the day before left p247's one compensated break uncompensated.
+   *
+   * ⚠️ IT IS THE **ASSIGNED** SLOT THAT IS ASKED, not the frame's — same reason `sport-slots.ts`
+   * gives at its own `dayOne0`: a declined hard slot has its FAMILY rewritten to the column's easy
+   * one, so the frame still calls day 1 hard after the week has converted it to easy running.
+   * ⚠️ AND THE SPORT MUST BE `run`. p280 is why: hard riding does not land on the legs the way
+   * running does, which is the whole reason the substituted case drops the reduction
+   * (`HAIRCUT_CAUSE_IS_OURS`).
+   */
+  const meLowerFrameDay = days.find((d) => d.label === 'ME: Lower')?.day ?? null;
+  const meLowerDay = meLowerFrameDay == null ? null : dayNameFor(args, meLowerFrameDay);
+  const dayBeforeMeLower = meLowerDay == null
+    ? null
+    : WEEKDAYS[(WEEKDAYS.indexOf(meLowerDay) + 6) % 7];
+  const hardRunBeforeLower = dayBeforeMeLower != null && days.some((d) =>
+    d.endurance.some((slot, i) => {
+      const assigned = assignedSlot(sportAssignment, d.day, i, slot);
+      return assigned.sport === 'run'
+        && isHardSlot({ family: assigned.family })
+        && enduranceDays.get(`${d.day}:${i}`) === dayBeforeMeLower;
+    }));
   for (const n of sportAssignment.notes) {
     if (!notes.some((x) => x.text === n.text)) {
       notes.push({ kind: n.kind === 'source' ? 'source' : n.kind === 'warning' ? 'warning' : 'ours', text: n.text, cite: n.cite });
@@ -1257,7 +1391,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const takenToday = new Set<string>();
         for (const slot of day.strength) {
           const { exercise, movement, sets, pattern } = exerciseForSlot(
-            slot, args, notes, sportAssignment.hardRunBeforeMeLower, takenToday, picks, focusMuscles,
+            slot, args, notes, hardRunBeforeLower, takenToday, picks, focusMuscles,
             dialMuscles, day.day);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
@@ -1321,6 +1455,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         level,
         archetype: assigned.archetype ?? rotatedArchetype(assigned.family, level, args.week),
         anchors,
+        // ⛔ §3c — the dial the athlete's typed number set. See `volume-bounds.ts`.
+        size: sizeForSport(assigned.sport),
       });
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
       sessions.push({
@@ -1328,10 +1464,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // a plyo block or an add-on, and those keep the frame's rotation — see `endurancePins`.
         // ⛔ AND THEN OFF A DAY THE ATHLETE CANNOT TRAIN — the pinned slots already went through the
         // relocator in the pre-pass above, so this reads their answer rather than re-asking.
-        day: enduranceDays.get(`${day.day}:${i}`) ?? relocate(
-          enduranceDayFor(args, day.day, slot.family, hardSlotIndex.get(`${day.day}:${i}`) ?? 0),
-          enduranceLabelFor(anchorRoleOf(slot.family)),
-        ),
+        // ⛔ READ, NEVER RE-ASKED. Every slot went through the relocator in the pre-pass above, so
+        // calling `relocate` again here would count the same session twice in its `used` set and
+        // push the NEXT relocated session a day further out. ⚠️ The fallback is the frame's own day
+        // and takes no relocator turn — it is unreachable by construction and exists so a future
+        // slot the pre-pass misses lands somewhere real instead of `undefined`.
+        day: enduranceDays.get(`${day.day}:${i}`) ?? dayNameFor(args, day.day),
         ...row,
         // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a reader
         // can still find the row on the page it came from.
@@ -1351,7 +1489,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const liftOnlyDays = days.filter((d) => !d.rest && d.endurance.length === 0 && d.strength.length > 0);
     const swimTargets = liftOnlyDays.length > 0 ? liftOnlyDays : days.filter((d) => !d.rest);
     for (let i = 0; i < swimAddOns && i < swimTargets.length; i++) {
-      const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors });
+      const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors, size: sizeForSport('swim') });
       const row = translateEnduranceSession(built);
       // ⚠️ THE ADD-ON IS ENDURANCE TOO, so it obeys the same blocked-day rule as the slots above.
       sessions.push({
@@ -1369,7 +1507,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const openDays = days.filter((d) => !d.rest && d.endurance.length === 0 && d.strength.length === 0);
     const targets = openDays.length > 0 ? openDays : days.filter((d) => !d.rest && d.endurance.length === 0);
     for (let i = 0; i < extraVt1 && i < targets.length; i++) {
-      const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors });
+      // ⛔ THE TIER'S RUNS TAKE THE RUN DIAL TOO — they are miles in the same week.
+      const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors, size: sizeForSport('run') });
       const row = translateEnduranceSession(built);
       sessions.push({
         day: relocate(dayNameFor(args, targets[i].day), 'the extra easy run'),
@@ -1512,9 +1651,64 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     }
   }
 
+  /**
+   * ⛔⛔ THE WEEK IS SCORED BY THE LAW, AT LAST (Q-288, 2026-08-26). Until now `compose.ts` built no
+   * Units and called no resolver, so **no standing-plan week had ever been checked against p131's
+   * keystone rule** — the rule existed in `week-model/model.ts`'s `COST` table the whole time and
+   * nothing on this path asked it. Q-288 recorded it as a missing rule; it was a missing wire.
+   *
+   * ⛔ IT RUNS LAST, ON THE FINISHED WEEK. Every session is placed by now — the pinned ones, the
+   * rotated ones, the relocated ones, the swim add-ons and the advanced tier — and a conflict
+   * computed on a half-built week would describe an arrangement nobody trains.
+   *
+   * ⚠️ `kind: 'warning'`, WHICH IS WHAT PUTS IT ON THE SCREEN. `plan-row.ts` turns every warning
+   * note into a `placement_compromises` entry, and that is the channel `NonRaceBuilder` already
+   * renders. A cost the athlete pays and cannot see is not disclosed.
+   * ⛔ AND IT NEVER REFUSES — D-452, warn never block. Michael, 2026-08-26: *"we will not stop them
+   * but they should know the cost."*
+   */
+  /**
+   * ⛔ §3c'S SENTENCE, WHERE THE ATHLETE ALREADY LOOKS. `kind: 'warning'` puts it into
+   * `placement_compromises`, the channel the preview renders — the same reason the conflict
+   * sentences use it. Silent on a week that delivers the number, which is what makes the other two
+   * worth reading.
+   * ⚠️ THE LONG SLOT'S SPORT DECIDES WHETHER THE LEVER EXISTS — "moving it to the run holds more" is
+   * true only while the long day is a ride.
+   */
+  {
+    const longSlotSport = (() => {
+      for (const d of days) {
+        const i = d.endurance.findIndex((slot) => anchorRoleOf(slot.family) === 'long');
+        if (i >= 0) return assignedSlot(sportAssignment, d.day, i, d.endurance[i]).sport;
+      }
+      return undefined;
+    })();
+    for (const [sport, solve, bound] of [
+      ['run', volume.run, volume.bounds.run],
+      ['ride', volume.ride, volume.bounds.ride],
+    ] as const) {
+      const text = volumeLine(solve, bound, sport, { longSlotSport });
+      if (text && !notes.some((n) => n.text === text)) {
+        notes.push({ kind: 'warning', text, cite: 'Viada p275' });
+      }
+    }
+  }
+
+  const conflicts = weekConflicts({
+    sessions,
+    frame: args.frame,
+    column: args.column,
+    dayOffset: args.dayOffset ?? 0,
+  });
+  for (const c of conflicts) {
+    if (!notes.some((n) => n.text === c.text)) {
+      notes.push({ kind: 'warning', text: c.text, cite: 'Viada p130, p131' });
+    }
+  }
+
   return {
     frame: args.frame, week: args.week, column: args.column, isTestWeek: testWeek,
-    sessions, ledger, meRows, notes,
+    sessions, ledger, meRows, notes, conflicts, volume,
   };
 }
 

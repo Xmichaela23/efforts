@@ -201,12 +201,101 @@ export type SlotAssignment = {
   /** Keyed `${frameDay}:${indexWithinDay}`. */
   byKey: Record<string, AssignedSlot>;
   counts: { run: number; ride: number; swim: number };
-  /** ⛔ TRUE WHEN DAY 1'S ENDURANCE SESSION IS A RUN — the haircut's stated cause. See `compose.ts`. */
-  hardRunBeforeMeLower: boolean;
+  /**
+   * ⛔ THE HAIRCUT'S CAUSE IS NOT ANSWERED HERE ANY MORE (2026-08-26). This carried
+   * `hardRunBeforeMeLower`, read off the FRAME's day-1 slot — and p247's subject is an ADJACENCY
+   * ("Monday's run… an ME lower session the next day"), which no function that has never seen a
+   * weekday can answer. `endurancePins` can put that run anywhere in the week, so the field was
+   * true of blocks with no run in front of the leg day and false of blocks with one. `compose.ts`
+   * owns it now, off the placed calendar. ⛔ Do not reinstate a frame-level answer here.
+   */
   notes: { kind: 'source' | 'ours' | 'warning'; text: string; cite?: string }[];
 };
 
 const key = (day: number, i: number) => `${day}:${i}`;
+
+/**
+ * ⛔⛔ THE ATHLETE'S VARIANT PICKS, AND THE RULE THAT NO WEEK BUILDS ONE SHAPE TWICE.
+ *
+ * ⛔⛔ IT IS A FUNCTION BECAUSE `assignSports` HAS TWO EXITS AND THIS RAN ON ONLY ONE OF THEM
+ * (found 2026-08-26). The `mix.slots` branch — the one the wizard ALWAYS takes, because the
+ * endurance screen answers every slot's sport — returns before the bottom of the function, so
+ * **every within-family variant the athlete picked was silently dropped on the live path.** The
+ * card offered Over-unders or Cut-downs, the athlete tapped one, and the week built the engine's
+ * rotation regardless. Two exits, one rule, applied once: that is what this shape prevents.
+ *
+ * ⚠️ MUTATES `byKey` IN PLACE, deliberately — both callers own it and neither wants a copy.
+ */
+function applyVariantPicks(
+  byKey: Record<string, AssignedSlot>,
+  slots: { day: number; i: number; slot: EnduranceSlot }[],
+  mix: SportMix,
+): void {
+  // ── the athlete's variant picks, validated against the assigned family ───────────────────────
+  /** ⛔ WHICH SLOTS THE ATHLETE ANSWERED. A pick is never moved by the de-collision below. */
+  const picked = new Set<string>();
+  for (const [k, want] of Object.entries(mix.archetypes ?? {})) {
+    const assigned = byKey[k];
+    if (!assigned || typeof want !== 'string' || !want) continue;
+    const fam = FAMILIES[assigned.family];
+    if (fam?.archetypes.some((a) => a.id === want)) {
+      byKey[k] = { ...assigned, archetype: want };
+      picked.add(k);
+    }
+  }
+
+  /**
+   * ⛔⛔ NO WEEK BUILDS THE SAME SHAPE TWICE (Michael, 2026-08-26): *"the two hard-session cards must
+   * not build the same shape twice."* The card greys out a shape the other card holds; this is the
+   * same rule on the engine, and it is not a duplicate of that — a payload can arrive from a client
+   * that never greyed anything, and the built week is what the athlete trains.
+   *
+   * ⛔⛔ AND THE CASE THAT NEEDED IT MOST IS THE ONE THE GREYING CANNOT REACH: the athlete picks a
+   * shape on one card and leaves the other on "engine's pick". On the BIKE both hard slots resolve
+   * to `ride_sweet_spot`, and an unanswered slot is not left blank — `RIDE_EQUIVALENT` stamps it
+   * `medium` (frame day 1) or `long` (day 3). So picking `long` on card one and leaving card two
+   * alone produced two identical sweet-spot sessions, and nothing in the week said so.
+   *
+   * ⚠️ THE ATHLETE'S PICK NEVER MOVES — pins-win (D-452). Only a slot they did not answer is
+   * re-pointed, and it takes the first shape its own family offers that nothing else in the week
+   * holds. ⚠️ TWO EXPLICIT PICKS OF THE SAME SHAPE ARE LEFT ALONE: both are answers, and overriding
+   * one would be the engine unpicking a choice. The card is what stops that arising.
+   * ⚠️ FAMILY-LOCAL. Two slots in DIFFERENT families sharing an archetype id is not a collision —
+   * they build different sessions — so the comparison is keyed on family and id together, and on
+   * the run (two different families) this whole block is a no-op.
+   */
+  {
+    const heldByFamily = new Map<string, Set<string>>();
+    const hold = (family: string, id: string) => {
+      const set = heldByFamily.get(family) ?? new Set<string>();
+      set.add(id);
+      heldByFamily.set(family, set);
+    };
+    // ⚠️ THE ATHLETE'S ANSWERS ARE RESERVED FIRST, in one pass, so a pick always beats a default
+    // whatever order the slots come in.
+    for (const k of picked) {
+      const a = byKey[k];
+      if (a?.archetype) hold(a.family, a.archetype);
+    }
+    for (const { day, i } of slots) {
+      const k = key(day, i);
+      if (picked.has(k)) continue;
+      const a = byKey[k];
+      if (!a?.archetype) continue;
+      const held = heldByFamily.get(a.family);
+      if (!held?.has(a.archetype)) { hold(a.family, a.archetype); continue; }
+      const free = (FAMILIES[a.family]?.archetypes ?? [])
+        .filter((x) => !x.levels || x.levels.includes(a.level))
+        .find((x) => !held.has(x.id));
+      // ⚠️ NOWHERE TO MOVE — a family with one usable shape keeps it rather than being emptied.
+      // The week then genuinely has two of it, and that is the library's ceiling, not a defect here.
+      if (!free) continue;
+      byKey[k] = { ...a, archetype: free.id };
+      hold(a.family, free.id);
+    }
+  }
+
+}
 
 /**
  * ⛔ ASSIGN A SPORT TO EVERY ENDURANCE SLOT IN THE COLUMN.
@@ -244,7 +333,7 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
 
   const total = slots.length;
   if (total === 0) {
-    return { byKey, counts: { run: 0, ride: 0, swim: 0 }, hardRunBeforeMeLower: false, notes };
+    return { byKey, counts: { run: 0, ride: 0, swim: 0 }, notes };
   }
 
   // ── 1. SWIM NEVER TAKES A SLOT — RULED 2026-08-24 (Michael), superseding slice 4's easy-slot
@@ -309,27 +398,12 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
         cite: 'Viada p280',
       });
     }
+    // ⛔ THE PICKS APPLY ON THIS EXIT TOO — see `applyVariantPicks`. This branch skipped them
+    // entirely until 2026-08-26, and it is the branch the wizard always takes.
+    applyVariantPicks(byKey, slots, mix);
     const counts0 = { run: 0, ride: 0, swim: 0 };
     for (const a of Object.values(byKey)) counts0[a.sport] += 1;
-    const dayOne0 = slots.filter(({ day }) => day === 1);
-    return {
-      byKey,
-      counts: counts0,
-      /**
-       * ⛔⛔ HARDNESS IS READ OFF THE **ASSIGNED** SLOT, NOT THE FRAME'S (2026-08-25). This said
-       * `isHardSlot(slot)` — the frame's own slot — and that was correct while every assignment
-       * kept the family and changed only the sport. **A declined hard slot changes the FAMILY**, so
-       * the frame still calls day 1 hard after the week has converted it to easy running, and the
-       * lower-body haircut would fire on an intensity session that is no longer in the plan.
-       *
-       * ⚠️ `byKey` is fully populated for every slot before this runs, so there is no ordering risk.
-       */
-      hardRunBeforeMeLower: dayOne0.some(({ day, i }) => {
-        const a = byKey[key(day, i)];
-        return !!a && isHardSlot({ family: a.family }) && a.sport === 'run';
-      }),
-      notes,
-    };
+    return { byKey, counts: counts0, notes };
   }
 
   if (rides > 0 && open.length > 0) {
@@ -395,29 +469,9 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
   const counts = { run: 0, ride: 0, swim: 0 };
   for (const a of Object.values(byKey)) counts[a.sport] += 1;
 
-  /**
-   * ⛔ THE HAIRCUT'S STATED CAUSE, ANSWERED HERE RATHER THAN ASSUMED IN THE LOADER.
-   *
-   * p247: *"**Monday's run is fairly challenging**, given that there is an ME lower session the next
-   * day… a 3 to 4 percent reduction in working 1RM should be assumed here."* The subject of that
-   * sentence is the RUN. See `compose.ts` for what this flag does and for why the substituted case
-   * is labelled ours.
-   */
-  const dayOne = slots.filter(({ day }) => day === 1);
-  const hardRunBeforeMeLower = dayOne.some(({ day, i, slot }) =>
-    isHardSlot(slot) && byKey[key(day, i)]?.sport === 'run');
+  applyVariantPicks(byKey, slots, mix);
 
-  // ── the athlete's variant picks, validated against the assigned family ───────────────────────
-  for (const [k, want] of Object.entries(mix.archetypes ?? {})) {
-    const assigned = byKey[k];
-    if (!assigned || typeof want !== 'string' || !want) continue;
-    const fam = FAMILIES[assigned.family];
-    if (fam?.archetypes.some((a) => a.id === want)) {
-      byKey[k] = { ...assigned, archetype: want };
-    }
-  }
-
-  return { byKey, counts, hardRunBeforeMeLower, notes };
+  return { byKey, counts, notes };
 }
 
 /** The assignment for one slot, or the frame's own run slot when nothing was assigned. */

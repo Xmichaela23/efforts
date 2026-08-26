@@ -1078,3 +1078,97 @@ Cut-downs, Threshold, easy wording). Plyo got its own tag + muted magenta (#B967
 
 **Rejected:** carving clubs out of blocked-day relocation (blocking your club's day means you can't
 make club); a sports-color legend on the week strip (vertical cost); a third hard slot.
+
+---
+
+## D-453 — A hard day leaves 24h on the legs, and a hard RIDE leaves 12h (2026-08-26, Michael)
+
+**What forced it: encoding the book as a test showed the law calling the book's own week illegal.**
+The 2026-08-26 audit wrote p246's frame into `standing-plan/fuzz-builder.test.ts` as a check for the
+first time. p246 prints a hard endurance session on day 1 and **ME: Lower on day 2**. `COST` gave
+`hard_cardio` a 36-hour leg debt, so that adjacency was **12 hours short** — 4,292 of the 16,832
+swept shapes came back as engine-placed keystone breaks, and the engine's "fault" was building the
+week the source prints.
+
+**p247 does not forbid the adjacency. It PRICES it:**
+
+> *"Monday's run is fairly challenging, given that there is an ME lower session the next day… a 3 to
+> 4 percent reduction in working 1RM should be assumed here."*
+
+The compensation is the haircut. A law that outlaws the compensated case has replaced the author.
+
+### 1. `hard_cardio` → 24h (was 36h)
+
+**The 36 was mine and the note beside it invited exactly this** — *"the number is mine and he should
+overrule it if he disagrees."* Overruled. At this model's own convention (an exact clearance PASSES,
+set by a Sunday long run clearing a Tuesday deadlift at exactly 48h) 24h makes the day after legal
+and anything closer than a full day short.
+
+⚠️ **What the 36 was protecting is relocated, not lost.** Its stated case was an evening threshold
+run followed by a morning squat — ~12 hours, not 24. This model has no time of day, so it never
+measured that; a unit that genuinely couples the two carries `internalGapHours` and is priced on it.
+⛔ Do not restore 36 to reach a within-day case that hours-since-midnight cannot see.
+
+**Class B fell from 4,292 to 0.** Every failure surviving the audit is athlete-caused and
+warning-side. There is no placement defect in the composer.
+
+### 2. The hard RIDE splits off at 12h — OURS, and labelled
+
+Michael: *"we will not stop them but they should know the cost."*
+
+⚠️ **The source states no figure.** Searched, not assumed. What it states is the **criterion**: p275
+allows the cycling work on *"any modality with a power meter that is relatively non-impact"* (rower,
+ski erg, air bike), while running work on an elliptical still *"recommends impact with the ground on
+at least one day."* **Impact is the axis**, and p247's reduction names a RUN as its cause and is
+written only for the run layout.
+
+⛔ **The precedent is this table's own.** The long-effort clearance already splits by sport for the
+same reason — `long_run` needs `heavy_legs` clear, `long_ride` needs nothing, because *"the backward
+shadow makes for a miserable ride, but it doesn't cause structural failure"* (Michael, 2026-08-18).
+The ride keeps the injury-relevant half and loses the quality half. This is that shape applied to
+intensity.
+
+⛔ **12 AND 24 ARE THE SAME ANSWER AT DAY GRANULARITY, AND 12 WAS CHOSEN ANYWAY.** Any value in
+(0, 24] behaves identically once sessions are clocked at `day * 24`: the same day is short, the next
+day clears. **Only ZERO would change a verdict** — measured, it removes 9,717 of the 34,154
+athlete-caused breaks, every one of them a same-day heavy-lower-plus-hard-ride collision. Zero was
+rejected: it would say a hard ride costs the legs nothing, contradict the row's own reason for
+existing (*"hard cardio is systemic fatigue and cannot cost nothing"*), and make a same-day squat and
+hard ride silently legal. **12 is the honest number written down, and it becomes a different answer
+the day this model grows a time of day.**
+
+### 3. It lives IN the table, not beside it
+
+A second `Load` (`hard_ride`) was rejected on measurement: every construction site in the repo
+already carries `sport` on the session, so a second load means two fields that must agree in eighteen
+places with nothing checking that they do — and it would have touched `STRESSOR_LOADS`, `buildUnits`'
+pairing, `resolve.ts`'s `isEndurance` and `solver-adapter`'s mapping for a difference none of them
+care about. Instead `Cost.emitsBySport` is a cell **inside** `COST`, so a reader looking up what a
+hard session costs the legs sees both numbers at once. **One reader — `emitsFor` — and it sits beside
+the table.** `emitsOf` and `resolve.ts`'s `unmetNeeds` both come through it.
+
+### 4. ⚠️ AN UNVERIFIED CITE, FLAGGED AND LEFT STANDING
+
+`standing-plan/sport-slots.ts` ships an athlete-facing note cited **"Viada p280"** — *"riding hard
+does not land on the legs the way running does, so the intensity costs the lifting less."* **p280 is
+not transcribed in `SOURCE-viada-hybrid-athlete.md`**; it appears only in the program index, as the
+notes page for the three cycling programs. The copy stays as-is until the page is read (Michael may
+photograph it). ⛔ **Nothing in this entry rests on it** — the anchor is p275, which is read.
+
+### What moved
+
+- `week-model/model.ts` — `COST.hard_cardio` 36h → 24h; new `Cost.emitsBySport` with `bike: 12h`;
+  new `emitsFor(session)`; `CLOSED_2026_08_17` updated so the figure's history is on the record.
+- `week-model/resolve.ts` — `unmetNeeds` reads `emitsFor`, never `COST[...].emits`.
+- `week-model/model.test.ts` — the "24h on the legs" test asserted the OLD behaviour and its own
+  comment named itself as the assertion that would break. Rewritten; a new test holds the ride split.
+- `standing-plan/fuzz-builder.test.ts` — the harness was holding a second opinion about the law: it
+  built one unit per DAY with `internalGapHours = 6`, which pushes a hard session's debt LATER and
+  therefore CLOSER to the next morning's lift, making p246's week read six hours short even at 24h.
+  The standing plan prescribes no time of day. Composed sessions now go to the law's own `buildUnits`
+  with their days as pins. The p247 carve-out added earlier that day is **deleted** — at 24h the law
+  agrees with the book and no exemption is needed.
+
+**Warn, never block, throughout — D-452 unchanged.** The remaining audit classes (34,154
+athlete-caused keystone breaks, 4,616 hard-endurance-on-a-lower-day) are sentences the plan does not
+yet say, not weeks it should refuse to build.

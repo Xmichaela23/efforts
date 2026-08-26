@@ -17,6 +17,7 @@ import {
   type Unit,
   COST,
   DAY_NAMES,
+  emitsFor,
   emitsOf,
   forwardGap,
   needsOf,
@@ -70,7 +71,8 @@ export function unmetNeeds(placements: Placement[]): Unmet[] {
   const debts: Array<{ from: string; system: SystemId; at: number; hours: number }> = [];
   for (const p of placements) {
     for (const { session, hour } of sessionHours(p.unit, p.day)) {
-      for (const [sys, hours] of Object.entries(COST[session.load].emits)) {
+      // ⛔ `emitsFor`, NEVER `COST[...].emits` DIRECTLY — the row may carry a per-sport cell (D-453).
+      for (const [sys, hours] of Object.entries(emitsFor(session))) {
         debts.push({ from: session.label, system: sys as SystemId, at: hour, hours: hours as number });
       }
     }

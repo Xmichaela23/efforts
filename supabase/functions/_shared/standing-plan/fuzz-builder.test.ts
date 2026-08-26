@@ -39,12 +39,21 @@ import {
   chooseDayMap,
   defaultCompetitionLifts,
   frameFixedDaysFor,
+  HAIRCUT_CAUSE_IS_OURS,
+  isHardSlot,
   isLongSlot,
+  weekdayForFrameDay,
+  type ColumnKind,
   type PlanSession,
   type Weekday,
 } from './index.ts';
-import { buildUnits, type Session } from '../week-model/model.ts';
-import { resolveAroundPins, unmetNeeds, recoveryDaysOf } from '../week-model/resolve.ts';
+import { buildUnits, type Load, type Session } from '../week-model/model.ts';
+import {
+  lowerDaysOf, placementsOf, typedSessionsOf, weekConflicts,
+} from './week-conflicts.ts';
+import {
+  resolveAroundPins, unmetNeeds, recoveryDaysOf, type Placement,
+} from '../week-model/resolve.ts';
 
 const DAYS: Weekday[] = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
@@ -57,10 +66,29 @@ const BASELINES = {
   },
   performance_numbers: {},
 };
+/**
+ * ⛔ WORKING NUMBERS ARE PRESENT, AND THEY HAVE TO BE (2026-08-26). Without them `exerciseForSlot`
+ * returns "By feel" before it ever reaches `prescribedLoad`, so the lower-body haircut never runs
+ * and NEITHER of the two sentences that explain it is ever written. Criterion 8 checks the
+ * athlete-visible OUTPUT rather than an internal flag, so the sweep has to build weeks that
+ * actually carry a number.
+ *
+ * ⚠️ PLACEMENT IS UNAFFECTED. Criteria 1-4 and 6 are about which weekday a session lands on, and a
+ * weight changes none of them. ⚠️ Week one is still the test week: the skip needs `skipTestWeek`
+ * as well, and nothing here sets it.
+ */
+const wn = (lift: 'bench' | 'squat' | 'deadlift' | 'overheadPress', predicted: number) => ({
+  lift, predicted1RM: predicted, workingNumber: Math.round(predicted * 0.96),
+  measured: { weight: Math.round(predicted * 0.85), reps: 5 }, cite: 'fuzz fixture',
+});
 const BASE = {
   frame: 'strength_5k' as const,
   competitionLifts: defaultCompetitionLifts(),
   seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+  workingNumbers: {
+    bench: wn('bench', 200), squat: wn('squat', 265),
+    deadlift: wn('deadlift', 340), overheadPress: wn('overheadPress', 125),
+  },
   baselines: BASELINES,
   equipment: ['Commercial gym'],
   roundTo: 5,
@@ -148,7 +176,328 @@ function build(c: Case) {
  * the failure this criterion is really looking for.
  */
 /** Counts of trade-offs that are expected rather than wrong — reported, never asserted on. */
-const tradeOffs = { liftOnBlockedWithNote: 0 };
+const tradeOffs = {
+  liftOnBlockedWithNote: 0,
+  /** Hard endurance on a lower-body day that the athlete's own answers put there, WITH a note. */
+  hardOnLowerWithNote: 0,
+  /** A keystone clearance the athlete broke, WITH a sentence naming the day and the shortfall. */
+  keystoneBreakWithNote: 0,
+};
+
+// ── VIADA'S PLACEMENT LAWS, AS CHECKS (2026-08-26) ───────────────────────────────────────────────
+//
+// ⛔ WHY THEY RIDE THE SAME CASES rather than living in a suite of their own: the laws have to hold
+// on every one of the 16,832 shapes, and a separate sweep would sweep a different space and prove a
+// different thing. Criteria 6-8 below are evaluated inside `checkComposer`'s week loop.
+//
+// ⛔ THE LAWS, PAGE-CITED (`docs/SOURCE-viada-hybrid-athlete.md`):
+//
+//   · **p246 §E1a — the frame's endurance layout.** Day 1 MLSS+ with ME Upper, day 3 NT on the plyo
+//     day, day 4 VT1 with DE Upper, day 6 LSD, day 7 rest. **Days 2 and 5 — the lower-body days —
+//     carry no endurance at all.** Two consequences, and they are criterion 6: an UNPINNED slot
+//     lands on its frame day, and hard endurance never sits on a lower-body day.
+//
+//   · **p131 — keystones.** *"Keystone sessions are the ones that require you to be in the most
+//     recovered state to perform"*, and the placement law is **fresh in the relevant systems, not
+//     fresh overall.** ⛔ THAT RULE IS ALREADY IN CODE — `week-model/model.ts`'s `COST` table:
+//     `heavy_lower` needs `heavy_legs` and `long_effort` clear, `hard_cardio` leaves 36h on the
+//     legs, a long effort leaves 48h. Criterion 7 ASKS that table rather than restating it.
+//     ⚠️ Q-288 recorded the rule as missing. It is not missing, it is **UNWIRED**: `compose.ts`
+//     builds no Units and never calls the resolver, so no standing-plan week has ever been scored
+//     by the law. This check is the first thing that asks it.
+//
+//   · **p247 §E1d — the ONE compensated break.** *"Monday's run is fairly challenging, given that
+//     there is an ME lower session the next day… a 3 to 4 percent reduction in working 1RM should
+//     be assumed here."* So the adjacency is legal **only with the haircut engaged**, and the
+//     haircut is honest **only when the adjacency is really there**. Criterion 8 is that biconditional.
+//
+//   · **p130 — consolidation is judged by what each session REQUIRES.** A spacing the ATHLETE broke
+//     is legal and must be SAID; a spacing the ENGINE broke is a defect. That is not a fifth check,
+//     it is the classifier applied to the three above — the same shape criterion 2 already uses,
+//     and Michael's law: choice wins, informed.
+
+/**
+ * ⛔ THE COMPOSED WEEK IN THE LAW'S VOCABULARY — `week-conflicts.ts`'s OWN mapping, imported.
+ *
+ * ⚠️ THIS FILE USED TO CARRY ITS OWN COPY, and that made the sweep prove nothing about the thing
+ * that ships: a harness checking a duplicate of the production logic checks the duplicate. The
+ * mapping, the placements and the sentences all live in `week-conflicts.ts` now; this reads them.
+ */
+function lawViewOf(ss: PlanSession[], column: ColumnKind): {
+  typed: Array<{ s: PlanSession; load: Load; frameDay: number | null; role: 'long' | 'hard' | null; hardIndex: number }>;
+  placements: Placement[];
+  dayOfLabel: Map<string, number>;
+} {
+  const typed = typedSessionsOf(ss, 'strength_5k', column);
+  /**
+   * ⛔ THE FRAME SLOT EACH ENDURANCE ROW FILLED — the harness's own question, not the module's.
+   * Criterion 6 needs to know which slot a session came from and whether the athlete pinned THAT
+   * slot; `week-conflicts.ts` only needs the load. So the zip is here and the loads are imported.
+   */
+  const slots = frameEnduranceSlotRoles(column);
+  const withSlot = typed.map((t) => ({ ...t, frameDay: null as number | null, role: null as 'long' | 'hard' | null, hardIndex: -1 }));
+  let si = 0;
+  let hardSeen = 0;
+  const isEnd = (x: PlanSession) => x.type === 'run' || x.type === 'ride' || x.type === 'swim';
+  const isAddOn = (x: PlanSession) =>
+    (x.tags ?? []).includes('swim_addon') || (x.tags ?? []).includes('advanced_tier');
+  for (const row of withSlot) {
+    if (!isEnd(row.s) || isAddOn(row.s) || (row.s.tags ?? []).includes('plyo')) continue;
+    const slot = slots[si];
+    si += 1;
+    if (!slot) continue;
+    row.frameDay = slot.frameDay;
+    row.role = slot.role;
+    row.hardIndex = slot.role === 'hard' ? hardSeen++ : -1;
+  }
+  const { placements, dayOfLabel } = placementsOf(typed);
+  const asIndex = new Map<string, number>();
+  for (const [label, day] of dayOfLabel) asIndex.set(label, DAYS.indexOf(day));
+  return { typed: withSlot, placements, dayOfLabel: asIndex };
+}
+
+/** The frame's endurance slots with their frame day, in emit order. Read off `FRAMES`. */
+function frameEnduranceSlotRoles(column: ColumnKind): Array<{ frameDay: number; role: 'long' | 'hard' | null }> {
+  const out: Array<{ frameDay: number; role: 'long' | 'hard' | null }> = [];
+  for (const d of FRAMES.strength_5k.columns[column]) {
+    for (const slot of d.endurance) {
+      out.push({
+        frameDay: d.day,
+        role: isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : null,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * ⛔ SENTENCES THAT NAME A CLEARANCE — the note criterion 7's athlete-caused arm is waiting for.
+ * A break the athlete asked for is legal; a break nobody mentions is the bug. ⚠️ The haircut's own
+ * p247 sentence deliberately does NOT match: it names no weekday, so it can never stand in for a
+ * note about a specific collision.
+ */
+const CLEARANCE_WORDS = /(clear|fresh|still in the legs|too close|the day before|recover|short)/i;
+
+/**
+ * ⛔ CRITERIA 6-8 — VIADA'S PLACEMENT LAWS ON ONE COMPOSED WEEK. Returns failures; the caller's
+ * `report` groups them by class. Never throws.
+ */
+function checkPlacementLaws(
+  c: Case,
+  built: ReturnType<typeof build>,
+  wk: string,
+  ss: PlanSession[],
+): string[] {
+  const fails: string[] = [];
+  const column: ColumnKind = c.taper && wk === '2' ? 'taper' : 'standard';
+  const dayOf = (frameDay: number) => weekdayForFrameDay(frameDay, built.dayMap.offset);
+  /**
+   * ⛔ EVERY SENTENCE THE BLOCK CARRIES. `placement_compromises` is the channel the athlete already
+   * reads (`NonRaceBuilder.tsx:2716`); `notes` is what `describeBlock` folds into the plan's own
+   * description. Both are on the row, so both count as SAID — and criterion 2's own standard for
+   * "said" is the same one used here: the day is named.
+   */
+  const spoken = [
+    ...(built.row.placement_compromises ?? []).map((x) => x.text),
+    ...built.row.notes.map((n) => n.text),
+  ];
+  const namesDay = (d: string) => spoken.some((t) => t.includes(d));
+  /**
+   * ⚠️ ONLY THE SENTENCES THAT NAME A DAY GO IN A FAILURE LINE. The block carries a dozen source
+   * notes about plyo dose and accessory folds; printing all of them buried the one fact the reader
+   * needs — whether anything mentioned this day at all.
+   */
+  const dayNotes = () => {
+    const hits = spoken.filter((t) => DAYS.some((d) => t.includes(d)));
+    return hits.length > 0 ? hits.join(' | ') : 'NOTHING NAMES ANY DAY';
+  };
+  const namesClearanceOn = (d: string) =>
+    spoken.some((t) => t.includes(d) && CLEARANCE_WORDS.test(t));
+
+  const view = lawViewOf(ss, column);
+  const lower = lowerDaysOf('strength_5k', column);
+  const lowerWeekdays = [lower.me, lower.de]
+    .filter((d): d is number => d != null)
+    .map(dayOf);
+
+  /**
+   * ⛔⛔ WHICH SESSIONS THE ATHLETE'S OWN ANSWERS MOVED — p130's classifier, and the first draft of it
+   * was wrong in a way that mattered.
+   *
+   * It asked *"is this session ON a day the athlete named"*, which misses the biggest athlete-caused
+   * class of all: a session RELOCATED off a blocked day lands somewhere the athlete never named, so
+   * every consequence of their day off was being filed against the engine. A break is the athlete's
+   * when either session sitting in it is one they pinned, or one their day off displaced.
+   */
+  const touchedBy = (t: TypedSession): boolean => {
+    if (t.frameDay == null) return false;
+    const ownPin = t.role === 'long'
+      ? c.longDay
+      : t.role === 'hard' ? c.hardDays[t.hardIndex] ?? null : null;
+    if (ownPin) return true;                                   // they named this session's day
+    if (c.blocked.includes(dayOf(t.frameDay) as Weekday)) return true;  // their day off moved it
+    return false;
+  };
+  /** Label → was this session's day the athlete's doing. Keyed the way `lawViewOf` labels them. */
+  const touchedLabels = new Set<string>();
+  view.typed.forEach((t, i) => {
+    if (touchedBy(t)) touchedLabels.add(`${t.s.name} #${i}`);
+  });
+
+  // 6a ── AN UNPINNED SLOT LANDS ON ITS FRAME DAY (p246 §E1a).
+  //
+  // ⛔ THIS IS THE BANNER'S UNVERIFIED CLAIM, MADE CHECKABLE: *"one untouched preview build post-fix
+  // should land hard sessions Mon + Wed (frame days) — nobody has watched it."* Stated per SLOT
+  // rather than per week, so a build that pins the long day still has to put its unpinned hard
+  // sessions on the frame's own days under the chosen rotation.
+  for (const t of view.typed) {
+    if (t.frameDay == null) continue;
+    const pinned = t.role === 'long'
+      ? !!c.longDay
+      : t.role === 'hard' ? !!c.hardDays[t.hardIndex] : false;
+    if (pinned) continue;
+    const want = dayOf(t.frameDay);
+    if (t.s.day === want) continue;
+    // ⚠️ A DAY OFF MAY STILL MOVE IT, and `compose.ts` says so through `enduranceMoves`. Silent is
+    // the bug, exactly as in criterion 2.
+    if (c.blocked.includes(want as Weekday) && namesDay(want)) continue;
+    fails.push(`week ${wk}: UNPINNED endurance left its frame day — `
+      + `${t.s.name} expected ${want}, landed ${t.s.day} · blocked=[${c.blocked.join(',')}] · `
+      + `notes=[${dayNotes()}]`);
+  }
+
+  // 6b ── HARD ENDURANCE NEVER SITS ON A LOWER-BODY DAY (p246 §E1a — days 2 and 5 carry none).
+  for (const t of view.typed) {
+    if (t.load !== 'hard_cardio') continue;
+    if (!lowerWeekdays.includes(t.s.day as Weekday)) continue;
+    const ownPin = t.role === 'hard' ? c.hardDays[t.hardIndex] : null;
+    const athleteCaused = ownPin === t.s.day
+      || (t.frameDay != null && c.blocked.includes(dayOf(t.frameDay) as Weekday))
+      || (!!ownPin && c.blocked.includes(ownPin as Weekday));
+    if (athleteCaused) {
+      // ⛔ p130: legal, because the athlete chose it — and it must be SAID (Michael's law).
+      if (namesDay(t.s.day)) { tradeOffs.hardOnLowerWithNote++; continue; }
+      // ⚠️ Placement-law note: `checkPlacementLaws` runs 6b before the conflicts are computed below,
+      // so this arm re-asks rather than reading them. Same answer, one order later.
+      if (weekConflicts({ sessions: ss, frame: 'strength_5k', column, dayOffset: built.dayMap.offset })
+        .some((c) => c.days.includes(t.s.day as Weekday))) {
+        tradeOffs.hardOnLowerWithNote++;
+        continue;
+      }
+      fails.push(`week ${wk}: hard endurance on the lower-body day ${t.s.day} because the ATHLETE `
+        + `put it there, and NOTHING SAYS SO — ${t.s.name} · notes=[${dayNotes()}]`);
+      continue;
+    }
+    fails.push(`week ${wk}: the ENGINE put hard endurance on a lower-body day — `
+      + `${t.s.day}/${t.s.name} · lower days ${lowerWeekdays.join(',')} · offset ${built.dayMap.offset}`);
+  }
+
+  // 6c ── THE FRAME'S SLOT COUNT SURVIVES. A row more or fewer than the column prints means the zip
+  //       above is reading a different week from the one `composeWeek` built.
+  {
+    const wantSlots = frameEnduranceSlotRoles(column).length;
+    const gotSlots = view.typed.filter((t) => t.frameDay != null).length;
+    if (gotSlots !== wantSlots) {
+      fails.push(`week ${wk}: ${gotSlots} frame endurance rows, the ${column} column prints ${wantSlots}`);
+    }
+  }
+
+  /**
+   * ⛔ p247's ONE NAMED ADJACENCY, MEASURED ON THE PLACED CALENDAR — a hard RUN on the day before
+   * ME Lower. Criterion 8 below is the only thing that judges it now; criterion 7 needs no exemption
+   * for it since D-453 set the leg debt to 24h and the day-after clears exactly.
+   */
+  const meLowerWeekday = lower.me == null ? null : dayOf(lower.me);
+  const dayBeforeMeLower = meLowerWeekday == null
+    ? null
+    : DAYS[(DAYS.indexOf(meLowerWeekday) + 6) % 7];
+  const hardRunTheDayBefore = dayBeforeMeLower != null && view.typed.some((t) =>
+    t.load === 'hard_cardio' && t.s.type === 'run' && t.s.day === dayBeforeMeLower);
+
+  // 7 ── KEYSTONES: FRESH IN THE RELEVANT SYSTEMS (p131, Q-288). Asked of `COST`, not restated.
+  //
+  // ⛔ THE p247 CARVE-OUT THAT STOOD HERE IS DELETED, AND ITS DELETION IS THE POINT OF D-453.
+  // It exempted one adjacency — a hard session the day before ME Lower — because `hard_cardio`
+  // emitted 36h and p246's own printed week is 24h apart, so the law was calling the source's week
+  // illegal and this file was papering over it. Michael overruled the 36 on 2026-08-26. At 24h the
+  // day-after clears exactly and no exemption is needed, which is what an exemption's absence
+  // should always mean: the law now agrees with the book instead of being argued around.
+  /**
+   * ⛔ CHECKED STRUCTURALLY, NOT BY MATCHING PROSE. A first draft asked whether any note contained
+   * the day AND a clearance word, and it graded the COPY rather than the wiring — a sentence that
+   * named the collision perfectly failed for not using the word "clear". What matters is that the
+   * break produced a conflict, and that the conflict's sentence reached the block.
+   */
+  const conflicts = weekConflicts({
+    sessions: ss, frame: 'strength_5k', column, dayOffset: built.dayMap.offset,
+  });
+  for (const u of unmetNeeds(view.placements)) {
+    const subjectDay = view.dayOfLabel.get(u.unit);
+    const blockerDay = view.dayOfLabel.get(u.blockedBy);
+    const where = subjectDay == null ? '?' : DAYS[subjectDay];
+    const covered = conflicts.some((c) =>
+      (subjectDay != null && c.days.includes(DAYS[subjectDay]))
+      || (blockerDay != null && c.days.includes(DAYS[blockerDay])));
+    if (covered) { tradeOffs.keystoneBreakWithNote++; continue; }
+    const athleteCaused = touchedLabels.has(u.unit) || touchedLabels.has(u.blockedBy);
+    fails.push(`week ${wk}: KEYSTONE break the ${athleteCaused ? 'ATHLETE asked for and NOTHING NAMES' : 'ENGINE placed'}`
+      + ` — ${u.unit} on ${where} needs ${u.system} clear; ${u.blockedBy} leaves it outstanding, `
+      + `${u.shortBy}h short`);
+  }
+  // ⛔ AND THE SENTENCE ACTUALLY REACHED THE BLOCK. A conflict computed and never surfaced is the
+  //    silent cost this whole pass exists to end.
+  for (const c of conflicts) {
+    if (!spoken.includes(c.text)) {
+      fails.push(`week ${wk}: a ${c.rule} conflict was found and the block never says it — "${c.text}"`);
+    }
+  }
+
+  // 8 ── p247's ONE COMPENSATED BREAK, AS A BICONDITIONAL.
+  //
+  // ⛔ THE ADJACENCY IS MEASURED ON THE CALENDAR, NOT ON THE FRAME, and that is the whole point.
+  // `sport-slots.ts` used to decide this from the FRAME's day-1 slot alone and never looked at a
+  // weekday — while `enduranceDayFor` can pin that hard run anywhere in the week. So the flag and
+  // the fact disagreed in both directions, and both directions were wrong:
+  //   · adjacency with the haircut OFF = p247's break, uncompensated (29 shapes).
+  //   · the haircut ON with no adjacency = a 3.5% reduction whose own on-screen sentence
+  //     ("the run the day before is still in the legs") describes a day that has no run on it
+  //     (6,688 shapes).
+  // ⛔ FIXED 2026-08-26: `compose.ts` now answers it off the placed calendar and the frame-level
+  // reader is deleted. This check stays, because it is what proves the two cannot drift apart again.
+  //
+  // ⛔ CHECKED ON THE BLOCK'S OWN SENTENCES, NOT ON AN INTERNAL FLAG. The first draft asked
+  // `assignSports` for the frame-level flag, which is the very reader the fix moved away from — so
+  // it went on reporting the old owner's answer after the composer had stopped using it. What
+  // the athlete can actually see is the pair of sentences `exerciseForSlot` writes, and those are
+  // what this asserts:
+  //   · the reduction engaged → p247's *"the run the day before is still in the legs"*.
+  //   · the reduction dropped → `HAIRCUT_CAUSE_IS_OURS`, our stated reading of his p280 reason.
+  // Exactly one of them is true of a block, and which one must match the calendar.
+  {
+    const meWeekday = meLowerWeekday;
+    if (meWeekday != null) {
+      const before = dayBeforeMeLower!;
+      const adjacency = hardRunTheDayBefore;
+      const saysReduced = spoken.some((t) => t.includes('three and a half per cent'));
+      const saysDropped = spoken.some((t) => t === HAIRCUT_CAUSE_IS_OURS);
+      if (adjacency && !saysReduced) {
+        fails.push(`week ${wk}: hard RUN on ${before}, ME Lower on ${meWeekday}, and the block never `
+          + `says the lower-body weights were reduced — p247's one compensated break, UNCOMPENSATED`);
+      }
+      if (!adjacency && !saysDropped) {
+        fails.push(`week ${wk}: no hard run on ${before} (ME Lower is ${meWeekday}) and the block `
+          + `never says the reduction was dropped — either it is reducing for a cause that is not `
+          + `there, or nothing explains the number`);
+      }
+      if (adjacency && saysDropped && !saysReduced) {
+        fails.push(`week ${wk}: a hard RUN sits on ${before} and the block claims the reduction was `
+          + `dropped because the hard work is on the bike — the sentence contradicts the calendar`);
+      }
+    }
+  }
+
+  return fails;
+}
 
 /** Returns a list of failures, empty when the case passes. Never throws for a normal failure. */
 function checkComposer(c: Case): string[] {
@@ -227,6 +576,9 @@ function checkComposer(c: Case): string[] {
       fails.push(`week ${wk}: ${liftDays.size} lift days, expected ${LIFT_DAY_COUNT} `
         + `[${[...liftDays].join(',')}]`);
     }
+
+    // 6-8 ── VIADA'S PLACEMENT LAWS. See `checkPlacementLaws` for the pages and the classifier.
+    for (const f of checkPlacementLaws(c, built, wk, ss)) fails.push(f);
   }
   return fails;
 }
@@ -357,7 +709,11 @@ function report(name: string, cases: Case[], check: (c: Case) => string[]): numb
   }
   console.log(`  ${name}: ${cases.length} combinations, ${total} failures in `
     + `${byClass.size} class(es), ${tradeOffs.liftOnBlockedWithNote} stated lift-on-day-off trade-offs`);
+  console.log(`    · stated trade-offs: hard-on-lower-with-note ${tradeOffs.hardOnLowerWithNote}, `
+    + `keystone-break-with-note ${tradeOffs.keystoneBreakWithNote}`);
   tradeOffs.liftOnBlockedWithNote = 0;
+  tradeOffs.hardOnLowerWithNote = 0;
+  tradeOffs.keystoneBreakWithNote = 0;
   for (const [k, v] of [...byClass.entries()].sort((a, b) => b[1].n - a[1].n)) {
     console.log(`    ✗ [${v.n}×] ${k}`);
     console.log(`        e.g. ${v.first}`);
@@ -474,6 +830,26 @@ Deno.test('FUZZ 4 — THE DEGENERATE EXTREMES, named one by one', () => {
     { runs: 3, rides: 2, swimDays: 0, swimEasy: 0, longDay: 'Saturday', hardDays: ['Tuesday', 'Thursday'], blocked: ['Saturday', 'Tuesday', 'Thursday'], taper: false },
     // taper week with everything at once
     { runs: 3, rides: 2, swimDays: 2, swimEasy: 2, longDay: 'Saturday', hardDays: ['Tuesday', 'Thursday'], blocked: ['Friday', 'Monday'], taper: true },
+    /**
+     * ⛔⛔ MICHAEL'S MAXED-OUT WIZARD BUILD, 2026-08-26 — THE SHAPE THAT PROMPTED THIS WHOLE PASS,
+     * AND HE TOUCHED NO DAY.
+     *
+     * Every add-on at once: run + ride mix, two hard sessions, the accessory bias on, the long ride
+     * on Saturday. The step-7 preview put **both** hard sessions on the two lower-body lifting days
+     * — Tue `Test: Lower` + Hard Ride, Fri `DE: Lower` + Hard Run — with Thursday's upper day
+     * carrying the easy run. p246 puts the hard endurance on days 1 and 3, WITH the upper day and on
+     * the plyo day, and prints no endurance at all on days 2 and 5.
+     *
+     * ⚠️ UNPINNED IS THE WHOLE POINT. He made no schedule adjustment, so criterion 6 must catch this
+     * as the ENGINE's placement rather than a stated trade-off. If it does not, the check is wrong
+     * before the engine is.
+     */
+    { runs: 3, rides: 2, swimDays: 0, swimEasy: 0, longDay: 'Saturday', hardDays: [null, null], blocked: [], taper: false },
+    /**
+     * ⛔ THE SAME WEEK WITH THE TWO HARD DAYS PINNED TO THE LOWER-BODY DAYS ON PURPOSE. p130: the
+     * athlete's choice wins, and the week has to SAY what it broke. Legal only with a note.
+     */
+    { runs: 3, rides: 2, swimDays: 0, swimEasy: 0, longDay: 'Saturday', hardDays: ['Tuesday', 'Friday'], blocked: [], taper: false },
   ];
   console.log('EXHAUSTIVE over: 12 named degenerate shapes');
   report('degenerate extremes', cases, checkComposer);
