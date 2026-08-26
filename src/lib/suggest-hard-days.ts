@@ -131,6 +131,21 @@ export type WeekInput = {
    */
   longRunPinned?: boolean;
   longRidePinned?: boolean;
+  /**
+   * ⛔⛔ WHICH SPORT THE FRAME'S ONE LONG SLOT IS (2026-08-26). `strength_5k` carries **one** long
+   * session; this model built BOTH a Long Run and a Long Ride whenever the athlete had any running
+   * and any riding at all, because `hasRun` / `hasRide` are satisfied by the volume alone.
+   *
+   * ⛔ AND THE PHANTOM ONE WROTE A FATIGUE WARNING ABOUT A SESSION THE PLAN NEVER BUILDS. Michael's
+   * screen, on a week whose long day is a RIDE: *"Deadlift is 24h short of clearance from a long
+   * effort — Long Run leaves the legs loaded until Wednesday."* There is no long run in that block.
+   * `long_run` emits `long_effort` and needs `heavy_legs` clear, so an invented one collides with a
+   * real lift and the athlete is told to move a session to clear a session that does not exist.
+   *
+   * ⚠️ OPTIONAL, so every caller that predates the Standing Plan is unchanged — a path with two
+   * genuine long days still gets two.
+   */
+  longSlotSport?: 'run' | 'ride' | 'swim' | null;
 };
 
 /**
@@ -188,8 +203,14 @@ export function buildWizardWeek(input: WeekInput): Unit[] {
     || !!input.longRunDay;
   const hasRide = Number(input.rideDays) > 0 || slots.some((h) => h.discipline === 'bike')
     || !!input.longRideDay;
-  long('lr', 'Long Run', 'run', input.longRunDay, hasRun);
-  long('lb', 'Long Ride', 'bike', input.longRideDay, hasRide);
+  /**
+   * ⛔⛔ ONE LONG SESSION WHEN THE FRAME HAS ONE — see `WeekInput.longSlotSport`. Without this the
+   * model builds both and the spare writes a clearance warning about a session nobody will train.
+   * ⚠️ ABSENT LEAVES THE OLD BEHAVIOUR EXACTLY, which is what every non-Standing-Plan caller wants.
+   */
+  const oneLong = input.longSlotSport === 'run' || input.longSlotSport === 'ride';
+  long('lr', 'Long Run', 'run', input.longRunDay, oneLong ? input.longSlotSport === 'run' : hasRun);
+  long('lb', 'Long Ride', 'bike', input.longRideDay, oneLong ? input.longSlotSport === 'ride' : hasRide);
 
   // ⚠️ THE `n <= 0` GUARD IS THIS FILE'S OWN AND STAYS. Zero here means *"the athlete has not
   // answered yet"* — the wizard's counts start at 0 and the card renders before anything is picked

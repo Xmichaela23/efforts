@@ -402,3 +402,60 @@ Deno.test('⛔ THE REST DAY BECOMES ACTIVE RECOVERY — his sentence, and the se
     assert(!DAY_NAMES.some((d) => line.text.includes(d)), `a weekday leaked in: ${line.text}`);
   }
 });
+
+
+Deno.test('⛔ THE HOURS SWEEP CROSSED WITH BLOCKED DAYS — the case that was missing', () => {
+  /**
+   * ⛔⛔ THE GAP THIS CLOSES. The hours sweep never set a blocked day and the 16,832-shape fuzz never
+   * set an hours target, so **the fill path and the blocked-day law had never met.** Michael blocked
+   * Sunday, saw a session on it, and the two suites between them said nothing — each was green about
+   * its own half.
+   *
+   * ⛔ CRITERION 2'S LAW APPLIES TO A FILL LIKE ANY OTHER SESSION: endurance on a blocked day is
+   * always a defect, because it is movable by definition (D-452, blocked beats everything).
+   * ⚠️ AND THE REST-DAY SENTENCE IS JUDGED ON THE PLACED WEEKDAY. It read the FRAME day, so a fill
+   * aimed at the rest day and then relocated off it — because the athlete had blocked that day —
+   * still fired: the week kept its day off and the block said it had lost it.
+   */
+  const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const SHAPES: Array<Record<string, string>> = [
+    ALL_RIDE,
+    ALL_RUN,
+    { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' },
+    { '1:0': 'ride', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' },
+  ];
+  let checked = 0;
+  for (const slots of SHAPES) {
+    for (const blockedStart of [0, 3, 5, 6]) {
+      for (const n of [1, 2, 3]) {
+        const blocked = Array.from({ length: n }, (_, i) => DAY_ORDER[(blockedStart + i) % 7]);
+        for (const hours of [1, 6, 11]) {
+          for (const sport of ['run', 'ride'] as const) {
+            if (!Object.values(slots).includes(sport)) continue;
+            const wk = composeWeek({
+              ...BASE, week: 2, column: 'standard',
+              sportMix: { runs: 4, rides: 0, swimDays: 0, slots } as never,
+              unavailableDays: blocked,
+              ...(sport === 'run' ? { targetRunHours: hours } : { targetRideHours: hours }),
+            } as never);
+            checked += 1;
+
+            // 1 ── NOTHING ENDURANCE-SHAPED SITS ON A DAY THE ATHLETE CANNOT TRAIN — fills included.
+            const onBlocked = wk.sessions.filter((x) =>
+              (x.type === 'run' || x.type === 'ride' || x.type === 'swim') && blocked.includes(x.day));
+            assertEquals(onBlocked.length, 0,
+              `${sport} ${hours}h, blocked ${blocked.join(',')} → ${onBlocked.map((x) => `${x.day}/${x.name}`).join(', ')}`);
+
+            // 2 ── THE REST-DAY SENTENCE MATCHES THE WEEK, BOTH WAYS.
+            const said = wk.notes.some((nt) => /becomes active recovery/.test(nt.text));
+            const restWeekday = DAY_ORDER[(6 + (0)) % 7];   // frame day 7 at offset 0
+            const restBusy = wk.sessions.some((x) => x.day === restWeekday);
+            assertEquals(said, restBusy,
+              `${sport} ${hours}h, blocked ${blocked.join(',')} → says "${said}", ${restWeekday} busy "${restBusy}"`);
+          }
+        }
+      }
+    }
+  }
+  assert(checked >= 80, `the sweep only reached ${checked} builds`);
+});

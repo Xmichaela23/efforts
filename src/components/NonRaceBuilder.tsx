@@ -2663,6 +2663,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       longRunDay: state.longRunDay,
       longRideDay: state.longRideDay,
       // ⛔ SAME RULE FOR THE TWO LONG SLOTS. A club long session is pinned by its nature (slice 2b).
+      /**
+       * ⛔ THE FRAME HAS ONE LONG SLOT AND THIS IS ITS SPORT — without it the health model builds a
+       * Long Run AND a Long Ride, and the spare writes a clearance warning about a session the plan
+       * never builds (Michael's screen, 2026-08-26).
+       */
+      longSlotSport,
       longRunPinned: !!state.longClub || !!touchedUnits.longRun,
       longRidePinned: !!state.longClub || !!touchedUnits.longRide,
       runDays: state.runDays,
@@ -3769,12 +3775,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     if (!state.longRunDay && !state.longRideDay) return;   // nothing to solve around yet
     const t = setTimeout(() => { void runPreview(); }, 400);
     return () => clearTimeout(t);
-    // ⚠️ `targetRunHours` IS IN THE DEPS (2026-08-26). The strength path's running ask moved to its
-    // own field; without it the preview would not rebuild when the athlete changed their hours,
-    // which is the one number this whole screen exists to move.
+    /**
+     * ⛔⛔ EVERY ANSWER THE PREVIEW IS BUILT FROM IS IN HERE, and the ones that were missing gave
+     * Michael a week that contradicted his own screen (2026-08-26).
+     *
+     * `unavailableDays` was absent, so **blocking a day never rebuilt the preview.** He blocked
+     * Sunday, the grid kept showing a session on it and "7 training days, 0 rest", and it read as
+     * the engine ignoring a day off — while the engine had simply never been asked again. The chip
+     * row owns its own `useState` rather than living on `NonRaceState`, which is exactly why it fell
+     * out of a list of `state.*` entries.
+     *
+     * ⚠️ `slotSports` AND `swimEasySessions` WERE MISSING FOR THE SAME REASON and are added here:
+     * changing a slot's sport or the swim count rebuilds the block, so it must rebuild the preview.
+     * ⛔ THE RULE: anything `payloadNow()` reads belongs in this array. A preview built from a
+     * stale answer is worse than no preview — it is a confident picture of a week nobody asked for.
+     */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
-      state.qualityDays, state.hardDays, state.targetMiles, state.targetRunHours, state.rideHours]);
+      state.qualityDays, state.hardDays, state.targetMiles, state.targetRunHours, state.rideHours,
+      unavailableDays, state.slotSports, state.swimEasySessions]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:

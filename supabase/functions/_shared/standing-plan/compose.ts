@@ -1596,6 +1596,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   {
     const restFrameDay = days.find((d) => d.rest)?.day ?? null;
+    /** ⛔ The weekday the frame's rest day actually lands on under this block's rotation. */
+    const restWeekday = restFrameDay == null ? null : dayNameFor(args, restFrameDay);
     const clearDays = days
       .filter((d) => !d.rest && d.endurance.length === 0)
       .map((d) => d.day);
@@ -1616,8 +1618,6 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           dayNameFor(args, frameDay),
           sport === 'run' ? 'the extra easy run' : 'the extra easy ride',
         );
-        const takesRestDay = restFrameDay != null && frameDay === restFrameDay;
-        if (takesRestDay) spentRestDay = true;
         fillsPlaced += 1;
         /**
          * ⛔ THE REST-DAY SESSION IS TAGGED AS ACTIVE RECOVERY (Michael, 2026-08-26), and the tag is
@@ -1628,6 +1628,15 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * every surface that renders a week, and it is flagged as follow-up rather than smuggled in
          * here; the tag is what a surface will read when that lands.
          */
+        /**
+         * ⛔⛔ THE REST DAY IS JUDGED ON THE PLACED WEEKDAY, NOT THE FRAME DAY (fixed 2026-08-26).
+         * It read the frame day, so a fill aimed at the rest day and then RELOCATED off it — because
+         * the athlete had blocked that day — still stamped the session and still fired the sentence.
+         * The week kept its day off and the block said it had lost it: 702 shapes in the sweep.
+         * ⚠️ The weekday the relocator returned is the only honest subject here.
+         */
+        const takesRestDay = restWeekday != null && day === restWeekday;
+        if (takesRestDay) spentRestDay = true;
         sessions.push({
           day,
           ...row,
