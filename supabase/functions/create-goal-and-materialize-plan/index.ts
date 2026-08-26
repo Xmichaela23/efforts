@@ -3203,6 +3203,26 @@ Deno.serve(async (req: Request) => {
       }
       const triDurationWeeks = Math.max(triFloorWeeks, Math.min(weeksOutTri, 32));
 
+      // ⛔ A PREVIEW MUST NOT WRITE — THE TRI PATH'S COPY, CLOSED (2026-08-26). The run-event
+      // fix's own comment flagged this hole and left it "for the slice that owns the tri path":
+      // the `mode === 'create'` insert below had no `bodyPreview` guard, so previewing a tri goal
+      // created a real active goal and built a real plan. Neither the standalone tri generator nor
+      // this branch has a no-persist mode, so a tri preview is REFUSED outright rather than
+      // half-run — generating and persisting under a preview flag is the exact failure the run
+      // path had. When a tri intake ships (the generator is the future tri builder), preview
+      // support gets designed with it; until then no client fires preview on this path.
+      if (bodyPreview) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            preview: true,
+            sport: 'triathlon',
+            error_code: 'preview_not_supported',
+            error: 'Preview is not available for triathlon plans yet — building writes the plan.',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
       if (mode === 'create') {
         const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
         const { data: createdGoal, error: goalInsertErr } = await supabase
@@ -3810,9 +3830,9 @@ Deno.serve(async (req: Request) => {
     // the link/activate/retire block — see the two changes further down, and the (b)-run branch at
     // `:2721`/`:2774`, which is the shape being copied.
     //
-    // ⚠️ THE TRIATHLON EVENT PATH AT `:2842` STILL HAS THIS HOLE. Same `if (mode === 'create')`,
-    // same missing guard, and it is unreachable from the marathon intake so it is left for the
-    // slice that owns the tri path. Do not assume it was fixed here.
+    // ✅ THE TRIATHLON EVENT PATH'S COPY IS CLOSED (2026-08-26): its branch now refuses
+    // `bodyPreview` outright before the goal insert — no no-persist mode exists there, so refusal
+    // beats a half-run. See the guard above that path's `mode === 'create'` insert.
     if (mode === 'create' && !bodyPreview) {
       const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
       const { data: createdGoal, error: goalInsertErr } = await supabase

@@ -170,6 +170,7 @@ interface LoggedExercise {
    *  estimate to make a decision. Absent/true → every existing protocol behaves exactly as before. */
   rir_tracked?: boolean;
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
+  slot_intent?: string; // Standing-plan slot intent as data ('ME'|'DE'|'SKILL'|'HYP'), 2026-08-26
   // D-322: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
   // straight off `computed.steps[].strength.percent_1rm`. Its one job is to let a SWAP derive
   // the substitute's weight at the intensity the block actually intended, instead of
@@ -2275,6 +2276,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
             planned_percent_1rm: plannedPct, // D-322: authored intensity, for the swap seed
             planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
+            // The composer's slot intent, as data (2026-08-26). New rows carry it; rows
+            // materialized before then fall back to the notes regex in the cue detection.
+            slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
             // ⛔ IS THIS ROW ONE OF THE BLOCK'S ASSISTANCE SLOTS? The composer marks them
             // `load_prescribed: false` — assistance in 5/3/1 is never priced off a percentage
             // ("the engine prescribes NO weight for assistance work. Ever."). Carried through so the
@@ -5456,15 +5460,51 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // on it — but on a standing session that row is a speed slot with no load, and
                   // the Wendler line names neither the intent nor the weight. Priced rows
                   // (load_prescribed ≠ false — the tested lifts) keep the bar-speed cue untouched.
-                  const standingSlotText = Array.isArray(scheduledWorkout?.tags)
+                  // Intent comes from `slot_intent` (data, 2026-08-26) with the notes regex as the
+                  // legacy fallback — rows materialized before the field existed still carry the
+                  // slot notation in `notes`.
+                  const standingEligible = Array.isArray(scheduledWorkout?.tags)
                     && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
-                    && exercise?.load_prescribed === false
-                    ? String(exercise?.notes || '') : '';
-                  const standingCue = /\bME\b/.test(standingSlotText)
+                    && exercise?.load_prescribed === false;
+                  const standingSlotText = standingEligible ? String(exercise?.notes || '') : '';
+                  const slotIntent = standingEligible
+                    ? ((exercise as any)?.slot_intent
+                        ?? (/\bME\b/.test(standingSlotText) ? 'ME' : /\bDE\b/.test(standingSlotText) ? 'DE' : null))
+                    : null;
+                  const standingCue = slotIntent === 'ME'
                     ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'))
-                    : /\bDE\b/.test(standingSlotText)
+                    : slotIntent === 'DE'
                       ? STANDING_DE_SET_CUE(String(exercise?.target_reps || '2-4'))
                       : null;
+                  /**
+                   * ⛔ THE ADVANCE NUDGE — the app DETECTING the double-progression trigger instead
+                   * of only stating it (Michael, 2026-08-25: "should their weightload get easier
+                   * they should know they can add"). Pure arithmetic over what the previous-session
+                   * fetch already holds (per-set reps + RIR); no server call, no LLM.
+                   *
+                   * Fires only when ALL of: the row is auto-regulated with a rep BAND; last
+                   * session's every set is at or above the band top; and no set was at zero
+                   * reserve (a ground-out top is not "room to spare"). The wording splits on
+                   * whether reserve was actually logged — the line never claims a reserve the
+                   * athlete did not report.
+                   * ⚠️ DE ROWS ARE EXCLUDED: speed work advances on bar speed (its own cue says
+                   * so), not on reaching the band top.
+                   */
+                  const advanceNudge = (() => {
+                    const m = String(exercise?.target_reps ?? '').match(/^(\d+)\s*[-–]\s*(\d+)$/);
+                    if (!m || exercise?.load_prescribed !== false) return null;
+                    if (slotIntent === 'DE' || /\bDE\b/.test(String(exercise?.notes || ''))) return null;
+                    const hi = parseInt(m[2], 10);
+                    const prior = previousSessionByName[normalizeExerciseName(exercise.name)];
+                    if (!Array.isArray(prior) || prior.length === 0) return null;
+                    if (!prior.every((s) => typeof s.reps === 'number' && s.reps >= hi)) return null;
+                    if (prior.some((s) => s.rir === 0)) return null;
+                    const reps = prior.map((s) => s.reps).join(' · ');
+                    const reserveLogged = prior.every((s) => typeof s.rir === 'number' && s.rir >= 1);
+                    return reserveLogged
+                      ? `Last time: ${reps} — top of the band with room to spare. Add weight.`
+                      : `Last time: ${reps} — top of the band. If it felt easy, add weight.`;
+                  })();
 
                   // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in 5/3/1 is a
                   // total to reach across as many sets as you need, so the live number is "how many
@@ -5482,6 +5522,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {(standingCue || titleCue) && (
                         <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-strength/75 leading-snug">
                           {standingCue ?? titleCue}
+                        </div>
+                      )}
+                      {/* The detected advance trigger — a fact about last session, dimmer than the
+                          rule above it. Renders independently of the cues: an old-plan band row
+                          with no standing cue still earns it. */}
+                      {advanceNudge && (
+                        <div className="px-1.5 pb-2 text-[11px] text-white/55 leading-snug">
+                          {advanceNudge}
                         </div>
                       )}
                       {/* Rep-total countdown (option A) — a prominent number + progress bar, its own

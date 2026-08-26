@@ -109,6 +109,17 @@ export type StrengthExercise = {
   percent_1rm?: number;
   load_prescribed?: boolean;
   notes?: string;
+  /**
+   * ⛔ THE SLOT'S INTENT AS A FIELD, NOT PROSE (2026-08-26, Michael: "these take up a lot of
+   * space dont use the abbreviations"). The book's slot notation ("1 x ME: Accessory: primary
+   * pull") used to travel in `notes` — jargon in the athlete-notes box, and the logger's ME/DE
+   * cue detection had to regex it back out. The intent now travels as data; the verbatim p246
+   * row moves to `source_row` (provenance, never rendered).
+   */
+  slot_intent?: 'ME' | 'DE' | 'SKILL' | 'HYP';
+  /** The p246 table row verbatim (pattern-swapped on even weeks) — the deterministic record of
+   *  which book cell authored this row. Display surfaces must not render it. */
+  source_row?: string;
   /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
   target_rir?: number;
   set_plan?: PlannedSet[];
@@ -915,7 +926,8 @@ function exerciseForSlot(
         weight: 'By feel',
         load_prescribed: false,
         ...(targetRir != null ? { target_rir: targetRir } : {}),
-        notes: noteForWeek(slot, args.week),
+        slot_intent: slot.intent,
+        source_row: noteForWeek(slot, args.week),
       },
       movement,
       sets,
@@ -960,7 +972,8 @@ function exerciseForSlot(
         weight,
         reps: p.kind === 'barbell' ? p.reps.hi : 1,
       })),
-      notes: noteForWeek(slot, args.week),
+      slot_intent: slot.intent,
+      source_row: noteForWeek(slot, args.week),
     },
     movement,
     sets,

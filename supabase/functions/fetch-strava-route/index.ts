@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { authenticatedSubFromBearer } from '../_shared/bearer-auth.ts';
+import { AuthError, requireUser } from '../_shared/require-user.ts';
 import { ensureStravaAccessToken } from '../_shared/strava-access-token.ts';
 import {
   normalizeHttpsUrlMax512,
@@ -26,10 +26,11 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ success: false, error: 'Method not allowed' }, 405);
 
   try {
-    const userId = authenticatedSubFromBearer(req);
-    if (!userId) {
-      return json({ success: false, error: 'Sign in required (Authorization: Bearer …).' }, 401);
-    }
+    // ⛔ SIGNATURE-VERIFIED, NOT DECODED (2026-08-26). This read `authenticatedSubFromBearer` —
+    // `bearer-auth.ts`, which atob'd the JWT and TRUSTED an attacker-supplied `sub` without
+    // checking the signature. That helper is deleted; `requireUser` verifies the token
+    // server-side (the B1 boundary). Throws AuthError → 401 below.
+    const { userId } = await requireUser(req);
 
     const body = (await req.json().catch(() => ({}))) as { route_url?: unknown };
     const route_url = typeof body.route_url === 'string' ? body.route_url : '';
@@ -92,6 +93,9 @@ Deno.serve(async (req: Request) => {
     };
     return json(out);
   } catch (e) {
+    if (e instanceof AuthError) {
+      return json({ success: false, error: 'Sign in required (Authorization: Bearer …).' }, 401);
+    }
     console.error('[fetch-strava-route]', e);
     return json({ success: false, error: String(e) }, 500);
   }

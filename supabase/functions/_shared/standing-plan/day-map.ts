@@ -403,16 +403,26 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
         : `This plan's week has no long run to place on ${longPin}.`,
     });
   }
-  for (const p of hardPins) {
-    const landed = anchors.hard.some((d) => weekdayForFrameDay(d, chosen.offset) === p);
-    if (landed) continue;
-    if (lostToADayOff((c) =>
-      anchors.hard.some((d) => weekdayForFrameDay(d, c.offset) === p))) continue;
+  /**
+   * ⛔ ONE SENTENCE FOR EVERY MISSED HARD PIN, NOT ONE PARAGRAPH EACH (Michael, 2026-08-26, on the
+   * confirm screen: "I wanna get rid of this ai slop"). Two missed picks used to print two
+   * near-identical paragraphs — same landed days, same mechanism, restated per pin. The cost is
+   * still stated (that ruling stands); it is stated ONCE, in one line.
+   */
+  const missedHardPins = hardPins.filter((p) => {
+    if (anchors.hard.some((d) => weekdayForFrameDay(d, chosen.offset) === p)) return false;
+    return !lostToADayOff((c) =>
+      anchors.hard.some((d) => weekdayForFrameDay(d, c.offset) === p));
+  });
+  if (missedHardPins.length > 0) {
+    const say = (xs: string[]) =>
+      xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
     const actual = anchors.hard.map((d) => weekdayForFrameDay(d, chosen.offset));
     compromises.push({
       kind: 'cost',
-      text: `The hard session is on ${actual.join(' and ')} rather than ${p}. The week's order is `
-        + `fixed and the long day is placed first, so ${p} could not also be reached.`,
+      text: `The hard ${actual.length === 1 ? 'session is' : 'sessions are'} on ${say(actual)} `
+        + `rather than ${say(missedHardPins)} — the week's order is fixed, and the long day `
+        + 'places first.',
     });
   }
   /**

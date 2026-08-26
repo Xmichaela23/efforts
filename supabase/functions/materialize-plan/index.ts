@@ -2403,6 +2403,11 @@ function expandTokensForRow(
             // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader
             // that treats absent as assistance would turn every main lift into one.
             ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}),
+            // ⛔ AND CARRY THE SLOT INTENT (2026-08-26) — the same whitelist, the fourth time. The
+            // composer stopped writing its slot notation into `notes` (jargon in the athlete-notes
+            // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
+            // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
+            ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
             // ⛔ AND CARRY THE SUGGESTION (2026-08-09, D-406) — SAME WHITELIST, SAME TRAP. This is the
             // second field the composer authors for assistance rows, and it dies here exactly as
             // `load_prescribed` did for four days unless it is listed. It is NOT a prescribed load:
@@ -2716,6 +2721,11 @@ function expandTokensForRow(
             // ⚠️ Only ever `false` or absent — never `true`. Absent means "not stated", and a reader
             // that treats absent as assistance would turn every main lift into one.
             ...(((ex as any)?.load_prescribed === false) ? { load_prescribed: false } : {}),
+            // ⛔ AND CARRY THE SLOT INTENT (2026-08-26) — the same whitelist, the fourth time. The
+            // composer stopped writing its slot notation into `notes` (jargon in the athlete-notes
+            // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
+            // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
+            ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
             // ⛔ AND CARRY THE SUGGESTION (2026-08-09, D-406) — SAME WHITELIST, SAME TRAP. This is the
             // second field the composer authors for assistance rows, and it dies here exactly as
             // `load_prescribed` did for four days unless it is listed. It is NOT a prescribed load:

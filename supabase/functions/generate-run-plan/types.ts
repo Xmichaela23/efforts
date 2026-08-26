@@ -411,6 +411,11 @@ export interface VolumeParameters {
   weeklyIncrease: number;
 }
 
+// ⛔ MARKED FOR DELETION (STATE-race-builder §2.6, marked 2026-08-26) — Michael: "once wired,
+// redundancies I'd like marked for deletion." This table LOOKS canonical and IS NOT: the live
+// generator reads its own WEEKLY_MILEAGE. The 2026-08-05 audit nearly moved the wrong one. Its
+// only remaining readers are `base-generator.ts:241/:252` — verify those paths are dead before
+// deleting, and delete the accessors with it.
 export const FITNESS_TO_VOLUME: Record<string, Record<string, VolumeParameters>> = {
   'marathon': {
     'beginner': { startWeekly: 15, peakWeekly: 35, longRunCap: 18, weeklyIncrease: 1.5 },

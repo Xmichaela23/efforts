@@ -24,7 +24,9 @@ The logger's save-time fill did not visibly fire on his Mon/Tue test saves. Depl
 
 ## QUEUED — STEP 8 CONFIRM SCREEN (Michael, 2026-08-25, "when we get to it")
 
-- [ ] **Color-code the workouts by sport** on the step 8 week list (same sport colors as the
+- [~] **FIXED IN WORKING TREE 2026-08-26** (client only, not device-seen): `WeekGrid` colors each
+      session name by sport via `getDisciplineColor`, same palette + same plyo-by-tag / ride→bike
+      mappings as the master strip. Original ask: **Color-code the workouts by sport** on the step 8 week list (same sport colors as the
       master strip). Nothing is missing from the list — the sessions are all there, they just
       read as a wall of same-colored text (Michael corrected the earlier "missing sessions" read).
 
@@ -98,9 +100,13 @@ D-450), not a bug. The day is on the plan one screen later.
       athlete-notes box with the composer's internal slot text ("1 x ME: Accessory: primary pull")
       — a three-row jargon box under every card. FIXED IN WORKING TREE, client only: the box
       renders only for athlete-written notes (slot-pattern text suppresses it; any athlete edit
-      brings it back). Data kept — the ME/DE cue detection reads it. ⚠️ Residue for a later pass:
-      the slot text still persists into the logged workout's notes on save, and the cleaner fix is
-      the composer not writing sourceText into `notes` at all (server change + redeploy).
+      brings it back). Data kept — the ME/DE cue detection reads it.
+      ✅ **The server half is DONE 2026-08-26 (working tree; needs deploy):** the composer now
+      writes `slot_intent` (data) + `source_row` (p246 provenance, never rendered) and no longer
+      puts sourceText into `notes`; `materialize-plan` carries `slot_intent` through both
+      whitelists; the logger's cue detection reads `slot_intent` first with the notes regex as the
+      legacy fallback (Michael's live rows keep the old shape until a restate). Standing-plan
+      suite 259/0 incl. fuzz; two pins updated to the field.
 - [ ] **"Rest of plan" swaps on a standing block — WORK BY CONSTRUCTION, one device check owed**
       (2026-08-25, Michael: "swap used to let you make it permanent for the block — does it
       still?"). ⚠️ The first version of this entry claimed the standing pipeline was blind to swaps
@@ -116,7 +122,13 @@ D-450), not a bug. The day is on the plan one screen later.
       **Owed: one device pass** — swap an accessory "Rest of plan" on the standing block, confirm a
       future week's logger shows the substitute, then (after the next re-test apply) confirm it
       survived. "Just today" swaps were never in question.
-- [ ] **The advance nudge — the app detecting the trigger instead of only stating it** (designed
+- [~] **BUILT IN WORKING TREE 2026-08-26** (client only, not device-seen): the logger now detects
+      the trigger from the previous-session fetch (per-set reps + RIR were already there — a render
+      job, as the trace note below suspected) and prints "Last time: 12 · 12 · 12 — top of the band
+      with room to spare. Add weight." under the cue. Fires only on auto-regulated band rows, all
+      sets at band top, no zero-reserve set; DE rows excluded (they advance on bar speed). The
+      wording claims logged reserve only when it was logged.
+      Original design note — **The advance nudge — the app detecting the trigger instead of only stating it** (designed
       2026-08-25, not built). "Top of the rep band at target RIR on every set" is computable from
       what the logger already stores (per-set reps + RIR); surfaced on the NEXT session's row as a
       one-line fact ("Last time: 12/12/12 with reps to spare — add weight"), it makes the
@@ -253,20 +265,22 @@ never superseded, so these ride the same Focus → Race → Marathon pass:
       inside the long run's 48 h to buy flat its space (0 breaches across a 24-shape sweep) — this is
       confirming the scored preference behaves in a real plan.
 
-Lifted from the archived 2026-08-06 strength-rebuild block — and now ANSWERED:
-- [ ] 🔴 **[Q-261] — CONFIRMED BROKEN ON DEVICE (Michael, 2026-08-25): the hill descents export as
-      1-SECOND RESTS**, the exact failure signature the 2026-08-06 entry predicted. Traced 2026-08-25,
-      partial: the main export path in `send-workout-to-garmin` IS guarded (`index.ts:679` catches
-      `lap_button`, `:825`/`:921` catch `lapButton` → `durationType: 'OPEN'`). Two live suspects,
-      unresolved: (a) the export fell to a FALLBACK intervals path — the `kind === 'rest'` branch at
-      `index.ts:795-808` has NO lap-button check and coerces a missing duration to
-      `Math.max(1, …) = 1s`; (b) his 2026-08-24 block was built by the STANDING-PLAN pipeline
-      (`rematerialize-standing-block` / `standing-plan/compose`), which may not attach `lap_button`
-      to descent steps at all — the rlap expander verified present is `materialize-plan/index.ts:1769`,
-      a different pipeline. **Next step: read the stored steps JSON of the planned hill session**
-      (does it carry `lap_button: true`?) — that one read decides (a) vs (b). Fix ends in a deploy.
-      (Known and unfixed alongside it: the planned duration excludes the open descents, so the
-      calendar under-reads ~32 min for ~40 — [Q-259].)
+Lifted from the archived 2026-08-06 strength-rebuild block — DIAGNOSED 2026-08-26, one re-send closes it:
+- [ ] 🟡 **[Q-261] — the 1-second rests were most likely the OLD block's stale data, not a live
+      defect.** Michael saw 1s rests on device 2026-08-25; the full chain was then verified: (1) the
+      current block's stored steps are CORRECT (Hard Run recoveries `seconds: 120`, Hard Ride 240 —
+      read from prod 2026-08-26); (2) the deployed `send-workout-to-garmin` (v105, 2026-08-06
+      08:35 UTC) is byte-current with main — deployed the same minute as commit `a5a1f19d` — and its
+      rest branch reads `seconds` (fallback present since 2025-09); (3) so current data through
+      deployed code produces real rests. The failing session was almost certainly the PRE-08-06
+      block's hill workout, whose descents were expanded before durations/`lap_button` existed —
+      no duration stored → `Math.max(1, …) = 1s`. That block was deleted 2026-08-24.
+      **CLOSES on one device pass: send the 2026-08-28 "Hard Run" to the watch — rests should read
+      2:00.** If 1s persists on THAT session, it is a live repro against clean data — instrument the
+      export. ⚠️ The current standing plan has NO open-descent hill session (its vocabulary is
+      fixed-rest intervals), so the lap-button path itself now has no live producer.
+      (Still true alongside: [Q-259] — the old hill token's planned duration excluded its open
+      descents; moot unless that token gets a producer again.)
 
 ---
 
@@ -279,11 +293,11 @@ Full record, incl. everything that shipped: [`STATE-race-builder-2026-08-05.md`]
 |---|---|---|
 | ~~1~~ | ~~**The intake screen has grown by accretion.**~~ ✅ **CLOSED 2026-08-05 — Michael: *"keep as is."*** Reviewed on device and kept: strength picker stays on "Your week", club-intensity stays under the club picker. ⛔ **Not a backlog item — a decision. Do not "tidy" it later.** | — |
 | 2 | **The solver collapse** — `week-solver.ts` still has not taken the run generators (`SPEC-week-solver` §7). `assign-days.ts` is a narrow stopgap that overrode a written "do not patch this". | large |
-| 3 | **Two doors to a marathon plan** — route `run` out of `renderEventForm` (`GoalsScreen.tsx:2433`); the form keeps ride/swim/tri. | small |
+| ~~3~~ | ~~**Two doors to a marathon plan**~~ ✅ **ALREADY DONE — verified 2026-08-26:** run left `renderEventForm` on 2026-08-06 ("Run leaves by the door" comment; sport select has no Run; a router card sends to the race builder). Stale row. | — |
 | 4 | **Bike/swim cannot be opted into a marathon plan** — the hold cards move *after* the preview, and no post-preview surface exists. | medium |
 | 5 | **"Marathon" → "Run race"** (half/10k/5k). Engine is already multi-distance; needs per-distance `TIER_SEEDS` + distance-neutral tier copy first. | medium |
-| 6 | **Mark redundancies for deletion** — Michael asked for this explicitly. Six named in §2.6 of the state doc, incl. two duplicates that are numerically identical *today* only. | small |
-| 7 | **The tri event path has the same unguarded-insert hole** the race path had (`create-goal…:2842`) — preview still writes. | small |
+| ~~6~~ | ~~**Mark redundancies for deletion**~~ ✅ **MARKED 2026-08-26:** deletion banners on `FITNESS_TO_VOLUME` (types.ts), `distributeVolume` (base-generator, zero callers), and the VDOT duplicate tables (GoalsScreen). Of the other three: the third `LONG_RUN_PROGRESSION` died with `simple-completion.ts`; `schedule_preferences` already carries do-not-add-readers; the dead `hardday` step is now LIVE-adjacent (the 2026-08-24 endurance-week screen replaced it on the strength path only) — not marked. | — |
+| ~~7~~ | ~~**The tri event path unguarded-insert hole**~~ ✅ **CLOSED 2026-08-26 (working tree; needs deploy):** the tri branch refuses `bodyPreview` outright before its goal insert (no no-persist mode exists there, so refusal beats a half-run); the run path's stale "still has this hole" comment back-annotated. | — |
 | 8 | **Delete the stray `Efforts_Summer` Supabase secret.** | trivial |
 
 ⚠️ **Nothing from 2026-08-05 is device-verified.** Code, tests and typecheck only.
@@ -570,8 +584,11 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 
 # 2. SECURITY — pre-launch, not burning, but real
 
-- [ ] **🔴 DELETE `strava-refresh`.** Zero callers, **deployed**, **no auth check**: takes `userId` from the request body and **returns that user's Strava access token** (`strava-refresh/index.ts:17`, `:93`). The anon key that reaches it is public and sits in your JS bundle. Live refresh already lives in `_shared/strava-access-token.ts`. **Delete, don't document.**
-- [ ] **`_shared/bearer-auth.ts:17` decodes JWTs WITHOUT verifying the signature** (`atob` + `JSON.parse`, trusts an attacker-supplied `sub`). A second, unsafe auth idiom next to the good one. Delete it; adopt `require-user`.
+- [~] **🔴 DELETE `strava-refresh`** — **repo directory DELETED 2026-08-26; the DEPLOYED function
+      still needs `supabase functions delete strava-refresh` (prod action, Michael's go).** Zero callers, **deployed**, **no auth check**: takes `userId` from the request body and **returns that user's Strava access token** (`strava-refresh/index.ts:17`, `:93`). The anon key that reaches it is public and sits in your JS bundle. Live refresh already lives in `_shared/strava-access-token.ts`. **Delete, don't document.**
+- [x] ✅ **DONE 2026-08-26 (working tree; needs `fetch-strava-route` redeploy).** `bearer-auth.ts`
+      DELETED; its one importer, `fetch-strava-route`, now uses `requireUser` (signature-verified,
+      AuthError → 401). `deno check` clean on the changed file.
 - [ ] **B1 — `require-user` adoption is 9 of 87.** 77 of 87 functions instantiate a service-role (RLS-bypassing) client. Sensitive functions taking identity from the **body** rather than a verified JWT: `strava-token-exchange`, `strava-webhook-manager`, `import-strava-history`, `send-workout-to-garmin`, `import-garmin-history`, `swift-task`. *(`strava-webhook-manager` is called with the anon key as bearer, so it carries no identity **by construction** — it cannot adopt `require-user` without a client change.)*
 - [ ] **Admin functions have no server-side admin check.** The 8 edge functions `WorkloadAdmin.tsx` invokes are gated **client-side only**. `is_app_admin()` exists in SQL and guards only `library_plans` INSERT.
 - [ ] **`disconect-connection` (misspelled) is a REAL deployed function with NO SOURCE in the repo**, kept as a permanent fallback branch at `Connections.tsx:495`. Unknown behaviour. Find it, delete it, remove the branch.

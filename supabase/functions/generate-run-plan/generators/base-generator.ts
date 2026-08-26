@@ -746,6 +746,9 @@ export abstract class BaseGenerator {
 
   /**
    * Distribute weekly volume across sessions
+   *
+   * ⛔ MARKED FOR DELETION (STATE-race-builder §2.6, marked 2026-08-26) — zero callers anywhere
+   * in the repo (verified by grep, 2026-08-26). Delete on the next generator pass.
    */
   protected distributeVolume(
     weeklyVolume: number,

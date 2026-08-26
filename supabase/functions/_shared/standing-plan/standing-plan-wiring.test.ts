@@ -295,9 +295,11 @@ Deno.test('his reps-in-reserve reaches the row, and the ME slot is left without 
   const working = { bench: workingNumberFromTest('bench', { weight: 185, reps: 5 })! };
   const wk = composeBlock({ ...ROW_ARGS.compose, workingNumbers: working, weeks: 2, taperWeeks: [] })[1];
   const day1 = wk.sessions.find((s) => s.day === 'Monday' && s.type === 'strength')!;
-  const me = day1.strength_exercises!.find((e) => e.notes?.startsWith('1 x ME'))!;
-  const de = day1.strength_exercises!.find((e) => e.notes?.startsWith('1 x DE'))!;
-  const hyp = day1.strength_exercises!.find((e) => e.notes?.startsWith('1 x HYP'))!;
+  // 2026-08-26: the slot notation left `notes` (jargon on the athlete-notes box); the intent is
+  // now the `slot_intent` field and the verbatim p246 row lives in `source_row`.
+  const me = day1.strength_exercises!.find((e) => e.slot_intent === 'ME')!;
+  const de = day1.strength_exercises!.find((e) => e.slot_intent === 'DE')!;
+  const hyp = day1.strength_exercises!.find((e) => e.slot_intent === 'HYP')!;
   // ⛔ p218 says "no RIR target" for ME in as many words.
   assertEquals(me.target_rir, undefined);
   assertEquals(de.target_rir, 3.5);   // his 3-4

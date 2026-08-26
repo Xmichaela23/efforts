@@ -27,6 +27,8 @@
  */
 import React from 'react';
 
+import { getDisciplineColor } from '@/lib/context-utils';
+import { isPlyoSession } from '@/lib/utils';
 import { WEEK_DAYS as ORDER, isEnduranceSession, type WeekSession } from '@/lib/week-budget';
 
 export type WeekGridSession = WeekSession;
@@ -159,6 +161,16 @@ export default function WeekGrid({
             const mins = Number(s.duration) || 0;
             return mins > 0 ? `${name} ${fmtMins(mins)}` : name;
           };
+          /**
+           * ⛔ THE SESSIONS WEAR THEIR SPORT'S COLOUR (Michael, 2026-08-25, step-8 queue item:
+           * "color-code the workouts by sport … they just read as a wall of same-colored text").
+           * Same palette as the master strip above — `SPORT_COLORS` via `getDisciplineColor`,
+           * with the strip's own two mappings copied exactly: plyo by TAG (it is `type: 'strength'`
+           * and must not wear lifting's orange), and `ride` → `bike` for the palette key. If the
+           * strip and this list ever disagree on a colour, one of those mappings drifted.
+           */
+          const colorOf = (s: WeekGridSession) =>
+            getDisciplineColor(isPlyoSession(s as { tags?: unknown }) ? 'plyo' : (s.type === 'ride' ? 'bike' : s.type));
           const ordered = [...(lift ? [lift] : []), ...endur];
           return (
             /**
@@ -176,8 +188,15 @@ export default function WeekGrid({
                 {ordered.length === 0 ? (
                   <span className="text-white/40">—</span>
                 ) : (
-                  <span className={lift ? 'text-white/90' : 'text-white/80'}>
-                    {ordered.map(label).join('  ·  ')}
+                  /* One span per session so each carries its own sport colour; the separator stays
+                     neutral so the row still reads as one line, not a legend. */
+                  <span>
+                    {ordered.map((s, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && <span className="text-white/40">{'  ·  '}</span>}
+                        <span style={{ color: colorOf(s) }}>{label(s)}</span>
+                      </React.Fragment>
+                    ))}
                   </span>
                 )}
                 {/* ⚠️ THE SWAPS ARE THE PART THE ATHLETE CANNOT PREDICT, and at `white/35` they were

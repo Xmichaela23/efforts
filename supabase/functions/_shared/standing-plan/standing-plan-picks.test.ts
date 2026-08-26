@@ -59,10 +59,12 @@ Deno.test('a pick that fits a hypertrophy slot fills it, in the athlete\'s own s
   assertEquals(mine.length, 1, 'the pick landed zero times or more than once');
   // ⚠️ THEIR CASING, NOT THE CATALOGUE'S. The catalogue key is `bulgarian split squat`; printing that
   // back reads as the app having ignored the choice and found something similar.
-  assert(!rows(wk).some((e) => e.name === 'bulgarian split squat' && e.notes?.includes('HYP')),
+  // 2026-08-26: the slot notation moved out of `notes` into `slot_intent` (data) + `source_row`
+  // (provenance) — same assertions, read off the fields.
+  assert(!rows(wk).some((e) => e.name === 'bulgarian split squat' && e.slot_intent === 'HYP'),
     'the catalogue spelling was printed over the athlete\'s');
   // ⛔ AND IT IS A HYP SLOT. ME and DE carry the frame's own prescriptions.
-  assert(/HYP/.test(String(mine[0].notes ?? '')), 'a pick took a slot that is not the athlete\'s to fill');
+  assertEquals(mine[0].slot_intent, 'HYP', 'a pick took a slot that is not the athlete\'s to fill');
 });
 
 Deno.test('⛔ A PICK IS NEVER PRESCRIBED TWICE IN ONE WEEK', () => {

@@ -1130,6 +1130,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   // --- Quick Calibration (two-pace baseline) ---
 
+  // ⛔ MARKED FOR DELETION (STATE-race-builder §2.6, marked 2026-08-26): `PACE_BY_VDOT` below is a
+  // byte-for-byte duplicate of `PACE_TABLE` in `effort-score.ts` — numerically identical TODAY, a
+  // coincidence that will not survive an edit to one. The deletion is "import the one table", not
+  // a copy tweak. `VDOT_5K` has live readers in this function; it goes only if the whole
+  // calibration block moves onto the shared table.
   const VDOT_5K: [number, number][] = [
     [30,1860],[31,1800],[32,1740],[33,1686],[34,1632],[35,1584],[36,1536],[37,1488],
     [38,1446],[39,1404],[40,1362],[41,1326],[42,1290],[43,1254],[44,1222],[45,1188],
