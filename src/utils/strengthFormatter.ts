@@ -33,7 +33,26 @@ export function formatStrengthExercise(
   }
   
   if (exercise?.notes) parts.push(`(${exercise.notes})`);
-  
+
+  /**
+   * ⛔ WHAT THEY GOT LAST TIME, ON THE ROW (2026-08-26).
+   *
+   * A heavy slot prescribes a rep BAND and nothing else — "Bench Press 1×1-5 @ 145 lb" — and the
+   * weight moves once in twelve weeks on a light bar, so a block that is progressing exactly as
+   * designed reads as FROZEN for eight weeks. The progression lives in the reps; this is the only
+   * place the athlete can see it moving.
+   *
+   * ⚠️ ABSENT MEANS ABSENT. `last_reps` is written only where the athlete has a logged result at the
+   * weight now on the row, so the line disappears the week a jump lands — correct, because there is
+   * no last time at the new weight yet, and repeating a count earned on a lighter bar would be a
+   * claim about a session that did not happen.
+   */
+  const lastReps = Array.isArray(exercise?.last_reps) ? exercise.last_reps : null;
+  const lastRep = lastReps && lastReps.length > 0 ? Number(lastReps[lastReps.length - 1]) : null;
+  if (lastRep != null && Number.isFinite(lastRep)) {
+    parts.push(`— last time ${lastRep}`);
+  }
+
   return parts.join(' ');
 }
 

@@ -430,9 +430,42 @@ export const STANDING_ACCESSORY_SET_CUE = 'No weight is prescribed — find the 
  * pull-up athlete. Most people on this movement are working TOWARD reps, some on band assistance —
  * the Assist/+ column runs in both directions, and the cue has to. So it names the intensity and
  * lets the athlete pick the direction; the band is the row's own `target_reps`, never restated.
+ *
+ * ⛔⛔ REWRITTEN 2026-08-26, CONSTRAINT FIRST, AND THE OLD TAIL IS DELETED ON A RULING.
+ *
+ * It used to end *"Top of the band with room to spare: go heavier next time."* Two things are wrong
+ * with that now:
+ *
+ *   1. ⛔ **IT TURNS THE SET INTO A REP CHASE**, which is the one thing p219 forbids on this slot —
+ *      *"each set stops short of failure; technical breakdown here is counterproductive."* An athlete
+ *      told that reaching the top moves the weight up will reach for the top. Michael's ruling on the
+ *      work order is explicit: the row may not say that extra reps move the weight sooner. It is
+ *      TRUE — the engine does exactly that — and it still does not go on the row.
+ *   2. ⚠️ It instructed the athlete to do the engine's job. The bar now moves on its own when the
+ *      range is finished twice running (`standing-plan/progression.ts`), so a line telling them to
+ *      go heavier is a second owner of a decision that already has one.
+ *
+ * What replaces it is the CONSTRAINT, first: how many reps, and how hard. *"Stopped short of
+ * failure"* is his own wording (p219) — and note he defines zero reps in reserve as **not** failure,
+ * the last rep still completes, slowly, so the band is wider than it sounds.
+ *
+ * ⚠️ AND "IF YOU GET MORE THAN N, LOG IT" IS NOT A REP CHASE — it is the opposite instruction. The
+ * rep stepper used to be capped and the set plan opened at the band top, so an athlete who got six
+ * had nowhere to put it and the honest number was lost. This asks for the truth, it does not ask for
+ * more.
+ *
+ * ⚠️ THE DIRECTION CLAUSE SURVIVES ON UNPRICED ROWS ONLY. A pull-up has no prescribed weight and the
+ * athlete picks assistance or added load; a bench at 150 lb has the number on the row already, and
+ * repeating it there would read as licence to change it.
  */
-export const STANDING_ME_SET_CUE = (band: string): string =>
-  `Max-effort set — ${band} reps close to your limit. Assistance if you need it, added weight if you don't. Top of the band with room to spare: go heavier next time.`;
+export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: boolean }): string => {
+  const hi = String(band).match(/(\d+)\s*$/)?.[1] ?? '';
+  const more = hi ? ` If you get more than ${hi}, log it.` : '';
+  const direction = opts?.loadPrescribed === false
+    ? " Assistance if you need it, added weight if you don't."
+    : '';
+  return `${band} reps, stopped short of failure.${more}${direction}`;
+};
 
 /**
  * ⛔ THE DE ROW'S OWN INSTRUCTION (2026-08-25, Michael on the close-grip card: "move the bar fast

@@ -151,25 +151,50 @@ export type ProgressionVerdict =
   | 'advance'
   /** Inside the range → repeat the same weight and add reps. */
   | 'hold_add_reps'
-  /** Below the bottom of the range → weight down. */
+  /**
+   * Below the bottom of the range. ⛔ ON AN ME SLOT THE FLOOR IS ONE REP, so this is reached only
+   * by a set that was logged with ZERO — the attempt that failed. It undoes the last earned
+   * increment; it does not cut a percentage. See `NO_PERCENTAGE_BACKOFF_IS_OURS`.
+   */
   | 'back_off'
   /** ⛔ NOTHING LOGGED IS NOT A FAILURE. No evidence → hold. Never zero, never a reset. */
   | 'no_evidence';
 
 /**
  * ⛔ STALL HANDLING IS GENERIC AND PREDATES ANY ONE AUTHOR (pivot §4): nothing logged = no evidence
- * = hold; a miss holds; a confirmed REPEATED stall backs off and rebuilds. All thresholds are fixed
- * numbers and all of them are ours.
+ * = hold; a miss holds. All thresholds are fixed numbers and all of them are ours.
  *
- * ⚠️ NEVER ACT ON A SINGLE READING. `STALL_CONFIRMATIONS = 2` is the deadband: one short session is
- * a bad day, two in a row is a signal. That rule is why `back_off` needs a caller-supplied count.
+ * ⚠️ NEVER ACT ON A SINGLE READING. `STALL_CONFIRMATIONS = 2` is the deadband and it now runs in
+ * BOTH directions: one session finishing the rep range is a good day, two in a row is what moves the
+ * bar (`barLadderStep`). One short session is a bad day; the undo needs a failed set or three
+ * falling sessions.
  */
 export const STALL_CONFIRMATIONS = 2;
-export const STALL_BACKOFF = 0.10;
 export const FREEZE_WEEKS_BEFORE_SAYING_SO = 4;
 export const THRESHOLDS_ARE_OURS =
-  'Two confirmations before a back-off, a ten per cent back-off, and four unmoved weeks before the '
-  + 'plan says a lift is frozen. Fixed numbers, ours, from field practice.';
+  'Two confirmations before anything moves, and four unmoved weeks before the plan says a lift is '
+  + 'frozen. Fixed numbers, ours, from field practice.';
+
+/**
+ * ⛔⛔ THERE IS NO PERCENTAGE BACK-OFF, AND ITS ABSENCE IS THE RULING (Michael, 2026-08-26).
+ *
+ * `STALL_BACKOFF = 0.10` stood here, was read by nothing, and could never have fired: it was reached
+ * through `back_off`, which needs a logged set BELOW the band floor, and on an ME slot that floor is
+ * one rep — unreachable for any set that was logged at all.
+ *
+ * ⛔ IT WAS NOT FIXED, IT WAS REPLACED, and the reason is that a percentage cut is a WENDLER
+ * necessity rather than a Viada one. Wendler's training max climbs every cycle whether or not the
+ * athlete keeps up, so they can get ahead of the bar and have to be pulled back. Here the bar only
+ * moves when it is earned, so nobody can outrun it and there is nothing to back off FROM.
+ *
+ * ⚠️ WHAT SHIPS INSTEAD IS `undoLastStep` BELOW: an athlete who earned an increment and cannot
+ * hold it returns to the weight they were holding before it. Proportional by construction, with no
+ * percentage to choose. If they never earned a jump they are on the scheduled rise and nothing
+ * happens — which is correct.
+ */
+export const NO_PERCENTAGE_BACKOFF_IS_OURS =
+  'A lift that stops holding a weight it earned goes back to the weight it held before, not down by '
+  + 'a percentage. The only weight it can lose is one it added itself.';
 
 export function progressionVerdict(
   sets: SetResult[] | null | undefined,
@@ -414,4 +439,195 @@ export function setPositionForCount(count: number, band: { lo: number; hi: numbe
   if (band.hi <= band.lo) return 0;
   const clamped = Math.min(band.hi, Math.max(band.lo, Math.round(count)));
   return (clamped - band.lo) / (band.hi - band.lo);
+}
+
+// ── OURS: THE BAR LADDER — THE REPS CARRY THE PROGRESSION ───────────────────────────────────────
+
+/**
+ * ⛔⛔ WHY THE OVERLOAD MOVED ONTO THE REPS, AND IT IS AN ARITHMETIC PROBLEM RATHER THAN A TASTE ONE
+ * (Michael, 2026-08-26 — `docs/WORKORDER-rep-driven-progression-2026-08-26.md`).
+ *
+ * His rate anchor is one per cent every three weeks applied to the calculated 1RM (p247), and a
+ * percentage that small cannot be expressed on a bar below roughly 250 lb once it is rounded to real
+ * plates. On a 170 lb bench the ME slot prescribes 145 and moves ONCE in twelve weeks; on a 100 lb
+ * press it prescribes 85 and moves once, in a week decided by nothing more principled than where the
+ * unrounded number happens to sit against the rounding line.
+ *
+ * ⚠️ ONE REP IS WORTH ABOUT THREE PER CENT — finer than the smallest plate jump a light bar can take,
+ * which is six. So the reps are where the overload lives and `scheduledRise` stays underneath as the
+ * FLOOR: when nobody earns anything his one per cent still moves the bar, and the earned jump sits on
+ * top of it rather than replacing it.
+ *
+ * ⛔ RIR IS NOT PART OF THIS. A rep count is completed work; a reserve estimate is a guess about a rep
+ * that was not performed, and it is least reliable in exactly the athletes this plan is for.
+ */
+export const REPS_CARRY_THE_PROGRESSION_IS_OURS =
+  'The heavy set moves the weight up when the athlete finishes its rep range twice in a row, and the '
+  + 'reps start again at the bottom of the range when it does. The book states one progression rate — '
+  + 'one per cent every three weeks — and that stays underneath as the floor. Reading the reps as the '
+  + 'overload is ours: his own number cannot be expressed on a bar light enough to need it.';
+
+/** ⛔ THREE FALLING SESSIONS, AND STRICTLY FALLING. See `barLadderStep` for why not two, and why not equal. */
+export const DECLINE_SESSIONS_TO_UNDO = 3;
+
+/**
+ * What one heavy slot has earned on top of the scheduled rise.
+ *
+ * ⚠️ `steps` IS A STACK AND NOT A COUNT, deliberately. The undo returns the athlete to the weight they
+ * were holding BEFORE the increment, and the increment they took is not always the one they would take
+ * now — the step is gated on their plates and their plates can change. Popping the actual number is the
+ * only version of "back to what you held" that is true.
+ */
+export type BarLadderState = {
+  /** Pounds on top of the scheduled rise. Never below zero. */
+  offsetLb: number;
+  /** The increments taken, most recent last. */
+  steps: number[];
+  /** Sessions finishing the rep range at THIS weight since the last change. */
+  earnedRun: number;
+  /** Best set of each recent session at THIS weight, most recent last. The decline window. */
+  recentReps: number[];
+  /** ⚠️ The weight those sessions were actually performed at. Both counters belong to it. */
+  atWeight: number | null;
+};
+
+export const BAR_LADDER_START: BarLadderState = {
+  offsetLb: 0, steps: [], earnedRun: 0, recentReps: [], atWeight: null,
+};
+
+export type BarSessionSignal =
+  /** Finished the rep range, or beat it, on every logged set. Earns toward the next increment. */
+  | 'earned'
+  /** Inside the range. Breaks the run; three falling ones undo a jump. */
+  | 'held'
+  /** ⛔ A SET LOGGED AT ZERO REPS — the attempt that failed. Undoes the last jump at once. */
+  | 'failed'
+  /** ⛔ NOTHING LOGGED IS NOT A FAILURE. Silence holds — the run, the window and the weight stand. */
+  | 'no_evidence';
+
+/**
+ * ⛔ WHAT ONE LOGGED HEAVY SESSION WAS, FOR THE BAR.
+ *
+ * ⚠️ THE VERDICT IS `progressionVerdict`'S, NOT A SECOND COPY OF IT. `advance` on every set at or past
+ * the top of the band, `back_off` on a set below the floor — and on an ME slot that floor is one rep,
+ * so `back_off` here means a set logged with zero and nothing else can reach it.
+ *
+ * ⚠️ `targetRir` IS NULL AND THAT IS THE POINT. p218 gives ME no RIR target, and a reserve estimate is
+ * a guess about a rep nobody performed. The reps decide.
+ */
+export function barSessionSignal(
+  sets: LoggedMeSet[] | null | undefined,
+  repBand: { lo: number; hi: number },
+): { signal: BarSessionSignal; bestReps: number | null; weight: number | null } {
+  // ⛔ COMPLETED ONLY, THE SAME EVIDENCE BAR `meSessionOutcome` USES — and a ZERO-rep set is completed
+  // evidence, not an absent one. That distinction is the whole failed-attempt signal.
+  const logged = (sets ?? []).filter((s) => s?.completed === true && Number.isFinite(Number(s?.reps)));
+  if (logged.length === 0) return { signal: 'no_evidence', bestReps: null, weight: null };
+
+  const weights = logged.map((s) => Number(s.weight)).filter((w) => Number.isFinite(w) && w > 0);
+  const weight = weights.length > 0 ? Math.max(...weights) : null;
+  const bestReps = Math.max(...logged.map((s) => Number(s.reps)));
+
+  const verdict = progressionVerdict(logged.map((s) => ({ reps: Number(s.reps) })), repBand, null);
+  if (verdict === 'back_off') return { signal: 'failed', bestReps, weight };
+  if (verdict === 'advance') return { signal: 'earned', bestReps, weight };
+  return { signal: 'held', bestReps, weight };
+}
+
+/** ⛔ BACK TO THE WEIGHT HELD BEFORE THE INCREMENT — never a percentage. `NO_PERCENTAGE_BACKOFF_IS_OURS`. */
+function undoLastStep(state: BarLadderState): BarLadderState {
+  const last = state.steps.length > 0 ? state.steps[state.steps.length - 1] : 0;
+  return {
+    // ⚠️ NO EARNED STEP MEANS NOTHING HAPPENS, and that is correct rather than a gap: an athlete who
+    // never earned a jump is on the scheduled rise, which is the floor and is not theirs to lose.
+    offsetLb: Math.max(0, state.offsetLb - last),
+    steps: state.steps.slice(0, -1),
+    earnedRun: 0,
+    recentReps: [],
+    atWeight: null,
+  };
+}
+
+const isStrictlyFalling = (reps: number[]): boolean =>
+  reps.every((r, i) => i === 0 || r < reps[i - 1]);
+
+/**
+ * ⛔ ONE SESSION MOVES THE BAR ONE INCREMENT AT MOST, in either direction.
+ *
+ * @param stepLb  what one increment is for this lift — `advanceStep`, gated on the athlete's plates.
+ *
+ * ⛔ AND THE RUN AND THE WINDOW BOTH BELONG TO A WEIGHT. Sessions performed at different weights are
+ * not a run and they are not a decline: the scheduled rise, a restate, or the athlete's own increment
+ * can move the bar underneath them, and comparing five reps at 85 with three at 90 as though the lift
+ * got worse is the mistake this whole mechanism exists to avoid — they are the same effort.
+ *
+ * ⛔⛔ WHY THE DECLINE TEST IS THREE SESSIONS AND STRICTLY FALLING (Michael's ruling, 2026-08-26):
+ * *"4 reps then 3 then 3, at the same weight, inside a 1-5 range, is normal variance"* — Tuesday's
+ * heavy lower work sits behind Monday's run, which is the entire reason the haircut exists. A signal
+ * that fires inside the acceptable range contradicts the range. Two sessions is a wobble; three
+ * EQUAL-or-lower is 4-3-3 and would fire on that variance. Strictly falling over three is a lift
+ * genuinely going backwards.
+ */
+export function barLadderStep(
+  state: BarLadderState,
+  args: { sets: LoggedMeSet[] | null | undefined; repBand: { lo: number; hi: number }; stepLb: number },
+): BarLadderState {
+  const read = barSessionSignal(args.sets, args.repBand);
+  // ⛔ SILENCE HOLDS. A skipped week is the plan having nothing to read, not a lift going backwards.
+  if (read.signal === 'no_evidence') return state;
+
+  // ⛔ A FAILED ATTEMPT UNDOES AT ONCE — no confirmation. Zero reps is not a wobble inside the band,
+  // it is the athlete not making the lift, and it is the one reading the band cannot contain.
+  if (read.signal === 'failed') return undoLastStep(state);
+
+  const sameWeight = state.atWeight == null || read.weight == null || read.weight === state.atWeight;
+  const atWeight = read.weight ?? state.atWeight;
+  const window = (sameWeight ? [...state.recentReps, read.bestReps as number] : [read.bestReps as number])
+    .slice(-DECLINE_SESSIONS_TO_UNDO);
+  const run = sameWeight ? state.earnedRun : 0;
+
+  if (read.signal === 'earned') {
+    const earnedRun = run + 1;
+    if (earnedRun < STALL_CONFIRMATIONS) return { ...state, earnedRun, recentReps: window, atWeight };
+    /**
+     * ⛔ THE JUMP, AND THE REPS RESET WITH IT (item 3 of the work order). Five reps at 85 and three at
+     * 90 are the same effort, so the window is cleared rather than carried: the reset is what absorbs
+     * a six per cent plate jump on a light bar, and carrying the old numbers across it would read the
+     * athlete's next honest session as a collapse.
+     */
+    return {
+      offsetLb: state.offsetLb + args.stepLb,
+      steps: [...state.steps, args.stepLb],
+      earnedRun: 0,
+      recentReps: [],
+      atWeight: null,
+    };
+  }
+
+  if (window.length >= DECLINE_SESSIONS_TO_UNDO && isStrictlyFalling(window)) return undoLastStep(state);
+  return { ...state, earnedRun: 0, recentReps: window, atWeight };
+}
+
+/** Walk one lift's heavy sessions in order and report what the bar has earned. */
+export function barFromHistory(
+  sessions: { sets: LoggedMeSet[] | null | undefined }[] | null | undefined,
+  repBand: { lo: number; hi: number },
+  stepLb: number,
+): BarLadderState {
+  let state = BAR_LADDER_START;
+  for (const s of sessions ?? []) state = barLadderStep(state, { sets: s.sets, repBand, stepLb });
+  return state;
+}
+
+/**
+ * ⛔ WHAT THE ATHLETE GOT LAST TIME AT THIS WEIGHT — the bottom of the range after a jump.
+ *
+ * ⚠️ IT IS THE HONEST PREFILL AND NOT THE FLATTERING ONE. Stage 2's logger fills the rep stepper from
+ * this: prefilling the TOP of the range would let everyone tap through at the top and advance the bar
+ * on a phantom session. After a jump there is no last time at this weight, so it is the bottom of his
+ * band — which is item 3 said in the one place a surface can read it.
+ */
+export function repsToExpect(state: BarLadderState, repBand: { lo: number; hi: number }): number {
+  const last = state.recentReps[state.recentReps.length - 1];
+  return Number.isFinite(last) ? (last as number) : repBand.lo;
 }

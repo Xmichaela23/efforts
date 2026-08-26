@@ -245,9 +245,26 @@ Deno.serve(async (req: Request) => {
       throughWeek: currentWeek,
     });
 
+    /**
+     * ⛔ THE EARNED BAR REACHES THE REMAINING WEEKS HERE (item 7, 2026-08-26) — and it is the SAME
+     * path the set ladder already ran on, not a second one.
+     *
+     * A jump earned in week three has to appear in weeks four through twelve, or the mechanism
+     * computes correctly and reaches nobody's calendar. `restateFromTest` below already rewrites
+     * every week after the live one when a weight moves; feeding the offset into this composition is
+     * all it takes for an early jump to rebuild the rest of the block.
+     *
+     * ⚠️ AND ONLY THE WEEKS THAT HAVE NOT STARTED. History is not editable and the live week keeps
+     * the prescription it is being judged against — the boundary `afterWeek` draws below.
+     */
     const composed = composeBlock({
       ...composeBase,
       ...(Object.keys(ladder.sets).length > 0 ? { meSetsByPattern: ladder.sets } : {}),
+      ...(Object.keys(ladder.bar).length > 0 ? { barOffsetsByPattern: ladder.bar } : {}),
+      // ⛔ AND WHAT THEY GOT LAST TIME, ON THE SAME PATH (stage 2, items 5 and 6). The row prints it
+      // so a working block stops looking frozen, and the logger's rep cell opens on it instead of on
+      // the top of the band — the phantom five-rep session that used to move the bar.
+      ...(Object.keys(ladder.lastReps).length > 0 ? { meLastRepsByPattern: ladder.lastReps } : {}),
     });
 
     const restated = restateFromTest({
@@ -265,6 +282,9 @@ Deno.serve(async (req: Request) => {
         // ⛔ WHAT THE HEAVY SETS HAVE EARNED, AND OFF WHAT. A surface offering the athlete this diff
         // has to be able to say why a second set appeared, or it is a number they never agreed to.
         me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
+        // ⛔ WHAT THE BAR HAS EARNED AND OFF WHAT — the same rule the set ladder ships under. A
+        // surface offering the athlete this diff has to be able to say why a weight moved early.
+        me_bar: { by_pattern: ladder.bar, state: ladder.barState, last_reps: ladder.lastReps },
       });
     }
 
@@ -296,6 +316,10 @@ Deno.serve(async (req: Request) => {
             // it back for provenance; the composition itself is re-derived from history every time,
             // so a stale value can never prescribe anything.
             me_sets_by_pattern: Object.keys(ladder.sets).length > 0 ? ladder.sets : null,
+            // ⛔ AND WHAT THE BAR EARNED, ON THE SAME TERMS: provenance only. The composition
+            // re-derives it from logged history on every restate, so a stale value here can never
+            // prescribe a weight.
+            me_bar_offsets_by_pattern: Object.keys(ladder.bar).length > 0 ? ladder.bar : null,
           },
         },
       })
@@ -335,7 +359,8 @@ Deno.serve(async (req: Request) => {
       `[standing-restate] plan=${plan.id} week=${currentWeek} lifts=${found.join(',')} `
       + `rows=${written}/${restated.rows.length} changes=${restated.changes.length} `
       + `unmatched=${restated.unmatched.length} `
-      + `me_sets=${JSON.stringify(ladder.sets)} me_unread=${ladder.unread}`,
+      + `me_sets=${JSON.stringify(ladder.sets)} me_bar=${JSON.stringify(ladder.bar)} `
+      + `me_unread=${ladder.unread}`,
     );
 
     return json({
@@ -344,6 +369,7 @@ Deno.serve(async (req: Request) => {
       working_numbers: workingNamed, missing: reading.missing,
       changes: restated.changes, unmatched: restated.unmatched,
       me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
+      me_bar: { by_pattern: ladder.bar, state: ladder.barState, last_reps: ladder.lastReps },
       config_written: !cfgErr,
       computed_refreshed: computedRefreshed,
     });

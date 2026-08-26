@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, Repeat } from 'lucide-react';
+import { repFloorFor, repsAreBlank } from '@/lib/logged-rep-entry';
+import { advanceNudgeFor } from '@/lib/advance-nudge';
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
@@ -146,6 +148,19 @@ interface LoggedSet {
    *  so the athlete knows it's a starting suggestion, not their own log.
    *  Cleared the moment the athlete edits any field on the set OR taps Done. */
   from_previous?: boolean;
+  /**
+   * ⛔ DID THE ATHLETE TYPE THIS REP COUNT, OR IS THE CELL SIMPLY EMPTY? (2026-08-26)
+   *
+   * `reps: 0` has meant "blank / cleared" everywhere except a pull-up rep-max test, and the
+   * 2026-08-13 blank-set guard is built on that. The heavy slot now needs a THIRD state — a set the
+   * athlete attempted and FAILED, which is a real zero the progression reads to undo an earned
+   * increment. The value alone cannot tell the two apart, so the provenance travels beside it, the
+   * same idiom as `from_previous` and `prefilled`.
+   *
+   * ⚠️ TRUE ONLY ON AN EXPLICIT ENTRY. Clearing the cell writes it false, so an untouched or emptied
+   * set can never be read as a missed lift.
+   */
+  reps_entered?: boolean;
   /** D-326 — how the TOP set felt, in the athlete's own tap. Three words, never a number.
    *
    *  ⛔ NEVER AUTO-FILLED, and never reaches `brzycki1RM`. This is the replacement for the signal
@@ -889,9 +904,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // Q-039: a normal logged rep count is an integer ≥1; invalid/empty entry clears to 0.
       // Q-102 exception: a pull-up rep-MAX test set allows 0 ("goal: your first pull-up") — a typed 0 is the
       // result, not a clear, so it must NOT be bumped to 1.
-      const tgtSet = exercises.find(e => e.id === ctx.exerciseId)?.sets?.[ctx.setIndex] as any;
-      const repFloor = tgtSet?.repMaxTest === true ? 0 : 1;
-      updateSet(ctx.exerciseId, ctx.setIndex, { reps: isValidNumber ? Math.max(repFloor, Math.round(n)) : 0 });
+      const tgtEx = exercises.find(e => e.id === ctx.exerciseId);
+      const tgtSet = tgtEx?.sets?.[ctx.setIndex];
+      /**
+       * ⛔ A HEAVY SET CAN BE LOGGED AT ZERO — the attempt that failed (2026-08-26).
+       *
+       * The floor of 1 made a missed lift unloggable, and the missed lift is half the signal the
+       * standing plan's progression reads: two sessions finishing the rep range move the bar up, and
+       * a set at zero puts it back to the weight the athlete was holding. With the floor in place the
+       * up half could fire and the down half could not — a one-way ratchet.
+       *
+       * ⚠️ SCOPED TO THE ME SLOT AND NOT TO EVERY SET, deliberately. `reps: 0` means "cleared"
+       * app-wide and the blank-set guard depends on it; widening the floor everywhere would let any
+       * emptied cell be ticked as done. The heavy slot is where a zero MEANS something, so it is the
+       * only place the meaning changes — and even there it is `reps_entered` that separates a typed
+       * zero from an empty one, never the value.
+       *
+       * ⚠️ NOTHING CAPS THE TOP. An athlete who gets six logs six; the cell has never had a ceiling
+       * and this does not add one.
+       */
+      const repFloor = repFloorFor({ repMaxTest: tgtSet?.repMaxTest, slotIntent: tgtEx?.slot_intent });
+      updateSet(ctx.exerciseId, ctx.setIndex, isValidNumber
+        ? { reps: Math.max(repFloor, Math.round(n)), reps_entered: true }
+        : { reps: 0, reps_entered: false });
     } else if (ctx.field === 'weight') {
       updateSet(ctx.exerciseId, ctx.setIndex, { weight: isValidNumber ? Math.max(0, n) : 0 });
     } else if (ctx.field === 'band') {
@@ -2232,6 +2267,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           && typeof repsRaw === 'string'
           && /^\d+\s*[-–]\s*\d+$/.test(repsRaw.trim())
           && s?.load_prescribed === false;
+        /**
+         * ⛔⛔ THE HEAVY SLOT NEVER OPENS AT THE TOP OF ITS BAND (2026-08-26).
+         *
+         * The ME row is PRICED, so `isRepBandRow` above misses it and the cell took `set_plan`'s
+         * reps — which the composer stamped at the band top, five. Every heavy set opened reading
+         * five, and an athlete who tapped Done without editing handed the progression a five-rep
+         * session they never performed. Two of those in a row move the bar. That is the phantom.
+         *
+         * ⚠️ THE COMPOSER NOW SENDS WHAT THEY GOT LAST TIME, or omits the count entirely when there
+         * is no last time at this weight — so the fallback to the band's leading digit has to go too.
+         * Falling back would prefill ONE rep, which is Michael's 2026-08-25 "1 pull up?" reading of
+         * the same mistake at the other end of the band.
+         */
+        const isMeSlotRow = String(s?.slot_intent || '') === 'ME';
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
@@ -2336,6 +2385,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // Blank, deliberately: the athlete logs each chunk (15 / 15 / 12 / 8). `reps` is left
             // undefined rather than 0 so the cell reads empty and the countdown still shows the
             // whole total owed — `completedReps` ignores both, but 0 would render as a logged zero.
+          } else if (isMeSlotRow && !setAmrap && p?.reps == null) {
+            // Blank for the same reason as the band row below, one slot along: a heavy set with no
+            // last-time number at this weight. ⚠️ Tested on `p?.reps`, never on `setReps` — the
+            // band-floor fallback is exactly what must not fire here.
           } else if (isRepBandRow && !setAmrap) {
             // Blank, deliberately — the band lives in the "target 1-5" label, and prefilling its
             // floor prescribed one rep. An AMRAP set on a band row still takes the 0-open below.
@@ -3960,8 +4013,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     //   · mobility mode — handled above;
     //   · warmups — the baseline ramps prescribe reps as hint text only ("5–10 is plenty",
     //     Q-097) and the field is empty BY DESIGN; plan warmups arrive prefilled anyway.
-    const repsBlank = set.reps === undefined || set.reps === null
-      || (set.reps === 0 && set.repMaxTest !== true);
+    // ⚠️ AND A TYPED ZERO IS NOT BLANK (2026-08-26). On the heavy slot a zero the athlete entered is
+    // the failed attempt — a real result the progression reads — so it completes like any other count.
+    // An untouched or cleared cell still cannot be ticked, which is what the 2026-08-13 fix was for.
+    const repsBlank = repsAreBlank(set);
     if (repsBlank && set.setType !== 'warmup'
         && set.duration_seconds === undefined && !isDurationLogged(exercise.name)) {
       openKeypadForSet({
@@ -5463,48 +5518,46 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // Intent comes from `slot_intent` (data, 2026-08-26) with the notes regex as the
                   // legacy fallback — rows materialized before the field existed still carry the
                   // slot notation in `notes`.
+                  /**
+                   * ⛔ THE PRICED HEAVY LIFTS NOW GET THE CUE TOO (2026-08-26), and that gate was the
+                   * reason the ME instruction reached nobody who needed it. `load_prescribed === false`
+                   * limited the cue to AUTO-REGULATED rows — the pull-up — so bench, squat and
+                   * deadlift, the three lifts the whole progression is about, showed no effort
+                   * instruction at all. p218 gives ME no reps-in-reserve number, so the words are the
+                   * only instruction that slot can carry.
+                   *
+                   * ⚠️ IT NOW BEATS THE BAR-SPEED CUE ON A STANDING SESSION, which is the same call
+                   * already made for DE one paragraph down: `barSpeedCueFor` speaks Wendler, and on a
+                   * block composed from Viada that line names the wrong programme's intent. Off a
+                   * standing-plan session nothing changes — the tag is the gate.
+                   */
                   const standingEligible = Array.isArray(scheduledWorkout?.tags)
-                    && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
-                    && exercise?.load_prescribed === false;
+                    && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan');
                   const standingSlotText = standingEligible ? String(exercise?.notes || '') : '';
                   const slotIntent = standingEligible
                     ? ((exercise as any)?.slot_intent
                         ?? (/\bME\b/.test(standingSlotText) ? 'ME' : /\bDE\b/.test(standingSlotText) ? 'DE' : null))
                     : null;
                   const standingCue = slotIntent === 'ME'
-                    ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'))
+                    ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'),
+                        { loadPrescribed: exercise?.load_prescribed !== false })
                     : slotIntent === 'DE'
                       ? STANDING_DE_SET_CUE(String(exercise?.target_reps || '2-4'))
                       : null;
                   /**
-                   * ⛔ THE ADVANCE NUDGE — the app DETECTING the double-progression trigger instead
-                   * of only stating it (Michael, 2026-08-25: "should their weightload get easier
-                   * they should know they can add"). Pure arithmetic over what the previous-session
-                   * fetch already holds (per-set reps + RIR); no server call, no LLM.
-                   *
-                   * Fires only when ALL of: the row is auto-regulated with a rep BAND; last
-                   * session's every set is at or above the band top; and no set was at zero
-                   * reserve (a ground-out top is not "room to spare"). The wording splits on
-                   * whether reserve was actually logged — the line never claims a reserve the
-                   * athlete did not report.
-                   * ⚠️ DE ROWS ARE EXCLUDED: speed work advances on bar speed (its own cue says
-                   * so), not on reaching the band top.
+                   * ⛔ THE ADVANCE NUDGE — extracted to `@/lib/advance-nudge` on 2026-08-26, in the
+                   * change that narrowed its scope. The rule it now enforces is a RULING — *a row the
+                   * engine decides for does not get a nudge* — and a ruling buried in this file is one
+                   * the next session re-litigates. The reasoning, the exclusion list and the fixtures
+                   * all live beside the code there.
                    */
-                  const advanceNudge = (() => {
-                    const m = String(exercise?.target_reps ?? '').match(/^(\d+)\s*[-–]\s*(\d+)$/);
-                    if (!m || exercise?.load_prescribed !== false) return null;
-                    if (slotIntent === 'DE' || /\bDE\b/.test(String(exercise?.notes || ''))) return null;
-                    const hi = parseInt(m[2], 10);
-                    const prior = previousSessionByName[normalizeExerciseName(exercise.name)];
-                    if (!Array.isArray(prior) || prior.length === 0) return null;
-                    if (!prior.every((s) => typeof s.reps === 'number' && s.reps >= hi)) return null;
-                    if (prior.some((s) => s.rir === 0)) return null;
-                    const reps = prior.map((s) => s.reps).join(' · ');
-                    const reserveLogged = prior.every((s) => typeof s.rir === 'number' && s.rir >= 1);
-                    return reserveLogged
-                      ? `Last time: ${reps} — top of the band with room to spare. Add weight.`
-                      : `Last time: ${reps} — top of the band. If it felt easy, add weight.`;
-                  })();
+                  const advanceNudge = advanceNudgeFor({
+                    targetReps: exercise?.target_reps,
+                    loadPrescribed: exercise?.load_prescribed,
+                    slotIntent: slotIntent,
+                    notes: exercise?.notes,
+                    prior: previousSessionByName[normalizeExerciseName(exercise.name)],
+                  });
 
                   // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in 5/3/1 is a
                   // total to reach across as many sets as you need, so the live number is "how many
@@ -5515,6 +5568,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // is not banked work, the same rule the save path and the missed-Done prompt use.
                   const exRepTotal = parseRepTotal(exercise.target_reps);
                   const exHasRepTotal = hasRepTotal(exercise.target_reps);
+                  /**
+                   * ⛔ DOES THIS ROW PRESCRIBE A REP BAND RATHER THAN A COUNT? (2026-08-26)
+                   *
+                   * A band is an OPEN target — the prefill deliberately leaves the cell empty on
+                   * these rows rather than anchoring the athlete to either end of it. The reps cell
+                   * has to survive that, which is what this gates; without it a blank band row lost
+                   * its input entirely.
+                   *
+                   * ⚠️ Read off `target_reps`, the row's own prescription, so it is true for the
+                   * unpriced pull-up and the priced bench alike — the two arrive at a blank cell by
+                   * different routes and the render must not care which.
+                   */
+                  const exOpenRepBand = /^\d+\s*[-–]\s*\d+$/.test(String(exercise.target_reps ?? '').trim());
                   const exRepsLeft = exRepTotal != null ? repsRemaining(exRepTotal, exercise.sets) : 0;
 
                   return (
@@ -5752,10 +5818,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           //   · an assistance REP TOTAL — the set opens blank so each chunk is
                           //     logged (2026-08-11). Without this the blank-set change would render
                           //     an accessory with no reps field at all.
-                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal) {
+                          // ⛔ A ROW THAT PRESCRIBES A REP BAND OPENS BLANK AND STILL NEEDS A CELL
+                          // (2026-08-26). `exOpenRepBand` is the fourth exception and it was
+                          // MISSING: the auto-regulated rows deliberately leave `reps` undefined
+                          // (`isRepBandRow` / `isMeSlotRow` in the prefill), which landed them in
+                          // this branch and rendered NO REPS FIELD AT ALL — the athlete had
+                          // nowhere to type, so the one signal the whole progression reads could
+                          // not be entered on those rows.
+                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal && !exOpenRepBand) {
                             return <span aria-hidden="true" />;
                           }
-                          const shown = set.reps === 0 ? '' : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest || exHasRepTotal) ? '' : '—'));
+                          // ⚠️ A TYPED ZERO SHOWS AS 0 — it is the failed attempt, a real result
+                          // the progression reads, and rendering it empty would make the one
+                          // session that undoes a jump look like a set nobody touched.
+                          const repsEntered = set.reps_entered === true;
+                          const shown = (set.reps === 0 && !repsEntered)
+                            ? ''
+                            : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest || exHasRepTotal || exOpenRepBand) ? '' : '—'));
                           return (
                             <button
                               type="button"
@@ -5764,7 +5843,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 setIndex,
                                 field: 'reps',
                                 title: 'Reps',
-                                initialValue: set.reps === 0 ? '' : String(set.reps ?? ''),
+                                initialValue: (set.reps === 0 && !repsEntered) ? '' : String(set.reps ?? ''),
                                 allowDecimal: false,
                               })}
                               className={numCls}

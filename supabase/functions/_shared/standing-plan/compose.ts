@@ -107,7 +107,12 @@ import {
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
-export type PlannedSet = { weight: number; reps: number; amrap?: boolean; warmup?: boolean };
+/**
+ * ⚠️ `reps` IS OPTIONAL (2026-08-26). An auto-regulated heavy set with no last-time result at
+ * this weight carries a weight and NO rep count — the cell opens blank and the row's own band
+ * is the target. Every other slot still states one.
+ */
+export type PlannedSet = { weight: number; reps?: number; amrap?: boolean; warmup?: boolean };
 
 export type StrengthExercise = {
   name: string;
@@ -478,6 +483,41 @@ export type ComposeArgs = {
    * earned. See `ME_SET_LADDER_IS_OURS`.
    */
   meSetsByPattern?: Partial<Record<ViadaPattern, number>> | null;
+  /**
+   * ⛔⛔ POUNDS THE HEAVY SLOT HAS EARNED, ON TOP OF THE SCHEDULED RISE (2026-08-26).
+   *
+   * ⚠️ IT IS AN OFFSET AND `scheduledRise` IS STILL THE FLOOR. p247's one per cent every three weeks
+   * is the only progression rate the source states, and it is not replaced — but rounded to real
+   * plates it cannot be expressed at all on a bar under roughly 250 lb, so a 145 lb bench moves ONCE
+   * in twelve weeks. The reps carry the rest: finishing the rep range twice running adds one
+   * increment, and this is where that increment arrives. See `REPS_CARRY_THE_PROGRESSION_IS_OURS`.
+   *
+   * ⛔ THE ME SLOT ONLY. It is earned on the heavy set's reps and it is spent there. A DE or SKILL
+   * slot is a different intent at a different percentage and nobody logged anything against it.
+   *
+   * ⚠️ ABSENT IS ZERO, which is every block at the moment it is authored. Like `meSetsByPattern` this
+   * reaches a block only through the restater, after the sessions that earned it were logged.
+   */
+  barOffsetsByPattern?: Partial<Record<ViadaPattern, number>> | null;
+  /**
+   * ⛔⛔ WHAT THE ATHLETE ACTUALLY GOT ON THIS PATTERN'S HEAVY SLOT, most recent last (stage 2).
+   *
+   * ⚠️ IT IS ONE FACT SERVING TWO SURFACES, which is why it arrives as one argument. The ROW prints
+   * it (`last_reps`) so a block that is working correctly stops looking frozen for eight weeks, and
+   * the LOGGER prefills the most recent number into the rep cell so the lazy path is the honest one.
+   *
+   * ⛔ NEVER THE TOP OF THE BAND. `set_plan` stamped `reps.hi` on every ME set — so the logger opened
+   * at five, everybody tapped through at five, and the bar advanced on a session nobody performed.
+   * That is the phantom the work order names.
+   *
+   * ⚠️ EMPTY OR ABSENT MEANS **NO LAST TIME AT THIS WEIGHT** AND THE CELL OPENS BLANK — not at the
+   * band floor. Michael's ruling, 2026-08-25, on the unpriced ME row: prefilling the floor "read as
+   * do 1 rep". ⛔ THIS IS NOT `repsToExpect`, AND THE TWO MUST NOT BE COLLAPSED: that function answers
+   * the ENGINE's question (what baseline does the decline window measure against, which after a jump
+   * is the bottom of the band by item 3). This answers the SCREEN's question, where "nothing yet" has
+   * to render as nothing rather than as a prescription for one rep.
+   */
+  meLastRepsByPattern?: Partial<Record<ViadaPattern, number[]>> | null;
 };
 
 export type ComposeNote = { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string };
@@ -609,7 +649,9 @@ const LIFT_FOR_PATTERN: Record<ViadaPattern, TestedLift> = {
   press_lower: 'squat',
 };
 
-const LOWER_PATTERNS: ViadaPattern[] = ['hinge_lower', 'press_lower'];
+/** ⛔ WHICH PATTERNS THE LOWER-BODY HAIRCUT AND THE 10 lb STEP BELONG TO. One owner, read by
+ * `me-history.ts` for the bar ladder's increment as well as by this file for the haircut. */
+export const LOWER_PATTERNS: ViadaPattern[] = ['hinge_lower', 'press_lower'];
 
 /**
  * ⛔ WHICH PATTERN'S COMPETITION LIFT IS THIS TESTED LIFT — and the `null` is the load-bearing half.
@@ -983,7 +1025,7 @@ function exerciseForSlot(
     };
   }
 
-  const { weight, haircut } = prescribedLoad({
+  const { weight: floorWeight, haircut } = prescribedLoad({
     working,
     frame: args.frame,
     week: args.week,
@@ -992,6 +1034,29 @@ function exerciseForSlot(
     pctOfWorkingNumber: pct,
     roundTo: args.roundTo ?? 5,
   });
+
+  /**
+   * ⛔ THE EARNED INCREMENT LANDS ON TOP OF THE ROUNDED FLOOR, NOT INSIDE THE ARITHMETIC.
+   *
+   * ⚠️ THE OFFSET IS ALREADY A WHOLE NUMBER OF REAL PLATES — `advanceStep` gated it on the athlete's
+   * kit — so it is added to the rounded figure and stays exactly loadable. ⛔ NOT AN ARITHMETIC
+   * NO-OP IN GENERAL: while the increment is a multiple of `roundTo` the two orders agree, and the
+   * moment those two numbers stop dividing each other (a 2.5 lb round against a 5 lb pair, say) only
+   * this one keeps the earned jump whole. Adding it here also keeps the earned figure out of the
+   * percentage arithmetic entirely, which is what stops it from compounding with the scheduled rise.
+   *
+   * ⛔ AND IT IS ADDITIVE TO HIS RATE, NOT A REPLACEMENT FOR IT. `scheduledRise` is inside
+   * `prescribedLoad` above and stays there.
+   *
+   * ⚠️ `percent_1rm` BELOW IS NOT RECOMPUTED, DELIBERATELY. It is the percentage the INTENT asks for
+   * — the bottom of p218's band for this slot — and it is what `standing-plan-me-sets.test.ts`
+   * checks every row against. Restating it as "weight ÷ working number" would make it a derived
+   * figure that drifts above the band's floor the moment anything is earned, and would break the
+   * invariant that no row carries the top of both bands. The weight is the prescription; the
+   * percentage is the label on the slot.
+   */
+  const earnedLb = slot.intent === 'ME' ? Number(args.barOffsetsByPattern?.[pattern]) : NaN;
+  const weight = Number.isFinite(earnedLb) && earnedLb > 0 ? floorWeight + earnedLb : floorWeight;
 
   if (isLower && !hardRunBeforeLower && !notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS)) {
     // ⛔ SAID OUT LOUD, BECAUSE IT IS OUR READING. The lower-body weights are NOT reduced this block,
@@ -1013,6 +1078,29 @@ function exerciseForSlot(
     });
   }
 
+  /**
+   * ⛔⛔ THE HEAVY SLOT NO LONGER OPENS THE LOGGER AT THE TOP OF THE BAND (stage 2, item 5).
+   *
+   * `set_plan` stamped `p.reps.hi` on every set of every intent, and on ME that is five — the top of
+   * his 1-5. The logger prefills from `set_plan`, so every heavy set opened reading FIVE, the whole
+   * point of an open rep target was gone, and an athlete who tapped Done without editing handed the
+   * progression a five-rep session they never performed. Two of those in a row moves the bar.
+   *
+   * ⚠️ SO THE ME SLOT TAKES WHAT THEY ACTUALLY GOT LAST TIME, and NOTHING when there is no last time
+   * at this weight — the cell opens blank and the row's own "1-5" carries the target. Michael's
+   * ruling, 2026-08-25: the band floor is not a safe fallback, it reads as a prescription for one rep.
+   *
+   * ⚠️ THE OTHER THREE INTENTS ARE UNTOUCHED. DE, SKILL and HYP keep the band top in their set plan,
+   * which is what they have always carried and what their own rep prescription means.
+   */
+  const lastReps = slot.intent === 'ME'
+    ? (args.meLastRepsByPattern?.[pattern] ?? []).filter((n) => Number.isFinite(n))
+    : [];
+  const bandTop = p.kind === 'barbell' ? p.reps.hi : 1;
+  const openAt = slot.intent === 'ME'
+    ? (lastReps.length > 0 ? lastReps[lastReps.length - 1] : null)
+    : bandTop;
+
   return {
     exercise: {
       name: movement,
@@ -1021,9 +1109,16 @@ function exerciseForSlot(
       weight,
       percent_1rm: pct,
       ...(targetRir != null ? { target_rir: targetRir } : {}),
+      // ⛔ WHAT THEY GOT, ON THE ROW (item 6). `reps` above is the BAND and stays "1-5" — every
+      // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
+      // on that shape, so the result travels as its own field rather than inside the string.
+      ...(lastReps.length > 0 ? { last_reps: lastReps } : {}),
       set_plan: Array.from({ length: sets }, () => ({
         weight,
-        reps: p.kind === 'barbell' ? p.reps.hi : 1,
+        // ⚠️ THE KEY IS OMITTED, NOT ZEROED. `plannedSetsFor` reads a non-positive rep count as
+        // absent already, but a stored 0 would render as a logged zero — which is now the FAILED
+        // ATTEMPT signal, and inventing one on an unlogged set would undo a jump the athlete earned.
+        ...(openAt != null ? { reps: openAt } : {}),
       })),
       slot_intent: slot.intent,
       source_row: noteForWeek(slot, args.week),

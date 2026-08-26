@@ -189,16 +189,31 @@ export function restateFromTest(args: {
       const fromSets = setCountOf(ex);
       const setsMove = toSets != null && fromSets != null && toSets !== fromSets;
       const weightMoves = to != null && from !== to;
-      if (!weightMoves && !setsMove) return ex;
+      /**
+       * ⛔ AND LAST TIME'S RESULT MOVES ON A THIRD AXIS (2026-08-26) — the same trap `setsMove` was
+       * written for, one field further along. The heavy slot's reps are what the athlete GOT, so they
+       * change on a week where neither the weight nor the set count did; a diff that tested only
+       * those two would compute the result correctly and never write it to a single calendar row.
+       *
+       * ⚠️ AND IT IS NOT A `changes` ENTRY. The change list is the PRESCRIPTION diff the athlete is
+       * asked to accept; what they lifted last Tuesday is provenance the row displays, not a proposal.
+       * The row is still rewritten — `touched` — so the number reaches the calendar.
+       */
+      const repsKey = (v: unknown) => (Array.isArray(v) ? v.map((n) => Number(n)).join(',') : '');
+      const repsMove = repsKey((fresh as Record<string, unknown>).last_reps)
+        !== repsKey((ex as Record<string, unknown>).last_reps);
+      if (!weightMoves && !setsMove && !repsMove) return ex;
       touched = true;
-      changes.push({
-        week,
-        day,
-        movement: String(fresh.name),
-        from,
-        to: weightMoves ? to : null,
-        ...(setsMove ? { sets: { from: fromSets as number, to: toSets as number } } : {}),
-      });
+      if (weightMoves || setsMove) {
+        changes.push({
+          week,
+          day,
+          movement: String(fresh.name),
+          from,
+          to: weightMoves ? to : null,
+          ...(setsMove ? { sets: { from: fromSets as number, to: toSets as number } } : {}),
+        });
+      }
       /**
        * ⚠️ ONLY A PRESCRIBED WEIGHT REPLACES A WEIGHT. A HYP row carries no percentage by design
        * (p218) and stays "By feel" forever — so a set-count-only change leaves the load fields alone
@@ -214,7 +229,18 @@ export function restateFromTest(args: {
           }
           : {}),
         ...(setsMove ? { sets: toSets as number } : {}),
-        ...((weightMoves || setsMove) && fresh.set_plan ? { set_plan: fresh.set_plan } : {}),
+        // ⛔ THE SET PLAN CARRIES THE LOGGER'S REP PREFILL, so it travels whenever the result moves —
+        // not only on a weight or set change. That is where "open the cell on what they got last
+        // time" actually lands; without it the heavy set keeps opening at whatever it opened at when
+        // the block was authored.
+        ...((weightMoves || setsMove || repsMove) && fresh.set_plan ? { set_plan: fresh.set_plan } : {}),
+        // ⚠️ WRITTEN AS AN ABSENCE TOO. A pattern that just took a jump has no last time at the new
+        // weight, and the row has to STOP showing the old number rather than keep it forever.
+        ...(repsMove
+          ? (Array.isArray((fresh as Record<string, unknown>).last_reps)
+            ? { last_reps: (fresh as Record<string, unknown>).last_reps }
+            : { last_reps: undefined })
+          : {}),
       };
     });
     if (touched) rows.push({ id: String(row.id), week, day, strength_exercises: next });

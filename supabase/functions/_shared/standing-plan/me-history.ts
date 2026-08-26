@@ -10,10 +10,16 @@
 // ============================================================================
 
 import type { ComposedWeek, MeRowIndex } from './compose.ts';
-import { ME_SETS_BAND } from './compose.ts';
+import { LOWER_PATTERNS, ME_SETS_BAND } from './compose.ts';
 import {
+  advanceStep,
+  BAR_LADDER_START,
+  barLadderStep,
+  barSessionSignal,
   meLadderStep,
   meSessionOutcome,
+  type BarLadderState,
+  type BarSessionSignal,
   type LoggedMeSet,
   type MeLadderState,
   type MeSessionOutcome,
@@ -38,8 +44,41 @@ export type LoggedMeWorkoutRowish = {
 export type MeLadderReading = {
   /** What each pattern has earned. Absent patterns are the band's low end by omission. */
   sets: Partial<Record<ViadaPattern, number>>;
+  /**
+   * ⛔ POUNDS THE BAR HAS EARNED ON TOP OF THE SCHEDULED RISE, per pattern (2026-08-26).
+   *
+   * ⚠️ IT IS AN OFFSET AND NOT A WEIGHT. `scheduledRise` still owns the floor — his one per cent
+   * every three weeks — and this sits on top of it. Absent, or zero, is a pattern that has not
+   * earned an increment, which is every pattern at the start of every block.
+   */
+  bar: Partial<Record<ViadaPattern, number>>;
+  /**
+   * ⚠️ THE WHOLE LADDER STATE, for the surfaces that need more than the number: what the athlete got
+   * last time at this weight (stage 2's honest rep prefill), and which increments are stacked up and
+   * therefore undoable. Provenance, never a decision.
+   */
+  barState: Partial<Record<ViadaPattern, BarLadderState>>;
+  /**
+   * ⛔ WHAT THE ATHLETE ACTUALLY GOT AT THE WEIGHT THEY ARE ON, most recent last (stage 2).
+   *
+   * ⚠️ IT IS `barState[p].recentReps` LIFTED OUT rather than a second computation, because two
+   * surfaces need it and neither should reach into a ladder's internals to find it: the plan row
+   * prints it, and the logger opens its rep cell on the last entry. ⛔ EMPTY AFTER A JUMP, and that
+   * is correct — there is no last time at the NEW weight, and the row saying nothing beats it
+   * repeating a number earned on a lighter bar.
+   */
+  lastReps: Partial<Record<ViadaPattern, number[]>>;
   /** Per pattern, the sessions that were read and what each one was. Provenance, never a decision. */
-  history: Partial<Record<ViadaPattern, { week: number; day: string; movement: string; outcome: MeSessionOutcome }[]>>;
+  history: Partial<Record<ViadaPattern, {
+    week: number;
+    day: string;
+    movement: string;
+    outcome: MeSessionOutcome;
+    /** What the same session said about the BAR — a separate axis with a separate threshold. */
+    bar: BarSessionSignal;
+    /** The offset standing after this session, so a jump and its undo are both visible in the walk. */
+    barOffsetLb: number;
+  }[]>>;
   /** ⛔ ME rows the reader found no logged session for. Silence holds; saying so is not optional. */
   unread: number;
 };
@@ -81,6 +120,12 @@ export function earnedMeSets(args: {
   composed: ComposedWeek[];
   logged: LoggedMeWorkoutRowish[] | null | undefined;
   throughWeek: number;
+  /**
+   * ⚠️ THE SEAM FOR THE PLATE QUESTION, AND IT IS DELIBERATELY UNWIRED. `advanceStep` raises the
+   * increment to something the athlete can actually load; absent leaves the 5 lb upper / 10 lb lower
+   * default, which assumes the pair of 2.5s nearly everyone has. Nothing in the app writes this yet.
+   */
+  smallestPlatePairLb?: number | null;
 }): MeLadderReading {
   const band = ME_SETS_BAND;
   const repBand = meRepBand();
@@ -93,7 +138,9 @@ export function earnedMeSets(args: {
     }
   }
 
-  type Seen = { row: MeRowIndex; outcome: MeSessionOutcome };
+  // ⚠️ THE RAW SETS TRAVEL WITH THE ROW. The set ladder reads an OUTCOME and the bar ladder reads the
+  // reps themselves against a different threshold, so one walk feeds two mechanisms off one match.
+  type Seen = { row: MeRowIndex; outcome: MeSessionOutcome; sets: LoggedMeSet[] };
   const seen: Seen[] = [];
   const matched = new Set<string>();
 
@@ -113,10 +160,12 @@ export function earnedMeSets(args: {
       const row = index.get(key);
       if (!row) continue;
       matched.add(key);
+      const sets = setsOf(ex);
       seen.push({
         row,
+        sets,
         outcome: meSessionOutcome({
-          sets: setsOf(ex),
+          sets,
           prescribedSets: row.sets,
           repBand,
           prescribedWeight: row.weight,
@@ -137,17 +186,56 @@ export function earnedMeSets(args: {
     || (DAY_ORDER.indexOf(a.row.day) - DAY_ORDER.indexOf(b.row.day)));
 
   const state = new Map<ViadaPattern, MeLadderState>();
+  const bars = new Map<ViadaPattern, BarLadderState>();
   const history: MeLadderReading['history'] = {};
   for (const s of seen) {
     const cur = state.get(s.row.pattern) ?? { sets: band.lo, cleanRun: 0 };
     state.set(s.row.pattern, meLadderStep(cur, s.outcome, band));
+
+    /**
+     * ⛔ THE BAR WALKS THE SAME SESSIONS ON ITS OWN AXIS (2026-08-26). The set ladder asks whether the
+     * athlete has recovery to spare for a second set; the bar asks whether they finished the rep
+     * range twice running. ⚠️ The thresholds differ on purpose — a set is earned within one rep of
+     * the top, the bar needs the top itself — so the two must never be collapsed into one verdict.
+     *
+     * ⚠️ THE INCREMENT IS THE PATTERN'S, NOT THE SLOT'S: 10 lb on a lower-body lift, 5 on an upper,
+     * raised to whatever the athlete's plates can actually make.
+     */
+    const stepLb = advanceStep(
+      LOWER_PATTERNS.includes(s.row.pattern),
+      args.smallestPlatePairLb ?? null,
+    );
+    const nextBar = barLadderStep(bars.get(s.row.pattern) ?? BAR_LADDER_START, {
+      sets: s.sets, repBand, stepLb,
+    });
+    bars.set(s.row.pattern, nextBar);
+
     (history[s.row.pattern] ??= []).push({
-      week: s.row.week, day: s.row.day, movement: s.row.movement, outcome: s.outcome,
+      week: s.row.week,
+      day: s.row.day,
+      movement: s.row.movement,
+      outcome: s.outcome,
+      bar: barSessionSignal(s.sets, repBand).signal,
+      barOffsetLb: nextBar.offsetLb,
     });
   }
 
   const sets: Partial<Record<ViadaPattern, number>> = {};
   for (const [pattern, st] of state) sets[pattern] = st.sets;
 
-  return { sets, history, unread: [...index.keys()].filter((k) => !matched.has(k)).length };
+  // ⛔ ONLY A PATTERN THAT ACTUALLY EARNED SOMETHING APPEARS. A zero offset is the same prescription
+  // as no offset, and reporting it would put every untested pattern in a diff that changed nothing.
+  const bar: Partial<Record<ViadaPattern, number>> = {};
+  const barState: Partial<Record<ViadaPattern, BarLadderState>> = {};
+  const lastReps: Partial<Record<ViadaPattern, number[]>> = {};
+  for (const [pattern, st] of bars) {
+    barState[pattern] = st;
+    if (st.offsetLb > 0) bar[pattern] = st.offsetLb;
+    if (st.recentReps.length > 0) lastReps[pattern] = st.recentReps;
+  }
+
+  return {
+    sets, bar, barState, lastReps, history,
+    unread: [...index.keys()].filter((k) => !matched.has(k)).length,
+  };
 }
