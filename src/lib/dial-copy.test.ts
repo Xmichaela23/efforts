@@ -17,6 +17,7 @@ import {
   ACCESSORY_SUBTITLE,
   CORE_PICK_NOTE,
   DIAL_CAP_NOTE,
+  DIAL_CONTROL_VISIBLE,
   DIAL_SUBLINE,
   dialChipLine,
 } from './dial-copy.ts';
@@ -164,4 +165,29 @@ Deno.test('the dose line agrees with the rows', () => {
   assert(!/6\s*(–|-|to)\s*12/.test(ACCESSORY_DOSE_LINE), 'the contradicting dose is back');
   // And the RIR instruction is the reason it was kept rather than deleted.
   assert(/left in the tank/.test(ACCESSORY_DOSE_LINE), 'the RIR instruction was dropped');
+});
+
+
+Deno.test('⛔⛔ THE DIAL CONTROL IS OFF THE SCREEN — HIDDEN, AND STILL WIRED', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26: *"pills go away"*, and before it *"I think we couch the pills FOR NOW,
+   * get the plan closest to his working"*. **"For now" is his word.** The next session will find a
+   * dial with copy, chips and tests and no control anywhere on screen, and the obvious tidy-up is to
+   * delete it. This is what says do not.
+   *
+   * ⚠️ WHY IT CAME OFF, so it is not re-derived: every chip raises a weekly SET TARGET. Chest,
+   * Shoulders and Arms already have picker rows, so their extra sets land on an existing row
+   * silently; Glutes had no row, so filling its target CREATED one. Same mechanism, two different
+   * screens — it read as "glutes works, core is broken" when both did exactly the same thing.
+   */
+  assertEquals(DIAL_CONTROL_VISIBLE, false, 'the dial control is back on screen');
+
+  // ⛔ AND THE ENGINE IS UNTOUCHED. Hiding a control is not retiring a mechanism: the copy, the
+  // chips and the per-chip line all still work, so restoring the row is one boolean.
+  assert(DIAL_SUBLINE.length > 0, 'the dial subline was deleted with the control');
+  assert(DIAL_CAP_NOTE.length > 0, 'the cap note was deleted with the control');
+  for (const chip of ['chest', 'shoulders', 'arms', 'glutes', 'core'] as const) {
+    const line = dialChipLine(chip, { equipment: EQUIPMENT });
+    assert(line.length > 0, `${chip} lost its line — the engine was retired, not hidden`);
+  }
 });

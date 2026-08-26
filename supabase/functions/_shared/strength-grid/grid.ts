@@ -138,8 +138,12 @@ const OFFERABLE = (m: GridMovement) => !OFFER_STOPLIST.has(m.name);
  * ⚠️ `band` IS NOT BODYWEIGHT and is deliberately not folded in. A band is a real external load,
  * badly steppable, and {@link LAST_RESORT_RANK_FLOOR} already ranks it where it belongs. Two
  * judgements, two mechanisms, and merging them would demote a band twice.
+ *
+ * ⚠️ EXPORTED 2026-08-26 for `accessory-picks.ts`'s `requiresLoad` cells, which need the same
+ * question answered one rung up — and needed it as a GATE rather than as the tiebreak `rank` applies
+ * below. One owner of "does this movement carry external load", read by both.
  */
-function isBodyweightLoad(name: string): boolean {
+export function isBodyweightLoad(name: string): boolean {
   return resolveExerciseConfig(name).config?.displayFormat === 'bodyweight';
 }
 

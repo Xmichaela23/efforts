@@ -94,6 +94,7 @@ import {
   ACCESSORY_SUBTITLE,
   CORE_PICK_NOTE,
   DIAL_CAP_NOTE,
+  DIAL_CONTROL_VISIBLE,
   DIAL_SUBLINE,
   dialChipLine,
 } from '@/lib/dial-copy';
@@ -4963,6 +4964,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 endurance screens' focus CONTROL; a verb in a supporting line is not that control.
                 ⛔ CAP TWO, AND THE SCREEN SAYS WHY IN ITS OWN LINE. The upper days already carry
                 seven to nine counted work sets and p086's ceiling is the binding constraint. */}
+            {/* ⛔⛔ THE DIAL IS OFF THE SCREEN — HIDDEN, NOT DELETED (Michael, 2026-08-26: "pills go
+                away", and earlier "I think we couch the pills FOR NOW, get the plan closest to his
+                working"). "For now" is his word, so `DIAL_CONTROL_VISIBLE` is a one-line switch and
+                the engine below it stays wired and tested.
+
+                ⛔ WHY IT WAS NOT EARNING ITS PLACE, so it is not re-derived. Every chip raises a
+                WEEKLY SET TARGET for a muscle. Chest, Shoulders and Arms already have rows on this
+                screen, so their extra sets land on an existing row and nothing visibly happens;
+                Glutes had no row, so filling its target CREATED one. Same mechanism, two different
+                screens — which read as "glutes works, core is broken" when both were doing exactly
+                the same thing. Michael's call is to take the CONTROL off rather than fix the
+                display for now.
+
+                ⚠️ NOTHING ELSE HAD TO CHANGE, and that is measured rather than assumed: the wizard
+                opens with `dial: []` (see `patchViada`'s default), so with no control the value
+                stays empty and the composer's dial paths are simply never entered. The chip-row
+                block below self-hides on `dialRowChips.length > 0`, which is false on an empty dial.
+                There is no stored dial from a previous block to strand. */}
+            {DIAL_CONTROL_VISIBLE && (
             <div>
               {/* ⛔ SECTION-TITLE WEIGHT, NOT LABEL WEIGHT (Michael, from device screenshots
                   2026-08-24). At `text-sm` it read as a field label sitting above some chips rather
@@ -5025,6 +5045,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <p className="text-white/45 text-[13px] mt-2 leading-relaxed">{DIAL_CAP_NOTE}</p>
               )}
             </div>
+            )}
 
             {/* ── THE ROWS A CHIP ADDS ───────────────────────────────────────────────────────────
                 ⛔ ONLY FOR THE CHIPS THAT REACH NO SLOT — Glutes and Core. For those two the extra

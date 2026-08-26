@@ -28,11 +28,13 @@ import {
   type MuscleGroup,
 } from '../accessory-dosing/index.ts';
 import {
+  isBodyweightLoad,
   resolveSlot,
   type GridMovement,
   type ViadaCategory,
   type ViadaPattern,
 } from '../strength-grid/index.ts';
+import { ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
 // ⚠️ `WEEKDAYS` left with `dialSentence` (the week-order sort went to `src/lib/dial-copy.ts`).
@@ -53,6 +55,37 @@ export type ViadaPickKey =
 export const VIADA_PICK_KEYS: ViadaPickKey[] = [
   'db_press', 'iso_push', 'iso_pull_a', 'iso_pull_b', 'single_leg_a', 'single_leg_b', 'quad_iso', 'core',
 ];
+
+/**
+ * ⛔⛔ THERE IS NO EIGHTH PICK FOR THE LOWER POSTERIOR, AND IT WAS CONSIDERED AND REJECTED
+ * (Michael, 2026-08-26). This is the note for whoever notices the gap next — because it IS a real
+ * gap in the picker, and the obvious fix is wrong for three separate reasons.
+ *
+ * ⛔ 1. THERE IS NO CELL. `strength_5k` carries seven HYP accessory cells across both columns, all
+ * seven already claimed by the rows below, and **not one of them is `hinge_lower`** — not secondary,
+ * not focused, in either column. An eighth pick has nothing to point at, and the gate in
+ * `standing-plan-accessory-picks.test.ts` would fail by construction.
+ *
+ * ⛔ 2. THE POSTERIOR IS ALREADY TRAINED. Frame day 2 carries `DE accessory secondary hinge_lower`,
+ * and that cell resolves to **hip thrust** for every equipment case tested — none declared, barbell
+ * and bench, full gym — with romanian deadlift and RDL behind it. What is missing is the athlete's
+ * CHOICE, not the work. And that slot is DE: the programme's own prescription (pivot §6), not the
+ * athlete's to own. Handing it over is a different decision and needs its own ruling.
+ *
+ * ⚠️ 3. AND THE ABSENCE READS DELIBERATE. §E1b records "accessory lower" as genuinely ambiguous —
+ * the phrase is in no category on pp.218-223 — but he DOES name a focused hamstring slot in the All
+ * Rounder (p274) and did not put one here.
+ *
+ * ⚠️ AND WHY NORDIC CURL IS NOT THE HOME SUBSTITUTE, since it is the first thing anyone reaches for
+ * when the machine leg curl is out of range: nordics are heavily ECCENTRIC, eccentric hamstring work
+ * is among the most soreness-producing things available, and this athlete runs five days a week.
+ * Sore hamstrings cost the week's hardest run. Hip thrust is concentric-dominant and leaves almost
+ * nothing behind — benefit without a recovery cost to the endurance work, which is the whole test a
+ * movement has to pass in a hybrid programme.
+ */
+export const LOWER_POSTERIOR_NEEDS_NO_PICK =
+  'The heavy leg day already prescribes a hip thrust. The frame leaves no accessory slot for '
+  + 'hamstring or glute work, and the slot that trains them is the programme\'s own.';
 
 /**
  * ⛔ THE DEFAULT LAYOUT IS BALANCED BY ITSELF; THE DIAL IS FINE-TUNING ON TOP OF A BALANCED WEEK,
@@ -107,6 +140,32 @@ export type ViadaPickSpec = {
   leadCite: string;
   /** Which Dial chips this pick can be re-pointed by. Empty = the chip cannot reach it. */
   servesChips: DialChip[];
+  /**
+   * ⛔⛔ THIS CELL'S JOB NEEDS EXTERNAL LOAD (Michael, 2026-08-26, off the dropdown's own screenshot).
+   *
+   * Bodyweight Squat, Air Squat and Bodyweight Lunges were being offered to an athlete who squats
+   * 200 lb, in a SECONDARY slot on the heavy lower day. They provide no stimulus there. ⚠️ NONE OF
+   * THE THREE IS IN p220'S LIST for this cell — his own is split squat, Zercher squat, freestanding
+   * barbell calf raises, forward or reverse lunge. They are catalogue members, not his.
+   *
+   * ⛔ GATED, NOT DELETED. An athlete with nothing to load with still sees them, because for that
+   * athlete they are the real options and an empty cell is worse than a light one. `resolveSlot`
+   * never returns an empty list and this must not be the thing that makes it.
+   *
+   * ⚠️ AND IT IS A GATE HERE RATHER THAN IN `rank`, DELIBERATELY. The grid already DEMOTES bodyweight
+   * work for a loaded athlete, and its own docblock says that is *"a tiebreak, NEVER a gate"* —
+   * turning it into one there would exclude bodyweight options from every cell in the app on one
+   * cell's evidence. So the rule is declared per pick, and today only these two rows carry it.
+   */
+  requiresLoad?: boolean;
+  /**
+   * ⛔ MOVEMENTS THIS CELL EXCLUDES BY INTENT — not by equipment, and not from the catalogue.
+   *
+   * ⚠️ THE GENERAL DEFECT BEHIND IT: the grid ranks by EQUIPMENT FIT and is blind to whether an
+   * option can do the job the slot exists for. Everything in the cell is reachable and correctly
+   * patterned; some of it is still the wrong intent.
+   */
+  excludes?: string[];
 };
 
 /**
@@ -120,6 +179,23 @@ export type ViadaPickSpec = {
  * ⚠️ THE ATHLETE-FACING SENTENCE FOR THIS LIVES IN `src/lib/dial-copy.ts` (`CORE_PICK_NOTE`), not
  * here. The string that stood in this spot named the source, the missing slot and "the four movement
  * patterns" — engine vocabulary under a dropdown. This note is for whoever edits the table.
+
+/**
+ * ⛔ EXPLOSIVE STEP UP COMES OUT OF THE LEG-ACCESSORY CELL (Michael, 2026-08-26) — AND IS NOT
+ * DELETED FROM THE CATALOGUE.
+ *
+ * ⚠️ PLYO DOES NOT OWN IT, AND I CHECKED BEFORE REMOVING IT. `standing-plan/plyo.ts` carries no
+ * step-up of any kind, and the app's own files classify this one as ordinary loaded work:
+ * `exercise-role.ts` files it `secondary` / `loaded_accessory`, and `exercise-config.ts` gives it a
+ * load basis (squat × 0.4, per hand) with the comment *"'Explosive' is a speed cue, not a load
+ * basis."* So dropping it outright would have removed it from the app with nowhere else to live.
+ *
+ * ⛔ THE REASON IT LEAVES THIS CELL IS NEARER THAN THE PLYO ARGUMENT ANYWAY: `step up` is already in
+ * the list, and these two are the same movement differing only by a cue that tells the athlete to
+ * move fast — which is the DE slot's instruction, not this one's. A HYP secondary slot asking for
+ * controlled work should not offer a near-duplicate whose only distinguishing feature contradicts it.
+ */
+export const EXPLOSIVE_STEP_UP_IS_THE_WRONG_INTENT = ['explosive step up'];
 
 /**
  * ⛔ THE TABLE. Seven rows, six of them a `category × pattern` that exists in `frames.ts` today —
@@ -186,21 +262,42 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   // for the balance argument that belongs to `iso_pull_a` / `iso_pull_b`.
   //
   // ⚠️ NEITHER SERVES A CHIP, so unlike the pull pair there is no dial split to keep in step.
+  //
+  // ⛔⛔ "LEG ACCESSORY", NOT "SINGLE-LEG" (Michael, 2026-08-26, off the dropdown's screenshot:
+  // *"might be wendler legacy make it right"*). It was — and it was the WORDING, not the code.
+  //
+  // ⚠️ TRACED, NOT ASSERTED: `src/lib/assistance-catalog.ts` carries `single_leg_core` as one of
+  // WENDLER'S three assistance categories, display name *"Single-leg / core"*. This file does not
+  // import it and never has — the `label` strings are hardcoded here — so it was never a live
+  // dependency. The phrase walked across; the wiring did not.
+  //
+  // ⛔ AND IT MISDESCRIBED THE CELL. p220's own list for `secondary press_lower` is **split squat ·
+  // Zercher squat · freestanding barbell calf raises · forward or reverse lunge** — a bilateral
+  // squat and a calf raise sit in it. "Single-leg" named a subset of his own list and told the
+  // athlete the cell was narrower than it is. "Leg accessory" is true of the whole cell, and it sits
+  // beside `quad_iso`'s "Lower isolation" (the single-JOINT cell) without the two colliding.
+  //
+  // ⚠️ THE LABEL IS THE ONLY THING THAT CHANGED. The cell, the day split, both `leadWith` heads and
+  // the two-picks-one-per-day ruling of 2026-08-25 all stand exactly as they were.
   single_leg_a: {
     key: 'single_leg_a',
-    label: 'Single-leg',
+    label: 'Leg accessory',
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 2 },
     leadWith: ['bulgarian split squat', 'reverse lunge', 'step up', 'lateral lunge'],
     leadCite: 'Viada p220 — secondary press lower (ME lower day)',
     servesChips: [],
+    requiresLoad: true,
+    excludes: EXPLOSIVE_STEP_UP_IS_THE_WRONG_INTENT,
   },
   single_leg_b: {
     key: 'single_leg_b',
-    label: 'Single-leg',
+    label: 'Leg accessory',
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 5 },
     leadWith: ['walking lunge', 'step up', 'reverse lunge', 'lateral lunge'],
     leadCite: 'Viada p220 — secondary press lower (DE lower day)',
     servesChips: [],
+    requiresLoad: true,
+    excludes: EXPLOSIVE_STEP_UP_IS_THE_WRONG_INTENT,
   },
   quad_iso: {
     key: 'quad_iso',
@@ -379,7 +476,30 @@ export function pickOptions(
     intent: 'HYP',
     equipment: equipment ?? null,
   });
-  const pool = dedupeByCanonical(resolved.options);
+  /**
+   * ⛔⛔ TWO FILTERS THE GRID CANNOT APPLY, AND ONE REASON BEHIND BOTH (2026-08-26).
+   *
+   * `resolveSlot` ranks by EQUIPMENT FIT. It answers "can this athlete reach it" and "is it the
+   * right pattern", and it is blind to whether the movement can do the job the slot exists FOR. So a
+   * secondary slot on the heavy lower day offered Bodyweight Squat to someone who squats 200 lb, and
+   * offered Explosive Step Up next to the Step Up it is a speed-cued copy of.
+   *
+   * ⚠️ BOTH ARE DECLARED PER PICK, NEVER GLOBAL. The same blindness exists in every cell; whether it
+   * MATTERS is a per-cell judgement, and widening either rule on this cell's evidence is how one
+   * screenshot becomes an app-wide behaviour change nobody ruled on.
+   */
+  const excluded = new Set((spec.excludes ?? []).map((n) => canonicalize(n)));
+  /**
+   * ⛔ ONLY FOR AN ATHLETE WHO OWNS SOMETHING TO LOAD WITH. A bodyweight athlete's whole catalogue is
+   * bodyweight; gating them would empty the cell, and `resolveSlot`'s own contract is that it never
+   * returns nothing. ⚠️ An athlete nobody asked about equipment is untouched — `ownsLoadingImplement`
+   * is false on absent, which is the conservative arm and the app's existing §0h rule.
+   */
+  const dropBodyweight = spec.requiresLoad === true && ownsLoadingImplement(equipment);
+  const pool = dedupeByCanonical(resolved.options).filter((m) => {
+    if (excluded.has(canonicalize(m.name))) return false;
+    return !(dropBodyweight && isBodyweightLoad(m.name));
+  });
   const leadKeys = spec.leadWith.map((n) => canonicalize(n));
   const rank = (m: GridMovement): number => {
     const i = leadKeys.indexOf(canonicalize(m.name));

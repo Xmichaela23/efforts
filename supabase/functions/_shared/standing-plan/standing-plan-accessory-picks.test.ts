@@ -675,3 +675,101 @@ Deno.test('the lower-isolation default sits on each side of the machine gate', (
   assertEquals(canonicalize(String(gym.quad_iso)), canonicalize('leg extension'),
     'a gym athlete lost leg extension');
 });
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE LEG-ACCESSORY CELL — the label, and the two things the grid cannot filter (2026-08-26)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+const GYM = ['Full commercial gym access'];
+const HOME_BARBELL = ['Full barbell + plates', 'Bench (flat/adjustable)'];
+const NOTHING = ['Bodyweight only'];
+
+Deno.test('⛔⛔ THE LABEL IS "LEG ACCESSORY" — the Wendler wording is gone', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26, off the dropdown's screenshot: *"might be wendler legacy make it right."*
+   * It was, and it was the WORDING rather than the code: `assistance-catalog.ts` carries
+   * `single_leg_core` — one of WENDLER'S three assistance categories — with the display name
+   * "Single-leg / core". This file never imported it; the phrase walked across on its own.
+   *
+   * ⛔ AND IT MISDESCRIBED THE CELL. p220's list for `secondary press_lower` is split squat, Zercher
+   * squat, freestanding barbell calf raises, forward or reverse lunge — a bilateral squat and a calf
+   * raise sit in it. "Single-leg" named a subset of HIS OWN LIST.
+   */
+  for (const key of ['single_leg_a', 'single_leg_b'] as const) {
+    assertEquals(VIADA_PICKS[key].label, 'Leg accessory');
+    assert(!/single.?leg/i.test(VIADA_PICKS[key].label), `${key} still says single-leg`);
+  }
+  // ⚠️ AND IT DOES NOT COLLIDE WITH THE SINGLE-JOINT CELL NEXT TO IT.
+  assertEquals(VIADA_PICKS.quad_iso.label, 'Lower isolation');
+  // ⛔ THE LABEL WAS THE ONLY CHANGE. The 2026-08-25 day split and both lead heads still stand.
+  assertEquals(VIADA_PICKS.single_leg_a.slot?.frameDay, 2);
+  assertEquals(VIADA_PICKS.single_leg_b.slot?.frameDay, 5);
+  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'bulgarian split squat');
+  assertEquals(VIADA_PICKS.single_leg_b.leadWith[0], 'walking lunge');
+});
+
+Deno.test('⛔⛔ UNLOADED WORK IS GATED, NOT DELETED — it surfaces only with nothing to load with', () => {
+  /**
+   * ⛔ THE DEFECT: Bodyweight Squat and Air Squat were offered to an athlete who squats 200 lb, in a
+   * SECONDARY slot on the heavy lower day, where they provide no stimulus. ⚠️ None of them is in
+   * p220's list for this cell — they are catalogue members, not his.
+   */
+  for (const eq of [GYM, HOME_BARBELL]) {
+    const names = pickOptions('single_leg_a', eq).map((o) => o.name);
+    for (const bw of ['bodyweight squat', 'air squat', 'bodyweight lunges']) {
+      assertEquals(names.includes(bw), false, `${bw} was offered to a loaded athlete: ${names.join(', ')}`);
+    }
+    assert(names.length >= 4, `the cell was gutted for a loaded athlete: ${names.join(', ')}`);
+  }
+
+  /**
+   * ⛔ AND THE ATHLETE WITH NOTHING TO LOAD WITH STILL GETS THEM. For that athlete these ARE the real
+   * options, and `resolveSlot`'s contract is that a cell is never empty — this must not be the thing
+   * that empties one. ⚠️ MUTATION-TESTED: drop `ownsLoadingImplement` from the gate and this fails.
+   */
+  const bodyweight = pickOptions('single_leg_a', NOTHING).map((o) => o.name);
+  assert(bodyweight.some((n) => ['bodyweight squat', 'air squat', 'bodyweight lunges'].includes(n)),
+    `the bodyweight athlete lost their own options: ${bodyweight.join(', ')}`);
+
+  // ⚠️ AN ATHLETE NOBODY ASKED IS UNTOUCHED — the conservative arm, and the app's existing §0h rule.
+  const undeclared = pickOptions('single_leg_a', null).map((o) => o.name);
+  assert(undeclared.includes('bodyweight squat'), 'an unasked athlete was gated on equipment they never declared');
+});
+
+Deno.test('⛔ EXPLOSIVE STEP UP IS OUT OF THIS CELL, AND STILL IN THE APP', () => {
+  /**
+   * ⛔ IT IS A SPEED-CUED COPY OF `step up`, WHICH IS ALREADY IN THE LIST — and the cue it adds is
+   * the DE slot's instruction, not this one's. A HYP secondary slot asking for controlled work
+   * should not offer a near-duplicate whose only distinguishing feature contradicts it.
+   *
+   * ⚠️ PLYO DOES NOT OWN IT, CHECKED BEFORE REMOVING: `plyo.ts` carries no step-up, and the app
+   * files this one as ordinary loaded work (`exercise-role.ts` → `loaded_accessory`,
+   * `exercise-config.ts` → squat × 0.4 per hand, *"'Explosive' is a speed cue, not a load basis"*).
+   * So it is excluded from the CELL, never dropped from the catalogue.
+   */
+  for (const eq of [GYM, HOME_BARBELL, NOTHING, null]) {
+    for (const key of ['single_leg_a', 'single_leg_b'] as const) {
+      const names = pickOptions(key, eq).map((o) => o.name);
+      assertEquals(names.includes('explosive step up'), false, `${key} still offers the speed-cued copy`);
+      // ⛔ AND THE MOVEMENT IT DUPLICATES IS STILL THERE — the exclusion must not take the real one.
+      assert(names.includes('step up'), `${key} lost the plain step up too: ${names.join(', ')}`);
+    }
+  }
+});
+
+Deno.test('⛔ THE RULES ARE DECLARED PER PICK, NEVER GLOBAL', () => {
+  /**
+   * ⚠️ THE GENERAL DEFECT IS REAL AND IS NOT BEING FIXED GLOBALLY HERE. `resolveSlot` ranks by
+   * EQUIPMENT FIT and is blind to whether an option can do the job the slot exists FOR — that is
+   * true of every cell. Whether it MATTERS is a per-cell judgement, and widening either rule on one
+   * cell's evidence is how a screenshot becomes an app-wide change nobody ruled on.
+   */
+  const loaded = VIADA_PICK_KEYS.filter((k) => VIADA_PICKS[k].requiresLoad === true);
+  assertEquals(loaded, ['single_leg_a', 'single_leg_b']);
+  const excluding = VIADA_PICK_KEYS.filter((k) => (VIADA_PICKS[k].excludes ?? []).length > 0);
+  assertEquals(excluding, ['single_leg_a', 'single_leg_b']);
+  // ⛔ AND THE OTHER CELLS ARE UNCHANGED — a gym athlete's core pick still holds its bodyweight work,
+  // which is what core work IS. Proof the rule did not leak.
+  const core = pickOptions('core', GYM).map((o) => o.name);
+  assert(core.length >= 3, `the core pick was gated by a rule it does not carry: ${core.join(', ')}`);
+});

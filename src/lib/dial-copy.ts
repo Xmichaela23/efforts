@@ -85,6 +85,27 @@ export const DIAL_CAP_NOTE =
   'Two at a time — past that the lifting days get big enough to cost the next day’s run.';
 
 /**
+ * ⛔⛔ THE DIAL'S CONTROL IS OFF THE SCREEN — HIDDEN, NOT DELETED (Michael, 2026-08-26).
+ *
+ * His words: *"pills go away"*, and before that *"I think we couch the pills FOR NOW, get the plan
+ * closest to his working"*. **"For now" is his word**, which is why this is a switch and not a
+ * deletion: the chips, their copy, `dialChipLine`, `defaultViadaPicks`'s chip handling and the
+ * composer's dial paths all stay wired and tested. Flipping this back is the whole restoration.
+ *
+ * ⛔ WHY IT WAS NOT EARNING ITS PLACE, recorded so it is not re-derived from the screen. Every chip
+ * raises a WEEKLY SET TARGET for a muscle. Chest, Shoulders and Arms already have picker rows on
+ * that screen, so their extra sets land on an existing row and nothing visibly happens. Glutes had
+ * no row, so filling its target CREATED one. **Same mechanism, two different screens** — which read
+ * as "glutes works, core is broken" when both were doing exactly the same thing. Michael's call was
+ * to take the CONTROL off rather than fix the display, for now.
+ *
+ * ⚠️ NOTHING ELSE HAD TO CHANGE, and that is measured rather than assumed: the wizard opens with
+ * `dial: []`, so with no control the value stays empty and the composer's dial branches are never
+ * entered. There is no dial stored from a previous block to strand.
+ */
+export const DIAL_CONTROL_VISIBLE = false;
+
+/**
  * ⛔ THE CORE PICK'S NOTE (Michael, 2026-08-24). Replaced a three-clause explanation that named the
  * source, the absence of a core slot, and "the four movement patterns" — sourcing talk, engine
  * vocabulary, and a taxonomy, under a dropdown. What the athlete needs is what the control does.
