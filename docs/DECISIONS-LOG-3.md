@@ -1035,3 +1035,46 @@ Single-leg rows differ, and an A-skip row asks reps only. On the `ENGINE-STATE` 
    `single_leg_a` / `single_leg_b` (days 2/5, split on the DAY — ME lower vs DE lower, and it buys
    movement variety, not muscle coverage). ⚠️ **See the superseded block above** — this entry
    originally recorded the opposite call on `single_leg`.
+
+---
+
+## D-452 — Athlete pins always win, informed; blocked days beat everything; stacking is the release valve (2026-08-25, Michael)
+
+**The ruling, verbatim intent: "user choice always wins, it's just informed."** One day of chat
+rulings, built and deployed the same day. This entry is the only record — both HANDOFF docs
+(`HANDOFF-strongfocus-week-screen-ux-2026-08-25.md`, `HANDOFF-your-week-pins-win-2026-08-25.md`)
+shipped fully and were deleted on this close per the spec lifecycle.
+
+**The law, in precedence order:**
+1. **A blocked day ("Days you can't train") outranks everything** — including the athlete's own tap
+   on the same day (the session is rescheduled off it with a note naming the move) and the long-day
+   pin in the lifting rotation (`chooseDayMap` scores blocked days above `LONG_RUN_WINS` — reality
+   beats preference). Endurance sessions never land on a blocked day; the lifting frame rotates to
+   clear one, and sits on one only when no rotation satisfies all pins together — then the note
+   says so.
+2. **A tapped day is an absolute pin.** The engine re-solves everything unpinned around it. No
+   science rule blocks; every rule warns (breach/trade-off tiers off the layer in
+   `week-model/resolve.ts` — `resolveAroundPins`, `violationsOf`).
+3. **Club = pin.** Ticking club (any session card, including the long-ride card — club can BE the
+   long ride, slice 2b) pins the day the club meets. Club on the long card consumes no hard slot
+   (`long_session.ownership`, never in `hardDays`). Club typical-duration shortfall vs the plan's
+   long target = one informed note.
+4. **Stacking is the release valve.** Relocation prefers days already training (club days included)
+   before eating the rest day — consolidation (SOURCE p130) applied under pressure.
+5. **The two-hard-session cap stays firm at intake** — the one deliberate exception to warn-never-
+   block; it is the source's own prescription for a strength block.
+
+**Anchor identity belongs to the frame slot, not the sport assigner.** `anchorRoleOf` reads
+`slot.family`; a 16,832-case fuzz harness (`standing-plan/fuzz-builder.test.ts`, permanent, ~35s)
+caught the sport-assigner variant silently dropping every hard/club pin whenever rides were in the
+mix. Same harness proved: never throws, never empty, always exactly the frame's lift-day count.
+
+**Copy doctrine that rode along:** engine internals stay internal — clearance hours, pairing, and
+rest-day doctrine were removed from the athlete-facing rules list ("Use these tips to put your own
+week together", 4 plain lines, Michael's wording); they reach the athlete only as concrete notes
+when a pick trips one. Pairing is fully silent. `week-rules-copy.ts` keys explainer + warning to one
+row so they cannot drift. Book-lifted display names replaced with field-standard terms (Over-unders,
+Cut-downs, Threshold, easy wording). Plyo got its own tag + muted magenta (#B9678F) app-wide.
+
+**Rejected:** carving clubs out of blocked-day relocation (blocking your club's day means you can't
+make club); a sports-color legend on the week strip (vertical cost); a third hard slot.

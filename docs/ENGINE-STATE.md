@@ -1,6 +1,50 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-25 — after the Dial / opt-in / TYPE_TABLE arc)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-25 night — after the pins-win day)
+
+### Your job: **CLEAN UP `POLISH-PUNCH-LIST.md`.** Michael called it: next session works the punch list.
+
+Read the list top to bottom, verify each open item against code before acting (a Q-entry is a LEAD,
+not a verified bug), close what's done with dates, and work what's real. The AWAITING MICHAEL
+accessory-rows block at the top is **DONE** — all four checks passed in the audited plan export
+(core = pick+1, isolation pulls differ, single-legs differ, A-skip reps-only); mark it closed.
+
+### What shipped today, so you don't re-litigate it (all PUSHED + DEPLOYED, most device-verified)
+
+- **D-452 — the whole pins-win law.** Athlete pins absolute; blocked days beat everything including
+  the athlete's own tap and the long pin; club = pin (and club can BE the long ride); stacking is
+  the release valve; every science rule warns, never blocks (the two-hard cap at intake is the one
+  firm limit). Engine: `week-model/resolve.ts` (resolveAroundPins/violationsOf),
+  `standing-plan/compose.ts` (endurancePins, relocator), `day-map.ts` (rotation scores blocked
+  days). ⚠️ `anchorRoleOf` reads `slot.family` — the frame's — NEVER the sport-assigned family;
+  a comment in compose.ts forbids the tempting "fix" that silently dropped every pin when rides
+  were in the mix.
+- **The fuzz harness is permanent**: `standing-plan/fuzz-builder.test.ts`, 16,832 cases, ~35s,
+  runs with `deno test`. It caught two shipped bugs on day one. Do not delete or sample it down.
+- **The "Your week" screen (step 7) is rebuilt and device-verified**: master strip, always-open
+  pickers, pinned("yours")/placed chips with tap cue, rest-day row, tiered notes, 4-line tips list
+  in Michael's wording. The wizard copy pass (steps 4/5/6, Train/Strength screens) is his wording —
+  don't re-voice it.
+- **Plyo has its own tag + color** (#B9678F magenta, Zap icon) app-wide, device-verified.
+- **Book-lifted names are gone** (Over-unders, Cut-downs, Threshold, easy wording) — display only,
+  archetype ids untouched.
+- Deploy state: `generate-strength-plan` v145+, `create-goal-and-materialize-plan`,
+  `rematerialize-standing-block` all redeployed 2026-08-25 ~23:29 UTC; client on Netlify at
+  `fa60efa3`+ (docs commits after).
+
+### Still UNVERIFIED / open
+
+- **A three-club built plan on a device post-pin-fix.** Michael's current plan predates the
+  anchor-role fix (it has no clubs, so it's unaffected — he kept it, no reimport). The acceptance
+  that's never been run on a device: build a plan with clubs + a blocked day and read the BUILT
+  week. The fuzz proves it server-side; a human hasn't seen it.
+- **Q-286** (deadlift-week Friday vs pairing law), **Q-287** (phantom seed prefs + export brief —
+  a terminal paste exists, work not done), **Q-288** (keystone slot scoring — unverified gap).
+- Step-8 confirm screen: color-code the week list by sport (queued on the punch list).
+- ⚠️ Deno is at `~/.deno/bin/deno`, not on PATH; run suites with `-A` (under-permissioned runs
+  hide real failures).
+
+## 🧭 DONE — was START HERE (2026-08-25 morning — the Dial / opt-in / TYPE_TABLE arc; all four accessory-row checks passed in the audited export, 2026-08-25 night)
 
 ### Your job: **BUILD A BLOCK AND READ THE ACCESSORY ROWS.** Four things to confirm, then you are done with this screen.
 

@@ -14,7 +14,7 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
       master strip). Nothing is missing from the list — the sessions are all there, they just
       read as a wall of same-colored text (Michael corrected the earlier "missing sessions" read).
 
-## ⏳ AWAITING MICHAEL — THE BUILT BLOCK'S ACCESSORY ROWS (2026-08-25)
+## ✅ DONE 2026-08-25 night — THE BUILT BLOCK'S ACCESSORY ROWS (all four checks passed in the audited plan export; see ENGINE-STATE banner)
 
 **Deployed and version-verified** (`generate-strength-plan` v140, `rematerialize-standing-block` v18,
 2026-08-25 10:44 UTC). The wizard screens are seen; **the BUILT WEEK is not.** Generate a Strength

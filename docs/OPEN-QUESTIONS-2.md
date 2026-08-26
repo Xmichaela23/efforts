@@ -927,3 +927,29 @@ despite the acceptance verifying the test wrote working numbers (bench 149 / OHP
 session early via Pick planned, or a real starvation (sheet not reading the restated
 `planned_workouts.strength_exercises`, or ME rows never stamped). A LEAD, not a verified bug —
 check what next Monday's session shows on-date before touching anything.
+
+---
+
+## Q-286 — Alternate-week Friday DE leads with deadlift on the hard-RUN day (2026-08-25)
+
+The default plan's ME/DE lift rotation puts Deadlift + front squat on Friday's DE: Lower on
+even weeks — the day the hard run shares. The pairing law (model.ts PAIRING) says deadlift belongs
+with the ride, squat with the run. Squat-weeks match the law; deadlift-weeks don't. May be
+intentional rotation arithmetic (the weekly ME/DE swap can't hold both pairings both weeks).
+A LEAD — one-line trace of the rotation vs PAIRING before calling it a bug.
+
+## Q-287 — Phantom seed preferences + export brief describes the wrong plan (2026-08-25)
+
+An untouched wizard writes seed defaults into `preferred_days` (hard days friday/tuesday,
+quality_bike tuesday) that read as athlete choices in the stored config and the .md export. And the
+export's intro paragraph is static run-only text ("four runs", "the hard sessions are on the bike")
+pasted onto every mix, with the test-week sentence duplicated. Export is a dev feature — low
+priority. A terminal paste for both exists (2026-08-25 chat) but the work was NOT done; the fuzz
+harness took that session instead.
+
+## Q-288 — Keystone-gets-the-freshest-slot is not verifiably encoded in the solver (2026-08-25)
+
+The source's strongest scheduling rule (p131: keystone sessions get the most-recovered slot) has no
+identified counterpart in week-model/resolve.ts score terms. The default frame happens to honor it
+(ME days land straight off the rest day), but nothing appears to *score* it under athlete pins.
+UNVERIFIED — trace before building anything; may be implicitly covered by the clearance costs.
