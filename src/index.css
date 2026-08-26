@@ -166,6 +166,25 @@
     --swim-glow-a2-active: 0.18;
     --swim-glow-a3-active: 0.11;
 
+    /* Plyo (Muted magenta) - the plyometric drill day, NOT a lifting day.
+       ⛔ Must equal SPORT_COLORS.plyo in src/lib/context-utils.ts (pinned by
+       src/lib/sport-color-parity.test.ts). Same alpha ramp as strength/mobility so it sits at the
+       same brightness on the dark theme rather than glowing harder than the disciplines. */
+    --plyo-core: #B9678F;
+    --plyo-glow-rgb: 185 103 143;
+    --plyo-glow-a1-idle: 0.015;
+    --plyo-glow-a2-idle: 0.008;
+    --plyo-glow-a3-idle: 0.004;
+    --plyo-glow-a1-week: 0.08;
+    --plyo-glow-a2-week: 0.05;
+    --plyo-glow-a3-week: 0.03;
+    --plyo-glow-a1-done: 0;
+    --plyo-glow-a2-done: 0;
+    --plyo-glow-a3-done: 0;
+    --plyo-glow-a1-active: 0.28;
+    --plyo-glow-a2-active: 0.18;
+    --plyo-glow-a3-active: 0.11;
+
     /* Bike (Green) - Bright emerald green (clean, vibrant) */
     --bike-core: #50C878;
     --bike-glow-rgb: 80 200 120;

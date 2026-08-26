@@ -84,6 +84,9 @@ export function formatMilesShort(miles: number | null, digits: number = 1): stri
 
 export function typeAbbrev(typeLike: string | undefined, workout?: any): string {
   const t = (typeLike || '').toLowerCase();
+  // ⛔ BEFORE THE STRENGTH BRANCH, because the plyo day IS `type: 'strength'` on the wire and would
+  // otherwise abbreviate to `ST`. See `isPlyoSession` — the tag decides, never the name.
+  if (workout && isPlyoSession(workout)) return 'PLYO';
   if (t.includes('run')) return 'RN';
   if (t.includes('ride') || t.includes('bike') || t === 'cycling') return 'BK';
   if (t.includes('swim')) return 'SW';
@@ -109,6 +112,52 @@ export function typeAbbrev(typeLike: string | undefined, workout?: any): string 
   }
   if (t.includes('walk')) return 'WK';
   return 'WO';
+}
+
+/**
+ * ⛔ THE TAG LIST, HOWEVER IT ARRIVED. `planned_workouts.tags` comes back as a real array from the
+ * client's own writes and as a JSON string from some plan materialisations, and three call sites in
+ * this repo had each grown their own copy of that branch. One reader.
+ */
+export function readWorkoutTags(workout?: { tags?: unknown } | null): string[] {
+  const raw = workout?.tags;
+  let tags: unknown[] = [];
+  if (Array.isArray(raw)) tags = raw;
+  else if (typeof raw === 'string') { try { const p: unknown = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch { /* not JSON */ } }
+  return tags.map((t) => String(t).toLowerCase());
+}
+
+/**
+ * ⛔ IS THIS THE PLYOMETRIC DRILL DAY? THE TAG DECIDES, NEVER THE NAME OR THE TYPE.
+ *
+ * `standing-plan/compose.ts` `plyoSession` emits the frame's plyo day as `type: 'strength'` with
+ * `tags: ['standing_plan', 'plyo']` and no barbell in it — so on `type` alone it is indistinguishable
+ * from a lifting day, which is exactly how the calendar came to show a four-lift week as five
+ * orange STG chips.
+ *
+ * ⚠️ THE TAG, NOT THE NAME. `lifting-commitment.ts` and `WeekGrid.tsx` both already exclude this
+ * session by its tag and both carry the same warning: the name is a display string and matching on
+ * one is what the label renames had to unpick twice.
+ * ⚠️ DISPLAY ONLY. Nothing that reasons about the session — load, dosing, the reconciler — reads
+ * this; it is still a strength row everywhere upstream of a pixel.
+ */
+export function isPlyoSession(workout?: { tags?: unknown } | null): boolean {
+  if (!workout) return false;
+  return readWorkoutTags(workout).includes('plyo');
+}
+
+/**
+ * ⛔ WHICH COLOUR AND WHICH ICON THIS SESSION WEARS — the one seam between "what it is on the wire"
+ * and "what an athlete sees". Returns a `SPORT_COLORS` key.
+ *
+ * ⚠️ IT DERIVES NOTHING ELSE. A caller wanting the session's actual discipline must read `type`;
+ * this answers only the display question, and `plyo` is the single case where the two differ.
+ */
+export function displayDisciplineOf(
+  workout?: { type?: unknown; workout_type?: unknown; tags?: unknown } | null,
+): string {
+  if (isPlyoSession(workout)) return 'plyo';
+  return String(workout?.type || workout?.workout_type || '').toLowerCase();
 }
 
 /**

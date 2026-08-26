@@ -38,6 +38,20 @@ export const SPORT_COLORS = {
   weights: '#FF8C42',  // alias
   mobility: '#B794F6', // bright lavender purple (clean, vibrant)
   pilates_yoga: '#B794F6', // alias
+  /**
+   * ⛔ PLYO IS ITS OWN COLOUR BECAUSE IT WAS ITS OWN THING WEARING STRENGTH'S (2026-08-25).
+   *
+   * The composer emits the frame's plyo day as `type: 'strength'` (`standing-plan/compose.ts`
+   * `plyoSession`), so the calendar drew it as an orange STG chip identical to a barbell day — a
+   * four-lift week read as five sessions of lifting. `lifting-commitment.ts` and `WeekGrid` had
+   * already had to exclude it BY ITS TAG; this is the same distinction made visible.
+   *
+   * ⚠️ MUTED MAGENTA, NOT THE NEON END (Michael's hex). It sits beside orange strength without
+   * reading as a second strength, and away from mobility's lavender.
+   * ⚠️ DISPLAY ONLY. Nothing downstream — load, dosing, the reconciler — knows this key exists;
+   * the session is still `type: 'strength'` everywhere that reasons about it.
+   */
+  plyo: '#B9678F',     // muted magenta (plyometric drill day — not a lifting day)
 } as const;
 
 /**
@@ -76,6 +90,7 @@ const DISCIPLINE_TO_TAILWIND: Record<string, string> = {
   pilates: 'purple',
   yoga: 'purple',
   stretch: 'purple',
+  plyo: 'pink',
 };
 
 /**
@@ -137,6 +152,7 @@ export function getDisciplineTailwindClass(type: string): string {
     blue: 'bg-blue-500',
     orange: 'bg-orange-500',
     purple: 'bg-purple-500',
+    pink: 'bg-pink-500',
     gray: 'bg-gray-500',
   };
   return classMap[colorName] || 'bg-gray-500';
@@ -164,6 +180,7 @@ export function getDisciplineTextClass(type: string): string {
     blue: 'text-blue-500',
     orange: 'text-orange-500',
     purple: 'text-purple-500',
+    pink: 'text-pink-500',
     gray: 'text-gray-500',
   };
   return classMap[colorName] || 'text-gray-500';
@@ -181,6 +198,7 @@ export function getDisciplineCheckmarkColor(type: string): string {
     blue: 'text-blue-500',
     orange: 'text-orange-500',
     purple: 'text-purple-500',
+    pink: 'text-pink-500',
     gray: 'text-gray-500',
   };
   return classMap[colorName] || 'text-white';
@@ -330,6 +348,7 @@ export function getDisciplineTextClassVariant(type: string, variant: '400' | '50
     blue: { '400': 'text-blue-400', '500': 'text-blue-500' },
     orange: { '400': 'text-orange-400', '500': 'text-orange-500' },
     purple: { '400': 'text-purple-400', '500': 'text-purple-500' },
+    pink: { '400': 'text-pink-400', '500': 'text-pink-500' },
     gray: { '400': 'text-gray-400', '500': 'text-gray-500' },
   };
   return classMap[colorName]?.[variant] || classMap.gray[variant];
@@ -347,6 +366,7 @@ export function getDisciplineBorderClass(type: string, opacity: '30' | '50' | '6
     blue: { '30': 'border-blue-500/30', '50': 'border-blue-500/50', '60': 'border-blue-500/60' },
     orange: { '30': 'border-orange-500/30', '50': 'border-orange-500/50', '60': 'border-orange-500/60' },
     purple: { '30': 'border-purple-500/30', '50': 'border-purple-500/50', '60': 'border-purple-500/60' },
+    pink: { '30': 'border-pink-500/30', '50': 'border-pink-500/50', '60': 'border-pink-500/60' },
     gray: { '30': 'border-gray-500/30', '50': 'border-gray-500/50', '60': 'border-gray-500/60' },
   };
   return classMap[colorName]?.[opacity] || classMap.gray[opacity];
@@ -364,6 +384,7 @@ export function getDisciplineBgClassVariant(type: string, variant: '500' | '600'
     blue: { '500': 'bg-blue-500', '600': 'bg-blue-600' },
     orange: { '500': 'bg-orange-500', '600': 'bg-orange-600' },
     purple: { '500': 'bg-purple-500', '600': 'bg-purple-600' },
+    pink: { '500': 'bg-pink-500', '600': 'bg-pink-600' },
     gray: { '500': 'bg-gray-500', '600': 'bg-gray-600' },
   };
   return classMap[colorName]?.[variant] || classMap.gray[variant];
@@ -381,6 +402,7 @@ export function getDisciplineFocusRingClass(type: string): string {
     blue: 'focus:ring-blue-500/50',
     orange: 'focus:ring-orange-500/50',
     purple: 'focus:ring-purple-500/50',
+    pink: 'focus:ring-pink-500/50',
     gray: 'focus:ring-gray-500/50',
   };
   return classMap[colorName] || classMap.gray;
@@ -398,6 +420,7 @@ export function getDisciplineFocusBorderClass(type: string): string {
     blue: 'focus:border-blue-500/50',
     orange: 'focus:border-orange-500/50',
     purple: 'focus:border-purple-500/50',
+    pink: 'focus:border-pink-500/50',
     gray: 'focus:border-gray-500/50',
   };
   return classMap[colorName] || classMap.gray;
@@ -474,6 +497,7 @@ function getDisciplineGlowRgbVar(type: string): string {
     bike: '--bike-glow-rgb',
     ride: '--bike-glow-rgb',
     cycling: '--bike-glow-rgb',
+    plyo: '--plyo-glow-rgb',
   };
   return varMap[normalized] || '--run-glow-rgb';
 }
@@ -506,6 +530,7 @@ function getDisciplineGlowAlphaVars(type: string, state: 'idle' | 'week' | 'done
     bike: '--bike-glow',
     ride: '--bike-glow',
     cycling: '--bike-glow',
+    plyo: '--plyo-glow',
   };
   const prefix = prefixMap[normalized] || '--run-glow';
   return {

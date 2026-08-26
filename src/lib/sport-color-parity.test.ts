@@ -48,6 +48,22 @@ Deno.test('the `--strength-core` CSS var is the same colour too', () => {
   assertEquals(glow, asRgb);
 });
 
+Deno.test('tailwind `plyo` and `--plyo-core` are exactly SPORT_COLORS.plyo', () => {
+  // Added 2026-08-25 with the plyo tag. Same three definition sites as `strength`, pinned for the
+  // same reason: the plyo day exists precisely so it cannot be mistaken for a lifting day, and a
+  // hue that drifts back toward orange in one of the three would undo that silently.
+  assertEquals(configColor('plyo'), SPORT_COLORS.plyo.toUpperCase());
+
+  const cssSrc = Deno.readTextFileSync(new URL('../index.css', import.meta.url));
+  const core = cssSrc.match(/--plyo-core:\s*(#[0-9A-Fa-f]{6})/)?.[1].toUpperCase() ?? null;
+  assertEquals(core, SPORT_COLORS.plyo.toUpperCase());
+
+  const hex = SPORT_COLORS.plyo.replace('#', '');
+  const asRgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(' ');
+  const glow = cssSrc.match(/--plyo-glow-rgb:\s*([\d\s]+);/)?.[1].trim() ?? null;
+  assertEquals(glow, asRgb);
+});
+
 Deno.test('the discipline colours are still all distinct', () => {
   // The three leaks removed from the logger were each a discipline colour doing another
   // discipline's job (orange-300 reading as run gold, sky-300 as swim, emerald as bike). That is
@@ -58,6 +74,10 @@ Deno.test('the discipline colours are still all distinct', () => {
     SPORT_COLORS.swim,
     SPORT_COLORS.strength,
     SPORT_COLORS.mobility,
+    // ⛔ PLYO IS IN THIS LIST DELIBERATELY. It is not a discipline — it is a display class — but it
+    // sits on the same chips and the same dot strips, so "two things share a colour" is the same
+    // defect here as it is between two sports.
+    SPORT_COLORS.plyo,
   ].map((c) => c.toUpperCase());
   assertEquals(new Set(distinct).size, distinct.length);
 });

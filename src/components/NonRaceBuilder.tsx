@@ -26,6 +26,8 @@ import { demonstratedRunVolume } from '../../supabase/functions/_shared/standing
 import { advancedTierSessions } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
+// ⛔ ONE READER FOR "is this the plyo day" — shared with the calendar chip. The tag, never the name.
+import { isPlyoSession } from '@/lib/utils';
 // ONE band, shared with the composer — what the athlete is told while typing and what the plan
 // records cannot disagree. A REFERENCE, never a cap (D-222's ceiling was retired on purpose).
 import { maintenanceDoseFor, startLightMiles, volumeStateForMiles, volumeStateLine, volumeStateLineVsUsual, volumeStateVsUsual } from '@/lib/maintenance-volume-band';
@@ -2350,7 +2352,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       const d = String((s as { day?: string }).day ?? '').toLowerCase();
       if (!d) continue;
       const t = String((s as { type?: string }).type ?? '').toLowerCase();
-      (out[d] ??= []).push(t === 'ride' ? 'bike' : (t || 'strength'));
+      /**
+       * ⛔ THE PLYO DAY GETS ITS OWN DOT (2026-08-25). It is `type: 'strength'` — the same fact
+       * `WeekGrid`'s lift count had to exclude by tag — so the strip drew a fifth orange dot on a
+       * four-lift week, in the one object whose whole job is "what shape is my week".
+       * ⚠️ `isPlyoSession` IS THE READER, shared with the calendar chip, so the strip and the
+       * calendar cannot come to different conclusions about the same session.
+       */
+      (out[d] ??= []).push(
+        isPlyoSession(s as { tags?: unknown }) ? 'plyo' : (t === 'ride' ? 'bike' : (t || 'strength')),
+      );
     }
     return out;
   }, [previewWeek]);

@@ -2,11 +2,11 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout } from '@/lib/utils';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
-import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, Zap, type LucideIcon } from 'lucide-react';
 // ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the same function the drawer control uses. See the glyph.
 import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipline-swap';
 // ⛔ THE SAME "did this miss a planned slot" RULE the workout view uses — never a second copy.
@@ -114,6 +114,16 @@ const DISCIPLINE_ICONS: Record<string, LucideIcon> = {
   pilates_yoga: CircleDot,
   pilates: CircleDot,
   yoga: CircleDot,
+  /**
+   * ⛔ THE PLYO DAY GETS THE BOLT, NOT THE DUMBBELL (Michael, 2026-08-25). It is `type: 'strength'`
+   * on the wire, so it drew a dumbbell — which said "lifting" in the one glyph the magenta chip
+   * exists to stop saying. A drill day is jumps and skips and there is no bar in it.
+   *
+   * ⚠️ THE ENTRY IS LOAD-BEARING, not decoration: without a row here `resolveDisciplineForIcon`
+   * falls `plyo` through its label regexes to the `run` default and the chip silently draws the
+   * run icon.
+   */
+  plyo: Zap,
 };
 
 function resolveDisciplineForIcon(workoutType: string, label: string): string {
@@ -123,6 +133,7 @@ function resolveDisciplineForIcon(workoutType: string, label: string): string {
   if (/^rn[- ]|run|rnvo2|rn-lr|rn-tmp|rn-int/.test(labelLower)) return 'run';
   if (/^bk|bike|ride|cycling/.test(labelLower)) return 'ride';
   if (/^sm|swim|swimming/.test(labelLower)) return 'swim';
+  if (/plyo/.test(labelLower)) return 'plyo';
   if (/stg|strength|upper|lower|full|cmp|acc|core/.test(labelLower)) return 'strength';
   if (/mbl|mobility|pilates|yoga|plt|ygo|py/.test(labelLower)) return 'pilates_yoga';
   return 'run'; // default fallback
@@ -275,6 +286,13 @@ function derivePlannedCellLabel(w: any): string | null {
     if (type === 'strength') {
       // A 1RM/baseline TEST is measurement, not training — label it as such (Q-097/Q-102).
       if (isBaselineTestWorkout(w)) return 'TEST';
+      /**
+       * ⛔ THE PLYOMETRIC DRILL DAY IS NOT A LIFTING DAY, AND THE CHIP SAID IT WAS (2026-08-25).
+       * It arrives `type: 'strength'` from `standing-plan/compose.ts`, so every branch below read it
+       * as a lift and drew `STG` — a four-lift week showed five identical orange chips.
+       * ⚠️ THE TAG DECIDES. `isPlyoSession` is the one reader; the name is a display string.
+       */
+      if (isPlyoSession(w)) return isOptional ? 'OPT PLYO' : 'PLYO';
       // For optional strength, just show "OPT STG"
       if (isOptional) {
         return 'OPT STG';
@@ -1238,7 +1256,13 @@ export default function WorkoutCalendar({
                     // Check actual workout_status from _src
                     const workoutStatus = String((evt?._src?.workout_status || '')).toLowerCase();
                     const isCompleted = workoutStatus === 'completed';
-                    const workoutType = String(evt?._src?.type || evt?._src?.workout_type || '').toLowerCase();
+                    /**
+                     * ⛔ THE DISPLAY DISCIPLINE, NOT THE WIRE TYPE — one seam, feeding the pill, the
+                     * glow, the icon and the text colour below. `displayDisciplineOf` returns the
+                     * row's own `type` for everything except the tagged plyo day, which is
+                     * `type: 'strength'` and must not wear strength's orange.
+                     */
+                    const workoutType = displayDisciplineOf(evt?._src);
                     
                     // Determine glow state based on date and status
                     // Fill rule: ONLY completed workouts get fills. Today's uncompleted workouts = no fill.

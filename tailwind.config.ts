@@ -31,6 +31,9 @@ export default {
         // built-in Tailwind ramp is how the accent drifted off the sport colour four separate
         // times in one file. Use `strength` and an opacity modifier — never `orange-*`.
         strength: '#FF8C42',
+        // ⛔ SAME RULE FOR PLYO. The plyometric drill day is `type: 'strength'` on the wire and
+        // wore strength's orange until 2026-08-25; it is its own hue now. Never `pink-*`.
+        plyo: '#B9678F',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
