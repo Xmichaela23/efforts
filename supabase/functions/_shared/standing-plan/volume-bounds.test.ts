@@ -148,15 +148,24 @@ Deno.test('⛔ THE CAP MOVES WITH THE SPORT MIX — which is the lever the sente
   assertEquals(capLine(capOf(ALL_RUN).ride, 'ride'), null);
 });
 
-Deno.test('⛔ OVER THE CAP: the week is built at the ceiling and SAYS SO, with the lever', () => {
+Deno.test('⛔ OVER THE ASK: the verdict is kept, and the CEILING SENTENCE IS SILENT', () => {
+  /**
+   * ⛔⛔ THE SENTENCE WAS FALSE AND IS GONE (Michael, 2026-08-26, hours after it shipped). It told
+   * the athlete their picks had a weekly ceiling. His ruling: *"your hard ride caps at… your long
+   * ride caps at… any additional hour will be programmed easy."* The QUALITY sessions are
+   * band-capped; the week is not. A ceiling sentence over a plan with no ceiling is a false
+   * statement about the plan, and silence beats bad copy while the replacement is decided.
+   *
+   * ⚠️ THE VERDICT IS STILL COMPUTED AND STILL RIGHT — the fact survived, only the sentence went.
+   * ⛔ This test asserts the SILENCE on purpose. When the block model lands it will assert the new
+   * sentence instead; until then a green test that expected the old one would be guarding a lie.
+   */
   const wk = build(HIS_SLOTS, 15);
   assertEquals(wk.volume.run.verdict, 'over_cap');
-  const said = wk.notes.filter((n) => n.kind === 'warning').map((n) => n.text);
-  const line = said.find((t) => /hold up to about/.test(t));
-  assert(line, `nothing named the ceiling: ${said.join(' | ')}`);
-  assert(/moving it to the run/.test(line!), `the lever was not named: ${line}`);
-  // ⛔ AND THE WEEK IS ACTUALLY AT THE CEILING, not merely described as at it.
   assertEquals(wk.volume.run.size, 1);
+  const said = wk.notes.filter((n) => n.kind === 'warning').map((n) => n.text);
+  assert(!said.some((t) => /hold up to about|at that ceiling/.test(t)),
+    `the ceiling sentence came back: ${said.join(' | ')}`);
 });
 
 Deno.test('⛔ UNDER THE FLOOR: §3c bounds BOTH ends, and the short week says where it lands', () => {
@@ -168,8 +177,11 @@ Deno.test('⛔ UNDER THE FLOOR: §3c bounds BOTH ends, and the short week says w
   const wk = build(HIS_SLOTS, undefined, 2);
   assertEquals(wk.volume.ride.verdict, 'under_floor');
   assertEquals(wk.volume.ride.size, 0);
+  // ⚠️ SILENCED WITH THE CEILING LINE, and not because this one was false — it was not. It is the
+  // same sentence family and the same field, and shipping half a disclosure would read as a bug.
+  // The floor is real and will be said again in the replacement's own words.
   const said = wk.notes.filter((n) => n.kind === 'warning').map((n) => n.text);
-  assert(said.some((t) => /at the shortest/.test(t)), `the floor went unsaid: ${said.join(' | ')}`);
+  assert(!said.some((t) => /at the shortest/.test(t)), `the floor sentence came back: ${said.join(' | ')}`);
 });
 
 Deno.test('⛔ A WEEK THAT DELIVERS THE NUMBER SAYS NOTHING ABOUT VOLUME', () => {
@@ -182,9 +194,16 @@ Deno.test('⛔ A WEEK THAT DELIVERS THE NUMBER SAYS NOTHING ABOUT VOLUME', () =>
   const none = build(HIS_SLOTS);
   assertEquals(none.volume.ride.verdict, 'no_target');
   assert(!none.notes.some((n) => n.kind === 'warning' && /hold up to about/.test(n.text)));
+  // ⚠️ EVERY VOLUME SENTENCE IS SILENT RIGHT NOW — see the over-the-ask test for why. This line is
+  // what makes that a decision rather than an accident: all three arms are quiet, not just this one.
 });
 
-Deno.test('⛔ EVERY VOLUME SENTENCE PASSES THE VOICE CHECK', () => {
+Deno.test('⛔ THE SENTENCES STILL PASS THE VOICE CHECK, though nothing emits them today', () => {
+  /**
+   * ⚠️ `capLine` AND `volumeLine` ARE NOT DELETED and this test is why. The block model replaces
+   * what they SAY, not that they exist, and their voice-checked shape is the thing worth keeping —
+   * deleting them would take it with them and the replacement would start from nothing.
+   */
   const specs: SlotSpec[] = [
     { family: 'ride_sweet_spot', level: 2, archetype: 'medium', sport: 'ride' },
     { family: 'run_vt1', level: 1, sport: 'run' },

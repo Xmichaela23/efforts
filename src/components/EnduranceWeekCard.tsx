@@ -52,13 +52,6 @@ import {
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
-/**
- * ⛔ §3c'S SENTENCE COMES FROM THE ENGINE, NOT FROM THIS SCREEN. The composer writes the same line
- * onto the built block through the same two functions, so the number the athlete reads while
- * choosing and the number the plan states afterwards cannot come apart — which is the ask-15-get-20
- * defect the whole ruling exists to end.
- */
-import { capLine, verdictFor, volumeLine } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
@@ -156,14 +149,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       cap: bounds.rideHours?.max ?? 0,
       sessions: bounds.rideHours ? 1 : 0,
     },
-  };
-  /** ⚠️ The lever is only real while the long day is a ride — see `volumeLine`. */
-  const volumeSay = (sport: 'run' | 'ride', typed: string) => {
-    const bound = sport === 'run' ? volumeBound.run : volumeBound.ride;
-    const n = typed === '' ? null : Number(typed);
-    return volumeLine(verdictFor(bound, n), bound, sport, {
-      longSlotSport: props.slots.long ?? undefined,
-    }) ?? capLine(bound, sport);
   };
   const rate = liftingRateLine(props.slots, props.squat1RM);
   const split = upperLowerSplitLine(props.slots);
@@ -483,14 +468,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
               {/* ⛔ THE REALITY CHECK, ONE LINE, UNDER THE NUMBER IT CHECKS (moved off the tier
                   screen, 2026-08-24 evening). A three-row table here would re-create the height
                   problem it arrived to fix. */}
-              {/* ⛔ §3c'S LIVE LINE — the ceiling these picks hold, and the lever when the typed
-                  number is past it. Recomputed as the athlete changes a sport, which is why the
-                  bound is a function of the slots and not a constant. */}
-              {volumeSay('run', props.runVolume) ? (
-                <p className="text-white/55 text-xs mt-1.5" data-testid="run-volume-bound">
-                  {volumeSay('run', props.runVolume)}
-                </p>
-              ) : null}
+              {/* ⛔⛔ THE CEILING LINE IS SILENCED (Michael, 2026-08-26, hours after it shipped).
+                  It told the athlete their picks had a weekly ceiling; the plan has no such thing.
+                  His model: the QUALITY sessions cap at the book's doses and everything past them
+                  is programmed easy. The replacement names the two capped sessions and says where
+                  the rest goes — it lands with the block model, and a false line does not stay up
+                  waiting for it. */}
               <p className="text-white/40 text-xs mt-1.5" data-testid="mileage-check">
                 {runnerMileageLine(props.unit)}
               </p>
@@ -514,15 +497,9 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 />
                 <span className="text-white/50 text-sm">h</span>
               </div>
-              {/* ⛔ §3c — AND THE RIDE HOURS GET THE SAME SENTENCE. They had none at all until now:
-                  the typed hours reached no engine and no line, so half the disclosure never
-                  existed. ⚠️ No lever clause on this side — moving the long day to the run REDUCES
-                  the hours, so offering it here would answer a question nobody asked. */}
-              {volumeSay('ride', props.rideHours) ? (
-                <p className="text-white/55 text-xs mt-1.5" data-testid="ride-hours-bound">
-                  {volumeSay('ride', props.rideHours)}
-                </p>
-              ) : null}
+              {/* ⛔ Silenced with the run side above, and for the same reason — this was the sentence
+                  Michael read on his own screen: "these picks hold up to about 4h35 a week, and the
+                  week is built at that ceiling", against a typed 8h that should simply build. */}
             </div>
           ) : null}
           </div>

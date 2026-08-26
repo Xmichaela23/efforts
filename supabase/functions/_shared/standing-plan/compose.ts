@@ -91,7 +91,7 @@ function rotatedArchetype(family: string, level: number, week: number): string |
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
-  DEFAULT_SIZE, sizeFor, slotSpans, volumeLine, weekVolumeBounds,
+  DEFAULT_SIZE, sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
 import {
@@ -1668,31 +1668,24 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * but they should know the cost."*
    */
   /**
-   * ⛔ §3c'S SENTENCE, WHERE THE ATHLETE ALREADY LOOKS. `kind: 'warning'` puts it into
-   * `placement_compromises`, the channel the preview renders — the same reason the conflict
-   * sentences use it. Silent on a week that delivers the number, which is what makes the other two
-   * worth reading.
-   * ⚠️ THE LONG SLOT'S SPORT DECIDES WHETHER THE LEVER EXISTS — "moving it to the run holds more" is
-   * true only while the long day is a ride.
+   * ⛔⛔ THE VOLUME SENTENCES ARE SILENCED (Michael, 2026-08-26, hours after they shipped).
+   *
+   * They said the week had a CEILING — *"these picks hold up to about 4h35 a week, and the week is
+   * built at that ceiling"* — and **that is not the model.** His ruling: *"your hard ride caps at…
+   * your long ride caps at… any additional hour will be programmed easy."* The QUALITY sessions are
+   * band-capped; the base is not, and surplus volume becomes easy work rather than being refused.
+   * A ceiling sentence over a plan with no ceiling is a false statement about the plan, and the
+   * standing rule is silence over bad copy.
+   *
+   * ⚠️ THE SIZING UNDERNEATH STAYS AND IS STILL CORRECT — a target inside the bands still shrinks
+   * the week toward it (his 4h ride ask, which used to build 5h19). What is temporarily missing is
+   * the case ABOVE the bands, where the surplus should become easy sessions and currently just
+   * clamps. ⛔ `volume.run` / `volume.ride` still carry the verdict, so nothing downstream lost the
+   * fact — only the sentence is gone.
+   *
+   * ⛔ `capLine` and `volumeLine` are NOT deleted: the block model replaces what they say, not that
+   * they exist, and deleting them would take their voice-checked shape with them.
    */
-  {
-    const longSlotSport = (() => {
-      for (const d of days) {
-        const i = d.endurance.findIndex((slot) => anchorRoleOf(slot.family) === 'long');
-        if (i >= 0) return assignedSlot(sportAssignment, d.day, i, d.endurance[i]).sport;
-      }
-      return undefined;
-    })();
-    for (const [sport, solve, bound] of [
-      ['run', volume.run, volume.bounds.run],
-      ['ride', volume.ride, volume.bounds.ride],
-    ] as const) {
-      const text = volumeLine(solve, bound, sport, { longSlotSport });
-      if (text && !notes.some((n) => n.text === text)) {
-        notes.push({ kind: 'warning', text, cite: 'Viada p275' });
-      }
-    }
-  }
 
   const conflicts = weekConflicts({
     sessions,
