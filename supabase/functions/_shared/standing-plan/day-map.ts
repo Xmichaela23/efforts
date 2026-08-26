@@ -362,69 +362,66 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
     )];
     const list = (xs: string[]) =>
       xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-    const parts: string[] = [];
-    if (liftHits.length > 0) {
-      parts.push(liftHits.length === 1
-        ? `${liftHits[0]} carries a lifting day`
-        : `${list(liftHits)} carry lifting days`);
-    }
-    if (plyoOnlyHits.length > 0) {
-      // ⚠️ "THE JUMP DRILLS", NOT "PLYOMETRICS" — the row on the calendar is named `Plyometrics` and
-      // the athlete can find it, but a sentence about their week says what it is.
-      parts.push(plyoOnlyHits.length === 1
-        ? `${plyoOnlyHits[0]} carries the jump drills`
-        : `${list(plyoOnlyHits)} carry the jump drills`);
-    }
-    const subject = parts.join(', and ');
+    // ⚠️ "THE JUMP DRILLS", NOT "PLYOMETRICS" — the row on the calendar is named `Plyometrics` and
+    // the athlete can find it, but a sentence about their week says what it is.
+    /**
+     * ⛔ PLAIN WORDS OR NOTHING (Michael, 2026-08-26: "the way you talk makes no sense", on
+     * "carries a lifting day… no arrangement… honours that pin"). The sentence is one lifter
+     * telling another what happened: the day off, what landed on it, and why it would not fit
+     * anywhere else. No "carries", no "honours", no "arrangement".
+     */
     const named = [...liftHits, ...plyoOnlyHits];
+    const what = [
+      liftHits.length === 0 ? '' : liftHits.length === 1 ? 'a lifting day' : 'lifting days',
+      plyoOnlyHits.length > 0 ? 'the jump drills' : '',
+    ].filter(Boolean).join(' and ');
+    const offClause = `${list(named)} ${named.length === 1 ? 'is a day off' : 'are days off'}, `
+      + `but the week still puts ${what} there`;
     const nLifts = frameFixed.lifting.length;
+    const longName = `long ${longSlotSport === 'ride' ? 'ride' : 'run'}`;
     compromises.push({
       kind: 'cost',
       text: clearableAtAll && longPin !== '' && chosen.long
-        // ⚠️ THE COMPETING PIN IS NAMED, because it is the only thing the athlete can act on. Stated
-        // as the trade it is, with no imperative and no request to change either answer.
-        ? `${subject}. The long ${longSlotSport === 'ride' ? 'ride' : 'run'} is pinned to ${longPin}, `
-          + `and no arrangement of this week's ${nLifts} lifting days honours that pin and leaves `
-          + `${list(named)} clear at the same time.`
-        : `${subject}. This week has ${nLifts} lifting days and a drill day in a fixed order, and no `
-          + 'arrangement of them leaves every day off clear.',
-    });
-  }
-  if (longPin !== '' && !chosen.long && !lostToADayOff((c) => c.long)) {
-    const actual = anchors.long != null ? weekdayForFrameDay(anchors.long, chosen.offset) : null;
-    compromises.push({
-      kind: 'cost',
-      // ⚠️ "The", not "Your" — voice rule 1, the subject is the thing that moved
-      // (`strength-calibration-copy.ts:120`). Fact, then the rule it happened under, no apology.
-      text: actual
-        ? `The long run is on ${actual} rather than ${longPin}. This plan's week has a fixed order, `
-          + `so moving one day moves all of them, and ${longPin} was not reachable alongside the `
-          + 'other pinned days.'
-        : `This plan's week has no long run to place on ${longPin}.`,
+        ? `${offClause} — ${nLifts} lifting days plus the ${longPin} ${longName} don't fit any other way.`
+        : `${offClause} — the week's sessions don't fit without ${named.length === 1 ? 'it' : 'them'}.`,
     });
   }
   /**
-   * ⛔ ONE SENTENCE FOR EVERY MISSED HARD PIN, NOT ONE PARAGRAPH EACH (Michael, 2026-08-26, on the
-   * confirm screen: "I wanna get rid of this ai slop"). Two missed picks used to print two
-   * near-identical paragraphs — same landed days, same mechanism, restated per pin. The cost is
-   * still stated (that ruling stands); it is stated ONCE, in one line.
+   * ⛔⛔ THE MISSED-LONG-PIN "rather than" SENTENCE IS DELETED — the same falsehood as the
+   * missed-hard-pin one below (2026-08-26). `compose.ts`'s `enduranceDayFor` returns the athlete's
+   * long pin UNCONDITIONALLY (`if (role === 'long' && pins.long) return pins.long`), so a long pin
+   * the ROTATION could not reach is still honoured in the built week, and "The long run is on
+   * Saturday rather than Sunday" described a discarded intermediate step. What survives is the one
+   * case that stays true on the calendar: a pin on a week that has no long session to place.
    */
-  const missedHardPins = hardPins.filter((p) => {
-    if (anchors.hard.some((d) => weekdayForFrameDay(d, chosen.offset) === p)) return false;
-    return !lostToADayOff((c) =>
-      anchors.hard.some((d) => weekdayForFrameDay(d, c.offset) === p));
-  });
-  if (missedHardPins.length > 0) {
-    const say = (xs: string[]) =>
-      xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-    const actual = anchors.hard.map((d) => weekdayForFrameDay(d, chosen.offset));
+  if (longPin !== '' && anchors.long == null && !lostToADayOff((c) => c.long)) {
+    const longName = `long ${longSlotSport === 'ride' ? 'ride' : 'run'}`;
     compromises.push({
       kind: 'cost',
-      text: `The hard ${actual.length === 1 ? 'session is' : 'sessions are'} on ${say(actual)} `
-        + `rather than ${say(missedHardPins)} — the week's order is fixed, and the long day `
-        + 'places first.',
+      text: `Taper weeks have no ${longName}, so there is nothing to put on ${longPin}.`,
     });
   }
+  /**
+   * ⛔⛔ THE MISSED-HARD-PIN COMPROMISE IS DELETED, NOT REWORDED (Michael, 2026-08-26: "I wanna get
+   * rid of this ai slop" → "what are you trying to say" → "its not even right" — and his built week
+   * proved the last one: the note claimed Tuesday and Friday "could not be reached" while the
+   * calendar showed the Hard Ride ON Tuesday and the Hard Run ON Friday).
+   *
+   * It was FALSE BY CONSTRUCTION under pins-win: this function chooses the LIFTING rotation, and a
+   * hard pin the rotation cannot reach is still honoured downstream — `compose.ts`'s endurance
+   * pinning places the session on the tapped day regardless. So the sentence described a discarded
+   * intermediate step, never the built week. The client knew: `NonRaceBuilder`'s tiered-notes
+   * comment (pins-win, 2026-08-25) says these rotation lines "describe an intermediate step rather
+   * than the built week" and drops them wholesale on step 7 — but the confirm screen rendered the
+   * server's copy unfiltered. One source of truth: the server stops writing it.
+   *
+   * ⚠️ AND THE PINS IT NAMED WERE OFTEN NOBODY'S — Q-287's phantom seeds (an untouched wizard
+   * writes hard-day defaults that read back as athlete choices) made it fire on picks no one made.
+   * That write is still Q-287's open work; nothing here fixes it, this just stops narrating it.
+   *
+   * ⚠️ SCOPE: the hard-pin block only. The blocked-day and long-pin compromises above state facts
+   * about days that stay true in the built week; they stand.
+   */
   /**
    * ⛔ THE PIN THE FRAME HAS NO SESSION FOR — STATED, NEVER DROPPED (2026-08-24).
    *

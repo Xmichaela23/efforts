@@ -449,14 +449,15 @@ Deno.test('four days off cannot all be clear of four lifting days, and the note 
   const map = chooseDayMap('strength_5k', { unavailableDays: blocked });
   assertEquals(map.honoured.unavailableDays, false);
 
-  const note = map.compromises.find((c) => /carr(?:ies|y) lifting day|carries a lifting day/.test(c.text));
+  // ⛔ RE-PINNED 2026-08-26 to the plain wording (Michael: "the way you talk makes no sense" —
+  // "carries a lifting day… no arrangement… honours that pin" is gone). The note now reads
+  // "<days> are days off, but the week still puts lifting days there — the week's sessions don't
+  // fit without them." Same facts: the days off, what landed, and that it cannot fit elsewhere.
+  const note = map.compromises.find((c) => /days? off, but the week still puts/.test(c.text));
   assert(note, `no note fired: ${map.compromises.map((c) => c.text).join(' | ')}`);
-  // ⚠️ THE COUNT NOW CARRIES THE DRILL DAY TOO (2026-08-25, after the fuzz sweep). The plyo day is
-  // frame-fixed and can land on a day off just as a lifting day can; the sentence used to leave it
-  // out of the arithmetic it was quoting.
   assert(
-    /4 lifting days and a drill day in a fixed order/i.test(note!.text),
-    `the note does not state the count it turns on: ${note!.text}`,
+    /don't fit/.test(note!.text),
+    `the note does not say it cannot fit: ${note!.text}`,
   );
   // ⚠️ NO COMPETING PIN TO NAME, so it must not invent one.
   assert(!/pinned to/i.test(note!.text), `the note named a pin that does not exist: ${note!.text}`);

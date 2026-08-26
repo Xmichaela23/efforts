@@ -940,6 +940,16 @@ A LEAD — one-line trace of the rotation vs PAIRING before calling it a bug.
 
 ## Q-287 — Phantom seed preferences + export brief describes the wrong plan (2026-08-25)
 
+> **HALF-CLOSED 2026-08-26 — the phantom-seed half is FIXED in the client** (confirmed live by
+> Michael: "I made NO adjustments to the schedule handed to me", yet compromise notes fired on his
+> untouched seeds). `assemblePayload` now ships a hard/long day only when the athlete tapped it
+> (`touchedUnits`, the same ledger `wizardSolveInput` already used) or a club owns it; an untouched
+> slot ships day-less ("engine, propose one", slice 8). The race-path long-day tap now records the
+> touch too. Two false compromise sentences that narrated the discarded rotation step (missed hard
+> pin, missed long pin) were deleted the same night — pins are honoured downstream
+> (`compose.ts` `enduranceDayFor`), so they could never describe the built week. **Still open: the
+> export brief's static run-only intro + duplicated test-week sentence.**
+
 An untouched wizard writes seed defaults into `preferred_days` (hard days friday/tuesday,
 quality_bike tuesday) that read as athlete choices in the stored config and the .md export. And the
 export's intro paragraph is static run-only text ("four runs", "the hard sessions are on the bike")

@@ -1301,6 +1301,12 @@ function assemblePayload(
    * arrives as an argument rather than the payload reaching around the screen for it.
    */
   unavailableDays?: string[],
+  /**
+   * ⛔ WHOSE ANSWER EACH DAY IS (Q-287, 2026-08-26) — the tap ledger, passed in like
+   * `unavailableDays` because it lives in component state. Absent (older callers/tests) means
+   * "nothing tapped": seeded days then stay home, which is the safe direction.
+   */
+  touchedUnits?: Record<string, boolean>,
 ): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
@@ -1489,7 +1495,12 @@ function assemblePayload(
           // `buildPreferredDays` omits both when no day is picked.
           preferred_days: buildPreferredDays(state.posture, {
             trainingDays: state.trainingDays,
-            longRunDay: state.longRunDay, longRideDay: state.longRideDay,
+            // ⛔ SEEDED LONG DAYS DO NOT TRAVEL (Q-287, 2026-08-26) — same gate as `hard_days`
+            // below and the same rule `wizardSolveInput` already applies (`longRunPinned`). The
+            // schedule step pre-fills these from the engine's own suggestion; a day ships only when
+            // the athlete tapped it (every tap site calls `touch`) or the club owns it.
+            longRunDay: (state.longClub || touchedUnits?.longRun) ? state.longRunDay : '',
+            longRideDay: (state.longClub || touchedUnits?.longRide) ? state.longRideDay : '',
             /**
              * ⛔ THE ONE LONG SLOT, SO THE BAG CANNOT WRITE A DAY FOR THE OTHER SPORT (2026-08-25).
              * `slotSports` is only ever set on the strength path, so passing it is self-gating:
@@ -1503,9 +1514,15 @@ function assemblePayload(
             // `hard_days` below carries the full answer. First slot of each discipline wins here.
             qualityDays: {
               ...(state.runClubIntensity === 'quality' ? state.qualityDays : {}),
+              // ⛔ SAME GATE AS `hard_days` BELOW (Q-287): a seeded suggestion in `h.day` is not the
+              // athlete's answer and must not become `preferred_days.quality_*`. Tapped or club only.
               ...Object.fromEntries(
                 (['run', 'bike'] as const)
-                  .map((d) => [d, state.hardDays.find((h) => h.discipline === d && !!h.day)?.day])
+                  .map((d) => {
+                    const i = state.hardDays.findIndex((h) => h.discipline === d && !!h.day);
+                    const h = i >= 0 ? state.hardDays[i] : undefined;
+                    return [d, h && (h.ownership === 'club' || touchedUnits?.[`hard:${i}`]) ? h.day : undefined];
+                  })
                   .filter(([, day]) => !!day),
               ),
             },
@@ -1544,9 +1561,24 @@ function assemblePayload(
           ...(state.hardDays.some((h) => h.ownership !== 'club' || !!h.day)
             ? {
                 hard_days: state.hardDays
-                  .filter((h) => h.ownership !== 'club' || !!h.day)
-                  .map((h) => ({
-                    ...(h.day ? { day: h.day } : {}),
+                  /**
+                   * ⛔⛔ A SEEDED DAY IS NOT A PICK, AND IT NO LONGER TRAVELS AS ONE (Q-287,
+                   * confirmed live 2026-08-26 — Michael: "I made NO adjustments to the schedule
+                   * handed to me", yet the stored goal and the compromise notes read his untouched
+                   * seeds back as choices). The pre-fill writes the engine's suggestion into
+                   * `h.day`; `touchedUnits` is the only place that knows whose answer it is — the
+                   * SOLVER input already gates on it (`pinned:` below at `wizardSolveInput`), and
+                   * the server payload never did. A day now ships only when the athlete tapped it
+                   * (or it is a club's — the world's answer, not a preference). An untouched slot
+                   * ships day-less, which is already the slice-8 contract: "engine, propose one".
+                   * ⚠️ Index carried BEFORE the filter — filtering first renumbers the slots and
+                   * `touchedUnits` keys by the state index.
+                   */
+                  .map((h, i) => ({ h, i }))
+                  .filter(({ h }) => h.ownership !== 'club' || !!h.day)
+                  .map(({ h, i }) => ({
+                    ...(h.day && (h.ownership === 'club' || touchedUnits?.[`hard:${i}`])
+                      ? { day: h.day } : {}),
                     discipline: h.discipline,
                     ownership: h.ownership,
                     /**
@@ -3540,6 +3572,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       : undefined;
     return assemblePayload(
       state, equipmentTier, canonMiles, canonLongRun, paceMinPerMile, canonElevM, unavailableDays,
+      touchedUnits,
     );
   };
 
@@ -4655,6 +4688,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   // free one — which is what makes a plain toggle safe here.
                   if (weekQuestion === 'long') {
                     const releasing = state.longRunDay === d;
+                    // ⛔ THE TAP IS RECORDED HERE TOO (Q-287, 2026-08-26): the payload now ships a
+                    // long day only when it is the athlete's answer, and this race-path picker was
+                    // the one tap site that never said so.
+                    touch('longRun');
                     setState((st) => ({
                       ...st,
                       longRunDay: releasing ? '' : d,
@@ -6384,7 +6421,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
                 {previewWeek && previewWeek.length > 0 ? (
                   <div className={previewing ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
-                    <WeekGrid sessions={previewWeek} notes={[]} />
+                    <WeekGrid sessions={previewWeek} notes={[]} title="Sample week — week 1" />
                   </div>
                 ) : previewing ? (
                   <p className="text-white/50 text-sm">Building your week…</p>
@@ -6906,7 +6943,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     // line, same compromise sentences, so the athlete learns it once. It also owns
                     // the endurance budget, which is DERIVED from the lifting frequency rather than
                     // hardcoded, so it stays true if the block ever runs 3 lifting days.
-                    return <WeekGrid sessions={previewWeek} notes={previewNotes} />;
+                    return <WeekGrid sessions={previewWeek} notes={previewNotes} title="Sample week — week 1" />;
                   })()}
                 </div>
               )}

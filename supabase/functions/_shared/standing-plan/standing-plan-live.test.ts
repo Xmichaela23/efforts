@@ -118,19 +118,20 @@ Deno.test('the anchors are read off the frame, not from a second table naming da
   assertEquals(weekdayForFrameDay(7, 1), 'Monday');
 });
 
-Deno.test('two pins that no rotation can both reach state the cost, and the long day wins', () => {
+Deno.test('two pins the rotation cannot both reach: the long day wins, and NO cost is written', () => {
   /**
-   * ⛔ NEVER A SILENT REFUSAL (D-325 §7). Long run Sunday forces offset 1, which puts the hard days
-   * on Tuesday and Thursday. A hard day pinned to Wednesday cannot also be reached.
+   * ⛔ SUPERSEDED 2026-08-26 (was: "state the cost", D-325 §7). Under pins-win (D-452,
+   * 2026-08-25) a hard pin the ROTATION cannot reach is still honoured downstream —
+   * `compose.ts`'s endurance pinning places the session on the tapped day regardless — so the
+   * rotation's cost sentence described a discarded intermediate step, never the built week.
+   * Michael's device proved it false ("its not even right": the note said Tuesday and Friday
+   * could not be reached while the calendar showed hard sessions ON both). The emission is
+   * deleted; `honoured.hardDays` stays a rotation-level fact for callers that read it.
    */
   const map = chooseDayMap('strength_5k', { longRunDay: 'Sunday', hardDays: ['Wednesday'] });
   assert(map.honoured.longRun, 'the long run lost to a hard day');
   assertEquals(map.honoured.hardDays, 0);
-  assertEquals(map.compromises.length, 1);
-  const text = map.compromises[0].text;
-  assertEquals(map.compromises[0].kind, 'cost');
-  assert(/Wednesday/.test(text), `the cost does not name the day that was asked for: ${text}`);
-  assert(/Tuesday|Thursday/.test(text), `the cost does not name where the session went: ${text}`);
+  assertEquals(map.compromises.length, 0);
 });
 
 Deno.test('a long-run pin on a column that has no long run says so', () => {
@@ -171,7 +172,10 @@ Deno.test('the cost reaches the athlete through the channel that is already read
    * warnings in `config.standing_plan_notes`, which nothing renders: *"a cost the athlete pays and
    * cannot see is not disclosed."*
    */
-  const map = chooseDayMap('strength_5k', { longRunDay: 'Sunday', hardDays: ['Wednesday'] });
+  // ⚠️ Scenario swapped 2026-08-26: the missed-hard-pin cost is deleted (see the superseded test
+  // above), so this channel test rides the one long-pin cost that stays TRUE in the built week —
+  // a long-run pin on the taper column, which carries no long run to place.
+  const map = chooseDayMap('strength_5k', { longRunDay: 'Sunday' }, 'taper');
   const row = buildStandingPlanRow({ compose: COMPOSE, weeks: 4, taperWeeks: [], dayMap: map });
   assert(Array.isArray(row.placement_compromises), 'the cost never left the composer');
   assertEquals(row.placement_compromises!.length, 1);

@@ -37,11 +37,19 @@ export default function WeekGrid({
   sessions,
   notes = [],
   className = '',
+  title,
 }: {
   sessions: WeekGridSession[];
   /** The solver's own words for what it could not honour. Printed verbatim, never paraphrased. */
   notes?: string[];
   className?: string;
+  /**
+   * ⛔ SAY WHICH WEEK THIS IS (Michael, 2026-08-26: "we should say sample week — week one"). The
+   * wizard previews WEEK 1 — the test week — which is the block's least representative week:
+   * every later week replaces the test days with the heavy days. Unlabeled, it reads as "your
+   * week" for the whole block.
+   */
+  title?: string;
 }) {
   // Two upper lifts on consecutive days — worth a word, because it looks like an oversight.
   const UPPER = /Bench Press|Overhead Press/;
@@ -108,6 +116,9 @@ export default function WeekGrid({
 
   return (
     <div className={`space-y-2 ${className}`}>
+      {title && (
+        <p className="text-white/50 text-[11px] uppercase tracking-[0.08em]">{title}</p>
+      )}
       <p className="text-white/75 text-sm">
         {activeDays} training {activeDays === 1 ? 'day' : 'days'}, {7 - activeDays} rest
         {/* ⚠️ SILENT ON A WEEK WITH NO LIFTING — the grid also serves run-only plans, and "0 lifts"
@@ -218,6 +229,61 @@ export default function WeekGrid({
       {adjacentPressDays && (
         <p className="text-white/40 text-xs leading-tight">Press days sit together on purpose — no recovery gap needed.</p>
       )}
+
+      {/* ⛔ THE WEEK EXPLAINS ITSELF, AND THE POINT IS BALANCING STRESSORS (Michael, 2026-08-26:
+          "it should be about balancing stressors — isn't that viada's whole thing"). It is —
+          SOURCE-viada p130 (consolidation: examine what each session requires and arrange the week
+          so nothing that needs to recover fails to, so no session becomes "a heavily fatigued
+          write-off") and p131 (the heavy sessions must come fresh in the systems they need). The
+          old notes only spoke when something FAILED, in apology voice; this states what the layout
+          is FOR. Derived from the placed week itself, so it can never disagree with the grid above
+          it. Silent when there is nothing to explain (no hard/long sessions). */}
+      {(() => {
+        /**
+         * ⛔ ONLY WHEN IT IS TRUE (Michael, 2026-08-26: "and is it true?"). Two honesty gates:
+         * (1) it renders only when the solver reported NO conflicts — a week where pins forced
+         * stacking is arranged around the athlete's days, not around balance, and the notes below
+         * are the true story there; (2) it claims the spacing's PURPOSE, never per-session
+         * freshness — the book's own default sends Monday's run into Tuesday's heavy legs and
+         * compensates with the 3.5% cut (p247), so "every session starts fresh" would be a lie
+         * even on the untouched week.
+         */
+        if (notes.length > 0) return null;
+        const endur = sessions.filter(isEnduranceSession);
+        const hardN = endur.filter((s) => /^Hard\b/i.test(s.name)).length;
+        const longest = endur.reduce<WeekGridSession | null>(
+          (a, s) => ((Number(s.duration) || 0) > (Number(a?.duration) || 0) ? s : a), null);
+        const hasLong = longest && (Number(longest.duration) || 0) >= 75;
+        if (hardN === 0 && !hasLong) return null;
+        const liftDayNames = ORDER.filter((d) =>
+          sessions.some((s) => s.day === d && s.type === 'strength' && !(s.tags ?? []).includes('plyo')));
+        if (liftDayNames.length === 0) return null;
+        const say = (xs: string[]) =>
+          xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+        // ⚠️ NO DAY ON THE LONG SESSION (Michael, 2026-08-26: "but the scheduler put it on sat") —
+        // its weekday is the scheduler's own output, so citing it as a cause would be circular.
+        // The sentence names WHAT is in the week; the grid above shows where everything landed.
+        const additions = [
+          hardN === 0 ? '' : hardN === 1 ? 'one hard session' : hardN === 2 ? 'two hard sessions' : `${hardN} hard sessions`,
+          hasLong ? `a long ${longest!.type === 'ride' ? 'ride' : 'run'}` : '',
+        ].filter(Boolean).join(' and ');
+        /**
+         * ⛔ PRINCIPLE FIRST, PLACEMENT AFTER (Michael, 2026-08-26: "you're thinking backwards").
+         * The week is not an outcome to be explained by its sessions — it IS the stress-balanced
+         * arrangement, and the sessions were placed into it. So the sentence leads with what the
+         * week is, then where things sit. No causality, no agency, no engine internals.
+         */
+        const hardClause = [
+          hardN === 0 ? '' : hardN === 1 ? 'the hard session' : 'the hard sessions',
+          hasLong ? `the long ${longest!.type === 'ride' ? 'ride' : 'run'}` : '',
+        ].filter(Boolean).join(' and ');
+        return (
+          <p className="pt-2 border-t border-white/10 text-white/60 text-sm leading-relaxed">
+            This week is arranged to balance the stressors — lifting on {say(liftDayNames)},
+            {' '}{hardClause} spaced around it.
+          </p>
+        );
+      })()}
 
       {/* What the solver could not honour, in its own words. Never hidden, never reworded. */}
       {notes.length > 0 && (
