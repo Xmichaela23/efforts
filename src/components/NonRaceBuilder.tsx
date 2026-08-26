@@ -9,6 +9,7 @@ import EnduranceWeekCard, { EnduranceWeekRate } from './EnduranceWeekCard';
 import HardSlotChoices from './HardSlotChoices';
 import {
   SLOT_KEYS,
+  HARD_SLOT_KEYS,
   allSlotsChosen,
   emptySlotSports,
   unansweredLine,
