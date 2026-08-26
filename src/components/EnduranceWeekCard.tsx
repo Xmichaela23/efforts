@@ -68,7 +68,6 @@ export type EnduranceWeekCardProps = {
   /** The athlete's baselines row — the caps resolve every session against their own anchors. */
   baselines?: unknown;
   easyPaceSecPerMi?: number | null;
-  squat1RM?: number | null;
   /** Weekly running, in the athlete's own display unit. */
   runVolume: string;
   onRunVolume: (v: string) => void;
@@ -140,7 +139,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
   });
-  const rate = liftingRateLine(props.slots, props.squat1RM);
+  const rate = liftingRateLine(props.slots);
   const split = upperLowerSplitLine(props.slots);
 
   /**
@@ -499,11 +498,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
  * lifted up over the volume inputs the moment the content passed the port height; `StepLayout`'s
  * `footer` slot is outside the scroll, so it cannot overlap anything by construction.
  */
+/**
+ * ⚠️ NO `squat1RM` PROP (2026-08-26). The rate line stopped pricing itself in pounds — see
+ * `liftingRateLine` for why that clause was false on any squat under 250 — and a prop that feeds
+ * nothing is the next session's excuse to put the pounds back.
+ */
 export function EnduranceWeekRate(props: {
   slots: SlotSelection;
-  squat1RM?: number | null;
 }) {
-  const rate = liftingRateLine(props.slots, props.squat1RM);
+  const rate = liftingRateLine(props.slots);
   const split = upperLowerSplitLine(props.slots);
 
   return (

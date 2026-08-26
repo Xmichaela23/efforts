@@ -159,13 +159,13 @@ Deno.test('the rate is live on the zero-hard default, not stuck on pending', () 
    * screen's one live number would have read "pending" forever on the default path.
    */
   const zeroHard = { hard1: null, hard2: null, easy: 'run', long: 'run' } as const;
-  const line = liftingRateLine(zeroHard, 300);
+  const line = liftingRateLine(zeroHard);
   assert(line !== RATE_PENDING_LINE, 'the default week shows no rate');
   // ⚠️ AND IT IS THE BEST RATE — `liftingRateTier` counts hard RUNS, and there are none.
   assert(/1% every 3 weeks/.test(line), line);
   // Still pending while the week itself is incomplete.
-  assertEquals(liftingRateLine(emptySlotSports(), 300), RATE_PENDING_LINE);
-  assertEquals(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null }, 300), RATE_PENDING_LINE);
+  assertEquals(liftingRateLine(emptySlotSports()), RATE_PENDING_LINE);
+  assertEquals(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null }), RATE_PENDING_LINE);
 });
 
 Deno.test('the blocked line names what is missing, and nothing else', () => {
@@ -188,13 +188,13 @@ Deno.test('the blocked line names what is missing, and nothing else', () => {
 Deno.test('the rate says which fact is missing rather than showing a number that is not true', () => {
   // ⛔ THE RATE IS A FUNCTION OF THE TWO HARD SLOTS. Until both have a sport there is no rate, and
   // the screen's one live number must never be a placeholder an athlete could read as an answer.
-  assertEquals(liftingRateLine(emptySlotSports(), 300), RATE_PENDING_LINE);
+  assertEquals(liftingRateLine(emptySlotSports()), RATE_PENDING_LINE);
   // ⛔⛔ THIS PINNED THE OLD MODEL (updated 2026-08-25). It read
   // `liftingRateLine({hard1:'ride', hard2:null, easy:'run', long:'run'}) === RATE_PENDING_LINE` —
   // correct while both hard slots had to be answered. **One hard session is now a complete week**,
   // so that case has a real rate; what is still pending is a week missing a REQUIRED slot.
-  assertEquals(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null }, 300), RATE_PENDING_LINE);
-  assert(/1% every 4 weeks/.test(liftingRateLine({ hard1: 'run', hard2: null, easy: 'run', long: 'run' }, 300)),
+  assertEquals(liftingRateLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null }), RATE_PENDING_LINE);
+  assert(/1% every 4 weeks/.test(liftingRateLine({ hard1: 'run', hard2: null, easy: 'run', long: 'run' })),
     'one hard run is a finished week and scores its own rate');
   assertEquals(upperLowerSplitLine({ hard1: 'run', hard2: null, easy: 'run', long: null }), null);
   assert(!/%/.test(RATE_PENDING_LINE), 'the pending line carries a number');
@@ -233,7 +233,7 @@ Deno.test('⛔ NO ENDURANCE-IMPROVEMENT PERCENTAGE APPEARS ANYWHERE', () => {
     LONG_SLOT_NOTE,
     ...SLOT_KEYS.flatMap((k) => [SLOT_LABEL[k], ...SLOT_OPTIONS[k].map((o) => o.label)]),
     ...[mix('ride', 'ride'), mix('ride', 'run'), mix('run', 'run')]
-      .flatMap((m) => [liftingRateLine(m), liftingRateLine(m, 300), upperLowerSplitLine(m) ?? '']),
+      .flatMap((m) => [liftingRateLine(m), upperLowerSplitLine(m) ?? '']),
   ].filter(Boolean);
 
   for (const line of everything) {
@@ -246,16 +246,51 @@ Deno.test('⛔ NO ENDURANCE-IMPROVEMENT PERCENTAGE APPEARS ANYWHERE', () => {
   }
 });
 
-Deno.test('the rate line prints pounds when there is a squat to print them off, and not otherwise', () => {
-  // ⚠️ A percentage of an unnamed number is not a fact anyone can feel — but an invented squat is
-  // worse. Absent, the sentence stands without it.
-  const withSquat = liftingRateLine(mix('ride', 'ride'), 300);
-  assert(/300 lb squat/.test(withSquat), withSquat);
-  assert(/about 5 lb a step/.test(withSquat), withSquat);
-  for (const missing of [null, undefined, 0, -10, NaN]) {
-    const line = liftingRateLine(mix('ride', 'ride'), missing as never);
-    assert(!/lb/.test(line), `a pound figure was invented from ${String(missing)}: ${line}`);
+Deno.test('⛔⛔ THE RATE LINE NEVER PRINTS A POUND FIGURE — the clause that was false under 250 lb', () => {
+  /**
+   * ⛔ WHAT WAS DELETED, AND WHY IT MAY NOT COME BACK (Michael, off a screenshot of the wizard,
+   * 2026-08-26). The sentence used to close with *"— about 5 lb a step on a 110 lb squat"*, off
+   * `Math.max(5, Math.round((squat * 0.01) / 5) * 5)`. On a 110 lb squat one per cent is 1.1, which
+   * rounds to ZERO, and the floor supplies the five — so the screen presented a floored plate as
+   * though it were the one per cent.
+   *
+   * ⚠️ IT IS WRONG FOR ANY SQUAT UNDER 250. Below that, 1% rounds under 2.5 and the `Math.max`
+   * invents the number. ABOVE 250 IT HAPPENS TO BE TRUE, which is exactly why it survived review —
+   * so a test that only checked a 300 lb fixture would have passed on the broken code. This one
+   * bans the pound figure outright rather than checking one value of it.
+   *
+   * ⛔ THE STEP SIZE ITSELF WAS NOT THE LIE. Five pounds is genuinely what goes on the bar. What is
+   * false is pairing it with the CADENCE: "1% every 4 weeks — about 5 lb a step" reads as a plate
+   * every four weeks, when on a 110 lb squat it is a plate roughly every twenty.
+   *
+   * ⚠️ AND IT IS THE SAME DISEASE THE REP-DRIVEN-PROGRESSION BUILD WAS ABOUT — a percentage rate
+   * stated as a plate. His 1% cannot be expressed on a light bar at all.
+   */
+  const lines = [
+    ...[mix('ride', 'ride'), mix('ride', 'run'), mix('run', 'run')].map((m) => liftingRateLine(m)),
+    liftingRateLine({ hard1: null, hard2: null, easy: 'run', long: 'run' }),
+    RATE_PENDING_LINE,
+  ];
+  for (const line of lines) {
+    assert(!/\blbs?\b/i.test(line), `the rate line priced itself in pounds again: "${line}"`);
+    assert(!/\bpounds?\b/i.test(line), `the rate line priced itself in pounds again: "${line}"`);
+    // ⛔ AND NO BARE NUMBER OTHER THAN THE RATE'S OWN. A figure with no unit is the same claim with
+    // the giveaway removed — "about 5 a step" would slip past a pound-only ban.
+    const nums = [...String(line).matchAll(/\d+(?:\.\d+)?/g)].map((m) => m[0]);
+    for (const n of nums) {
+      assert(new RegExp(`${n}%|every ${n} weeks`).test(String(line)),
+        `a number that is not part of the rate: "${n}" in "${line}"`);
+    }
   }
+  // ⛔ THE SENTENCE ENDS AT THE RATE. No trailing clause, of any kind.
+  assert(/^On this mix the plan advances the bar [^—]+\.$/.test(liftingRateLine(mix('ride', 'ride'))),
+    liftingRateLine(mix('ride', 'ride')));
+});
+
+Deno.test('⛔ AND THE FUNCTION TAKES NO SQUAT — a dead argument is an invitation', () => {
+  // ⚠️ `liftingRateLine` accepted `squat1RM` only to price the deleted clause. Pinned at arity so a
+  // future session cannot quietly thread a number back in ahead of restoring the sentence.
+  assertEquals(liftingRateLine.length, 1);
 });
 
 Deno.test('the upper/lower split is shown only when a hard RUN is in the mix', () => {
@@ -285,7 +320,7 @@ Deno.test('every sentence this file GENERATES passes the voice gate', () => {
     LONG_SLOT_NOTE,
     ...SLOT_KEYS.flatMap((k) => [SLOT_LABEL[k], ...SLOT_OPTIONS[k].map((o) => o.label)]),
     ...[mix('ride', 'ride'), mix('ride', 'run'), mix('run', 'run')]
-      .flatMap((m) => [liftingRateLine(m), liftingRateLine(m, 300), upperLowerSplitLine(m) ?? '']),
+      .flatMap((m) => [liftingRateLine(m), upperLowerSplitLine(m) ?? '']),
   ].filter((s) => s && s.trim().length > 0);
   assert(generated.length >= 12, `the voice gate is reading almost nothing: ${generated.length}`);
   for (const line of generated) {
@@ -304,7 +339,7 @@ Deno.test('every sentence this file GENERATES passes the voice gate', () => {
    * re-voicing it to satisfy a house rule would be editing the specification. The rule still holds
    * for every sentence this file generates — asserted above.
    */
-  for (const line of [liftingRateLine(mix('run', 'run'), 300), upperLowerSplitLine(mix('run', 'run'))!]) {
+  for (const line of [liftingRateLine(mix('run', 'run')), upperLowerSplitLine(mix('run', 'run'))!]) {
     assert(!/\byou\b|\byour\b/i.test(line), `second person in generated copy: ${line}`);
   }
 });

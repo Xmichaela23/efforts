@@ -311,10 +311,29 @@ export const RATE_CITE: Record<LiftingRateTier, string> = {
 /**
  * ⛔ THE LIVE LINE UNDER THE HEADER. One sentence, one number, and the number is a LIFTING rate.
  *
- * ⚠️ IN POUNDS WHERE THE SCREEN HAS A NUMBER TO USE. The addendum asks for it — *"render pounds
- * where possible (~3 lb per step on a 300 lb squat)"* — because a percentage of an unnamed number is
- * not a fact anyone can feel. Absent a squat on file the sentence stands without it rather than
- * inventing one.
+ * ⛔⛔ AND IT ENDS AT THE RATE. THE POUND CLAUSE WAS DELETED 2026-08-26 AND MAY NOT COME BACK.
+ *
+ * It used to close with *"— about 5 lb a step on a 110 lb squat"*, off:
+ *
+ *     const step = Math.max(5, Math.round((squat * 0.01) / 5) * 5);
+ *
+ * ⚠️ ON A 110 lb SQUAT ONE PER CENT IS 1.1, WHICH ROUNDS TO ZERO, AND THE FLOOR SUPPLIES THE FIVE.
+ * The sentence then presented that floored plate as though it WERE the one per cent. It is false for
+ * any squat under 250 — below that, 1% rounds under 2.5 and the `Math.max` invents the figure. Above
+ * 250 it happens to be true, which is exactly why it survived review.
+ *
+ * ⛔ THE STEP SIZE IS NOT THE LIE. Five pounds is genuinely what goes on the bar when it moves. What
+ * is false is PAIRING IT WITH THE CADENCE: "1% every 4 weeks — about 5 lb a step" reads as a plate
+ * every four weeks, when on a 110 lb squat it is a plate roughly every twenty.
+ *
+ * ⚠️ AND IT IS THE SAME DISEASE THE WHOLE REP-DRIVEN-PROGRESSION BUILD WAS ABOUT (work order
+ * 2026-08-26): a percentage rate stated as a plate. His 1% cannot be expressed on a light bar at all,
+ * which is why the reps carry the overload — and why a screen that promises a plate on a cadence is
+ * promising something the plate grid cannot deliver.
+ *
+ * ⚠️ THE ADDENDUM DID ASK FOR POUNDS — *"render pounds where possible (~3 lb per step on a 300 lb
+ * squat)"* — and its own example shows the problem: three pounds is not a step anyone can load. The
+ * ask is superseded, not forgotten.
  *
  * ⚠️ NO ENDURANCE FIGURE. What the running costs on the other side is the header's business, in
  * direction words, and no source gives a percentage for it.
@@ -327,10 +346,11 @@ export const RATE_CITE: Record<LiftingRateTier, string> = {
 export const RATE_PENDING_LINE =
   'The lifting rate appears once the recovery and long sessions have a sport.';
 
-export function liftingRateLine(
-  slots: SlotSelection,
-  squat1RM?: number | null,
-): string {
+/**
+ * ⚠️ NO `squat1RM` PARAMETER, AND ITS ABSENCE IS DELIBERATE. It existed only to price the deleted
+ * clause, and a dead argument on an exported function is an invitation to find a use for it.
+ */
+export function liftingRateLine(slots: SlotSelection): string {
   /**
    * ⛔⛔ PENDING ON THE REQUIRED SLOTS, NOT ON THE HARD ONES (2026-08-25). This read
    * `!slots.hard1 || !slots.hard2` — correct while all four had to be answered, and **wrong the
@@ -344,17 +364,10 @@ export function liftingRateLine(
   if (!allSlotsChosen(slots)) return RATE_PENDING_LINE;
   const tier = liftingRateTier(slots as Record<SlotKey, SlotSport>);
   const rate = RATE_TEXT[tier];
-  const squat = Number(squat1RM);
   // ⛔ PRESCRIPTION, NOT PROPHECY (Michael, 2026-08-24 evening: "that feels like an overconfidence
   // number"). The rates are his published program rates — what the PLAN advances the bar by. "The
   // lifting climbs" promised the athlete's own response; the plan advancing is the fact.
-  if (!Number.isFinite(squat) || squat <= 0) {
-    return `On this mix the plan advances the bar ${rate}.`;
-  }
-  // ⚠️ ONE PER CENT OF THE NUMBER ON FILE, ROUNDED TO THE NEAREST FIVE — the plate grid the block
-  // already prescribes on. A pound-exact figure would be precision the plates cannot express.
-  const step = Math.max(5, Math.round((squat * 0.01) / 5) * 5);
-  return `On this mix the plan advances the bar ${rate} — about ${step} lb a step on a ${Math.round(squat)} lb squat.`;
+  return `On this mix the plan advances the bar ${rate}.`;
 }
 
 /**

@@ -2268,12 +2268,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * card renders no cap rather than one computed off nothing.
    */
   const baselinesRow = paceRow as unknown;
-  /** The squat on file, for the rate line's pounds. ⚠️ Absent → the sentence stands without it. */
-  const squat1RMNow = (() => {
-    const pn = (paceRow as { performance_numbers?: Record<string, unknown> } | null)?.performance_numbers;
-    const v = Number(pn?.squat ?? (pn as Record<string, unknown> | undefined)?.squat1RM);
-    return Number.isFinite(v) && v > 0 ? v : null;
-  })();
   /** The typed calibration, if it is coherent. Drives the preview and the save. */
   const calResult = calibrationFromPaces({
     easyPace: state.calEasy, fiveKPace: state.calFiveK, isMetric: unit === 'km',
@@ -5559,7 +5553,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
            * element inside the scroll lifts over its own siblings the moment the content passes the
            * port height, which is how it ended up on top of the volume inputs.
            */
-          footer={<EnduranceWeekRate slots={slotSportsNow} squat1RM={squat1RMNow} />}
+          footer={<EnduranceWeekRate slots={slotSportsNow} />}
         >
           {tierLine ? (
             <p className="text-white/55 text-xs mb-3" data-testid="tier-line">{tierLine}</p>
@@ -5716,7 +5710,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             rideFixedLine={fixedHoursLineFor('ride')}
             baselines={baselinesRow}
             easyPaceSecPerMi={paceMinPerMile ? paceMinPerMile * 60 : null}
-            squat1RM={squat1RMNow}
             runVolume={state.targetRunHours === '' ? '' : String(state.targetRunHours)}
             onRunVolume={(v) => setState((st) => ({
               ...st, targetRunHours: v === '' ? '' : Number(v), targetTouched: true,
