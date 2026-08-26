@@ -18,6 +18,7 @@ import {
   EMITTED_TOKEN_SHAPES,
   FRAMES,
   HAIRCUT_CAUSE_IS_OURS,
+  HARD_ON_BIKE_CITE,
   isHardSlot,
   isLongSlot,
   lowerBodyHaircut,
@@ -151,7 +152,11 @@ Deno.test('the hard sessions go on the bike, and the run keeps its long day', ()
     if (isHardSlot(frameSlot)) assertEquals(slot.sport, 'ride', `a hard slot stayed a run: ${k}`);
     if (isLongSlot(frameSlot)) assertEquals(slot.sport, 'run', `the long slot was taken from the run: ${k}`);
   }
-  assert(a.notes.some((n) => n.cite === 'Viada p280'), 'the dial placed the hard work and said nothing');
+  // ⚠️ ASSERTED THROUGH THE CONSTANT, not the literal 'Viada p280'. The cite was marked UNVERIFIED in
+  // place on 2026-08-26 (p280 is not transcribed in the corpus), and a test hard-coding the old
+  // string would have to be edited every time the marking is reworded. `HARD_ON_BIKE_CITE` is where
+  // the copy lives; the test below pins that it still says UNVERIFIED.
+  assert(a.notes.some((n) => n.cite === HARD_ON_BIKE_CITE), 'the dial placed the hard work and said nothing');
 });
 
 Deno.test('the cost of losing the hard run is stated, not left to be noticed', () => {
@@ -807,4 +812,53 @@ Deno.test('the RUN slots are untouched by all of it — different families canno
   // ⚠️ Day 3's archetype is the FRAME's own (`below_threshold`); day 1's is left to the rotation.
   assertEquals(arche(a, '3:0'), 'below_threshold');
   assertEquals(arche(a, '1:0'), undefined);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE BIKE SENTENCE COUNTS THE WEEK IT WAS BUILT FOR (2026-08-26)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ "the hard sessions are on the bike" says what is TRUE of the built week', () => {
+  // ⛔ THE DEFECT, FROM A SCREEN. The note fired whenever ANY slot was substituted to a ride, so a
+  // week with one hard run and one hard ride told the athlete every hard session was on the bike.
+  // Same disease as the "four runs" block description, same fix: read the finished week, not the
+  // fact that a substitution happened.
+  const S = FRAMES.strength_5k.columns.standard;
+  const say = (mix: Record<string, unknown>) =>
+    assignSports(S, mix as never).notes.find((n) => /on the bike/.test(n.text))?.text ?? null;
+
+  const mixed = say({ runs: 2, rides: 2, slots: { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } });
+  assert(mixed != null, 'a week with a hard ride in it said nothing about the bike');
+  assert(/^One of the hard sessions is on the bike\./.test(mixed!),
+    `one hard ride and one hard run read: "${mixed}"`);
+
+  const allBike = say({ runs: 1, rides: 3, slots: { '1:0': 'ride', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } });
+  assert(/^The hard sessions are on the bike\./.test(allBike ?? ''),
+    `an all-bike hard week read: "${allBike}"`);
+
+  assertEquals(say({ runs: 4, rides: 0, slots: { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'run' } }), null,
+    'an all-run week claimed hard sessions were on the bike');
+
+  // ⚠️ THE RATIO BRANCH TAKES THE SAME EXIT. Two ways into `assignSports`, one sentence.
+  assert(/^One of the hard sessions is on the bike\./.test(say({ runs: 3, rides: 1 }) ?? ''),
+    'the ratio branch miscounted a single hard ride');
+});
+
+Deno.test('⚠️ THE BIKE SENTENCE COUNTS FRAME SLOTS, NOT ASSIGNED FAMILIES', () => {
+  // ⛔ THE TRAP UNDER THE FIX, PINNED SO NOBODY "SIMPLIFIES" IT. `isHardSlot` reads `HARDNESS`, which
+  // lists only the RUN families. Ask it about a slot substituted to `ride_sweet_spot` and it says
+  // false — so counting off the ASSIGNMENT returns zero on exactly the week the sentence is about,
+  // and the note goes silent. The frame slot owns hard identity, the same rule `anchorRoleOf` follows.
+  assertEquals(isHardSlot({ family: 'ride_sweet_spot' } as never), false,
+    'a ride family became hard — the note in sport-slots.ts can be simplified, re-read it first');
+  assertEquals(isHardSlot({ family: 'run_mlss' } as never), true);
+});
+
+Deno.test('the bike claim is marked unverified where the copy lives', () => {
+  // ⛔ MICHAEL, 2026-08-26: do not delete the claim, mark the cite so nobody later reads it as
+  // page-backed. p280 is not transcribed in `docs/SOURCE-viada-hybrid-athlete.md`.
+  const S = FRAMES.strength_5k.columns.standard;
+  const note = assignSports(S, { runs: 3, rides: 1 } as never).notes.find((n) => /on the bike/.test(n.text));
+  assert(note != null);
+  assert(/UNVERIFIED/.test(note!.cite ?? ''), `the bike cite reads as page-backed: "${note!.cite}"`);
 });

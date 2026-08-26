@@ -104,6 +104,34 @@ export const RIDE_EQUIVALENT: Partial<Record<FamilyId, { family: FamilyId; arche
   run_lsd: { family: 'ride_endurance', archetype: 'steady' },
 };
 
+/**
+ * ⛔⛔ THE SENTENCE COUNTS THE WEEK IT IS DESCRIBING (fixed 2026-08-26). It read *"The hard sessions
+ * are on the bike"* and fired whenever ANY slot was substituted — so a week with one hard run and
+ * one hard ride said both were on the bike. Michael read it on his own export beside a Monday hard
+ * run. Same disease as `describeBlock`'s "four runs": inherited copy asserting a fact the build
+ * disproves, and the true numbers were already in hand.
+ *
+ * ⚠️ THE CLAIM IS UNCHANGED AND IS STILL THE REASON THE DIAL PUTS INTENSITY ON THE BIKE — only its
+ * SUBJECT is corrected to however many hard sessions actually ended up there.
+ *
+ * ⛔⛔ THE CITE IS UNVERIFIED AND SAYS SO. p280 is **not transcribed in
+ * `docs/SOURCE-viada-hybrid-athlete.md`** — it appears only in the program index, as the notes page
+ * for the three cycling programs. The claim may well be his; nobody has read the page. Michael's
+ * ruling (2026-08-26): do not delete the claim, mark the cite so nobody later reads it as
+ * page-backed. ⛔ If p280 is ever photographed, this is the line to come back to.
+ */
+export const HARD_ON_BIKE_CITE = 'Viada p280 — UNVERIFIED, page not transcribed in the corpus';
+
+export function hardOnBikeNote(hardRides: number, hardRuns: number): string | null {
+  if (hardRides <= 0) return null;
+  // ⚠️ NAMED BY COUNT, and the mixed case is its own sentence rather than a hedge on the plural.
+  const subject = hardRuns > 0
+    ? (hardRides === 1 ? 'One of the hard sessions is on the bike' : `${hardRides} of the hard sessions are on the bike`)
+    : (hardRides === 1 ? 'The hard session is on the bike' : 'The hard sessions are on the bike');
+  return `${subject}. Riding hard does not land on the legs the way running does, so the intensity `
+    + 'costs the lifting less.';
+}
+
 export const RIDE_EQUIVALENCE_IS_OURS =
   'Matching each run slot to the ride family whose stated work floor is closest to its own is ours. '
   + 'The source permits swapping to any power-metered non-impact modality and says the long ride can '
@@ -391,12 +419,23 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
     if (declined > 0) notes.push({ kind: 'ours', text: HARD_SESSIONS_ARE_OPT_IN });
     if (substituted > 0) {
       notes.push({ kind: 'ours', text: RIDE_EQUIVALENCE_IS_OURS });
-      notes.push({
-        kind: 'source',
-        text: 'The hard sessions are on the bike. Riding hard does not land on the legs the way '
-          + 'running does, so the intensity costs the lifting less.',
-        cite: 'Viada p280',
-      });
+      /**
+       * ⛔ COUNTED OFF THE **FRAME'S** HARD SLOTS, NOT THE ASSIGNED FAMILY — see `hardOnBikeNote`.
+       * ⚠️ `isHardSlot` reads `HARDNESS`, which lists only the RUN families, so asking it about a
+       * substituted `ride_sweet_spot` returns false and the count would come back zero on exactly
+       * the week the sentence is about. The frame slot owns hard identity here, the same rule
+       * `anchorRoleOf` follows in `compose.ts`.
+       */
+      {
+        const hard = slots.filter(({ slot }) => isHardSlot(slot))
+          .map(({ day, i }) => byKey[key(day, i)])
+          .filter(Boolean);
+        const text = hardOnBikeNote(
+          hard.filter((x) => x.sport === 'ride').length,
+          hard.filter((x) => x.sport === 'run').length,
+        );
+        if (text) notes.push({ kind: 'source', text, cite: HARD_ON_BIKE_CITE });
+      }
     }
     // ⛔ THE PICKS APPLY ON THIS EXIT TOO — see `applyVariantPicks`. This branch skipped them
     // entirely until 2026-08-26, and it is the branch the wizard always takes.
@@ -448,12 +487,23 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
     }
     if (placed > 0) {
       notes.push({ kind: 'ours', text: RIDE_EQUIVALENCE_IS_OURS });
-      notes.push({
-        kind: 'source',
-        text: 'The hard sessions are on the bike. Riding hard does not land on the legs the way '
-          + 'running does, so the intensity costs the lifting less.',
-        cite: 'Viada p280',
-      });
+      /**
+       * ⛔ COUNTED OFF THE **FRAME'S** HARD SLOTS, NOT THE ASSIGNED FAMILY — see `hardOnBikeNote`.
+       * ⚠️ `isHardSlot` reads `HARDNESS`, which lists only the RUN families, so asking it about a
+       * substituted `ride_sweet_spot` returns false and the count would come back zero on exactly
+       * the week the sentence is about. The frame slot owns hard identity here, the same rule
+       * `anchorRoleOf` follows in `compose.ts`.
+       */
+      {
+        const hard = slots.filter(({ slot }) => isHardSlot(slot))
+          .map(({ day, i }) => byKey[key(day, i)])
+          .filter(Boolean);
+        const text = hardOnBikeNote(
+          hard.filter((x) => x.sport === 'ride').length,
+          hard.filter((x) => x.sport === 'run').length,
+        );
+        if (text) notes.push({ kind: 'source', text, cite: HARD_ON_BIKE_CITE });
+      }
       if (runs > 0) {
         // ⛔ STATE THE COST (pivot §2). A held sport keeps its base and loses its top end.
         notes.push({

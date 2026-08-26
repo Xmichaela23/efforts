@@ -200,8 +200,31 @@ Deno.test('no muscle below its floor, no session at the costly line — every fo
         const after = ledgerFor(filled.sessions);
         checked++;
 
-        assertEquals(after.belowFloor, [], `${where}: muscles left below the floor`);
-        assertEquals(filled.unfilled, [], `${where}: the floor could not be filled`);
+        // ⛔ A MUSCLE MAY BE LEFT SHORT ONLY IF THE ENGINE SAID SO OUT LOUD (2026-08-26).
+        //
+        // This used to assert `belowFloor` and `unfilled` were both empty — that the catalogue can
+        // fill every muscle for every kit. That held only while ~160 catalogue movements carried no
+        // gear tag and `canPerform` therefore waved them all through: a pull-up-bar athlete's biceps
+        // floor was being filled with a DUMBBELL CURL. Tagging the wider catalogue took the false
+        // offer away and left the real gap showing.
+        //
+        // ⚠️ THE GAP IS REAL AND IT IS THE CATALOGUE'S. There is no bodyweight prime-mover movement
+        // for biceps or triceps in it — chin-ups and push-ups reach those muscles as SECONDARY
+        // engagement, which this module lists and never counts. `movementsForMuscle('biceps',
+        // ['Pull-up bar'])` returns nothing, and `fillMuscleFloor` already reports exactly that:
+        // *"No movement in the catalogue reaches this muscle with the declared equipment."*
+        //
+        // ⛔ SO THE GATE IS UNCHANGED IN STRENGTH, only in shape: nothing may go short SILENTLY. A
+        // muscle below its floor must appear in `unfilled` with a reason. Weakening this to "short is
+        // fine" would let a future tag error hide here.
+        const declared = new Set(filled.unfilled.map((u) => u.muscle));
+        const silent = after.belowFloor.filter((m) => !declared.has(m));
+        assertEquals(silent, [], `${where}: muscles left below the floor with no reason given`);
+        for (const u of filled.unfilled) {
+          assert(u.reason.trim().length > 0, `${where}: "${u.muscle}" was dropped without a reason`);
+          assert(after.belowFloor.includes(u.muscle),
+            `${where}: "${u.muscle}" was reported unfilled but is not actually short`);
+        }
         for (const s of after.perSession) {
           assert(s.countedSets < SESSION_SETS_COSTLY,
             `${where}: "${s.label}" carries ${s.countedSets} work sets, at or past the costly line`);

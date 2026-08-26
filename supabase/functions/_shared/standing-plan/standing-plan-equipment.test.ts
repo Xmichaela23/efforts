@@ -211,7 +211,14 @@ Deno.test('an untagged machine movement is still not offered to a home athlete',
    * existed for: `leg press` and `hack squat` carry no gear tag, so `canPerform` alone passes them,
    * and the materialize backstop has a rule for only some machines.
    */
-  assertEquals(isGearTagged('leg press'), false, 'leg press gained a gear tag — this test is stale');
+  // ⚠️ THE MECHANISM MOVED, THE OUTCOME DID NOT (2026-08-26). This read `isGearTagged('leg press')
+  // === false` — the leg press was ejected because NOTHING was known about it, and the name regex
+  // was the only thing standing between a home gym and a fixed station. The catalogue tagging gave
+  // it `[['machine']]`, so `canPerform` now ejects it for a reason. Asserting the absence of a tag
+  // would be asserting the fix had not happened.
+  assertEquals(isGearTagged('leg press'), true, 'the leg press lost its gear tag');
+  // ⛔ THE REGEX STILL MATTERS, and this is what it is for now: the thirteen movements that remain
+  // untagged because `GearKey` cannot express their kit (see `strength-gear-catalogue.test.ts`).
   assert(readsAsMachineBraced('leg press'));
   assert(readsAsMachineBraced('chest supported row'));
   assert(readsAsMachineBraced('cable crossover'));
@@ -236,15 +243,31 @@ Deno.test('a movement that names its own band is not mistaken for a machine', ()
   assert(readsAsMachineBraced('lat pull down'), 'the machine reading was loosened for everything');
 });
 
-Deno.test('an untagged movement is free for a declared athlete unless it is a machine', () => {
-  // ⛔ STAGE 3'S FINDING, PINNED ON THE SLOT PATH. Every calf movement in the catalogue is untagged;
-  // under the old rule the grid declined all nine and calves were unfillable.
-  assertEquals(isGearTagged('rear delt fly'), false, 'rear delt fly gained a tag — this test is stale');
+Deno.test('calves are fillable for a declared athlete — stage 3\'s finding, kept', () => {
+  /**
+   * ⛔ THE FINDING THIS PINS IS UNCHANGED; WHAT SATISFIES IT IS NOT (2026-08-26). Every calf movement
+   * in the catalogue used to be UNTAGGED, the grid declined all nine on a strict reading, and calves
+   * were unfillable for a commercial-gym athlete. The test therefore asserted that untagged
+   * movements survive a declared athlete's pool — a true statement about the mechanism of the day.
+   *
+   * ⛔ THAT ASSERTION IS NOW THE WRONG ONE TO MAKE. Only thirteen catalogue movements remain
+   * untagged, and every one of them is untagged because it needs kit the vocabulary cannot express —
+   * a TRX, a sled, a GHD. "Untagged movements survive the pool" is now a restatement of the defect
+   * Michael reported, not a protection against it.
+   *
+   * ⚠️ SO THE OUTCOME IS PINNED DIRECTLY. Calves fill, because calf raises are tagged {@link ALWAYS}
+   * — an answer, not an absence.
+   */
+  assertEquals(isGearTagged('rear delt fly'), true, 'rear delt fly lost its gear tag');
   assert(!readsAsMachineBraced('rear delt fly'));
   const r = resolveSlot({ intent: 'HYP', category: 'focused', pattern: 'press_lower', equipment: ['Commercial gym'] });
   assert(r.options.length > 0, 'a commercial-gym athlete has no focused lower option');
-  assert(r.options.some((o) => !isGearTagged(o.name)),
-    'untagged movements are still being ejected from a declared athlete\'s pool');
+  assert(r.options.some((o) => /calf|soleus|tibialis/i.test(o.name)),
+    'calves are unfillable for a commercial-gym athlete again — stage 3\'s defect is back');
+  // ⚠️ AND THE BODYWEIGHT ATHLETE KEEPS THEM TOO, which is the reason they are ALWAYS and not
+  // `[['machine']]` for the standing calf-raise machine a gym happens to have.
+  const bw = resolveSlot({ intent: 'HYP', category: 'focused', pattern: 'press_lower', equipment: ['Pull-up bar'] });
+  assert(bw.options.some((o) => /calf/i.test(o.name)), 'a bodyweight athlete lost calf work');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

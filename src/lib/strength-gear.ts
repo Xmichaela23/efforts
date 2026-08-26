@@ -65,7 +65,20 @@ export type GearKey =
   // precedent above (leave ungated, let substitution swap) does not transfer: leg curl's
   // substitute collides with nothing, leg extension's collided with a default pick on its own
   // path. "Commonly declarable" is satisfied — the commercial-gym chip is the declaration.
-  | 'machine';
+  | 'machine'
+  // ⛔ THE SLICE 7 EXCEPTION, RULED 2026-08-26 — and it does not reverse Slice 7's rule, it applies
+  // it. That ruling cut gear people could not NAME: a glute-ham developer, dip bars, a leg curl
+  // machine, drawing Michael's *"I wouldn't know what that is."* The test it left behind is "BOTH
+  // required AND commonly declarable", and these two pass it — somebody with a rack and a bar in
+  // their garage knows perfectly well whether they own a TRX or a stability ball.
+  //
+  // ⚠️ THE ALTERNATIVE WAS WORSE, which is why they earned keys rather than joining the drop list.
+  // `trx fallout`, `stability ball rollout` and `stir the pot` were being PRESCRIBED to athletes who
+  // own neither — the 2026-08-26 defect. The kit that could not clear the same bar (a GHD, a sled, a
+  // captain's chair, a landmine, a sandbag) was dropped from the prescribable pool instead; see
+  // `PRESCRIPTION_EXCLUDED` in `strength-grid/taxonomy.ts`.
+  | 'suspension_trainer'
+  | 'stability_ball';
 
 /** Athlete-facing label per key. Also the vocabulary's roster — a key absent here does not exist. */
 export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
@@ -82,6 +95,8 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   box: 'Box',
   rings: 'Rings',
   machine: 'Machine',
+  suspension_trainer: 'Suspension Trainer',
+  stability_ball: 'Stability Ball',
 };
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -195,6 +210,27 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       out.add('incline_bench');
       // Fixed-station machines are what a commercial gym IS. Nothing else grants this key.
       out.add('machine');
+      // ⛔ BANDS AND KETTLEBELLS TOO (2026-08-26). The clause above says "most fixed equipment", and
+      // these two are the things it left out for being loose rather than bolted down — which is not
+      // the question. The question is whether the athlete can reach one, and in a commercial gym they
+      // can. The omission was already costing offers before the catalogue was tagged: `band face
+      // pulls`, `band leg curls` and `band tricep pushdown` all carried `[['bands']]` and were
+      // therefore ejected from every gym member's pool. Tagging the wider catalogue widened the same
+      // hole to swings, goblet squats, turkish get-ups and the whole banded prehab shelf.
+      //
+      // ⚠️ THIS CAN ONLY ADD, NEVER SUBTRACT. Granting a key opens routes; it closes none.
+      out.add('bands');
+      out.add('kettlebell');
+      // ⚠️ AND THE TWO 2026-08-26 KEYS. A commercial gym has a suspension trainer and a stability
+      // ball on the floor as surely as it has dumbbells.
+      out.add('suspension_trainer');
+      out.add('stability_ball');
+    }
+    // ⛔ THE TWO CHIPS ADDED 2026-08-26 — see the GearKey note. Matched by SUBSTRING, like every
+    // clause above, so "TRX / suspension trainer" and "Stability ball" both land.
+    if (s.includes('trx') || s.includes('suspension')) out.add('suspension_trainer');
+    if (s.includes('stability ball') || s.includes('swiss ball') || s.includes('exercise ball')) {
+      out.add('stability_ball');
     }
   }
   return out;
@@ -354,6 +390,233 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'db side bend': [['dumbbells'], ['kettlebell']],
   'dumbbell side bend': [['dumbbells'], ['kettlebell']],
   'plank': ALWAYS,
+
+  // ══ THE WIDER CATALOGUE (2026-08-26) ═══════════════════════════════════════════════════════════
+  //
+  // ⛔ WHY THESE 147 ROWS EXIST. Everything above is the curated 28-movement assistance menu, and it
+  // is fully tagged. `strength-grid` is the OTHER consumer, and it reads the whole of
+  // `EXERCISE_CONFIG` — 211 classified movements, of which 160 carried no tag. Measured for a
+  // declared home gym (barbell, rack, bench, dumbbells, pull-up bar, bands): 148 of those 160 reached
+  // the athlete anyway, because `grid.ts:reachable` lets an untagged movement through unless its NAME
+  // reads as machine-braced. A regex was doing a tag's job for two thirds of the catalogue.
+  //
+  // ⚠️ THE RANKING WAS THE QUIETER HALF OF IT. `equipmentFitRank` has no route to read for an
+  // untagged movement, so all 160 tied at zero and the catalogue's key order picked the winner —
+  // "not a decision, an accident", in `grid.ts`'s own words about the case that surfaced it.
+  //
+  // ⛔ ALWAYS HERE IS AN ANSWER, NOT AN ABSENCE. A row tagged {@link ALWAYS} has been read and judged
+  // to need nothing; an absent row is a movement nobody has looked at. The two used to be
+  // indistinguishable, which is the whole reason `gearRoutesFor` warns.
+  //
+  // ⚠️ THIRTEEN MOVEMENTS ARE DELIBERATELY LEFT UNTAGGED: trx fallout, stability ball rollout, stir
+  // the pot, ghd sit up, roman chair sit up, captain's chair knee raise (both spellings), sled push,
+  // sled pull, landmine twist, sandbag lunge, backpack carry, ring dips. Each needs kit this
+  // vocabulary cannot express, and the Slice 7 ruling in `TrainingBaselines.tsx` forbids re-adding
+  // the chips that would express it — "gate only on gear that is BOTH required AND commonly
+  // declarable", after an itemized picker drew *"I wouldn't know what that is."* Tagging them would
+  // mean inventing keys no athlete can produce, which the vocabulary note at the top of this file
+  // rules out. Open with Michael, 2026-08-26; not an oversight.
+
+  // ── PRIMARY LIFTS ───────────────────────────────────────────────────────────────────────────────
+  // ⚠️ Bare `squat` / `bench` / `press` / `deadlift` are the grid's PRIMARY names — the main lift
+  // itself, not a bodyweight cousin. Tagged as the loaded movement they classify as.
+  'squat': [['barbell', 'rack']],
+  'back squat': [['barbell', 'rack']],
+  'barbell back squat': [['barbell', 'rack']],
+  'deadlift': [['barbell']],
+  'conventional deadlift': [['barbell']],
+  // A trap bar is a barbell variant with no key of its own, and inventing one fails "commonly
+  // declarable". The plates chip is the honest minimum.
+  'trap bar deadlift': [['barbell']],
+  'sumo deadlift': [['barbell']],
+  'bench': [['barbell', 'bench']],
+  'bench press': [['barbell', 'bench']],
+  'barbell bench press': [['barbell', 'bench']],
+  // ⚠️ NO `decline_bench` KEY — that chip was cut by Slice 7. A flat bench is the declarable
+  // minimum; the decline itself is the substitution backstop's problem, not the gate's.
+  'decline bench press': [['barbell', 'bench']],
+  'overhead press': [['barbell']],
+  'standing barbell overhead press': [['barbell']],
+  'military press': [['barbell']],
+  'press': [['barbell']],
+  'ohp': [['barbell']],
+  'push press': [['barbell']],
+  // Ambiguous name — dumbbells are the commoner reading, so both routes.
+  'shoulder press': [['dumbbells'], ['barbell']],
+  'pullup': [['pull_up_bar']],
+  'chinup': [['pull_up_bar']],
+
+  // ── BRACED / FIXED-STATION ──────────────────────────────────────────────────────────────────────
+  // The motivating case for the `machine` key, named in the vocabulary note above.
+  'leg press': [['machine']],
+  'ab machine crunch': [['machine']],
+  'lat pull down': [['cable'], ['bands']],
+  'explosive lat pull down': [['cable'], ['bands']],
+  'cable row': [['cable']],
+  'cable face pull': [['cable']],
+  'band assisted pull up': [['pull_up_bar', 'bands']],
+  // Chest-supported means something to lie on at an angle, or the station that does it for you.
+  'chest supported row': [['dumbbells', 'incline_bench'], ['machine']],
+
+  // ── CARRIES ─────────────────────────────────────────────────────────────────────────────────────
+  // Anything with a handle. `backpack carry` is NOT here — see the thirteen, above.
+  'farmer walk': [['dumbbells'], ['kettlebell'], ['barbell']],
+  'farmers carry': [['dumbbells'], ['kettlebell'], ['barbell']],
+  'suitcase carry': [['dumbbells'], ['kettlebell'], ['barbell']],
+  'overhead carry': [['dumbbells'], ['kettlebell'], ['barbell']],
+
+  // ── CORE: NEEDS NOTHING ─────────────────────────────────────────────────────────────────────────
+  'crunch': ALWAYS,
+  'bicycle crunch': ALWAYS,
+  'cross body crunch': ALWAYS,
+  'reverse crunch': ALWAYS,
+  'bird dog': ALWAYS,
+  'dead bug': ALWAYS,
+  'plank hold': ALWAYS,
+  'plank with shoulder tap': ALWAYS,
+  'side plank': ALWAYS,
+  'side plank abduction': ALWAYS,
+  'side plank with hip dip': ALWAYS,
+  // ⚠️ A COUCH OR A CHAIR IS THE PROP, the same F-6 reasoning `inverted row` follows. The bench a gym
+  // athlete uses is convenience, not a prerequisite.
+  'copenhagen plank': ALWAYS,
+  'superman hold': ALWAYS,
+  'flutter kicks': ALWAYS,
+  'scissor kicks': ALWAYS,
+  'russian twist': ALWAYS,
+  'toe touches': ALWAYS,
+  'v up': ALWAYS,
+  // The athlete's-choice rows. Gating a free choice would be circular.
+  'core work': ALWAYS,
+  'core circuit': ALWAYS,
+  'core work (5 min your choice)': ALWAYS,
+  'core work 5 min your choice': ALWAYS,
+
+  // ── CORE: NEEDS SOMETHING ───────────────────────────────────────────────────────────────────────
+  // Hanging. The bar is the movement.
+  'toes to bar': [['pull_up_bar']],
+  'hanging windshield wipers': [['pull_up_bar']],
+  'l sits': [['pull_up_bar']],
+  'ab rollout': [['ab_wheel']],
+  // ⛔ THE TWO CHIPS RULED IN 2026-08-26 — see the `suspension_trainer` / `stability_ball` note on
+  // GearKey. These three movements were the case: prescribed to athletes who owned neither.
+  'trx fallout': [['suspension_trainer']],
+  // ⚠️ EITHER BALL OR STRAPS. A stir-the-pot is forearms on a ball; the TRX version is the same
+  // anti-extension movement on straps, and an athlete with one does not need the other.
+  'stir the pot': [['stability_ball'], ['suspension_trainer']],
+  'stability ball rollout': [['stability_ball']],
+  'cable crunch': [['cable'], ['bands']],
+  'cable woodchopper': [['cable'], ['bands']],
+  'pallof press': [['cable'], ['bands']],
+  'turkish getup': [['kettlebell'], ['dumbbells']],
+  'turkish get ups': [['kettlebell'], ['dumbbells']],
+
+  // ── CALVES AND SHINS ────────────────────────────────────────────────────────────────────────────
+  // ⛔ ALWAYS, AND IT MATTERS. `accessory-dosing/ledger.ts` recorded calves going unfillable for a
+  // commercial-gym athlete under a stricter reading, because every calf movement was untagged. They
+  // are also genuinely bodyweight movements — a step edge is not equipment.
+  'calf raise': ALWAYS,
+  'calf raises (bilateral)': ALWAYS,
+  'single leg calf raise': ALWAYS,
+  'soleus raise': ALWAYS,
+  'tibialis raise': ALWAYS,
+  'weighted single leg calf raise': [['dumbbells'], ['kettlebell'], ['barbell']],
+
+  // ── ARMS, DELTS AND FLYES ───────────────────────────────────────────────────────────────────────
+  'barbell curl': [['barbell']],
+  // Plural aliases of rows already above. ⚠️ The routes must MATCH their singulars — the grid dedupes
+  // plurals and can offer either spelling, so a disagreement here is a gate that flips on spelling.
+  'dumbbell curls': [['dumbbells']],
+  'hammer curls': [['dumbbells']],
+  'cable curls': [['cable'], ['bands']],
+  'tricep extensions': [['dumbbells'], ['barbell'], ['bands']],
+  'bent over reverse flye': [['dumbbells']],
+  'rear delt fly': [['dumbbells'], ['cable'], ['bands']],
+  'rear delt flyes': [['dumbbells'], ['cable'], ['bands']],
+  'reverse fly': [['dumbbells'], ['cable'], ['bands']],
+  'reverse flye': [['dumbbells'], ['cable'], ['bands']],
+  // ⛔ THE NAME SAYS BODYWEIGHT and the config comment calls it the fallback the engine reaches for
+  // when the athlete owns nothing. Gating it would delete the fallback from the athlete it is for.
+  'reverse flyes (bodyweight)': ALWAYS,
+  'reverse flyes bodyweight': ALWAYS,
+  // Prone on the floor. Light plates are optional, never required.
+  'prone y t w raise': ALWAYS,
+  'ytw raises': ALWAYS,
+  'lateral raise': [['dumbbells'], ['cable'], ['bands']],
+  'dumbbell lateral raise': [['dumbbells']],
+  'band lateral raise': [['bands']],
+  'front raise': [['dumbbells'], ['barbell'], ['bands']],
+  'scaption': [['dumbbells'], ['bands']],
+  'scaption (bodyweight shoulder raises)': ALWAYS,
+  'scaption bodyweight shoulder raise': ALWAYS,
+  'chest fly': [['dumbbells'], ['cable'], ['bands']],
+  'chest flyes': [['dumbbells'], ['cable'], ['bands']],
+  'dumbbell fly': [['dumbbells']],
+  'dumbbell flyes': [['dumbbells']],
+  'cable crossover': [['cable'], ['bands']],
+
+  // ── HINGE ───────────────────────────────────────────────────────────────────────────────────────
+  'rdl': [['barbell'], ['dumbbells'], ['kettlebell']],
+  'db romanian deadlift': [['dumbbells']],
+  'single leg rdl': [['dumbbells'], ['kettlebell'], ['barbell']],
+  'single leg romanian deadlift': [['dumbbells'], ['kettlebell'], ['barbell']],
+  'kettlebell swing': [['kettlebell']],
+  'kb swings': [['kettlebell']],
+  'dumbbell swing': [['dumbbells']],
+  'db swings': [['dumbbells']],
+  'kb db swing': [['kettlebell'], ['dumbbells']],
+  'glute bridge': ALWAYS,
+  'glute bridge march': ALWAYS,
+  'single leg glute bridge': ALWAYS,
+  'hip extension': ALWAYS,
+  'clamshell': ALWAYS,
+  'band lateral walk': [['bands']],
+  'lateral band walk': [['bands']],
+
+  // ── SQUAT PATTERN AND LUNGES ────────────────────────────────────────────────────────────────────
+  'air squat': ALWAYS,
+  'bodyweight squat': ALWAYS,
+  'single leg squat': ALWAYS,
+  'pistol squats': ALWAYS,
+  'lunges': ALWAYS,
+  'walking lunge': ALWAYS,
+  'lateral lunge': ALWAYS,
+  // ⚠️ `box` IS MENTION-ONLY — no chip produces it, so a route through it could never be satisfied.
+  // A step-up is done on whatever is knee height, which is the F-6 reading `inverted row` already
+  // takes. The box belongs on the Equipment line, not in the gate.
+  'step up': ALWAYS,
+  'box step up': ALWAYS,
+  'explosive step up': ALWAYS,
+  'barbell walking lunge': [['barbell']],
+  'dumbbell walking lunge': [['dumbbells']],
+  'goblet squat': [['kettlebell'], ['dumbbells']],
+
+  // ── ROWS AND REAR-CHAIN PULLS ───────────────────────────────────────────────────────────────────
+  'bent over row': [['barbell'], ['dumbbells']],
+  'rows': [['barbell'], ['dumbbells']],
+  'single arm row': [['dumbbells']],
+  'light db row': [['dumbbells']],
+  'kettlebell rows': [['kettlebell']],
+  'band row': [['bands']],
+  'resistance band row': [['bands']],
+  'band pull apart': [['bands']],
+  'band face pull': [['bands']],
+  'band leg curl': [['bands']],
+  'external rotation': [['bands'], ['dumbbells'], ['cable']],
+
+  // ── PRESSES AND PUSH-UPS ────────────────────────────────────────────────────────────────────────
+  'pushup': ALWAYS,
+  'archer push up': ALWAYS,
+  'decline push up': ALWAYS,
+  'pike push up': ALWAYS,
+  'handstand push ups': ALWAYS,
+  'dumbbell press': [['dumbbells']],
+  'db push press': [['dumbbells']],
+  'db thruster': [['dumbbells']],
+  'kettlebell press': [['kettlebell']],
+  'kettlebell snatches': [['kettlebell']],
+  'band overhead press': [['bands']],
+  'incline bench': [['barbell', 'incline_bench']],
 };
 
 /** Names already warned about, so an untagged movement announces itself once, not once per render. */

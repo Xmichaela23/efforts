@@ -594,7 +594,26 @@ Deno.test('the ledger sees the strength sets, and no week breaks the ceiling or 
       for (const s of wk.ledger.perSession) {
         assert(s.countedSets < 14, `${where}: "${s.label}" carries ${s.countedSets} work sets`);
       }
-      assertEquals(wk.ledger.belowFloor, [], `${where}: muscles left below the floor`);
+      /**
+       * ⛔ A MUSCLE MAY BE SHORT ONLY IF THE WEEK SAYS SO, BY NAME (2026-08-26).
+       *
+       * This asserted `belowFloor` was empty for every kit. That held only while ~160 catalogue
+       * movements carried no gear tag and therefore passed every gate: a pull-up-bar athlete's
+       * biceps floor was being filled with a BARBELL CURL. Tagging the catalogue took the false
+       * offer away and left the real gap showing — the catalogue has no bodyweight prime-mover for
+       * biceps or triceps, and chin-ups and push-ups reach them as SECONDARY engagement, which this
+       * ledger lists and never counts.
+       *
+       * ⚠️ THE GATE KEEPS ITS TEETH. Silence is still a failure: a short muscle must appear in the
+       * week's own warnings with a reason. "Short is fine" would let a future tag error hide here.
+       */
+      const spoken = new Set(
+        (wk.notes ?? [])
+          .filter((n) => n.kind === 'warning')
+          .flatMap((n) => wk.ledger.belowFloor.filter((m) => n.text.startsWith(`${m}:`))),
+      );
+      const silent = wk.ledger.belowFloor.filter((m) => !spoken.has(m));
+      assertEquals(silent, [], `${where}: muscles left below the floor with no warning naming them`);
     }
   }
 });

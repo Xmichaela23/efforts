@@ -1135,6 +1135,20 @@ const disciplineOptions = [
    * (`substituteExerciseForEquipment`). Do not re-add a chip here to make a gate more precise — that
    * trade was made once and reversed.
    *
+   * ⛔ TWO CHIPS WERE ADDED 2026-08-26, AND THE RULE ABOVE IS WHY, NOT AN EXCEPTION TO IT. Suspension
+   * trainer and stability ball pass BOTH halves of the test. Required: `trx fallout`, `stir the pot`
+   * and `stability ball rollout` cannot be done without them, and the engine was prescribing all
+   * three to athletes who own neither — Michael, 2026-08-26: *"we need to add to equipment list for
+   * home gym, should never be just prescribed."* Commonly declarable: somebody with a rack and a bar
+   * in their garage knows whether they own a TRX or a stability ball. What Slice 7 cut was gear
+   * people could not NAME — a glute-ham developer, dip bars, a leg curl machine. These are not that.
+   *
+   * ⚠️ AND THE KIT THAT COULD NOT CLEAR THE SAME BAR DID NOT GET A CHIP. A GHD, a sled, a captain's
+   * chair, a landmine, a sandbag, a ruck, gymnastic rings — those movements were DROPPED FROM THE
+   * PRESCRIBABLE POOL instead (`PRESCRIPTION_EXCLUDED`, `strength-grid/taxonomy.ts`). They stay in
+   * the library and an athlete may still log them by choice. Not commonly declarable means not
+   * gateable means never prescribed — which is this rule carried through, not bent.
+   *
    * ⛔ THESE STRINGS ARE MATCHED BY SUBSTRING in `src/lib/strength-gear.ts` and exactly by
    * `substituteExerciseForEquipment`. Renaming one silently removes the capability from every athlete
    * who ticked it.
@@ -1151,7 +1165,12 @@ const disciplineOptions = [
     "Kettlebells",
     "Cable machine",
     "Resistance bands",
-    "Ab wheel"
+    "Ab wheel",
+    // ⛔ ADDED 2026-08-26 — see the ruling above. ⚠️ Both strings are matched by SUBSTRING in
+    // `athleteEquipmentToKeys` ("trx"/"suspension", "stability ball"); renaming either silently
+    // removes the capability from every athlete who ticked it.
+    "TRX / suspension trainer",
+    "Stability ball"
   ];
 
   

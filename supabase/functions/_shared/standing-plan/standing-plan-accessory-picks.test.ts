@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { athleteEquipmentToKeys } from '../../../../src/lib/strength-gear.ts';
 import {
   DIAL_CAP,
   DIAL_CHIPS,
@@ -440,6 +441,30 @@ Deno.test('⛔ EVERY focus-row default is rep-based and on the catalogue', () =>
   for (const equipment of EQ_CASES) {
     for (const chip of DIAL_CHIPS) {
       const opts = dialRowOptions(chip, equipment);
+      /**
+       * ⛔ ONE KNOWN EMPTY CELL, NAMED RATHER THAN WAIVED (2026-08-26). `arms` is empty for an
+       * athlete whose declared kit maps to NO gear key at all, and the reason is the catalogue's:
+       * every biceps and triceps prime-mover in it needs a barbell, dumbbells, a cable, bands, or
+       * something to dip on. `movementsForMuscle('biceps', ['Pull-up bar'])` returns nothing.
+       *
+       * ⚠️ IT WAS INVISIBLE UNTIL THE CATALOGUE WAS TAGGED, and invisible in the worst way: the row
+       * offered a BARBELL CURL to an athlete with no barbell, because an untagged movement passed
+       * every gate. An empty row is the honest version of the same fact.
+       *
+       * ⛔ THE REAL-WORLD CASE IS `['Pull-up bar']`, NOT THIS SYNTHETIC LABEL. An athlete who ticks
+       * nothing lands on `[]`, which is §0h — undeclared, ungated, everything offered. An athlete who
+       * ticks only the pull-up bar hits this hole for real. Open with Michael, 2026-08-26: either the
+       * catalogue gains a bodyweight arms movement (chin-ups and diamond push-ups reach those muscles
+       * as SECONDARY engagement, which is not the same claim) or the chip is withheld from a kit that
+       * cannot fill it. It is not fixable by loosening a gear tag.
+       */
+      const noLoadableKit = Array.isArray(equipment) && equipment.length > 0
+        && athleteEquipmentToKeys(equipment).size === 0;
+      if (chip === 'arms' && noLoadableKit) {
+        assertEquals(opts.length, 0,
+          'arms gained an option for a kit with no gear keys — the catalogue gap closed, update this note');
+        continue;
+      }
       assert(opts.length > 0, `${chip} offers nothing for ${JSON.stringify(equipment)}`);
       const first = opts[0];
       // ⛔ REP-BASED. The row is dosed 3 x 8-10 by feel; a hold cannot carry that.

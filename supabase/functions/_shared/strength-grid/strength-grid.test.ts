@@ -612,11 +612,17 @@ Deno.test('undeclared equipment offers everything; declared equipment gates', ()
   assert(/dumbbell|db/.test(db.chosen.name), `a dumbbell owner was offered "${db.chosen.name}"`);
 });
 
-Deno.test('an untagged movement is not treated as free for an athlete who declared their kit', () => {
-  // ⛔ THE READING THIS GRID MAKES LOCALLY, AND THE REASON. `gearRoutesFor` returns "needs nothing"
-  // for an untagged movement — right over a curated 28-movement menu, wrong over a 316-movement
-  // catalogue, where it hands a bodyweight athlete a leg press.
-  assertEquals(isGearTagged('leg press'), false, 'leg press gained a gear tag — this test is now stale');
+Deno.test('a fixed-station movement is not offered to an athlete who declared no station', () => {
+  // ⛔ THE BEHAVIOUR IS THE TEST; THE MECHANISM UNDER IT CHANGED TWICE. This started as "an untagged
+  // movement is not treated as free", asserting `isGearTagged('leg press') === false` — the grid's
+  // local guard, which ejected the leg press because NOTHING was known about it. The 2026-08-26 pass
+  // tagged the wider catalogue (147 rows), so the leg press now carries `[['machine']]` and
+  // `canPerform` ejects it for a real reason. Asserting the absence of a tag would now be asserting
+  // that the fix had not happened.
+  //
+  // ⚠️ WHAT MUST NOT CHANGE is underneath: a bodyweight athlete is not handed a leg press, the swap
+  // is declared, and a gym member still gets one.
+  assertEquals(isGearTagged('leg press'), true, 'the leg press lost its gear tag');
   assertEquals(isGearTagged('push up'), true);
   const bw = resolveSlot({ intent: 'HYP', category: 'braced', pattern: 'press_lower', equipment: ['Pull-up bar'] });
   assert(bw.chosen.name !== 'leg press', 'a bodyweight athlete was handed a leg press');

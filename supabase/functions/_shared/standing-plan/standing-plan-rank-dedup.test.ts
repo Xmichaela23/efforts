@@ -57,6 +57,7 @@ import {
 } from '../strength-grid/index.ts';
 import {
   equipmentFitRank,
+  hasLoadableFit,
   ownsLoadingImplement,
 } from '../../../../src/lib/strength-gear.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
@@ -156,9 +157,19 @@ Deno.test('the two cells from the device report order loaded work first', () => 
   const names = pull.options.map((o) => o.name);
   const fallback = names.indexOf('reverse flyes (bodyweight)');
   assert(fallback >= 0, 'the bodyweight fallback left this cell — this test is now stale');
-  const lastLoaded = names.reduce((acc, n, i) => (isBodyweight(n) ? acc : i), -1);
+  // ⛔ "LOADED" IS `hasLoadableFit`, NOT "not bodyweight-format" (corrected 2026-08-26). The old
+  // reading counted `cable curls` as loaded work that the fallback had to sit behind. Once the
+  // catalogue was tagged, `cable curls` resolved to `[['cable'], ['bands']]` on a gym with bands and
+  // no cable stack — a BAND-tier fit, rank 101, which `equipmentFitRank` deliberately sorts below
+  // every rank-0 movement including this fallback. Demanding the fallback sit behind it would be
+  // demanding the band rule be broken. `hasLoadableFit` is the app's own word for the distinction.
+  // ⚠️ AND BOTH HALVES ARE NEEDED. `hasLoadableFit` alone means "reached without a band", which an
+  // ALWAYS-tagged bodyweight movement satisfies — it caught `reverse flyes bodyweight`, the second
+  // spelling of the fallback itself, and demanded the fallback sort behind its own twin.
+  const isLoaded = (n: string) => hasLoadableFit(n, HOME_GYM) && !isBodyweight(n);
+  const lastLoaded = names.reduce((acc, n, i) => (isLoaded(n) ? i : acc), -1);
   assert(fallback > lastLoaded,
-    `"reverse flyes (bodyweight)" is at ${fallback}, ahead of loaded work ending at ${lastLoaded}`);
+    `"reverse flyes (bodyweight)" is at ${fallback}, ahead of loadable work ending at ${lastLoaded}`);
 
   /**
    * ⛔ AND THE CELL WHERE THE FIX ACTUALLY MOVES SOMETHING. `focused / press_lower` held
@@ -205,7 +216,15 @@ Deno.test('⛔ A BODYWEIGHT ATHLETE IS NOT DEMOTED OUT OF THEIR OWN CATALOGUE', 
     const r = resolveSlot({ intent: 'HYP', category: 'focused', pattern: 'press_lower', equipment: equipment as string[] | null });
     const names = r.options.map((o) => o.name);
     assertEquals(names[0], expectedHead, `[${equipment ?? 'undeclared'}] the head of the cell moved`);
-    assert(names.indexOf('calf raise') < names.indexOf('weighted single leg calf raise'),
+    // ⚠️ AND IF THE DUMBBELL MOVEMENT IS NOT OFFERED AT ALL, THE DEMOTION CANNOT HAPPEN — the
+    // stronger outcome, not a weaker test. `weighted single leg calf raise` was untagged until
+    // 2026-08-26 and therefore offered to everyone; it now routes through dumbbells, a kettlebell or
+    // a barbell, so a pull-up-bar athlete never sees it. `indexOf` returning -1 is that fact, and
+    // reading -1 as "sorts first" is how this assertion would silently invert.
+    const bw = names.indexOf('calf raise');
+    const loaded = names.indexOf('weighted single leg calf raise');
+    assert(bw >= 0, `[${equipment ?? 'undeclared'}] the bodyweight calf raise left the cell`);
+    assert(loaded < 0 || bw < loaded,
       `[${equipment ?? 'undeclared'}] a bodyweight athlete was demoted below dumbbell work`);
   }
 });

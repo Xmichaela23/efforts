@@ -350,6 +350,54 @@ function dedupeKey(name: string): string {
   return foldExerciseName(name).replace(/(\w)s\b/g, '$1').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * ⛔ IN THE LIBRARY, NEVER PRESCRIBED (Michael, 2026-08-26).
+ *
+ * Each of these needs kit `GearKey` cannot express — a GHD, a roman chair, a captain's chair, a
+ * sled, a landmine, a sandbag, a ruck, gymnastic rings. Slice 7's rule is *"gate only on gear that
+ * is BOTH required AND commonly declarable"*, and none of them clears the second half: an itemized
+ * picker asking about a glute-ham developer is the exact trade that ruling reversed, after drawing
+ * Michael's *"I wouldn't know what that is."*
+ *
+ * ⛔ SO THE RULE IS CARRIED THROUGH RATHER THAN BENT: not commonly declarable means not gateable
+ * means never prescribed. Leaving them in the pool untagged was the 2026-08-26 defect — measured on
+ * a declared home gym, every one of them reached an athlete who had declared none of its kit.
+ *
+ * ⚠️ THIS DROPS THEM FROM THE ENGINE'S POOL ONLY. `EXERCISE_CONFIG` still holds them, the exercise
+ * library still lists them, and an athlete who CHOOSES a sled push can still log one — that is their
+ * call to make and it always was. The engine simply never makes it for them.
+ *
+ * ⚠️ NOT THE SAME LIST AS THE UNTAGGED ONE. `trx fallout`, `stir the pot` and `stability ball
+ * rollout` were on it until the same ruling gave suspension trainers and stability balls their own
+ * chips — those pass "commonly declarable", so they are tagged and offered rather than dropped.
+ */
+export const PRESCRIPTION_EXCLUDED: readonly string[] = [
+  'backpack carry',
+  'captain s chair knee raise',
+  "captain's chair knee raise",
+  'ghd sit up',
+  'landmine twist',
+  'ring dips',
+  'roman chair sit up',
+  'sandbag lunge',
+  'sled pull',
+  'sled push',
+];
+
+/**
+ * ⛔ MATCHED ON THE DEDUPE STEM, NOT THE FOLD, and the difference showed up immediately. Naming
+ * `ring dips` alone dropped the plural and handed the dedupe slot to `ring dip` — the catalogue's
+ * other spelling of the same movement — which then sailed back into the pool untagged. Every
+ * spelling of a dropped movement has to go with it; see {@link dedupeKey}, the same collapse
+ * `allGridMovements` already uses to pick between twins.
+ */
+const EXCLUDED_STEMS = new Set(PRESCRIPTION_EXCLUDED.map((n) => dedupeKey(n)));
+
+/** Is this movement barred from anything the engine PRESCRIBES? See {@link PRESCRIPTION_EXCLUDED}. */
+export function isPrescribable(exerciseName: string): boolean {
+  return !EXCLUDED_STEMS.has(dedupeKey(String(exerciseName ?? '')));
+}
+
 let INDEX: GridMovement[] | null = null;
 
 /** Every catalogued movement, classified. Built once, lazily; the catalogue is a module constant. */
@@ -362,6 +410,9 @@ export function allGridMovements(): GridMovement[] {
     if (seen.has(dk)) continue;
     const category = viadaCategoryOf(name);
     if (!category) continue;
+    // ⛔ DROPPED BEFORE `seen` IS MARKED, deliberately. Marking first would let an excluded spelling
+    // consume the dedupe slot and take a legitimate twin down with it.
+    if (!isPrescribable(name)) continue;
     seen.add(dk);
     out.push({
       name,
