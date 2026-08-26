@@ -1,6 +1,50 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-25 night — after the pins-win day)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-25, late — the mid-test-week interrupt session)
+
+### Your job: FIRST check whether Michael's week-2 weights landed. THEN the punch-list cleanup below.
+
+**The live situation:** Michael is in week 1 of his own Standing Plan (Strong Focus) block — tests
+logged Monday (upper) and Tuesday (lower). The save-time weight fill (`StrengthLogger.tsx:4370`
+fires both rematerializers on every strength save) **did not visibly fire for him** — no sheet, no
+weights. Unknown whether it ran and abstained, ran and found nothing, or never ran (stale bundle).
+Weights must be in place before week 2 starts Monday 2026-08-31.
+
+**What was built for it:** a manual trigger card on `/plans/admin`
+(`src/components/StandingRestateAdmin.tsx`) — **Check** = dry run of both rematerializers, prints
+what was read from the logged tests + rows that would change; **Apply** = writes weeks that have
+not started. Michael was about to run it when the session closed.
+
+- If he ran it and weights landed: done, mark it in the punch list.
+- If Check answered `no_completed_test_sets`: the logged test workouts did not link to the planned
+  test sessions (`workouts.planned_id` → `planned_workouts`). That's the diagnosis path —
+  `readTestWeek` refuses any set it cannot prove is week one (`rematerialize-standing-block/index.ts:~110`).
+- The card itself has NEVER been run by anyone. It compiles and mirrors the logger's exact calls;
+  that is all that is known.
+
+### What shipped this session (PUSHED `22358d8d` + edge functions DEPLOYED; NOT verified)
+
+- **Rotation-week label fix** — `standing-plan/compose.ts` `noteForWeek` (~line 480): on even
+  (swap) weeks the exercise note now swaps hinge/push so a back squat is never labeled "Primary
+  hinge lower". Display text only; weights/selection/rotation untouched. Found via an outside AI's
+  critique of a plan export that took the mismatched labels as a programming error (it isn't — the
+  pairing is Viada p246-247's own rotation). Verified by fixture compose across 4 weeks; suite
+  259/259 green.
+- **`StandingRestateAdmin` card** on `/plans/admin` (see above).
+- **CLAUDE.md**: "Answer only what was asked" rule added to How-to-talk-to-Michael.
+- Deployed: `rematerialize-standing-block`, `generate-strength-plan`, `generate-combined-plan`,
+  `generate-run-plan`, `generate-triathlon-plan` (the five that bundle `standing-plan/`). Netlify
+  auto-deploying `22358d8d`.
+- ⚠️ Run deno suites with `-A` — an under-permissioned run reported 23 false failures this session
+  (file-read tests die on NotCapable before testing anything).
+
+### Carried forward, untouched this session (from the pins-win banner below)
+
+**The punch-list cleanup job** — read `POLISH-PUNCH-LIST.md` top to bottom, verify each open item
+against code, close what's done. Plus the pins-win banner's own unverified items: the three-club
+built plan on a device, Q-286/Q-287/Q-288, step-8 color-coding.
+
+## 🧭 SUPERSEDED — was START HERE (2026-08-25 night — the pins-win day; its punch-list job was NOT done, carried in the banner above)
 
 ### Your job: **CLEAN UP `POLISH-PUNCH-LIST.md`.** Michael called it: next session works the punch list.
 

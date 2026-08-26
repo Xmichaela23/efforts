@@ -14,6 +14,14 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — WEEK-2 WEIGHTS ON HIS LIVE BLOCK (2026-08-25)
+
+The logger's save-time fill did not visibly fire on his Mon/Tue test saves. Deployed fallback:
+- [ ] Open `/plans/admin` in the **web** app → **Check** → read the line → **Apply**.
+- [ ] Then open week 2 Monday's ME Upper: bench shows a weight, not "By feel".
+- [ ] If Check says `no_completed_test_sets`: report back — that's an attach failure
+      (logged tests not linked to planned rows), needs a data look.
+
 ## QUEUED — STEP 8 CONFIRM SCREEN (Michael, 2026-08-25, "when we get to it")
 
 - [ ] **Color-code the workouts by sport** on the step 8 week list (same sport colors as the
