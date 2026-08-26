@@ -2948,6 +2948,34 @@ Deno.serve(async (req: Request) => {
                 }
                 return out.length > 0 ? { unavailable_days: out } : {};
               })(),
+              /**
+               * ⛔⛔ THE WEEKLY HOURS ASK, PER SPORT (§3c). WITHOUT THESE TWO LINES THE FEATURE IS
+               * DEAD, and it was — through two deploys.
+               *
+               * The wizard asks for hours, writes them into `training_prefs`, and this body is an
+               * explicit ALLOWLIST: a key not named here never reaches the generator. `target_run_hours`
+               * was not named, so `sizeFor(spans, 'run', args.targetRunHours)` saw `undefined` and the
+               * run dial sat at the library midpoint — picking one hour and picking six built the
+               * identical week. ⚠️ The RIDE side only worked by accident: `compose.ts` falls back to
+               * `targetWeeklyRideHours`, and `target_weekly_ride_hours` IS forwarded below.
+               *
+               * ⛔ AND THE DEPLOY LIST IS THE REAL LESSON. Grepping which functions import the
+               * `_shared` files I changed gave the right answer to the wrong question — the payload's
+               * route is not the module's, and this function imports none of them. A key must survive
+               * BOTH hops; a module-import grep cannot see an allowlist.
+               *
+               * ⚠️ VALIDATED, NOT TRUSTED, like every field on this body: non-numeric or non-positive
+               * is treated as ABSENT, because absent means "no opinion" and the composer keeps the
+               * library's midpoint, while a coerced zero would read as "no running at all".
+               */
+              ...(() => {
+                const out: Record<string, number> = {};
+                for (const k of ['target_run_hours', 'target_ride_hours'] as const) {
+                  const n = Number((gsTp as Record<string, unknown>)[k]);
+                  if (Number.isFinite(n) && n > 0) out[k] = n;
+                }
+                return out;
+              })(),
               ...(gsTp.skip_test_week === true ? { skip_test_week: true } : {}),
               /**
                * ⛔ THE ATHLETE'S PER-SLOT SPORT ANSWER (endurance-week screen, 2026-08-24). Counts
