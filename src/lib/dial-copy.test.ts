@@ -53,16 +53,6 @@ Deno.test('the sub-line is the one exemption, and only on `focus`', () => {
   assertEquals(voiceViolation(DIAL_SUBLINE.replace(/\bfocus\b/, 'settle')), null);
 });
 
-Deno.test('the subtitle is Michael\'s wording and does NOT need an exemption', () => {
-  // ⚠️ "focuses" is not "focus" — the gate is whole-word, so this passes unaided. Worth pinning:
-  // a future trim to "Every day focuses on..." → "Focus each day on..." would trip it, correctly.
-  assertEquals(
-    ACCESSORY_SUBTITLE,
-    'Every day focuses on a compound lift. The additional accessory fine-tunes the muscle work.',
-  );
-  assertEquals(voiceViolation(ACCESSORY_SUBTITLE), null);
-});
-
 // ── the shape rules ──────────────────────────────────────────────────────────────────────────────
 
 Deno.test('⛔ NO ENGINE VOCABULARY REACHES THE ATHLETE ON THIS SCREEN', () => {
@@ -190,4 +180,32 @@ Deno.test('⛔⛔ THE DIAL CONTROL IS OFF THE SCREEN — HIDDEN, AND STILL WIRED
     const line = dialChipLine(chip, { equipment: EQUIPMENT });
     assert(line.length > 0, `${chip} lost its line — the engine was retired, not hidden`);
   }
+});
+
+Deno.test('⛔⛔ THE SUBTITLE STATES HIS RULE, AND STOPS BORROWING HIS WORD', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26. The line it replaces — *"Every day focuses on a compound lift. The
+   * additional accessory fine-tunes the muscle work."* — was wrong twice:
+   *
+   *   1. ⚠️ IT UNDERSTATED HIM. p247: *"All first lifts of the day should be a competition
+   *      movement."* Not any compound — a COMPETITION movement, and specifically the FIRST lift.
+   *   2. ⛔ IT MISUSED HIS OWN WORD. §E1b: "accessory" in his notation marks a NON-COMPETITION
+   *      movement in the same gross pattern — paused deadlifts, box squats, Larsen presses. It has
+   *      nothing to do with fine-tuning a muscle.
+   *
+   * ⚠️ "SUPPORT IT" WAS REJECTED on his own reasoning: split squats and rear-delt work do support
+   * the main lifts; barbell curls and calf raises do not. The line sits over all seven rows and has
+   * to be true of all seven.
+   */
+  assertEquals(
+    ACCESSORY_SUBTITLE,
+    'Every lifting day opens on a competition lift. These fill in the muscle work around it.',
+  );
+  assertEquals(/compound/i.test(ACCESSORY_SUBTITLE), false, 'the understated version is back');
+  assertEquals(/fine.?tune/i.test(ACCESSORY_SUBTITLE), false, 'the misuse of "accessory" is back');
+  assertEquals(/\bsupport(s|ing)?\b/i.test(ACCESSORY_SUBTITLE), false,
+    'the rejected "support it" wording is back — it is false of curls and calf raises');
+  // ⛔ AND "slot" STILL DOES NOT APPEAR — the 2026-08-24 ruling this screen already carried.
+  assertEquals(/\bslot/i.test(ACCESSORY_SUBTITLE), false);
+  assertEquals(voiceViolation(ACCESSORY_SUBTITLE), null, ACCESSORY_SUBTITLE);
 });

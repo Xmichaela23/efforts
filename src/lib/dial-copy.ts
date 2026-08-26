@@ -52,14 +52,34 @@ import { WEEKLY_SETS_SOLID } from '../../supabase/functions/_shared/accessory-do
 import { WEEKDAYS } from '../../supabase/functions/_shared/standing-plan/day-map.ts';
 
 /**
- * ⛔ THE SCREEN'S SUBTITLE — Michael's wording, verbatim (2026-08-24).
+ * ⛔ THE SCREEN'S SUBTITLE — Michael's wording, verbatim (2026-08-26).
  *
- * ⚠️ IT REPLACED "The programme owns the slots. You pick what fills them." The old line was true and
- * it taught the athlete a word from the engine's vocabulary in the first sentence of the screen.
- * The word "slot" is not to appear anywhere athlete-facing on this screen.
+ * ⚠️ IT REPLACED "The programme owns the slots. You pick what fills them." (2026-08-24). That line
+ * was true and it taught the athlete a word from the engine's vocabulary in the first sentence of
+ * the screen. The word "slot" is not to appear anywhere athlete-facing on this screen.
+ *
+ * ⛔⛔ AND ITS REPLACEMENT WAS WRONG TWICE — *"Every day focuses on a compound lift. The additional
+ * accessory fine-tunes the muscle work."* Rewritten 2026-08-26:
+ *
+ *   1. ⚠️ **"focuses on a compound lift" UNDERSTATED HIM.** p247 is stricter than that: *"All first
+ *      lifts of the day should be a competition movement."* Not any compound — a COMPETITION
+ *      movement, and specifically the FIRST lift of the day. The screen was hedging a rule the
+ *      source states flatly.
+ *   2. ⛔ **"the additional accessory" MISUSED HIS OWN WORD.** §E1b: in his notation "accessory"
+ *      marks a NON-COMPETITION movement in the same gross movement pattern — paused deadlifts, box
+ *      squats, Larsen presses. It has nothing to do with fine-tuning a muscle. The screen borrowed
+ *      his term for something it does not mean, which is worse than using none of his words.
+ *
+ * ⚠️ "SUPPORT IT" WAS CONSIDERED AND REJECTED on Michael's own reasoning: split squats and rear-delt
+ * work genuinely do support the main lifts, but barbell curls and calf raises do not — they are
+ * single-joint muscle work in their own right. "Fill in the muscle work around it" is true of all
+ * seven rows, which is the test a subtitle over seven rows has to pass.
+ *
+ * ⚠️ THE SCREEN'S TITLE ("Accessory work") CARRIES THE SAME MISUSE AND IS DELIBERATELY UNTOUCHED —
+ * not overlooked. Michael has not ruled on it.
  */
 export const ACCESSORY_SUBTITLE =
-  'Every day focuses on a compound lift. The additional accessory fine-tunes the muscle work.';
+  'Every lifting day opens on a competition lift. These fill in the muscle work around it.';
 
 /**
  * ⛔ THE DIAL'S SUB-LINE. Michael's wording, verbatim; trips the voice lint on `focus` by design.

@@ -156,6 +156,15 @@ export type ViadaPickSpec = {
    * work for a loaded athlete, and its own docblock says that is *"a tiebreak, NEVER a gate"* —
    * turning it into one there would exclude bodyweight options from every cell in the app on one
    * cell's evidence. So the rule is declared per pick, and today only these two rows carry it.
+   *
+   * ⛔⛔ AND THE OPEN QUESTION ON IT IS CLOSED — BY THE BOOK, NOT BY A PREFERENCE (2026-08-26).
+   * The rule also drops **Pistol Squat and Single Leg Squat**, which Michael had not named, and the
+   * obvious next move was an exception for them: a pistol squat is genuinely hard for a strong
+   * athlete. It is not needed. **p220's own list for `secondary press_lower` is split squat, Zercher
+   * squat, freestanding barbell calf raises, forward or reverse lunge** — four movements, all
+   * loaded. Neither pistols nor single-leg squats are in his vocabulary for this cell at all, so
+   * gating them is not an over-reach of the rule; it is the rule agreeing with the source. ⚠️ Do not
+   * re-open this without new evidence from the page.
    */
   requiresLoad?: boolean;
   /**
@@ -203,6 +212,22 @@ export const EXPLOSIVE_STEP_UP_IS_THE_WRONG_INTENT = ['explosive step up'];
  * that silently does nothing, which is the whole defect this file replaces.
  */
 export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
+  /**
+   * ⚠️ THE SAME DEFECT LIVES HERE AND IS DELIBERATELY UNFIXED — recorded 2026-08-26 so it is not
+   * re-discovered as news.
+   *
+   * A full-gym athlete is offered **Push Up, Diamond, Decline, Archer, Pike and Handstand Push Ups**
+   * in this cell, for the same reason the leg cell offered bodyweight squats: `resolveSlot` ranks by
+   * EQUIPMENT FIT and is blind to whether a movement can do the slot's job.
+   *
+   * ⛔ AND THE BOOK AGREES IT IS WRONG. p220's list for `secondary push_upper` is Larsen press,
+   * incline bench, close-grip bench, JM press, seated dumbbell press, Arnold press — six movements,
+   * every one of them loaded, and no push-up among them.
+   *
+   * ⛔ IT STILL DOES NOT CARRY `requiresLoad`, BECAUSE MICHAEL HAS NOT RULED ON IT. Widening the
+   * rule on the leg cell's evidence is exactly how one screenshot becomes an app-wide behaviour
+   * change nobody asked for. Adding it here is one line the day he says so.
+   */
   db_press: {
     key: 'db_press',
     label: 'Dumbbell press',
@@ -366,27 +391,93 @@ export function pickKeyForSlot(
  * pins a long-run day rotates the whole week, and these tags move with it — see the day map's own
  * header: a rotation moves every day by the same amount.
  */
+export function frameDaysForPick(
+  key: ViadaPickKey,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): number[] {
+  const spec = VIADA_PICKS[key];
+  if (!spec.slot) return [];
+  const days = FRAMES[frame]?.columns[column] ?? [];
+  const out: number[] = [];
+  for (const day of days) {
+    // ⛔ A DAY-SCOPED PICK CLAIMS ONE DAY, NOT EVERY DAY ITS CELL FALLS ON. Without this the two
+    // isolation-pull picks would both tag days 1 and 4 and the screen would print the same pair
+    // twice for two controls that do different things.
+    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
+    const hit = day.strength.some((s) =>
+      s.intent === 'HYP' && s.role === 'accessory'
+      && s.category === spec.slot!.category && s.pattern === spec.slot!.pattern);
+    if (hit) out.push(day.day);
+  }
+  return out;
+}
+
+/**
+ * ⛔ THE SAME ANSWER AS A WEEKDAY. It DELEGATES rather than walking the frame a second time, so
+ * "which days does this pick fall on" has one owner and the two answers cannot drift apart.
+ */
 export function daysForPick(
   key: ViadaPickKey,
   frame: FrameId = 'strength_5k',
   column: ColumnKind = 'standard',
   offset = 0,
 ): Weekday[] {
-  const spec = VIADA_PICKS[key];
-  if (!spec.slot) return [];
-  const days = FRAMES[frame]?.columns[column] ?? [];
-  const out: Weekday[] = [];
-  for (const day of days) {
-    // ⛔ A DAY-SCOPED PICK CLAIMS ONE DAY, NOT EVERY DAY ITS CELL FALLS ON. Without this the two
-    // isolation-pull picks would both tag "monday and thursday" and the screen would print the same
-    // pair of days twice for two controls that do different things.
-    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
-    const hit = day.strength.some((s) =>
-      s.intent === 'HYP' && s.role === 'accessory'
-      && s.category === spec.slot!.category && s.pattern === spec.slot!.pattern);
-    if (hit) out.push(weekdayForFrameDay(day.day, offset));
-  }
-  return out;
+  return frameDaysForPick(key, frame, column).map((d) => weekdayForFrameDay(d, offset));
+}
+
+/**
+ * ⛔⛔ THE PICKS IN THE ORDER THE WEEK RUNS THEM (Michael, 2026-08-26: *"1-2 4 and 5 and put them in
+ * order"*).
+ *
+ * `VIADA_PICK_KEYS` is TABLE order — it groups the two isolation-pull rows together and the two leg
+ * rows together, which interleaves the days on screen: day 4, day 1, day 1, day 4, day 2, day 5,
+ * day 5. An athlete reading down the list cannot see their week in it.
+ *
+ * ⚠️ SORTED ON THE **RESOLVED** DAY, NOT ON `spec.slot.frameDay`. Only four of the seven declare a
+ * `frameDay`; `db_press`, `iso_push` and `quad_iso` have none and take whatever day their cell falls
+ * on, which the frame answers. Sorting on the spec field would leave those three unsorted at the
+ * front — the exact trap, and it is why this reads the frame instead.
+ *
+ * ⚠️ `core` HAS NO SLOT AND NO DAY, AND SORTS LAST. It fills the week's core minimum rather than
+ * landing on a day, so there is nothing to place it among the others by.
+ */
+export function pickKeysInDayOrder(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): ViadaPickKey[] {
+  const dayOf = (k: ViadaPickKey): number => {
+    const days = frameDaysForPick(k, frame, column);
+    return days.length > 0 ? Math.min(...days) : Number.MAX_SAFE_INTEGER;
+  };
+  return [...VIADA_PICK_KEYS]
+    .map((k, i) => ({ k, i, d: dayOf(k) }))
+    // ⚠️ THE TABLE ORDER IS THE TIEBREAK, so two rows on one day keep the order the table gives them
+    // rather than being reordered by an accident of the sort.
+    .sort((a, b) => (a.d === b.d ? a.i - b.i : a.d - b.d))
+    .map(({ k }) => k);
+}
+
+/**
+ * ⛔⛔ HIS DAY NUMBER, NOT A WEEKDAY AND NOT A RENUMBER (Michael, 2026-08-26).
+ *
+ * The wizard asks for the accessories BEFORE it asks for the calendar, so the athlete has not chosen
+ * days yet and the plan places them later. Printing "monday · thursday" there stated something the
+ * screen does not know. ⛔ `daysForPick` above still exists and is still right for a surface that
+ * HAS the calendar; this is the day-agnostic one.
+ *
+ * ⚠️ AND THE NUMBERS ARE HIS, OFF p246: the lifting days sit at 1, 2, 4 and 5 of a seven-day week,
+ * with day 3 and the weekend endurance-only. Renumbering them 1 through 4 would be OURS and would
+ * break the correspondence with his own table — the thing this whole file exists to preserve.
+ */
+export function dayLabelForPick(
+  key: ViadaPickKey,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): string | null {
+  const days = frameDaysForPick(key, frame, column);
+  if (days.length === 0) return null;
+  return days.map((d) => `day ${d}`).join(' · ');
 }
 
 // ── WHAT EACH PICK OFFERS ────────────────────────────────────────────────────────────────────────

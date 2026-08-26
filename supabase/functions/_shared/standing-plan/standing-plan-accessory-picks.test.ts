@@ -21,7 +21,10 @@ import {
   dialDose,
   dialRowOptions,
   chipHasFrameSlot,
+  dayLabelForPick,
   daysForPick,
+  frameDaysForPick,
+  pickKeysInDayOrder,
   defaultViadaPicks,
   flattenViadaPicks,
   normalizeViadaPrefs,
@@ -772,4 +775,86 @@ Deno.test('⛔ THE RULES ARE DECLARED PER PICK, NEVER GLOBAL', () => {
   // which is what core work IS. Proof the rule did not leak.
   const core = pickOptions('core', GYM).map((o) => o.name);
   assert(core.length >= 3, `the core pick was gated by a rule it does not carry: ${core.join(', ')}`);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE ROWS READ IN WEEK ORDER, TAGGED WITH HIS DAY NUMBERS (2026-08-26)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔⛔ THE TAG IS HIS DAY NUMBER — not a weekday, and not a 1-through-4 renumber', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26: *"1-2 4 and 5 and put them in order."* The screen printed monday /
+   * tuesday / thursday / friday, which is something it does not know: the wizard asks for the
+   * accessories BEFORE it asks for the calendar, and the plan places the days one screen later.
+   *
+   * ⛔ AND THE NUMBERS ARE HIS, OFF p246. The lifting days sit at 1, 2, 4 and 5 of a SEVEN-day week
+   * — day 3 and the weekend are endurance-only. A 1-through-4 renumber would be OURS and would break
+   * the correspondence with his own table, which is the thing this file exists to preserve. ⚠️ THAT
+   * IS WHY 3 MUST NEVER APPEAR AND 5 MUST.
+   */
+  assertEquals(dayLabelForPick('iso_push'), 'day 1');
+  assertEquals(dayLabelForPick('iso_pull_a'), 'day 1');
+  assertEquals(dayLabelForPick('single_leg_a'), 'day 2');
+  assertEquals(dayLabelForPick('db_press'), 'day 4');
+  assertEquals(dayLabelForPick('iso_pull_b'), 'day 4');
+  assertEquals(dayLabelForPick('single_leg_b'), 'day 5');
+  assertEquals(dayLabelForPick('quad_iso'), 'day 5');
+  // ⛔ CORE HAS NO SLOT AND NO DAY. The screen prints its own line instead; this must not invent one.
+  assertEquals(dayLabelForPick('core'), null);
+
+  const all = VIADA_PICK_KEYS.map((k) => dayLabelForPick(k)).filter(Boolean).join(' ');
+  assertEquals(/day 3/.test(all), false, 'a lifting day appeared on the endurance-only day 3');
+  assert(/day 5/.test(all), 'the days were renumbered 1-4 — the correspondence with p246 is broken');
+  // ⚠️ AND NO WEEKDAY SURVIVES ANYWHERE IN THE TAG.
+  assertEquals(/monday|tuesday|wednesday|thursday|friday/i.test(all), false, all);
+});
+
+Deno.test('⛔⛔ THE ROWS SORT INTO WEEK ORDER, ON THE RESOLVED DAY', () => {
+  /**
+   * ⛔ THE DEFECT: `VIADA_PICK_KEYS` is TABLE order. It groups the two isolation-pull rows and the
+   * two leg rows together, so the days interleave on screen — 4, 1, 1, 4, 2, 5, 5 — and an athlete
+   * reading down the list cannot see their week in it.
+   *
+   * ⚠️ AND THE SORT READS THE **FRAME**, NOT `spec.slot.frameDay`. Only four of the seven declare a
+   * `frameDay`; `db_press`, `iso_push` and `quad_iso` have none and take whatever day their cell
+   * falls on. Sorting on the spec field would leave those three unsorted at the front — pinned here
+   * because it is the exact trap, and it is invisible without this assertion.
+   */
+  assertEquals(pickKeysInDayOrder(), [
+    'iso_push', 'iso_pull_a',      // day 1
+    'single_leg_a',                // day 2
+    'db_press', 'iso_pull_b',      // day 4
+    'single_leg_b', 'quad_iso',    // day 5
+    'core',                        // no day — last
+  ]);
+
+  // ⛔ THE DAYS THEMSELVES ARE NON-DECREASING, which is the property the athlete actually reads.
+  const days = pickKeysInDayOrder()
+    .map((k) => frameDaysForPick(k))
+    .filter((d) => d.length > 0)
+    .map((d) => Math.min(...d));
+  for (let i = 1; i < days.length; i += 1) {
+    assert(days[i] >= days[i - 1], `the rows went backwards: ${days.join(', ')}`);
+  }
+
+  // ⛔ NOTHING IS LOST OR DUPLICATED BY THE SORT — the same seven picks plus core, every time.
+  assertEquals([...pickKeysInDayOrder()].sort(), [...VIADA_PICK_KEYS].sort());
+
+  // ⚠️ THE THREE WITH NO `frameDay` ARE THE ONES THIS PROTECTS. If any of them ever gains one, this
+  // says so — the sort would still be right, but the trap it guards would have quietly gone away.
+  for (const k of ['db_press', 'iso_push', 'quad_iso'] as const) {
+    assertEquals(VIADA_PICKS[k].slot?.frameDay, undefined,
+      `${k} now declares a frameDay — the resolved-day sort is no longer load-bearing for it`);
+    assertEquals(frameDaysForPick(k).length, 1, `${k} resolves to more than one day`);
+  }
+});
+
+Deno.test('⛔ THE WEEKDAY ANSWER STILL EXISTS, AND THE TWO CANNOT DRIFT', () => {
+  // ⚠️ `daysForPick` is still right for a surface that HAS the calendar; it was the WIZARD that
+  // could not know. It now delegates to `frameDaysForPick`, so one owner answers both questions.
+  assertEquals(daysForPick('single_leg_a'), ['Tuesday']);
+  assertEquals(frameDaysForPick('single_leg_a'), [2]);
+  for (const k of VIADA_PICK_KEYS) {
+    assertEquals(daysForPick(k).length, frameDaysForPick(k).length, `${k}: the two answers disagree`);
+  }
 });

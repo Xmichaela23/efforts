@@ -80,10 +80,10 @@ import {
   dialRowOptions,
   DIAL_ROW_DAY_IS_THE_COMPOSERS,
   chipHasFrameSlot,
-  daysForPick,
+  dayLabelForPick,
+  pickKeysInDayOrder,
   defaultViadaPicks,
   pickOptions,
-  VIADA_PICK_KEYS,
   VIADA_PICKS,
   type DialChip,
   type ViadaAccessoryPrefs,
@@ -4939,9 +4939,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           accessory slots, no core slot and no open compound-pull slot — so three of the nine picks
           could essentially never place, and the Glutes and Core focus chips could never fire at all
           because no cell in the grid offers a glute- or core-prime movement. */}
+      {/* ⛔⛔ "Accessory work" → "Build focus", WITH THE EYE (Michael, 2026-08-26). Two reasons.
+          1. It carried the same defect the subtitle did: "accessory" is HIS term for a
+             NON-COMPETITION movement in the same gross movement pattern (§E1b — paused deadlifts,
+             box squats, Larsen presses), not for muscle work. The screen borrowed his word for
+             something it does not mean.
+          2. ⚠️ "BUILD" IS LITERAL, NOT A METAPHOR. All seven picks claim HYP accessory cells, and
+             p219 defines that intent as standard bodybuilding-style work. This screen IS the
+             muscle-building slots.
+          ⛔ AND "FOCUS" IS THE SECTION'S THEME WORD, not a label chosen here: the nav tab reads
+          Focus with the eye, the Focus screen's own heading carries it, and the Train screen offers
+          Strength / Run / Ride / Athletic Focus. `eyeTitle` is the same mark those use. */}
       {currentStep === 'accessory' && isStrengthFocus && (
         <StepLayout
-          step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
+          step={stepNo('accessory')} totalSteps={steps.length} title={eyeTitle('Build focus')}
           // ⛔ MICHAEL'S WORDING, VERBATIM (2026-08-24). It replaced "The programme owns the slots.
           // You pick what fills them." — true, and it taught the athlete a word out of the engine's
           // vocabulary in the first sentence of the screen. ⛔ THE WORD "SLOT" IS NOT TO APPEAR
@@ -5089,28 +5100,35 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             )}
 
             {/* ── THE SEVEN ──────────────────────────────────────────────────────────────────────
-                ⛔ THE DAY TAGS ARE REAL DAYS, READ OFF THE FRAME. The week is fixed (p246) and the
-                calendar question comes one screen later, so there is nothing to hedge about: these
-                are the days the block opens on. ⚠️ Pinning a long-run day on the next screen rotates
-                the whole week, which moves every one of these by the same amount.
-                ⚠️ ISOLATION PULL AND SINGLE-LEG EACH RENDER TWICE — two rows apiece, one per day.
+                ⛔⛔ THE TAGS ARE HIS DAY NUMBERS, NOT WEEKDAYS (Michael, 2026-08-26: "1-2 4 and 5
+                and put them in order"). They read monday / tuesday / thursday / friday until then,
+                and that was the screen stating something it does not know: the athlete has not
+                chosen days at this point and the plan places them one screen later. `daysForPick`
+                still exists and is still right for a surface that HAS the calendar.
+                ⚠️ AND THE NUMBERS ARE HIS, OFF p246 — the lifting days sit at 1, 2, 4 and 5 of a
+                seven-day week, with day 3 and the weekend endurance-only. Renumbering them 1-4 would
+                be ours and would break the correspondence with his own table.
+                ⛔ THE ROWS ARE SORTED INTO THAT ORDER, AND ON THE RESOLVED DAY. `VIADA_PICK_KEYS` is
+                TABLE order, which groups the two pull rows and the two leg rows together and so
+                interleaves the days (4, 1, 1, 4, 2, 5, 5). ⚠️ Only four picks declare a `frameDay`;
+                the other three take whatever day their cell falls on, so `pickKeysInDayOrder` reads
+                the FRAME rather than the spec field — sorting on the field would leave those three
+                unsorted at the front.
+                ⚠️ ISOLATION PULL AND LEG ACCESSORY EACH RENDER TWICE — two rows apiece, one per day.
                 The frame carries both cells twice and each occurrence has its own pick, so the two
                 rows share a label and are told apart by the day tag beside them. This list is driven
-                off VIADA_PICK_KEYS, so a table split shows up here with no change to this file. */}
+                off the same key table, so a table split shows up here with no change to this file. */}
             <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
-              {VIADA_PICK_KEYS.map((key) => {
+              {pickKeysInDayOrder().map((key) => {
                 const spec = VIADA_PICKS[key];
                 const opts = pickOptions(key, strengthEquipment);
                 const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
-                const days = daysForPick(key);
                 return (
                   <div key={key}>
                     <div className="flex items-baseline justify-between gap-2 mb-1">
                       <span className="text-white/85 text-sm">{spec.label}</span>
                       <span className="text-white/45 text-xs">
-                        {days.length > 0
-                          ? days.map((d) => d.toLowerCase()).join(' · ')
-                          : 'fills the week\u2019s core minimum'}
+                        {dayLabelForPick(key) ?? 'fills the week\u2019s core minimum'}
                       </span>
                     </div>
                     <select
@@ -5143,6 +5161,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         </StepLayout>
       )}
 
+      {/* ⛔⛔ THIS TITLE STAYS "Accessory work" — IT IS THE RACE BUILDER, A DIFFERENT LINEAGE
+          (Michael, 2026-08-26, confirmed out of scope).
+          The screen above was renamed to "Build focus" with the eye. This one was NOT, and it is not
+          an oversight anyone should finish: it is a different flow with three slots and its own
+          history, and the Focus theme has not been extended to it. ⛔ Do not rename it in a future
+          pass without a ruling that names THIS screen specifically. `wizard-focus-theme.test.ts`
+          pins the count of this exact title at ONE so a well-meaning "complete the rename" fails
+          there rather than shipping. */}
       {currentStep === 'accessory' && !isStrengthFocus && (
         <StepLayout
           step={stepNo('accessory')} totalSteps={steps.length} title="Accessory work"
@@ -5555,9 +5581,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {/* ⛔ THE ENDURANCE WEEK — ONE SCREEN (Michael's flow, 2026-08-24), replacing `volume` and
           `hardday` on the strength path. Both of those still render for every other goal; this step
           simply is not in their flow. See `EnduranceWeekCard.tsx` for why one screen. */}
+      {/* ⛔ "Your endurance week" → "Endurance focus", with the eye (Michael, 2026-08-26:
+          *"instead of your endurance week it should be endurance focus and we should use the luci
+          eye icon"*). Focus is the section's theme word — the nav tab, the Focus screen heading and
+          the Train screen's Strength/Run/Ride/Athletic Focus all carry it — and this step was the
+          one place in the flow that named itself after the WEEK rather than after the theme. */}
       {currentStep === 'endurance' && (
         <StepLayout
-          step={stepNo('endurance')} totalSteps={steps.length} title="Your endurance week"
+          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
           // ⚠️ NO SUBTITLE. Michael's header is the first thing on the card and it is verbatim; a
           // subtitle above it would be the app talking over him.
           onBack={back} onContinue={next}
