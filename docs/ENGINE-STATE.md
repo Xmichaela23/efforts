@@ -1,48 +1,78 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-25, late — the mid-test-week interrupt session)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-26, early — the "fix the plan generating rules" handoff)
 
-### Your job: FIRST check whether Michael's week-2 weights landed. THEN the punch-list cleanup below.
+### Your job: MAKE THE ENGINE ENFORCE VIADA'S PLACEMENT LAWS. Audit first, then fix what the audit finds.
 
-**The live situation:** Michael is in week 1 of his own Standing Plan (Strong Focus) block — tests
-logged Monday (upper) and Tuesday (lower). The save-time weight fill (`StrengthLogger.tsx:4370`
-fires both rematerializers on every strength save) **did not visibly fire for him** — no sheet, no
-weights. Unknown whether it ran and abstained, ran and found nothing, or never ran (stale bundle).
-Weights must be in place before week 2 starts Monday 2026-08-31.
+Michael's ruling tonight, verbatim thread: the balance claim must be TRUE of the engine, not
+inherited copy — "you are correcting the copy when the engine might be flawed" → "we need to fix the
+plan generating rules." The sequence:
 
-**What was built for it:** a manual trigger card on `/plans/admin`
-(`src/components/StandingRestateAdmin.tsx`) — **Check** = dry run of both rematerializers, prints
-what was read from the logged tests + rows that would change; **Apply** = writes weeks that have
-not started. Michael was about to run it when the session closed.
+1. **Write the book's placement rules as checks** in the fuzz harness
+   (`_shared/standing-plan/fuzz-builder.test.ts` — `checkComposer` ~line 154, `checkViolations`
+   ~line 245, 16,832 shapes). The rules, page-cited in `docs/SOURCE-viada-hybrid-athlete.md`:
+   - **The frame's endurance days (p246, §E1a ~line 902):** day 1 MLSS+ sits WITH ME Upper, day 3 NT
+     on the plyo day, day 4 VT1 with DE Upper, day 6 LSD, day 7 rest. **Hard endurance never sits on
+     a lower-body day in the frame.** An UNPINNED build must land hard sessions on frame days.
+   - **p131 keystones (§ ~line 440):** heavy days preceded by the recovery they specifically need
+     ("fresh in the relevant systems, not fresh overall"). This is Q-288 — the rule exists nowhere
+     in code, so no test has ever checked it.
+   - **p247's ONE compensated break (§E1d ~line 966):** hard RUN the day before ME Lower is the
+     book's own layout, absorbed by the 3.5% haircut — `compose.ts` passes `hardRunBeforeLower`
+     into `prescribedLoad`; constants in `standing-plan/progression.ts` (`LOWER_HAIRCUT_*`).
+     The invariant: that adjacency is legal ONLY with the haircut engaged.
+   - **p130 consolidation (§ ~line 423):** judged by what each session REQUIRES; a violated spacing
+     the athlete pinned is legal but must be SAID (Michael's law: choice wins, informed).
+2. **Run the audit.** Every one of the 16,832 weeks either satisfies the rules or carries an
+   on-screen note naming the break. The failures list IS the work order.
+3. **Fix by cause:** the engine's own placement broke it → placement changes; the athlete's pin
+   broke it → the warning must name it (grep `week-model/resolve.ts` rules first — a clearance rule
+   may already cover it and just not fire on this path).
+4. **LAST, with Michael's explicit go: his live block.** It carries the Friday hard run — a phantom
+   seed baked at build (prod read 2026-08-26: "Hard Run" every Friday, the DE Lower day; the book
+   wants it Monday with ME Upper). He is TRAINING on it (week 1, tests done, weights priced). Do not
+   touch it until the rules are fixed and he says go.
 
-- If he ran it and weights landed: done, mark it in the punch list.
-- If Check answered `no_completed_test_sets`: the logged test workouts did not link to the planned
-  test sessions (`workouts.planned_id` → `planned_workouts`). That's the diagnosis path —
-  `readTestWeek` refuses any set it cannot prove is week one (`rematerialize-standing-block/index.ts:~110`).
-- The card itself has NEVER been run by anyone. It compiles and mirrors the logger's exact calls;
-  that is all that is known.
+**Mechanics:** deno is at `~/.deno/bin/deno`, NOT on PATH; run with `-A --no-check` (type-check
+failures in the standing-plan tests pre-exist; under-permissioned runs hide real failures).
 
-### What shipped this session (PUSHED `22358d8d` + edge functions DEPLOYED; NOT verified)
+### What shipped 2026-08-25/26 (PUSHED + DEPLOYED), so you don't re-litigate it
 
-- **Rotation-week label fix** — `standing-plan/compose.ts` `noteForWeek` (~line 480): on even
-  (swap) weeks the exercise note now swaps hinge/push so a back squat is never labeled "Primary
-  hinge lower". Display text only; weights/selection/rotation untouched. Found via an outside AI's
-  critique of a plan export that took the mismatched labels as a programming error (it isn't — the
-  pairing is Viada p246-247's own rotation). Verified by fixture compose across 4 weeks; suite
-  259/259 green.
-- **`StandingRestateAdmin` card** on `/plans/admin` (see above).
-- **CLAUDE.md**: "Answer only what was asked" rule added to How-to-talk-to-Michael.
-- Deployed: `rematerialize-standing-block`, `generate-strength-plan`, `generate-combined-plan`,
-  `generate-run-plan`, `generate-triathlon-plan` (the five that bundle `standing-plan/`). Netlify
-  auto-deploying `22358d8d`.
-- ⚠️ Run deno suites with `-A` — an under-permissioned run reported 23 false failures this session
-  (file-read tests die on NotCapable before testing anything).
+- **Week-2 weights LANDED — the previous banner's job is DONE, VERIFIED ON DEVICE.** The Test:
+  Lower save fired the sheet: bench 149 / squat 117 / deadlift 173 / OHP 102, 11 weeks priced.
+- **Q-287's client half is FIXED (back-annotated in OPEN-QUESTIONS-2):** `assemblePayload`
+  (`NonRaceBuilder.tsx`) ships a hard/long day only when the athlete TAPPED it (`touchedUnits`,
+  threaded as a parameter) or a club owns it; untouched slots ship day-less ("engine, propose one").
+  The race-path long-day tap now records the touch. ⚠️ UNVERIFIED: one untouched preview build
+  post-fix should land hard sessions Mon + Wed (frame days) — nobody has watched it.
+- **Two FALSE compromise sentences DELETED in `day-map.ts`:** the missed-hard-pin and
+  missed-long-pin "rather than" notes described the discarded rotation step — pins are honoured
+  unconditionally downstream (`compose.ts` `enduranceDayFor` ~187-203) — and Michael's screen
+  disproved them live. Survivors rewritten plain ("X is a day off, but the week still puts a
+  lifting day there — N lifting days plus the long ride don't fit any other way" / "Taper weeks
+  have no long run…"). Two stale test pins superseded with dated notes
+  (`standing-plan-live.test.ts`, `unavailable-days.test.ts`). Suite 259/0 incl. fuzz.
+- **WeekGrid:** "Sample week — week 1" label on both wizard previews (the preview IS the test
+  week); sessions colored by sport; the balance-the-stressors line renders ONLY on conflict-free
+  weeks and claims the design's purpose, never per-session freshness.
+- **Deployed 2026-08-26:** `generate-strength-plan`, `rematerialize-standing-block` (day-map
+  bundle). Earlier same night: 7-function batch incl. `materialize-plan` (slot_intent carry),
+  `create-goal-and-materialize-plan` (tri preview-write hole closed), `fetch-strava-route`
+  (requireUser; `bearer-auth.ts` deleted). `strava-refresh` deleted from prod; `Efforts_Summer`
+  secret unset. Client on Netlify; iOS synced, not installed.
+- **The punch-list cleanup is DONE** (2026-08-25 daytime): stale checklists archived to
+  `archive/POLISH-PUNCH-LIST-archive-2026-08-25.md`, three never-run engines resolved, five logger
+  fixes live (blank band prefills, plain ME/DE cues with condition-gated advance rules, slot-text
+  suppressed, delete moved off the header X, advance nudge).
 
-### Carried forward, untouched this session (from the pins-win banner below)
+### Still UNVERIFIED / open (carried)
 
-**The punch-list cleanup job** — read `POLISH-PUNCH-LIST.md` top to bottom, verify each open item
-against code, close what's done. Plus the pins-win banner's own unverified items: the three-club
-built plan on a device, Q-286/Q-287/Q-288, step-8 color-coding.
+- The audit itself (step 2) — nobody knows yet whether silent breaks exist beyond the seed case.
+- Whether pinned hard-leg-work on/before ME Lower produces ANY warning today.
+- Three-club built plan on a device (pins-win acceptance, carried from 2026-08-25).
+- **Q-286** (deadlift-week Friday vs pairing law) · **Q-287's export-brief half** · **Q-288** (this
+  banner's step 1 encodes it). Hill-descent watch test (send Thursday's Hard Run to Garmin — rests
+  should read 2:00; the 1s-rest bug traced to the deleted pre-08-06 block's stale data).
 
 ## 🧭 SUPERSEDED — was START HERE (2026-08-25 night — the pins-win day; its punch-list job was NOT done, carried in the banner above)
 
