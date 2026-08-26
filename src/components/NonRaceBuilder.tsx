@@ -5606,8 +5606,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     type="number" inputMode="numeric" min={0} placeholder={unit === 'km' ? 'e.g. 22' : 'e.g. 14'}
                     value={state.targetMiles === '' ? '' : String(state.targetMiles)}
                     onChange={(e) => setState((st) => ({ ...st, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
-                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white"
-                    style={{ fontSize: '16px' }}
+                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white focus:outline-none focus:border-[var(--fc)]"
+                    style={{ fontSize: '16px', ['--fc' as string]: `rgb(${getDisciplineColorRgb('run')})` }}
                   />
                   <span className="px-2.5 py-1 rounded-xl text-sm font-medium" style={{ backgroundColor: `rgba(${getDisciplineColorRgb('run')},0.16)`, color: `rgb(${getDisciplineColorRgb('run')})` }}>
                     {unit === 'km' ? 'km' : 'miles'} / week
@@ -5696,8 +5696,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     type="number" inputMode="numeric" min={0} placeholder="e.g. 3"
                     value={state.rideHours === '' ? '' : String(state.rideHours)}
                     onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
-                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white"
-                    style={{ fontSize: '16px' }}
+                    className="w-28 py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white focus:outline-none focus:border-[var(--fc)]"
+                    style={{ fontSize: '16px', ['--fc' as string]: `rgb(${getDisciplineColorRgb('bike')})` }}
                   />
                   <span className="px-2.5 py-1 rounded-xl text-sm font-medium" style={{ backgroundColor: `rgba(${getDisciplineColorRgb('bike')},0.16)`, color: `rgb(${getDisciplineColorRgb('bike')})` }}>
                     hours / week
@@ -6601,7 +6601,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   value={state.targetMiles === '' ? '' : state.targetMiles}
                   onChange={(e) => setState((s) => ({ ...s, targetMiles: e.target.value === '' ? '' : Number(e.target.value), targetTouched: true }))}
                   placeholder={`e.g. ${Math.max(4, capDisplay - 4)}`}
-                  className="w-24 py-2 px-3 rounded-xl bg-white/[0.04] text-white border border-white/12 text-sm"
+                  className="w-24 py-2 px-3 rounded-xl bg-white/[0.04] text-white border border-white/12 text-sm focus:outline-none focus:border-[var(--fc)]"
+                  style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb('run')})` }}
                 />
                 <span className="text-white/60 text-sm">{unit}/wk</span>
               </div>
@@ -6663,8 +6664,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   value={state.rideHours === '' ? '' : state.rideHours}
                   onChange={(e) => setState((st) => ({ ...st, rideHours: e.target.value === '' ? '' : Number(e.target.value) }))}
                   placeholder="e.g. 4"
-                  className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm"
-                  style={{ fontSize: '16px' }}
+                  className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm focus:outline-none focus:border-[var(--fc)]"
+                  style={{ fontSize: '16px', ['--fc' as string]: `rgb(${getDisciplineColorRgb('bike')})` }}
                 />
                 <span className="text-white/75 text-sm">h/wk</span>
               </div>

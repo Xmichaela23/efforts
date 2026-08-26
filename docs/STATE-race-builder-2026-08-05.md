@@ -162,7 +162,7 @@ find what works."*
 
 - **The tri event path has the same unguarded-insert hole** the race path had — `create-goal…:2842`.
   Not fixed; the preview-writes-a-plan bug lives there too.
-- **Delete the stray `Efforts_Summer` Supabase secret** (created in error during the API-key swap).
+- ~~**Delete the stray `Efforts_Summer` Supabase secret**~~ **DONE 2026-08-25 — unset from prod** (created in error during the API-key swap).
 - **Race-readiness prose → charts** — parked at the top of `POLISH-PUNCH-LIST.md`, all six fields
   including taper guidance.
 - **Nothing from 2026-08-05 is device-verified.** Code, tests and typecheck only.

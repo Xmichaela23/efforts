@@ -484,7 +484,7 @@ That is the whole diagnosis, and it produces exactly three diseases:
 
 ## PHASE 7 — HYGIENE (delete, mostly)
 
-- [ ] 🔴 **DELETE `strava-refresh`.** Zero callers, **deployed**, **no auth check** — takes `userId` from the body and **returns that user's Strava access token**. The anon key that reaches it is public. **Delete, don't document.**
+- [x] ✅ **DONE 2026-08-25 — `strava-refresh` DELETED (repo + deployed prod function).** Zero callers, **deployed**, **no auth check** — takes `userId` from the body and **returns that user's Strava access token**. The anon key that reaches it is public. **Delete, don't document.**
 - [ ] 🔴 **DELETE `_shared/bearer-auth.ts`** — decodes JWTs **without verifying the signature**. A second, unsafe auth idiom next to the good one (`require-user`, adopted by 13 of 96; `bearer-auth.ts` has one importer left — `fetch-strava-route`) ⟨A31⟩.
 - [ ] **Server-side admin check** — the 8 backfill functions `WorkloadAdmin` invokes are gated **client-side only**.
 - [ ] **Dead edge functions.** The empty dirs are GONE (0 remain, `analyze-workout/` deleted). The live decoy is still there: `generate-training-context/index.ts` (3,423 lines, dead twin of the live `coach`). **Re-count the dead functions before working this — "24" is a 2026-07-13 number against a tree that now has 96 dirs.** ⟨A31⟩

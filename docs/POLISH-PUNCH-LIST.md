@@ -298,7 +298,7 @@ Full record, incl. everything that shipped: [`STATE-race-builder-2026-08-05.md`]
 | 5 | **"Marathon" → "Run race"** (half/10k/5k). Engine is already multi-distance; needs per-distance `TIER_SEEDS` + distance-neutral tier copy first. | medium |
 | ~~6~~ | ~~**Mark redundancies for deletion**~~ ✅ **MARKED 2026-08-26:** deletion banners on `FITNESS_TO_VOLUME` (types.ts), `distributeVolume` (base-generator, zero callers), and the VDOT duplicate tables (GoalsScreen). Of the other three: the third `LONG_RUN_PROGRESSION` died with `simple-completion.ts`; `schedule_preferences` already carries do-not-add-readers; the dead `hardday` step is now LIVE-adjacent (the 2026-08-24 endurance-week screen replaced it on the strength path only) — not marked. | — |
 | ~~7~~ | ~~**The tri event path unguarded-insert hole**~~ ✅ **CLOSED 2026-08-26 (working tree; needs deploy):** the tri branch refuses `bodyPreview` outright before its goal insert (no no-persist mode exists there, so refusal beats a half-run); the run path's stale "still has this hole" comment back-annotated. | — |
-| 8 | **Delete the stray `Efforts_Summer` Supabase secret.** | trivial |
+| 8 | ~~Delete the stray `Efforts_Summer` Supabase secret.~~ **DONE 2026-08-25 — unset from prod.** | trivial |
 
 ⚠️ **Nothing from 2026-08-05 is device-verified.** Code, tests and typecheck only.
 
@@ -584,12 +584,16 @@ The 2026-07-13 audit found the same disease three times, and it is the highest-l
 
 # 2. SECURITY — pre-launch, not burning, but real
 
-- [~] **🔴 DELETE `strava-refresh`** — **repo directory DELETED 2026-08-26; the DEPLOYED function
-      still needs `supabase functions delete strava-refresh` (prod action, Michael's go).** Zero callers, **deployed**, **no auth check**: takes `userId` from the request body and **returns that user's Strava access token** (`strava-refresh/index.ts:17`, `:93`). The anon key that reaches it is public and sits in your JS bundle. Live refresh already lives in `_shared/strava-access-token.ts`. **Delete, don't document.**
+- [x] ✅ **DONE 2026-08-25 — `strava-refresh` DELETED.** Repo directory removed; the DEPLOYED function
+      deleted from prod (`supabase functions delete strava-refresh`, project `yyriamwvtvzlkumqrvpm`). Zero callers, **deployed**, **no auth check**: takes `userId` from the request body and **returns that user's Strava access token** (`strava-refresh/index.ts:17`, `:93`). The anon key that reaches it is public and sits in your JS bundle. Live refresh already lives in `_shared/strava-access-token.ts`. **Delete, don't document.**
 - [x] ✅ **DONE 2026-08-26 (working tree; needs `fetch-strava-route` redeploy).** `bearer-auth.ts`
       DELETED; its one importer, `fetch-strava-route`, now uses `requireUser` (signature-verified,
       AuthError → 401). `deno check` clean on the changed file.
 - [ ] **B1 — `require-user` adoption is 9 of 87.** 77 of 87 functions instantiate a service-role (RLS-bypassing) client. Sensitive functions taking identity from the **body** rather than a verified JWT: `strava-token-exchange`, `strava-webhook-manager`, `import-strava-history`, `send-workout-to-garmin`, `import-garmin-history`, `swift-task`. *(`strava-webhook-manager` is called with the anon key as bearer, so it carries no identity **by construction** — it cannot adopt `require-user` without a client change.)*
+- [ ] **LEAD (2026-08-26, filed from the secret-unset session, not investigated):**
+      `SUPABASE_PUBLISHABLE_KEYS` and `SUPABASE_SECRET_KEYS` are both set to the EMPTY string
+      (shared digest = SHA-256 of ""). Decide: delete them, or fill them — an empty secret that
+      looks configured is the misleading kind.
 - [ ] **Admin functions have no server-side admin check.** The 8 edge functions `WorkloadAdmin.tsx` invokes are gated **client-side only**. `is_app_admin()` exists in SQL and guards only `library_plans` INSERT.
 - [ ] **`disconect-connection` (misspelled) is a REAL deployed function with NO SOURCE in the repo**, kept as a permanent fallback branch at `Connections.tsx:495`. Unknown behaviour. Find it, delete it, remove the branch.
 

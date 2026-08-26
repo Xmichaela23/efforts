@@ -52,7 +52,7 @@ import {
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
-import { getDisciplineColor } from '@/lib/context-utils';
+import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
   slots: SlotSelection;
@@ -431,7 +431,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   onChange={(e) => props.onRunVolume(e.target.value)}
                   /* ⛔ NO NUMBER IN AN EMPTY BOX (Michael, 2026-08-24 night). A grey midpoint read
                      as a suggestion — the athlete types their own week or nothing. */
-                  className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums"
+                  /* ⛔ FOCUS IN THE SPORT'S COLOUR (Michael, 2026-08-26: "these highlight the wrong
+                     colors") — the field had no focus style, so the browser's default blue ring won.
+                     Palette via the CSS var, never a hand-picked hex. */
+                  className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
+                  style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb('run')})` }}
                 />
                 <span className="text-white/50 text-sm">{props.unit === 'km' ? 'km' : 'mi'}</span>
               </div>
@@ -463,8 +467,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   data-testid="ride-hours"
                   value={props.rideHours}
                   onChange={(e) => props.onRideHours(e.target.value)}
-                  /* ⛔ Same — no suggested hours in the empty box. */
-                  className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums"
+                  /* ⛔ Same — no suggested hours in the empty box. Focus ring: bike green, same
+                     rule as the run field above. */
+                  className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
+                  style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb('bike')})` }}
                 />
                 <span className="text-white/50 text-sm">h</span>
               </div>
