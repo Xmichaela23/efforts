@@ -415,7 +415,39 @@ export const ACCESSORY_SET_CUE = 'Split these into as many sets as you need. Lea
  * Same lint note as ACCESSORY_SET_CUE: "failure" appears only inside the stop rule, pinned by
  * `strength-accessory-copy.test.ts`. Do not widen the bar-speed lint over this constant.
  */
-export const STANDING_ACCESSORY_SET_CUE = 'No weight is prescribed — find the load where the target reps leave a rep or two in reserve, never to failure.';
+export const STANDING_ACCESSORY_SET_CUE = 'No weight is prescribed — find the load where the target reps leave a rep or two in reserve, never to failure. Top of the band on every set: add weight, start the band over.';
+
+/**
+ * ⛔ THE ME ROW'S OWN INSTRUCTION (2026-08-25, Michael on next week's ME: Upper: "we need to lose
+ * that and give clear instruction"). An auto-regulated max-effort row (the pull-up in the standing
+ * frame) prescribes a 1-5 band and no load, and the screen said only "target 1-5" — which, with the
+ * old band-floor prefill, read as "do 1 pull up". This line states what the set IS.
+ *
+ * **Basis: Viada p218/p219** — ME: 1 to 5 reps at 90-100%, and his own stop rule: *"Each set stops
+ * short of failure — technical breakdown here is counterproductive."*
+ *
+ * ⚠️ NEVER "ADD WEIGHT" (Michael, 2026-08-25): the first cut said it, and it assumes a weighted-
+ * pull-up athlete. Most people on this movement are working TOWARD reps, some on band assistance —
+ * the Assist/+ column runs in both directions, and the cue has to. So it names the intensity and
+ * lets the athlete pick the direction; the band is the row's own `target_reps`, never restated.
+ */
+export const STANDING_ME_SET_CUE = (band: string): string =>
+  `Max-effort set — ${band} reps close to your limit. Assistance if you need it, added weight if you don't. Top of the band with room to spare: go heavier next time.`;
+
+/**
+ * ⛔ THE DE ROW'S OWN INSTRUCTION (2026-08-25, Michael on the close-grip card: "move the bar fast
+ * and controlled and what the weight cue should be"). The Wendler work-set line was leaking onto
+ * this card — `close grip bench press` sits on the MAIN_531_LIFTS list as a bench-slot variant, so
+ * `barSpeedCueFor` fired — but on a standing-plan session the row is a SPEED slot with no
+ * prescribed load, and the Wendler line names neither the speed intent nor the weight.
+ *
+ * **Basis: Viada p218/p219** — DE: 2 to 4 reps at 70-80%, *"maximum velocity"*, 3-4 RIR, and the
+ * objective: *"Bar speed and quality of movement… Fatigue is discouraged."* The if-it-slows-down
+ * stop rule is the field-standard speed-work regulator and is the same claim as his
+ * fatigue-is-discouraged, stated as something an athlete can act on mid-set.
+ */
+export const STANDING_DE_SET_CUE = (band: string): string =>
+  `Speed sets — move the bar fast and controlled, ${band} reps. About 70-80% of your max — if the bar slows, it's too heavy. Still crisp every set: add a little next time.`;
 
 /**
  * ⛔ GATED ON `verdictFrom95Set` BEING WIRED. Do not render until the composer reads the verdict

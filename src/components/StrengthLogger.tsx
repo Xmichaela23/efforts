@@ -26,6 +26,8 @@ import {
   barSpeedLineFor,
   ACCESSORY_SET_CUE,
   STANDING_ACCESSORY_SET_CUE,
+  STANDING_DE_SET_CUE,
+  STANDING_ME_SET_CUE,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
 // ⛔ SLICE b — the calibration sentences, shared with State and Performance. One signal, three
@@ -2219,6 +2221,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // ⚠️ Reps only. A LOADED assistance movement (Romanian Deadlift) keeps its weight prefill —
         // the total is about reps, and blanking the weight would throw away a real prescription.
         const isRepTotalRow = hasRepTotal(repsRaw);
+        // ⛔ A REP BAND ON AN AUTO-REGULATED ROW IS A TARGET, NOT A COUNT (2026-08-25, Michael on
+        // next week's ME: Upper: "1 pull up?"). "1-5" fell through the leading-digit parse above and
+        // prefilled every set at the band FLOOR, so a max-effort pull-up opened reading "do 1 rep".
+        // Same contract as the rep-total row: the cell opens blank and the "target 1-5" label
+        // carries the band. Gated on `load_prescribed === false` — a priced row's `set_plan`
+        // carries real per-set reps and keeps them.
+        const isRepBandRow = !isRepTotalRow
+          && typeof repsRaw === 'string'
+          && /^\d+\s*[-–]\s*\d+$/.test(repsRaw.trim())
+          && s?.load_prescribed === false;
         const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
@@ -2320,6 +2332,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // Blank, deliberately: the athlete logs each chunk (15 / 15 / 12 / 8). `reps` is left
             // undefined rather than 0 so the cell reads empty and the countdown still shows the
             // whole total owed — `completedReps` ignores both, but 0 would render as a logged zero.
+          } else if (isRepBandRow && !setAmrap) {
+            // Blank, deliberately — the band lives in the "target 1-5" label, and prefilling its
+            // floor prescribed one rep. An AMRAP set on a band row still takes the 0-open below.
           } else {
             // An all-out set opens at 0 — the athlete enters what they actually got. The prescribed
             // number is the FLOOR, not the target, and prefilling it would anchor them to it.
@@ -5122,15 +5137,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     <ChevronDown className="h-4 w-4" />
                   }
                 </button>
-                {exercises.length > 1 && (
-                  <button 
-                    onClick={() => deleteExercise(exercise.id)} 
-                    className="h-8 w-8 p-0 flex items-center justify-center text-white/60 hover:text-red-400 transition-colors flex-shrink-0 rounded-md hover:bg-white/[0.08]"
-                    aria-label="Delete exercise"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+                {/* ⛔ NO DELETE IN THE HEADER (2026-08-25, Michael: "where the x is makes it easy
+                    to delete the exercise"). The bare X sat in the header's prime tap zone directly
+                    beside the collapse chevron — a destructive control one mis-tap from a
+                    prescribed lift, with only the confirm dialog between them. Removal now lives at
+                    the BOTTOM of the expanded card as a labeled button (the core-work card's
+                    existing pattern), which is also where Strong/Hevy keep exercise deletion:
+                    behind intent, never beside navigation. `deleteExercise`'s confirm stays as the
+                    second guard. */}
 
 
               {/* ── Q-181 — THE SWAP SHEET ────────────────────────────────────────────────────────
@@ -5431,6 +5445,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // working set's detail line; that space now carries plate math. `barSpeedCueFor` with
                   // an empty set returns the work_set line and misses to null off the main lifts.
                   const titleCue = barSpeedCueFor(exercise, {} as any);
+                  // ⛔ THE STANDING SLOT'S OWN INSTRUCTION (2026-08-25, Michael: "we need to lose
+                  // that and give clear instruction", then on the close-grip card: "move the bar
+                  // fast and controlled and what the weight cue should be"). Auto-regulated ME and
+                  // DE rows on a standing-plan session get a line stating what the set IS —
+                  // detection reads the composer's own sourceText in `notes` ("1 x ME: …",
+                  // "4 x DE: …"), the same tag-not-new-field idiom as the pretest gate.
+                  // ⚠️ THE DE CUE DELIBERATELY BEATS THE BAR-SPEED CUE: close grip bench press is
+                  // on the MAIN_531_LIFTS list as a Wendler bench-slot variant, so `titleCue` fires
+                  // on it — but on a standing session that row is a speed slot with no load, and
+                  // the Wendler line names neither the intent nor the weight. Priced rows
+                  // (load_prescribed ≠ false — the tested lifts) keep the bar-speed cue untouched.
+                  const standingSlotText = Array.isArray(scheduledWorkout?.tags)
+                    && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
+                    && exercise?.load_prescribed === false
+                    ? String(exercise?.notes || '') : '';
+                  const standingCue = /\bME\b/.test(standingSlotText)
+                    ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'))
+                    : /\bDE\b/.test(standingSlotText)
+                      ? STANDING_DE_SET_CUE(String(exercise?.target_reps || '2-4'))
+                      : null;
 
                   // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in 5/3/1 is a
                   // total to reach across as many sets as you need, so the live number is "how many
@@ -5445,9 +5479,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                   return (
                     <>
-                      {titleCue && (
+                      {(standingCue || titleCue) && (
                         <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-strength/75 leading-snug">
-                          {titleCue}
+                          {standingCue ?? titleCue}
                         </div>
                       )}
                       {/* Rep-total countdown (option A) — a prominent number + progress bar, its own
@@ -6135,8 +6169,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {(() => {
                   const loggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                   const isMobilityMode = loggerMode === 'mobility';
-                  // Show notes section for mobility mode, or if notes exist
-                  if (isMobilityMode || exercise.notes) {
+                  // ⛔ THE COMPOSER'S SLOT TEXT IS NOT AN ATHLETE NOTE (2026-08-25, Michael on the
+                  // ME: Upper cards: "these take up a lot of space dont use the abbreviations no
+                  // one knows what they are"). Standing-plan rows arrive with `notes` prefilled
+                  // with the plan's internal slot notation ("1 x ME: Accessory: primary pull") —
+                  // jargon in a three-row box, restating what the cue line above the sets now says
+                  // in plain words. The box renders only for something the athlete wrote; any edit
+                  // breaks the pattern and brings it back. ⚠️ The DATA is deliberately kept — the
+                  // standing ME/DE cue detection reads `exercise.notes` for exactly this text.
+                  const isSlotText = /^\d+\s*[x×]\s*(ME|DE|HYP|SKILL)\b/i.test(String(exercise.notes || '').trim());
+                  // Show notes section for mobility mode, or if athlete-written notes exist
+                  if (isMobilityMode || (exercise.notes && !isSlotText)) {
                     return (
                       <div className="mt-3 pt-3 border-t border-white/10">
                         <Textarea
@@ -6162,6 +6205,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   }
                   return null;
                 })()}
+
+                {/* Removal moved here from the header X (2026-08-25) — labeled, at the card's
+                    foot, reachable only with the card open. Same `deleteExercise` (confirm
+                    included). */}
+                {exercises.length > 1 && (
+                  <div className="flex justify-end mt-3">
+                    <button
+                      type="button"
+                      onClick={() => deleteExercise(exercise.id)}
+                      className="px-2.5 py-1 rounded-xl text-[11px] border border-white/15 bg-white/[0.04] text-white/45 hover:text-red-400 hover:border-red-400/50 transition-colors flex items-center gap-1"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                    >
+                      <X className="h-3 w-3" /> Remove exercise
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             </>

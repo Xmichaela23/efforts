@@ -73,11 +73,19 @@ Deno.test('standing cue — no "split these": the rows prescribe discrete sets',
     `standing cue must not carry the Wendler split clause: ${STANDING_ACCESSORY_SET_CUE}`);
 });
 
-Deno.test('standing cue — failure appears only as the stop rule; no rep-chasing vocabulary', () => {
+Deno.test('standing cue — failure appears only as the stop rule; advancing is condition-gated', () => {
   const s = STANDING_ACCESSORY_SET_CUE.toLowerCase();
   assert(!/\b(to|until)\s+failure\b/.test(s.replace(/never to failure/g, '')),
     `"failure" may appear only inside "never to failure": ${STANDING_ACCESSORY_SET_CUE}`);
-  for (const banned of ['heavier', 'add weight', 'push hard', 'max']) {
+  // ⛔ SUPERSEDED 2026-08-25 (Michael: "should their weightload get easier they should know they
+  // can add"): the 2026-08-24 version of this pin banned "add weight" outright as rep-chasing
+  // vocabulary. The cue now carries the double-progression advance rule ON PURPOSE — what the pin
+  // protects instead is that advancing stays CONDITION-GATED (top of the band earns the jump,
+  // the calendar never does) and that exhortation vocabulary stays out.
+  assertStringIncludes(s, 'top of the band');
+  assert(s.indexOf('top of the band') < s.indexOf('add weight'),
+    `the condition must come before the instruction: ${STANDING_ACCESSORY_SET_CUE}`);
+  for (const banned of ['push hard', 'max', 'go for it', 'crush']) {
     assert(!s.includes(banned), `standing cue must not contain "${banned}": ${STANDING_ACCESSORY_SET_CUE}`);
   }
 });
