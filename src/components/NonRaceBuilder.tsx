@@ -17,6 +17,12 @@ import {
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy } from '@/lib/hard-slot-choices';
+import { SLOT_FAMILY } from '@/lib/standing-plan-week-bounds';
+import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import {
+  fixedHoursLine, slotSpans, type SlotSpec,
+} from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
+import { resolveEnduranceAnchors } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useAppContext } from '@/contexts/AppContext';
@@ -1621,6 +1627,22 @@ function assemblePayload(
            * is a day no session may have. ⚠️ OMITTED WHEN EMPTY, like every other key here: absent
            * means "no days blocked", which is every block built before this field.
            */
+          /**
+           * ⛔⛔ THE WEEKLY HOURS, PER SPORT (§3c, 2026-08-26). Michael: *"the accumulative hours for
+           * the week"*, and *"then we use hours"* — Viada prescribes in TIME throughout, so the ask
+           * is hours on BOTH sports and the mile conversion is gone rather than hidden.
+           *
+           * ⚠️ NEW KEYS, NOT `target_weekly_miles` RENAMED. That field is load-bearing as MILES in
+           * five places — the coach payload's upkeep comparison, the State screen's accent,
+           * `create-goal`'s untouched-seed test, `athlete-weekly-intent`, and the Get Stronger
+           * generator — and a silent unit change would corrupt every one of them. Two fields, two
+           * meanings. ⚠️ Omitted when unanswered: absent means no opinion, and the composer keeps
+           * the library's own midpoint.
+           */
+          ...(state.targetMiles !== '' && Number(state.targetMiles) > 0
+            ? { target_run_hours: Number(state.targetMiles) } : {}),
+          ...(state.rideHours !== '' && Number(state.rideHours) > 0
+            ? { target_ride_hours: Number(state.rideHours) } : {}),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -3557,6 +3579,42 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     const runs = SLOT_KEYS.filter((k) => slotSportsNow[k] === 'run').length;
     return { runs, rides: SLOT_KEYS.length - runs };
   })();
+
+  /**
+   * ⛔ THE FIXED-HOURS SENTENCE, PER SPORT — the one line the volume fields carry. Built from the
+   * athlete's current slot picks so it moves as they change a sport.
+   * ⚠️ NULL UNTIL EVERY SLOT IS ANSWERED, and null when the sport fixes nothing in this week.
+   */
+  const enduranceAnchorsNow = React.useMemo(
+    () => resolveEnduranceAnchors((baselinesRow ?? {}) as never),
+    [baselinesRow],
+  );
+  const fixedHoursLineFor = (sport: 'run' | 'ride'): string | null => {
+    if (!allSlotsChosen(slotSportsNow)) return null;
+    const specs = SLOT_KEYS.map((k) => {
+      const s = slotSportsNow[k];
+      if (!s) return null;
+      const fam = SLOT_FAMILY[k];
+      const eq = s === 'ride' ? RIDE_EQUIVALENT[fam.family] : null;
+      return {
+        key: k,
+        spec: {
+          family: (eq?.family ?? fam.family),
+          level: fam.level,
+          archetype: eq?.archetype,
+          sport: s,
+        },
+      };
+    }).filter(Boolean) as Array<{ key: SlotKey; spec: SlotSpec }>;
+    const spans = slotSpans(specs.map((x) => x.spec), enduranceAnchorsNow);
+    const keyOf = (span: { spec: SlotSpec }) => specs.find((x) => x.spec === span.spec)?.key;
+    return fixedHoursLine(
+      spans,
+      sport,
+      (span) => HARD_SLOT_KEYS.includes(keyOf(span) as SlotKey),
+      (span) => keyOf(span) === 'long',
+    );
+  };
 
   const payloadNow = () => {
     // canonicalize the typed mileage (display unit → miles) before it leaves the client
@@ -5596,6 +5654,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 />
               );
             }}
+            /**
+             * ⛔ THE ENGINE WRITES THE SENTENCE, THIS SCREEN RENDERS IT (§3c, 2026-08-26).
+             * `fixedHoursLine` reads the same slot picks the composer will, so the hours named here
+             * and the hours the block states afterwards cannot come apart — which is the
+             * ask-15-get-20 defect the whole volume ruling exists to end.
+             * ⚠️ QUALITY vs LONG is read off the FRAME's own slot roles, not off the assigned sport:
+             * the long slot is the long slot whichever discipline fills it.
+             */
+            runFixedLine={fixedHoursLineFor('run')}
+            rideFixedLine={fixedHoursLineFor('ride')}
             baselines={baselinesRow}
             easyPaceSecPerMi={paceMinPerMile ? paceMinPerMile * 60 : null}
             squat1RM={squat1RMNow}

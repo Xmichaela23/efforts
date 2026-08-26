@@ -91,7 +91,8 @@ function rotatedArchetype(family: string, level: number, week: number): string |
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
-  DEFAULT_SIZE, sizeFor, slotSpans, weekVolumeBounds,
+  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, REST_DAY_RUNG,
+  sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
 import {
@@ -330,6 +331,20 @@ export type ComposeArgs = {
    */
   targetWeeklyMiles?: number | null;
   targetWeeklyRideHours?: number | null;
+  /**
+   * ⛔⛔ THE ACCUMULATIVE WEEKLY HOURS THE ATHLETE PICKED, PER SPORT (Michael, 2026-08-26): *"the
+   * accumulative hours for the week… we can probably do 0-2 2-4 4-6 6-8 8-10 for runs, similar
+   * stack for bike… and then we just have copy say hard hours cap at whatever, rest will be easy."*
+   *
+   * ⛔ HOURS ON BOTH SPORTS. The running ask was in MILES and that was our conversion at an assumed
+   * pace, never the book's — Viada prescribes in time throughout. ⚠️ `targetWeeklyMiles` above is
+   * NOT repurposed: it is load-bearing as MILES in the coach payload's upkeep comparison, the State
+   * screen's accent, `create-goal`'s untouched-seed test, `athlete-weekly-intent` and the Get
+   * Stronger generator. Two fields, two meanings, no silent unit change.
+   * ⚠️ Absent is no opinion, and the dial keeps the library's own midpoint.
+   */
+  targetRunHours?: number | null;
+  targetRideHours?: number | null;
   roundTo?: number;
   smallestPlatePairLb?: number | null;
   /**
@@ -1260,10 +1275,53 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     return out;
   })();
   const volumeSpans = slotSpans(enduranceSpecs, anchors);
+  /**
+   * ⛔ THE HOURS ASK WINS OVER THE OLD MILES ASK where both arrive. `targetWeeklyMiles` still travels
+   * for every other reader of that field, but this composer stopped measuring running in miles.
+   */
   const volume = {
     bounds: weekVolumeBounds(enduranceSpecs, anchors),
-    run: sizeFor(volumeSpans, 'run', args.targetWeeklyMiles),
-    ride: sizeFor(volumeSpans, 'ride', args.targetWeeklyRideHours),
+    run: sizeFor(volumeSpans, 'run', args.targetRunHours),
+    ride: sizeFor(volumeSpans, 'ride', args.targetRideHours ?? args.targetWeeklyRideHours),
+  };
+  /**
+   * ⛔⛔ THE HOURS PAST THE FIXED SESSIONS BECOME EASY WORK (Michael, 2026-08-26): *"any additional
+   * hour will be programmed easy."* The hard and long sessions are the book's doses and do not
+   * stretch; when the ask is above what the four slots hold at their caps, the surplus is EASY
+   * SESSIONS, appended the way the advanced tier and the easy swims already are.
+   *
+   * ⛔ MORE SESSIONS, NEVER LONGER ONES. Stretching a session past its band is what p275 forbids in
+   * terms (*"resist the urge to add more difficulty or length/level"*) and what §3d caps. Every
+   * appended session is a level-1 base session — a dose that is on the page.
+   * ⚠️ THEY LAND ON THE TWO DAYS THE FRAME LEAVES CLEAR of endurance, which are the lower-body
+   * lifting days, and then on the rest day. `easyFillFor` decides how many; the loop below places
+   * them through the same relocator everything else uses.
+   */
+  const easyFillFor = (sport: 'run' | 'ride'): number => {
+    const solve = sport === 'run' ? volume.run : volume.ride;
+    const bound = sport === 'run' ? volume.bounds.run : volume.bounds.ride;
+    if (solve.verdict !== 'over_cap' || bound.sessions === 0) return 0;
+    const want = Number(sport === 'run' ? args.targetRunHours : (args.targetRideHours ?? args.targetWeeklyRideHours));
+    if (!Number.isFinite(want) || want <= bound.cap) return 0;
+    const each = easyFillHours(sport, anchors);
+    if (each <= 0) return 0;
+    /**
+     * ⛔⛔ ROUNDED TO THE NEAREST SESSION, NOT UP — and Michael's own worst case is what forced it.
+     * His words: *"If someone runs an hour a week and they only pick one run, worst case they get
+     * the cap on the hard session."* One hard run caps at about 50 minutes; ask for an hour and the
+     * gap is eleven minutes. `Math.ceil` bought a whole 30-minute easy run for those eleven minutes
+     * and built 1h19 against a 1h ask — overshooting the number in the name of honouring it.
+     * ⚠️ SO A GAP SMALLER THAN HALF A SESSION BUYS NOTHING. The week lands nearest the ask, which is
+     * the only reading of "the accumulative hours for the week" that does not routinely overshoot.
+     *
+     * ⚠️ CAPPED BY THE WEEK'S OWN ROOM, not by the ask. Past the free days and the rest day the only
+     * answer left is stacking onto a lifting day, which is a different question (D-452) and not one
+     * a volume number gets to decide on its own.
+     */
+    return Math.min(
+      FREE_ENDURANCE_DAYS + REST_DAY_RUNG,
+      Math.max(0, Math.round((want - bound.cap) / each)),
+    );
   };
   /** ⛔ ONE SIZE PER SPORT — see `sizeFor`. A swim has no typed target and keeps the default. */
   const sizeForSport = (sport: 'run' | 'ride' | 'swim'): number =>
@@ -1524,6 +1582,100 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     });
   }
 
+  /**
+   * ⛔⛔ THE HOURS PAST THE FIXED SESSIONS, AS EASY SESSIONS (Michael, 2026-08-26). See `easyFillFor`
+   * above for the count and `EASY_FILL_SPEC` for the dose.
+   *
+   * ⛔ THE DAYS THE FRAME LEAVES CLEAR, IN ORDER, AND THE REST DAY LAST. p246 puts no endurance on
+   * the two lower-body lifting days and gives the week one full rest day; those are the only rooms
+   * the week has. Filling the lifting days first is the cheaper of the two — a day that already
+   * trains costs the athlete no additional day off, which is D-452's own stacking logic — and the
+   * REST DAY IS SPENT ONLY WHEN THE ASK NEEDS IT, and says so when it is.
+   * ⚠️ EVERY ONE GOES THROUGH THE SAME RELOCATOR as the rest of the week, so a day off still moves
+   * it and still gets its sentence.
+   */
+  {
+    const restFrameDay = days.find((d) => d.rest)?.day ?? null;
+    const clearDays = days
+      .filter((d) => !d.rest && d.endurance.length === 0)
+      .map((d) => d.day);
+    for (const sport of ['run', 'ride'] as const) {
+      const want = easyFillFor(sport);
+      if (want <= 0) continue;
+      const spec = EASY_FILL_SPEC[sport];
+      const room = restFrameDay == null ? clearDays : [...clearDays, restFrameDay];
+      let spentRestDay = false;
+      let fillsPlaced = 0;
+      for (let i = 0; i < want && i < room.length; i++) {
+        const frameDay = room[i];
+        const built = buildEnduranceSession({
+          family: spec.family, level: spec.level, archetype: spec.archetype, anchors, size: 1,
+        });
+        const row = translateEnduranceSession(built);
+        const day = relocate(
+          dayNameFor(args, frameDay),
+          sport === 'run' ? 'the extra easy run' : 'the extra easy ride',
+        );
+        const takesRestDay = restFrameDay != null && frameDay === restFrameDay;
+        if (takesRestDay) spentRestDay = true;
+        fillsPlaced += 1;
+        /**
+         * ⛔ THE REST-DAY SESSION IS TAGGED AS ACTIVE RECOVERY (Michael, 2026-08-26), and the tag is
+         * a claim the source makes rather than a softer word for the same thing. His rule 7: *"A
+         * rest day is not always needed. An easier activity can be more rejuvenating than sitting at
+         * home."* The day is not lost — it changes job.
+         * ⚠️ THE TAG ONLY. Giving the session its own NAME and flavour is a display change across
+         * every surface that renders a week, and it is flagged as follow-up rather than smuggled in
+         * here; the tag is what a surface will read when that lands.
+         */
+        sessions.push({
+          day,
+          ...row,
+          tags: [...row.tags, 'volume_fill', ...(takesRestDay ? ['active_recovery'] : [])],
+        });
+      }
+      /**
+       * ⛔⛔ DAY-AGNOSTIC, AND THAT IS A FACT ABOUT THE SCREEN RATHER THAN A STYLE CHOICE (Michael,
+       * 2026-08-26). A draft named the weekdays — *"added as easy rides on Tuesday and Friday"* —
+       * and it cannot: **the endurance screen sits BEFORE the scheduler.** Days are not decided
+       * when this line is read, and pins and blocked days move sessions afterwards. A weekday here
+       * would be a promise the next screen breaks.
+       *
+       * ⛔ AND THE HOURS PICK IS NOT ONLY VOLUME — Michael, verbatim: *"remember they are
+       * potentially building days."* An added easy session can land on a day that currently carries
+       * no endurance, so choosing more hours can change how many days the week trains on. That is
+       * the half a volume number does not obviously carry, and it is what this sentence is for.
+       * ⚠️ "CAN", NOT "WILL": on a lifting-only day the athlete already trains, so the session adds
+       * work rather than a day. Only the rest-day rung adds a day outright, and its own line below
+       * says so.
+       */
+      if (fillsPlaced > 0) {
+        notes.push({
+          kind: 'ours',
+          text: `The extra hours are added as easy ${sport === 'run' ? 'runs' : 'rides'}, which can `
+            + 'add training days to the week.',
+        });
+      }
+      /**
+       * ⛔⛔ MICHAEL'S OWN SENTENCE, VERBATIM AND WITHOUT A DAY NAME: *"At this many hours, rest day
+       * becomes active recovery."* Mine said the day *"stops being a rest day"* — a loss where his
+       * states a change of job — and a later draft named the weekday, which this screen cannot know.
+       *
+       * ⛔ THE SOURCE IS ON HIS SIDE. Rule 7: *"A rest day is not always needed. An easier activity
+       * can be more rejuvenating than sitting at home"*, with consolidation of stressors deciding
+       * whether a full rest day is actually needed. p246 gives the week a rest day; it does not say
+       * the day may only be spent lying down.
+       */
+      if (spentRestDay) {
+        notes.push({
+          kind: 'warning',
+          text: 'At this many hours, rest day becomes active recovery.',
+          cite: 'Viada p139-145',
+        });
+      }
+    }
+  }
+
   // ── accessories: stage 3's floor, over the WHOLE week ─────────────────────────────────────────
   //
   // ⛔ THE LEDGER SEES THE STRENGTH SETS TOO. p147 puts high-intensity work sets from strength work
@@ -1683,8 +1835,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * clamps. ⛔ `volume.run` / `volume.ride` still carry the verdict, so nothing downstream lost the
    * fact — only the sentence is gone.
    *
-   * ⛔ `capLine` and `volumeLine` are NOT deleted: the block model replaces what they say, not that
-   * they exist, and deleting them would take their voice-checked shape with them.
+   * ⛔ `capLine` and `volumeLine` ARE now deleted — `fixedHoursLine` replaced them, so keeping a
+   * silenced sentence "in case" would just be dead copy.
    */
 
   const conflicts = weekConflicts({

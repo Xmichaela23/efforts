@@ -164,7 +164,13 @@ export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 
  * The athlete decides their endurance; no governor, no prefill (his ruling, same conversation).
  */
 export const VOLUME_HONESTY_LINES = [
-  'Add the miles you currently hold comfortably — this is not the time for road PRs.',
+  /**
+   * ⛔ HOURS, NOT MILES (Michael, 2026-08-26): *"then we use hours."* Viada prescribes in TIME
+   * throughout — VT1 by duration (p235), LSD in hours, cycling endurance in hours (p239) — so the
+   * mileage this line used to ask for was OUR conversion at an assumed pace and never his. The rest
+   * of the sentence is unchanged and is his own wording.
+   */
+  'Pick the hours you currently hold comfortably — this is not the time for road PRs.',
   'More running will slow your strength progress; riding is much more forgiving.',
   // ⛔ "re-dial" IS A DEBT (2026-08-24 evening, flagged at the time): no mid-block volume edit
   // exists today — the wizard is the only place these numbers are typed. The line ships on

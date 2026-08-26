@@ -33,7 +33,6 @@ import {
   ENDURANCE_WEEK_PREAMBLE,
   LONG_SLOT_NOTE,
   VOLUME_HONESTY_LINES,
-  runnerMileageLine,
   SLOT_KEYS,
   SLOT_LABEL,
   SLOT_OPTIONS,
@@ -51,7 +50,12 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { weekBounds, RUN_MILES_BLOCK_CAP, OVER_CAP_LINE } from '@/lib/standing-plan-week-bounds';
+import { weekBounds } from '@/lib/standing-plan-week-bounds';
+/**
+ * ⛔ THE OPTION LIST IS THE ENGINE'S, NOT THIS SCREEN'S. One list, so the hours offered here and the
+ * hours the composer can build are the same list by construction.
+ */
+import { WEEKLY_HOUR_OPTIONS } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 
 export type EnduranceWeekCardProps = {
@@ -69,6 +73,9 @@ export type EnduranceWeekCardProps = {
   runVolume: string;
   onRunVolume: (v: string) => void;
   rideHours: string;
+  /** ⛔ THE ENGINE'S OWN SENTENCE per sport — `fixedHoursLine`. Null when the sport fixes nothing. */
+  runFixedLine?: string | null;
+  rideFixedLine?: string | null;
   onRideHours: (v: string) => void;
   unit: 'mi' | 'km';
   /** Rendered inside the open hard-slot row — VO2 vs speed, club session. */
@@ -133,23 +140,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
   });
-  /**
-   * ⛔ §3c — WHAT THESE PICKS HOLD, LIVE. Adapted from the bounds this screen ALREADY sums; nothing
-   * is recomputed. ⚠️ `sessions` is what tells the copy a sport is absent from the week — a "up to
-   * about 0 miles" line would be the confident wrong answer, and `capLine` returns null instead.
-   */
-  const volumeBound = {
-    run: {
-      floor: bounds.runMiles?.min ?? 0,
-      cap: bounds.runMiles?.max ?? 0,
-      sessions: bounds.runMiles ? 1 : 0,
-    },
-    ride: {
-      floor: bounds.rideHours?.min ?? 0,
-      cap: bounds.rideHours?.max ?? 0,
-      sessions: bounds.rideHours ? 1 : 0,
-    },
-  };
   const rate = liftingRateLine(props.slots, props.squat1RM);
   const split = upperLowerSplitLine(props.slots);
 
@@ -429,79 +419,61 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       {allSlotsChosen(props.slots) && (bounds.runMilesInput || bounds.rideHours) ? (
         <div ref={volumeRef}>
           {/* ⛔ THE HONESTY NOTE, BESIDE THE NUMBER IT IS ABOUT (moved off the tier screen,
-              Michael, 2026-08-24 evening). His words, verbatim. */}
+              Michael, 2026-08-24 evening). His words, verbatim — the first line reworded from
+              miles to hours on 2026-08-26 and the other two untouched. */}
           <div className="mb-3 space-y-0.5">
             {VOLUME_HONESTY_LINES.map((line) => (
               <p key={line} className="text-white/70 text-[13px] leading-snug">{line}</p>
             ))}
           </div>
           <div className="flex flex-wrap gap-4">
-          {bounds.runMilesInput ? (
-            <div className="flex-1 min-w-[150px]">
-              <p className="text-white/80 text-[13px] mb-2">Weekly running to hold</p>
-              <div className="flex items-baseline gap-2">
-                <input
-                  type="number" inputMode="numeric"
-                  min={bounds.runMilesInput.min} max={bounds.runMilesInput.max}
-                  data-testid="run-volume"
-                  value={props.runVolume}
-                  onChange={(e) => props.onRunVolume(e.target.value)}
-                  /* ⛔ NO NUMBER IN AN EMPTY BOX (Michael, 2026-08-24 night). A grey midpoint read
-                     as a suggestion — the athlete types their own week or nothing. */
-                  /* ⛔ FOCUS IN THE SPORT'S COLOUR (Michael, 2026-08-26: "these highlight the wrong
-                     colors") — the field had no focus style, so the browser's default blue ring won.
-                     Palette via the CSS var, never a hand-picked hex. */
-                  className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
-                  style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb('run')})` }}
-                />
-                <span className="text-white/50 text-sm">{props.unit === 'km' ? 'km' : 'mi'}</span>
+          {(['run', 'ride'] as const).map((sport) => {
+            const present = sport === 'run' ? !!bounds.runMilesInput : !!bounds.rideHours;
+            if (!present) return null;
+            const value = sport === 'run' ? props.runVolume : props.rideHours;
+            const onChange = sport === 'run' ? props.onRunVolume : props.onRideHours;
+            const line = sport === 'run' ? props.runFixedLine : props.rideFixedLine;
+            return (
+              <div key={sport} className="flex-1 min-w-[150px]">
+                <p className="text-white/80 text-[13px] mb-2">
+                  Weekly {sport === 'run' ? 'running' : 'riding'} to hold
+                </p>
+                <div className="flex items-baseline gap-2">
+                  {/* ⛔⛔ A DROPDOWN OF WHOLE HOURS, SAME LIST BOTH SPORTS (Michael, 2026-08-26,
+                      final): *"no time buckets — 1,2,3,4,5,6 hours for both ride and run"*, tops
+                      per sport: *"8 for runs 12 for rides, I mean its silly but not unheard of."*
+                      ⛔ ALWAYS THE FULL LIST — no filtering to what the picks can build. An ask
+                      under the week's fixed sessions simply builds those sessions, which is his own
+                      worst case: *"if someone runs an hour a week and they only pick one run,
+                      worst case they get the cap on the hard session."*
+                      ⚠️ THE EMPTY OPTION STAYS FIRST. No number in an untouched box (Michael,
+                      2026-08-24 night) — a preselected value reads as a suggestion. */}
+                  <select
+                    data-testid={sport === 'run' ? 'run-volume' : 'ride-hours'}
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="w-24 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
+                    style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb(sport === 'run' ? 'run' : 'bike')})` }}
+                  >
+                    <option value="">—</option>
+                    {WEEKLY_HOUR_OPTIONS[sport].map((h) => (
+                      <option key={h} value={String(h)}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-white/50 text-sm">{Number(value) === 1 ? 'hour' : 'hours'}</span>
+                </div>
+                {/* ⛔ THE ONE LINE THAT REMAINS — what the book fixes, and where the rest goes.
+                    Michael's own shape: *"copy say hard hours cap at 1.38 or whatever for the run
+                    and same for bike, rest will be easy."* It replaces every cap, floor and
+                    over-cap sentence this screen used to carry. ⚠️ Written by the ENGINE
+                    (`fixedHoursLine`), so the number here and the number the block states cannot
+                    come apart. */}
+                {line ? (
+                  <p className="text-white/55 text-xs mt-1.5" data-testid={`${sport}-fixed-hours`}>{line}</p>
+                ) : null}
               </div>
-              {/* ⛔ "This week holds X to Y" CUT (Michael, 2026-08-24 evening: "it's confusing").
-                  The input keeps its min/max and placeholder; the mileage bands below are the
-                  guidance. `boundsLine` still exists for the engine's own tests. */}
-              {/* ⛔ THE 20-MILE CEILING'S SIGNAGE (Michael, 2026-08-24): typing above the block's
-                  running cap gets one factual line, not a refusal — and a link when the
-                  endurance-leading frame exists. */}
-              {Number(props.runVolume) > RUN_MILES_BLOCK_CAP ? (
-                <p className="text-white/55 text-xs mt-1.5" data-testid="over-cap">{OVER_CAP_LINE}</p>
-              ) : null}
-              {/* ⛔ THE REALITY CHECK, ONE LINE, UNDER THE NUMBER IT CHECKS (moved off the tier
-                  screen, 2026-08-24 evening). A three-row table here would re-create the height
-                  problem it arrived to fix. */}
-              {/* ⛔⛔ THE CEILING LINE IS SILENCED (Michael, 2026-08-26, hours after it shipped).
-                  It told the athlete their picks had a weekly ceiling; the plan has no such thing.
-                  His model: the QUALITY sessions cap at the book's doses and everything past them
-                  is programmed easy. The replacement names the two capped sessions and says where
-                  the rest goes — it lands with the block model, and a false line does not stay up
-                  waiting for it. */}
-              <p className="text-white/40 text-xs mt-1.5" data-testid="mileage-check">
-                {runnerMileageLine(props.unit)}
-              </p>
-            </div>
-          ) : null}
-
-          {bounds.rideHours ? (
-            <div className="flex-1 min-w-[150px]">
-              <p className="text-white/80 text-[13px] mb-2">Weekly riding to hold</p>
-              <div className="flex items-baseline gap-2">
-                <input
-                  type="number" inputMode="decimal"
-                  min={bounds.rideHours.min} max={bounds.rideHours.max} step={0.5}
-                  data-testid="ride-hours"
-                  value={props.rideHours}
-                  onChange={(e) => props.onRideHours(e.target.value)}
-                  /* ⛔ Same — no suggested hours in the empty box. Focus ring: bike green, same
-                     rule as the run field above. */
-                  className="w-20 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
-                  style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb('bike')})` }}
-                />
-                <span className="text-white/50 text-sm">h</span>
-              </div>
-              {/* ⛔ Silenced with the run side above, and for the same reason — this was the sentence
-                  Michael read on his own screen: "these picks hold up to about 4h35 a week, and the
-                  week is built at that ceiling", against a typed 8h that should simply build. */}
-            </div>
-          ) : null}
+            );
+          })}
           </div>
         </div>
       ) : null}

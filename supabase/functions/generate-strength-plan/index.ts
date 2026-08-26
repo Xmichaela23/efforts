@@ -655,6 +655,20 @@ Deno.serve(async (req: Request) => {
            */
           targetWeeklyMiles: runMilesAsked ?? undefined,
           targetWeeklyRideHours: rideHoursAsked ?? undefined,
+          /**
+           * ⛔ THE HOURS ASK, PER SPORT — the wizard's dropdowns (§3c). ⚠️ Validated here rather
+           * than trusted: a non-numeric or non-positive value is treated as ABSENT, because absent
+           * means "no opinion" and the composer keeps the library's midpoint, while a coerced zero
+           * would read as "no running at all".
+           */
+          targetRunHours: (() => {
+            const n = Number((body as Record<string, unknown>).target_run_hours);
+            return Number.isFinite(n) && n > 0 ? n : undefined;
+          })(),
+          targetRideHours: (() => {
+            const n = Number((body as Record<string, unknown>).target_ride_hours);
+            return Number.isFinite(n) && n > 0 ? n : undefined;
+          })(),
           // ⛔ THE ATHLETE'S DAYS BEAT THE FRAME ORDER — see `endurancePins` above and the note on
           // the field in `compose.ts`. Absent pins leave the rotation exactly as it was.
           endurancePins,
