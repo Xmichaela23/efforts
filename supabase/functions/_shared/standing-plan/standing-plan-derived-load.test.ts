@@ -212,3 +212,38 @@ Deno.test('⛔⛔ AND IT CANNOT DRIFT — every derived weight stays within one 
   }
 });
 
+Deno.test('⛔⛔ NO DERIVED LIFT IS FROZEN ACROSS A BLOCK — heavy AND fast', () => {
+  /**
+   * ⛔ MICHAEL'S SECOND EXPORT, 2026-08-27. Applying the ratio to the primary's PRESCRIBED weight
+   * unfroze the heavy rows and left the fast ones stuck:
+   *     Back Squat (DE)   W2 @ 80  →  W5 @ 85     the primary moved
+   *     front squat (DE)  W2 @ 70  →  W12 @ 70    0.85 x 80 = 68, 0.85 x 85 = 72.25, both round to 70
+   * One step of the primary is 4.25 lb on the derived lift, so whether it moved came down to which
+   * side of a rounding boundary the multiplication landed. A coin toss, not a progression. It now
+   * carries a whole step when the primary takes one, clamped to within a step of the ratio.
+   *
+   * ⚠️ ASSERTED ON THE DERIVED SERIES, NOT AGAINST THE PRIMARY WEEK BY WEEK, and the frame is why: a
+   * pattern's primary and its derived movement alternate — week 2 has the front squat on the fast
+   * lower day and week 3 has the back squat — so the two are never in the same week to compare. The
+   * ratio relationship is pinned separately by the drift test above.
+   *
+   * ⛔ BOTH INTENTS ARE CHECKED BY NAME. The ME path and the DE path compute the primary separately
+   * and only one of them was fixed last time; a test that happened to sample one would have passed
+   * over exactly this defect.
+   */
+  const series: Record<string, number[]> = {};
+  for (let week = 2; week <= 12; week++) {
+    for (const r of rowsFor(week)) {
+      if (r.load_basis !== 'derived_ratio' || typeof r.weight !== 'number') continue;
+      (series[`${r.name}|${r.slot_intent}`] ||= []).push(r.weight as number);
+    }
+  }
+  const tracked = Object.entries(series).filter(([, v]) => v.length >= 4);
+  assert(tracked.length >= 2, `only ${tracked.length} derived lifts appear across the block`);
+  assert(tracked.some(([k]) => k.endsWith('|ME')), 'no ME derived row was tracked');
+  assert(tracked.some(([k]) => k.endsWith('|DE')), 'no DE derived row was tracked');
+  for (const [key, weights] of tracked) {
+    assert(weights[weights.length - 1] > weights[0],
+      `${key} never moved: ${weights.join(' → ')}`);
+  }
+});

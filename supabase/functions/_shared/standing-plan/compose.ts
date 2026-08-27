@@ -1227,9 +1227,44 @@ function exerciseForSlot(
    * figure `prescribedLoad` rounds to and `advanceStep` honours.
    */
   const plateStep = Number.isFinite(args.roundTo) && (args.roundTo ?? 0) > 0 ? (args.roundTo as number) : 5;
-  const weight = derived
-    ? Math.max(plateStep, Math.round((primaryWeight * derived.ratio) / plateStep) * plateStep)
-    : primaryWeight;
+  /**
+   * ⛔⛔ AND THE DERIVED LIFT CARRIES ITS OWN STEP, BECAUSE THE RATIO ALONE STILL FROZE IT
+   * (2026-08-27, Michael's second export). Applying the ratio to the primary's PRESCRIBED weight
+   * fixed the heavy rows — 105 → 110 becomes 90 → 95 — and left the fast ones stuck:
+   *
+   *     Back Squat (DE)   W2 @ 80  →  W5 @ 85     the primary moved
+   *     front squat (DE)  W2 @ 70  →  W12 @ 70    0.85 x 80 = 68 and 0.85 x 85 = 72.25,
+   *                                               and both round to 70
+   *
+   * One step of the primary is 4.25 lb on the derived lift, so whether it moves at all depends on
+   * which side of a rounding boundary the multiplication lands. That is a coin toss, not a
+   * progression.
+   *
+   * ⛔ SO THE DERIVED LIFT TAKES A WHOLE STEP WHEN THE PRIMARY TAKES ONE. The base is still the
+   * ratio — `round(primary at week 1 x ratio)` — and every step the primary has gained since is
+   * added as a full plate step rather than as its 85% shadow.
+   *
+   * ⚠️ AND IT IS CLAMPED, WHICH IS WHAT STOPS IT DRIFTING. A lift advancing on its own step forever
+   * would wander toward the primary's own number; if the carried figure ever sits more than one step
+   * from `primary x ratio`, the ratio wins and it re-derives. Over a block the primary gains one or
+   * two steps, so the carry stays well inside that — but the guard is what makes the rule safe
+   * rather than lucky.
+   * ⚠️ WEEK 1 IS THE BASE WHATEVER THE BLOCK DOES, so the arithmetic is the same for a tested block
+   * and a skipped one: `prescribedLoad` is pure, and asking it for week 1 costs nothing.
+   */
+  const weight = (() => {
+    if (!derived) return primaryWeight;
+    const round = (n: number) => Math.max(plateStep, Math.round(n / plateStep) * plateStep);
+    const primaryBase = prescribedLoad({
+      working, frame: args.frame, week: 1, isLower, hardRunBeforeLower,
+      pctOfWorkingNumber: pct, roundTo: plateStep,
+    }).weight;
+    const steps = Math.round((primaryWeight - primaryBase) / plateStep);
+    const carried = round(primaryBase * derived.ratio) + steps * plateStep;
+    const byRatio = round(primaryWeight * derived.ratio);
+    // ⛔ THE RATIO IS THE AUTHORITY WHEN THE CARRY HAS DRIFTED PAST ONE STEP OF IT.
+    return Math.abs(carried - primaryWeight * derived.ratio) <= plateStep ? carried : byRatio;
+  })();
 
   if (isLower && !hardRunBeforeLower && !notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS)) {
     // ⛔ SAID OUT LOUD, BECAUSE IT IS OUR READING. The lower-body weights are NOT reduced this block,
