@@ -84,11 +84,17 @@ Deno.test('the four slots are the four the frame has, labelled as the athlete se
   // starting empty, two identical labels are two identical rows.
   assertEquals(SLOT_LABEL.hard1, 'Hard session 1');
   assertEquals(SLOT_LABEL.hard2, 'Hard session 2');
-  assertEquals(SLOT_LABEL.easy, 'Recovery session');
+  /**
+   * ⛔ "Easy session", NOT "Recovery session" (Michael, 2026-08-27). At a six-hour ask this slot
+   * builds ninety minutes against the long slot's hundred — ten minutes apart — and a ninety-minute
+   * recovery session is not one. Both caps are his (p235's level-3 VT1, p247's long run) and neither
+   * moved; only the word did. ⚠️ THE WORDING IS OURS, the change is his.
+   */
+  assertEquals(SLOT_LABEL.easy, 'Easy session');
   assertEquals(SLOT_LABEL.long, 'Long session');
   // ⛔ A COLLAPSED ROW STATES ITS WHOLE ANSWER — the screen opens finished.
   assertEquals(slotSummary('hard1', 'ride', 'Sustained threshold'), 'Hard session 1 · Ride · Sustained threshold');
-  assertEquals(slotSummary('easy', 'run'), 'Recovery session · Run');
+  assertEquals(slotSummary('easy', 'run'), 'Easy session · Run');
   assertEquals(slotSummary('long', 'ride'), 'Long session · Long ride');
   // ⛔ AN UNANSWERED ROW IS ITS LABEL ALONE — no sport, and nothing invented to fill the gap.
   assertEquals(slotSummary('hard1', null), 'Hard session 1');
@@ -153,7 +159,7 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
   assertEquals(ENDURANCE_WEEK_INTRO, [
     'Your week has 4  endurance slots.',
     'One Long session',
-    'One recovery session',
+    'One easy session',
     '2 that can be filled with hard or easy session.',
     'Rides are easier on your legs than runs.',
     'Lower body weightloads will automatically be reduced if you add a hard run',
@@ -238,10 +244,10 @@ Deno.test('the blocked line names what is missing, and nothing else', () => {
   // ⚠️ TWO NAMES TAKE THE PLURAL VERB — the line was singular-only while only one row could be
   // missing at a time on the tested path.
   assert(/have no sport yet/.test(two), two);
-  assert(/recovery session/i.test(two), two);
+  assert(/easy session/i.test(two), two);
   assert(/hard session 2/i.test(two), `the line did not name the unanswered hard session: ${two}`);
   const all = unansweredLine(emptySlotSports())!;
-  assert(/hard session 1, hard session 2, recovery session and long session/i.test(all), all);
+  assert(/hard session 1, hard session 2, easy session and long session/i.test(all), all);
   assert(/have no sport yet/.test(all), all);
   // ⚠️ VOICE: it states the fact, it does not instruct.
   for (const line of [one, two]) {

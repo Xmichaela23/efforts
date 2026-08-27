@@ -51,7 +51,7 @@ export const SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
 export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
   'Your week has 4  endurance slots.',
   'One Long session',
-  'One recovery session',
+  'One easy session',
   '2 that can be filled with hard or easy session.',
 ];
 
@@ -143,10 +143,29 @@ export const LONG_SLOT_NOTE = 'one per week, run or ride';
  * ⚠️ THE NUMBERS ARE ALSO REAL. Slot one is the top-end session and slot two the sustained one — the
  * frame's own two hard days, in order (`hardSlotDefault`).
  */
+/**
+ * ⛔⛔ "Recovery session" → "Easy session" (Michael, 2026-08-27). He ruled the change; the WORDING is
+ * ours and he said it is easy to move.
+ *
+ * ⛔ THE DOSE WAS NEVER THE PROBLEM, THE LABEL WAS. At a six-hour running ask this slot builds NINETY
+ * MINUTES and the long slot a hundred — ten minutes apart, so the week read as two long runs. Both
+ * caps were checked before the label moved and **both are his**: 90 traces to p235's level-3 VT1
+ * (see `LADDER_CEILING_MIN`, which says so in its own note) and 100 is p247's long session. Neither
+ * is arbitrary and neither moves.
+ *
+ * A twenty-five-minute "Recovery session" is recovery. A ninety-minute one is an easy run — which is
+ * what the engine has always called it (`run_vt1`, and the composed row is named "Easy Run"). **This
+ * screen was the only place still saying recovery.**
+ *
+ * ⚠️ THE COMPOSED SESSION'S NAME AND FAMILY ARE UNTOUCHED. This is the wizard's label catching up to
+ * what the plan already emits, not a rename of the session.
+ * ⚠️ `unansweredLine` BUILDS ITS SENTENCE FROM THIS TABLE, so the blocked-Continue copy follows —
+ * *"hard session 2 and easy session have no sport yet."*
+ */
 export const SLOT_LABEL: Record<SlotKey, string> = {
   hard1: 'Hard session 1',
   hard2: 'Hard session 2',
-  easy: 'Recovery session',
+  easy: 'Easy session',
   long: 'Long session',
 };
 
