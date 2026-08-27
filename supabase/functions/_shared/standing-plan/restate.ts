@@ -29,6 +29,13 @@ export type PlannedRowish = {
   week_number?: number | null;
   date?: string | null;
   strength_exercises?: unknown;
+  /**
+   * ⛔ WHETHER THE ATHLETE HAS ALREADY DONE IT. *"History stands"* is a per-SESSION fact, not a
+   * per-week one — see `restateFromTest`. A row this is missing on is treated as not done, which is
+   * the safe direction: it may be rewritten, and a rewrite of a future session costs nothing.
+   */
+  workout_status?: string | null;
+  completed_workout_id?: string | null;
 };
 
 export type RestatedRow = {
@@ -114,10 +121,41 @@ function topWorkWeight(ex: StrengthExercise | null | undefined): number | null {
  * carries several movements) and name alone is not enough (bench appears on two days of the frame).
  * A composed session with no matching row is REPORTED, not dropped.
  */
+/** ⛔ A SESSION THE ATHLETE HAS ALREADY DONE. Never rewritten, whatever week it is in. */
+function isDone(row: PlannedRowish): boolean {
+  if (row?.completed_workout_id) return true;
+  const status = String(row?.workout_status ?? '').toLowerCase();
+  return status === 'completed' || status === 'skipped';
+}
+
 export function restateFromTest(args: {
   composed: ComposedWeek[];
   planned: PlannedRowish[] | null | undefined;
+  /**
+   * ⛔⛔ THE CUT IS THE TEST, NOT THE WEEK (Michael, 2026-08-27: *"its a dumb rule should just fill
+   * everything after test."*).
+   *
+   * ⛔ WHAT IT REPLACES AND WHY THAT WAS SELF-DEFEATING. The caller passed
+   * `Math.max(TEST_WEEK_INDEX, currentWeek)` under the comment *"history and the live week stand"*.
+   * **The test sits INSIDE the live week**, so protecting the live week protected exactly the
+   * sessions the test had just enabled. His own block: tested Monday and Tuesday, and Thursday's
+   * DE: Upper still read *"No weight is prescribed"* while week 2's identical session carried 105 lb.
+   * Two intentions collapsed into one week-level cut and the wrong half won.
+   *
+   * ⚠️ AND THE OTHER HALF IS KEPT, AS A PER-SESSION GUARD. *"History stands"* is the real
+   * constraint: a session already completed or skipped is never rewritten, in any week. An athlete
+   * who did Wednesday must not find Wednesday changed.
+   *
+   * ⚠️ NOT FAKED BY DECREMENTING THE WEEK. That would expose the test sessions themselves; the cut
+   * is a DATE inside the test week, taken from the last day the composed week marks as a test.
+   */
   afterWeek: number;
+  /**
+   * The last test session's date, ISO. Rows in the test week ON OR BEFORE it are left alone; rows
+   * after it are restated. ⚠️ Absent falls back to the old week-level behaviour, so a caller that
+   * has not been taught the new rule cannot silently start rewriting a test day.
+   */
+  testDayCutoff?: string | null;
 }): Restatement {
   /**
    * ⛔⛔ IT ACCUMULATES; IT USED TO OVERWRITE, AND THAT BECAME A SILENT NO-OP ON 2026-08-24.
@@ -144,9 +182,23 @@ export function restateFromTest(args: {
   const changes: RestatedChange[] = [];
   const matched = new Set<string>();
 
+  const cutoff = typeof args.testDayCutoff === 'string' ? args.testDayCutoff.slice(0, 10) : null;
   for (const row of args.planned ?? []) {
     const week = Number(row?.week_number);
-    if (!Number.isFinite(week) || week <= args.afterWeek) continue;
+    if (!Number.isFinite(week)) continue;
+    /**
+     * ⛔ THREE GATES, AND EACH ONE IS A HALF OF THE RULING.
+     *   1. a session already done is never touched — history stands, per session;
+     *   2. a week entirely before the cut is left alone;
+     *   3. inside the cut week, only the days AFTER the last test session are restated.
+     */
+    if (isDone(row)) continue;
+    const date = String(row?.date ?? '').slice(0, 10);
+    if (week < args.afterWeek) continue;
+    if (week === args.afterWeek) {
+      // ⚠️ NO CUTOFF MEANS THE OLD RULE — the whole cut week is left alone rather than guessed at.
+      if (!cutoff || !date || date <= cutoff) continue;
+    }
     const day = weekdayOf(row?.date);
     if (!day || !row?.id) continue;
     const wanted = bySlot.get(`${week}|${day}`);

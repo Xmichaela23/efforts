@@ -561,3 +561,78 @@ Deno.test('the skip answer survives the hop through create-goal', async () => {
   assert(/skip_test_week/.test(code), 'the skip answer is dropped between the goal and the builder');
   assert(/gsTp\.skip_test_week === true/.test(code), 'the skip is not allowlisted to `true`');
 });
+
+Deno.test('⛔⛔ THE CUT IS THE TEST, NOT THE WEEK — and a done session still stands', () => {
+  /**
+   * ⛔ MICHAEL, ON HIS OWN BLOCK (2026-08-27): *"its a dumb rule should just fill everything after
+   * test."* He tested Monday and Tuesday; Thursday's DE: Upper — same week, after both tests — still
+   * read "No weight is prescribed" while week 2's identical session carried 105 lb.
+   *
+   * ⛔ THE GUARD WAS SELF-DEFEATING. The cut was `max(TEST_WEEK_INDEX, currentWeek)` under the
+   * comment "history and the live week stand" — and the test sits INSIDE the live week, so
+   * protecting the live week protected exactly the sessions the test had just enabled. Two
+   * intentions collapsed into one week-level cut and the wrong half won.
+   *
+   * ⚠️ THE OTHER HALF SURVIVES AS A PER-SESSION GUARD: a completed or skipped session is never
+   * rewritten, in any week. That is what "history stands" always meant.
+   */
+  const wn = { bench: { lift: 'bench' as const, predicted1RM: 214, workingNumber: 205,
+    measured: { weight: 185, reps: 5 }, cite: 'x' } };
+  const composed = composeBlock({ ...COMPOSE, workingNumbers: wn, weeks: 3, taperWeeks: [] });
+  const MONDAY = Date.parse('2026-09-07T00:00:00Z');
+  const dateFor = (week: number, day: string) => new Date(MONDAY
+    + (week - 1) * 7 * 86400000
+    + WEEKDAYS.indexOf(day as never) * 86400000).toISOString().slice(0, 10);
+  const rows = composed.flatMap((wk) => wk.sessions
+    .filter((s) => s.type === 'strength')
+    .map((s) => ({
+      id: `${wk.week}-${s.day}`,
+      week_number: wk.week,
+      date: dateFor(wk.week, s.day),
+      day: s.day,
+      isTest: (s.tags ?? []).includes('test_week'),
+      // ⚠️ ONLY A SESSION THE BLOCK PUTS A NUMBER ON CAN BE "left unprescribed". The plyo day's
+      // drills are `load_prescribed: false` by design and restate to themselves.
+      prescribes: (s.strength_exercises ?? []).some((e) => typeof e.weight === 'number'),
+      strength_exercises: (s.strength_exercises ?? []).map((e) => ({ ...e, weight: 'By feel', set_plan: undefined })),
+    })));
+
+  // The last test day in week one — the cut the caller computes off the composed week's own tag.
+  const cutoff = rows.filter((r) => r.week_number === 1 && r.isTest)
+    .map((r) => r.date).sort().slice(-1)[0];
+  assert(cutoff, 'week one has no test session to cut on');
+
+  const out = restateFromTest({ composed, planned: rows, afterWeek: 1, testDayCutoff: cutoff });
+  const touched = new Set(out.rows.map((r) => r.id));
+
+  // ⛔ THE DEFECT ITSELF: a week-one session AFTER the test is filled in.
+  const afterTest = rows.filter((r) => r.week_number === 1 && !r.isTest && r.prescribes && r.date > cutoff!);
+  assert(afterTest.length > 0, 'week one has no session after the test to check');
+  for (const r of afterTest) {
+    assert(touched.has(r.id), `${r.day} of week one sits after the test and was left unprescribed`);
+  }
+  // ⛔ AND THE TEST DAYS THEMSELVES ARE NEVER TOUCHED — the cut is a date, not a decremented week.
+  for (const r of rows.filter((x) => x.week_number === 1 && x.isTest)) {
+    assert(!touched.has(r.id), `the test session on ${r.day} was rewritten`);
+  }
+
+  /**
+   * ⛔ HISTORY STANDS, PER SESSION. The same week, with the day after the test marked completed:
+   * it is left exactly as the athlete did it, while its neighbours are still filled.
+   */
+  const withHistory = rows.map((r) => (r.id === afterTest[0].id
+    ? { ...r, workout_status: 'completed' }
+    : r));
+  const guarded = restateFromTest({ composed, planned: withHistory, afterWeek: 1, testDayCutoff: cutoff });
+  const guardedIds = new Set(guarded.rows.map((r) => r.id));
+  assert(!guardedIds.has(afterTest[0].id), 'a completed session was rewritten');
+  assert(guardedIds.size > 0, 'the guard swallowed the whole restatement');
+
+  // ⚠️ AND NO CUTOFF FALLS BACK TO THE OLD WEEK-LEVEL RULE, so an untaught caller cannot start
+  // rewriting a test day by accident.
+  const legacy = restateFromTest({ composed, planned: rows, afterWeek: 1 });
+  for (const r of rows.filter((x) => x.week_number === 1)) {
+    assert(!new Set(legacy.rows.map((x) => x.id)).has(r.id),
+      `without a cutoff, week one should be untouched — ${r.day} was rewritten`);
+  }
+});

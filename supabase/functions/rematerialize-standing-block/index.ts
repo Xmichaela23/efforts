@@ -28,6 +28,8 @@ import {
   earnedMeSets,
   readTestWeek,
   restateFromTest,
+  // ⚠️ ONE ANSWER TO "which weekday is this date" — the same helper the restatement matches rows on.
+  weekdayOf,
   STANDING_PLAN_PROTOCOL_ID,
   TEST_WEEK_INDEX,
 } from '../_shared/standing-plan/index.ts';
@@ -84,7 +86,9 @@ Deno.serve(async (req: Request) => {
     // ── WHAT THE TEST WEEK ACTUALLY RECORDED ─────────────────────────────────
     const { data: plannedRows } = await supabase
       .from('planned_workouts')
-      .select('id, week_number, date, strength_exercises')
+      // ⛔ COMPLETION TRAVELS WITH THE ROW NOW — the cut is per session, not per week, so
+      // `restateFromTest` has to be able to tell a done session from a future one.
+      .select('id, week_number, date, strength_exercises, workout_status, completed_workout_id')
       .eq('training_plan_id', plan.id)
       .eq('user_id', userId);
 
@@ -186,6 +190,22 @@ Deno.serve(async (req: Request) => {
         : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null),
       demonstratedWeeklyMiles: sp.demonstrated_weekly_miles ?? null,
       /**
+       * ⛔⛔ THE EXPERIENCE ANSWER THE BLOCK'S LEVELS WERE BUILT FROM, READ BACK (2026-08-27) — and
+       * THIS IS THE HOP THAT MATTERS MOST. It is the sole input to the endurance level, and this
+       * function rewrites every week the athlete has not started yet. Without it, the first restate
+       * after week one re-composes those weeks at the frame's own printed levels: an athlete who
+       * answered "Newer" watches their hard sessions and their long session grow mid-block, with
+       * nothing said, on a calendar they were already training against.
+       *
+       * ⚠️ READ, NEVER RE-ASKED. The athlete's answer can change in a later wizard run; the calendar
+       * cannot. This block's own answer is what has to be reproduced — same law as `day_offset`,
+       * `sport_mix` and `athlete_equipment`.
+       * ⚠️ ABSENT ON EVERY BLOCK BUILT BEFORE THIS SHIPPED, which re-composes exactly as it did.
+       */
+      ...(sp.endurance_experience && typeof sp.endurance_experience === 'object'
+        ? { enduranceExperience: sp.endurance_experience }
+        : {}),
+      /**
        * ⛔⛔ THE BLOCK'S OWN ROTATION, READ BACK FROM ITS CONFIG — NOT RE-DERIVED FROM THE PINS.
        *
        * `restateFromTest` matches a composed session to a calendar row on week + WEEKDAY + movement.
@@ -267,11 +287,46 @@ Deno.serve(async (req: Request) => {
       ...(Object.keys(ladder.lastReps).length > 0 ? { meLastRepsByPattern: ladder.lastReps } : {}),
     });
 
+    /**
+     * ⛔⛔ THE LAST TEST DAY, AS A DATE — the cut the restatement uses inside the test week.
+     *
+     * ⛔ WHY A DATE AND NOT A WEEK (Michael, 2026-08-27: *"its a dumb rule should just fill
+     * everything after test"*). The old cut was `max(TEST_WEEK_INDEX, currentWeek)` under the
+     * comment *"history and the live week stand"* — and the test sits INSIDE the live week, so
+     * protecting the live week protected exactly the sessions the test had just enabled. He tested
+     * Monday and Tuesday and Thursday still read "No weight is prescribed".
+     *
+     * ⚠️ TAKEN FROM THE COMPOSED WEEK'S OWN `test_week` TAG, not from a weekday named here — the
+     * frame's rotation decides which days the tests land on, and a second answer to that question is
+     * how the two drift.
+     */
+    const testCutoff = (() => {
+      const testWeek = composed.find((w) => w.week === TEST_WEEK_INDEX);
+      if (!testWeek) return null;
+      const testDays = new Set(testWeek.sessions
+        .filter((s) => (s.tags ?? []).includes('test_week'))
+        .map((s) => String(s.day).toLowerCase()));
+      if (testDays.size === 0) return null;
+      const dates = (plannedRows ?? [])
+        .filter((r) => Number(r?.week_number) === TEST_WEEK_INDEX)
+        .filter((r) => testDays.has(weekdayOf(r?.date) ?? ''))
+        .map((r) => String(r?.date ?? '').slice(0, 10))
+        .filter(Boolean)
+        .sort();
+      return dates.length > 0 ? dates[dates.length - 1] : null;
+    })();
+
     const restated = restateFromTest({
       composed,
       planned: plannedRows ?? [],
-      // ⛔ HISTORY AND THE LIVE WEEK STAND.
-      afterWeek: Math.max(TEST_WEEK_INDEX, currentWeek),
+      /**
+       * ⛔ AFTER THE TEST, MINUS ANYTHING ALREADY DONE. The week index is the TEST week now rather
+       * than the live one; `testDayCutoff` carries the day-level half, and `restateFromTest` skips
+       * any session already completed or skipped in any week. History still stands — per session,
+       * which is what it always meant.
+       */
+      afterWeek: TEST_WEEK_INDEX,
+      testDayCutoff: testCutoff,
     });
 
     if (!willWrite) {

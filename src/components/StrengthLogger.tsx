@@ -5032,10 +5032,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               tag-not-new-field idiom as the pretest gate above. A `plyo` session gets NO cue: every
               drill row is load_prescribed:false, but "find the load" over a bodyweight A-Skip is the
               Box Jump mistake again — the drill rows carry their own stop rule in `notes`. */}
+          {/* ⛔⛔ AND NEVER OVER ROWS THAT DO CARRY A WEIGHT (2026-08-27, Michael's screenshot: the
+              line sat under four sets at 105 lb). *"No weight is prescribed"* was gated on the
+              session's TAG and on the row being assistance — never on whether the block had
+              actually put a number on it. The restatement fills the test week now, so the same
+              session can carry loads on one day and not the next; a cue that cannot see the load is
+              a sentence that contradicts the rows above it.
+              ⚠️ READ OFF THE ROWS THE CUE COVERS, not off the first one: the line speaks for the
+              whole assistance group, so it is only true when NONE of them is prescribed. */}
           {!isBaselineTestWorkout(scheduledWorkout || {})
             && !(Array.isArray(scheduledWorkout?.tags)
               && scheduledWorkout.tags.some((t: unknown) => String(t) === 'plyo'))
             && isAssistanceRow(exercise)
+            && !exercises.some((e) => isAssistanceRow(e)
+              && (typeof (e as { weight?: unknown }).weight === 'number'
+                || (e as { load_prescribed?: boolean }).load_prescribed === true))
             && exercises.findIndex((e) => isAssistanceRow(e)) === exerciseIndex && (
             <p className="mx-3 mb-1.5 mt-2 text-[11px] font-medium text-white/45 leading-snug">
               {Array.isArray(scheduledWorkout?.tags)
