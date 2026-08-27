@@ -15,6 +15,7 @@ import {
   PLYO_FAMILIES_PER_DAY,
   PLYO_FAMILY_IDS,
   PLYO_FAMILY_MIX_IS_OURS,
+  PLYO_ROTATION_ORDER_IS_HIS,
 } from './plyo.ts';
 import { FRAMES } from './frames.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
@@ -98,6 +99,45 @@ Deno.test('⛔ THE LOGGER\'S OWN BODYWEIGHT TEST COVERS THE DRILLS TOO — the t
     const folded = name.toLowerCase().replace(/[\s-]/g, '');
     assert(re.test(folded), `"${name}" (${folded}) is not seen as bodyweight by the logger`);
   }
+});
+
+Deno.test('⛔⛔ WEEK 1 IS FOOTSPEED AND IN-PLACE WORK — p89\'s ramp, not the table\'s order', () => {
+  /**
+   * ⛔ p89, *"Building to Plyos"*: *"I typically introduce an athlete to plyometrics via a
+   * combination of foot-speed drills and static plyometrics"*, and only *"with these skills
+   * mastered… you can proceed to more conventional dynamic plyometrics, such as skipping, bounding,
+   * and hops/jumps."* p88 adds that these are movements many trainees have not performed since
+   * school *"if ever"*.
+   *
+   * ⛔ THE DEFECT THIS PINS: the rotation walked the p227 TABLE, so week 1 served an A-skip
+   * (skipping) and single-leg hops (hops) — one from each half of the group he puts SECOND.
+   *
+   * ⚠️ THE NAMES AND THE FAMILIES DID NOT MOVE, only the order. `rotation` must stay a permutation
+   * of `drills`, or a drill has been invented or lost.
+   */
+  for (const family of PLYO_FAMILY_IDS) {
+    const f = PLYO_FAMILIES[family];
+    assertEquals([...f.rotation].sort(), [...f.drills].sort(),
+      `${family}: the rotation is not a permutation of his drills`);
+  }
+
+  // ⛔ THE AFTER-MASTERY GROUP, IN HIS OWN WORDS: skipping, bounding, hops/jumps. None of them in
+  // week 1, on either column.
+  const AFTER_MASTERY = ['A-Skip', 'B-Skip', 'Bounding', 'Single-Leg Hops', 'Skater Hops', 'Lunge Hops'];
+  for (const column of ['standard', 'taper'] as const) {
+    const wk = composeWeek({ ...BASE, week: 1, column } as never);
+    const names = wk.sessions.filter((s) => s.tags.includes('plyo'))
+      .flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name));
+    assert(names.length > 0, `${column}: week 1 has no plyo rows`);
+    for (const n of names) {
+      assert(!AFTER_MASTERY.includes(n), `${column}: week 1 serves "${n}", which p89 puts after mastery`);
+    }
+  }
+
+  // ⛔ AND THE ORDER IS LABELLED HIS. It was the table's order presented as a ramp, which is the
+  // silent reconciliation this codebase labels its way out of.
+  assert(/p89/.test(PLYO_ROTATION_ORDER_IS_HIS));
+  assert(/his/i.test(PLYO_ROTATION_ORDER_IS_HIS));
 });
 
 Deno.test('the drills rotate week to week — he asks for the variety outright', () => {

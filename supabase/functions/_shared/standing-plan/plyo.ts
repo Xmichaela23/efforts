@@ -23,8 +23,16 @@ export type PlyoFamily = {
   id: PlyoFamilyId;
   /** What the family is FOR, in his words. */
   benefit: string;
-  /** ⛔ HIS DRILLS. Order is the page's order; rotation walks it. */
+  /** ⛔ HIS DRILLS, IN THE PAGE'S OWN ORDER. The transcription; nothing walks it. */
   drills: string[];
+  /**
+   * ⛔ THE ORDER THE ROTATION WALKS — p89's ramp, which is NOT the page-table order.
+   *
+   * ⚠️ A PERMUTATION OF `drills` AND NOTHING ELSE. The names are his and the family membership is
+   * his; only the sequence is stated here, and it is his too (p89). Two fields because the table's
+   * order is a transcription of p227 and must stay readable against the photograph.
+   */
+  rotation: string[];
 };
 
 /**
@@ -49,16 +57,37 @@ export const PLYO_FAMILIES: Record<PlyoFamilyId, PlyoFamily> = {
     id: 'bounding',
     benefit: 'running gait and speed',
     drills: ['A-Skip', 'B-Skip', 'Bounding', 'Stiff-Legged Run'],
+    /**
+     * ⛔ THE STIFF-LEGGED RUN LEADS, AND THE BOUND IS LAST. p89 names *"skipping, bounding, and
+     * hops/jumps"* as the AFTER-MASTERY group; the stiff-legged run is a gait drill and none of the
+     * three, so it is the one movement in this family an untrained athlete can be handed in week 1.
+     * The two skips follow, in his own A-then-B pairing, and distance bounding — the movement he
+     * calls out by name as challenging — arrives last.
+     */
+    rotation: ['Stiff-Legged Run', 'A-Skip', 'B-Skip', 'Bounding'],
   },
   ground_contact: {
     id: 'ground_contact',
     benefit: 'general speed and explosiveness',
     drills: ['Single-Leg Hops', 'Rebound Jumps', 'Skater Hops', 'Lunge Hops', 'Pogo Hops'],
+    /**
+     * ⛔ IN-PLACE FIRST, ON TWO FEET — p89's *"static plyometrics"*. Pogo hops and rebound jumps are
+     * both two-footed and both stay on the spot; the lunge hop adds a split stance, the single-leg
+     * hop takes a foot away, and the skater hop is unilateral AND lateral — and *"lateral hopping"*
+     * is the second movement p89 names outright as challenging.
+     */
+    rotation: ['Pogo Hops', 'Rebound Jumps', 'Lunge Hops', 'Single-Leg Hops', 'Skater Hops'],
   },
   footspeed: {
     id: 'footspeed',
     benefit: 'general foot and leg control',
     drills: ['Ladder Drills', 'Ickey Shuffle', 'Hopscotch'],
+    /**
+     * ⚠️ ALREADY EASIEST-FIRST, so this repeats the table: the plain ladder before a named ladder
+     * pattern, and hopscotch — the only one that leaves the ground — last. This whole family is
+     * p89's entry point, which is why it is untouched.
+     */
+    rotation: ['Ladder Drills', 'Ickey Shuffle', 'Hopscotch'],
   },
 };
 
@@ -92,6 +121,23 @@ export const PLYO_FAMILY_MIX_IS_OURS =
   + 'bucket is ours, and it is the only arrangement that touches all three.';
 
 /**
+ * ⛔ THE ORDER THE ROTATION WALKS IS HIS NOW, WHERE IT USED TO BE THE TABLE'S (p89, 2026-08-26).
+ *
+ * ⚠️ IT WAS NEVER LABELLED OURS, WHICH IS THE POINT — it was the page-table order, taken as if a
+ * transcription order were a teaching order. It is not: p89 introduces plyometrics *"via a
+ * combination of foot-speed drills and static plyometrics"* and only *"with these skills mastered"*
+ * proceeds to *"skipping, bounding, and hops/jumps."* Week 1 served an A-skip and a single-leg hop —
+ * one from each half of the group he puts SECOND.
+ *
+ * ⚠️ `PLYO_FAMILY_MIX_IS_OURS` IS UNCHANGED AND STILL TRUE. One drill from each of the three
+ * families is still ours; which drill each family gives first is now his.
+ */
+export const PLYO_ROTATION_ORDER_IS_HIS =
+  'Which drill a family gives first follows p89: foot-speed drills and static plyometrics before '
+  + 'skipping, bounding and hops. The ramp is his; only taking one drill from each family at a time '
+  + 'is ours.';
+
+/**
  * ⛔ WHICH DRILL THIS FAMILY GIVES THIS WEEK — rotation, because he asks for it.
  *
  * p275: *"left open-ended because **variety and week-to-week modification are encouraged**."* So the
@@ -102,8 +148,13 @@ export const PLYO_FAMILY_MIX_IS_OURS =
  * appears once and the argument could never be anything but zero. A parameter that cannot change an
  * answer is the dead guard this codebase keeps removing.
  */
+/**
+ * ⛔⛔ IT WALKS `rotation`, NOT `drills` (p89, 2026-08-26). The table's order is a transcription and
+ * was being read as a ramp; see `PLYO_ROTATION_ORDER_IS_HIS`. ⚠️ The two lists hold the same names,
+ * so nothing downstream sees a new movement — a drill simply arrives in a different week.
+ */
 export function drillForWeek(family: PlyoFamilyId, week: number): string {
-  const drills = PLYO_FAMILIES[family].drills;
+  const order = PLYO_FAMILIES[family].rotation;
   const w = Math.max(1, Math.round(week));
-  return drills[(w - 1) % drills.length];
+  return order[(w - 1) % order.length];
 }
