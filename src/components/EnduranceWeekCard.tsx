@@ -30,7 +30,8 @@
 import React from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import {
-  ENDURANCE_WEEK_PREAMBLE,
+  ENDURANCE_WEEK_INTRO_CONSEQUENCE,
+  ENDURANCE_WEEK_INTRO_STRUCTURE,
   LONG_SLOT_NOTE,
   VOLUME_HONESTY_LINES,
   SLOT_KEYS,
@@ -40,10 +41,9 @@ import {
   upperLowerSplitLine,
   allSlotsChosen,
   defaultSportForAddedSlot,
-  HARD_SESSIONS_OPT_IN_LINE,
   HARD_SLOT_KEYS,
   MAX_HARD_SESSIONS,
-  REQUIRED_SLOT_KEYS,
+  REQUIRED_SLOT_DISPLAY_ORDER,
   hardSessionCount,
   type SlotKey,
   type SlotSelection,
@@ -356,23 +356,53 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       className="flex flex-col gap-5"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
     >
-      {/* ⛔ THE PREAMBLE IS ONE SENTENCE (Michael, 2026-08-24 evening). The session list left with
-          it — the four rows below carry the same words as their labels, and the list's height is
-          what pushed the fourth row off a phone screen. The running-tax sentences stay at the
-          moment they are about — `RUN_TAX_LINES`, inside the hard rows. */}
-      <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_PREAMBLE[0]}</p>
+      {/* ⛔⛔ THE INTRO — MICHAEL'S OWN WORDING, VERBATIM (2026-08-26), replacing both paragraphs
+          that stood here. See `ENDURANCE_WEEK_INTRO_*` for his text and what its removal took with
+          it.
 
-      {/* ⛔⛔ THE DECISION LEADS THE SCREEN (Michael, from a device screenshot 2026-08-25).
+          ⛔⛔ AND IT IS **TWO PARTS, NOT ONE WALL** — that is the point of the change, not a
+          decoration on it. Three kinds of information were at one visual weight and the eye could
+          not find the seams: what the week IS (the slots), what a choice COSTS, and the
+          instruction. Same words, same place, read as two things.
+
+          ⛔ THE CONSEQUENCE LINES STAY UP HERE and do not move onto the hard-session card. Michael:
+          *"they already went into the restaurant so they will feel they should order something."*
+          By the time that card is open the athlete has committed — the tradeoff has to be readable
+          BEFORE the Add tap. A later pass will want to move them "beside the control they are
+          about"; that is the tidy-up this note exists to stop. */}
+      <div className="flex flex-col gap-3">
+        <div>
+          <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_INTRO_STRUCTURE[0]}</p>
+          {/* ⚠️ A LIST BECAUSE HE WROTE ONE — one line per slot, not a paragraph. No bullet glyphs:
+              he wrote bare lines and a bullet is punctuation he did not use. */}
+          <div className="mt-1.5 space-y-0.5">
+            {ENDURANCE_WEEK_INTRO_STRUCTURE.slice(1).map((line) => (
+              <p key={line} className="text-white/70 text-[14px] leading-snug pl-3">{line}</p>
+            ))}
+          </div>
+        </div>
+        {/* ⚠️ SEPARATED BY SPACE AND WEIGHT BOTH — the gap says "different kind of thing" and the
+            lighter tone says "this is not more of the list". */}
+        <div className="space-y-0.5">
+          {ENDURANCE_WEEK_INTRO_CONSEQUENCE.map((line) => (
+            <p key={line} className="text-white/60 text-[13px] leading-relaxed">{line}</p>
+          ))}
+        </div>
+      </div>
+
+      {/* ⛔⛔ THE ORDER MOVED A THIRD TIME, AND THIS ONE REVERSES THE SECOND (Michael, 2026-08-26).
           ═══════════════════════════════════════════════════════════════════════════════════════
-          The hard-session block sits FIRST, directly under the subtitle: his copy line, any added
-          sessions, then the add control. **It is the only decision on this screen.** Recovery and
-          long are passive cards — the frame's own two, a sport tap each — and with them on top the
-          one thing the athlete is here to choose sat underneath them, below the fold on a phone.
+          The hard block led the screen from 2026-08-25, on the argument that it is the only DECISION
+          here. What that missed is which rows GATE THE STEP: Continue is blocked until recovery and
+          long have a sport, and those two sat underneath the optional control — which is also why
+          *"recovery session and long session have no sport yet"* read as a surprise.
 
-          ⚠️ THIS IS THE SECOND TIME THE ORDER HAS MOVED, for a different reason each time. The
-          earlier pass separated the two KINDS of row (opt-in vs the frame's own), which was right;
-          it then put the frame's own first, which reads as "here is your week, and also…". The
-          kinds stay separate — what changed is which block LEADS. */}
+          ⛔ SO THE PICKER RUNS LONG · RECOVERY · + ADD A HARD SESSION. The two that block the step
+          first, the optional one last. It matches the intro's own order and its own claim that easy
+          is the default.
+
+          ⚠️ THE KINDS STAY SEPARATE, which every pass has agreed on — the frame's own two are one
+          block and the opt-in addition is another. Only which one leads has changed. */}
       {/* ⛔⛔ THE ADD CONTROLS — HARD SESSIONS ARE OPT-IN (Michael, 2026-08-25).
           ═══════════════════════════════════════════════════════════════════════════════════════
           They sit BELOW the frame's own sessions and read as an addition to the week, which is what
@@ -387,10 +417,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           zero has to guess. An explicit dismiss is the inverse of an explicit Add, which is the
           pattern the rest of this wizard already uses ("+ Add a run"), and it keeps the sport chips
           doing exactly one thing. */}
+      {/* ⛔ THE FRAME'S OWN TWO — the passive half of the screen. A sport tap each and nothing to
+          decide beyond that, which is exactly why they no longer lead it. **Hard sessions are
+          opt-in and are not the same kind of thing as these**, which is why they are not in this
+          list. Easy and long are the week; the hard ones are an addition to it. */}
       <div className="flex flex-col gap-2">
-        <p className="text-white/70 text-[13px] leading-relaxed" data-testid="hard-opt-in">
-          {HARD_SESSIONS_OPT_IN_LINE}
-        </p>
+        {REQUIRED_SLOT_DISPLAY_ORDER.map(slotRow)}
+      </div>
+
+      <div className="flex flex-col gap-2">
         {/* ⛔ THE ADDED SESSIONS SIT BETWEEN THE LINE AND THE ADD CONTROL — the copy explains the
             choice, the cards are the choices made, and the control adds another. An added card
             below the "+ Add" button would read as the next empty one. */}
@@ -422,13 +457,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
       </div>
 
 
-      {/* ⛔ THE FRAME'S OWN TWO — the passive half of the screen. A sport tap each and nothing to
-          decide beyond that, which is exactly why they no longer lead it. **Hard sessions are
-          opt-in and are not the same kind of thing as these**, which is why they are not in this
-          list. Easy and long are the week; the hard ones are an addition to it. */}
-      <div className="flex flex-col gap-2">
-        {REQUIRED_SLOT_KEYS.map(slotRow)}
-      </div>
 
       {/* ⛔ VOLUME, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the sports
           change, because the slots they are summed from just did.

@@ -22,12 +22,14 @@ import {
   SLOT_KEYS,
   SLOT_LABEL,
   SLOT_OPTIONS,
-  ENDURANCE_WEEK_PREAMBLE,
+  ENDURANCE_WEEK_INTRO,
+  ENDURANCE_WEEK_INTRO_CONSEQUENCE,
+  ENDURANCE_WEEK_INTRO_STRUCTURE,
+  REQUIRED_SLOT_DISPLAY_ORDER,
   RUN_TAX_LINES,
   slotSummary,
   allSlotsChosen,
   defaultSportForAddedSlot,
-  HARD_SESSIONS_OPT_IN_LINE,
   HARD_SLOT_KEYS,
   MAX_HARD_SESSIONS,
   REQUIRED_SLOT_KEYS,
@@ -72,7 +74,6 @@ Deno.test("the header is Michael's copy, word for word", () => {
    * rows carry the same words as their labels, so the list was the rows said twice. The header above
    * stays whole as the one verbatim source; the tax lines still render inside the hard rows.
    */
-  assertEquals(ENDURANCE_WEEK_PREAMBLE, ENDURANCE_WEEK_HEADER.slice(0, 1));
   assertEquals(RUN_TAX_LINES, [ENDURANCE_WEEK_HEADER[5], ENDURANCE_WEEK_HEADER[6]]);
 });
 
@@ -138,19 +139,65 @@ Deno.test('every row starts neutral, and Continue waits only on the frame\'s own
   assertEquals(unansweredLine(full), null, 'a finished week still named something missing');
 });
 
-Deno.test('⛔ MICHAEL\'S OPT-IN LINE, VERBATIM', () => {
-  assertEquals(
-    HARD_SESSIONS_OPT_IN_LINE,
-    'Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and hours '
-    + 'default to easy pace and recovery if none is picked — which may improve your lower body lifts.',
-  );
-  // ⚠️ IT OPENS WITH AN IMPERATIVE ("Pick up to 2") AND STILL PASSES THE GATE UNAIDED — the banned
-  // list holds `stay / keep / try / consider / focus`, not `pick`. So this needs NO override, unlike
-  // the Dial's sub-line. Asserted clean rather than exempted: an exemption nobody needs is an
-  // exemption that later hides a real violation.
-  assertEquals(voiceViolation(HARD_SESSIONS_OPT_IN_LINE), null, HARD_SESSIONS_OPT_IN_LINE);
-  assertEquals(MAX_HARD_SESSIONS, 2, 'the line says 2 and the cap must agree');
-  assert(HARD_SESSIONS_OPT_IN_LINE.includes(String(MAX_HARD_SESSIONS)));
+Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
+  /**
+   * ⛔ SHIP IT AS WRITTEN (2026-08-26). His capitalisation, his missing full stops, "weightloads" as
+   * one word, and the double space in "4  endurance". ⚠️ THE DOUBLE SPACE COLLAPSES IN THE BROWSER —
+   * HTML folds runs of whitespace — and he has been told; `white-space: pre-wrap` was ruled OUT
+   * because it would preserve every other whitespace choice in the block as a side effect.
+   */
+  assertEquals(ENDURANCE_WEEK_INTRO, [
+    'Your week has 4  endurance slots.',
+    'One Long session',
+    'One recovery session',
+    '2 that can be filled with hard or easy session.',
+    'Rides are easier on your legs than runs.',
+    'Lower body weightloads will automatically be reduced if you add a hard run',
+    'Easy sessions are the default pick hard session below to add',
+  ]);
+  // ⛔ THE DOUBLE SPACE IS IN THE STRING. A "helpful" trim would be a silent edit of his copy.
+  assert(ENDURANCE_WEEK_INTRO[0].includes('4  endurance'), 'his double space was normalised away');
+  // ⛔ AND THE CAPITAL L, which every spellcheck wants to fix.
+  assert(ENDURANCE_WEEK_INTRO[1].includes('One Long session'));
+
+  /**
+   * ⛔⛔ TWO PARTS, NOT ONE WALL — the split is the point of the change, not a decoration on it.
+   * Lines 1-4 are what the week IS; 5-7 are what a choice COSTS plus the instruction. Three kinds of
+   * information at one visual weight left the eye no seams to find.
+   */
+  assertEquals(ENDURANCE_WEEK_INTRO_STRUCTURE.length, 4);
+  assertEquals(ENDURANCE_WEEK_INTRO_CONSEQUENCE.length, 3);
+  assertEquals([...ENDURANCE_WEEK_INTRO_STRUCTURE, ...ENDURANCE_WEEK_INTRO_CONSEQUENCE], ENDURANCE_WEEK_INTRO);
+
+  // ⚠️ ALL SEVEN PASS THE GATE UNAIDED — measured, so no exemption is recorded and none is needed.
+  for (const line of ENDURANCE_WEEK_INTRO) assertEquals(voiceViolation(line), null, line);
+
+  /**
+   * ⛔⛔ AND THE OLD FRAMING MAY NOT COME BACK. The line this replaced ended *"— which may improve
+   * your lower body lifts"*, and that had the causality backwards: skipping a hard run improves
+   * nothing. No reduction is the baseline; a hard run CAUSES the reduction, which is what his own
+   * line now says.
+   */
+  const whole = ENDURANCE_WEEK_INTRO.join(' ');
+  assertEquals(/may improve your lower body lifts/.test(whole), false, 'the backwards framing is back');
+  assert(/reduced if you add a hard run/.test(whole), 'the causality line was lost');
+  assertEquals(MAX_HARD_SESSIONS, 2);
+});
+
+Deno.test('⛔ THE PICKER DRAWS LONG FIRST, AND IT IS A RENDER ORDER ONLY', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-26. The screen led with the OPTIONAL control and buried the two rows that
+   * GATE Continue — which is also why "recovery session and long session have no sport yet" read as
+   * a surprise. Long · Recovery · + Add a hard session.
+   *
+   * ⚠️ `REQUIRED_SLOT_KEYS` IS THE MODEL ORDER AND IS UNTOUCHED. It drives `allSlotsChosen`,
+   * `unansweredSlots`, the blocked line's wording and the single-sport auto-assign; reordering IT
+   * would change what the blocked sentence says as a side effect of a layout ruling.
+   */
+  assertEquals(REQUIRED_SLOT_DISPLAY_ORDER, ['long', 'easy']);
+  assertEquals(REQUIRED_SLOT_KEYS, ['easy', 'long'], 'the MODEL order moved — the layout ruling leaked');
+  // ⛔ A PERMUTATION, NOT A SECOND LIST. A slot added to one must not be silently missed by the other.
+  assertEquals([...REQUIRED_SLOT_DISPLAY_ORDER].sort(), [...REQUIRED_SLOT_KEYS].sort());
 });
 
 Deno.test('the blocked line names what is missing, and nothing else', () => {

@@ -138,3 +138,39 @@ Deno.test('⛔ THE RATE FOOTER IS GONE AND THE SPLIT LINE IS IN THE CARD', () =>
   const splitAt = CARD.indexOf('data-testid="upper-lower-split"');
   assert(noteAt > 0 && splitAt > noteAt, 'the split line is not beside the volume note it refines');
 });
+
+Deno.test('⛔⛔ THE INTRO RENDERS AS TWO PARTS, AND THE PICKER LEADS WITH LONG', () => {
+  /**
+   * ⛔ THE SPLIT IS THE RULING, NOT A DECORATION (Michael, 2026-08-26). Three kinds of information
+   * were at one visual weight — what the week IS, what a choice COSTS, and the instruction — and
+   * the eye could not find the seams. Same words, same place, read as two things.
+   */
+  assert(/ENDURANCE_WEEK_INTRO_STRUCTURE\[0\]/.test(CARD), 'the opening line is not rendered on its own');
+  assert(/ENDURANCE_WEEK_INTRO_STRUCTURE\.slice\(1\)\.map/.test(CARD), 'the slots are not rendered as a list');
+  assert(/ENDURANCE_WEEK_INTRO_CONSEQUENCE\.map/.test(CARD), 'the consequence lines are not rendered');
+  // ⛔ AND THEY ARE SEPARATE ELEMENTS. One `.map` over all seven would be the wall this replaced.
+  assertEquals(/ENDURANCE_WEEK_INTRO\.map/.test(CARD), false, 'the block was flattened back into one list');
+
+  /**
+   * ⛔⛔ THE CONSEQUENCE LINES STAY AT THE TOP. Michael ruled out moving them onto the hard-session
+   * card: *"they already went into the restaurant so they will feel they should order something"* —
+   * by the time that card opens the athlete has committed. ⚠️ THIS IS THE ASSERTION THAT STOPS THE
+   * TIDY-UP: a later pass will want them "beside the control they are about".
+   */
+  const introAt = CARD.indexOf('ENDURANCE_WEEK_INTRO_CONSEQUENCE.map');
+  const addAt = CARD.indexOf('data-testid="add-hard-session"');
+  const requiredAt = CARD.indexOf('REQUIRED_SLOT_DISPLAY_ORDER.map');
+  assert(introAt > 0 && addAt > 0 && requiredAt > 0);
+  // ⚠️ MEASURED AGAINST THE **ROWS**, NOT THE ADD BUTTON. "Above the add control" is satisfied by
+  // sitting immediately on top of it, which is exactly the move he ruled out — the lines have to be
+  // read BEFORE the athlete is among the choices at all.
+  assert(requiredAt > introAt, 'the consequence lines dropped below the picker rows');
+  assert(addAt > introAt, 'the consequence lines moved down to the add control');
+
+  // ⛔ THE PICKER ORDER: the two that gate Continue first, the optional one last.
+  assert(addAt > requiredAt, 'the optional add control leads the picker again');
+
+  // ⛔ AND THE SUPERSEDED PARAGRAPHS ARE GONE FROM THE SCREEN.
+  assertEquals(/HARD_SESSIONS_OPT_IN_LINE/.test(CARD), false, 'the old opt-in paragraph is back');
+  assertEquals(/ENDURANCE_WEEK_PREAMBLE/.test(CARD), false, 'the old first paragraph is back');
+});

@@ -22,6 +22,61 @@ export const SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
  * ⛔ MICHAEL'S HEADER, VERBATIM (2026-08-24). Not paraphrased, not re-voiced, not trimmed.
  * Rendered as separate lines so the four-session list reads as a list.
  */
+/**
+ * ⛔⛔ THE SCREEN'S INTRO — MICHAEL'S OWN WORDING, VERBATIM (2026-08-26). SHIP IT AS IT IS.
+ *
+ * ⛔ IT REPLACES BOTH PARAGRAPHS that stood above the slots: *"Add your regular weekly endurance
+ * here."* and the opt-in line *"Pick up to 2 hard sessions a week to maintain your top-end fitness.
+ * Your miles and hours default to easy pace and recovery if none is picked — which may improve your
+ * lower body lifts."*
+ *
+ * ⛔⛔ AND THAT REMOVAL IS PART OF THE RULING, NOT COLLATERAL. *"which may improve your lower body
+ * lifts"* is GONE deliberately: skipping a hard run does not improve anything. **No reduction is the
+ * baseline, and a hard run CAUSES the reduction** — which is what `CONSEQUENCE[1]` now says instead.
+ * Do not reinstate the old framing; it had the causality backwards.
+ *
+ * ⚠️ HIS PUNCTUATION AND CAPITALISATION ARE HIS AND ARE NOT TYPOS TO FIX. The capital L in "One Long
+ * session", the missing full stops on three lines, "weightloads" as one word, and the double space in
+ * "4  endurance" are all as he wrote them.
+ * ⚠️ THE DOUBLE SPACE COLLAPSES IN THE BROWSER — HTML folds runs of whitespace, so it renders as one
+ * space. He has been told. ⛔ DO NOT ADD `white-space: pre-wrap` TO PRESERVE IT: that would preserve
+ * every other whitespace choice in the block as a side effect, which is a bigger change than the one
+ * character it would save.
+ *
+ * ⚠️ ALL SEVEN LINES PASS `voiceViolation` UNAIDED — measured, not assumed. No exemption is recorded
+ * for this block and none is needed; if a future edit trips the gate, that is the gate working.
+ */
+
+/** Lines 1-4: WHAT THE WEEK IS. The opening line, then its three slots. */
+export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
+  'Your week has 4  endurance slots.',
+  'One Long session',
+  'One recovery session',
+  '2 that can be filled with hard or easy session.',
+];
+
+/**
+ * Lines 5-7: WHAT A CHOICE COSTS, and the instruction.
+ *
+ * ⛔⛔ THESE STAY AT THE TOP OF THE SCREEN AND DO NOT MOVE ONTO THE HARD-SESSION CARD.
+ * Michael ruled that out in his own words: *"they already went into the restaurant so they will feel
+ * they should order something."* By the time the card is open the athlete has committed — the
+ * tradeoff has to be readable BEFORE the Add tap, not inside it.
+ * ⚠️ A LATER PASS WILL WANT TO MOVE THEM "next to the control they are about". That is the tidy-up
+ * this note exists to stop.
+ */
+export const ENDURANCE_WEEK_INTRO_CONSEQUENCE: string[] = [
+  'Rides are easier on your legs than runs.',
+  'Lower body weightloads will automatically be reduced if you add a hard run',
+  'Easy sessions are the default pick hard session below to add',
+];
+
+/** His block whole, in order — for the test that pins it verbatim. */
+export const ENDURANCE_WEEK_INTRO: string[] = [
+  ...ENDURANCE_WEEK_INTRO_STRUCTURE,
+  ...ENDURANCE_WEEK_INTRO_CONSEQUENCE,
+];
+
 export const ENDURANCE_WEEK_HEADER: string[] = [
   'Add your regular weekly endurance here.',
   '4 sessions:',
@@ -33,20 +88,19 @@ export const ENDURANCE_WEEK_HEADER: string[] = [
 ];
 
 /**
- * ⛔ THE HARD SESSIONS ARE OPT-IN, AND THIS IS MICHAEL'S LINE, VERBATIM (2026-08-25).
+ * ⛔⛔ `HARD_SESSIONS_OPT_IN_LINE` IS DELETED — SUPERSEDED BY MICHAEL'S OWN INTRO (2026-08-26).
  *
- * ⚠️ Rendered as two sentences on one control, above the two add rows. The second half is the whole
- * point of the ruling: a week with no hard session is not a thinner week, it is the same four
- * sessions at easy pace — and the miles and hours the athlete already set are unchanged.
+ * It read: *"Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and
+ * hours default to easy pace and recovery if none is picked — which may improve your lower body
+ * lifts."* `ENDURANCE_WEEK_INTRO_CONSEQUENCE` says what it was for, in his words.
  *
- ⚠️ IT OPENS WITH AN IMPERATIVE ("Pick up to 2") AND STILL PASSES THE VOICE GATE UNAIDED — the banned
- * list holds `stay / keep / try / consider / focus`, not `pick`. So unlike the Dial's sub-line this
- * needs no override, and it is asserted CLEAN rather than exempted: an exemption nobody needs is one
- * that later hides a real violation.
+ * ⛔ AND THE LAST CLAUSE WAS BACKWARDS, which is why it is not being reworded but removed. Skipping
+ * a hard run does not IMPROVE anything: no reduction is the baseline, and a hard run CAUSES the
+ * reduction. His replacement states the causality the right way round.
+ *
+ * ⚠️ DELETED RATHER THAN SILENCED. Nothing rendered it once the intro landed, and this file's own
+ * rule is that a sentence kept "in case" is dead copy.
  */
-export const HARD_SESSIONS_OPT_IN_LINE =
-  'Pick up to 2 hard sessions a week to maintain your top-end fitness. Your miles and hours default '
-  + 'to easy pace and recovery if none is picked — which may improve your lower body lifts.';
 
 /** The label under the long-session control. His own permission, p275: the long one may be a ride. */
 export const LONG_SLOT_NOTE = 'one per week, run or ride';
@@ -154,7 +208,12 @@ export const RUN_TAX_LINES: string[] = [
  * header are retired from the screen on his instruction; the header above stays whole so his copy
  * still has one verbatim source.
  */
-export const ENDURANCE_WEEK_PREAMBLE: string[] = ENDURANCE_WEEK_HEADER.slice(0, 1);
+/**
+ * ⛔ `ENDURANCE_WEEK_PREAMBLE` IS DELETED (2026-08-26). It was `ENDURANCE_WEEK_HEADER.slice(0, 1)` —
+ * *"Add your regular weekly endurance here."* — and `ENDURANCE_WEEK_INTRO` replaced it. Nothing
+ * renders it. ⚠️ `ENDURANCE_WEEK_HEADER` itself STAYS: it is the verbatim record of his 2026-08-24
+ * copy and `RUN_TAX_LINES` still reads two of its lines.
+ */
 
 /**
  * ⛔ THE VOLUME NOTE (Michael, 2026-08-24 evening — supersedes the moved TIER_ENTRY_NOTE the same
@@ -236,6 +295,24 @@ export function emptySlotSports(): SlotSelection {
  * ⚠️ A FUTURE SESSION SHOULD NOT "FIX" THIS by adding an X to these rows to match the others.
  */
 export const REQUIRED_SLOT_KEYS: SlotKey[] = ['easy', 'long'];
+
+/**
+ * ⛔⛔ THE ORDER THE REQUIRED ROWS ARE **DRAWN** IN — long first (Michael, 2026-08-26).
+ *
+ * The screen led with the OPTIONAL thing (the add-a-hard-session control) and buried the two rows
+ * that gate Continue underneath it — which is also why *"recovery session and long session have no
+ * sport yet"* read as a surprise. The picker now runs Long · Recovery · + Add a hard session: the
+ * two that block the step first, the optional one last. It matches the intro's own order and its own
+ * claim that easy is the default.
+ *
+ * ⚠️ IT IS A **RENDER** ORDER AND NOTHING ELSE. `REQUIRED_SLOT_KEYS` above is the model order — it
+ * drives `allSlotsChosen`, `unansweredSlots`, the blocked line's wording and the single-sport
+ * auto-assign — and reordering THAT would change what the blocked sentence says as a side effect of
+ * a layout ruling. Two constants, two jobs.
+ * ⚠️ A test asserts this is a permutation of `REQUIRED_SLOT_KEYS`, so a slot added to one cannot be
+ * silently missed by the other.
+ */
+export const REQUIRED_SLOT_DISPLAY_ORDER: SlotKey[] = ['long', 'easy'];
 
 /** ⛔ THE HARD SLOTS — added, up to two, default zero. */
 export const HARD_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2'];
