@@ -673,3 +673,105 @@ and does not read the plan's. So the inferred lead changes nothing in the built 
 slots for everyone, cited to p280. A rider-forward athlete might want Run first. Rows start neutral
 by Michael's own ruling, so that is CHIP ORDER, not a default answer — a copy call, his, and not a
 control.
+
+---
+
+# §H. THE CUE PAGES — pp.82, 83, 117, 125, read 2026-08-27
+
+**Read on Michael's instruction, for week/session notes and cues.** He asked whether the book gives
+an *"if you feel this, do this"*. It does, and these four pages carry most of it. All read off the
+images this session.
+
+## ⛔ H1. p117 — THE FRAME FOR A SESSION NOTE
+
+> *"The objective of any training session is to trigger the appropriate training stimulus in the
+> context of your greater objectives and the program structure as a whole. **This means that not
+> every session has to do all things** — even a single-sport objective (run a fast 5K) has multiple
+> components … all of which may require different sessions to target."*
+
+> *"…you can build a training week that lets you hit *some* component of your sport every day
+> **without hammering yourself into the ground by doing the same thing over and over again**."*
+
+And on rest periods: *"Longer rest periods tend to mean higher work interval quality… shorter rest
+periods … tax the cardiorespiratory system and can cause greater muscle fatigue. They serve different
+purposes… **there is no single 'optimal' ratio or intensity for any purpose, just ones that work in
+context.**"*
+
+⛔ **THIS IS THE SHAPE OF A SESSION NOTE: name the ONE job this session has.** It is also a standing
+refusal of any copy that implies a session should feel maximal.
+
+## ⛔⛔ H2. p82–83 — WHERE A SET ENDS, AND WHY SORENESS IS NOT THE POINT
+
+p82, the two caveats on training to failure:
+
+> *"**We're talking about muscular failure, not task failure.** Task failure may simply represent the
+> inability to complete future reps without form breakdown — think excessive back rounding in a
+> squat, ending the set before your quads fail, or what I call **single muscle failure (SMF)**, where
+> a single muscle group fails before the others involved in the movement… **SMF and task failure are
+> more likely to occur in compound movements**."*
+
+p83:
+
+> *"**Failure is often highly stressful to the body/target muscles.** A single set to failure … may
+> degrade your ability to perform future productive work in a session… There's also quite a recovery
+> cost. Failure may cause some trauma to the muscles, and **muscular damage, contrary to early belief,
+> is neither necessary for nor conducive to muscular growth. In fact, it can cause recovery to take
+> longer and diminish your capacity to train hard in the near term.**"*
+
+⛔ **THAT IS THE ANSWER TO MICHAEL'S SORENESS QUESTION, stated directly.** Damage is a cost, never a
+signal, and its price is paid in the NEXT sessions — which for this athlete are runs and rides.
+
+**Effective reps, and the range it implies:**
+- *"the last 5 (or so) repetitions before failure are effective for muscle growth"*
+- *"any repetition range **under 5** is typically **poor for hypertrophy**"*
+- *"any repetition range **over 12** or so just seems silly. When you'd have to do 10 reps just to get
+  to the first effective one, other forms of fatigue begin to affect the movement."*
+- ⚠️ So the growth window is **5–12**, and B2's *"8–10 preferred"* sits inside it. Consistent.
+
+⛔ **AND A NAMED PRESCRIPTION FOR HYBRID ATHLETES THAT WE DO NOT IMPLEMENT:**
+> *"Within this general framework, **hybrid athletes may benefit significantly from cluster sets, myo
+> reps, and other rest-pause variants of training.** … These techniques typically involve performing
+> an initial fatiguing set close to failure and then rapidly performing a number of additional
+> repetitions at either lower weight with equal repetitions or equal weight with lower repetitions,
+> **all leaving several reps in reserve to rapidly accrue more effective reps in minimal time**."*
+
+He says these are *"explained and incorporated into the programs in Part 2."* ⚠️ Not in `strength_5k`
+(p246) as transcribed. **Logged as a finding, not a build.**
+
+## ⛔ H3. p125 — THE ENDURANCE ATHLETE'S PAIN TOLERANCE WORKS AGAINST THEM UNDER A BAR
+
+> *"A higher pain tolerance may be an excellent adaptation for endurance athletes because the ability
+> to manage increasingly uncomfortable sensations during various endurance-dependent events may be
+> directly related to their overall performance in their sport. **For strength athletes, however, it
+> may be less clear; a higher tolerance may be of negligible benefit or even counterproductive to
+> longer-term health.**"*
+
+⛔ **THIS IS THE CUSTOMER EXACTLY** — a runner/rider who has spent years training themselves to push
+through discomfort, now handed a barbell where that trained instinct is the wrong one. It is the
+strongest argument on the page for stating reps-in-reserve as a rule rather than a suggestion, and
+for H2's *stop at form breakdown, not at muscular failure*.
+
+⚠️ **AND A CAUTION ON OUR OWN NUMBERS, same page:** *"many of the performance norms and
+characteristics discussed in this book, including **rep max calculators, threshold estimates**, and so
+forth, **may need to be taken with a few more grains of salt than usual**"* for hybrid athletes.
+Our working number is a rep-max calculation and our easy/threshold paces are estimates. He is not
+saying they are wrong; he is saying the error bars are wider for this athlete than for a specialist.
+
+## H4. WHAT A WEEK/SESSION NOTE CAN NOW SAY, ALL PAGE-BACKED
+
+| cue | page |
+|---|---|
+| This session has ONE job; it does not have to do everything | p117 |
+| End the set when form goes, not when the muscle quits — and in a compound lift form goes first | p82 |
+| Soreness is a cost, not a sign. Damage is neither necessary nor conducive, and it is paid for in the next days' sessions | p83 |
+| Reps under 5 do little for growth; over 12 is wasted | p83 |
+| Your tolerance for discomfort is a running adaptation, and it is the wrong instinct under a bar | p125 |
+| Stop plyos when the movement stops being crisp | p227 (shipped) |
+| Terminate a session at 5% cardiac drift when training this often | p107 |
+| Feeling taxed: cut every part equally. Feeling ready: add one or two back | p149 |
+| The legs feel the run for the first weeks; it is priced in and lifts by about week ten | p247 (shipped) |
+| Six to eight hours between two sessions in a day; four to six if the morning one is short and easy | p108 |
+| Six to eight work sets leaves tomorrow's run intact; fourteen or more costs up to three days | p86 |
+
+⚠️ **VOICE:** every one of these is a conditional consequence or a fact, which is what `COPY-VOICE.md`
+asks for. **None is an imperative and none should be written as one.**

@@ -5900,11 +5900,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // misreading the rep-total work exists to remove. Suppressed on
                         // `hasRepTotal`, not on the parsed number, so a malformed "total" drops the
                         // meaningless label too instead of rendering "target total".
-                        const targetHint = set.amrap
+                        /**
+                         * ⛔⛔ THE RESERVE TARGET PRINTS BESIDE THE REP TARGET (2026-08-27). The
+                         * number was already on the row — the plan stamps `target_rir` per slot from
+                         * p218 — and the only place it appeared was as a faint placeholder INSIDE
+                         * the RIR cell, which vanishes the moment a value is logged. So the athlete
+                         * was being graded against a number they were never shown.
+                         *
+                         * ⚠️ IT IS A DISPLAY CHANGE AND NOTHING ELSE. The number is the plan's, and
+                         * the progression still does not read RIR — a rep count is completed work, a
+                         * reserve estimate is a guess about a rep that was not performed.
+                         *
+                         * ⚠️ NEVER ON AN AMRAP SET, which is the one set with no reserve by
+                         * definition, and never on an ME row, which carries no target at all because
+                         * p218 says there is none.
+                         * ⚠️ AN ASSISTANCE ROW WITH A REP TOTAL STILL PRINTS NOTHING PER SET — that
+                         * suppression is deliberate (a per-set line read as "50 on this set"), and
+                         * the reserve is not worth reinstating it for. Noted, not built.
+                         */
+                        const rirHint = (!set.amrap && exercise.rir_tracked !== false
+                          && typeof exercise.target_rir === 'number')
+                          ? `${formatRirTarget(exercise.target_rir)} in reserve`
+                          : null;
+                        const repHint = set.amrap
                           ? `AMRAP · ${exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum`
                           : (exHasRepTotal
                             ? null
                             : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
+                        const targetHint = [repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null;
                         const cue = barSpeedCueFor(exercise, set);
                         const platesOpen = !isDurationBased && !exIsBodyweight && exEquip === 'barbell'
                           && expandedPlates[`${exercise.id}-${setIndex}`];

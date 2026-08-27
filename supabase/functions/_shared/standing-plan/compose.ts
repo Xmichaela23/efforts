@@ -1251,6 +1251,33 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
   };
 }
 
+/**
+ * ⛔⛔ WHERE A SET ENDS — MICHAEL'S OWN SENTENCE, VERBATIM AND FINAL (2026-08-27). Do not reword it.
+ *
+ * > *"End the set when your form goes or you still have 1 or 2 reps left. Beyond that could mean
+ * > longer recovery and fewer gains."*
+ *
+ * ⛔ IT IS TWO PAGES IN ONE LINE. p82 separates MUSCULAR failure from TASK failure — *"the inability
+ * to complete future reps without form breakdown — think excessive back rounding in a squat, ending
+ * the set before your quads fail"* — and says both *"are more likely to occur in compound
+ * movements"*, which is every prescribed row in this block. p83 prices going past it: *"muscular
+ * damage, contrary to early belief, is neither necessary for nor conducive to muscular growth. In
+ * fact, it can cause recovery to take longer and diminish your capacity to train hard in the near
+ * term."* For this athlete the near term is tomorrow's run.
+ *
+ * ⚠️ AN EARLIER DRAFT SAID *"stop when you start to feel it"* AND WAS CORRECTED. A heavy set feels
+ * hard from about rep two, so that version would end every set before it did anything. It is
+ * recorded here because it is the obvious rewrite and it is wrong.
+ *
+ * ⚠️ IT IS ON THE SESSION, NOT ON EVERY ROW, and it is the LIFTING sessions only — the plyo day has
+ * its own stop rule (p227) and the test day has its own instruction. ⛔ AND IT IS NOT THE BLOCK'S
+ * reason: p125's *"why"* is stated once, not twelve times. Said weekly it becomes wallpaper.
+ * ⚠️ PASSES `voiceViolation` UNAIDED — measured, not assumed.
+ */
+export const SET_END_CUE =
+  'End the set when your form goes or you still have 1 or 2 reps left. Beyond that could mean '
+  + 'longer recovery and fewer gains.';
+
 /** ⛔ COMPOSE ONE WEEK. */
 export function composeWeek(args: ComposeArgs): ComposedWeek {
   const frame = FRAMES[args.frame];
@@ -1656,7 +1683,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           day: dayNameFor(args, day.day),
           type: 'strength',
           name: day.label ?? 'Strength',
-          description: '',
+          // ⛔ THE SESSION SAID NOTHING AT ALL UNTIL NOW, on a screen where every endurance session
+          // states its own job. See `SET_END_CUE` — his words, and the two pages under them.
+          description: SET_END_CUE,
           duration: 55,
           strength_exercises: exercises,
           tags: ['standing_plan', `frame:${frame.id}`, `column:${args.column}`],
