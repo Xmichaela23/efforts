@@ -501,7 +501,29 @@ export const FAMILIES: Record<FamilyId, {
      * so are `intent` and `cite` — the physiology is still the physiology, and the citation still
      * points at the page this came from.
      */
-    label: 'Threshold',
+    /**
+     * ⛔⛔ "Threshold" → "Above threshold" (2026-08-27). The old word was on TWO families at once and
+     * on the wrong one.
+     *
+     * ⛔ THE COLLISION, ON SCREEN: this label reached the wizard row — *"Hard session 1 · Run ·
+     * Threshold"* — while `session-vocabulary.ts` names THIS family's session **"Hard Run"** and
+     * names `run_near_threshold` **"Threshold Run"**. So the wizard's word for this session was the
+     * plan's word for the OTHER one.
+     *
+     * ⛔ AND IT WAS WRONG ON THE PAGE'S OWN TERMS, both read off the images. p231: *"Workouts that
+     * emphasize time spent in zone 4. The objective is accruing maximum time with equalized
+     * fatigue."* Zone 4 is the band ABOVE threshold — which is why this family's own level-1 work is
+     * prescribed at 100-130%. p233, the other one: *"Workouts that maximize time near-threshold
+     * (NT) — whether shorter above-threshold intervals or longer below-threshold intervals"*, with
+     * level-1 work at 88-95%.
+     *
+     * ⚠️ THIS SUPERSEDES A WORD MICHAEL PICKED HIMSELF (2026-08-25), which is why the note below
+     * stays and this one sits on top of it. He chose "Threshold" as the field's plain word for
+     * "maximal lactate steady state"; the reason to move it is the collision, not the plainness.
+     * The exact replacement is his to change — "Above threshold" is page-true and plain, and it is
+     * ours.
+     */
+    label: 'Above threshold',
     workFloorPct: 1.0,
     intent: 'Maximum time in zone 4 with equalised fatigue.',
     cite: 'Viada pp231-232',

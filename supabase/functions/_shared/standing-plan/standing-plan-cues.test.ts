@@ -17,6 +17,8 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import { composeWeek, defaultCompetitionLifts, SET_END_CUE } from './index.ts';
 import { buildStandingPlanRow, PAIN_TOLERANCE_NOTE } from './plan-row.ts';
 import { PLYO_DOSE } from './frames.ts';
+import { FAMILIES } from '../endurance-library/source-rules.ts';
+import { FAMILY_LABEL } from './session-vocabulary.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
 
 const BASELINES = {
@@ -119,4 +121,36 @@ Deno.test('⛔⛔ THE REASON IS ON THE BLOCK, ONCE — and never on a session', 
   assertEquals(/\byou\b|\byour\b/i.test(PAIN_TOLERANCE_NOTE), false);
   // ⛔ AND IT STATES THE PAGE'S OWN CLAIM, not a softened one.
   assert(/negligible benefit/.test(PAIN_TOLERANCE_NOTE));
+});
+
+Deno.test('⛔⛔ NO WORD NAMES TWO DIFFERENT SESSIONS — the wizard and the plan agree', () => {
+  /**
+   * ⛔ THE COLLISION, OFF MICHAEL'S SCREEN (2026-08-27). `source-rules.ts` labelled `run_mlss`
+   * "Threshold", so the wizard row read *"Hard session 1 · Run · Threshold"* — while
+   * `session-vocabulary.ts` names that family's session **"Hard Run"** and names
+   * `run_near_threshold` **"Threshold Run"**. The wizard's word for one session was the plan's word
+   * for the other.
+   *
+   * ⛔ AND IT WAS WRONG ON THE PAGE. p231: MLSS is *"Workouts that emphasize time spent in zone 4"*
+   * — the band ABOVE threshold, which is why its own work is prescribed at 100-130%. p233 gives
+   * "Near-Threshold" to the family that works at 88-95%.
+   *
+   * ⚠️ THE PLAN'S TWO SESSION NAMES ARE FINE AND ARE NOT TOUCHED. What moved is the library label.
+   */
+  assertEquals(FAMILIES.run_mlss.label, 'Above threshold');
+  assertEquals(FAMILY_LABEL.run_mlss, 'Hard Run');
+  assertEquals(FAMILY_LABEL.run_near_threshold, 'Threshold Run');
+
+  /**
+   * ⛔ NO LIBRARY LABEL MAY BE A PLAN SESSION NAME FOR A DIFFERENT FAMILY. That is the shape of the
+   * defect, stated once so any future rename trips it rather than repeating it.
+   */
+  for (const [family, rules] of Object.entries(FAMILIES)) {
+    const label = String((rules as { label: string }).label).toLowerCase();
+    for (const [other, name] of Object.entries(FAMILY_LABEL)) {
+      if (other === family) continue;
+      assertEquals(label === String(name).toLowerCase(), false,
+        `${family}'s library label "${label}" is ${other}'s session name`);
+    }
+  }
 });

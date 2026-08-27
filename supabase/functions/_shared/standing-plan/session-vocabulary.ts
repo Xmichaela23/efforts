@@ -190,7 +190,13 @@ function repMinutes(session: EnduranceSession): { reps: number; workMin: number;
   };
 }
 
-const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
+/**
+ * ⚠️ EXPORTED 2026-08-27 so a test can hold it against the LIBRARY's family labels. The word
+ * "Threshold" was on both — this file's name for `run_near_threshold` and the library's label for
+ * `run_mlss` — so the wizard's word for one session was the plan's word for the other. Nothing here
+ * changed; the library's label did.
+ */
+export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
   run_mlss: 'Hard Run',
   run_near_threshold: 'Threshold Run',
   run_vt1: 'Easy Run',
