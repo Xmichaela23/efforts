@@ -24,14 +24,25 @@
  *
  * ⛔ **This does not route through `adapt-plan`'s `strength_progression` / `strength_deload`
  * suggestions**, which slice b's brief and `CLAUDE.md` both name as the existing consent-first path.
- * Traced 2026-08-15: those suggestions are computed server-side and **dropped on the floor** —
- * `useCoachWeekContext.ts:615-669` maps only `strength_relayout` and `strength_training_max`, no
- * component reads `plan_adaptation_suggestions`, and no `action: 'accept'` call exists anywhere under
- * `src/`. The documented "State strength-row adjust modal" is likewise unreachable:
- * `StrengthAdjustmentModal.tsx` has **zero importers** and `StateAdjustLens` is a v0 scaffold whose
- * own footnote says weight changes live in the logger. There was no tap-to-apply on the client to
- * convert; the logger's sheet was the only working path, and this hook extends it rather than
- * reviving a surface nobody wired.
+ *
+ * ⚠️ RE-TRACED 2026-08-27, AND THE 2026-08-15 WORDING HERE WAS PART WRONG. It said those suggestions
+ * are *"dropped on the floor"*. What is actually true, in three parts:
+ *   · the hook DOES carry them — `useCoachWeekContext.ts` declares
+ *     `plan_adaptation_suggestions` (:326, :437) and merges into it (:619-621, :650-664), mapping
+ *     `strength_relayout`, `endurance_pace_update`, `endurance_ftp_update` and
+ *     `strength_training_max`. So they reach the payload object, not the floor;
+ *   · **no component reads the field.** The only mention of it under `src/` outside that hook is
+ *     this comment, so nothing renders them;
+ *   · **no `action: 'accept'` call exists anywhere under `src/`.** There is no path from a
+ *     suggestion to a plan change.
+ *
+ * ⚠️ THE DISTINCTION MATTERS AND IS WHY IT IS CORRECTED RATHER THAN TRIMMED: the transport half is
+ * built and only the display and the accept are missing, which is a much smaller gap than "dropped".
+ *
+ * The documented "State strength-row adjust modal" is still unreachable: `StrengthAdjustmentModal.tsx`
+ * has **zero importers** and `StateAdjustLens` is a v0 scaffold whose own footnote says weight
+ * changes live in the logger. There was no tap-to-apply on the client to convert; the logger's sheet
+ * was the only working path, and this hook extends it rather than reviving a surface nobody wired.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';

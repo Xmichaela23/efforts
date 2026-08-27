@@ -13,7 +13,8 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeWeek, defaultCompetitionLifts } from './index.ts';
 import {
-  bucketForStep, ENDURANCE_LEDGER_BOUNDARIES_ARE_OURS, enduranceLedgerFor,
+  ENDURANCE_LEDGER_BOUNDARIES, ENDURANCE_LEDGER_UNSTATED, enduranceLedgerFor, placeStep,
+  vt1FractionFor,
 } from './endurance-ledger.ts';
 import { buildEnduranceSession, resolveEnduranceAnchors } from '../endurance-library/index.ts';
 
@@ -112,21 +113,85 @@ Deno.test('⛔⛔ THE BUCKETS ARE THE SUM ACROSS SPORTS, NEVER PER SPORT', () =>
   assert(both.subVt1Minutes > 0);
 });
 
-Deno.test('⛔ A PACE THE LIBRARY REFUSES TO RESOLVE IS NOT GIVEN A BUCKET', () => {
+Deno.test('⛔⛔ A STEP IS PLACED BY ITS OWN PERCENTAGE, NOT BY THE FAMILY IT SITS IN', () => {
   /**
-   * ⚠️ `race_pace` is a 5K's vVO2-ish pace or a marathon's threshold pace depending on the race, and
-   * the library says so outright — *"set by the race being trained for, not by this library."*
-   * Guessing a bucket for it would be inventing the athlete's race, so it is counted as unclassified
-   * and named. ⛔ NEVER silently dropped into a bucket to make the totals look complete.
+   * ⛔ p232 IS WHY. One level-2 `run_mlss` session runs *"15 seconds @ 130% · 45 seconds @ 105% ·
+   * 1 minute @ VT1"*, and another *"10 seconds @ 100% · 10 seconds @ all-out · 50 seconds @ 115% ·
+   * 1 minute @ 95% · 1 minute @ 90% · 2 minutes @ VT1"*. He prescribes a percentage PER INTERVAL so
+   * the athlete knows where each piece sits; filing the whole session under one bucket because the
+   * family is called Threshold throws away exactly the resolution p146 asks for.
+   *
+   * ⛔ AND THE SCALE IS STATED. p229: *"100 percent representing threshold/VT2."*
    */
-  const step = { role: 'work', label: 'x', seconds: 600, intensity: { kind: 'race_pace' }, target: {} } as never;
-  assertEquals(bucketForStep(step, 'run_lsd' as never), null);
-  const easy = { role: 'warmup', label: 'x', seconds: 600, intensity: { kind: 'easy' }, target: {} } as never;
-  assertEquals(bucketForStep(easy, 'run_mlss' as never), 'sub_vt1');
-  // ⛔ A FLOAT COUNTS ONE BUCKET BELOW THE WORK IT ALTERNATES WITH — ours, and labelled.
-  const float = { role: 'float', label: 'x', seconds: 60, intensity: { kind: 'pct_threshold', lo: 1.05, hi: 1.15 }, target: {} } as never;
-  assertEquals(bucketForStep(float, 'run_mlss' as never), 'near_threshold');
-  assert(/ours/i.test(ENDURANCE_LEDGER_BOUNDARIES_ARE_OURS));
+  const RUN = { sport: 'run', value: 420, unit: 'sec_per_mi', source: 'x', isEstimate: false, vt1SecPerMi: 547 } as never;
+  const at = (kind: string, extra: Record<string, unknown> = {}) =>
+    ({ role: 'work', label: 'x', seconds: 60, intensity: { kind, ...extra }, target: {} }) as never;
+
+  assertEquals(ENDURANCE_LEDGER_BOUNDARIES.vt2Pct, 1.0);
+  // ⛔ VT1 IS MEASURED FROM THE ATHLETE'S OWN TWO ANCHORS — speed is the reciprocal of pace.
+  const vt1 = vt1FractionFor(RUN)!;
+  assert(Math.abs(vt1 - 420 / 547) < 1e-9, `${vt1} is not this athlete's own ratio`);
+
+  // ⛔ THE RECOVERY PIECES INSIDE AN INTERVAL ARE SUB-VT1, whatever session they are in.
+  assertEquals(placeStep(at('pct_threshold', { lo: 0.5, hi: 0.5 }), RUN), { kind: 'bucket', bucket: 'sub_vt1' });
+  assertEquals(placeStep(at('pct_threshold', { lo: 0.6, hi: 0.6 }), RUN), { kind: 'bucket', bucket: 'sub_vt1' });
+  assertEquals(placeStep(at('vt1'), RUN), { kind: 'bucket', bucket: 'sub_vt1' });
+  assertEquals(placeStep(at('easy'), RUN), { kind: 'bucket', bucket: 'sub_vt1' });
+  // ⛔ ZONE 3 UP TO THE STATED VT2 LINE.
+  assertEquals(placeStep(at('pct_threshold', { lo: 0.9, hi: 0.9 }), RUN), { kind: 'bucket', bucket: 'near_threshold' });
+  assertEquals(placeStep(at('pct_threshold', { lo: 1.0, hi: 1.0 }), RUN), { kind: 'bucket', bucket: 'near_threshold' });
+  // ⛔ AND HIS OWN WORK-SET LINE.
+  assertEquals(placeStep(at('all_out'), RUN), { kind: 'bucket', bucket: 'work_set' });
+  assertEquals(placeStep(at('faster_than_vvo2'), RUN), { kind: 'bucket', bucket: 'work_set' });
+});
+
+Deno.test('⛔⛔ ABOVE VT2 THE PAGE GIVES TWO BUCKETS AND NO LINE — so the minutes are not split', () => {
+  /**
+   * ⛔ p146 puts *"just over the second ventilatory threshold"* in NEAR-threshold and *"notably over
+   * threshold, moving through zone 4"* in OVER-threshold, and states neither edge as a number. p232
+   * prescribes 105%, 115%, 120%, 125% and 130% inside one block, so the difference is real — and
+   * this module cannot draw it without inventing the line.
+   *
+   * ⚠️ SO THE MINUTES ARE REPORTED TOGETHER AND SAY SO. An honest "N minutes above threshold,
+   * unsplit" beats a confident wrong bucket, which is the same discipline as `isLowerBound`.
+   * ⛔ `overThresholdMinutes` STAYS EMPTY UNTIL THE LINE IS RULED. A zero there is not "no hard
+   * work"; the work is in `overVt2Minutes`, and a reader that shows one without the other lies.
+   */
+  const RUN = { sport: 'run', value: 420, unit: 'sec_per_mi', source: 'x', isEstimate: false, vt1SecPerMi: 547 } as never;
+  const step = (lo: number, hi: number) =>
+    ({ role: 'work', label: 'x', seconds: 60, intensity: { kind: 'pct_threshold', lo, hi }, target: {} }) as never;
+  assertEquals(placeStep(step(1.05, 1.05), RUN), { kind: 'over_vt2', band: { lo: 1.05, hi: 1.05 } });
+  assertEquals(placeStep(step(1.30, 1.30), RUN), { kind: 'over_vt2', band: { lo: 1.30, hi: 1.30 } });
+
+  const session = build('run_mlss', 2) as { anchor: unknown };
+  const led = enduranceLedgerFor([session as never]);
+  assert(led.overVt2Minutes > 0, 'a threshold session reported no minutes above threshold');
+  assertEquals(led.overThresholdMinutes, 0, 'the unstated line was drawn after all');
+  assert(led.overVt2Band && led.overVt2Band.hi > 1, JSON.stringify(led.overVt2Band));
+  assert(/unsplit/.test(ENDURANCE_LEDGER_UNSTATED));
+  assert(/first ventilatory threshold has no percentage/.test(ENDURANCE_LEDGER_UNSTATED));
+});
+
+Deno.test('⛔ NO MEASURED VT1 MEANS UNPLACED MINUTES, NOT A GUESSED BUCKET', () => {
+  /**
+   * ⛔ THE RUN'S VT1 LINE IS THE ATHLETE'S OWN measured easy pace against their own threshold pace.
+   * With no easy pace on file there is no line, and a step at 90% of threshold cannot be told from
+   * one below VT1 — so those minutes are named rather than filed.
+   * ⚠️ THE RIDE HAS A PAGE FOR IT: p239 prescribes easy riding *"below 75%"*, which is why a ride
+   * needs no measured anchor for this boundary.
+   */
+  const noEasy = { sport: 'run', value: 420, unit: 'sec_per_mi', source: 'x', isEstimate: false } as never;
+  assertEquals(vt1FractionFor(noEasy), null);
+  const step = { role: 'work', label: 'x', seconds: 600, intensity: { kind: 'pct_threshold', lo: 0.9, hi: 0.9 }, target: {} } as never;
+  const placed = placeStep(step, noEasy) as { kind: string; reason: string };
+  assertEquals(placed.kind, 'unplaced');
+  assert(/ventilatory/.test(placed.reason), placed.reason);
+
+  assertEquals(vt1FractionFor({ sport: 'ride', value: 250, unit: 'watts', source: 'x', isEstimate: false } as never),
+    ENDURANCE_LEDGER_BOUNDARIES.rideVt1Pct);
+  // ⚠️ AND TWO ANCHORS THAT DISAGREE ABOUT WHICH PACE IS FASTER ARE REFUSED, never clamped into a
+  // number that would look measured.
+  assertEquals(vt1FractionFor({ sport: 'run', value: 600, unit: 'sec_per_mi', source: 'x', isEstimate: false, vt1SecPerMi: 400 } as never), null);
 });
 
 Deno.test('⛔ THE COMPOSED WEEK CARRIES IT, AND IT DOES NOT RECOMPUTE BUCKETS 4 AND 5', () => {
