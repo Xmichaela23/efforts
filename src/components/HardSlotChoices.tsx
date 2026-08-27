@@ -21,7 +21,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { slotVariantOptions, VARIANT_BODY, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
+import { CLUB_SESSION_CONTROL_VISIBLE, slotVariantOptions, VARIANT_BODY, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
 
 export type HardSlotChoicesProps = {
   /** The slot's sport, as the endurance screen has it. */
@@ -132,6 +132,13 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           ⚠️ UN-CHECKING RETURNS THE SLOT TO `prescribed` AND NOTHING ELSE — the role and goal are the
           frame's now and `syncHardDays` writes them, so sending them from here would be a second
           owner of a fact that has one. */}
+      {/* ⛔⛔ AND IT IS OFF THE SCREEN — HIDDEN, NOT DELETED (Michael, 2026-08-26: "kill run and ride
+          clubs FOR NOW, I'll revisit — I need to get a working plan going first, I've been leading
+          with too many features"). `CLUB_SESSION_CONTROL_VISIBLE` carries the reasoning and the
+          proof that nothing can be stranded by hiding it; the engine's club handling is D-452 law
+          and is untouched. This gate covers all three club-capable slots, because this one control
+          serves both hard sessions and the long one. */}
+      {CLUB_SESSION_CONTROL_VISIBLE ? (
       <button
         type="button"
         data-testid={`hard-${props.slotKey}-club`}
@@ -159,6 +166,7 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
           </span>
         </span>
       </button>
+      ) : null}
     </div>
   );
 }

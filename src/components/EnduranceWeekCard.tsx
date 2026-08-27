@@ -36,7 +36,6 @@ import {
   SLOT_KEYS,
   SLOT_LABEL,
   SLOT_OPTIONS,
-  liftingRateLine,
   slotSummary,
   upperLowerSplitLine,
   allSlotsChosen,
@@ -139,7 +138,31 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
   });
-  const rate = liftingRateLine(props.slots);
+
+  /**
+   * ⛔⛔ WHICH HOUR DIALS EXIST — THE SPORTS THE ATHLETE KEEPS, NOT THE SPORTS THEIR SLOTS CARRY.
+   *
+   * This read `bounds.runMilesInput || bounds.rideHours`, which is derived from the SLOTS — so on a
+   * mixed athlete both dials were absent until a slot had been answered, and the ungating alone
+   * would have moved the friction from four taps to one rather than removing it.
+   *
+   * ⛔ AND THE SLOTS ARE THE WRONG QUESTION ANYWAY. The hours are the week's TOTAL; the slots are
+   * the structured sessions inside it. Michael's own line on this screen says so: *"Your miles and
+   * hours default to easy pace and recovery if none is picked."* An athlete keeping the bike has
+   * riding hours whether or not one of the four slots happens to be a ride.
+   *
+   * ⚠️ `allowedSports` IS THE POSTURE STEP'S ANSWER, given before this screen — so it is available
+   * on arrival, which is the whole point. ⚠️ It is a UNION with the old test, never a replacement:
+   * a dial that used to appear still appears, and an unrestricted athlete is unchanged.
+   */
+  const sportsWithHours: SlotSport[] = (['run', 'ride'] as const).filter((sp) =>
+    (props.allowedSports?.includes(sp) ?? false)
+    || (sp === 'run' ? !!bounds.runMilesInput : !!bounds.rideHours));
+  /**
+   * ⛔ THE ONE LINE THAT SURVIVED THE RATE LINE (Michael, 2026-08-26: *"E kill it"* — this was not
+   * what he killed). It is a real p247 fact and the only thing on the screen naming WHICH lifts the
+   * running costs. It renders in the volume note; see there for why that is its honest home.
+   */
   const split = upperLowerSplitLine(props.slots);
 
   /**
@@ -412,10 +435,17 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           ⛔ ONE ROW (Michael, 2026-08-24). Stacked, they read as two separate questions and pushed the
           second toward the fold. ⚠️ `flex-wrap` with a `min-w` basis, not a fixed two-column grid: a
           narrow viewport stacks them rather than crushing both. */}
-      {/* ⛔ THE VOLUME QUESTION ARRIVES WHEN THE WEEK DOES. Its caps are summed from the slots, so
-          before all four are answered it would show a bound for a week the athlete has not described
-          — and it would move under them as they answered. */}
-      {allSlotsChosen(props.slots) && (bounds.runMilesInput || bounds.rideHours) ? (
+      {/* ⛔⛔ THE DIALS ARE NOT GATED ANY MORE (Michael, 2026-08-26, off the audit). They were, on
+          `allSlotsChosen`, and the reason given was that the CAPS are summed from the slots — true
+          of the LINE under each dial, and not true of the dial itself.
+          ⛔ WHAT IT COST: the hours are the primary thing this screen collects, and on a mixed
+          athlete they did not exist until Recovery and Long had both been expanded and answered —
+          four taps to reach the main control, with Continue blocked the whole way.
+          ⚠️ SO THE SPLIT IS BY WHAT ACTUALLY NEEDS THE SLOTS: the dial renders always, and
+          `fixedHoursLine` — the only thing here summed from them — stays behind `allSlotsChosen`
+          below. The bounds still decide WHICH dials exist, because a sport nobody is doing has no
+          hours to set. */}
+      {(sportsWithHours.length > 0) ? (
         <div ref={volumeRef}>
           {/* ⛔ THE HONESTY NOTE, BESIDE THE NUMBER IT IS ABOUT (moved off the tier screen,
               Michael, 2026-08-24 evening). His words, verbatim — the first line reworded from
@@ -424,11 +454,22 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             {VOLUME_HONESTY_LINES.map((line) => (
               <p key={line} className="text-white/70 text-[13px] leading-snug">{line}</p>
             ))}
+            {/* ⛔⛔ THE UPPER/LOWER SPLIT, REHOMED HERE (Michael, 2026-08-26). It rode in the chrome
+                beside the lifting-rate line; that line was killed and this one was not — it is a
+                real p247 fact and the only thing on the screen naming WHICH lifts the running costs.
+                ⛔ AND THIS IS ITS HONEST HOME, NOT A LEFTOVER SLOT. The line directly above it —
+                "More running will slow your strength progress; riding is much more forgiving" —
+                makes the same claim less precisely; this one names the lifts that pay. The general
+                claim, then the specific one, beside the control they are both about.
+                ⚠️ IT KEEPS ITS OWN GATE: null when no hard slot is a run, because then there is no
+                split to explain. */}
+            {split ? (
+              <p className="text-white/70 text-[13px] leading-snug" data-testid="upper-lower-split">{split}</p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-4">
           {(['run', 'ride'] as const).map((sport) => {
-            const present = sport === 'run' ? !!bounds.runMilesInput : !!bounds.rideHours;
-            if (!present) return null;
+            if (!sportsWithHours.includes(sport)) return null;
             const value = sport === 'run' ? props.runVolume : props.rideHours;
             const onChange = sport === 'run' ? props.onRunVolume : props.onRideHours;
             const line = sport === 'run' ? props.runFixedLine : props.rideFixedLine;
@@ -467,7 +508,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     over-cap sentence this screen used to carry. ⚠️ Written by the ENGINE
                     (`fixedHoursLine`), so the number here and the number the block states cannot
                     come apart. */}
-                {line ? (
+                {/* ⚠️ THIS is the half that genuinely needs every slot answered — it is summed from
+                    them. Before that it would state a figure for a week the athlete has not
+                    described, and it would move under them as they answered. */}
+                {allSlotsChosen(props.slots) && line ? (
                   <p className="text-white/55 text-xs mt-1.5" data-testid={`${sport}-fixed-hours`}>{line}</p>
                 ) : null}
               </div>
@@ -491,28 +535,16 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
 
 
 /**
- * ⛔ THE LIVE RATE, RENDERED IN THE STEP'S CHROME RATHER THAN IN ITS BODY (2026-08-24).
+ * ⛔⛔ `EnduranceWeekRate` IS DELETED (Michael, 2026-08-26: *"E kill it"*), and this note is here so
+ * the footer is not rebuilt for the sentence that survived it.
  *
- * It is the only thing on this screen that TEACHES — it moves when a slot moves, and a number that
- * changes off-screen has taught nobody anything. ⚠️ It was `sticky` inside the scrolling body and
- * lifted up over the volume inputs the moment the content passed the port height; `StepLayout`'s
- * `footer` slot is outside the scroll, so it cannot overlap anything by construction.
+ * It was a pinned footer holding the lifting-rate line, on the argument that the rate was the one
+ * thing on the screen that TAUGHT and *"a number that changes off-screen has taught nobody
+ * anything."* The rate is gone — see `standing-plan-week-copy.ts` for the measurements that killed
+ * it — and with it the reason for a pinned element at all.
+ *
+ * ⚠️ THE SPLIT LINE DID NOT GO WITH IT. It moved INTO the card, beside the volume note, because a
+ * pinned footer is for something LIVE and that sentence is static: it appears when a hard slot is a
+ * run and does not change again. Pinning a fixed fact would hold it permanently over the athlete's
+ * controls, which is the opposite of what the footer was for.
  */
-/**
- * ⚠️ NO `squat1RM` PROP (2026-08-26). The rate line stopped pricing itself in pounds — see
- * `liftingRateLine` for why that clause was false on any squat under 250 — and a prop that feeds
- * nothing is the next session's excuse to put the pounds back.
- */
-export function EnduranceWeekRate(props: {
-  slots: SlotSelection;
-}) {
-  const rate = liftingRateLine(props.slots);
-  const split = upperLowerSplitLine(props.slots);
-
-  return (
-    <div className="instrument-card !p-3.5">
-      <p className="text-white text-[13px] leading-snug tabular-nums" data-testid="lifting-rate">{rate}</p>
-      {split ? <p className="text-white/50 text-[11px] leading-snug mt-1">{split}</p> : null}
-    </div>
-  );
-}

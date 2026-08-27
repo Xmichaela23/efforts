@@ -6,6 +6,30 @@
  */
 import { singleSlotOptions } from './hard-day-menus';
 
+/**
+ * ⛔⛔ THE CLUB CONTROL IS OFF THE SCREEN — HIDDEN, NOT DELETED (Michael, 2026-08-26).
+ *
+ * His words: *"kill run and ride clubs for now, I'll revisit — I need to get a working plan going
+ * first, I've been leading with too many features."* **"For now" and "I'll revisit" are his**, which
+ * is why this is a switch and not a removal — the same shape `DIAL_CONTROL_VISIBLE` already uses.
+ *
+ * ⛔ WHAT IT GATES: the "A club session I already attend" toggle on all three club-capable slots —
+ * both hard sessions and the long session — and the long session's "Usually runs about ___ min"
+ * input that sits with it.
+ *
+ * ⛔ THE ENGINE IS UNTOUCHED AND MUST STAY THAT WAY. Club ownership is D-452 law: a club session is
+ * a PIN because its day is fixed by the world, and a club ride can BE the long ride. `hard_days`
+ * still carries `ownership`, `long_session.ownership` still travels, `club-long-pin.test.ts` and
+ * `pins-beat-frame.test.ts` still pass. Only the control comes off.
+ *
+ * ⚠️ NOTHING CAN BE STRANDED BY HIDING IT, and that is measured rather than assumed. The wizard's
+ * state is a fresh `useState` per mount with no draft or storage restore; the defaults are
+ * `longClub: false` and `ownership: 'prescribed'` (`syncHardDays` carries `prev?.ownership ??
+ * 'prescribed'`); and the ONLY two writers of a club value are the two controls this flag hides.
+ * So with it false, no athlete can produce club ownership and nothing downstream is entered.
+ */
+export const CLUB_SESSION_CONTROL_VISIBLE = false;
+
 export type HardSlotValue = {
   role?: 'intensity' | 'threshold';
   goal?: 'speed' | 'vo2';

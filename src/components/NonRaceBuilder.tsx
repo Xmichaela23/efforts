@@ -4,20 +4,21 @@ import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
-import EnduranceWeekCard, { EnduranceWeekRate } from './EnduranceWeekCard';
+import EnduranceWeekCard from './EnduranceWeekCard';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
 import HardSlotChoices from './HardSlotChoices';
 import {
   SLOT_KEYS,
   HARD_SLOT_KEYS,
   allSlotsChosen,
+  REQUIRED_SLOT_KEYS,
   emptySlotSports,
   unansweredLine,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy } from '@/lib/hard-slot-choices';
+import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy } from '@/lib/hard-slot-choices';
 import { SLOT_FAMILY } from '@/lib/standing-plan-week-bounds';
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import {
@@ -3499,13 +3500,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStrengthFocus, longSlotSport, state.longRunDay, state.longRideDay]);
 
+  /**
+   * ⛔⛔ ONE SPORT MEANS THERE IS NOTHING TO ASK — SO THE REQUIRED SLOTS ANSWER THEMSELVES. An
+   * athlete keeping only running never sees a Ride chip anywhere on this screen, so a screen asking
+   * run-or-ride four times would be four controls with one option each.
+   *
+   * ⛔⛔ AND IT FILLED THE HARD SLOTS TOO UNTIL 2026-08-26, WHICH WAS A BUG WITH A REAL COST. This
+   * effect is dated 2026-08-24 and its own comment said *"every slot is auto-assigned"*; hard
+   * sessions became OPT-IN on 2026-08-25 and this was never revisited. The consequences, all
+   * measured on a run-only athlete — the 10-30 mi/wk single-sport runner this plan is FOR:
+   *   · they arrived on a week carrying TWO hard sessions they had never chosen;
+   *   · "+ Add a hard session" was gone, because `hardSessionCount` already read 2 of a cap of 2;
+   *   · the line directly above still read *"Pick up to 2 hard sessions a week"*, over two they did
+   *     not pick and could not add to;
+   *   · and the rate line scored their week at the WORST tier off a choice nobody made.
+   *
+   * ⚠️ SO IT FILLS `REQUIRED_SLOT_KEYS` AND NOTHING ELSE — recovery and long, the two the frame owns
+   * and Continue is gated on. The hard slots stay empty and stay the athlete's to add. ⛔ Read off
+   * `REQUIRED_SLOT_KEYS` rather than spelled out here, so the day a slot changes hands this cannot
+   * quietly keep filling the old set.
+   */
   useEffect(() => {
     if (currentStep !== 'endurance' || allowedSlotSports.length !== 1) return;
     const only = allowedSlotSports[0];
     const cur = state.slotSports ?? emptySlotSports();
-    if (Object.values(cur).every((s) => s === only)) return;
+    if (REQUIRED_SLOT_KEYS.every((k) => cur[k] === only)) return;
     setState((st) => {
-      const slots = { hard1: only, hard2: only, easy: only, long: only } as SlotSelection;
+      const slots = { ...(st.slotSports ?? emptySlotSports()) } as SlotSelection;
+      for (const k of REQUIRED_SLOT_KEYS) slots[k] = only;
       return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5600,12 +5622,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           canContinue={allSlotsChosen(slotSportsNow)}
           blockedReason={tintedReason(unansweredLine(slotSportsNow) ?? undefined)}
           /**
-           * ⛔ THE LIVE RATE SITS IN THE CHROME, NOT IN THE BODY. It has to stay visible while the
-           * slots below it change — a number that moves off-screen teaches nobody — and a `sticky`
-           * element inside the scroll lifts over its own siblings the moment the content passes the
-           * port height, which is how it ended up on top of the volume inputs.
+           * ⚠️ NO `footer` (Michael, 2026-08-26: *"E kill it"*). It held the lifting-rate line, on
+           * the argument that the rate was the one thing on the screen that TAUGHT. The rate is gone
+           * — three tiers off the count of hard runs, two of them the same number, hours moving it
+           * not at all, and its best state the zero-touch default. The p247 split line that shared
+           * the footer survived and moved into the card beside the volume note, where the sentence
+           * it refines already lives.
            */
-          footer={<EnduranceWeekRate slots={slotSportsNow} />}
         >
           {tierLine ? (
             <p className="text-white/55 text-xs mb-3" data-testid="tier-line">{tierLine}</p>
@@ -5682,7 +5705,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         question about a session the app is not writing. The plan's own long-ride
                         target is compared against it on the week step; a club ride that comes up
                         short is ONE note there, never a block. */}
-                    {state.longClub && (
+                    {/* ⛔ GATED WITH THE TOGGLE ABOVE IT (Michael, 2026-08-26 — clubs are off the
+                        screen for now). ⚠️ `state.longClub` can no longer become true with the
+                        control hidden, so this is already unreachable; the flag is here so the
+                        intent is visible and so restoring the control restores its input with it,
+                        rather than leaving a club session with nowhere to state its length. */}
+                    {CLUB_SESSION_CONTROL_VISIBLE && state.longClub && (
                       <label className="flex items-center justify-between gap-3 px-2.5 py-2 rounded-xl border border-white/12 bg-white/[0.03]">
                         <span className="text-white/85 text-sm">Usually runs about</span>
                         <span className="flex items-center gap-1.5 shrink-0">
@@ -6216,7 +6244,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-white/85 text-sm">
                     {scheduleRunShown ? 'Long run' : 'Long ride'}
-                    {state.longClub && <span className="text-white/45"> — club ride</span>}
+                    {/* ⚠️ THE SAME GATE, and it was a one-line change so the three stay consistent.
+                        `state.longClub` cannot become true while the control is hidden, so this was
+                        unreachable rather than wrong — but a reader finding one club reference gated
+                        and another not would have to work out which was deliberate. */}
+                    {CLUB_SESSION_CONTROL_VISIBLE && state.longClub
+                      && <span className="text-white/45"> — club ride</span>}
                   </span>
                   {/* ⛔ A CLUB SESSION IS NOT ASKED WHERE IT SHOULD GO (slice 2b). Only the athlete
                       knows when the club meets, so the question changes from a choice to a fact. */}
@@ -6328,7 +6361,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 carries the club toggle beside the session choice, which is where the athlete says
                 WHAT the session is. This step only asks WHEN. The sentence is here because this is
                 where the count matters. */}
-            {state.hardDays.length > 0 && (
+            {/* ⛔ GATED WITH THE CONTROL IT REFERS TO (Michael, 2026-08-26: "remove the line").
+                Its own comment two lines up says the control is on the endurance step — and that
+                control is hidden, so the sentence was pointing at something no athlete could see.
+                ⚠️ ON THE SAME BOOLEAN, DELIBERATELY: restoring the club control restores this line
+                with it, rather than leaving a sentence somebody has to remember to bring back. */}
+            {CLUB_SESSION_CONTROL_VISIBLE && state.hardDays.length > 0 && (
               <p className="text-white/60 text-xs leading-snug px-1">
                 A club ride or run counts as a high intensity day.
               </p>

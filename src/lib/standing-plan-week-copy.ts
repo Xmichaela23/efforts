@@ -220,6 +220,21 @@ export function emptySlotSports(): SlotSelection {
  * ⛔ THE TWO SLOTS A WEEK CANNOT DO WITHOUT. Easy and long are the frame's; the two hard sessions are
  * OPT-IN (Michael, 2026-08-25) and an empty one is a complete answer, not a missing one.
  */
+/**
+ * ⛔⛔ THE TWO THE FRAME OWNS — AND THEY CANNOT BE DECLINED. RULED, NOT AN OPEN GAP
+ * (Michael, 2026-08-26: *"D keep it"*).
+ *
+ * The audit raised it as a gap: the two HARD slots carry a dismiss and can be removed, these two
+ * carry none, and Continue is blocked until both are answered — so an athlete who wants no long
+ * session has no answer on the screen.
+ *
+ * ⛔ IT IS NOT A MISSING AFFORDANCE. p246's week has FOUR endurance slots and the long session is
+ * his; declining it is a departure from the frame, not a control the screen forgot. The hard
+ * sessions are dismissible precisely because they are the opt-in ADDITION to that week — a
+ * different kind of thing, which is why they render in a different block.
+ *
+ * ⚠️ A FUTURE SESSION SHOULD NOT "FIX" THIS by adding an X to these rows to match the others.
+ */
 export const REQUIRED_SLOT_KEYS: SlotKey[] = ['easy', 'long'];
 
 /** ⛔ THE HARD SLOTS — added, up to two, default zero. */
@@ -294,81 +309,32 @@ export function liftingRateTier(slots: Record<SlotKey, SlotSport>): LiftingRateT
   return 'two_hard_runs';
 }
 
-const RATE_TEXT: Record<LiftingRateTier, string> = {
-  hard_on_bike: 'about 1% every 3 weeks',
-  one_hard_run: 'about 1% every 4 weeks',
-  // ⚠️ THE LOOSEST OF THE THREE, ON PURPOSE. It is the floor his two published rates imply, not a
-  // number he prints, and stating it to the week would be precision nobody sourced.
-  two_hard_runs: 'about 1% a month',
-};
-
-export const RATE_CITE: Record<LiftingRateTier, string> = {
-  hard_on_bike: 'Viada p247',
-  one_hard_run: 'Viada p251',
-  two_hard_runs: 'Viada pp247-251',
-};
-
 /**
- * ⛔ THE LIVE LINE UNDER THE HEADER. One sentence, one number, and the number is a LIFTING rate.
+ * ⛔⛔ THE LIFTING-RATE LINE IS GONE (Michael, 2026-08-26: *"E kill it"*), and this is what stood
+ * here so nobody rebuilds it: `RATE_TEXT`, `RATE_CITE`, `RATE_PENDING_LINE` and `liftingRateLine`.
  *
- * ⛔⛔ AND IT ENDS AT THE RATE. THE POUND CLAUSE WAS DELETED 2026-08-26 AND MAY NOT COME BACK.
+ * It printed *"On this mix the plan advances the bar about 1% every N weeks."* under the endurance
+ * screen, pinned in the chrome, on the argument that it was the one thing on the screen that
+ * TAUGHT. The audit measured it and it was not teaching:
  *
- * It used to close with *"— about 5 lb a step on a 110 lb squat"*, off:
+ *   · THREE TIERS, OFF THE COUNT OF HARD **RUNS** ONLY — 1% every 3 weeks / every 4 weeks / "about
+ *     1% a month".
+ *   · ⛔ THE LAST TWO ARE THE SAME NUMBER SAID TWICE. Every four weeks IS about 1% a month.
+ *   · ⛔ HOURS DID NOT MOVE IT AT ALL. Three hours a week and ten read identically, on the screen
+ *     whose primary control is the hours.
+ *   · ⚠️ TWO OF THE THREE TIERS WERE ALREADY LABELLED OURS, because the book prints two rates, not
+ *     three — `two_hard_runs` said so in its own comment ("the floor his two published rates imply,
+ *     not a number he prints").
+ *   · ⛔⛔ AND ITS BEST STATE WAS THE ZERO-TOUCH DEFAULT. With no hard sessions added the line read
+ *     the FASTEST rate — so the screen rewarded the empty week, and on the path it was designed for
+ *     (read, glance, Continue) the number never moved once.
  *
- *     const step = Math.max(5, Math.round((squat * 0.01) / 5) * 5);
+ * ⚠️ MICHAEL'S OWN READING, and it is the general point: *"the 1% is standing pretty much no matter
+ * what loaded, I think that's Viada's general premise, so it may be redundant."*
  *
- * ⚠️ ON A 110 lb SQUAT ONE PER CENT IS 1.1, WHICH ROUNDS TO ZERO, AND THE FLOOR SUPPLIES THE FIVE.
- * The sentence then presented that floored plate as though it WERE the one per cent. It is false for
- * any squat under 250 — below that, 1% rounds under 2.5 and the `Math.max` invents the figure. Above
- * 250 it happens to be true, which is exactly why it survived review.
- *
- * ⛔ THE STEP SIZE IS NOT THE LIE. Five pounds is genuinely what goes on the bar when it moves. What
- * is false is PAIRING IT WITH THE CADENCE: "1% every 4 weeks — about 5 lb a step" reads as a plate
- * every four weeks, when on a 110 lb squat it is a plate roughly every twenty.
- *
- * ⚠️ AND IT IS THE SAME DISEASE THE WHOLE REP-DRIVEN-PROGRESSION BUILD WAS ABOUT (work order
- * 2026-08-26): a percentage rate stated as a plate. His 1% cannot be expressed on a light bar at all,
- * which is why the reps carry the overload — and why a screen that promises a plate on a cadence is
- * promising something the plate grid cannot deliver.
- *
- * ⚠️ THE ADDENDUM DID ASK FOR POUNDS — *"render pounds where possible (~3 lb per step on a 300 lb
- * squat)"* — and its own example shows the problem: three pounds is not a step anyone can load. The
- * ask is superseded, not forgotten.
- *
- * ⚠️ NO ENDURANCE FIGURE. What the running costs on the other side is the header's business, in
- * direction words, and no source gives a percentage for it.
+ * ⛔ `liftingRateTier` SURVIVES AND IS NOT ORPHANED — `upperLowerSplitLine` below gates on it, and
+ * that line is a real p247 fact Michael explicitly did NOT kill.
  */
-/**
- * ⛔ THE RATE IS A FUNCTION OF THE TWO HARD SLOTS, so it cannot be stated until both have a sport.
- * ⚠️ It says which fact is missing rather than showing a number that is not yet true — the screen's
- * one live number must never be a placeholder the athlete could read as an answer.
- */
-export const RATE_PENDING_LINE =
-  'The lifting rate appears once the recovery and long sessions have a sport.';
-
-/**
- * ⚠️ NO `squat1RM` PARAMETER, AND ITS ABSENCE IS DELIBERATE. It existed only to price the deleted
- * clause, and a dead argument on an exported function is an invitation to find a use for it.
- */
-export function liftingRateLine(slots: SlotSelection): string {
-  /**
-   * ⛔⛔ PENDING ON THE REQUIRED SLOTS, NOT ON THE HARD ONES (2026-08-25). This read
-   * `!slots.hard1 || !slots.hard2` — correct while all four had to be answered, and **wrong the
-   * moment hard sessions became opt-in**: the default path adds none, so the screen's one live
-   * number would have read "pending" forever on exactly the week the ruling makes standard.
-   *
-   * ⚠️ ZERO HARD SESSIONS IS A REAL ANSWER AND IT SCORES THE BEST RATE — `liftingRateTier` counts
-   * hard RUNS, so none gives `hard_on_bike`'s 1% every 3 weeks. That is the same direction as
-   * Michael's own copy: *"may improve your lower body lifts."*
-   */
-  if (!allSlotsChosen(slots)) return RATE_PENDING_LINE;
-  const tier = liftingRateTier(slots as Record<SlotKey, SlotSport>);
-  const rate = RATE_TEXT[tier];
-  // ⛔ PRESCRIPTION, NOT PROPHECY (Michael, 2026-08-24 evening: "that feels like an overconfidence
-  // number"). The rates are his published program rates — what the PLAN advances the bar by. "The
-  // lifting climbs" promised the athlete's own response; the plan advancing is the fact.
-  return `On this mix the plan advances the bar ${rate}.`;
-}
 
 /**
  * ⛔ THE SECOND LINE THE ADDENDUM ASKS FOR: *"the bench line barely moves with running choices; the

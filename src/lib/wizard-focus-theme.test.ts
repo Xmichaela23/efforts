@@ -82,3 +82,59 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
     assert(WIZARD.includes(`title={eyeTitle('${kept}')}`), `"${kept}" lost the mark it already had`);
   }
 });
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE ENDURANCE FOCUS SCREEN — the audit fixes (2026-08-26)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+const CARD = await Deno.readTextFile(new URL('src/components/EnduranceWeekCard.tsx', ROOT));
+
+Deno.test('⛔⛔ A SINGLE-SPORT ATHLETE IS NOT HANDED HARD SESSIONS THEY NEVER CHOSE', () => {
+  /**
+   * ⛔ THE BUG, AND IT HIT THE CORE CUSTOMER. The auto-assign is dated 2026-08-24 and filled EVERY
+   * slot with the athlete's one sport; hard sessions became OPT-IN on 2026-08-25 and it was never
+   * revisited. A run-only athlete — the 10-30 mi/wk single-sport runner this plan is for — arrived
+   * on a week carrying two hard sessions they had not picked, with "+ Add a hard session" gone
+   * because the cap was already met, under a line still reading "Pick up to 2 hard sessions a week."
+   *
+   * ⚠️ IT FILLS `REQUIRED_SLOT_KEYS` AND NOTHING ELSE, and it reads that constant rather than naming
+   * the slots, so the day a slot changes hands this cannot keep filling the old set.
+   */
+  assert(/for \(const k of REQUIRED_SLOT_KEYS\) slots\[k\] = only;/.test(WIZARD),
+    'the auto-assign no longer fills exactly the required slots');
+  assertEquals(/const slots = \{ hard1: only, hard2: only/.test(WIZARD), false,
+    'the auto-assign is filling the hard slots again — a single-sport athlete gets sessions they never chose');
+});
+
+Deno.test('⛔⛔ THE HOUR DIALS ARE NOT GATED BEHIND ANSWERING THE OTHER ROWS', () => {
+  /**
+   * ⛔ THE HOURS ARE THE PRIMARY THING THIS SCREEN COLLECTS and they did not exist until Recovery
+   * and Long had both been expanded and answered — four taps, with Continue blocked the whole way.
+   * The gate was `allSlotsChosen`, which is true of the CAPS line and was never true of the dial.
+   *
+   * ⚠️ AND THE SPORTS COME FROM THE POSTURE STEP, not from the slots. The hours are the week's
+   * TOTAL; the slots are the structured sessions inside it — Michael's own line says so ("Your miles
+   * and hours default to easy pace and recovery if none is picked"). Reading the slots is what left
+   * a mixed athlete with no dials on arrival.
+   */
+  assert(/const sportsWithHours/.test(CARD), 'the dials lost their own gate');
+  assert(/props\.allowedSports\?\.includes\(sp\)/.test(CARD),
+    'the dials no longer read the posture answer — a mixed athlete sees none on arrival');
+  assertEquals(/\{allSlotsChosen\(props\.slots\) && \(bounds\.runMilesInput/.test(CARD), false,
+    'the dials are gated on every slot being answered again');
+  // ⛔ AND THE CAPS LINE IS STILL GATED — it is genuinely summed from the slots.
+  assert(/allSlotsChosen\(props\.slots\) && line \?/.test(CARD),
+    'the fixed-hours line escaped its gate and will state a figure for a week nobody described');
+});
+
+Deno.test('⛔ THE RATE FOOTER IS GONE AND THE SPLIT LINE IS IN THE CARD', () => {
+  // ⛔ Michael, 2026-08-26: "E kill it". The footer existed for the rate; the p247 split line that
+  // shared it survived and moved beside the volume note, where the sentence it refines already is.
+  assertEquals(/EnduranceWeekRate/.test(WIZARD), false, 'the rate footer is back in the wizard');
+  assertEquals(/footer=\{<EnduranceWeekRate/.test(WIZARD), false, 'the footer prop is back');
+  assert(/data-testid="upper-lower-split"/.test(CARD), 'the split line lost its home in the card');
+  // ⚠️ AND IT SITS WITH THE VOLUME NOTE, not floating: the general claim then the specific one.
+  const noteAt = CARD.indexOf('VOLUME_HONESTY_LINES.map');
+  const splitAt = CARD.indexOf('data-testid="upper-lower-split"');
+  assert(noteAt > 0 && splitAt > noteAt, 'the split line is not beside the volume note it refines');
+});
