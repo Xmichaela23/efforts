@@ -297,10 +297,14 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       option among the real choices. Plain text — information looks like
                       information. */}
                   {/* ⛔ THE TAX LINES LEFT THE SLOT ROW (Michael, 2026-08-24 night: "too much
-                      nonsense to get to what you're picking"). The volume note below the slots now
-                      carries the same fact ("More running will slow your strength progress…"), so
-                      here they were the message said twice, standing between the chips and the
-                      choices. `RUN_TAX_LINES` stays exported — the copy tests pin his sentences. */}
+                      nonsense to get to what you're picking"). They were the message said twice,
+                      standing between the chips and the choices. `RUN_TAX_LINES` stays exported —
+                      the copy tests pin his sentences.
+                      ⚠️ THE LINE THIS NOTE USED TO POINT AT IS ALSO GONE (2026-08-27): the volume
+                      note's "More running will slow your strength progress" was cut, because
+                      nothing in this block actually advances the bar more slowly for running. What
+                      running costs is stated at the TOP of the screen now — the 3-4% reduction on
+                      the day before heavy legs. */}
                   {/* ⛔ THE LONG SLOT GETS THE EXPANSION TOO (slice 2b). A club ride can BE the
                       long ride — Michael, after field research: a 2.5-3h weekend club ride is
                       routinely an athlete's long day. So the club toggle is not a property of hard
@@ -409,10 +413,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             {/* ⛔⛔ THE UPPER/LOWER SPLIT, REHOMED HERE (Michael, 2026-08-26). It rode in the chrome
                 beside the lifting-rate line; that line was killed and this one was not — it is a
                 real p247 fact and the only thing on the screen naming WHICH lifts the running costs.
-                ⛔ AND THIS IS ITS HONEST HOME, NOT A LEFTOVER SLOT. The line directly above it —
-                "More running will slow your strength progress; riding is much more forgiving" —
-                makes the same claim less precisely; this one names the lifts that pay. The general
-                claim, then the specific one, beside the control they are both about.
+                ⛔ AND IT IS THE ONLY ONE OF THE THREE LEFT HERE. It used to sit under "More running
+                will slow your strength progress; riding is much more forgiving", which was cut on
+                2026-08-27 — with the intro's own two lines that made a filled-in screen state
+                "running costs your legs" three separate ways. This one is the specific claim, it
+                names the lifts that pay, and it only appears once a hard run is actually picked.
                 ⚠️ IT KEEPS ITS OWN GATE: null when no hard slot is a run, because then there is no
                 split to explain. */}
             {split ? (

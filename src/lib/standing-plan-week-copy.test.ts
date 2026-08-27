@@ -258,13 +258,25 @@ Deno.test('the blocked line names what is missing, and nothing else', () => {
    * comma-joined with "and" before the last.
    */
   const two = unansweredLine({ hard1: 'ride', hard2: null, easy: null, long: 'run' })!;
+  // ⛔ TOP-DOWN, MATCHING THE ROWS — easy is drawn above hard 2, so it is named first.
+  assert(two.indexOf('easy session') < two.indexOf('hard session 2'), two);
   // ⚠️ TWO NAMES TAKE THE PLURAL VERB — the line was singular-only while only one row could be
   // missing at a time on the tested path.
   assert(/have no sport yet/.test(two), two);
   assert(/easy session/i.test(two), two);
   assert(/hard session 2/i.test(two), `the line did not name the unanswered hard session: ${two}`);
   const all = unansweredLine(emptySlotSports())!;
-  assert(/hard session 1, hard session 2, easy session and long session/i.test(all), all);
+  /**
+   * ⛔⛔ IT NAMES THEM IN THE ORDER THEY ARE DRAWN (Michael, off the deployed screen, 2026-08-27).
+   * It used to read *"hard session 1, hard session 2, easy session and long session"* under rows
+   * drawn Long · Easy · Hard 1 · Hard 2 — the sentence ran bottom-up.
+   * ⚠️ FIXED IN `unansweredLine`, NOT BY REORDERING `REQUIRED_SLOT_KEYS`: that is the model order and
+   * drives `allSlotsChosen` and the single-sport auto-assign, so moving it to fix a sentence would
+   * change behaviour as a side effect of a layout concern.
+   */
+  assert(/long session, easy session, hard session 1 and hard session 2/i.test(all), all);
+  assertEquals(REQUIRED_SLOT_KEYS, ['hard1', 'hard2', 'easy', 'long'],
+    'the model order was moved to fix a sentence');
   assert(/have no sport yet/.test(all), all);
   // ⚠️ VOICE: it states the fact, it does not instruct.
   for (const line of [one, two]) {
@@ -305,9 +317,11 @@ Deno.test('⛔⛔ THE LIFTING-RATE LINE IS GONE, AND MAY NOT COME BACK', () => {
 Deno.test('⛔ BUT THE SPLIT LINE SURVIVED, AND KEEPS ITS GATE', () => {
   /**
    * ⚠️ IT IS NOT WHAT HE KILLED. p247's reduction is LOWER BODY ONLY, and this is the only sentence
-   * on the screen that names which lifts the running costs. It moved out of the deleted footer and
-   * into the volume note, beside "More running will slow your strength progress" — the general
-   * claim, then the specific one.
+   * on the screen that names which lifts the running costs. It moved out of the deleted footer into
+   * the volume note. ⚠️ THE GENERAL LINE IT SAT BESIDE IS NOW CUT (2026-08-27) — "More running will
+   * slow your strength progress" claimed a slowdown the engine does not implement, and with the
+   * intro's two lines a filled-in screen said "running costs your legs" three ways. This is the one
+   * that survived, because it is p247's and it is specific.
    */
   const line = upperLowerSplitLine(mix('run', 'run'))!;
   assert(/squat and deadlift/.test(line), line);

@@ -256,7 +256,25 @@ export const VOLUME_HONESTY_LINES = [
    * of the sentence is unchanged and is his own wording.
    */
   'Pick the hours you currently hold comfortably — this is not the time for road PRs.',
-  'More running will slow your strength progress; riding is much more forgiving.',
+  /**
+   * ⛔⛔ *"More running will slow your strength progress; riding is much more forgiving."* IS CUT
+   * (Michael, off the deployed screen, 2026-08-27) — and the first half was a claim the engine does
+   * not implement.
+   *
+   * ⛔ THE SLOWDOWN DOES NOT EXIST. Nothing in this block advances the bar more slowly because of
+   * running. The tiered rate line was deleted for exactly this, on his own reading: *"the 1% is
+   * standing pretty much no matter what loaded, I think that's Viada's general premise, so it may be
+   * redundant."* This sentence was that dead claim surviving in a second place.
+   *
+   * ⛔ AND WHAT RUNNING ACTUALLY COSTS IS ALREADY SAID TWICE ABOVE IT. `ENDURANCE_WEEK_INTRO_
+   * CONSEQUENCE[1]` states the real, implemented cost — *"A hard run the day before heavy legs
+   * reduces the squat and deadlift by 3-4%"* (p247) — and `[0]` already says rides are easier on the
+   * legs. Once a hard run is picked, `upperLowerSplitLine` states it a THIRD time in this very block.
+   * A filled-in screen was telling the athlete "running costs your legs" three ways.
+   *
+   * ⚠️ THE DIVISION THAT SURVIVES: interference at the TOP of the screen, hours guidance at the
+   * bottom. This line was interference sitting in the hours block.
+   */
   /**
    * ⛔⛔ THE PROMISE IS CUT AND THE DEBT IS DISCHARGED WITH IT (Michael, 2026-08-27). The line read
    * *"Start on the lower end if unsure — give it a month before re-dialing your endurance numbers"*,
@@ -390,7 +408,24 @@ export function unansweredSlots(slots: SlotSelection): SlotKey[] {
  * what is missing and nothing else.
  */
 export function unansweredLine(slots: SlotSelection): string | null {
-  const left = unansweredSlots(slots);
+  /**
+   * ⛔⛔ NAMED IN THE ORDER THE ATHLETE IS LOOKING AT (Michael, off the deployed screen, 2026-08-27).
+   * It read *"hard session 1, hard session 2, easy session and long session have no sport yet"* under
+   * rows drawn Long · Easy · Hard 1 · Hard 2 — the sentence listed them bottom-up.
+   *
+   * ⛔ THE FIX IS HERE AND NOT IN `REQUIRED_SLOT_KEYS`, WHICH IS THE WHOLE REASON THE TWO CONSTANTS
+   * EXIST SEPARATELY. That one is the MODEL order — it drives `allSlotsChosen`, `unansweredSlots`
+   * and the single-sport auto-assign — and reordering it to fix a sentence would change behaviour as
+   * a side effect of a layout concern. Its own note says so.
+   *
+   * ⚠️ THE MISMATCH IS OLDER THAN THE BUG. It only reached the screen when all four slots became
+   * required and the sentence could finally name more than two.
+   * ⚠️ THE SORT IS TOTAL: a test asserts the two constants are permutations of each other, so every
+   * key has a position. `?? 0` is the dead-guard shape this file keeps deleting, hence `indexOf`
+   * straight through.
+   */
+  const left = [...unansweredSlots(slots)]
+    .sort((a, b) => REQUIRED_SLOT_DISPLAY_ORDER.indexOf(a) - REQUIRED_SLOT_DISPLAY_ORDER.indexOf(b));
   if (left.length === 0) return null;
   const names = left.map((k) => SLOT_LABEL[k].toLowerCase());
   const named = names.length === 1
