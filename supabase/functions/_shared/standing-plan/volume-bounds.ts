@@ -136,6 +136,13 @@ export type SlotSpan = {
 const SECONDS_PER_MIN = 60;
 
 /**
+ * ⛔ THE DIAL POSITION THAT MEANS "NO OPINION" — the middle of a session's own band. ⚠️ HOISTED
+ * ABOVE `ladderOf` (2026-08-27) because a quality rung is now measured at it; it was declared below
+ * and a `const` is not hoisted the way a function is.
+ */
+export const DEFAULT_SIZE = 0.5;
+
+/**
  * ⛔⛔ THE MILE ESTIMATE THAT STOOD HERE IS DELETED (Michael, 2026-08-26), and deleting it is the
  * point rather than a side effect.
  *
@@ -220,6 +227,36 @@ export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
     // so offering it would prescribe past the ruling that set the cap.
     if (Math.min(full, ceiling) < lo) continue;
     if (full <= ceiling) {
+      /**
+       * ⛔⛔ A QUALITY SESSION IS ONE FIXED DOSE, NOT A RANGE THE HOURS PULL ON (2026-08-27, off
+       * Michael reading his hard ride as too light).
+       *
+       * ⛔ WHAT WAS HAPPENING. Every span shared one dial per sport, and the long ride's ladder is
+       * enormous — 60 to 300 minutes — while the sweet spot's is fifteen. So the solve found the
+       * dial almost entirely from the long ride, and the hard session sat at the BOTTOM of its band
+       * for every realistic ask: 35 minutes at a two-hour ask, 35 at three, 35 at four, and only 39
+       * once the long ride had maxed out. The athlete's hours were deciding the quality session's
+       * size, backwards.
+       *
+       * ⛔ AND IT CONTRADICTED THIS FILE'S OWN RULE, which is the tell: *"QUALITY STAYS LOCKED AT THE
+       * FRAME'S LEVEL... Nothing here touches them."* p246 assigns the level and p247 prices the one
+       * adjacency it creates; the hours are meant to move the BASE families only, which is also why
+       * a week's surplus lands on easy work (p93).
+       *
+       * ⚠️ SO THE RUNG COLLAPSES TO A POINT — the session at `DEFAULT_SIZE`, the middle of its own
+       * band, which is the library's own answer when nothing is asked. Picking the middle is ours;
+       * the band and the level are his.
+       * ⚠️ AND EVERYTHING DOWNSTREAM INHERITS THE TRUTH: `sizeFor` bisects over the base families
+       * with this as a constant, `weekVolumeBounds` stops claiming a range the week will not use,
+       * and `fixedHoursLine`'s "at most" becomes the number the session will actually be.
+       */
+      if (!isBaseFamily(spec.family)) {
+        const fixed = at({ ...spec, level: level as Level }, anchors, DEFAULT_SIZE);
+        const secs = (fixed as { totals?: { clockedSeconds?: number } } | null)?.totals?.clockedSeconds;
+        const minutes = typeof secs === 'number' && secs > 0 ? secs / SECONDS_PER_MIN : lo;
+        out.push({ level: level as Level, lo: minutes, hi: minutes, sizeHi: DEFAULT_SIZE });
+        continue;
+      }
       out.push({ level: level as Level, lo, hi: full, sizeHi: 1 });
       continue;
     }
@@ -316,7 +353,11 @@ export function rungAt(rungs: Rung[], t: number): { level: Level; size: number; 
    */
   if (total <= 0) {
     const i = Math.min(rungs.length - 1, Math.floor(clamped * rungs.length));
-    return { level: rungs[i].level, size: 0, minutes: rungs[i].lo };
+    // ⚠️ A FLAT RUNG CARRIES ITS OWN SIZE. On a quality slot that is `DEFAULT_SIZE` — the dose the
+    // rung was measured at — and returning 0 here would hand the builder the band's floor instead of
+    // the number this ladder just promised. On a genuinely flat base rung any size gives the same
+    // minutes, so nothing else moves.
+    return { level: rungs[i].level, size: rungs[i].sizeHi, minutes: rungs[i].lo };
   }
   let want = clamped * total;
   for (let i = 0; i < rungs.length; i++) {
@@ -407,7 +448,6 @@ export type SizeSolve = {
  * ⚠️ ABSENT TARGET IS NOT ZERO. No number typed means no opinion, and the dial stays at the
  * library's own default — the midpoint every block before this shipped at.
  */
-export const DEFAULT_SIZE = 0.5;
 
 export function sizeFor(
   spans: SlotSpan[],

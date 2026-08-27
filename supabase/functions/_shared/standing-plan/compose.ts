@@ -1633,7 +1633,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
         const a = assignedSlot(sportAssignment, d.day, i, slot);
-        out.push({ family: a.family, level: a.level, archetype: a.archetype, sport: a.sport });
+        // ⚠️ SAME RESOLUTION AS `enduranceSpecs` — see the note there. This is the frame's own week
+        // for the tier comparison, so it takes the frame's LEVEL but the same shape.
+        out.push({
+          family: a.family,
+          level: a.level,
+          archetype: a.archetype ?? rotatedArchetype(a.family, a.level, args.week),
+          sport: a.sport,
+        });
       });
     }
     return out;
@@ -1666,7 +1673,22 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const a = assignedSlot(sportAssignment, d.day, i, slot);
         // ⚠️ THE FRAME'S OWN LEVEL, not the dial's answer — `slotSpans` builds the ladder UP from
         // here, so handing it a climbed level would start the ladder half-spent.
-        out.push({ family: a.family, level: levelForFamily(a.family, a.level), archetype: a.archetype, sport: a.sport });
+        /**
+         * ⛔⛔ AND THE SAME ARCHETYPE THE WEEK WILL ACTUALLY BUILD (2026-08-27). The frame names no
+         * shape on most slots, so this passed `undefined` and the library measured its FIRST
+         * archetype — while the build below rotates through them (p229). The bounds were describing
+         * a different session from the one the athlete gets: on an all-run week the floor claimed
+         * 133 minutes and the week built 128.
+         * ⚠️ ONE RESOLUTION, READ TWICE. The rotation is deterministic in the week number, so calling
+         * it here and at the build site gives the same answer — but it has to be CALLED in both,
+         * not left to the library's default in one of them.
+         */
+        out.push({
+          family: a.family,
+          level: levelForFamily(a.family, a.level),
+          archetype: a.archetype ?? rotatedArchetype(a.family, levelForFamily(a.family, a.level), args.week),
+          sport: a.sport,
+        });
       });
     }
     const swims = Math.min(2, Math.max(0, Math.round(Number(args.swimEasySessions) || 0)));
