@@ -8,6 +8,9 @@
 // ============================================================================
 
 import { assert, assertEquals, assertThrows } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+// ⛔ THE APP'S OWN RATIO TABLE, read here for the same reason the composer reads it: a second
+// statement of what a front squat loads at is how the two start disagreeing.
+import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import {
   ADVANCED_TIER_MIN_WEEKLY_MILES,
   advancedTierSessions,
@@ -352,11 +355,18 @@ Deno.test('an accessory slot never takes the competition lift', () => {
   }
 });
 
-Deno.test('only a tested lift ever carries a prescribed weight', () => {
-  // ⛔ D-322 WITH A NEW FACE, AND NOTHING CAUGHT IT UNTIL MUTATION-TESTING ASKED. The pretest
-  // measures four lifts. A pull-up shares the `pull_upper` pattern with nothing that was tested and
-  // a hip thrust shares `hinge_lower` with the deadlift — prescribing either off the neighbouring
-  // lift's number produces "Pull Up @ 205 lb", a real weight for a movement that has none.
+Deno.test('every prescribed weight is either the tested lift\'s own or a labelled derivation', () => {
+  /**
+   * ⛔⛔ THIS TEST USED TO SAY *"only a tested lift ever carries a prescribed weight"*, and Michael
+   * superseded it on 2026-08-27 off a seeded export: *"they should all get numbers… so lets supply
+   * the numbers."* His complaint was two top sets on one day, one prescribed and one saying "By
+   * feel", which nobody can take on a heavy single.
+   *
+   * ⛔ WHAT IT WAS PROTECTING IS STILL PROTECTED, and it is D-322's disease: a weight on a movement
+   * whose pattern has no tested lift — *"Pull Up @ 205 lb"*, from `LIFT_FOR_PATTERN` mapping
+   * `pull_upper` to `bench`. So the rule is no longer "only the tested lift" but **"the tested lift,
+   * or a derivation that says it is one and can name where it came from"**.
+   */
   const comps = Object.values(BASE_ARGS.competitionLifts).map((c) => String(c).toLowerCase());
   for (const kit of KITS) {
     for (const [week, column] of [[2, 'standard'], [3, 'standard'], [11, 'taper']] as const) {
@@ -365,8 +375,18 @@ Deno.test('only a tested lift ever carries a prescribed weight', () => {
         if (s.type !== 'strength') continue;
         for (const e of s.strength_exercises ?? []) {
           if (typeof e.weight !== 'number') continue;
-          assert(comps.includes(e.name.toLowerCase()),
-            `[${kit.label} wk${week}] "${e.name}" carries a prescribed weight of ${e.weight} and was never tested`);
+          const where = `[${kit.label} wk${week}] "${e.name}"`;
+          if (comps.includes(e.name.toLowerCase())) continue;
+          // ⛔ ANYTHING ELSE MUST DECLARE ITSELF DERIVED. A bare number on a non-competition movement
+          // is the old defect exactly.
+          assertEquals((e as { load_basis?: string }).load_basis, 'derived_ratio',
+            `${where} carries ${e.weight} and does not say where it came from`);
+          // ⛔ AND IT MUST BE DERIVABLE: same-pattern reference, whole-bar, non-zero ratio.
+          const cfg = resolveExerciseConfig(e.name).config;
+          assert(cfg?.primaryRef != null, `${where} has no primaryRef and was still weighted`);
+          assertEquals(cfg!.displayFormat === 'perHand', false, `${where} is per-hand and was weighted`);
+          // ⛔⛔ AND NEVER A PULL. Its pattern names no competition lift, which is what excludes it.
+          assert(!/pull ?up|chin ?up|row/i.test(e.name), `${where} is a pull and carries a weight`);
         }
       }
     }

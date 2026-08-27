@@ -81,6 +81,12 @@ import {
  */
 import { canonicalize } from '../canonicalize.ts';
 import { musclesWorkedBy } from '../accessory-dosing/index.ts';
+/**
+ * ⛔ THE APP'S OWN RATIO TABLE, READ RATHER THAN RESTATED. `primaryRef` + `ratio` already sit on
+ * every movement in the catalogue; a second table here is how two answers to "what does a front
+ * squat load at" start disagreeing.
+ */
+import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 
 /** The default rotation: the family's offered archetypes at this level, alternated by week. OURS. */
@@ -140,6 +146,14 @@ export type StrengthExercise = {
   source_row?: string;
   /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
   target_rir?: number;
+  /**
+   * ⛔ HOW THIS ROW'S WEIGHT WAS ARRIVED AT, when it was not the athlete's own tested lift.
+   * `derived_ratio` = the working number of this pattern's tested lift × the movement's catalogue
+   * ratio. Absent means the weight is the tested lift's own, or there is no weight.
+   * ⚠️ A DISPLAY SURFACE SHOULD NOT RENDER THE TWO IDENTICALLY. Nothing branches on it yet — the
+   * `notes` line carries the same fact in words so the athlete sees it either way.
+   */
+  load_basis?: 'derived_ratio';
   set_plan?: PlannedSet[];
 };
 
@@ -1021,7 +1035,72 @@ function exerciseForSlot(
   const movementIsTested = testedLift != null
     && args.competitionLifts[pattern] != null
     && movement.toLowerCase() === String(args.competitionLifts[pattern]).toLowerCase();
-  const working = movementIsTested ? args.workingNumbers?.[testedLift] : undefined;
+
+  /**
+   * ⛔⛔ A COMPOUND IN A TOP SET GETS A NUMBER TOO (Michael, off a seeded 12-week export, 2026-08-27:
+   * *"they should all get numbers"*, then *"so lets supply the numbers"*).
+   *
+   * ⛔ THE DEFECT, IN HIS OWN WEEK: *"W2 Tue: Back Squat 1x1-5 @ 110 | trap bar deadlift 1x1-5 @ By
+   * feel"*. **Two top sets on the same day, one prescribed and one by feel** — and nobody takes a
+   * heavy top set by feel. Every non-competition movement fell through the test above, including the
+   * ones sitting in the same pattern as a lift that WAS tested.
+   *
+   * ⛔ THE RATIO IS THE APP'S, NOT A NEW TABLE. `exercise-config.ts` already carries `primaryRef` and
+   * `ratio` on every movement — front squat 0.85 of squat, trap bar deadlift 1.0 of deadlift, close
+   * grip bench 0.9 of bench — and `strength-grid/taxonomy.ts` describes the scheme and names the
+   * front squat's 0.85 outright. The composer simply was not reading it.
+   *
+   * ⛔⛔ THREE GATES, AND EACH ONE IS A DEFECT THIS REPO HAS ALREADY SHIPPED ONCE:
+   *
+   *   1. **TOP SETS ONLY.** ME and DE — the `1x1-5` and `4x2-4` rows. ⛔ The `3x6-12` growth work
+   *      STAYS by feel and that is correct, not a gap: p83 makes reps-in-reserve the target, so the
+   *      weight is an OUTPUT of the rule rather than an input — the athlete picks the dumbbell that
+   *      leaves them one or two. It is also how Strong and Hevy behave. A computed number on a
+   *      3x10 curl is false precision on work where their judgement is the better input.
+   *   2. **THE MOVEMENT'S OWN `primaryRef` MUST BE THIS PATTERN'S TESTED LIFT.** Not merely present.
+   *      A barbell row's `primaryRef` is `bench` because a row LOADS at ~80% of a bench — that map
+   *      answers "which number do I derive from", not "which pattern is this".
+   *   3. ⛔⛔ **AND A PATTERN WITH NO NAMED COMPETITION LIFT IS EXCLUDED ENTIRELY, WHICH IS WHAT
+   *      KEEPS PULL-UPS OUT.** `LIFT_FOR_PATTERN` maps `pull_upper` to `bench` and that mapping is
+   *      the acknowledged-wrong one — it is what produced *"pull up @ 205 lb"* in the composer's
+   *      first smoke run. `defaultCompetitionLifts()` deliberately leaves `pull_upper` unset, so the
+   *      `competitionLifts[pattern] != null` test below excludes the whole pattern by construction
+   *      rather than by a name blocklist. ⚠️ A pull has no same-pattern tested lift and stays by
+   *      feel. Its own tested field (`performance_numbers.pullupMaxReps`) is a REPS capacity, not a
+   *      load, and does not solve this.
+   *
+   * ⚠️ NO `primaryRef`, NO RATIO, OR A RATIO OF ZERO → BY FEEL. Nothing is default-guessed; the
+   * catalogue's own rule is that an unknown name is never treated as a category by default.
+   * ⚠️ ONE CHAIN, AND IT IS THE EXISTING ONE: tested set → predicted 1RM → working number (96%) →
+   * × the movement's ratio. ⛔ No second path off a stored 1RM — `working-number.ts`'s header exists
+   * to keep those apart.
+   */
+  const derived = (() => {
+    if (movementIsTested || testedLift == null) return null;
+    if (slot.intent !== 'ME' && slot.intent !== 'DE') return null;
+    if (args.competitionLifts[pattern] == null) return null;
+    const cfg = resolveExerciseConfig(movement).config;
+    if (!cfg || cfg.primaryRef !== testedLift) return null;
+    /**
+     * ⛔⛔ ONE NUMBER, ONE BAR — A PER-HAND OR UNILATERAL MOVEMENT STAYS BY FEEL. The catalogue marks
+     * a dumbbell bench `displayFormat: 'perHand'` with `ratioIsTotal: true`, so its 0.8 is the TOTAL
+     * across both hands and has to be halved before it means anything to the athlete. Emitting the
+     * total on a row that says "90 lb" invites them to load 90s — a doubled prescription on a top
+     * set, which is a worse failure than no number at all.
+     *
+     * ⚠️ THIS IS ALSO WHAT KEEPS MICHAEL'S OWN BY-FEEL LIST INTACT. Dumbbell bench and split squats
+     * were named as staying by feel; they are exactly the `perHand` rows. What is left is the
+     * whole-bar work he named — trap bar deadlift, front squat, close grip bench — where one weight
+     * on the row is the weight on the bar.
+     */
+    if (cfg.displayFormat === 'perHand' || cfg.isUnilateral === true || cfg.ratioIsTotal === true) return null;
+    const ratio = Number(cfg.ratio);
+    if (!Number.isFinite(ratio) || ratio <= 0) return null;
+    const w = args.workingNumbers?.[testedLift];
+    return w ? { working: w, ratio, refLift: testedLift } : null;
+  })();
+
+  const working = movementIsTested ? args.workingNumbers?.[testedLift] : derived?.working;
 
   // ⛔ HYP CARRIES NO PERCENTAGE (p218 gives it reps, tempo and RIR and no load), so a HYP row states
   // the movement and the reps and NOTHING about the weight — the same `load_prescribed: false`
@@ -1052,7 +1131,12 @@ function exerciseForSlot(
     week: args.week,
     isLower,
     hardRunBeforeLower,
-    pctOfWorkingNumber: pct,
+    /**
+     * ⚠️ THE RATIO RIDES ON THE PERCENTAGE, NOT ON THE WORKING NUMBER. Same arithmetic either way —
+     * working × pct × ratio — but this keeps `working` meaning "the tested lift's working number"
+     * everywhere it is read, so nothing downstream can mistake a derived figure for a measured one.
+     */
+    pctOfWorkingNumber: derived ? pct * derived.ratio : pct,
     roundTo: args.roundTo ?? 5,
   });
 
@@ -1122,6 +1206,19 @@ function exerciseForSlot(
     ? (lastReps.length > 0 ? lastReps[lastReps.length - 1] : null)
     : bandTop;
 
+  /**
+   * ⛔⛔ A DERIVED WEIGHT MUST NOT READ LIKE A MEASURED ONE. It is two steps from anything the
+   * athlete actually lifted — tested set → predicted max → working number → ratio — and p125 warns
+   * that rep-max estimates already carry wider error bars for a hybrid athlete than for a
+   * specialist. So the row says where the number came from, in the box the athlete already reads.
+   * ⚠️ `load_prescribed` STAYS TRUE: it IS prescribed, and a false there would strip the weight
+   * entirely. What marks it is `load_basis` for any surface that wants to branch, and the note for
+   * the one that does not.
+   */
+  const derivedNote = derived
+    ? `About ${Math.round(derived.ratio * 100)}% of your ${testedLiftName(derived.refLift).toLowerCase()} — derived, not tested.`
+    : null;
+
   return {
     exercise: {
       name: movement,
@@ -1129,6 +1226,7 @@ function exerciseForSlot(
       reps,
       weight,
       percent_1rm: pct,
+      ...(derived ? { load_basis: 'derived_ratio' as const, notes: derivedNote! } : {}),
       ...(targetRir != null ? { target_rir: targetRir } : {}),
       // ⛔ WHAT THEY GOT, ON THE ROW (item 6). `reps` above is the BAND and stays "1-5" — every
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
