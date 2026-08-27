@@ -62,20 +62,56 @@ export const isBaseFamily = (family: string): boolean => BASE_FAMILIES.includes(
  * ⛔ HOW FAR A BASE SESSION MAY CLIMB, IN MINUTES (Michael, 2026-08-26): *"easy run 25-30 → 45-60 →
  * 80-90 min (cap 90), long run to 2.5h; easy ride 60-100 → 2h10-3h30, ride caps per the bands."*
  *
+ * ⛔⛔ THE LONG RUN'S CEILING IS 100, NOT 150 — SUPERSEDED THE SAME DAY, AND BY THE BOOK
+ * (Michael, 2026-08-26 evening: *"His page says ninety to a hundred minutes use that."*).
+ *
+ * The 2h30 above was OURS: it was the top of p235's level-2 mixed-terrain band, taken as the long
+ * day's cap because nothing tighter had been read. **p247 prescribes 90 to 100 minutes for THIS
+ * program's long session**, and a page that names the number outranks a band we clipped ourselves.
+ * ⚠️ HIS LATER RULING WINS OVER HIS EARLIER ONE. Both are his and both are dated 2026-08-26; the
+ * 2.5h line was written before p247 was read back to him.
+ *
+ * ⚠️ WHAT IT DOES TO THE LADDER: `run_lsd` level 2 spans 68-150, so it now stops at 100 rather than
+ * at the top of its own level, and level 3 (floor 104) is swallowed whole and drops out — which is
+ * `ladderOf`'s existing `hi < lo` rule doing its job, not a new one. **The long run can no longer
+ * absorb an athlete's extra hours**; they land on the easy sessions, which is p134's own rule.
+ *
  * ⚠️ A CEILING ON TOP OF THE LEVELS, not instead of them. The ladder is still the book's own level
- * bands; this clips it where his ruling is tighter than the top level. `run_lsd` level 3 reaches
- * 2h37 and his cap is 2h30, so the long run stops inside its own level rather than at the top of it.
- * ⚠️ B3 BOUNDS IT ANYWAY at *"rarely more than 2h of VT1 in one session"* — the easy run's 90-minute
- * ceiling sits well inside that, which is the check worth remembering if a cap is ever raised.
+ * bands; this clips it where the ruling is tighter than the top level.
+ * ⚠️ B3 BOUNDS IT ANYWAY at *"rarely more than 2h of VT1 in one session"* — both run ceilings sit
+ * well inside that, which is the check worth remembering if a cap is ever raised.
  */
 export const LADDER_CEILING_MIN: Record<string, number> = {
   run_vt1: 90,
-  run_lsd: 150,
+  run_lsd: 100,
   ride_endurance: 300,
 };
 
 /** One rung: a level and the minutes it spans, already clipped to the family's ceiling. */
-export type Rung = { level: Level; lo: number; hi: number };
+export type Rung = {
+  level: Level;
+  lo: number;
+  hi: number;
+  /**
+   * ⛔⛔ THE `size` THAT BUILDS `hi` — 1 on a rung the ceiling does not touch, and less on one it
+   * does (2026-08-26).
+   *
+   * ⛔ THE DEFECT IT FIXES, found the moment a ceiling first landed INSIDE a level. `size` is handed
+   * to the session builder as a position in the LIBRARY's band, and while every ceiling sat at or
+   * above its band's top, the clipped top and the band's top were the same number and `size` 1 was
+   * right by accident. Drop `run_lsd` to 100 against a 68-140 band and the top of the rung still
+   * asked for `size` 1 — a 140-minute run under a 100-minute cap. **The cap leaked by the whole
+   * width of the clip.**
+   *
+   * ⚠️ SOLVED BY MEASUREMENT, NOT BY PROPORTION. This module's own rule is that only the ENDS of a
+   * band are exact — the builder rounds to whole reps and steps, so the interior is a staircase and
+   * a linear inversion still overshot by four minutes. `ladderOf` bisects on real builds and takes
+   * the largest size that lands AT OR UNDER the ceiling.
+   *
+   * ⚠️ UNCLIPPED RUNGS ARE UNCHANGED, ARITHMETICALLY IDENTICAL TO BEFORE THIS FIELD EXISTED.
+   */
+  sizeHi: number;
+};
 
 export type SlotSpan = {
   spec: SlotSpec;
@@ -172,11 +208,39 @@ export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
     })();
     if (!band) continue;
     const lo = band.shortest / SECONDS_PER_MIN;
-    const hi = Math.min(band.longest / SECONDS_PER_MIN, ceiling);
+    const full = band.longest / SECONDS_PER_MIN;
     // ⚠️ A RUNG THE CEILING HAS SWALLOWED WHOLE IS NOT A RUNG. Its floor is already past the cap,
     // so offering it would prescribe past the ruling that set the cap.
-    if (hi < lo) continue;
-    out.push({ level: level as Level, lo, hi });
+    if (Math.min(full, ceiling) < lo) continue;
+    if (full <= ceiling) {
+      out.push({ level: level as Level, lo, hi: full, sizeHi: 1 });
+      continue;
+    }
+    /**
+     * ⛔ THE CEILING LANDS INSIDE THIS LEVEL, so the top of the rung has to be SOLVED. See
+     * `Rung.sizeHi` for why proportion is not good enough: the builder's interior is a staircase.
+     * ⚠️ TWELVE BUILDS, AND ONLY FOR A CLIPPED RUNG. Every other rung costs nothing, and
+     * `buildEnduranceSession` is arithmetic over the library's own numbers.
+     */
+    const clockMin = (size: number): number | null => {
+      const built = at({ ...spec, level: level as Level }, anchors, size);
+      const secs = (built as { totals?: { clockedSeconds?: number } } | null)?.totals?.clockedSeconds;
+      return typeof secs === 'number' && secs > 0 ? secs / SECONDS_PER_MIN : null;
+    };
+    const floorMin = clockMin(0);
+    // ⚠️ THE MEASURED FLOOR IS THE ONE THAT DECIDES. A level whose shortest build is already past
+    // the cap is swallowed whole, whatever the stated band says.
+    if (floorMin == null || floorMin > ceiling) continue;
+    let below = 0;
+    let above = 1;
+    let bestSize = 0;
+    let bestMin = floorMin;
+    for (let i = 0; i < 12; i++) {
+      const mid = (below + above) / 2;
+      const m = clockMin(mid);
+      if (m != null && m <= ceiling) { bestSize = mid; bestMin = m; below = mid; } else { above = mid; }
+    }
+    out.push({ level: level as Level, lo, hi: bestMin, sizeHi: bestSize });
   }
   return out;
 }
@@ -197,6 +261,11 @@ export function rungAt(rungs: Rung[], t: number): { level: Level; size: number; 
   const total = spans.reduce((a, b) => a + b, 0);
   // ⚠️ EVERY RUNG FLAT (a fixed dose at every level) — the dial cannot move it, so it takes the
   // rung `t` lands in by position rather than by length, and its one length is the answer.
+  /**
+   * ⛔ THE DIAL POSITION INSIDE A RUNG IS SCALED BY `sizeHi` — 1 on an unclipped rung, so this is
+   * the same multiplication by one the function always did. On a rung the ceiling cut, the top of
+   * the dial is the size that BUILDS the cap rather than the size that builds the band's top.
+   */
   if (total <= 0) {
     const i = Math.min(rungs.length - 1, Math.floor(clamped * rungs.length));
     return { level: rungs[i].level, size: 0, minutes: rungs[i].lo };
@@ -205,11 +274,15 @@ export function rungAt(rungs: Rung[], t: number): { level: Level; size: number; 
   for (let i = 0; i < rungs.length; i++) {
     const span = spans[i];
     if (want > span && i < rungs.length - 1) { want -= span; continue; }
-    const size = span > 0 ? Math.min(1, want / span) : 0;
-    return { level: rungs[i].level, size, minutes: rungs[i].lo + size * span };
+    const within = span > 0 ? Math.min(1, want / span) : 0;
+    return {
+      level: rungs[i].level,
+      size: within * rungs[i].sizeHi,
+      minutes: rungs[i].lo + within * span,
+    };
   }
   const last = rungs[rungs.length - 1];
-  return { level: last.level, size: 1, minutes: last.hi };
+  return { level: last.level, size: last.sizeHi, minutes: last.hi };
 }
 
 export type VolumeBound = {

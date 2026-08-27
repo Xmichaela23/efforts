@@ -16,13 +16,13 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
 import { DAY_NAMES } from '../week-model/model.ts';
-import { resolveEnduranceAnchors } from '../endurance-library/index.ts';
+import { buildEnduranceSession, resolveEnduranceAnchors } from '../endurance-library/index.ts';
 import {
   composeWeek, defaultCompetitionLifts, type ComposeArgs, type PlanSession,
 } from './index.ts';
 import {
-  fixedHoursLine, LADDER_CEILING_MIN, sizeFor, slotSpans, weekVolumeBounds, WEEKLY_HOUR_OPTIONS,
-  type SlotSpan, type SlotSpec,
+  fixedHoursLine, ladderOf, LADDER_CEILING_MIN, rungAt, sizeFor, slotSpans, weekVolumeBounds,
+  WEEKLY_HOUR_OPTIONS, type SlotSpan, type SlotSpec,
 } from './volume-bounds.ts';
 
 const BASELINES = {
@@ -551,6 +551,43 @@ Deno.test('⛔ BASE SESSIONS GROW BEFORE NEW DAYS APPEAR — the ladder, swept',
     }
   }
   assert(checked >= 40, `the sweep only reached ${checked} builds`);
+});
+
+Deno.test('⛔⛔ A CEILING INSIDE A LEVEL ACTUALLY BINDS — solved on real builds, not proportioned', () => {
+  /**
+   * ⛔ THE LONG SESSION'S CAP IS 90-100 MINUTES (p247, Michael 2026-08-26: *"His page says ninety to
+   * a hundred minutes use that"*), and `run_lsd` level 2 spans 68-140 — **the first ceiling in this
+   * file that lands INSIDE a level rather than at or above its top.**
+   *
+   * ⛔ THE DEFECT THAT EXPOSED, and it had been latent the whole time: the rung's top still handed
+   * the builder `size` 1, which means the top of the LIBRARY's band. The dial said 100 minutes and
+   * the week built 140.
+   *
+   * ⛔ AND PROPORTION DOES NOT FIX IT. Inverting the band linearly asked for 100 and built 104 —
+   * this module's own rule is that only the ENDS of a band are exact, because the builder rounds to
+   * whole reps and steps. The top of a clipped rung is solved against real builds.
+   *
+   * ⚠️ SWEPT ACROSS THE DIAL, not checked at the top alone: every position must land under the cap.
+   */
+  const ceiling = LADDER_CEILING_MIN.run_lsd;
+  const spec = { family: 'run_lsd', level: 2, archetype: 'long_with_inserts', sport: 'run' } as SlotSpec;
+  const rungs = ladderOf(spec, ANCHORS);
+  assert(rungs.length > 0, 'the long session lost its ladder entirely');
+  for (const t of [0, 0.25, 0.5, 0.75, 0.9, 1]) {
+    const at = rungAt(rungs, t);
+    const built = buildEnduranceSession({
+      family: 'run_lsd', level: at.level as never, archetype: 'long_with_inserts',
+      anchors: ANCHORS, size: at.size,
+    } as never) as { totals: { clockedSeconds: number } };
+    const minutes = built.totals.clockedSeconds / 60;
+    assert(minutes <= ceiling + 1,
+      `dial ${t}: the ladder said ${at.minutes.toFixed(0)}m and the session built ${minutes.toFixed(0)}m, past the ${ceiling}m cap`);
+    assert(Math.abs(minutes - at.minutes) <= 1,
+      `dial ${t}: the ladder said ${at.minutes.toFixed(0)}m and the session built ${minutes.toFixed(0)}m`);
+  }
+  // ⛔ AND THE LEVEL ABOVE IS GONE, NOT CLIPPED TO NOTHING. `run_lsd` level 3 starts at 104 minutes,
+  // already past the cap, so it is swallowed whole — `ladderOf`'s own rule, now measured.
+  assertEquals(rungs.map((r) => r.level), [2], 'a level whose floor is past the cap is still on the ladder');
 });
 
 Deno.test('⛔ QUALITY SESSIONS NEVER CHANGE LEVEL — only base families climb', () => {
