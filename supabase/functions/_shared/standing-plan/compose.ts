@@ -92,6 +92,8 @@ function rotatedArchetype(family: string, level: number, week: number): string |
   return offered[(Math.max(1, week) - 1) % offered.length].id;
 }
 import { translateEnduranceSession } from './session-vocabulary.ts';
+import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
+import type { EnduranceSession } from '../endurance-library/index.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf, lowVolumeSports,
@@ -561,6 +563,14 @@ export type ComposedWeek = {
   sessions: PlanSession[];
   /** ⛔ THE DOSING LEDGER FOR THE WHOLE WEEK, strength sets included — p147's bucket. */
   ledger: DoseLedger;
+  /**
+   * ⛔⛔ HIS BUCKETS 1-3, IN MINUTES, SUMMED ACROSS RUN AND RIDE (p146) — the unit he actually
+   * balances in, which this app did not compute at all until now. Together with `ledger` above
+   * (buckets 4 and 5) it is the whole of his weekly accounting.
+   * ⚠️ NOTHING SURFACES IT YET, deliberately: it is arithmetic over the week just built, not a
+   * control and not a question for the athlete.
+   */
+  enduranceLedger: EnduranceLedger;
   /** ⛔ THE ME ROWS THIS WEEK PRESCRIBED — see {@link MeRowIndex}. Empty in the test week. */
   meRows: MeRowIndex[];
   notes: ComposeNote[];
@@ -1302,6 +1312,15 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const notes: ComposeNote[] = [];
   const sessions: PlanSession[] = [];
   const dosing: DosingSession[] = [];
+  /**
+   * ⛔ EVERY ENDURANCE SESSION THIS WEEK BUILDS, kept as the LIBRARY built it — the plan row carries
+   * a name, a clock and tokens, and none of those say what intensity each step is. `Step.intensity`
+   * does, and it is the only thing p146's buckets can be counted from.
+   * ⚠️ THE FILLS, THE SWIM ADD-ONS AND THE ADVANCED TIER'S EXTRA RUNS ARE IN HERE TOO. All minutes
+   * count (p109); a ledger that saw only the frame's four slots would understate the week for
+   * exactly the athletes closest to their ceiling.
+   */
+  const builtEndurance: EnduranceSession[] = [];
   /** ⛔ THE EARN RULE'S INDEX — see {@link MeRowIndex}. Never persisted. */
   const meRows: MeRowIndex[] = [];
   /**
@@ -1744,6 +1763,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         size: rung.size,
         ...(carriesStrides ? { addOn: 'strides' as const } : {}),
       });
+      builtEndurance.push(built);
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
       sessions.push({
         // ⛔ THE PIN WINS HERE AND ONLY HERE. Every other `dayNameFor` call in this file is a lift,
@@ -1776,6 +1796,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const swimTargets = liftOnlyDays.length > 0 ? liftOnlyDays : days.filter((d) => !d.rest);
     for (let i = 0; i < swimAddOns && i < swimTargets.length; i++) {
       const built = buildEnduranceSession({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, anchors, size: dialForSport('swim') });
+      builtEndurance.push(built);
       const row = translateEnduranceSession(built);
       // ⚠️ THE ADD-ON IS ENDURANCE TOO, so it obeys the same blocked-day rule as the slots above.
       sessions.push({
@@ -1820,6 +1841,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (let i = 0; i < extraVt1 && i < targets.length; i++) {
       // ⛔ THE TIER'S RUNS TAKE THE RUN DIAL TOO — they are miles in the same week.
       const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors, size: dialForSport('run') });
+      builtEndurance.push(built);
       const row = translateEnduranceSession(built);
       sessions.push({
         day: relocate(dayNameFor(args, targets[i].day), 'the extra easy run'),
@@ -1866,6 +1888,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const built = buildEnduranceSession({
           family: spec.family, level: spec.level, archetype: spec.archetype, anchors, size: 1,
         });
+        builtEndurance.push(built);
         const row = translateEnduranceSession(built);
         const day = relocate(
           dayNameFor(args, frameDay),
@@ -2151,6 +2174,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   return {
     frame: args.frame, week: args.week, column: args.column, isTestWeek: testWeek,
     sessions, ledger, meRows, notes, conflicts, volume,
+    // ⛔ p146's BUCKETS 1-3, counted off the sessions as the library built them. See
+    // `endurance-ledger.ts` — nothing surfaces it, and it asks the athlete nothing.
+    enduranceLedger: enduranceLedgerFor(builtEndurance),
   };
 }
 

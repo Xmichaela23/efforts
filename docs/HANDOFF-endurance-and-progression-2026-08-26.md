@@ -775,3 +775,141 @@ saying they are wrong; he is saying the error bars are wider for this athlete th
 
 ⚠️ **VOICE:** every one of these is a conditional consequence or a fact, which is what `COPY-VOICE.md`
 asks for. **None is an imperative and none should be written as one.**
+
+---
+
+# §I. THE METRIC PAGES — pp.94, 98, 100, 101, 102, 124, read 2026-08-27
+
+**Read on Michael's instruction — what belongs on the session review and the State screen.** With
+these, **Chapter 4 is closed. Nothing in it is still unread that bears on a metric.**
+
+## ⛔⛔ I1. p100 — A WORKED EXAMPLE FOR THIS EXACT CUSTOMER, AND IT IS NOT 80/20
+
+> *"A busy hybrid athlete may say, 'I have 150 minutes to allocate toward endurance per week. If 80
+> percent of that is zone 2, I'm doing 30 minutes of higher intensity at most per week. Is that
+> enough?' **With proper usage of subthreshold work, this athlete may train and recover well with
+> only 50 percent of their time being zone 2 and 75 minutes of their endurance work being a variety
+> of subthreshold workouts. They may progress quite well with minimal additional fatigue.**"*
+
+Same page: *"By carefully calibrating this subthreshold intensity, **hybrid athletes can follow
+decidedly more 'pyramidal' program structures** while avoiding overtraining or accruing excessive
+fatigue."*
+
+⛔ **150 minutes is two and a half hours — the low-volume athlete this app just built a tier for.**
+His answer for them is **50% zone 2 / 50% subthreshold**, not 80/20. ⚠️ This does NOT contradict §G1
+(p91's refusal of a universal ratio); it is the case he works when TIME is the binding constraint,
+and it points the opposite way from the polarized default. **Anyone reaching for 80/20 for a
+time-limited athlete should read this page first.**
+
+⛔ **THE WEEKLY SUBTHRESHOLD CEILING, stated:** *"The 'maximum tolerable dose' varies tremendously,
+but **30 to 40 minutes is well tolerated by even relative beginners, while 120 minutes or so seems to
+be the upper bound** for most high-level athletes who can tolerate otherwise staggering amounts of
+volume."*
+
+**Zone definitions from the same page:** zone 4 = the band between threshold (*"what you can sustain
+for 45 to 60 minutes or so"*) and vVO2max. vVO2max testing = an **8–10 minute all-out effort**, which
+is also roughly how long it can be held.
+
+## ⛔⛔ I2. p98 — TIME NEAR THRESHOLD IS THE VARIABLE. THIS IS THE HEADLINE NUMBER.
+
+> *"The reason is that physiologically, **the total duration of time spent near threshold is the
+> relevant variable at play here**, and being in an extremely high fatigue state during this period is
+> not necessary for adaptation. In fact, high accumulated fatigue can **limit** the time you can spend
+> in this state, within both a single training session and an entire training block."*
+
+His illustration: 25 minutes straight at threshold leaves you *"utterly crushed, with the last 5
+minutes being an RPE of 9.5 or more"*; 4 × 8 minutes at near-threshold with short breaks buys more
+time in the zone for far less cost.
+
+Also p98: *"for many hybrid programs, which aim to minimize individual session fatigue, an
+understanding of your threshold is most crucial **so that you can avoid exceeding this level unless
+specifically needed**"* · *"you want to **maximize aggregate stimulus while minimizing stress**"* ·
+drift: *"accumulating fatigue during a training session will result in working harder and harder to
+maintain the same stimulus."* Subthreshold repeats: 90–94% of threshold, ~1 km, full rest or walk,
+*"complete subsequent sets while feeling relatively 'fresh'."*
+
+⛔ **SO BUCKET 2 IS NOT ONE OF THREE EQUAL NUMBERS. It is the number he says matters.**
+
+## I3. p94 — VT1 IS TESTABLE WITHOUT A DEVICE
+
+> *"A good **'talk test,'** a protocol for which is outlined in Part 2, can help determine the level of
+> intensity that this inflection point corresponds to. In clinical settings, this is an extremely
+> accurate proxy for the underlying metabolic changes, and you can use a simple talk test in place of
+> a far more complicated clinical test to determine your **VT1/zone 2 rapidly and accurately**."*
+
+VT1 in his description: breathing gets *deeper* though the rate does not change — lungs filling and
+emptying more completely — and the inflection point is where *"carrying on a conversation and using
+your air to form sentences (rather than strictly to aid in gas exchange) becomes very challenging."*
+
+⚠️ **The protocol is in Part 2 and is NOT in this corpus** (pp.218–241 hold the movement key; a
+pretest section is referenced but only p215 is known, and its image is still missing). If a talk test
+is ever built, find the protocol page first.
+
+## ⛔⛔ I4. pp.101–102 — DO NOT FEATURE VO2MAX. HE ARGUES AGAINST IT DIRECTLY.
+
+p102, **Goodhart's Law**, in his own words:
+> *"once a measurement becomes a metric, it ceases to be a good measurement. VO2 max is just a
+> measurement of underlying physiological processes that correlate with performance, so training
+> simply to maximize this number may not improve performance. Thus, it's no longer a good correlate."*
+
+> *"**As a hybrid athlete**, by virtue of broader exposure to modalities but potentially shallower
+> expertise in any single sport, **you may find your VO2 max results lower than anticipated for your
+> overall fitness**, and you may want to take tested figures with a grain of salt if moving from one
+> sport to another."*
+
+p101 adds the specifics:
+- **Movement-specific**, with *"up to 15 percent differences in recorded numbers from runners
+  performing cycling tests and vice versa."*
+- *"a **proxy** for actual practical output… a snapshot of how much work is being done to move you
+  forward. **It also says nothing about your ability to sustain work at a given level.**"*
+- *"Athletes with lower VO2 max scores may outperform those with higher VO2 max scores."*
+- ⛔ **AND A DIRECT WARNING FOR AN APP THAT SEES LIFTING:** resistance training *"may involve localized
+  changes to blood gases… which means hemoglobin during a heavy set may result in very high values
+  for utilization that are not necessarily indicative of testing during a single repetition… **be wary
+  about comparing VO2 max across modalities**, especially with modalities that don't have established
+  testing methods."*
+
+⚠️ **The State screen's dead "Body aerobic fitness" row (`AUDIT-state-screen-2026-08-13` gap 3) should
+stay dead unless someone has an argument that survives this page.**
+
+## I5. p124 — WHAT A TEST RESULT MEANS, AND THE TRAP IN SHOWING IMPROVEMENT
+
+> *"…without changing any variables can return notably better results as the athlete's strategy for
+> the test improves. … No, Chadley, your proprietary running program alone is not responsible for a
+> 4-minute 5K PR after three weeks of training; it's probably because **the athlete finally learned
+> pacing**."*
+
+- Testing should be *"primarily for **troubleshooting**"*, and the athlete told **ahead of time** that
+  the result *"will not represent their event performance."*
+- Test *"in similar-but-different circumstances to an 'A' race"* — same energy systems and
+  bottlenecks, not identical parameters.
+- The objective is *"**strategic lessons**"* — pacing, equipment, and so on — not a number.
+- *"A good result can increase confidence, but a poor result may be devastating."*
+
+⛔ **ANY SCREEN THAT SHOWS A NUMBER IMPROVING OWES THIS CAVEAT** — early improvement in a tested
+effort is frequently pacing skill, not fitness.
+
+## §I6. WHAT THIS SAYS TO PUT ON THE TWO SCREENS
+
+**Session review (per session):**
+| show | source |
+|---|---|
+| Minutes in each bucket FOR THIS SESSION — and how few of them were actually near threshold | p146, p98 |
+| Drift across the session; 5% is the hybrid athlete's stop line, 10% the general one | p107 |
+| Whether the session's own objective was met — it has ONE job | p117 |
+
+**State (the week, and across weeks):**
+| show | source |
+|---|---|
+| **Near-threshold minutes as the headline** — *"the relevant variable"* | p98 |
+| Its band: **30–40 min tolerated by beginners, ~120 min the high-level ceiling** | p100 |
+| The other two buckets beside it, and the split as a percentage | p146 |
+| Week-over-week change in each, against the **<10%, ideally ≤5%** rule | p148 |
+| Work sets and effective reps — buckets 4 and 5, already computed | p147 |
+
+⛔ **DO NOT ADD:** VO2max as a headline (I4) · any 80/20 target (I1 + §G1) · an improvement claim off a
+single test without p124's caveat.
+
+⚠️ **CHAPTER 4 IS NOW FULLY READ FOR METRICS.** The remaining unread pages in the shoot (96, 97, 103,
+104, 105, 110–116) are lactate physiology, sprint characteristics and PAP — none of them prescribes a
+number this app would display. **No further reading is owed before building these two screens.**
