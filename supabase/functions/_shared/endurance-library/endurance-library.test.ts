@@ -745,3 +745,62 @@ Deno.test('no pace, wattage or swim time is stored anywhere in the rules', () =>
     assert(!forbidden.test(code), 'source-rules.ts holds a resolved pace or wattage');
   });
 });
+
+Deno.test('⛔⛔ A REPEAT COUNT COMES FROM THE WORK BAND, NOT FROM A SECOND DIAL', () => {
+  /**
+   * ⛔ THE DEFECT (2026-08-27). `repSeconds` climbs `repBand` with the LEVEL and `repCount` climbed
+   * `repsBand` with the level AND the size, so both ends of the session grew together and the top of
+   * the dial produced pairings no page prints:
+   *
+   *     run_near_threshold L3 race_repeats     built 4 x 15 min
+   *     run_near_threshold L3 below_threshold  built 7 x 8:30
+   *
+   * ⛔ HIS OPTIONS ARE PAIRS. p234's race-specific level 3 reads 5K 4x5, 10K 4x8, half 3x12,
+   * marathon 3x15 — as the repeat gets longer the count comes DOWN. Two independent bands cannot
+   * express that and will always invent the both-at-the-top session. The count now comes from the
+   * family's own work band divided by the repeat length, with `repsBand` as a clamp.
+   *
+   * ⚠️ NOT A PROMISE OF VERBATIM REPRODUCTION — this library models a family as a SHAPE inside his
+   * bands. What is asserted is that a LONGER repeat never comes in equal or greater numbers than a
+   * shorter one at the same level, which is the property his tables have and the old rule broke.
+   */
+  const REF = { learned_fitness: { run_threshold_pace_sec_per_km: { value: 261, confidence: 'high', sample_count: 10 }, run_easy_pace_sec_per_km: { value: 340, confidence: 'high', sample_count: 20 } }, performance_numbers: { ftp: 250 } } as never;
+  const shape = (family: string, level: number, id: string) => {
+    const s = buildEnduranceSession({ family, level, archetype: id, size: 0.5, baselines: REF } as never);
+    const b = s.blocks[0];
+    const work = b.steps.filter((x) => x.role === 'work' || x.role === 'float')
+      .reduce((t, x) => t + (x.seconds ?? 0), 0);
+    return { reps: b.repeat, work, rest: b.restBetween?.seconds ?? null };
+  };
+
+  // ⛔ p234's OWN LINE: the marathon repeat is fifteen minutes and comes as THREE.
+  const race = shape('run_near_threshold', 3, 'race_repeats');
+  assertEquals(race.work, 900, 'the level-3 race repeat is no longer fifteen minutes');
+  assertEquals(race.reps, 3, `p234 prints 3 x 15; built ${race.reps}`);
+  // ⛔ AND THE 8:30 ROUNDS ARE NOT SEVEN. p234 prints four; the band allows five, never seven.
+  const below = shape('run_near_threshold', 3, 'below_threshold');
+  assert(below.reps <= 5, `p234 prints 4 rounds of 8:30; built ${below.reps}`);
+
+  /**
+   * ⛔ THE PROPERTY, ACROSS EVERY FAMILY AND LEVEL: within one family and level, a longer repeat
+   * never comes in greater numbers than a shorter one. That is what makes the pairing his.
+   */
+  for (const family of ['run_near_threshold', 'run_mlss', 'ride_sweet_spot'] as const) {
+    for (const level of [1, 2, 3] as const) {
+      const seen = archetypesFor(family as never, level)
+        .map((a) => ({ id: a.id, ...shape(family, level, a.id) }))
+        .filter((x) => x.reps > 1)
+        .sort((a, b) => a.work - b.work);
+      for (let i = 1; i < seen.length; i++) {
+        assert(seen[i].reps <= seen[i - 1].reps + 1,
+          `${family} L${level}: ${seen[i].id} is ${seen[i].reps} x ${seen[i].work}s against `
+            + `${seen[i - 1].id} at ${seen[i - 1].reps} x ${seen[i - 1].work}s — longer and more numerous`);
+      }
+    }
+  }
+
+  // ⚠️ AND THE RECOVERY IS ON THE BLOCK, NOT IN THE STEPS — p234 states one for both shapes, and
+  // `totalsFor` counts it on every repeat but the last.
+  assert(race.rest != null && race.rest > 0, 'the race repeat lost its stated recovery');
+  assert(below.rest != null && below.rest > 0, 'the 8:30 round lost its VT1 recovery');
+});

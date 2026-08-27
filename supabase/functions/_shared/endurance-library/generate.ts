@@ -321,9 +321,35 @@ export function applyTempoCrossover(
  *
  * Where the shape states no rep count, the family's computed dose band divides by the rep.
  */
+/**
+ * ⛔⛔ HOW MANY REPEATS — DERIVED FROM THE WORK TARGET, NOT WALKED UP A SECOND AXIS (2026-08-27).
+ *
+ * ⛔ THE DEFECT. `repSeconds` climbs `repBand` with the LEVEL and this climbed `repsBand` with the
+ * level AND the size, so both ends of the session grew together and the top of the dial produced
+ * pairings no page prints. Measured on `run_near_threshold` level 3:
+ *
+ *     race_repeats     built 4 x 15 min      p234 prints 3 x 15 (marathon); four repeats
+ *                                            only ever appear at five or eight minutes
+ *     below_threshold  built 7 x 8:30        p234 prints "4 rounds of 8:30 @ 85%"
+ *
+ * ⛔ HIS OPTIONS ARE PAIRS. p234's race-specific level 3 reads 5K 4x5, 10K 4x8, half 3x12, marathon
+ * 3x15 — as the repeat gets longer the count comes DOWN. Two independent bands cannot express that
+ * and will always invent the both-at-the-top session.
+ *
+ * ⚠️ SO THE COUNT COMES FROM THE FAMILY'S OWN WORK BAND, which is sourced, and `repsBand` becomes a
+ * CLAMP rather than a second dial: how much work this level asks for, divided by how long one
+ * repeat is. A longer repeat now yields fewer of them, which is the shape of his table.
+ *
+ * ⚠️ AND IT IS NOT A PROMISE OF VERBATIM REPRODUCTION. This library models a family as a SHAPE
+ * inside his bands — `EnduranceSession.archetype` says so in as many words: *"Not one of his
+ * workouts — a shape."* Five rounds of 8:30 is inside his level-3 work band and is not a line on
+ * p234. What this removes is the combination that is outside anything he pairs, not every session
+ * he does not print.
+ */
 function repCount(a: Archetype, ctx: BuildContext, workPerRep: number): number {
-  if (a.repsBand) return Math.max(1, Math.round(lerp(a.repsBand, (levelT(ctx.level) + ctx.size) / 2)));
-  return Math.max(1, Math.round(ctx.target / Math.max(1, workPerRep)));
+  const derived = Math.max(1, Math.round(ctx.target / Math.max(1, workPerRep)));
+  if (!a.repsBand) return derived;
+  return Math.min(a.repsBand.hi, Math.max(a.repsBand.lo, derived));
 }
 
 function buildIntervals(ctx: BuildContext): Block[] {
