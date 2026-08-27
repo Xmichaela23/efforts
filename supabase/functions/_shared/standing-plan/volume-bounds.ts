@@ -449,7 +449,25 @@ export function sizeFor(
     const mid = (low + high) / 2;
     if (at(mid) < want) low = mid; else high = mid;
   }
-  const t = (low + high) / 2;
+  /**
+   * ⛔⛔ AND IT TAKES THE NEARER SIDE OF THE RISER, NOT THE LOWER ONE (2026-08-27, off Michael's
+   * export: two hours of running asked, one hour forty built).
+   *
+   * ⛔ THE BISECTION CONVERGES ON THE CROSSING, and when the ask falls inside a JUMP between two
+   * levels there is no `t` that delivers it. p235 offers a 25-30 minute easy run and a 45-60 minute
+   * one and nothing between, so on his week the total went 93 minutes → 124 across an
+   * infinitesimal step in `t`, with the 120 he asked for sitting in the gap. Returning `low`
+   * silently chose 93 — a twenty-seven minute miss when a four minute one was available.
+   *
+   * ⚠️ IT GETS WORSE THE MORE SESSIONS ARE SPREAD, which is why it surfaced when the days answer
+   * landed: every extra base session adds another riser for the ask to fall into.
+   * ⚠️ NEITHER SIDE STRETCHES A SESSION PAST ITS BAND. Both are real rungs — p275's rule is untouched
+   * and the band-cap sweep still holds. Choosing the nearer one only decides which real dose to use.
+   * ⚠️ TIES GO LOW. Equidistant means the shorter week, which is the conservative half of "about".
+   */
+  const below = at(low);
+  const above = at(high);
+  const t = (want - below) <= (above - want) ? low : high;
   return { size: t, verdict: 'at_target', expected: at(t) };
 }
 

@@ -654,6 +654,51 @@ Deno.test('⛔⛔ A CEILING INSIDE A LEVEL ACTUALLY BINDS — solved on real bui
   assertEquals(rungs.map((r) => r.level), [2], 'a level whose floor is past the cap is still on the ladder');
 });
 
+Deno.test('⛔⛔ THE ASK LANDS ON THE NEARER RUNG, NOT THE LOWER ONE', () => {
+  /**
+   * ⛔ MICHAEL'S EXPORT, 2026-08-27: two hours of running asked, ONE HOUR FORTY built, while his
+   * riding — which lands mid-rung — was exact to the minute.
+   *
+   * ⛔ THE CAUSE IS THE STAIRCASE. p235 offers a 25-30 minute easy run and a 45-60 minute one and
+   * nothing between, so a week's total jumps between levels. The bisection converges on the crossing
+   * and used to return the LOW side: on his week the total went 93 minutes → 124 across an
+   * infinitesimal step in the dial, with his 120 sitting in the gap, and 93 was chosen. A
+   * twenty-seven minute miss where a four minute one was available.
+   *
+   * ⚠️ IT GOT WORSE THE MORE DAYS HE ASKED FOR — every extra base session adds another riser — which
+   * is why it surfaced the moment the days control landed.
+   * ⚠️ NEITHER SIDE STRETCHES A SESSION PAST ITS BAND: both are real rungs, so p275 is untouched.
+   */
+  const spans = slotSpans([
+    { family: 'run_near_threshold', level: 1, archetype: 'below_threshold', sport: 'run' },
+    { family: 'run_vt1', level: 1, sport: 'run' },
+    { family: 'run_vt1', level: 1, sport: 'run' },
+  ] as SlotSpec[], ANCHORS);
+  const solved = sizeFor(spans, 'run', 2);
+  assert(Math.abs(solved.expected - 2) < 0.2,
+    `a two-hour ask solved to ${(solved.expected * 60).toFixed(0)} minutes`);
+
+  /**
+   * ⛔ AND THE WEEK IT BUILDS AGREES WITH THE SOLVE. A model that lands on the ask while the
+   * composer builds something else is the same defect one layer down.
+   */
+  const wk = build({ '1:0': 'ride', '3:0': 'run', '4:0': 'run', '6:0': 'ride' }, 2, 4);
+  const runMin = wk.sessions.filter((s) => s.type === 'run')
+    .reduce((t, s) => t + (Number(s.duration) || 0), 0);
+  assert(Math.abs(runMin - 120) <= 15, `two hours asked, ${runMin} minutes built`);
+
+  /**
+   * ⚠️ AND THE MISS IS BOUNDED BY HALF A RISER, WHICH IS THE REAL GUARANTEE. An ask exactly between
+   * two rungs can land either side — `rungAt`'s ends are floating point and a true tie is not
+   * distinguishable — but it can never be further from the ask than the nearer rung is.
+   */
+  const flat = slotSpans([{ family: 'run_vt1', level: 1, sport: 'run' }] as SlotSpec[], ANCHORS);
+  for (const want of [0.5, 0.625, 0.9, 1.2]) {
+    const got = sizeFor(flat, 'run', want).expected;
+    assert(Math.abs(got - want) <= 0.135, `${want}h asked, ${got.toFixed(2)}h solved`);
+  }
+});
+
 Deno.test('⛔⛔ AN APPENDED EASY SESSION IS MEASURED AT THE DOSE IT IS BUILT AT', () => {
   /**
    * ⛔ THE DEFECT. `easyFillHours` measured the appended session with `slotSpans`, which CLIMBS base
