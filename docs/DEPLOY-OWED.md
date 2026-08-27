@@ -1,5 +1,53 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## ⛔ 2026-08-27 — THE VIADA ARC WENT LIVE, AND NOTHING IN IT HAS BEEN SEEN ON A DEVICE.
+>
+> Sixteen commits of engine and wizard work, `892b545e..2d93ffcb`. Michael authorised the push and
+> deploy directly. **No human has built a Standing Plan end to end against any of it.** He is
+> pre-launch and the only account, so the blast radius is his own — that is why it went out
+> unverified, and it is his call, but nothing below should be read as checked.
+>
+> **PUSHED:** `origin/main == 2d93ffcb` (2026-08-27 14:47 UTC).
+> **CLIENT DEPLOYED:** live on Netlify, `efforts.work`, confirmed by fetching the served bundle
+> (`/assets/index-560_9z7Y.js`) and grepping it — the new copy is IN it ("Two hard sessions",
+> "One easy session", "day before heavy legs", "Start on the lower end if unsure.") and the replaced
+> copy is OUT ("Add a hard session", "Recovery session", "re-dialing" all absent). Not assumed from
+> the push.
+> **EDGE FUNCTIONS DEPLOYED:** `generate-strength-plan` **v162** and `rematerialize-standing-block`
+> **v37**, both 2026-08-27 14:48 UTC.
+> ⚠️ **AND ONLY THOSE TWO, TRACED RATHER THAN GUESSED.** They are the only functions importing
+> `_shared/standing-plan` or `_shared/endurance-library`. `create-goal-and-materialize-plan` does NOT
+> import either — it invokes `generate-strength-plan` over HTTP, so it needs no redeploy.
+> `generate-combined-plan`, `generate-run-plan` and `generate-triathlon-plan` mention the standing-plan
+> DOC names in header comments only.
+>
+> ### WHAT IS NOW OWED — one end-to-end build, in priority order. Stop and report on the first failure.
+>
+> ⛔ **THROWAWAY ACCOUNT ONLY. NEVER user `45d122e7`** — Michael's own. ⚠️ The strength path refuses
+> any athlete without all four barbell 1RMs on file (`missingBarbellLifts`, enforced in both
+> `create-goal-and-materialize-plan` and `generate-strength-plan`), so bench, squat, deadlift and
+> overhead press must be set before the wizard will build. ⚠️ Browser note carried from 2026-06-28:
+> CDP mouse clicks timed out; JS `.click()` and set-value-plus-dispatch drove the flow. Wait ≥10s on
+> "Build plan" without navigating.
+>
+> 1. **It builds at all.** Get Stronger → run+ride → through the endurance screen → a plan comes out.
+> 2. **The endurance screen renders four slot rows and NO "+ Add a hard session" control**, with the
+>    intro reading "Your week has 4 endurance slots / One long session / One easy session / Two hard
+>    sessions". Confirm "Easy session", not "Recovery session".
+> 3. **The week's shape:** four lifting days, a plyometrics day, four endurance sessions, one rest day.
+> 4. ⛔ **The strides are on the easy run AND reach a workout as real interval steps** — Michael's own
+>    hard constraint. `send-workout-to-garmin` builds from `intervals`; anything living only in a
+>    description never reaches the watch. Check the intervals, not the rendered card.
+> 5. **The long session is 90-100 minutes**, not 2h30.
+> 6. **A two-hour running ask on an all-run week is not inflated to 3h20** — the low-volume tier
+>    (15e8cac8, re-cut in 38eaaf91). This is the one that most affects the stated customer.
+> 7. **The lifting cue appears** on a lifting session: "End the set when your form goes or you still
+>    have 1 or 2 reps left…"
+>
+> ⚠️ A blocked check reported honestly is worth more than a green one nobody can trust — this file
+> already records that failure mode from 2026-06-28.
+
+
 Changes committed plus verifications that can only run **against the deployed code** (not the local working tree). Work this list: deploy the named functions, then run the post-deploy checks here. This is the bucket for "local-verified, deployed-equals-local still owed."
 
 > Convention: nothing here blocks local work. These are the checks that close the loop once code is live.
