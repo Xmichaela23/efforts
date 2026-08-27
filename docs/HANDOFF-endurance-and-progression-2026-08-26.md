@@ -641,3 +641,35 @@ arithmetic divided by a figure three times too large and bought nothing. A six-h
 in that order. ⚠️ One consequence is flagged in that commit: a one-hour ask with a single hard run on
 the LOW-VOLUME tier now adds one easy run (1h08 against 1h) where Michael's stated worst case was
 "the cap on the hard session". His case on the standard column is unchanged.
+
+---
+
+## ⛔⛔ §G10. PIECE 5 IS DEAD — the run-forward / ride-forward toggle. Do not propose it again.
+
+**Ruled 2026-08-27.** Michael, in conversation: *"no toggle... they tell you, 5 hours of bike 2
+quality, you know where those three go."* The engineering trace below is why he is right, recorded
+so this does not come back in a month wearing a different name.
+
+The toggle was specified to do two things. **Both are already the athlete's own answer**, and each
+became so in a change made this week:
+
+1. **"Which sport gets the hard sessions."** Since all four slots joined the frame, every row on the
+   endurance screen carries its own Run/Ride chip and starts unanswered. A mixed athlete answers all
+   four. `endurance_slots` forwards those answers verbatim
+   (`create-goal-and-materialize-plan:2989` → `generate-strength-plan:411` → `SportMix.slots`), and
+   `assignSports` places them. There is nothing left for a lead to decide.
+2. **"How the typed hours split."** There is no single pool to split. The screen collects two
+   independent dials — weekly running and weekly riding — and `sizeFor` solves each sport's slots
+   against its own number.
+
+**And the inference it was meant to replace no longer decides anything.** `gsSport`
+(`create-goal-and-materialize-plan:2564`) reads run-first, so a five-hour rider who also runs two is
+read as a runner. That value now feeds exactly two things: `resolveFrame`, which since piece 4
+returns `strength_5k` for run and bike alike, and the `endurance_sport` column stored on the plan
+row. Its readers were checked — `analyze-strength-workout` recomputes its own from logged workouts
+and does not read the plan's. So the inferred lead changes nothing in the built week.
+
+⚠️ **THE ONE REAL THING INSIDE IT, AND IT IS OPTICS.** `SLOT_OPTIONS` draws Ride first on both hard
+slots for everyone, cited to p280. A rider-forward athlete might want Run first. Rows start neutral
+by Michael's own ruling, so that is CHIP ORDER, not a default answer — a copy call, his, and not a
+control.
