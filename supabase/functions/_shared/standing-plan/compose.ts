@@ -1132,11 +1132,11 @@ function exerciseForSlot(
     isLower,
     hardRunBeforeLower,
     /**
-     * ⚠️ THE RATIO RIDES ON THE PERCENTAGE, NOT ON THE WORKING NUMBER. Same arithmetic either way —
-     * working × pct × ratio — but this keeps `working` meaning "the tested lift's working number"
-     * everywhere it is read, so nothing downstream can mistake a derived figure for a measured one.
+     * ⛔⛔ THE RATIO IS NO LONGER IN HERE, AND THAT IS THE FIX FOR THE FROZEN LIFTS (2026-08-27).
+     * See `weight` below: this call now always computes the PRIMARY's number for this slot, and the
+     * ratio is applied to that already-rounded figure afterwards.
      */
-    pctOfWorkingNumber: derived ? pct * derived.ratio : pct,
+    pctOfWorkingNumber: pct,
     roundTo: args.roundTo ?? 5,
   });
 
@@ -1161,7 +1161,47 @@ function exerciseForSlot(
    * percentage is the label on the slot.
    */
   const earnedLb = slot.intent === 'ME' ? Number(args.barOffsetsByPattern?.[pattern]) : NaN;
-  const weight = Number.isFinite(earnedLb) && earnedLb > 0 ? floorWeight + earnedLb : floorWeight;
+  const primaryWeight = Number.isFinite(earnedLb) && earnedLb > 0 ? floorWeight + earnedLb : floorWeight;
+
+  /**
+   * ⛔⛔ A DERIVED LIFT TAKES ITS RATIO OF THE PRIMARY'S **PRESCRIBED** WEIGHT, NOT OF THE WORKING
+   * NUMBER — and the difference is the whole bug (Michael's own 12-week export, 2026-08-27).
+   *
+   * ⛔ THREE LIFTS NEVER MOVED IN TWELVE WEEKS:
+   *     front squat (ME)       W3 @ 90  →  W12 @ 90
+   *     front squat (DE)       W2 @ 70  →  W12 @ 70
+   *     close grip bench (DE)  W2 @ 95  →  W12 @ 95
+   * while the lifts they derive from moved correctly at his rate — bench 135→140, squat 105→110,
+   * deadlift 155→160. **The trap bar deadlift moved and the others did not, because its ratio is
+   * exactly 1.0.** That is the tell.
+   *
+   * ⛔ THE CAUSE WAS ROUNDING, NOT THE LADDER. `me-history.ts` already keys the earned ladder by
+   * PATTERN, so beating reps on a front squat does advance `press_lower` — that half worked. What
+   * broke is that the derived weight was recomputed from scratch each week as
+   * `working × rise × ratio`, rounded to the plate step. p247's rate is 1% every three weeks, so the
+   * primary gains about 5 lb across a block; at a 0.85 ratio that is 4.25 lb on the front squat,
+   * which rounds straight back to where it started. **The lift was frozen unless the primary jumped
+   * a whole step at once, which at these numbers it never does.**
+   *
+   * ⛔⛔ SO THE RATIO IS APPLIED TO A NUMBER THAT HAS ALREADY BEEN QUANTIZED. The squat's 105 → 110
+   * becomes 89.25 → 93.5, which rounds 90 → 95: the derived lift moves exactly when the lift it
+   * comes from moves, in the same number of steps.
+   *
+   * ⚠️ AND THIS IS THE BOUND, RATHER THAN A CLAMP ON TOP OF ONE. The brief proposed carrying the
+   * derived weight forward by its own increment and clamping it to within a step of `primary ×
+   * ratio`. Recomputing from the primary's own prescribed weight reaches the same place with no
+   * carried state and no clamp: the answer IS `round(primary × ratio)` every week, so it cannot
+   * drift from the ratio at all — a front squat can never creep toward the squat's own number. The
+   * only slack is the rounding step itself, which is the clamp the brief asked for, structurally.
+   * ⚠️ IT ALSO INHERITS THE EARNED LADDER FOR FREE: `primaryWeight` already carries the pattern's
+   * earned offset on an ME slot, so a front squat that earns a jump on `press_lower` gets its share.
+   * ⚠️ THE STEP IS THE ATHLETE'S OWN — `roundTo` is their smallest plate pair, doubled, the same
+   * figure `prescribedLoad` rounds to and `advanceStep` honours.
+   */
+  const plateStep = Number.isFinite(args.roundTo) && (args.roundTo ?? 0) > 0 ? (args.roundTo as number) : 5;
+  const weight = derived
+    ? Math.max(plateStep, Math.round((primaryWeight * derived.ratio) / plateStep) * plateStep)
+    : primaryWeight;
 
   if (isLower && !hardRunBeforeLower && !notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS)) {
     // ⛔ SAID OUT LOUD, BECAUSE IT IS OUR READING. The lower-body weights are NOT reduced this block,

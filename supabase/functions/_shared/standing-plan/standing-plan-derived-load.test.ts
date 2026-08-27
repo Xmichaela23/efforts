@@ -148,3 +148,67 @@ Deno.test('⛔ ONE CHAIN — the derived weight tracks the tested lift it came f
   assert((after.weight as number) > (before.weight as number),
     `the front squat did not follow the squat: ${before.weight} → ${after.weight}`);
 });
+
+Deno.test('⛔⛔ A DERIVED LIFT IS NOT FROZEN — it moves when the lift it comes from moves', () => {
+  /**
+   * ⛔ MICHAEL'S OWN 12-WEEK EXPORT, 2026-08-27. Three lifts never moved:
+   *     front squat (ME)       W3 @ 90  →  W12 @ 90
+   *     front squat (DE)       W2 @ 70  →  W12 @ 70
+   *     close grip bench (DE)  W2 @ 95  →  W12 @ 95
+   * while bench went 135→140, squat 105→110 and deadlift 155→160. **The trap bar deadlift moved and
+   * the others did not, because its ratio is exactly 1.0** — which is the tell that this was
+   * rounding and not the ladder.
+   *
+   * ⛔ THE CAUSE. The derived weight was recomputed each week as `working × rise × ratio` and then
+   * rounded to the plate step. p247's rate is 1% every three weeks — about 5 lb across a block — and
+   * at a 0.85 ratio that is 4.25 lb, which rounds straight back. Frozen unless the primary jumped a
+   * whole step at once.
+   *
+   * ⚠️ NOT THE EARNED LADDER, WHICH ALREADY WORKED: `me-history.ts` keys it by PATTERN, so reps beaten
+   * on a front squat do advance `press_lower`.
+   */
+  const seen: Record<string, number[]> = {};
+  for (let week = 2; week <= 12; week++) {
+    for (const r of rowsFor(week)) {
+      if (r.load_basis !== 'derived_ratio' || typeof r.weight !== 'number') continue;
+      (seen[`${r.name}|${r.slot_intent}`] ||= []).push(r.weight as number);
+    }
+  }
+  const tracked = Object.entries(seen).filter(([, v]) => v.length >= 4);
+  assert(tracked.length >= 2, `only ${tracked.length} derived lifts appear across the block`);
+  for (const [key, weights] of tracked) {
+    assert(weights[weights.length - 1] > weights[0],
+      `${key} never moved across the block: ${weights[0]} → ${weights[weights.length - 1]}`);
+  }
+});
+
+Deno.test('⛔⛔ AND IT CANNOT DRIFT — every derived weight stays within one plate step of its ratio', () => {
+  /**
+   * ⛔ THE BOUND THE FIX HAD TO CARRY. A derived lift advancing on its own increment forever would
+   * wander away from the ratio it was born at — a front squat creeping toward the squat's own number
+   * is nonsense.
+   *
+   * ⚠️ CHOSEN SHAPE, AND WHY. The brief proposed carrying the weight forward and clamping it.
+   * Recomputing as `round(primary's PRESCRIBED weight × ratio)` reaches the same place with no
+   * carried state and no clamp: the answer IS the ratio of the primary every week, so the only slack
+   * is the rounding step itself. That is the clamp, structurally, and it cannot be forgotten.
+   */
+  const STEP = 5;
+  for (const week of [2, 3, 5, 8, 11, 12]) {
+    const rows = rowsFor(week);
+    for (const r of rows) {
+      if (r.load_basis !== 'derived_ratio' || typeof r.weight !== 'number') continue;
+      const cfg = resolveExerciseConfig(r.name).config!;
+      // The primary this row derives from, in the SAME slot — same intent, same week, same haircut.
+      const primary = rows.find((x) => x.slot_intent === r.slot_intent
+        && typeof x.weight === 'number'
+        && x.load_basis == null
+        && resolveExerciseConfig(x.name).config?.primaryRef === cfg.primaryRef);
+      if (!primary) continue;
+      const expected = (primary.weight as number) * cfg.ratio;
+      assert(Math.abs((r.weight as number) - expected) <= STEP,
+        `week ${week}: ${r.name} @ ${r.weight} is more than one step from ${cfg.ratio} x ${primary.name} @ ${primary.weight}`);
+    }
+  }
+});
+
