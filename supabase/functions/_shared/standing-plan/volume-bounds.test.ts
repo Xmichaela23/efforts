@@ -21,8 +21,8 @@ import {
   composeWeek, defaultCompetitionLifts, type ComposeArgs, type PlanSession,
 } from './index.ts';
 import {
-  fixedHoursLine, ladderOf, LADDER_CEILING_MIN, rungAt, sizeFor, slotSpans, weekVolumeBounds,
-  WEEKLY_HOUR_OPTIONS, type SlotSpan, type SlotSpec,
+  easyFillHours, EASY_FILL_SPEC, fixedHoursLine, ladderOf, LADDER_CEILING_MIN, rungAt, sizeFor,
+  slotSpans, weekVolumeBounds, WEEKLY_HOUR_OPTIONS, type SlotSpan, type SlotSpec,
 } from './volume-bounds.ts';
 import {
   LOW_VOLUME_TIER_GATE_IS_OURS, LOW_VOLUME_TIER_MAX_WEEKLY_MILES, lowVolumeRunLevels,
@@ -343,9 +343,17 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
     assert(total >= top * 60 * 0.9, `${sport}: the top option ${top}h built only ${total} min`);
   }
 
-  // ⛔ HIS WORST CASE, BUILT. One hard run in the week, one hour asked: the athlete gets the hard
-  // run the book prescribes and nothing invented around it.
-  const wk = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1);
+  /**
+   * ⛔ HIS WORST CASE, BUILT. One hard run in the week, one hour asked: the athlete gets the hard
+   * run the book prescribes and nothing invented around it.
+   *
+   * ⚠️ MEASURED ON A DEMONSTRATED RUNNER, and that qualifier is new (2026-08-26 evening). On the
+   * STANDARD column the single hard run caps at 50 minutes, so a one-hour ask leaves a ten-minute
+   * gap and the rounding rule below buys nothing — which is his sentence exactly. A low-volume
+   * athlete's hard run caps at 38, and that case is asserted separately underneath, because it now
+   * behaves differently and he has not seen it.
+   */
+  const wk = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1, undefined, DEMONSTRATED_RUNNER);
   const runs = wk.sessions.filter((s) => s.type === 'run');
   assertEquals(runs.length, 1, runs.map((r) => r.name).join(', '));
   /**
@@ -363,6 +371,28 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
    * fixed it, and this line is what stops it coming back.
    */
   assert(!wk.sessions.some((s) => (s.tags ?? []).includes('volume_fill')), 'the week padded itself');
+
+  /**
+   * ⛔⛔ THE SAME ASK ON A LOW-VOLUME ATHLETE NOW ADDS ONE EASY RUN, AND THIS IS A CHANGE TO WHAT HE
+   * DESCRIBED — flagged rather than hidden.
+   *
+   * His sentence was *"if someone runs an hour a week and they only pick one run, worst case they
+   * get the cap on the hard session."* An athlete running an hour a week is in the low-volume tier,
+   * where the hard run caps at 38 minutes — so the gap is twenty-two minutes, not ten, and the
+   * nearest-session rule buys the easy run. The week lands at 1h08 against a 1h ask instead of at
+   * 38 minutes.
+   *
+   * ⚠️ THE RULE IS UNCHANGED; WHAT CHANGED IS THE MEASUREMENT. `easyFillHours` was reading the top of
+   * the whole base LADDER — 1h30 for an easy run that is actually appended at 30 minutes — so "half
+   * a session" was three times too large and this gap bought nothing. Both halves of that arithmetic
+   * now use the same figure.
+   */
+  const lowTier = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1);
+  const lowRuns = lowTier.sessions.filter((s) => s.type === 'run');
+  assertEquals(lowRuns.length, 2, lowRuns.map((r) => r.name).join(', '));
+  assertEquals(lowRuns.filter((s) => (s.tags ?? []).includes('volume_fill')).length, 1);
+  const lowTotal = lowRuns.reduce((t, s) => t + (Number(s.duration) || 0), 0);
+  assert(Math.abs(lowTotal - 60) <= 10, `a one-hour ask built ${lowTotal} minutes`);
   const runMin = runs.reduce((t, r) => t + (Number(r.duration) || 0), 0);
   assert(runMin <= 60, `a one-hour ask built ${runMin} minutes of running`);
 });
@@ -614,6 +644,31 @@ Deno.test('⛔⛔ A CEILING INSIDE A LEVEL ACTUALLY BINDS — solved on real bui
   // ⛔ AND THE LEVEL ABOVE IS GONE, NOT CLIPPED TO NOTHING. `run_lsd` level 3 starts at 104 minutes,
   // already past the cap, so it is swallowed whole — `ladderOf`'s own rule, now measured.
   assertEquals(rungs.map((r) => r.level), [2], 'a level whose floor is past the cap is still on the ladder');
+});
+
+Deno.test('⛔⛔ AN APPENDED EASY SESSION IS MEASURED AT THE DOSE IT IS BUILT AT', () => {
+  /**
+   * ⛔ THE DEFECT. `easyFillHours` measured the appended session with `slotSpans`, which CLIMBS base
+   * families — so it returned the top of the whole ladder (an easy run at 1h30, an easy ride at five
+   * hours) while the placement builds the fill at level 1, size 1: 30 minutes and 1h40.
+   *
+   * ⛔ WHAT IT COST. The gap between the ask and the week's cap is divided by this number and
+   * rounded to the nearest session, so a figure three times too large meant real gaps bought
+   * nothing: a six-hour running ask built five and a half and reported the week full, on a menu
+   * whose own derivation promises every listed value is buildable.
+   *
+   * ⚠️ PINNED AGAINST THE LIBRARY, NOT AGAINST A CONSTANT, so a band that moves on the page moves
+   * this with it.
+   */
+  for (const sport of ['run', 'ride'] as const) {
+    const spec = EASY_FILL_SPEC[sport];
+    const built = buildEnduranceSession({
+      family: spec.family, level: spec.level, archetype: spec.archetype, anchors: ANCHORS, size: 1,
+    } as never) as { totals: { clockedSeconds: number } };
+    const hours = easyFillHours(sport, ANCHORS);
+    assert(Math.abs(hours - built.totals.clockedSeconds / 3600) < 0.02,
+      `${sport}: the fill is measured at ${(hours * 60).toFixed(0)}m and built at ${(built.totals.clockedSeconds / 60).toFixed(0)}m`);
+  }
 });
 
 Deno.test('⛔⛔ THE FLOOR CANNOT EXCEED WHAT THE ATHLETE RUNS — the low-volume tier', () => {

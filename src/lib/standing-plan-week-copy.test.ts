@@ -162,8 +162,9 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
    * ⛔⛔ HIS THIRD CONSEQUENCE LINE IS DELETED (2026-08-26 evening) — *"Easy sessions are the default
    * pick hard session below to add"*. It described a default that stopped existing when both quality
    * sessions joined the frame, and there is no "below" to add from.
-   * ⛔ IT WAS ALSO AGAINST p134 WHILE IT WAS TRUE: spare room goes to QUALITY, not to another easy
-   * run, which is the *"junk volume"* that page names.
+   * ⛔ IT WAS ALSO AGAINST p134 WHILE IT WAS TRUE — that page warns against BOLTING ON a recovery
+   * run, and a screen whose stated default is "easy sessions unless you add a hard one" advertises
+   * exactly that. ⚠️ It says nothing about where extra HOURS land; that is p93's question.
    * ⛔⛔ AND NOTHING REPLACES IT. A line saying the block spends fewer of the athlete's hours was
    * drafted and is WRONG for this customer — p119's cut is for an athlete at their maximum tolerable
    * volume and p149 exempts everyone else. Their hours stay.

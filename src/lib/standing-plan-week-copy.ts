@@ -70,9 +70,11 @@ export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
  * session below to add"*. It described a default that no longer exists: both quality sessions are
  * the frame's now, and there is nothing below to add.
  *
- * ⛔ AND IT WAS AGAINST p134 EVEN WHILE IT WAS TRUE. His rule is that spare room goes to QUALITY,
- * not to another easy run — an easy default advertised as the recommended path is the *"junk
- * volume"* he names on that page.
+ * ⛔ AND IT WAS AGAINST p134 EVEN WHILE IT WAS TRUE. That page's warning is about BOLTING ON a
+ * *"random hypertrophy set of arm work or a 'recovery run'"* — and a screen whose stated default is
+ * "easy sessions, pick a hard one if you want" is advertising exactly that as the recommended path.
+ * ⚠️ IT IS NOT A CLAIM ABOUT THE SCALING CURVE. Where a week's extra HOURS land is p93's question,
+ * and the answer there is the easy sessions.
  *
  * ⛔⛔ AND NOTHING REPLACES IT. An earlier draft of this change asked for a line saying the block
  * spends fewer of the athlete's hours. **Do not add one.** p119's volume cut is for an athlete AT

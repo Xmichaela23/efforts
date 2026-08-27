@@ -74,7 +74,14 @@ export const isBaseFamily = (family: string): boolean => BASE_FAMILIES.includes(
  * ⚠️ WHAT IT DOES TO THE LADDER: `run_lsd` level 2 spans 68-150, so it now stops at 100 rather than
  * at the top of its own level, and level 3 (floor 104) is swallowed whole and drops out — which is
  * `ladderOf`'s existing `hi < lo` rule doing its job, not a new one. **The long run can no longer
- * absorb an athlete's extra hours**; they land on the easy sessions, which is p134's own rule.
+ * absorb an athlete's extra hours**; they land on the easy sessions.
+ *
+ * ⚠️ AND THE PAGE FOR THAT IS p93, NOT p134 (corrected 2026-08-27). p93: lower-intensity work
+ * *"can be prescribed liberally… the tolerable dose is often so high that many athletes can engage
+ * in nearly the maximum effective dose every day and still recover adequately"*, and p106 says
+ * consistent exposure is what matters. **p134 is about not BOLTING ON a junk recovery run**, which
+ * is a different claim, and citing it for the scaling curve reads as "fill the quality first" — a
+ * reading that would build a four-hour week as 95 minutes of threshold against a 25-minute easy run.
  *
  * ⚠️ A CEILING ON TOP OF THE LEVELS, not instead of them. The ladder is still the book's own level
  * bands; this clips it where the ruling is tighter than the top level.
@@ -471,10 +478,28 @@ export const EASY_FILL_SPEC: Record<'run' | 'ride', SlotSpec> = {
   ride: { family: 'ride_endurance', level: 1, archetype: 'steady', sport: 'ride' },
 };
 
-/** Hours one appended easy session adds, at its cap. */
+/**
+ * ⛔ HOURS ONE APPENDED EASY SESSION ADDS — ITS OWN LEVEL'S CAP, NOT THE TOP OF THE LADDER.
+ *
+ * ⛔⛔ THE DEFECT THIS FIXES (found 2026-08-26 while measuring the week's floor). `slotSpans` climbs
+ * BASE families, and the fill spec is a base family — so `minHi` was the top of the whole ladder
+ * rather than the dose actually appended. An easy run fill was measured at **1h30** while the
+ * placement below builds it at level 1, size 1: **30 minutes.** The ride was worse — measured at
+ * five hours against a 1h40 session.
+ *
+ * ⛔ WHAT IT COST, IN THE ONLY PLACE IT IS READ. `easyFillFor` divides the gap between the ask and
+ * the week's cap by this number and rounds to the nearest session. Three times too large means a gap
+ * of forty minutes bought NO easy run where it should have bought one — so a six-hour running ask
+ * built five and a half and said the week was full, on a menu whose own comment says every offered
+ * value must be buildable.
+ *
+ * ⚠️ `rungs[0]` IS THE SPEC'S OWN LEVEL, which is what the placement builds. One rung, one dose, one
+ * number — the same figure on both sides of the arithmetic.
+ */
 export function easyFillHours(sport: 'run' | 'ride', anchors: EnduranceAnchors): number {
   const span = slotSpans([EASY_FILL_SPEC[sport]], anchors)[0];
-  return span ? span.minHi / 60 : 0;
+  const rung = span?.rungs[0];
+  return rung ? rung.hi / 60 : 0;
 }
 
 export function sayHours(n: number): string {
