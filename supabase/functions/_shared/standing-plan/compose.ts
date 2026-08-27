@@ -1216,7 +1216,10 @@ function exerciseForSlot(
    * the one that does not.
    */
   const derivedNote = derived
-    ? `About ${Math.round(derived.ratio * 100)}% of your ${testedLiftName(derived.refLift).toLowerCase()} — derived, not tested.`
+    // ⚠️ THE ATHLETE'S OWN NAME FOR THE LIFT, not the canonical one — `refLift` is this pattern's
+    // tested lift, so `competitionLifts[pattern]` is that same lift as they named it.
+    ? `About ${Math.round(derived.ratio * 100)}% of your `
+      + `${testedLiftName(derived.refLift, args.competitionLifts[pattern]).toLowerCase()} — derived, not tested.`
     : null;
 
   return {
