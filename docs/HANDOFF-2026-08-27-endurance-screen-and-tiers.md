@@ -1,4 +1,4 @@
-# HANDOFF — 2026-08-27. The endurance screen, the tier control, and one blocking bug.
+# HANDOFF — 2026-08-27. Build the experience control. Everything for it is settled.
 
 **Written for a fresh session at the end of a long day.** The previous handoff
 (`HANDOFF-endurance-and-progression-2026-08-26.md`) is now a RESEARCH document — §A–§I hold the book
@@ -17,12 +17,17 @@ first; go to that one when you need a page cited.
 
 ---
 
-# ⛔ 1. THE ONE THING BLOCKING EVERYTHING ELSE
+# ⛔ THE ONE THING TO DO: build §2's experience control. Design, copy, tiers and numbers are all
+# settled and recorded below. Nothing is blocking it.
+
+---
+
+# 1. ✅ FIXED — the bug that was blocking it (`67cda50f`, deployed)
 
 **The session builder generates sessions Viada does not prescribe.** Found while measuring durations
 for a new screen; reported to the terminal session, not yet fixed.
 
-Measured, `run_near_threshold` level 3 at `size: 0.5`:
+What it did, measured at the time, `run_near_threshold` level 3 at `size: 0.5`:
 
     race_repeats     builds  4 × 900s (15 min)   → 90m total
     below_threshold  builds  7 × 510s (8:30)     → 85m total
@@ -43,12 +48,13 @@ both toward their tops at once. His options are PAIRS — a rep count belongs to
 ⚠️ **Also unconfirmed:** whether the between-rep recoveries are in the clock. A probe printed the
 work step and nothing else inside the block; they may live on `restBetween`.
 
-**Why it blocks:** the tier screen below prints the longest hard session each tier gives. Those
-numbers come straight out of these bands.
+**Why it mattered:** the tier screen prints the longest hard session each tier gives, straight out of
+these bands. ✅ The count now comes from the family's own work band divided by the repeat length, so a
+longer repeat yields fewer of them — the shape of his table. The marathon case builds 3 × 15 exactly.
 
 ---
 
-# 2. THE SCREEN MICHAEL DESIGNED TODAY — settled, waiting only on §1's numbers
+# ⛔ 2. THE SCREEN MICHAEL DESIGNED TODAY — BUILD THIS. Numbers are measured and in this file.
 
 Two chips per sport, under that sport's hours and days on the Endurance focus step.
 
