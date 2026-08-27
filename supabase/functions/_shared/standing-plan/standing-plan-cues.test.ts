@@ -139,7 +139,12 @@ Deno.test('⛔⛔ NO WORD NAMES TWO DIFFERENT SESSIONS — the wizard and the pl
    */
   assertEquals(FAMILIES.run_mlss.label, 'Above threshold');
   assertEquals(FAMILY_LABEL.run_mlss, 'Hard Run');
-  assertEquals(FAMILY_LABEL.run_near_threshold, 'Threshold Run');
+  /**
+   * ⛔ AND THE PLAN FOLLOWED THE WIZARD (2026-08-27). It called this session "Threshold Run" while
+   * the wizard row read "Near-threshold" — two names for one session, and the plan's was the word
+   * just taken off `run_mlss` for being wrong. p233 titles the family "Near-Threshold".
+   */
+  assertEquals(FAMILY_LABEL.run_near_threshold, 'Near-threshold Run');
 
   /**
    * ⛔ NO LIBRARY LABEL MAY BE A PLAN SESSION NAME FOR A DIFFERENT FAMILY. That is the shape of the

@@ -197,8 +197,24 @@ function repMinutes(session: EnduranceSession): { reps: number; workMin: number;
  * changed; the library's label did.
  */
 export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
+  /**
+   * ⛔⛔ "Threshold Run" → "Near-threshold Run" (2026-08-27, off Michael's own screens). The wizard
+   * row read *"Hard session 2 · Run · Near-threshold"* and the built plan called the same session
+   * *"Threshold Run"* on Wednesday — two names for one session, and the plan's was the word that had
+   * just been taken off the OTHER family for being wrong.
+   *
+   * ⛔ THE VOCABULARY FOLLOWS THE WIZARD, NOT THE REVERSE, because the wizard is now using his own
+   * heading: p233 titles this family **"Near-Threshold"** — *"Workouts that maximize time
+   * near-threshold (NT) — whether shorter above-threshold intervals or longer below-threshold
+   * intervals"* — and its level-1 work sits at 88-95%.
+   *
+   * ⚠️ THE OTHER PAIRS ARE DIFFERENT WORDS FOR THE SAME THING AND THAT IS FINE. "Above threshold" /
+   * "Hard Run" and "Sweet spot" / "Hard Ride" describe rather than collide — no library label is
+   * another family's session name, which is the rule the cues test now enforces. What could not
+   * stand was one WORD naming two different sessions.
+   */
   run_mlss: 'Hard Run',
-  run_near_threshold: 'Threshold Run',
+  run_near_threshold: 'Near-threshold Run',
   run_vt1: 'Easy Run',
   run_lsd: 'Long Run',
   // ⛔ SLICE 4 — the ride and swim slots. Plain names in the app's existing register; nothing here
