@@ -342,6 +342,24 @@ export type ComposeArgs = {
   /** ⛔ DEMONSTRATED, not intended. Gates the advanced tier — see `advancedTierSessions`. */
   demonstratedWeeklyMiles?: number | null;
   /**
+   * ⛔⛔ HOW MANY DAYS A WEEK THE ATHLETE ACTUALLY DOES EACH SPORT — their own answer, and a FLOOR on
+   * the number of sessions of that sport (Michael, 2026-08-27: *"I run for three hours a week over
+   * the course of three days. I ride for four hours a week over the course of two days and then we
+   * chop it up according to the plans numbers"*).
+   *
+   * ⛔ A FLOOR, NOT A CAP, AND THE FRAME IS WHY. p246 owns the four endurance slots and none of them
+   * can be declined, so an athlete asking for FEWER days than their slots already carry cannot have
+   * that — the slots stay. Asking for MORE adds easy sessions until the count is met.
+   *
+   * ⚠️ IT DOES NOT COLLIDE WITH THE LIFTS. The frame already stacks endurance onto lifting days and
+   * leaves two clear days plus the rest day, so five endurance days sit inside a four-lift week
+   * without touching it.
+   * ⚠️ THE EXTRA DAYS ARE IN THE SOLVE, NOT BOLTED ON AFTER IT. They join `enduranceSpecs` before
+   * `sizeFor` runs, so the athlete's hours are divided across every session they asked for rather
+   * than across four and then topped up.
+   */
+  enduranceDaysBySport?: { run?: number | null; ride?: number | null } | null;
+  /**
    * ⛔ DEMONSTRATED MINUTES PER SPORT over the last four weeks — the low-volume tier's gate, which
    * compares them against what this week's own slots would build at their shortest
    * (`lowVolumeSports`). ⚠️ MINUTES, because that is the unit the frame answers in; miles would need
@@ -1581,6 +1599,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const levelForFamily = (family: string, frameLevel: Level): Level =>
     (args.levelOverrides?.[family] as Level | undefined) ?? (tierLevels[family] as Level | undefined) ?? frameLevel;
 
+  /**
+   * ⛔ HOW MANY MORE SESSIONS OF A SPORT THE ATHLETE'S OWN DAY COUNT ASKS FOR — see
+   * `enduranceDaysBySport`. ⚠️ ONE OWNER, read twice: once when the specs are built (so the hours
+   * solve sees every session) and once when they are placed (so the same number of days is actually
+   * emitted). Two derivations is how a solved week and a built week start disagreeing.
+   */
+  const dayShortfall = (specs: SlotSpec[], sport: 'run' | 'ride'): number => {
+    const asked = Math.max(0, Math.round(Number(args.enduranceDaysBySport?.[sport]) || 0));
+    if (asked === 0 || args.column !== 'standard') return 0;
+    const have = specs.filter((sp) => sp.sport === sport).length;
+    // ⚠️ THE WEEK'S OWN ROOM CAPS IT: the two days the frame leaves clear, then the rest day.
+    return Math.max(0, Math.min(asked - have, FREE_ENDURANCE_DAYS + REST_DAY_RUNG));
+  };
+
+  const dayFills: Record<'run' | 'ride', number> = { run: 0, ride: 0 };
   const enduranceSpecs: SlotSpec[] = (() => {
     const out: SlotSpec[] = [];
     for (const d of days) {
@@ -1598,6 +1631,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       }
       for (let i = 0; i < advancedTierSessions(args.demonstratedWeeklyMiles); i++) {
         out.push({ family: 'run_vt1', level: 1, sport: 'run' });
+      }
+      /**
+       * ⛔⛔ THE DAYS THE ATHLETE SAID THEY DO EACH SPORT — see `enduranceDaysBySport`. Three runs
+       * against two run slots means one more easy run, and it joins the specs HERE, before the
+       * solve, so their hours are divided across three runs rather than across two and topped up.
+       * ⚠️ THE EXTRA IS ALWAYS EASY. The frame owns the quality (p246), so a day the athlete adds
+       * can only be base work — the same rule the hours fill already follows (p134).
+       * ⚠️ CAPPED BY THE WEEK'S OWN ROOM, not by the ask: two clear days plus the rest day.
+       */
+      for (const sport of ['run', 'ride'] as const) {
+        // ⚠️ COUNTED ONCE AND REMEMBERED. The placement below reads the same figure rather than
+        // recomputing it against a different basis — the advanced tier's extra easy runs are in
+        // `out` by now and would otherwise be counted on one side and not the other.
+        dayFills[sport] = dayShortfall(out, sport);
+        for (let i = 0; i < dayFills[sport]; i++) out.push({ ...EASY_FILL_SPEC[sport] });
       }
     }
     return out;
@@ -1626,9 +1674,27 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * them through the same relocator everything else uses.
    */
   const easyFillFor = (sport: 'run' | 'ride'): number => {
+    /**
+     * ⛔⛔ THE ATHLETE'S DAY COUNT IS A FLOOR ON THIS, not just an input to the solve. `dayFills` is
+     * what the spec builder actually counted, so the same number of days is placed as was solved
+     * for. Without it the hours would be divided across (say) three runs and only two ever built.
+     * ⚠️ MAX, NOT SUM. If the hours already buy two extra easy sessions and the athlete asked for
+     * one more day, they get two — not three.
+     */
+    const byDays = dayFills[sport];
+    /**
+     * ⛔⛔ A STATED DAY COUNT IS EXACT — IT IS A CAP AS WELL AS A FLOOR. If the athlete says they
+     * ride two days, four hours of riding is divided across two rides; it does not buy a third day
+     * they did not ask for. Their days are a fact about their week, not a starting point for the
+     * hours to argue with.
+     * ⚠️ AND WHEN THE HOURS DO NOT FIT IN THOSE DAYS, the week says so through the channel that
+     * already exists — `sizeFor`'s `over_cap` verdict and `fixedHoursLine` — rather than quietly
+     * adding a day. Michael's own framing: they tell us the days, and we chop the hours up.
+     */
+    if (Number(args.enduranceDaysBySport?.[sport]) > 0) return byDays;
     const solve = sport === 'run' ? volume.run : volume.ride;
     const bound = sport === 'run' ? volume.bounds.run : volume.bounds.ride;
-    if (solve.verdict !== 'over_cap' || bound.sessions === 0) return 0;
+    if (solve.verdict !== 'over_cap' || bound.sessions === 0) return byDays;
     const want = Number(sport === 'run' ? args.targetRunHours : (args.targetRideHours ?? args.targetWeeklyRideHours));
     if (!Number.isFinite(want) || want <= bound.cap) return 0;
     const each = easyFillHours(sport, anchors);
@@ -1648,7 +1714,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      */
     return Math.min(
       FREE_ENDURANCE_DAYS + REST_DAY_RUNG,
-      Math.max(0, Math.round((want - bound.cap) / each)),
+      Math.max(byDays, Math.round((want - bound.cap) / each)),
     );
   };
   /** ⛔ ONE DIAL POSITION PER SPORT — see `sizeFor`. A swim has no typed target and keeps the default. */
@@ -2026,8 +2092,29 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       let fillsPlaced = 0;
       for (let i = 0; i < want && i < room.length; i++) {
         const frameDay = room[i];
+        /**
+         * ⛔⛔ SIZED BY THE SAME DIAL AS EVERY OTHER SESSION (2026-08-27). This was pinned at `size:
+         * 1` — the session at its cap — which was right while a fill existed only to soak up hours
+         * the frame could not hold. It is wrong now that a fill can be a day the athlete ASKED for:
+         * the solve divides their hours across every session including this one, and building it at
+         * its cap regardless made the week miss the ask (three hours asked, 2h39 built).
+         * ⚠️ `rungForSlot` IS THE ONE OWNER of "where does this sport's dial sit", so the appended
+         * day climbs its levels on the same terms as the frame's own easy session.
+         */
+        /**
+         * ⛔⛔ AND ONLY THE DAYS THE ATHLETE ASKED FOR ARE DIAL-SIZED. `dayFills` sessions are in
+         * `enduranceSpecs`, so the solve divided the hours across them and the dial is their answer.
+         * An HOURS-driven fill is not in the specs — `easyFillFor` buys it by dividing the leftover
+         * by `easyFillHours`, which is the LEVEL-1 cap — so it stays at that dose. Dial-sizing one
+         * of those climbed it to the family's ceiling and built five hours of riding against a
+         * four-hour ask.
+         */
+        const askedDay = i < dayFills[sport];
+        const rung = askedDay
+          ? rungForSlot(spec.family, spec.level, spec.archetype, sport)
+          : { level: spec.level, size: 1 };
         const built = buildEnduranceSession({
-          family: spec.family, level: spec.level, archetype: spec.archetype, anchors, size: 1,
+          family: spec.family, level: rung.level, archetype: spec.archetype, anchors, size: rung.size,
         });
         builtEndurance.push(built);
         const row = translateEnduranceSession(built);

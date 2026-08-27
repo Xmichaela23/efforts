@@ -684,6 +684,26 @@ Deno.serve(async (req: Request) => {
             const n = Number((body as Record<string, unknown>).target_ride_hours);
             return Number.isFinite(n) && n > 0 ? n : undefined;
           })(),
+          /**
+           * ⛔⛔ HOW MANY DAYS A WEEK THEY DO EACH SPORT — their own answer, and the thing their hours
+           * are divided across (Michael, 2026-08-27: *"I run for three hours a week over the course
+           * of three days. I ride for four hours a week over the course of two days and then we chop
+           * it up according to the plans numbers"*).
+           * ⚠️ A SEPARATE FIELD FROM `run_days` / `ride_days`, deliberately. Those are the slot RATIO
+           * this frame assigns sports by; this is a count of DAYS. Overloading one on the other is
+           * how a ratio starts being read as a schedule.
+           */
+          enduranceDaysBySport: (() => {
+            const raw = (body as Record<string, unknown>).endurance_days;
+            if (!raw || typeof raw !== 'object') return undefined;
+            const pick = (k: string) => {
+              const n = Number((raw as Record<string, unknown>)[k]);
+              return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+            };
+            const run = pick('run');
+            const ride = pick('ride');
+            return run == null && ride == null ? undefined : { run, ride };
+          })(),
           // ⛔ THE ATHLETE'S DAYS BEAT THE FRAME ORDER — see `endurancePins` above and the note on
           // the field in `compose.ts`. Absent pins leave the rotation exactly as it was.
           endurancePins,

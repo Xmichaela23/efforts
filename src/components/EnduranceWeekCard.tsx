@@ -47,6 +47,12 @@ import {
 } from '@/lib/standing-plan-week-copy';
 import { weekBounds } from '@/lib/standing-plan-week-bounds';
 /**
+ * ⛔ HOW MANY DAYS ONE SPORT CAN RUN OVER. Seven is the week; the engine caps what it can actually
+ * place at the two days the frame leaves clear plus the rest day, and says so when the ask exceeds
+ * what those hold.
+ */
+const ENDURANCE_DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
+/**
  * ⛔ THE OPTION LIST IS THE ENGINE'S, NOT THIS SCREEN'S. One list, so the hours offered here and the
  * hours the composer can build are the same list by construction.
  */
@@ -75,6 +81,11 @@ export type EnduranceWeekCardProps = {
   /** Weekly running, in the athlete's own display unit. */
   runVolume: string;
   onRunVolume: (v: string) => void;
+  /** ⛔ HOW MANY DAYS A WEEK THIS SPORT HAPPENS — the count the hours are divided across. */
+  runDays: string;
+  onRunDays: (v: string) => void;
+  rideDays: string;
+  onRideDays: (v: string) => void;
   rideHours: string;
   /** ⛔ THE ENGINE'S OWN SENTENCE per sport — `fixedHoursLine`. Null when the sport fixes nothing. */
   runFixedLine?: string | null;
@@ -458,6 +469,31 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     ))}
                   </select>
                   <span className="text-white/50 text-sm">{Number(value) === 1 ? 'hour' : 'hours'}</span>
+                </div>
+                {/* ⛔⛔ OVER HOW MANY DAYS (Michael, 2026-08-27): *"I run for three hours a week over
+                    the course of three days. I ride for four hours a week over the course of two
+                    days and then we chop it up according to the plans numbers."* The hours say how
+                    much; this says across how many sessions, and the engine divides.
+                    ⚠️ IT SITS UNDER THE HOURS IT DIVIDES, not in its own block — one question about
+                    this sport, answered in one place.
+                    ⚠️ THE EMPTY OPTION STAYS FIRST, same as the hours: no number in an untouched box
+                    means no opinion, and the frame's own count stands. */}
+                <div className="flex items-baseline gap-2 mt-2">
+                  <select
+                    data-testid={sport === 'run' ? 'run-days' : 'ride-days'}
+                    value={sport === 'run' ? props.runDays : props.rideDays}
+                    onChange={(e) => (sport === 'run' ? props.onRunDays : props.onRideDays)(e.target.value)}
+                    className="w-24 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
+                    style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb(sport === 'run' ? 'run' : 'bike')})` }}
+                  >
+                    <option value="">—</option>
+                    {ENDURANCE_DAY_OPTIONS.map((d) => (
+                      <option key={d} value={String(d)}>{d}</option>
+                    ))}
+                  </select>
+                  <span className="text-white/50 text-sm">
+                    {Number(sport === 'run' ? props.runDays : props.rideDays) === 1 ? 'day' : 'days'}
+                  </span>
                 </div>
                 {/* ⛔ THE ONE LINE THAT REMAINS — what the book fixes, and where the rest goes.
                     Michael's own shape: *"copy say hard hours cap at 1.38 or whatever for the run

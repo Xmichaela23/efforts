@@ -1665,6 +1665,20 @@ function assemblePayload(
             ? { target_run_hours: Number(state.targetRunHours) } : {}),
           ...(state.rideHours !== '' && Number(state.rideHours) > 0
             ? { target_ride_hours: Number(state.rideHours) } : {}),
+          /**
+           * ⛔⛔ HOW MANY DAYS A WEEK THEY DO EACH SPORT — the count their hours are divided across
+           * (Michael, 2026-08-27). ⚠️ A SEPARATE FIELD FROM `run_days` / `ride_days`: those are the
+           * slot RATIO the frame assigns sports by, this is a count of days.
+           * ⚠️ Omitted when unanswered, and per sport — no opinion leaves the frame's own count.
+           */
+          ...(isStrengthFocusPath && (state.runDays > 0 || state.rideDays > 0)
+            ? {
+              endurance_days: {
+                ...(state.runDays > 0 ? { run: state.runDays } : {}),
+                ...(state.rideDays > 0 ? { ride: state.rideDays } : {}),
+              },
+            }
+            : {}),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -5845,6 +5859,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             }))}
             rideHours={state.rideHours}
             onRideHours={(v) => setState((st) => ({ ...st, rideHours: v }))}
+            /** ⛔ HOW MANY DAYS A WEEK EACH SPORT HAPPENS — the count the hours are divided across.
+             *  ⚠️ `runDays` / `rideDays` already exist on the state and are what every other goal's
+             *  own card writes; the strength path simply stopped asking. It asks again. */
+            runDays={state.runDays > 0 ? String(state.runDays) : ''}
+            onRunDays={(v) => setState((st) => ({ ...st, runDays: v === '' ? 0 : Number(v) }))}
+            rideDays={state.rideDays > 0 ? String(state.rideDays) : ''}
+            onRideDays={(v) => setState((st) => ({ ...st, rideDays: v === '' ? 0 : Number(v) }))}
             unit={unit === 'km' ? 'km' : 'mi'}
           />
         </StepLayout>
