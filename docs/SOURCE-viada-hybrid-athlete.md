@@ -31,7 +31,7 @@ room** and without re-photographing it.
 | **A — strength grid** (pp.218–227) | transcribed with the page images open | ✅ high |
 | **D — endurance library** (pp.229–241) | transcribed with the page images open | ✅ high, but long and dense — **spot-check a session before coding it as a constant** |
 | **E — All Rounder week + notes** (pp.274–275) | transcribed with the page images open; the week table re-verified against `p274.jpg` | ✅ high |
-| **B — Ch.4 dosing** (pp.69–125) | ⚠️ written from **notes taken in an earlier session**, not from pages in hand | ⚠️ one generation removed. Re-shoot pp.69–125 before these numbers become constants. |
+| **B — Ch.4 dosing** (pp.69–125) | ⚠️ earlier-session notes, **part-corrected against the 2026-08-26 re-shoot** | ⚠️ **MIXED.** Eleven pages now read off the photographs — see **B4b** for what is confirmed and what is corrected. Everything else is still one generation removed. |
 | **C — week assembly** (pp.128–151) | ⚠️ same — earlier-session notes | ⚠️ one generation removed, **and incomplete: six items are recorded under a heading that says nine.** |
 
 ## ⛔ THE PAGE IMAGES — the ground truth
@@ -318,6 +318,124 @@ buckets equally. Intensity may rise inside a flat split.
 - **~1/3 of productive volume, at least 1×/week, holds an adaptation.**
 - As event volume climbs, taper the non-event buckets — but **keep the low-percentage high-velocity
   skill work**.
+
+## ⛔ B4b. THE RE-SHOOT — pp.69–131, read off the photographs 2026-08-26
+
+**Michael re-shot the chapter** (`~/Downloads/Endurance period/`, IMG_3637–3698, 62 frames, one page
+each: image number − 3568 = page). ⚠️ **THE SHOOT OVERRUNS PART B.** It runs pp.69–131, so it covers
+Ch.4 (Part B) *and* the opening of Ch.5 — pp.128–131, which is **PART C's** territory. The folder is
+named for endurance; the pages are the whole programming chapter.
+
+⚠️ **THIS SECTION RECORDS ONLY THE PAGES READ SO FAR — 69, 70, 92, 98, 103, 107, 116, 120, 122, 123,
+131.** The remaining ~51 frames are photographed and unread. **Part B's provenance downgrade in Part
+G item 6 therefore still stands for every number not named below.**
+
+### ⛔⛔ "THE CIRCLE OF MAXES" — p123. GAP G-8 IS ANSWERED, AND IT CHANGES A LABEL WE SHIPPED.
+
+`E1c` records p247's *"progress here should be through the circle of reps"* with the warning that the
+phrase **is not defined on that page and appears nowhere else in the corpus**, and
+`progression.ts`'s `DOUBLE_PROGRESSION_IS_OURS` ships our mechanism labelled OURS on exactly that
+basis. **p123 defines the mechanism.** He calls it the circle of MAXES:
+
+> *"As the weeks progress, athletes may rotate through the "circle of maxes," varying repetition
+> ranges and using their expected performance on each as a baseline. If an athlete repeatedly
+> succeeds at these lifts or outperforms, the coach may, after a period of time, raise their
+> theoretical 1-rep max and base the next few training microcycles/training weeks on this new max."*
+
+⛔ **THAT IS THE MECHANISM WE BUILT** — repeated success at a prescribed rep target raises the number
+the next block is prescribed from. ⚠️ It is not proof the two phrases are the same ("reps" vs
+"maxes", 124 pages apart) and the labelling call is Michael's, not this file's. **Reported, not
+relabelled.**
+
+### ⛔⛔ HOW AN ATHLETE KNOWS TO ADD OR CUT — p123, and the answer is NOT purely objective
+
+The question this re-shoot was taken to answer. He gives the endurance case directly:
+
+> *"Similar calculations may be done for endurance-focused workouts… If the athlete is completing
+> these sessions and exceeding performance expectations (**lower heart rate at completion, lower
+> reported RPE, reducing rest periods** on variable-rest workouts such as self-led fartleks, and so
+> on) **after six weeks** of training and rotating in numerous intervals and percentages that
+> represent similar "sufficient but not excessive" stimuli, the coach may lower (speed up) the
+> threshold pace by several seconds per kilometer and base the new training cycle on this updated
+> figure."*
+
+⛔ **THREE SIGNALS, AND ONE OF THEM IS FEEL.** Lower heart rate is objective; **lower reported RPE is
+subjective**; reducing rest on self-led work is behavioural. So the earlier reading — *"his adjustment
+guidance is entirely objective"* — is **CORRECTED**: reported RPE is one of the three indicators he
+names, and it sits beside the objective ones rather than under them.
+
+⚠️ **AND THE CADENCE IS SIX WEEKS**, not a month. ⚠️ **AND HE ADJUSTS THE TARGET, NOT THE VOLUME** —
+every signal above moves the *threshold pace* the next cycle is written from. **Nothing on these
+pages says an athlete should add or cut weekly HOURS by feel.**
+
+⚠️ **THE ONE PLACE FEEL IS AN IN-SESSION INSTRUCTION** is p98, on subthreshold rest: repeats
+*"separated by full rest or walk periods that allow you to complete subsequent sets while feeling
+relatively **'fresh.'**"*
+
+⛔ **AND ONE LINE SITS AGAINST "START ON THE LOWER END"** (p122). He argues for starting AT trainable
+potential:
+
+> *"I strongly advocate for steady progression that starts at trainable potential (as opposed to
+> **starting well below potential** and then progressing to overreaching — a tactic that provides more
+> rewarding-feeling progress but little other advantage)."*
+
+⚠️ **HE IS TALKING ABOUT THE TRAINING MAX AND WORKOUT TARGETS, NOT WEEKLY ENDURANCE HOURS.** It is a
+tension, not a contradiction, and it is Michael's to weigh — but a screen that says "start low"
+should know he has a sentence arguing the opposite about a neighbouring quantity.
+
+### ⛔ CONFIRMED OFF THE PAGE
+
+- **Cardiac drift 10% / 5% — CONFIRMED, p107**, and it is a session-TERMINATION rule:
+  > *"a session is terminated when cardiac drift reaches 10 percent… For hybrid athletes engaged in
+  > numerous weekly sessions, or if a session will be followed by a "key" session (one targeting a
+  > system or adaptation that you're hoping to improve in the current training cycle) **within 24
+  > hours, the number is 5 percent**."*
+- **Subthreshold 90–94% — CONFIRMED, p98:** *"repeats in the 90 to 94 percent of threshold range,
+  lasting for a kilometer or so."*
+- **Overreach-to-deload rejected — CONFIRMED, p120**, already marked read-directly.
+- **Six-zone table — CONFIRMED, p92**, Table 4.1, with the full per-zone bounds and durations.
+
+### ⚠️ CORRECTIONS AND REFINEMENTS
+
+- ⚠️ **VT1 BOUT LENGTH IS A FLOOR, NOT A PRESCRIPTION (p107).** B3 records *"VT1 bouts 10–15 min"*.
+  The page says the opposite shape: *"At lower intensities, single bouts of much less than 10 to 15
+  minutes are, therefore, unlikely to be worthwhile."* **10–15 minutes is the MINIMUM below which a
+  bout stops being worth doing** — not a prescribed bout length.
+- ⚠️ **SUBTHRESHOLD REST IS "FULL REST OR WALK", NOT 4:1 (p98).** B-notes record threshold work at
+  *"4:1 work-to-rest"*. p98 prescribes *"more complete rest periods than you may be accustomed to…
+  full rest or walk periods"* — considerably MORE rest than 4:1. ⛔ Either the 4:1 belongs to a
+  different intensity or the note is wrong; **the page for 4:1 has not been found yet**, so this is
+  flagged rather than overwritten.
+- ⚠️ **THE DOSING VARIABLE IS TIME-AT-INTENSITY (p98):** *"the total duration of time spent near
+  threshold is the relevant variable at play here, and being in an extremely high fatigue state
+  during this period is not necessary for adaptation."*
+
+### ⛔ HE USES THE PHRASE "TRAINING MAX" HIMSELF — p122
+
+> *"the testing I recommend is an assessment of "typical day potential"… utilizing a **"training
+> max"** or relative percentage of "perfect race performance" is preferable to utilizing "perfectly
+> peaked" performances when structuring workouts."*
+
+⛔ **THIS DOES NOT SOFTEN PART H'S RULE.** Viada's training max is a typical-day potential; Wendler's
+is 85% of a true 1RM. They remain two quantities wearing one English word, and no function may accept
+both. What changes is only that **the phrase is his, not our paraphrase.**
+
+⚠️ **AND p122 GIVES BRZYCKI ALONE, WITH THE FORMULA:** *"1 rep max = weight / (1.0278 − 0.0278 ×
+reps)"*, worked as 200 kg daily max → 178 kg 5RM → ~150 kg 10RM. Part H (p215) records the working max
+as **Epley and Brzycki AVERAGED**. Two different passages, two different jobs — p122 is illustrating
+workout targets, p215 is deriving a working number — but **anyone coding either should read both.**
+
+⛔ **AND HE RULES OUT 0 RIR FOR STRENGTH WORK (p122):** *"training to 0 reps in reserve is
+inadvisable (and performing multiple sets that each represent one's daily maximum potential is nearly
+impossible)"* — the example leaves *"about 2 reps in reserve."*
+
+### ⚠️ NOT YET FOUND ON A PAGE
+
+The five accounting buckets, the 10%-per-week change rule, the "back off all buckets equally"
+instruction, the weekly floor (one speed / one subthreshold / remainder VT1), the 6–8h two-a-day
+spacing, the 4–6h post-VT1 spacing, the ~1/3 maintenance figure, and the 2h VT1 session ceiling.
+**All still carry Part B's one-generation-removed provenance.** They are likely in the ~51 unread
+frames; they are not in the eleven pages read.
 
 ## B7. Progression, testing, periodization
 
@@ -1120,9 +1238,17 @@ they are equivalent.
 5. **The session-order rules are INCOMPLETE.** Six items are recorded under a heading that says
    nine, they came from earlier-session notes rather than pages in hand, and the numbering may not
    map 1:1 (some rules are split a/b across pages). ⛔ **Re-shoot pp.139–145. Do not cite "rule N".**
-6. **Part B (Ch.4 dosing) was written from earlier-session notes, not from pages in hand.** The
-   numbers are believed right and were stated consistently across two sessions, but they are one
-   generation removed from the book. Re-shoot pp.69–125 before they become code constants.
+6. ⚠️ **PART B — THE RE-SHOOT EXISTS AND IS PART-READ (updated 2026-08-26). STILL OPEN.**
+   The pages are photographed: `~/Downloads/Endurance period/`, IMG_3637–3698, 62 frames covering
+   **pp.69–131** (image number − 3568 = page). ⚠️ The shoot OVERRUNS Part B — pp.128–131 are Ch.5 and
+   belong to **Part C**, whose provenance is downgraded for the same reason.
+   ✅ **ELEVEN PAGES READ OFF THE PHOTOGRAPHS** — 69, 70, 92, 98, 103, 107, 116, 120, 122, 123, 131 —
+   and recorded in **B4b**, with four confirmations, three corrections, and the answer to the
+   adjust-by-feel question.
+   ⛔ **~51 FRAMES REMAIN UNREAD, AND EVERY NUMBER NOT NAMED IN B4b STILL CARRIES THE OLD PROVENANCE.**
+   Specifically still one generation removed: the five accounting buckets, the 10%-per-week change
+   rule, "back off all buckets equally", the weekly floor, both two-a-day spacings, the ~1/3
+   maintenance figure and the 2h VT1 ceiling. **Do not code any of those as constants yet.**
 5. ✅ **CLOSED — all eighteen Ch.10 programs are captured as images** (pp.244–284, see Part E0).
    Sixteen are untranscribed **by choice**, not by gap.
 7. ⚠️ **p215 IS READ AND VERIFIED; ITS IMAGE IS PENDING IN THE FOLDER** (raised and closed
@@ -1185,3 +1311,121 @@ they are equivalent.
   successor programs, so the set is a transition graph rather than a list; and every endurance cell
   is written in the Part D session vocabulary, which is the seam a generator would work through.
   **The corpus is now 151 images and nothing in this file is waiting on a page.**
+
+---
+
+## ⚠️ B4c. RELAYED FINDINGS — pp.108–151, read off photographs 2026-08-26 by a session that died before transcribing
+
+⛔ **PROVENANCE WARNING, READ FIRST.** Every quote below was read off a page image by a research
+session that reported it in chat and then terminated before writing it into this file. The quotes
+are recorded here verbatim as relayed, but **this section is one step weaker than B4b** — nobody has
+re-verified these against the images since. ⚠️ **Verify each page before any number here becomes a
+code constant.** They are recorded rather than lost.
+
+⚠️ **AND THE FILENAME FORMULA DRIFTS.** The relaying session found that `IMG_number − 3568 = page`
+breaks past p109 — IMG_3696 prints page 129, not 128, so the shoot gains a frame somewhere. **Do not
+cite a page from a Downloads filename alone.** Page-numbered images are at
+`~/Efforts_Local_Folder/book-sources/viada-hybrid-athlete/`.
+
+### ⛔⛔ p119 — THE PAGE THE WHOLE ENDURANCE QUESTION TURNS ON
+
+Under "Full-spectrum performance in the 'maintained' athletic parameters":
+
+> *"If you are peaking your strength and want to put running on the back burner, you should NOT
+> simply 'run base miles' or 'sprint once a week' to maintain your running. You may reduce your
+> running to a minimum effective dose, but it's crucial to continue to train running economy (often
+> via speed work), maintain your threshold performance (through some near-threshold work), and base
+> (via easy miles) in your running program. The volume can be dramatically reduced, but no quality
+> should be allowed to deteriorate completely."*
+
+⛔ **THIS IS HIS ANSWER TO "KEEP MY TOP END, KEEP MY MILES." He grants the top end and refuses the
+miles.** All THREE qualities must remain present — speed, near-threshold, easy — which is a floor of
+three distinct endurance flavours, not two.
+
+### ⛔ p118 — THE INTENSITY DOES NOT DROP
+
+> *"The adaptive pressure on your body to rapidly drop 'gains' in one area due to higher demands in
+> another may require you to train these lower-priority systems or disciplines with just as much
+> intensity as during your concurrent progress phases if you want to minimize losses (just with more
+> careful attention paid to limiting fatigue)."*
+
+Same page: *"Progressing in a single parameter while stagnating or deteriorating in others is
+technically not hybrid. It's sport switching."*
+
+### ⛔ p134 — WHICH MILES GET CUT
+
+> *"A running program that's intended to build peak running performance may have a certain ideal
+> dose of mileage that maximizes adaptations, and a hybrid athlete may not be able to manage this
+> and might need to ruthlessly chop miles here and there."*
+
+Hybrid athletes end up doing proportionately more near-threshold running, compound lift variations
+and plyometrics than they expected — in contrast to athletes who gravitate to accumulating
+lower-intensity miles, *"junk volume — sessions that would seem to be lower in fatigue but end up
+being equally low stimulus."* ⛔ **The cut comes out of the EASY miles.**
+
+### ⛔ p149 — FEEL IS THE TRIGGER, BOTH DIRECTIONS
+
+> *"If an athlete begins to show signs of overreaching… I recommend that you reduce a program by
+> equal amounts in ALL these buckets if you're feeling taxed, and then you can progress incrementally
+> in one or two buckets at a time (where indicated) if you're feeling ready to push again."*
+
+⚠️ **THIS CORRECTS B4b**, which states "Nothing on these pages says an athlete should add or cut
+weekly HOURS by feel." p149 says exactly that. p108 adds: *"Do as much as you feel you can for your
+goals, but any exercise is better than none."*
+
+### ⛔ p137 — A QUANTIFIED PRESCRIPTION FOR THE RUN+RIDE CUSTOMER
+
+> *"If you're a hybrid runner and have determined that 18 to 20 miles per week running at various
+> intensities represents your current upper bound, adding two hours of cycling or Arc Trainer/
+> elliptical per week will almost certainly aid your running, as long as you properly maintain
+> recovery."*
+
+Same page carries the cross-training law verbatim: *"when in doubt, use cross-training for easy
+work, not threshold or sprint work."*
+
+### ⛔ p138 — THE EXCEPTION THAT SANCTIONS A HARD RIDE
+
+> *"Consider adding some work at higher intensity with similar modalities IF you're really pushing
+> the limits of your tolerable volume and you can't otherwise figure out how to break through to the
+> next level."*
+
+⛔ So a hard RIDE in place of a hard run is permitted **precisely when running volume is capped** —
+which is this app's customer. This is the page that turns the bike graft from an inference into a
+sanctioned case.
+
+### ⛔ p86 — THE SECOND QUANTIFIED INTERFERENCE COST, LIFTING → ENDURANCE
+
+> *"A highly taxing, 14+ work set session may diminish performance in other modalities significantly
+> for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set
+> session may result in only marginal performance deficits for twenty-four hours, with few issues
+> noted forty-eight hours after the session."*
+
+⛔ **The cost of a lifting day is a SET COUNT, not a percentage.** 6–8 work sets keeps the next day's
+run intact; 14+ does not.
+
+### CONFIRMED OFF THE PAGE — all previously one generation removed
+
+| claim | page |
+|---|---|
+| The five accounting buckets, defined individually, two worked weekly examples | pp.146–147 |
+| 10%/week change rule — *"aiming to change each of these by less than 10 percent per week, though ideally 5 percent is as high as I will usually go"* | p148 |
+| Back off all buckets equally when overreaching | p149 |
+| Weekly floor: one speed, one subthreshold, remainder VT1 or below · "All minutes count" | p109 |
+| 2h VT1 session ceiling + 6–8h between two-a-days | p108 |
+| One-third of productive volume, at least 1×/week, holds an adaptation | p151 |
+| Strength dose: 4–6 reps over 90% + 15–20 velocity reps at 70–85%, 2×/week ideal, floor once per 8–9 days, 3:1 speed-to-heavy when adding | p80 |
+| Hypertrophy dose: 8–12 sets/muscle/week, 18–20 borders overreaching, 32–48 effective reps, 70–80 max, 8–10 reps preferred, 1–2 RIR | p86 |
+
+### ⛔ p99 CLOSES B4b's OPEN CONFLICT
+
+4:1 work-to-rest, rest never under 30s or over 2 min, 8–15 min intervals capped at 2 min rest, over
+15 min becomes a single-effort tempo. ⚠️ **This resolves the apparent contradiction with p98:** 4:1
+is THRESHOLD work; the "full rest or walk periods" instruction is SUBTHRESHOLD 90–94% repeats. Two
+different intensities, no contradiction. B4b's note that "the page carrying 4:1 has not been found"
+is now closed.
+
+### STILL UNREAD
+
+⚠️ Roughly 35 frames of the pp.69–151 shoot were still unread when the session ended. Nothing found
+so far contradicts the corpus's existing "no program is both strength-leading and run+ride" finding,
+the 2h30-vs-p247 long-run conflict, or the shipped lifting progression.
