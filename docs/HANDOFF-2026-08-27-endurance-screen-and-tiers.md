@@ -12,7 +12,7 @@ first; go to that one when you need a page cited.
 | | |
 |---|---|
 | **pushed + deployed** | through `192694b6`. Client live on `efforts.work` (confirmed off the served bundle, not assumed). Edge functions `generate-strength-plan`, `create-goal-and-materialize-plan`, `rematerialize-standing-block`. |
-| **committed, NOT pushed** | `9ba51cf6` and `1d873131` — the hours-rung fix and the fixed-dose fix. Tests green. |
+| **all pushed + deployed** | through `f8cb7637`, 2026-08-27 evening. 390 engine tests green. Includes the hours-rung fix, the fixed-dose fix and the repeat-count fix. |
 | **verified on a device** | Michael built plans through the live wizard repeatedly today and read the exports. **The wizard and the composer ARE device-exercised.** What has never been checked: the strides reaching an actual Garmin workout. |
 
 ---
@@ -97,6 +97,62 @@ said *"your session from p234"* would not be. Never name him for a specific work
 
 ---
 
+# ⛔⛔ 2b. MICHAEL'S LAST RULING OF THE DAY — HISTORY IS OUT OF THE LEVEL DECISION
+
+*"I dont want that."* Said on being told the level is currently decided from his last 28 days of
+logged runs and rides.
+
+⛔ **THE EXPERIENCE CHIPS BECOME THE SOLE INPUT TO THE HARD-SESSION LEVEL.** `lowVolumeSports` /
+`demonstratedRunVolume` stop deciding it. No fallback, no "history corrects it later" — the athlete
+answers and that is the level.
+
+⛔ **HIS OWN CASE, AND IT IS THE WHOLE ARGUMENT:** *"im coming off a marathon a few months ago I was
+training less, this is the wrong thing."* A 28-day window measures the last month, not training age.
+Post-race, injured, off-season, on holiday, or simply not syncing a watch all read as beginner.
+p247's word is *"experience level"*, never recent mileage.
+
+⚠️ **NOT IN SCOPE UNLESS HE SAYS SO:** the separate advanced tier that adds extra EASY sessions above
+25 demonstrated miles a week (`advancedTierSessions`). It adds volume, not hard-session length. It
+has the same 28-day flaw and he was told it exists; he left it standing.
+
+⚠️ **WHAT THIS DELETES ALONG WITH IT:** §3's no-history-reads-as-low problem and the never-ramps
+problem both disappear, because neither the gate nor the ramp exists any more. §3 below is retained
+as the REASON the control exists, not as open work.
+
+## ⛔ THE MEASURED NUMBERS — re-measured after the repeat-count fix, off built sessions
+
+Maximum session length per level, warm-up and cooldown included, at `size: 0.5`:
+
+| family | L1 | L2 | L3 |
+|---|---|---|---|
+| `run_near_threshold` (hard slot 2) | **46m** | 56m | **71m** |
+| `run_mlss` (hard slot 1) | **44m** | **49m** | 54m |
+| `ride_sweet_spot` | **68m** | **75m** | 83m |
+
+**Bold = the two levels Strength + 5K actually uses for that slot** (standard week and taper week),
+which are the two tiers. The chips for Michael's own config — ride on hard 1, run on hard 2:
+
+```
+Running experience
+Sets the length of your hard runs.
+[ Newer · up to 46 min ]  [ Experienced · up to 71 min ]
+
+Riding experience
+Sets the length of your hard rides.
+[ Newer · up to 68 min ]  [ Experienced · up to 75 min ]
+```
+
+⚠️ **THE RIDE LADDER IS WEAK — 68 against 75.** Both levels' longest shape is his 20-minute-block
+session, which barely changes between them. Michael was told and kept the control: it is still the
+athlete's answer, and it stops the bike being the one sport they have no say over.
+⚠️ **SWAP THE SPORTS BETWEEN SLOTS AND THE NUMBERS CHANGE** — a run on Monday is 44 against 49, a
+ride on Wednesday is 68 against 83. The screen computes them from the slot answers four rows above.
+⚠️ **CONFIRMED IN A PROBE, NOT IN A BUILT PLAN.** Michael had not rebuilt after the deploy when the
+session ended.
+
+
+---
+
 # ⛔ 3. WHAT THE TIER CONTROL REPLACES — and why it exists
 
 Today the level is inferred from logged history alone, and **`lowVolumeSports` treats no history as
@@ -166,9 +222,10 @@ p93 puts surplus on easy work.
 
 # 6. STILL OPEN
 
-1. ⛔ **§1's builder bug.** Blocks the screen.
-2. **The tier control itself** (§2), once §1 gives real numbers.
-3. **The tier gate** (§3) — no history reads as low, and it never ramps.
+1. ⛔⛔ **BUILD THE EXPERIENCE CONTROL** (§2 + §2b). Two chips per sport, history out of the level.
+   This is the next piece of work and everything for it is settled — design, copy, tiers, numbers.
+2. ✅ **§1's builder bug is FIXED** (`67cda50f`) and the numbers below are re-measured against it.
+3. ✅ **The tier gate problems in §3 are moot** once §2b lands — no gate, no ramp needed.
 4. **The endurance ledger has no surface.** Built and computing; State has no home for five numbers
    (`ReadoutTiles` caps at three) and nothing renders it.
 5. **The tamp-down control.** `adapt-plan` declares `endurance_deload` and never emits it. Transport
