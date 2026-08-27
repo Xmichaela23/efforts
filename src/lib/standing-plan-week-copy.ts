@@ -35,13 +35,16 @@ export const SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
  * baseline, and a hard run CAUSES the reduction** — which is what `CONSEQUENCE[1]` now says instead.
  * Do not reinstate the old framing; it had the causality backwards.
  *
- * ⚠️ HIS PUNCTUATION AND CAPITALISATION ARE HIS AND ARE NOT TYPOS TO FIX. The capital L in "One Long
- * session", the missing full stops on three lines, "weightloads" as one word, and the double space in
- * "4  endurance" are all as he wrote them.
- * ⚠️ THE DOUBLE SPACE COLLAPSES IN THE BROWSER — HTML folds runs of whitespace, so it renders as one
- * space. He has been told. ⛔ DO NOT ADD `white-space: pre-wrap` TO PRESERVE IT: that would preserve
- * every other whitespace choice in the block as a side effect, which is a bigger change than the one
- * character it would save.
+ * ⚠️⚠️ THE "HIS TYPOS ARE HIS" RULE IS SUPERSEDED (Michael, 2026-08-27), AND THE HISTORY MATTERS.
+ * This note used to protect the double space in "4  endurance", the capital L in "One Long session"
+ * and the missing full stops as deliberate. He has since called the first two typos rather than
+ * style, and they are fixed. **The missing full stops stay** — every line in the list is a fragment
+ * and none of them takes one.
+ * ⛔ THE OLD REASONING IS KEPT SO THE FIX IS NOT RE-LITIGATED IN EITHER DIRECTION: the double space
+ * collapses in the browser anyway (HTML folds runs of whitespace), and `white-space: pre-wrap` was
+ * ruled out for preserving every other whitespace choice in the block as a side effect. Nothing is
+ * lost by it being gone.
+ * ⚠️ "weightloads" AS ONE WORD IS STILL HIS and is untouched.
  *
  * ⚠️ ALL SEVEN LINES PASS `voiceViolation` UNAIDED — measured, not assumed. No exemption is recorded
  * for this block and none is needed; if a future edit trips the gate, that is the gate working.
@@ -49,10 +52,10 @@ export const SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
 
 /** Lines 1-4: WHAT THE WEEK IS. The opening line, then its three slots. */
 export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
-  'Your week has 4  endurance slots.',
-  'One Long session',
+  'Your week has 4 endurance slots.',
+  'One long session',
   'One easy session',
-  '2 that can be filled with hard or easy session.',
+  'Two hard sessions',
 ];
 
 /**
@@ -86,7 +89,23 @@ export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
  */
 export const ENDURANCE_WEEK_INTRO_CONSEQUENCE: string[] = [
   'Rides are easier on your legs than runs.',
-  'Lower body weightloads will automatically be reduced if you add a hard run',
+  /**
+   * ⛔⛔ REWRITTEN (Michael, 2026-08-27). It read *"Lower body weightloads will automatically be
+   * reduced if you add a hard run"*, and it was wrong twice over.
+   *
+   * ⛔ "IF YOU ADD" DESCRIBED A CONTROL THAT NO LONGER EXISTS. Both quality sessions are the frame's;
+   * there is nothing to add.
+   * ⛔⛔ AND THE REDUCTION DOES NOT FIRE ON ANY HARD RUN. `hardRunBeforeLower` fires only when the
+   * hard run actually lands the day BEFORE the heavy leg session — p247's own stated cause:
+   * *"Monday's run is fairly challenging, given that there is an ME lower session the next day… a 3
+   * to 4 percent reduction in working 1RM should be assumed here."* The old line promised it
+   * unconditionally, which is a screen describing a week the engine does not build.
+   *
+   * ⚠️ THE NUMBER IS p247's OWN BAND, and the engine applies 3.5% — the midpoint, which is the one
+   * value in `lowerBodyHaircut` labelled ours. The band on the screen contains the number in the
+   * block, so they cannot contradict. ⛔ If they ever do, the copy is wrong and not the engine.
+   */
+  'A hard run the day before heavy legs reduces the squat and deadlift by 3–4%.',
 ];
 
 /** His block whole, in order — for the test that pins it verbatim. */
@@ -238,10 +257,15 @@ export const VOLUME_HONESTY_LINES = [
    */
   'Pick the hours you currently hold comfortably — this is not the time for road PRs.',
   'More running will slow your strength progress; riding is much more forgiving.',
-  // ⛔ "re-dial" IS A DEBT (2026-08-24 evening, flagged at the time): no mid-block volume edit
-  // exists today — the wizard is the only place these numbers are typed. The line ships on
-  // Michael's call; the control it promises is owed. Same pattern as the retired "unlock" line.
-  'Start on the lower end if unsure — give it a month before re-dialing your endurance numbers.',
+  /**
+   * ⛔⛔ THE PROMISE IS CUT AND THE DEBT IS DISCHARGED WITH IT (Michael, 2026-08-27). The line read
+   * *"Start on the lower end if unsure — give it a month before re-dialing your endurance numbers"*,
+   * and this file's own comment had flagged the second half as a debt since 2026-08-24: **no
+   * mid-block volume edit exists**, so it promised a control that was never built.
+   * ⚠️ THE ADVICE HALF IS SOURCED AND STAYS. p149: *"Too rapid increases in any category is the
+   * greatest source of program failure that I observe in hybrid programs."*
+   */
+  'Start on the lower end if unsure.',
 ] as const;
 
 /** The reality-check bands are field practice (the novice/intermediate norms the big running apps

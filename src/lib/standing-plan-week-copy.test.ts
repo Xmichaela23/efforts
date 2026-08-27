@@ -151,18 +151,19 @@ Deno.test('⛔⛔ EVERY ROW STARTS NEUTRAL, AND CONTINUE WAITS ON ALL FOUR', () 
 
 Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
   /**
-   * ⛔ SHIP IT AS WRITTEN (2026-08-26). His capitalisation, his missing full stops, "weightloads" as
-   * one word, and the double space in "4  endurance". ⚠️ THE DOUBLE SPACE COLLAPSES IN THE BROWSER —
-   * HTML folds runs of whitespace — and he has been told; `white-space: pre-wrap` was ruled OUT
-   * because it would preserve every other whitespace choice in the block as a side effect.
+   * ⛔ HIS WORDS, AND HIS OWN CORRECTIONS TO THEM (2026-08-27). The block was pinned character-exact
+   * on 2026-08-26 including the double space in "4  endurance" and the capital L in "One Long
+   * session"; he has since called those two typos rather than style. **The missing full stops stay** —
+   * every line in the list is a fragment.
+   * ⚠️ "weightloads" IS GONE WITH THE LINE THAT CARRIED IT, not normalised away — see below.
    */
   assertEquals(ENDURANCE_WEEK_INTRO, [
-    'Your week has 4  endurance slots.',
-    'One Long session',
+    'Your week has 4 endurance slots.',
+    'One long session',
     'One easy session',
-    '2 that can be filled with hard or easy session.',
+    'Two hard sessions',
     'Rides are easier on your legs than runs.',
-    'Lower body weightloads will automatically be reduced if you add a hard run',
+    'A hard run the day before heavy legs reduces the squat and deadlift by 3–4%.',
   ]);
   /**
    * ⛔⛔ HIS THIRD CONSEQUENCE LINE IS DELETED (2026-08-26 evening) — *"Easy sessions are the default
@@ -179,10 +180,13 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
     'the deleted default line is back');
   assertEquals(/fewer (of your )?hours/i.test(ENDURANCE_WEEK_INTRO.join(' ')), false,
     'a "the block spends fewer hours" line was added — see p149, this customer is not at a ceiling');
-  // ⛔ THE DOUBLE SPACE IS IN THE STRING. A "helpful" trim would be a silent edit of his copy.
-  assert(ENDURANCE_WEEK_INTRO[0].includes('4  endurance'), 'his double space was normalised away');
-  // ⛔ AND THE CAPITAL L, which every spellcheck wants to fix.
-  assert(ENDURANCE_WEEK_INTRO[1].includes('One Long session'));
+  /**
+   * ⛔⛔ THE FOURTH LINE DESCRIBED A CONTROL THAT NO LONGER EXISTS. It read *"2 that can be filled
+   * with hard or easy session."* — true while the hard slots were opt-in, and false from the moment
+   * both quality sessions became the frame's. Two hard sessions is what the week has.
+   */
+  assertEquals(/hard or easy session/.test(ENDURANCE_WEEK_INTRO.join(' ')), false,
+    'the opt-in line is back on a screen with no opt-in');
 
   /**
    * ⛔⛔ TWO PARTS, NOT ONE WALL — the split is the point of the change, not a decoration on it.
@@ -204,7 +208,20 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
    */
   const whole = ENDURANCE_WEEK_INTRO.join(' ');
   assertEquals(/may improve your lower body lifts/.test(whole), false, 'the backwards framing is back');
-  assert(/reduced if you add a hard run/.test(whole), 'the causality line was lost');
+
+  /**
+   * ⛔⛔ AND THE CONSEQUENCE LINE STATES THE CONDITION NOW (2026-08-27). It used to read *"Lower body
+   * weightloads will automatically be reduced if you add a hard run"*, which was wrong twice: "if you
+   * add" named a control that is gone, and the reduction does NOT fire on any hard run.
+   * `hardRunBeforeLower` fires only on the adjacency p247 states — *"Monday's run is fairly
+   * challenging, given that there is an ME lower session the next day… a 3 to 4 percent reduction in
+   * working 1RM should be assumed here."*
+   * ⚠️ THE BAND ON THE SCREEN MUST CONTAIN THE NUMBER IN THE BLOCK. The engine applies 3.5% — the
+   * midpoint, and the one value in `lowerBodyHaircut` labelled ours — which sits inside his 3-4%.
+   */
+  assert(/day before heavy legs/.test(whole), 'the condition was dropped from the reduction line');
+  assert(/3–4%/.test(whole), 'p247\'s own band left the screen');
+  assertEquals(/if you add a hard run/.test(whole), false, 'the unconditional promise is back');
 });
 
 Deno.test('⛔ THE PICKER DRAWS LONG FIRST, AND IT IS A RENDER ORDER ONLY', () => {
