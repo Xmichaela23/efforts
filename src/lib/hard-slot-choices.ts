@@ -210,6 +210,21 @@ export function variantsTakenBy(
  * renders, label-only, so a new archetype can never be hidden by missing copy.
  */
 export const VARIANT_BODY: Record<string, string> = {
+  /**
+   * ⛔⛔ THE DEFAULT'S OWN LINE, AND IT IS HIS (p229, read off the image 2026-08-27):
+   * *"I encourage you to try each type of workout in each segment; some may be subjectively 'easier'
+   * than others, and each one has a slightly different intent/emphasis. When in doubt, alternate
+   * between the one you like the most and hate the most."*
+   *
+   * ⛔ SO ROTATION IS INSTRUCTED AND HOLDING ONE IS ALLOWED — *"when in doubt"* is what makes a
+   * settled preference legitimate. The line says which way he leans without taking the choice away.
+   *
+   * ⚠️ "try" IS A BANNED WORD in `voiceViolation`, so his verb cannot be quoted directly here.
+   * ⚠️ AND WHAT IS OURS IS THE ORDER: he alternates between the one the athlete likes most and hates
+   * most; we alternate by week number, because nobody can answer that question before they have
+   * done both. Not asked, and not claimed as his.
+   */
+  '': 'Each shape has a different emphasis, and Viada encourages covering them all across a block.',
   // run_mlss (pp231-232)
   surge_float: 'Surges above threshold with a hard float between, in sets.',
   descending: 'Repeats that shrink as you go — recovery shrinks with them.',

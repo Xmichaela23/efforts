@@ -89,7 +89,17 @@ import { musclesWorkedBy } from '../accessory-dosing/index.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 
-/** The default rotation: the family's offered archetypes at this level, alternated by week. OURS. */
+/**
+ * ⛔⛔ THE DEFAULT ROTATION — the family's offered archetypes at this level, alternated by week.
+ * **HIS, not ours** (relabelled 2026-08-27 off p229): *"I encourage you to try each type of workout
+ * in each segment; some may be subjectively 'easier' than others, and each one has a slightly
+ * different intent/emphasis. When in doubt, alternate between the one you like the most and hate the
+ * most."*
+ *
+ * ⚠️ WHAT IS OURS IS THE ORDER. He alternates between the one the athlete likes most and hates most;
+ * this alternates by week number, because that preference cannot be answered before they have done
+ * both and the wizard does not ask it. ⚠️ An explicit pick still wins — see the call site.
+ */
 function rotatedArchetype(family: string, level: number, week: number): string | undefined {
   const rules = (FAMILIES as Record<string, { archetypes: Array<{ id: string; levels?: number[] }> }>)[family];
   if (!rules) return undefined;
