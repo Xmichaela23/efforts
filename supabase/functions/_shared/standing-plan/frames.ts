@@ -315,6 +315,85 @@ export function advancedTierSessions(demonstratedWeeklyMiles: number | null | un
 }
 
 /**
+ * ⛔⛔ THE LOW-VOLUME TIER — THE SAME SESSIONS AT HIS SMALLER SIZES (2026-08-26 evening).
+ *
+ * ⛔ THE DEFECT IT ANSWERS, MEASURED. With all four endurance slots on foot, the frame's standard
+ * column has a FLOOR of three hours twenty: MLSS level 2 (32 min), NT level 3 (75), VT1 level 1 (25)
+ * and LSD level 2 (68) at their shortest. Ask for two hours of running and the week still built
+ * 3h20 — about seventy per cent more than the athlete said they run, in week one.
+ *
+ * ⛔ AND THAT IS THE FAILURE HE NAMES BY NAME. p148: change each bucket by *"less than 10 percent"*
+ * a week, *"though ideally 5 percent is as high as I will usually go."* p149 calls too-rapid
+ * increases *"the greatest source of program failure that I observe in hybrid programs."* It lands
+ * hardest on this plan's own stated customer — ten to thirty miles a week, which at the bottom is
+ * about an hour forty.
+ *
+ * ⛔⛔ THE LEVELS ARE HIS. p246's TAPER column prescribes these same two quality sessions at LEVEL 1
+ * — MLSS level 1 on day 1, near-threshold level 1 on day 3 — so the smaller dose is his own number
+ * for his own session, already transcribed in `STRENGTH_5K_TAPER` above.
+ *
+ * ⛔ AND THE LONG SESSION SCALES WITH THEM, ON p247's OWN SENTENCE: *"Mileage will be dictated by
+ * experience level, with more proficient runners looking at runs up to 90 to 100 minutes here with
+ * an emphasis on LT intervals, and less experienced runners opting for shorter fartlek variations."*
+ * The 90-to-100-minute long session — the ceiling this engine adopted — is stated as the PROFICIENT
+ * runner's figure. `run_lsd` level 1 is p235's own band for the same session (35-90 min), so the
+ * shorter long run is his dose too.
+ *
+ * ⚠️ THE LEVEL MOVES, THE BAND NEVER DOES. p275 forbids stretching a session past its band and the
+ * same logic binds the other end: nothing here shortens a session below what the page prints for it.
+ * ⚠️ AND NO SESSION IS DROPPED. All four slots are the frame's (p119, 2026-08-26) — the tier changes
+ * how big they are, never how many there are.
+ * ⚠️ IT ONLY TOUCHES RUN FAMILIES, so a mixed athlete whose hard slots are rides is unaffected by
+ * construction rather than by a special case. The defect only ever bit the run slots.
+ * ⚠️ AND IT BARELY MOVES THE TOP. A low-tier athlete asking for five hours still gets four and a
+ * half, because the easy and long sessions are base families and climb. What the tier changes is the
+ * FLOOR — three hours twenty becomes about two.
+ */
+export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
+  run_mlss: 1,
+  run_near_threshold: 1,
+  run_lsd: 1,
+};
+
+/**
+ * ⛔ THE GATE IS DEMONSTRATED HISTORY, AND THE THRESHOLD IS OURS — the same shape as
+ * `ADVANCED_TIER_MIN_WEEKLY_MILES`, pointing the other way.
+ *
+ * He says *"less experienced runners"* and defines nothing, so the number cannot be his and is
+ * labelled. ⚠️ TWENTY MILES A WEEK IS OURS, and the derivation is the frame's own arithmetic rather
+ * than a preference: the standard column's four run sessions total about three hours twenty at their
+ * shortest, which is what twenty miles a week is at an easy ten-minute mile. **Below that line the
+ * frame's own floor asks for more running than the athlete already does** — which is the defect.
+ *
+ * ⚠️ NO HISTORY MEANS THE LOW TIER, and that is the same rule the advanced gate follows from the
+ * other end: never hand out volume the athlete is not shown to be doing (§0h — an unknown week is
+ * not licence to hand out the ceiling). ⛔ It is DEMONSTRATED, never the hours they typed: the ask
+ * sizes the week inside the tier, it does not choose the tier.
+ */
+export const LOW_VOLUME_TIER_MAX_WEEKLY_MILES = 20;
+export const LOW_VOLUME_TIER_GATE_IS_OURS =
+  'The source says "less experienced runners" and defines nothing. Twenty miles a week is ours — '
+  + 'the frame\'s own four run sessions total about three hours twenty at their shortest, which is '
+  + 'twenty miles at an easy ten-minute mile, so below that line the week would ask for more running '
+  + 'than the athlete already does. The smaller sizes themselves are his: the taper column prescribes '
+  + 'these sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient '
+  + 'runner\'s figure.';
+
+/**
+ * The endurance levels this athlete's running history earns, per family.
+ *
+ * ⚠️ EMPTY IS THE STANDARD COLUMN. An athlete at or above the gate gets p246 exactly as printed.
+ */
+export function lowVolumeRunLevels(
+  demonstratedWeeklyMiles: number | null | undefined,
+): Record<string, Level> {
+  const miles = Number(demonstratedWeeklyMiles);
+  // ⚠️ UNREADABLE OR ABSENT HISTORY TAKES THE SMALLER WEEK — see the gate note above.
+  if (Number.isFinite(miles) && miles >= LOW_VOLUME_TIER_MAX_WEEKLY_MILES) return {};
+  return { ...LOW_VOLUME_TIER_LEVELS };
+}
+
+/**
  * ⛔ PLYO DOSE — the drill count and the stop rule are HIS; the effort count is OURS (pivot §8).
  *
  * p227: *"Throwing more than three or four plyometric movements together on a given day is likely a

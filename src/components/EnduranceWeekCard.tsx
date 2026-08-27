@@ -65,6 +65,12 @@ export type EnduranceWeekCardProps = {
   /** The athlete's baselines row — the caps resolve every session against their own anchors. */
   baselines?: unknown;
   easyPaceSecPerMi?: number | null;
+  /**
+   * ⛔ WHAT THEY ACTUALLY RAN over the last four weeks — the low-volume tier's gate. The hours this
+   * screen quotes come from the levels that tier picks, so it has to be the same number the engine
+   * reads. ⚠️ Absent takes the smaller week, exactly as the composer does.
+   */
+  demonstratedWeeklyMiles?: number | null;
   /** Weekly running, in the athlete's own display unit. */
   runVolume: string;
   onRunVolume: (v: string) => void;
@@ -130,6 +136,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const bounds = weekBounds(props.slots, {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
+    demonstratedWeeklyMiles: props.demonstratedWeeklyMiles,
   });
 
   /**

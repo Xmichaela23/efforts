@@ -45,6 +45,8 @@ import {
 import {
   advancedTierSessions,
   FRAMES,
+  LOW_VOLUME_TIER_GATE_IS_OURS,
+  lowVolumeRunLevels,
   PLYO_DOSE,
   type ColumnKind,
   type FrameDay,
@@ -1350,6 +1352,22 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⚠️ THE TIER'S GATE IS UNCHANGED — `advancedTierSessions` still decides how many, on demonstrated
    * history. This only counts what it decided.
    */
+  /**
+   * ⛔⛔ THE LEVEL A SLOT IS BUILT AT, WITH ONE OWNER (2026-08-26 evening). Three things can decide
+   * it and they have a fixed precedence:
+   *
+   *   1. the ATHLETE's own answer (`levelOverrides`) — an explicit choice always wins;
+   *   2. the LOW-VOLUME TIER, when their running history does not carry the frame's own floor;
+   *   3. the FRAME's printed level (p246).
+   *
+   * ⛔ THE TIER IS NOT WRITTEN INTO `levelOverrides`, deliberately. That field means *"the level the
+   * athlete chose"*, and folding a program tier into it would lose the difference between a decision
+   * they made and one the engine made for them — which is the label this codebase exists to keep.
+   */
+  const tierLevels = lowVolumeRunLevels(args.demonstratedWeeklyMiles);
+  const levelForFamily = (family: string, frameLevel: Level): Level =>
+    (args.levelOverrides?.[family] as Level | undefined) ?? (tierLevels[family] as Level | undefined) ?? frameLevel;
+
   const enduranceSpecs: SlotSpec[] = (() => {
     const out: SlotSpec[] = [];
     for (const d of days) {
@@ -1357,7 +1375,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const a = assignedSlot(sportAssignment, d.day, i, slot);
         // ⚠️ THE FRAME'S OWN LEVEL, not the dial's answer — `slotSpans` builds the ladder UP from
         // here, so handing it a climbed level would start the ladder half-spent.
-        out.push({ family: a.family, level: (args.levelOverrides?.[a.family] as Level | undefined) ?? a.level, archetype: a.archetype, sport: a.sport });
+        out.push({ family: a.family, level: levelForFamily(a.family, a.level), archetype: a.archetype, sport: a.sport });
       });
     }
     const swims = Math.min(2, Math.max(0, Math.round(Number(args.swimEasySessions) || 0)));
@@ -1434,10 +1452,15 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⚠️ `levelOverrides` STILL WINS. An explicit caller answer is not a dial position.
    */
   const rungForSlot = (
-    family: string, level: Level, archetype: string | undefined, sport: 'run' | 'ride' | 'swim',
+    family: string, frameLevel: Level, archetype: string | undefined, sport: 'run' | 'ride' | 'swim',
   ): { level: Level; size: number } => {
     const override = args.levelOverrides?.[family] as Level | undefined;
     if (override != null) return { level: override, size: dialForSport(sport) };
+    // ⛔ THE LOW-VOLUME TIER SITS BETWEEN THE ATHLETE'S ANSWER AND THE FRAME'S — see `levelForFamily`.
+    // ⚠️ Read here as well as in `enduranceSpecs`, because the ladder and the built session must
+    // start from the same rung; two readings of "which level" is how the stated hours and the built
+    // week come apart.
+    const level = levelForFamily(family, frameLevel);
     /**
      * ⛔⛔ NO ANSWER MEANS THE FRAME'S OWN PRESCRIPTION, NOT THE MIDDLE OF THE LADDER.
      *
@@ -1686,6 +1709,27 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       });
     }
     notes.push({ kind: 'ours', text: SWIM_IS_EASY_ONLY });
+  }
+
+  /**
+   * ── the low-volume tier: the same four sessions at his smaller sizes ─────────────────────────
+   *
+   * ⛔ THE BLOCK SAYS SO WHEN IT APPLIES. The sessions are the frame's and the levels are his taper
+   * column's, but the GATE is ours — twenty miles a week — and an unlabelled tier is the engine
+   * making a decision the athlete cannot see. Same discipline as the advanced tier's own note.
+   * ⚠️ ONE NOTE PER BLOCK, not one per week: `composeWeek` runs per week and the note is deduped by
+   * its text everywhere else in this file.
+   */
+  if (Object.keys(tierLevels).length > 0 && !notes.some((n) => n.text === LOW_VOLUME_TIER_GATE_IS_OURS)) {
+    notes.push({ kind: 'ours', text: LOW_VOLUME_TIER_GATE_IS_OURS });
+    notes.push({
+      kind: 'source',
+      text: 'The two quality runs and the long run are prescribed at the smaller of the source\'s own '
+        + 'sizes, because the running on file does not yet carry the standard week. The taper column '
+        + 'prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the '
+        + 'more proficient runner\'s figure.',
+      cite: 'Viada pp246-247',
+    });
   }
 
   // ── the advanced tier: a PROGRAM tier, gated on demonstrated history ──────────────────────────

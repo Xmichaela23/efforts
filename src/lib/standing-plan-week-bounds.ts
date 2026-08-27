@@ -23,6 +23,13 @@ import {
 // only one toolchain can check.
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import { HARD_SLOT_KEYS } from './standing-plan-week-copy';
+/**
+ * ⛔ THE TIER IS THE ENGINE'S, READ HERE RATHER THAN RESTATED. `lowVolumeRunLevels` decides which
+ * levels a low-mileage athlete's run slots are built at, and this screen quotes hours off the same
+ * levels the composer will use. ⚠️ A second table here is how a preview and a plan diverge — the
+ * same reason `RIDE_EQUIVALENT` is imported rather than copied.
+ */
+import { lowVolumeRunLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import type { SlotKey, SlotSelection, SlotSport } from './standing-plan-week-copy';
 
 /**
@@ -105,8 +112,20 @@ export type WeekBounds = {
  */
 export function weekBounds(
   slots: SlotSelection,
-  opts: { baselines?: EnduranceBaselines; easyPaceSecPerMi?: number | null },
+  opts: {
+    baselines?: EnduranceBaselines;
+    easyPaceSecPerMi?: number | null;
+    /**
+     * ⛔ DEMONSTRATED WEEKLY RUNNING — the low-volume tier's gate, and it must be the same number
+     * the engine gates on or this screen quotes hours the week will not build. ⚠️ Absent is not
+     * neutral: no history takes the smaller week, exactly as the composer does.
+     */
+    demonstratedWeeklyMiles?: number | null;
+  },
 ): WeekBounds {
+  const tierLevels = lowVolumeRunLevels(opts.demonstratedWeeklyMiles);
+  const levelFor = (family: string, frameLevel: Level): Level =>
+    (tierLevels[family] as Level | undefined) ?? frameLevel;
   let runShort = 0;
   let runLong = 0;
   let rideShort = 0;
@@ -125,7 +144,9 @@ export function weekBounds(
       // ⛔ THE COMPOSER'S OWN EQUIVALENCE. A second table here is how a preview and a plan diverge.
       const eq = RIDE_EQUIVALENT[base.family];
       if (!eq) continue;
-      const band = sessionDurationBandSeconds(eq.family, base.level, {
+      // ⚠️ THE TIER IS KEYED BY FAMILY, so a slot the athlete put on the bike is untouched by
+      // construction — the tier only names run families.
+      const band = sessionDurationBandSeconds(eq.family, levelFor(eq.family, base.level), {
         baselines: opts.baselines,
         archetype: eq.archetype,
       });
@@ -134,7 +155,7 @@ export function weekBounds(
       isLowerBound = isLowerBound || band.isLowerBound;
       anyRide = true;
     } else {
-      const band = sessionDurationBandSeconds(base.family, base.level, {
+      const band = sessionDurationBandSeconds(base.family, levelFor(base.family, base.level), {
         baselines: opts.baselines,
       });
       runShort += band.shortest;

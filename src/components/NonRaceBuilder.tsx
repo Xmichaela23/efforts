@@ -31,7 +31,7 @@ import { useAppContext } from '@/contexts/AppContext';
 // ⛔ THE SAME functions the SERVER's tier gate runs — client-reachable by design, so the line the
 // wizard shows and the tier the composer builds cannot disagree (item 8, 2026-08-24).
 import { demonstratedRunVolume } from '../../supabase/functions/_shared/standing-plan/demonstrated-history.ts';
-import { advancedTierSessions } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { advancedTierSessions, lowVolumeRunLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 // ⛔ ONE READER FOR "is this the plyo day" — shared with the calendar chip. The tag, never the name.
@@ -3483,13 +3483,25 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * workouts already in context, so the line and the built tier cannot disagree.
    */
   const { workouts: ctxWorkouts } = useAppContext();
+  /**
+   * ⛔⛔ THE HISTORY READ, WITH ITS AS-OF DATE (2026-08-26 evening). It was called with the workouts
+   * alone; the second argument is the date to measure back from, and without it every read returned
+   * *"no usable date to measure from"* and a null figure. **So this line has never once appeared on
+   * a device**, and the low-volume tier below would have been decided on the same dead number.
+   * ⚠️ TODAY, NOT THE BLOCK'S START DATE. The window is the last 28 days of what the athlete has
+   * actually done, which is a fact about now.
+   */
+  const demonstratedRun = useMemo(
+    () => demonstratedRunVolume((ctxWorkouts ?? []) as never, new Date().toISOString().slice(0, 10)),
+    [ctxWorkouts],
+  );
   const tierLine = useMemo(() => {
-    const vol = demonstratedRunVolume((ctxWorkouts ?? []) as never);
+    const vol = demonstratedRun;
     const extra = advancedTierSessions(vol.weeklyMiles);
     if (extra <= 0) return null;
     return `Your history supports a ${4 + extra}-session endurance week — ${extra} extra easy `
       + `run${extra === 1 ? '' : 's'} (${vol.source}).`;
-  }, [ctxWorkouts]);
+  }, [demonstratedRun]);
 
   /** ⛔ ONE LONG SESSION, ONE PIN (B1). When the long slot is a ride, a stale long-RUN pin is the
    *  phantom pref that reached a built goal ("Long Run: sunday" on a week with no long run). */
@@ -3642,16 +3654,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   );
   const fixedHoursLineFor = (sport: 'run' | 'ride'): string | null => {
     if (!allSlotsChosen(slotSportsNow)) return null;
+    /**
+     * ⛔ THE LOW-VOLUME TIER APPLIES HERE TOO. This sentence names the hours the week FIXES, and the
+     * engine builds those sessions at the tier's levels — quoting the frame's printed levels to an
+     * athlete whose block is built at the smaller ones is the screen lying about the plan.
+     * ⚠️ Keyed by family, so a slot on the bike is untouched: the tier names run families only.
+     */
+    const tierLevels = lowVolumeRunLevels(demonstratedRun.weeklyMiles);
     const specs = SLOT_KEYS.map((k) => {
       const s = slotSportsNow[k];
       if (!s) return null;
       const fam = SLOT_FAMILY[k];
       const eq = s === 'ride' ? RIDE_EQUIVALENT[fam.family] : null;
+      const family = (eq?.family ?? fam.family);
       return {
         key: k,
         spec: {
-          family: (eq?.family ?? fam.family),
-          level: fam.level,
+          family,
+          level: (tierLevels[family] as typeof fam.level | undefined) ?? fam.level,
           archetype: eq?.archetype,
           sport: s,
         },
@@ -5636,6 +5656,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <EnduranceWeekCard
             allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
+            /** ⛔ THE SAME NUMBER THE ENGINE GATES THE LOW-VOLUME TIER ON, so the hours this screen
+             *  quotes and the hours the block builds come from the same levels. */
+            demonstratedWeeklyMiles={demonstratedRun.weeklyMiles}
             /** ⛔ `sport` IS NEVER NULL HERE ANY MORE (2026-08-26 evening). The card's only slot
              *  gesture is answering a row; the dismiss that used to clear one is gone with the
              *  opt-in, and the prop's type says so rather than leaving a dead arm behind. */

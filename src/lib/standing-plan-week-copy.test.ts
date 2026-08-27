@@ -395,7 +395,14 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
    * direction is asserted against the raw arithmetic rather than only against a built week.
    */
   const slots = { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' } as const;
-  const b = weekBounds(slots, { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
+  /**
+   * ⚠️ MEASURED ON A RUNNER WHOSE HISTORY CARRIES THE FRAME'S OWN LEVELS (2026-08-26 evening). The
+   * low-volume tier builds a low-mileage athlete's run slots at smaller levels, and this test
+   * compares the bound against the FRAME's bands — so without a demonstrated figure it would be
+   * comparing two different weeks and calling the difference a rounding error.
+   */
+  const opts = { baselines: BASELINES as never, easyPaceSecPerMi: PACE, demonstratedWeeklyMiles: 22 };
+  const b = weekBounds(slots, opts);
   assert(b.runMiles);
   // ⛔ AGAINST THE RAW ARITHMETIC, not against its own rounding. `min === floor(min)` is true of a
   // ceiled integer too, which is why the first version of this test survived the mutation.
@@ -412,7 +419,7 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
     `the floor rounded IN: ${b.runMiles!.min} > ${(rawShort / PACE).toFixed(2)}`);
   assert(b.runMiles!.max >= rawLong / PACE - 1e-9,
     `the cap rounded IN: ${b.runMiles!.max} < ${(rawLong / PACE).toFixed(2)}`);
-  const tight = weekBounds({ hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' }, { baselines: BASELINES as never, easyPaceSecPerMi: PACE });
+  const tight = weekBounds({ hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' }, opts);
   assert(tight.runMiles && tight.runMiles.max < b.runMiles!.max,
     'moving slots to the bike did not lower the running cap');
 });
