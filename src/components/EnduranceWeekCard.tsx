@@ -28,7 +28,7 @@
  * improvement percentage appears anywhere** — the work order forbids it and no source gives one.
  */
 import React from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import {
   ENDURANCE_WEEK_INTRO_CONSEQUENCE,
   ENDURANCE_WEEK_INTRO_STRUCTURE,
@@ -40,11 +40,7 @@ import {
   slotSummary,
   upperLowerSplitLine,
   allSlotsChosen,
-  defaultSportForAddedSlot,
-  HARD_SLOT_KEYS,
-  MAX_HARD_SESSIONS,
   REQUIRED_SLOT_DISPLAY_ORDER,
-  hardSessionCount,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
@@ -60,10 +56,12 @@ import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 export type EnduranceWeekCardProps = {
   slots: SlotSelection;
   /**
-   * ⛔ `null` CLEARS THE SLOT — it is how a hard session is REMOVED (2026-08-25). Only the two hard
-   * slots are ever cleared; easy and long are the frame's and Continue is gated on both.
+   * ⛔⛔ A SLOT IS ANSWERED, NEVER CLEARED (2026-08-26 evening). The `null` arm is gone with the
+   * dismiss control: all four slots are the frame's, Continue is gated on all four, and there is no
+   * gesture on this screen that empties a row. ⚠️ The type is what makes that unreachable rather
+   * than merely unused.
    */
-  onSlotChange: (key: SlotKey, sport: SlotSport | null) => void;
+  onSlotChange: (key: SlotKey, sport: SlotSport) => void;
   /** The athlete's baselines row — the caps resolve every session against their own anchors. */
   baselines?: unknown;
   easyPaceSecPerMi?: number | null;
@@ -105,15 +103,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    */
   const [open, setOpen] = React.useState<SlotKey | null>(null);
   /**
-   * ⛔ WHAT WAS OPEN WHEN "+ Add" WAS TAPPED, so dismissing that card puts the screen back EXACTLY
-   * as it was (Michael, 2026-08-25). Adding a session opens it, which collapses whatever the athlete
-   * already had open; X-ing straight back out would otherwise leave that card closed — a curiosity
-   * tap that quietly costs them their place. ⚠️ Cleared once the added card is dismissed or the
-   * athlete opens anything else, so it can never restore a stale row much later.
+   * ⛔⛔ THE ADD/UNDO STATE IS DELETED (2026-08-26 evening). It remembered which row was open when
+   * "+ Add a hard session" was tapped, so dismissing the added card put the screen back exactly as
+   * it was. With every slot required there is no Add and no dismiss, so there is nothing to undo.
    */
-  const [restoreOnDismiss, setRestoreOnDismiss] = React.useState<
-    { added: SlotKey; prevOpen: SlotKey | null } | null
-  >(null);
 
   /**
    * ⛔ THE VOLUME SECTION ANNOUNCES ITSELF (Michael, 2026-08-24 evening: "the miles and hours are
@@ -220,28 +213,25 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 backgroundColor: isOpen ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.02)',
               }}
             >
-              {/* ⛔⛔ THE DISMISS SITS ON THE HEADER, BESIDE THE CHEVRON (Michael, from a device
-                  screenshot 2026-08-25): *"+ Add a hard session costs a curiosity tap too much"*.
-                  The only exit used to be a text link at the bottom of the EXPANDED card, so an
-                  athlete who tapped Add to see what it was had to open the card, scroll it and read
-                  for the way out. **Tapping Add and immediately X-ing out returns the screen to
-                  exactly its pre-tap state.**
+              {/* ⛔⛔ THE DISMISS CONTROL IS DELETED (2026-08-26 evening), AND THE HEADER IS STILL A
+                  FLEX ROW because the chevron is laid out against the label.
 
-                  ⛔ IT IS A SIBLING OF THE DISCLOSURE BUTTON, NOT INSIDE IT. A button nested in a
-                  button is invalid HTML and the inner click would toggle the row on its way out —
-                  the card would collapse and vanish in one frame, which reads as a glitch rather
-                  than as a dismissal. The header is a flex row holding both controls. */}
+                  ⛔ WHAT WAS HERE AND WHY IT IS NOT COMING BACK: an X beside the chevron on the two
+                  hard rows, so tapping "+ Add a hard session" out of curiosity and X-ing straight
+                  back returned the screen to its pre-tap state. Both quality sessions are the
+                  frame's now (p119, see `REQUIRED_SLOT_KEYS`) — there is no Add, and a control that
+                  empties a required row would put the athlete back on the week the source forbids.
+
+                  ⚠️ THE OTHER HALF OF THAT NOTE STILL STANDS, and it is about the sport chips: a
+                  second tap on the chosen sport must NOT clear the slot. It conflates "I want the
+                  other sport" with "I do not want this session", and it loses the answer to a
+                  mis-tap with no undo. The chips do exactly one thing. */}
               <div className="flex items-stretch">
                 <button
                   type="button"
                   data-testid={`slot-row-${key}`}
                   aria-expanded={isOpen}
-                  onClick={() => {
-                    // ⚠️ TOUCHING ANY ROW ENDS THE UNDO. The restore only means "this add was a
-                    // curiosity tap"; once the athlete has worked the screen it is stale.
-                    setRestoreOnDismiss(null);
-                    setOpen(isOpen ? null : key);
-                  }}
+                  onClick={() => setOpen(isOpen ? null : key)}
                   className="flex-1 min-w-0 text-left pl-4 pr-2 py-3.5 flex items-center justify-between gap-3"
                 >
                   <span className="min-w-0">
@@ -259,34 +249,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     style={isOpen ? { transform: 'rotate(180deg)' } : undefined}
                   />
                 </button>
-                {/* ⚠️ VISIBLE WHETHER THE CARD IS OPEN OR CLOSED — the exit must not be something
-                    you have to expand the card to find. ⛔ Hard slots only: recovery and long are
-                    the frame's own and are not dismissible. */}
-                {isHard ? (
-                  <button
-                    type="button"
-                    data-testid={`dismiss-hard-${key}`}
-                    aria-label="Remove this hard session"
-                    onClick={() => {
-                      props.onSlotChange(key, null);
-                      // ⛔ BACK TO THE PRE-TAP STATE. If this is the card "+ Add" just opened, the
-                      // row that was open before it re-opens; otherwise the dismissal only closes
-                      // this one. ⚠️ A blanket `setOpen(null)` would close somebody else's expanded
-                      // card as a side effect of dismissing this one.
-                      if (restoreOnDismiss?.added === key) {
-                        setOpen(restoreOnDismiss.prevOpen);
-                        setRestoreOnDismiss(null);
-                      } else if (isOpen) {
-                        setOpen(null);
-                      }
-                    }}
-                    /* A 44px-wide target — the row is already tall enough, and a 16px icon alone is
-                       under the thumb minimum this wizard uses everywhere else. */
-                    className="shrink-0 w-11 flex items-center justify-center text-white/35"
-                  >
-                    <X aria-hidden className="h-4 w-4" />
-                  </button>
-                ) : null}
               </div>
 
               {isOpen ? (
@@ -390,73 +352,27 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
         </div>
       </div>
 
-      {/* ⛔⛔ THE ORDER MOVED A THIRD TIME, AND THIS ONE REVERSES THE SECOND (Michael, 2026-08-26).
-          ═══════════════════════════════════════════════════════════════════════════════════════
-          The hard block led the screen from 2026-08-25, on the argument that it is the only DECISION
-          here. What that missed is which rows GATE THE STEP: Continue is blocked until recovery and
-          long have a sport, and those two sat underneath the optional control — which is also why
-          *"recovery session and long session have no sport yet"* read as a surprise.
+      {/* ⛔⛔ ONE BLOCK OF FOUR ROWS (2026-08-26 evening). The screen used to be two blocks — the
+          frame's own two, then an opt-in "+ Add a hard session" control under them — because hard
+          sessions were an ADDITION to the week and a different kind of thing.
 
-          ⛔ SO THE PICKER RUNS LONG · RECOVERY · + ADD A HARD SESSION. The two that block the step
-          first, the optional one last. It matches the intro's own order and its own claim that easy
-          is the default.
+          ⛔ p119 ENDS THAT DISTINCTION: *"it's crucial to continue to train running economy…
+          maintain your threshold performance… and base… no quality should be allowed to deteriorate
+          completely."* Both quality sessions are the frame's, so all four rows are one kind of thing
+          and read as one list. Michael: *"lets not make them optional that was not understanding
+          things on my part."*
 
-          ⚠️ THE KINDS STAY SEPARATE, which every pass has agreed on — the frame's own two are one
-          block and the opt-in addition is another. Only which one leads has changed. */}
-      {/* ⛔⛔ THE ADD CONTROLS — HARD SESSIONS ARE OPT-IN (Michael, 2026-08-25).
-          ═══════════════════════════════════════════════════════════════════════════════════════
-          They sit BELOW the frame's own sessions and read as an addition to the week, which is what
-          they are. ⚠️ An unadded hard session is not an unanswered row: nothing is blocked, nothing
-          is highlighted, and Continue is live from the moment easy and long are set.
+          ⛔ THE ADD CONTROL IS DELETED, NOT HIDDEN, and so is the dismiss on the hard rows. What is
+          gone with them: the add-then-undo restore, the "up to two" cap, and the count of added
+          sessions. See `REQUIRED_SLOT_KEYS` for the whole tombstone.
 
-          ⛔ ADD / REMOVE, NOT TAP-TO-CLEAR ON THE SPORT CHIP. Michael asked whether a second tap on
-          the chosen sport should clear the slot. It should not, and the reason is that it conflates
-          two different intents: *"I want the other sport"* and *"I do not want this session at all"*.
-          A chip that clears on a second tap also loses the session to a mis-tap, with no undo and no
-          warning — and it leaves no affordance saying removal is possible, so an athlete who wants
-          zero has to guess. An explicit dismiss is the inverse of an explicit Add, which is the
-          pattern the rest of this wizard already uses ("+ Add a run"), and it keeps the sport chips
-          doing exactly one thing. */}
-      {/* ⛔ THE FRAME'S OWN TWO — the passive half of the screen. A sport tap each and nothing to
-          decide beyond that, which is exactly why they no longer lead it. **Hard sessions are
-          opt-in and are not the same kind of thing as these**, which is why they are not in this
-          list. Easy and long are the week; the hard ones are an addition to it. */}
+          ⛔ THE ORDER IS LONG · RECOVERY · HARD 1 · HARD 2 — his own intro's order, so the list
+          above the rows and the rows themselves read the same way. ⚠️ Long still leads for the
+          reason it was moved there: it is the row most likely to be the athlete's fixed weekend
+          session. */}
       <div className="flex flex-col gap-2">
         {REQUIRED_SLOT_DISPLAY_ORDER.map(slotRow)}
       </div>
-
-      <div className="flex flex-col gap-2">
-        {/* ⛔ THE ADDED SESSIONS SIT BETWEEN THE LINE AND THE ADD CONTROL — the copy explains the
-            choice, the cards are the choices made, and the control adds another. An added card
-            below the "+ Add" button would read as the next empty one. */}
-        {HARD_SLOT_KEYS.filter((k) => !!props.slots[k]).map(slotRow)}
-        {hardSessionCount(props.slots) < MAX_HARD_SESSIONS ? (
-          <button
-            type="button"
-            data-testid="add-hard-session"
-            onClick={() => {
-              // The first unadded hard slot, in the frame's own order.
-              const next = HARD_SLOT_KEYS.find((k) => !props.slots[k]);
-              if (!next) return;
-              // ⛔ IT OPENS ON A SPORT THE ATHLETE ACTUALLY HAS — `defaultSportForAddedSlot`, which
-              // is `SLOT_OPTIONS`' own order filtered by the mix. Ride leads a hard slot when riding
-              // is in their week (p280); Run leads when it is not. ⚠️ This read `allowedSports[0]`
-              // for one commit and handed a mixed athlete Run, because that array is built run-first
-              // by the POSTURE step and its order carries no preference.
-              const lead = defaultSportForAddedSlot(next, props.allowedSports);
-              if (!lead) return;
-              props.onSlotChange(next, lead);
-              setRestoreOnDismiss({ added: next, prevOpen: open });
-              setOpen(next);
-            }}
-            className="w-full px-4 py-3 rounded-xl border border-white/35 bg-white/[0.06] text-white/90 text-sm font-medium text-left"
-          >
-            + Add a hard session
-          </button>
-        ) : null}
-      </div>
-
-
 
       {/* ⛔ VOLUME, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the sports
           change, because the slots they are summed from just did.

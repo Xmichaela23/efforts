@@ -29,11 +29,8 @@ import {
   RUN_TAX_LINES,
   slotSummary,
   allSlotsChosen,
-  defaultSportForAddedSlot,
   HARD_SLOT_KEYS,
-  MAX_HARD_SESSIONS,
   REQUIRED_SLOT_KEYS,
-  hardSessionCount,
   emptySlotSports,
   unansweredLine,
   unansweredSlots,
@@ -104,38 +101,45 @@ Deno.test('the four slots are the four the frame has, labelled as the athlete se
 // B — THE PRE-FILL AND THE DERIVED MIX
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('every row starts neutral, and Continue waits only on the frame\'s own two', () => {
+Deno.test('⛔⛔ EVERY ROW STARTS NEUTRAL, AND CONTINUE WAITS ON ALL FOUR', () => {
   /**
    * ⛔ MICHAEL, 2026-08-24 — **supersedes the pre-fill**. It put both hard slots on the bike before
    * the athlete had said anything, which made a screen full of decisions look like a screen full of
    * answers; an athlete who scrolled past it had a mix nobody chose.
    *
-   * ⛔⛔ AND MICHAEL, 2026-08-25 — **hard sessions are OPT-IN, up to two, default ZERO.** This test
-   * was called *"Continue is gated on all four"* and that is exactly what had to change: gating on
-   * the hard slots makes the default path unreachable, and the screen would sit naming two rows as
-   * missing that the athlete deliberately left alone. An empty hard slot is a complete answer.
+   * ⛔⛔ AND MICHAEL, 2026-08-26 EVENING — **BOTH QUALITY SESSIONS ARE THE FRAME'S**: *"lets not
+   * make them optional that was not understanding things on my part."* This reverses the opt-in of
+   * 2026-08-25, and p119 is why: *"it's crucial to continue to train running economy… maintain your
+   * threshold performance… and base… no quality should be allowed to deteriorate completely."* With
+   * the hard slots defaulting to none, the untouched screen built one long easy session and one
+   * recovery session — *"run base miles"*, the phrase p119 uses when saying not to do it.
+   *
+   * ⛔ SO THE ZERO-HARD WEEK IS NOT A COMPLETE ANSWER ANY MORE. That case is asserted below as
+   * BLOCKED, which is the exact assertion that flipped.
    */
   const empty = emptySlotSports();
   assertEquals(empty, { hard1: null, hard2: null, easy: null, long: null });
   assert(!allSlotsChosen(empty), 'an untouched screen let Continue through');
-  // ⛔ ONLY THE REQUIRED TWO ARE EVER "UNANSWERED". The hard slots are never named as missing.
+  // ⛔ ALL FOUR ARE REQUIRED, AND THE HARD SLOTS ARE NAMED AS MISSING LIKE ANY OTHER ROW.
   assertEquals(unansweredSlots(empty), REQUIRED_SLOT_KEYS);
-  assert(!unansweredSlots(empty).some((k) => HARD_SLOT_KEYS.includes(k)),
-    'an unadded hard session was reported as a missing answer');
+  assertEquals(REQUIRED_SLOT_KEYS.length, 4, 'a slot left the frame');
+  for (const k of HARD_SLOT_KEYS) {
+    assert(REQUIRED_SLOT_KEYS.includes(k), `${k} is optional again — p119's quality can lapse`);
+  }
 
   const partial = { ...empty, hard1: 'ride' as const, easy: 'run' as const };
   assert(!allSlotsChosen(partial), 'a week with no long session let Continue through');
-  assertEquals(unansweredSlots(partial), ['long']);
+  assertEquals(unansweredSlots(partial), ['hard2', 'long']);
 
-  // ⛔ THE DEFAULT PATH: no hard sessions at all, and the week is complete.
+  // ⛔⛔ THE WEEK THE OLD DEFAULT BUILT — no hard sessions at all — IS BLOCKED. It is the "run base
+  // miles" week, and the screen now says which rows are missing instead of letting it through.
   const zeroHard = { hard1: null, hard2: null, easy: 'run', long: 'run' } as const;
-  assert(allSlotsChosen(zeroHard), 'the zero-hard default could not reach Continue');
-  assertEquals(unansweredLine(zeroHard), null, 'the default week named something missing');
-  assertEquals(hardSessionCount(zeroHard), 0);
+  assert(!allSlotsChosen(zeroHard), 'a week with neither quality session reached Continue');
+  assert(/hard session/i.test(unansweredLine(zeroHard) ?? ''),
+    'the blocked line does not name the missing quality sessions');
 
   const full = { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' } as const;
   assert(allSlotsChosen(full));
-  assertEquals(hardSessionCount(full), MAX_HARD_SESSIONS);
   assertEquals(unansweredLine(full), null, 'a finished week still named something missing');
 });
 
@@ -153,8 +157,21 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
     '2 that can be filled with hard or easy session.',
     'Rides are easier on your legs than runs.',
     'Lower body weightloads will automatically be reduced if you add a hard run',
-    'Easy sessions are the default pick hard session below to add',
   ]);
+  /**
+   * ⛔⛔ HIS THIRD CONSEQUENCE LINE IS DELETED (2026-08-26 evening) — *"Easy sessions are the default
+   * pick hard session below to add"*. It described a default that stopped existing when both quality
+   * sessions joined the frame, and there is no "below" to add from.
+   * ⛔ IT WAS ALSO AGAINST p134 WHILE IT WAS TRUE: spare room goes to QUALITY, not to another easy
+   * run, which is the *"junk volume"* that page names.
+   * ⛔⛔ AND NOTHING REPLACES IT. A line saying the block spends fewer of the athlete's hours was
+   * drafted and is WRONG for this customer — p119's cut is for an athlete at their maximum tolerable
+   * volume and p149 exempts everyone else. Their hours stay.
+   */
+  assertEquals(/default pick hard session/.test(ENDURANCE_WEEK_INTRO.join(' ')), false,
+    'the deleted default line is back');
+  assertEquals(/fewer (of your )?hours/i.test(ENDURANCE_WEEK_INTRO.join(' ')), false,
+    'a "the block spends fewer hours" line was added — see p149, this customer is not at a ceiling');
   // ⛔ THE DOUBLE SPACE IS IN THE STRING. A "helpful" trim would be a silent edit of his copy.
   assert(ENDURANCE_WEEK_INTRO[0].includes('4  endurance'), 'his double space was normalised away');
   // ⛔ AND THE CAPITAL L, which every spellcheck wants to fix.
@@ -166,7 +183,7 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
    * information at one visual weight left the eye no seams to find.
    */
   assertEquals(ENDURANCE_WEEK_INTRO_STRUCTURE.length, 4);
-  assertEquals(ENDURANCE_WEEK_INTRO_CONSEQUENCE.length, 3);
+  assertEquals(ENDURANCE_WEEK_INTRO_CONSEQUENCE.length, 2);
   assertEquals([...ENDURANCE_WEEK_INTRO_STRUCTURE, ...ENDURANCE_WEEK_INTRO_CONSEQUENCE], ENDURANCE_WEEK_INTRO);
 
   // ⚠️ ALL SEVEN PASS THE GATE UNAIDED — measured, so no exemption is recorded and none is needed.
@@ -181,7 +198,6 @@ Deno.test('⛔⛔ MICHAEL\'S INTRO, VERBATIM — every character his', () => {
   const whole = ENDURANCE_WEEK_INTRO.join(' ');
   assertEquals(/may improve your lower body lifts/.test(whole), false, 'the backwards framing is back');
   assert(/reduced if you add a hard run/.test(whole), 'the causality line was lost');
-  assertEquals(MAX_HARD_SESSIONS, 2);
 });
 
 Deno.test('⛔ THE PICKER DRAWS LONG FIRST, AND IT IS A RENDER ORDER ONLY', () => {
@@ -194,8 +210,14 @@ Deno.test('⛔ THE PICKER DRAWS LONG FIRST, AND IT IS A RENDER ORDER ONLY', () =
    * `unansweredSlots`, the blocked line's wording and the single-sport auto-assign; reordering IT
    * would change what the blocked sentence says as a side effect of a layout ruling.
    */
-  assertEquals(REQUIRED_SLOT_DISPLAY_ORDER, ['long', 'easy']);
-  assertEquals(REQUIRED_SLOT_KEYS, ['easy', 'long'], 'the MODEL order moved — the layout ruling leaked');
+  /**
+   * ⛔⛔ ALL FOUR ROWS ARE IN BOTH LISTS NOW (2026-08-26 evening, p119). The hard rows go LAST in the
+   * render order, which is the order his own intro reads in — long, recovery, then the two that can
+   * be hard. ⚠️ The model order is the slot order the rest of the module speaks in.
+   */
+  assertEquals(REQUIRED_SLOT_DISPLAY_ORDER, ['long', 'easy', 'hard1', 'hard2']);
+  assertEquals(REQUIRED_SLOT_KEYS, ['hard1', 'hard2', 'easy', 'long'],
+    'the MODEL order moved — the layout ruling leaked');
   // ⛔ A PERMUTATION, NOT A SECOND LIST. A slot added to one must not be silently missed by the other.
   assertEquals([...REQUIRED_SLOT_DISPLAY_ORDER].sort(), [...REQUIRED_SLOT_KEYS].sort());
 });
@@ -204,12 +226,22 @@ Deno.test('the blocked line names what is missing, and nothing else', () => {
   const one = unansweredLine({ hard1: 'ride', hard2: 'ride', easy: 'run', long: null })!;
   assert(/long session/i.test(one), one);
   assert(/has no sport yet/.test(one), one);
-  // ⛔ AND IT NEVER NAMES A HARD SESSION (2026-08-25). They are opt-in; an unadded one is not
-  // missing, and telling the athlete it is would be the screen asking a question it stopped asking.
+  /**
+   * ⛔⛔ AND IT NAMES AN UNANSWERED HARD SESSION AGAIN (2026-08-26 evening). It was silent about
+   * them while they were opt-in — an unadded one was not missing — and p119 makes them the frame's,
+   * so a hard row with no sport is a missing answer like any other.
+   * ⚠️ IT READS AS A SENTENCE WITH FOUR NAMES IN IT, which is the case worth looking at: the list is
+   * comma-joined with "and" before the last.
+   */
   const two = unansweredLine({ hard1: 'ride', hard2: null, easy: null, long: 'run' })!;
-  assert(/has no sport yet/.test(two), two);
+  // ⚠️ TWO NAMES TAKE THE PLURAL VERB — the line was singular-only while only one row could be
+  // missing at a time on the tested path.
+  assert(/have no sport yet/.test(two), two);
   assert(/recovery session/i.test(two), two);
-  assert(!/hard session/i.test(two), `the line named an unadded hard session: ${two}`);
+  assert(/hard session 2/i.test(two), `the line did not name the unanswered hard session: ${two}`);
+  const all = unansweredLine(emptySlotSports())!;
+  assert(/hard session 1, hard session 2, recovery session and long session/i.test(all), all);
+  assert(/have no sport yet/.test(all), all);
   // ⚠️ VOICE: it states the fact, it does not instruct.
   for (const line of [one, two]) {
     assertEquals(voiceViolation(line), null, line);
@@ -533,51 +565,41 @@ Deno.test('⛔ THE WIZARD RE-STAMPS THE FRAME\'S SESSION, so a stale role cannot
 
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// ⛔ AN ADDED HARD SESSION OPENS ON A SPORT THE ATHLETE HAS (Michael, 2026-08-25)
+// ⛔⛔ THE OPT-IN PATH IS DELETED — AND THE MODULE MUST NOT RE-EXPORT IT (2026-08-26 evening)
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('⛔ A RUN-ONLY ATHLETE IS NEVER HANDED A RIDE', () => {
+Deno.test('⛔⛔ NO ADD, NO CAP, NO COUNT — the opt-in cannot come back piecemeal', () => {
   /**
-   * ⛔ THE DEFECT, and it shipped for one commit: the add handler read `allowedSports[0]`, and
-   * `allowedSlotSports` is built RUN-FIRST off the posture step — so the array's order carries the
-   * POSTURE screen's order, not a preference. A mixed athlete's added session opened on Run and a
-   * ride-only athlete got Ride by luck of the filter.
+   * ⛔ p119 AND MICHAEL'S OWN CORRECTION: *"lets not make them optional that was not understanding
+   * things on my part."* Both quality sessions are the frame's, so there is nothing to add, nothing
+   * to cap and nothing to count.
+   *
+   * ⛔ WHAT WENT, AND WHY EACH ONE IS NAMED HERE RATHER THAN JUST DELETED:
+   *   · `MAX_HARD_SESSIONS` — a cap of two on an ADDITION to the week. All four are the frame's.
+   *   · `hardSessionCount` — how many the athlete had added. Always two now.
+   *   · `defaultSportForAddedSlot` — what sport a newly ADDED row opened on. Rows start neutral.
+   *
+   * ⚠️ ASSERTING THE ABSENCE IS DELIBERATE, the same way the killed rate line is asserted absent: a
+   * partial restoration — a dismiss on one row, a "up to two" line, a count that still reads zero —
+   * is easy to do by accident and hard to see in a diff.
+   *
+   * ⚠️ THE RULE `defaultSportForAddedSlot` CARRIED IS NOT LOST. `SLOT_OPTIONS` still leads the hard
+   * slots with Ride (p280 — no impact, so the intensity does not tax the lifts) and the card renders
+   * its chips in that order; the test below pins it.
    */
-  for (const key of HARD_SLOT_KEYS) {
-    assertEquals(defaultSportForAddedSlot(key, ['run']), 'run', `${key}: run-only got a ride`);
-    assertEquals(defaultSportForAddedSlot(key, ['ride']), 'ride', `${key}: ride-only got a run`);
+  const mod = api as Record<string, unknown>;
+  for (const gone of ['MAX_HARD_SESSIONS', 'hardSessionCount', 'defaultSportForAddedSlot']) {
+    assertEquals(mod[gone], undefined, `${gone} is back — the hard-session opt-in was rebuilt`);
   }
 });
 
-Deno.test('⛔ RIDE LEADS ONLY WHEN RIDING IS IN THE WEEK', () => {
+Deno.test('⛔ RIDE STILL LEADS THE HARD SLOTS, AND RUN LEADS THE OTHER TWO', () => {
+  // ⛔ p280: intensity on the bike does not tax the lifts, so a hard slot offers Ride first. This is
+  // the order the card renders its chips in, and it is the only surviving statement of the lead now
+  // that nothing pre-answers a row.
   for (const key of HARD_SLOT_KEYS) {
-    // ⛔ MIXED — Ride leads a hard slot. p280: no impact, so the intensity does not tax the lifts.
-    assertEquals(defaultSportForAddedSlot(key, ['run', 'ride']), 'ride', `${key}: mixed did not lead on ride`);
-    // ⚠️ AND THE POSTURE ORDER MUST NOT DECIDE IT — same mix, other order, same answer. This is the
-    // exact assertion the shipped bug would have failed.
-    assertEquals(defaultSportForAddedSlot(key, ['ride', 'run']), 'ride', `${key}: the answer moved with the input order`);
+    assertEquals(SLOT_OPTIONS[key][0].value, 'ride', `${key} stopped leading with the ride`);
   }
-});
-
-Deno.test('the default is the chip the card highlights — one owner for the order', () => {
-  // ⚠️ IT MUST BE `SLOT_OPTIONS`' OWN FIRST OFFERED VALUE, because that is the order the row renders
-  // its chips in. A default derived anywhere else is how the highlighted chip and the stored answer
-  // start disagreeing — which is the class of defect this whole screen has been fixing.
-  for (const key of SLOT_KEYS) {
-    for (const allowed of [undefined, ['run'], ['ride'], ['run', 'ride']] as const) {
-      const expected = SLOT_OPTIONS[key]
-        .map((o) => o.value)
-        .filter((v) => !allowed || allowed.includes(v))[0] ?? null;
-      assertEquals(defaultSportForAddedSlot(key, allowed as never), expected, `${key} / ${JSON.stringify(allowed)}`);
-    }
-  }
-});
-
-Deno.test('an unconstrained or empty mix still answers, and never with null', () => {
-  // ⚠️ `allowedSlotSports` is passed as `undefined` when it is empty, and an added session with no
-  // sport would be an unanswered row on a screen that just stopped having any.
-  for (const key of HARD_SLOT_KEYS) {
-    assertEquals(defaultSportForAddedSlot(key, undefined), 'ride');
-    assertEquals(defaultSportForAddedSlot(key, []), 'ride');
-  }
+  assertEquals(SLOT_OPTIONS.easy[0].value, 'run');
+  assertEquals(SLOT_OPTIONS.long[0].value, 'run');
 });

@@ -89,21 +89,22 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
 
 const CARD = await Deno.readTextFile(new URL('src/components/EnduranceWeekCard.tsx', ROOT));
 
-Deno.test('⛔⛔ A SINGLE-SPORT ATHLETE IS NOT HANDED HARD SESSIONS THEY NEVER CHOSE', () => {
+Deno.test('⛔⛔ THE AUTO-ASSIGN READS THE CONSTANT, NEVER A SPELLED-OUT SET OF SLOTS', () => {
   /**
-   * ⛔ THE BUG, AND IT HIT THE CORE CUSTOMER. The auto-assign is dated 2026-08-24 and filled EVERY
-   * slot with the athlete's one sport; hard sessions became OPT-IN on 2026-08-25 and it was never
-   * revisited. A run-only athlete — the 10-30 mi/wk single-sport runner this plan is for — arrived
-   * on a week carrying two hard sessions they had not picked, with "+ Add a hard session" gone
-   * because the cap was already met, under a line still reading "Pick up to 2 hard sessions a week."
+   * ⛔ THIS EFFECT HAS BEEN WRONG IN BOTH DIRECTIONS, which is why the assertion is about HOW it
+   * decides rather than about which slots it fills. It filled every slot from 2026-08-24; hard
+   * sessions became opt-in on 2026-08-25 and it was not revisited, so a run-only athlete — the
+   * 10-30 mi/wk single-sport runner this plan is FOR — arrived carrying two hard sessions they had
+   * never picked. It was narrowed to the required two on 2026-08-26, and the same evening p119 made
+   * all four required.
    *
-   * ⚠️ IT FILLS `REQUIRED_SLOT_KEYS` AND NOTHING ELSE, and it reads that constant rather than naming
-   * the slots, so the day a slot changes hands this cannot keep filling the old set.
+   * ⛔ READING `REQUIRED_SLOT_KEYS` IS WHAT MADE THAT LAST CHANGE FREE. A spelled-out list here is
+   * a second owner of the frame's membership, and it is how this went stale the first time.
    */
   assert(/for \(const k of REQUIRED_SLOT_KEYS\) slots\[k\] = only;/.test(WIZARD),
     'the auto-assign no longer fills exactly the required slots');
   assertEquals(/const slots = \{ hard1: only, hard2: only/.test(WIZARD), false,
-    'the auto-assign is filling the hard slots again — a single-sport athlete gets sessions they never chose');
+    'the auto-assign names its slots again instead of reading the frame');
 });
 
 Deno.test('⛔⛔ THE HOUR DIALS ARE NOT GATED BEHIND ANSWERING THE OTHER ROWS', () => {
@@ -158,17 +159,24 @@ Deno.test('⛔⛔ THE INTRO RENDERS AS TWO PARTS, AND THE PICKER LEADS WITH LONG
    * TIDY-UP: a later pass will want them "beside the control they are about".
    */
   const introAt = CARD.indexOf('ENDURANCE_WEEK_INTRO_CONSEQUENCE.map');
-  const addAt = CARD.indexOf('data-testid="add-hard-session"');
   const requiredAt = CARD.indexOf('REQUIRED_SLOT_DISPLAY_ORDER.map');
-  assert(introAt > 0 && addAt > 0 && requiredAt > 0);
-  // ⚠️ MEASURED AGAINST THE **ROWS**, NOT THE ADD BUTTON. "Above the add control" is satisfied by
-  // sitting immediately on top of it, which is exactly the move he ruled out — the lines have to be
-  // read BEFORE the athlete is among the choices at all.
+  assert(introAt > 0 && requiredAt > 0);
+  // ⚠️ MEASURED AGAINST THE **ROWS**. The lines have to be read BEFORE the athlete is among the
+  // choices at all, not sitting immediately on top of the control they are about.
   assert(requiredAt > introAt, 'the consequence lines dropped below the picker rows');
-  assert(addAt > introAt, 'the consequence lines moved down to the add control');
 
-  // ⛔ THE PICKER ORDER: the two that gate Continue first, the optional one last.
-  assert(addAt > requiredAt, 'the optional add control leads the picker again');
+  /**
+   * ⛔⛔ THE ADD CONTROL AND THE DISMISS ARE DELETED, NOT HIDDEN (2026-08-26 evening, p119). Both
+   * quality sessions are the frame's — Michael: *"lets not make them optional that was not
+   * understanding things on my part"* — so the screen is one block of four required rows.
+   * ⚠️ ASSERTED ABSENT, because a partial restoration is the failure mode: an X on one row, or an
+   * add control for a slot the frame already owns.
+   */
+  assertEquals(/data-testid="add-hard-session"/.test(CARD), false, 'the opt-in add control is back');
+  assertEquals(/data-testid={`dismiss-hard-/.test(CARD), false, 'a required row can be emptied again');
+  assertEquals(/restoreOnDismiss/.test(CARD), false, 'the add-then-undo state is back');
+  // ⛔ AND ONE LIST DRAWS ALL FOUR — a second `.map` over the hard slots is the two-block screen.
+  assertEquals(/HARD_SLOT_KEYS\.filter/.test(CARD), false, 'the hard rows are drawn as a separate block again');
 
   // ⛔ AND THE SUPERSEDED PARAGRAPHS ARE GONE FROM THE SCREEN.
   assertEquals(/HARD_SESSIONS_OPT_IN_LINE/.test(CARD), false, 'the old opt-in paragraph is back');

@@ -65,10 +65,26 @@ export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
  * ⚠️ A LATER PASS WILL WANT TO MOVE THEM "next to the control they are about". That is the tidy-up
  * this note exists to stop.
  */
+/**
+ * ⛔⛔ HIS THIRD LINE IS DELETED (2026-08-26 evening) — *"Easy sessions are the default pick hard
+ * session below to add"*. It described a default that no longer exists: both quality sessions are
+ * the frame's now, and there is nothing below to add.
+ *
+ * ⛔ AND IT WAS AGAINST p134 EVEN WHILE IT WAS TRUE. His rule is that spare room goes to QUALITY,
+ * not to another easy run — an easy default advertised as the recommended path is the *"junk
+ * volume"* he names on that page.
+ *
+ * ⛔⛔ AND NOTHING REPLACES IT. An earlier draft of this change asked for a line saying the block
+ * spends fewer of the athlete's hours. **Do not add one.** p119's volume cut is for an athlete AT
+ * their maximum tolerable volume; p149 grants the exception — *"if you aren't nearly at your level
+ * of maximum tolerable volume, you may find that you tolerate a general hybrid program just fine"* —
+ * and this customer, at two to three hours of running, is nowhere near a ceiling. **Their hours
+ * stay.** `fixedHoursLine` already states the true thing: what the week fixes, and that the rest is
+ * easy.
+ */
 export const ENDURANCE_WEEK_INTRO_CONSEQUENCE: string[] = [
   'Rides are easier on your legs than runs.',
   'Lower body weightloads will automatically be reduced if you add a hard run',
-  'Easy sessions are the default pick hard session below to add',
 ];
 
 /** His block whole, in order — for the test that pins it verbatim. */
@@ -141,36 +157,6 @@ export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]
   easy: [{ value: 'run', label: 'Run' }, { value: 'ride', label: 'Ride' }],
   long: [{ value: 'run', label: 'Long run' }, { value: 'ride', label: 'Long ride' }],
 };
-
-/**
- * ⛔⛔ WHAT SPORT A NEWLY ADDED HARD SESSION OPENS ON — and it must be one the athlete actually has
- * (Michael, 2026-08-25).
- *
- * ⛔ THE BUG THIS REPLACES, shipped the same day the add control was: the handler read
- * `allowedSports[0]`, and `allowedSlotSports` is built RUN-FIRST (`posture.run` then `posture.bike`).
- * So a mixed athlete's added session opened on **Run** — the opposite of the frame's own preference —
- * while a ride-only athlete got Ride by luck of the filter. The array's order is the POSTURE step's,
- * and reading a preference out of it was reading meaning into an order that carries none.
- *
- * ⛔ THE RULE, AND IT IS `SLOT_OPTIONS`' OWN ORDER FILTERED BY THE MIX: Ride leads a hard slot when
- * riding is in the athlete's week (p280 — no impact, so the intensity does not tax the lifts), and
- * Run leads when it is not. **An athlete with no rides is never handed one.**
- *
- * ⚠️ ONE OWNER FOR THE ORDER. `SLOT_OPTIONS` already states the lead per slot and the card already
- * renders its chips in that order; deriving the default anywhere else is how the highlighted chip
- * and the stored answer start disagreeing.
- *
- * @param allowed the sports in the athlete's week — `undefined` means unconstrained.
- */
-export function defaultSportForAddedSlot(
-  key: SlotKey,
-  allowed?: SlotSport[] | null,
-): SlotSport | null {
-  const offered = SLOT_OPTIONS[key]
-    .map((o) => o.value)
-    .filter((v) => !allowed || allowed.length === 0 || allowed.includes(v));
-  return offered[0] ?? null;
-}
 
 /**
  * ⛔ THE SCREEN OPENS FINISHED, AND THIS IS THE LINE THAT SAYS SO (Michael, 2026-08-24).
@@ -276,25 +262,29 @@ export function emptySlotSports(): SlotSelection {
 }
 
 /**
- * ⛔ THE TWO SLOTS A WEEK CANNOT DO WITHOUT. Easy and long are the frame's; the two hard sessions are
- * OPT-IN (Michael, 2026-08-25) and an empty one is a complete answer, not a missing one.
+ * ⛔⛔ ALL FOUR SLOTS ARE THE FRAME'S, AND NONE OF THEM CAN BE DECLINED
+ * (Michael, 2026-08-26 evening: *"lets not make them optional that was not understanding things on
+ * my part"* — plural, both quality sessions).
+ *
+ * ⛔ WHY IT CHANGED, AND IT IS THE BOOK. p119: *"it's crucial to continue to train running economy
+ * (often via speed work), maintain your threshold performance (through some near-threshold work),
+ * and base (via easy miles)… The volume can be dramatically reduced, but **no quality should be
+ * allowed to deteriorate completely**."* With both hard slots opt-in and defaulting to none, the
+ * untouched screen built one long easy session and one recovery session — which is *"run base
+ * miles"*, the exact phrase p119 uses when saying not to do it. **The default was the thing the
+ * source forbids.**
+ *
+ * ⛔⛔ THE OLD WARNING HERE IS REWRITTEN, NOT DELETED, AND IT ARGUED AGAINST A CHANGE THAT NO LONGER
+ * APPLIES. It said a future session must not add a dismiss control to these rows *"to match the
+ * others"* — there are no others now. **The frame owns four endurance slots (p246) and not one of
+ * them is dismissible.** Declining any of them is a departure from the frame, not a control the
+ * screen forgot. That is the warning, restated for a screen where every row is required.
+ *
+ * ⚠️ AND THE OPT-IN PATH IS GONE FROM THE MODULE, NOT HIDDEN: `MAX_HARD_SESSIONS`,
+ * `hardSessionCount` and `defaultSportForAddedSlot` are deleted below. A partial restoration — a
+ * dismiss on one row, a count that still reads "up to two" — is the shape to watch for.
  */
-/**
- * ⛔⛔ THE TWO THE FRAME OWNS — AND THEY CANNOT BE DECLINED. RULED, NOT AN OPEN GAP
- * (Michael, 2026-08-26: *"D keep it"*).
- *
- * The audit raised it as a gap: the two HARD slots carry a dismiss and can be removed, these two
- * carry none, and Continue is blocked until both are answered — so an athlete who wants no long
- * session has no answer on the screen.
- *
- * ⛔ IT IS NOT A MISSING AFFORDANCE. p246's week has FOUR endurance slots and the long session is
- * his; declining it is a departure from the frame, not a control the screen forgot. The hard
- * sessions are dismissible precisely because they are the opt-in ADDITION to that week — a
- * different kind of thing, which is why they render in a different block.
- *
- * ⚠️ A FUTURE SESSION SHOULD NOT "FIX" THIS by adding an X to these rows to match the others.
- */
-export const REQUIRED_SLOT_KEYS: SlotKey[] = ['easy', 'long'];
+export const REQUIRED_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
 
 /**
  * ⛔⛔ THE ORDER THE REQUIRED ROWS ARE **DRAWN** IN — long first (Michael, 2026-08-26).
@@ -311,26 +301,35 @@ export const REQUIRED_SLOT_KEYS: SlotKey[] = ['easy', 'long'];
  * a layout ruling. Two constants, two jobs.
  * ⚠️ A test asserts this is a permutation of `REQUIRED_SLOT_KEYS`, so a slot added to one cannot be
  * silently missed by the other.
+ *
+ * ⛔⛔ THE TWO HARD ROWS JOINED IT (2026-08-26 evening), AND THEY GO LAST — which is the order his
+ * own intro reads in: *"One Long session · One recovery session · 2 that can be filled with hard or
+ * easy session."* The list above the rows and the rows themselves now run in the same sequence.
+ * ⚠️ Long still leads, for the reason it was moved there in the first place.
  */
-export const REQUIRED_SLOT_DISPLAY_ORDER: SlotKey[] = ['long', 'easy'];
+export const REQUIRED_SLOT_DISPLAY_ORDER: SlotKey[] = ['long', 'easy', 'hard1', 'hard2'];
 
 /** ⛔ THE HARD SLOTS — added, up to two, default zero. */
 export const HARD_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2'];
 
-export const MAX_HARD_SESSIONS = HARD_SLOT_KEYS.length;
-
-/** How many hard sessions the athlete has added. */
-export function hardSessionCount(slots: SlotSelection): number {
-  return HARD_SLOT_KEYS.filter((k) => slots[k] === 'run' || slots[k] === 'ride').length;
-}
+/**
+ * ⛔⛔ `MAX_HARD_SESSIONS` AND `hardSessionCount` ARE DELETED (2026-08-26 evening), and this note is
+ * what stood behind them so the opt-in is not rebuilt piecemeal.
+ *
+ * They existed to cap and count an ADDITION to the week: hard sessions were opt-in, default zero,
+ * up to two. p119 ends that — both quality sessions are the frame's and every week carries both, so
+ * a count of them is always two and a cap on them is a cap on the frame. See `REQUIRED_SLOT_KEYS`.
+ *
+ * ⛔ `defaultSportForAddedSlot` GOES WITH THEM. It answered *"what sport does a newly ADDED hard
+ * session open on"*, and nothing is added any more — every row starts neutral and the athlete
+ * answers it. ⚠️ The rule it carried is not lost: `SLOT_OPTIONS` still states Ride first on the hard
+ * slots (p280 — no impact, so the intensity does not tax the lifts), and the card still renders its
+ * chips in that order.
+ */
 
 /**
- * ⛔ CONTINUE IS GATED ON THIS, AND IT NO LONGER WAITS ON THE HARD SLOTS (Michael, 2026-08-25).
- *
- * It used to read *"a week with an unanswered slot is not a week"* across all four, which was right
- * while every slot was a session to configure. **Hard sessions are now something the athlete ADDS**,
- * and the default is zero — so gating Continue on them would make the default path unreachable and
- * the screen would sit there naming two rows as missing that the athlete deliberately left alone.
+ * ⛔⛔ CONTINUE WAITS ON ALL FOUR AGAIN (Michael, 2026-08-26 evening), which is what it did before
+ * the hard slots became opt-in on 2026-08-25. A week with an unanswered slot is not a week.
  */
 export function allSlotsChosen(slots: SlotSelection): boolean {
   return REQUIRED_SLOT_KEYS.every((k) => slots[k] === 'run' || slots[k] === 'ride');

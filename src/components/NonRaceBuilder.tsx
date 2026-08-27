@@ -3505,20 +3505,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * athlete keeping only running never sees a Ride chip anywhere on this screen, so a screen asking
    * run-or-ride four times would be four controls with one option each.
    *
-   * ⛔⛔ AND IT FILLED THE HARD SLOTS TOO UNTIL 2026-08-26, WHICH WAS A BUG WITH A REAL COST. This
-   * effect is dated 2026-08-24 and its own comment said *"every slot is auto-assigned"*; hard
-   * sessions became OPT-IN on 2026-08-25 and this was never revisited. The consequences, all
-   * measured on a run-only athlete — the 10-30 mi/wk single-sport runner this plan is FOR:
-   *   · they arrived on a week carrying TWO hard sessions they had never chosen;
-   *   · "+ Add a hard session" was gone, because `hardSessionCount` already read 2 of a cap of 2;
-   *   · the line directly above still read *"Pick up to 2 hard sessions a week"*, over two they did
-   *     not pick and could not add to;
-   *   · and the rate line scored their week at the WORST tier off a choice nobody made.
+   * ⛔ IT FILLS `REQUIRED_SLOT_KEYS`, WHICH IS NOW ALL FOUR (2026-08-26 evening). Reading the
+   * constant rather than naming the slots is what let this follow p119 without being touched.
    *
-   * ⚠️ SO IT FILLS `REQUIRED_SLOT_KEYS` AND NOTHING ELSE — recovery and long, the two the frame owns
-   * and Continue is gated on. The hard slots stay empty and stay the athlete's to add. ⛔ Read off
-   * `REQUIRED_SLOT_KEYS` rather than spelled out here, so the day a slot changes hands this cannot
-   * quietly keep filling the old set.
+   * ⛔⛔ AND THE HISTORY MATTERS, BECAUSE THIS EFFECT HAS BEEN WRONG IN BOTH DIRECTIONS. It filled
+   * every slot from 2026-08-24; when hard sessions became opt-in on 2026-08-25 it was not revisited,
+   * so a run-only athlete — the 10-30 mi/wk single-sport runner this plan is FOR — arrived on a week
+   * carrying two hard sessions they had never chosen, with the add control gone because the cap was
+   * already met. It was narrowed to the two required slots on 2026-08-26; the same evening p119 made
+   * all four required, and filling all four is right again — **for a different reason.** A
+   * single-sport athlete has one legal answer per row, so the screen is not deciding anything for
+   * them; a mixed athlete is still asked four times.
    */
   useEffect(() => {
     if (currentStep !== 'endurance' || allowedSlotSports.length !== 1) return;
@@ -3591,14 +3588,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   ): NonRaceState['hardDays'] => (['hard1', 'hard2'] as const).map((k) => {
     const i = HARD_SLOT_INDEX[k];
     const prev = st.hardDays[i];
-    // ⚠️ AN UNANSWERED HARD SLOT KEEPS WHATEVER WAS THERE. Nothing reaches the engine until Continue
-    // opens, and Continue is gated on every row having a sport.
     const sport = slots[k];
-    // ⛔⛔ AN UNADDED HARD SLOT IS NULL NOW, NOT "not yet answered" (Michael, 2026-08-25: hard
-    // sessions are opt-in, default zero). It used to return `prev` — right while every slot was a
-    // session being configured and the athlete's draft had to survive a sport change. **With the
-    // slot removable, returning `prev` resurrects the session they just deleted**: the day, the
-    // club answer and the archetype all travel on to the composer as an allocation nobody made.
+    /**
+     * ⛔ AN UNANSWERED HARD SLOT CONTRIBUTES NOTHING — it is a row the athlete has not reached yet,
+     * and Continue is gated on all four (p119, 2026-08-26 evening), so this state never reaches the
+     * engine.
+     *
+     * ⚠️ IT USED TO MEAN "REMOVED", AND THE DIFFERENCE IS WORTH KEEPING STRAIGHT. While hard
+     * sessions were opt-in, dropping the entry is what stopped a dismissed session's day, club
+     * answer and archetype travelling on to the composer as an allocation nobody made. There is no
+     * dismiss any more; dropping it is now simply how a half-answered screen carries no allocation.
+     */
     if (!sport) return null;
     const want = hardDefaultsFor(sport, k);
     return {
@@ -5636,9 +5636,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <EnduranceWeekCard
             allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
-            /** ⛔ `sport` IS `null` WHEN A HARD SESSION IS REMOVED (2026-08-25). It clears the slot
-             *  and `syncHardDays` drops the matching `hardDays` entry, so nothing about a session
-             *  the athlete deleted travels to the composer. */
+            /** ⛔ `sport` IS NEVER NULL HERE ANY MORE (2026-08-26 evening). The card's only slot
+             *  gesture is answering a row; the dismiss that used to clear one is gone with the
+             *  opt-in, and the prop's type says so rather than leaving a dead arm behind. */
             onSlotChange={(key, sport) => setState((st) => {
               const slots = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
               // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
