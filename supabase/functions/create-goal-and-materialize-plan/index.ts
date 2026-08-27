@@ -2995,6 +2995,28 @@ Deno.serve(async (req: Request) => {
                 }
                 return Object.keys(out).length > 0 ? { endurance_slots: out } : {};
               })(),
+              /**
+               * ⛔⛔ HOW MANY DAYS A WEEK EACH SPORT RUNS OVER — and this hop was DROPPING IT
+               * (2026-08-27, off Michael's own export). The wizard collected "Run: 3, Ride: 2", the
+               * goal recorded it, and the week built two runs: `generate-strength-plan` reads
+               * `endurance_days` off its own body and this function never put it there.
+               *
+               * ⚠️ THE PLAN ROW SHOWING THE ANSWER PROVED NOTHING. It is written from the wizard's
+               * payload on the goal, not from what the composer received — so the export said
+               * "Run: 3" over a two-run week and looked consistent.
+               * ⚠️ Validated the same way as the slots above: whole numbers above zero, and a
+               * malformed value drops that sport rather than the pair.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).endurance_days;
+                if (!raw || typeof raw !== 'object') return {};
+                const out: Record<string, number> = {};
+                for (const sport of ['run', 'ride'] as const) {
+                  const n = Number((raw as Record<string, unknown>)[sport]);
+                  if (Number.isFinite(n) && n > 0) out[sport] = Math.round(n);
+                }
+                return Object.keys(out).length > 0 ? { endurance_days: out } : {};
+              })(),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {
                 const raw = (gsTp as Record<string, unknown>).endurance_slot_archetypes;
