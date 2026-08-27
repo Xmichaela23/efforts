@@ -42,6 +42,8 @@ export type RunRowish = {
   type?: string | null;
   date?: string | null;
   distance?: number | null;
+  /** ⛔ SECONDS, and the unit is settled — see `demonstratedWeeklyMinutes`. */
+  moving_time?: number | null;
 };
 
 export type DemonstratedRunVolume = {
@@ -92,5 +94,71 @@ export function demonstratedRunVolume(
     weeklyMiles,
     runs,
     source: `${runs} logged run${runs === 1 ? '' : 's'} over the last ${DEMONSTRATED_WINDOW_DAYS} days`,
+  };
+}
+
+
+// ── MINUTES, EITHER SPORT — what the low-volume tier is gated on ───────────────────────────────
+
+/**
+ * ⛔⛔ THE SAME MEASURE IN THE UNIT THE FRAME SPEAKS. The tier asks one question — *"is this athlete
+ * already doing what the standard week would build them?"* — and the frame's answer is in MINUTES,
+ * so the athlete's side has to be too. Miles would need a pace, and a pace is the conversion this
+ * area spent a day deleting (Michael, 2026-08-26: *"then we use hours"*).
+ *
+ * ⚠️ EVERY PROPERTY OF `demonstratedRunVolume` IS KEPT: the same 28-day window and its note, the
+ * same never-guess-a-zero rule, the same plain-words `source`.
+ *
+ * ⛔⛔ IT READS `moving_time` AND NOTHING ELSE, AND THAT IS THE SAME REFUSAL THIS FILE ALREADY MAKES.
+ * The workouts row also carries `duration`, and the two disagree in unit — `daily-ledger.ts:206`
+ * reconciles them with `durRaw < 1000 ? minutes : seconds`, a heuristic that reads a 999-second ride
+ * as sixteen hours. A gate fed by an ambiguous unit fires, or fails to, by a factor of sixty. So
+ * this reads the field whose unit is settled and treats a session without one as UNMEASURABLE
+ * rather than as a zero — exactly what the run version does with a distanceless run.
+ */
+export type DemonstratedMinutes = {
+  /** Weekly average minutes over the window. `null` when there is nothing to average. */
+  weeklyMinutes: number | null;
+  sessions: number;
+  source: string;
+};
+
+export function demonstratedWeeklyMinutes(
+  rows: RunRowish[] | null | undefined,
+  asOfIso: string,
+  sport: 'run' | 'ride',
+): DemonstratedMinutes {
+  const asOf = Date.parse(`${String(asOfIso).slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(asOf)) {
+    return { weeklyMinutes: null, sessions: 0, source: 'no usable date to measure from' };
+  }
+  const from = asOf - DEMONSTRATED_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  let seconds = 0;
+  let sessions = 0;
+  for (const row of rows ?? []) {
+    if (String(row?.type ?? '').toLowerCase() !== sport) continue;
+    const at = Date.parse(`${String(row?.date ?? '').slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(at) || at < from || at > asOf) continue;
+    const secs = Number(row?.moving_time);
+    // ⚠️ A SESSION WITH NO CLOCK IS ONE THAT CANNOT BE MEASURED, not a zero-minute session.
+    if (!Number.isFinite(secs) || secs <= 0) continue;
+    seconds += secs;
+    sessions += 1;
+  }
+  if (sessions === 0) {
+    const word = sport === 'ride' ? 'ride' : 'run';
+    return {
+      weeklyMinutes: null,
+      sessions: 0,
+      source: `no logged ${word}s with a recorded time in the last ${DEMONSTRATED_WINDOW_DAYS} days`,
+    };
+  }
+  const weeks = DEMONSTRATED_WINDOW_DAYS / 7;
+  const word = sport === 'ride' ? 'ride' : 'run';
+  return {
+    weeklyMinutes: Math.round((seconds / 60 / weeks) * 10) / 10,
+    sessions,
+    source: `${sessions} logged ${word}${sessions === 1 ? '' : 's'} over the last ${DEMONSTRATED_WINDOW_DAYS} days`,
   };
 }

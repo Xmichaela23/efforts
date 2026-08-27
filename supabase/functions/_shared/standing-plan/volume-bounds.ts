@@ -253,6 +253,47 @@ export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
 }
 
 /**
+ * ⛔⛔ WHICH SPORTS ARE BELOW THE WEEK THE FRAME WOULD BUILD THEM — the low-volume tier's gate, and
+ * it is DERIVED rather than picked (2026-08-27).
+ *
+ * ⛔ THE QUESTION THE TIER IS ACTUALLY ASKING is *"would the standard column hand this athlete more
+ * than they already do?"* — so the honest gate is that comparison, not a threshold. The frame's own
+ * floor is computable: every slot at its printed level, at the shortest dose the source offers. The
+ * athlete's side is their logged minutes. Below the floor, the tier applies.
+ *
+ * ⛔ AND IT REPLACES A NUMBER THAT WAS OURS. The first version of this gate was twenty miles a week,
+ * reasoned as *"the standard column's four run sessions total about three hours twenty at their
+ * shortest, which is twenty miles at an easy ten-minute mile."* **That reasoning IS this function** —
+ * the number was the arithmetic written down. Deriving it removes the invented figure, removes the
+ * pace conversion inside it, and extends to the bike without inventing a second one.
+ *
+ * ⚠️ MEASURED ON THE FRAME'S LEVELS, NEVER THE TIER'S. Pass the specs as the frame prints them; the
+ * floor of a week already lowered by the tier would let an athlete out of it again the next time the
+ * question is asked.
+ * ⚠️ PER SPORT, AND ONLY THE SPORTS THE WEEK ACTUALLY CARRIES. A mixed athlete's two run slots floor
+ * far lower than four do, so the comparison is against their own week rather than a notional one.
+ * ⚠️ UNKNOWN TAKES THE SMALLER WEEK. No logged sessions is not evidence of volume, and §0h's rule is
+ * that an unknown week is not licence to hand out the ceiling.
+ */
+export function lowVolumeSports(
+  frameSpecs: SlotSpec[],
+  anchors: EnduranceAnchors,
+  demonstratedWeeklyMinutes: { run?: number | null; ride?: number | null } | null | undefined,
+): Array<'run' | 'ride'> {
+  const bounds = weekVolumeBounds(frameSpecs, anchors);
+  const out: Array<'run' | 'ride'> = [];
+  for (const sport of ['run', 'ride'] as const) {
+    const bound = bounds[sport];
+    // ⚠️ A SPORT WITH NO SLOTS HAS NO FLOOR TO BE UNDER. Nothing to lower, nothing to decide.
+    if (!bound || bound.sessions === 0) continue;
+    const minutes = Number(demonstratedWeeklyMinutes?.[sport]);
+    if (!Number.isFinite(minutes) || minutes <= 0) { out.push(sport); continue; }
+    if (minutes < bound.floor * 60) out.push(sport);
+  }
+  return out;
+}
+
+/**
  * ⛔ WHERE A SLOT SITS AT DIAL POSITION `t` — the ladder walked as one continuous dial.
  *
  * ⛔⛔ THE RUNGS ARE TRAVERSED BY THEIR OWN LENGTHS, and the jump between them is a JUMP. p235 gives

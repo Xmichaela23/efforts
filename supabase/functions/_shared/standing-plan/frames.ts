@@ -353,44 +353,62 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
   run_mlss: 1,
   run_near_threshold: 1,
   run_lsd: 1,
+  /**
+   * ⛔ THE RIDE FAMILIES, AND DROPPING **THEIR** LEVEL IS OURS (2026-08-27). `RIDE_EQUIVALENT` maps
+   * the frame's four slots onto `ride_sweet_spot` (the two hard ones) and `ride_endurance` (easy and
+   * long), and p246's taper column — the source for *"the same session, smaller"* on the run side —
+   * has no cycling counterpart. **There is no ride taper column, so there is no page under this.**
+   * See `LOW_VOLUME_RIDE_LEVELS_ARE_OURS`.
+   *
+   * ⚠️ THE LEVELS THEMSELVES ARE STILL HIS: p239 prints cycling endurance at three levels and p238's
+   * sweet-spot the same way, so level 1 is a dose he states for the session. What is ours is the
+   * decision to use it for a lower-volume rider.
+   */
+  ride_sweet_spot: 1,
+  ride_endurance: 1,
 };
 
-/**
- * ⛔ THE GATE IS DEMONSTRATED HISTORY, AND THE THRESHOLD IS OURS — the same shape as
- * `ADVANCED_TIER_MIN_WEEKLY_MILES`, pointing the other way.
- *
- * He says *"less experienced runners"* and defines nothing, so the number cannot be his and is
- * labelled. ⚠️ TWENTY MILES A WEEK IS OURS, and the derivation is the frame's own arithmetic rather
- * than a preference: the standard column's four run sessions total about three hours twenty at their
- * shortest, which is what twenty miles a week is at an easy ten-minute mile. **Below that line the
- * frame's own floor asks for more running than the athlete already does** — which is the defect.
- *
- * ⚠️ NO HISTORY MEANS THE LOW TIER, and that is the same rule the advanced gate follows from the
- * other end: never hand out volume the athlete is not shown to be doing (§0h — an unknown week is
- * not licence to hand out the ceiling). ⛔ It is DEMONSTRATED, never the hours they typed: the ask
- * sizes the week inside the tier, it does not choose the tier.
- */
-export const LOW_VOLUME_TIER_MAX_WEEKLY_MILES = 20;
-export const LOW_VOLUME_TIER_GATE_IS_OURS =
-  'The source says "less experienced runners" and defines nothing. Twenty miles a week is ours — '
-  + 'the frame\'s own four run sessions total about three hours twenty at their shortest, which is '
-  + 'twenty miles at an easy ten-minute mile, so below that line the week would ask for more running '
-  + 'than the athlete already does. The smaller sizes themselves are his: the taper column prescribes '
-  + 'these sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient '
-  + 'runner\'s figure.';
+export const LOW_VOLUME_RIDE_LEVELS_ARE_OURS =
+  'Building the ride slots at level 1 for a lower-volume rider is ours. The levels are his — p238 '
+  + 'and p239 print each session at three — but the taper column that justifies the smaller dose on '
+  + 'the run side has no cycling counterpart, so nothing on the page says to do this for a bike.';
 
 /**
- * The endurance levels this athlete's running history earns, per family.
+ * ⛔⛔ THE GATE IS DERIVED, NOT PICKED (rewritten 2026-08-27) — see `lowVolumeSports` in
+ * `volume-bounds.ts`, which owns the comparison.
  *
- * ⚠️ EMPTY IS THE STANDARD COLUMN. An athlete at or above the gate gets p246 exactly as printed.
+ * ⛔ WHAT IT REPLACES, AND WHY THE REPLACEMENT IS THE SAME ANSWER. The first version was twenty
+ * miles a week, reasoned as *"the standard column's four run sessions total about three hours twenty
+ * at their shortest, which is twenty miles at an easy ten-minute mile."* That reasoning is an
+ * arithmetic, and the arithmetic is now the gate: **the tier applies to a sport when the athlete's
+ * logged minutes are under what the frame's own slots of that sport would build at their shortest.**
+ * The invented number is gone, the pace conversion inside it is gone, and the bike needed no second
+ * threshold to be pressed out of thin air.
+ *
+ * ⚠️ NOTHING IN THE CORPUS TIERS CYCLING BY VOLUME, which is exactly why a derived gate was worth
+ * the change. p137's *"two hours of cycling"* is a supplement figure for a RUNNER and is not a tier
+ * gate; pressing it into service as one would have been an invented rule wearing a citation.
  */
-export function lowVolumeRunLevels(
-  demonstratedWeeklyMiles: number | null | undefined,
-): Record<string, Level> {
-  const miles = Number(demonstratedWeeklyMiles);
-  // ⚠️ UNREADABLE OR ABSENT HISTORY TAKES THE SMALLER WEEK — see the gate note above.
-  if (Number.isFinite(miles) && miles >= LOW_VOLUME_TIER_MAX_WEEKLY_MILES) return {};
-  return { ...LOW_VOLUME_TIER_LEVELS };
+export const LOW_VOLUME_TIER_GATE_IS_OURS =
+  'The smaller sizes are his — the taper column prescribes the run sessions at level 1, and p247 '
+  + 'states the 90-to-100-minute long run as the more proficient runner\'s figure. Deciding WHEN to '
+  + 'use them is ours: the sessions drop a level for a sport when the athlete\'s logged minutes over '
+  + 'the last four weeks are under what this week\'s own slots of that sport would build at their '
+  + 'shortest. The source names "less experienced runners" and defines nothing.';
+
+/**
+ * The endurance levels this athlete's history earns, per family.
+ *
+ * @param lowSports the sports the athlete is under the frame's own floor in — `lowVolumeSports`.
+ * ⚠️ EMPTY IS THE FRAME AS PRINTED. A sport at or above its floor gets p246 exactly.
+ */
+export function lowVolumeLevels(lowSports: Array<'run' | 'ride'>): Record<string, Level> {
+  const out: Record<string, Level> = {};
+  for (const [family, level] of Object.entries(LOW_VOLUME_TIER_LEVELS)) {
+    const sport = family.startsWith('ride_') ? 'ride' : 'run';
+    if (lowSports.includes(sport)) out[family] = level;
+  }
+  return out;
 }
 
 /**

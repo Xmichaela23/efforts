@@ -46,7 +46,8 @@ import {
   advancedTierSessions,
   FRAMES,
   LOW_VOLUME_TIER_GATE_IS_OURS,
-  lowVolumeRunLevels,
+  LOW_VOLUME_RIDE_LEVELS_ARE_OURS,
+  lowVolumeLevels,
   PLYO_DOSE,
   type ColumnKind,
   type FrameDay,
@@ -93,8 +94,8 @@ function rotatedArchetype(family: string, level: number, week: number): string |
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
-  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf, REST_DAY_RUNG,
-  rungAt, sizeFor, slotSpans, weekVolumeBounds,
+  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf, lowVolumeSports,
+  REST_DAY_RUNG, rungAt, sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
 import {
@@ -324,6 +325,14 @@ export type ComposeArgs = {
   levelOverrides?: Partial<Record<string, Level>>;
   /** ⛔ DEMONSTRATED, not intended. Gates the advanced tier — see `advancedTierSessions`. */
   demonstratedWeeklyMiles?: number | null;
+  /**
+   * ⛔ DEMONSTRATED MINUTES PER SPORT over the last four weeks — the low-volume tier's gate, which
+   * compares them against what this week's own slots would build at their shortest
+   * (`lowVolumeSports`). ⚠️ MINUTES, because that is the unit the frame answers in; miles would need
+   * a pace, and this area deleted its pace conversions on 2026-08-26.
+   * ⚠️ ABSENT IS NOT NEUTRAL — a sport with no logged time takes the smaller week (§0h).
+   */
+  demonstratedWeeklyMinutes?: { run?: number | null; ride?: number | null } | null;
   /**
    * ⛔⛔ THE NUMBERS THE ATHLETE TYPED, AND THEY ARE INPUTS NOW (§3c, 2026-08-26). Until today they
    * reached `composeStrengthPrimaryPlan` and nothing else, so a Standing Plan block never saw them
@@ -1364,7 +1373,24 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * athlete chose"*, and folding a program tier into it would lose the difference between a decision
    * they made and one the engine made for them — which is the label this codebase exists to keep.
    */
-  const tierLevels = lowVolumeRunLevels(args.demonstratedWeeklyMiles);
+  /**
+   * ⛔ THE FRAME'S OWN WEEK, AT THE LEVELS p246 PRINTS — the thing the athlete's history is measured
+   * against. ⚠️ Built separately from `enduranceSpecs` below, which carries the tier: comparing an
+   * athlete with a week the tier has already lowered would let them straight back out of it.
+   */
+  const frameSpecs: SlotSpec[] = (() => {
+    const out: SlotSpec[] = [];
+    for (const d of days) {
+      d.endurance.forEach((slot, i) => {
+        const a = assignedSlot(sportAssignment, d.day, i, slot);
+        out.push({ family: a.family, level: a.level, archetype: a.archetype, sport: a.sport });
+      });
+    }
+    return out;
+  })();
+  const tierLevels = lowVolumeLevels(
+    lowVolumeSports(frameSpecs, anchors, args.demonstratedWeeklyMinutes),
+  );
   const levelForFamily = (family: string, frameLevel: Level): Level =>
     (args.levelOverrides?.[family] as Level | undefined) ?? (tierLevels[family] as Level | undefined) ?? frameLevel;
 
@@ -1743,6 +1769,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   if (Object.keys(tierLevels).length > 0 && !notes.some((n) => n.text === LOW_VOLUME_TIER_GATE_IS_OURS)) {
     notes.push({ kind: 'ours', text: LOW_VOLUME_TIER_GATE_IS_OURS });
+    // ⛔ AND THE RIDE SIDE CARRIES ITS OWN LABEL, because there is no cycling taper column under it.
+    if (Object.keys(tierLevels).some((f) => f.startsWith('ride_'))) {
+      notes.push({ kind: 'ours', text: LOW_VOLUME_RIDE_LEVELS_ARE_OURS });
+    }
     notes.push({
       kind: 'source',
       text: 'The two quality runs and the long run are prescribed at the smaller of the source\'s own '

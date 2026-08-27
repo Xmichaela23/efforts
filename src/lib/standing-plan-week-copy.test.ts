@@ -402,7 +402,13 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
    * compares the bound against the FRAME's bands — so without a demonstrated figure it would be
    * comparing two different weeks and calling the difference a rounding error.
    */
-  const opts = { baselines: BASELINES as never, easyPaceSecPerMi: PACE, demonstratedWeeklyMiles: 22 };
+  const opts = {
+    baselines: BASELINES as never,
+    easyPaceSecPerMi: PACE,
+    // ⚠️ MINUTES PER SPORT since 2026-08-27 — the tier's gate is a comparison against the frame's own
+    // floor, so the fixture states an athlete who already carries it rather than a mileage figure.
+    demonstratedWeeklyMinutes: { run: 400, ride: 600 },
+  };
   const b = weekBounds(slots, opts);
   assert(b.runMiles);
   // ⛔ AGAINST THE RAW ARITHMETIC, not against its own rounding. `min === floor(min)` is true of a

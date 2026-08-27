@@ -12,6 +12,7 @@
  * which is the ask-15-get-20 defect the whole work order exists to kill.
  */
 import {
+  resolveEnduranceAnchors,
   sessionDurationBandSeconds,
   type EnduranceBaselines,
   type FamilyId,
@@ -24,12 +25,14 @@ import {
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import { HARD_SLOT_KEYS } from './standing-plan-week-copy';
 /**
- * ⛔ THE TIER IS THE ENGINE'S, READ HERE RATHER THAN RESTATED. `lowVolumeRunLevels` decides which
- * levels a low-mileage athlete's run slots are built at, and this screen quotes hours off the same
- * levels the composer will use. ⚠️ A second table here is how a preview and a plan diverge — the
- * same reason `RIDE_EQUIVALENT` is imported rather than copied.
+ * ⛔ THE TIER IS THE ENGINE'S, READ HERE RATHER THAN RESTATED. `lowVolumeSports` decides which
+ * sports are under the week the frame would build them, and `lowVolumeLevels` turns that into the
+ * levels those slots are built at — so this screen quotes hours off the same levels the composer
+ * will use. ⚠️ A second table here is how a preview and a plan diverge, the same reason
+ * `RIDE_EQUIVALENT` is imported rather than copied.
  */
-import { lowVolumeRunLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { lowVolumeLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { lowVolumeSports } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import type { SlotKey, SlotSelection, SlotSport } from './standing-plan-week-copy';
 
 /**
@@ -116,14 +119,36 @@ export function weekBounds(
     baselines?: EnduranceBaselines;
     easyPaceSecPerMi?: number | null;
     /**
-     * ⛔ DEMONSTRATED WEEKLY RUNNING — the low-volume tier's gate, and it must be the same number
-     * the engine gates on or this screen quotes hours the week will not build. ⚠️ Absent is not
-     * neutral: no history takes the smaller week, exactly as the composer does.
+     * ⛔ DEMONSTRATED MINUTES PER SPORT over the last four weeks — the low-volume tier's gate, and it
+     * must be the same measure the engine gates on or this screen quotes hours the week will not
+     * build. ⚠️ Absent is not neutral: a sport with no logged time takes the smaller week, exactly
+     * as the composer does.
      */
-    demonstratedWeeklyMiles?: number | null;
+    demonstratedWeeklyMinutes?: { run?: number | null; ride?: number | null } | null;
   },
 ): WeekBounds {
-  const tierLevels = lowVolumeRunLevels(opts.demonstratedWeeklyMiles);
+  /**
+   * ⛔ THE FRAME'S OWN WEEK FIRST, at the levels p246 prints, because that is what the athlete's
+   * history is compared against. ⚠️ An unanswered slot contributes nothing here for the same reason
+   * it contributes nothing below: it is not yet part of a week.
+   */
+  const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
+  const frameSpecs = (Object.keys(SLOT_FAMILY) as SlotKey[]).flatMap((key) => {
+    const sport = slots[key];
+    if (!sport) return [];
+    const base = SLOT_FAMILY[key];
+    const eq = sport === 'ride' ? RIDE_EQUIVALENT[base.family] : null;
+    if (sport === 'ride' && !eq) return [];
+    return [{
+      family: (eq?.family ?? base.family) as FamilyId,
+      level: base.level,
+      archetype: eq?.archetype,
+      sport,
+    }];
+  });
+  const tierLevels = lowVolumeLevels(
+    lowVolumeSports(frameSpecs as never, anchors, opts.demonstratedWeeklyMinutes),
+  );
   const levelFor = (family: string, frameLevel: Level): Level =>
     (tierLevels[family] as Level | undefined) ?? frameLevel;
   let runShort = 0;

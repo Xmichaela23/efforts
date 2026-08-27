@@ -30,8 +30,9 @@ import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ THE SAME functions the SERVER's tier gate runs — client-reachable by design, so the line the
 // wizard shows and the tier the composer builds cannot disagree (item 8, 2026-08-24).
-import { demonstratedRunVolume } from '../../supabase/functions/_shared/standing-plan/demonstrated-history.ts';
-import { advancedTierSessions, lowVolumeRunLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { demonstratedRunVolume, demonstratedWeeklyMinutes } from '../../supabase/functions/_shared/standing-plan/demonstrated-history.ts';
+import { advancedTierSessions, lowVolumeLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { lowVolumeSports } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 // ⛔ ONE READER FOR "is this the plyo day" — shared with the calendar chip. The tag, never the name.
@@ -3495,6 +3496,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     () => demonstratedRunVolume((ctxWorkouts ?? []) as never, new Date().toISOString().slice(0, 10)),
     [ctxWorkouts],
   );
+  /**
+   * ⛔ WHAT THEY ACTUALLY DID PER SPORT, IN MINUTES — the low-volume tier's gate, and the same
+   * measure the engine uses. ⚠️ Minutes rather than miles because that is the unit the frame answers
+   * in; the mileage figure above still feeds the ADVANCED tier, which is a different question.
+   */
+  const demonstratedMinutes = useMemo(() => {
+    const asOf = new Date().toISOString().slice(0, 10);
+    return {
+      run: demonstratedWeeklyMinutes((ctxWorkouts ?? []) as never, asOf, 'run').weeklyMinutes,
+      ride: demonstratedWeeklyMinutes((ctxWorkouts ?? []) as never, asOf, 'ride').weeklyMinutes,
+    };
+  }, [ctxWorkouts]);
   const tierLine = useMemo(() => {
     const vol = demonstratedRun;
     const extra = advancedTierSessions(vol.weeklyMiles);
@@ -3658,9 +3671,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
      * ⛔ THE LOW-VOLUME TIER APPLIES HERE TOO. This sentence names the hours the week FIXES, and the
      * engine builds those sessions at the tier's levels — quoting the frame's printed levels to an
      * athlete whose block is built at the smaller ones is the screen lying about the plan.
-     * ⚠️ Keyed by family, so a slot on the bike is untouched: the tier names run families only.
+     * ⚠️ THE GATE IS THE COMPARISON, NOT A THRESHOLD (2026-08-27): the frame's own slots at the
+     * levels p246 prints, floored, against what the athlete has actually logged. `frameSpecs` is
+     * therefore built BEFORE the tier is applied — measuring against an already-lowered week would
+     * let the athlete straight back out of it.
      */
-    const tierLevels = lowVolumeRunLevels(demonstratedRun.weeklyMiles);
+    const frameSpecs = SLOT_KEYS.flatMap((k) => {
+      const sp = slotSportsNow[k];
+      if (!sp) return [];
+      const fam = SLOT_FAMILY[k];
+      const eq = sp === 'ride' ? RIDE_EQUIVALENT[fam.family] : null;
+      if (sp === 'ride' && !eq) return [];
+      return [{ family: (eq?.family ?? fam.family), level: fam.level, archetype: eq?.archetype, sport: sp }];
+    }) as SlotSpec[];
+    const tierLevels = lowVolumeLevels(
+      lowVolumeSports(frameSpecs, enduranceAnchorsNow, demonstratedMinutes),
+    );
     const specs = SLOT_KEYS.map((k) => {
       const s = slotSportsNow[k];
       if (!s) return null;
@@ -5658,7 +5684,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             slots={slotSportsNow}
             /** ⛔ THE SAME NUMBER THE ENGINE GATES THE LOW-VOLUME TIER ON, so the hours this screen
              *  quotes and the hours the block builds come from the same levels. */
-            demonstratedWeeklyMiles={demonstratedRun.weeklyMiles}
+            demonstratedWeeklyMinutes={demonstratedMinutes}
             /** ⛔ `sport` IS NEVER NULL HERE ANY MORE (2026-08-26 evening). The card's only slot
              *  gesture is answering a row; the dismiss that used to clear one is gone with the
              *  opt-in, and the prop's type says so rather than leaving a dead arm behind. */

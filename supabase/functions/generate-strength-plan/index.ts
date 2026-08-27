@@ -49,6 +49,7 @@ import {
   type Weekday,
   defaultCompetitionLifts,
   demonstratedRunVolume,
+  demonstratedWeeklyMinutes,
   assignSports,
   evidenceForSkip,
   evidenceWorkingNumbers,
@@ -337,22 +338,36 @@ Deno.serve(async (req: Request) => {
       let demonstrated: { weeklyMiles: number | null; runs: number; source: string } = {
         weeklyMiles: null, runs: 0, source: 'the run history could not be read',
       };
+      /**
+       * ⛔ MINUTES PER SPORT, FOR THE LOW-VOLUME TIER (2026-08-27) — a different question from the
+       * advanced tier's miles, and it needs the RIDES too. The tier asks whether the athlete is
+       * already doing what the frame would build them, and the frame answers in minutes.
+       * ⚠️ ABSENT IS NOT NEUTRAL HERE, and that is the opposite of the advanced tier's abstention: a
+       * reader that cannot read must never ADD volume, and must never assume volume either.
+       */
+      let demonstratedMinutes: { run: number | null; ride: number | null } = { run: null, ride: null };
       try {
         const asOf = (typeof start_date === 'string' && start_date.trim())
           ? String(start_date).slice(0, 10)
           : new Date().toISOString().slice(0, 10);
         const from = new Date(Date.parse(`${asOf}T00:00:00Z`) - 35 * 24 * 60 * 60 * 1000)
           .toISOString().slice(0, 10);
-        const { data: runRows } = await supabase
+        const { data: rows } = await supabase
           .from('workouts')
-          .select('type, date, distance')
+          // ⚠️ `moving_time` IS THE ONLY CLOCK READ — the row also carries `duration` and the two
+          // disagree in unit. See `demonstratedWeeklyMinutes` for why an ambiguous field is refused.
+          .select('type, date, distance, moving_time')
           .eq('user_id', String(user_id))
-          .eq('type', 'run')
+          .in('type', ['run', 'ride'])
           .gte('date', from)
           .lte('date', asOf);
-        demonstrated = demonstratedRunVolume(runRows as never, asOf);
+        demonstrated = demonstratedRunVolume(rows as never, asOf);
+        demonstratedMinutes = {
+          run: demonstratedWeeklyMinutes(rows as never, asOf, 'run').weeklyMinutes,
+          ride: demonstratedWeeklyMinutes(rows as never, asOf, 'ride').weeklyMinutes,
+        };
       } catch (e) {
-        console.warn('[standing-plan] demonstrated run volume unreadable; base tier:', (e as Error)?.message);
+        console.warn('[standing-plan] demonstrated volume unreadable; base tier:', (e as Error)?.message);
       }
 
       /**
@@ -702,6 +717,9 @@ Deno.serve(async (req: Request) => {
           baselines: ub as never,
           equipment: equipmentStrength,
           demonstratedWeeklyMiles: demonstrated.weeklyMiles,
+          // ⛔ THE LOW-VOLUME TIER'S GATE — minutes per sport, compared against what this week's own
+          // slots would build at their shortest (`lowVolumeSports`).
+          demonstratedWeeklyMinutes: demonstratedMinutes,
           /**
            * ⛔ THE ATHLETE'S SPORT MIX (slice 4). ⚠️ A RATIO, NOT A COUNT — pivot §2: *"the program
            * owns session count; athlete owns sport + level."* The frame holds four endurance slots
