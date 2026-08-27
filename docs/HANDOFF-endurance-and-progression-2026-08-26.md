@@ -192,3 +192,452 @@ does not call themselves a hybrid athlete.
   isolation is worse than not answering — his words: *"everything has a domino effect."*
 - **No past ruling of his, and none of the app's invented rules, constrain a new finding.**
   *"Just don't use my words against me."* The strength-forward 12-week block is the one fixed thing.
+
+---
+---
+
+# ADDENDUM — 2026-08-26, evening session. THE p119 QUESTION IS CLOSED.
+
+**Written after reading twenty more pages off the images: 88, 89, 108, 109, 118, 119, 120, 121, 122,
+123, 132, 133, 134, 136, 137, 138, 146, 147, 148, 149, 150, 151.** Everything below is page-verified
+or code-traced in this session. ⛔ The section above was written before these pages were read; where
+the two disagree, this one is later.
+
+---
+
+## ⛔ §A. THE p119 PROBLEM IS RESOLVED, AND THE SCREEN WAS NOT ASKING THE WRONG QUESTION
+
+The section above says the hours question may be wrong and that it is Michael's call. **It is
+answered, and the answer is that the question is right and the DEFAULT is wrong.**
+
+**p149 carries the exception the earlier reading missed:**
+
+> *"If you aren't nearly at your level of maximum tolerable volume, you may find that you tolerate a
+> general hybrid program just fine and can jump right into a different type of program with minimal
+> stress. This overall load analysis is still a worthy exercise, however, because it can highlight
+> potential risks in the transition and help identify the specific culprit if you find yourself being
+> overtaxed in the first few weeks or months of a new program."*
+
+⛔ **So p119's volume cut is for an athlete AT their tolerable ceiling.** The customer — two to three
+hours running, five riding — is nowhere near one. **Their hours stay.** The cut is not owed.
+
+⛔ **AND ASKING WHAT THEY CURRENTLY HOLD IS HIS OWN METHOD**, pp.146–148: audit the existing week's
+buckets, then move each by under 10%. p149: *"you do not just 'start' a hybrid program; you 'evolve'
+the program into a hybrid one."* The screen's *"Pick the hours you currently hold comfortably"* is
+that instruction.
+
+⛔ **WHAT IS ACTUALLY WRONG IS THE DEFAULT.** Leave the screen untouched and the week is one long
+easy session plus one recovery session — which is *"run base miles"*, the phrase p119 uses when
+saying not to do it. Both quality sessions sit behind an opt-in that defaults to none.
+
+**And the machinery is already right underneath:** the hour dials only stretch the base families
+(`run_vt1`, `run_lsd`, `ride_endurance`). Quality stays locked at the frame's level. So an extra hour
+can only ever become easy work — which is p134's rule already built.
+
+---
+
+## ⛔ §B. RULINGS MADE THIS SESSION — do not re-litigate
+
+| ruling | his words / basis |
+|---|---|
+| **Both quality sessions stop being optional** | *"lets not make them optional that was not understanding things on my part"* — plural. All four slots become the frame's. |
+| **Long session → 90–100 minutes** | *"His page says ninety to a hundred minutes use that."* Replaces the 2h30 ceiling, which was OURS. |
+| **Plyo rotation reordered to his ramp** | *"lets do that."* See §D4. |
+| **The plyo day STAYS for a non-runner** | p88's benefits are running economy, chronic-injury reduction AND balance *"which can help even loaded movements and carries."* Not runner-only. This unblocks §E piece 4. |
+| **`DOUBLE_PROGRESSION_IS_OURS` → HIS** | p123 read directly, see §C1. |
+| **Build focus keeps its name** | The word is accurate; the imbalance is the problem. See piece 7. |
+
+---
+
+## ⛔ §C. FINDINGS THAT CHANGE A LABEL OR A NUMBER
+
+### C1. ⛔⛔ THE REP PROGRESSION IS HIS. p123, read off the image, top of page, verbatim:
+
+> *"they do give a solid starting point for performance. As the weeks progress, athletes may rotate
+> through the **'circle of maxes,'** varying repetition ranges and using their expected performance
+> on each as a baseline. **If an athlete repeatedly succeeds at these lifts or outperforms, the coach
+> may, after a period of time, raise their theoretical 1-rep max and base the next few training
+> microcycles/training weeks on this new max.**"*
+
+Rotate rep ranges → repeatedly succeed or beat them → raise the theoretical max → rebuild the next
+weeks from it. **That is what shipped.** Open item 5 of the section above is closed: relabel
+`DOUBLE_PROGRESSION_IS_OURS` as HIS, cite p123.
+
+### C2. ⛔ THERE IS NO SPEED WORK ANYWHERE IN THE FRAME, and the earlier reading of the fix was wrong.
+
+The frame's four slots are `run_mlss` (threshold), `run_near_threshold`, `run_vt1` (easy) and
+`run_lsd` (long). **None is economy/speed work.** p119 lists economy FIRST of the three qualities.
+
+⚠️ **A CORRECTION MADE IN-SESSION, RECORDED SO IT IS NOT REPEATED.** It was first stated that the
+long run's fast variant already exists and merely defaults off. **It does not.** `run_lsd`'s three
+archetypes are `long_with_inserts` (inserts at 0.95–1.15 of threshold), `fartlek` (0.85) and
+`race_pace_finish`. **All three are threshold-or-below. None is speed.** `run_sprint_power`
+(`workFloorPct` 1.3) is fully built with three archetypes — `short_max` is 25–50 m × 4–8, which is
+strides in all but name — and **the frame never reaches for it.**
+
+⛔ **p109 IS THE PAGE THAT MAKES THIS SOLVABLE IN FOUR SLOTS:**
+
+> *"Even for speed development, athletes can improve turnover/running economy with as few as a
+> handful of strides before, during, or after other running sessions, so **there's no need for a
+> speed session to be a lengthy stand-alone!**"*
+
+Same page: *"All minutes count. If your schedule dictates that you can get in only two or three runs
+a week, **many of them can be multipurpose sessions**, with extended warm-ups and cooldowns adding
+extra low-intensity minutes in the same session as speed or subthreshold intervals."*
+
+⛔ **THE REAL GAP: every session in the library is a WHOLE session.** There is no shape for hanging a
+short piece of fast work onto an otherwise easy one. That is what piece 2 has to build — not a
+default flip.
+
+### C3. The long-run conflict is settled — 90–100 min (p247), not 2h30. `LADDER_CEILING_MIN.run_lsd`
+is `150`; his figure is 90–100. `slotSpans` and the ladder ceiling both move.
+
+### C4. ⛔ PROVENANCE — Part G item 6 IS LARGELY CLOSED by this session's reading.
+
+Read off the page today and **no longer one generation removed**: the five accounting buckets
+(pp.146–147, with both worked examples), the 10%/week change rule (p148, *"though ideally 5 percent
+is as high as I will usually go"*), back off all buckets equally (p149), the weekly floor and
+*"all minutes count"* (p109), the 2h VT1 ceiling and 6–8h between two-a-days (p108), the one-third
+maintenance figure (p151). **These may now be coded as constants.** Part G item 6 should be updated.
+
+### C5. p151 answers the race question and nothing needs building for it.
+
+*"PROGRESSING TO A LONGER EVENT"* — for a marathon or a 70.3 you do not switch plans. Over **8 to 12
+weeks** mileage rises and the strength volume is traded *gradually* down toward the one-third
+maintenance floor, **while skill work is preserved**: *"What's most critical, of course, is that you
+maintain skill work… practicing sport skill (especially dynamic effort/speed work in compound lifts)
+… Keeping percentages low, velocity high, and rest periods sufficient tremendously helpful. This can
+allow you to continue to engage in very productive strength sessions deep into higher-mileage
+weeks."* He adds that dropping strength all the way to maintenance is *"unnecessary because the
+running will be increasing gradually, and there will be recovery left on the table."*
+
+p121 backs it: *"Two hybrid athletes' running programs may look remarkably similar, even if one is
+training for a 10K and the other for a 50K… these programs only starting to diverge as needed."*
+⛔ **One base block serves the marathon, the half and the 70.3. That is a confirmation of what is
+built, not a change.**
+
+### C6. p137/p138 — the bike graft is sanctioned, and its terms are now exact.
+
+p137: at an 18–20 mi/wk running ceiling, *"adding two hours of cycling or Arc Trainer/elliptical per
+week will almost certainly aid your running."* Same page states the law: *"when in doubt, use
+cross-training for easy work, not threshold or sprint work."* Proficiency first — a **4–5 week crash
+course** in a new modality, **2–3 week high-intensity refresher** if familiar but undertrained.
+
+p138 grants the exception the app relies on: *"Consider adding some work at higher intensity with
+similar modalities if you're really pushing the limits of your tolerable volume and you can't
+otherwise figure out how to break through to the next level."* ⛔ **This is why `SLOT_OPTIONS` puts
+Ride first on the hard slots. It is his, not ours.**
+
+---
+
+## ⛔ §D. THE WORK ORDER — pieces 1, 2, 3 and 8. None depends on §E's open call.
+
+### D1. Piece 1 — BOTH QUALITY SESSIONS JOIN THE FRAME
+
+`standing-plan-week-copy.ts` · `EnduranceWeekCard.tsx` · `NonRaceBuilder.tsx`
+
+- `REQUIRED_SLOT_KEYS` becomes all four. `REQUIRED_SLOT_DISPLAY_ORDER` gains them; its test asserts
+  the two are permutations of each other, so both move together.
+- The "+ Add a hard session" block and `MAX_HARD_SESSIONS` opt-in path are **deleted**, not hidden.
+  `restoreOnDismiss`, the X control on hard rows, and `hardSessionCount`'s opt-in readers go with it.
+- ⛔ **THE "DO NOT FIX THIS" NOTE AT `REQUIRED_SLOT_KEYS` MUST BE REWRITTEN, NOT TRIPPED OVER.** It
+  currently says a future session should not add a dismiss control to the required rows *to match the
+  others*. Once all four are required there are no others. Rewrite the note to say the frame owns all
+  four (p246) and none is dismissible. Do not delete the warning wholesale.
+- `allSlotsChosen` / `unansweredSlots` / `unansweredLine` all key off `REQUIRED_SLOT_KEYS` and follow
+  automatically — **check the blocked sentence still reads correctly with four names in it.**
+- ⚠️ `syncHardDays` and the `hardDays` array in `NonRaceBuilder` assume a slot can be cleared to
+  `null`. With no dismiss control, `onSlotChange(key, null)` should become unreachable rather than
+  left as dead code.
+
+### D2. Piece 2 — SPEED. The hard one; read C2 first.
+
+⛔ **Do NOT implement this as "flip the long run's default archetype."** No existing archetype is
+speed work. Two candidate shapes, and the choice is an engineering call:
+
+- **(a) An add-on on an existing session** — a short block of `run_sprint_power`'s `short_max`
+  (25–50 m × 4–8) appended to the easy or long run. Matches p109 exactly. Needs a shape the library
+  does not have: every session is currently whole.
+- **(b) A fifth slot.** Cleanest in the model, but the frame owns four and p246 prints four.
+
+⚠️ (a) is the book's own answer. (b) contradicts the frame. Recommend (a).
+
+### D3. Piece 3 — VOLUME COPY. **Smaller than the earlier list said — read §A.**
+
+- Delete `ENDURANCE_WEEK_INTRO_CONSEQUENCE[2]`, *"Easy sessions are the default pick hard session
+  below to add"*. It is against p134 (*if there is room, add quality, not a recovery run*) and it
+  describes a default that no longer exists after D1.
+- ⛔ **DO NOT add a line saying the block will spend fewer of their hours.** An earlier draft of this
+  work order said to. §A shows it is wrong for this customer, and `fixedHoursLine` already states the
+  true thing — what is fixed, and that the rest is easy.
+- ⚠️ `ENDURANCE_WEEK_INTRO` is pinned verbatim by a test in `wizard-focus-theme.test.ts`. The
+  deletion lands there too.
+
+### D4. Piece 8 — PLYO ORDER (new, ruled this session)
+
+`_shared/standing-plan/plyo.ts`
+
+p89, *"Building to Plyos"*, read off the image:
+
+> *"for many athletes, more advanced movements like bounding and lateral hopping may be challenging.
+> As such, **I typically introduce an athlete to plyometrics via a combination of foot-speed drills
+> and static plyometrics.**"* … *"**With these skills mastered** (which can be taught relatively
+> easily), you can proceed to more conventional dynamic plyometrics, **such as skipping, bounding,
+> and hops/jumps.**"*
+
+p88 adds: these are movements many trainees *"haven't performed since they played on organized sport
+teams in their teens, if ever… plyometrics should be incorporated gradually."*
+
+⛔ **`drillForWeek` walks each family in PAGE ORDER, which is not easiest-first.** Week 1 currently
+serves `A-Skip` (bounding) and `Single-Leg Hops` (ground contact) — **both are in his after-mastery
+group.** Reorder the rotation so the early weeks are footspeed and in-place work and bounding/hops
+arrive later.
+
+⚠️ **The drill NAMES and the family membership are his and do not move** — only the order within the
+walk. Keep `PLYO_FAMILY_MIX_IS_OURS`; add a note that the ORDER is now his (p89) where it was ours.
+⚠️ Every emitted name must still resolve in `src/lib/exercise-config.ts` (D-322).
+
+---
+
+## §E. THE REST OF THE LIST
+
+**Piece 4 — kill the second endurance policy. UNBLOCKED** (the plyo question is answered, §B).
+Everyone on the strength path gets the four-slot week; Get Stronger's private endurance handling
+goes. ⚠️ Its own composer is currently pinned **byte-identical** by `standing-plan.test.ts` — that
+pin is the thing this piece breaks, deliberately. The exposed case is the athlete who rides and never
+runs: `resolveFrame` refuses them today (`enduranceSport === 'bike'` → `null`). They would take four
+slots all on the bike. ⛔ Nothing from the old policy is carried across — the assistance tier band
+keys on **total endurance hours**, which is the one number pp.146–148 deliberately refuse.
+
+**Piece 5 — ASK WHICH SPORT LEADS. STILL MICHAEL'S CALL, NOT A PIECE YET.**
+Today it is inferred: `create-goal-and-materialize-plan:2564` reads
+`gsPosture?.run === 'maintain' ? 'run' : … 'bike'`. ⛔ **Run wins whenever it is kept at all**, so an
+athlete riding five hours and running two is read as a runner and handed a runner's frame. The fork:
+honouring a "bike leads" answer properly needs a cycling frame (**Cycling: Base, p278/p280, not
+built**); the cheap version asks and uses the answer only for slot mix and hours split.
+
+**Piece 6 — the downward adjustment.** `adapt-plan` declares `endurance_deload` as a type **and never
+emits it** — no push site exists. Every live suggestion moves a target or a layout (lift weight,
+training max, easy pace, FTP, relayout); **none takes work away**, and `isAcwrFatiguedSignal` only
+sets `allowLoadIncrease = false`. p149 is the missing behaviour: cut every bucket equally when taxed,
+add one or two back when ready. It also pays off the screen's existing *"give it a month before
+re-dialing"* promise, for which no control exists.
+
+**Piece 7 — SHOW THE TEN PRESCRIBED SLOTS.** The frame decides 10 of 17 lifting slots (4 ME, 6 DE)
+and the athlete never sees them anywhere in the wizard. `confirm`'s subtitle already claims
+*"Strength leads; your endurance holds"* with nothing behind it, and the week is fully computed by
+then — the collision check on that same screen reads it. ⚠️ This is why "Build focus" reads as the
+whole plan: all seven athlete picks are HYP cells, so the only screen they touch is the growth work.
+
+---
+
+## §F. LOGGED, NO ACTION
+
+- **The two `pull_upper` slots carry no weight, deliberately.** `LIFT_FOR_PATTERN` maps `pull_upper`
+  to `bench`, so seeding it would produce *"pull up @ 205 lb"* — the first defect the composer's smoke
+  run found. 8 of the 10 prescribed slots carry a number; the two pulls do not.
+- **The deleted `lifting` step's note says every block is three days; this frame is four.** Written
+  for the Get Stronger path, so probably fine. Worth a glance.
+- **`p215.jpg` is still not in `book-sources/`** (Part G item 7). The working number — 96% of a fresh
+  prediction — cannot be re-verified in this corpus and every prescribed weight rests on it.
+
+---
+
+# §G. HOW VIADA DISTRIBUTES ANY NUMBER OF HOURS
+
+**Written 2026-08-27, overnight, on Michael's instruction: *"you need to figure out how viada would
+handle any number of hour combinations for people."*** Every page below was read off the images in
+this session or the one before it. ⛔ Read §G1 first — it governs everything after it.
+
+---
+
+## ⛔⛔ G1. HE REFUSES TO GIVE A RATIO. p91, read directly, verbatim:
+
+> *"There is considerable debate in the field regarding the exact distribution of training intensity.
+> The old 'polarized training' concept, in which elite athletes were observed to conduct **80 to 88
+> percent** of their training in the low-intensity region (sub zone 2, or under your
+> ventilatory/aerobic threshold) and the remainder in the higher-intensity range … sounded wonderfully
+> straightforward. But as with most rules of thumb, it allowed further pedantic zealotry laced with
+> utter confusion to flourish."*
+
+He then lists the ways "20 percent" is ambiguous — session count, aggregate duration, time-at-intensity
+within a session, heart rate versus prescribed intensity — and answers:
+
+> *"The correct answer, of course, is 'yes.' In other words, successful programs have used every one
+> of those criteria and done just fine. … debate began to ensue between periodized programs (80/20),
+> 'pyramidal' programs (70/20/10, for example), and other layouts. **My perspective is that the ideal
+> program can be any of these layouts, as long as the athlete/coach knows their athlete (and the
+> definitions).**"*
+
+⛔ **THEREFORE: ANY PERCENTAGE SPLIT THIS APP USES IS OURS.** Do not code 80/20, do not code
+70/20/10, and above all do not cite him for either. He names both and declines to choose.
+
+---
+
+## G2. WHAT HE GIVES INSTEAD IS A FLOOR, EXPRESSED IN SESSIONS — p109
+
+- **at least one speed session** — and it need not be standalone: *"there's no need for a speed
+  session to be a lengthy stand-alone"*, a handful of strides before/during/after another run does it.
+- **at least one subthreshold session**
+- **the remainder at VT1 or below**
+- *"All minutes count."* Two or three runs a week can be **multipurpose** sessions, with extended
+  warm-ups and cooldowns adding the low-intensity minutes inside the same session as the intervals.
+
+⚠️ **A FLOOR IS NOT A RATIO.** It says what must be PRESENT, never in what proportion.
+
+---
+
+## ⛔ G3. AND A UNIT — AND IT IS NOT HOURS PER SPORT. p146.
+
+p146 opens by naming the exact problem: systems exist for tracking volume *within* one modality and
+*"there are few practical ways to track total load across different stimuli."* The five buckets are
+his answer, tracked weekly **across all modalities**:
+
+1. **sub-VT1 minutes** — total minutes above zone 1 and below VT1
+2. **near-threshold minutes** — between VT1 and just over VT2 (zone 3 crossing into zone 4)
+3. **over-threshold minutes** — notably over threshold, zone 4/5, through to vVO2max
+4. **high-intensity work sets** — *"if muscular fatigue/failure causes the set to end, it's a
+   high-intensity work set"*; strength work sets go in the same bucket
+5. **effective hypertrophy reps per muscle group**
+
+His two worked examples (pp.147–148) show how far apart two real athletes sit:
+
+| | elite marathoner | strongman |
+|---|---|---|
+| sub-VT1 | 550 min | 100 min |
+| near-threshold | 110 min | 4 min |
+| over-threshold | 40 min | 5 min |
+| work sets | 15 | 25 |
+| hyp reps/muscle | 10–15 lower | 30–35 upper, 35–40 lower |
+
+⛔⛔ **SO THE TWO HOUR DIALS ARE OUR SHAPE, NOT HIS.** A run+ride athlete's dose in his terms is the
+**sum across sports**; which sport carries which minutes is a PLACEMENT question, not a dosing one.
+That is also why p109 says all minutes count whatever the modality.
+
+⚠️ **THE APP COMPUTES BUCKETS 4 AND 5 AND NONE OF 1–3.** `ledgerFor` / `accessory-dosing` covers the
+strength side (and correctly includes strength work sets, per p147). **Nothing anywhere computes
+endurance minutes by intensity.** See §G8 — this is the load-bearing consequence.
+
+---
+
+## ⛔ G4. QUALITY IS BOUNDED; EASY IS THE ELASTIC PART. p93, read directly:
+
+> *"Lower-intensity sessions are the bread and butter of most training programs. … Lower-intensity
+> training is also significantly easier to recover from; the demands and costs are relatively low, so
+> **this training can be prescribed liberally throughout a training program. In fact, the tolerable
+> dose is often so high that many athletes can engage in nearly the maximum effective dose every day
+> and still recover adequately.**"*
+
+p106 agrees from the adaptation side: *"almost any dosage of low-intensity work can help stimulate
+these adaptations — and there is a fairly large ceiling on this trigger, especially on a per-week
+basis, but it's pretty clear that **consistent exposure** to some amount of exercise is what matters."*
+
+**So the easy sessions are where a week's surplus is meant to land.** The quality sessions carry
+narrow bands and hard per-session limits; easy work does not.
+
+---
+
+## G5. THE FILL ORDER, as it falls out of his pages
+
+Given a weekly budget, in this order:
+
+1. **Every required session at its band minimum.** That is the floor and it is not negotiable — the
+   floor is the FRAME (four sessions, p246), not a number.
+2. **Surplus grows the sessions that already exist**, quality inside its own band and base inside
+   its level.
+3. **Then base sessions climb LEVELS** — for VT1, p235: *"the level refers almost strictly to
+   duration."* Quality levels stay where p246 put them.
+4. **Then extra DAYS** — the two lifting days the frame leaves clear, then the rest day last.
+   ⚠️ **GROW BEFORE ADDING.** p134's junk-volume warning is aimed at *bolting on a recovery run*
+   (*"rather than adding on a random hypertrophy set of arm work or a 'recovery run'"*), not at
+   lengthening a session the program already contains. p246 gives the week one rest day; spending it
+   costs something the frame chose, so the week should say so when it goes.
+5. **Ceilings that stop the climb:** 2h of VT1 in one session (p108) · terminate at **5%** cardiac
+   drift for a hybrid athlete doing numerous weekly sessions (p107) · VT1 bouts no shorter than
+   10–15 min (p108) · the long session at 90–100 min for THIS program (p247).
+
+⚠️ **WHETHER STEP 2 SHOULD FILL QUALITY *BEFORE* BASE IS OURS, AND THE CURRENT ANSWER IS DEFENSIBLE.**
+The engine scales everything proportionally. Reading p134 as "max the quality first" would build a
+four-hour week as 95 min of threshold against a 25-min easy run, which p93 contradicts directly.
+**Proportional is the right reading. Do not "fix" this toward quality-first.**
+
+---
+
+## G6. BELOW THE FLOOR — DROP THE LEVEL, NEVER THE BAND
+
+p247: *"Mileage will be dictated by experience level, with more proficient runners looking at runs up
+to 90 to 100 minutes here … and **less experienced runners opting for shorter fartlek variations**."*
+p246's taper column runs every endurance session at **level 1** — his own smaller version of the same
+four sessions. p275 forbids stretching a session past its band, and the same logic binds the bottom.
+
+**Absolute floor:** one-third of productive volume, at least once a week, holds an adaptation (p151).
+
+✅ Built 2026-08-27 — `lowVolumeRunLevels` / `LOW_VOLUME_TIER_GATE_IS_OURS`.
+
+---
+
+## G7. THE RATE OF CHANGE BOUNDS ALL OF IT
+
+p148: change **each** bucket by *"less than 10 percent per week, though ideally 5 percent is as high
+as I will usually go."* p149: *"Too rapid increases in any category is the greatest source of program
+failure that I observe in hybrid programs."* And the exception that decides whether a cut is owed at
+all: *"If you aren't nearly at your level of maximum tolerable volume, you may find that you tolerate
+a general hybrid program just fine and can jump right into a different type of program."*
+
+---
+
+## ⛔⛔ G8. WHAT THIS MEANS FOR THE APP — the one real conclusion
+
+**The fill order is already right.** §G5 describes what the ladder does today.
+
+**The UNIT is wrong, and it is the thing that blocks the rest.** We balance hours-per-sport; he
+balances minutes-per-intensity summed across every modality. Because **nothing computes buckets 1–3**:
+
+- Nothing can check the 10%-per-week limit on the endurance side. p149 calls breaking it the single
+  biggest cause of these programs failing, and we have no way to see it.
+- **PIECE 6 HAS NOTHING TO MEASURE.** "Cut every bucket by the same amount when the athlete is taxed"
+  is not implementable without the buckets. The suggestion type `endurance_deload` is declared in
+  `adapt-plan` and never emitted; this is why.
+- A mixed athlete's real dose is invisible. Two hour dials cannot tell you whether a week is 78% easy
+  or 50% easy, and those are different programs.
+
+⛔ **SO THE NEXT PIECE OF INFRASTRUCTURE IS THE ENDURANCE LEDGER: buckets 1–3, computed off the built
+week, summed across run and ride.** Every session the composer emits already knows its family and its
+minutes, so this is arithmetic over data that exists — not a new question for the athlete. It is the
+prerequisite for piece 6 and for any honest answer to "is this week too much."
+
+⚠️ Do NOT surface the three numbers to the athlete as a control. He tracks them; the athlete does not
+type them. The dials stay.
+
+---
+
+## §G9. LOGGED OVERNIGHT — the next piece, and one open question
+
+### ⛔ NEXT PIECE: THE ENDURANCE LEDGER (buckets 1–3). Not started; Michael to schedule.
+
+§G8's conclusion, restated here so it is not lost in a long section. Buckets 1–3 — sub-VT1,
+near-threshold and over-threshold MINUTES — computed off the built week and summed across run and
+ride. Every session the composer emits already carries its family and its minutes, so this is
+arithmetic over data that exists; no new athlete question and no new control. It is the prerequisite
+for p148's 10%-per-week check and for piece 6, whose `endurance_deload` type has no emit site
+because there is nothing to measure.
+
+### ⚠️ OPEN QUESTION FOR MICHAEL: the easy run and the long run are ten minutes apart.
+
+`LADDER_CEILING_MIN.run_vt1` is **90** and `run_lsd` is now **100**. At a six-hour running ask the
+week builds a 90-minute "easy run" and a 100-minute "long run", which read as two long runs.
+
+Both numbers are defensible and neither is ours to move alone: **90 is his** — Michael, 2026-08-26,
+*"easy run 25-30 → 45-60 → 80-90 min (cap 90)"*, and p235's VT1 level 3 is 80–90 — and **100 is the
+book's**, p247, adopted the same evening. Nothing is broken; the two simply met after the long run
+came down from 150. Flagged rather than changed.
+
+### ✅ ANSWERED: the free-day fill that "never fired".
+
+It was a measurement bug, now fixed. `easyFillHours` read the top of the whole base ladder (an easy
+run at 1h30) while the placement builds the fill at level 1 (30 minutes), so the gap-to-sessions
+arithmetic divided by a figure three times too large and bought nothing. A six-hour all-run ask built
+5h35 and called the week full; it now builds 6h03 across the two clear lifting days and the rest day,
+in that order. ⚠️ One consequence is flagged in that commit: a one-hour ask with a single hard run on
+the LOW-VOLUME tier now adds one easy run (1h08 against 1h) where Michael's stated worst case was
+"the cap on the hard session". His case on the standard column is unchanged.
