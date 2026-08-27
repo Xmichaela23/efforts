@@ -211,9 +211,16 @@ Deno.test('the edge resolves the long slot\'s sport before it picks which long p
 // C — GET STRONGER'S ROUTING IS UNTOUCHED
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('the wizard change moved no routing — a runner still gets the frame, a cyclist still does not', () => {
+Deno.test('the wizard change moved no routing — and both kept sports now reach the frame', () => {
   assertEquals(resolveFrame({ enduranceSport: 'run' }).frame, 'strength_5k');
-  assertEquals(resolveFrame({ enduranceSport: 'bike' }).frame, null);
+  /**
+   * ⛔ THE CYCLIST REACHES IT TOO SINCE 2026-08-27. This asserted `null` from slice 2 until Michael
+   * ruled that the strength-forward path stops reaching Get Stronger at all — the refusal's only
+   * effect was to route a rider to the plan he is retiring. See the resolver's comment for the
+   * argument it overrules.
+   */
+  assertEquals(resolveFrame({ enduranceSport: 'bike' }).frame, 'strength_5k');
+  // ⚠️ NO ENDURANCE STILL REFUSES, and is unreachable from this wizard's three athlete types.
   assertEquals(resolveFrame({ enduranceSport: null }).frame, null);
 });
 

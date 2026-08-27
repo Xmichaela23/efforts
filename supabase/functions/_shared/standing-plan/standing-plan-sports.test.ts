@@ -31,6 +31,7 @@ import {
   RIDE_EQUIVALENCE_IS_OURS,
   WEEKDAYS,
   RIDE_EQUIVALENT,
+  resolveFrame,
   sportForFamily,
   SWIM_IS_EASY_ONLY,
   SWIM_SLOT,
@@ -39,6 +40,7 @@ import {
   type PlanSession,
 } from './index.ts';
 import { FAMILIES } from '../endurance-library/source-rules.ts';
+import { WEEKLY_HOUR_OPTIONS } from './volume-bounds.ts';
 
 const BASELINES = {
   learned_fitness: {
@@ -201,6 +203,71 @@ Deno.test('the ride equivalence never trades a run slot for a HARDER ride', () =
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // C — THE SWIM: OFF BY DEFAULT, EASY AND TECHNIQUE ONLY
 // ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔⛔ A BIKE-ONLY ATHLETE TAKES THE FRAME — the refusal is overruled, not forgotten', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-27: *"if wendler has a future at all its not in this path."* `resolveFrame`
+   * used to refuse a cyclist — *"strength leading with a cyclist is Cycling: Base (p278/p280) and it
+   * is not built"* — and a refused athlete fell through to the Get Stronger path. That is the plan
+   * being retired, so the refusal now sends them nowhere better than the frame does.
+   *
+   * ⚠️ THE OLD ARGUMENT WAS NOT WRONG AND IS KEPT IN THE RESOLVER'S OWN COMMENT: `strength_5k`'s
+   * shape is a runner's. It is OVERRULED by the alternative, and the athlete gets a runner-shaped
+   * week filled with rides — four endurance sessions, one of them long, and the plyo day.
+   */
+  assertEquals(resolveFrame({ enduranceSport: 'bike' }).frame, 'strength_5k');
+  assertEquals(resolveFrame({ enduranceSport: 'run' }).frame, 'strength_5k');
+  /**
+   * ⛔ AND THE ONE REMAINING REFUSAL STAYS. Every frame is a hybrid week, so an athlete holding no
+   * endurance is not a plan this file can serve. ⚠️ It is unreachable from the wizard, which offers
+   * exactly three athlete types — run only, ride only, run + ride — and is kept as a guard for any
+   * other caller.
+   */
+  const none = resolveFrame({ enduranceSport: null });
+  assertEquals(none.frame, null);
+  assert(/no endurance sport/.test((none as { reason: string }).reason));
+});
+
+Deno.test('⛔ THE ALL-RIDE WEEK BUILDS WHOLE — four sessions, one long, and the plyo day stays', () => {
+  const wk = composeWeek({
+    ...BASE, week: 2, column: 'standard',
+    sportMix: { runs: 0, rides: 4, swimDays: 0 },
+    targetRideHours: 8,
+  } as never);
+  const endurance = wk.sessions.filter((s) => s.type === 'run' || s.type === 'ride');
+  assertEquals(endurance.length, 4, endurance.map((s) => `${s.type}:${s.name}`).join(', '));
+  assertEquals(endurance.filter((s) => s.type === 'run').length, 0,
+    'a bike-only athlete was handed a run');
+  assert(endurance.some((s) => /long/i.test(s.name) || Number(s.duration) >= 120),
+    'the long session did not survive the sport assignment');
+  /**
+   * ⛔ THE PLYO DAY STAYS FOR A NON-RUNNER (Michael, 2026-08-26). p88's benefits are running economy,
+   * chronic-injury reduction AND balance *"which can help even loaded movements and carries"* — the
+   * last of those is why it is not runner-only.
+   */
+  assert(wk.sessions.some((s) => (s.tags ?? []).includes('plyo')), 'the plyo day left with the runs');
+  /**
+   * ⛔ AND NO LOWER-BODY HAIRCUT, because its stated cause is a hard RUN in front of the leg day
+   * (p247). It already no-ops without one; this pins that a bike-only week does not pay a cost the
+   * page prices for running.
+   */
+  assertEquals(haircutSaid(wk as never).reduced, false,
+    'a bike-only week took the reduction p247 prices for a run');
+});
+
+Deno.test('⛔ THE RIDE MENU\'S TOP IS STILL REACHABLE ON AN ALL-RIDE WEEK', () => {
+  // ⚠️ CHECKED AFTER THE LONG SESSION'S CEILING CAME DOWN TO 100 MINUTES. That cap is `run_lsd`'s
+  // and does not touch the ride ladder — this is the assertion that says so rather than assuming it.
+  const top = WEEKLY_HOUR_OPTIONS.ride[WEEKLY_HOUR_OPTIONS.ride.length - 1];
+  const wk = composeWeek({
+    ...BASE, week: 2, column: 'standard',
+    sportMix: { runs: 0, rides: 4, swimDays: 0 },
+    targetRideHours: top,
+  } as never);
+  const minutes = wk.sessions.filter((s) => s.type === 'ride')
+    .reduce((t, s) => t + (Number(s.duration) || 0), 0);
+  assert(minutes >= top * 60 * 0.9, `the top ride option ${top}h built only ${minutes} min`);
+});
 
 Deno.test('the swim is off unless asked for, and arrives as an ADD-ON, never a slot', () => {
   // ⛔ RE-RULED 2026-08-24 (Michael): swims never take a session spot. `swimDays` on the mix no

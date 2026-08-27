@@ -41,22 +41,38 @@ export type FrameResolution =
  * non-impact modality and for a ride standing in for the long run. `sport-slots.ts` does that
  * assignment, so a kept bike or a kept swim routes INTO this frame instead of away from it.
  *
- * ⚠️ WHAT STILL REFUSES, and it is only the dial positions that have no frame built: a cyclist with
- * no running at all (Cycling: Base, p278/p280) and an athlete holding no endurance at all. Every
- * frame is a hybrid week, so the second is not a plan this file can serve.
+ * ⛔⛔ THE BIKE-ONLY REFUSAL IS GONE (Michael, 2026-08-27), AND ITS ARGUMENT IS NOT DELETED WITH IT
+ * — IT IS OVERRULED. What stood here, and it is not wrong:
  *
- * ⚠️ ⛔ A BIKE-ONLY ATHLETE IS STILL REFUSED EVEN THOUGH THE SLOTS COULD NOW ALL BE RIDES, and that
- * is deliberate. `strength_5k`'s SHAPE is built around running — four endurance sessions, the plyo
- * day, and a lower-body haircut whose stated cause is a run — and handing a pure cyclist a week cut
- * to a runner's page would be a different program wearing this one's slot count. His cycling
- * programs are their own pages and are the next frames to build.
+ *   *"`strength_5k`'s SHAPE is built around running — four endurance sessions, the plyo day, and a
+ *   lower-body haircut whose stated cause is a run — and handing a pure cyclist a week cut to a
+ *   runner's page would be a different program wearing this one's slot count."*
+ *
+ * ⛔ WHAT OVERRULES IT IS THE ALTERNATIVE, NOT A COUNTER-ARGUMENT. A refused athlete fell through to
+ * the Get Stronger path, and Michael's ruling is *"if wendler has a future at all its not in this
+ * path."* Refusing a cyclist no longer sends them to a second program; it sends them to one this
+ * path is not keeping. **A runner-shaped week filled with rides beats a plan that is being retired.**
+ *
+ * ⚠️ SO SAY PLAINLY WHAT A BIKE-ONLY ATHLETE GETS: `strength_5k`'s skeleton — four endurance
+ * sessions, one of them long, the plyo day — with every slot assigned to the bike. Viada's own
+ * cycling program (Cycling: Base, p278/p280) is the frame that supersedes this, and it is not built.
+ * ⚠️ AND THE SHAPE HOLDS UP BETTER THAN THE OLD NOTE FEARED, on three counts checked before the
+ * refusal came out: `assignSports` already routes a kept bike into every slot and `RIDE_EQUIVALENT`
+ * maps every family; the lower-body haircut already no-ops without a run in front of the leg day
+ * (`progression.ts`, `hardRunBeforeLower`); and the plyo day STAYS, because p88's benefits are
+ * running economy, chronic-injury reduction AND balance *"which can help even loaded movements and
+ * carries"* — not runner-only (Michael, 2026-08-26).
+ *
+ * ⚠️ WHAT STILL REFUSES is the one position with no endurance at all. Every frame is a hybrid week,
+ * so that is not a plan this file can serve. ⛔ IT IS ALSO UNREACHABLE FROM THE WIZARD, which offers
+ * exactly three athlete types — run only, ride only, run + ride. It stays as a guard for a caller
+ * that is not the wizard, and it is not the gap.
  */
 export function resolveFrame(position: FramePosition): FrameResolution {
-  if (position.enduranceSport === 'run') {
+  // ⛔ ONE FRAME, EITHER SPORT. Which sport fills the slots is `sport-slots.ts`'s question, not this
+  // file's — see the note above for what a bike-only athlete is actually handed.
+  if (position.enduranceSport === 'run' || position.enduranceSport === 'bike') {
     return { frame: 'strength_5k', cite: FRAMES.strength_5k.cite };
-  }
-  if (position.enduranceSport === 'bike') {
-    return { frame: null, reason: 'strength leading with a cyclist is Cycling: Base (p278/p280) and it is not built' };
   }
   return { frame: null, reason: 'no endurance sport is being held, and every frame is a hybrid week' };
 }

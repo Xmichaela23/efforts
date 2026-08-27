@@ -66,21 +66,27 @@ Deno.test('a strength-leading runner resolves the frame; a position with no fram
   assertEquals(runner.frame, 'strength_5k');
 
   /**
+   * ⛔⛔ AND SO DOES A CYCLIST NOW (Michael, 2026-08-27): *"if wendler has a future at all its not in
+   * this path."* The bike-only refusal — *"strength leading with a cyclist is Cycling: Base
+   * (p278/p280) and it is not built"* — sent that athlete to the Get Stronger path, which is the
+   * plan being retired. A runner-shaped week filled with rides beats a plan with no future.
+   * ⚠️ The argument the refusal carried is kept verbatim in the resolver's own comment: it is
+   * overruled by the alternative, not answered.
+   */
+  assertEquals(resolveFrame({ enduranceSport: 'bike' }).frame, 'strength_5k');
+
+  /**
    * ⛔ EVERY REFUSAL CARRIES A REASON. A silent null is how a routing decision becomes unexplainable
    * — the caller logs this, and Get Stronger builds the block unchanged.
    *
-   * ⚠️ THE TWO SPORT REFUSALS ARE GONE (slice 4). A kept bike and a kept swim used to refuse this
-   * frame because every endurance slot was a run; `sport-slots.ts` assigns a sport per slot now, so
-   * they route INTO the frame. What is left refusing is only the dial positions with no frame built.
+   * ⚠️ ONE POSITION IS LEFT REFUSING: no endurance at all. Every frame is a hybrid week, so it is
+   * not a plan this file can serve. ⚠️ It is also unreachable from the wizard, which offers exactly
+   * three athlete types — run only, ride only, run + ride — and is kept as a guard for any other
+   * caller.
    */
-  for (const position of [
-    { enduranceSport: 'bike' as const },
-    { enduranceSport: null },
-  ]) {
-    const r = resolveFrame(position);
-    assertEquals(r.frame, null, `${JSON.stringify(position)} was routed to a frame`);
-    assert('reason' in r && r.reason.length > 10, 'a refusal with no reason');
-  }
+  const r = resolveFrame({ enduranceSport: null });
+  assertEquals(r.frame, null, 'an athlete holding no endurance was routed to a hybrid frame');
+  assert('reason' in r && r.reason.length > 10, 'a refusal with no reason');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
