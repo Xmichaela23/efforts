@@ -127,22 +127,34 @@ export function prescribedLoad(args: {
   return { weight: Math.round(raw / step) * step, haircut, risen };
 }
 
-// ── OURS: double progression ────────────────────────────────────────────────────────────────────
+// ── HIS: the circle of maxes ────────────────────────────────────────────────────────────────────
 
 /**
- * ⛔ OURS, AND LABELLED — the mechanism, not the rate. Pivot §4: double progression on his rep
- * ranges, because every one of his slots IS a range (ME 1-5, DE 2-4, SKILL 3-5, HYP 6-12).
+ * ⛔⛔ RELABELLED OURS → HIS ON 2026-08-26, off p123 read directly. The mechanism did not change;
+ * only the claim about where it came from did.
  *
- * ⚠️ **AND IT IS NOT "THE CIRCLE OF REPS".** p247 says *"progress here should be through the circle
- * of reps"* and never defines the term; it appears nowhere else in the capture (corpus gap G-8).
- * Double progression is the field-standard reading and may well be what he means — **but it ships
- * labelled OURS until his definition is photographed.** Presenting it as his would be exactly the
- * silent reconciliation this work order forbids.
+ * ⛔ WHAT IT SAID BEFORE, so the reasoning is not lost: p247 prescribes progression *"through the
+ * circle of reps"* and never defines that phrase, so double progression shipped labelled OURS as the
+ * field-standard reading of an undefined term (corpus gap G-8).
+ *
+ * ⛔⛔ p123 DEFINES THE **CIRCLE OF MAXES**, and it is the same mechanism 124 pages earlier:
+ * *"athletes may rotate through the 'circle of maxes,' varying repetition ranges and using their
+ * expected performance on each as a baseline. If an athlete repeatedly succeeds at these lifts or
+ * outperforms, the coach may, after a period of time, raise their theoretical 1-rep max and base the
+ * next few training microcycles/training weeks on this new max."*
+ *
+ * Rotate the rep ranges → repeatedly succeed or beat them → raise the theoretical max → build the
+ * next weeks from it. **That is exactly what ships.** Different words, two different pages.
+ *
+ * ⚠️ WHAT IS STILL OURS INSIDE IT: the reps-in-reserve condition on the top of the range, and the
+ * two-session confirmation (`STALL_CONFIRMATIONS`). He gives no number for *"after a period of
+ * time"*, and the RIR gate is the field's, not his — see the notes on those two.
  */
-export const DOUBLE_PROGRESSION_IS_OURS =
-  'Working the top of the rep range at the prescribed reps-in-reserve across every set, then adding '
-  + 'weight, is a field-standard mechanism and it is ours. The source prescribes progression "through '
-  + 'the circle of reps" and does not define the phrase.';
+export const DOUBLE_PROGRESSION_IS_HIS =
+  'Rotating through rep ranges and raising the working max once the athlete repeatedly succeeds at '
+  + 'them or outperforms is his — the "circle of maxes", p123. Requiring the top of the range at the '
+  + 'prescribed reps-in-reserve, and confirming over two sessions, is ours; he gives no number for '
+  + '"after a period of time".';
 
 export type SetResult = { reps: number; rir?: number | null };
 

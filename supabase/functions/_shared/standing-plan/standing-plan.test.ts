@@ -14,7 +14,7 @@ import {
   brzycki1RM,
   composeBlock,
   composeWeek,
-  DOUBLE_PROGRESSION_IS_OURS,
+  DOUBLE_PROGRESSION_IS_HIS,
   EMITTED_TOKEN_SHAPES,
   epley1RM,
   FRAMES,
@@ -445,12 +445,20 @@ Deno.test('prescribed weights land on real plates and rise over the block', () =
   assertEquals(fine.weight % 2.5, 0);
 });
 
-Deno.test('double progression is labelled OURS, because the circle of reps is undefined', () => {
-  // ⛔ p247 says *"progress here should be through the circle of reps"* and never defines the phrase;
-  // it appears nowhere else in the capture (corpus gap G-8). Double progression is the field-standard
-  // reading and may well be what he means — it ships labelled ours until his definition is shot.
-  assert(/ours/i.test(DOUBLE_PROGRESSION_IS_OURS));
-  assert(/circle of reps/i.test(DOUBLE_PROGRESSION_IS_OURS));
+Deno.test('the rep progression is labelled HIS — p123 defines the circle of maxes', () => {
+  /**
+   * ⛔ RELABELLED 2026-08-26 off p123, read directly: *"athletes may rotate through the 'circle of
+   * maxes,' varying repetition ranges… If an athlete repeatedly succeeds at these lifts or
+   * outperforms, the coach may, after a period of time, raise their theoretical 1-rep max and base
+   * the next few training microcycles/training weeks on this new max."* That is the shipped
+   * mechanism, and it closes the OURS label that p247's undefined "circle of reps" forced.
+   *
+   * ⚠️ THE RIR CONDITION AND THE TWO-SESSION CONFIRMATION STAY OURS, and the string still says so —
+   * relabelling the mechanism must not quietly annex the parts he does not state.
+   */
+  assert(/circle of maxes/i.test(DOUBLE_PROGRESSION_IS_HIS));
+  assert(/p123/.test(DOUBLE_PROGRESSION_IS_HIS));
+  assert(/ours/i.test(DOUBLE_PROGRESSION_IS_HIS), 'the RIR gate and the two-session wait stopped being labelled ours');
 
   const range = { lo: 6, hi: 12 };
   const rir = { lo: 1, hi: 2 };
