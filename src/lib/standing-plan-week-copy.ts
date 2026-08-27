@@ -143,6 +143,22 @@ export const ENDURANCE_WEEK_HEADER: string[] = [
 export const LONG_SLOT_NOTE = 'one per week, run or ride';
 
 /**
+ * ⛔⛔ WHICH ROW THE 3-4% IS ABOUT (Michael, 2026-08-27). The intro already states the cost — *"A
+ * hard run the day before heavy legs reduces the squat and deadlift by 3-4%"* — but nothing on the
+ * screen said WHICH slot that is, so the athlete could not act on it.
+ *
+ * ⛔ IT IS SLOT ONE AND ONLY SLOT ONE. p246 puts hard session 1 on frame day 1 and the ME lower
+ * session on day 2; hard session 2 is day 3 and is followed by an upper day, so its sport costs the
+ * lifts nothing either way. Putting the run here is the choice that pays, and putting the ride here
+ * is the choice that does not.
+ *
+ * ⚠️ A SUB-LABEL, NOT A SECOND SENTENCE — the same shape as `LONG_SLOT_NOTE`. It is a fact about the
+ * row, always visible, adding no decision and no reading: the consequence is already stated above
+ * and this only says where it lands.
+ */
+export const HARD_1_SLOT_NOTE = 'sits the day before heavy legs';
+
+/**
  * ⛔ WHAT THE SLOT IS, IN THE HEADER'S OWN WORDS — never "Hard 1 / Hard 2" (Michael, 2026-08-24).
  *
  * Those were internal keys leaking onto a screen: an athlete has no first and second hard session,

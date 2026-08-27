@@ -32,6 +32,7 @@ import { ChevronDown } from 'lucide-react';
 import {
   ENDURANCE_WEEK_INTRO_CONSEQUENCE,
   ENDURANCE_WEEK_INTRO_STRUCTURE,
+  HARD_1_SLOT_NOTE,
   LONG_SLOT_NOTE,
   VOLUME_HONESTY_LINES,
   SLOT_KEYS,
@@ -260,6 +261,13 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     </span>
                     {key === 'long' ? (
                       <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
+                    ) : null}
+                    {/* ⛔ ONLY SLOT ONE. It is the row the intro's 3-4% is about — day 1 sits before
+                        the heavy leg day. Slot 2 is followed by an upper day and its sport costs the
+                        lifts nothing, so it stays silent rather than carrying a line that would read
+                        as the same warning twice. */}
+                    {key === 'hard1' ? (
+                      <span className="block text-white/40 text-xs mt-0.5">{HARD_1_SLOT_NOTE}</span>
                     ) : null}
                   </span>
                   <ChevronDown
