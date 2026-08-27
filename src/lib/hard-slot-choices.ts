@@ -224,7 +224,10 @@ export const VARIANT_BODY: Record<string, string> = {
    * most; we alternate by week number, because nobody can answer that question before they have
    * done both. Not asked, and not claimed as his.
    */
-  '': 'Each shape has a different emphasis, and Viada encourages covering them all across a block.',
+  // ⚠️ "the source", NEVER HIS NAME (Michael, 2026-08-27). The app is inspired by the book; it does
+  // not carry the author's name in front of an athlete. Citations in code and provenance notes keep
+  // the page reference — that is for us, not for the screen.
+  '': 'Each shape has a different emphasis, and covering them all across a block is what the source encourages.',
   // run_mlss (pp231-232)
   surge_float: 'Surges above threshold with a hard float between, in sets.',
   descending: 'Repeats that shrink as you go — recovery shrinks with them.',
