@@ -1660,6 +1660,26 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * workouts wearing a rotation's label. OURS: alternate the family's own offered shapes by
        * week; his variety principle, applied inside his own option set.
        */
+      /**
+       * ⛔⛔ THE STRIDES, AND THEY ARE THE FRAME'S ONLY SPEED WORK (Michael, 2026-08-26 evening).
+       *
+       * ⛔ THE GAP: p119 lists running economy FIRST of the three qualities that may not lapse, and
+       * NOT ONE of the frame's four sessions is speed work — MLSS, near-threshold, VT1 and LSD are
+       * all threshold-or-below. `run_sprint_power` is fully built and the frame never reaches for it.
+       *
+       * ⛔ AND p109 IS WHY THERE IS NO FIFTH SLOT: *"athletes can improve turnover/running economy
+       * with as few as a handful of strides before, during, or after other running sessions, so
+       * there's no need for a speed session to be a lengthy stand-alone!"* p246 prints four slots and
+       * all four are the frame's, so the economy work goes ON one of them.
+       *
+       * ⚠️ THE EASY RUN CARRIES THEM, and only when that slot is actually a run. It is the lightest
+       * session in the week and sits on day 4 — after the hardest day and before the long one. An
+       * athlete who put that slot on the bike gets no strides, which is the honest answer: there is
+       * no running economy to train on a session with no running in it.
+       * ⚠️ THE FRAME'S OWN SLOT ONLY. The volume-fill easy runs and the advanced tier's extra easy
+       * runs are appended elsewhere in this file and carry none — one stride block a week.
+       */
+      const carriesStrides = assigned.family === 'run_vt1' && assigned.sport === 'run';
       const built = buildEnduranceSession({
         family: assigned.family,
         level,
@@ -1667,6 +1687,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         anchors,
         // ⛔ §3c — the dial the athlete's typed number set. See `volume-bounds.ts`.
         size: rung.size,
+        ...(carriesStrides ? { addOn: 'strides' as const } : {}),
       });
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
       sessions.push({

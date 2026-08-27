@@ -1036,6 +1036,85 @@ export const SPRINT_PACING_NOTE =
   + 'speed available that day. Work intervals may be run on hills with the pace adjusted to hold the '
   + 'target intensity.';
 
+/**
+ * ⛔⛔ SESSION ADD-ONS — A SHORT BLOCK HUNG ON THE END OF AN OTHERWISE WHOLE SESSION.
+ *
+ * ⛔ THE GAP THIS FILLS. Every session this library builds is a WHOLE session, so there was no way
+ * to say *"this session, plus a short piece of something else on the end"* — and that is exactly
+ * what p109 prescribes:
+ *
+ * > *"Even for speed development, athletes can improve turnover/running economy with as few as a
+ * > handful of strides before, during, or after other running sessions, so there's no need for a
+ * > speed session to be a lengthy stand-alone!"*
+ *
+ * Same page: *"All minutes count… many of them can be multipurpose sessions."*
+ *
+ * ⛔⛔ AND IT IS WHY THE FRAME NEEDS NO FIFTH SLOT. p119 lists running economy FIRST of the three
+ * qualities that may not lapse, and none of the frame's four sessions is speed work — MLSS,
+ * near-threshold, VT1 and LSD are all threshold-or-below. p246 prints four endurance slots and
+ * Michael ruled all four are the frame's, so the economy work goes ON one of them.
+ *
+ * ⚠️ THE ADD-ON COMES OUT OF THE SESSION'S OWN DOSE, NOT ON TOP OF IT. p109's own framing is a
+ * MULTIPURPOSE session, not a longer one, and a bolted-on block would push the easy run past the
+ * band p235 prints for it — which p275 forbids at the other end for the same reason.
+ */
+export type SessionAddOnId = 'strides';
+
+export type SessionAddOn = {
+  id: SessionAddOnId;
+  label: string;
+  /** ⛔ The sport it belongs to. A stride is a running movement; nothing else offers this yet. */
+  sport: Sport;
+  /** Which families may carry it. */
+  families: FamilyId[];
+  reps: Range;
+  secondsPerRep: Range;
+  work: Intensity;
+  cite: string;
+};
+
+/**
+ * ⛔ STRIDES — HIS PLACEMENT, HIS INTENSITY, OUR DOSE, AND EACH PART IS LABELLED.
+ *
+ * HIS (p109): a handful of strides before, during or after another run is enough to train running
+ * economy, and a speed session need not be a stand-alone.
+ *
+ * HIS (p229, `run_sprint_power`): the intensity is *"all-out"* — the best speed available that day —
+ * and it carries NO PACE TARGET, deliberately. *"Paces come from performance and RPE rather than a
+ * prescribed pace."* The recovery is his `open`: full recovery, no stated duration.
+ *
+ * ⚠️ OURS: FOUR TO EIGHT EFFORTS OF TWENTY TO THIRTY SECONDS (Michael's ruling, 2026-08-26). The
+ * page gives no dose for a stride — the shortest thing he prints is a 25-50 m maximal acceleration
+ * (`short_max`), which is four to eight SECONDS and a different movement. Twenty to thirty seconds
+ * is the field standard for a stride (Daniels, Pfitzinger and the Hansons all append them to an easy
+ * day), which is also why it will not read as strange to a runner or to a lifter.
+ */
+export const SESSION_ADD_ONS: Record<SessionAddOnId, SessionAddOn> = {
+  strides: {
+    id: 'strides',
+    label: 'Strides',
+    sport: 'run',
+    // ⛔ THE EASY RUN AND THE LONG RUN ONLY. p109 says "other running sessions" and means the ones
+    // that are not already speed work; hanging strides off a threshold session would be adding
+    // quality to a quality day, which is not what the page is describing.
+    families: ['run_vt1', 'run_lsd'],
+    reps: { lo: 4, hi: 8 },
+    secondsPerRep: { lo: 20, hi: 30 },
+    work: { kind: 'all_out' },
+    cite: 'Viada p109',
+  },
+};
+
+export const STRIDES_DOSE_IS_OURS =
+  'Four to eight efforts of twenty to thirty seconds is ours. The source prescribes strides by name '
+  + 'and gives no dose for them; twenty to thirty seconds is the field standard. The placement, the '
+  + 'all-out intensity and the full recovery are his.';
+
+export const STRIDES_NOTE =
+  'A handful of strides at the end of an easy run trains running economy without a separate speed '
+  + 'session. Run them fast and relaxed, at the best speed available that day — there is no pace '
+  + 'target — and take full recovery between them.';
+
 /** p237 — the anaerobic sessions are a floor, not a target. */
 export const POWER_FLOOR_NOTE =
   'These are best ridden by feel against a power floor rather than to a specific power target. Each '

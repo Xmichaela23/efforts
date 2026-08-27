@@ -142,6 +142,14 @@ export type Block = {
   steps: Step[];
   /** Between-repeat recovery. Null when the source states none. */
   restBetween: Step | null;
+  /**
+   * ⛔ SET WHEN THIS BLOCK IS AN ADD-ON rather than the session's own work — the strides on the end
+   * of an easy run (p109). ⚠️ IT IS A MARKER, NOT A DIFFERENT KIND OF BLOCK: the steps are real
+   * steps, they are counted in the totals, and they reach the watch like any others. What the marker
+   * buys is the edge being able to name the two halves separately, so an easy run's own token still
+   * says how long the EASY part is.
+   */
+  addOn?: string;
 };
 
 /**

@@ -22,7 +22,11 @@ import {
   OPEN_WATER_TIMER_NOTE,
   PERCENT_BASIS,
   POWER_FLOOR_NOTE,
+  SESSION_ADD_ONS,
   SPRINT_PACING_NOTE,
+  STRIDES_DOSE_IS_OURS,
+  STRIDES_NOTE,
+  type SessionAddOnId,
   SWIM_DRILLS,
   SWIM_OPENER_SHARE,
   SWIM_SESSION_CEILING_SECONDS,
@@ -79,6 +83,16 @@ export type SessionRequest = {
   baselines?: EnduranceBaselines;
   /** Pre-resolved anchors, when the caller already has them (the wizard resolves once per athlete). */
   anchors?: EnduranceAnchors;
+  /**
+   * ⛔ A SHORT BLOCK HUNG ON THE END OF THIS SESSION — see `SESSION_ADD_ONS`. Today that is strides
+   * on an easy or long run (p109), which is how running economy is trained without a fifth slot.
+   *
+   * ⚠️ IT COMES OUT OF THE SESSION'S OWN DOSE, NOT ON TOP. p109 describes a MULTIPURPOSE session,
+   * and a bolted-on block would push the run past the band p235 prints for it.
+   * ⚠️ AN ADD-ON THE FAMILY DOES NOT CARRY IS IGNORED, not an error: the composer asks per slot and
+   * a slot the athlete moved to the bike simply has no strides on it.
+   */
+  addOn?: SessionAddOnId;
 };
 
 // ── small arithmetic ────────────────────────────────────────────────────────────────────────────
@@ -612,6 +626,43 @@ function totalsFor(warmup: Step[], blocks: Block[], cooldown: Step[], workFloorP
   };
 }
 
+/**
+ * ⛔ THE ADD-ON BLOCK — real steps, so it reaches the watch.
+ *
+ * ⛔⛔ MICHAEL'S ONE HARD CONSTRAINT: *"make sure however we do the strides they make it onto
+ * garmin."* The watch builder reads the planned workout's INTERVALS; anything that lives only in a
+ * description or a note never leaves the phone. So this is a block of steps like any other, and the
+ * edge emits a token for it — it is never a sentence appended to the session text.
+ *
+ * ⚠️ NO PACE TARGET, AND THAT IS HIS (p229). *"All-out"* resolves to nothing in this library by
+ * design, so the step carries `unresolved` rather than an invented number.
+ * ⚠️ FULL RECOVERY BETWEEN, ALSO HIS — `run_sprint_power`'s own `open` recovery, which states no
+ * duration. That makes the session's total a lower bound, which is true and is said on the card.
+ */
+function addOnBlock(
+  id: SessionAddOnId,
+  ctx: { family: FamilyId; sport: Sport; size: number; anchor: AnchorReport; notes: SessionNote[] },
+): Block | null {
+  const spec = SESSION_ADD_ONS[id];
+  if (!spec) return null;
+  if (spec.sport !== ctx.sport || !spec.families.includes(ctx.family)) return null;
+  // ⚠️ THE DOSE SCALES WITH THE SESSION'S OWN SIZE — a longer easy day carries a few more. Both ends
+  // are ours (`STRIDES_DOSE_IS_OURS`); the page gives no dose for a stride at all.
+  const reps = Math.round(lerp(spec.reps, ctx.size));
+  const seconds = Math.round(lerp(spec.secondsPerRep, ctx.size) / 5) * 5;
+  const work = step('work', spec.label.replace(/s$/, ''), seconds, spec.work, ctx.sport, ctx.anchor);
+  const rest = step('rest', 'Full recovery', null, { kind: 'easy' }, ctx.sport, ctx.anchor);
+  ctx.notes.push({ kind: 'source', text: STRIDES_NOTE, cite: spec.cite });
+  ctx.notes.push({ kind: 'ours', text: STRIDES_DOSE_IS_OURS });
+  return {
+    repeat: reps,
+    label: `${reps} x ${seconds}s ${spec.label.toLowerCase()}`,
+    steps: [work],
+    restBetween: rest,
+    addOn: spec.id,
+  };
+}
+
 // ── the public entry point ──────────────────────────────────────────────────────────────────────
 
 export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
@@ -643,8 +694,22 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
   const attempt = (scale: number) => {
     const full = lerp({ lo: band.lo, hi: band.hi }, size) * scale;
     const openerMeters = isPoolSwim ? full * SWIM_OPENER_SHARE : 0;
-    const target = full - openerMeters;
     const scoped: SessionNote[] = [];
+    /**
+     * ⛔⛔ THE ADD-ON IS BUILT FIRST, AND ITS CLOCK COMES OUT OF THE SESSION'S DOSE. p109 describes a
+     * MULTIPURPOSE session — the strides are part of the easy run, not an extension of it — and a
+     * block added on top would push the run past the band p235 prints for its level, which is the
+     * thing p275 forbids from the other direction.
+     * ⚠️ ONLY THE WORK SECONDS ARE SUBTRACTED, because the recoveries between strides are his "full
+     * recovery" and carry no stated duration. The session's total is a lower bound and says so.
+     */
+    const added = req.addOn
+      ? addOnBlock(req.addOn, { family: req.family, sport, size, anchor, notes: scoped })
+      : null;
+    const addedSeconds = added
+      ? added.repeat * added.steps.reduce((t, st) => t + (st.seconds ?? 0), 0)
+      : 0;
+    const target = Math.max(0, full - openerMeters - addedSeconds);
     const ctx: BuildContext = { family: req.family, sport, level: req.level, size, archetype, anchor, target, notes: scoped };
 
     let blocks: Block[];
@@ -677,7 +742,17 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
       });
     }
 
-    return { blocks, warmup, cooldown, scoped, totals: totalsFor(warmup, blocks, cooldown, familyRules.workFloorPct) };
+    // ⛔ THE ADD-ON GOES LAST, BEFORE THE COOLDOWN. p109: *"before, during, or after"* — the end of
+    // the session is where a stride block belongs on an easy day, and it is where every field
+    // program puts it.
+    const withAddOn = added ? [...blocks, added] : blocks;
+    return {
+      blocks: withAddOn,
+      warmup,
+      cooldown,
+      scoped,
+      totals: totalsFor(warmup, withAddOn, cooldown, familyRules.workFloorPct),
+    };
   };
 
   let built = attempt(1);

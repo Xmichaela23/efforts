@@ -51,10 +51,15 @@ function round5(n: number): number {
   return Math.max(5, Math.round(n / 5) * 5);
 }
 
-/** Total clocked seconds of the steps at or above the family's work floor. */
+/**
+ * ⛔ THE SESSION'S OWN WORK, WITHOUT ITS ADD-ON. A block marked `addOn` is real work and reaches the
+ * watch, but it is a SEPARATE token — so an easy run carrying strides still says how long the easy
+ * part is. Counting the strides into `run_easy_{n}min` would prescribe the same minutes twice.
+ */
 function workSeconds(session: EnduranceSession): number {
   let total = 0;
   for (const block of session.blocks) {
+    if (block.addOn) continue;
     for (let r = 0; r < block.repeat; r++) {
       for (const step of block.steps) {
         if (step.role === 'work' && step.seconds != null) total += step.seconds;
@@ -62,6 +67,43 @@ function workSeconds(session: EnduranceSession): number {
     }
   }
   return total;
+}
+
+/** Clocked seconds the add-on blocks contribute — their own steps and their timed recoveries. */
+function addOnSeconds(session: EnduranceSession): number {
+  let total = 0;
+  for (const block of session.blocks) {
+    if (!block.addOn) continue;
+    for (let r = 0; r < block.repeat; r++) {
+      for (const step of block.steps) total += step.seconds ?? 0;
+      if (block.restBetween?.seconds != null && r < block.repeat - 1) total += block.restBetween.seconds;
+    }
+  }
+  return total;
+}
+
+/**
+ * ⛔⛔ THE ADD-ON'S OWN TOKENS — AND THIS IS THE HALF THAT REACHES THE WATCH.
+ *
+ * Michael's one hard constraint on the strides: *"make sure however we do the strides they make it
+ * onto garmin."* The watch builder reads a planned workout's INTERVALS, which come from these
+ * tokens; anything living only in the description or the notes never leaves the phone.
+ *
+ * ⚠️ `strides_{n}x{s}s` IS THE MATERIALIZER'S OWN EXISTING TOKEN, not a new one — it emits a work
+ * step per stride with NO pace target (which is p229's *"all-out"*, honestly carried) and a walk/jog
+ * recovery between, skipping the trailing one. Nothing here had to be invented at the edge.
+ * ⚠️ THE WATCH PUTS A NUMBER ON THE RECOVERY (90 seconds) WHERE THE LIBRARY STATES NONE. A watch
+ * step cannot be untimed; the session's own card still says full recovery.
+ */
+function addOnTokens(session: EnduranceSession): string[] {
+  const out: string[] = [];
+  for (const block of session.blocks) {
+    if (block.addOn !== 'strides') continue;
+    const seconds = block.steps.find((st) => st.role === 'work')?.seconds ?? null;
+    if (seconds == null || block.repeat < 1) continue;
+    out.push(`strides_${block.repeat}x${Math.round(seconds)}s`);
+  }
+  return out;
 }
 
 /** How many work reps the session actually prescribes, and how long each is. */
@@ -182,7 +224,8 @@ export function translateEnduranceSession(
       break;
 
     case 'run_lsd':
-      work = [`longrun_${totalMin}min_easypace`];
+      // ⚠️ THE ADD-ON'S MINUTES COME OFF THE LONG-RUN TOKEN, because they travel as their own token.
+      work = [`longrun_${Math.max(1, totalMin - minutes(addOnSeconds(session)))}min_easypace`];
       break;
 
     case 'run_near_threshold': {
@@ -287,7 +330,9 @@ export function translateEnduranceSession(
     name: raceTempo ? `${label} (race tempo)` : label,
     description: describeSession(session, raceTempo),
     duration: totalMin,
-    steps_preset: [...pre, ...work, ...post],
+    // ⛔ THE ADD-ON SITS BETWEEN THE SESSION AND THE COOLDOWN — p109 puts the strides after the run,
+    // and the watch plays these in order.
+    steps_preset: [...pre, ...work, ...addOnTokens(session), ...post],
     tags: raceTempo ? [...tags, 'race_tempo'] : tags,
   };
 }
@@ -329,6 +374,9 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^longrun_\d+min_easypace$/, example: 'longrun_90min_easypace' },
   { shape: /^cruise_\d+x[\d.]+mi_threshold$/, example: 'cruise_4x1mi_threshold' },
   { shape: /^interval_\d+x\d+m_5kpace_R\d+s$/, example: 'interval_6x800m_5kpace_R90s' },
+  // ⛔ THE STRIDES ADD-ON (p109). The materializer has parsed this shape since before the Standing
+  // Plan existed; it emits one untargeted work step per stride and a walk/jog between.
+  { shape: /^strides_\d+x\d+s$/, example: 'strides_6x20s' },
   // ⛔ SLICE 4 — the ride and swim tokens, all of them already parsed by the materializer.
   { shape: /^warmup_bike_quality_\d+min_fastpedal$/, example: 'warmup_bike_quality_15min_fastpedal' },
   { shape: /^cooldown_bike_\d+min$/, example: 'cooldown_bike_10min' },
@@ -369,4 +417,8 @@ export const MATERIALIZER_RUN_PATTERNS: RegExp[] = [
   /long[_-]?run_\d+min(?:_easypace)?/,
   /cruise_\d+x[\d.]+mi_threshold/,
   /interval_\d+x/,
+  // ⛔ COPIED FROM `expandRunToken`'s strides branch (`materialize-plan/index.ts:1870`) on
+  // 2026-08-26. Same cache rule as the rest of this list: if that regex moves, the gate is the
+  // tripwire.
+  /strides_\d+x/,
 ];
