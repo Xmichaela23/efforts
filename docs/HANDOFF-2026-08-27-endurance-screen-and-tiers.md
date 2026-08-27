@@ -124,6 +124,37 @@ has the same 28-day flaw and he was told it exists; he left it standing.
 ⚠️ **WHAT THIS DELETES ALONG WITH IT:** §3's no-history-reads-as-low problem and the never-ramps
 problem both disappear, because neither the gate nor the ramp exists any more. §3 below is retained
 as the REASON the control exists, not as open work.
+---
+
+# ⛔ 2c. SECOND RULING — FILL EVERYTHING AFTER THE TEST, NOT AFTER THE LIVE WEEK
+
+*"its a dumb rule should just fill everything after test."* Said after hitting it on his own block.
+
+**What he hit.** Block started Monday 24 August. He tested Monday (upper) and Tuesday (lower).
+Thursday's DE: Upper — same week, after both tests — still read *"No weight is prescribed"*, while
+week 2's identical session carried 105 lb across four sets. Confirmed in his export: week 1's DE
+sessions have no loads, week 2 onward do.
+
+**The rule today.** `rematerialize-standing-block/index.ts:290` passes
+`afterWeek: Math.max(TEST_WEEK_INDEX, currentWeek)`, commented *"HISTORY AND THE LIVE WEEK STAND."*
+
+⛔ **IT IS SELF-DEFEATING AS WRITTEN.** The test sits INSIDE the live week, so protecting the live
+week protects exactly the sessions the test just enabled. ⚠️ And it is NOT the dev button — the same
+guard runs on a real save. Michael asked; a genuine test would have done the same thing.
+
+⛔ **THE RULING: the cut is the TEST, not the week.**
+⚠️ **KEEP THE OTHER HALF.** *"History stands"* is the real constraint — never rewrite a session
+already logged. So: after the test, minus anything completed. A per-session guard, not a per-week one.
+⚠️ **IT IS A DAY-LEVEL CUT AND THE FUNCTION WORKS IN WEEKS.** `restateFromTest`'s `afterWeek` is a
+week index. Do NOT fake it by decrementing the week number — that would expose the test sessions
+themselves.
+
+⚠️ **AND ONE STALE LINE GOES WITH IT.** The logger prints *"No weight is prescribed — find the load
+where the target reps leave a rep or two in reserve"* on sessions that DO prescribe one. Michael has
+a screenshot of that note sitting under four sets at 105 lb. Whatever gates it must read whether the
+row actually carries a load.
+
+
 
 ## ⛔ THE MEASURED NUMBERS — re-measured after the repeat-count fix, off built sessions
 
@@ -228,7 +259,8 @@ p93 puts surplus on easy work.
 
 # 6. STILL OPEN
 
-1. ⛔⛔ **BUILD THE EXPERIENCE CONTROL** (§2 + §2b). Two chips per sport, history out of the level.
+1. ⛔⛔ **BUILD THE EXPERIENCE CONTROL** (§2 + §2b) and **§2c's rematerialize cut**. Both ruled today.
+   The experience control: Two chips per sport, history out of the level.
    This is the next piece of work and everything for it is settled — design, copy, tiers, numbers.
 2. ✅ **§1's builder bug is FIXED** (`67cda50f`) and the numbers below are re-measured against it.
 3. ✅ **The tier gate problems in §3 are moot** once §2b lands — no gate, no ramp needed.
