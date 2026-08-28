@@ -21,9 +21,16 @@
 > rather than guessed. `workout-detail` and `analyze-cycling-workout` import the `state-trend` barrel
 > and would have been missed; `materialize-plan` has two independent reasons to be here.
 >
-> **CLIENT:** pushed to `main`; Netlify auto-publishes. ⚠️ **The served bundle was NOT checked** —
-> there is no site URL anywhere in this repo and none was supplied. Treat the client as pushed, not
-> confirmed live.
+> **CLIENT: DEPLOYED AND CONFIRMED OFF THE SERVED BUNDLE**, not off the push. Origin is
+> **`https://efforts.work`** — ⛔ **that URL appears NOWHERE in this repo** (not `netlify.toml`, not
+> any config), which cost a round trip to discover; it is written here so the next session does not
+> hit the same wall.
+> Receipt: `https://efforts.work` serves `/assets/index-6JACH7u8.js` (3,750,411 bytes), and that
+> bundle contains `is the bar going up`, `heavy days only`, `Moving up`, `Stalled`,
+> `you are here · week` and `last time` — strings that exist only in this arc's components.
+> ⚠️ **A STRING IN A BUNDLE IS NOT A RENDERED CARD.** It proves the code Netlify serves is this code.
+> It says nothing about whether a card draws a correct number, which is what `VERIFIED` means and
+> what is still owed.
 >
 > ### ⛔ WHAT TO LOOK FOR, AND WHAT IS EXPECTED TO LOOK WRONG
 > 1. **Nothing changes until `compute-snapshot` runs again**, which happens on the next ingest. A

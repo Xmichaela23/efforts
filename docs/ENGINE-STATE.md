@@ -12,8 +12,11 @@ what is EXPECTED to look broken.** Then the work order: `docs/WORKORDER-the-stre
 `compute-snapshot` **142** · `coach` **470** · `workout-detail` **351** ·
 `analyze-cycling-workout` **217** · `generate-strength-plan` **175** ·
 `rematerialize-standing-block` **51** · `materialize-plan` **308**.
-**VERIFIED: NO.** Nobody has looked at the screen. ⚠️ The client push was not confirmed off the
-served bundle either — no site URL exists in this repo.
+**CLIENT CONFIRMED OFF THE SERVED BUNDLE:** `https://efforts.work` → `/assets/index-6JACH7u8.js`
+carries this arc's own strings. ⚠️ **That URL is nowhere in the repo** — it is recorded in
+`DEPLOY-OWED.md` so you do not have to go looking for it.
+**VERIFIED: NO.** A string in a bundle proves the code shipped; nobody has watched a card render a
+number, which is what verified means.
 
 ### The three facts you need before you touch anything
 
