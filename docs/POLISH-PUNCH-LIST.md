@@ -849,6 +849,51 @@ his sessions, not a construction rule for ours.
 
 ---
 
+### THE DOWNLOAD SCREEN'S LABELLER MISNAMES A RUN AND DROPS REPS (NOTED 2026-08-27, traced)
+
+⛔ **LABEL-ONLY. NO SESSION IS MIS-BUILT AND NO BIKE WORK REACHES THE ATHLETE** — the plan row and the
+materialised workout are both correct. This is `humanizeToken` in `AllPlansInterface.tsx:79-98`,
+which renders the parenthetical detail line on the exported plan.
+
+Two defects, both confirmed by reproducing the exact export string:
+- **A run is called a bike session.** Line 94 reads `t.startsWith('bike_thr') || t.includes('threshold')`.
+  The `includes` arm catches the RUN token `cruise_5x0.8mi_threshold` and returns *"Bike Threshold"*.
+- **A repeated block prints as one rep.** The duration regex takes the FIRST `\d{1,3}min` in
+  `bike_ss_3x18min_R5min` → *"18min"*, dropping the ×3 and the recoveries. Michael read
+  *"Warm-up 13min • Bike Sweet Spot 18min"* against a stated 1h15 and reasonably asked why 31 ≠ 75.
+
+⚠️ **DO NOT "FIX" IT BY CHANGING A SESSION.** The composer, the plan row and the watch are right; only
+this string is wrong.
+
+---
+
+### THE PLAN AND THE CALENDAR STILL DISAGREE BY 2-3 MINUTES (NOTED 2026-08-27, two of four causes fixed)
+
+**The same session was priced twice** — once by the composer's own clock, once by the materialiser
+expanding its tokens into steps — and the athlete trains the second one. Michael, on being told:
+*"nothing should disagree."*
+
+✅ **TWO INVENTED NUMBERS ARE GONE** (`6a56e7bb`, deployed): the recovery after the LAST bike block
+(his 5-minute spins between blocks stay — they are on p238-239; a third is not), and the strides'
+90-second recovery, now a lap-button step per Michael's ruling. Ride 82 → **77**; easy run 35 → **27**.
+
+⚠️ **WHAT REMAINS, UNTRACED:** the hard ride and the hard run still differ by 2 and 3 minutes. The
+materialiser prices the intervals off the athlete's REAL threshold pace where the composer used an
+estimate. **That is likely the calendar being MORE right, not less** — so the fix is probably to make
+the composer read the same number, not to revert the materialiser.
+
+⛔ **THE ARCHITECTURAL ANSWER, NOT YET RULED:** expand the session first and take its stated length
+from those steps, so one calculation serves the chip, the preview, the calendar and the watch. Today
+the composer decides a length and the materialiser quietly recomputes it. ⚠️ **The fix reaches every
+generator in the app**, which is why it is here and not in a work order — it needs Michael's ruling on
+which clock is authoritative.
+
+⚠️ **PRE-EXISTING, NOT FROM THE EXPERIENCE CONTROL.** The divergence applied to the 51-minute ride the
+old code built too. What changed is that a chip now prints a promise out loud, so the gap became
+visible.
+
+---
+
 # 5. BLOCKED ON MICHAEL
 
 Nothing here moves without you.

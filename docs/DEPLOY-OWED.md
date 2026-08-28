@@ -1,5 +1,78 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## ⛔ 2026-08-27 EVENING — THE EXPERIENCE CONTROL AND TWO INVENTED NUMBERS WENT LIVE. UNSEEN ON A DEVICE.
+>
+> Michael authorised push and deploy directly, in that order, three times. **He is downloading a plan
+> to confirm and had not done so when this was written.** Pre-launch, only account, blast radius his own.
+>
+> **PUSHED:** `origin/main == d4c6dbff`.
+> · `2769a2df` — the experience control (the athlete's answer sets the hard-session size)
+> · `6a56e7bb` — two invented numbers leave the session clock
+> · `d4c6dbff` — week one's weights arrive with the test, not in week two
+> **CLIENT DEPLOYED:** Netlify auto-publishes from `main`. `2769a2df` confirmed live by fetching the
+> served bundle (`/assets/index-D2k0kYwy.js`) and grepping it — "Running experience", "Riding
+> experience", "Less experienced", "More experienced" all present. ⚠️ The two later commits are
+> server-side; the client carries no change from them.
+> **EDGE FUNCTIONS DEPLOYED**, versions confirmed from `supabase functions list`, not assumed:
+> · `materialize-plan` **v306** · `generate-strength-plan` **v170** · `rematerialize-standing-block`
+>   **v45** — all 2026-08-28 01:45 UTC
+> · `create-goal-and-materialize-plan` **v372** — 00:39 UTC, with `2769a2df` only. ⚠️ It needed that
+>   deploy (it threads the experience answer through) but imports neither shared module, so the two
+>   later commits do not reach it.
+>
+> ### ⛔ WHAT SHIPPED, IN THE ORDER IT MATTERS
+>
+> 1. **The athlete's own answer sets the hard-session size.** Two chips per sport on the Endurance
+>    focus step; logged history no longer decides the level. Stored on the plan row, honoured in every
+>    week — verified against the stored rows for plan `601a035f`, not inferred.
+> 2. **The bike's invented third rest is gone.** His 5-minute spins between blocks are his and stay;
+>    the recovery after the LAST block was ours and is not on p238-239. A hard ride reads **77** where
+>    it read 82.
+> 3. **The strides' invented 90 seconds is gone.** Michael: *"six strides, 30 seconds each, rest as
+>    long as you want between them."* The recovery is now a lap-button (Garmin OPEN) step. ⚠️ The
+>    comment justifying the 90 seconds claimed a watch step cannot be untimed — untrue, the app has
+>    been sending lap-button steps all along, and the library always said the recovery was `open`.
+>    An easy run reads **27** in both places where it read 35.
+> 4. **Week one's copy.** "Fully prescribed weights start in week two" was false from `5af9472c` on.
+>    Three sentences now say the weights fill in as soon as the two test sessions are logged.
+>
+> ### ⛔ WHAT IS OWED — Michael is doing #1 himself. Stop and report on the first failure.
+>
+> ⛔ **THROWAWAY ACCOUNT ONLY for anything automated. NEVER user `45d122e7`** — Michael's own.
+>
+> 1. ⛔ **Michael downloads a fresh plan and confirms the numbers.** Expected on his own config
+>    (ride hard 1, run hard 2, easy run, long ride · 2h run over 3 days · 4h ride over 2 days · more
+>    experienced both): **hard ride 77 · hard run 63-66 · easy runs 27 · long ride 2h45**, and the
+>    same in every week 1-12. ⚠️ **An existing plan keeps the old numbers until it is rebuilt.**
+> 2. ⛔ **The chips render and gate.** Two per sport, "Less experienced" / "More experienced", bare
+>    minutes and "needs Xh/wk" on each. The upper chip greys out below its minimum and keeps its
+>    reason readable; the lower never gates; dropping hours after picking the upper one falls the
+>    selection back visibly. Continue waits until both are answered.
+> 3. ⛔ **The hard rows offer Ride/Run and nothing else** — no "Engine's pick", no "Over-unders", no
+>    "Cut-downs". The long slot keeps its club control.
+> 4. ⛔ **THE STRIDES REACH A REAL GARMIN WORKOUT**, and this is now more urgent than it was: their
+>    recovery changed to a lap-button step today and **nobody has ever seen strides on a watch.**
+>    Check the intervals, not the rendered card.
+> 5. **Week one's weights fill in after the test.** Log the two test sessions; Thursday and Friday of
+>    week one should then carry numbers.
+>
+> ### ⚠️ KNOWN AND NOT FIXED — do not report these as new
+>
+> - **The download screen's labeller** (`AllPlansInterface.tsx:79-98`, `humanizeToken`). Traced and
+>   confirmed label-only: line 94's `t.includes('threshold')` catches the RUN token
+>   `cruise_5x0.8mi_threshold` and prints "Bike Threshold"; the duration regex takes the first
+>   `\d{1,3}min` in `3x18min` and prints "18min", dropping the ×3 and the rests. ⛔ **No bike work
+>   reaches the athlete and no session is mis-built** — the plan row and the watch are correct.
+> - **A 2-3 minute plan-vs-calendar gap remains** on the hard ride and the hard run. Cause: the
+>   calendar prices intervals off the athlete's real threshold pace where the plan used an estimate.
+>   ⚠️ **Untraced, and likely the calendar being more right, not less.** The two invented numbers are
+>   gone; this is a different and smaller thing.
+> - **`create-goal-and-materialize-plan` is one commit behind** the other three (v372, `2769a2df`).
+>   Correct as things stand — it imports neither shared module — but check that assumption before
+>   assuming it is current.
+
+---
+
 > ## ⛔ 2026-08-27 — THE VIADA ARC WENT LIVE, AND NOTHING IN IT HAS BEEN SEEN ON A DEVICE.
 >
 > Sixteen commits of engine and wizard work, `892b545e..2d93ffcb`. Michael authorised the push and

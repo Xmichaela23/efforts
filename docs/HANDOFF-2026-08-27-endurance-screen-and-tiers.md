@@ -17,8 +17,38 @@ first; go to that one when you need a page cited.
 
 ---
 
-# ⛔ THE ONE THING TO DO: build §2's experience control. Design, copy, tiers and numbers are all
-# settled and recorded below. Nothing is blocking it.
+# ✅ BUILT, PUSHED AND DEPLOYED — 2026-08-27 evening. See `DEPLOY-OWED.md` for versions and what is owed.
+#
+# ⛔ THIS FILE IS NOW HISTORY. Read it for the RULINGS and the reasoning; read `DEPLOY-OWED.md` for
+# state. Where the two differ, that one is later.
+#
+# ⚠️ FIVE RULINGS ARRIVED AFTER THIS FILE WAS WRITTEN AND OVERRIDE PARTS OF §2 BELOW:
+#
+# 1. ⛔ THE CHIP'S NUMBER IS THE HARD SESSION ONLY. §2's draft copy said "hard runs and your long
+#    run"; making the number cover the long session too let the long run swallow it (Michael's own
+#    config read 90/100, which is the Saturday long run, while the hard run it was setting was ~45).
+#    The long run still MOVES with the tier — p247 ties it to experience level — it is simply not
+#    what the chip claims.
+# 2. ⛔ THE LABELS ARE "Less experienced" / "More experienced". "Newer" reads as novice and this
+#    product's athletes are not novices. p247's own contrast: *"more proficient runners"* against
+#    *"less experienced runners"*.
+# 3. ⛔ THE HARD RIDE CLAMPS TO LEVEL 2, wherever the level came from. A ride on the day-3 slot was
+#    inheriting NT's level 3; p278's Cycling Base tops out at level 1-2 anywhere in the book.
+# 4. ⛔ ONE HARD RUN + ONE HARD RIDE NORMALISES: ride on his day 1, run on his day 3, whichever slot
+#    the athlete answered. p278 places the sweet spot on day 1; p246 places NT level 3 on day 3.
+#    Each sport lands on the day its own page prescribes.
+# 5. ⛔ THE HARD ROWS OFFER THE SPORT TOGGLE ONLY. The archetype picker came off: an archetype the
+#    athlete chose can cease to exist when the tier changes the level, and the chip's duration is
+#    computed before any such pick. The week-to-week rotation still varies the session.
+#
+# ⛔ AND THE MEASURED NUMBERS IN §2b's TABLE ARE SUPERSEDED. Those were probe figures at `size: 0.5`.
+# The shipped chips, computed from the athlete's own slots and baselines, read on Michael's config:
+# **running 45 / 66 · riding 68 / 75.**
+#
+# ⚠️ THE RIDE LADDER IS 7 MINUTES AND THAT IS DELIBERATE, not a weak ladder to be widened. p278 day 1
+# is the only cell in the corpus prescribing a SPAN — `Cyc sweet spot (level 1-2)` — and the two
+# chips ARE that span spelled out. A 1.5x run-to-ride ratio, a 75-minute cap and a top-of-band build
+# were each floated on 2026-08-27 and each withdrawn. Do not reopen it.
 
 ---
 
