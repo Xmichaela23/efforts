@@ -1109,3 +1109,49 @@ D-346 was written about, and this row would be the second instance.
 ⚠️ **ALSO ABSENT FOR BOTH SPORTS: drift as a SERIES.** `RunFitness.decoupling` publishes verdict,
 band, range and `recentPct` but no points, and the ride has no drift signal on the contract at all.
 The trend computes the points internally; they are simply never carried out.
+
+## Q-294 — The endurance read is athlete-scoped, not plan-scoped — and the app already had the predicate (2026-08-28)
+
+⛔ **THE RULING (Michael):** a LIFT is prescribed, so the comparison is against a prescription and the
+plan is the correct frame. **A RUN is not.** His words: *"I have race plans, we will have lots of
+different plans, a user might come in and import all their Strava data — locking endurance to a plan
+feels weird. I understand strength, because that's a clearer metric, but endurance not so much."*
+
+⛔⛔ **AND THIS IS THE PART THAT MATTERS MORE THAN THE RESHAPE: THE APP ALREADY HAD THE
+ATHLETE-SCOPED PREDICATE, AND A PLAN-SCOPED ONE WAS BUILT BESIDE IT.**
+`state-trend/run.ts` has always restricted the efficiency and decoupling reads to **STEADY AEROBIC
+EFFORTS** — the plan-free way of asking exactly the same question. The endurance cards shipped
+2026-08-28 identify their session by the plan's family tag instead. **Two answers to one question,
+authored days apart, both live.** That is this codebase's own named disease (see the CLAUDE.md
+preamble: *"the derivation slot usually exists, and the AXIS is what's new"*), and it was walked into
+in full view. ⚠️ Record it as the REASON for the reshape, not merely as its outcome — the next
+session should read why it happened, or it happens again.
+
+**WHAT IS ACTUALLY PLAN-LOCKED: ONE THING.** All three numbers are computed from workouts and know
+nothing about plans — `fitness_baselines` FTP history (keyed on user/discipline/metric),
+`run_facts.efficiency_index` / `ride_facts.efficiency_factor`, and `hr_drift_pct`. **Only the
+IDENTIFICATION is plan-locked.** The "same session repeated" row does not disappear athlete-scoped;
+its qualifier changes from *this Wednesday session week to week* to *your steady aerobic work*.
+
+⛔ **RECOMMENDATION: REFINEMENT, NOT REMOVAL.** Athlete-scoped series as the card's spine; the
+family-tag join (`namedSessions`, ~40 lines in `compute-snapshot`, already isolated) kept as an
+optional sharper overlay where a plan happens to exist. Where a plan DOES exist the repeated-session
+read is genuinely sharper — same route, same duration, same prescription — and discarding it to serve
+the case where it does not exist is the wrong trade. Cost of keeping both is **one extra payload
+field, not a second mechanism.**
+
+⚠️ **THE COPY CONSTRAINT, AND IT IS THE REAL COST:** two populations on one card. *"Your steady runs"*
+and *"your Wednesday session"* answer slightly different questions, so a card showing both **must say
+which line is which, or it reads as one series with a kink in it.**
+
+⛔ **IT DISSOLVES [[Q-292]] AS A SIDE EFFECT.** A race plan gets the full card with no further work —
+all three numbers are workout-derived — and the one row a periodised block structurally cannot
+support (the repeated session) is exactly the row that becomes optional under this model.
+⛔⛔ **WITH ONE HOLE: [[Q-290]].** On a race plan the reference number climbing is the PRIMARY read,
+and the run has no threshold-pace history — so an athlete-scoped run card on a race plan is silent on
+the exact number that plan exists to move.
+⚠️ Needs [[Q-293]] for the ride's efficiency line. See also [[Q-291]].
+
+⚠️ **TIMING, DECIDED:** after Monday. Both live pieces are unverified; landing a reshape first means
+Monday proves neither what was deployed nor what replaced it. **Nothing on screen is wrong today —
+narrower than it should be, which is not the same thing.**
