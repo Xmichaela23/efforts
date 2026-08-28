@@ -19,6 +19,32 @@ import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
+
+/**
+ * ⛔ DOES THIS ROW GET A DERIVED RESERVE TARGET? Two answers, and they are different questions.
+ *
+ *   1. **The PROTOCOL** — `protocolUsesRir`. 5/3/1 auto-regulates nothing: the working number and
+ *      the reps are fixed at plan creation, so a reserve target is a second instruction that can
+ *      contradict the prescription.
+ *   2. **The SLOT** — p218 gives ME *"no RIR target"* in as many words, while giving DE, SKILL and
+ *      HYP one each. That is a per-row fact and the protocol flag cannot express it.
+ *
+ * ⚠️ IT WAS ONLY EVER ASKING (1), AND MICHAEL SAW THE RESULT (2026-08-28). The composer stamps
+ * nothing on an ME row precisely because the source states nothing (`compose.ts`
+ * `targetRirForIntent` returns null for ME) — and this file then DERIVED one off the RPE chart. His
+ * ME pull-up card read *"1-5 reps, stopped short of failure"* above a row reading **"target 1-5 · 2
+ * in reserve"**. The plan contradicted itself on one card.
+ *
+ * ⛔ EXTRACTED SO IT CAN BE TESTED. It was the same expression inlined at two seams (the strength
+ * branch runs twice in this file), which is two places for one rule to drift and nowhere to assert
+ * it. ⚠️ ABSENT, NEVER ZERO — p219 defines 0 RIR as a real and specific instruction, so a zero here
+ * would say something he did not say.
+ */
+export function stampsTargetRir(protocolTracksRir: boolean, slotIntent: unknown): boolean {
+  if (!protocolTracksRir) return false;
+  return String(slotIntent ?? '').toUpperCase() !== 'ME';
+}
+
 import { resolvePlanPhase } from '../_shared/plan-phase.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
@@ -2357,7 +2383,24 @@ function expandTokensForRow(
           // number and the reps are fixed at plan creation, so a reserve target is a second
           // instruction that can contradict the prescription. Every other protocol is unchanged.
           const strengthProfile = resolveProfile(strengthProtocolId);
-          const tracksRir = protocolUsesRir(strengthProfile);
+          /**
+           * ⛔⛔ AND p218 GIVES **ME** NO RESERVE TARGET, IN AS MANY WORDS (2026-08-28).
+           *
+           * ⚠️ THE DEFECT, FROM MICHAEL'S SCREEN: the ME pull-up card's cue read *"1-5 reps, stopped
+           * short of failure"* — correct — and the row directly under it read **"target 1-5 · 2 in
+           * reserve"**. The composer stamps nothing on an ME row precisely because the source states
+           * no target (`compose.ts` `targetRirForIntent` returns null for ME), and this seam then
+           * DERIVED one off the RPE chart, because `protocolUsesRir` is protocol-wide rather than
+           * per-slot. The plan contradicted itself on one card.
+           *
+           * ⛔ THE GATE IS PER-SLOT AND THE ROW ALREADY CARRIES IT. `slot_intent` is stamped by the
+           * standing-plan composer and is read eighty lines below this one; nothing new is plumbed.
+           * ⚠️ ABSENT, NEVER ZERO. p219 defines 0 RIR as a real and specific instruction — the last
+           * rep still completes, very slowly — so a zero here would say something he did not say.
+           * ⚠️ `compose.ts:684-687` RECORDED THIS AS A GAP for "the slice that touches the RIR seam".
+           * This is that slice; that comment is now history.
+           */
+          const tracksRir = stampsTargetRir(protocolUsesRir(strengthProfile), (ex as any)?.slot_intent);
           const target_rir = !tracksRir ? undefined : getTargetRir(
             strengthProfile,
             String(name ?? ''),
@@ -2688,7 +2731,24 @@ function expandTokensForRow(
           // number and the reps are fixed at plan creation, so a reserve target is a second
           // instruction that can contradict the prescription. Every other protocol is unchanged.
           const strengthProfile = resolveProfile(strengthProtocolId);
-          const tracksRir = protocolUsesRir(strengthProfile);
+          /**
+           * ⛔⛔ AND p218 GIVES **ME** NO RESERVE TARGET, IN AS MANY WORDS (2026-08-28).
+           *
+           * ⚠️ THE DEFECT, FROM MICHAEL'S SCREEN: the ME pull-up card's cue read *"1-5 reps, stopped
+           * short of failure"* — correct — and the row directly under it read **"target 1-5 · 2 in
+           * reserve"**. The composer stamps nothing on an ME row precisely because the source states
+           * no target (`compose.ts` `targetRirForIntent` returns null for ME), and this seam then
+           * DERIVED one off the RPE chart, because `protocolUsesRir` is protocol-wide rather than
+           * per-slot. The plan contradicted itself on one card.
+           *
+           * ⛔ THE GATE IS PER-SLOT AND THE ROW ALREADY CARRIES IT. `slot_intent` is stamped by the
+           * standing-plan composer and is read eighty lines below this one; nothing new is plumbed.
+           * ⚠️ ABSENT, NEVER ZERO. p219 defines 0 RIR as a real and specific instruction — the last
+           * rep still completes, very slowly — so a zero here would say something he did not say.
+           * ⚠️ `compose.ts:684-687` RECORDED THIS AS A GAP for "the slice that touches the RIR seam".
+           * This is that slice; that comment is now history.
+           */
+          const tracksRir = stampsTargetRir(protocolUsesRir(strengthProfile), (ex as any)?.slot_intent);
           const target_rir = !tracksRir ? undefined : getTargetRir(
             strengthProfile,
             String(name ?? ''),

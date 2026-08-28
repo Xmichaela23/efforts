@@ -14,7 +14,7 @@
 // ============================================================================
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { composeWeek, defaultCompetitionLifts, SET_END_CUE } from './index.ts';
+import { ACCESSORY_FATIGUE_CUE, composeWeek, defaultCompetitionLifts, SET_END_CUE, SPEED_SET_END_CUE } from './index.ts';
 import { buildStandingPlanRow, PAIN_TOLERANCE_NOTE } from './plan-row.ts';
 import { PLYO_DOSE } from './frames.ts';
 import { FAMILIES } from '../endurance-library/source-rules.ts';
@@ -60,19 +60,100 @@ Deno.test('⛔⛔ EVERY LIFTING SESSION SAYS WHERE THE SET ENDS — his words, v
    * it"* — a heavy set feels hard from about rep two, so that version ends every set before it does
    * anything. It is asserted absent, not just corrected.
    */
+  /**
+   * ⛔⛔ REVISED 2026-08-28 — THIS USED TO DEMAND THE SAME LINE ON ALL FOUR LIFTING DAYS, AND THAT
+   * WAS THE BUG. On Michael's device a DE session's description asked for *"1 or 2 reps left"* while
+   * the rows underneath prescribed **3-4 in reserve** (p218). One screen, two answers. `SET_END_CUE`
+   * is unchanged and is still correct on the heavy days; it stopped being the only line.
+   */
+  let heavy = 0;
+  let speed = 0;
   for (const [wk, column] of [[2, 'standard'], [5, 'standard'], [11, 'taper']] as const) {
     const lifting = week(wk, column).sessions.filter((s) =>
       s.type === 'strength' && !(s.tags ?? []).includes('plyo') && !(s.tags ?? []).includes('test_week'));
     assert(lifting.length > 0, `week ${wk} ${column}: no lifting sessions at all`);
     for (const s of lifting) {
-      assertEquals(s.description, SET_END_CUE, `${s.name} does not carry the cue`);
+      // ⚠️ KEYED OFF THE NAME HERE ONLY BECAUSE THIS IS A TEST. The composer reads the frame day's
+      // competition slot (`sessionCueFor`), never the label — a display string that `plain-intent.ts`
+      // rewrites before an athlete sees it. Asserting against the label from outside is the
+      // independent check; using it inside the engine would not be.
+      const isSpeedDay = /^DE:/.test(String(s.name ?? ''));
+      assertEquals(s.description, `${isSpeedDay ? SPEED_SET_END_CUE : SET_END_CUE} ${ACCESSORY_FATIGUE_CUE}`,
+        `${s.name} carries the wrong session line`);
+      // ⛔ AND THE ACCESSORY LINE IS ON BOTH INTENTS. All four lifting days carry accessories, so the
+      // fatigue rule that inverts on them (p84) is said on every one of them.
+      assert(String(s.description).includes(ACCESSORY_FATIGUE_CUE), `${s.name} lost the accessory line`);
+      if (isSpeedDay) speed += 1; else heavy += 1;
     }
   }
+  // ⛔ NOT VACUOUS — both branches must actually have been reached.
+  assert(heavy > 0, 'no heavy lifting day was checked');
+  assert(speed > 0, 'no speed lifting day was checked');
   assertEquals(SET_END_CUE,
     'End the set when your form goes or you still have 1 or 2 reps left. Beyond that could mean '
     + 'longer recovery and fewer gains.');
   assertEquals(/start to feel it/i.test(SET_END_CUE), false, 'the corrected draft is back');
   assertEquals(voiceViolation(SET_END_CUE), null);
+});
+
+Deno.test('⛔⛔ THE CLAIM IS HIS, THE WORDS ARE OURS — and the rejected drafts stay rejected', () => {
+  /**
+   * ⛔⛔ THIS TEST USED TO ENFORCE VERBATIM, AND THAT WAS THE WRONG GATE (2026-08-28). It asserted
+   * every clause of the speed line appeared inside p219's transcribed objective. Michael raised the
+   * problem with the policy itself: his prose shipped as app copy in a product intended to sell is
+   * REPRODUCTION, not citation — and his sentences are written for a book, so *"Fatigue is
+   * discouraged"* is flat and academic under a bar. **The rule is the one `SET_END_CUE` already
+   * followed: the claim is his, the words are ours, the citation lives in the code.**
+   *
+   * ⚠️ SO WHAT IS PINNED IS THE EXACT STRING PLUS THE DRAFTS THAT MUST NOT COME BACK. There is no
+   * mechanical test for "is this his claim" — that is a reading, and it lives in the comment block
+   * beside the constants.
+   */
+  assertEquals(SPEED_SET_END_CUE,
+    'This day trains bar speed and a clean bar path, not weight. Every rep gets the same intent as a '
+    + 'max attempt. Fatigue is discouraged here.');
+  assertEquals(ACCESSORY_FATIGUE_CUE,
+    'The accessories run the other way. Slowing down may be part of what makes them work, rather than '
+    + 'a reason to stop. Still short of failure.');
+
+  // ⛔ BOTH HALVES OF p219's OBJECTIVE SURVIVE. A draft kept only speed and dropped the bar path —
+  // a loss of content, not a tightening.
+  assert(/bar speed/i.test(SPEED_SET_END_CUE) && /bar path/i.test(SPEED_SET_END_CUE),
+    'the speed line dropped half of his objective');
+
+  /**
+   * ⛔⛔ THE TWO REJECTED DRAFTS. Both read better than what shipped, which is exactly why they are
+   * asserted absent rather than merely described:
+   *   · "If the bar slows, the set is done." — OURS. The field-standard speed regulator; he gives no
+   *     in-set stop rule for DE, so this line gives none.
+   *   · "Fatigue costs you what the day trains." — FUSES p219 with p77 and states a causal claim the
+   *     page does not make.
+   */
+  assertEquals(/bar slows|set is done|too heavy/i.test(SPEED_SET_END_CUE), false,
+    'an ours-labelled speed stop rule came back');
+  assertEquals(/costs you|what the day trains/i.test(SPEED_SET_END_CUE), false,
+    'the two-page fusion came back');
+
+  /**
+   * ⛔ "MAY BE" IS LOAD-BEARING. p84 is hedged — "may well be a crucial part" — and a draft flattened
+   * it to "is part of what makes them work". Michael took the hedge. It reads weaker; that is the
+   * price of matching what he actually claims.
+   */
+  assert(/\bmay be\b/.test(ACCESSORY_FATIGUE_CUE), 'the p84 hedge was flattened');
+  // ⛔ AND THE SECOND SENTENCE, WITHOUT WHICH THIS LINE CONTRADICTS THE HEAVY ONE.
+  assert(/short of failure/i.test(ACCESSORY_FATIGUE_CUE), 'the accessory line lost its stop rule');
+
+  // ⛔ NO REST CONTENT ON ANY LINE. Rest has one owner and it renders under the countdown.
+  for (const line of [SET_END_CUE, SPEED_SET_END_CUE, ACCESSORY_FATIGUE_CUE]) {
+    assertEquals(/\brest\b|recover between|between sets/i.test(line), false,
+      'a session line grew rest content — that belongs to the timer');
+  }
+  for (const line of [SPEED_SET_END_CUE, ACCESSORY_FATIGUE_CUE]) {
+    assertEquals(voiceViolation(line), null);
+  }
+  // ⚠️ AND JOINED, WHICH IS HOW THEY ARE ACTUALLY STAMPED.
+  assertEquals(voiceViolation(`${SET_END_CUE} ${ACCESSORY_FATIGUE_CUE}`), null);
+  assertEquals(voiceViolation(`${SPEED_SET_END_CUE} ${ACCESSORY_FATIGUE_CUE}`), null);
 });
 
 Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () => {

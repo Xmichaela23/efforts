@@ -678,12 +678,14 @@ function noteForWeek(slot: StrengthSlot, week: number): string {
  * ⚠️ MIDPOINT OF HIS BAND, rounded to the half. The band is his; picking a single number out of it
  * is ours, and it is the only choice in this function.
  *
- * ⚠️ AND AN ME ROW STILL RECEIVES A DERIVED TARGET DOWNSTREAM. `protocolUsesRir` is a
- * protocol-wide flag, not a per-slot one, so `materialize-plan` reads a target off the RPE chart for
- * any row that carries none. On an ME row (90-100%, 1-5 reps) that lands at essentially zero
- * reserve, which restates the prescription rather than contradicting it — but it is not the same as
- * p218's "no target". ⛔ RECORDED AS A GAP for the slice that touches the RIR seam; it is not fixed
- * by widening a shared flag on this stage's account.
+ * ✅ **CLOSED 2026-08-28 — AND IT WAS WORSE ON A DEVICE THAN THIS NOTE PREDICTED.** This said a
+ * derived ME target *"restates the prescription rather than contradicting it"*. On Michael's screen
+ * the ME pull-up card's cue read *"1-5 reps, stopped short of failure"* while the row under it read
+ * **"target 1-5 · 2 in reserve"** — two reps, not essentially zero, and the two halves of one card
+ * disagreeing. ⛔ THE FIX IS THE PER-SLOT GATE THIS NOTE ASKED FOR, at `materialize-plan/index.ts`
+ * (both seams): the row's own `slot_intent` suppresses the derived target, the shared
+ * `protocolUsesRir` flag is untouched, and `StrengthLogger`'s Done handler no longer autofills a
+ * fabricated 3 when a row carries no target. Everything above is history.
  */
 function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | null {
   const p = prescribe(intent, 'barbell');
@@ -1516,6 +1518,116 @@ export const SET_END_CUE =
   'End the set when your form goes or you still have 1 or 2 reps left. Beyond that could mean '
   + 'longer recovery and fewer gains.';
 
+/**
+ * ⛔⛔ THE VERBATIM POLICY IS OFF, AND IT MATTERS MORE THAN ANY LINE BELOW (Michael, 2026-08-28).
+ *
+ * A draft of the speed line was assembled word-for-word from p219 and handed to him as "all the
+ * book". He raised the problem himself and it is the right call, for two reasons:
+ *
+ *   1. ⛔ **HIS PROSE IN A PRODUCT INTENDED TO SELL IS REPRODUCTION, NOT CITATION.** Quoting him in
+ *      `SOURCE-viada-hybrid-athlete.md` is reference. Shipping his sentences as app copy is a
+ *      different act, and a policy of "verbatim" points squarely at it.
+ *   2. ⚠️ **HIS SENTENCES ARE WRITTEN FOR A BOOK.** *"Fatigue is discouraged"* is flat and academic
+ *      under a bar.
+ *
+ * ⛔ **THE RULE IS THE ONE {@link SET_END_CUE} ALREADY FOLLOWED: THE CLAIM IS HIS, THE WORDS ARE
+ * OURS, THE CITATION LIVES IN THE CODE.** That constant is Michael's own sentence traced to
+ * p82/p83 — nobody would mistake it for a quote and it reads like a person talking. Every line here
+ * is built the same way. ⚠️ **Do not "improve" any of them back toward the source wording.** The
+ * pull toward the page is real and it is the wrong direction.
+ */
+
+/**
+ * ⛔⛔ THE SPEED DAY GETS ITS OWN LINE, BECAUSE {@link SET_END_CUE} IS WRONG ON IT (2026-08-28).
+ *
+ * ⚠️ THE DEFECT, FROM MICHAEL'S DEVICE: `SET_END_CUE` was stamped as the `description` of ALL FOUR
+ * lifting sessions. On a DE day it told him to stop with *"1 or 2 reps left"* while the rows
+ * directly underneath prescribed **3-4 in reserve** (p218). One screen, two answers, and the
+ * session-level one was the wrong one.
+ *
+ * ⛔ `SET_END_CUE` IS NOT REWORDED AND MUST NOT BE. It is Michael's own sentence, its own comment
+ * forbids it, and it is CORRECT on the heavy days. What changed is only that it stopped being the
+ * only line. Four intents, four meanings (p219) — two are written today.
+ *
+ * **THE CLAIM, p219:** *"Bar speed and quality of movement. Velocity and a consistent bar path are
+ * the objectives; treat every rep as though the bar were loaded to a maximum. Fatigue is
+ * discouraged."* ⚠️ **SENTENCE ONE CARRIES BOTH HALVES OF HIS OBJECTIVE** — speed AND bar path. A
+ * draft kept only speed; that is a loss of content, not a tightening. Do not drop it again.
+ *
+ * ⛔⛔ TWO DRAFTS WERE REJECTED, AND BOTH READ BETTER THAN WHAT SHIPPED. Recorded because the next
+ * session will otherwise re-derive them:
+ *
+ *   · *"If the bar slows, the set is done."* — **OURS.** The field-standard speed regulator, and
+ *     `strength-focus-copy.ts` says so itself, calling it *"the same claim as his
+ *     fatigue-is-discouraged, stated as something an athlete can act on mid-set."* **He gives no
+ *     in-set stop rule for DE, so this line gives none.** Michael cut it on sight.
+ *   · *"Fatigue costs you what the day trains."* — **FUSES TWO PAGES.** p219 says only that fatigue
+ *     is discouraged; the *why* is p77. It states a causal claim the page does not make. *"Fatigue
+ *     is discouraged here"* is flatter and correct, and flatter-and-correct wins.
+ *
+ * ⚠️ AND A SOURCED FACT IS DELIBERATELY UNPLACED, NOT DROPPED: p77 — *"ensuring that you are
+ * minimally fatigued prior to and during strength movement practice can be crucial because high
+ * fatigue can impair proper motor unit recruitment"* — is about what precedes the session, not what
+ * happens inside it. It belongs somewhere; it does not belong here.
+ *
+ * ⚠️ NO REST CONTENT, ON ANY OF THESE LINES. Rest renders under the countdown
+ * (`strength-rest-timer.ts`, carrying p78's rule from `strength-grid/intents.ts`). One owner, one
+ * place — and `SET_END_CUE`'s own comment is the precedent: said weekly it becomes wallpaper.
+ *
+ * ⚠️ PASSES `voiceViolation` UNAIDED — measured 2026-08-28, alone and joined to the accessory line.
+ */
+export const SPEED_SET_END_CUE =
+  'This day trains bar speed and a clean bar path, not weight. Every rep gets the same intent as a '
+  + 'max attempt. Fatigue is discouraged here.';
+
+/**
+ * ⛔⛔ THE FATIGUE RULE INVERTS ON THE ACCESSORIES, AND THE APP SAID SO TO NOBODY (2026-08-28).
+ *
+ * ⚠️ THE HOLE: every session line an athlete reads tells them to stop early. p84 says the OPPOSITE
+ * for hypertrophy work — *"Strength and power training typically dictate that this point of reduced
+ * capacity represents the end of a productive session, but in hypertrophy training, this may well
+ * be a crucial part of the training session itself"* — and we stated that in code
+ * (`strength-grid/intents.ts` `REST_BETWEEN_SETS_RULE_HYP`) and on no screen at all.
+ *
+ * ⛔⛔ **"MAY BE" IS LOAD-BEARING AND IS NOT A WEAK VERB TO TIGHTEN.** p84 is hedged in the source —
+ * *"may well be"* — and a draft flattened it to *"is part of what makes them work"*. Michael was
+ * shown both and took the hedge. **It reads weaker. That is the price of matching what he actually
+ * claims, and it is the right price.** Leave it.
+ *
+ * ⛔ THE SECOND SENTENCE IS p82/p83 AND IT IS WHAT STOPS THIS LINE CONTRADICTING THE HEAVY ONE.
+ * Without it, "slowing down is part of the point" reads as licence to grind an accessory to failure
+ * — which is the one thing both pages agree is unproductive.
+ *
+ * ⚠️ EVERY LIFTING DAY, BOTH INTENTS. All four carry accessories, so this is appended to the heavy
+ * line and the speed line alike. ⛔ ONE LINE AT THE SESSION LEVEL, NOT A PARAGRAPH PER CARD:
+ * Michael's ruling, and adding one to every accessory card would multiply exactly the double-accent
+ * legibility problem the same session was fixing.
+ */
+export const ACCESSORY_FATIGUE_CUE =
+  'The accessories run the other way. Slowing down may be part of what makes them work, rather than '
+  + 'a reason to stop. Still short of failure.';
+
+/**
+ * ⛔ WHAT THIS LIFTING DAY SAYS ABOUT ITS SETS — read off the FRAME'S OWN DATA, never the day label.
+ *
+ * ⚠️ THE COMPETITION SLOT IS THE DAY'S IDENTITY. Every lifting day in both columns carries exactly
+ * one `role: 'competition'` slot and its intent is what the label announces (`ME: Upper` opens on an
+ * ME competition slot, `DE: Lower` on a DE one) — but the day ALSO carries DE and HYP accessories,
+ * so "does this day contain a DE slot" is not the question. The competition slot is.
+ *
+ * ⛔ AND NOT `day.label`. That string is display text — `plain-intent.ts` maps it to `Heavy:` /
+ * `Speed:` before an athlete reads it — and keying engine behaviour off a display string is how the
+ * two get renamed apart. The intent is data; use the data.
+ *
+ * ⚠️ FALLS BACK TO THE HEAVY LINE, which is the conservative direction: it is the stop rule, and a
+ * day whose identity could not be read should not lose one.
+ */
+export function sessionCueFor(day: FrameDay): string {
+  const competition = day.strength.find((s) => s.role === 'competition');
+  const setEnd = competition?.intent === 'DE' ? SPEED_SET_END_CUE : SET_END_CUE;
+  return `${setEnd} ${ACCESSORY_FATIGUE_CUE}`;
+}
+
 /** ⛔ COMPOSE ONE WEEK. */
 export function composeWeek(args: ComposeArgs): ComposedWeek {
   const frame = FRAMES[args.frame];
@@ -1993,7 +2105,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           name: day.label ?? 'Strength',
           // ⛔ THE SESSION SAID NOTHING AT ALL UNTIL NOW, on a screen where every endurance session
           // states its own job. See `SET_END_CUE` — his words, and the two pages under them.
-          description: SET_END_CUE,
+          // ⛔ AND IT SAID THE SAME THING ON ALL FOUR LIFTING DAYS UNTIL 2026-08-28, which was wrong
+          // on the speed days — `SET_END_CUE` asks for 1-2 in reserve while a DE row prescribes 3-4.
+          // `sessionCueFor` picks by the day's competition slot; see `SPEED_SET_END_CUE`.
+          description: sessionCueFor(day),
           duration: 55,
           strength_exercises: exercises,
           tags: ['standing_plan', `frame:${frame.id}`, `column:${args.column}`],

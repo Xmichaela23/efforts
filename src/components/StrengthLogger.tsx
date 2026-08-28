@@ -4128,7 +4128,31 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // "hit the number" step (supersedes D-134's blocking confirm). For WORKING sets, surface a small
     // NON-BLOCKING adjust strip so the athlete can tap a different number ONLY if it actually felt
     // different (warmups skip it). Keeps the RIR signal honest without the friction.
-    const suggestedRir = rirLoggedSeed(exercise.target_rir) ?? 3;
+    /**
+     * ⛔⛔ NO TARGET MEANS NO NUMBER — NOT A FABRICATED 3 (2026-08-28).
+     *
+     * ⚠️ `?? 3` WAS THE FALLBACK, and it was invisible until p218's "ME has no RIR target" started
+     * being honoured at the stamp seam (`materialize-plan`). On a max-effort set at 90-100% it would
+     * have written *"three reps left in the tank"* that the athlete never said — strictly worse than
+     * the wrong "2" it replaced, and it lands in the cell they are looking at. `rir_autofilled`
+     * keeps it out of e1RM and adherence; it does NOT keep it off the screen.
+     *
+     * ⛔ THE PRECEDENT IS SIX LINES ABOVE THIS ONE. A row with `rir_tracked === false` (D-324)
+     * already completes with no reserve at all. This is the same instruction arriving per-slot
+     * instead of per-protocol: the standing plan tracks RIR on its speed and muscle-building rows
+     * and states none on its heavy ones.
+     *
+     * ⚠️ THE SET STILL COMPLETES AND THE REST TIMER STILL ARMS. What is skipped is inventing a
+     * reserve, not logging the work. The adjust strip below still opens, so an athlete who DOES want
+     * to record one has the same tap they always had.
+     */
+    const suggestedRir = rirLoggedSeed(exercise.target_rir);
+    if (suggestedRir == null) {
+      updateSet(exerciseId, setIndex, { completed: true });
+      autoStartRestForSet(exerciseId, setIndex);
+      if (set.setType !== 'warmup') setRirConfirm({ exerciseId, setIndex });
+      return;
+    }
     // D-203: auto-saved with the SUGGESTED RIR, not an observed signal. Mark it so
     // e1RM + RIR-adherence exclude it; the adjust strip below clears the flag if the
     // athlete taps a real number.
