@@ -35,7 +35,7 @@ import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
-import { StrengthReadCards, NamedRunCard } from './StrengthReadCards';
+import { StrengthReadCards, EnduranceReadCards } from './StrengthReadCards';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -1504,12 +1504,12 @@ export default function StateTab({
           cards is server-decided. Not fixed here. */}
       {(() => {
         const meHistory = (wsv as { me_history_v1?: React.ComponentProps<typeof StrengthReadCards>['meHistory'] }).me_history_v1;
-        const runSession = wsv.trends?.display?.namedRunSession ?? null;
+        const namedSessions = (wsv.trends?.display as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | undefined)?.namedSessions ?? null;
         // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
         // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
         // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
         // section on the lift half would hide it for the block's whole first week.
-        if (!meHistory && !runSession) return null;
+        if (!meHistory && !(namedSessions && namedSessions.length > 0)) return null;
         const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
         const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
         for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
@@ -1532,12 +1532,13 @@ export default function StateTab({
               style={readoutPlateStyle(undefined, { galaxy: true })}
             >
               {cards}
-              {/* ⛔ THE RUN CARD SITS ON THE SAME PLATE, LAST. It answers the same question in the
-                  other discipline — is the same work getting cheaper — and the block is one thing,
-                  not two screens. ⚠️ It renders independently of the lift cards: a week where the
-                  run is logged and no heavy session is yet (which is week 1 of every block) shows
-                  the run card alone, and that is the honest state. */}
-              <NamedRunCard session={runSession} />
+              {/* ⛔ THE ENDURANCE CARDS SIT ON THE SAME PLATE, LAST — one per sport. They answer the
+                  same question in the other disciplines (is the same work getting cheaper) and the
+                  block is one thing, not three screens. ⚠️ They render independently of the lift
+                  cards: week 1 of every block is the two strength tests, so a week where the runs
+                  and rides are logged and no heavy session is yet shows these alone, which is the
+                  honest state. */}
+              <EnduranceReadCards sessions={namedSessions} />
             </div>
           </>
         );

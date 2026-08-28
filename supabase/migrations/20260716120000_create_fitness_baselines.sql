@@ -22,7 +22,14 @@
 -- STRENGTH is intentionally NOT stored here — its declared 1RMs in user_baselines are already confirmed
 -- anchors (contract §2d). This table holds the DERIVABLE disciplines: run / bike / swim.
 --
--- Apply via the Supabase SQL editor (repo migration-tracking divergence), reviewed. STAGED — not yet applied.
+-- Apply via the Supabase SQL editor (repo migration-tracking divergence), reviewed.
+-- ⛔ CORRECTION 2026-08-28: THIS IS APPLIED AND LIVE IN PRODUCTION. The line here read "STAGED — not
+-- yet applied" long after it had been applied, and that was believed on sight during the endurance
+-- trace until a direct select proved otherwise — 14 rows for the primary athlete, the supersede
+-- chain intact (six dated bike FTP readings, 176 → 153 → 168, plus seven run decoupling rows).
+-- ⚠️ THE LEDGER CANNOT TELL YOU THIS. `supabase migration list` records only `0000` for this repo;
+-- every migration here was applied by hand, so a file's own header is the only claim about its state
+-- and this one was wrong. Verify against the database, never against the header.
 CREATE TABLE IF NOT EXISTS public.fitness_baselines (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

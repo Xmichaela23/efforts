@@ -17,6 +17,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   assembleStateTrends,
+  DRIFT_LIMITS,
   buildAllTimeBestByLift,
   intentCanMintAMax,
   liftSeriesFromExerciseLog,
@@ -145,37 +146,50 @@ Deno.test('⛔ THE WEEK SURVIVES THE DISPLAY MAP — the narrow point, pinned', 
   assertEquals(bench!.series!.map((p) => p.week), [1, 2, 3]);
 });
 
-Deno.test('⛔ THE NAMED RUN SESSION REACHES THE DISPLAY CONTRACT UNTOUCHED', () => {
+Deno.test('⛔ THE NAMED SESSIONS REACH THE DISPLAY CONTRACT UNTOUCHED — one per sport', () => {
   /**
-   * The card reads `display.namedRunSession`. This assembly neither builds nor judges it — the
-   * caller gated and joined it — so what is pinned here is that it survives the assembly and the
+   * The cards read `display.namedSessions`. This assembly neither builds nor judges them — the
+   * caller gated and joined them — so what is pinned here is that they survive the assembly and the
    * display map, the same narrow point where the lift line's week was nearly lost.
+   * ⚠️ THE RIDE CARRIES A REFERENCE SERIES AND THE RUN DOES NOT, deliberately: `fitness_baselines`
+   * supersedes rather than overwrites so FTP accumulates a dated trail, while run threshold pace is
+   * a single overwritten value. A card must not fabricate a line from one number.
    */
-  const session = {
-    family: 'run_near_threshold',
-    label: 'Near-threshold Run',
-    points: [
-      { week: 1, date: '2026-09-02', hrAvg: 164, durationMin: 66 },
-      { week: 2, date: '2026-09-09', hrAvg: 158, durationMin: 66 },
-    ],
-  };
+  const sessions = [
+    {
+      family: 'run_near_threshold', sport: 'run', label: 'Near-threshold Run',
+      points: [
+        { week: 1, date: '2026-09-02', hrAvg: 164, durationMin: 66, efficiency: 0.0121, driftPct: 6.4, keySessionWithin24h: false },
+        { week: 2, date: '2026-09-09', hrAvg: 158, durationMin: 66, efficiency: 0.0129, driftPct: 4.1, keySessionWithin24h: true },
+      ],
+      reference: null,
+    },
+    {
+      family: 'ride_sweet_spot', sport: 'ride', label: 'Hard Ride',
+      points: [
+        { week: 1, date: '2026-08-31', hrAvg: 148, durationMin: 75, efficiency: 1.32, driftPct: 3.2, keySessionWithin24h: false },
+        { week: 2, date: '2026-09-07', hrAvg: 146, durationMin: 75, efficiency: 1.41, driftPct: 2.8, keySessionWithin24h: false },
+      ],
+      reference: { metric: 'ftp', unit: 'W', points: [
+        { date: '2026-07-17', value: 176, status: 'provisional' },
+        { date: '2026-08-25', value: 168, status: 'provisional' },
+      ] },
+    },
+  ];
   const out = assembleStateTrends({
     asOf: '2026-09-20',
     exerciseRows: [], bikeRows: [], runJoined: [], swimRows: [],
     plannedBy: {}, doneBy: {}, cadenceCounts: { run: 12 },
-    namedRunSession: session,
-  } as never) as { namedRunSession?: unknown };
-  assertEquals(out.namedRunSession, session, 'the assembly altered a series it does not own');
+    namedSessions: sessions,
+  } as never) as { namedSessions?: unknown };
+  assertEquals(out.namedSessions, sessions, 'the assembly altered series it does not own');
 });
 
-Deno.test('⚠️ NO NAMED SESSION → THE FIELD IS ABSENT, not an empty shell', () => {
-  // A card with nothing to say does not render, and an empty object would make it render empty.
-  const out = assembleStateTrends({
-    asOf: '2026-09-20',
-    exerciseRows: [], bikeRows: [], runJoined: [], swimRows: [],
-    plannedBy: {}, doneBy: {}, cadenceCounts: { run: 12 },
-  } as never) as { namedRunSession?: unknown };
-  assertEquals(out.namedRunSession, null);
+Deno.test('⛔ p107 IS TWO LINES, NOT ONE — and the tighter one is stated, never averaged', () => {
+  // Terminate at 10% drift; 5% when a key session falls within 24 hours. Ours to state, not derive.
+  assertEquals(DRIFT_LIMITS.standardPct, 10);
+  assertEquals(DRIFT_LIMITS.keySessionWithin24hPct, 5);
+  assertEquals(DRIFT_LIMITS.cite, 'Viada p107');
 });
 
 Deno.test('⛔ THE EXPECTED CURVE REACHES THE PER-LIFT CONTRACT — the display map, again', () => {

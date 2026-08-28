@@ -416,9 +416,9 @@ export interface StateTrendInputs {
    *  caller off `resolvePlanWeekIndex` and bounded to the block's own window, so a point from a
    *  previous block carries no week rather than a clamped "week 1". See `LiftSeriesContext`. */
   weekByDate?: Record<string, number> | null;
-  /** ⛔ The repeated named session, already gated and joined by the caller (see `compute-snapshot`).
-   *  This module carries it to the display contract and does nothing else with it. */
-  namedRunSession?: NamedSessionSeries | null;
+  /** ⛔ The repeated named sessions, one per sport, already gated and joined by the caller (see
+   *  `compute-snapshot`). This module carries them to the display contract and does nothing else. */
+  namedSessions?: NamedSessionSeries[] | null;
   /** ⛔ The block's expected curve per canonical lift — dated weekly points, anchored on the block's
    *  opening working number at the plan's own rate. Built by the caller; carried, never computed. */
   expectedByCanonical?: Record<string, Array<{ date: string; value: number }>> | null;
@@ -462,9 +462,9 @@ export interface StateTrendResult {
   /** S2: per-discipline 90d session counts (the card sort key) — carried so the cached DISPLAY contract
    *  is self-contained and the client no longer needs the raw cadence rows to render. */
   cadenceCounts: Record<string, number>;
-  /** ⛔ The repeated named session, carried through from the inputs. Null when the block has none
-   *  or nothing has been logged against it — a card with nothing to say does not render. */
-  namedRunSession?: NamedSessionSeries | null;
+  /** ⛔ The repeated named sessions, carried through from the inputs. Empty when the block has none
+   *  or nothing has been logged against them — a card with nothing to say does not render. */
+  namedSessions?: NamedSessionSeries[] | null;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -946,7 +946,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     fitnessAnchors,
     cadenceCounts: inp.cadenceCounts,
     // Carried, not computed — the caller gated and joined it. See `NamedSessionSeries`.
-    namedRunSession: inp.namedRunSession ?? null,
+    namedSessions: inp.namedSessions ?? null,
   };
 }
 
@@ -986,18 +986,71 @@ export interface NamedSessionPoint {
   /** Block week. Present because the caller resolved it; a point outside the block is not emitted. */
   week: number;
   date: string;
-  /** Average heart rate, from `run_facts.hr_avg` — the same reading the efficiency trend uses. */
+  /** Average heart rate, from `run_facts.hr_avg` / `ride_facts.avg_hr`. */
   hrAvg: number;
   /** The prescribed session's own duration, so the card can say which session it is. */
   durationMin: number | null;
+  /**
+   * ⛔ THE COST OF THE SESSION — output per heartbeat, taken from the fact AS STORED and never
+   * re-derived. Run: `run_facts.efficiency_index`, metres per second per beat. Ride:
+   * `ride_facts.efficiency_factor`, normalised power over average heart rate — **TrainingPeaks'
+   * efficiency factor exactly**, which is why it is read rather than recomputed: a second derivation
+   * here would fork the definition from the one the analyser already publishes.
+   * ⚠️ Rising = the engine is doing the same work for less. Null when the session had no HR or no
+   * pace/power to divide by.
+   */
+  efficiency: number | null;
+  /**
+   * ⛔ FADE INSIDE THE SESSION — `hr_drift_pct`, first-half mean HR against second-half, already
+   * computed per session for both sports and never once put against the source's own line.
+   * ⚠️ THE LINE IS p107's AND IT IS TWO NUMBERS, NOT ONE: terminate at 10% drift, **5% when a key
+   * session falls within 24 hours**. The threshold belongs to the surface that states it — this
+   * carries the measurement, and `keySessionWithin24h` says which line applies.
+   */
+  driftPct: number | null;
+  /** ⛔ True when the plan puts a key session inside 24 hours of this one, so p107's tighter 5%
+   *  line is the one that applies. Resolved by the caller off the plan, never guessed from the day. */
+  keySessionWithin24h: boolean;
+}
+
+/** ⛔ p107, read off the page. Ours to STATE, never to re-derive — and two lines, not one. */
+export const DRIFT_LIMITS = {
+  /** Terminate the session at this drift. */
+  standardPct: 10,
+  /** ⛔ The tighter line when a key session falls within 24 hours. */
+  keySessionWithin24hPct: 5,
+  cite: 'Viada p107',
+} as const;
+
+/**
+ * ⛔⛔ THE REFERENCE NUMBER OVER TIME — the endurance twin of the estimated 1RM.
+ *
+ * Every percentage the plan prescribes is a percentage OF this, so this moving IS the improvement.
+ * ⚠️ IT IS A REAL SERIES ONLY WHERE THE APP KEPT ONE. `fitness_baselines` supersedes rather than
+ * overwrites, so bike FTP accumulates a dated trail by construction. Run threshold pace does NOT —
+ * it is a single value in `user_baselines.learned_fitness`, overwritten on every re-learn — so the
+ * run card ships without this row rather than fabricating a line from one number.
+ */
+export interface ReferenceSeries {
+  /** 'ftp' — the metric as `fitness_baselines` names it. */
+  metric: string;
+  unit: string;
+  /** Oldest first. Each entry is a superseded or active baseline row, dated by its source effort. */
+  points: Array<{ date: string; value: number; status: string }>;
 }
 
 export interface NamedSessionSeries {
   /** The family tag this series was gated to, e.g. `run_near_threshold`. Provenance. */
   family: string;
+  /** 'run' | 'ride' — decides which number the card leads with. ⚠️ A rider reads POWER, not heart
+   *  rate, so the ride card leads on efficiency and the run on beats. */
+  sport: string;
   /** The session's name as the plan wrote it. */
   label: string;
   points: NamedSessionPoint[];
+  /** ⛔ Present only where the app kept a history of the reference number — see `ReferenceSeries`.
+   *  Absent on the run, deliberately, and the card says so rather than leaving a gap. */
+  reference?: ReferenceSeries | null;
 }
 
 export interface StateDisplayV1 {
@@ -1013,9 +1066,10 @@ export interface StateDisplayV1 {
   /** Per-discipline rendered anchor (tick + label) for anchored rows. */
   fitnessAnchors: Record<string, FitnessAnchor>;
   cadenceCounts: Record<string, number>;
-  /** ⛔ The repeated named session, when the block has one and it has been logged. Absent otherwise —
-   *  a card with nothing to say does not render, and there is no placeholder. */
-  namedRunSession?: NamedSessionSeries | null;
+  /** ⛔ The repeated named sessions, one per sport, when the block has them and they have been
+   *  logged. Absent otherwise — a card with nothing to say does not render, and there is no
+   *  placeholder. */
+  namedSessions?: NamedSessionSeries[] | null;
 }
 
 export interface StateTrendsV1 {
@@ -1255,7 +1309,7 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       fitnessAnchors: r.fitnessAnchors,
       cadenceCounts: r.cadenceCounts,
       // Passed through verbatim — this assembly neither builds nor judges it.
-      ...(r.namedRunSession ? { namedRunSession: r.namedRunSession } : {}),
+      ...(r.namedSessions && r.namedSessions.length > 0 ? { namedSessions: r.namedSessions } : {}),
     },
     strength: {
       ...disc('strength'),

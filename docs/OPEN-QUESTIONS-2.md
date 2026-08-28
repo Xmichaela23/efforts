@@ -963,3 +963,35 @@ The source's strongest scheduling rule (p131: keystone sessions get the most-rec
 identified counterpart in week-model/resolve.ts score terms. The default frame happens to honor it
 (ME days land straight off the rest day), but nothing appears to *score* it under athlete pins.
 UNVERIFIED — trace before building anything; may be implicitly covered by the clearance costs.
+
+## Q-289 — "Holding" is stated for two different facts, and the payload cannot tell them apart (2026-08-28)
+
+⛔ **THE BRANCH:** `_shared/state-trend/classify.ts:100-107`. When a computed `improving`/`sliding`
+fails to beat `noiseGuardStdev` × the series' own standard deviation, the verdict is rewritten to
+**`holding`**. Nothing records that the guard fired.
+
+So the screen prints **a claim** — "holding" — where the honest answer is *"the movement was smaller
+than this metric's own run-to-run scatter and we cannot separate it."* Those are different facts and
+they want different responses from the athlete. **A genuinely flat metric and a suppressed one are
+indistinguishable on `TrendResult` today**, so no surface can say which it is even if it wanted to.
+
+⚠️ **THREE ROWS SHARE IT**, all passing `noiseGuardStdev`: run decoupling (`run.ts:298`, 1.0) and both
+bike signals — terrain-binned power and efficiency (`bike-fitness.ts:193`, `:237`,
+`BIKE_NOISE_GUARD_STDEV`). The fix belongs at the shared word, not at one call site.
+
+⚠️ **AND IT IS THE EXPECTED STATE ON EASY TRAINING, NOT A FAULT.** Zone-2 running produces small true
+movement against normal day-to-day scatter, so the guard doing its job is the correct outcome. Any
+copy written here must read as a description of the athlete's training, never as a complaint about
+their data. ⛔ **Do not loosen the guard to make a verdict appear** — the guard is right; only the
+explanation is missing.
+
+**WHAT IT WOULD TAKE:** a `noiseSuppressed` flag on `TrendResult`, set at that branch and carried to
+the display contract, plus the copy on every row that prints "holding". ⛔ **Both halves go together
+— carrying the flag without a reader is a field nobody reads**, which is the other disease this
+codebase names.
+
+⚠️ **FOUND WHILE FIXING SOMETHING ELSE**, and deliberately parked: it lands on rows nobody asked to
+touch, and it was found hours before a block rebuild. Not urgent, not cosmetic, and not started.
+⚠️ **RELATED BUT ALREADY CORRECT:** the run efficiency row's own two-reasons split (D-346) is fine —
+`withheld` (too few) and the route engine's interval straddling zero are separate branches with
+separate copy. Only its opening three words were wrong, and those were fixed the same day.

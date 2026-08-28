@@ -25,6 +25,14 @@ import { stateTrendGate } from "./state-trend-gate.ts";
 // ⛔ ONE NAME RESOLVER, NOT A SECOND ONE. The expected curve is keyed by the same canonical name the
 // e1RM series is keyed by, or the two would sit on one chart under different keys.
 import { canonicalize } from "../_shared/canonicalize.ts";
+
+/** One day on, as an ISO date. ⚠️ Noon local so a DST boundary cannot roll the answer a day. */
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 // The block's own rate — 1% every three weeks (Viada p247). The curve states the plan's shape and it
 // must be the rate the plan was BUILT on, never a second opinion.
 import { RATE_ANCHOR } from "../_shared/standing-plan/frames.ts";
@@ -48,6 +56,7 @@ import {
   type PullupProgress,
   type NamedSessionSeries,
   type NamedSessionPoint,
+  type ReferenceSeries,
 } from "../_shared/state-trend/index.ts";
 // Slice 6 — the pull-up progression's clean/assisted split. ⛔ Read from the RAW logged sets; the
 // `exercise_log` aggregate has no `resistance_level` and cannot answer this.
@@ -1134,36 +1143,96 @@ serve(async (req: Request) => {
          * oversight: a set is a measurement, a session is a prescription, and only one of them
          * survives its plan.
          */
-        let namedRunSession: NamedSessionSeries | null = null;
+        let namedSessions: NamedSessionSeries[] = [];
         try {
           // Only worth asking when the block gave us a week map — without it there is no axis.
           if (weekByDate && Object.keys(weekByDate).length > 0) {
-            const { data: runLinkRows } = await supabase
-              .from("workouts").select("date,planned_id")
-              .eq("user_id", userId).in("type", ["run", "running"]).eq("workout_status", "completed")
+            /**
+             * ⛔ ONE FAMILY PER SPORT, NAMED HERE AND NOWHERE ELSE. The run's repeated quality
+             * session and the ride's. Gated on the FAMILY TAG rather than the session's name: the
+             * name is copy and can be rewritten, the tag is the composer's own identifier for which
+             * cell of the book authored the session.
+             */
+            const FAMILIES: Array<{ sport: string; family: string; types: string[]; fallbackLabel: string }> = [
+              { sport: 'run', family: 'family:run_near_threshold', types: ['run', 'running'], fallbackLabel: 'Near-threshold run' },
+              { sport: 'ride', family: 'family:ride_sweet_spot', types: ['ride', 'bike', 'cycling'], fallbackLabel: 'Hard ride' },
+            ];
+
+            /**
+             * ⛔ THE FACTS ARE READ AS STORED, NEVER RE-DERIVED. `run_facts.efficiency_index` is
+             * metres per second per beat; `ride_facts.efficiency_factor` is normalised power over
+             * average heart rate — TrainingPeaks' EF exactly, already published by the analyser. A
+             * second derivation here would fork the definition from the one every other surface uses.
+             */
+            const { data: factRows } = await supabase
+              .from("workout_facts").select("date,discipline,run_facts,ride_facts")
+              .eq("user_id", userId).in("discipline", ["run", "ride"])
               .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
-            const linked = (Array.isArray(runLinkRows) ? runLinkRows : [])
-              .filter((r: any) => typeof r?.planned_id === "string" && r.planned_id.length > 0);
-            const plannedIds = Array.from(new Set(linked.map((r: any) => String(r.planned_id))));
-            if (plannedIds.length > 0) {
-              const { data: plannedRuns } = await supabase
+            const factByDate = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null }>();
+            for (const f of (Array.isArray(factRows) ? factRows : []) as any[]) {
+              const rf = f?.run_facts, bf = f?.ride_facts;
+              const src = rf ?? bf;
+              if (!src) continue;
+              const eff = Number(rf?.efficiency_index ?? bf?.efficiency_factor);
+              const drift = Number(src?.hr_drift_pct);
+              const hr = Number(rf?.hr_avg ?? bf?.avg_hr);
+              factByDate.set(String(f.date).slice(0, 10), {
+                efficiency: Number.isFinite(eff) && eff > 0 ? eff : null,
+                // ⚠️ Drift may legitimately be NEGATIVE (HR fell across the session), so the guard is
+                // finiteness alone. A `> 0` test here would silently drop the best sessions.
+                drift: Number.isFinite(drift) ? drift : null,
+                hr: Number.isFinite(hr) && hr > 0 ? hr : null,
+              });
+            }
+
+            /**
+             * ⛔ WHICH DAYS CARRY A KEY SESSION — p107's tighter 5% line applies when one falls
+             * within 24 hours. Read off the PLAN, never guessed from the weekday: the frame's
+             * rotation decides which days are hard, and it moves with the athlete's pins.
+             */
+            const { data: keyRows } = await supabase
+              .from("planned_workouts").select("date,tags")
+              .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", addDaysIso(asOf, 1));
+            const keyDates = new Set<string>();
+            for (const p2 of (Array.isArray(keyRows) ? keyRows : []) as any[]) {
+              const tags = (Array.isArray(p2?.tags) ? p2.tags : []).map((t: any) => String(t).toLowerCase());
+              /**
+               * ⛔ A KEY SESSION IS ONE OF THE BLOCK'S QUALITY SLOTS OR A BARBELL DAY, AND THAT IS THE
+               * PAGE'S OWN DEFINITION RATHER THAN ours. p107: *"one targeting a system or adaptation
+               * that you're hoping to improve in the current training cycle."*
+               * ⚠️ DO NOT NARROW THIS BACK TO ENDURANCE. In a strength-led block a barbell day is
+               * squarely what that sentence describes — it is the adaptation the cycle exists for.
+               * An easy run the next morning is not, which is the whole reason the 5% line is
+               * tighter than the 10% one.
+               */
+              const isKey = tags.some((t: string) => /family:(run_near_threshold|run_sprint|ride_sweet_spot|ride_vo2|ride_anaerobic)/.test(t))
+                || tags.includes('strength');
+              if (isKey) keyDates.add(String(p2.date).slice(0, 10));
+            }
+
+            for (const fam of FAMILIES) {
+              const { data: linkRows } = await supabase
+                .from("workouts").select("date,planned_id")
+                .eq("user_id", userId).in("type", fam.types).eq("workout_status", "completed")
+                .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
+              const linked = (Array.isArray(linkRows) ? linkRows : [])
+                .filter((r: any) => typeof r?.planned_id === "string" && r.planned_id.length > 0);
+              const plannedIds = Array.from(new Set(linked.map((r: any) => String(r.planned_id))));
+              if (plannedIds.length === 0) continue;
+              const { data: plannedRows2 } = await supabase
                 .from("planned_workouts").select("id,name,tags,duration").in("id", plannedIds);
-              const NEAR_THRESHOLD = "family:run_near_threshold";
               const byId = new Map<string, { label: string; durationMin: number | null }>();
-              for (const p of (Array.isArray(plannedRuns) ? plannedRuns : [])) {
-                const tags = (Array.isArray((p as any)?.tags) ? (p as any).tags : []).map((t: any) => String(t).toLowerCase());
-                // ⚠️ Gated on the FAMILY tag, not on the session's name. The name is copy and can be
-                // rewritten; the tag is the composer's own identifier for which cell of the book
-                // authored the session.
-                if (!tags.includes(NEAR_THRESHOLD)) continue;
-                const dur = Number((p as any)?.duration);
-                byId.set(String((p as any).id), {
-                  label: String((p as any)?.name || "Near-threshold run"),
+              for (const p2 of (Array.isArray(plannedRows2) ? plannedRows2 : []) as any[]) {
+                const tags = (Array.isArray(p2?.tags) ? p2.tags : []).map((t: any) => String(t).toLowerCase());
+                if (!tags.includes(fam.family)) continue;
+                const dur = Number(p2?.duration);
+                byId.set(String(p2.id), {
+                  label: String(p2?.name || fam.fallbackLabel),
                   durationMin: Number.isFinite(dur) && dur > 0 ? Math.round(dur) : null,
                 });
               }
               const points: NamedSessionPoint[] = [];
-              let label = "Near-threshold run";
+              let label = fam.fallbackLabel;
               for (const r of linked) {
                 const hit = byId.get(String(r.planned_id));
                 if (!hit) continue;
@@ -1172,22 +1241,62 @@ serve(async (req: Request) => {
                 // ⚠️ Outside the block → no week → not emitted. Same rule as the lift line: a session
                 // from a previous block is not week 1 of this one.
                 if (!Number.isFinite(week)) continue;
-                const hr = runHrByDate.get(date);
-                // ⚠️ NO HEART RATE, NO POINT. The card is a heart-rate line; a session logged without
-                // one has nothing to plot and inventing a zero would draw a crash.
-                if (!Number.isFinite(hr as number) || (hr as number) <= 0) continue;
+                const f = factByDate.get(date);
+                const hr = f?.hr ?? null;
+                // ⚠️ A POINT NEEDS SOMETHING TO PLOT. No heart rate and no efficiency is a session we
+                // measured nothing on; inventing a zero would draw a crash.
+                if (hr == null && f?.efficiency == null) continue;
                 label = hit.label;
-                points.push({ week, date, hrAvg: Math.round(hr as number), durationMin: hit.durationMin });
+                points.push({
+                  week,
+                  date,
+                  hrAvg: hr != null ? Math.round(hr) : 0,
+                  durationMin: hit.durationMin,
+                  efficiency: f?.efficiency ?? null,
+                  driftPct: f?.drift ?? null,
+                  keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
+                });
               }
               points.sort((a, b) => a.week - b.week || a.date.localeCompare(b.date));
-              if (points.length > 0) {
-                namedRunSession = { family: "run_near_threshold", label, points };
+              if (points.length === 0) continue;
+
+              /**
+               * ⛔ THE REFERENCE NUMBER, AND ONLY WHERE THE APP KEPT ONE. `fitness_baselines`
+               * supersedes rather than overwrites, so bike FTP accumulates a dated trail by
+               * construction — six readings over six weeks on this athlete, 176 → 153 → 168.
+               * ⚠️ THE RUN HAS NO EQUIVALENT AND GETS NO ROW. Its threshold pace is a single value in
+               * `user_baselines.learned_fitness`, overwritten on every re-learn; the previous number
+               * is gone. The card says so rather than drawing a line from one point. Storing it as a
+               * superseding baseline is the right fix and is deliberately NOT smuggled in here — it
+               * changes what `learn-fitness-profile` writes, which reaches every surface reading a pace.
+               */
+              let reference: ReferenceSeries | null = null;
+              if (fam.sport === 'ride') {
+                try {
+                  const { data: base } = await supabase
+                    .from("fitness_baselines").select("value,source_date,created_at,status")
+                    .eq("user_id", userId).eq("discipline", "bike").eq("metric", "ftp")
+                    .order("source_date", { ascending: true });
+                  const pts = (Array.isArray(base) ? base : [])
+                    .map((b: any) => ({
+                      date: String(b?.source_date || b?.created_at || "").slice(0, 10),
+                      value: Number(b?.value),
+                      status: String(b?.status || "provisional"),
+                    }))
+                    .filter((b) => b.date.length === 10 && Number.isFinite(b.value) && b.value > 0);
+                  // ⚠️ TWO POINTS IS NOT A LINE. One reading is the current number, which the card
+                  // already has elsewhere; the row earns its place only once it can show movement.
+                  if (pts.length >= 2) reference = { metric: 'ftp', unit: 'W', points: pts };
+                } catch (e: any) {
+                  console.log("[compute-snapshot] ftp baseline series failed (non-fatal):", e?.message || e);
+                }
               }
+              namedSessions.push({ family: fam.family.replace('family:', ''), sport: fam.sport, label, points, reference });
             }
           }
         } catch (e: any) {
-          // Non-fatal: no series → the card does not render → exactly today's screen.
-          console.log("[compute-snapshot] named run session join failed (non-fatal):", e?.message || e);
+          // Non-fatal: no series → the cards do not render → exactly today's screen.
+          console.log("[compute-snapshot] named session join failed (non-fatal):", e?.message || e);
         }
 
         // ⛔ WHICH DAYS MEASURED SOMETHING. Written by compute-facts onto `strength_facts.measured`
@@ -1419,7 +1528,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedRunSession, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

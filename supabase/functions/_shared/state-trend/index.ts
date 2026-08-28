@@ -110,6 +110,8 @@ export {
   type StateDisplayV1,
   type NamedSessionSeries,
   type NamedSessionPoint,
+  type ReferenceSeries,
+  DRIFT_LIMITS,
   type DisciplineTrendCache,
   type ExerciseLogLite,
 } from './assemble.ts';

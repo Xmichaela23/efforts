@@ -1171,7 +1171,21 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           // threshold that no longer decides anything, which is how a screen starts lying quietly.
           eff.route
             ? <span className="text-white/60 text-[12px]">
-                Too soon to tell — reading {eff.route.points} runs, the trend isn't separated from the noise yet
+                {/* ⛔ THE FIRST THREE WORDS CARRIED THE OPPOSITE MEANING TO THE REST OF THE SENTENCE
+                    (2026-08-28, Michael reading his own screen: *"I'm just still seeing that not
+                    enough runs thing"*). It opened "Too soon to tell" — which is the wait-for-more-
+                    data complaint — and then said the runs are there and the movement is inside the
+                    scatter. He read the opening. This branch means the athlete has PLENTY of runs, so
+                    the sentence now leads with the count.
+                    ⚠️ AND IT IS NOT A FAULT TO REPORT. On easy training this is the EXPECTED state:
+                    zone-2 running produces small true movement against normal day-to-day variation,
+                    so the guard withholding a direction is the correct outcome. The line describes
+                    the training, never the data. ⛔ Do not reintroduce "too soon", "not yet" or "need
+                    more" here — the other branch below is the one that means those things.
+                    ⚠️ SEE Q-289 for the larger version of this, still open: when the noise guard
+                    fires elsewhere the screen says "holding", which is a CLAIM, and nothing on the
+                    payload records that it was suppressed. */}
+                Reading {eff.route.points} runs — the change is smaller than the normal spread between them
               </span>
             : <span className="text-white/60 text-[12px]">Need a few more runs — {eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read a trend</span>
         )}
