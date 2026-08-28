@@ -1028,6 +1028,13 @@ populating on its own. That changes whether it is worth storing history, not whe
 ⛔ RAISED DELIBERATELY RATHER THAN BUILT: it changes what a learner writes, which reaches every
 surface that reads a pace, and it must not ride in on a card. See also [[Q-289]].
 
+⛔⛔⛔ **PROMOTED AGAIN 2026-08-28 (later): IT IS NOW THE MISSING HALF OF A CARD, NOT A MISSING ROW.**
+Michael ruled the endurance read **athlete-scoped, not plan-scoped** — a lift is prescribed so the
+plan is the right frame, a run is not. Under that model the reference number climbing is the PRIMARY
+row, and on a race plan it is the only honest read (a periodised block has no repeated session to
+compare). **The ride has that number and the run does not**, so an athlete-scoped run card is silent
+on exactly the quantity the block exists to move. See [[Q-291]], [[Q-292]].
+
 ⛔⛔ **AND ITS WEIGHT IS HIGHER THAN THE STANDING-PLAN CASE SUGGESTS — see [[Q-292]].** On a standing
 plan this is one missing row. **On a RACE plan it is the whole card**: a periodised block has no
 repeated session to compare, so the reference number climbing across the block is the only honest
@@ -1081,3 +1088,24 @@ and it is the honest one for that plan type.
 ⛔⛔ **WHICH PROMOTES [[Q-290]].** On a standing plan the run's missing threshold-pace history is a
 gap in one row. **On a race plan it is the whole card.** Weigh Q-290 on that basis, not on the
 standing-plan case alone.
+
+
+## Q-293 — Bike efficiency has a verdict and no series; the run has both (2026-08-28)
+
+⛔ **`computeEfficiencyTrend` (`bike-fitness.ts:233`) returns a verdict, `pctChange` and a
+`recentValue` — and NO dated points.** `bikePowerChartSeries` exists beside it and its own comment
+says *"Populated only for the POWER signal."* So the bike's cost-per-session read has a number and a
+direction with nothing to draw, while the run's equivalent (`runFitness.efficiency.series`,
+`assemble.ts:548`) has had an 84-day dated series since D-346.
+
+⚠️ **IT ONLY MATTERS NOW BECAUSE THE ENDURANCE READ WENT ATHLETE-SCOPED** — see [[Q-291]]. Under the
+plan-scoped version the ride's efficiency came from the repeated-session join and did not need this;
+athlete-scoped, the card wants the same 12-week line the run already has.
+
+⛔ **THE FIX IS A MIRROR OF THE POWER BUILDER OVER THE SAME `hrAtBand` POINTS THE VERDICT ALREADY
+READS — never a fresh pass over the rides.** Chart and verdict on different data is the exact failure
+D-346 was written about, and this row would be the second instance.
+
+⚠️ **ALSO ABSENT FOR BOTH SPORTS: drift as a SERIES.** `RunFitness.decoupling` publishes verdict,
+band, range and `recentPct` but no points, and the ride has no drift signal on the contract at all.
+The trend computes the points internally; they are simply never carried out.
