@@ -16,7 +16,8 @@
 
 import {
   prescribe,
-  REST_BETWEEN_SETS_NOT_STATED,
+  REST_BETWEEN_SETS_RULE,
+  REST_BETWEEN_SETS_RULE_HYP,
   RIR_NOTE,
   type Prescription,
   type ViadaIntent,
@@ -382,7 +383,15 @@ export function resolveSlot(req: SlotRequest): ResolvedSlot {
   const def = CATEGORY_DEFINITION[req.category];
   notes.unshift({ kind: 'source', text: def.text, cite: def.cite });
   notes.push({ kind: 'source', text: prescription.cite === undefined ? '' : RIR_NOTE, cite: 'Viada p219' });
-  notes.push({ kind: 'gap', text: REST_BETWEEN_SETS_NOT_STATED, cite: 'Viada — not stated' });
+  // ⛔ REST IS SOURCED, AND IT IS TWO DIFFERENT ANSWERS. p78 for strength (nearly full recovery,
+  // no accumulating fatigue), p84 for hypertrophy (the drop-off IS the stimulus). This note was a
+  // `gap` until 2026-08-27, asserting the book gave no rest guidance — see `intents.ts` for what
+  // that assertion was and why it was wrong. ⚠️ Neither page gives minutes; a clock is still ours.
+  notes.push(
+    req.intent === 'HYP'
+      ? { kind: 'source', text: REST_BETWEEN_SETS_RULE_HYP, cite: 'Viada p84' }
+      : { kind: 'source', text: REST_BETWEEN_SETS_RULE, cite: 'Viada p78' },
+  );
   if (prescription.kind === 'barbell' && prescription.setsBand.lo !== prescription.setsBand.hi) {
     notes.push({
       kind: 'gap',

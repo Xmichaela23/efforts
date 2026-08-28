@@ -336,17 +336,38 @@ Deno.test('carries reuse the four names and mean different things by them', () =
   assert(barbellMe.kind === 'barbell' && 'reps' in barbellMe);
 });
 
+Deno.test('rest between sets is HIS rule, on both sides, and never a number', () => {
+  // ⛔ REGRESSION, 2026-08-27. This assertion used to demand a `gap` note saying the book gives no
+  // rest guidance. It does: p78 has a section titled "Rest Periods". The gap was ours — p78 sat in
+  // the unread half of the pp.69-131 re-shoot — and the constant asserting otherwise shipped.
+  const strength = resolveSlot({ intent: 'ME', category: 'secondary', pattern: 'push_upper', equipment: null });
+  const restStrength = strength.notes.find((n) => n.text.includes('cool down'));
+  assert(restStrength, 'no note carrying p78\'s rest rule');
+  assertEquals(restStrength!.kind, 'source', 'p78 is a source, not a gap');
+  assertEquals(restStrength!.cite, 'Viada p78');
+
+  // ⛔ AND THE OPPOSITE ANSWER FOR HYP — p84. Stamping the strength rule here quotes him against
+  // himself: the drop-off in capacity IS the hypertrophy stimulus.
+  const hyp = resolveSlot({ intent: 'HYP', category: 'secondary', pattern: 'push_upper', equipment: null });
+  const restHyp = hyp.notes.find((n) => n.text.includes('part of the '));
+  assert(restHyp, 'no note carrying p84\'s hypertrophy exception');
+  assertEquals(restHyp!.cite, 'Viada p84');
+  assert(!hyp.notes.some((n) => n.text.includes('cool down')),
+    'the strength rest rule leaked onto a hypertrophy slot');
+
+  // ⛔ HE GIVES NO MINUTES ON EITHER PAGE. Any clock a surface shows is ours and says so there.
+  for (const n of [restStrength!, restHyp!]) {
+    assert(!/\b\d+\s*(s|sec|second|min|minute)/.test(n.text), 'the rest note supplied a number');
+  }
+});
+
 Deno.test('the gaps he leaves are named, not filled', () => {
   const r = resolveSlot({ intent: 'ME', category: 'secondary', pattern: 'push_upper', equipment: null });
-  // Rest between sets — gap #10.
-  const rest = r.notes.find((n) => n.kind === 'gap' && n.text.includes('rest interval'));
-  assert(rest, 'no note saying the rest interval is unstated');
-  assert(!/\b\d+\s*(s|sec|second|min|minute)/.test(rest!.text.replace(/6-8 minutes/, '')),
-    'the rest note supplied a number');
   // The 1-to-3-sets band — gap #11.
   assert(r.notes.some((n) => n.kind === 'gap' && n.text.includes('progressing well')),
     'no note saying when the set count may rise');
-  // And no prescription anywhere carries a rest field.
+  // And no prescription anywhere carries a rest field. p78 is a readiness rule, not a duration —
+  // there is still no number to put in one.
   assert(!('restSeconds' in (r.prescription as Record<string, unknown>)),
     'a prescription grew a rest interval the source never gave');
 });

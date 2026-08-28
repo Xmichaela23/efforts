@@ -175,13 +175,43 @@ export function setsFor(band: Range, position?: number): number {
 }
 
 /**
- * ⛔ REST BETWEEN SETS IS NOT STATED, AND IS NOT SUPPLIED. Gap #10 of the twelve. The one rest
- * figure in the book is 6-8 minutes for the PAP protocol (Ch.4), which is a different protocol and
- * does not generalise. A `restSeconds` field on these prescriptions would be a number nobody wrote.
+ * ⛔ REST BETWEEN SETS **IS** STATED — AS A RULE, NOT A NUMBER. p78, section "Rest Periods".
+ *
+ * ⚠️ **THIS REPLACES A CONSTANT THAT ASSERTED THE OPPOSITE.** Until 2026-08-27 this file shipped
+ * `REST_BETWEEN_SETS_NOT_STATED`, which called this "gap #10 of the twelve" and named the 6-8
+ * minute PAP figure as the book's only rest guidance. **That was false.** p78 was in the
+ * unread half of the pp.69-131 re-shoot; it was read on 2026-08-27 and it carries a whole
+ * section on the question. Part G item 6 and `SOURCE-viada-hybrid-athlete.md` §B4d record it.
+ *
+ * > *"Therefore, if you're interested in maximizing strength, you should focus on movement quality
+ * > and generally avoid excessive fatigue. Rest periods between sets should be sufficient to allow
+ * > nearly full recovery (though not so long as to allow you to cool down), and sets should stop
+ * > well before failure, with several reps in reserve."*
+ * > *"…Overall, true strength sessions should have very little accumulating fatigue. In other
+ * > words, hit the next set when you know you can complete it without getting crushed."*
+ *
+ * ⛔ **HE GIVES NO MINUTES, ANYWHERE.** The rule is a readiness condition, not a duration. Any
+ * clock a surface shows is OURS and must be labelled OURS — this constant supplies the rule the
+ * clock is serving, and nothing here may be read as sanctioning a number.
+ *
+ * ⚠️ **AND IT IS A STRENGTH RULE ONLY.** p84 states the opposite for hypertrophy: *"Strength and
+ * power training typically dictate that this point of reduced capacity represents the end of a
+ * productive session, but in hypertrophy training, this may well be a crucial part of the training
+ * session itself!"* A caller stamping this on a HYP slot is quoting him against himself.
  */
-export const REST_BETWEEN_SETS_NOT_STATED =
-  'The source gives no rest interval for these sets. The only rest figure in the book is the 6-8 '
-  + 'minutes the PAP protocol calls for, which belongs to that protocol and not to this table.';
+export const REST_BETWEEN_SETS_RULE =
+  'Rest until you are nearly recovered, but not so long that you cool down. Take the next set when '
+  + 'you know you can finish it without getting crushed — a strength session should not accumulate '
+  + 'fatigue. The source gives this as a rule and no number of minutes.';
+
+/**
+ * The same question for HYP, which p84 answers in the opposite direction. Kept separate so no
+ * caller can stamp the strength rule on a hypertrophy slot by accident.
+ */
+export const REST_BETWEEN_SETS_RULE_HYP =
+  'Muscle-building work is the exception: the point where capacity drops off is part of the '
+  + 'stimulus rather than the end of the session, so it does not need the same near-full recovery '
+  + 'between sets. The source gives this as a rule and no number of minutes.';
 
 /** RIR, defined on p219 — carried so a surface can explain the number rather than just print it. */
 export const RIR_NOTE =

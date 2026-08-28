@@ -340,7 +340,7 @@ Stated so nobody fills them quietly. **Five block the build.**
 | 7 | **The All Rounder's keystones** | He names them for Fondo and Crit, not this one. We pick; say so. |
 | 8 | **Strength progression for this program** | He says only "adjust your 1RM as you improve". **Wendler fills it — a stated graft.** |
 | 9 | **Warm-up sets for lifting** | Wendler's 40/50/60. Cite him. |
-| 10 | **Rest between sets** | Not stated except 6–8 min for PAP. |
+| 10 | **Rest between sets** | ✅ **CLOSED 2026-08-27 — IT WAS NEVER A GAP.** p78 has a section titled "Rest Periods": rest to nearly full recovery but not so long you cool down; take the next set when you know you can finish it without getting crushed; a strength session should carry very little accumulating fatigue. p84 states the opposite for hypertrophy. ⚠️ **It is a rule, not a number — he gives no minutes, so any clock stays OURS.** See `SOURCE-viada-hybrid-athlete.md` §B4d. |
 | 11 | **When "1 to 3 sets" becomes 2 or 3** | "Start low, go up if progressing well with recovery to spare." No rule. |
 | 12 | **How often to re-estimate threshold** | ⛔ **UNANSWERED, and it is his stated progression mechanism for this plan** (p275: adjust intensity and threshold, never level). **Ask Michael.** |
 

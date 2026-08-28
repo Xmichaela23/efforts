@@ -291,10 +291,25 @@ export const INTENSITY_STARTS_LOW_IS_OURS =
  * ⛔ WHY A LADDER EXISTS AT ALL, AND IT IS A DOSE THE PLAN WAS MISSING.
  *
  * `setsFor` returns the low end of every band unless a caller says otherwise, and nothing ever did —
- * so every ME slot prescribed **one** set of 1-5 for all twelve weeks. p084's own dose for maximal
- * work is **4 to 6 reps above 90% per movement pattern per week**; a single set of one to five reps
- * sits at or below that floor permanently, and no amount of progression moves it, because the thing
- * that is short is the SET COUNT and nothing in the engine could ever change it.
+ * so every ME slot prescribed **one** set of 1-5 for all twelve weeks. His own dose for maximal work
+ * is **4 to 6 reps over 90% per movement pattern per week**; a single set of one to five reps sits at
+ * or below that floor permanently, and no amount of progression moves it, because the thing that is
+ * short is the SET COUNT and nothing in the engine could ever change it.
+ *
+ * ⚠️ **THE PAGE IS p80, NOT p84 — CORRECTED 2026-08-27.** This comment cited "p084" from the day it
+ * was written. p84 is "Volume and Hypertrophy" and carries no such figure; the 4-to-6 dose is in p80's
+ * *"How Much Strength Work Do You Need?"*, read off the photograph 2026-08-27 and recorded in
+ * `SOURCE-viada-hybrid-athlete.md` §B4d.
+ *
+ * ⛔ **AND THE SAME SENTENCE IS A CEILING AS WELL AS A FLOOR, WHICH NOTHING HERE ENFORCES.** p80:
+ * *"For a given movement pattern, 4 to 6 repetitions over 90 percent and 15 to 20 velocity-focused
+ * repetitions per week (between 70 percent and 85 percent) may be sufficient for consistent progress
+ * at most levels, with more advanced athletes benefiting from more."* Each pattern carries one ME
+ * slot **every** week of the frame (the lower rotation swaps the two patterns' roles, not their
+ * presence), so a fully ramped pattern prescribes three sets across a 1-5 rep range — **3 to 15 reps
+ * at 90%, against his 4 to 6.** ⚠️ **RAISED, NOT RULED ON. The band is deliberately unchanged**; his
+ * own "more advanced athletes benefiting from more" is the clause that would settle it, and nobody
+ * has decided whether this athlete is that.
  *
  * ⛔ HIS RANGE IS 1-3 SETS (p218) AND HIS CONDITION IS IN WORDS: *"increasing only if the athlete is
  * finding that they are progressing well and seem to have recovery to spare."* That is gap #11 of

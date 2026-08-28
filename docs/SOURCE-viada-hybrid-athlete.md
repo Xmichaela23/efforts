@@ -31,7 +31,7 @@ room** and without re-photographing it.
 | **A — strength grid** (pp.218–227) | transcribed with the page images open | ✅ high |
 | **D — endurance library** (pp.229–241) | transcribed with the page images open | ✅ high, but long and dense — **spot-check a session before coding it as a constant** |
 | **E — All Rounder week + notes** (pp.274–275) | transcribed with the page images open; the week table re-verified against `p274.jpg` | ✅ high |
-| **B — Ch.4 dosing** (pp.69–125) | ⚠️ earlier-session notes, **part-corrected against the 2026-08-26 re-shoot** | ⚠️ **MIXED.** Eleven pages now read off the photographs — see **B4b** for what is confirmed and what is corrected. Everything else is still one generation removed. |
+| **B — Ch.4 dosing** (pp.69–125) | ⚠️ earlier-session notes, **part-corrected against the 2026-08-26 re-shoot and the 2026-08-27 second pass** | ⚠️ **MIXED.** Twenty-two pages now read off the photographs — **B4b** (eleven, the endurance-side pages) and **B4d** (eleven, the strength half, pp.71–90). ⛔ **B4d falsified a shipped constant.** Everything named in neither is still one generation removed. |
 | **C — week assembly** (pp.128–151) | ⚠️ same — earlier-session notes | ⚠️ one generation removed, **and incomplete: six items are recorded under a heading that says nine.** |
 
 ## ⛔ THE PAGE IMAGES — the ground truth
@@ -326,9 +326,11 @@ each: image number − 3568 = page). ⚠️ **THE SHOOT OVERRUNS PART B.** It ru
 Ch.4 (Part B) *and* the opening of Ch.5 — pp.128–131, which is **PART C's** territory. The folder is
 named for endurance; the pages are the whole programming chapter.
 
-⚠️ **THIS SECTION RECORDS ONLY THE PAGES READ SO FAR — 69, 70, 92, 98, 103, 107, 116, 120, 122, 123,
-131.** The remaining ~51 frames are photographed and unread. **Part B's provenance downgrade in Part
-G item 6 therefore still stands for every number not named below.**
+⚠️ **THIS SECTION RECORDS ONLY THE PAGES THIS PASS READ — 69, 70, 92, 98, 103, 107, 116, 120, 122,
+123, 131.** ✅ **A SECOND PASS ON 2026-08-27 READ ELEVEN MORE — pp.72, 76, 77, 78, 80, 84, 85, 87, 88,
+89, 90 — and they are in §B4d, not here.** ⛔ **That pass falsified a shipped constant**: p78 has a
+section titled "Rest Periods", and we shipped code asserting the book gave none. **Part B's
+provenance downgrade in Part G item 6 still stands for every number named in neither section.**
 
 ### ⛔⛔ "THE CIRCLE OF MAXES" — p123. GAP G-8 IS ANSWERED, AND IT CHANGES A LABEL WE SHIPPED.
 
@@ -434,8 +436,182 @@ impossible)"* — the example leaves *"about 2 reps in reserve."*
 The five accounting buckets, the 10%-per-week change rule, the "back off all buckets equally"
 instruction, the weekly floor (one speed / one subthreshold / remainder VT1), the 6–8h two-a-day
 spacing, the 4–6h post-VT1 spacing, the ~1/3 maintenance figure, and the 2h VT1 session ceiling.
-**All still carry Part B's one-generation-removed provenance.** They are likely in the ~51 unread
-frames; they are not in the eleven pages read.
+**All still carry Part B's one-generation-removed provenance.** They are in neither the eleven pages
+this pass read nor the eleven §B4d read on 2026-08-27; they are likely in the ~40 frames still
+unread, which are almost all pp.91–131, the endurance half.
+
+## ⛔ B4d. THE RE-SHOOT, SECOND PASS — pp.71–90, read off the photographs 2026-08-27
+
+**Same shoot as B4b** (`~/Downloads/Endurance period/`, IMG_3637–3698 — ⚠️ **these frames are in
+Downloads, not `book-sources/`**). This pass read the strength half of Ch.4, which B4b had left
+unread: **pp.72, 76, 77, 78, 80, 84, 85, 87, 88, 89, 90.**
+
+⚠️ **PROVENANCE — the same as B4b, one notch better on page numbers.** Read off the photographs,
+not the printed book; but **every page number below was read off the printed page itself**, not
+computed from the filename. That matters because B4c records the `IMG − 3568 = page` formula drifting
+past p109. It holds across this range, and the pages confirm it.
+
+⛔ **THIS PASS FALSIFIED SOMETHING WE SHIPPED.** See the first entry.
+
+### ⛔⛔ p78 — "REST PERIODS". THE SECTION WE SHIPPED A CONSTANT SAYING DID NOT EXIST.
+
+`strength-grid/intents.ts` shipped `REST_BETWEEN_SETS_NOT_STATED` — *"The source gives no rest
+interval for these sets"* — and gap #10 of the twelve said the same. **p78 carries a section titled
+"Rest Periods".** Both are corrected as of 2026-08-27.
+
+> *"For strength training, you're primarily concerned with the ability to generate productive force
+> in a given movement pattern. Fatigue is the enemy; as the muscles begin to become fatigued, the
+> fast-twitch muscle fibers (larger motor units) begin to contribute less to the movement."*
+
+> *"Therefore, if you're interested in maximizing strength, you should focus on movement quality and
+> generally avoid excessive fatigue. **Rest periods between sets should be sufficient to allow nearly
+> full recovery (though not so long as to allow you to cool down), and sets should stop well before
+> failure, with several reps in reserve.**"*
+
+> *"Developing the ability to "grind" under heavy weights may be an asset, but it should represent a
+> small portion of training. Overall, true strength sessions should have very little accumulating
+> fatigue. **In other words, hit the next set when you know you can complete it without getting
+> crushed.**"*
+
+⛔ **IT IS A RULE, NOT A NUMBER. HE GIVES NO MINUTES, HERE OR ANYWHERE.** Any clock a surface shows
+is OURS and must be labelled OURS. What this page supplies is the condition the clock is standing in
+for — a readiness test, not a duration.
+
+### ⛔⛔ p84 — AND HYPERTROPHY GETS THE OPPOSITE RULE
+
+> *"Strength and power training typically dictate that this point of reduced capacity represents the
+> end of a productive session, but **in hypertrophy training, this may well be a crucial part of the
+> training session itself!**"*
+
+⛔ **THE TWO PAGES DISAGREE ON PURPOSE.** p78's avoid-fatigue rule is a *strength* rule. A surface
+that stamps it on a HYP slot is quoting him against himself. This is the same inversion already
+recorded in the p226 carry table, where SKILL's fatigue is `avoid` and HYP's is `target`.
+
+### ⛔⛔ p80 — "HOW MUCH STRENGTH WORK DO YOU NEED?" A FULLY QUANTIFIED DOSE WE DID NOT HAVE
+
+- **Minimal effective dose:** *"at least one session every eight to nine days to get any consistent
+  improvement in a specific skill movement."*
+- **The ME/DE weekly rotation, as a principle** — and until 2026-08-27 our code cited only p247's
+  program-specific instance:
+  > *"I recommend that every strength movement be ideally trained at least twice per week, or once
+  > every three to four days, with at least one day focused on heavy/near-maximum lifting (lower
+  > repetitions over 90 percent) and one day focused on velocity."*
+- **Session volume:** *"Total volume per session may not be tremendously high."*
+- ⚠️ **THE WEEKLY CAP, WHICH WE DO NOT ENFORCE:**
+  > *"For a given movement pattern, 4 to 6 repetitions over 90 percent and 15 to 20 velocity-focused
+  > repetitions per week (between 70 percent and 85 percent) may be sufficient for consistent
+  > progress at most levels, with more advanced athletes benefiting from more."*
+- **If more is tolerated:** *"I recommend adding speed/proficiency/skill work sets in a 3:1 ratio to
+  heavier sets (of 1 to 3 repetitions) with over 90 percent effort."*
+
+⚠️ **OPEN AGAINST OUR ME RAMP.** The ME slot ramps 1→3 sets at a 1–5 rep band, so a fully ramped week
+can exceed 4–6 reps over 90 percent for one pattern. **Raised, not resolved — the band is unchanged
+and nothing here may be used to change it without a ruling.**
+
+### ⛔ p72 — TRAINING TO FAILURE, AND WHERE ME/DE COMES FROM
+
+> *"Training to failure is neither required nor terribly productive if the goal is increasing
+> strength."*
+
+- Training for strength *"focuses on quality of movement and expression of maximum force/velocity."*
+- *"There's considerable overlap between rate of force production and the force curve, but these two
+  things are not the same."*
+- **The vocabulary is Westside's, and he says so:** *"Westside-style conjugate training was an early
+  influence on me, and many principles taken from this system proved instrumental in early hybrid
+  programming."* Its dual emphasis: (a) velocity / rate of force production, and (b) *"engaging in a
+  variety of movements **related** to the primary lifts."*
+
+### ⛔ p76 — THE PULL-QUOTE, HIS EMPHASIS
+
+> *"When you perform a strength movement, generally speaking, **every rep either improves movement
+> quality or degrades it!**"*
+
+⚠️ Set as a display pull-quote on the page, not body text. ⛔ **It carries no percentage and no
+load**, which makes it the one strength cue in this corpus that stays true on a bodyweight row.
+
+### ⛔ p77 — "DYNAMIC EFFORT AND MAXIMUM EFFORT": GO IN FRESH
+
+> *"The primary takeaways are that in hybrid programs aimed at strength, ensuring that you are
+> minimally fatigued prior to and during strength movement practice can be crucial because high
+> fatigue can impair proper motor unit recruitment. In fact, it can lead you to learn improper
+> coordination patterns and expressions of force output. To put it another way, if you're tired, you
+> move slowly, lift slowly, and may not engage the very motor units you're supposedly learning to
+> recruit and coordinate. This is not always a detriment, but you should nevertheless ensure that you
+> perform a certain portion of your strength training at a high level of specific readiness!"*
+
+### ⛔ p78 — HIS ME AND DE DEFINITIONS, WHICH ARE NOT p219'S
+
+⚠️ **A SECOND DEFINITION OF THE SAME TWO WORDS.** Part A1 carries p219's abbreviations table. p78
+defines them by *purpose*, and the purposes are what a cue should be built from:
+
+- **Dynamic effort** — *"allows for higher volumes of coordination development work without the same
+  orthopedic and psychological stress of heavy weights."*
+- **Maximum effort** — *"often involves rotating lifts that may train certain sport-related patterns
+  of motor unit recruitment without necessarily stressing all the muscle groups involved in a major
+  lift (for example, wide-stance good mornings as opposed to squats — training similar hip hinge with
+  less quadriceps fatigue)."*
+
+### ⛔ p85 — THE CYCLIST WHO ALSO WANTS MUSCLE. OUR CUSTOMER, NAMED.
+
+> *"If you're cycling as well as training for muscle gain, you may find that training your legs with
+> high intensity and volume in the weight room twice per week leaves you few days when you can do
+> productive bike work. Consequently, the hypertrophy work must be far more conservative."*
+
+> *"…many hybrid "hypertrophy" programs focus on more single-joint movements for hypertrophy, and
+> train compound movements in almost exclusively strength-based rep ranges."*
+
+⚠️ Same page, on volume: *"Few athletes can perform multiple consecutive sets to true failure with a
+given muscle group, so many studies that cite high numbers of failure sets per week can likely be
+discarded as being of questionable veracity."*
+
+### ⛔ pp.87–88 — PLYOMETRICS ARE NOT OPTIONAL
+
+> *"In my opinion, plyometrics are an absolute game changer in hybrid programs. **They must be
+> included in hybrid programs**"* — because they play a vital role in movement efficiency/economy;
+aid injury reduction (balance and control reduce chronic and acute improper loading); benefit agility
+and general physical preparedness; **have a relatively low recovery cost**; and can be incorporated
+into training sessions easily.
+
+**Placement (p88):** *"they can be their own training session, used as a warm-up before sprint work
+or speed work, or done before high-skill resistance training sessions."* And: *"finding ways to work
+various plyometric and agility drills into as many sessions as possible, allowing for a high
+aggregate training volume to be done with minimal interference with the rest of the program."*
+
+Also p88: *"Plyometric drills are also useful in that they can play a strong role as both a
+preparatory and a stimulatory movement."* And plyos *"can help even loaded movements and carries"*
+return large benefits for *"a relatively insignificant time commitment."*
+
+### ⛔ p89 — "BUILDING TO PLYOS": A PROGRESSION LADDER WE DO NOT IMPLEMENT
+
+> *"Plyometrics can range from simple to highly complex. A simple jump is a plyometric movement that
+> most people should be capable of performing, but for many athletes, more advanced movements like
+> bounding and lateral hopping may be challenging. As such, **I typically introduce an athlete to
+> plyometrics via a combination of foot-speed drills and static plyometrics.**"*
+
+The ladder, in his order:
+
+1. **Foot-speed drills** — agility ladders, *"stepping through rapidly in given patterns"*. ⚠️ They do
+   not build agility; they build familiarity with the body's position in space. *"Rapid precise foot
+   movement and placement are precursors to proper jumping and bounding."*
+2. **Static plyometrics** — single-legged hopping in place, side to side over a line, box in-outs.
+   ⚠️ **These differ from foot-speed drills in that the centre of gravity moves up and down rapidly**,
+   whereas foot-speed drills involve slow movement/migration of the centre of gravity.
+3. **Balance** — *static* (hold a position against perturbation) and *dynamic* (control the centre of
+   gravity in a precise direction, with full control over continued movement and redirection: *"can
+   you jump from point to point without needing to stop and balance or reorient?"*). ⚠️ He is explicit
+   that **static balance is not necessarily a precursor to dynamic balance** — standing on one leg all
+   day *"won't necessarily improve your ability to jump from one foot to the other."*
+4. **Conventional dynamic plyometrics** — *"With these skills mastered (which can be taught relatively
+   easily), you can proceed to more conventional dynamic plyometrics, such as skipping, bounding, and
+   hops/jumps."*
+
+⚠️ Part A2's plyometrics entry (p227) is the movement list. **This is the sequencing rule for it**,
+and nothing in our code does it today.
+
+### ⛔ p90 — WHERE THE STRENGTH HALF ENDS
+
+p90 opens **"ENDURANCE TRAINING PRINCIPLES"**. Everything from there to the end of the shoot (p131)
+is the endurance half; B4c already relays the load-bearing pages inside it.
 
 ## B7. Progression, testing, periodization
 
@@ -1238,17 +1414,28 @@ they are equivalent.
 5. **The session-order rules are INCOMPLETE.** Six items are recorded under a heading that says
    nine, they came from earlier-session notes rather than pages in hand, and the numbering may not
    map 1:1 (some rules are split a/b across pages). ⛔ **Re-shoot pp.139–145. Do not cite "rule N".**
-6. ⚠️ **PART B — THE RE-SHOOT EXISTS AND IS PART-READ (updated 2026-08-26). STILL OPEN.**
+6. ⚠️ **PART B — THE RE-SHOOT EXISTS AND IS PART-READ (updated 2026-08-27). STILL OPEN, BUT THE
+   STRENGTH HALF IS DONE.**
    The pages are photographed: `~/Downloads/Endurance period/`, IMG_3637–3698, 62 frames covering
-   **pp.69–131** (image number − 3568 = page). ⚠️ The shoot OVERRUNS Part B — pp.128–131 are Ch.5 and
-   belong to **Part C**, whose provenance is downgraded for the same reason.
-   ✅ **ELEVEN PAGES READ OFF THE PHOTOGRAPHS** — 69, 70, 92, 98, 103, 107, 116, 120, 122, 123, 131 —
-   and recorded in **B4b**, with four confirmations, three corrections, and the answer to the
-   adjust-by-feel question.
-   ⛔ **~51 FRAMES REMAIN UNREAD, AND EVERY NUMBER NOT NAMED IN B4b STILL CARRIES THE OLD PROVENANCE.**
-   Specifically still one generation removed: the five accounting buckets, the 10%-per-week change
-   rule, "back off all buckets equally", the weekly floor, both two-a-day spacings, the ~1/3
-   maintenance figure and the 2h VT1 ceiling. **Do not code any of those as constants yet.**
+   **pp.69–131** (image number − 3568 = page, ⚠️ and B4c reports the formula drifting past p109).
+   ⚠️ The shoot OVERRUNS Part B — pp.128–131 are Ch.5 and belong to **Part C**, whose provenance is
+   downgraded for the same reason.
+   ✅ **TWENTY-TWO PAGES NOW READ OFF THE PHOTOGRAPHS.**
+   - **B4b (2026-08-26)** — 69, 70, 92, 98, 103, 107, 116, 120, 122, 123, 131: four confirmations,
+     three corrections, and the answer to the adjust-by-feel question.
+   - **B4d (2026-08-27)** — 72, 76, 77, 78, 80, 84, 85, 87, 88, 89, 90: **pp.71–90, the strength half
+     of Ch.4.** ⛔ **This pass FALSIFIED A SHIPPED CONSTANT** — `REST_BETWEEN_SETS_NOT_STATED` said the
+     book gave no rest guidance; **p78 has a section titled "Rest Periods"**, and gap #10 of the twelve
+     was never a gap. It also supplies p80's quantified strength dose, p84's opposite fatigue rule for
+     hypertrophy, and p89's plyometric progression ladder — none of which we had.
+   ⛔ **~40 FRAMES REMAIN UNREAD — ALMOST ALL pp.91–131, THE ENDURANCE HALF** (p90 opens "Endurance
+   Training Principles"). B4c relays several of those at weaker provenance.
+   ⛔ **EVERY NUMBER NAMED IN NEITHER B4b NOR B4d STILL CARRIES THE OLD PROVENANCE.** Specifically
+   still one generation removed: the five accounting buckets, the 10%-per-week change rule, "back off
+   all buckets equally", the weekly floor, both two-a-day spacings, the ~1/3 maintenance figure and
+   the 2h VT1 ceiling. **Do not code any of those as constants yet.**
+   ⚠️ **THE LESSON, NOT JUST THE COUNT:** an unread frame is not a gap in the book. Before any
+   constant asserts *"the source does not say"*, the pages it would be on must have been read.
 5. ✅ **CLOSED — all eighteen Ch.10 programs are captured as images** (pp.244–284, see Part E0).
    Sixteen are untranscribed **by choice**, not by gap.
 7. ⚠️ **p215 IS READ AND VERIFIED; ITS IMAGE IS PENDING IN THE FOLDER** (raised and closed
@@ -1311,6 +1498,17 @@ they are equivalent.
   successor programs, so the set is a transition graph rather than a list; and every endurance cell
   is written in the Part D session vocabulary, which is the seam a generator would work through.
   **The corpus is now 151 images and nothing in this file is waiting on a page.**
+- **2026-08-27 — ⛔ THE STRENGTH HALF OF THE RE-SHOOT READ, AND A SHIPPED CONSTANT FALSIFIED.**
+  pp.72, 76, 77, 78, 80, 84, 85, 87, 88, 89, 90 read off the photographs and recorded as **B4d**.
+  **`strength-grid/intents.ts` shipped `REST_BETWEEN_SETS_NOT_STATED`, asserting the book gives no
+  rest interval. p78 has a section titled "Rest Periods."** The constant is replaced with his rule
+  (nearly full recovery, not so long you cool down, next set when you know you can complete it
+  without getting crushed), p84's opposite hypertrophy rule is carried separately, and gap #10 of the
+  twelve is closed in `WORKORDER-the-standing-plan-2026-08-22.md`.
+  ⚠️ **The rule carries no minutes — any clock stays labelled ours.** Also new and unimplemented:
+  p80's quantified weekly strength dose (which is also the source for the ME/DE rotation our code
+  cited only p247 for), p89's plyometric progression ladder, and p72's Westside provenance for the
+  ME/DE vocabulary. ⛔ **Root cause: the assertion was written about pages nobody had read.**
 
 ---
 

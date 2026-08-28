@@ -55,6 +55,19 @@ export type StrengthSlot = {
    * This is what the table's *"(rotate with primary push)"* means. On an odd week the slot takes its
    * own pattern; on an even week it swaps with its partner. ⚠️ **`pivot §8` listed rotation cadence
    * as a gap to fill from field practice. It is not a gap — he wrote it, and nothing here is ours.**
+   *
+   * ⛔ **AND p80 IS THE WHY, ADDED 2026-08-27** — p247 gives this program's cadence, p80 gives the
+   * principle it is an instance of, and until now we cited only the former:
+   *
+   * > *"I recommend that every strength movement be ideally trained at least twice per week, or
+   * > once every three to four days, with at least one day focused on heavy/near-maximum lifting
+   * > (lower repetitions over 90 percent) and one day focused on velocity."*
+   *
+   * ⚠️ **THE SAME PAGE CAPS THE HEAVY DOSE**, and we have never encoded that: *"For a given movement
+   * pattern, 4 to 6 repetitions over 90 percent and 15 to 20 velocity-focused repetitions per week
+   * (between 70 percent and 85 percent) may be sufficient…"* Recorded in
+   * `SOURCE-viada-hybrid-athlete.md` §B4d; **the ME set band is deliberately unchanged pending a
+   * ruling, so do not read this comment as sanctioning the ramp's top end.**
    */
   rotatesWith?: ViadaPattern;
   /**
