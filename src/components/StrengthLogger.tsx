@@ -77,6 +77,9 @@ import { canWritePullupCapacity } from '@/lib/pullup-progression';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
 import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
+// ⛔ `ME: Upper` → `Heavy: Upper`, at the last moment before an athlete reads it. The engine string
+// is untouched. See `plain-intent.ts` — the mapping has one owner, not one copy per surface.
+import { plainIntent } from '@/lib/plain-intent';
 // The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
 import { hasRepTotal, parseRepTotal, repsRemaining, repTotalLine } from '@/lib/rep-total';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -4774,7 +4777,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {(() => {
                 const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                 if (mode === 'mobility') return 'Log Mobility';
-                return scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength';
+                return scheduledWorkout ? `Log: ${plainIntent(scheduledWorkout.name)}` : 'Log Strength';
               })()}
             </h1>
             {/* D-124: surface deload context so a lighter-than-last-time prescription
@@ -4895,12 +4898,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       .map((w:any)=> (
                         <button key={w.id} onClick={()=>{ 
                           prefillFromPlanned(w); 
-                          setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); 
+                          setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${plainIntent(w.name)||'Strength'}`); 
                           setSourcePlannedId(w.id); 
                           setSourcePlannedDate(w.date); 
                           setShowPlannedMenu(false); 
                         }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.15] text-sm flex items-center justify-between text-white" type="button">
-                          <span className="font-light">{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
+                          <span className="font-light">{weekdayShortFromYmd(w.date)} — {plainIntent(w.name)||'Strength'}</span>
                           <span className="text-2xs px-1.5 py-0.5 rounded border-2 border-white/40 text-white/80 bg-white/[0.12]">{String(w.workout_status||'planned')}</span>
                         </button>
                       ))}
@@ -5652,8 +5655,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                   return (
                     <>
+                      {/**
+                        * ⛔ THE CUE GIVES UP THE ACCENT; THE NUMBER KEEPS IT (Michael, on a device,
+                        * 2026-08-28: *"the double orange might be killing us, legibility is tough"*).
+                        *
+                        * Two different things carried the strength accent on one card — this
+                        * paragraph and the RIR value in every row — and on the close-grip speed card
+                        * this ran to FOUR lines of full-accent body text with nowhere for the eye to
+                        * rest.
+                        *
+                        * ⚠️ THE SPLIT IS BY WHAT THE READER DOES WITH IT. The RIR value is a
+                        * glanceable NUMBER, checked mid-set, and an accent is what makes it findable.
+                        * This is PROSE — read once at the top of the session and never again — so
+                        * long-form accent text on a dark ground pays the whole legibility cost for
+                        * none of the benefit. ⛔ After this there is exactly ONE accent per row and
+                        * it always means the same thing.
+                        *
+                        * ⚠️ ALL THREE CUES, NOT JUST THE SPEED ONE. This element renders
+                        * `STANDING_ME_SET_CUE`, `STANDING_DE_SET_CUE` and `barSpeedCueFor`'s title
+                        * cue — leaving any of them accented re-creates the problem with fewer
+                        * instances.
+                        *
+                        * ⚠️ AND IT IS NOT A NEW TREATMENT. `white/55` is what the per-set
+                        * `targetHint` line ("target 6-12 · 1 in reserve") and the `advanceNudge`
+                        * directly below already use. `STANDING_ACCESSORY_SET_CUE` sits one step
+                        * dimmer at `white/45` because it speaks for a whole group from outside the
+                        * card; matching THAT would have put the rule below the observation under it.
+                        */}
                       {(standingCue || titleCue) && (
-                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-strength/75 leading-snug">
+                        <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-white/55 leading-snug">
                           {standingCue ?? titleCue}
                         </div>
                       )}

@@ -43,6 +43,7 @@ import type { MatrixSessionKind } from '../../supabase/functions/_shared/schedul
 import { ArrowLeftRight } from 'lucide-react';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { plainIntent } from '@/lib/plain-intent';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
 const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPlanned: any, linkedPlanned: any) => {
@@ -935,9 +936,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex items-center justify-between">
           <h2 className="font-light tracking-normal text-base text-white">
             {(() => {
+              // ⛔ `ME: Upper` → `Heavy: Upper` at the last moment. Display only; the engine string
+              // is untouched, and `plainIntent` is total so every other title passes through.
               const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
-              if (st) return st;
-              return generateWorkoutTitle();
+              if (st) return plainIntent(st);
+              return plainIntent(generateWorkoutTitle());
             })()}
           </h2>
           {/* Attach/Unattach button - moved here */}

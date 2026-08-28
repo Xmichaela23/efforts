@@ -28,6 +28,34 @@ import { singleSlotOptions } from './hard-day-menus';
  * 'prescribed'`); and the ONLY two writers of a club value are the two controls this flag hides.
  * So with it false, no athlete can produce club ownership and nothing downstream is entered.
  */
+/**
+ * ⛔⛔ WHEN IT COMES BACK, IT COMES BACK WITH THESE RULES (Michael, 2026-08-27). Ruled while the
+ * control was still hidden, so that flipping the flag is not also a design session.
+ *
+ * ⛔ 1. ONE HARD CLUB SESSION, NEVER TWO. A hard club run OR a hard club ride, not both. Two
+ * sessions the app does not write, both hard, in a strength block is a week with no control in it.
+ *
+ * ⛔ 2. THE LONG CLUB RIDE IS BRACKETED BY THE TALK TEST, AND THE TEST IS HIS. p235, VT1: practise
+ * the talk test at least twice per run — once after five minutes and once after twenty. So the club
+ * ride asks two questions and they resolve it:
+ *   · *"Can you hold a conversation the whole way?"* — yes, it is easy work and it IS the long ride.
+ *     No, it is not an easy day and filing it as one under-counts the week.
+ *   · *"How experienced are you in a group?"* — the same bunch ride is a sit-in for one rider and
+ *     three hours of hanging on for another. That is the variable, not the ride.
+ *
+ * ⛔ 3. THE TWO RULES CLOSE ON EACH OTHER. A club ride that comes back as "cannot really chat" IS
+ * the athlete's one hard club session — so they do not also get a hard club run.
+ *
+ * ⚠️ WHY THE SPLIT IS WHERE IT IS. A club RUN is predictable — warm-up, a structured hard block,
+ * cool-down, about an hour to an hour and a quarter, close to what the plan would have written
+ * anyway. A club RIDE is not: the same two words cover a 90-minute chaingang and a three-hour café
+ * ride. And a wrong guess is cheap on the long slot (easy volume, nothing stacked against it) and
+ * expensive on a hard slot, which sits next to the heavy days — p247 prices that adjacency at 3-4%
+ * off the squat and deadlift.
+ *
+ * ⚠️ NOT BUILT: the intensity question itself. `hard_days.ownership` and `long_session.ownership`
+ * carry WHO owns the session; nothing carries how hard it is. That is the one new input this needs.
+ */
 export const CLUB_SESSION_CONTROL_VISIBLE = false;
 
 export type HardSlotValue = {

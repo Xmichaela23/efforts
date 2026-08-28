@@ -30,6 +30,7 @@ import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { isPlyoSession } from '@/lib/utils';
 import { WEEK_DAYS as ORDER, isEnduranceSession, type WeekSession } from '@/lib/week-budget';
+import { plainIntent } from '@/lib/plain-intent';
 
 export type WeekGridSession = WeekSession;
 
@@ -58,20 +59,10 @@ export default function WeekGrid({
     .filter((i) => i >= 0);
   const adjacentPressDays = upperIdx.length === 2 && Math.abs(upperIdx[0] - upperIdx[1]) === 1;
 
-  /**
-   * ⛔ WESTSIDE SHORTHAND DOES NOT SHIP TO A LIFTER (punch item 6, 2026-08-25). The Standing
-   * Plan frames title their days `ME: Upper` / `DE: Lower` — max effort and dynamic effort, a
-   * conjugate-method vocabulary a Strong or Hevy user has no reason to have met. The day was
-   * labelled with the METHOD'S name for the intent instead of the intent.
-   *
-   * ⚠️ BOTH HALVES OF THE PAIR, OR NEITHER. Renaming `DE` and leaving `ME` reads as two
-   * different kinds of thing on the same week; they are one axis with two ends.
-   * ⚠️ DISPLAY ONLY. The engine strings are unchanged and stay the thing tests and the
-   * composer match on — this maps at the last moment, where an athlete reads it.
-   * ⚠️ `Test:` IS LEFT ALONE. It is already the plain word for what the day is.
-   */
-  const INTENT_WORD: Record<string, string> = { ME: 'Heavy', DE: 'Speed' };
-  const plainIntent = (name: string) => name.replace(/^(ME|DE):/, (_m, k: string) => `${INTENT_WORD[k]}:`);
+  // ⛔ MOVED TO `@/lib/plain-intent` (2026-08-28). It lived here as two lines and was used HERE
+  // ONLY, so the logger header, the calendar and the plan download screen all still printed
+  // `DE: Upper` at the athlete. Pasting the two lines into three more files is the private-list
+  // disease this codebase keeps paying for; the mapping now has one owner and four readers.
 
   /**
    * ⛔ ONE CAPITALISATION FOR EVERY MOVEMENT (punch item 5, 2026-08-25). The accessory line read

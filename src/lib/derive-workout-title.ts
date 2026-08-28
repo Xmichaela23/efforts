@@ -29,6 +29,7 @@
 // see it. Other client-side `src/lib/*.ts` files that have deno-test coverage
 // follow the same convention (see `pairing-timing.ts`).
 import { plannedSwimSessionLabel } from '../utils/swimPlanTokens.ts';
+import { plainIntent } from './plain-intent';
 
 export type WorkoutLike = {
   name?: string | null;
@@ -100,7 +101,24 @@ export function deriveWorkoutTitle(workout: WorkoutLike | null | undefined): str
     const stTit = structuredTitle(workout);
     const candidate = stTit || nm;
     if (candidate && candidate.toLowerCase() !== 'strength') {
-      return stripTrailingDateSuffix(candidate) || 'Strength';
+      /**
+       * ⛔ WESTSIDE SHORTHAND DOES NOT SHIP TO A LIFTER, AND THIS IS WHERE IT WAS GETTING OUT
+       * (2026-08-28, Michael on a device). The Standing Plan frames title their days `ME: Upper` /
+       * `DE: Lower`. The mapping to `Heavy:` / `Speed:` has existed since 2026-08-25 and lived as two
+       * private lines inside `WeekGrid.tsx`, used by the week overview and nothing else — so every
+       * surface that goes through THIS function (plan detail, the Today card, the planned drawer, the
+       * full planned screen) kept printing the shorthand.
+       *
+       * ⚠️ THE RIGHT PLACE IS HERE, NOT AT THE CALL SITES. This function's own header calls itself
+       * the single source of truth for display titles; a name-mapping applied anywhere else is one
+       * more surface to remember. See `plain-intent.ts` for why the mapping is a module.
+       *
+       * ⚠️ DISPLAY ONLY, AND THE ENGINE STRING IS UNTOUCHED. `workout.name` still reads `ME: Upper`
+       * for anything that matches, stores or compares it — this is the last moment before an athlete
+       * reads it. `plainIntent` is total and idempotent, so every non-Standing-Plan name (a user's
+       * own "Push Day", a 5/3/1 session, `Test: Upper`) passes through unchanged.
+       */
+      return plainIntent(stripTrailingDateSuffix(candidate)) || 'Strength';
     }
     if (/squat|deadlift|bench|ohp/.test(desc)) return 'Strength — Compounds';
     if (/chin|row|pull|lunge|accessor/i.test(desc)) return 'Strength — Accessory';

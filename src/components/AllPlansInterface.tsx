@@ -28,6 +28,7 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { plannedDurationMinutes, plannedDurationSeconds } from '@/lib/planned-session/duration';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
+import { plainIntent } from '@/lib/plain-intent';
 import {
   fetchStrengthOrderingPreference,
   useStrengthOrderingPreference,
@@ -1786,7 +1787,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             meta.push(w.intensity);
           }
           if (typeof w.duration === 'number' && w.duration > 0) meta.push(fmtHM(w.duration));
-          lines.push(`- ${w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
+          // ⛔ THE DOWNLOAD IS A SURFACE TOO. It prints the session name verbatim, so the Standing
+          // Plan's `DE: Upper` reached the athlete in the file even after the screens were mapped.
+          // Display only — the engine string is unchanged. See `plain-intent.ts`.
+          lines.push(`- ${plainIntent(w.name)}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
           if (w.description) lines.push(`  - ${w.description}`);
 
           const discExport = String(w.type || w.discipline || '').toLowerCase();
