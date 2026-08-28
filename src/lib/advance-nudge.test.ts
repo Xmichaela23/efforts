@@ -81,3 +81,65 @@ Deno.test('the pre-existing gates are unchanged', () => {
     'Last time: 12 — top of the band. If it felt easy, add weight.',
   );
 });
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ A BODYWEIGHT ROW IS NOT ASKED FOR WEIGHT (2026-08-28)
+//
+// Michael's device: the ab wheel rollout card read "Last time: 10 · 10 · 10 — top of the band with
+// room to spare. Add weight." on a row that correctly has no weight box, no plate chip and no bar
+// picker. ⚠️ IT IS A CONSEQUENCE OF A FIX: until 2026-08-27 the logger's private regex called an ab
+// wheel rollout "not bodyweight", so the row was drawn a bar and the ask was merely wrong rather
+// than impossible. 55 movements gained a correct answer in that change and every one can reach here.
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+const TOPPED_OUT = [{ reps: 10, rir: 2 }, { reps: 10, rir: 2 }, { reps: 10, rir: 2 }];
+const BAND = { targetReps: '8-10', loadPrescribed: false as const, prior: TOPPED_OUT };
+
+Deno.test('⛔ THE ROW ON THE SCREENSHOT — an ab wheel rollout is not told to add weight', () => {
+  const line = advanceNudgeFor({ ...BAND, movement: 'Ab Wheel Rollout' });
+  assertEquals(line, 'Last time: 10 · 10 · 10 — top of the band with room to spare.');
+  // ⛔ THE FACT SURVIVES. Suppressing the whole line was the other option and it loses something
+  // real: the athlete finished the top of the band three sessions running.
+  assert(line!.includes('10 · 10 · 10'), 'the observation was thrown away with the instruction');
+});
+
+Deno.test('⛔ NO IMPERATIVE REACHES ANY BODYWEIGHT ROW — the class, not the one instance', () => {
+  // ⚠️ B3's measured list is the blast radius. These are spread across it: a core rollout, a
+  // lower-body pattern, a hang, a squat and a hinge.
+  for (const name of ['Ab Wheel Rollout', 'Pistol Squat', 'Hanging Leg Raise', 'Air Squat', 'Glute Bridge', 'Sit Up']) {
+    for (const prior of [TOPPED_OUT, [{ reps: 10 }, { reps: 10 }, { reps: 10 }]]) {
+      const line = advanceNudgeFor({ ...BAND, prior, movement: name });
+      assert(line, `${name}: the observation was suppressed along with the ask`);
+      assertEquals(/add weight|go heavier|add a little/i.test(line!), false,
+        `${name} is asked for weight it has no box for: "${line}"`);
+    }
+  }
+});
+
+Deno.test('⛔ A LOADED ROW IS COMPLETELY UNCHANGED — the ask is the whole point there', () => {
+  // Dumbbell bench press was on the same screen and it is FINE: that row has a weight box.
+  assertEquals(advanceNudgeFor({ ...BAND, movement: 'Dumbbell Bench Press' }),
+    'Last time: 10 · 10 · 10 — top of the band with room to spare. Add weight.');
+  assertEquals(advanceNudgeFor({ ...BAND, prior: [{ reps: 10 }, { reps: 10 }, { reps: 10 }], movement: 'Dumbbell Bench Press' }),
+    'Last time: 10 · 10 · 10 — top of the band. If it felt easy, add weight.');
+  // ⛔ AND THE TWO GOT SWAPPED ONCE BEFORE: cable woodchopper answered "bodyweight" to the old regex
+  // because "woodcHOPper" contains the `hop` stem. It is loaded and it keeps the ask.
+  assertEquals(/add weight/i.test(advanceNudgeFor({ ...BAND, movement: 'Cable Woodchopper' }) ?? ''), true,
+    'the woodchopper collision came back');
+});
+
+Deno.test('⚠️ AN ABSENT MOVEMENT BEHAVES EXACTLY AS BEFORE', () => {
+  // Every caller that does not name the movement keeps the loaded wording — the parameter is
+  // additive, so no existing surface changed by being left alone.
+  for (const movement of [undefined, null, '']) {
+    assertEquals(advanceNudgeFor({ ...BAND, movement }),
+      'Last time: 10 · 10 · 10 — top of the band with room to spare. Add weight.');
+  }
+});
+
+Deno.test('⛔ THE LOGGER NAMES THE MOVEMENT — a gate that is never asked is not a gate', async () => {
+  const src = await Deno.readTextFile(new URL('../components/StrengthLogger.tsx', import.meta.url));
+  const call = src.match(/advanceNudgeFor\(\{[\s\S]*?\}\)/);
+  assert(call, 'the advance-nudge call site moved or was rewritten');
+  assert(/movement:/.test(call![0]), 'the logger stopped naming the movement — the ask can return');
+});

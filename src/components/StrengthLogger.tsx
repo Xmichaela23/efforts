@@ -5651,6 +5651,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     slotIntent: slotIntent,
                     notes: exercise?.notes,
                     prior: previousSessionByName[normalizeExerciseName(exercise.name)],
+                    // ⛔ SO THE LINE CANNOT SAY "Add weight" ON A ROW WITH NO WEIGHT BOX. See
+                    // `advanceNudgeFor` — it asks `isBodyweightLogged`, the same classifier this
+                    // component's own bodyweight gate uses.
+                    movement: exercise.name,
                   });
 
                   // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in 5/3/1 is a
