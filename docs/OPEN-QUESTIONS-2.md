@@ -1155,3 +1155,47 @@ the exact number that plan exists to move.
 ⚠️ **TIMING, DECIDED:** after Monday. Both live pieces are unverified; landing a reshape first means
 Monday proves neither what was deployed nor what replaced it. **Nothing on screen is wrong today —
 narrower than it should be, which is not the same thing.**
+
+## Q-295 — Run efficiency vs TrainingPeaks: the grade adjustment is ALREADY THERE; the sample is thinned by something else (2026-08-28)
+
+⛔ **THE BRIEF'S PREMISE IS HALF WRONG, AND THE HALF THAT IS WRONG MATTERS.** The claim was that our
+efficiency uses RAW pace where TrainingPeaks uses normalized graded pace. Traced:
+
+- ⛔ **THE TREND PATH IS ALREADY GRADE-ADJUSTED.** `efficiencyIndexToSeries` (`run.ts:86`) reads
+  `gap_efficiency_index ?? efficiency_index` — **GAP preferred, raw as fallback.** `compute-snapshot`
+  builds `gapEfficiencyIndex` from the stored GAP pace ÷ HR (2026-07-21, fixed 2026-07-22), and
+  `runEffHistory` — the route engine's input — is GAP ÷ HR as well. So the verdict, the chart and the
+  route regression are all on grade-adjusted pace already. **This is the third "it already exists in a
+  different place" of this arc.**
+- ⚠️ **WHAT IS RAW IS THE PER-SESSION FACT.** `run_facts.efficiency_index` (`compute-facts:1168`) is
+  `(1000 / pace_s_per_km) / hr_avg` — raw. That is the number the 2026-08-28 endurance card reads
+  per session, so **the card and the trend beside it are computed on different pace definitions.**
+  That is the real defect here, and it is a smaller one than the brief describes.
+
+⛔⛔ **AND THE SAMPLE IS NOT THINNED BY GRADE — IT IS THINNED BY TWO FILTERS, ONE OF WHICH NOBODY HAS
+MENTIONED.** `efficiencyIndexToSeries` filters on:
+1. `isSteadyAerobic(workout_type)` — the one under discussion, and
+2. ⛔ **`duration_minutes >= 30 && <= 70`** — an undiscussed window that drops every run shorter than
+   half an hour and **every long run**. On a standing block the long run is ~73 minutes, so it is
+   excluded by one minute over the ceiling. For a runner whose easy runs vary in length this is
+   plausibly the larger thinner of the two.
+
+**So "23 runs cannot call a direction" needs re-measuring against BOTH filters before anything is
+changed.** Correcting for grade cannot widen a sample that is already grade-corrected.
+
+⚠️ **RECOMPUTE OR FRESH START — ANSWERED: RECOMPUTE, where the data exists.** GAP is stored on the
+workout row at `computed.overall.gap_pace_s_per_mi`, not computed only at analysis time, so historical
+runs can be re-read. ⛔ **Unverified: how many of his runs actually carry it.** A treadmill or no-GPS
+run writes none. Count before promising him a continuous history — his accepted cost (*"that will
+shape historical moving forward so current numbers are limited"*) may be smaller than he thinks, or
+may apply only to a subset.
+
+⚠️ **THE STEADY GATE — DO NOT WIDEN IT REFLEXIVELY, and the reasoning is the same one TrainingPeaks
+gives.** If grade is corrected the gate's remaining job is excluding intervals and races, not hills —
+a narrower job than it does today. But **speed work is still a different question from a steady run**,
+and the field's own guidance is compare like with like rather than pool everything. ⛔ The 30-70
+minute window is the filter to interrogate first; it is arbitrary on its face and nobody has defended
+it in writing.
+
+Related: [[Q-294]] (athlete-scoped reshape — same card, and this belongs with it), [[Q-293]] (the bike
+has no efficiency series at all), [[Q-290]] (the run's missing reference number).
