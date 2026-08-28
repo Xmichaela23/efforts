@@ -17,6 +17,36 @@
 >
 > ⚠️ **ITEMS 4 AND 5 ARE NOT BUILT.** The energy/soreness/sleep row is still on State, and the load
 > gauge still leads with the pooled points total. Both remain open.
+>
+> ---
+>
+> ## ⚠️ ITEM 2 GREW INTO THE ENDURANCE READ — DEPLOYED THE SAME EVENING, ALSO NOT VERIFIED.
+> Pushed `dc354b27`; `compute-snapshot` 143 · `compute-facts` 126 · `workout-detail` 352 ·
+> `analyze-cycling-workout` 218 · `coach` 471; client bundle `index-eYfKzP5E.js` confirmed served.
+>
+> ⛔ **RULINGS MADE DURING THAT BUILD THAT ARE NOWHERE ELSE IN THIS FILE:**
+> 1. **The endurance rows move into Viada's parlance — ONE CARD PER SPORT**, the lift card's shape.
+>    Run: the Wednesday near-threshold session. Ride: the Monday hard ride. Both gated on the
+>    family tag, both off the join item 2 already needed.
+> 2. **THE RIDE LEADS ON POWER, THE RUN ON HEART RATE**, and that governs LAYOUT, not just the
+>    series — a rider reads watts, and FTP is the number their whole prescription is a percentage of.
+> 3. **THE REFERENCE NUMBER OVER TIME IS THE ENDURANCE TWIN OF THE ESTIMATED 1RM.** ⛔ Ride only:
+>    `fitness_baselines` supersedes rather than overwrites so FTP has a dated trail; run threshold
+>    pace is a single overwritten value, so **the run card ships with two rows and says so** rather
+>    than drawing a line from one number. See Q-290.
+> 4. **DRIFT IS STATED AGAINST p107 AND GRADED BY NOTHING** — 10%, and 5% when a key session falls
+>    within 24 hours. ⚠️ **No verdict word**, deliberately: two heart rates is not a fitness claim
+>    and no threshold was ruled. The card prints the figure with the line beside it.
+> 5. **A KEY SESSION INCLUDES A BARBELL DAY**, on p107's own words — *"one targeting a system or
+>    adaptation that you're hoping to improve in the current training cycle."* ⛔ Do not narrow it
+>    back to endurance: in a strength-led block the barbell day is exactly that.
+> 6. **EFFICIENCY IS READ AS STORED, NEVER RE-DERIVED** — `run_facts.efficiency_index` and
+>    `ride_facts.efficiency_factor`, the latter being TrainingPeaks' EF exactly. A second derivation
+>    would fork the definition from the one the analyser already publishes.
+>
+> ⚠️ **THE EXISTING ROWS ALL STAY** — run efficiency across all runs, and the bike fitness/form row.
+> They trend across every session; these cards are one repeated session. Different questions.
+> **The bike fitness/form row's future is Michael's open call, not this order's.**
 
 **2026-08-28. Michael ruled the scope and approved the mock. Supersedes
 `WORKORDER-the-coachs-read-2026-08-28.md`, which was written the same morning and scoped too wide.**

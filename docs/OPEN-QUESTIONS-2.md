@@ -995,3 +995,35 @@ touch, and it was found hours before a block rebuild. Not urgent, not cosmetic, 
 ⚠️ **RELATED BUT ALREADY CORRECT:** the run efficiency row's own two-reasons split (D-346) is fine —
 `withheld` (too few) and the route engine's interval straddling zero are separate branches with
 separate copy. Only its opening three words were wrong, and those were fixed the same day.
+
+## Q-290 — Run threshold pace has no history, so the run card has no reference line (2026-08-28)
+
+⛔ **THIS IS WHY THE RUN CARD LOOKS THINNER THAN THE RIDE CARD, and it is a storage gap, not an
+oversight in the card.**
+
+The reference number is the endurance twin of the estimated 1RM: every percentage the plan
+prescribes is a percentage OF it, so it moving is the improvement. The RIDE has one —
+`fitness_baselines` supersedes rather than overwrites (`metric: 'ftp'`, `baseline-derive.ts:105`), so
+bike FTP accumulates a dated trail by construction: six readings over six weeks on the primary
+athlete, 176 → 153 → 168.
+
+⛔ **THE RUN DOES NOT.** `learned_fitness.run_threshold_pace_sec_per_km` is a single `LearnedMetric`
+in the `user_baselines.learned_fitness` JSONB, **overwritten in place** on every re-learn
+(`learn-fitness-profile:490`). The previous value is gone. There is no series to draw, so the run
+card ships with two rows instead of three rather than fabricating a line from one number.
+⚠️ And the run's entry in `fitness_baselines` is `decoupling` (`baseline-derive.ts:97`), not pace —
+so the table that would give it a history is anchoring the run on a different metric entirely.
+
+**WHAT THE FIX WOULD TOUCH** (traced, not estimated):
+- `learn-fitness-profile` — what it writes, and it currently overwrites in place.
+- `baseline-derive.ts` — the run would gain a second anchored metric beside `decoupling`.
+- `fitness_baselines` — a new `metric` value. **No schema change**: the column is free text.
+- Every surface reading a current pace must keep reading the ACTIVE row, not the trail.
+
+⚠️ **IT MAY NOT NEED DOING.** His threshold pace is empty because the critical-speed fit needs two
+hard efforts in different duration bands and he has been training zone 2 only. His Wednesday session
+carries 5-8 minute intervals, which is exactly what that fit waits for — so the number may start
+populating on its own. That changes whether it is worth storing history, not whether the gap is real.
+
+⛔ RAISED DELIBERATELY RATHER THAN BUILT: it changes what a learner writes, which reaches every
+surface that reads a pace, and it must not ride in on a card. See also [[Q-289]].

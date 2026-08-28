@@ -1,5 +1,49 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## ⚠️ 2026-08-28 (later) — THE ENDURANCE READ. **DEPLOYED, NOT VERIFIED.**
+>
+> ⛔ **SECOND DEPLOY OF THE SAME EVENING. NEITHER HAS BEEN SEEN WORKING.** The entry below is the
+> strength read; this one sits on top of it and they are proven or not on the same Monday.
+>
+> **PUSHED:** `origin/main == dc354b27`.
+> **EDGE FUNCTIONS DEPLOYED**, versions read back from `supabase functions list`, not assumed:
+> `compute-snapshot` **143** · `compute-facts` **126** · `workout-detail` **352** ·
+> `analyze-cycling-workout` **218** — all 22:58:28 UTC — and `coach` **471** at 22:58:38.
+> ⚠️ **COACH LAST, TEN SECONDS BEHIND, AND THE ORDER WAS LOAD-BEARING.** Its payload bump (172 → 173)
+> invalidates `coach_cache`; deploying it FIRST would have re-sourced from a `compute-snapshot` that
+> had not been updated yet, cached that, and left the cards empty until the following ingest.
+> ⚠️ No migration in this piece, so last night's schema hazard did not apply.
+>
+> **CLIENT: DEPLOYED AND CONFIRMED OFF THE SERVED BUNDLE.** `https://efforts.work` →
+> `/assets/index-eYfKzP5E.js` (3,752,137 bytes), waited for Netlify to publish rather than assuming.
+> It carries `watts per beat`, `speed per beat` and `the change is smaller than the normal spread` —
+> and the old `Too soon to tell — reading N runs` is **gone** (the bare `Too soon to tell` that
+> remains is the OTHER branch, where it is correct).
+>
+> **What it is:** one endurance card per sport, the lift card's shape. Ride leads on FTP over time
+> (six dated readings, 176 → 153 → 168) — the endurance twin of the estimated 1RM, since every
+> prescribed percentage is a percentage of it. Run leads on heart rate. Both carry cost-per-session
+> (efficiency read AS STORED, never re-derived) and fade inside the session put against p107's own
+> line — 10%, or 5% when a key session falls within 24 hours — for the first time in this app.
+>
+> ### ⛔ EXPECTED TO LOOK WRONG — do not report these as breaks
+> 1. **Nothing appears until `compute-snapshot` runs**, on his next ingest.
+> 2. **The run card has NO reference line, by design.** Threshold pace is a single overwritten value
+>    in `user_baselines.learned_fitness`; there is no history to draw and the card must not fabricate
+>    one from a single number. See Q-290 — that is the fix, raised and unstarted.
+> 3. **A card renders only where a session has been logged AND attached.** A week missing from a line
+>    is a LINKER fault, not the card's.
+> 4. **No verdict word on drift or on the run card.** Deliberate: two heart rates is not a fitness
+>    claim, and no threshold was ruled. The card states the figure with the line beside it.
+> 5. **Nobody has seen an endurance card at all.**
+>
+> ### ⛔ THE REAL-FAILURE TRIPWIRE — distinct from the above
+> **If the RIDE card is still empty after a Monday hard ride is logged, attached, and a snapshot has
+> run, that is genuine.** ⚠️ Start the trace at the FAMILY TAG on the planned row
+> (`family:ride_sweet_spot`), not at the card — the join is gated on that tag and nothing else.
+> The same applies to the run card and `family:run_near_threshold`.
+
+
 > ## ⚠️ 2026-08-28 — THE STRENGTH READ. **DEPLOYED, NOT VERIFIED.** ONE THING OWED.
 >
 > ⛔ **NOBODY HAS SEEN IT WORK.** Pushed and deployed are both true; verified is false and stays

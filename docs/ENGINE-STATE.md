@@ -1,64 +1,62 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-28 — the strength read arc)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-28, late — two deploys, neither verified)
 
-### Your job: WATCH MONDAY'S TEST LAND. Everything below is deployed and NOT ONE PIECE OF IT HAS BEEN SEEN WORKING.
+### Your job: WATCH MONDAY LAND. Do not start anything. Two pieces went out tonight and NOT ONE PIECE OF EITHER HAS BEEN SEEN WORKING.
 
-**Read `docs/DEPLOY-OWED.md`'s top entry first — it lists what to look for and, more importantly,
-what is EXPECTED to look broken.** Then the work order: `docs/WORKORDER-the-strength-read-2026-08-28.md`.
+**Read `docs/DEPLOY-OWED.md`'s top TWO entries first** — the endurance read sits on the strength
+read, and both carry a section on **what is expected to look wrong** plus a real-failure tripwire.
+Reporting an expected state as a break is the way to waste Monday.
 
-**PUSHED:** `origin/main == ead07380` (arc `65dc556e` → `ead07380`).
-**DEPLOYED**, versions read back from `supabase functions list`: `compute-facts` **125** ·
-`compute-snapshot` **142** · `coach` **470** · `workout-detail` **351** ·
-`analyze-cycling-workout` **217** · `generate-strength-plan` **175** ·
+**PUSHED:** `origin/main == dc354b27`.
+**DEPLOYED**, versions read back from `supabase functions list`, never assumed:
+`compute-facts` **126** · `compute-snapshot` **143** · `coach` **471** · `workout-detail` **352** ·
+`analyze-cycling-workout` **218** · `generate-strength-plan` **175** ·
 `rematerialize-standing-block` **51** · `materialize-plan` **308**.
-**CLIENT CONFIRMED OFF THE SERVED BUNDLE:** `https://efforts.work` → `/assets/index-6JACH7u8.js`
-carries this arc's own strings. ⚠️ **That URL is nowhere in the repo** — it is recorded in
-`DEPLOY-OWED.md` so you do not have to go looking for it.
-**VERIFIED: NO.** A string in a bundle proves the code shipped; nobody has watched a card render a
-number, which is what verified means.
+**CLIENT:** `https://efforts.work` → `/assets/index-eYfKzP5E.js`, confirmed off the served bundle.
+⚠️ That URL is nowhere in the repo; it is recorded in `DEPLOY-OWED.md` so you do not go looking.
+**VERIFIED: NO, ON BOTH.** Nobody has watched a card render a number. That is the whole job.
 
-### The three facts you need before you touch anything
+### The four facts you need before touching anything
 
-1. ⛔ **THE e1RM GATE FAILS CLOSED. Only a set stamped `ME` mints a max.** `exercise_log.slot_intent`
-   is new (`state-trend/assemble.ts` → `intentCanMintAMax`). Everything logged before 2026-08-26 has
-   no stamp and has LEFT the strength line. **That is Michael's ruling, not a bug** — *"don't let the
-   old lifts drag me down."* An earlier fail-open ruling was reversed the same day; do not restore it
-   by analogy with D-417's rep gate one line above, which still fails OPEN on purpose.
-2. ⛔ **THE TEST WEEK IS WHAT REFILLS THE LINE.** `compose.ts` stamps the pretest's competition lifts
-   `ME` (accessories on those days stay unstamped). Michael rebuilt his block Monday 2026-08-31 and
-   those two sessions are the line's first points. ⚠️ **If the line is still empty after they are
-   logged and a snapshot has run, that is a REAL failure** — start at `exercise_log.slot_intent` on
-   those rows and walk forward.
-3. ⚠️ **THE PATTERN THIS ARC KEPT HITTING, and it will hit you.** `slot_intent` was dropped THREE
-   times at points that rebuild a row field by field — the query field map in `compute-snapshot`, the
-   per-lift display map in `assemble.ts` (which discards `meta`), and two record-gate fixtures. Each
-   time it was selected, resolved and correct, and arrived as `undefined`. **A gate reading
-   `undefined` does not error; it silently takes the absent branch.** None were caught by reading.
-   The note lives on `ExerciseLogLite.slot_intent`. Grep the field name across all three before
-   assuming one write site is enough.
+1. ⛔ **THE e1RM GATE FAILS CLOSED. Only a set stamped `ME` mints a max.** Everything logged before
+   2026-08-26 has no stamp and has LEFT the strength line. **That is Michael's ruling, not a bug** —
+   *"don't let the old lifts drag me down."* An earlier fail-open ruling was reversed the same day;
+   do not restore it by analogy with D-417's rep gate, which still fails OPEN on purpose.
+2. ⛔ **THE TEST WEEK REFILLS THE LINE.** `compose.ts` stamps the pretest's competition lifts `ME`
+   (accessories stay unstamped). ⚠️ **If the line is still empty after those two sessions are logged
+   and a snapshot has run, that is a REAL failure** — start at `exercise_log.slot_intent` on those rows.
+3. ⛔ **THE ENDURANCE CARDS ARE GATED ON THE FAMILY TAG AND NOTHING ELSE.**
+   `family:run_near_threshold` and `family:ride_sweet_spot` on the PLANNED row, reached through the
+   attach at ingest. A missing week is a LINKER fault, not the card's. ⚠️ The run card has no
+   reference line by design — see Q-290, which is the reason and is unstarted.
+4. ⚠️ **THE PATTERN THAT KEPT BITING, and it will bite you.** `slot_intent` was dropped THREE times
+   at points that rebuild a row field by field — `compute-snapshot`'s query map, the per-lift display
+   map in `assemble.ts` (which discards `meta`), and two record-gate fixtures. Each time it was
+   selected, resolved and correct, and arrived as `undefined`. **A gate reading `undefined` does not
+   error; it silently takes the absent branch.** None were caught by reading. The note lives on
+   `ExerciseLogLite.slot_intent`.
 
-### What shipped, in one line each
-- One card per main lift on State: the weight being lifted, reps held at it, a heavy-only e1RM line
-  (rolling across blocks) against a faint expected curve (block-scoped, anchored on the block's
-  opening working number at the plan's own rate). One word — **Stalled · On track · Moving up** —
-  mapped from `meSessionOutcome`, which has run inside `earnedMeSets` on every restate since the ME
-  ladder shipped and had its verdict thrown away.
-- One run card: the same prescribed near-threshold session week to week, its average heart rate.
-  Block-scoped on purpose — a set is a measurement, a session is a prescription, and only one
-  survives its plan. No verdict word on it: two heart rates is not a fitness claim.
-- `week_ledger_v1` and `me_history_v1` persisted; **the five weekly numbers are deliberately NOT
-  rendered** (measured: a standing block is the same week twelve times).
-- Get Stronger stamps `HYP` on assistance. Its main lift is unstamped, so ⛔ **that path now has no
-  strength line at all** — raised, unruled, and neither does any off-plan session.
+### What shipped tonight, in one line each
+- **Strength:** one card per main lift — the weight being lifted, reps held at it, a heavy-only e1RM
+  line (rolling across blocks) against a faint expected curve (block-scoped, anchored on the block's
+  opening working number). One word — **Stalled · On track · Moving up** — mapped from
+  `meSessionOutcome`, which had run on every restate and had its verdict thrown away.
+- **Endurance:** one card per sport, the same shape. Ride leads on FTP over time (the endurance twin
+  of the 1RM); run leads on heart rate. Both carry cost-per-session (efficiency read AS STORED) and
+  fade against p107 — 10%, or 5% when a key session falls within 24 hours. No verdict word on either.
+- **Not rendered on purpose:** `week_ledger_v1` (the five weekly numbers — a standing block is the
+  same week twelve times) and the `holding`-vs-suppressed distinction (Q-289).
 
-### Unverified claims, stated as such
-- That the cards render at all. No human has seen them.
-- That `auto-attach-planned` links the Wednesday run reliably enough for the run card to have every
-  week. Never measured; a missing week there is a LINKER fault, not the card's.
+### Open, raised tonight, unstarted
+- **Q-289** — "holding" is a CLAIM stated for two different facts; a genuinely flat metric and a
+  noise-suppressed one are indistinguishable on the payload. Three rows. ⛔ Do not loosen the guard.
+- **Q-290** — run threshold pace has no history, which is why the run card has two rows not three.
+- **Get Stronger has no strength line at all** — nothing stamps `ME` outside the Standing Plan
+  composer. Neither does any off-plan session. Raised in `DEPLOY-OWED`, unruled.
 
-⚠️ **No `D-NNN` entries for this arc either** — same low-doc-overhead posture as the logger arc. The
-rulings live in `DEPLOY-OWED.md`, the work order, and the code comments, which are heavy on purpose.
+⚠️ **No `D-NNN` entries for either arc** — the low-doc-overhead posture continues. The rulings live in
+`DEPLOY-OWED.md`, the work orders, and code comments that are heavy on purpose.
 
 ## 🧭 SUPERSEDED — was START HERE (2026-08-26, late — the gear-gate + plate-trace handoff)
 
