@@ -14,11 +14,19 @@ import { STANDING_DE_SET_CUE, STANDING_ME_SET_CUE } from './strength-focus-copy.
 Deno.test('⛔⛔ CONSTRAINT FIRST — his wording, and the band comes off the row', () => {
   assertEquals(
     STANDING_ME_SET_CUE('1-5'),
-    '1-5 reps, stopped short of failure. If you get more than 5, log it.',
+    '1-5 reps, stop short of failure. If you get more than 5, log it.',
   );
-  // ⚠️ "Stopped short of failure" is p219, verbatim — and he defines ZERO reps in reserve as NOT
-  // failure (the last rep still completes, slowly), so the band is wider than the phrase sounds.
-  assert(STANDING_ME_SET_CUE('1-5').includes('stopped short of failure'));
+  /**
+   * ⛔ "stopped" → "stop", 2026-08-28, AND IT IS A SANCTIONED DEPARTURE FROM THE PAGE. p219 reads
+   * *"Each set is stopped short of failure"* — his grammar inside a full sentence, which reads wrong
+   * as a fragment on a card. Michael's call, and the claim is unchanged. Same policy `compose.ts`'s
+   * session-line block records: the claim is his, the words are ours.
+   * ⚠️ He defines ZERO reps in reserve as NOT failure (the last rep still completes, slowly), so the
+   * band is wider than the phrase sounds.
+   */
+  assert(STANDING_ME_SET_CUE('1-5').includes('stop short of failure'));
+  assertEquals(STANDING_ME_SET_CUE('1-5').includes('stopped short'), false,
+    'the participle came back — it reads wrong as a fragment');
   // The band is never restated as a literal: a band change has to move the sentence with it.
   assert(STANDING_ME_SET_CUE('2-6').startsWith('2-6 reps'));
   assert(STANDING_ME_SET_CUE('2-6').includes('more than 6'));
@@ -54,10 +62,34 @@ Deno.test('⛔ THE DIRECTION CLAUSE IS FOR THE UNPRICED ROW ONLY', () => {
   assertEquals(STANDING_ME_SET_CUE('1-5').includes('Assistance'), false, 'absent must mean priced');
 });
 
-Deno.test('⛔ THE LINE IS THE HEAVY SLOT\'S ALONE — the speed cue is untouched', () => {
+Deno.test('⛔⛔ THE SPEED CUE IS RETIRED — kept as a record, rendered nowhere', async () => {
+  /**
+   * ⛔ MICHAEL'S RULING, 2026-08-28. Once the approved per-intent SESSION line landed
+   * (`compose.ts` `SPEED_SET_END_CUE`), a speed card carried two instructions and every clause of
+   * this one was covered, contradicted, or a phrase he had cut: *"if the bar slows, it's too heavy"*
+   * is OURS, and *"add a little next time"* is the rep-chase tail already deleted from the ME cue.
+   *
+   * ⛔ THE CONSTANT STAYS BECAUSE THE RECORD DOES — its comment block is why those two phrases must
+   * not return, and a deleted constant takes its own reasoning with it. What is asserted here is
+   * that it has NO CALLER.
+   */
   const de = STANDING_DE_SET_CUE('2-4');
-  assertEquals(de.includes('stopped short of failure'), false,
+  assertEquals(de.includes('stop short of failure'), false,
     'the ME instruction leaked onto the speed slot, which already prints a reserve number');
+
+  const logger = await Deno.readTextFile(new URL('../components/StrengthLogger.tsx', import.meta.url));
+  assertEquals(/STANDING_DE_SET_CUE\s*\(/.test(logger), false,
+    'the retired speed cue is being rendered again');
+
+  /**
+   * ⛔⛔ AND `null` WOULD NOT HAVE MEANT "NO CUE". The logger renders `standingCue ?? titleCue`, so a
+   * DE row returning null FALLS THROUGH to `barSpeedCueFor` — and close-grip bench press is a
+   * secondary push in this frame AND on `MAIN_531_LIFTS`, so that card would have started printing
+   * *"Every rep explosive and controlled."*: Wendler's words on a Viada block, which is the exact
+   * defect the DE cue was originally written to beat. The suppression has to be explicit.
+   */
+  assert(/'suppressed'/.test(logger),
+    'the DE row lost its explicit suppression — it will fall through to the Wendler bar-speed cue');
 });
 
 Deno.test('⛔ AND IT PASSES THE COPY GATE', () => {
@@ -71,5 +103,5 @@ Deno.test('⛔ AND IT PASSES THE COPY GATE', () => {
 Deno.test('a malformed band degrades to the constraint rather than to a broken sentence', () => {
   // ⚠️ The band is read off `target_reps`, which is a row's own string; a row that lost it must not
   // print "If you get more than , log it."
-  assertEquals(STANDING_ME_SET_CUE('open'), 'open reps, stopped short of failure.');
+  assertEquals(STANDING_ME_SET_CUE('open'), 'open reps, stop short of failure.');
 });

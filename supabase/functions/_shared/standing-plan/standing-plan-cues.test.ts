@@ -44,7 +44,7 @@ const week = (n: number, column: 'standard' | 'taper' = 'standard') =>
     sessions: { name: string; type: string; description: string; tags: string[] }[];
   };
 
-Deno.test('⛔⛔ EVERY LIFTING SESSION SAYS WHERE THE SET ENDS — his words, verbatim', () => {
+Deno.test('⛔⛔ EVERY LIFTING SESSION SAYS WHAT KIND OF DAY IT IS — and the stop rule is on the card', () => {
   /**
    * ⛔ MICHAEL'S OWN SENTENCE, ITERATED THREE TIMES AND FINAL: *"End the set when your form goes or
    * you still have 1 or 2 reps left. Beyond that could mean longer recovery and fewer gains."*
@@ -78,8 +78,17 @@ Deno.test('⛔⛔ EVERY LIFTING SESSION SAYS WHERE THE SET ENDS — his words, v
       // rewrites before an athlete sees it. Asserting against the label from outside is the
       // independent check; using it inside the engine would not be.
       const isSpeedDay = /^DE:/.test(String(s.name ?? ''));
-      assertEquals(s.description, `${isSpeedDay ? SPEED_SET_END_CUE : SET_END_CUE} ${ACCESSORY_FATIGUE_CUE}`,
+      /**
+       * ⛔⛔ THE HEAVY DAY LOST ITS STOP RULE HERE, AND THAT IS THE RULING (2026-08-28). It was said
+       * twice on one screen — session level and every ME card — and Michael put it on the card,
+       * where the set you are stopping is. `SET_END_CUE` is untouched as a constant.
+       * ⚠️ THE SPEED DAY IS UNCHANGED. `SPEED_SET_END_CUE` is not a stop rule and has no per-card
+       * counterpart now that the DE card cue is retired. Do not symmetry-fix it.
+       */
+      assertEquals(s.description, isSpeedDay ? `${SPEED_SET_END_CUE} ${ACCESSORY_FATIGUE_CUE}` : ACCESSORY_FATIGUE_CUE,
         `${s.name} carries the wrong session line`);
+      assertEquals(String(s.description).includes(SET_END_CUE), false,
+        `${s.name} still stamps the stop rule at session level — it belongs on the card`);
       // ⛔ AND THE ACCESSORY LINE IS ON BOTH INTENTS. All four lifting days carry accessories, so the
       // fatigue rule that inverts on them (p84) is said on every one of them.
       assert(String(s.description).includes(ACCESSORY_FATIGUE_CUE), `${s.name} lost the accessory line`);

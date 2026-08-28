@@ -457,6 +457,29 @@ export const STANDING_ACCESSORY_SET_CUE = 'No weight is prescribed — find the 
  * ⚠️ THE DIRECTION CLAUSE SURVIVES ON UNPRICED ROWS ONLY. A pull-up has no prescribed weight and the
  * athlete picks assistance or added load; a bench at 150 lb has the number on the row already, and
  * repeating it there would read as licence to change it.
+ *
+ * ── ⛔ 2026-08-28: "stopped" → "stop", AND WHICH HALVES OF THIS LINE ARE HIS ─────────────────────
+ *
+ * ⛔ **THE GRAMMAR CHANGE IS SANCTIONED AND IS A DEPARTURE FROM THE PAGE.** p219 reads *"Each set is
+ * stopped short of failure"* — his grammar inside a full sentence, and it reads wrong as a fragment
+ * on a card. Michael's call. **The claim is unchanged.** This is the same policy `compose.ts`'s
+ * session-line block records at length: *the claim is his, the words are ours, the citation lives in
+ * the code.* ⚠️ Do not "restore" the participle to match the page.
+ *
+ * ⛔⛔ AND HE ASKED WHETHER THIS WHOLE LINE WAS VIADA'S. **HALF OF IT IS NOT, AND BOTH OURS EARN
+ * THEIR PLACE.** Recorded so nobody trims them as unsourced:
+ *
+ *   · *"If you get more than N, log it."* — **OURS. Not in the book.** It stays because after the
+ *     2026-08-28 RIR change the heavy rows carry NO reserve target (p218 gives ME none), so the
+ *     logged rep count is the ONLY signal this slot produces — and `standing-plan/progression.ts`'s
+ *     bar ladder reads exactly that. Without the line the athlete who gets six has no reason to
+ *     record it.
+ *   · *"Assistance if you need it, added weight if you don't."* — **OURS. Not in the book.** It is
+ *     the only thing on the screen that explains the Assist/+ column running in both directions.
+ *
+ * ⚠️ **BOTH ARE ABOUT THE APP, NOT ABOUT THE TRAINING**, and neither claims to be his. That is the
+ * test for whether an unsourced clause may ship: a training claim needs a page, an instruction about
+ * how to use this screen does not.
  */
 export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: boolean }): string => {
   const hi = String(band).match(/(\d+)\s*$/)?.[1] ?? '';
@@ -464,7 +487,7 @@ export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: bool
   const direction = opts?.loadPrescribed === false
     ? " Assistance if you need it, added weight if you don't."
     : '';
-  return `${band} reps, stopped short of failure.${more}${direction}`;
+  return `${band} reps, stop short of failure.${more}${direction}`;
 };
 
 /**
@@ -478,6 +501,35 @@ export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: bool
  * objective: *"Bar speed and quality of movement… Fatigue is discouraged."* The if-it-slows-down
  * stop rule is the field-standard speed-work regulator and is the same claim as his
  * fatigue-is-discouraged, stated as something an athlete can act on mid-set.
+ */
+/**
+ * ⛔⛔ RETIRED 2026-08-28 — IT NO LONGER REACHES A CARD, AND THE CONSTANT IS KEPT DELIBERATELY.
+ *
+ * Michael's ruling, after the approved per-intent SESSION line landed (`compose.ts`
+ * `SPEED_SET_END_CUE`). On a speed card he was reading two instructions, and every clause of this
+ * one was already covered, contradicted, or a phrase he had personally cut:
+ *
+ *   · *"move the bar fast and controlled"* → the session line's own first sentence.
+ *   · *"{band} reps"* → `targetHint` prints "target 2-4" directly underneath it.
+ *   · *"About 70-80% of your max"* → **the original defect.** On a bodyweight pull-up there is no
+ *     bar and no percentage field, only Assist/+.
+ *   · *"if the bar slows, it's too heavy"* → **OURS**, as this file said itself: the field-standard
+ *     speed regulator, *"the same claim as his fatigue-is-discouraged"*. Viada gives no in-set stop
+ *     rule for DE. Michael cut it on sight when approving the session line.
+ *   · *"add a little next time"* → the rep-chase / second-owner tail already deleted from
+ *     {@link STANDING_ME_SET_CUE} on 2026-08-26, on his own ruling. DE is in `advance-nudge.ts`'s
+ *     `ENGINE_OWNED_INTENTS`, so the engine owns that decision regardless.
+ *
+ * ⛔ **THE CONSTANT STAYS BECAUSE THE RECORD DOES.** Everything above is why two phrases must not
+ * come back, and a deleted constant takes its own reasoning with it. It has no caller; that is the
+ * point.
+ *
+ * ⚠️ **AND REMOVING ITS RENDER WAS NOT A DELETION AT THE CALL SITE.** `StrengthLogger` renders
+ * `standingCue ?? titleCue`, so a DE row returning `null` would have FALLEN THROUGH to
+ * `barSpeedCueFor` — and close-grip bench press is a secondary push in this frame and on
+ * `MAIN_531_LIFTS`, so it would have started reading *"Every rep explosive and controlled."*
+ * Wendler's words on a Viada block, which is the exact defect this cue was written to beat. The
+ * call site suppresses explicitly.
  */
 export const STANDING_DE_SET_CUE = (band: string): string =>
   `Speed sets — move the bar fast and controlled, ${band} reps. About 70-80% of your max — if the bar slows, it's too heavy. Still crisp every set: add a little next time.`;

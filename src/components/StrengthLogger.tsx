@@ -28,7 +28,6 @@ import {
   barSpeedLineFor,
   ACCESSORY_SET_CUE,
   STANDING_ACCESSORY_SET_CUE,
-  STANDING_DE_SET_CUE,
   STANDING_ME_SET_CUE,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
@@ -5632,12 +5631,36 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     ? ((exercise as any)?.slot_intent
                         ?? (/\bME\b/.test(standingSlotText) ? 'ME' : /\bDE\b/.test(standingSlotText) ? 'DE' : null))
                     : null;
-                  const standingCue = slotIntent === 'ME'
+                  /**
+                   * ⛔⛔ THE DE CARD SHOWS NOTHING NOW, AND "NOTHING" HAD TO BE SAID EXPLICITLY
+                   * (Michael's ruling, 2026-08-28).
+                   *
+                   * The per-card speed cue is gone. Every clause of it was already covered by the
+                   * approved session line, contradicted by it, or a phrase he had cut:
+                   * *"move the bar fast and controlled"* is the session line's own first sentence;
+                   * *"2-4 reps"* is printed directly underneath by `targetHint`; *"About 70-80% of
+                   * your max"* was the original defect (no bar and no percentage field on a pull-up);
+                   * *"if the bar slows, it's too heavy"* is OURS and he cut it on sight; *"add a
+                   * little next time"* is the rep-chase tail already deleted from the ME cue, and DE
+                   * is in `advance-nudge.ts`'s `ENGINE_OWNED_INTENTS` so the engine owns that
+                   * decision anyway.
+                   *
+                   * ⛔⛔ BUT `null` WOULD NOT HAVE MEANT NOTHING. The render below is
+                   * `standingCue ?? titleCue`, so a DE row returning null FALLS THROUGH to
+                   * `barSpeedCueFor` — and close-grip bench press is a secondary push in this frame
+                   * AND on `MAIN_531_LIFTS`, so that row would have started reading *"Every rep
+                   * explosive and controlled."* Wendler's words on a Viada block. **Deleting the DE
+                   * cue would have restored the exact defect the DE cue was written to beat** — the
+                   * comment above says so in as many words. `suppressed` is the difference between
+                   * "no standing cue" and "no cue".
+                   */
+                  const standingCue: string | null | 'suppressed' = slotIntent === 'ME'
                     ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'),
                         { loadPrescribed: exercise?.load_prescribed !== false })
                     : slotIntent === 'DE'
-                      ? STANDING_DE_SET_CUE(String(exercise?.target_reps || '2-4'))
+                      ? 'suppressed'
                       : null;
+                  const cardCue = standingCue === 'suppressed' ? null : (standingCue ?? titleCue);
                   /**
                    * ⛔ THE ADVANCE NUDGE — extracted to `@/lib/advance-nudge` on 2026-08-26, in the
                    * change that narrowed its scope. The rule it now enforces is a RULING — *a row the
@@ -5700,9 +5723,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         * it always means the same thing.
                         *
                         * ⚠️ ALL THREE CUES, NOT JUST THE SPEED ONE. This element renders
-                        * `STANDING_ME_SET_CUE`, `STANDING_DE_SET_CUE` and `barSpeedCueFor`'s title
-                        * cue — leaving any of them accented re-creates the problem with fewer
-                        * instances.
+                        * `STANDING_ME_SET_CUE` and `barSpeedCueFor`'s title cue — leaving either
+                        * accented re-creates the problem with fewer instances. ⚠️ It rendered
+                        * `STANDING_DE_SET_CUE` too until 2026-08-28; that cue no longer reaches a
+                        * card at all — see `standingCue` above.
                         *
                         * ⚠️ AND IT IS NOT A NEW TREATMENT. `white/55` is what the per-set
                         * `targetHint` line ("target 6-12 · 1 in reserve") and the `advanceNudge`
@@ -5710,9 +5734,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         * dimmer at `white/45` because it speaks for a whole group from outside the
                         * card; matching THAT would have put the rule below the observation under it.
                         */}
-                      {(standingCue || titleCue) && (
+                      {cardCue && (
                         <div className="px-1.5 pt-0.5 pb-2 text-[11px] font-medium text-white/55 leading-snug">
-                          {standingCue ?? titleCue}
+                          {cardCue}
                         </div>
                       )}
                       {/* The detected advance trigger — a fact about last session, dimmer than the

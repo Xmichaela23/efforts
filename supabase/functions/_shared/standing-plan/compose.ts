@@ -1624,8 +1624,25 @@ export const ACCESSORY_FATIGUE_CUE =
  */
 export function sessionCueFor(day: FrameDay): string {
   const competition = day.strength.find((s) => s.role === 'competition');
-  const setEnd = competition?.intent === 'DE' ? SPEED_SET_END_CUE : SET_END_CUE;
-  return `${setEnd} ${ACCESSORY_FATIGUE_CUE}`;
+  /**
+   * ⛔⛔ THE HEAVY DAY'S SESSION LINE CARRIES NO STOP RULE — MOVED, NOT DROPPED (Michael, 2026-08-28).
+   *
+   * ⚠️ IT WAS SAID TWICE ON ONE SCREEN. `SET_END_CUE` at the top of the day and *"stop short of
+   * failure"* on every ME card are the same instruction, and he ruled that **the card owns it**: a
+   * stop rule is about the set in front of you, and that is where you are looking when you need it.
+   *
+   * ⛔ SO A HEAVY DAY NOW CARRIES ONLY {@link ACCESSORY_FATIGUE_CUE}, AND THAT IS DELIBERATE, NOT AN
+   * OVERSIGHT. `SET_END_CUE` is untouched as a constant — his own verbatim sentence, its comment
+   * still forbids rewording, and `strength-focus-copy.ts`'s `STANDING_ME_SET_CUE` is where the same
+   * instruction now reaches him. **It stopped being stamped here; it did not stop being said.**
+   *
+   * ⚠️ AND THE SPEED DAY IS UNCHANGED — DO NOT SYMMETRY-FIX THIS. `SPEED_SET_END_CUE` is not a stop
+   * rule; it states what the day trains. It has no per-card counterpart at all now that the DE card
+   * cue is retired (`strength-focus-copy.ts` `STANDING_DE_SET_CUE`), so removing it would leave the
+   * speed day saying nothing about itself.
+   */
+  const dayLine = competition?.intent === 'DE' ? `${SPEED_SET_END_CUE} ` : '';
+  return `${dayLine}${ACCESSORY_FATIGUE_CUE}`;
 }
 
 /** ⛔ COMPOSE ONE WEEK. */
