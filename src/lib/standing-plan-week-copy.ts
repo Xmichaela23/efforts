@@ -450,6 +450,132 @@ export function unansweredLine(slots: SlotSelection): string | null {
   return `${named} ${names.length === 1 ? 'has' : 'have'} no sport yet.`;
 }
 
+// ── THE EXPERIENCE CONTROL — two chips per sport ────────────────────────────────────────────────
+
+/**
+ * ⛔⛔ THE HEADING AND THE SUBTITLE, PER SPORT — AND THE SUBTITLE NAMES THE HARD SESSIONS ONLY.
+ *
+ * ⛔ MICHAEL, 2026-08-27, CORRECTING HIS OWN EARLIER WORDING: *"the chip programs the HARD SESSION.
+ * That is what this control is for and it is the only thing its number may claim."* A draft read
+ * *"hard runs and your long run"*, and aiming the chip's number at that wider claim let the long run
+ * swallow it — both chips printed the Saturday long run's 90 and 100 while the hard run the athlete
+ * was actually choosing sat around 42-50.
+ *
+ * ⚠️ THE LONG SESSION STILL MOVES WITH THE ANSWER, AND THAT IS NOT A CONTRADICTION. `run_lsd` is in
+ * the tier map and p247 backs it — *"Mileage will be dictated by experience level"* — but what the
+ * tier moves there is the long session's FLOOR, not its ceiling: the hours dial climbs a base family
+ * to level 3 from wherever the tier starts it (p93). So the long run genuinely changes and genuinely
+ * is not what this chip's number is about.
+ *
+ * ⚠️ THE RIDE SIDE IS OURS AND THE ENGINE ALREADY SAYS SO — `LOW_VOLUME_RIDE_LEVELS_ARE_OURS`.
+ * p246's taper column has no cycling counterpart, so nothing on the page prescribes the smaller
+ * ride. The levels themselves are his (p238, p239); using them for a newer rider is ours.
+ */
+export const EXPERIENCE_HEADING: Record<SlotSport, string> = {
+  run: 'Running experience',
+  ride: 'Riding experience',
+};
+
+export const EXPERIENCE_SUBTITLE: Record<SlotSport, string> = {
+  run: 'Sets how long your hard runs are.',
+  ride: 'Sets how long your hard rides are.',
+};
+
+/**
+ * ⛔ THE TWO ANSWERS, AND THERE IS NO THIRD (Michael: *"if its not associated with 5k plus stregnth
+ * than no"*). Strength + 5K uses exactly two levels per hard session — the standard week and the
+ * taper week. Level 3 never appears on the Monday session in this program, so there is no third rung
+ * to offer.
+ */
+export const EXPERIENCE_LABEL: Record<'newer' | 'experienced', string> = {
+  /**
+   * ⛔⛔ "Newer" IS OUT (Michael, 2026-08-27). This product's athletes are not novices — the stated
+   * customer is 10-30 mi/wk runners, weekend riders and burnt-out triathletes — and "Newer" calls
+   * them beginners on the one screen where they are describing what they already do.
+   *
+   * ⛔ THE REPLACEMENT IS THE BOOK'S OWN CONTRAST, p247: *"more proficient runners"* against *"less
+   * experienced runners"*. Symmetrical, and neither half implies a novice.
+   *
+   * ⚠️ THE STORED VALUES ARE UNCHANGED — `'newer'` and `'experienced'` are what the wizard, the plan
+   * row and the composer pass around, and they are already on blocks. These are the words the
+   * athlete reads; renaming the keys would be a migration for a copy change.
+   */
+  newer: 'Less experienced',
+  experienced: 'More experienced',
+};
+
+/**
+ * ⛔ WHAT THE CHIP READS. Three facts, one line: the tier, the longest session it gives, and the
+ * weekly hours it needs for that sport.
+ *
+ * ⛔ AND THE CLAIM IS ABOUT THE TIER, NEVER ABOUT A PAGE. *"up to 46 min"* is true — it is what the
+ * tier gives. *"your session from p234"* would not be: the levels, the work bands, the session
+ * shapes and the durations they produce are HIS, and the exact repeat-by-interval combination inside
+ * them is OURS. ⛔ Never name the author against a specific workout.
+ */
+export function experienceChipLine(
+  tier: 'newer' | 'experienced',
+  longestMin: number | null,
+  needsHours: number,
+): string {
+  const hours = `needs ${needsHours}h/wk`;
+  /**
+   * ⚠️ NO DURATION WHEN THIS SPORT FILLS NEITHER HARD SLOT. There is no hard session of it in the
+   * week, so the chip states the hours alone rather than a number about a session it is not setting.
+   * ⛔ The answer still matters there — it moves that sport's long session floor, which is what the
+   * hours figure moves with.
+   */
+  if (longestMin == null) return `${EXPERIENCE_LABEL[tier]} · ${hours}`;
+  /**
+   * ⛔⛔ NO "up to" — THE HARD SESSION IS A FIXED DOSE (Michael, 2026-08-27). `ladderOf` collapses a
+   * non-base family's rung to a POINT: p246 assigns the level and the hours never pull on it, so the
+   * session is this length at every hours ask. *"up to 43 min"* would overstate a number that cannot
+   * vary, and a hedge on a fixed figure reads as the app not knowing its own plan.
+   * ⚠️ PINNED BY A TEST that sweeps the hours and asserts the built hard session does not move.
+   */
+  return `${EXPERIENCE_LABEL[tier]} · ${longestMin} min · ${hours}`;
+}
+
+/**
+ * ⛔ WHY THE TOP CHIP IS DEAD, ON THE CHIP ITSELF. A greyed control with no reason sends the athlete
+ * back up the screen guessing — so the "needs Xh/wk" stays readable on it and this line says what
+ * would change it. ⚠️ It names the hours row directly above the chips, which is the control that
+ * unlocks it.
+ */
+export function experienceGatedLine(sport: SlotSport, needsHours: number): string {
+  // ⚠️ IT NAMES THE CHIP IT IS ABOUT, in the chip's own words — see `EXPERIENCE_LABEL`.
+  return `${EXPERIENCE_LABEL.experienced} needs ${needsHours} hours of `
+    + `${sport === 'run' ? 'running' : 'riding'} a week.`;
+}
+
+/**
+ * ⛔⛔ THE LOWER TIER NEVER GATES (Michael: *"lower never gates just top"*). It is the plan's own
+ * floor — if the athlete's hours do not reach even that, the problem is the hours ask and the week
+ * already flags it there. Leaving both chips dead would be the screen refusing to be answered.
+ *
+ * ⛔ THE TOP TIER GATES ON THE HOURS FOR THAT SPORT ALONE, and only once a number has been given:
+ * an empty hours box is no opinion, not a small one.
+ */
+export function experiencedIsReachable(
+  hours: number | null | undefined,
+  needsHours: number,
+): boolean {
+  const n = Number(hours);
+  if (!Number.isFinite(n) || n <= 0) return true;
+  return n >= needsHours;
+}
+
+/**
+ * ⛔ WHAT THE SCREEN SAYS WHILE THE EXPERIENCE ROWS ARE STILL BLANK — same voice as
+ * `unansweredLine`: it names what is missing and nothing else, no imperative.
+ */
+export function experienceUnansweredLine(sports: SlotSport[]): string | null {
+  if (sports.length === 0) return null;
+  const names = sports.map((sp) => (sp === 'run' ? 'running' : 'riding'));
+  const named = names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
+  return `${named} experience ${names.length === 1 ? 'has' : 'have'} no answer yet.`;
+}
+
 // ── THE LIFTING RATE, FROM HIS ANCHORS ONLY ─────────────────────────────────────────────────────
 
 export type LiftingRateTier = 'hard_on_bike' | 'one_hard_run' | 'two_hard_runs';

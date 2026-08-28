@@ -368,6 +368,40 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
   ride_endurance: 1,
 };
 
+/**
+ * ⛔⛔ NO RIDE IS EVER BUILT ABOVE HIS LEVEL 2 (Michael, 2026-08-27, off p278).
+ *
+ * ⛔ THE DEFECT IT CLOSES, MEASURED. A ride inherits the SLOT's difficulty through
+ * `RIDE_EQUIVALENT`, and the frame's second hard slot is `run_near_threshold` at LEVEL 3 (p246). So
+ * an athlete who put a ride on that slot was handed `ride_sweet_spot` level 3 — a dose the book
+ * prescribes to nobody.
+ *
+ * ⛔ p278, HIS OWN CYCLING BASE STANDARD WEEK, read off the page image: day 1 `Cyc sweet spot
+ * (level 1-2)`, day 3 `Cyc VO2 (level 1)` + `Cyc sweet spot (level 1)`, day 5 `Cyc sprint
+ * (level 1)`, day 7 `Cyc endurance (level 2)`. **Level 2 is the ceiling anywhere in his cycling
+ * programs, and it appears on one session.** Level 3 sweet spot exists in the session library
+ * (p239) and he prescribes it in no program — so offering it on a Wednesday ride hands a hybrid
+ * athlete a harder dose than the book gives a dedicated cyclist.
+ *
+ * ⚠️ THE RUN SIDE IS UNTOUCHED. The Wednesday RUN stays at level 3, which is exactly what p246
+ * prints for it and what p247 calls *"the hardest session of the week."*
+ * ⚠️ IT IS A CLAMP, NOT A TIER. It binds whatever the level came from — the frame, the experience
+ * answer, or an explicit caller override — because the argument is about the bike, not about who
+ * asked.
+ */
+export const RIDE_LEVEL_CEILING: Level = 2;
+
+export const RIDE_LEVEL_CEILING_CITE =
+  'No ride is built above level 2. p278\'s Cycling Base standard week tops out at level 2 and uses '
+  + 'it on one session; level 3 sweet spot is in the p239 library and is prescribed in none of his '
+  + 'cycling programs.';
+
+/** The level a slot is actually built at, with the bike's own ceiling applied. */
+export function clampRideLevel(family: string, level: Level): Level {
+  if (!family.startsWith('ride_')) return level;
+  return (level > RIDE_LEVEL_CEILING ? RIDE_LEVEL_CEILING : level) as Level;
+}
+
 export const LOW_VOLUME_RIDE_LEVELS_ARE_OURS =
   'Building the ride slots at level 1 for a lower-volume rider is ours. The levels are his — p238 '
   + 'and p239 print each session at three — but the taper column that justifies the smaller dose on '
@@ -409,6 +443,49 @@ export function lowVolumeLevels(lowSports: Array<'run' | 'ride'>): Record<string
     if (lowSports.includes(sport)) out[family] = level;
   }
   return out;
+}
+
+/**
+ * ⛔⛔ THE ATHLETE'S OWN EXPERIENCE ANSWER, PER SPORT — AND IT IS THE SOLE INPUT TO THE LEVEL
+ * (Michael, 2026-08-27). Two answers, no third.
+ *
+ * ⛔ WHAT IT REPLACES, AND WHY. Until today the level was decided from the athlete's LAST 28 DAYS of
+ * logged running and riding (`lowVolumeSports`, gated on `demonstratedWeeklyMinutes`). Michael's own
+ * case is the whole argument: *"im coming off a marathon a few months ago I was training less, this
+ * is the wrong thing."* A 28-day window measures the last month, not training age — post-race,
+ * injured, off-season, on holiday, or simply not syncing a watch all read as beginner.
+ *
+ * ⛔ AND THE SOURCE NAMES THE RIGHT QUANTITY. p247 says *"experience level"* and gives no mileage
+ * qualifier anywhere. Every number in the gate this replaces was ours.
+ *
+ * ⛔ NO FALLBACK AND NO CORRECTION. History does not decide it, does not break a tie, and does not
+ * revise it later. The athlete answers and that is the level.
+ */
+export type ExperienceTier = 'newer' | 'experienced';
+
+/** The answer per sport. ⚠️ A sport with no answer takes the frame's own printed levels — the same
+ *  thing "Experienced" applies — because absent is not a claim that they are new to it. */
+export type EnduranceExperience = { run?: ExperienceTier | null; ride?: ExperienceTier | null };
+
+export const EXPERIENCE_IS_THE_ATHLETES_ANSWER =
+  'The two sizes are his — p246\'s taper column prescribes the quality sessions at level 1, and '
+  + 'p247 states the 90-to-100-minute long run as the more proficient runner\'s figure. WHICH of '
+  + 'the two an athlete gets is now their own answer, asked once in the wizard. It was inferred '
+  + 'from the last four weeks of logged training until 2026-08-27; the source names "experience '
+  + 'level" and never recent mileage.';
+
+/**
+ * The endurance levels the athlete's own answer sets, per family.
+ *
+ * ⛔ "Newer" APPLIES `LOW_VOLUME_TIER_LEVELS` FOR THAT SPORT. "Experienced" APPLIES NOTHING — the
+ * frame's own printed levels, p246 as transcribed. ⚠️ So this is a swap of the gate's INPUT, not a
+ * new level system: the mapping is unchanged and `lowVolumeLevels` still owns it.
+ */
+export function experienceLevels(
+  experience: EnduranceExperience | null | undefined,
+): Record<string, Level> {
+  const newer = (['run', 'ride'] as const).filter((sp) => experience?.[sp] === 'newer');
+  return lowVolumeLevels(newer);
 }
 
 /**

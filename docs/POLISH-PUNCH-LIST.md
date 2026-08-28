@@ -738,6 +738,117 @@ The reorganized State (Building vs Holding, posture-aware metric per discipline 
 
 ---
 
+### ⛔ THE BIKE TAKES OVER THE WEEK AND WE KEEP BUILDING A RUNNING PROGRAM (NOTED 2026-08-27)
+
+**The question this answers, Michael's words:** *"does our cycling lighten the fatigue of a run
+program to comfortably add on cycling, or does the fatigue cycling might hide along with running add
+more fatigue and require his reduced cycling and strength?"* **Both, and the deciding factor is
+whether the bike REPLACES running or ADDS to it.**
+
+⛔ **VIADA ANSWERS BOTH CASES AND THEY DO NOT CONTRADICT.** Read off the page images, not the corpus
+notes.
+
+- **p137 — replacing is the lighter option.** For a runner at their own ceiling (his example: *"18 to
+  20 miles per week running… represents your current upper bound"*), *"adding two hours of cycling or
+  Arc Trainer/elliptical per week will almost certainly aid your running, as long as you properly
+  maintain recovery."* His default still stands alongside it: *"when in doubt, use cross-training for
+  easy work, not threshold or sprint work."*
+- **p138 — and hard cross-training has its own permission.** *"Cross-training at higher intensities
+  may be useful for athletes who are limited in their overall volume even at an advanced level"*,
+  summarised in his own bullets as *"consider adding some work at higher intensity with similar
+  modalities if you're really pushing the limits of your tolerable volume."* ⚠️ Giving a run slot to
+  the bike caps that athlete's running, so the swap sits inside this permission.
+- **p280 — but riding as the main sport costs a lifting day.** *"Cycling can be surprisingly taxing
+  on the central nervous system — surprising in that the lack of impact may allow for fatigue
+  accumulation that is not 'felt' the same way… fatigue will mask fitness quite thoroughly… you
+  should expect somewhat lowered performance on the lower body days… you may want to proactively
+  lower your working max by a few more percentage points than usual."*
+
+⛔ **WHAT WE DO THAT HE NEVER DOES: keep FOUR lifting days while the bike takes the week.** p246's
+Strength + 5K is four lifting days against four RUNS. p278's Cycling Base is **three** lifting days
+against **six rides** — he collapses the two DE days into one `DE: Full` and adds a `SKILL: Carry`.
+⚠️ Days 1 and 2 are otherwise WORD-FOR-WORD IDENTICAL between the two programs, so the lifting
+difference is exactly that one collapsed day, and p280 says why.
+
+## ⛔ THE LINE, AND IT IS OURS — THE SECOND HARD RIDE
+
+He gives no threshold, so this is ours and is labelled. **Count the HARD slots, not the rides.**
+
+| the athlete's answers | verdict |
+|---|---|
+| **no hard rides** (bike on the easy/long slots only) | his blessed case, p137 exactly. Nothing changes. |
+| **one hard ride** | inside p138's volume-capped permission. The week still holds real running quality. Nothing changes. |
+| **two hard rides** | ⛔ **no running quality left at all.** A cycling week with a 5K program's lifting bolted on — and p278-280 already answer that week. |
+
+⚠️ **COUNTING RIDES WOULD MISS IT.** The line can be crossed with only two of the four endurance
+slots on the bike, and NOT crossed with two rides on the easy and long days — which is his own
+preferred arrangement.
+
+## ⛔ THE BUILD, WHEN IT COMES — offer his cycling program, never switch silently
+
+**Michael, 2026-08-27:** *"can we be smart enough… to shift to the riding program if there is 2 hard
+rides and it becomes clear this person is a cyclist who runs a little?"* ✅ Yes, and the book is built
+for it — **programs name their own successors** (roster §E0 fact 2), and Cycling Base is his named
+entry point: *"if you have less experience, I encourage you to run the Base program for at least 4
+weeks before attempting the others"* (p280).
+
+**What it needs:**
+1. **The Cycling Base week, p278** — transcribe the table. Standard: day 1 `ME Upper` + Cyc sweet
+   spot (level 1-2) · day 2 `ME Lower` + Cyc endurance (1) · day 3 plyo warm-up + Cyc VO2 (1) + Cyc
+   sweet spot (1) · day 4 `DE: Full` + `SKILL: Carry`, no ride · day 5 Cyc endurance (1) + Cyc sprint
+   (1) · day 7 Cyc endurance (2) · rest. Deload column drops every ride to level 1 and cuts day 2's
+   second ME to DE.
+2. **Its notes, p280** — the lowered working max, and the powerlifting line: *"For powerlifters, the
+   Base and Fondo programs offer the best framework for competitive lift training… the big three can
+   be trained one or two times per week, both dynamically and through max effort lifting."*
+3. **p279 Fondo and p281 Crit** are the successors, not the entry. ⚠️ Crit cuts strength to *"DE
+   secondary movements"* only and says to switch back to Base for 4-6 weeks to peak strength.
+4. **Detection is already in the athlete's answers** — two hard rides on the endurance screen is the
+   whole signal. No history read, no inference. ⛔ Which keeps it clear of the 28-day-window defect
+   the experience control exists to remove.
+
+⛔ **OFFER IT, DO NOT SWITCH SILENTLY** (Michael). Something in the shape of *"you've put both hard
+sessions on the bike — his cycling program fits you better. Want it?"*
+⚠️ **BASE IS A FOUR-WEEK ENTRY BLOCK IN HIS BOOK, NOT A TWELVE-WEEK PLAN.** The switch has a shape,
+not just a swap.
+
+⛔ **NO UI FOR THIS UNTIL IT IS BUILT** (Michael, 2026-08-27: *"we dont have to dress up ui for
+something not built"*). No stopgap sentence on the endurance screen, no teaser, no disabled control.
+
+⚠️ **PAGE IMAGES ARE LOCAL ONLY** — `~/Efforts_Local_Folder/book-sources/viada-hybrid-athlete/`,
+`p278.jpg` `p279.jpg` `p280.jpg` `p281.jpg` `p137.jpg` `p138.jpg`. Deliberately not in git. Read the
+page, not the corpus summary: the corpus bullet *"similar-modality threshold work only when
+volume-capped"* is a compression and is NOT his sentence.
+
+---
+
+### THE RIDE SESSIONS ARE BUILT FROM A DIAL, AND HE WROTE A MENU (NOTED 2026-08-27)
+
+⚠️ **A SECOND-ORDER FINDING off the same session — not blocking the experience control, and it
+touches the RUN sessions equally.** He prints **four** sweet-spot rides per level (p238-239); the
+library models the level as a work BAND and builds somewhere inside it, currently the middle
+(`volume-bounds.ts` — a quality rung collapses to `DEFAULT_SIZE`). **Neither the middle nor the
+bottom is one of his four sessions.**
+
+**Measured, 2026-08-27, weeks 2-5 at 3h/5h/8h asks — the hard ride is 43 min at level 1 and 51 at
+level 2, identical at every hours ask.** Against his own printed sessions with the 10-15 min easy-spin
+warm-up (he states no cooldown for sweet spot):
+
+| | his shortest printed | his longest printed | what we build |
+|---|---|---|---|
+| **level 1** | ~45 min (6 × 4 min @ 95%) | ~70 min (3 × 15 min @ 80%) | 43 min |
+| **level 2** | ~60 min (8 × 4 min @ 95%) | ~85 min (3 × 20 min @ 80%) | 51 min |
+
+⛔ **WHY IT MATTERS BEYOND FIDELITY:** the two tiers of the experience control land 8 minutes apart
+on the bike, which Michael read as *"nominal"* — and the cause is the dial, not the levels. His own
+levels are 15-25 minutes apart at both ends of the menu.
+⚠️ **DO NOT "FIX" THIS BY REINTRODUCING A RATIO.** A 1.5x run-to-ride equivalence was floated and
+withdrawn — it is not his, and p280 states his own version anyway (*"some of these cycling workouts
+may easily run 50 percent longer than a comparable running session"*), which is an observation about
+his sessions, not a construction rule for ours.
+
+---
+
 # 5. BLOCKED ON MICHAEL
 
 Nothing here moves without you.

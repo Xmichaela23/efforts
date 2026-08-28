@@ -737,8 +737,30 @@ Deno.serve(async (req: Request) => {
           baselines: ub as never,
           equipment: equipmentStrength,
           demonstratedWeeklyMiles: demonstrated.weeklyMiles,
-          // ⛔ THE LOW-VOLUME TIER'S GATE — minutes per sport, compared against what this week's own
-          // slots would build at their shortest (`lowVolumeSports`).
+          /**
+           * ⛔⛔ THE ATHLETE'S OWN EXPERIENCE ANSWER, PER SPORT — THE SOLE INPUT TO THE ENDURANCE
+           * LEVEL (Michael, 2026-08-27). The wizard asks it once, per sport, on the Endurance focus
+           * step, and gates Continue on it.
+           *
+           * ⚠️ VALIDATED HERE RATHER THAN TRUSTED, and per sport: an unrecognised value drops THAT
+           * sport rather than the pair, and a dropped sport takes the frame's own printed levels —
+           * which is what every block built before this shipped already carries.
+           */
+          enduranceExperience: (() => {
+            const raw = (body as Record<string, unknown>).endurance_experience;
+            if (!raw || typeof raw !== 'object') return undefined;
+            const out: Record<string, string> = {};
+            for (const sport of ['run', 'ride'] as const) {
+              const v = (raw as Record<string, unknown>)[sport];
+              if (v === 'newer' || v === 'experienced') out[sport] = v;
+            }
+            return Object.keys(out).length > 0 ? out as never : undefined;
+          })(),
+          /**
+           * ⛔ IT NO LONGER DECIDES THE LEVEL (2026-08-27) — `enduranceExperience` above does, with
+           * no fallback to this. Still measured and still sent: the field stays on the composer for
+           * its other readers, and removing it was ruled out of scope the same day.
+           */
           demonstratedWeeklyMinutes: demonstratedMinutes,
           /**
            * ⛔ THE ATHLETE'S SPORT MIX (slice 4). ⚠️ A RATIO, NOT A COUNT — pivot §2: *"the program

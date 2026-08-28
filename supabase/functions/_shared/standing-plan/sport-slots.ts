@@ -17,6 +17,7 @@
 
 import { FAMILIES } from '../endurance-library/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
+import { clampRideLevel } from './frames.ts';
 import type { EnduranceSlot, FrameDay } from './frames.ts';
 
 export type SportMix = {
@@ -98,7 +99,37 @@ export type AssignedSlot = {
  * long run; it gives no family-to-family mapping, and neither does anything else in the corpus.
  */
 export const RIDE_EQUIVALENT: Partial<Record<FamilyId, { family: FamilyId; archetype: string }>> = {
-  run_mlss: { family: 'ride_sweet_spot', archetype: 'medium' },
+  /**
+   * ⛔⛔ THE HARD RIDE IS HIS LONGEST PRINTED SWEET-SPOT SESSION — 3 rounds of 20 min @ 80%, p238-239
+   * (Michael, 2026-08-27), which builds to about 68 minutes at level 1 and 75 at level 2.
+   *
+   * ⛔ WHY IT MOVED OFF `medium`. That shape gave 43 minutes at level 1 and 51 at level 2 — an
+   * eight-minute gap between the two experience answers, which is not a choice worth a control. The
+   * cause is not the tier: a quality rung is a fixed dose at the middle of its band (`ladderOf`) and
+   * his two cycling levels' middles sit close together on that shape. The longest shape ladders.
+   * ⚠️ AND IT IS HIS SESSION, NOT OUR ARITHMETIC. A 1.5x run-to-ride ratio was proposed for the same
+   * numbers and WITHDRAWN — it was ours. Both figures here are sessions he prints.
+   * ⚠️ LEVEL 3 IS UNREACHABLE ANYWAY — see `clampRideLevel`. So this shape's 83-minute level 3 never
+   * arrives, and the pair is 68 / 75.
+   *
+   * ⛔⛔ SEVEN MINUTES BETWEEN THE TWO EXPERIENCE ANSWERS IS NOT A WEAK LADDER — IT IS HIS OWN SPAN,
+   * AND THIS NOTE EXISTS SO IT IS NOT "FIXED" (Michael, 2026-08-27).
+   *
+   * p278, Cycling Base, standard week, day 1: `Cyc sweet spot (level 1-2)`. **That is the only cell
+   * in the captured corpus where he prescribes a SPAN of levels rather than one level.** Every other
+   * cell in every program table names a single level. On this session — the hard ride on day 1,
+   * which is exactly the slot the placement rule now puts it on — he deliberately leaves the choice
+   * between level 1 and level 2 to the rider. The two chips ARE his "level 1-2", spelled out.
+   *
+   * ⛔ SO THERE IS NOTHING TO WIDEN AT EITHER END. Level 1 is the floor of his span, and p280 is a
+   * reason to KEEP it rather than raise it: cycling *"may allow for fatigue accumulation that is not
+   * 'felt'"*, so the smaller dose has to stay available to a rider carrying more than they can
+   * sense. Level 2 is the top of his span and also `clampRideLevel`'s ceiling; the two agree.
+   * ⚠️ EVERY WIDER GAP WAS FLOATED ON 2026-08-27 AND WITHDRAWN — a run-to-ride ratio, a different
+   * position in the band, the top of the band instead of its middle. The gap is seven minutes
+   * because his span is seven minutes wide.
+   */
+  run_mlss: { family: 'ride_sweet_spot', archetype: 'tempo' },
   run_near_threshold: { family: 'ride_sweet_spot', archetype: 'long' },
   run_vt1: { family: 'ride_endurance', archetype: 'steady' },
   run_lsd: { family: 'ride_endurance', archetype: 'steady' },
@@ -341,6 +372,66 @@ function applyVariantPicks(
  *
  * ⛔ THE SLOT COUNT NEVER MOVES. `runs` and `rides` set a ratio against the frame's own count.
  */
+/**
+ * ⛔⛔ ONE HARD RUN AND ONE HARD RIDE LAND IN A FIXED PLACE, WHATEVER ORDER THEY WERE ANSWERED IN
+ * (Michael, 2026-08-27): *"follow his rules."* The picker's order must not decide the week.
+ *
+ *   HARD RIDE → hard slot 1, his day 1.   HARD RUN → hard slot 2, his day 3.
+ *
+ * ⛔ BOTH HALVES ARE SOURCED, and together they give each sport the dose its own page prescribes:
+ * p278's Cycling Base puts `Cyc sweet spot (level 1-2)` on DAY 1 — day 1 is where he places the hard
+ * ride, and level 2 is its ceiling (`clampRideLevel`). p246's Strength + 5K puts `NT (level 3)` on
+ * DAY 3, and p247 calls it *"the hardest session of the week"*; that session is a RUN in his program
+ * and it stays a run at level 3.
+ *
+ * ⛔ WHAT THE OTHER ARRANGEMENT COSTS, recorded so it is not re-proposed. Ride on day 3 and run on
+ * day 1 caps the ride at level 2 on the hardest day AND drops the run to day 1's easier dose — so
+ * the athlete's running never gets its quality session at all.
+ *
+ * ⚠️ ONE RULE FOR ONE CASE, AND IT MUST NOT GROW INTO A PLACEMENT ENGINE (Michael: *"I'll worry
+ * about those nuances later"*). Two hard runs, two hard rides, and the easy and long slots are
+ * untouched — this fires only on the exact one-of-each pair, and only to swap it into his order.
+ * ⚠️ NOT p247's CROSS-TRAINING ESCAPE HATCH, which permits converting the day 3 run for *"larger
+ * athletes who experience more wear and tear from running."* That is a different athlete and a
+ * different control; nothing here removes it.
+ */
+export const HARD_PAIR_ORDER_IS_HIS =
+  'A hard ride takes his day 1 and a hard run takes his day 3, whichever way round they were '
+  + 'picked. p278 places the hard ride on day 1 of his cycling week; p246 places the near-threshold '
+  + 'run on day 3 and p247 calls it the hardest session of the week.';
+
+/** The frame keys of the two hard slots — `${frameDay}:${indexWithinDay}`, same as `mix.slots`. */
+export const HARD_SLOT_FRAME_KEYS = { hard1: '1:0', hard2: '3:0' } as const;
+
+/**
+ * The two hard answers in his order. ⚠️ TOTAL AND IDEMPOTENT — every other pair, and any pair with
+ * an unanswered or declined half, comes back exactly as it went in.
+ */
+export function hardPairInFrameOrder<T extends string>(
+  hard1: T | undefined, hard2: T | undefined,
+): { hard1: T | undefined; hard2: T | undefined } {
+  if (hard1 === 'run' && hard2 === 'ride') {
+    return { hard1: hard2, hard2: hard1 };
+  }
+  return { hard1, hard2 };
+}
+
+/** The athlete's per-slot answers with the one-of-each pair put in his order. */
+export function hardSlotsInFrameOrder(
+  slots: Record<string, string> | null | undefined,
+): Record<string, string> | null | undefined {
+  if (!slots) return slots;
+  const a = slots[HARD_SLOT_FRAME_KEYS.hard1];
+  const b = slots[HARD_SLOT_FRAME_KEYS.hard2];
+  const put = hardPairInFrameOrder(a, b);
+  if (put.hard1 === a && put.hard2 === b) return slots;
+  return {
+    ...slots,
+    [HARD_SLOT_FRAME_KEYS.hard1]: put.hard1 as string,
+    [HARD_SLOT_FRAME_KEYS.hard2]: put.hard2 as string,
+  };
+}
+
 export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
   const runs = Math.max(0, Math.round(Number(mix.runs) || 0));
   const rides = Math.max(0, Math.round(Number(mix.rides) || 0));
@@ -378,6 +469,12 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
    * See `SportMix.slots`. ⚠️ A slot the caller did not name keeps the frame's own run.
    */
   if (mix.slots && Object.keys(mix.slots).length > 0) {
+    /**
+     * ⛔ HIS ORDER, NOT THE PICKER'S — see `hardPairInFrameOrder`. Applied here rather than at the
+     * screen alone, because a payload can arrive from a client that never normalised anything and
+     * the built week is what the athlete trains.
+     */
+    const answered = hardSlotsInFrameOrder(mix.slots) as Record<string, string>;
     let substituted = 0;
     let declined = 0;
     // ⚠️ RESOLVED BEFORE THE LOOP so every declined hard slot reads the SAME easy answer, whatever
@@ -387,13 +484,13 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
     const easySport = ((): 'run' | 'ride' | null => {
       for (const { day, i, slot } of open) {
         if (isHardSlot(slot) || isLongSlot(slot)) continue;
-        const a = mix.slots?.[key(day, i)];
+        const a = answered[key(day, i)];
         if (a === 'run' || a === 'ride') return a;
       }
       return null;
     })();
     for (const { day, i, slot } of open) {
-      const asked = mix.slots[key(day, i)];
+      const asked = answered[key(day, i)];
       // ⛔ DECLINED — the athlete added no hard session here. Convert, never remove. ⚠️ Guarded on
       // `isHardSlot`: `'none'` on an easy or long slot is meaningless (they are not opt-in) and is
       // ignored rather than quietly emptying the week.
@@ -411,7 +508,10 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
       const eq = RIDE_EQUIVALENT[slot.family];
       if (!eq) continue;
       byKey[key(day, i)] = {
-        family: eq.family, level: slot.level, archetype: eq.archetype, raceTempo: slot.raceTempo,
+        // ⛔ THE BIKE'S OWN CEILING — see `clampRideLevel`. A ride inherits the SLOT's difficulty,
+        // and the frame's second hard slot is level 3, which his cycling programs never prescribe.
+        family: eq.family, level: clampRideLevel(eq.family, slot.level),
+        archetype: eq.archetype, raceTempo: slot.raceTempo,
         sport: 'ride', substituted: true, sourceText: slot.sourceText,
       };
       substituted += 1;

@@ -17,22 +17,28 @@ import {
   type SlotKey,
   type SlotSelection,
   type SlotSport,
+  experiencedIsReachable,
+  experienceUnansweredLine,
 } from '@/lib/standing-plan-week-copy';
 import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy } from '@/lib/hard-slot-choices';
 import { SLOT_FAMILY } from '@/lib/standing-plan-week-bounds';
-import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import { hardPairInFrameOrder, RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import {
   fixedHoursLine, slotSpans, type SlotSpec,
 } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import { resolveEnduranceAnchors } from '../../supabase/functions/_shared/endurance-library/index.ts';
-import { slotsForEngine } from '@/lib/standing-plan-week-bounds';
+import { experienceChips, slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ THE SAME functions the SERVER's tier gate runs — client-reachable by design, so the line the
 // wizard shows and the tier the composer builds cannot disagree (item 8, 2026-08-24).
 import { demonstratedRunVolume, demonstratedWeeklyMinutes } from '../../supabase/functions/_shared/standing-plan/demonstrated-history.ts';
-import { advancedTierSessions, lowVolumeLevels } from '../../supabase/functions/_shared/standing-plan/frames.ts';
-import { lowVolumeSports } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
+import {
+  advancedTierSessions,
+  experienceLevels,
+  type EnduranceExperience,
+  type ExperienceTier,
+} from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 // ⛔ ONE READER FOR "is this the plyo day" — shared with the calendar chip. The tag, never the name.
@@ -1031,6 +1037,17 @@ type NonRaceState = {
    * `rideDays` are DERIVED from this rather than asked. See `EnduranceWeekCard.tsx`.
    */
   slotSports?: SlotSelection;
+  /**
+   * ⛔⛔ HOW LONG THIS ATHLETE'S HARD SESSIONS AND LONG SESSION ARE, PER SPORT — their own answer,
+   * asked once on the Endurance focus step (Michael, 2026-08-27). It is the SOLE input to the level.
+   *
+   * ⛔ IT REPLACED A MEASUREMENT, AND HISTORY IS OUT WITH NO FALLBACK. The level was inferred from
+   * the last 28 days of logged running and riding: *"im coming off a marathon a few months ago I was
+   * training less, this is the wrong thing."* A 28-day window measures the last month, not training
+   * age. ⚠️ Absent per sport = the frame's own printed levels; Continue is gated on an answer for
+   * every sport that fills a slot, so a block built through this wizard always carries one.
+   */
+  enduranceExperience?: EnduranceExperience;
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
   raceDate: string;
@@ -1679,6 +1696,24 @@ function assemblePayload(
               },
             }
             : {}),
+          /**
+           * ⛔⛔ THE EXPERIENCE ANSWER, PER SPORT (Michael, 2026-08-27) — the sole input to how long
+           * this athlete's hard sessions and long session are. ⚠️ It has to travel the WHOLE path:
+           * here, then `create-goal`'s forward, then `generate-strength-plan`'s body read, then the
+           * plan row's config — because `rematerialize-standing-block` re-composes the unstarted
+           * weeks off that row, and a block that rematerialises without it reverts to the frame's
+           * own levels mid-block with nothing said.
+           * ⚠️ Omitted when unanswered, and per sport — absent takes the frame's printed levels.
+           */
+          ...(() => {
+            if (!isStrengthFocusPath) return {};
+            const out: Record<string, string> = {};
+            for (const sport of ['run', 'ride'] as const) {
+              const v = state.enduranceExperience?.[sport];
+              if (v === 'newer' || v === 'experienced') out[sport] = v;
+            }
+            return Object.keys(out).length > 0 ? { endurance_experience: out } : {};
+          })(),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -2032,7 +2067,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined,
+    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined, enduranceExperience: undefined,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -3522,6 +3557,59 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       ride: demonstratedWeeklyMinutes((ctxWorkouts ?? []) as never, asOf, 'ride').weeklyMinutes,
     };
   }, [ctxWorkouts]);
+  /**
+   * ⛔⛔ THE TWO EXPERIENCE CHIPS' OWN NUMBERS, COMPUTED FROM THE SLOTS (2026-08-27). Read here as
+   * well as in the card because the SCREEN needs them for two jobs the card cannot do: gating
+   * Continue, and falling the selection back when the hours drop under the top tier's minimum.
+   * ⚠️ ONE OWNER, READ TWICE — `experienceChips` is the same function the card renders from, so the
+   * number the athlete sees and the number the gate tests cannot come apart.
+   */
+  const experienceOptions = useMemo(
+    () => experienceChips(slotSportsNow, { baselines: (baselinesRow ?? {}) as never }),
+    [slotSportsNow, baselinesRow],
+  );
+  /** The sports that actually fill a slot, so have an experience question. ⚠️ A sport the athlete
+   *  keeps but whose four slots carry none of it has nothing for the answer to size. */
+  const experienceSports: SlotSport[] = (['run', 'ride'] as const)
+    .filter((sp) => experienceOptions[sp] != null);
+  const experienceHoursFor = (sport: SlotSport): number | null => {
+    const raw = sport === 'run' ? state.targetRunHours : state.rideHours;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  /**
+   * ⛔⛔ LOWERING THE HOURS AFTER PICKING "Experienced" FALLS THE SELECTION BACK TO "Newer", VISIBLY
+   * (Michael, 2026-08-27). The hours sit ABOVE the chips, so an athlete can pick the top tier and
+   * then reduce the hours under its own minimum — and a week that silently does not fit is the exact
+   * failure this control exists to remove.
+   * ⚠️ IT MOVES THE ANSWER, IT DOES NOT JUST DISABLE THE CHIP. The athlete has to be able to see the
+   * change happen; a greyed chip over a stale selection would leave the screen and the block
+   * disagreeing about a decision they made.
+   */
+  useEffect(() => {
+    if (currentStep !== 'endurance') return;
+    for (const sport of experienceSports) {
+      const pair = experienceOptions[sport];
+      if (!pair) continue;
+      if (state.enduranceExperience?.[sport] !== 'experienced') continue;
+      if (experiencedIsReachable(experienceHoursFor(sport), pair.experienced.needsHours)) continue;
+      setState((st) => ({
+        ...st,
+        enduranceExperience: { ...(st.enduranceExperience ?? {}), [sport]: 'newer' },
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, experienceOptions, state.enduranceExperience, state.targetRunHours, state.rideHours]);
+  /**
+   * ⛔ CONTINUE WAITS ON THE EXPERIENCE ANSWER, exactly as it waits on all four slots (2026-08-27).
+   * A preselected "Newer" would silently hand beginner-sized sessions to everyone who does not notice
+   * the control — the precise defect this control exists to remove — and a preselected "Experienced"
+   * has the opposite failure and is worse, because it overreaches by default.
+   */
+  const experienceUnanswered: SlotSport[] = experienceSports
+    .filter((sp) => state.enduranceExperience?.[sp] !== 'newer'
+      && state.enduranceExperience?.[sp] !== 'experienced');
+
   const tierLine = useMemo(() => {
     const vol = demonstratedRun;
     const extra = advancedTierSessions(vol.weeklyMiles);
@@ -3682,25 +3770,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const fixedHoursLineFor = (sport: 'run' | 'ride'): string | null => {
     if (!allSlotsChosen(slotSportsNow)) return null;
     /**
-     * ⛔ THE LOW-VOLUME TIER APPLIES HERE TOO. This sentence names the hours the week FIXES, and the
-     * engine builds those sessions at the tier's levels — quoting the frame's printed levels to an
-     * athlete whose block is built at the smaller ones is the screen lying about the plan.
-     * ⚠️ THE GATE IS THE COMPARISON, NOT A THRESHOLD (2026-08-27): the frame's own slots at the
-     * levels p246 prints, floored, against what the athlete has actually logged. `frameSpecs` is
-     * therefore built BEFORE the tier is applied — measuring against an already-lowered week would
-     * let the athlete straight back out of it.
+     * ⛔ THE EXPERIENCE ANSWER APPLIES HERE TOO. This sentence names the hours the week FIXES, and
+     * the engine builds those sessions at the levels the answer picks — quoting the frame's printed
+     * levels to an athlete whose block is built at the smaller ones is the screen lying about the
+     * plan.
+     * ⚠️ THE INPUT MOVED ON 2026-08-27. It was the athlete's last 28 days of logged training,
+     * compared against the frame's own floor; history is out of the level entirely now.
      */
-    const frameSpecs = SLOT_KEYS.flatMap((k) => {
-      const sp = slotSportsNow[k];
-      if (!sp) return [];
-      const fam = SLOT_FAMILY[k];
-      const eq = sp === 'ride' ? RIDE_EQUIVALENT[fam.family] : null;
-      if (sp === 'ride' && !eq) return [];
-      return [{ family: (eq?.family ?? fam.family), level: fam.level, archetype: eq?.archetype, sport: sp }];
-    }) as SlotSpec[];
-    const tierLevels = lowVolumeLevels(
-      lowVolumeSports(frameSpecs, enduranceAnchorsNow, demonstratedMinutes),
-    );
+    const tierLevels = experienceLevels(state.enduranceExperience);
     const specs = SLOT_KEYS.map((k) => {
       const s = slotSportsNow[k];
       if (!s) return null;
@@ -3877,7 +3954,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
       state.qualityDays, state.hardDays, state.targetMiles, state.targetRunHours, state.rideHours,
-      unavailableDays, state.slotSports, state.swimEasySessions]);
+      // ⚠️ THE EXPERIENCE ANSWER CHANGES EVERY HARD SESSION'S LENGTH, so it changes the preview.
+      unavailableDays, state.slotSports, state.swimEasySessions, state.enduranceExperience]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -5679,8 +5757,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
            * neutral, so an ungated Continue would build a week off four unanswered slots — which is
            * exactly what the deleted pre-fill did silently.
            */
-          canContinue={allSlotsChosen(slotSportsNow)}
-          blockedReason={tintedReason(unansweredLine(slotSportsNow) ?? undefined)}
+          /**
+           * ⛔ AND ON THE EXPERIENCE ANSWER TOO (2026-08-27), for the same reason the four slots gate
+           * it: the answer decides how long every hard session and the long session are, and nothing
+           * downstream catches an athlete who never saw the control. ⚠️ The slots are named first —
+           * the chips do not exist until all four are answered, so that is the sentence to show.
+           */
+          canContinue={allSlotsChosen(slotSportsNow) && experienceUnanswered.length === 0}
+          blockedReason={tintedReason(
+            unansweredLine(slotSportsNow)
+            ?? experienceUnansweredLine(experienceUnanswered)
+            ?? undefined,
+          )}
           /**
            * ⚠️ NO `footer` (Michael, 2026-08-26: *"E kill it"*). It held the lifting-rate line, on
            * the argument that the rate was the one thing on the screen that TAUGHT. The rate is gone
@@ -5696,14 +5784,38 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <EnduranceWeekCard
             allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
-            /** ⛔ THE SAME NUMBER THE ENGINE GATES THE LOW-VOLUME TIER ON, so the hours this screen
-             *  quotes and the hours the block builds come from the same levels. */
-            demonstratedWeeklyMinutes={demonstratedMinutes}
+            /** ⛔ THE SAME ANSWER THE ENGINE BUILDS THE LEVELS FROM, so the hours this screen quotes
+             *  and the hours the block builds come from one input. */
+            experience={state.enduranceExperience ?? {}}
+            /** ⛔ THE VARIANT PICKED IN EACH HARD ROW — same map the payload sends as
+             *  `endurance_slot_archetypes`, so the chip measures the session the composer builds. */
+            hardArchetypes={{
+              hard1: (hardEntry(state, 'hard1') as { archetype?: string } | undefined)?.archetype,
+              hard2: (hardEntry(state, 'hard2') as { archetype?: string } | undefined)?.archetype,
+            }}
+            onExperienceChange={(sport, tier) => setState((st) => ({
+              ...st,
+              enduranceExperience: { ...(st.enduranceExperience ?? {}), [sport]: tier },
+            }))}
             /** ⛔ `sport` IS NEVER NULL HERE ANY MORE (2026-08-26 evening). The card's only slot
              *  gesture is answering a row; the dismiss that used to clear one is gone with the
              *  opt-in, and the prop's type says so rather than leaving a dead arm behind. */
             onSlotChange={(key, sport) => setState((st) => {
-              const slots = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
+              const picked = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
+              /**
+               * ⛔⛔ ONE HARD RUN AND ONE HARD RIDE GO IN HIS ORDER — ride on his day 1, run on his
+               * day 3 — whichever row the athlete answered (Michael, 2026-08-27: *"follow his
+               * rules"*). See `hardPairInFrameOrder` for the two pages under it.
+               * ⚠️ APPLIED HERE SO THE SWAP IS VISIBLE. The engine normalises the same pair, so a
+               * screen that did not would show one week and build another — and the athlete would
+               * find their hard run on a different day with nothing said.
+               */
+              const order = hardPairInFrameOrder(picked.hard1 ?? undefined, picked.hard2 ?? undefined);
+              const slots = {
+                ...picked,
+                hard1: (order.hard1 ?? null) as SlotSport | null,
+                hard2: (order.hard2 ?? null) as SlotSport | null,
+              };
               // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
               // card would offer ride sessions on a slot the engine still had down as a run.
               return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
@@ -5795,51 +5907,32 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   </div>
                 );
               }
-              const h = hardEntry(state, key) ?? hardDefaultsFor(sport, key);
               /**
-               * ⛔ WHAT THE OTHER HARD CARD IS ALREADY BUILDING (Michael, 2026-08-26). On the BIKE
-               * both hard slots resolve to `ride_sweet_spot`, so the two cards offer one list and
-               * could build the same session twice; on the run they are different families and
-               * `variantsTakenBy` returns nothing. ⚠️ A club slot holds no shape — its session is
-               * replaced entirely — so it blocks nothing.
+               * ⛔⛔ THE HARD ROW OFFERS THE SPORT AND NOTHING ELSE (Michael, 2026-08-27, off the
+               * screenshot): *"we shouldnt offer 3 differnet hard options right we need to offer the
+               * approtriate one for the level we are prescribing."*
+               *
+               * ⛔ WHAT WAS HERE: a shape picker — "Engine's pick — rotates week to week",
+               * "Over-unders", "Cut-downs" — writing `archetype` onto the slot. ⛔ THE LEVEL
+               * PRESCRIBES THE SESSION NOW. The week-to-week rotation still varies it, because he
+               * prints four options per level and covering them across a block is his arrangement;
+               * what is gone is the ATHLETE overriding the prescription.
+               *
+               * ⛔ THREE REASONS, AND THE FIRST WAS A LIVE BUG:
+               *   1. A picked shape can cease to exist when the experience answer changes the level.
+               *      `ladderOf` already says so — the archetype list varies by level and the library
+               *      owns which is offered — so a shape chosen at one tier silently resolved to
+               *      something else at the other.
+               *   2. The experience chip's duration is computed for a RESOLVED shape. Let the
+               *      athlete change the shape afterwards and the number on the chip stops being true.
+               *   3. "Over-unders" and "cut-downs" are OUR labels over a band, not his four printed
+               *      workouts, so they would not survive a move to those.
+               *
+               * ⚠️ THE MACHINERY IS NOT DELETED — the rotation still needs archetypes, `hardDays`
+               * still carries the role and ownership the composer reads, and the LONG slot keeps its
+               * club-session control above. Only the hard rows' picker is gone.
                */
-              const otherKey: 'hard1' | 'hard2' = key === 'hard1' ? 'hard2' : 'hard1';
-              const otherEntry = hardEntry(state, otherKey);
-              const takenByOtherSlot = otherEntry?.ownership === 'club'
-                ? []
-                : variantsTakenBy(key, sport, {
-                    key: otherKey,
-                    sport: slotSportsNow[otherKey],
-                    archetype: (otherEntry as { archetype?: string } | undefined)?.archetype,
-                  });
-              return (
-                <HardSlotChoices
-                  slotKey={key}
-                  sport={sport}
-                  takenByOtherSlot={takenByOtherSlot}
-                  value={{ role: h.role, goal: h.goal, ownership: h.ownership, archetype: (h as { archetype?: string }).archetype }}
-                  onChange={(patch) => setState((st) => {
-                    const next = syncHardDays(st, slotSportsNow);
-                    // ⚠️ INDEX RESOLVED AGAINST `next`, NOT `st` — `syncHardDays` may have dropped a
-                    // removed slot, so the position in the rebuilt array is the only valid one.
-                    const j = next.findIndex((h) => h.slot === key);
-                    if (j < 0) return st;
-                    // ⚠️ SPREAD THE PATCH LAST so an explicit `goal: undefined` CLEARS a stale one —
-                    // a threshold slot carrying a leftover "speed" is a session nobody picked.
-                    next[j] = { ...next[j], ...patch } as NonRaceState['hardDays'][number];
-                    /**
-                     * ⛔ CLUB PINS THE DAY (Michael's ruling, 2026-08-25) — the club meets when it
-                     * meets, so its day is the world's answer and not the engine's to propose. Same
-                     * `touch` a tap sets, so the chip reads as the athlete's and the pre-fill stops
-                     * writing over it. ⚠️ Un-ticking does NOT release the pin: the day is still a day
-                     * they answered, and silently handing it back to the engine would be the unpick
-                     * this file has removed twice.
-                     */
-                    if (patch.ownership === 'club') touch(`hard:${j}`);
-                    return { ...st, hardDays: next };
-                  })}
-                />
-              );
+              return null;
             }}
             /**
              * ⛔ THE ENGINE WRITES THE SENTENCE, THIS SCREEN RENDERS IT (§3c, 2026-08-26).

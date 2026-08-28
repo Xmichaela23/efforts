@@ -442,9 +442,10 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
   const opts = {
     baselines: BASELINES as never,
     easyPaceSecPerMi: PACE,
-    // ⚠️ MINUTES PER SPORT since 2026-08-27 — the tier's gate is a comparison against the frame's own
-    // floor, so the fixture states an athlete who already carries it rather than a mileage figure.
-    demonstratedWeeklyMinutes: { run: 400, ride: 600 },
+    // ⚠️ THE ATHLETE'S OWN ANSWER since 2026-08-27 (it was their logged history, and history is out
+    // of the level entirely). "Experienced" is the frame as p246 prints it, which is the week the
+    // raw arithmetic below is summed from.
+    experience: { run: 'experienced' as const, ride: 'experienced' as const },
   };
   const b = weekBounds(slots, opts);
   assert(b.runMiles);

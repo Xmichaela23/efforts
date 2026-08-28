@@ -276,10 +276,24 @@ Deno.test('an explicit per-slot answer overrides the dial; absent, the dial stil
     ...COMPOSE, week: 2, column: 'standard', sportMix: mixFrom(asked),
   });
   const dayOf = (t: string) => withSlots.sessions.filter((s) => s.type === t).map((s) => s.day).sort();
-  // Frame day 1 is Monday at offset zero — the athlete asked for a RUN there.
-  assert(dayOf('run').includes('Monday'), `hard 1 was not the run they asked for: ${JSON.stringify(dayOf('run'))}`);
+  /**
+   * ⛔⛔ THE HARD PAIR GOES IN HIS ORDER, NOT THE PICKER'S (Michael, 2026-08-27) — see
+   * `hardPairInFrameOrder`. This asked hard 1 = run and hard 2 = ride, which is the exact
+   * one-of-each pair the rule normalises: the RIDE takes his day 1 (Monday, p278's own slot for it)
+   * and the RUN takes his day 3 (Wednesday, p246's near-threshold session, which p247 calls the
+   * hardest of the week).
+   * ⚠️ THIS TEST ASSERTED THE OPPOSITE UNTIL THAT RULING, and the ruling is what changed — not the
+   * per-slot override, which still decides everything else on this week.
+   */
+  assert(dayOf('ride').includes('Monday'),
+    `the hard ride did not take his day 1: ${JSON.stringify(dayOf('ride'))}`);
+  assert(dayOf('run').includes('Wednesday'),
+    `the hard run did not take his day 3: ${JSON.stringify(dayOf('run'))}`);
+  // ⚠️ AND THE OTHER TWO SLOTS ARE UNTOUCHED BY IT — the rule is the hard pair and nothing else.
   // Frame day 6 is Saturday — they asked for a RIDE there.
   assert(dayOf('ride').includes('Saturday'), `the long slot was not the ride they asked for: ${JSON.stringify(dayOf('ride'))}`);
+  // Frame day 4 is Thursday — they asked for a RUN there.
+  assert(dayOf('run').includes('Thursday'), `the easy slot was not the run they asked for: ${JSON.stringify(dayOf('run'))}`);
 
   // ⚠️ WITHOUT THE MAP the dial assigns: hard slots to the bike, the long session kept by the runner.
   const dialled = composeWeek({
@@ -331,8 +345,13 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
   assertEquals(hard.map((d) => d.day), [1, 3]);
   assertEquals(hard[0].endurance[0].family, 'run_mlss');
   assertEquals(hard[1].endurance[0].family, 'run_near_threshold');
-  // ⛔ AND THEY STAY DISTINCT THROUGH THE RIDE SUBSTITUTION — different archetypes, different tokens.
-  assertEquals(RIDE_EQUIVALENT.run_mlss?.archetype, 'medium');
+  /**
+   * ⛔ AND THEY STAY DISTINCT THROUGH THE RIDE SUBSTITUTION — different archetypes, different tokens.
+   * ⚠️ DAY 1 IS `tempo` SINCE 2026-08-27 — his longest printed sweet-spot session (3 x 20 min @ 80%,
+   * p238-239), which is what makes the two riding experience answers 68 and 75 rather than 43 and
+   * 51. That pair is p278's own `Cyc sweet spot (level 1-2)` span spelled out as two options.
+   */
+  assertEquals(RIDE_EQUIVALENT.run_mlss?.archetype, 'tempo');
   assertEquals(RIDE_EQUIVALENT.run_near_threshold?.archetype, 'long');
 
   const wk = composeWeek({
@@ -342,8 +361,16 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
   // Frame day 1 → Monday at offset zero; day 3 → Wednesday.
   const slot1 = (byDay('Monday')?.steps_preset ?? []).join(' ');
   const slot2 = (byDay('Wednesday')?.steps_preset ?? []).join(' ');
-  assert(/bike_thr_/.test(slot1), `slot one is not the threshold-token session: ${slot1}`);
-  assert(/bike_ss_/.test(slot2), `slot two is not the sweet-spot session: ${slot2}`);
+  /**
+   * ⛔ THE CLAIM IS THAT THE TWO HARD SLOTS BUILD DIFFERENT SESSIONS, which is what the screenshot
+   * defect was about, and `slot1 !== slot2` is the whole of it.
+   * ⚠️ SLOT ONE'S TOKEN CHANGED ON 2026-08-27, from a `bike_thr_` shape to a sweet-spot one, because
+   * day 1's ride is now his longest printed sweet-spot session (`tempo`). Both hard slots have
+   * always resolved to the `ride_sweet_spot` FAMILY; only day 1's shape within it moved. Pinning one
+   * slot's token prefix was pinning the shape, not the distinctness this test is named for.
+   */
+  assert(/bike_ss_/.test(slot1), `slot one is not a sweet-spot session: ${slot1}`);
+  assert(/bike_ss_/.test(slot2), `slot two is not a sweet-spot session: ${slot2}`);
   assert(slot1 !== slot2, 'the two hard slots built the same session');
 
   // ⛔ THE DEFAULTS THE SCREEN SHOWS, against those two.

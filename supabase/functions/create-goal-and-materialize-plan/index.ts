@@ -3017,6 +3017,24 @@ Deno.serve(async (req: Request) => {
                 }
                 return Object.keys(out).length > 0 ? { endurance_days: out } : {};
               })(),
+              /**
+               * ⛔⛔ THE EXPERIENCE ANSWER, PER SPORT — AND THIS HOP IS THE ONE THAT DROPS THINGS
+               * (2026-08-27, the same defect `endurance_days` above was just fixed for).
+               * `generate-strength-plan` reads `endurance_experience` off its own BODY, so a hop that
+               * does not forward it hands the composer nothing — and nothing takes the frame's own
+               * printed levels, which is silently the opposite answer for an athlete who said Newer.
+               * ⚠️ Validated the same way as the slots: an unrecognised value drops THAT sport.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).endurance_experience;
+                if (!raw || typeof raw !== 'object') return {};
+                const out: Record<string, string> = {};
+                for (const sport of ['run', 'ride'] as const) {
+                  const v = (raw as Record<string, unknown>)[sport];
+                  if (v === 'newer' || v === 'experienced') out[sport] = v;
+                }
+                return Object.keys(out).length > 0 ? { endurance_experience: out } : {};
+              })(),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {
                 const raw = (gsTp as Record<string, unknown>).endurance_slot_archetypes;

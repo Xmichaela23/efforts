@@ -19,7 +19,7 @@ import {
   type ComposedWeek,
   type PlanSession,
 } from './compose.ts';
-import { FRAMES, type FrameId } from './frames.ts';
+import { FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
 import type { ConflictRule, WeekConflict } from './week-conflicts.ts';
 import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
 import { type DayMap } from './day-map.ts';
@@ -96,6 +96,20 @@ export type StandingPlanConfig = {
   /** Demonstrated weekly miles the advanced tier was gated on, and where the number came from. */
   demonstrated_weekly_miles: number | null;
   demonstrated_miles_source: string | null;
+  /**
+   * ⛔⛔ THE ATHLETE'S EXPERIENCE ANSWER, PER SPORT — AND STORING IT IS NOT OPTIONAL (2026-08-27).
+   *
+   * It is the sole input to the endurance level, and `rematerialize-standing-block` re-composes the
+   * unstarted weeks from THIS ROW. Without the answer here, a block built as "Newer" would rebuild
+   * every later week at the frame's own printed levels the first time the test is read back — the
+   * hard sessions and the long session silently growing mid-block, on a calendar the athlete has
+   * already been training against. ⚠️ Same law as `day_offset`, `sport_mix` and `athlete_equipment`:
+   * a restate has to reach the identical week, so every input it was composed from lives on the row.
+   *
+   * ⚠️ NULL ON EVERY BLOCK BUILT BEFORE THIS SHIPPED, which re-composes exactly as it did — absent
+   * takes the frame's own levels, which is what those blocks already carry.
+   */
+  endurance_experience: EnduranceExperience | null;
   /** ⛔ TRUE ONCE THE TEST HAS BEEN READ AND THE FUTURE WEEKS REWRITTEN FROM IT. */
   test_read: boolean;
   /**
@@ -263,6 +277,17 @@ export function buildStandingPlanRow(args: {
       test_week: TEST_WEEK_INDEX,
       demonstrated_weekly_miles: args.compose.demonstratedWeeklyMiles ?? null,
       demonstrated_miles_source: args.demonstratedMilesSource ?? null,
+      // ⛔ THE ANSWER THE LEVELS WERE BUILT FROM — see the field doc for why a restate is a silent
+      // level change without it. ⚠️ Only the sports that were actually answered are stored.
+      endurance_experience: (() => {
+        const src = args.compose.enduranceExperience;
+        const out: EnduranceExperience = {};
+        for (const sport of ['run', 'ride'] as const) {
+          const v = src?.[sport];
+          if (v === 'newer' || v === 'experienced') out[sport] = v;
+        }
+        return Object.keys(out).length > 0 ? out : null;
+      })(),
       test_read: args.compose.workingNumbers != null,
       day_offset: args.dayMap?.offset ?? args.compose.dayOffset ?? 0,
       unavailable_days: (args.compose.unavailableDays ?? [])

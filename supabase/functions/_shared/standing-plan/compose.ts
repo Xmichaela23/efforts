@@ -45,11 +45,12 @@ import {
 import {
   advancedTierSessions,
   FRAMES,
-  LOW_VOLUME_TIER_GATE_IS_OURS,
+  EXPERIENCE_IS_THE_ATHLETES_ANSWER,
+  experienceLevels,
   LOW_VOLUME_RIDE_LEVELS_ARE_OURS,
-  lowVolumeLevels,
   PLYO_DOSE,
   type ColumnKind,
+  type EnduranceExperience,
   type FrameDay,
   type FrameId,
   type StrengthSlot,
@@ -112,7 +113,7 @@ import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts'
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
-  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf, lowVolumeSports,
+  DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
   REST_DAY_RUNG, rungAt, sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
@@ -370,11 +371,24 @@ export type ComposeArgs = {
    */
   enduranceDaysBySport?: { run?: number | null; ride?: number | null } | null;
   /**
-   * ⛔ DEMONSTRATED MINUTES PER SPORT over the last four weeks — the low-volume tier's gate, which
-   * compares them against what this week's own slots would build at their shortest
-   * (`lowVolumeSports`). ⚠️ MINUTES, because that is the unit the frame answers in; miles would need
-   * a pace, and this area deleted its pace conversions on 2026-08-26.
-   * ⚠️ ABSENT IS NOT NEUTRAL — a sport with no logged time takes the smaller week (§0h).
+   * ⛔⛔ THE ATHLETE'S OWN EXPERIENCE ANSWER, PER SPORT — AND IT IS THE SOLE INPUT TO THE ENDURANCE
+   * LEVEL (Michael, 2026-08-27). See `experienceLevels` for the ruling and the reason.
+   *
+   * ⛔ "Newer" builds that sport's quality sessions and its long session at the taper column's own
+   * level 1; "Experienced" builds the frame's printed levels. ⚠️ A SPORT WITH NO ANSWER TAKES THE
+   * FRAME'S OWN LEVELS — absent is not a claim that the athlete is new to it, and the wizard gates
+   * Continue on the answer so a block built through it always carries one.
+   */
+  enduranceExperience?: EnduranceExperience | null;
+  /**
+   * ⛔⛔ DEMONSTRATED MINUTES PER SPORT over the last four weeks. **IT NO LONGER DECIDES THE LEVEL**
+   * (Michael, 2026-08-27) — `enduranceExperience` above does, with no fallback to this.
+   *
+   * ⚠️ THE FIELD STAYS BECAUSE ITS CALLERS DO. `generate-strength-plan` still measures and sends it,
+   * and removing it was ruled out of scope on the same day this gate moved. ⛔ NOTHING IN THIS
+   * COMPOSER READS IT — the advanced tier is gated on `demonstratedWeeklyMiles`, a different field
+   * in a different unit. If a future reader wants it, it is measured and it is here; what it must
+   * never do again is decide how long a hard session is.
    */
   demonstratedWeeklyMinutes?: { run?: number | null; ride?: number | null } | null;
   /**
@@ -1624,30 +1638,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * they made and one the engine made for them — which is the label this codebase exists to keep.
    */
   /**
-   * ⛔ THE FRAME'S OWN WEEK, AT THE LEVELS p246 PRINTS — the thing the athlete's history is measured
-   * against. ⚠️ Built separately from `enduranceSpecs` below, which carries the tier: comparing an
-   * athlete with a week the tier has already lowered would let them straight back out of it.
+   * ⛔⛔ THE TIER IS THE ATHLETE'S OWN ANSWER NOW, AND HISTORY IS OUT OF IT (Michael, 2026-08-27):
+   * *"im coming off a marathon a few months ago I was training less, this is the wrong thing."*
+   *
+   * ⛔ WHAT STOOD HERE AND WHY IT IS NOT COMING BACK. A `frameSpecs` week was composed at p246's
+   * printed levels purely so `lowVolumeSports` could measure the athlete's last 28 days of logged
+   * running and riding against its floor. That comparison IS the thing that was ruled out: a 28-day
+   * window measures the last month, not training age, and p247's word is *"experience level"* with
+   * no mileage qualifier anywhere. **No fallback and no later correction** — the answer decides it.
+   *
+   * ⚠️ THE MAPPING IS UNCHANGED. `experienceLevels` still returns `LOW_VOLUME_TIER_LEVELS` for a
+   * sport answered "Newer" and nothing for one answered "Experienced"; only the INPUT moved.
+   * ⚠️ `lowVolumeSports` IS STILL EXPORTED AND STILL TESTED — it is the derivation of the frame's
+   * own floor, which the screen's "needs Xh/wk" is computed from. It simply no longer gates a level.
    */
-  const frameSpecs: SlotSpec[] = (() => {
-    const out: SlotSpec[] = [];
-    for (const d of days) {
-      d.endurance.forEach((slot, i) => {
-        const a = assignedSlot(sportAssignment, d.day, i, slot);
-        // ⚠️ SAME RESOLUTION AS `enduranceSpecs` — see the note there. This is the frame's own week
-        // for the tier comparison, so it takes the frame's LEVEL but the same shape.
-        out.push({
-          family: a.family,
-          level: a.level,
-          archetype: a.archetype ?? rotatedArchetype(a.family, a.level, args.week),
-          sport: a.sport,
-        });
-      });
-    }
-    return out;
-  })();
-  const tierLevels = lowVolumeLevels(
-    lowVolumeSports(frameSpecs, anchors, args.demonstratedWeeklyMinutes),
-  );
+  const tierLevels = experienceLevels(args.enduranceExperience);
   const levelForFamily = (family: string, frameLevel: Level): Level =>
     (args.levelOverrides?.[family] as Level | undefined) ?? (tierLevels[family] as Level | undefined) ?? frameLevel;
 
@@ -2083,16 +2088,16 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   }
 
   /**
-   * ── the low-volume tier: the same four sessions at his smaller sizes ─────────────────────────
+   * ── the newer tier: the same four sessions at his smaller sizes ──────────────────────────────
    *
    * ⛔ THE BLOCK SAYS SO WHEN IT APPLIES. The sessions are the frame's and the levels are his taper
-   * column's, but the GATE is ours — twenty miles a week — and an unlabelled tier is the engine
-   * making a decision the athlete cannot see. Same discipline as the advanced tier's own note.
+   * column's, and WHICH of the two an athlete gets is their own answer as of 2026-08-27 — so the
+   * note names the answer rather than a gate we invented. Same discipline as the advanced tier's.
    * ⚠️ ONE NOTE PER BLOCK, not one per week: `composeWeek` runs per week and the note is deduped by
    * its text everywhere else in this file.
    */
-  if (Object.keys(tierLevels).length > 0 && !notes.some((n) => n.text === LOW_VOLUME_TIER_GATE_IS_OURS)) {
-    notes.push({ kind: 'ours', text: LOW_VOLUME_TIER_GATE_IS_OURS });
+  if (Object.keys(tierLevels).length > 0 && !notes.some((n) => n.text === EXPERIENCE_IS_THE_ATHLETES_ANSWER)) {
+    notes.push({ kind: 'ours', text: EXPERIENCE_IS_THE_ATHLETES_ANSWER });
     // ⛔ AND THE RIDE SIDE CARRIES ITS OWN LABEL, because there is no cycling taper column under it.
     if (Object.keys(tierLevels).some((f) => f.startsWith('ride_'))) {
       notes.push({ kind: 'ours', text: LOW_VOLUME_RIDE_LEVELS_ARE_OURS });
@@ -2100,9 +2105,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     notes.push({
       kind: 'source',
       text: 'The two quality runs and the long run are prescribed at the smaller of the source\'s own '
-        + 'sizes, because the running on file does not yet carry the standard week. The taper column '
-        + 'prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the '
-        + 'more proficient runner\'s figure.',
+        + 'sizes, which is the answer given for running experience. The taper column prescribes these '
+        + 'sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient '
+        + 'runner\'s figure.',
       cite: 'Viada pp246-247',
     });
   }

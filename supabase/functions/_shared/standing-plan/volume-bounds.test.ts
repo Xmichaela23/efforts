@@ -25,6 +25,7 @@ import {
   slotSpans, weekVolumeBounds, WEEKLY_HOUR_OPTIONS, type SlotSpan, type SlotSpec,
 } from './volume-bounds.ts';
 import {
+  EXPERIENCE_IS_THE_ATHLETES_ANSWER, experienceLevels,
   LOW_VOLUME_RIDE_LEVELS_ARE_OURS, LOW_VOLUME_TIER_GATE_IS_OURS, lowVolumeLevels,
 } from './frames.ts';
 import { lowVolumeSports } from './volume-bounds.ts';
@@ -65,33 +66,43 @@ const ALL_RIDE = { '1:0': 'ride', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' };
  * readers and this composer stopped measuring running in miles.
  */
 /**
- * ⚠️ `demonstratedMinutes` GATES THE LOW-VOLUME TIER (rewritten 2026-08-27). Absent means nothing on
- * file for that sport, which takes the SMALLER week — so a test about the standard column's own
- * sizes has to say what the athlete does, exactly as their history would.
+ * ⛔⛔ THE LEVEL IS THE ATHLETE'S OWN ANSWER (rewritten 2026-08-27). This parameter was
+ * `demonstratedMinutes` — the last 28 days of logged training — and history was ruled out of the
+ * level entirely: *"im coming off a marathon a few months ago I was training less, this is the wrong
+ * thing."*
+ *
+ * ⚠️ THE FIXTURE'S DEFAULT ATHLETE ANSWERS "Newer", which is what every call here without an explicit
+ * answer used to get from an empty history. It keeps this file's existing numbers meaningful.
+ * ⛔ THE PRODUCT HAS NO SUCH DEFAULT and must not grow one: the wizard gates Continue on the answer,
+ * because a preselected "Newer" silently hands beginner-sized sessions to everyone who does not
+ * notice the control — the precise defect the control exists to remove.
  */
+const NEWER = { run: 'newer', ride: 'newer' } as const;
+const EXPERIENCED = { run: 'experienced', ride: 'experienced' } as const;
+
 function build(
   slots: Record<string, string>,
   runHours?: number,
   rideHours?: number,
-  demonstratedMinutes?: { run?: number | null; ride?: number | null } | null,
+  experience?: { run?: 'newer' | 'experienced'; ride?: 'newer' | 'experienced' } | null,
 ) {
   return composeWeek({
     ...BASE, week: 2, column: 'standard',
     sportMix: { runs: 4, rides: 0, swimDays: 0, slots } as never,
     targetRunHours: runHours ?? null,
     targetRideHours: rideHours ?? null,
-    demonstratedWeeklyMinutes: demonstratedMinutes ?? null,
-    demonstratedWeeklyMiles: (demonstratedMinutes?.run ?? 0) > 0 ? 22 : null,
+    enduranceExperience: experience ?? NEWER,
+    // ⚠️ THE ADVANCED TIER IS A DIFFERENT QUESTION and a different unit — it gates on MILES and it is
+    // untouched by this ruling. Absent here so no fixture silently gains an extra easy run.
+    demonstratedWeeklyMiles: null,
   } as never);
 }
 /**
- * An athlete already doing what the frame would build them, in BOTH sports — the standard column
- * exactly as p246 prints it, four sessions and no more.
- * ⚠️ THE RUN FIGURE IS ALSO KEPT UNDER THE ADVANCED GATE by the helper above (22 mi/wk). Past 25
- * miles the advanced tier appends an extra easy run, the ask spreads over five sessions instead of
- * four, and each comes out shorter — a different week from the one these tests measure.
+ * ⛔ `DEMONSTRATED_RUNNER` IS DELETED (2026-08-27) and this note is its tombstone. It was 260 run
+ * minutes and 400 ride minutes a week — an athlete whose LOGGED HISTORY already carried the frame,
+ * which is what used to buy them p246's printed levels. History no longer decides the level; the
+ * athlete answers, and the fixture says so with `EXPERIENCED` above.
  */
-const DEMONSTRATED_RUNNER = { run: 260, ride: 400 };
 const minutesOf = (wk: { sessions: PlanSession[] }, type: 'run' | 'ride') =>
   wk.sessions.filter((s) => s.type === type).reduce((t, s) => t + (Number(s.duration) || 0), 0);
 
@@ -109,26 +120,33 @@ Deno.test('⛔ THE TYPED HOURS SIZE THE WEEK — and his 4h was under the floor 
    * minutes are under what that sport's own slots would build — so a fixture with no history would
    * be measuring a different week and calling his export's numbers wrong.
    */
-  const midpoint = hours(build(HIS_SLOTS, undefined, undefined, DEMONSTRATED_RUNNER));
+  const midpoint = hours(build(HIS_SLOTS, undefined, undefined, EXPERIENCED));
   // ⛔ 5h19 IS THE NUMBER OFF HIS EXPORT. The untargeted week still sits at the library's midpoint,
   // which is the "before" this whole item is measured against.
   assert(Math.abs(midpoint - 5.32) < 0.1, `the untargeted week left the midpoint: ${midpoint}h`);
 
   /**
    * ⛔⛔ AND HIS FOUR HOURS WERE NEVER REACHABLE — the finding this test exists to keep. These slots'
-   * shortest week is **4h15**: the level-3 sweet-spot block is a flat 65 minutes at any size, and the
+   * shortest week is about **4h25**: the hard sweet-spot block is a flat dose at any size, and the
    * two endurance rides bottom out at 60 and 130. So the honest answer to "4" is the floor and a
    * sentence, not a week that pretends. ⛔ Do not loosen this into a tolerance check — it would hide
    * exactly the case §3c's "bounded BOTH ends" was written for.
+   *
+   * ⚠️ THE FLOOR MOVED FROM 4h15 TO 4h25 ON 2026-08-27, and BOTH of that day's ride rulings are in
+   * it. His day-1 ride became `tempo`, his longest printed sweet-spot session, which is longer than
+   * the `medium` shape it replaced; and the day-3 ride dropped from level 3 to level 2, which is
+   * shorter, because p278 prescribes level 3 nowhere in his cycling programs (`clampRideLevel`).
+   * ⚠️ THE RUN AND THE RIDE ALSO SWAPPED DAYS HERE — these slots are one of each, so
+   * `hardPairInFrameOrder` puts the ride on his day 1 and the run on his day 3.
    */
-  const asked4 = build(HIS_SLOTS, undefined, 4, DEMONSTRATED_RUNNER);
+  const asked4 = build(HIS_SLOTS, undefined, 4, EXPERIENCED);
   assertEquals(asked4.volume.ride.verdict, 'under_floor');
-  assert(Math.abs(hours(asked4) - 4.25) < 0.1, `the floor moved: ${hours(asked4).toFixed(2)}h`);
+  assert(Math.abs(hours(asked4) - 4.42) < 0.1, `the floor moved: ${hours(asked4).toFixed(2)}h`);
   assert(hours(asked4) < midpoint, 'asking for less did not get less');
 
   // ⛔ AND A TARGET INSIDE THE BAND IS DELIVERED. ⚠️ Tolerance, because the interior of the dial is a
   // staircase — the builders round to whole reps and steps, which is what "about" is honest about.
-  const asked5 = hours(build(HIS_SLOTS, undefined, 5, DEMONSTRATED_RUNNER));
+  const asked5 = hours(build(HIS_SLOTS, undefined, 5, EXPERIENCED));
   assert(Math.abs(asked5 - 5) < 0.2, `asked 5h, built ${asked5.toFixed(2)}h`);
   assert(asked5 > hours(asked4), 'asking for more did not get more');
 });
@@ -344,8 +362,8 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
     // ⚠️ MEASURED ON AN ATHLETE WHO ACTUALLY RUNS. The top of the menu is about being reachable on
     // SOME shape by SOME athlete; a week gated into the low-volume tier is a different question.
     const wk = sport === 'run'
-      ? build(widest, top, undefined, DEMONSTRATED_RUNNER)
-      : build(widest, undefined, top, DEMONSTRATED_RUNNER);
+      ? build(widest, top, undefined, EXPERIENCED)
+      : build(widest, undefined, top, EXPERIENCED);
     const mine = wk.sessions.filter((x) => x.type === sport);
     const total = mine.reduce((t, x) => t + (Number(x.duration) || 0), 0);
     assert(total >= top * 60 * 0.9, `${sport}: the top option ${top}h built only ${total} min`);
@@ -361,7 +379,7 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
    * athlete's hard run caps at 38, and that case is asserted separately underneath, because it now
    * behaves differently and he has not seen it.
    */
-  const wk = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1, undefined, DEMONSTRATED_RUNNER);
+  const wk = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1, undefined, EXPERIENCED);
   const runs = wk.sessions.filter((s) => s.type === 'run');
   /**
    * ⚠️ THE WEEK LANDS NEAR THE ASK, WHICH IS THE HALF OF HIS SENTENCE THAT STILL BINDS (2026-08-27).
@@ -377,14 +395,23 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
   assert(Math.abs(worstCaseMin - 60) <= 20, `one hour asked, ${worstCaseMin} minutes built`);
   assert(runs.length <= 2, runs.map((r) => r.name).join(', '));
   /**
-   * ⚠️ `over_cap`, NOT `under_floor`, AND THE LABEL IS THE ONLY SURPRISING PART. A one-hour ask is
-   * ABOVE what a single hard session holds, and the verdict says so.
-   * ⚠️ THE SIZE IS NO LONGER 1 (2026-08-27). It used to be the session at its CAP, because the dial
-   * stretched quality along with everything else; quality is now a fixed dose and the dial it
-   * returns describes the BASE families, which this week has none of. The verdict is the assertion
-   * that still means something here.
+   * ⛔⛔ `under_floor` SINCE THE PLACEMENT RULING (2026-08-27), AND IT USED TO BE `over_cap`. The
+   * flip is the whole consequence of that ruling, recorded here rather than absorbed.
+   *
+   * These slots are one hard run and one hard ride, so `hardPairInFrameOrder` now puts the RIDE on
+   * his day 1 and the RUN on his day 3 — p278 places the hard ride on day 1, p246 places the
+   * near-threshold run on day 3 and p247 calls it the hardest session of the week. The single hard
+   * run therefore stopped being day 1's ~49-minute session and became day 3's ~66-minute one.
+   *
+   * ⛔ SO A ONE-HOUR RUNNING ASK IS NOW BELOW THIS WEEK'S FLOOR RATHER THAN ABOVE ITS CAP. Michael's
+   * own worst case — *"if someone runs an hour a week and they only pick one run, worst case they
+   * get the cap on the hard session"* — now resolves to his day-3 session at 66 minutes, and the
+   * week says `under_floor` instead of quietly fitting. The honest answer is still a number and a
+   * sentence; which sentence it is changed.
+   * ⚠️ THE SIZE IS NOT 1 EITHER (2026-08-27). Quality is a fixed dose, and the dial the solve returns
+   * describes the BASE families, which this week has none of.
    */
-  assertEquals(wk.volume.run.verdict, 'over_cap');
+  assertEquals(wk.volume.run.verdict, 'under_floor');
   /**
    * ⛔ NOTHING IS ADDED FOR A GAP SMALLER THAN HALF A SESSION. The fill once used `Math.ceil`, so an
    * eleven-minute gap bought a whole 30-minute easy run and the week built 1h19 against a 1h ask;
@@ -404,23 +431,26 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
    * ⛔⛔ THE SAME ASK ON A LOW-VOLUME ATHLETE NOW ADDS ONE EASY RUN, AND THIS IS A CHANGE TO WHAT HE
    * DESCRIBED — flagged rather than hidden.
    *
-   * His sentence was *"if someone runs an hour a week and they only pick one run, worst case they
-   * get the cap on the hard session."* An athlete running an hour a week is in the low-volume tier,
-   * where the hard run caps at 38 minutes — so the gap is twenty-two minutes, not ten, and the
-   * nearest-session rule buys the easy run. The week lands at 1h08 against a 1h ask instead of at
-   * 38 minutes.
+   * ⛔⛔ AND IT CAME BACK TO HIS SENTENCE ON 2026-08-27, so this note now records a round trip.
    *
-   * ⚠️ THE RULE IS UNCHANGED; WHAT CHANGED IS THE MEASUREMENT. `easyFillHours` was reading the top of
-   * the whole base LADDER — 1h30 for an easy run that is actually appended at 30 minutes — so "half
-   * a session" was three times too large and this gap bought nothing. Both halves of that arithmetic
-   * now use the same figure.
+   * His sentence is *"if someone runs an hour a week and they only pick one run, worst case they get
+   * the cap on the hard session."* It stopped being true when the single hard run was day 1's
+   * ~38-minute session: the gap to an hour was twenty-two minutes, the nearest-session rule bought
+   * an easy run, and the week landed at 1h08 against a 1h ask.
+   *
+   * ⛔ THE PLACEMENT RULING PUT IT BACK. One hard run plus one hard ride now sends the RIDE to his
+   * day 1 and the RUN to his day 3 (`hardPairInFrameOrder`, p246/p247/p278), so the single hard run
+   * is the near-threshold session at 45 minutes. The gap is fifteen — under half an easy run — and
+   * buys nothing. **The week is one 45-minute hard run against a one-hour ask, which is his sentence
+   * exactly.** ⚠️ Nothing in the fill rule changed; the session it is measuring against did.
    */
   const lowTier = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1);
   const lowRuns = lowTier.sessions.filter((s) => s.type === 'run');
-  assertEquals(lowRuns.length, 2, lowRuns.map((r) => r.name).join(', '));
-  assertEquals(lowRuns.filter((s) => (s.tags ?? []).includes('volume_fill')).length, 1);
+  assertEquals(lowRuns.length, 1, lowRuns.map((r) => r.name).join(', '));
+  assertEquals(lowRuns.filter((s) => (s.tags ?? []).includes('volume_fill')).length, 0,
+    'a gap smaller than half a session bought an easy run');
   const lowTotal = lowRuns.reduce((t, s) => t + (Number(s.duration) || 0), 0);
-  assert(Math.abs(lowTotal - 60) <= 10, `a one-hour ask built ${lowTotal} minutes`);
+  assert(Math.abs(lowTotal - 60) <= 20, `a one-hour ask built ${lowTotal} minutes`);
   /**
    * ⚠️ THE STANDARD-COLUMN CASE LANDS NEAR THE ASK RATHER THAN UNDER IT (2026-08-27). It used to be
    * asserted as "never over an hour", which held while the single hard session stretched to its cap
@@ -773,13 +803,13 @@ Deno.test('⛔⛔ THE FLOOR CANNOT EXCEED WHAT THE ATHLETE RUNS — the low-volu
    * runner's figure — *"less experienced runners opting for shorter fartlek variations."* The LEVEL
    * moves; no session is built outside its own band and no session is dropped.
    */
-  const lowAsk = build(ALL_RUN, 2);
+  const lowAsk = build(ALL_RUN, 2, undefined, NEWER);
   const lowTotal = lowAsk.sessions.filter((s) => s.type === 'run')
     .reduce((t, s) => t + (Number(s.duration) || 0), 0);
   assert(lowTotal <= 150, `a two-hour ask still built ${lowTotal} minutes of running`);
 
   // ⛔ AND THE STANDARD COLUMN IS UNTOUCHED FOR A RUNNER WHO ALREADY CARRIES IT.
-  const runnerAsk = build(ALL_RUN, 2, undefined, DEMONSTRATED_RUNNER);
+  const runnerAsk = build(ALL_RUN, 2, undefined, EXPERIENCED);
   const runnerTotal = runnerAsk.sessions.filter((s) => s.type === 'run')
     .reduce((t, s) => t + (Number(s.duration) || 0), 0);
   assert(runnerTotal >= 195, `the standard column shrank for a runner: ${runnerTotal} minutes`);
@@ -805,17 +835,17 @@ Deno.test('⛔⛔ THE FLOOR CANNOT EXCEED WHAT THE ATHLETE RUNS — the low-volu
    * column would over-serve and the tier is what stops it. Ask for more than the floor and both
    * tiers deliver the ask.
    */
-  const ridesPlentyRunsLittle = build(mixed, 1, 3, { run: 20, ride: 600 });
-  const carriesBoth = build(mixed, 1, 3, DEMONSTRATED_RUNNER);
+  const ridesPlentyRunsLittle = build(mixed, 1, 3, { run: 'newer', ride: 'experienced' });
+  const carriesBoth = build(mixed, 1, 3, EXPERIENCED);
   assertEquals(sums(ridesPlentyRunsLittle, 'ride'), sums(carriesBoth, 'ride'),
     'a rider who is under only on RUNNING had their rides lowered too');
   assert(sums(ridesPlentyRunsLittle, 'run') < sums(carriesBoth, 'run'),
     `the run slots did not drop for an athlete who barely runs: ${sums(ridesPlentyRunsLittle, 'run')} vs ${sums(carriesBoth, 'run')}`);
 
   // ⛔ AND THE BLOCK SAYS THE GATE IS OURS. An unlabelled tier is a decision the athlete cannot see.
-  assert(lowAsk.notes.some((n) => n.kind === 'ours' && n.text === LOW_VOLUME_TIER_GATE_IS_OURS),
-    'the low-volume tier applied without saying its gate is ours');
-  assertEquals(runnerAsk.notes.some((n) => n.text === LOW_VOLUME_TIER_GATE_IS_OURS), false,
+  assert(lowAsk.notes.some((n) => n.kind === 'ours' && n.text === EXPERIENCE_IS_THE_ATHLETES_ANSWER),
+    'the smaller sizes applied without saying whose answer chose them');
+  assertEquals(runnerAsk.notes.some((n) => n.text === EXPERIENCE_IS_THE_ATHLETES_ANSWER), false,
     'the tier note appears on a week the tier did not touch');
 });
 
@@ -836,14 +866,22 @@ Deno.test('⛔⛔ THE BIKE-ONLY FLOOR COMES DOWN TOO — and dropping the RIDE l
   const minutes = (wk: { sessions: PlanSession[] }) => wk.sessions
     .filter((s) => s.type === 'ride').reduce((t, s) => t + (Number(s.duration) || 0), 0);
 
-  const lowRider = build(allRide, undefined, 3, { ride: 180 });
-  assert(minutes(lowRider) <= 220,
+  /**
+   * ⚠️ THE BAR MOVED FROM 220 TO 250 MINUTES ON 2026-08-27, and it is a ruling not a drift. His day-1
+   * ride became `tempo` — the longest sweet-spot session he prints (3 x 20 min @ 80%, p238-239) —
+   * which adds about 25 minutes to every ride week's floor. That is the cost of the riding
+   * experience answers being his own `Cyc sweet spot (level 1-2)` span (p278) rather than two
+   * middles of a band eight minutes apart.
+   * ⛔ THE CLAIM IS UNCHANGED: a three-hour ask must not be handed the five-hour standard column.
+   */
+  const lowRider = build(allRide, undefined, 3, { ride: 'newer' });
+  assert(minutes(lowRider) <= 250,
     `a three-hour ride ask still built ${minutes(lowRider)} minutes`);
   assertEquals(lowRider.sessions.filter((s) => s.type === 'ride').length, 4,
     'the tier dropped a ride instead of shrinking one');
 
   // ⛔ AND A RIDER WHO ALREADY CARRIES THE FRAME KEEPS IT — five hours of riding on file, five-hour week.
-  const realRider = build(allRide, undefined, 3, { ride: 400 });
+  const realRider = build(allRide, undefined, 3, { ride: 'experienced' });
   assert(minutes(realRider) >= 290, `the standard column shrank for a rider: ${minutes(realRider)} minutes`);
 
   // ⛔ THE RIDE LABEL IS ITS OWN, because it has no page under it the way the run levels do.
@@ -855,6 +893,14 @@ Deno.test('⛔⛔ THE BIKE-ONLY FLOOR COMES DOWN TOO — and dropping the RIDE l
   assertEquals(realRider.notes.some((n) => n.text === LOW_VOLUME_RIDE_LEVELS_ARE_OURS), false);
 });
 
+/**
+ * ⛔⛔ THIS TEST NO LONGER DESCRIBES HOW A LEVEL IS DECIDED (2026-08-27). `lowVolumeSports` is still
+ * exported, still correct, and still the derivation of the frame's own per-sport FLOOR — which the
+ * Endurance focus screen's "needs Xh/wk" is computed from. What it stopped being is the input to the
+ * endurance LEVEL: the athlete's own experience answer is that, with no fallback to history.
+ * ⚠️ SO EVERYTHING BELOW IS ABOUT THE FUNCTION, NOT ABOUT THE COMPOSER. The "unknown takes the
+ * smaller week" rule holds for this function and reaches nothing.
+ */
 Deno.test('⛔⛔ THE GATE IS A COMPARISON, NOT A THRESHOLD — and unknown takes the smaller week', () => {
   /**
    * ⛔ THE QUESTION IS *"would the standard column hand this athlete more than they already do?"*, so
@@ -998,4 +1044,79 @@ Deno.test('⛔ A DOUBLE DAY IS LEGAL AND NEVER SILENT — the spacing is the par
   }
   assert(checked >= 20, `the sweep only reached ${checked} builds`);
   assert(sawADouble, 'no boxed-in week produced a double day — the sweep is not reaching the case');
+});
+
+// ============================================================================
+// THE EXPERIENCE CONTROL — the athlete's answer is the only input to the level
+// (Michael, 2026-08-27; work order `WORKORDER-experience-tiers-2026-08-27.md`)
+// ============================================================================
+
+Deno.test('⛔⛔ THE ANSWER DECIDES THE LEVEL, AND HISTORY CANNOT TOUCH IT', () => {
+  /**
+   * ⛔ MICHAEL'S OWN CASE IS THE WHOLE ARGUMENT: *"im coming off a marathon a few months ago I was
+   * training less, this is the wrong thing."* A 28-day window measures the last month, not training
+   * age — so a runner with an empty history who says Experienced gets the frame's printed levels,
+   * and one with a full history who says Newer gets the taper column's sizes.
+   *
+   * ⛔ NO FALLBACK. This is the assertion the whole ruling rests on: the demonstrated minutes are
+   * passed at the OPPOSITE of the answer in both directions, and the week does not move.
+   */
+  const week = (
+    experience: { run?: 'newer' | 'experienced'; ride?: 'newer' | 'experienced' } | null,
+    demonstrated: { run?: number | null; ride?: number | null } | null,
+  ) => composeWeek({
+    ...BASE, week: 2, column: 'standard',
+    sportMix: { runs: 4, rides: 0, swimDays: 0, slots: ALL_RUN } as never,
+    targetRunHours: 2,
+    enduranceExperience: experience,
+    demonstratedWeeklyMinutes: demonstrated,
+    demonstratedWeeklyMiles: null,
+  } as never);
+  const runMin = (wk: { sessions: PlanSession[] }) => wk.sessions
+    .filter((s) => s.type === 'run').reduce((t, s) => t + (Number(s.duration) || 0), 0);
+
+  const newerNoHistory = runMin(week({ run: 'newer' }, null));
+  const newerFullHistory = runMin(week({ run: 'newer' }, { run: 600 }));
+  assertEquals(newerNoHistory, newerFullHistory,
+    'a full logged history changed a week the athlete answered "Newer" for');
+
+  const expNoHistory = runMin(week({ run: 'experienced' }, null));
+  const expFullHistory = runMin(week({ run: 'experienced' }, { run: 600 }));
+  assertEquals(expNoHistory, expFullHistory,
+    'an empty logged history changed a week the athlete answered "Experienced" for');
+
+  // ⛔ AND THE TWO ANSWERS ARE ACTUALLY DIFFERENT WEEKS, or the control does nothing.
+  assert(newerNoHistory < expNoHistory,
+    `the answer moved nothing: newer ${newerNoHistory}m vs experienced ${expNoHistory}m`);
+
+  /**
+   * ⚠️ AND A SPORT WITH NO ANSWER TAKES THE FRAME'S OWN LEVELS — absent is not a claim that the
+   * athlete is new to it, and it is what every block built before this shipped already carries.
+   */
+  assertEquals(runMin(week(null, { run: 1 })), expNoHistory,
+    'a missing answer was read as "Newer" instead of taking the frame as printed');
+});
+
+Deno.test('⛔ THE MAPPING IS UNCHANGED — only the input moved', () => {
+  // ⛔ "Newer" APPLIES `LOW_VOLUME_TIER_LEVELS` FOR THAT SPORT; "Experienced" APPLIES NOTHING.
+  assertEquals(experienceLevels({ run: 'newer', ride: 'newer' }), lowVolumeLevels(['run', 'ride']));
+  assertEquals(experienceLevels({ run: 'newer' }), lowVolumeLevels(['run']));
+  assertEquals(experienceLevels({ ride: 'newer' }), lowVolumeLevels(['ride']));
+  assertEquals(experienceLevels({ run: 'experienced', ride: 'experienced' }), {});
+  assertEquals(experienceLevels(null), {});
+  assertEquals(experienceLevels(undefined), {});
+
+  /**
+   * ⛔ IT IS PER SPORT. A mixed athlete who is newer on foot and experienced on the bike gets the
+   * smaller runs and the frame's own rides — one answer never leaks into the other sport.
+   */
+  const split = experienceLevels({ run: 'newer', ride: 'experienced' });
+  assert(Object.keys(split).every((f) => f.startsWith('run_')),
+    `the run answer reached the ride families: ${Object.keys(split).join(', ')}`);
+
+  // ⛔ AND THE BLOCK NAMES THE ANSWER RATHER THAN A GATE WE INVENTED.
+  assert(/answer/i.test(EXPERIENCE_IS_THE_ATHLETES_ANSWER));
+  assert(!/last four weeks|logged/i.test(EXPERIENCE_IS_THE_ATHLETES_ANSWER)
+    || /until 2026-08-27/.test(EXPERIENCE_IS_THE_ATHLETES_ANSWER),
+    'the label still describes history as the live input');
 });

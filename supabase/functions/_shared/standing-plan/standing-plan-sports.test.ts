@@ -11,6 +11,8 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   assignSports,
   buildStandingPlanRow,
+  clampRideLevel,
+  hardPairInFrameOrder,
   chooseDayMap,
   composeBlock,
   composeWeek,
@@ -839,13 +841,18 @@ Deno.test('⛔ THE ATHLETE\'S VARIANT PICK REACHES THE WEEK ON THE SLOTS PATH �
 Deno.test('⛔ TWO HARD SLOTS NEVER BUILD ONE SHAPE — the unpicked one moves, the pick never does', () => {
   /**
    * ⛔ ON THE BIKE BOTH HARD SLOTS RESOLVE TO `ride_sweet_spot`, and an unanswered slot is not left
-   * blank — `RIDE_EQUIVALENT` stamps it `medium` (frame day 1) or `long` (day 3). So picking `long`
-   * on the first card and leaving the second alone produced two identical sweet-spot sessions with
-   * nothing in the week saying so. The card greys the taken shape out; this is the same rule on the
-   * engine, for a payload from a client that never greyed anything.
+   * blank — `RIDE_EQUIVALENT` stamps day 1 and day 3 with different shapes. So picking one on the
+   * first card and leaving the second alone produced two identical sweet-spot sessions with nothing
+   * in the week saying so. The card greys the taken shape out; this is the same rule on the engine,
+   * for a payload from a client that never greyed anything.
+   *
+   * ⚠️ DAY 1's SHAPE IS `tempo` SINCE 2026-08-27, not `medium` — his longest printed sweet-spot
+   * session (3 x 20 min @ 80%, p238-239), which is what makes the two experience answers 68 and 75
+   * rather than 43 and 51. Day 3 is unchanged. ⛔ THE TWO ARE STILL DISTINCT, which is what this
+   * test is actually about, and the shapes themselves are not this test's business.
    */
   const base = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE });
-  assertEquals([arche(base, '1:0'), arche(base, '3:0')], ['medium', 'long'],
+  assertEquals([arche(base, '1:0'), arche(base, '3:0')], ['tempo', 'long'],
     'the frame defaults stopped being distinct');
 
   // ⛔ THE PICK STAYS PUT AND THE DEFAULT GETS OUT OF ITS WAY — pins-win (D-452).
@@ -854,9 +861,9 @@ Deno.test('⛔ TWO HARD SLOTS NEVER BUILD ONE SHAPE — the unpicked one moves, 
   assert(arche(one, '3:0') !== 'long', `both slots built long: ${arche(one, '3:0')}`);
 
   // ⛔ AND IN THE OTHER DIRECTION, so the rule is not an artefact of slot order.
-  const two = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '3:0': 'medium' } });
-  assertEquals(arche(two, '3:0'), 'medium', 'the athlete\'s pick was moved');
-  assert(arche(two, '1:0') !== 'medium', `both slots built medium: ${arche(two, '1:0')}`);
+  const two = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '3:0': 'tempo' } });
+  assertEquals(arche(two, '3:0'), 'tempo', 'the athlete\'s pick was moved');
+  assert(arche(two, '1:0') !== 'tempo', `both slots built tempo: ${arche(two, '1:0')}`);
 
   // ⚠️ TWO EXPLICIT PICKS OF ONE SHAPE ARE BOTH HONOURED. Both are answers, and overriding one
   // would be the engine unpicking a choice; the card is what stops this arising at all.
@@ -928,4 +935,71 @@ Deno.test('the bike claim is marked unverified where the copy lives', () => {
   const note = assignSports(S, { runs: 3, rides: 1 } as never).notes.find((n) => /on the bike/.test(n.text));
   assert(note != null);
   assert(/UNVERIFIED/.test(note!.cite ?? ''), `the bike cite reads as page-backed: "${note!.cite}"`);
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE BIKE'S OWN CEILING, AND HIS ORDER FOR THE HARD PAIR (Michael, 2026-08-27)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔⛔ NO RIDE IS BUILT ABOVE HIS LEVEL 2, whichever slot it fills', () => {
+  /**
+   * ⛔ THE DEFECT, MEASURED. A ride inherits the SLOT's difficulty through `RIDE_EQUIVALENT`, and the
+   * frame's second hard slot is `run_near_threshold` at LEVEL 3 (p246). So a ride on that slot was
+   * built as `ride_sweet_spot` level 3 — a dose his cycling programs prescribe to nobody.
+   *
+   * ⛔ p278, Cycling Base, standard week: day 1 `Cyc sweet spot (level 1-2)`, day 3 `Cyc VO2
+   * (level 1)` + `Cyc sweet spot (level 1)`, day 5 `Cyc sprint (level 1)`, day 7 `Cyc endurance
+   * (level 2)`. Level 2 is the ceiling anywhere in his cycling programs and appears on one session.
+   */
+  const both = assignSports(STANDARD, { runs: 0, rides: 4, slots: BOTH_RIDE });
+  for (const k of ['1:0', '3:0']) {
+    const a = both.byKey[k];
+    assert(a.level <= 2, `${k}: a ride was built at level ${a.level}`);
+  }
+  // ⛔ AND THE RUN SIDE IS UNTOUCHED — day 3's RUN stays at level 3, which is what p246 prints and
+  // what p247 calls the hardest session of the week.
+  const runs = assignSports(STANDARD, { runs: 4, rides: 0, slots: { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'run' } });
+  assertEquals(runs.byKey['3:0'].level, 3, 'the bike ceiling reached the run');
+
+  // ⚠️ THE CLAMP IS TOTAL AND IDEMPOTENT — it binds wherever a ride level comes from.
+  assertEquals(clampRideLevel('ride_sweet_spot', 3), 2);
+  assertEquals(clampRideLevel('ride_endurance', 3), 2);
+  assertEquals(clampRideLevel('ride_sweet_spot', 1), 1);
+  assertEquals(clampRideLevel('run_near_threshold', 3), 3, 'the clamp reached a run family');
+});
+
+Deno.test('⛔⛔ ONE HARD RUN AND ONE HARD RIDE GO IN HIS ORDER, whichever way they were picked', () => {
+  /**
+   * ⛔ RIDE → his day 1 (p278 places the hard ride there); RUN → his day 3 (p246 places the
+   * near-threshold session there and p247 calls it the hardest of the week). The picker's order must
+   * not decide the week.
+   * ⛔ WHAT THE OTHER ARRANGEMENT COSTS: the ride is capped at level 2 on the hardest day AND the run
+   * drops to day 1's easier dose — so the athlete's running never gets its quality session at all.
+   */
+  const backwards = assignSports(STANDARD, {
+    runs: 2, rides: 2, slots: { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' },
+  });
+  assertEquals(backwards.byKey['1:0'].sport, 'ride', 'the hard ride did not take his day 1');
+  assertEquals(backwards.byKey['3:0'].sport, 'run', 'the hard run did not take his day 3');
+  // ⚠️ AND THE OTHER TWO SLOTS ARE UNTOUCHED — this is one rule for one case, not a placement engine.
+  assertEquals(backwards.byKey['4:0'].sport, 'run');
+  assertEquals(backwards.byKey['6:0'].sport, 'ride');
+
+  // ⛔ ALREADY IN HIS ORDER MEANS NOTHING MOVES — idempotent.
+  const forwards = assignSports(STANDARD, {
+    runs: 2, rides: 2, slots: { '1:0': 'ride', '3:0': 'run', '4:0': 'run', '6:0': 'ride' },
+  });
+  assertEquals(forwards.byKey['1:0'].sport, 'ride');
+  assertEquals(forwards.byKey['3:0'].sport, 'run');
+
+  /**
+   * ⚠️ EVERY OTHER COMBINATION IS UNCHANGED (Michael: *"I'll worry about those nuances later"*).
+   * Two hard runs, two hard rides, and a declined hard slot all come back exactly as answered.
+   */
+  for (const pair of [['run', 'run'], ['ride', 'ride'], ['none', 'ride'], ['run', 'none']] as const) {
+    const put = hardPairInFrameOrder(pair[0], pair[1]);
+    assertEquals([put.hard1, put.hard2], [pair[0], pair[1]], `${pair.join('/')} was reordered`);
+  }
+  // ⚠️ AN UNANSWERED HALF IS NOT THE ONE-OF-EACH CASE EITHER.
+  assertEquals(hardPairInFrameOrder('run', undefined).hard1, 'run');
 });

@@ -32,6 +32,11 @@ import { ChevronDown } from 'lucide-react';
 import {
   ENDURANCE_WEEK_INTRO_CONSEQUENCE,
   ENDURANCE_WEEK_INTRO_STRUCTURE,
+  EXPERIENCE_HEADING,
+  EXPERIENCE_SUBTITLE,
+  experienceChipLine,
+  experienceGatedLine,
+  experiencedIsReachable,
   HARD_1_SLOT_NOTE,
   LONG_SLOT_NOTE,
   VOLUME_HONESTY_LINES,
@@ -46,7 +51,8 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { weekBounds } from '@/lib/standing-plan-week-bounds';
+import { experienceChips, weekBounds } from '@/lib/standing-plan-week-bounds';
+import type { EnduranceExperience, ExperienceTier } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 /**
  * ⛔ HOW MANY DAYS ONE SPORT CAN RUN OVER. Seven is the week; the engine caps what it can actually
  * place at the two days the frame leaves clear plus the rest day, and says so when the ask exceeds
@@ -73,12 +79,18 @@ export type EnduranceWeekCardProps = {
   baselines?: unknown;
   easyPaceSecPerMi?: number | null;
   /**
-   * ⛔ WHAT THEY ACTUALLY DID, PER SPORT, over the last four weeks, in MINUTES — the low-volume
-   * tier's gate. The hours this screen quotes come from the levels that tier picks, so it has to be
-   * the same measure the engine reads. ⚠️ A sport with no logged time takes the smaller week,
-   * exactly as the composer does.
+   * ⛔⛔ THE ATHLETE'S OWN EXPERIENCE ANSWER, PER SPORT — the sole input to how long the hard sessions
+   * and the long session are (Michael, 2026-08-27). The hours this screen quotes come from the levels
+   * that answer picks, so the screen and the block read one input.
+   * ⚠️ IT REPLACED A MEASUREMENT. This prop was `demonstratedWeeklyMinutes` — the last 28 days of
+   * logged training — and history was ruled out of the level entirely: *"im coming off a marathon a
+   * few months ago I was training less, this is the wrong thing."*
    */
-  demonstratedWeeklyMinutes?: { run?: number | null; ride?: number | null } | null;
+  experience: EnduranceExperience;
+  onExperienceChange: (sport: SlotSport, tier: ExperienceTier) => void;
+  /** ⛔ THE VARIANT PICKED IN EACH HARD ROW, when the athlete has picked one — the chip's duration
+   *  is measured on the shape the composer will actually build. Absent leaves the frame's own. */
+  hardArchetypes?: Partial<Record<SlotKey, string | undefined>>;
   /** Weekly running, in the athlete's own display unit. */
   runVolume: string;
   onRunVolume: (v: string) => void;
@@ -149,7 +161,19 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const bounds = weekBounds(props.slots, {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
-    demonstratedWeeklyMinutes: props.demonstratedWeeklyMinutes,
+    experience: props.experience,
+  });
+  /**
+   * ⛔⛔ THE TWO CHIPS' NUMBERS, COMPUTED — never typed. `experienceChips` runs the engine's own
+   * `ladderOf` and `weekVolumeBounds` against the slot answers four rows above and the athlete's own
+   * baselines, so a run on the first hard slot and a run on the second give different numbers.
+   * ⚠️ NULL FOR A SPORT THAT FILLS NO SLOT — there is nothing for the answer to size, so no chip.
+   */
+  const chips = experienceChips(props.slots, {
+    baselines: props.baselines as never,
+    // ⛔ THE VARIANT THE ATHLETE PICKED INSIDE THE HARD ROW BEATS THE FRAME'S OWN SHAPE, in the
+    // composer and therefore here. Without it the chip quotes the session they just replaced.
+    archetypes: props.hardArchetypes,
   });
 
   /**
@@ -509,6 +533,77 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     over-cap sentence this screen used to carry. ⚠️ Written by the ENGINE
                     (`fixedHoursLine`), so the number here and the number the block states cannot
                     come apart. */}
+                {/* ⛔⛔ THE EXPERIENCE CONTROL — TWO CHIPS, UNDER THE HOURS AND DAYS THEY ANSWER FOR
+                    (Michael's screen, 2026-08-27). It is the sole input to how long this sport's hard
+                    sessions and long session are; the last 28 days of logged training used to decide
+                    it and no longer do.
+
+                    ⛔ CHIPS, NOT A DROPDOWN. With two options a dropdown costs two taps and hides
+                    half the choice. The Run/Ride pair inside each slot row is the same control.
+                    ⛔ THE DURATION SITS ON THE CHIP AND THERE IS NO TABLE UNDER IT. A lookup table
+                    makes the athlete find their own answer — rejected explicitly.
+                    ⛔ THE MAXIMUM, NOT A RANGE OR A TYPICAL. Ranges overlap between tiers because the
+                    session shape rotates weekly; maxima ladder cleanly.
+                    ⚠️ IT NEEDS EVERY SLOT ANSWERED for the same reason the fixed-hours line does —
+                    both numbers are summed from the slots, and before that they would describe a week
+                    the athlete has not yet described. */}
+                {allSlotsChosen(props.slots) && chips[sport] ? (() => {
+                  const pair = chips[sport]!;
+                  const picked = props.experience[sport] ?? null;
+                  const hours = Number(sport === 'run' ? props.runVolume : props.rideHours);
+                  /**
+                   * ⛔⛔ THE TOP TIER GREYS OUT BELOW ITS OWN MINIMUM, AND THE LOWER ONE NEVER GATES
+                   * (Michael: *"lower never gates just top"*). The lower tier is the plan's own floor
+                   * — if the hours do not reach even that, the problem is the hours ask and the week
+                   * flags it there rather than leaving both chips dead.
+                   * ⚠️ THE GREYED CHIP KEEPS ITS "needs Xh/wk" READABLE. A dead control with no
+                   * reason on it sends the athlete back up the screen guessing.
+                   */
+                  const canExperienced = experiencedIsReachable(hours, pair.experienced.needsHours);
+                  return (
+                    <div className="mt-3" data-testid={`${sport}-experience`}>
+                      <p className="text-white/80 text-[13px]">{EXPERIENCE_HEADING[sport]}</p>
+                      <p className="text-white/55 text-xs mt-0.5 leading-snug">{EXPERIENCE_SUBTITLE[sport]}</p>
+                      <div className="flex items-stretch gap-2 mt-2">
+                        {([pair.newer, pair.experienced]).map((chip) => {
+                          const dead = chip.tier === 'experienced' && !canExperienced;
+                          const on = picked === chip.tier && !dead;
+                          const c = getDisciplineColor(SPORT_DISCIPLINE[sport]);
+                          return (
+                            <button
+                              key={chip.tier}
+                              type="button"
+                              aria-pressed={on}
+                              disabled={dead}
+                              data-testid={`experience-${sport}-${chip.tier}`}
+                              onClick={() => props.onExperienceChange(sport, chip.tier)}
+                              className="flex-1 px-3 py-2 rounded-xl text-xs border leading-snug text-left"
+                              style={dead
+                                ? {
+                                    borderColor: 'rgba(255,255,255,0.08)',
+                                    backgroundColor: 'rgba(255,255,255,0.02)',
+                                    color: 'rgba(255,255,255,0.35)',
+                                  }
+                                : on
+                                  ? { borderColor: c, backgroundColor: `${c}29`, color: '#fff' }
+                                  : {
+                                      borderColor: 'rgba(255,255,255,0.12)',
+                                      backgroundColor: 'rgba(255,255,255,0.03)',
+                                      color: 'rgba(255,255,255,0.70)',
+                                    }}
+                            >{experienceChipLine(chip.tier, chip.longestMin, chip.needsHours)}</button>
+                          );
+                        })}
+                      </div>
+                      {/* ⛔ THE REASON THE TOP CHIP IS DEAD, SAID ONCE AND BESIDE IT. */}
+                      {!canExperienced ? (
+                        <p className="text-white/40 text-xs mt-1.5" data-testid={`${sport}-experience-gated`}>
+                          {experienceGatedLine(sport, pair.experienced.needsHours)}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })() : null}
                 {/* ⚠️ THIS is the half that genuinely needs every slot answered — it is summed from
                     them. Before that it would state a figure for a week the athlete has not
                     described, and it would move under them as they answered. */}
