@@ -1,5 +1,23 @@
 # WORKORDER — THE STRENGTH READ
 
+> ## ⚠️ STATE: BUILT AND DEPLOYED 2026-08-28. **NOT VERIFIED.**
+> Items 1, 2 and 3 are built, deployed (`compute-facts` 125 · `compute-snapshot` 142 · `coach` 470 ·
+> `workout-detail` 351 · `analyze-cycling-workout` 217 · `generate-strength-plan` 175 ·
+> `rematerialize-standing-block` 51 · `materialize-plan` 308) and pushed (`ead07380`). **Nobody has
+> seen any of it work.** `docs/DEPLOY-OWED.md`'s top entry carries what to look for.
+>
+> ⛔ **THREE RULINGS HERE WERE SUPERSEDED DURING THE BUILD — read the deltas or you will rebuild the
+> wrong thing:**
+> 1. The word does NOT come from distance to the expected curve. There is no band. It comes from
+>    completed reps, via `meSessionOutcome`, and the words are **Stalled · On track · Moving up**.
+> 2. The e1RM gate **fails CLOSED** (only `ME` mints), reversing an earlier fail-open ruling.
+> 3. The line is **rolling across blocks**, not block-scoped; only the faint curve is block-scoped.
+>    The mock's caption naming the line "your working weight" is wrong — the line is the estimated
+>    max off heavy sets.
+>
+> ⚠️ **ITEMS 4 AND 5 ARE NOT BUILT.** The energy/soreness/sleep row is still on State, and the load
+> gauge still leads with the pooled points total. Both remain open.
+
 **2026-08-28. Michael ruled the scope and approved the mock. Supersedes
 `WORKORDER-the-coachs-read-2026-08-28.md`, which was written the same morning and scoped too wide.**
 

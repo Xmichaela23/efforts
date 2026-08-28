@@ -1,79 +1,61 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-28 — the logger + corpus arc)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-28 — the strength read arc)
 
-### Your job: pick it up from `docs/NOTES-logger-and-corpus-2026-08-28.md`. The logger arc is CLOSED and DEVICE-VERIFIED.
+### Your job: WATCH MONDAY'S TEST LAND. Everything below is deployed and NOT ONE PIECE OF IT HAS BEEN SEEN WORKING.
 
-**Commits `6b100cc7` → `7f8ba187`, pushed. Edge functions deployed 2026-08-28 12:41:58 UTC —
-`materialize-plan` **307**, `generate-strength-plan` **174**, `rematerialize-standing-block` **50**.
-Michael rebuilt his block against them and confirmed on a device: *"cards are all good."*** That
-NOTES file is the consolidated writeup; read it before touching the logger or the standing plan's
-copy. ⚠️ **No `D-NNN` entries were written for this arc, deliberately** — Michael is running low doc
-overhead for UI iteration, so the rulings live in that one file and in the code comments.
+**Read `docs/DEPLOY-OWED.md`'s top entry first — it lists what to look for and, more importantly,
+what is EXPECTED to look broken.** Then the work order: `docs/WORKORDER-the-strength-read-2026-08-28.md`.
 
-### ⛔⛔ THE PREVIOUS BANNER'S HEADLINE CLAIM WAS WRONG, AND ANOTHER SESSION IS WORKING THAT ENGINE
+**PUSHED:** `origin/main == ead07380` (arc `65dc556e` → `ead07380`).
+**DEPLOYED**, versions read back from `supabase functions list`: `compute-facts` **125** ·
+`compute-snapshot` **142** · `coach` **470** · `workout-detail` **351** ·
+`analyze-cycling-workout` **217** · `generate-strength-plan` **175** ·
+`rematerialize-standing-block` **51** · `materialize-plan` **308**.
+**VERIFIED: NO.** Nobody has looked at the screen. ⚠️ The client push was not confirmed off the
+served bundle either — no site URL exists in this repo.
 
-It said reactive progression is *"fully built, fully tested, and called by nothing"*, that *"the plan
-raises weight on a date"*, and that `advanceStep` has *"no call sites at all, not even a test."*
-**Traced 2026-08-28 by reading the code — the wiring exists and is live:**
+### The three facts you need before you touch anything
 
-`StrengthLogger.tsx:4473` invokes `rematerialize-standing-block` with `apply: true` on every strength
-save → `index.ts:260` calls `earnedMeSets` (`_shared/standing-plan/me-history.ts:119`) → which calls
-`advanceStep` at **`me-history.ts:204`** (production, not a test) via the bar ladder. The results come
-back as `meSetsByPattern` / `barOffsetsByPattern` / `meLastRepsByPattern` into the compose of the
-unstarted weeks, with an announce-and-undo sheet on the logger.
+1. ⛔ **THE e1RM GATE FAILS CLOSED. Only a set stamped `ME` mints a max.** `exercise_log.slot_intent`
+   is new (`state-trend/assemble.ts` → `intentCanMintAMax`). Everything logged before 2026-08-26 has
+   no stamp and has LEFT the strength line. **That is Michael's ruling, not a bug** — *"don't let the
+   old lifts drag me down."* An earlier fail-open ruling was reversed the same day; do not restore it
+   by analogy with D-417's rep gate one line above, which still fails OPEN on purpose.
+2. ⛔ **THE TEST WEEK IS WHAT REFILLS THE LINE.** `compose.ts` stamps the pretest's competition lifts
+   `ME` (accessories on those days stay unstamped). Michael rebuilt his block Monday 2026-08-31 and
+   those two sessions are the line's first points. ⚠️ **If the line is still empty after they are
+   logged and a snapshot has run, that is a REAL failure** — start at `exercise_log.slot_intent` on
+   those rows and walk forward.
+3. ⚠️ **THE PATTERN THIS ARC KEPT HITTING, and it will hit you.** `slot_intent` was dropped THREE
+   times at points that rebuild a row field by field — the query field map in `compute-snapshot`, the
+   per-lift display map in `assemble.ts` (which discards `meta`), and two record-gate fixtures. Each
+   time it was selected, resolved and correct, and arrived as `undefined`. **A gate reading
+   `undefined` does not error; it silently takes the absent branch.** None were caught by reading.
+   The note lives on `ExerciseLogLite.slot_intent`. Grep the field name across all three before
+   assuming one write site is enough.
 
-⚠️ **BUT NOT ALL OF IT, AND THE CORRECTION HAS ITS OWN CORRECTION.** `progressionVerdict`
-(`progression.ts:174`) **is still called from tests only** — grep it. So the accurate statement is:
-*the BAR ladder is wired and running; `progressionVerdict` is not.* ⛔ Do not read "the banner was
-wrong" as "everything is wired." Trace before building either way.
+### What shipped, in one line each
+- One card per main lift on State: the weight being lifted, reps held at it, a heavy-only e1RM line
+  (rolling across blocks) against a faint expected curve (block-scoped, anchored on the block's
+  opening working number at the plan's own rate). One word — **Stalled · On track · Moving up** —
+  mapped from `meSessionOutcome`, which has run inside `earnedMeSets` on every restate since the ME
+  ladder shipped and had its verdict thrown away.
+- One run card: the same prescribed near-threshold session week to week, its average heart rate.
+  Block-scoped on purpose — a set is a measurement, a session is a prescription, and only one
+  survives its plan. No verdict word on it: two heart rates is not a fitness claim.
+- `week_ledger_v1` and `me_history_v1` persisted; **the five weekly numbers are deliberately NOT
+  rendered** (measured: a standing block is the same week twelve times).
+- Get Stronger stamps `HYP` on assistance. Its main lift is unstamped, so ⛔ **that path now has no
+  strength line at all** — raised, unruled, and neither does any off-plan session.
 
-⚠️ **AND IT IS NOT DEVICE-PROVEN.** `POLISH-PUNCH-LIST.md` still carries the 2026-08-25 report that
-the logger's save-time fill did not visibly fire on his Mon/Tue saves, with the `/plans/admin`
-Check/Apply as the deployed fallback. That item is **unproven either way** — the same save path has
-now been exercised repeatedly across this arc without a further complaint, which is evidence and not
-proof. Leave it open.
+### Unverified claims, stated as such
+- That the cards render at all. No human has seen them.
+- That `auto-attach-planned` links the Wednesday run reliably enough for the run card to have every
+  week. Never measured; a missing week there is a LINKER fault, not the card's.
 
-### ⛔ THE LESSON THIS ARC PAID FOR, AND IT WILL RECUR
-
-`strength-grid/intents.ts` shipped a constant asserting *"The source gives no rest interval for these
-sets."* **p78 has a section titled "Rest Periods."** The assertion was written about photographs
-nobody had read. ⛔ **An unread frame is not a gap in the book.** Before any constant claims *"the
-source does not say"*, the pages it would be on must have been read. ~40 frames of the pp.90–130
-shoot are still unread — they are the endurance half.
-
-### What shipped, so you do not re-litigate it
-
-Full list in the NOTES file. The headlines: the corpus correction above plus pp.71–90 recorded
-(§B4d); the logger's number cells 21px → **44px**; the bodyweight gate routed at the shared type
-table (**55 movements** gained a correct row); rest keyed to slot intent on standing rows; `ME:`/`DE:`
-renamed **Heavy / Speed** on every surface through one shared helper; per-intent session lines; ME
-rows carrying **no** reserve target (p218 gives none) and no fabricated `3` on completion.
-
-⛔ **THE RULINGS THAT WILL OTHERWISE BE RE-LITIGATED** — all argued in the NOTES file:
-**verbatim is off** (the claim is his, the words are ours); **the stop rule lives on the exercise
-card**, so a heavy day's session line carries only the accessory line; **deleting a cue is not a
-one-line change** (`standingCue ?? titleCue` falls through to Wendler's line); **two unsourced clauses
-stay** because they are about the app, not the training; and ✅ **no deload — this is not a race plan,
-`taperWeeks: []` is correct.** Settled by Michael; do not re-raise.
-
-### Still UNVERIFIED / open
-
-- **The Wendler fallback still fires** on a HYP or SKILL row sitting on `MAIN_531_LIFTS`. Suppressed
-  for DE only. Reported, acknowledged, not fixed.
-- **p80 caps heavy work at 4–6 reps over 90% per pattern per week**; the ME ramp can reach 3 sets
-  across a 1–5 band, reachable from week 5. ⛔ Raised, band unchanged, **no ruling**.
-- **p89's plyometric progression ladder is not implemented.** **p77** (readiness *going in* on speed
-  days) is sourced and unplaced.
-- Everything in the older banners below still applies where it has not been superseded here.
-
-**Mechanics:** deno is at `~/.deno/bin/deno`, NOT on PATH. Run
-`~/.deno/bin/deno test -A --no-check --sloppy-imports supabase/functions/ src/` — **4,606 passing /
-0 failing** at handoff. ⛔ `tsc --noEmit -p tsconfig.json` **checks ZERO files** (solution-style
-config). The real command is `-p tsconfig.app.json` and the honest baseline is **315 errors**, all
-pre-existing — any "tsc clean" claim that does not name that number is a no-op reported as a pass.
-
----
+⚠️ **No `D-NNN` entries for this arc either** — same low-doc-overhead posture as the logger arc. The
+rulings live in `DEPLOY-OWED.md`, the work order, and the code comments, which are heavy on purpose.
 
 ## 🧭 SUPERSEDED — was START HERE (2026-08-26, late — the gear-gate + plate-trace handoff)
 

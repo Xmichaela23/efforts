@@ -1,5 +1,59 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## ⚠️ 2026-08-28 — THE STRENGTH READ. **DEPLOYED, NOT VERIFIED.** ONE THING OWED.
+>
+> ⛔ **NOBODY HAS SEEN IT WORK.** Pushed and deployed are both true; verified is false and stays
+> false until Michael looks at the State screen after an ingest. Do not upgrade this entry without
+> that.
+>
+> **SCHEMA:** `exercise_log.slot_intent TEXT` — applied BY HAND in the Supabase SQL editor
+> (`supabase db push` refuses a single file in this repo; see the migration's own header for why the
+> ledger is left unrecorded). Confirmed live by a direct PostgREST select returning 200 with the
+> field present, **not** by reading a success message off a screen.
+>
+> **PUSHED:** `origin/main == ead07380` (arc runs `65dc556e` → `ead07380`).
+>
+> **EDGE FUNCTIONS DEPLOYED**, versions read back from `supabase functions list`, not assumed:
+> `compute-facts` **125** · `compute-snapshot` **142** · `coach` **470** · `workout-detail` **351** ·
+> `analyze-cycling-workout` **217** · `generate-strength-plan` **175** ·
+> `rematerialize-standing-block` **51** · `materialize-plan` **308** — all 2026-08-28 21:58-21:59 UTC.
+> ⚠️ Eight, and the last six are the `_shared` importer set traced across every function directory
+> rather than guessed. `workout-detail` and `analyze-cycling-workout` import the `state-trend` barrel
+> and would have been missed; `materialize-plan` has two independent reasons to be here.
+>
+> **CLIENT:** pushed to `main`; Netlify auto-publishes. ⚠️ **The served bundle was NOT checked** —
+> there is no site URL anywhere in this repo and none was supplied. Treat the client as pushed, not
+> confirmed live.
+>
+> ### ⛔ WHAT TO LOOK FOR, AND WHAT IS EXPECTED TO LOOK WRONG
+> 1. **Nothing changes until `compute-snapshot` runs again**, which happens on the next ingest. A
+>    stale screen right after deploy is expected, not a failed deploy.
+> 2. **The strength line will be EMPTY at first, and that is the ruling, not a bug.** The e1RM gate
+>    now fails closed: only a set stamped `ME` mints a max, so everything logged before 2026-08-26
+>    leaves the line. Michael ruled for exactly this — *"don't let the old lifts drag me down."*
+> 3. **The line fills from Monday's test.** The test week's competition lifts are stamped `ME`, so
+>    the two pretest sessions are what start it. ⚠️ If the line is still empty after those are logged
+>    and a snapshot has run, THAT is a real failure — start at `exercise_log.slot_intent` on those
+>    rows and work forward.
+> 4. **e1RM records may move down** for any lift whose best came off a set that is now gated out.
+> 5. **The cards fill in over three weeks.** Week 1 is the two tests: no heavy session yet, so no
+>    lift cards — only the run card, once Wednesday's run is logged and attached. Week 2 brings the
+>    cards, week 3 their lines (a line needs two in-block readings). No placeholder by ruling.
+> 6. **Deploy before rebuild.** This was done in that order. A block rebuilt first would have logged
+>    its first week with no intent stamps.
+>
+> ### ⚠️ RAISED, NOT FIXED — do not read these as regressions
+> - **Get Stronger has no strength line at all.** Nothing stamps `ME` outside the Standing Plan
+>   composer, so a 5/3/1 main lift mints nothing. Stamping it `ME` would assert a band that programme
+>   does not prescribe; the alternative is an explicit decision that path has no line. Unruled.
+> - **Nor does any off-plan session.** An athlete logging a heavy bench outside a plan gets no line.
+>   Real product hole, bigger than this arc.
+> - **`week_ledger_v1` and `me_history_v1` ship persisted and UNRENDERED.** The five weekly numbers
+>   are deliberately not on screen — measured: a standing block is the same week twelve times, so a
+>   weekly readout would show one picture twelve times. The module header says so; do not surface it
+>   without a ruling.
+
+
 > ## ✅ 2026-08-28 — THE LOGGER + CORPUS ARC. DEPLOYED **AND DEVICE-VERIFIED.** NOTHING OWED.
 >
 > ⛔ **THIS IS THE RARE ENTRY WHERE ALL THREE STATES ARE TRUE.** Pushed, deployed, and a human saw it

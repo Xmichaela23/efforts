@@ -1,5 +1,10 @@
 # WORKORDER — THE COACH'S READ
 
+> ## ⛔ SUPERSEDED 2026-08-28, same morning, by `docs/WORKORDER-the-strength-read-2026-08-28.md`,
+> which narrowed the scope to five cards. Nothing in this file was built. Kept for the four-questions
+> framing only.
+
+
 **2026-08-28. Supersedes `WORKORDER-state-and-day-screen-2026-08-27.md`, which designed the wrong
 thing and says so at its top.**
 
