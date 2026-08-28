@@ -13,8 +13,11 @@ const WEEKS = ['2026-05-06', '2026-05-13', '2026-05-20', '2026-05-27', '2026-06-
 
 function inputs(): StateTrendInputs {
   const exerciseRows: ExerciseLogLite[] = [
-    ...WEEKS.map((d, i) => ({ date: d, canonical_name: 'bench_press', exercise_name: 'Bench Press', estimated_1rm: 200 + i * 8 })),
-    ...WEEKS.map((d, i) => ({ date: d, canonical_name: 'squat', exercise_name: 'Squat', estimated_1rm: 320 - i * 8 })),
+  // ⛔ `slot_intent: 'ME'` — the e1RM gate fails CLOSED since 2026-08-28: only a set the plan
+  // asked to be maximal mints a max. These fixtures are MAIN-LIFT HEAVY sets, so they say so. An
+  // unstamped row here would build no series at all and the test would be asserting on emptiness.
+    ...WEEKS.map((d, i) => ({ date: d, canonical_name: 'bench_press', exercise_name: 'Bench Press', estimated_1rm: 200 + i * 8, slot_intent: 'ME' })),
+    ...WEEKS.map((d, i) => ({ date: d, canonical_name: 'squat', exercise_name: 'Squat', estimated_1rm: 320 - i * 8, slot_intent: 'ME' })),
   ];
   return {
     asOf: AS_OF,

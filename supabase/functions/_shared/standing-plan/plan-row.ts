@@ -23,6 +23,8 @@ import { FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
 import type { ConflictRule, WeekConflict } from './week-conflicts.ts';
 import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
 import { type DayMap } from './day-map.ts';
+import { weekLedgersFor, type WeekLedgersByWeek } from './week-ledger.ts';
+import type { MeLadderReading } from './me-history.ts';
 import type { ViadaPattern } from '../strength-grid/index.ts';
 import type { ViadaPickKey } from './accessory-picks.ts';
 
@@ -196,6 +198,46 @@ export type StandingPlanConfig = {
    * before any of them exist. It arrives through the restate, beside the working numbers.
    */
   me_sets_by_pattern: Partial<Record<ViadaPattern, number>> | null;
+  /**
+   * ⛔⛔ THE FIVE WEEKLY NUMBERS, PER WEEK, STORED WITH THE BLOCK THAT PRODUCED THEM.
+   *
+   * ⛔ THIS IS THE PLUMBING AND NOTHING ELSE. Both ledgers were computed at build time and read by
+   * nobody — `compose.ts:2644` attached the endurance one to the composed week and it died there.
+   * Every number is lifted verbatim off the week the composer already built (`weekLedgerFor`);
+   * nothing is recomputed here or downstream.
+   *
+   * ⛔ WHY THE ROW AND NOT A DERIVATION AT READ TIME. The whole twelve weeks exist at build, and
+   * re-composing a block to answer "what does week 6 hold" would re-derive a week from inputs that
+   * may since have changed — the same failure `sport_mix`, `accessory_picks` and `athlete_equipment`
+   * each exist to prevent. What was BUILT is a fact; what would compose today is a different one.
+   *
+   * ⚠️ `rematerialize-standing-block` REFRESHES IT. The endurance minutes never move on a restate,
+   * but the barbell set count does the moment an earned ME set lands, and a stale count printed
+   * beside a live calendar is the sort of quiet disagreement this file's other fields exist to stop.
+   * ⚠️ NULL ON EVERY BLOCK BUILT BEFORE THIS SHIPPED, and a reader must render nothing rather than
+   * zero — an absent ledger means "not stored", never "no work".
+   */
+  week_ledgers: WeekLedgersByWeek | null;
+  /**
+   * ⛔⛔ WHAT EVERY HEAVY SESSION OF THIS BLOCK WAS, per pattern, in the order it was trained.
+   *
+   * ⛔ ABSENT AT BUILD TIME, ALWAYS — like `me_sets_by_pattern` beside it, a session is read from
+   * logged work and a block is authored before any exists. It arrives through the restate, which is
+   * where `earnedMeSets` already walks these sessions.
+   *
+   * ⚠️ IT IS THE LADDER'S OWN READING, STORED RATHER THAN RECOMPUTED. `meSessionOutcome` has run on
+   * that path since the ME ladder shipped and only the set counts it implied were kept. Each entry
+   * is `{ week, day, movement, outcome, bar, barOffsetLb }`; a surface takes the most recent for the
+   * lift and maps the outcome to a word at its own edge.
+   * ⚠️ AND IT DECIDES NOTHING. The composition re-derives the ladder from logged history on every
+   * restate, so a stale value here can never prescribe a weight or a set.
+   */
+  me_history: MeLadderReading['history'] | null;
+  /** ⛔ WHAT THE ATHLETE GOT AT THE WEIGHT THEY ARE ON, per pattern. Empty after a jump, by design. */
+  me_last_reps: MeLadderReading['lastReps'] | null;
+  /** ⛔ The weight those reps were performed at, per pattern (`barState.atWeight`). Stored beside
+   *  `me_last_reps` because the two are ONE reading; a surface must never source them apart. */
+  me_at_weight: Partial<Record<ViadaPattern, number>> | null;
 };
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -330,6 +372,14 @@ export function buildStandingPlanRow(args: {
       // ⛔ THE SAME READING THE DESCRIPTION USES — see `weekShapeOf`. Two counts of one week is how
       // the stored fact and the sentence about it come to disagree.
       sport_counts: shape == null ? null : { run: shape.run, ride: shape.ride, swim: shape.swim },
+      // ⛔ READ OFF THE WEEKS JUST COMPOSED — see the field doc. `blocks` is every week of the
+      // block, so all twelve are stored at build and none is derived later.
+      week_ledgers: weekLedgersFor(blocks),
+      // ⛔ ABSENT AT BUILD, ALWAYS — no heavy session has been logged against a block being authored.
+      // The restate fills both. Stated as null rather than omitted so the shape is the same either way.
+      me_history: null,
+      me_last_reps: null,
+      me_at_weight: null,
     },
     notes,
     /**

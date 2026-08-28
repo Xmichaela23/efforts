@@ -7,6 +7,13 @@ import { liftSeriesFromExerciseLog, buildAllTimeBestByLift, type ExerciseLogLite
 import { allOutSeriesByLift } from '../strength/all-out-set.ts';
 import { trustedMaxReps } from '../../../../src/lib/estimate-1rm.ts';
 
+/**
+ * ⚠️ EVERY ROW HERE CARRIES `slot_intent: 'ME'`. The e1RM gate fails CLOSED since 2026-08-28 — only a
+ * set the plan asked to be maximal mints a max — and these fixtures are main-lift heavy sets, which
+ * is what they were always testing. Without the stamp the series would be empty and every assertion
+ * below would be passing on nothing. ⛔ The rep-ceiling gate these tests DO pin is unaffected: it
+ * still fails OPEN on an unknown rep count, and that difference between the two gates is deliberate.
+ */
 Deno.test('trustedMaxReps: deadlift ceiling is 5, everything else 8 (LeSuer bias)', () => {
   assertEquals(trustedMaxReps('deadlift'), 5);
   assertEquals(trustedMaxReps('Barbell Deadlift'), 5);
@@ -17,9 +24,9 @@ Deno.test('trustedMaxReps: deadlift ceiling is 5, everything else 8 (LeSuer bias
 
 Deno.test('series gate: the rep-out set is dropped; low-rep sets form the series (squat, ceiling 8)', () => {
   const rows: ExerciseLogLite[] = [
-    { date: '2026-07-14', canonical_name: 'squat', estimated_1rm: 105, reps: 5 },
-    { date: '2026-07-21', canonical_name: 'squat', estimated_1rm: 108, reps: 5 },
-    { date: '2026-08-04', canonical_name: 'squat', estimated_1rm: 125, reps: 17 }, // rep-out → excluded
+    { date: '2026-07-14', canonical_name: 'squat', estimated_1rm: 105, reps: 5, slot_intent: 'ME' },
+    { date: '2026-07-21', canonical_name: 'squat', estimated_1rm: 108, reps: 5, slot_intent: 'ME' },
+    { date: '2026-08-04', canonical_name: 'squat', estimated_1rm: 125, reps: 17, slot_intent: 'ME' }, // rep-out → excluded
   ];
   const squat = liftSeriesFromExerciseLog(rows).find((s) => s.canonical === 'squat')!;
   assertEquals(squat.points.map((p) => p.value), [105, 108]); // the 17-rep 125 never enters the series
@@ -27,10 +34,10 @@ Deno.test('series gate: the rep-out set is dropped; low-rep sets form the series
 
 Deno.test("series gate: Michael's deadlift — the tighter ceiling of 5 kills the 35-rep 225", () => {
   const rows: ExerciseLogLite[] = [
-    { date: '2026-07-10', canonical_name: 'deadlift', estimated_1rm: 140, reps: 5 },
-    { date: '2026-07-24', canonical_name: 'deadlift', estimated_1rm: 155, reps: 5 }, // 120 × 5, the real read
-    { date: '2026-08-01', canonical_name: 'deadlift', estimated_1rm: 225, reps: 35 }, // 105 × 35 → excluded
-    { date: '2026-08-07', canonical_name: 'deadlift', estimated_1rm: 200, reps: 25 }, // 110 × 25 → excluded
+    { date: '2026-07-10', canonical_name: 'deadlift', estimated_1rm: 140, reps: 5, slot_intent: 'ME' },
+    { date: '2026-07-24', canonical_name: 'deadlift', estimated_1rm: 155, reps: 5, slot_intent: 'ME' }, // 120 × 5, the real read
+    { date: '2026-08-01', canonical_name: 'deadlift', estimated_1rm: 225, reps: 35, slot_intent: 'ME' }, // 105 × 35 → excluded
+    { date: '2026-08-07', canonical_name: 'deadlift', estimated_1rm: 200, reps: 25, slot_intent: 'ME' }, // 110 × 25 → excluded
   ];
   const dl = liftSeriesFromExerciseLog(rows).find((s) => s.canonical === 'deadlift')!;
   assertEquals(dl.points.map((p) => p.value), [140, 155]); // ranks by weight now, not reps; no phantom 225
@@ -38,8 +45,8 @@ Deno.test("series gate: Michael's deadlift — the tighter ceiling of 5 kills th
 
 Deno.test('series gate: reps UNKNOWN fails open — older rows without the column are kept, never blanked', () => {
   const rows: ExerciseLogLite[] = [
-    { date: '2026-07-10', canonical_name: 'squat', estimated_1rm: 100 },
-    { date: '2026-07-24', canonical_name: 'squat', estimated_1rm: 110 },
+    { date: '2026-07-10', canonical_name: 'squat', estimated_1rm: 100, slot_intent: 'ME' },
+    { date: '2026-07-24', canonical_name: 'squat', estimated_1rm: 110, slot_intent: 'ME' },
   ];
   const squat = liftSeriesFromExerciseLog(rows).find((s) => s.canonical === 'squat')!;
   assertEquals(squat.points.length, 2);
@@ -60,15 +67,18 @@ Deno.test('series gate: reps UNKNOWN fails open — older rows without the colum
 
 /** Michael's real deadlift history: two trusted low-rep sets, two rep-outs whose estimates inflate. */
 const MICHAEL_DEADLIFT: ExerciseLogLite[] = [
-  { date: '2026-07-10', canonical_name: 'deadlift', estimated_1rm: 140, reps: 5 },  // 120 × 5 — the real best
-  { date: '2026-07-24', canonical_name: 'deadlift', estimated_1rm: 132, reps: 4 },
-  { date: '2026-08-01', canonical_name: 'deadlift', estimated_1rm: 225, reps: 35 }, // 105 × 35 → not a max
-  { date: '2026-08-07', canonical_name: 'deadlift', estimated_1rm: 200, reps: 25 }, // 110 × 25 → not a max
+  { date: '2026-07-10', canonical_name: 'deadlift', estimated_1rm: 140, reps: 5, slot_intent: 'ME' },  // 120 × 5 — the real best
+  { date: '2026-07-24', canonical_name: 'deadlift', estimated_1rm: 132, reps: 4, slot_intent: 'ME' },
+  { date: '2026-08-01', canonical_name: 'deadlift', estimated_1rm: 225, reps: 35, slot_intent: 'ME' }, // 105 × 35 → not a max
+  { date: '2026-08-07', canonical_name: 'deadlift', estimated_1rm: 200, reps: 25, slot_intent: 'ME' }, // 110 × 25 → not a max
 ];
 
 Deno.test("⛔ RECORD GATE (permanent): Michael's deadlift all-time best is 140, NOT the 225 rep-out", () => {
   const best = buildAllTimeBestByLift(MICHAEL_DEADLIFT.map((r) => ({
     canonical_name: r.canonical_name, estimated_1rm: r.estimated_1rm, best_reps: r.reps,
+    // ⚠️ Carried, or the closed intent gate blanks the record's population too — the same narrow
+    // point as the display map: a row rebuilt field by field loses whatever is not named.
+    slot_intent: r.slot_intent,
   })));
   assertEquals(best.deadlift.best, 140);
   assertEquals(best.deadlift.count, 2); // the two trusted sets — the rep-outs can't back a record either
@@ -79,15 +89,15 @@ Deno.test('RECORD GATE: the record can never exceed the top of the gated SERIES 
   const rows = MICHAEL_DEADLIFT;
   const seriesTop = Math.max(...liftSeriesFromExerciseLog(rows).find((s) => s.canonical === 'deadlift')!.points.map((p) => p.value));
   const record = buildAllTimeBestByLift(rows.map((r) => ({
-    canonical_name: r.canonical_name, estimated_1rm: r.estimated_1rm, best_reps: r.reps,
+    canonical_name: r.canonical_name, estimated_1rm: r.estimated_1rm, best_reps: r.reps, slot_intent: r.slot_intent,
   }))).deadlift.best;
   assertEquals(record <= seriesTop, true, `record ${record} must not exceed the trusted series top ${seriesTop}`);
 });
 
 Deno.test('RECORD GATE: a trusted all-time high DOES set the record (the gate blocks rep-outs, not progress)', () => {
   const best = buildAllTimeBestByLift([
-    ...MICHAEL_DEADLIFT.map((r) => ({ canonical_name: r.canonical_name, estimated_1rm: r.estimated_1rm, best_reps: r.reps })),
-    { canonical_name: 'deadlift', estimated_1rm: 165, best_reps: 3 }, // 150 × 3 — a real new max
+    ...MICHAEL_DEADLIFT.map((r) => ({ canonical_name: r.canonical_name, estimated_1rm: r.estimated_1rm, best_reps: r.reps, slot_intent: r.slot_intent })),
+    { canonical_name: 'deadlift', estimated_1rm: 165, best_reps: 3, slot_intent: 'ME' }, // 150 × 3 — a real new max
   ]);
   assertEquals(best.deadlift.best, 165);
   assertEquals(best.deadlift.count, 3);
@@ -95,9 +105,9 @@ Deno.test('RECORD GATE: a trusted all-time high DOES set the record (the gate bl
 
 Deno.test("RECORD GATE: the squat ceiling is its own (8) — a 17-rep set can't set the record either", () => {
   const best = buildAllTimeBestByLift([
-    { canonical_name: 'squat', estimated_1rm: 100, best_reps: 5 },
-    { canonical_name: 'squat', estimated_1rm: 125, best_reps: 17 }, // rep-out
-    { canonical_name: 'squat', estimated_1rm: 98, best_reps: 8 },   // AT the ceiling → counts
+    { canonical_name: 'squat', estimated_1rm: 100, best_reps: 5, slot_intent: 'ME' },
+    { canonical_name: 'squat', estimated_1rm: 125, best_reps: 17, slot_intent: 'ME' }, // rep-out
+    { canonical_name: 'squat', estimated_1rm: 98, best_reps: 8, slot_intent: 'ME' },   // AT the ceiling → counts
   ]);
   assertEquals(best.squat.best, 100);
   assertEquals(best.squat.count, 2);
@@ -106,9 +116,12 @@ Deno.test("RECORD GATE: the squat ceiling is its own (8) — a 17-rep set can't 
 Deno.test('RECORD GATE: reps UNKNOWN fails open — the record reads the SAME population as the series', () => {
   // An older row written before `best_reps` was threaded must not blank a real record; the series
   // already fails open here, and the two must not disagree about what history exists.
+  // ⚠️ THE ROWS CARRY AN INTENT because the INTENT gate is a separate, closed one — this test is
+  // about the REP gate, and leaving them unstamped would blank the population for the other reason
+  // and pass for the wrong cause.
   const best = buildAllTimeBestByLift([
-    { canonical_name: 'squat', estimated_1rm: 100, best_reps: null },
-    { canonical_name: 'squat', estimated_1rm: 110 },
+    { canonical_name: 'squat', estimated_1rm: 100, best_reps: null, slot_intent: 'ME' },
+    { canonical_name: 'squat', estimated_1rm: 110, slot_intent: 'ME' },
   ]);
   assertEquals(best.squat.best, 110);
   assertEquals(best.squat.count, 2);

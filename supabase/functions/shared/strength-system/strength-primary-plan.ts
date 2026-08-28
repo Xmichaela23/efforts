@@ -549,6 +549,14 @@ type StrengthExercise = {
    * here instead.
    */
   notes?: string;
+  /**
+   * ⛔ WHAT THE PLAN ASKED THIS ROW TO BE — 'ME' | 'DE' | 'SKILL' | 'HYP', the vocabulary
+   * `exercise_log.slot_intent` stores and `state-trend/assemble.ts` gates the e1RM series on.
+   * ⚠️ ABSENT ON MAIN LIFTS ON PURPOSE: an unknown intent fails open and keeps minting, which is
+   * right for the lift this programme measures, and a 5/3/1 top set is not Viada's 90-100% ME band.
+   * ⛔ A ROW THAT IS LIGHT ON PURPOSE MUST CARRY THIS or the strength line reads it as maximal.
+   */
+  slot_intent?: 'ME' | 'DE' | 'SKILL' | 'HYP';
   /** ⛔ THE PER-SET PRESCRIPTION. 5/3/1 is three sets at three weights; the app's one-weight-per-
    *  exercise shape cannot say that, and copying the top set onto all three prefills the phone with
    *  a weight the athlete was not asked to lift twice a session, four days a week, for twelve weeks.
@@ -953,6 +961,35 @@ function assistanceRows(
         // the athlete did would read as a skip.
         weight: 'By feel',
         load_prescribed: false,
+        /**
+         * ⛔ THE SET'S INTENT, AS DATA. `exercise_log.slot_intent` gates the e1RM series: a set the
+         * plan asked to be light never mints a max. Assistance here is auto-regulated by feel, at a
+         * rep TOTAL the athlete splits how they like; a by-feel set is not a high-intensity work set
+         * on anyone's definition, and letting one set an athlete's estimated max is the same false
+         * reading the Viada speed day produced.
+         *
+         * ⛔⛔ THE GATE FAILS CLOSED — ONLY `ME` MINTS (Michael, 2026-08-28). So this stamp is no
+         * longer what stops an assistance set counting; a null would stop it too. ⚠️ IT IS KEPT
+         * ANYWAY, because it is the honest record of what the row IS, and because a later ruling
+         * that reopens the gate must not silently re-admit by-feel work.
+         *
+         * ⛔⛔ AND THE MAIN LIFT'S SILENCE NOW HAS A CONSEQUENCE IT DID NOT HAVE. The four intents
+         * are Viada's — ME is 90-100% — and a 5/3/1 top set is 65-95% depending on the week, so
+         * stamping ME on it would assert a band this programme does not prescribe. Under fail-open
+         * that silence was free: the main lift kept minting. **Under fail-closed it does not mint at
+         * all, so a Get Stronger block has no strength line.** That is raised, not fixed here — see
+         * the report of 2026-08-28. Whoever resolves it is choosing between a claim the percentages
+         * do not support and a programme with no line, and it should be a ruling, not a patch.
+         *
+         * ⚠️ The supplemental (FSL) row needs no stamp — it carries the main lift's own `name`, so it
+         * lands on the SAME `exercise_log` row, where `best_weight` already takes the top set. It
+         * cannot plant a lower point.
+         *
+         * ⛔⛔ THE RULE FOR ANY FUTURE PROGRAMME: a generator whose main lift is meant to be measured
+         * MUST stamp this, or that programme has no strength line at all. Stamp it when the rows are
+         * authored, never afterwards.
+         */
+        slot_intent: 'HYP' as const,
         // ⚠️ A SEPARATE FIELD FOR A SEPARATE CLAIM. `weight_suggested` is not a quieter `weight` — it
         // is a STARTING POINT for the logger's entry box, greyed and overwritable, and no surface may
         // render it as what the plan asked for. Omitted entirely for bodyweight movements and

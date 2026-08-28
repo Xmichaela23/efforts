@@ -21,6 +21,11 @@ export interface WeekExecutionV1 { counts: WeekExecutionCount[]; accent: WeekAcc
 export type { PrimarySport } from '../_shared/load-status-reconcile.ts';
 import type { PrimarySport } from '../_shared/load-status-reconcile.ts';
 
+// The five weekly numbers, in the shape the plan row stores them. Type-only — the coach forwards
+// what `buildStandingPlanRow` wrote and computes none of it.
+import type { WeekLedgerV1 } from '../_shared/standing-plan/week-ledger.ts';
+import type { MeLadderReading } from '../_shared/standing-plan/me-history.ts';
+
 export type MethodologyId =
   | 'run:sustainable'
   | 'run:performance_build'
@@ -438,6 +443,41 @@ export type CoachWeekContextResponseV1 = {
        * it does not re-derive it (Law-4). strength/run/ride/swim → that row leads; tri/duathlon/hybrid → no lead. */
       primary_discipline: PrimarySport;
     };
+    /**
+     * ⛔⛔ THE FIVE WEEKLY NUMBERS FOR THE WEEK THE ATHLETE IS IN — read off the plan row, never
+     * computed here. Stored at build by `buildStandingPlanRow`, refreshed by
+     * `rematerialize-standing-block`, forwarded verbatim (Law-4: the surface renders, it does not
+     * re-decide).
+     *
+     * ⚠️ OPTIONAL, AND ABSENT IS THE COMMON CASE. It is present only on a Standing Plan block that
+     * carries `config.standing_plan.week_ledgers` and only once the plan is running — every other
+     * plan type, every block built before the field shipped, and a pre-start plan all omit it. The
+     * client renders nothing rather than zero.
+     *
+     * ⚠️ ONE WEEK, NO COMPARISON (ruled 2026-08-28). A standing block is the same week twelve times
+     * by design (p120, `NO_SCHEDULED_DELOAD_CITE`) — measured: identical minutes on all twelve
+     * weeks, identical set counts from week 2 on. A week N−1 field would exist to say nothing.
+     */
+    week_ledger_v1?: WeekLedgerV1 | null;
+    /**
+     * ⛔⛔ WHAT EVERY HEAVY SESSION OF THE CURRENT BLOCK WAS, per pattern, in the order trained —
+     * read off `config.standing_plan.me_history` and forwarded verbatim.
+     *
+     * ⛔ THE APP ALREADY KNEW THIS. `meSessionOutcome` runs inside `earnedMeSets` on every restate;
+     * the write path kept only the set counts it implied. Nothing here computes a verdict, and a
+     * surface maps `outcome` to a word at its own edge — the ladder's thresholds are not display
+     * concerns and do not move to suit a label.
+     *
+     * ⚠️ EMPTY ON A FRESH BLOCK. No heavy session logged means no word, which is a card that renders
+     * nothing rather than a card that guesses.
+     */
+    me_history_v1?: {
+      history: MeLadderReading['history'];
+      /** What the athlete got at the weight they are on. Empty right after a jump, by design. */
+      last_reps: MeLadderReading['lastReps'] | null;
+      /** The weight those reps were performed at. One reading with `last_reps` — never sourced apart. */
+      at_weight: Partial<Record<string, number>> | null;
+    } | null;
     guards: {
       is_transition_window: boolean;
       suppress_deviation_language: boolean;

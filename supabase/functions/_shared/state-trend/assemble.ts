@@ -177,7 +177,65 @@ export const disciplineOf = (t: unknown): string | null => {
 
 // Lift series from raw exercise_log rows — mirrors useExerciseLog's liftTrends derivation exactly
 // (filter e1RM>0, group by canonical, ≥2 sessions, sort by date). Same columns both runtimes read.
-export interface ExerciseLogLite { date: string; canonical_name: string; exercise_name?: string | null; estimated_1rm: number | null; reps?: number | null }
+export interface ExerciseLogLite {
+  date: string;
+  canonical_name: string;
+  exercise_name?: string | null;
+  estimated_1rm: number | null;
+  reps?: number | null;
+  /**
+   * ⛔ What the plan asked the set to be — see {@link intentCanMintAMax}. Null = not told, and under
+   * the closed gate that means the set mints nothing.
+   *
+   * ⚠️⚠️ IF YOU ADD A FIELD TO THIS ROW, FIND EVERY PLACE THE ROW IS REBUILT FIELD BY FIELD AND
+   * CARRY IT. This is a PATTERN in this codebase, not a coincidence — `slot_intent` alone was
+   * dropped at three separate narrow points before it reached a screen: the query's field map in
+   * `compute-snapshot`, the per-lift display map below (which rebuilds each chart point as
+   * `{date, value, recent}` and discards `meta`), and two test fixtures that rebuild rows for the
+   * record gate. Each time the field was selected, resolved and correct, and arrived as `undefined`.
+   * ⛔ A GATE THAT READS `undefined` DOES NOT ERROR — it silently takes the absent branch. That is
+   * why all three were found by a failing test or a printed value and none by reading the code.
+   * Grep the field name across `compute-snapshot`, `assemble.ts` and the fixtures before assuming
+   * one write site is enough.
+   */
+  slot_intent?: string | null;
+}
+
+/**
+ * ⛔⛔ ONLY A HEAVY SET MAY MINT A MAX — the gate, and the reason the strength line fell on a week
+ * followed exactly (2026-08-28).
+ *
+ * On a Viada standing block the SAME lift is prescribed at two intensities in one week: Michael's
+ * bench is 135 on the heavy day (ME, 90-100%) and 105 on the speed day (DE, 70-80%). Both landed on
+ * this series, so every Thursday planted a point roughly a fifth below Monday's and the graph read
+ * as a decline on a block the athlete was following exactly. Speed and hypertrophy sets keep their
+ * place in the logged-sets history; they stop moving the line. Field standard — Strong, Hevy and
+ * Boostcamp all separate the two — and the same move that closed the bike easy-ride false dip
+ * (`e8b67eaf`, gated on the shared hard-effort bins).
+ *
+ * ⛔⛔ IT FAILS CLOSED: ONLY `ME` MINTS. An unknown intent does NOT. This reverses an earlier
+ * fail-open ruling and the reversal is deliberate, so do not "restore" it by reading D-417 below as
+ * a precedent — the two gates answer different questions and now differ on purpose.
+ *
+ * ⛔ WHY FAIL-OPEN EXISTED AND WHY IT IS GONE (Michael, 2026-08-28). It existed to stop a live
+ * screen's history being deleted to cure a graph: `slot_intent` only began reaching `exercise_log`
+ * on 2026-08-26, so closing the gate empties the line of everything before that date. He then ruled
+ * that he does not want that history — *"Let's just begin this line fresh… I'm pretty much at my one
+ * rep max as tested… Don't let the old lifts drag me down."* He is re-testing and starting a real
+ * programme. **The reason for the exception went, so the exception went.**
+ *
+ * ⚠️ THE COST, ACCEPTED EXPLICITLY: the line is EMPTY until heavy sets carrying an intent are
+ * logged. That is the intended state, not a regression — a line built only from sets the plan asked
+ * to be maximal.
+ *
+ * ⚠️ AND A PROGRAMME THAT DOES NOT STAMP `slot_intent` NOW HAS NO STRENGTH LINE AT ALL, which under
+ * fail-open it did. Any plan generator whose main lift is meant to be measured must stamp it.
+ */
+export function intentCanMintAMax(slotIntent: string | null | undefined): boolean {
+  // ⚠️ ONE VALUE PASSES. Absent, empty, a non-heavy intent, or a name this build does not recognise
+  // all fail — a set only mints when the plan is on record asking for a maximal effort.
+  return String(slotIntent ?? '').trim().toUpperCase() === 'ME';
+}
 /** D-338 — what the PLAN was asking for on each dated point, resolved once by the caller off the
  *  single plan-phase resolver. `phaseByDate` carries the raw phase name lowercased ('deload',
  *  'leader', 'anchor', 'build'…); `measuredDates` are the days an all-out set was actually
@@ -185,6 +243,20 @@ export interface ExerciseLogLite { date: string; canonical_name: string; exercis
 export interface LiftSeriesContext {
   phaseByDate?: Record<string, string> | null;
   measuredDates?: string[] | null;
+  /**
+   * ⛔⛔ WHICH WEEK OF THE CURRENT BLOCK EACH DATED POINT FELL IN — resolved by the caller off
+   * `resolvePlanWeekIndex`, the app's one answer to that question (Constitution: surfaces render,
+   * they never re-decide). A card that derived week numbers from dates plus a block start would be
+   * re-deriving a fact the spine owns, and it would drift the first time a block is deleted and
+   * rebuilt.
+   *
+   * ⚠️ A DATE OUTSIDE THE CURRENT BLOCK IS ABSENT, NOT CLAMPED. `resolvePlanWeekIndex` pins
+   * anything before the start to week 1 and anything after the end to the last week, which would
+   * label a session from a previous block "week 1" of this one. A rebuilt block starts its own
+   * numbering and the old points are not week 1 of anything, so the caller omits them and a reader
+   * shows them without a week.
+   */
+  weekByDate?: Record<string, number> | null;
 }
 /**
  * ⛔ THE ALL-TIME e1RM RECORD — per lift, TRUSTED SETS ONLY (D-417, applied here 2026-08-12).
@@ -213,7 +285,7 @@ export interface LiftSeriesContext {
  * which is its correct home. Only the e1RM record stops reading it.
  */
 export function buildAllTimeBestByLift(
-  rows: Array<{ canonical_name?: string | null; estimated_1rm?: number | null; best_reps?: number | null }>,
+  rows: Array<{ canonical_name?: string | null; estimated_1rm?: number | null; best_reps?: number | null; slot_intent?: string | null }>,
 ): Record<string, { best: number; count: number }> {
   const out: Record<string, { best: number; count: number }> = {};
   for (const e of Array.isArray(rows) ? rows : []) {
@@ -222,6 +294,10 @@ export function buildAllTimeBestByLift(
     if (!k || !Number.isFinite(v) || v <= 0) continue;
     // Fail-open on unknown reps (mirrors the series gate at `liftSeriesFromExerciseLog`).
     if (e.best_reps != null && !estimateIsTrusted(k, e.best_reps)) continue;
+    // ⛔ AND ONLY A HEAVY SET MAY MINT A MAX (2026-08-28) — the SAME gate the series applies, for the
+    // same reason this file already gives for keeping the two side by side: split across files, one
+    // of them silently rots. A speed set cannot set an e1RM record any more than it can move the line.
+    if (!intentCanMintAMax(e.slot_intent)) continue;
     const cur = out[k];
     out[k] = cur ? { best: Math.max(cur.best, v), count: cur.count + 1 } : { best: v, count: 1 };
   }
@@ -238,6 +314,9 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
     // history; it just cannot mint a max. reps unknown (rows written before the column was threaded) →
     // kept, so we never blank real data. Matches the strength-world rule: a 1RM comes from a low-rep set.
     if (e.reps != null && e.reps > trustedMaxReps(e.canonical_name)) continue;
+    // ⛔ ONLY A HEAVY SET MAY MINT A MAX — and it fails CLOSED, unlike the rep gate directly above.
+    // See `intentCanMintAMax`: the two differ on purpose and the difference is not an oversight.
+    if (!intentCanMintAMax(e.slot_intent)) continue;
     const arr = byCanonical.get(e.canonical_name) ?? [];
     arr.push(e);
     byCanonical.set(e.canonical_name, arr);
@@ -246,6 +325,7 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
   // points carried no meta at all, so the exclusion wired into computeStrengthState never once fired.
   const phaseByDate = ctx?.phaseByDate ?? null;
   const measured = new Set(ctx?.measuredDates ?? []);
+  const weekByDate = ctx?.weekByDate ?? null;
   return [...byCanonical.entries()]
     .filter(([, rs]) => rs.length >= 2)
     .map(([canonical, rs]) => {
@@ -258,10 +338,21 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
         points: sorted.map((r) => {
           const phase = phaseByDate?.[r.date] ?? null;
           const isMeasured = measured.has(r.date);
+          // ⚠️ ABSENT FOR A POINT OUTSIDE THE CURRENT BLOCK — see `weekByDate`. Never a zero and
+          // never a guess: a point with no week is drawn without one.
+          const week = weekByDate?.[r.date];
           // Meta is OMITTED entirely when there is nothing to say, so a series built without
           // context is byte-identical to the one this function returned before.
-          return (phase || isMeasured)
-            ? { date: r.date, value: r.estimated_1rm!, meta: { ...(phase ? { phase } : {}), ...(isMeasured ? { measured: true } : {}) } }
+          return (phase || isMeasured || week != null)
+            ? {
+                date: r.date,
+                value: r.estimated_1rm!,
+                meta: {
+                  ...(phase ? { phase } : {}),
+                  ...(isMeasured ? { measured: true } : {}),
+                  ...(week != null ? { week } : {}),
+                },
+              }
             : { date: r.date, value: r.estimated_1rm! };
         }),
       };
@@ -321,6 +412,16 @@ export interface StateTrendInputs {
   /** D-338: the days an all-out set was actually performed (`strength_facts.measured`). The one
    *  distinction the series has never had — a test week vs an ordinary Tuesday. */
   measuredDates?: string[] | null;
+  /** ⛔ Which week of the CURRENT block each dated point fell in (2026-08-28) — resolved by the
+   *  caller off `resolvePlanWeekIndex` and bounded to the block's own window, so a point from a
+   *  previous block carries no week rather than a clamped "week 1". See `LiftSeriesContext`. */
+  weekByDate?: Record<string, number> | null;
+  /** ⛔ The repeated named session, already gated and joined by the caller (see `compute-snapshot`).
+   *  This module carries it to the display contract and does nothing else with it. */
+  namedRunSession?: NamedSessionSeries | null;
+  /** ⛔ The block's expected curve per canonical lift — dated weekly points, anchored on the block's
+   *  opening working number at the plan's own rate. Built by the caller; carried, never computed. */
+  expectedByCanonical?: Record<string, Array<{ date: string; value: number }>> | null;
   /** Slice 2: EVERY all-out set per canonical lift, oldest first (`allOutSeriesByLift`,
    *  `_shared/strength/all-out-set.ts`). The substrate for the 5/3/1 progress direction — the rep
    *  record, not the waved working weight. Absent → every lift keeps the e1RM gauge. */
@@ -361,6 +462,9 @@ export interface StateTrendResult {
   /** S2: per-discipline 90d session counts (the card sort key) — carried so the cached DISPLAY contract
    *  is self-contained and the client no longer needs the raw cadence rows to render. */
   cadenceCounts: Record<string, number>;
+  /** ⛔ The repeated named session, carried through from the inputs. Null when the block has none
+   *  or nothing has been logged against it — a card with nothing to say does not render. */
+  namedRunSession?: NamedSessionSeries | null;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -631,6 +735,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows, {
     phaseByDate: inp.phaseByDate,
     measuredDates: inp.measuredDates,
+    weekByDate: inp.weekByDate,
   });
   // Slice 2: the protocol's own gauge. For a 5/3/1 block (`readsEffortAs: 'amrap'`) a waved main
   // lift's direction reads the ALL-OUT SET, not the working-set e1RM the program itself waves.
@@ -662,7 +767,17 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       .map((s) => [s.canonical, s.points
         .filter((p) => p.date > _chartStart && p.date <= asOf)
         .sort((a, b) => a.date.localeCompare(b.date))
-        .map((p) => ({ date: p.date, value: Math.round(p.value), recent: p.date > _verdictStart }))]),
+        // ⛔ THE WEEK RIDES ALONG OR THE CARD CANNOT LABEL ITS AXIS. This map is where the point's
+        // `meta` is dropped, so a week resolved upstream and not carried here would reach the client
+        // as nothing — the same narrow point that would have killed the intent gate one file over.
+        .map((p) => ({
+          date: p.date,
+          value: Math.round(p.value),
+          recent: p.date > _verdictStart,
+          ...(((p.meta as { week?: number } | undefined)?.week) != null
+            ? { week: (p.meta as { week: number }).week }
+            : {}),
+        }))]),
   );
   const strengthPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
     canonical: l.canonical,
@@ -706,6 +821,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
     series: strengthChartByCanonical.get(l.canonical),
+    // ⚠️ The faint line, carried from the caller. Absent before the block's test is read — the card
+    // then draws the readings alone, which is still the read.
+    expected: inp.expectedByCanonical?.[l.canonical],
   }));
   // State v3 DOT — strength = e1RM (what you CAN lift), not volume (what you DID). Volume keeps its
   // trend/verdict for OTHER consumers (coach), but the FITNESS DOT rides e1RM.
@@ -827,6 +945,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     fitnessMode,
     fitnessAnchors,
     cadenceCounts: inp.cadenceCounts,
+    // Carried, not computed — the caller gated and joined it. See `NamedSessionSeries`.
+    namedRunSession: inp.namedRunSession ?? null,
   };
 }
 
@@ -849,6 +969,37 @@ export interface DisciplineTrendCache {
  *  queries + live assembleStateTrends). Mirrors the hook's return minus `headline` (no consumer). The
  *  coach forwards this on `weekly_state_v1`; the client reads it. Optional for back-compat (a snapshot
  *  written before this deploy has no `display` → the client falls back to the legacy live path). */
+/**
+ * ⛔⛔ ONE NAMED SESSION, REPEATED — the same workout every week, and its heart rate.
+ *
+ * A standing block prescribes the identical near-threshold run every week by design (p120: the
+ * standard week is built to be run indefinitely — measured on a composed block, all twelve weeks are
+ * Wednesday, 66 minutes, `family:run_near_threshold`). **Because the workout does not change, any
+ * change in the line is the athlete.** That is the whole reason this reads cleanly, and it is what
+ * the existing run row cannot say: that one trends efficiency and decoupling across ALL steady runs,
+ * where route, weather and distance all move at once.
+ *
+ * ⚠️ ONE ENTRY PER LOGGED-AND-ATTACHED SESSION. See the join in `compute-snapshot` for why a run
+ * that was never linked to its planned row cannot appear here, and why that is correct.
+ */
+export interface NamedSessionPoint {
+  /** Block week. Present because the caller resolved it; a point outside the block is not emitted. */
+  week: number;
+  date: string;
+  /** Average heart rate, from `run_facts.hr_avg` — the same reading the efficiency trend uses. */
+  hrAvg: number;
+  /** The prescribed session's own duration, so the card can say which session it is. */
+  durationMin: number | null;
+}
+
+export interface NamedSessionSeries {
+  /** The family tag this series was gated to, e.g. `run_near_threshold`. Provenance. */
+  family: string;
+  /** The session's name as the plan wrote it. */
+  label: string;
+  points: NamedSessionPoint[];
+}
+
 export interface StateDisplayV1 {
   cards: DisciplineCard[];
   bikeFitness: BikeFitness;
@@ -862,6 +1013,9 @@ export interface StateDisplayV1 {
   /** Per-discipline rendered anchor (tick + label) for anchored rows. */
   fitnessAnchors: Record<string, FitnessAnchor>;
   cadenceCounts: Record<string, number>;
+  /** ⛔ The repeated named session, when the block has one and it has been logged. Absent otherwise —
+   *  a card with nothing to say does not render, and there is no placeholder. */
+  namedRunSession?: NamedSessionSeries | null;
 }
 
 export interface StateTrendsV1 {
@@ -1100,6 +1254,8 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       fitnessMode: r.fitnessMode,
       fitnessAnchors: r.fitnessAnchors,
       cadenceCounts: r.cadenceCounts,
+      // Passed through verbatim — this assembly neither builds nor judges it.
+      ...(r.namedRunSession ? { namedRunSession: r.namedRunSession } : {}),
     },
     strength: {
       ...disc('strength'),

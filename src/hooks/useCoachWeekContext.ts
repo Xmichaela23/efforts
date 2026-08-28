@@ -3,6 +3,7 @@ import { COACH_CLIENT_MIN_PAYLOAD_VERSION } from '@/lib/coach-contract';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 import type { StateDisplayV1 } from '@shared/state-trend';
+import type { WeekLedgerV1 } from '@shared/standing-plan/week-ledger.ts';
 
 /** Same Monday boundary logic as the coach's week (local calendar date, en-CA). */
 function weekStartMondayEnCA(ymd: string): string {
@@ -411,6 +412,39 @@ export type CoachWeekContextV1 = {
        * session-type breakdown leads the execution surface — never re-derives it (Law-4). */
       primary_discipline?: 'strength' | 'run' | 'ride' | 'swim' | 'triathlon' | 'duathlon' | 'hybrid' | 'unknown';
     };
+    /**
+     * ⛔ THE FIVE WEEKLY NUMBERS FOR THE WEEK THE ATHLETE IS IN (coach payload v171) — the plan's
+     * own endurance minutes by intensity plus its work-set count, stored with the block at build
+     * and forwarded verbatim. The client renders it and computes none of it (Law-4).
+     *
+     * ⚠️ ABSENT IS THE COMMON CASE AND MEANS "not stored", never "no work": every non-Standing-Plan
+     * block, every block built before the field shipped, and any plan that has not started omit it.
+     * Render nothing rather than a zeroed bar. ⚠️ The type is the SERVER'S — one shape, imported,
+     * so the two cannot drift.
+     */
+    week_ledger_v1?: WeekLedgerV1 | null;
+    /**
+     * ⛔ WHAT EVERY HEAVY SESSION OF THE CURRENT BLOCK WAS (coach payload v172) — the ladder's own
+     * per-session outcomes, forwarded. The client maps `outcome` to a word at the display edge and
+     * computes no verdict of its own (Law-4).
+     *
+     * ⚠️ EMPTY ON A FRESH BLOCK, which is a card with no word rather than a card that guesses. The
+     * outcome thresholds belong to the ME ladder and must not be moved to suit a label.
+     */
+    me_history_v1?: {
+      history: Partial<Record<string, Array<{
+        week: number;
+        day: string;
+        movement: string;
+        /** `clean` | `mid_band` | `setback` | `no_evidence` — the ladder's vocabulary, not the card's. */
+        outcome: string;
+        bar: string;
+        barOffsetLb: number;
+      }>>>;
+      last_reps: Partial<Record<string, number[]>> | null;
+      /** The weight those reps were performed at. One reading with `last_reps` — never sourced apart. */
+      at_weight: Partial<Record<string, number>> | null;
+    } | null;
     guards: {
       is_transition_window: boolean;
       suppress_deviation_language: boolean;

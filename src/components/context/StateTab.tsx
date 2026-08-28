@@ -35,6 +35,7 @@ import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
+import { StrengthReadCards, NamedRunCard } from './StrengthReadCards';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -1486,6 +1487,61 @@ export default function StateTab({
           <RefreshCw className={`w-4 h-4 ${coachBusy ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {/* ── THE STRENGTH READ (2026-08-28) — one card per main lift, HEAVY DAYS ONLY. Its own plate,
+          above load and body, because it is a different clock and a different question: load and body
+          report the rolling last seven days off the athlete's sessions, this reports whether the bar
+          is going up across the block. Renders nothing at all until a lift has a heavy session logged
+          in the block (ruled: no placeholder, no dashes) — so it is absent in week 1, which is the two
+          tests, by construction.
+
+          ⚠️ IT DOES NOT REPLACE "from your logged sets" BELOW, deliberately. That section is the
+          Strong/Hevy set history Michael asked for on 2026-08-11 and it answers a different question
+          (what did I lift, when). The same instruction the work order gives for the run row applies
+          here: do not delete what exists to make room.
+          ⚠️ AND THAT SECTION READS `useExerciseLog` DIRECTLY — a client query, so it is already an
+          exception to smart-server/dumb-client. This work did not widen it: every number on these
+          cards is server-decided. Not fixed here. */}
+      {(() => {
+        const meHistory = (wsv as { me_history_v1?: React.ComponentProps<typeof StrengthReadCards>['meHistory'] }).me_history_v1;
+        const runSession = wsv.trends?.display?.namedRunSession ?? null;
+        // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
+        // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
+        // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
+        // section on the lift half would hide it for the block's whole first week.
+        if (!meHistory && !runSession) return null;
+        const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
+        const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
+        for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
+          if (!l?.canonical_name) continue;
+          if (Array.isArray(l.series)) seriesByCanonical[l.canonical_name] = l.series;
+          if (Array.isArray(l.expected)) expectedByCanonical[l.canonical_name] = l.expected;
+        }
+        const cards = (
+          <StrengthReadCards
+            meHistory={meHistory ?? null}
+            seriesByCanonical={seriesByCanonical}
+            expectedByCanonical={expectedByCanonical}
+          />
+        );
+        return (
+          <>
+            <div className="px-1 mb-1 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
+            <div
+              className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
+              style={readoutPlateStyle(undefined, { galaxy: true })}
+            >
+              {cards}
+              {/* ⛔ THE RUN CARD SITS ON THE SAME PLATE, LAST. It answers the same question in the
+                  other discipline — is the same work getting cheaper — and the block is one thing,
+                  not two screens. ⚠️ It renders independently of the lift cards: a week where the
+                  run is logged and no heavy session is yet (which is week 1 of every block) shows
+                  the run card alone, and that is the honest state. */}
+              <NamedRunCard session={runSession} />
+            </div>
+          </>
+        );
+      })()}
 
       {/* Section clock label: LOAD + BODY are the FAST clock (how the last 7 days feel vs typical).
           Named once here; per-row specifics (WTD pts, RPE receipt) inherit it. */}

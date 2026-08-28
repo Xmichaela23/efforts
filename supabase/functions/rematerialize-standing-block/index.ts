@@ -32,6 +32,7 @@ import {
   // ⚠️ ONE ANSWER TO "which weekday is this date" — the same helper the restatement matches rows on.
   STANDING_PLAN_PROTOCOL_ID,
   TEST_WEEK_INDEX,
+  weekLedgersFor,
 } from '../_shared/standing-plan/index.ts';
 
 const corsHeaders = {
@@ -361,6 +362,67 @@ Deno.serve(async (req: Request) => {
             // re-derives it from logged history on every restate, so a stale value here can never
             // prescribe a weight.
             me_bar_offsets_by_pattern: Object.keys(ladder.bar).length > 0 ? ladder.bar : null,
+            /**
+             * ⛔ THE FIVE WEEKLY NUMBERS, REFRESHED OFF THE WEEKS THIS RESTATE JUST COMPOSED.
+             *
+             * ⚠️ THE BARBELL COUNT IS WHY. A restate rewrites the remaining weeks with the ME sets
+             * the athlete has EARNED, so week 6's work-set count is not the one the block was built
+             * with — and the card prints that count beside a calendar that already carries the
+             * extra set. The endurance minutes do not move here (the sessions are not recomposed
+             * onto the calendar), and they are re-read anyway rather than merged, so one week is
+             * never half-old.
+             *
+             * ⚠️ `composed`, NOT `probe` — the probe is deliberately composed at the block's
+             * AUTHORED set counts to find the ME rows, so its ledger would report the numbers the
+             * restate is replacing. See the two-compositions comment above.
+             */
+            week_ledgers: weekLedgersFor(composed),
+            /**
+             * ⛔⛔ WHAT EVERY HEAVY SESSION OF THIS BLOCK WAS — the walk `earnedMeSets` already made,
+             * stored instead of thrown away.
+             *
+             * ⛔ IT COMPUTES NOTHING NEW. `meSessionOutcome` has run on this exact path since the ME
+             * ladder shipped; the write branch kept only the set counts it implied and dropped the
+             * per-session outcomes, so the one reading in the app that knows whether a heavy session
+             * was finished reached the database and stopped. This is the same starvation as
+             * `enduranceLedger`, one function along.
+             *
+             * ⚠️ THE OUTCOMES ARE THE LADDER'S OWN AND THEIR THRESHOLDS ARE NOT DISPLAY CONCERNS.
+             * `clean` is every set within one rep of the band top (`ME_CLEAN_REPS_WITHIN_TOP`),
+             * which is what earns the next set; a surface maps outcome to word at its own edge and
+             * must never move the threshold to suit a label.
+             *
+             * ⚠️ HISTORY, NOT A VERDICT. Ordered as trained, one entry per matched session, so a
+             * reader takes the most recent and can also show the walk. Empty on a fresh block — no
+             * heavy session has been logged yet, which is a card with no word rather than a bad one.
+             */
+            me_history: ladder.history,
+            /**
+             * ⛔ WHAT THE ATHLETE GOT AT THE WEIGHT THEY ARE ON, per pattern — `barState.recentReps`
+             * lifted out by `earnedMeSets`, not a second reading of the log.
+             * ⚠️ EMPTY AFTER A JUMP AND THAT IS CORRECT: there is no last time at the NEW weight, and
+             * saying nothing beats repeating a number earned on a lighter bar.
+             */
+            me_last_reps: Object.keys(ladder.lastReps).length > 0 ? ladder.lastReps : null,
+            /**
+             * ⛔ THE WEIGHT THOSE REPS WERE PERFORMED AT, per pattern — `barState.atWeight`.
+             *
+             * ⚠️ IT IS STORED BESIDE `me_last_reps` BECAUSE THE TWO ARE ONE READING. `me_last_reps`
+             * is `barState.recentReps` lifted out of this same state, and both belong to `atWeight`
+             * — that is the field's own comment. A surface that took the weight from anywhere else
+             * would print "140 lb · last time 4 reps" where the 4 was earned at 135: one sentence,
+             * two facts, and no way for a reader to tell.
+             * ⚠️ NULL BEFORE THE FIRST HEAVY SESSION OF A BLOCK, like the history. A card with no
+             * weight and no word does not render at all (ruled 2026-08-28) — no placeholder.
+             */
+            me_at_weight: (() => {
+              const out: Record<string, number> = {};
+              for (const [pattern, st] of Object.entries(ladder.barState ?? {})) {
+                const w = Number((st as { atWeight?: number | null } | undefined)?.atWeight);
+                if (Number.isFinite(w) && w > 0) out[pattern] = w;
+              }
+              return Object.keys(out).length > 0 ? out : null;
+            })(),
           },
         },
       })

@@ -588,3 +588,43 @@ Deno.test('the restater refuses a block that is not a Standing Plan block', asyn
   assert(!/training_max|wendler/i.test(code), 'the restater reaches into the training max');
   assert(/requireUser/.test(code), 'the restater does not verify who is asking');
 });
+
+Deno.test("⛔⛔ THE TEST WEEK'S COMPETITION LIFTS ARE STAMPED ME — the empty-Monday regression", () => {
+  /**
+   * ⛔ THE BUG THIS PINS (2026-08-28). `state-trend/assemble.ts` fails CLOSED: only a set stamped
+   * `ME` mints an estimated max. The p215 pretest was unstamped, so the block's MOST maximal
+   * sessions — the two the working numbers are derived from — reached the strength line as nothing,
+   * and an athlete opening a fresh block to "start the line from scratch" would have seen an empty
+   * card until week two. Found by printing the intents of a composed block.
+   *
+   * ⚠️ ME DESCRIBES THIS ROW, IT DOES NOT CHANGE IT. The pretest works up to a set taken for max
+   * clean reps; 90-100% is the band it already occupies. That is why it is defensible here and not
+   * on a 5/3/1 top set, where ME would assert a band the programme does not prescribe.
+   */
+  const block = composeBlock({ ...ROW_ARGS.compose, weeks: 2 } as never) as never as Array<{
+    week: number;
+    isTestWeek: boolean;
+    sessions: Array<{ name: string; strength_exercises?: Array<{ name: string; slot_intent?: string; load_prescribed?: boolean }> }>;
+  }>;
+  const wk1 = block.find((w) => w.week === 1)!;
+  assert(wk1.isTestWeek, 'week 1 is not the test week');
+
+  const testDays = wk1.sessions.filter((s) => /^Test: /.test(s.name));
+  assertEquals(testDays.length, 2, 'the test week did not carry two test days');
+
+  const competition = testDays.flatMap((s) => (s.strength_exercises ?? []).filter((e) => e.load_prescribed !== false || e.slot_intent));
+  assert(competition.length >= 2, 'no competition lifts found on the test days');
+  for (const ex of competition) {
+    assertEquals(ex.slot_intent, 'ME', `${ex.name} on a test day is not stamped ME — it will mint nothing`);
+  }
+
+  /**
+   * ⚠️ AND THE ACCESSORIES ON THOSE DAYS STAY UNSTAMPED. Blanket-stamping the session would put a
+   * maximal claim on a floor-filling hip thrust, which is the opposite failure.
+   */
+  const accessories = testDays.flatMap((s) => (s.strength_exercises ?? []))
+    .filter((e) => !competition.includes(e));
+  for (const ex of accessories) {
+    assertEquals(ex.slot_intent, undefined, `${ex.name} is an accessory and must not claim ME`);
+  }
+});

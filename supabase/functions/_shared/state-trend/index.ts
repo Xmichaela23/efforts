@@ -108,6 +108,8 @@ export {
   type StateTrendResult,
   type StateTrendsV1,
   type StateDisplayV1,
+  type NamedSessionSeries,
+  type NamedSessionPoint,
   type DisciplineTrendCache,
   type ExerciseLogLite,
 } from './assemble.ts';

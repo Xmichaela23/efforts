@@ -1,5 +1,21 @@
+> # ⛔ SUPERSEDED 2026-08-28 — THIS ORDER DESIGNED THE WRONG THING.
+>
+> It surfaced Viada's **build-time dose tool** as a weekly readout. Measured: a standing block composes
+> twelve IDENTICAL weeks (p120 — the standard week is built to run indefinitely), so the card would
+> show one picture twelve times. What he would actually watch is four different questions.
+>
+> **Read `WORKORDER-the-coachs-read-2026-08-28.md` instead.** Item 3 (the strength graph) survives
+> there as item 5; the plumbing survives, unrendered, with a header saying so. Everything below is
+> history.
+
 # WORKORDER — the five weekly numbers, the day-screen prompt, and the strength graph
-**2026-08-27. Ruled by Michael in a review session. Five items, independent — ship in any order.**
+**2026-08-27, item 3 rewritten 2026-08-28. Ruled by Michael in a review session.**
+
+⛔ **BUILD ORDER: 1 → 2 → 3, with 4 and 5 riding along whenever.** 1 is the real build; 4 and 5 are
+each a few lines. Items are independent — nothing blocks on anything else.
+
+⛔ **THIS PLAN IS ALL VIADA.** Wendler lives on the Get Stronger path only; `frame-resolver.ts:52`
+carries the ruling. Do not reason about the standing plan from 5/3/1 percentages.
 
 ---
 
@@ -8,7 +24,7 @@
 - `_shared/standing-plan/endurance-ledger.ts` (`enduranceLedgerFor`) computes buckets 1–3 (sub-VT1,
   near-threshold, over-threshold minutes) plus the endurance half of bucket 4, per built week.
   Shipped `bb4275c1` + `11758613`, deployed 2026-08-27.
-- ⛔ **NOTHING READS IT.** `compose.ts:2479` attaches it to the composed week as `enduranceLedger`
+- ⛔ **NOTHING READS IT.** `compose.ts:2644` attaches it to the composed week as `enduranceLedger`
   (`compose.ts:629`). It is not persisted to the plan row, not returned to the client, not rendered.
 - Buckets 4 and 5 (work sets, hypertrophy reps per muscle) already exist in
   `_shared/accessory-dosing/ledger.ts` (`ledgerFor`) and are NOT to be recomputed.
@@ -27,8 +43,20 @@ visible before the athlete trains a day of it.
 
 - **Week 1 counts. Week 2 compares.** Michael's own words. Week 1 is the anchor and carries no
   comparison — there is nothing before it.
-- ⚠️ `ReadoutTiles` renders 2 or 3 columns; five values do not fit its grid. The arrangement is
-  Michael's call — render nothing until he has seen a mock.
+- ⛔ **THE ARRANGEMENT IS RULED (2026-08-28, mock approved).** ONE horizontal bar split into easy /
+  medium-hard / hard, each segment sized to its real minutes and carrying its number. The three are
+  the same unit and they sum to the week's endurance time, so the bar shows the finding the ledger
+  exists for: a week the athlete calls "two hard sessions" is overwhelmingly easy minutes.
+  **Work sets and reps per muscle sit UNDER the bar as two plain figures** — they are counts, not
+  minutes, and they are never segments.
+- ⛔ **THE SEGMENTS ARE BRIGHTNESS, NOT SPORT COLOUR.** The axis is intensity; a discipline colour
+  only ever means its discipline (the logger palette law). ⚠️ And a sport-coloured bar could never
+  carry orange anyway — **lifting has no minutes in these buckets at all** (p146 excludes resistance
+  training), which is exactly why its numbers sit underneath as counts.
+- ⚠️ A sport cut of the same total, if Michael asks for it, is a SECOND thin bar under the first —
+  run and ride in their own colours, same width, same week. Not a second axis on the first bar.
+- ⚠️ `ReadoutTiles` renders 2 or 3 columns and is the wrong component for the bar. The two counts
+  underneath are a fit for it.
 - ⚠️ The endurance three come from `enduranceLedger`; the strength two come from `ledgerFor`. One
   surface, two sources, neither recomputed.
 
@@ -47,20 +75,37 @@ can act on it.
 
 ## 3. ⛔ THE STRENGTH GRAPH STOPS DIPPING ON A CORRECTLY-FOLLOWED WEEK
 
-The deload week is already excluded (D-338, `state-trend/deload.ts` reading `meta.phase`). **The
-opening week of a cycle is not**, and on 5/3/1 that week is 65/75/85% against week 3's 75/85/95% — so
-a followed week 1, and every new plan, reads as a fall in strength.
+⛔ **THE CAUSE, TRACED 2026-08-28: THE SERIES DOES NOT FILTER BY INTENT.**
+`state-trend/assemble.ts:231` (`liftSeriesFromExerciseLog`) admits any logged set with an
+`estimated_1rm` and reps at or under the trusted ceiling (8, 5 on deadlift, D-417), and excludes
+deload weeks (D-338, `deload.ts` reading `meta.phase`). **Nothing excludes a set that was light on
+purpose.**
+
+⛔ **THIS PLAN IS ALL VIADA — THERE IS NO 5/3/1 WAVE HERE.** An earlier draft of this item explained
+the dip with Wendler's week table; `frame-resolver.ts:52` records Michael's ruling — *"if wendler has
+a future at all its not in this"* — and the standing plan imports none of it. That explanation is
+withdrawn.
+
+**The real arithmetic, off Michael's own built block:** the heavy day prescribes bench at 135 lb for
+1-5 reps (ME, 90-100% per `strength-grid/intents.ts:74`); the speed day prescribes the same lift at
+105 lb for 2-4 reps (DE, 70-80%). Both land on the same series. Every Thursday and Friday plants a
+point roughly a fifth below Monday's, on a week followed exactly.
 
 Three changes, all field-standard (Strong / Hevy / Boostcamp):
+- ⛔ **ONLY A HEAVY SET MAY MINT A MAX.** Gate the series on the set's intent — the same move that
+  closed the bike easy-ride false-dip (`e8b67eaf`, gated on the shared hard-effort bins). Speed and
+  hypertrophy sets keep their place in the logged-sets history; they stop moving the line.
 - **A records line over the dots.** Plot the per-session estimates as points and trend the best-of.
-  A best-of line cannot dip on a light week.
-- **The last set's rep count beside it.** Same percentage, more reps, is the progress signal in
-  Wendler.
-- **A deliberate drop reads as a reset, not a decline** — when a new plan lowers the working weight,
-  say so.
+  A best-of line cannot dip.
+- **The last set's rep count beside it.** Same weight, more reps, is the progress signal this plan
+  actually produces — the working number moves about 1% every three weeks (p247), so the reps are
+  where week-to-week progress shows.
 
-⚠️ The cycle-week identity is already resolved per date by the plan-phase resolver — the same input
-D-338 uses. No new derivation.
+⚠️ **A DELIBERATE DROP READS AS A RESET, NOT A DECLINE** — when a new block's test sets a lower
+working number than the last one, say so rather than drawing a fall.
+
+⚠️ The intent already exists on the prescription side; the open question is whether it reaches
+`exercise_log`. Trace that before designing a new field — this is the starved-not-absent pattern.
 
 ## 4. ⛔ THE ENERGY / SORENESS / SLEEP ROW COMES OFF STATE
 
@@ -94,6 +139,11 @@ Remove the row. Leave the table and its readers standing.
 
 ## OPEN — Michael's, not the engineer's
 
-1. How the five numbers are arranged on screen.
-2. The wording of the day-screen line.
-3. Whether the five appear in the plan preview at build, or only once the plan is running.
+1. The wording of the day-screen line.
+2. Whether the five appear in the plan preview at build, or only once the plan is running.
+
+## THE MOCK
+
+The approved arrangement — week 1 with no comparison, week 4 with movement and the missing-work
+flag, and the day screen carrying the prompt:
+https://claude.ai/code/artifact/b17996ad-36da-4f11-ba77-3e31414e2a1c

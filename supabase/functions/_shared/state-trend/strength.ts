@@ -166,7 +166,20 @@ export interface StrengthPerLift {
   /** 12-week dated e1RM series for the per-lift sparkline (the "long view" behind the verdict).
    *  SAME points the verdict reads, over a wider 84d window; `recent` flags the points inside the
    *  verdict window (rendered in color). Only populated for the big-4 lifts. Mirrors run efficiency.series. */
-  series?: Array<{ date: string; value: number; recent: boolean }>;
+  /** ⛔ WHICH WEEK OF THE CURRENT BLOCK THE POINT FELL IN (2026-08-28) — resolved on the server off
+   *  `resolvePlanWeekIndex` so a card can label its axis "week 6" without re-deriving it from dates
+   *  plus a block start (Constitution: surfaces render, they never re-decide).
+   *  ⚠️ ABSENT ON A POINT OUTSIDE THE CURRENT BLOCK — a rebuilt block starts its own numbering and
+   *  an older session is not week 1 of it. Draw such a point without a week; never fill in a 1. */
+  series?: Array<{ date: string; value: number; recent: boolean; week?: number }>;
+  /** ⛔ WHERE THE PROGRAMME SAYS THIS LIFT SHOULD BE — dated weekly points from the block's opening
+   *  working number at the plan's own rate (1% every 3 weeks, p247).
+   *  ⚠️ IT DECIDES NOTHING. The word on the card comes from completed reps, never from distance to
+   *  this curve — a rise this slow moves less than one plate for most of a block, so a band around
+   *  it could only ever fire on rounding (measured 2026-08-28).
+   *  ⚠️ BLOCK-SCOPED WHILE `series` IS NOT: the readings are the athlete's across blocks, but "where
+   *  the programme says you should be" is a claim only the current programme can make. */
+  expected?: Array<{ date: string; value: number }>;
 }
 
 /** Bridge the spine's per-lift e1RM `direction` (TrendVerdict) to the per-workout narrative's

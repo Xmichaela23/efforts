@@ -24,7 +24,10 @@ import { isDeloadWeek } from './deload.ts';
 
 // A real 5/3/1 cycle for one lift: 1RM 300 → working number 255 (85%). Top set = pct × 255,
 // e1RM = Brzycki(w, reps) = w × 36/(37−reps). Weekly, one session per lift.
-const row = (date: string, e1rm: number) => ({ date, canonical_name: 'squat', estimated_1rm: e1rm });
+  // ⛔ `slot_intent: 'ME'` — the e1RM gate fails CLOSED since 2026-08-28: only a set the plan
+  // asked to be maximal mints a max. These fixtures are MAIN-LIFT HEAVY sets, so they say so. An
+  // unstamped row here would build no series at all and the test would be asserting on emptiness.
+const row = (date: string, e1rm: number) => ({ date, canonical_name: 'squat', estimated_1rm: e1rm, slot_intent: 'ME' });
 
 // wk1 85% × 5 reps → 217 × 1.125 ≈ 244 · wk2 90% × 3 → 230 × 1.059 ≈ 243
 // wk3 95% × 5 (the AMRAP came in at 5) → 242 × 1.125 ≈ 273 · wk4 DELOAD 60% × 5 → 153 × 1.125 ≈ 172

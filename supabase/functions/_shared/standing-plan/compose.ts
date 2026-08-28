@@ -1389,6 +1389,26 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
   if (!lifts) return null;
   // ⛔ THE TEST TESTS THE MOVEMENT THE BLOCK WILL PRESCRIBE — see `testWeekLiftNames`.
   const names = testWeekLiftNames(args.competitionLifts);
+  /**
+   * ⛔⛔ THE TEST'S OWN LIFTS ARE STAMPED `ME`, AND IT DESCRIBES THE ROW RATHER THAN CHANGING IT
+   * (2026-08-28). The p215 pretest works up in three steps to a set taken *for max clean reps* — it
+   * IS a maximal effort, and it is the set every working number in this block is derived from. ME
+   * (90-100%) names the band the row already occupies; it prescribes nothing new.
+   *
+   * ⛔ WITHOUT IT THE GATE DEFEATS ITS OWN RULING. `state-trend/assemble.ts` fails CLOSED — only ME
+   * mints an estimated max — so an unstamped test week means the athlete's most maximal sessions of
+   * the whole block reach the strength line as nothing, and a block opened to "start the line fresh"
+   * shows an empty card until week two. Caught by composing a block and printing the intents; it
+   * would otherwise have been found by the athlete, on the Monday, looking at nothing.
+   *
+   * ⚠️ THE COMPETITION LIFTS ONLY, NEVER THE WHOLE SESSION. The test day's floor-filling accessory
+   * rows are not maximal and stay unstamped — blanket-stamping the session would put a maximal claim
+   * on a hip thrust.
+   * ⚠️ AND THE BY-FEEL BRANCH IS STAMPED TOO: no seed means no warm-up weights, not a lighter
+   * session. The instruction is still "work up until the last set is genuinely hard", which is the
+   * same effort with a worse aim.
+   */
+  const TEST_LIFT_INTENT = 'ME' as const;
   const exercises: StrengthExercise[] = [];
   for (const lift of lifts) {
     const seed = args.seed1RMs?.[lift];
@@ -1400,6 +1420,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
         reps: '6, 5, max',
         weight: 'By feel',
         load_prescribed: false,
+        slot_intent: TEST_LIFT_INTENT,
         notes: 'No max on file to aim the warm-ups — work up until the last set is genuinely hard.',
       });
       continue;
@@ -1410,6 +1431,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
       reps: steps.map((s) => s.reps).join(', '),
       weight: steps[steps.length - 1].weight,
       load_prescribed: true,
+      slot_intent: TEST_LIFT_INTENT,
       notes: 'Test set — the last set is taken for max clean reps, and it sets the block\'s numbers.',
       set_plan: steps.map((s) => ({
         weight: s.weight,

@@ -30,7 +30,10 @@ const WEEKS = ['2026-06-10', '2026-06-17', '2026-06-24', '2026-07-01', '2026-07-
 const DIRECTION_WORDS = ['improving', 'sliding', 'trending', 'holding', 'declining', 'gaining'];
 
 function rows(canonical: string, name: string, values: number[], reps = 5): ExerciseLogLite[] {
-  return values.map((v, i) => ({ date: WEEKS[i], canonical_name: canonical, exercise_name: name, estimated_1rm: v, reps }));
+  // ⛔ `slot_intent: 'ME'` — the e1RM gate fails CLOSED since 2026-08-28: only a set the plan
+  // asked to be maximal mints a max. These fixtures are MAIN-LIFT HEAVY sets, so they say so. An
+  // unstamped row here would build no series at all and the test would be asserting on emptiness.
+  return values.map((v, i) => ({ date: WEEKS[i], canonical_name: canonical, exercise_name: name, estimated_1rm: v, reps, slot_intent: 'ME' }));
 }
 
 function inputs(exerciseRows: ExerciseLogLite[], extra: Partial<StateTrendInputs> = {}): StateTrendInputs {

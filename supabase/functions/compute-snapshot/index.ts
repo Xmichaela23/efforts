@@ -22,6 +22,12 @@ import {
   parseLocalDate,
 } from "../_shared/parse-local-date.ts";
 import { stateTrendGate } from "./state-trend-gate.ts";
+// ⛔ ONE NAME RESOLVER, NOT A SECOND ONE. The expected curve is keyed by the same canonical name the
+// e1RM series is keyed by, or the two would sit on one chart under different keys.
+import { canonicalize } from "../_shared/canonicalize.ts";
+// The block's own rate — 1% every three weeks (Viada p247). The curve states the plan's shape and it
+// must be the rate the plan was BUILT on, never a second opinion.
+import { RATE_ANCHOR } from "../_shared/standing-plan/frames.ts";
 import { resolveAcwrAsOf } from "./acwr-as-of.ts";
 import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
@@ -40,6 +46,8 @@ import {
   type StateTrendsV1,
   type PerDisciplinePosture,
   type PullupProgress,
+  type NamedSessionSeries,
+  type NamedSessionPoint,
 } from "../_shared/state-trend/index.ts";
 // Slice 6 — the pull-up progression's clean/assisted split. ⛔ Read from the RAW logged sets; the
 // `exercise_log` aggregate has no `resistance_level` and cannot answer this.
@@ -713,7 +721,10 @@ serve(async (req: Request) => {
         const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
 
         const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([
-          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm,best_reps")
+          // ⛔ `slot_intent` IS SELECTED OR THE HEAVY-ONLY GATE CANNOT FIRE (2026-08-28). The exact trap
+          // D-417 hit on the record: the rule lived in the shared reader and the query did not fetch
+          // the column it needed, so the gate structurally could not apply and rotted silently.
+          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm,best_reps,slot_intent")
             .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
@@ -901,6 +912,11 @@ serve(async (req: Request) => {
         const exerciseRows = (exR.data ?? []).map((e: any) => ({
           date: e.date, canonical_name: e.canonical_name, exercise_name: e.exercise_name, estimated_1rm: e.estimated_1rm,
           reps: e.best_reps, // D-417: trust gate — a high-rep set can't mint the e1RM series (records/trend/sparkline)
+          // ⛔ AND THE INTENT RIDES ALONG OR THE HEAVY-ONLY GATE IS DEAD (2026-08-28). This map is the
+          // narrow point: selecting the column above and dropping it here would leave
+          // `intentCanMintAMax` reading undefined on every row and failing open on all of them — a
+          // gate that exists, is tested, and never once fires. Same starvation the field itself had.
+          slot_intent: e.slot_intent,
         }));
 
         // REAL PR frame (2026-07-21) — the best estimated 1RM across ALL logged history per lift, NOT
@@ -915,7 +931,7 @@ serve(async (req: Request) => {
         let allTimeBestByLift: Record<string, { best: number; count: number }> = {};
         try {
           const { data: allHist } = await supabase.from("exercise_log")
-            .select("canonical_name,estimated_1rm,best_reps")
+            .select("canonical_name,estimated_1rm,best_reps,slot_intent")  // slot_intent: the record gates on it too
             .eq("user_id", userId).not("estimated_1rm", "is", null);
           allTimeBestByLift = buildAllTimeBestByLift((allHist ?? []) as any[]);
         } catch (e: any) { console.warn('[compute-snapshot] all-time-best e1RM query failed (non-fatal):', e?.message ?? e); }
@@ -965,6 +981,22 @@ serve(async (req: Request) => {
         // session happens to be attached. A phase is a property of the DATE and the plan, so an
         // unattached session on a deload week is still a deload week.
         let phaseByDate: Record<string, string> | null = null;
+        /**
+         * ⛔⛔ WHICH BLOCK WEEK EACH DATED POINT FELL IN — resolved HERE, off the one resolver, and
+         * sent to the client on the point. A card labelling its axis "week 6" must not derive that
+         * from dates plus a block start: that is the surface re-deciding a fact the spine owns, and
+         * it drifts the first time a block is deleted and rebuilt.
+         *
+         * ⚠️ BOUNDED BY HAND, BECAUSE `resolvePlanWeekIndex` CLAMPS. It pins any date before the
+         * start to week 1 and any date after the end to the last week — so a session from a
+         * PREVIOUS block would come back labelled "week 1" of this one, which is the exact lie a
+         * rebuilt block would tell on the athlete's first day. Anything outside the window is
+         * omitted, and a point with no week is drawn without one.
+         */
+        let weekByDate: Record<string, number> | null = null;
+        /** ⛔ The block's expected curve per lift — see the build below. Null when the block has no
+         *  working numbers yet (before the test is read), which draws the readings alone. */
+        let expectedByCanonical: Record<string, Array<{ date: string; value: number }>> | null = null;
         let measuredDates: string[] = [];
         // Slice 2: what the block says it READS. 'amrap' (5/3/1) puts waved main lifts on the
         // all-out-set gauge; anything else keeps the e1RM read, byte for byte.
@@ -982,19 +1014,182 @@ serve(async (req: Request) => {
             const dates = new Set<string>([
               ...exerciseRows.map((r: any) => String(r.date)),
               ...strengthVolumeRows.map((r: any) => String(r.date)),
+              // ⚠️ RUN DATES JOIN THE SAME MAP, not a second one — the named-session card needs a
+              // block week on each run, and it is the same question against the same window with
+              // the same bounding. A second resolver is how two surfaces come to disagree about
+              // which week a Wednesday was.
+              ...runRows.map((r: any) => String(r.date)),
             ].filter(Boolean));
             const map: Record<string, string> = {};
+            const weeks: Record<string, number> = {};
+            // The block's own window. `dur` may be absent on an older row; without it there is no
+            // end to bound against and every week goes unlabelled rather than mislabelled.
+            const blockStart = String(cfg?.user_selected_start_date || cfg?.start_date || '').slice(0, 10);
+            const blockEndExclusive = (() => {
+              if (!blockStart || !dur) return null;
+              const d0 = new Date(`${blockStart}T12:00:00`);
+              if (Number.isNaN(d0.getTime())) return null;
+              d0.setDate(d0.getDate() + dur * 7);
+              return d0.toISOString().slice(0, 10);
+            })();
             for (const d of dates) {
               const wk = resolvePlanWeekIndex(cfg, d, dur);
               const ph = wk != null ? resolvePlanPhase(cfg, wk) : null;
               if (ph) map[d] = String(ph).toLowerCase();
+              // ⚠️ INSIDE THE BLOCK ONLY — see `weekByDate` above for why the clamp cannot be trusted.
+              if (wk != null && blockStart && blockEndExclusive && d >= blockStart && d < blockEndExclusive) {
+                weeks[d] = wk;
+              }
             }
             if (Object.keys(map).length) phaseByDate = map;
+            if (Object.keys(weeks).length) weekByDate = weeks;
+
+            /**
+             * ⛔⛔ THE EXPECTED CURVE — the faint line behind the lift's own readings.
+             *
+             * ⛔ IT ANCHORS ON THE BLOCK'S OPENING WORKING NUMBER, not on the first heavy reading
+             * (ruled 2026-08-28). Week 1 is the two tests, so a curve anchored on a logged set could
+             * not be drawn until the block's second week — the curve would be missing exactly when
+             * the card has least else to show. The working number is stored at build and is
+             * available from day one.
+             *
+             * ⛔ THE RATE IS THE PLAN'S OWN, read off `RATE_ANCHOR` — 1% every three weeks (p247),
+             * the same constant the block's working numbers were composed from. A second copy of
+             * that number here is how the curve and the plan come to disagree.
+             *
+             * ⚠️ IT STAYS BLOCK-SCOPED WHILE THE READINGS DO NOT. The line is the athlete's heavy
+             * sets across blocks — those do not stop being theirs because a plan was rebuilt — but
+             * "where the programme says you should be" is a claim only the current programme can
+             * make, and it starts where that programme starts. Two clocks on one chart, deliberately.
+             */
+            try {
+              const sp = (cfg as any)?.standing_plan;
+              const wn = sp?.working_numbers;
+              const names = sp?.test_lift_names;
+              const rate = RATE_ANCHOR[(sp?.frame as keyof typeof RATE_ANCHOR)]?.perWeek;
+              if (wn && names && blockStart && Number.isFinite(rate)) {
+                const out: Record<string, Array<{ date: string; value: number }>> = {};
+                const weeksN = Math.max(1, Number(dur) || 12);
+                for (const [lift, w] of Object.entries(wn as Record<string, any>)) {
+                  const start = Number(w?.workingNumber);
+                  const name = String(names?.[lift] ?? "").trim();
+                  if (!Number.isFinite(start) || start <= 0 || !name) continue;
+                  const key = canonicalize(name);
+                  const pts: Array<{ date: string; value: number }> = [];
+                  for (let i = 0; i < weeksN; i++) {
+                    const d = new Date(`${blockStart}T12:00:00`);
+                    d.setDate(d.getDate() + i * 7);
+                    pts.push({
+                      date: d.toISOString().slice(0, 10),
+                      value: Math.round(start * (1 + (rate as number) * i) * 10) / 10,
+                    });
+                  }
+                  if (pts.length > 1) out[key] = pts;
+                }
+                if (Object.keys(out).length > 0) expectedByCanonical = out;
+              }
+            } catch (e: any) {
+              // Non-fatal: no curve → the card draws the readings alone, which is still the read.
+              console.log("[compute-snapshot] expected curve build failed (non-fatal):", e?.message || e);
+            }
           }
         } catch (e: any) {
           // Non-fatal: no phase → exactly today's behaviour (nothing excluded), never a crash.
           console.log("[compute-snapshot] D-338 phase resolve failed (non-fatal):", e?.message || e);
         }
+        /**
+         * ⛔⛔ ONE NAMED SESSION, WEEK BY WEEK — the same workout repeated, and its heart rate.
+         *
+         * A standing block prescribes the identical near-threshold run every week by design (p120 —
+         * the standard week is built to be run indefinitely). Measured on a composed twelve-week
+         * block: Wednesday, 66 minutes, `family:run_near_threshold`, all twelve weeks including the
+         * test week. **The workout does not change, so any change in the line is the athlete** —
+         * which is exactly what the existing run row cannot say, because it trends efficiency across
+         * ALL steady runs, where route, weather and distance move at once. Both rows stay.
+         *
+         * ⛔⛔ A RUN THAT WAS NEVER ATTACHED TO ITS PLANNED ROW CANNOT APPEAR HERE, AND THAT IS
+         * CORRECT. The family lives on `planned_workouts.tags`; a logged run reaches it only through
+         * `workouts.planned_id`, the link `auto-attach-planned` makes at ingest. If a week is missing
+         * from this card, **the fault is in the linker, not in this join** — look there.
+         * ⚠️ DO NOT ADD A FALLBACK THAT GUESSES FROM DAY-OF-WEEK AND DURATION. A Wednesday run of
+         * about the right length is not evidence that it WAS the prescribed session, and this app
+         * records what it is told rather than inferring (ruled 2026-08-28).
+         *
+         * ⚠️ THE SAME SHAPE AS THE STRENGTH JOIN BELOW (`allOutByLift`): ids off the workouts, one
+         * query for the planned rows, a map. Not a new mechanism.
+         *
+         * ⛔⛔ BLOCK-SCOPED ON PURPOSE, AND IT IS NOT THE SAME QUESTION AS THE STRENGTH LINE. That
+         * line went ROLLING across blocks on 2026-08-28, because a lifted weight and a rep count are
+         * a fact about a set — true forever, independent of any plan, and they do not stop being the
+         * athlete's because the app rebuilt their programme.
+         *
+         * ⛔ A POINT ON THIS CARD IS NOT THAT SHAPE. Its entire claim is *"the same prescribed
+         * session, repeated, so any change in the line is you"* — and that holds only WITHIN a
+         * block. Across blocks it does not: a different hours answer or experience tier resolves
+         * this family at a different level and a different duration, so a rolling version would put
+         * two different workouts on one line and read the difference as fitness. **That is the exact
+         * failure this card exists to avoid**, arrived at from the other direction.
+         *
+         * ⚠️ SO DO NOT "FIX" THIS TO MATCH THE STRENGTH LINE. The asymmetry is the reasoning, not an
+         * oversight: a set is a measurement, a session is a prescription, and only one of them
+         * survives its plan.
+         */
+        let namedRunSession: NamedSessionSeries | null = null;
+        try {
+          // Only worth asking when the block gave us a week map — without it there is no axis.
+          if (weekByDate && Object.keys(weekByDate).length > 0) {
+            const { data: runLinkRows } = await supabase
+              .from("workouts").select("date,planned_id")
+              .eq("user_id", userId).in("type", ["run", "running"]).eq("workout_status", "completed")
+              .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
+            const linked = (Array.isArray(runLinkRows) ? runLinkRows : [])
+              .filter((r: any) => typeof r?.planned_id === "string" && r.planned_id.length > 0);
+            const plannedIds = Array.from(new Set(linked.map((r: any) => String(r.planned_id))));
+            if (plannedIds.length > 0) {
+              const { data: plannedRuns } = await supabase
+                .from("planned_workouts").select("id,name,tags,duration").in("id", plannedIds);
+              const NEAR_THRESHOLD = "family:run_near_threshold";
+              const byId = new Map<string, { label: string; durationMin: number | null }>();
+              for (const p of (Array.isArray(plannedRuns) ? plannedRuns : [])) {
+                const tags = (Array.isArray((p as any)?.tags) ? (p as any).tags : []).map((t: any) => String(t).toLowerCase());
+                // ⚠️ Gated on the FAMILY tag, not on the session's name. The name is copy and can be
+                // rewritten; the tag is the composer's own identifier for which cell of the book
+                // authored the session.
+                if (!tags.includes(NEAR_THRESHOLD)) continue;
+                const dur = Number((p as any)?.duration);
+                byId.set(String((p as any).id), {
+                  label: String((p as any)?.name || "Near-threshold run"),
+                  durationMin: Number.isFinite(dur) && dur > 0 ? Math.round(dur) : null,
+                });
+              }
+              const points: NamedSessionPoint[] = [];
+              let label = "Near-threshold run";
+              for (const r of linked) {
+                const hit = byId.get(String(r.planned_id));
+                if (!hit) continue;
+                const date = String(r.date).slice(0, 10);
+                const week = weekByDate[date];
+                // ⚠️ Outside the block → no week → not emitted. Same rule as the lift line: a session
+                // from a previous block is not week 1 of this one.
+                if (!Number.isFinite(week)) continue;
+                const hr = runHrByDate.get(date);
+                // ⚠️ NO HEART RATE, NO POINT. The card is a heart-rate line; a session logged without
+                // one has nothing to plot and inventing a zero would draw a crash.
+                if (!Number.isFinite(hr as number) || (hr as number) <= 0) continue;
+                label = hit.label;
+                points.push({ week, date, hrAvg: Math.round(hr as number), durationMin: hit.durationMin });
+              }
+              points.sort((a, b) => a.week - b.week || a.date.localeCompare(b.date));
+              if (points.length > 0) {
+                namedRunSession = { family: "run_near_threshold", label, points };
+              }
+            }
+          }
+        } catch (e: any) {
+          // Non-fatal: no series → the card does not render → exactly today's screen.
+          console.log("[compute-snapshot] named run session join failed (non-fatal):", e?.message || e);
+        }
+
         // ⛔ WHICH DAYS MEASURED SOMETHING. Written by compute-facts onto `strength_facts.measured`
         // when an all-out set was actually performed. This is the distinction Q-227 called the
         // blocker under everything else: without it the series cannot tell a test from a Tuesday.
@@ -1224,7 +1419,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedRunSession, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside
