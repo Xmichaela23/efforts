@@ -692,6 +692,16 @@ function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | nul
 }
 
 /**
+ * ⛔ THE ACCESSORY DOSE'S OWN RESERVE — p86, *3 x 8-10 at 1-2 RIR*, midpoint of his band.
+ *
+ * ⚠️ IT IS NOT `targetRirForIntent('HYP')` AND MUST NOT BE COLLAPSED INTO IT. A floor or dial row is
+ * not a slot the frame named: p218's HYP band (0-2, midpoint 1) is the reserve for a **prescribed
+ * hypertrophy slot**, and p86's 1-2 is the reserve for **accessory work added on top**. Two pages,
+ * two doses, and the rows that carry each are decided in different places.
+ */
+const ACCESSORY_TARGET_RIR = 1.5;
+
+/**
  * ⛔ HIS ME SET BAND — 1 to 3, p218 — READ OFF STAGE 2 RATHER THAN RESTATED HERE.
  *
  * The ladder in `progression.ts` clamps to it and `exerciseForSlot` interpolates inside it. Writing
@@ -2320,6 +2330,29 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         reps: add.repPrescribable ? '8-10' : HOLD_PRESCRIPTION,
         weight: 'By feel',
         load_prescribed: false,
+        /**
+         * ⛔ THE RESERVE IS STAMPED HERE TOO, AND ITS ABSENCE WAS VISIBLE ON A DEVICE
+         * (Michael's screenshots, 2026-08-27). One session showed dumbbell bench at
+         * *"target 6-12 · 1 in reserve"* — a slot row, stamped by `targetRirForIntent` off p218's
+         * HYP band — and the ab wheel directly under it at *"target 8-10 · 2 in reserve"*. Two
+         * accessories, one day, two different numbers, because these floor and dial rows carried
+         * **no** `target_rir` at all and `materialize-plan`'s `getTargetRir` fell through to the
+         * protocol's generic default chart. The plan was answering the same question twice from two
+         * different places.
+         *
+         * ⛔ AND THE NUMBER IS HIS, FOR EXACTLY THIS ROW. p86 doses accessory work at
+         * **3 x 8-10 at 1-2 RIR** — already the stated basis for the `8-10` on the line above, and
+         * cited in `accessory-picks.ts`'s `DIAL_IS_OURS`. Taking the reserve from the same sentence
+         * that gave the reps is the only reading that keeps the row internally consistent.
+         *
+         * ⚠️ 1.5 IS THE MIDPOINT OF HIS BAND, the same convention `targetRirForIntent` uses, and it
+         * renders as *"1-2 in reserve"* rather than a fake half rep — `formatRirTarget` expands a
+         * half-step back into the band it came from.
+         *
+         * ⚠️ A HOLD GETS NONE. There is no reserve in a plank; `repPrescribable` already decided
+         * whether this row is dosed in reps or in seconds, and the reserve follows the reps.
+         */
+        ...(add.repPrescribable ? { target_rir: ACCESSORY_TARGET_RIR } : {}),
         // ⛔ THE ROW SAYS WHOSE MOVEMENT IT IS, AND THAT IS THE WHOLE DEVICE FINDING. `Floor: core had
         // nothing else this week` printed under a movement the athlete had asked for by name is the
         // engine stating, on the plan, that it never saw the choice.

@@ -2992,11 +2992,17 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
   },
+  // ⛔ `total`, NOT `bodyweight` — CORRECTED 2026-08-27, alongside the same row in
+  // `exercise-role.ts`'s TYPE_TABLE. Both files had it filed as bodyweight; the name says weighted
+  // and the plate on the chest is the whole movement. It went unnoticed because the logger asked its
+  // own private regex instead of either of them, and that regex never matched this name either way.
+  // ⚠️ `total` is the format its unweighted sibling's loaded neighbours use (`cable woodchopper`) —
+  // one number, not per-hand.
   'weighted sit up': {
     pattern: 'core',
     primaryRef: null,
     ratio: 0.0,
-    displayFormat: 'bodyweight',
+    displayFormat: 'total',
     isUnilateral: false,
   },
 

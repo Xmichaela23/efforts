@@ -28,6 +28,7 @@
  * has ONE home instead of two, since the component imports it from here.
  */
 import { isMain531Lift } from './exercise-role.ts';
+import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP } from '@shared/strength-grid/intents.ts';
 
 /**
  * Plyometric / explosive movement — needs full neural recovery between sets.
@@ -57,8 +58,101 @@ export const isPlyometricMovement = (exerciseName: string): boolean => {
  */
 export const HEAVY_MAIN_REST_SEC = 180;
 
-/** Rest in SECONDS. Driven by the movement and the reps actually logged, not by the plan. */
-export function calculateRestTime(exerciseName: string, reps: number | undefined): number {
+/**
+ * ⛔⛔ WHAT THE SLOT IS, NOT JUST WHAT THE MOVEMENT IS (2026-08-27).
+ *
+ * ⚠️ THE DEFECT: this function saw a name and a rep count and nothing else, so the standing plan's
+ * own vocabulary was invisible to it. **A max-effort pull-up rested 90 seconds** — a pull-up is not
+ * on `MAIN_531_LIFTS`, so at 1-5 reps it fell past every accessory band to the catch-all — while a
+ * max-effort bench on the same day rested three minutes. **And a speed bench at 2-4 reps took
+ * 120-180s**, which is the heavy answer on the one slot whose whole point is that it is not heavy.
+ *
+ * ⛔ AND NOW THERE IS A SOURCE FOR IT, WHICH THERE WAS NOT BEFORE. Viada p78, section "Rest
+ * Periods" — read off the page 2026-08-27, and the reason this could be built at all. The app had
+ * previously SHIPPED A CONSTANT ASSERTING THE BOOK GIVES NO REST GUIDANCE; it does, and the rule is
+ * {@link REST_BETWEEN_SETS_RULE}. p84 states the opposite for hypertrophy and is
+ * {@link REST_BETWEEN_SETS_RULE_HYP}. Both are imported, never restated here.
+ *
+ * ⛔⛔ HE GIVES NO MINUTES. NOT ON p78, NOT ANYWHERE. His rule is a readiness condition — rest to
+ * nearly full recovery, do not cool down, go when you know you can finish the set — and a countdown
+ * is our stand-in for a judgement the athlete makes. **Every number in {@link REST_BY_SLOT} is
+ * OURS**, and `REST_MINUTES_ARE_OURS` says so on the screen that shows them.
+ */
+export type RestBucket = 'heavy' | 'speed' | 'muscle';
+
+/**
+ * ⛔ FOUR INTENTS, THREE BUCKETS — Michael's call, 2026-08-27. `SKILL` rides with `DE` because p218
+ * gives both the same fatigue instruction (*"fatigue is discouraged"*, *"ample rest"*) at loads well
+ * under maximal; they differ in what the athlete is practising, not in what recovery the set needs.
+ * `ME` is its own bucket at the top and `HYP` is the one p84 carves out at the bottom.
+ */
+export function restBucketForIntent(intent: string | null | undefined): RestBucket | null {
+  switch (String(intent ?? '').toUpperCase()) {
+    case 'ME': return 'heavy';
+    case 'DE': case 'SKILL': return 'speed';
+    case 'HYP': return 'muscle';
+    default: return null;
+  }
+}
+
+/**
+ * ⛔ OURS, EVERY ONE, AND EACH ONE HAS TO SAY WHY. The source gives a rule and no duration, so these
+ * are the field's answer to his rule, not his answer:
+ *
+ *   · **heavy — 180s.** The one figure in this file that already had a basis: the NSCA prescribes
+ *     2-5 min between sets for strength/power work, and the phosphagen system that fuels a set of
+ *     1-5 is only ~85% resynthesised at two minutes and effectively complete near three. Unchanged
+ *     from {@link HEAVY_MAIN_REST_SEC}, which is the same number and the same argument.
+ *   · **speed — 120s.** Still inside the NSCA's 2-5 min power band, at the bottom of it, because the
+ *     set is 2-4 reps at 70-80% rather than a near-maximal single: "nearly full recovery" (p78)
+ *     arrives sooner after a light fast set than after a heavy one. ⚠️ **NOT the 45-60s of Westside
+ *     dynamic-effort work.** That short rest is deliberately a conditioning stimulus, and p78 rules
+ *     it out in as many words for this purpose — *"true strength sessions should have very little
+ *     accumulating fatigue."* Where the two sources disagree, the book we are building from wins.
+ *   · **muscle — 90s.** The top of the NSCA's 30-90s hypertrophy band, and the only bucket that is
+ *     not trying for full recovery, because p84 says the drop-off in capacity is part of the
+ *     stimulus here rather than the end of the session.
+ */
+export const REST_BY_SLOT: Record<RestBucket, number> = {
+  heavy: 180,
+  speed: 120,
+  muscle: 90,
+};
+
+/** ⛔ SAY IT ON THE SCREEN THAT SHOWS THE CLOCK. The rule is his; the minutes are not. */
+export const REST_MINUTES_ARE_OURS =
+  'The rule is the source\'s; the minutes are ours. He gives no rest interval anywhere in the book.';
+
+/**
+ * The line that belongs beside the countdown for a slot. ⛔ IMPORTED, NEVER REWORDED — one owner,
+ * in `strength-grid/intents.ts`, so the plan\'s notes and the timer cannot drift apart.
+ */
+export function restCueForBucket(bucket: RestBucket): string {
+  return bucket === 'muscle' ? REST_BETWEEN_SETS_RULE_HYP.cue : REST_BETWEEN_SETS_RULE.cue;
+}
+
+/**
+ * Rest in SECONDS.
+ *
+ * ⚠️ `slotIntent` IS THE STANDING PLAN\'S ONLY, AND ITS ABSENCE CHANGES NOTHING — Michael\'s call,
+ * 2026-08-27. A 5/3/1 row, a freestyle row and every logged workout with no plan intent fall through
+ * to the ladder below, byte-identical to what they got before. ⛔ **THAT LADDER — 150 / 120 / 90 /
+ * 75 / 60 — HAS NO STATED BASIS**: not in this file, not in its fixtures, not in the decisions log.
+ * It is OURS and undeclared, it is left running because nobody has reported a problem with it, and
+ * re-basing it on no evidence is the change that was deliberately not made. **It is now labelled
+ * rather than anonymous** — see {@link LEGACY_LADDER_IS_OURS}.
+ */
+export function calculateRestTime(
+  exerciseName: string,
+  reps: number | undefined,
+  slotIntent?: string | null,
+): number {
+  // ⛔ THE INTENT OUTRANKS EVERYTHING, INCLUDING THE REP COUNT AND THE MOVEMENT. That is the whole
+  // fix: the slot already says what kind of set this is, and re-deriving it from a name was how a
+  // max-effort pull-up ended up resting like an accessory.
+  const bucket = restBucketForIntent(slotIntent);
+  if (bucket) return REST_BY_SLOT[bucket];
+
   if (!reps || reps === 0) return 90; // Default 90 seconds
 
   // Plyometrics need full recovery between sets (2-3 min)
@@ -88,3 +182,21 @@ export function calculateRestTime(exerciseName: string, reps: number | undefined
   // Default for accessories outside range
   return 90;
 }
+
+/**
+ * ⛔ THE UNSOURCED LADDER, NAMED (2026-08-27). Audited on Michael\'s instruction and this is the
+ * finding: of everything in this file, only two things ever had a stated basis — the 180s heavy case
+ * (NSCA 2-5 min plus phosphagen resynthesis, argued at {@link HEAVY_MAIN_REST_SEC}) and the
+ * main-lift-versus-accessory split (D-380, which repointed it at the shared classifier). The
+ * 150 / 120 / 90 / 75 / 60 ladder has no citation in this file, none in `DECISIONS-LOG`, and its
+ * fixtures assert the numbers without ever saying where they came from.
+ *
+ * ⚠️ IT IS STILL RUNNING, AND ON PURPOSE. Nobody has reported a problem with rest on a 5/3/1 or
+ * freestyle session, and changing a number on no evidence is worse than leaving one that works. What
+ * changed is that it is no longer anonymous.
+ */
+export const LEGACY_LADDER_IS_OURS =
+  'Rest on a session with no plan intent is ours and has no stated source: three minutes for a heavy '
+  + 'main lift, two for a main lift in the middle bands, two and a half for plyometrics, and ninety '
+  + 'down to sixty seconds for accessories as the reps climb. Only the three-minute case is argued '
+  + 'anywhere.';

@@ -199,19 +199,30 @@ export function setsFor(band: Range, position?: number): number {
  * productive session, but in hypertrophy training, this may well be a crucial part of the training
  * session itself!"* A caller stamping this on a HYP slot is quoting him against himself.
  */
-export const REST_BETWEEN_SETS_RULE =
-  'Rest until you are nearly recovered, but not so long that you cool down. Take the next set when '
-  + 'you know you can finish it without getting crushed — a strength session should not accumulate '
-  + 'fatigue. The source gives this as a rule and no number of minutes.';
+export const REST_BETWEEN_SETS_RULE = {
+  /**
+   * ⛔ THE INSTRUCTION AN ATHLETE ACTS ON, MID-SESSION — and it is split out so the rest timer can
+   * print it beside its countdown without also printing the provenance clause, which is a sentence
+   * for whoever maintains the number and not for someone standing under a bar.
+   * ⚠️ ONE OWNER. The timer imports this; it does not carry its own wording (2026-08-27).
+   */
+  cue: 'Rest until you are nearly recovered, but not so long that you cool down. Take the next set '
+    + 'when you know you can finish it without getting crushed.',
+  /** ⛔ WHY ANY CLOCK BESIDE IT IS OURS. */
+  provenance: 'A strength session should not accumulate fatigue. The source gives this as a rule '
+    + 'and no number of minutes.',
+} as const;
 
 /**
  * The same question for HYP, which p84 answers in the opposite direction. Kept separate so no
  * caller can stamp the strength rule on a hypertrophy slot by accident.
  */
-export const REST_BETWEEN_SETS_RULE_HYP =
-  'Muscle-building work is the exception: the point where capacity drops off is part of the '
-  + 'stimulus rather than the end of the session, so it does not need the same near-full recovery '
-  + 'between sets. The source gives this as a rule and no number of minutes.';
+export const REST_BETWEEN_SETS_RULE_HYP = {
+  cue: 'Muscle-building work is the exception: the point where capacity drops off is part of the '
+    + 'stimulus rather than the end of the session, so it does not need the same near-full recovery '
+    + 'between sets.',
+  provenance: 'The source gives this as a rule and no number of minutes.',
+} as const;
 
 /** RIR, defined on p219 — carried so a surface can explain the number rather than just print it. */
 export const RIR_NOTE =

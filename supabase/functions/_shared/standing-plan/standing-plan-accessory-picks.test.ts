@@ -406,7 +406,49 @@ Deno.test('the extra rows carry his accessory dose — 3 x 8-10, by feel', () =>
     assertEquals(r.sets, 3);
     assertEquals(r.reps, '8-10');
     assertEquals(r.load_prescribed, false, 'an extra row prescribed a weight it has no basis for');
+    // ⛔ THE RESERVE COMES FROM THE SAME SENTENCE AS THE REPS (2026-08-27). p86 doses accessory work
+    // at 3 x 8-10 at 1-2 RIR; the row carried the sets and the reps and NOT the reserve, so
+    // `materialize-plan` fell through to the protocol's generic chart and Michael's screen showed
+    // two accessories on one day disagreeing — "1 in reserve" on a slot row, "2 in reserve" on this
+    // one. 1.5 is the midpoint of his band and renders as "1-2".
+    assertEquals(r.target_rir, 1.5, 'a floor/dial row left its reserve to the generic default chart');
   }
+});
+
+Deno.test('⛔ NO ADDED ROW LETS THE GENERIC CHART ANSWER FOR IT, AND A HOLD CARRIES NO RESERVE', () => {
+  // ⚠️ THE CLASS, NOT THE INSTANCE — every floor and Dial row in a real week, over the chips and
+  // several equipment cases, because the screenshot caught one row and the defect is shared by all
+  // of them.
+  let checkedReps = 0;
+  let checkedHolds = 0;
+  for (const equipment of [EQ_LABELS, ['Bodyweight'], []] as string[][]) {
+    for (const dial of [[], ['core'], ['glutes'], ['glutes', 'core']] as never[]) {
+      const picks = defaultViadaPicks(equipment, dial);
+      const added = rowsOf(week({ slotPicks: picks, dial, equipment }))
+        .filter((r) => r.load_prescribed === false && typeof r.notes === 'string'
+          && (r.notes.startsWith('Floor:') || r.notes.startsWith('Your ')));
+      for (const r of added) {
+        if (r.reps === '8-10') {
+          checkedReps += 1;
+          assertEquals(r.target_rir, 1.5, `${r.name}: a rep-dosed accessory lost its reserve`);
+        } else {
+          checkedHolds += 1;
+          // A plank has no reps and therefore no reps in reserve. ⛔ Absent, never zero — 0 RIR is a
+          // real and specific instruction (p219), not "we did not say".
+          assertEquals(r.target_rir, undefined, `${r.name}: a hold was given a reps-in-reserve target`);
+        }
+      }
+    }
+  }
+  // ⛔ NOT VACUOUS. If the floor stops adding rows this gate must fail loudly rather than pass by
+  // iterating over nothing — the same way it would have passed before the fix.
+  assert(checkedReps > 0, 'no rep-dosed accessory row was produced — this gate asserted nothing');
+  // ⚠️ AND THE HOLD HALF IS CURRENTLY UNREACHED, DELIBERATELY SAID OUT LOUD RATHER THAN ASSERTED.
+  // `checkedHolds` is 0 today because every Dial option is rep-prescribable by its own gate above
+  // and the floor placed no hold in these cases. The branch stays as a guard for the day one
+  // appears; it is not evidence of anything until it does.
+  assertEquals(checkedHolds, 0,
+    'a hold reached the floor — good, this branch is now live: delete this note and assert it instead');
 });
 
 /**

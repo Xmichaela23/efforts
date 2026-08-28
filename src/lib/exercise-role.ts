@@ -540,7 +540,12 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   // than a screenshot months later.
   'glute ham raise': 'bodyweight',
   'reverse hyper': 'bodyweight',
-  'weighted sit up': 'bodyweight',
+  // ⛔ `loaded_accessory`, NOT `bodyweight` — CORRECTED 2026-08-27. The name says weighted; the row
+  // has to offer somewhere to put the weight. It was filed as bodyweight, which was invisible only
+  // because the logger asked its own private regex instead of this table. The moment the logger
+  // started asking here (`isBodyweightLogged`), this row would have taken the weight box off a
+  // movement whose whole point is the plate on the chest.
+  'weighted sit up': 'loaded_accessory',
   'bodyweight lunges': 'bodyweight',
   'bodyweight lunge': 'bodyweight',
   // The three the substitution emits when the athlete owns nothing — bodyweight by construction.

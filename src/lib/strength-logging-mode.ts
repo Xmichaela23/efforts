@@ -26,7 +26,7 @@
  * named, tested, single-source classifier instead of an inline regex ladder — and when it earns a
  * row on the shared table (Axis 3, not scoped yet), there is exactly one place to change.
  */
-import { capabilitiesForExercise, type TypeCapability } from './exercise-role';
+import { capabilitiesForExercise, lookupExerciseType, type TypeCapability } from './exercise-role';
 
 /** The question a row asks. Identical to the type table's `loggedAs` — named for the caller. */
 export type LoggingMode = TypeCapability['loggedAs'];
@@ -55,6 +55,66 @@ export function isDurationLogged(name: string): boolean {
   const mode = loggingModeForExercise(name);
   return mode === 'time' || mode === 'done_or_time' || mode === 'distance_or_time';
 }
+
+/**
+ * ⛔ IS THE BODY THE LOAD? THE LOGGER'S FIFTH PRIVATE CLASSIFIER, RETIRED (2026-08-27).
+ *
+ * ⚠️ THE DEFECT, AS FOUND: an **Ab Wheel Rollout** on Michael's live session was drawn a weight box,
+ * a plate calculator and a 45 lb bar picker. `StrengthLogger.tsx` carried its own substring regex
+ * for this question with no `rollout` stem, so the row answered "not bodyweight", fell through to
+ * `equipmentForExercise`'s `barbell` default, and got the whole barbell treatment. ⛔ **THREE OTHER
+ * PLACES ALREADY KNEW**: `exercise-role.ts`'s type table says `bodyweight`, `exercise-config.ts`
+ * says `displayFormat: 'bodyweight'`, and Viada p223 lists ab wheel rollouts under CORE.
+ *
+ * ⛔ SO THE FIX IS NOT A STEM. Adding `rollout` would have fixed the one movement on the screenshot
+ * and left the rest: **measured over the type table, the regex missed 55 movements it calls
+ * bodyweight, isometric, plyo or mobility** — sit-ups, crunches, pistol squats, hanging leg raises,
+ * air squats, glute bridges, back extensions, dead hangs, wall sits, burpees, mountain climbers.
+ * Every one of them would have kept a bar and a plate calculator until someone photographed it.
+ *
+ * ⚠️ AND IT WAS WRONG IN THE OTHER DIRECTION TWICE, WHICH IS THE MORE INSTRUCTIVE HALF:
+ *   · **Cable Woodchopper** answered "bodyweight" — because `woodc`**`hop`**`per` contains the `hop`
+ *     stem meant for plyometrics. A loaded cable movement was being denied its load box by a
+ *     substring collision.
+ *   · **Weighted Single Leg Calf Raise** answered "bodyweight" off the `calfraise` stem, weighted or
+ *     not, so the weight had nowhere to go.
+ * Both are fixed by asking the table, and both are pinned in the fixtures.
+ *
+ * ⛔ THE UNKNOWN-NAME PATH IS THE REGEX, DELIBERATELY, AND IT IS NOT A SIXTH CLASSIFIER. The table
+ * is an EXACT-key lookup: a name it has never heard of resolves to `loaded_accessory` — the right
+ * default for the load system (count it) and the wrong one here (draw it a bar). The freestyle
+ * logger lets an athlete type any name at all, so switching cold would have taken the weight box off
+ * nothing and ADDED one to every unrecognised bodyweight movement someone typed by hand. The table
+ * answers wherever it knows; the old regex covers only what it has never seen, and
+ * `typeForExercise` already warns once per unmapped name so those names surface rather than sit.
+ *
+ * ⚠️ `equipmentForExercise`'s `barbell` DEFAULT IS NOT TOUCHED. That is the header's Axis 3 line and
+ * it stays where it is — this changes which movements reach the default, never what it answers.
+ */
+export function isBodyweightLogged(name: string): boolean {
+  // ⛔ `none` COUNTS. Plyometrics, isometric holds and mobility work have no external load either;
+  // the regex this replaces matched `jump`, `plank` and `plyo` for exactly that reason.
+  if (lookupExerciseType(name) !== null) {
+    const load = capabilitiesForExercise(name).load;
+    return load === 'bodyweight' || load === 'none';
+  }
+  return LEGACY_BODYWEIGHT_NAME_RE.test(
+    String(name || '').toLowerCase().replace(/[\s-]/g, ''),
+  );
+}
+
+/**
+ * ⛔ THE OLD LOGGER REGEX, VERBATIM, AND ONLY FOR NAMES THE TABLE HAS NEVER HEARD OF.
+ *
+ * ⚠️ ITS NORMALIZER STRIPS SPACES **AND** HYPHENS, which is why the stems are spelt closed up
+ * (`stiffleggedrun`, `ladderdrill`, `askip` reached via `skip`). It is NOT
+ * `normalizeExerciseNameForMatch` below — that one keeps spaces. Do not merge them.
+ *
+ * ⚠️ EVERY NAME THAT REACHES THIS IS A NAME THE TYPE TABLE SHOULD PROBABLY HOLD. The right fix for a
+ * recurring one is a row in `TYPE_TABLE`, not a stem here.
+ */
+const LEGACY_BODYWEIGHT_NAME_RE =
+  /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo|skip|shuffle|ladderdrill|stiffleggedrun|calfraise|corecircuit|corework/;
 
 /** How the weight input is DRAWN. Axis 2 — see the header. Not on the shared table. */
 export type ExerciseEquipment = 'barbell' | 'dumbbell' | 'band' | 'bodyweight' | 'goblet' | 'plyo';

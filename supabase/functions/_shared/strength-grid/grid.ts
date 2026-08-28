@@ -387,10 +387,12 @@ export function resolveSlot(req: SlotRequest): ResolvedSlot {
   // no accumulating fatigue), p84 for hypertrophy (the drop-off IS the stimulus). This note was a
   // `gap` until 2026-08-27, asserting the book gave no rest guidance — see `intents.ts` for what
   // that assertion was and why it was wrong. ⚠️ Neither page gives minutes; a clock is still ours.
+  // ⚠️ THE NOTE IS THE WHOLE THING — cue plus provenance. The two halves are separate fields so the
+  // rest timer can print the cue alone beside its clock (2026-08-27); a note reader wants both.
   notes.push(
     req.intent === 'HYP'
-      ? { kind: 'source', text: REST_BETWEEN_SETS_RULE_HYP, cite: 'Viada p84' }
-      : { kind: 'source', text: REST_BETWEEN_SETS_RULE, cite: 'Viada p78' },
+      ? { kind: 'source', text: `${REST_BETWEEN_SETS_RULE_HYP.cue} ${REST_BETWEEN_SETS_RULE_HYP.provenance}`, cite: 'Viada p84' }
+      : { kind: 'source', text: `${REST_BETWEEN_SETS_RULE.cue} ${REST_BETWEEN_SETS_RULE.provenance}`, cite: 'Viada p78' },
   );
   if (prescription.kind === 'barbell' && prescription.setsBand.lo !== prescription.setsBand.hi) {
     notes.push({

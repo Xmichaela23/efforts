@@ -70,13 +70,13 @@ import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
 // [Step 3] The logger's two private classifiers, moved out of this file and beside the shared type
 // table. `isDurationLogged` reads the table (`loggedAs`); `equipmentForExercise` is the transcribed
 // EQUIPMENT axis the table does not carry — see the module header for why it is not derived.
-import { equipmentForExercise, isDurationLogged } from '@/lib/strength-logging-mode';
+import { equipmentForExercise, isBodyweightLogged, isDurationLogged } from '@/lib/strength-logging-mode';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { canWritePullupCapacity } from '@/lib/pullup-progression';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
-import { calculateRestTime, isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
+import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
 // The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
 import { hasRepTotal, parseRepTotal, repsRemaining, repTotalLine } from '@/lib/rep-total';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -505,6 +505,22 @@ const PlateMath: React.FC<{
     </div>
   );
 };
+
+/**
+ * ⛔ WHAT KIND OF SET IS THIS? The standing plan already answered, on the row (2026-08-27).
+ *
+ * The rest timer used to see only a movement name and a rep count, so a max-effort pull-up rested
+ * ninety seconds while a max-effort bench on the same day rested three minutes. `slot_intent` is
+ * stamped by the standing-plan composer (`compose.ts:1171, 1372`) and is the row saying which of the
+ * four intents it is; `calculateRestTime` turns that into one of three rest buckets.
+ *
+ * ⚠️ THE ROW\'S OWN FIELD ONLY — NEVER PARSED OUT OF `notes`. The render path does parse the notes
+ * for an intent, but only behind a check that the whole workout is tagged `standing_plan`; without
+ * that gate a stray "ME" in a free-text note on any other workout would silently re-time it. Absent
+ * means absent: the timer keeps its existing behaviour, which is exactly the scope Michael set.
+ */
+const slotIntentOf = (ex: unknown): string | null =>
+  (ex as { slot_intent?: string } | null | undefined)?.slot_intent ?? null;
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
   const { workouts, addWorkout, updateWorkout, loadUserBaselines } = useAppContext();
@@ -958,18 +974,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const isMountedRef = useRef(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Helper: detect common bodyweight movements (no default load)
+  // ⛔ THE PRIVATE REGEX IS GONE — this now asks the shared type table (2026-08-27). It answered
+  // "not bodyweight" for an Ab Wheel Rollout, so the row was drawn a weight box, a plate calculator
+  // and a 45 lb bar picker on Michael's live session, while three other places in the app already
+  // knew the movement was bodyweight. The whole finding, the 55 movements it also missed, the two it
+  // got backwards (Cable Wood**chop**per matched the `hop` stem) and why unknown names still fall
+  // back to the old regex are all in `isBodyweightLogged`'s own header.
   const isBodyweightMove = (raw?: string): boolean => {
-    try {
-      const n = String(raw || '').toLowerCase().replace(/[\s-]/g,'');
-      // Include plyometrics as bodyweight (jumps, bounds, hops), calf raises, core work
-      // ⛔ `skip|shuffle|ladderdrill|stiffleggedrun` ADDED 2026-08-24 for Viada's named plyometric
-      // drills (p227). This normalizer strips spaces AND hyphens, so `A-Skip` arrives as `askip` and
-      // `Stiff-Legged Run` as `stiffleggedrun`. Without them the drills fell through and the row
-      // rendered a load column. Mirrors `equipmentForExercise` and `isPlyometricMovement`, which
-      // gained the same words in the same change — three private lists, one vocabulary.
-      return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo|skip|shuffle|ladderdrill|stiffleggedrun|calfraise|corecircuit|corework/.test(n);
-    } catch { return false; }
+    try { return isBodyweightLogged(raw ?? ''); } catch { return false; }
   };
 
   /**
@@ -1762,7 +1774,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // overflow set index, no "last: —" placeholder on a history-less exercise).
   // Handles: weight × reps @ RIR; duration sets (last: 0:45); bands
   // (resistance_level in place of weight); missing RIR (drop "@ RIR" cleanly).
-  const formatLastSet = (p?: LoggedSet, rirTracked?: boolean): string | null => {
+  // ⛔ `showRir: false` IS A SECOND, DIFFERENT REASON TO DROP IT (2026-08-27). `rirTracked === false`
+  // above is D-324 — the protocol killed reserve, so the number is irrelevant. This one is width: the
+  // compact Previous column is 68px (56px on an assist row) and the reserve tail is what pushes the
+  // string past it, so the athlete reads "55 × 6 @ R…" and loses the reps. See the call site.
+  const formatLastSet = (p?: LoggedSet, rirTracked?: boolean, showRir = true): string | null => {
     if (!p) return null;
     if (typeof p.duration_seconds === 'number' && p.duration_seconds > 0) {
       return `last: ${formatSeconds(p.duration_seconds)}`;
@@ -1783,7 +1799,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // and the reps are fixed in advance and no reserve estimate decides anything.
     // ⚠️ The number is real history, which is exactly why it survived: it is not FALSE, it is
     // IRRELEVANT — and on a card that shows nothing else about reserve it reads as a target.
-    if (rirTracked !== false && typeof p.rir === 'number') s += ` @ RIR ${p.rir >= 5 ? '5+' : p.rir}`;
+    if (showRir && rirTracked !== false && typeof p.rir === 'number') s += ` @ RIR ${p.rir >= 5 ? '5+' : p.rir}`;
     return s;
   };
 
@@ -2831,7 +2847,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           exs.forEach((exercise, exIndex) => {
             exercise.sets.forEach((set, setIndex) => {
               if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                const restTime = calculateRestTime(exercise.name, set.reps);
+                const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                 const restTimerKey = `${exercise.id}-${setIndex}`;
                 setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
               }
@@ -2963,7 +2979,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         prePopulatedExercises.forEach((exercise) => {
           exercise.sets.forEach((set, setIndex) => {
             if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-              const restTime = calculateRestTime(exercise.name, set.reps);
+              const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
               const restTimerKey = `${exercise.id}-${setIndex}`;
               setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
             }
@@ -2985,7 +3001,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           parsed.forEach((exercise) => {
             exercise.sets.forEach((set, setIndex) => {
               if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                const restTime = calculateRestTime(exercise.name, set.reps);
+                const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                 const restTimerKey = `${exercise.id}-${setIndex}`;
                 setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
               }
@@ -3038,7 +3054,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   final.forEach((exercise) => {
                     exercise.sets.forEach((set, setIndex) => {
                       if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                        const restTime = calculateRestTime(exercise.name, set.reps);
+                        const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                         const restTimerKey = `${exercise.id}-${setIndex}`;
                         setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
                       }
@@ -3102,7 +3118,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     final.forEach((exercise) => {
                       exercise.sets.forEach((set, setIndex) => {
                         if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                          const restTime = calculateRestTime(exercise.name, set.reps);
+                          const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                           const restTimerKey = `${exercise.id}-${setIndex}`;
                           setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
                         }
@@ -3147,7 +3163,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 final.forEach((exercise) => {
                   exercise.sets.forEach((set, setIndex) => {
                     if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                      const restTime = calculateRestTime(exercise.name, set.reps);
+                      const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                       const restTimerKey = `${exercise.id}-${setIndex}`;
                       setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
                     }
@@ -3231,7 +3247,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 final.forEach((exercise) => {
                   exercise.sets.forEach((set, setIndex) => {
                     if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                      const restTime = calculateRestTime(exercise.name, set.reps);
+                      const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                       const restTimerKey = `${exercise.id}-${setIndex}`;
                       setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
                     }
@@ -3263,7 +3279,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               final.forEach((exercise) => {
                 exercise.sets.forEach((set, setIndex) => {
                   if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                    const restTime = calculateRestTime(exercise.name, set.reps);
+                    const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
                     const restTimerKey = `${exercise.id}-${setIndex}`;
                     setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
                   }
@@ -3858,7 +3874,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         
         // Auto-calculate rest time when reps change (for rep-based exercises)
         if ('reps' in updates && updatedSet.reps !== undefined && updatedSet.duration_seconds === undefined) {
-          const restTime = calculateRestTime(exercise.name, updatedSet.reps);
+          const restTime = calculateRestTime(exercise.name, updatedSet.reps, slotIntentOf(exercise));
           const restTimerKey = `${exerciseId}-${setIndex}`;
           // Only set if timer doesn't exist or is at default value
           setTimers(prev => {
@@ -3905,7 +3921,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         
         // Auto-calculate rest time for the new set if it has reps
         if (newSet.reps && newSet.reps > 0 && newSet.duration_seconds === undefined) {
-          const restTime = calculateRestTime(exercise.name, newSet.reps);
+          const restTime = calculateRestTime(exercise.name, newSet.reps, slotIntentOf(exercise));
           const restTimerKey = `${exerciseId}-${updatedExercise.sets.length - 1}`;
           setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
         }
@@ -3955,7 +3971,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (setIndex >= ex.sets.length - 1) return;              // no rest after the last set
       const restKey = `${exerciseId}-${setIndex}`;
       const calculatedRest = (typeof set.reps === 'number' && set.reps > 0)
-        ? calculateRestTime(ex.name, set.reps)
+        ? calculateRestTime(ex.name, set.reps, slotIntentOf(ex))
         : 90;
       setRestDismissed((prev) => { if (!prev.has(restKey)) return prev; const n = new Set(prev); n.delete(restKey); return n; });
       setTimers((prev) => {
@@ -4687,8 +4703,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const [activeKey, activeTimer] = restEntries[0];
           const total = activeTimer.seconds ?? 0;
           const display = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+          /**
+           * ⛔ HIS RULE, BESIDE THE CLOCK (Michael, 2026-08-27). Viada p78 gives a readiness
+           * condition and NO NUMBER OF MINUTES — so the countdown alone is us answering a question he
+           * deliberately did not answer with a number. The sentence says what the clock is standing
+           * in for, and `REST_MINUTES_ARE_OURS` says whose the minutes are.
+           *
+           * ⚠️ THE WORDING IS IMPORTED, NOT WRITTEN HERE. `restCueForBucket` returns the same string
+           * the plan's own notes carry, out of `strength-grid/intents.ts`. p84's opposite rule for
+           * muscle-building work comes down the same path.
+           *
+           * ⚠️ ONLY ON A ROW THAT DECLARED AN INTENT. The timer key is `${exerciseId}-${setIndex}`,
+           * so the exercise is recovered by prefix rather than by splitting on a dash — an exercise
+           * id contains them. A 5/3/1 or freestyle row has no intent, gets no sentence, and keeps
+           * the countdown it always had.
+           */
+          const restEx = exercises.find((e) => activeKey.startsWith(`${e.id}-`));
+          const restBucket = restBucketForIntent(slotIntentOf(restEx));
           return (
-            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-strength/20 border border-strength/50 text-[#FFE6D5] shadow-lg backdrop-blur-md">
+            /* ⛔ THE PILL BODY NO LONGER SWALLOWS TAPS (2026-08-27). It is `sticky` over the top of
+               the scrolling set list, so whichever row is scrolled under it was losing its taps to a
+               readout that has no tap action of its own. `pointer-events-auto` now sits on the Skip
+               button alone — the only thing here anyone can press — and everything else falls
+               through to the row underneath. The pill still covers the row visually; that is the
+               tradeoff of pinning it, and it is not what made a cell hard to hit. */
+            <div className={`pointer-events-none bg-strength/20 border border-strength/50 text-[#FFE6D5] shadow-lg backdrop-blur-md ${
+              // A pill with nothing under it stays a pill; a pill carrying his rule is a small card.
+              restBucket ? 'max-w-[19rem] px-3.5 py-2 rounded-2xl' : 'flex items-center gap-2 px-3 py-1.5 rounded-full'
+            }`}>
+              <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wide text-strength/80">Rest</span>
               <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
               <button
@@ -4700,11 +4743,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   cancelRestNotification(activeKey);
                   clearPersistedTimer(activeKey); // Q-TIMER: skipped → drop its wall-clock deadline
                 }}
-                className="ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-white/80 hover:text-white flex items-center justify-center text-xs font-medium"
+                className="pointer-events-auto ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-white/80 hover:text-white flex items-center justify-center text-xs font-medium"
                 aria-label="Skip rest"
               >
                 Skip
               </button>
+              </div>
+              {restBucket && (
+                <div className="pt-1.5">
+                  <p className="text-[11px] leading-snug text-[#FFE6D5]/85">{restCueForBucket(restBucket)}</p>
+                  {/* ⛔ WHOSE NUMBER IT IS, ON THE SCREEN THAT SHOWS IT. He gives the rule and no
+                      minutes; the clock above is our stand-in and does not get to look like his. */}
+                  <p className="pt-1 text-[10px] leading-snug text-[#FFE6D5]/50">{REST_MINUTES_ARE_OURS}</p>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -5505,7 +5557,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     display: 'grid',
                     gridTemplateColumns: gridTemplate,
                     columnGap: exShowRir ? '8px' : '10px',
-                    alignItems: 'center',
+                    // ⛔ `end`, NOT `center` (2026-08-27). The number cells are 44px tall so they can
+                    // be hit; centring them would leave the set index and the Previous column floating
+                    // halfway up the row while the numbers sat on their underline. Bottom alignment
+                    // puts every element on the one rule.
+                    alignItems: 'end',
                   };
                   // Readable, not the .38 the first pass used — these are labels the athlete reads
                   // mid-set with a bar in their hands.
@@ -5672,7 +5728,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const bestPriorOneRm = set.amrap && done ? bestMeasuredOneRmFor(exercise.name) : undefined;
                         const isAmrapPR = amrapE1rm != null && bestPriorOneRm != null && amrapE1rm > bestPriorOneRm;
 
-                        const numCls = `w-full bg-transparent border-0 border-b-[1.5px] pb-1 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
+                        // ⛔ 44px TALL, AND IT IS NOT A COSMETIC CHANGE (Michael, 2026-08-27: "dumbell
+                        // bench press was hard to enter weight and rep had to hit it a lot").
+                        //
+                        // These cells were a bare 17px of text on `pb-1` with no height — about 21px
+                        // of tappable box against Apple's 44pt minimum, on the two numbers the athlete
+                        // enters most. ⛔ AND THE NEXT ENGINE ARC READS THE LOGGED REPS: the bar ladder
+                        // raises the weight off what was actually typed, so a rep cell that is hard to
+                        // hit correctly is bad input to a progression that cannot tell the difference.
+                        //
+                        // ⚠️ THE HEIGHT HAD TO BE REAL, NOT A HIT-AREA TRICK. Growing the box past its
+                        // visible bounds (negative insets, a pseudo-element) is the usual dodge and it
+                        // does not work here: the rows sit ~22px apart, so a 44px slop area would
+                        // overlap the neighbouring set's cells and steal its taps. The row grows; the
+                        // container's own padding gives some of it back.
+                        //
+                        // ⚠️ TEXT STAYS ON THE UNDERLINE. `items-end` + `pb-1.5` keeps the number
+                        // sitting on its rule exactly as before — the box grows upward, the ink does
+                        // not move — and the grid switches to `alignItems: end` so every cell, the set
+                        // index and the Previous column all share the one baseline.
+                        const numCls = `w-full h-11 flex items-end justify-center bg-transparent border-0 border-b-[1.5px] pb-1.5 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
                         const numStyle: React.CSSProperties = { fontSize: '17px', fontFamily: 'Inter, sans-serif' };
                         // D-097 / D-406: a value that came from the previous session or from the
                         // composer's suggestion is a STARTING POINT, greyed so it can never be
@@ -5690,7 +5765,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // target IS the number, so "previous" there is noise. rir_tracked !== false
                         // marks the accessories; set.amrap marks the top set.
                         const showPrevious = set.amrap === true || exercise.rir_tracked !== false;
-                        const priorTxt = (showPrevious && prior) ? (formatLastSet(prior, exercise.rir_tracked) || '').replace(/^last:\s*/, '') : '';
+                        // ⛔ NO RESERVE IN THIS COLUMN, AND THE COLUMN IS NOT WIDENED (Michael's
+                        // screenshots, 2026-08-27: "12 reps @ …", "55 × 6 @ R…", "8 reps @ R…").
+                        //
+                        // The column is 68px, 56px on an assist-capable row, and it is last in line
+                        // for width by design — a squeezed weight cell is a mis-logged set, so the
+                        // anchor gives up space rather than a number cell. What was being truncated
+                        // was the RESERVE, and the reserve is the one part of this string that does
+                        // nothing: `fillFromPrior` copies weight, reps, duration and resistance and
+                        // deliberately does NOT copy `rir`, so the tail could not even be tapped in.
+                        // Dropping it makes the whole remaining string fit instead of clipping the
+                        // reps, which is the number the athlete is actually reading off it.
+                        const priorTxt = (showPrevious && prior) ? (formatLastSet(prior, exercise.rir_tracked, false) || '').replace(/^last:\s*/, '') : '';
                         // Tap Previous to reuse it. Goes through `updateSet`, so provenance clears
                         // exactly as it does for any other athlete edit (from_previous, prefilled,
                         // and — since this writes no `rir` — the rir_autofilled flag is untouched).
@@ -5946,7 +6032,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return (
                           <div
                             key={setIndex}
-                            className={`relative px-1.5 py-2 border-b border-white/[0.06] last:border-b-0 transition-colors ${done ? rowAccent.rowBg : ''}`}
+                            // `py-1`, down from `py-2` (2026-08-27): the number cells now carry 44px
+                            // of their own height, so the container's padding is no longer what makes
+                            // the row tappable — it is only separation, and 8px of it was the row
+                            // growing twice.
+                            className={`relative px-1.5 py-1 border-b border-white/[0.06] last:border-b-0 transition-colors ${done ? rowAccent.rowBg : ''}`}
                           >
                             {/* Baseline test set-type label + hint */}
                             {exIsBaselineTest && (isWarmup || isWorking) && (
@@ -6011,7 +6101,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             )}
 
                             <div style={gridStyle}>
-                              <span className={`text-[13px] tabular-nums leading-none ${done ? rowAccent.num : 'text-white/70'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
+                              {/* `pb-1.5` matches the number cells' own bottom padding, so the index,
+                                  the Previous anchor and every typed number sit on one line. */}
+                              <span className={`text-[13px] tabular-nums leading-none pb-1.5 ${done ? rowAccent.num : 'text-white/70'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
                                 {setIndex + 1}
                               </span>
 
@@ -6019,14 +6111,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 <button
                                   type="button"
                                   onClick={fillFromPrior}
-                                  className="text-[11px] text-left text-white/[0.9] tabular-nums leading-none whitespace-nowrap overflow-hidden text-ellipsis hover:text-white transition-colors"
+                                  className="h-11 flex items-end pb-1.5 min-w-0 text-[11px] text-left text-white/[0.9] tabular-nums leading-none hover:text-white transition-colors"
                                   style={{ fontFamily: 'Inter, sans-serif' }}
                                   aria-label={`Use previous: ${priorTxt}`}
                                 >
-                                  {priorTxt}
+                                  {/* The ellipsis stays as the backstop — the reserve tail was what
+                                      normally overflowed, but a four-figure weight still can. */}
+                                  <span className="min-w-0 whitespace-nowrap overflow-hidden text-ellipsis">{priorTxt}</span>
                                 </button>
                               ) : (
-                                <span className="text-[11px] text-white/25 leading-none">{showPrevious ? '—' : ''}</span>
+                                <span className="text-[11px] text-white/25 leading-none pb-1.5">{showPrevious ? '—' : ''}</span>
                               )}
 
                               {renderWeightCell()}

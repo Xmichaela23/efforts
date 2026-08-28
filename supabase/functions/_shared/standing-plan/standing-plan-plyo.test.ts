@@ -19,7 +19,7 @@ import {
 } from './plyo.ts';
 import { FRAMES } from './frames.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
-import { equipmentForExercise } from '../../../../src/lib/strength-logging-mode.ts';
+import { equipmentForExercise, isBodyweightLogged } from '../../../../src/lib/strength-logging-mode.ts';
 import { isPlyometricMovement } from '../../../../src/lib/strength-rest-timer.ts';
 
 const BASE = {
@@ -82,23 +82,31 @@ Deno.test('⛔ EVERY DRILL RESOLVES IN THE CATALOGUE AND LOGS AS A PLYOMETRIC, N
   }
 });
 
-Deno.test('⛔ THE LOGGER\'S OWN BODYWEIGHT TEST COVERS THE DRILLS TOO — the third private list', async () => {
+Deno.test('⛔ THE LOGGER SEES EVERY DRILL AS BODYWEIGHT — and it is no longer a private list', async () => {
   /**
-   * ⛔ THREE LISTS, THREE NORMALIZERS, ONE VOCABULARY. `isBodyweightMove` lives inline in
-   * `StrengthLogger.tsx` and strips spaces AND hyphens, so its stems are spelt differently again
-   * (`askip`, `stiffleggedrun`, `ladderdrill`). ⚠️ A unit test cannot render the component, so this
-   * lints the regex itself and runs the drills through it — which is the shape of the failure, and
-   * the only half a test can reach.
+   * ⛔ IT WAS THREE LISTS, THREE NORMALIZERS, ONE VOCABULARY. `isBodyweightMove` lived inline in
+   * `StrengthLogger.tsx` and stripped spaces AND hyphens, so its stems were spelt differently again
+   * (`askip`, `stiffleggedrun`, `ladderdrill`) — and this test had to LINT THE REGEX out of the
+   * component by grep, because a unit test cannot render it.
+   *
+   * ✅ **2026-08-27: THE COMPONENT NOW ASKS THE SHARED TYPE TABLE** (`isBodyweightLogged`), so the
+   * question can be asked directly instead of pattern-matched out of a 6,000-line file. The trigger
+   * was an Ab Wheel Rollout on Michael's live session being drawn a bar and a plate calculator; the
+   * same regex was missing 55 other movements.
+   *
+   * ⚠️ THE DRILLS ARE THE CASE THAT MUST NOT REGRESS. p227 names them and none carries a jump or hop
+   * word, so they were the reason three separate lists were extended by hand in 2026-08-24.
    */
+  for (const name of everyDrill()) {
+    assert(isBodyweightLogged(name), `"${name}" would be drawn a load column by the logger`);
+  }
+  // ⛔ AND THE INLINE REGEX MUST NOT COME BACK. It is the fifth private classifier for this question
+  // and it was wrong in both directions; a `const isBodyweightMove = ... /dip|chinup/` here again
+  // means the shared answer has been quietly forked.
   const src = await Deno.readTextFile(
     new URL('../../../../src/components/StrengthLogger.tsx', import.meta.url).pathname);
-  const m = src.match(/return \/(dip\|chinup[^/]*)\/\.test\(n\);/);
-  assert(m, 'isBodyweightMove\'s regex could not be found — it moved or was rewritten');
-  const re = new RegExp(m![1]);
-  for (const name of everyDrill()) {
-    const folded = name.toLowerCase().replace(/[\s-]/g, '');
-    assert(re.test(folded), `"${name}" (${folded}) is not seen as bodyweight by the logger`);
-  }
+  assert(!/\/dip\|chinup/.test(src), 'the logger re-inlined its own bodyweight regex');
+  assert(src.includes('isBodyweightLogged'), 'the logger stopped asking the shared classifier');
 });
 
 Deno.test('⛔⛔ WEEK 1 IS FOOTSPEED AND IN-PLACE WORK — p89\'s ramp, not the table\'s order', () => {

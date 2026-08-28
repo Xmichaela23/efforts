@@ -10,7 +10,7 @@
  * asks time, a box jump asks reps, a carry asks distance, a band row asks for its resistance.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { equipmentForExercise, isDurationLogged, loggingModeForExercise } from './strength-logging-mode.ts';
+import { equipmentForExercise, isBodyweightLogged, isDurationLogged, loggingModeForExercise } from './strength-logging-mode.ts';
 import { EXERCISE_CONFIG } from './exercise-config.ts';
 
 /**
@@ -162,4 +162,105 @@ Deno.test('an unrecognised movement gets the safe logging mode', () => {
   assertEquals(loggingModeForExercise('Zercher Good Morning Complex'), 'weight_x_reps');
   assertEquals(isDurationLogged('Zercher Good Morning Complex'), false);
   assertEquals(equipmentForExercise('Zercher Good Morning Complex'), 'barbell');
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ AXIS 2b — IS THE BODY THE LOAD? (2026-08-27)
+//
+// Michael's live session drew an **Ab Wheel Rollout** a weight box, a plate calculator and a 45 lb
+// bar. The logger was asking its own substring regex — the fifth private classifier for a question
+// the shared type table already answers — and that regex has no `rollout` stem.
+//
+// ⚠️ THESE ARE NOT EQUIVALENCE FIXTURES. Every other test above proves a migration changed nothing;
+// this one exists because the migration changes 57 answers ON PURPOSE, and the whole list is named
+// below so nobody has to diff two classifiers to find out what moved.
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** The logger's old private regex, verbatim. ⚠️ Its normalizer strips spaces AND hyphens. */
+function legacyIsBodyweightMove(raw: string): boolean {
+  const n = String(raw || '').toLowerCase().replace(/[\s-]/g, '');
+  return /dip|chinup|pullup|pushup|plank|nordic|nordiccurl|nordiccurls|swissballwalk|swissball|walkout|jump|bound|hop|plyo|skip|shuffle|ladderdrill|stiffleggedrun|calfraise|corecircuit|corework/.test(n);
+}
+
+Deno.test('⛔ THE ROW ON THE SCREENSHOT — an ab wheel rollout is bodyweight, and was not', () => {
+  // ⛔ THE DEFECT ITSELF, PINNED. The old regex said no; the type table, the exercise config and
+  // Viada p223 (ab wheel rollouts, filed under CORE) all say yes.
+  assertEquals(legacyIsBodyweightMove('Ab Wheel Rollout'), false, 'the legacy regex changed — this fixture is stale');
+  assertEquals(isBodyweightLogged('Ab Wheel Rollout'), true);
+  // The same defect wore three other names in the same table.
+  for (const n of ['Ab Rollout', 'Stability Ball Rollout', 'TRX Fallout']) {
+    assertEquals(isBodyweightLogged(n), true, `${n} still asks for a weight`);
+  }
+});
+
+Deno.test('⛔ THE TWO IT GOT BACKWARDS — a loaded movement denied its weight box', () => {
+  /**
+   * ⛔ `woodc`**`hop`**`per`. The `hop` stem exists for plyometrics and it matched the middle of
+   * "woodchopper", so a loaded cable movement answered "bodyweight" and lost its load column. This
+   * is the exact failure mode a substring classifier has and a lookup table does not.
+   */
+  assertEquals(legacyIsBodyweightMove('Cable Woodchopper'), true, 'the legacy collision is gone — this fixture is stale');
+  assertEquals(isBodyweightLogged('Cable Woodchopper'), false);
+  // ⛔ AND THE `calfraise` STEM MATCHED REGARDLESS OF THE WORD "WEIGHTED" IN FRONT OF IT.
+  assertEquals(legacyIsBodyweightMove('Weighted Single Leg Calf Raise'), true, 'the legacy stem is gone — this fixture is stale');
+  assertEquals(isBodyweightLogged('Weighted Single Leg Calf Raise'), false);
+  // ⚠️ AND THE TABLE ITSELF HAD ONE WRONG, CORRECTED IN THE SAME CHANGE. `weighted sit up` was filed
+  // as `bodyweight`; the name says weighted and the row has to offer somewhere to put the plate.
+  assertEquals(isBodyweightLogged('Weighted Sit Up'), false);
+  // The unweighted one is still bodyweight, which is what makes the pair worth asserting together.
+  assertEquals(isBodyweightLogged('Sit Up'), true);
+});
+
+Deno.test('⛔ AN UNKNOWN NAME STILL FALLS BACK TO THE REGEX, and that is deliberate', () => {
+  /**
+   * ⛔ THE TABLE IS AN EXACT-KEY LOOKUP. A name it has never heard of resolves to
+   * `loaded_accessory` — correct for the load system, wrong here — and the freestyle logger lets an
+   * athlete type anything. Switching cold would have ADDED a weight box to every unrecognised
+   * bodyweight movement someone typed by hand, which is the same class of defect pointing the other
+   * way. The table answers where it knows; the regex covers only what it has never seen.
+   */
+  assertEquals(isBodyweightLogged('Archer Push Up Iso Hold Variation'), true, 'an unknown bodyweight name lost its fallback');
+  assertEquals(isBodyweightLogged('Zercher Good Morning Complex'), false, 'an unknown loaded name gained a bodyweight answer');
+});
+
+Deno.test('⛔ EVERY DIFFERENCE FROM THE OLD REGEX IS NAMED HERE — no silent third case', async () => {
+  /**
+   * ⚠️ THE GATE THAT MAKES THE OTHERS MEAN SOMETHING. It walks the whole known vocabulary, collects
+   * every name where the shared answer differs from the old regex, and asserts the set is exactly
+   * the one below. A movement that starts or stops being bodyweight without anyone deciding fails
+   * here and is named by the failure.
+   */
+  const gained: string[] = []; // regex said loaded, the table says bodyweight — the 55.
+  const lost: string[] = [];   // regex said bodyweight, the table says loaded — the collisions.
+  // ⚠️ THE FULL VOCABULARY, NOT JUST `EXERCISE_CONFIG` — the same seam the equivalence tests above
+  // use. The type table holds names the config does not (`weighted sit up` is one), and a fixture
+  // that walked only one of the two would have missed the row this change corrected.
+  for (const name of await knownVocabulary()) {
+    const now = isBodyweightLogged(name);
+    const before = legacyIsBodyweightMove(name);
+    if (now === before) continue;
+    (now ? gained : lost).push(name.toLowerCase());
+  }
+  // ⛔ THE COLLISIONS ARE THE SHORT LIST AND THE ONE WORTH READING. Anything new here means a stem
+  // is eating a loaded movement, which is exactly how the woodchopper broke.
+  // ⚠️ SPELT AS THE VOCABULARY SPELLS THEM. The type table says `weighted single leg calf raise`;
+  // `EXERCISE_CONFIG` says `Weighted Single-Leg Calf Raises`. Both resolve to the same row and both
+  // appear here, which is a fact about the vocabulary rather than about this change.
+  // ⚠️ `weighted sit up` IS DELIBERATELY ABSENT, AND ITS ABSENCE IS THE PROOF THE TABLE FIX LANDED.
+  // The old regex never matched it either (no stem fires on `weightedsitup`), so it is not a
+  // DIFFERENCE — it was a row the table itself had filed as bodyweight, corrected in this change.
+  // Had it been left wrong it would have shown up in `gained`, silently taking the plate box off a
+  // weighted movement. It is asserted directly in the fixture above.
+  assertEquals(lost.sort(), [
+    'cable woodchopper',
+    'weighted single leg calf raise',
+    'weighted single-leg calf raises',
+  ].sort(), 'a loaded movement changed sides — a stem is matching something it should not');
+  // ⛔ AND THE OTHER DIRECTION IS A COUNT PLUS ITS SPOT CHECKS, because the list is long and the
+  // point is the SIZE of it: one screenshot, fifty-plus rows drawing a bar they have no use for.
+  assert(gained.length >= 50, `expected the regex to have missed ~55 movements, found ${gained.length}`);
+  for (const n of ['ab wheel rollout', 'pistol squat', 'hanging leg raise', 'dead hang', 'wall sit', 'burpee']) {
+    assert(gained.includes(n), `${n} is missing from the movements this fixes`);
+  }
 });
