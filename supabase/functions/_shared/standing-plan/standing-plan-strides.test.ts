@@ -85,7 +85,9 @@ Deno.test('⛔⛔ THE STRIDES REACH THE WATCH — a token the expander turns int
   );
   const at = src.indexOf('if (/strides_\\d+x/.test(lower))');
   assert(at > 0, 'the expander\'s strides branch could not be found — it moved or was rewritten');
-  const body = src.slice(at, at + 2000);
+  // ⚠️ WIDENED 2026-08-28 — the branch now carries the note explaining why the recovery is untimed,
+  // and a 2000-character window stopped reaching the steps it is asserting on.
+  const body = src.slice(at, at + 4000);
   // ⛔ IT STILL PARSES THE SECONDS FORM. The edge emits `strides_6x20s`; a branch that only read
   // metres would match nothing and the watch would get an easy run with no strides on it.
   assert(body.includes("match(/strides_(\\d+)x(\\d+)(m|s)/)"),
@@ -98,6 +100,20 @@ Deno.test('⛔⛔ THE STRIDES REACH THE WATCH — a token the expander turns int
     'a stride was handed a pace target nobody prescribed');
   // ⛔ AND NO TRAILING RECOVERY: the watch ends on the last effort, not on a walk.
   assert(body.includes('if (i < reps - 1)'), 'the expander stopped skipping the final recovery');
+  /**
+   * ⛔⛔ AND THE RECOVERY BETWEEN THEM IS UNTIMED (Michael, 2026-08-28): *"Rest as long as you want
+   * between them. The card says 3 minutes of strides. The watch beeps six times."*
+   *
+   * ⛔ THE NINETY SECONDS THAT STOOD HERE WERE OURS, under a comment claiming a watch step cannot be
+   * untimed. **It can, and this app already does it** — `send-workout-to-garmin` maps `lap_button`
+   * to Garmin's `OPEN` duration type. p229's recovery for an all-out effort is `open`, and
+   * `source-rules.ts` has always said so; the materializer was overriding the library.
+   * ⚠️ IT COST ELEVEN AND A HALF MINUTES A SESSION — the easy run read 35 where the plan said 27.
+   */
+  assert(body.includes('lap_button: true'),
+    'the stride recovery is timed again — that number is ours and p229 says the recovery is open');
+  assert(!/kind: 'recovery',\s*\n\s*duration_s: rest_s/.test(body),
+    'the invented 90-second stride recovery came back');
 });
 
 Deno.test('⛔ THE STRIDES COME OUT OF THE SESSION\'S DOSE, NOT ON TOP OF IT', () => {
@@ -127,13 +143,17 @@ Deno.test('⛔ THE DOSE IS LABELLED OURS, AND THE PLACEMENT IS HIS', () => {
   /**
    * ⛔ HIS: p109's placement — a handful of strides on the end of another run — and p229's all-out
    * intensity with full recovery and no pace.
-   * ⚠️ OURS: four to eight efforts of twenty to thirty seconds. The page prints no dose for a
-   * stride; its shortest sprint is a 25-50 m acceleration, which is four to eight SECONDS and a
-   * different movement. Michael ruled the field-standard figure, 2026-08-26.
+   * ⚠️ OURS: SIX EFFORTS OF THIRTY SECONDS (Michael, 2026-08-28), narrowed from the four-to-eight /
+   * twenty-to-thirty band he set on 2026-08-26. The page prints no dose for a stride; its shortest
+   * sprint is a 25-50 m acceleration, which is four to eight SECONDS and a different movement.
+   * Twenty to thirty seconds is the field standard; six at thirty is the point he named inside it.
+   * ⚠️ A POINT, NOT A BAND — so the session's stride cost is exactly three minutes and the card can
+   * state it without hedging.
    */
   const spec = SESSION_ADD_ONS.strides;
-  assertEquals(spec.reps, { lo: 4, hi: 8 });
-  assertEquals(spec.secondsPerRep, { lo: 20, hi: 30 });
+  assertEquals(spec.reps, { lo: 6, hi: 6 });
+  assertEquals(spec.secondsPerRep, { lo: 30, hi: 30 });
+  assertEquals(spec.reps.lo * spec.secondsPerRep.lo, 180, 'the strides stopped costing three minutes');
   assertEquals(spec.work.kind, 'all_out');
   assertEquals(spec.cite, 'Viada p109');
   assert(/ours/i.test(STRIDES_DOSE_IS_OURS));

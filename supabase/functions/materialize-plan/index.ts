@@ -1875,10 +1875,24 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const unit = m[3];
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       
-      // Strides are fast but relaxed - no specific pace target, just "fast"
-      // They're done at ~95% max speed but staying relaxed
-      // Recovery is walk/jog (90s is standard)
-      const rest_s = 90;
+      /**
+       * ⛔⛔ THE RECOVERY IS UNTIMED, AND THE NINETY SECONDS THAT STOOD HERE WERE OURS
+       * (Michael, 2026-08-28): *"Rest as long as you want between them. The card says 3 minutes of
+       * strides. The watch beeps six times."*
+       *
+       * ⛔ THE COMMENT THAT JUSTIFIED THE NUMBER WAS FALSE, AND THIS APP DISPROVES IT. It read *"a
+       * watch step cannot be untimed, so somebody had to pick a number."* `send-workout-to-garmin`
+       * has carried a `lap_button` step the whole time and maps it to Garmin's `OPEN` duration
+       * type, whose own note reads *"a lap-button step has no duration to state — Garmin ends it
+       * when the athlete presses lap."* So the honest step existed and was not being used.
+       *
+       * ⛔ AND THE INVENTED NUMBER WAS EXPENSIVE. Six strides charged the session ELEVEN AND A HALF
+       * MINUTES of walking the source never prescribes — the easy run read 35 minutes where the plan
+       * said 27, and the athlete's weekly hours overshot their own ask because of it.
+       *
+       * ⚠️ p229's recovery for the all-out effort is `open` — full recovery, no stated duration — and
+       * `source-rules.ts` has always said so. This is the materializer catching up to the library.
+       */
       
       for (let i = 0; i < reps; i++) {
         if (unit === 'm') {
@@ -1899,14 +1913,16 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
             label: 'Stride'
           });
         }
-        // Recovery between strides: walk/jog (except after last one)
+        // ⛔ UNTIMED RECOVERY, NOT A NUMBER WE PICKED — see the note above. The watch ends it on the
+        // lap press; the clock charges it nothing, which is what makes six strides cost 3 minutes.
+        // ⚠️ STILL SKIPPED AFTER THE LAST ONE: the session ends there, it does not rest first.
         if (i < reps - 1) {
-          out.push({ 
-            id: uid(), 
-            kind: 'recovery', 
-            duration_s: rest_s, 
+          out.push({
+            id: uid(),
+            kind: 'recovery',
+            lap_button: true,
             pace_sec_per_mi: easyPace,
-            label: 'Walk/Jog'
+            label: 'Walk/Jog — as long as you need',
           });
         }
       }
@@ -1963,25 +1979,38 @@ export function expandBikeToken(tok: string, baselines: Baselines): any[] {
     out.push({ id: uid(), kind:'work', duration_s: sec, label: 'FTP Test - Maximal Effort', notes: 'All-out sustainable effort' });
     return out;
   }
+  /**
+   * ⛔⛔ THE REST BETWEEN BLOCKS IS HIS; THE ONE AFTER THE LAST BLOCK WAS OURS
+   * (Michael, 2026-08-28): *"Five minutes easy spin between blocks is printed right there in his
+   * cycling pages. What's ours is the third one — the app adds a rest after the last block, and he
+   * never wrote one."*
+   *
+   * ⛔ WHAT IT COST, MEASURED ON HIS OWN BLOCK. `bike_ss_3x18min_R5min` expanded to seven steps —
+   * three work and THREE recoveries — so a 13-minute warm-up plus three 18-minute blocks read as 82
+   * minutes where the session is 77. Every hard ride in every plan this app has ever materialised
+   * carried one rest it does not prescribe, and the athlete's weekly hours overshot by that much.
+   *
+   * ⚠️ THE INTERVAL COUNT AND THE REST LENGTH ARE UNTOUCHED — they are his, off p238-239. Only the
+   * trailing one goes: you do not rest after the final block, you stop.
+   * ⚠️ `reps - 1`, NOT a trailing pop, so a single-block session emits no recovery at all rather
+   * than emitting one and removing it.
+   */
   // SS: bike_ss_3x12min_R4min
   let m = lower.match(/bike_ss_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) { 
-    const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; 
-    console.log(`🔍 [BIKE DEBUG] Sweet spot match: ${reps}x${work/60}min, rest=${rest/60}min`);
-    for(let i=0;i<reps;i++){ 
-      const powerRange = pctRange(0.85,0.95);
-      console.log(`🔍 [BIKE DEBUG] Adding work step ${i+1}/${reps} with power_range:`, powerRange);
-      out.push({ id: uid(), kind:'work', duration_s: work, power_range: powerRange }); 
-      if(rest) out.push({ id: uid(), kind:'recovery', duration_s: rest }); 
-    } 
-    return out; 
+  if (m) {
+    const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60;
+    for(let i=0;i<reps;i++){
+      out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.85,0.95) });
+      if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest });
+    }
+    return out;
   }
   // Threshold: bike_thr_4x8min_R5min
   m = lower.match(/bike_thr_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.95,1.05) }); if(rest) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
+  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.95,1.05) }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
   // VO2: bike_vo2_5x4min_R4min
   m = lower.match(/bike_vo2_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(1.1,1.2) }); if(rest) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
+  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(1.1,1.2) }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
   // Endurance z2 time: bike_endurance_90min_Z2
   m = lower.match(/bike_endurance_(\d+)min/);
   if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(0.65,0.75) }); return out; }

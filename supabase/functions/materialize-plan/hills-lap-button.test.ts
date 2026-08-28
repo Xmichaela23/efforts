@@ -13,7 +13,7 @@
 //
 // Run: ~/.deno/bin/deno test --no-check supabase/functions/materialize-plan/hills-lap-button.test.ts
 
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { expandRunToken } from './index.ts';
 
 const BASE: any = { easyPace: '9:00/mi', fiveK_pace: '7:00/mi' };
@@ -66,3 +66,33 @@ Deno.test('⛔ THE EXISTING FIXED-RECOVERY HILL IS UNTOUCHED', () => {
   }
 });
 
+
+Deno.test('⛔⛔ NO REST AFTER THE LAST BIKE BLOCK — the rests between them are his, the trailing one was ours', async () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-28: *"Five minutes easy spin between blocks is printed right there in his
+   * cycling pages. What's ours is the third one — the app adds a rest after the last block, and he
+   * never wrote one."*
+   *
+   * ⛔ MEASURED ON HIS OWN BLOCK. `bike_ss_3x18min_R5min` expanded to SEVEN steps — three work and
+   * THREE recoveries — so a 13-minute warm-up plus three 18-minute blocks read as 82 minutes where
+   * the session is 77. Every hard ride this app has ever materialised carried a rest it does not
+   * prescribe, and the athlete's weekly hours overshot by that much.
+   *
+   * ⚠️ LINTED AS SOURCE, the same way this file's sibling strides test is: importing
+   * `materialize-plan` starts its server. The interval count and the rest LENGTH are untouched —
+   * they are his, off p238-239.
+   */
+  const src = await Deno.readTextFile(
+    new URL('./index.ts', import.meta.url).pathname,
+  );
+  for (const fam of ['bike_ss', 'bike_thr', 'bike_vo2']) {
+    const at = src.indexOf(`lower.match(/${fam}_(\\d+)x(\\d+)min_r(\\d+)min/)`);
+    assert(at > 0, `${fam}: the interval branch could not be found — it moved or was rewritten`);
+    const body = src.slice(at, at + 700);
+    assert(/i < reps - 1/.test(body),
+      `⛔ ${fam} rests after its final block again. That rest is ours and the source never wrote it`);
+    // ⛔ AND THE REST ITSELF IS STILL EMITTED between blocks — the fix is the trailing one, not the rest.
+    assert(/kind:'recovery', duration_s: rest/.test(body),
+      `${fam}: the between-block rest was dropped — those five minutes are his`);
+  }
+});

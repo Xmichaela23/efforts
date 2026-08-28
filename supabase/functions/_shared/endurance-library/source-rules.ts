@@ -1105,11 +1105,24 @@ export type SessionAddOn = {
  * and it carries NO PACE TARGET, deliberately. *"Paces come from performance and RPE rather than a
  * prescribed pace."* The recovery is his `open`: full recovery, no stated duration.
  *
- * ⚠️ OURS: FOUR TO EIGHT EFFORTS OF TWENTY TO THIRTY SECONDS (Michael's ruling, 2026-08-26). The
- * page gives no dose for a stride — the shortest thing he prints is a 25-50 m maximal acceleration
- * (`short_max`), which is four to eight SECONDS and a different movement. Twenty to thirty seconds
- * is the field standard for a stride (Daniels, Pfitzinger and the Hansons all append them to an easy
- * day), which is also why it will not read as strange to a runner or to a lifter.
+ * ⚠️ OURS: SIX EFFORTS OF THIRTY SECONDS (Michael's ruling, 2026-08-28), narrowed from the four-to-
+ * eight / twenty-to-thirty BAND he set on 2026-08-26. The page gives no dose for a stride — the
+ * shortest thing he prints is a 25-50 m maximal acceleration (`short_max`), which is four to eight
+ * SECONDS and a different movement. Twenty to thirty seconds is the field standard for a stride
+ * (Daniels, Pfitzinger and the Hansons all append them to an easy day), which is why it will not
+ * read as strange to a runner or to a lifter; six at thirty is the point inside that band he named.
+ *
+ * ⛔⛔ AND THE RECOVERY IS UNTIMED, WHICH IS HIS AND WAS BEING OVERRIDDEN. p229's recovery for the
+ * all-out effort is `open` — full recovery, no stated duration — and this file has always said so.
+ * The materializer was stamping NINETY SECONDS on it anyway, under a comment claiming *"a watch step
+ * cannot be untimed."* **That claim is false and the app already disproves it**:
+ * `send-workout-to-garmin` carries a `lap_button` step and maps it to Garmin's `OPEN` duration type,
+ * whose own note reads *"a lap-button step has no duration to state — Garmin ends it when the athlete
+ * presses lap."*
+ *
+ * ⛔ SO THE STRIDES COST THE SESSION THREE MINUTES, NOT ELEVEN. Michael, 2026-08-28: *"The card says
+ * 3 minutes of strides. The watch beeps six times."* Six thirty-second efforts is the whole of what
+ * the clock may charge; the rest between them is the athlete's and is not the app's to spend.
  */
 export const SESSION_ADD_ONS: Record<SessionAddOnId, SessionAddOn> = {
   strides: {
@@ -1120,17 +1133,18 @@ export const SESSION_ADD_ONS: Record<SessionAddOnId, SessionAddOn> = {
     // that are not already speed work; hanging strides off a threshold session would be adding
     // quality to a quality day, which is not what the page is describing.
     families: ['run_vt1', 'run_lsd'],
-    reps: { lo: 4, hi: 8 },
-    secondsPerRep: { lo: 20, hi: 30 },
+    // ⛔ A POINT, NOT A BAND — his own number inside the band that used to be ours. See above.
+    reps: { lo: 6, hi: 6 },
+    secondsPerRep: { lo: 30, hi: 30 },
     work: { kind: 'all_out' },
     cite: 'Viada p109',
   },
 };
 
 export const STRIDES_DOSE_IS_OURS =
-  'Four to eight efforts of twenty to thirty seconds is ours. The source prescribes strides by name '
-  + 'and gives no dose for them; twenty to thirty seconds is the field standard. The placement, the '
-  + 'all-out intensity and the full recovery are his.';
+  'Six efforts of thirty seconds is ours. The source prescribes strides by name and gives no dose '
+  + 'for them; twenty to thirty seconds is the field standard. The placement, the all-out intensity '
+  + 'and the untimed full recovery are his.';
 
 export const STRIDES_NOTE =
   'A handful of strides at the end of an easy run trains running economy without a separate speed '
