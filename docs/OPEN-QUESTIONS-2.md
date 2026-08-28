@@ -1156,10 +1156,22 @@ the exact number that plan exists to move.
 Monday proves neither what was deployed nor what replaced it. **Nothing on screen is wrong today —
 narrower than it should be, which is not the same thing.**
 
-## Q-295 — Run efficiency vs TrainingPeaks: the grade adjustment is ALREADY THERE; the sample is thinned by something else (2026-08-28)
+## Q-295 — An undefended 30-70 minute window is thinning the run efficiency sample (2026-08-28)
 
-⛔ **THE BRIEF'S PREMISE IS HALF WRONG, AND THE HALF THAT IS WRONG MATTERS.** The claim was that our
-efficiency uses RAW pace where TrainingPeaks uses normalized graded pace. Traced:
+⛔⛔ **START HERE, NOT WITH THE GAP ITEM BELOW.** `efficiencyIndexToSeries` (`run.ts:85`) filters on
+`duration_minutes >= 30 && <= 70`. **It drops every run under half an hour AND every long run** — on a
+standing block the long run is ~73 minutes, excluded by three minutes over a ceiling **nobody has
+ever defended in writing.** For a runner whose easy runs vary in length this is plausibly the larger
+of the two thinners, and it has never been discussed.
+
+⚠️ **DO NOT TREAT "23 runs cannot call a direction" AS DIAGNOSED.** It must be re-measured against
+BOTH filters — this window and the steady-aerobic gate — before anything is changed. The number has
+been quoted as evidence for a grade-correction fix that, per the trace below, would change nothing.
+
+---
+
+**AND THE ORIGINAL PREMISE, WHICH WAS HALF WRONG.** The brief claimed our efficiency uses RAW pace
+where TrainingPeaks uses normalized graded pace. Traced:
 
 - ⛔ **THE TREND PATH IS ALREADY GRADE-ADJUSTED.** `efficiencyIndexToSeries` (`run.ts:86`) reads
   `gap_efficiency_index ?? efficiency_index` — **GAP preferred, raw as fallback.** `compute-snapshot`
@@ -1199,3 +1211,36 @@ it in writing.
 
 Related: [[Q-294]] (athlete-scoped reshape — same card, and this belongs with it), [[Q-293]] (the bike
 has no efficiency series at all), [[Q-290]] (the run's missing reference number).
+
+## Q-296 — The block's own delta: what did these twelve weeks actually buy? (2026-08-28, Michael's)
+
+⛔ **A PRODUCT IDEA, NOT A DEFECT** — recorded because it would otherwise be lost, and because it
+falls out of [[Q-294]] for free rather than needing anything new.
+
+Once the endurance read is athlete-scoped with the plan as an overlay, the two together give
+something neither gives alone: **the historical line runs across everything, the plan marks which
+stretch of it was this block, and the difference between the two ends is what that block earned.**
+*"This block moved your FTP 12 watts, your bench 10 pounds."*
+
+**WHY IT IS WORTH A QUESTION RATHER THAN A NOTE:**
+- ⛔ **IT NEEDS NO NEW MEASUREMENT.** It is a subtraction across two things Q-294 already puts on the
+  same card — the reference series and the block's own start/end dates.
+- ⛔ **IT COMPOUNDS.** After two or three blocks it answers *"which twelve weeks actually worked, and
+  what was different about that one"* — the question a training app exists to answer and almost none
+  of them do.
+- ⚠️ **TrainingPeaks will overlay a plan on a chart and will not tell you what the block bought.**
+  That gap is the opportunity.
+
+⚠️ **THE HONEST CAVEAT, AND IT DECIDES WHERE THIS CAN SHIP FIRST: a delta across a block is only
+meaningful where the reference number has history at BOTH ENDS.** On the bike that is true today —
+`fitness_baselines` supersedes rather than overwrites, so FTP carries a dated trail. **On the run it
+is not**, and it needs [[Q-290]].
+
+⛔⛔ **THAT MAKES THIS THE THIRD THING POINTING AT Q-290** — after the athlete-scoped reshape and the
+race-plan case ([[Q-292]]). Three independent features all blocked on the same missing storage is the
+argument for doing it, and it is stronger than any one of them alone.
+
+⚠️ A second caveat worth stating before anyone builds it: **a block delta is not a causal claim.**
+Twelve weeks of training, sleep, work stress and weather moved that number together. The honest
+framing is what CHANGED across the block, never what the block CAUSED — the same discipline the rest
+of this screen keeps.
