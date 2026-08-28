@@ -1,5 +1,33 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## ✅ 2026-08-28 — THE LOGGER + CORPUS ARC. DEPLOYED **AND DEVICE-VERIFIED.** NOTHING OWED.
+>
+> ⛔ **THIS IS THE RARE ENTRY WHERE ALL THREE STATES ARE TRUE.** Pushed, deployed, and a human saw it
+> work — Michael rebuilt his block against the deployed functions and confirmed: *"cards are all
+> good."* Contrast every other entry in this file.
+>
+> **PUSHED:** `origin/main == 7f8ba187` (arc runs `6b100cc7` → `7f8ba187`).
+> **EDGE FUNCTIONS DEPLOYED**, versions read back from `supabase functions list`, not assumed:
+> `materialize-plan` **307** · `generate-strength-plan` **174** · `rematerialize-standing-block`
+> **50** — all 2026-08-28 12:41:58 UTC.
+> ⚠️ Those three are the complete importer set for `_shared/standing-plan` and
+> `_shared/strength-grid`, traced across every function directory rather than guessed.
+> **CLIENT:** Netlify auto-publishes from `main`. The last three commits (`91ef5a96`, `7f8ba187` and
+> the D2 nudge fix) are client-only and ride that.
+>
+> ⚠️ **ORDER MATTERED HERE AND WILL AGAIN:** a block rebuilt BEFORE the edge deploy re-bakes the old
+> session line into the new block. Deploy first, then rebuild. That is what was done.
+>
+> **What it is:** the corpus correction (p78 states a rest rule; the constant saying otherwise was
+> false), 44px logger cells, the bodyweight gate routed at the shared type table, rest keyed to slot
+> intent, Heavy/Speed naming everywhere, per-intent session lines, and ME rows carrying no reserve
+> target. Full writeup: **`docs/NOTES-logger-and-corpus-2026-08-28.md`**.
+>
+> ⚠️ **STILL NOT PROVEN, AND IT IS NOT THIS ARC'S:** the 2026-08-25 week-2-weights item on
+> `POLISH-PUNCH-LIST.md`. The same save path has been exercised repeatedly since without complaint;
+> nobody has watched the weights appear. Evidence, not proof.
+
+
 > ## ⛔ 2026-08-27 EVENING — THE EXPERIENCE CONTROL AND TWO INVENTED NUMBERS WENT LIVE. UNSEEN ON A DEVICE.
 >
 > Michael authorised push and deploy directly, in that order, three times. **He is downloading a plan

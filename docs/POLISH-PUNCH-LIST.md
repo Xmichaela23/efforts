@@ -51,6 +51,12 @@ bodyweight-only kit is not a real case for this plan. Not a bug to fix now.
 
 ## ⏳ AWAITING MICHAEL — WEEK-2 WEIGHTS ON HIS LIVE BLOCK (2026-08-25)
 
+⚠️ **STILL OPEN, AND STILL UNPROVEN EITHER WAY (noted 2026-08-28).** The same save path
+(`StrengthLogger.tsx:4473` → `rematerialize-standing-block` with `apply: true`) has now been
+exercised repeatedly across the 2026-08-27→28 logger arc with no further report of it failing, and
+Michael has device-verified that arc. ⛔ **That is evidence, not proof** — nobody has watched week-2
+weights appear from a save, which is the specific thing this item asks for. Leave it open.
+
 The logger's save-time fill did not visibly fire on his Mon/Tue test saves. Deployed fallback:
 - [ ] Open `/plans/admin` in the **web** app → **Check** → read the line → **Apply**.
 - [ ] Then open week 2 Monday's ME Upper: bench shows a weight, not "By feel".
