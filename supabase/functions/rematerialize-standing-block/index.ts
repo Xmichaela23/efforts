@@ -28,8 +28,8 @@ import {
   earnedMeSets,
   readTestWeek,
   restateFromTest,
+  testDayCutoff,
   // ⚠️ ONE ANSWER TO "which weekday is this date" — the same helper the restatement matches rows on.
-  weekdayOf,
   STANDING_PLAN_PROTOCOL_ID,
   TEST_WEEK_INDEX,
 } from '../_shared/standing-plan/index.ts';
@@ -300,21 +300,7 @@ Deno.serve(async (req: Request) => {
      * frame's rotation decides which days the tests land on, and a second answer to that question is
      * how the two drift.
      */
-    const testCutoff = (() => {
-      const testWeek = composed.find((w) => w.week === TEST_WEEK_INDEX);
-      if (!testWeek) return null;
-      const testDays = new Set(testWeek.sessions
-        .filter((s) => (s.tags ?? []).includes('test_week'))
-        .map((s) => String(s.day).toLowerCase()));
-      if (testDays.size === 0) return null;
-      const dates = (plannedRows ?? [])
-        .filter((r) => Number(r?.week_number) === TEST_WEEK_INDEX)
-        .filter((r) => testDays.has(weekdayOf(r?.date) ?? ''))
-        .map((r) => String(r?.date ?? '').slice(0, 10))
-        .filter(Boolean)
-        .sort();
-      return dates.length > 0 ? dates[dates.length - 1] : null;
-    })();
+    const testCutoff = testDayCutoff(composed, plannedRows ?? [], TEST_WEEK_INDEX);
 
     const restated = restateFromTest({
       composed,

@@ -80,6 +80,43 @@ export function weekdayOf(dateIso: string | null | undefined): string | null {
 }
 
 /**
+ * ⛔⛔ THE LAST TEST DAY IN THE TEST WEEK — the day-level half of "fill everything after the TEST".
+ *
+ * Lives here rather than inline in `rematerialize-standing-block` because it is LOGIC, and inline
+ * logic in an edge function is logic with no test. It had none, and it shipped broken: the composed
+ * day was folded to lower case and then looked up with `weekdayOf`, which returns `DAY_NAMES` —
+ * capitalised. `has('Monday')` against a set holding `'monday'` never matched, the cutoff came back
+ * `null`, and `restateFromTest`'s no-cutoff branch fell back to leaving the whole test week alone —
+ * the exact behaviour the day-level cut was written to remove.
+ *
+ * ⚠️ NOTHING FAILED. Weeks 2+ never reach that branch, so every suite stayed green and the diff read
+ * correctly while week one stayed "By feel". Found by reading the athlete's own rows.
+ * ⚠️ BOTH SIDES ARE FOLDED HERE, and the test beside this file feeds CAPITALISED days on purpose.
+ */
+export function testDayCutoff(
+  composed: Array<{ week: number; sessions: Array<{ day?: unknown; tags?: string[] | null }> }>,
+  planned: PlannedRowish[] | null | undefined,
+  testWeekIndex: number,
+): string | null {
+  const testWeek = composed.find((w) => w.week === testWeekIndex);
+  if (!testWeek) return null;
+  const fold = (d: unknown) => String(d ?? '').trim().toLowerCase();
+  const testDays = new Set(
+    (testWeek.sessions ?? [])
+      .filter((s) => (s.tags ?? []).includes('test_week'))
+      .map((s) => fold(s.day)),
+  );
+  if (testDays.size === 0) return null;
+  const dates = (planned ?? [])
+    .filter((r) => Number(r?.week_number) === testWeekIndex)
+    .filter((r) => testDays.has(fold(weekdayOf(r?.date))))
+    .map((r) => String(r?.date ?? '').slice(0, 10))
+    .filter(Boolean)
+    .sort();
+  return dates.length > 0 ? dates[dates.length - 1] : null;
+}
+
+/**
  * ⛔ HOW MANY WORK SETS A ROW PRESCRIBES — `set_plan` first, because that is what the logger draws.
  *
  * ⚠️ WARM-UPS ARE NOT COUNTED, the same rule p147 states for the dosing ledger. A row whose plan is
