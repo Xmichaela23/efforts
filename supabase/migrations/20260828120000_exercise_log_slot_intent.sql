@@ -1,3 +1,21 @@
+-- ⛔⛔ APPLIED BY HAND ON 2026-08-28, AND DELIBERATELY NOT RECORDED IN THE MIGRATION LEDGER.
+--
+-- Michael ran these two statements in the Supabase SQL editor against production
+-- (`yyriamwvtvzlkumqrvpm`); the column was then confirmed live by a direct PostgREST select
+-- returning 200 with the field present, not by reading a success message off a screen.
+--
+-- ⚠️ IF YOU RUN `supabase migration list` AND SEE TEN LOCAL-ONLY FILES, THAT IS THE EXISTING STATE,
+-- NOT A BREAKAGE. Only `0000` is recorded on Remote; every other migration in this repo was applied
+-- by hand exactly as this one was. `supabase db push` therefore refuses to run a single new file and
+-- demands `--include-all`, which would attempt the entire backlog against a database that already
+-- has it — which is why this one was applied directly instead.
+--
+-- ⛔ `migration repair --status applied` WAS CONSIDERED AND REJECTED. Stamping this file into a
+-- ledger that records none of its nine predecessors leaves `db push` refusing exactly as before, so
+-- the repair buys nothing — and it writes to production state to buy it. Consistency with the other
+-- nine is the smaller lie. ⚠️ The real fix is to reconcile the whole ledger at once, which is a
+-- separate piece of work and nobody's today.
+
 -- THE SET'S INTENT REACHES THE SERIES — `exercise_log.slot_intent`.
 --
 -- ⛔ STARVED, NOT ABSENT. The intent has been DATA on the prescription since 2026-08-26
