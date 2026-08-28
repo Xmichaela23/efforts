@@ -52,6 +52,13 @@ Reporting an expected state as a break is the way to waste Monday.
 - **Q-289** — "holding" is a CLAIM stated for two different facts; a genuinely flat metric and a
   noise-suppressed one are indistinguishable on the payload. Three rows. ⛔ Do not loosen the guard.
 - **Q-290** — run threshold pace has no history, which is why the run card has two rows not three.
+- **Q-291** — the whole read is a PLAN-HOLDER'S screen: every card needs a plan, and the off-plan
+  strength hole compounds it. ⛔ The useful half is that FTP history, per-session efficiency and
+  per-session drift need NO plan — the measurements survive, the comparison does not.
+- **Q-292** — a race plan breaks the premise structurally: it builds, peaks and tapers, so there is
+  no repeated session and a week-10 heart-rate drop may be the taper. ⛔ The answer is the OTHER
+  read (the reference number climbing), which **promotes Q-290 from one missing row to the whole
+  card** on that plan type.
 - **Get Stronger has no strength line at all** — nothing stamps `ME` outside the Standing Plan
   composer. Neither does any off-plan session. Raised in `DEPLOY-OWED`, unruled.
 

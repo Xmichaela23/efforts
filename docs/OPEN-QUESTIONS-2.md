@@ -1027,3 +1027,57 @@ populating on its own. That changes whether it is worth storing history, not whe
 
 ⛔ RAISED DELIBERATELY RATHER THAN BUILT: it changes what a learner writes, which reaches every
 surface that reads a pace, and it must not ride in on a card. See also [[Q-289]].
+
+⛔⛔ **AND ITS WEIGHT IS HIGHER THAN THE STANDING-PLAN CASE SUGGESTS — see [[Q-292]].** On a standing
+plan this is one missing row. **On a RACE plan it is the whole card**: a periodised block has no
+repeated session to compare, so the reference number climbing across the block is the only honest
+read left — and for the run, that number is exactly the one with no history. Decide Q-290 on the race
+case, not on the standing-plan one.
+
+## Q-291 — The strength/endurance read is a PLAN-HOLDER'S screen; an athlete on no plan sees none of it (2026-08-28)
+
+⛔ **EVERY CARD ON THE NEW READ NEEDS A PLAN.** The lift cards read a block's prescription; the word
+(`meSessionOutcome`) judges a session AGAINST that prescription; and both endurance cards identify
+their session by the plan's own family tag (`family:run_near_threshold` / `family:ride_sweet_spot`).
+No plan → no cards at all.
+
+⚠️ **AND THE OFF-PLAN STRENGTH HOLE COMPOUNDS IT.** The e1RM gate fails closed on a null
+`slot_intent`, and nothing stamps `ME` outside the Standing Plan composer — so an athlete logging a
+heavy bench off-plan gets **no strength line either**. Two independent mechanisms, same outcome.
+
+⛔ **THE USEFUL HALF, AND IT IS THE SHAPE OF THE FIX: three of the rows do NOT need a plan.** They are
+computed from workouts and care nothing about prescriptions —
+- **FTP history** off `fitness_baselines` (superseded rows, dated),
+- **efficiency per session** (`run_facts.efficiency_index` / `ride_facts.efficiency_factor`),
+- **drift per session** (`hr_drift_pct`).
+
+So an off-plan rider could have a real card today — FTP climbing, watts per beat, fade against p107.
+What they could NOT have is *"your Monday session is costing you less"*, because that sentence needs
+a repeated prescribed session to point at. **The split is: the measurements survive without a plan;
+the comparison does not.**
+
+⚠️ Relevant to the product direction Michael named — *"I ride a lot, I want to get stronger, I want
+the scaffolding of a program"* — a rider evaluating the app before committing to a block sees an
+empty screen today. See also [[Q-292]], [[Q-290]].
+
+## Q-292 — A race plan breaks the read's premise structurally, and the answer is the other read (2026-08-28)
+
+⛔ **THE WHOLE READ RESTS ON THE PLAN HOLDING STILL.** A standing block prescribes twelve identical
+weeks by design (p120), which is exactly why any change in the line is the athlete. **A race plan does
+the opposite on purpose:** it builds, peaks and tapers.
+
+Consequences, and they are structural rather than fixable by tuning:
+- **No repeated session to compare.** The endurance cards have nothing to identify week to week.
+- **A falling heart rate in week 10 may be the taper**, not fitness — the card would read a
+  deliberate unload as an improvement.
+- **Same on the lifting side.** Strength is maintenance on a race plan: no ME/DE structure, so no
+  word, no expected curve, and (per the closed gate) no `ME` stamps either.
+
+⛔ **THE ANSWER IS THE OTHER READ, NOT A PATCH TO THIS ONE.** What a periodised plan is trying to move
+is the reference number — threshold pace and FTP climbing across the block — which is also what every
+endurance platform shows for race training. That is a different card answering a different question,
+and it is the honest one for that plan type.
+
+⛔⛔ **WHICH PROMOTES [[Q-290]].** On a standing plan the run's missing threshold-pace history is a
+gap in one row. **On a race plan it is the whole card.** Weigh Q-290 on that basis, not on the
+standing-plan case alone.
