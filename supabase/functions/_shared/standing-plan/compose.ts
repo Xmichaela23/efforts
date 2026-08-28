@@ -1411,8 +1411,8 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
     notes.push({
       kind: 'source',
       text: 'The first week is the test. Two guided sessions set the numbers the rest of the block '
-        + 'is built on, and fully prescribed weights start in week two. Testing before a programme '
-        + 'is the source\'s own advice.',
+        + 'is built on, and the weights fill in as soon as those two are logged. Testing before a '
+        + 'programme is the source\'s own advice.',
       cite: 'Viada p215, p247',
     });
   }

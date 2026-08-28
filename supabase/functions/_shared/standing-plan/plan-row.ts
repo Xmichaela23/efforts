@@ -496,7 +496,7 @@ function describeBlock(
    * with a test week stopped declaring one. The fixed pair is the contract — one sentence for the
    * tested block, one for the skipped block — and a second owner of it is how they drift.
    * ⚠️ SO THE ONE FACT THE COMPOSER'S COPY ADDED IS FOLDED INTO THE FIXED LINE instead of lost:
-   * fully prescribed weights start in week two.
+   * the weights arrive as soon as the two test sessions are logged.
    * ⚠️ MATCHED ACROSS THE WHOLE SOURCE LIST rather than the sliced three, or a block whose test note
    * fell past the cut would print the duplicate again.
    */
@@ -535,7 +535,7 @@ function describeBlock(
     // they would notice and have no way to find out why.
     hasTestWeek
       ? 'Week one is a test week: two guided sessions set the numbers the rest of the block is built '
-        + 'on, and fully prescribed weights start in week two.'
+        + 'on. Log those two and the weights fill in from there, including the rest of week one.'
       : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
         + 'from the first session.',
     PAIN_TOLERANCE_NOTE,
