@@ -1313,7 +1313,6 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           ⚠️ THE VERDICT SENTENCE STAYS. It carries the direction across the whole population of runs
           ("reading 20 easy runs — the change is smaller than the normal spread between them"), which
           the card does not compute. The words are not the duplicate; the picture was. */}
-      {null}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
       {durWord && (
         <span className="basis-full text-[12px] text-white/55">{durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
