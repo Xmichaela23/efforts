@@ -23,16 +23,22 @@ function gapRow(type: string, paceSecPerMi: number | null, gapSecPerMi: number |
   return row ? row.value : null;
 }
 
-Deno.test('a hilly run states the adjusted pace and what the hills cost', () => {
+Deno.test('a hilly run states both numbers and what the hills cost', () => {
   // 11:20/mi raw, 10:52/mi adjusted — 28s/mi of hill.
-  assertEquals(
-    gapRow('run', 680, 652),
-    '10:52/mi — the hills cost you 28s/mi against your raw 11:20/mi',
-  );
+  assertEquals(gapRow('run', 680, 652), '10:52/mi · raw 11:20/mi — the hills cost you 28s/mi');
 });
 
-Deno.test('⚠️ A FLAT RUN GETS NO ROW — two identical numbers teach the reader it is noise', () => {
-  assertEquals(gapRow('run', 680, 678), null);
+Deno.test('⛔ A NEARLY FLAT RUN STILL SHOWS IT — no difference threshold (Michael, 2026-08-29)', () => {
+  // The struck governor withheld this row below 5s/mi. A 2s/mi difference is a real difference.
+  assertEquals(gapRow('run', 680, 678), '11:18/mi · raw 11:20/mi — the hills cost you 2s/mi');
+});
+
+Deno.test('a genuinely flat run prints both numbers and claims no terrain', () => {
+  assertEquals(gapRow('run', 680, 680), '11:20/mi · raw 11:20/mi');
+});
+
+Deno.test('a net-downhill run says the descents gave it back', () => {
+  assertEquals(gapRow('run', 652, 680), '11:20/mi · raw 10:52/mi — the descents gave you 28s/mi');
 });
 
 Deno.test('⛔ RUN ONLY — a ride is answered in power, not grade', () => {

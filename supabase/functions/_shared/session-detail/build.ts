@@ -817,29 +817,34 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
    *
    * ⚠️ IT WAS COMPUTED, USED AND NEVER SHOWN. The adjustment drives the efficiency trend, the drift
    * basis and — through `enrichSamplesWithGAP` in `granular-pace.ts` — the per-rep adherence badges
-   * themselves, so the app has been GRADING him on grade-adjusted pace while printing only raw. The
-   * number was already resolved onto `completed_totals.avg_gap_s_per_mi` and no surface read it.
+   * themselves, so the app has been GRADING him on grade-adjusted pace while printing only raw.
    *
-   * ⛔ FIELD STANDARD: Strava prints GAP on every run; TrainingPeaks' efficiency read is normalized
-   * GRADED pace over heart rate. Showing it is the convention, not an addition to it.
+   * ⛔ FIELD STANDARD: Strava prints it on runs and lets the athlete swap the column; Garmin gives it
+   * per lap; TrainingPeaks' efficiency read is normalized GRADED pace over heart rate.
    *
-   * ⚠️ ONLY WHEN IT SAYS SOMETHING. A flat run's adjusted pace equals its raw pace, and printing two
-   * identical numbers side by side teaches the athlete that the row is noise. The gate is 5 s/mi —
-   * the same floor `formatCyclingPacingRow`'s neighbours use for "a difference a reader can act on".
+   * ⛔⛔ NO DIFFERENCE THRESHOLD, AND THE FIRST CUT HAD ONE (struck 2026-08-29, Michael: *"you
+   * created this weird governor… they all show it even if it's just a fucking one percent grade"*).
+   * It withheld the row until raw and adjusted differed by 5s/mi — a number nobody's page supports,
+   * deciding whether the athlete gets told anything at all. He is right: a run either has the figure
+   * or it does not. If it has it, it prints, and a run where the two match says exactly that.
    * ⛔ RUN ONLY. Grade adjustment is a running construct; a ride's answer is power.
-   * ⚠️ APPENDED AT THE CALL SITE ON PURPOSE — `buildAnalysisDetailRows` takes POSITIONAL arguments
-   * and its own header records a row VANISHING because two params were added to the wrong function.
    */
   if (type === 'run') {
     const rawPace = fin(completedTotals.avg_pace_s_per_mi);
     const gapPace = fin(completedTotals.avg_gap_s_per_mi);
-    if (rawPace != null && gapPace != null && rawPace > 0 && gapPace > 0 && Math.abs(gapPace - rawPace) >= 5) {
+    if (rawPace != null && gapPace != null && rawPace > 0 && gapPace > 0) {
       const fmt = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}/mi`;
+      const delta = Math.round(rawPace - gapPace);
+      // ⛔ BOTH NUMBERS, AND THE RAW ONE IS NAMED. The table above prints raw pace per segment; a
+      // lone adjusted figure here would read as a correction to it rather than a second view of it.
+      // ⚠️ The tail is a FACT about the terrain, and it is only appended when there IS one — on a
+      // flat run the two numbers standing side by side is the whole statement.
+      const tail = delta >= 1 ? ` — the hills cost you ${delta}s/mi`
+        : delta <= -1 ? ` — the descents gave you ${Math.abs(delta)}s/mi`
+        : '';
       analysisDetailRows.push({
         label: 'Grade-adjusted pace',
-        // ⛔ BOTH NUMBERS, AND THE RAW ONE IS NAMED. The table above prints raw pace per segment; a
-        // lone adjusted figure here would read as a correction to it rather than a second view of it.
-        value: `${fmt(gapPace)} — the hills cost you ${Math.round(Math.abs(rawPace - gapPace))}s/mi against your raw ${fmt(rawPace)}`,
+        value: `${fmt(gapPace)} · raw ${fmt(rawPace)}${tail}`,
       });
     }
   }
