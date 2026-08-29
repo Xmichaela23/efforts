@@ -506,7 +506,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           fmtVal={(v) => String(Math.round(v))}
           unit=" W"
           minSpanFraction={0.15}
-          recentLabel="recent 8 wks in color"
+          recentLabel="recent 6 weeks in color"
         />
       )}
       {/* Q-255: when the row leads with LOAD, the chart is the LOAD — the same 42-day fitness tally the
@@ -519,7 +519,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           fmtVal={(v) => String(Math.round(v))}
           unit=" fitness"
           minSpanFraction={0.15}
-          recentLabel="recent 8 wks in color"
+          recentLabel="recent 6 weeks in color"
         />
       )}
     </Row>

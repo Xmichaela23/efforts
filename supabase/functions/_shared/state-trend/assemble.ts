@@ -94,6 +94,23 @@ export const isoMinus = (days: number): string => new Date(Date.now() - days * D
 export const STATE_TREND_WINDOWS = {
   liftWeeks: 12, // useExerciseLog(12)
   /**
+   * ⛔ HOW MUCH LIFTING HISTORY THE CHART CAN SHOW — 2026-08-29, and it is NOT `liftWeeks`.
+   *
+   * `liftWeeks` is how far back the reference-max question reaches; this is how much line there is
+   * to draw. They were the same number, so the chart could not show a rep older than twelve weeks
+   * even though the athlete had a year of sessions on file — and the line had just been changed to
+   * take each week's heaviest set precisely so that history WOULD be visible.
+   *
+   * ⛔ 52 IS THE FIELD'S ANSWER, NOT A ROUND NUMBER. Hevy's exercise graph offers 30 days, 3 months,
+   * a year and all time; Fitbod offers weekly, monthly and yearly views of the same chart. A year is
+   * the longest range either treats as ordinary, and it is one point per week per lift after the
+   * week's-heaviest reduction — roughly 52 points, not 52 weeks of raw rows.
+   * ⚠️ IT DOES NOT WIDEN THE REFERENCE MAX. `buildBestByLiftSince` applies the block-length window
+   * to the same rows (D-456 §5), so a max still expires with the block no matter how far the fetch
+   * reaches.
+   */
+  liftHistoryWeeks: 52,
+  /**
    * ⛔⛔ HOW FAR BACK A "KNOWN MAX" STAYS KNOWN — the recency window for the derived heavy gate
    * (item 4). **RULED 2026-08-28: it is the athlete's own BLOCK LENGTH**, and this is only the value
    * used when there is no block to ask.

@@ -756,7 +756,16 @@ serve(async (req: Request) => {
         } catch (e: any) {
           console.log("[compute-snapshot] block length lookup failed (non-fatal):", e?.message || e);
         }
-        const liftFetchWeeks = Math.max(STATE_TREND_WINDOWS.liftWeeks, planDurationWeeks ?? 0);
+        // ⛔ THE CHART'S HISTORY, NOT THE REFERENCE WINDOW (2026-08-29). `liftWeeks` (12) governs how
+        // far back a max stays current; it was also, silently, the only history the line could draw —
+        // so a line just rebuilt to show every week's heaviest set still stopped twelve weeks back.
+        // `buildBestByLiftSince` re-applies the block window to these same rows, so widening the
+        // fetch cannot age a max in.
+        const liftFetchWeeks = Math.max(
+          STATE_TREND_WINDOWS.liftHistoryWeeks,
+          STATE_TREND_WINDOWS.liftWeeks,
+          planDurationWeeks ?? 0,
+        );
 
         const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([
           // ⛔ `slot_intent` IS SELECTED OR THE HEAVY-ONLY GATE CANNOT FIRE (2026-08-28). The exact trap
