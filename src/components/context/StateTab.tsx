@@ -36,6 +36,7 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
 import { StrengthReadCards, EnduranceReadCards } from './StrengthReadCards';
+import { strengthReadCards } from '@/lib/strength-read';
 import ViadaWeekCard from './ViadaWeekCard';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
@@ -1593,6 +1594,12 @@ export default function StateTab({
           if (Array.isArray(l.series)) seriesByCanonical[l.canonical_name] = l.series;
           if (Array.isArray(l.expected)) expectedByCanonical[l.canonical_name] = l.expected;
         }
+        // The cards' own predicate, so the header above them cannot disagree with them.
+        const liftCardCount = strengthReadCards({
+          history: meHistory?.history,
+          lastReps: meHistory?.last_reps,
+          atWeight: meHistory?.at_weight,
+        }).length;
         const cards = (
           <StrengthReadCards
             meHistory={meHistory ?? null}
@@ -1610,7 +1617,12 @@ export default function StateTab({
               className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
               style={readoutPlateStyle(undefined, { galaxy: true })}
             >
-              {meHistory && (
+              {/* ⚠️ GATED ON THE CARDS EXISTING, NOT ON THE HISTORY EXISTING (2026-08-29, second cut).
+                  `me_history_v1` is present as soon as any heavy session is on file, but the cards
+                  render off `strengthReadCards`, which returns nothing until a lift has a heavy day
+                  IN THIS BLOCK — week 1 is the two tests. So the header still drew, alone, above the
+                  runs. Same predicate the cards use, asked once here. */}
+              {liftCardCount > 0 && (
                 <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
               )}
               {cards}
