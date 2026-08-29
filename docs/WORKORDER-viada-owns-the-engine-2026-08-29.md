@@ -124,6 +124,13 @@ overloads. The 4/8 deloads are Wendler's shape and need re-deriving, not deletin
   athlete; whether four lifts rotate in phase is not stated.
 - **Q-F. Old estimates.** Every stored `estimated_1rm` predates stage 1 and is Epley-only. Re-compute
   or leave forward-only — Michael's call, unasked.
+- **Q-H. THE REP CEILING IS PER-LIFT AND IT IS NOT HIS.** `trustedMaxReps` caps the deadlift at 5 reps
+  and every other lift at 8, cited to **LeSuer et al. 1997** — a Wendler-era reference carried in
+  `wendler-531.ts`. **Viada's p215 gives ONE protocol for the working max with no per-lift variation**,
+  and his answer to formula divergence is the average, not a cap. ⚠️ THIS IS WHY THE DEADLIFT CARD
+  BEHAVES DIFFERENTLY FROM THE OTHER THREE: Michael's 135 × 10 estimates to 180 and is refused, while
+  the same reps on a bench would be accepted. The formula is uniform across the four lifts as of stage
+  1; the CEILING is not. ⛔ Decide it against a page, not against the old citation.
 - **Q-G. Rep-total sessions poison the estimate table.** 105 × 35 is stored as an estimated max of 225,
   110 × 25 as 200. The trusted-rep ceiling keeps them off lines and records, but they are in the data.
 
