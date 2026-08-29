@@ -1589,10 +1589,22 @@ export default function StateTab({
         if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0) && !viadaWeek) return null;
         const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
         const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
-        for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
-          if (!l?.canonical_name) continue;
-          if (Array.isArray(l.series)) seriesByCanonical[l.canonical_name] = l.series;
-          if (Array.isArray(l.expected)) expectedByCanonical[l.canonical_name] = l.expected;
+        /**
+         * ⛔⛔ THE FIELD IS `canonical`, NOT `canonical_name` (2026-08-29) — and reading the wrong one
+         * cost nothing visible, which is why it survived. `per_lift` entries carry `canonical`;
+         * `exercise_log` rows carry `canonical_name`, and this loop was written against the second
+         * while reading the first. Every entry failed the guard, the map came out EMPTY, and the
+         * charts simply did not render — no error, no warning, no blank card. Four of this athlete's
+         * lifts had a series sitting in the payload the whole time.
+         * ⚠️ THE PATTERN THIS CODEBASE KEEPS REPEATING: a field resolved upstream and rebuilt by name
+         * downstream. `slot_intent` was dropped at three separate narrow points the same way.
+         * ⚠️ BOTH NAMES ARE ACCEPTED so a payload written before this cannot go dark again.
+         */
+        for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
+          const key = l?.canonical ?? l?.canonical_name;
+          if (!key) continue;
+          if (Array.isArray(l.series)) seriesByCanonical[key] = l.series;
+          if (Array.isArray(l.expected)) expectedByCanonical[key] = l.expected;
         }
         // The cards' own predicate, so the header above them cannot disagree with them.
         // ⚠️ The header follows the CARDS, and a card can now come from the series alone (2026-08-29),
