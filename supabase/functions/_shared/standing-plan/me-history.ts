@@ -83,6 +83,144 @@ export type MeLadderReading = {
   unread: number;
 };
 
+// ── THE DELOAD TRIGGER — a SECOND QUESTION over the reading above ───────────────────────────────
+
+/**
+ * ⛔⛔ HIS ONLY STATED DELOAD TRIGGER, p245 (Hypertrophy + 5K notes, read off the image 2026-08-29):
+ *
+ * > *"If performance begins to suffer, particularly **if the ME lifts underperform 2 weeks in a
+ * > row**, consider running a single deload week."*
+ *
+ * ⛔ THIS IS A DIFFERENT QUESTION FROM `earnedMeSets`, OVER THE SAME DATA — the pattern `CLAUDE.md`
+ * names: the ladder asks *"what has this pattern earned"* and walks per-pattern runs; this asks
+ * *"did the whole block have two bad weeks back to back"*, which is a per-WEEK question across all
+ * patterns at once. **Neither answer can be derived from the other**, which is why this is an
+ * accessor beside the ladder rather than a field inside it.
+ *
+ * ⛔ AND IT READS `reading.history`, WHICH IS ALREADY RETURNED. No second walk, no second matcher.
+ * A second name-matching pass over the logged rows is how two readers start disagreeing about which
+ * session was which.
+ *
+ * ⛔⛔ IT PROPOSES. IT DOES NOT WRITE, AND IT DOES NOT INSERT A WEEK. Two reasons, neither of them a
+ * preference: **p245 says "consider"**, and `rematerialize-standing-block`'s own law is *"it
+ * proposes; it does not silently write."* The silent strength auto-progression was deleted from
+ * `adapt-plan` for exactly this — *"the athlete opened the logger to a number they never agreed
+ * to."* A deload rewrites a week the athlete is training against; it is the same act.
+ */
+export type DeloadProposal = {
+  /** The week that should run the taper column if the athlete accepts. */
+  week: number;
+  /** The two weeks whose evidence triggered it, in order. */
+  because: [number, number];
+  /** Every ME session that came up short in those two weeks. Provenance, never a decision. */
+  evidence: { week: number; day: string; movement: string }[];
+  cite: string;
+};
+
+/**
+ * ⚠️ WHAT COUNTS AS A WEEK THAT UNDERPERFORMED — OURS, AND p245 IS GENUINELY AMBIGUOUS.
+ *
+ * He writes *"the ME lifts"* (plural) and gives no rule for how many. Two readings are available:
+ * **any** ME session in the week scoring `setback`, or **every** one of them. This takes ANY, and
+ * the reason is the shape of the consequence rather than a view about training: the output is a
+ * PROPOSAL the athlete can decline, so offering one week early costs a tap and missing one costs a
+ * dug hole. ⛔ If this ever becomes an automatic insert, revisit this line first — the cost
+ * asymmetry that justifies it disappears the moment the athlete stops being asked.
+ */
+export const DELOAD_WEEK_IS_BAD_IF_ANY_ME_SETBACK_IS_OURS =
+  'p245 says "the ME lifts underperform 2 weeks in a row" without saying how many lifts. We count a '
+  + 'week as underperforming if ANY heavy session in it came up short, because the result is a '
+  + 'proposal the athlete can decline — offering one early costs a tap, missing one costs a hole.';
+
+/**
+ * ⚠️ A WEEK WITH NO EVIDENCE NEITHER COUNTS NOR BREAKS THE RUN — OURS, and it is the only neutral
+ * option available.
+ *
+ * ⛔ SILENCE IS NOT A NUMBER is this codebase's own law (`progressionVerdict` returns `no_evidence`
+ * and holds; `TEST_READ_ABSTAINS` says the same). Counting an unlogged week as a bad week reads
+ * absence as failure. **But RESETTING the run on an unlogged week reads absence as success**, which
+ * is the identical error pointed the other way — a missed week would silently forgive the bad week
+ * before it. So a silent week is SKIPPED: weeks 3 and 5 can be "two in a row" if week 4 was never
+ * logged.
+ */
+export const DELOAD_SILENT_WEEK_IS_SKIPPED_IS_OURS =
+  'A week with no logged heavy session is skipped rather than counted or used to reset. Counting it '
+  + 'reads silence as failure; resetting on it reads silence as success. Skipping is the only '
+  + 'reading that adds nothing.';
+
+/**
+ * ⛔ TWO IN A ROW, and the number is HIS — the one place in this module where a threshold is not
+ * ours. p245 says two. It happens to match `STALL_CONFIRMATIONS` and `ME_CLEAN_SESSIONS_TO_EARN`,
+ * which are ours and were chosen for symmetry with it.
+ */
+export const DELOAD_CONSECUTIVE_BAD_WEEKS = 2;
+
+/**
+ * Propose a deload week, or don't.
+ *
+ * @param reading    the ladder reading for this block — `history` is the only field read.
+ * @param throughWeek evidence stops here, the same boundary `earnedMeSets` draws. The live week is
+ *                    still being trained.
+ * @param alreadyTaper weeks the block ALREADY runs as taper. ⛔ A block that is already deloading
+ *                    week N must not be told to deload week N, and the two bad weeks that produced
+ *                    an accepted proposal must not produce it again next restate.
+ *
+ * ⚠️ RETURNS THE LATEST PROPOSAL, NOT ALL OF THEM. Two bad weeks in week 3-4 and again in 8-9 is one
+ * live decision — the athlete is being asked about the week in front of them, not offered a history
+ * of weeks they have already trained through.
+ */
+export function deloadProposal(args: {
+  reading: MeLadderReading;
+  throughWeek: number;
+  totalWeeks: number;
+  alreadyTaper?: number[] | null;
+}): DeloadProposal | null {
+  const taper = new Set((args.alreadyTaper ?? []).filter((w) => Number.isFinite(w)));
+
+  /** week -> the short sessions in it. A week absent from this map had no evidence either way. */
+  const short = new Map<number, { week: number; day: string; movement: string }[]>();
+  const evidenced = new Set<number>();
+
+  for (const entries of Object.values(args.reading.history ?? {})) {
+    for (const e of entries ?? []) {
+      if (!Number.isFinite(e.week) || e.week > args.throughWeek) continue;
+      // ⛔ `no_evidence` IS NOT A BAD WEEK. It is a matched row whose sets were never completed —
+      // silence, which holds. It does not mark the week as evidenced either.
+      if (e.outcome === 'no_evidence') continue;
+      evidenced.add(e.week);
+      if (e.outcome !== 'setback') continue;
+      const bucket = short.get(e.week) ?? [];
+      bucket.push({ week: e.week, day: e.day, movement: e.movement });
+      short.set(e.week, bucket);
+    }
+  }
+
+  // ⛔ ONLY WEEKS THAT SAID SOMETHING, IN ORDER. A silent week is not in this list at all, which is
+  // what makes it skipped rather than counted or reset — see the constant above.
+  const weeks = [...evidenced].sort((a, b) => a - b);
+
+  let proposal: DeloadProposal | null = null;
+  for (let i = DELOAD_CONSECUTIVE_BAD_WEEKS - 1; i < weeks.length; i++) {
+    const run = weeks.slice(i - (DELOAD_CONSECUTIVE_BAD_WEEKS - 1), i + 1);
+    if (!run.every((w) => short.has(w))) continue;
+
+    // The week to deload is the one after the second bad week — the next one the athlete trains.
+    const target = run[run.length - 1] + 1;
+    if (target > args.totalWeeks) continue;
+    // ⛔ ALREADY DELOADING IS NOT A REASON TO DELOAD. This is also what stops an accepted proposal
+    // from being re-offered every restate off the same two weeks.
+    if (taper.has(target)) continue;
+
+    proposal = {
+      week: target,
+      because: [run[0], run[run.length - 1]] as [number, number],
+      evidence: run.flatMap((w) => short.get(w) ?? []),
+      cite: 'Viada p245',
+    };
+  }
+  return proposal;
+}
+
 /** ⛔ HIS REP BAND FOR ME (p218), read off stage 2 rather than restated. */
 function meRepBand(): { lo: number; hi: number } {
   const p = prescribe('ME', 'barbell');
