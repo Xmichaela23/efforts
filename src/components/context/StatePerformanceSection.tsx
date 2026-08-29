@@ -1510,6 +1510,20 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // (a verdict, OR a stale-but-real value to carry forward) or an efficiency verdict; else it
   // falls through to the standard card (adherence). Mirrors bike.
   const runHasSubstance = !!runFitness && (runFitness.decoupling.verdict !== 'needs_data' || runFitness.decoupling.stale || runFitness.efficiency.verdict !== 'needs_data');
+  /**
+   * ⛔ THE RUN ROW STANDS DOWN WHERE THE SPINE CARDS COVER IT (2026-08-29, Michael: *"I never trusted
+   * those old rows"* / *"why two ride lines?"*).
+   *
+   * The efficiency cards at the top of State draw this read per session type — easy runs, quality
+   * runs, rides — each with its own line, date range and the field's own name for the number. This
+   * row then said the same thing again in a different shape, and once its duplicate chart was removed
+   * it was a single sentence sitting under a sport header.
+   * ⚠️ IT IS A STAND-DOWN, NOT A DELETION. With no spine (a new athlete, or a payload written before
+   * the cards existed) the row renders exactly as it did — nothing that used to appear can vanish.
+   * ⚠️ THE BIKE ROW IS UNTOUCHED: its charts are POWER and LOAD, and no card carries those.
+   */
+  const runSpineCovers = Array.isArray((stateDisplay as any)?.enduranceSpine)
+    && ((stateDisplay as any).enduranceSpine as Array<any>).some((g) => String(g?.sport ?? g?.discipline ?? '') === 'run');
   // Strength shows the Volume · e1RM · sessions composite when volume trends or e1RM has a verdict;
   // else the adherence card. Volume gives the row a real verdict so it stops falling to the shrug.
   // ⚠️ THE PULL-UP PROGRESSION IS SUBSTANCE ON ITS OWN (Slice 6). An athlete who opted into it and
@@ -1584,7 +1598,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         const renderCard = (card: DisciplineCard, showAxis: boolean) => {
           const inner = (() => {
             if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
-            if (card.discipline === 'run' && runHasSubstance) return <RunFitnessRow fitness={runFitness!} postureSentence={card.postureSentence} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
+            if (card.discipline === 'run' && runHasSubstance && !runSpineCovers) return <RunFitnessRow fitness={runFitness!} postureSentence={card.postureSentence} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
             if (card.discipline === 'strength' && strengthHasSubstance) return (
