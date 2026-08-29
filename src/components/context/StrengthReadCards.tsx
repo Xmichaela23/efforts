@@ -90,11 +90,11 @@ function ReadChart({ points, expected }: {
         {points.map((p, i) => <circle key={i} cx={x(p.date)} cy={y(p.value)} r={1.6} fill={color} fillOpacity={0.55} />)}
         <circle cx={x(last.date)} cy={y(last.value)} r={2.5} fill={color} />
       </svg>
-      <div className="flex items-baseline justify-between text-[10px] text-white/35 tabular-nums mt-0.5">
+      <div className="flex items-baseline justify-between text-[10px] text-white/55 tabular-nums mt-0.5">
         <span>{fmtD(points[0].date)}</span>
         {/* ⚠️ The week LABELS the latest reading; it does not place it. Absent when that reading came
             from before the current block — a session from a deleted block is not week 1 of this one. */}
-        <span className="text-white/45">
+        <span className="text-white/60">
           {Number.isFinite(last.week as number) ? `you are here · week ${last.week}` : 'latest'}
         </span>
         <span>{fmtD(last.date)}</span>
@@ -117,7 +117,7 @@ function Card({ card, points, expected }: { card: StrengthReadCard; points?: Ser
       </div>
       <div className="flex items-baseline gap-1.5 mt-1">
         <span className="readout-num text-[26px] leading-none">{card.atWeight}</span>
-        <span className="text-[12px] text-white/45">lb</span>
+        <span className="text-[12px] text-white/60">lb</span>
       </div>
       {lastReps != null && (
         <div className="text-[12px] text-white/50 mt-1">
@@ -126,7 +126,7 @@ function Card({ card, points, expected }: { card: StrengthReadCard; points?: Ser
               the progress this plan produces between increments — but two numbers where the second
               is the first would state a comparison that has not happened yet. */}
           {firstReps != null && (
-            <span className="text-white/35"> · first at this weight <span className="tabular-nums">{firstReps}</span></span>
+            <span className="text-white/55"> · first at this weight <span className="tabular-nums">{firstReps}</span></span>
           )}
         </div>
       )}
@@ -283,7 +283,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[13px] text-white/80">{label}</span>
         {/* ⚠️ THE COUNT, NOT A WEEK NUMBER. This card has no block axis by construction. */}
-        <span className="text-[11px] text-white/45 tabular-nums">{pts.length} logged</span>
+        <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged</span>
       </div>
 
       {latest.efficiency != null && (
@@ -297,9 +297,9 @@ function SpineCard({ series }: { series: SpineSeries }) {
             */}
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="readout-num text-[26px] leading-none">{fmtEff(latest.efficiency, isRide)}</span>
-            <span className="text-[12px] text-white/45">efficiency factor</span>
+            <span className="text-[12px] text-white/60">efficiency factor</span>
           </div>
-          <div className="text-[11px] text-white/35 mt-0.5">
+          <div className="text-[11px] text-white/55 mt-0.5">
             {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
           </div>
           {/**
@@ -323,7 +323,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
         * the athlete to read a trend that does not exist yet.
         */}
       {eff.length >= 2 && (
-        <div className="text-[11px] text-white/35 mt-1">
+        <div className="text-[11px] text-white/55 mt-1">
           one session doesn't tell you much — a hot day or a hilly route moves this more than your
           fitness does. watch the line over a few weeks.
         </div>
@@ -335,7 +335,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
           last one:{' '}
           <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> harder in the
           second half
-          <span className="text-white/35">
+          <span className="text-white/55">
             {' '}· {driftLimit}% is the line{latest.keySessionWithin24h ? ', and a hard day is inside 24 hours' : ''}
           </span>
         </div>
@@ -349,13 +349,13 @@ function SpineCard({ series }: { series: SpineSeries }) {
          * missing their run. It is not missing — it is a different kind of session.
          * ⚠️ AND THE SESSION STILL COUNTS ABOVE: only the fade figure is withheld, never the run.
          */
-        <div className="text-[12px] text-white/35 mt-2">
+        <div className="text-[12px] text-white/55 mt-2">
           last one: no second-half number — its pace changed on purpose
         </div>
       ) : null}
 
       {latest.durationMin != null && latest.durationMin > 0 && (
-        <div className="text-[11px] text-white/35 mt-1">{latest.durationMin} min long</div>
+        <div className="text-[11px] text-white/55 mt-1">{latest.durationMin} min long</div>
       )}
     </div>
   );
@@ -383,7 +383,7 @@ function EnduranceCard({ session }: { session: NamedSession }) {
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[13px] text-white/80">{session.label}</span>
-        <span className="text-[11px] text-white/45 tabular-nums">week {latest.week}</span>
+        <span className="text-[11px] text-white/60 tabular-nums">week {latest.week}</span>
       </div>
 
       {/* ── ROW 1: the reference number. Ride only — see the header. ── */}
@@ -391,14 +391,14 @@ function EnduranceCard({ session }: { session: NamedSession }) {
         <>
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="readout-num text-[26px] leading-none">{Math.round(refLatest.value)}</span>
-            <span className="text-[12px] text-white/45">{ref!.unit} threshold</span>
+            <span className="text-[12px] text-white/60">{ref!.unit} threshold</span>
           </div>
           <RefChart points={ref!.points} color={color} />
         </>
       ) : (
         <div className="flex items-baseline gap-1.5 mt-1">
           <span className="readout-num text-[26px] leading-none">{latest.hrAvg}</span>
-          <span className="text-[12px] text-white/45">bpm avg</span>
+          <span className="text-[12px] text-white/60">bpm avg</span>
         </div>
       )}
 
@@ -411,7 +411,7 @@ function EnduranceCard({ session }: { session: NamedSession }) {
           {/* ⚠️ Only when there IS an earlier reading of the same session. One number is not a trend,
               and a second number that is the first would state a comparison that has not happened. */}
           {prior?.efficiency != null && (
-            <span className="text-white/35"> · week {prior.week} <span className="tabular-nums">{fmtEff(prior.efficiency, isRide)}</span></span>
+            <span className="text-white/55"> · week {prior.week} <span className="tabular-nums">{fmtEff(prior.efficiency, isRide)}</span></span>
           )}
         </div>
       )}
@@ -425,14 +425,14 @@ function EnduranceCard({ session }: { session: NamedSession }) {
               when a key session falls within 24 hours — the app knows what tomorrow is, so it says
               which line applies. ⚠️ No verdict word: that was not ruled, and "fine"/"too much" off a
               single session's HR is a claim this app does not make unasked. */}
-          <span className="text-white/35">
+          <span className="text-white/55">
             {' '}· {session.label.toLowerCase().includes('ride') ? 'his' : 'the source’s'} line is {driftLimit}%
             {latest.keySessionWithin24h ? ' — a key session is inside 24 hours' : ''}
           </span>
         </div>
       )}
 
-      {durLabel && <div className="text-[11px] text-white/35 mt-1">same {durLabel} session</div>}
+      {durLabel && <div className="text-[11px] text-white/55 mt-1">same {durLabel} session</div>}
     </div>
   );
 }

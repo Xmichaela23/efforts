@@ -66,13 +66,13 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
         {week.perMuscle.map((m) => (
           <div key={m.muscle} className="flex items-baseline justify-between gap-3">
             <span className="text-[13px] text-white/80">{word(MUSCLE_WORD, m.muscle)}</span>
-            <span className="text-[12px] text-white/45 tabular-nums">
+            <span className="text-[12px] text-white/60 tabular-nums">
               <span className="text-white/80">{m.sets}</span> sets · {m.effectiveReps} effective reps
             </span>
           </div>
         ))}
       </div>
-      <div className="text-[11px] text-white/35 mt-1">his range is 8–12 sets a muscle a week</div>
+      <div className="text-[11px] text-white/55 mt-1">his range is 8–12 sets a muscle a week</div>
       {week.belowFloor.length > 0 && (
         <div className="text-[12px] text-white/50 mt-1">
           nothing this week for {week.belowFloor.map((m) => word(MUSCLE_WORD, m)).join(', ')}
@@ -86,14 +86,14 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
             {week.perPattern.map((p) => (
               <div key={p.pattern} className="flex items-baseline justify-between gap-3">
                 <span className="text-[13px] text-white/80">{word(PATTERN_WORD, p.pattern)}</span>
-                <span className="text-[12px] text-white/45 tabular-nums">
+                <span className="text-[12px] text-white/60 tabular-nums">
                   <span className="text-white/80">{p.heavyReps}</span> heavy ·{' '}
                   <span className="text-white/80">{p.velocityReps}</span> speed
                 </span>
               </div>
             ))}
           </div>
-          <div className="text-[11px] text-white/35 mt-1">
+          <div className="text-[11px] text-white/55 mt-1">
             his range is 4–6 reps above 90% and 15–20 at 70–85%, per pattern
           </div>
         </>
@@ -113,12 +113,12 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
           {week.perSession.map((s, i) => (
             <div key={`${s.label}-${i}`} className="flex items-baseline justify-between gap-3">
               <span className="text-[13px] text-white/80">{s.label}</span>
-              <span className="text-[12px] text-white/45 tabular-nums">
+              <span className="text-[12px] text-white/60 tabular-nums">
                 <span className="text-white/80">{s.countedSets}</span> work sets
               </span>
             </div>
           ))}
-          <div className="text-[11px] text-white/35">
+          <div className="text-[11px] text-white/55">
             6–8 work sets leaves the next day about normal; 14 or more costs it
           </div>
         </div>
