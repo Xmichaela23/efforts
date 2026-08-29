@@ -31,6 +31,60 @@ If you are about to say "the app needs X" — you are probably about to rebuild 
 
 ---
 
+# ⛔ THE CONFIDENT WRONG ANSWER — the four rules, added 2026-08-29 after a session lost hours to it
+
+**Michael, 2026-08-29:** *"about 40% of my sessions are lost to you saying I was wrong… you freak
+out, you don't do the research, and then I go 'well it can be done' and you go 'I was wrong'."*
+**He is right, and the pattern is one shape, not five.**
+
+⛔ **EVERY WRONG CALL IN THAT SESSION WAS: a claim about what DOESN'T EXIST or DOESN'T WORK, made
+from a partial read, stated at full confidence — with the answer one grep away.**
+
+| what was claimed | what was actually true |
+|---|---|
+| *"the rep targets are nowhere, this gap is final"* | p218's SKILL band. **In the corpus since 2026-08-21.** |
+| *"the heavy day's cue contradicts the source"* | Read the GENERATED OUTPUT, never the composer. `meSessionOutcome` already scored RIR 0 as a setback. |
+| *"protect the all-out set from the archive"* | Never checked how the engine scores a session. It wants stop-short quality; the AMRAP is Wendler's. |
+| *"five build stages"* | **Wrote a build plan without opening `progression.ts`.** Four of the five were already built, cited and labelled. |
+| *"the event taper is dead in the water, a plumbing job"* | The reason was in a comment **directly above the line being indicted** (`generate-strength-plan:784`). |
+
+⛔⛔ **THE TELL: CONFIDENCE ROSE AS EVIDENCE FELL.** *"This gap is now final, not pending a page"* was
+the loudest sentence written that day and the most wrong. **When you escalate to ⛔⛔ or "the whole
+ballgame", you are usually furthest from a page.** Rank the claim before you dress it up.
+
+## The four rules
+
+1. ⛔ **NO ABSENCE CLAIM WITHOUT A NAMED SEARCH.** Never *"X doesn't exist"* / *"the source doesn't
+   say"* / *"this gap is final"*. Only **"I grepped A, B and C and did not find X."** If you cannot
+   name what you searched, it is not a finding — and this is the same rule the top of this file
+   already states about rebuilding. **It keeps being broken about ABSENCE rather than existence.**
+2. ⛔ **READ AROUND IT BEFORE CALLING IT BROKEN.** Ten lines either side of the value you are about to
+   indict. A hardcoded `[]`, a magic number, a "missing" branch — the reason is usually in the
+   comment above it, written by the session that decided it.
+3. ⛔ **NO PLAN WRITTEN FROM A DOC.** Build claims cite `file:line` or they do not ship. A workorder
+   is itself somebody's partial read; writing a plan from one **inherits its errors and amplifies
+   them into a commit message.**
+4. ⛔ **LABEL THE EVIDENCE IN THE SENTENCE.** *"I read this page"* / *"I traced this code"* / *"I am
+   inferring"*. **Michael cannot check the work, so anything unhedged becomes a fact in these docs.**
+
+## Where the line actually is
+
+- ✅ **RELIABLE:** what you read directly and can quote — a page, test output, grep results, a file you
+  opened this session.
+- ❌ **NOT RELIABLE:** anything about what does **not** exist · anything about **why** something is the
+  way it is · anything inherited from a doc rather than the code.
+
+⚠️ **THE QUESTION THAT CATCHES MOST OF IT, and Michael has been told to ask it every time:
+"what did you read to know that?"** If the answer is a doc, or *"I inferred"*, it is a hypothesis.
+**Say so in the same breath.**
+
+⛔ **AND THE STANDING CONTEXT FOR THIS APP (Michael, 2026-08-29):** *"I handed you a book that
+explains everything. There is no Claude extrapolation in this app any more. The only thing I'm
+relying on you for is to put the pieces together properly."* **Assembly, not invention.** When the
+book is silent, the answer is a labelled OURS entry — never a confident guess.
+
+---
+
 ## STOP — this app is BUILT. The job is wiring, not features.
 
 Efforts is a mature, largely-complete app. The near-term mission is **continuity**: verify every capability is wired together and reads one truth — NOT building new features. Before you propose to build ANYTHING, obey this:
