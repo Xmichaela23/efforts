@@ -37,7 +37,25 @@ ME lower, plyo, DE upper, DE lower) · ME at 1–5 reps · DE at 2–4 reps × 4
 **squat and deadlift alternating the ME slot weekly (p247)** · the working number drifting ~5 lb
 across twelve weeks, which is about p245's 1% every three weeks.
 
-⛔ **SO THIS IS NOT A REBUILD. It is five corrections and one extraction.**
+⛔⛔ **CORRECTED 2026-08-29, AFTER READING THE CODE — THIS PLAN'S FIRST DRAFT OVERSTATED THE WORK.**
+The draft was written from the workorder and the book **without opening `progression.ts`**. That is
+the failure mode this project keeps hitting, and it happened again in the writing of this file.
+**What was found on reading it:**
+
+| First draft claimed | Actually in the code |
+|---|---|
+| Stage 4: build progression on evidence | ✅ **BUILT.** `progressionVerdict` — advance / hold-and-add-reps / back off / no evidence. **Silence holds; it never punishes.** |
+| p123 needs adding | ✅ **ALREADY CITED.** `DOUBLE_PROGRESSION_IS_OURS` was **already relabelled `DOUBLE_PROGRESSION_IS_HIS`** on p123's basis, with the "circle of maxes" quote in the header |
+| Stage 4: build the haircut | ✅ **BUILT.** `LOWER_HAIRCUT_INITIAL` 3.5%, phase-out 2%/3wk over 9 weeks, cited p247, deliberately **composed with** the working number rather than multiplied into it so the phase-out stays expressible |
+| §6.4: "repeatedly" is an open decision | ✅ **DECIDED AND LABELLED OURS.** `ME_CLEAN_SESSIONS_TO_EARN = 2`, `STALL_CONFIRMATIONS = 2`, both matching p245's two-in-a-row in the other direction |
+| Stage 3: the heavy day's RIR contradicts p218 | ❌ **NOT A BUG — see §2.3 as rewritten** |
+| Stage 5: per-plan progression switch | ✅ **BUILT.** `RATE_ANCHOR` is per-frame, with its cite |
+| Stage 2: build the light week | ⚠️ **HALF BUILT.** The taper column composes fully; **nothing chooses which weeks are taper** |
+
+✅ **BASELINE: `deno test supabase/functions/_shared/standing-plan/` — 372 passed, 0 failed
+(2026-08-29).** Build from green.
+
+⛔ **SO THIS IS NOT A REBUILD, AND IT IS NOT FIVE CORRECTIONS. It is TWO, plus the extraction.**
 
 ---
 
@@ -187,15 +205,22 @@ regression.
 
 ### STAGE 1 — THE TEST SET. Do this first; every other number depends on it.
 
-**What is wrong.** `working-number.ts` `PRETEST_STEPS` = `0.75/6`, `0.85/5`, `0.90/max`. Strong
-Focus renders the last step as a near-single (`135×1+`).
+**What is wrong — and it is ONLY the fractions.** `working-number.ts` `PRETEST_STEPS` =
+`0.75/6`, `0.85/5`, `0.90/max`. ✅ **The `'max'` on the last step is correct**; `135×1+` is just how a
+max-rep set renders, not a prescribed single. **The two upper fractions are the defect.**
 
 **What the page says.** Second step **0.825**, measured step **0.8625**, and the measured step is a
 **max-rep set expected to land at 5–6 reps** (p214: that range *"allows for the best combination of
 reliability and precision"*; p215's own worked example produces **6 reps**).
 
-**Why it matters.** A single at 90% is Wendler's AMRAP shape. It returns fewer reps, a wider error
-band, and **the whole twelve weeks is computed from that one set.**
+**Why it matters.** At 0.90 the measured set returns roughly **4 reps where his own example returns
+6**. Epley and Brzycki diverge as reps change — which is p215's stated reason for averaging them —
+so testing higher lands in the noisier part of both curves. ⛔ **The whole twelve weeks is computed
+from that one set.**
+
+⚠️ **The file header already claims p215 for these steps.** The cite is right and the arithmetic was
+never checked against the worked example. **Add the worked example as a fixture so it cannot drift
+again.**
 
 **Done when:** the fractions are the page's, the measured step reads as a max-rep set, the p215
 worked example (225 → 165/180×5/190×6 → 224.25 → 215) passes as a fixture, and the rendered plan
@@ -217,17 +242,45 @@ SKILL lives, the 75–85% band never appears either. **One cause, two symptoms.*
 **Done when:** a fixture where the ME lift misses twice consecutively produces a deload week, a
 fixture with a race 2 weeks out produces one, and a clean fixture over 12 weeks produces **none**.
 
-### STAGE 3 — THE HEAVY DAY'S CONTRACT.
+### ~~STAGE 3 — THE HEAVY DAY'S CONTRACT.~~ ❌ WITHDRAWN — NOT A BUG.
 
-**What is wrong.** Strong Focus tells the athlete *"End the set when your form goes or you still have
-1 or 2 reps left"* on the **Heavy** day. **p218 gives ME no RIR target.** The instrument that reads
-the heavy slot is the all-out set; a 1–2 RIR instruction contradicts it and corrupts the evidence
-Stage 4 needs.
+⛔ **THIS STAGE WAS WRONG AND IS KEPT SO THE ERROR IS LEGIBLE.** The draft read Strong Focus's
+*"End the set when your form goes or you still have 1 or 2 reps left"* on the Heavy day as
+contradicting p218's *"no RIR target"*. **It does not, on two counts checked in the code:**
 
-**Done when:** ME carries no RIR target in copy or prescription, and DE/SKILL/HYP carry theirs from
-§1b (3–4, 3–4, 0–2).
+1. **The cue is Michael's own sentence (2026-08-27), traced to p82/p83** and marked do-not-reword.
+   p82 separates **task failure** from **muscular failure** and says both are likelier in compound
+   movements; p83 prices going past it — muscle damage *"can cause recovery to take longer and
+   diminish your capacity to train hard in the near term."* **For this athlete the near term is
+   tomorrow's run.**
+2. ⛔ **p218's "no RIR target" means no PRESCRIBED number, not "go to failure."** And the engine
+   already agrees: `meSessionOutcome` returns **`setback` for any set logged at RIR 0** — *"five reps
+   taken to zero in reserve is the session his instruction rules out."*
 
-### STAGE 4 — PROGRESSION ON EVIDENCE.
+⛔⛔ **AND THIS CORRECTS §1c's ADDITION FROM EARLIER TODAY.** That section said the all-out set is
+*"the instrument p123's rule is read from"* and must be re-homed before the extraction. **Wrong for
+this path.** Viada's progression reads **stop-short clean sessions** — the top of the rep band at
+quality, twice — not an AMRAP. **The all-out set is Wendler's instrument for Wendler's plan and goes
+to the closet with it.** See §3 as rewritten.
+
+⚠️ **THE ONE THING WORTH WATCHING, AS A QUESTION AND NOT A DEFECT:** p80 gives *"4 to 6 repetitions
+over 90 percent"* per pattern per week as sufficient. A fully ramped ME slot at three sets across a
+1–5 band prescribes **3 to 15 reps at 90%**. `progression.ts` raises this in its own header and
+deliberately does not rule on it — his *"more advanced athletes benefiting from more"* is the clause
+that would settle it, and nobody has decided whether this athlete is that. **Left open, on purpose.**
+
+### ~~STAGE 4 — PROGRESSION ON EVIDENCE.~~ ✅ ALREADY BUILT — VERIFY, DO NOT REBUILD.
+
+⛔ **`progression.ts` ships all of it**, cited and labelled: p123's rule as `DOUBLE_PROGRESSION_IS_HIS`,
+the verdict machine, the two-session deadband in both directions, the haircut with its phase-out, the
+per-frame rate anchor, plate-gated step sizes, and `undoLastStep` in place of a percentage back-off
+(*"the only weight it can lose is one it added itself"*).
+
+⚠️ **THE JOB HERE IS A READ-THROUGH AGAINST §1, NOT A BUILD.** Confirm each constant against its page,
+confirm each OURS label is still honest, and stop. **What the draft below described is largely
+already there; it is kept as the checklist for that read-through.**
+
+
 
 **Build §1c literally — and §1c's rule is p123's, which is a COUNT.**
 - ⛔ **Raise on repeated success at the prescribed rep target, or outperformance of it** (p123), read
@@ -252,10 +305,11 @@ demonstrated progress plus spare recovery.
 right week; a fixture that misses lowers it; a lower-body fixture opens 3–4% down and converges by
 week nine.
 
-### STAGE 5 — THE PER-PLAN SWITCH (§1g).
+### ~~STAGE 5 — THE PER-PLAN SWITCH (§1g).~~ ✅ ALREADY BUILT.
 
-A plan declares whether it chases the 1RM. Seven of his eighteen do not. **Small, and it stops Stage
-4 from being wrong everywhere it does not belong.**
+`RATE_ANCHOR` is keyed by frame and carries its own cite (`strength_5k: 1% every 3 weeks, p247`).
+⚠️ **It becomes live work only when a second frame lands (§8)** — a frame whose program does not chase
+the 1RM (p249, p259, p265, p271, p277) needs a rate anchor that says so, not a number.
 
 ---
 
@@ -286,12 +340,13 @@ not a cap. ⚠️ **This is why the deadlift card behaves differently from the o
 against p214/p215, and if the cap survives it survives as **OURS**, labelled, not as a Wendler
 inheritance.
 
-⛔⛔ **DO NOT ARCHIVE THE ALL-OUT SET WITH THE LOADING MODULE.** The heavy day's max-rep set is
-Wendler's *measuring device*, and it is the instrument p123's progression rule is read from (§1c).
-**Wendler's loading goes; Wendler's instrument stays**, re-homed on the Viada side before anything
-moves. `_shared/strength/all-out-set.ts` is the file this concerns.
+⛔⛔ **CORRECTED — THE ALL-OUT SET GOES TO THE CLOSET TOO.** An earlier version of this section said
+to re-home it on the Viada side as the instrument p123 is read from. **That was wrong.** Viada's
+progression reads **stop-short clean sessions** (`meSessionOutcome`, which treats RIR 0 as a
+*setback*), not an AMRAP. `_shared/strength/all-out-set.ts` serves the Wendler path and **archives
+with it** — confirm no Standing Plan module imports it, then let it go.
 
-**Order:** resolve all six outside sites → re-home the all-out set on the Viada side → confirm zero
+**Order:** resolve all six outside sites → confirm zero
 non-test imports remain → **then** move `shared/strength-system/loading/` (and whatever else is
 Wendler-only) to `archive/`. **Nothing is deleted; nothing points at it.**
 
@@ -406,15 +461,16 @@ a second frame lands.
 
 ## 9. SEQUENCE
 
+⚠️ **REVISED against the code, 2026-08-29. Two build stages, not five.**
+
 | | Stage | Blocked by |
 |---|---|---|
-| 1 | The test set (§2.1) | nothing — **start here** |
-| 2 | The light week + delete the 4/8 deloads (§2.2) | stage 1 |
-| 3 | The heavy day's contract (§2.3) | nothing; can run parallel to 2 |
-| 4 | Progression on evidence + the haircut + the set lever (§2.4) | stages 1–3 |
-| 5 | The per-plan progression switch (§2.5) | stage 4 |
-| 6 | Resolve the six outside Wendler call sites (§3) | **§4 answered** |
-| 7 | Archive `shared/strength-system/loading/` (§3) | stage 6, zero imports proven |
+| 1 | **The pretest fractions** — `0.85 → 0.825`, `0.90 → 0.8625`, worked example as a fixture (§2.1) | nothing — **start here** |
+| 2 | **Choose the taper weeks.** `generate-strength-plan:786` and `rematerialize-standing-block:171` both hardcode `taperWeeks: []`. Build p245's trigger and p247/p269's event switch to fill it (§2.2) | stage 1 |
+| — | ~~Stage 3~~ withdrawn, not a bug · ~~Stages 4–5~~ already built | — |
+| 3 | **Read-through** of `progression.ts` against §1 — confirm every constant's page and every OURS label | stages 1–2 |
+| 4 | Resolve the six outside Wendler call sites (§3) | **§4 answered ✅ — closet** |
+| 5 | Archive `shared/strength-system/loading/` + `all-out-set.ts` (§3) | stage 4, zero imports proven |
 
 ⚠️ **Nothing in stages 1–5 touches Wendler. Nothing in 6–7 changes a training rule.** That separation
 is deliberate: a loading bug and an extraction bug must never land in the same commit.
