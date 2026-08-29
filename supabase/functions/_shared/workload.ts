@@ -20,11 +20,12 @@ import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
 // in the name. Same import path precedent as `_shared/response-model/weekly.ts`.
 import { typeForExercise } from '../../../src/lib/exercise-role.ts';
 import { equipmentForExercise } from '../../../src/lib/strength-logging-mode.ts';
+import { barWeightForType, DEFAULT_BAR_LB } from '../../../src/lib/bar-types.ts';
 import { getExerciseConfig } from '../../../src/lib/exercise-config.ts';
 
-/** ⛔ The empty Olympic bar — the same 45 the plan writer floors warm-ups at (`BAR_LB`), restated
- *  here rather than imported so the load path does not depend on the 5/3/1 loading module. */
-const OLYMPIC_BAR_LB = 45;
+/** ⛔ The fallback bar for a barbell movement whose set never named one — `BAR_TYPES.standard`, the
+ *  same 45 the plan writer floors warm-ups at and the same default Strong and Hevy ship. */
+const OLYMPIC_BAR_LB = DEFAULT_BAR_LB;
 
 // ---------------------------------------------------------------------------
 // Intensity factor tables
@@ -448,7 +449,7 @@ export function bandLoadLb(raw: unknown): number | null {
 }
 
 export function strengthSetVolume(
-  set: { weight?: number | string | null; reps?: number | string | null; resistance_level?: string | number | null },
+  set: { weight?: number | string | null; reps?: number | string | null; resistance_level?: string | number | null; barType?: string | null },
   opts: StrengthVolumeOpts = {},
 ): number {
   const reps = Number(set?.reps) || 0;
@@ -517,8 +518,15 @@ export function strengthSetVolume(
   // the row itself are untouched, and a strength session's load has a duration/intensity floor that
   // does not read this number.
   if (opts.bodyIsLoad === false) {
-    // ⛔ EXCEPT THAT A BARBELL LIFT IS NEVER ZERO POUNDS — THERE IS A BAR (2026-08-29). See `barLb`.
-    const bar = Number(opts.barLb) || 0;
+    // ⛔ EXCEPT THAT A BARBELL LIFT IS NEVER ZERO POUNDS — THERE IS A BAR (2026-08-29).
+    //
+    // ⛔⛔ AND IT IS THE BAR THE ATHLETE PICKED, NOT 45 (Michael: *"we actually see the bar weight
+    // that people use… people can choose different bar weights"*). The logger has stored `barType`
+    // on every set since it shipped, and the first cut of this rule ignored it — inventing 20 lb on
+    // an EZ curl (25) and losing 15 on a trap bar (60). The set's own answer wins; `barLb` is only
+    // the fallback for a barbell movement whose set never named one.
+    const chosen = barWeightForType(set?.barType);
+    const bar = chosen ?? (Number(opts.barLb) || 0);
     return bar > 0 ? bar * reps : 0;
   }
 

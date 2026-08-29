@@ -1,3 +1,4 @@
+import { BAR_TYPES } from '@/lib/bar-types';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -419,16 +420,8 @@ const STRENGTH_CHIP = {
 };
 
 // One bar table for the plate math AND the chip label — two readers, one source.
-const BAR_TYPES: Record<string, { weight: number; name: string }> = {
-  'standard': { weight: 45, name: 'Barbell (45lb)' },
-  'womens': { weight: 33, name: 'Light (33lb)' },
-  'safety': { weight: 45, name: 'Safety Squat (45lb)' },
-  'ez': { weight: 25, name: 'EZ Curl (25lb)' },
-  'trap': { weight: 60, name: 'Trap/Hex (60lb)' },
-  'cambered': { weight: 55, name: 'Cambered (55lb)' },
-  'swiss': { weight: 35, name: 'Swiss/Football (35lb)' },
-  'technique': { weight: 15, name: 'Technique (15lb)' },
-};
+// ⛔ BAR_TYPES MOVED TO `src/lib/bar-types.ts` (2026-08-29) — the load pricer reads the same table
+// now, and two copies of it is how the plate calculator and the volume number come to disagree.
 
 const PlateMath: React.FC<{ 
   weight: number; 

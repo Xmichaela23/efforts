@@ -263,3 +263,26 @@ Deno.test('⚠️ AND A MOVEMENT WITH NO BAR STILL PRICES ZERO — a dumbbell ha
   const v = build([], [{ name: 'Dumbbell Row', sets: [{ weight: 0, reps: 10, completed: true }] }], BW);
   assertEquals(v.completed[0].volume_lb, 0);
 });
+
+Deno.test('⛔ THE BAR THE ATHLETE PICKED WINS — an EZ curl bar is 25, not 45 (Michael, 2026-08-29)', () => {
+  const v = build(
+    [],
+    [{ name: 'Barbell Curl', sets: [{ weight: 0, reps: 12, completed: true, barType: 'ez' }] }],
+    BW,
+  );
+  assertEquals(v.completed[0].volume_lb, 25 * 12);
+});
+
+Deno.test('⚠️ AND A TRAP BAR IS 60 — the fallback would have under-counted it', () => {
+  const v = build(
+    [],
+    [{ name: 'Trap Bar Deadlift', sets: [{ weight: 0, reps: 5, completed: true, barType: 'trap' }] }],
+    BW,
+  );
+  assertEquals(v.completed[0].volume_lb, 60 * 5);
+});
+
+Deno.test('a barbell set that never named a bar falls back to the standard 45', () => {
+  const v = build([], [{ name: 'Barbell Curl', sets: [{ weight: 0, reps: 10, completed: true }] }], BW);
+  assertEquals(v.completed[0].volume_lb, 45 * 10);
+});
