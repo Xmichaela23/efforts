@@ -230,6 +230,139 @@ not a loosening of it.
 
 ---
 
+## ⛔ ITEM 6 — A TYPED-IN BASELINE MUST CARRY A DATE. RULED 2026-08-28. **SPEC'D, NOTHING BUILT.**
+
+> **STATE: SCOPED AND REPORTED. Michael asked for scope BEFORE a build; this section is that scope.**
+
+### THE RULING, IN HIS WORDS
+
+*"Typed-in baselines must carry a date stamp. Every logged set already has one; only manually entered
+and learned baselines don't, which is why the block-length window can't be applied to them. The app
+already does this for FTP — `fitness_baselines` supersedes rather than overwrites, giving a dated
+trail. **Do not build a new mechanism.**"*
+
+⛔ **HE IS RIGHT ABOUT THE MECHANISM AND IT IS ALREADY LIVE.** `fitness_baselines` (migration
+`20260716120000`) is supersede-not-delete with `source_date`, `superseded_at` and a `superseded_by`
+lineage pointer. **14 rows on the primary athlete, chain intact** — six dated bike FTP readings
+(176 → 153 → 168) and seven run decoupling rows. This item is a MIGRATION of two writers onto it,
+not a design.
+
+### WHAT ACTUALLY LACKS A DATE — traced, and it is narrower than "baselines"
+
+| Store | Dated? | Why |
+|---|---|---|
+| `exercise_log` / every logged set | ✅ | `date` per row. This is why the block window works at all. |
+| `fitness_baselines` | ✅ | The mechanism. `source_date` + supersede chain. |
+| `user_baselines.performance_numbers` | ⛔ **NO** | A JSON blob of typed numbers. The row has ONE `updated_at` for **all of them** — change your swim pace and your squat's "date" moves too. |
+| `user_baselines.learned_fitness` | ⛔ **NO** | `LearnedMetric` is `{value, confidence, source, sample_count}`. **No date field at all.** One `learned_fitness.last_updated` covers every metric. |
+
+⚠️ **SO THE STAMP EXISTS AND IS AT THE WRONG GRANULARITY.** It is per-ROW, and the values are a blob.
+That is the whole bug, stated precisely — not "baselines have no dates".
+
+### SCOPE — THREE PIECES, AND THEY ARE NOT EQUAL
+
+**PIECE 1 — the `discipline` CHECK excludes strength. A migration is required.**
+```
+discipline text NOT NULL CHECK (discipline IN ('run','bike','swim'))
+```
+⛔ **AND THE TABLE'S OWN HEADER ARGUES AGAINST THIS ITEM:** *"STRENGTH is intentionally NOT stored
+here — its declared 1RMs in `user_baselines` are already confirmed anchors (contract §2d)."* **That
+is a prior decision and this ruling reverses it.** The reversal is sound — §2d assumed a confirmed
+anchor needs no history, and the block-length window is exactly the reader that proves it does — but
+it must be **back-annotated on the migration and on contract §2d**, or the next session reads the
+header and reverts this. `metric` is free text with **no CHECK**, so `squat` / `bench_press` etc. need
+no schema change beyond the discipline.
+
+**PIECE 2 — ⛔ THE WRITER IS KEYED BY DISCIPLINE, NOT BY (DISCIPLINE, METRIC). This is the real work.**
+The DB index is `(user_id, discipline, metric) WHERE superseded_at IS NULL` — **correct, and it already
+allows many metrics per discipline.** But `compute-snapshot`'s reconciler builds
+`activeByDisc = Map<discipline, row>` and loops `for (const disc of ["run","bike","swim"])`, taking
+**one candidate per discipline** from `deriveProvisionalBaselines`. ⛔ **So a second run metric would
+collide with the first in the writer even though the database is happy to hold both.**
+⚠️ **THIS IS THE LOAD-BEARING FINDING OF THE TRACE.** Both halves of this item — strength maxes and
+Q-290's run pace — need the reconciler to become metric-keyed. **Do that once, not twice.**
+
+**PIECE 3 — the write sites that must start stamping.** Four, and one is a direct client write:
+`AppContext.saveUserBaselines` (the main typed save) · `AthleticRecordPage.tsx:415` (**client writes
+`user_baselines` directly** — an existing smart-server/dumb-client exception, not widened by this) ·
+`save-baseline-test/index.ts:187,193` · `compute-workout-analysis/index.ts:825`. `learn-fitness-profile`
+is the learned half.
+
+### ⛔ DOES IT CLOSE Q-290? — **PARTLY. The mechanism yes, the writer no, and the reason is Piece 2.**
+
+Q-290 is *"run threshold pace has no history"* — stored as one `LearnedMetric`
+(`run_threshold_pace_sec_per_km`, `learn-fitness-profile:377`) overwritten on every re-learn, while
+the run's entry in `fitness_baselines` is `decoupling`, **not pace**.
+
+- ✅ **No schema change needed for it.** `discipline='run'` already passes the CHECK and `metric` is
+  free text, so `metric='threshold_pace'` fits the table as it stands **today**.
+- ⛔ **But it needs Piece 2 first**, for exactly the reason above: run already holds an active
+  `decoupling` row, and the discipline-keyed reconciler has no room for a second run metric.
+- ⚠️ **AND IT NEEDS A DERIVER.** `deriveProvisionalBaselines` produces one run candidate (decoupling).
+  A pace candidate must be derived or forwarded from `learn-fitness-profile`. **That is new logic —
+  the only genuinely new thinking in this item.**
+
+⚠️ **WHAT CLOSING Q-290 UNBLOCKS, ALREADY WRITTEN DOWN:** Q-292 and Q-296 depend on it, and **item 2
+point 5 of this work order is explicitly blocked on it** — the run has no reference series and the
+endurance card says so rather than drawing a line from one number. ⛔ It is the "next real piece" the
+handoff already named; this ruling reaches it from the strength side.
+
+⚠️ **AND THE STRENGTH HALF CLOSES THE HOLE ITEM 4 SHIPPED WITH** — the one named in `bfdece3a`: a
+baseline carries no date, so a 1RM typed two years ago still counts as a current max and the
+block-length window cannot touch it. **That hole is this item's whole reason to exist.**
+
+### ⚠️ WHAT THIS ITEM IS NOT
+
+- ⛔ **NOT a new table, and not a new mechanism.** His instruction, and the trace agrees.
+### ⛔ THE OLD VALUES — RULED 2026-08-28. **NO BACKFILL AND NO MIGRATION STAMP.**
+
+> ⚠️ **THIS REPLACES THE "needs a ruling" NOTE THAT STOOD HERE**, which offered stamping at migration
+> or ageing out and decided neither.
+
+**Michael's reasoning:** these numbers are already rewritten on their own, so an undated value is not
+a stale value — it is a **refreshed value with no stamp**. Once stamping exists it gets a date on its
+next auto-update. Nothing to backfill.
+⛔ **AND THE ALTERNATIVE IS WORSE, which is why this closes it:** the only available backfill date is
+`user_baselines.updated_at`, the ROW's stamp — it would date every metric to the last time any ONE of
+them changed. **That is the bug wearing a date**, and it would be indistinguishable from a real one.
+
+⚠️⚠️ **TRACED, AND IT HOLDS FOR ONE HALF CLEANLY AND THE OTHER WITH A CONSEQUENCE. Both are stated
+because the difference changes what an athlete sees.**
+
+| Half | Auto-refreshed? | What follows |
+|---|---|---|
+| **`learned_fitness`** (learned) | ✅ **YES.** `learn-fitness-profile` rewrites it on its own cadence (`index.ts:488-519`), and that fires off ingest. | The premise holds exactly. Every learned value gets dated on its next re-learn, which is soon. |
+| **`performance_numbers`** (typed) | ⛔ **NO GENERAL REFRESH.** See below. | An undated typed number stays undated until the athlete touches it. |
+
+⛔ **THE TYPED HALF HAS NO AUTO-WRITER ANY MORE, AND THAT IS DELIBERATE — D-285.** `adapt-plan` USED to
+rewrite `performance_numbers` automatically on a ≥7% divergence, and **that block was deleted** with a
+standing ban in its place: *"DO NOT RE-ADD AN AUTO-WRITE HERE. If a baseline should change, it goes
+through the suggestion list and the athlete accepts it."* What remains writes only on a test or a tap:
+`save-baseline-test`, `compute-workout-analysis:825` (swim CSS only, after a CSS test),
+`AppContext.saveUserBaselines` and `AthleticRecordPage` (both athlete-initiated).
+
+⛔ **SO THE CONSEQUENCE, STATED RATHER THAN DISCOVERED LATER: an undated typed max reads as OUT OF
+WINDOW, and the derived heavy gate fails closed on it.** A typed 1RM the athlete never revisits stops
+being a reference max. ⚠️ **That is the correct behaviour and it is also a real change in what the
+screen shows** — it is the honest end of the ruling ("a max has a lifespan"), not a gap in it, and it
+resolves the moment the athlete confirms or retypes the number. **It must not be discovered as a bug.**
+
+⚠️ **AND THE REPO ALREADY HAS THE PER-COLUMN PRECEDENT:** `materialize-plan:3543` writes
+`effort_paces` **with its own `effort_updated_at`** beside it. A column with its own stamp is an
+established pattern here, not a new idea.
+- ⚠️ **NOT free of a display consequence.** Dated strength maxes make a strength reference series
+  possible, the way FTP's already is. Whether that renders is a separate call.
+
+### THE SIZE, HONESTLY
+
+**Piece 2 is the only hard part** and it is shared by both halves. Piece 1 is one migration plus two
+back-annotations. Piece 3 is mechanical. **Q-290's deriver is the one piece of genuinely new logic.**
+⚠️ It touches the write path of the athlete's own typed numbers, so a wrong move here is worse than a
+wrong chart — and `compute-workout-analysis:825` already writes `performance_numbers` automatically,
+which should be understood before anything is changed there.
+
+---
+
 ## ⛔ RULED OUT PERMANENTLY — SLEEP / ENERGY / SORENESS (Michael, 2026-08-28)
 
 *"I don't wanna fuck with the sleep stuff because I can't get reliable data based on the accessible
