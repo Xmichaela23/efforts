@@ -1836,9 +1836,19 @@ export default function StateTab({
          * ⚠️ THIRD TIME THIS SHAPE HAS BITTEN: a field resolved upstream and looked up by the wrong
          * name downstream fails SILENTLY — empty map, no chart, no error.
          */
+        /**
+         * ⛔⛔ THE CLIENT ONLY EVER RECEIVES `trends.display` — VERIFIED AGAINST THE LIVE PAYLOAD.
+         * `state_trends_v1.strength.per_lift` exists in the SNAPSHOT ROW and is not forwarded; asking
+         * for it here returned nothing, which is why two previous fixes changed nothing on screen.
+         * The same lifts, with the same series, ride inside `display.strengthFitness.perLift`.
+         * ⚠️ Fallbacks kept in source order — display first, then the un-forwarded branch, then the
+         * coach's verdict rows (which carry no series at all) — so no payload shape can go dark.
+         */
+        const displayPerLift = ((wsv.trends?.display as any)?.strengthFitness?.perLift ?? []) as Array<any>;
         const trendPerLift = ((wsv.trends as any)?.strength?.per_lift ?? []) as Array<any>;
         const modelPerLift = (rm?.strength?.per_lift ?? []) as Array<any>;
-        const perLiftRows = trendPerLift.length > 0 ? trendPerLift : modelPerLift;
+        const perLiftRows = displayPerLift.length > 0 ? displayPerLift
+          : trendPerLift.length > 0 ? trendPerLift : modelPerLift;
         for (const l of perLiftRows as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
           const key = l?.canonical ?? l?.canonical_name;
           if (!key) continue;
