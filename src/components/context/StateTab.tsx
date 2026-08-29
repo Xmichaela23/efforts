@@ -1330,7 +1330,50 @@ export default function StateTab({
   // StatePerformanceSection (below), framed "from your logged sets" as provisional detail — so a
   // confident per-lift line can't read as a second, competing "STRENGTH" top-line when the spine
   // trend says needs-data. All state/handlers stay here; only the rendered node is passed down.
-  const strengthPerLiftDetail: React.ReactNode = perLiftMain.length > 0 ? (
+  /**
+   * ⛔⛔ EVERY OTHER LIFT THE ATHLETE LOGGED — SECONDARIES AND ACCESSORIES (work order item 5).
+   *
+   * ⛔ THE COMMENT ON `perLiftMain` SAID IT OUTRIGHT: *"Accessories are not being hidden as
+   * unimportant — they have no home YET… That row is unbuilt."* This is that home, and it is
+   * deliberately **not a new surface**: they hang in the "from your logged sets" section that already
+   * exists, under the lifts already there.
+   *
+   * ⛔⛔ NOT A PICKER, AND THAT IS THE RULING (Michael, 2026-08-28). He asked directly whether this
+   * means a dropdown of every accessory. **It does not, and a dropdown is the answer to reject.**
+   * Field standard (Strong, Hevy): the summary carries only the main lifts as cards, and every other
+   * lift's record lives on that lift itself, seen where it was already the subject. **No list to
+   * scroll, no lift selector on the State screen.** These rows appear only because the athlete logged
+   * them, inside a section that is folded by default.
+   *
+   * ⛔ RECORDS AND BEST SETS, NOT A MAX LINE. *"Nobody trends a 1RM here."* An accessory has no tested
+   * max to trend against and needs no reference number, so it gets the heaviest set it has ever
+   * carried — which is the Hevy solution and is lighter than the gate. ⚠️ So this needs NONE of item
+   * 4's "needs a recent max" problem, and works for an athlete with no maxes at all.
+   *
+   * ⚠️ NO NEW QUERY AND NO SERVER CHANGE. `liftTrends` (`useExerciseLog`, already fetched above for
+   * the main lifts) covers EVERY logged canonical with two or more sessions — accessories included,
+   * plan or no plan. Trace before building: the data was already on the screen's own hook.
+   */
+  const mainCanonicals = new Set(perLiftMain.map((l: { canonical_name?: string | null }) => String(l?.canonical_name ?? '')));
+  const otherLifts = liftTrends
+    .filter((t) => !mainCanonicals.has(t.canonical))
+    .map((t) => {
+      // ⛔ THE RECORD IS THE HEAVIEST SET, decided on WEIGHT — not on the estimate. An estimate ranks
+      // by reps (D-417's whole lesson: a 105 × 35 read as a 225 "max"), and for a lift with no tested
+      // max the estimate has nothing honest to stand on anyway.
+      const best = t.entries.reduce(
+        (b, e) => (Number(e.best_weight) > Number(b?.best_weight ?? 0) ? e : b),
+        null as (typeof t.entries)[number] | null,
+      );
+      return { canonical: t.canonical, displayName: t.displayName, best, sessions: t.entries.length };
+    })
+    .filter((l) => l.best != null && Number(l.best!.best_weight) > 0)
+    // ⚠️ Most-trained first, so the lifts the athlete actually repeats lead. Capped: this is a folded
+    // detail list, not an inventory, and an uncapped one would BE the scrollable list just rejected.
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, 8);
+
+  const strengthPerLiftDetail: React.ReactNode = (perLiftMain.length > 0 || otherLifts.length > 0) ? (
     // Layout 2026-08-11 (Michael): reclaim the horizontal space — the list used to indent 84px to align
     // under the parent label column, leaving each lift cramped in ~68% width. It now runs near-full-width
     // (a light border-l keeps the nesting cue) so the sets read clean, like Strong's exercise detail.
@@ -1344,7 +1387,9 @@ export default function StateTab({
       >
         <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
         from your logged sets
-        <span className="text-white/45 normal-case tracking-normal">· {perLiftMain.length} {perLiftMain.length === 1 ? 'lift' : 'lifts'}</span>
+        {/* ⚠️ THE COUNT NOW INCLUDES THE OTHER LIFTS (item 5) — it named only the main ones while
+            accessories had no home, and would understate the section the moment they got one. */}
+        <span className="text-white/45 normal-case tracking-normal">· {perLiftMain.length + otherLifts.length} {perLiftMain.length + otherLifts.length === 1 ? 'lift' : 'lifts'}</span>
       </button>
       {strengthDetailOpen && perLiftMain.map((lt: any) => {
         // A SET HISTORY, LIKE STRONG/HEVY (2026-08-11, Michael: *"it should offer what the other apps
@@ -1392,6 +1437,24 @@ export default function StateTab({
           </div>
         );
       })}
+      {/* ── SECONDARIES AND ACCESSORIES: RECORDS, NOT A LINE (item 5). ── */}
+      {strengthDetailOpen && otherLifts.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          {/* ⚠️ ITS OWN QUIET HEADING, because these answer a DIFFERENT question from the rows above.
+              A main lift shows a history trending toward a max; these show the best you have done.
+              Running them together would imply the accessory has a max line, which it does not. */}
+          <div className="text-[11px] uppercase tracking-wider text-white/40">your best sets</div>
+          {otherLifts.map((l) => (
+            <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
+              <span className="text-white/75">{l.displayName}</span>
+              <span className="text-white/75 tabular-nums">{l.best!.best_weight} lb × {l.best!.best_reps}</span>
+              {/* ⛔ NO e1RM AND NO DIRECTION WORD. Nobody trends a one-rep max on a curl, and this app
+                  does not assert a direction it cannot support. The count is the receipt. */}
+              <span className="text-white/40 tabular-nums">{l.sessions} {l.sessions === 1 ? 'session' : 'sessions'}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   ) : null;
 

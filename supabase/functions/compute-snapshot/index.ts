@@ -736,7 +736,10 @@ serve(async (req: Request) => {
           // ⛔ `slot_intent` IS SELECTED OR THE HEAVY-ONLY GATE CANNOT FIRE (2026-08-28). The exact trap
           // D-417 hit on the record: the rule lived in the shared reader and the query did not fetch
           // the column it needed, so the gate structurally could not apply and rotted silently.
-          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm,best_reps,slot_intent")
+          // ⛔ `best_weight` IS SELECTED FOR THE DERIVED HEAVY GATE (item 4, Q-297). Without it
+          // `setMintsAMax`'s second door reads `undefined` on every row and can never fire — the
+          // same starvation `slot_intent` suffered at three separate points before it reached a screen.
+          supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm,best_reps,best_weight,slot_intent")
             .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
@@ -954,6 +957,9 @@ serve(async (req: Request) => {
         const exerciseRows = (exR.data ?? []).map((e: any) => ({
           date: e.date, canonical_name: e.canonical_name, exercise_name: e.exercise_name, estimated_1rm: e.estimated_1rm,
           reps: e.best_reps, // D-417: trust gate — a high-rep set can't mint the e1RM series (records/trend/sparkline)
+          // ⛔ AND THE WEIGHT RIDES ALONG (item 4). This map is the narrow point: selecting the column
+          // above and dropping it here leaves the derived door reading `undefined` and silently shut.
+          best_weight: e.best_weight,
           // ⛔ AND THE INTENT RIDES ALONG OR THE HEAVY-ONLY GATE IS DEAD (2026-08-28). This map is the
           // narrow point: selecting the column above and dropping it here would leave
           // `intentCanMintAMax` reading undefined on every row and failing open on all of them — a

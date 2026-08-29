@@ -372,12 +372,31 @@ there. Read Item 5 before acting on this finding. **Not built, and not to be bui
 
 | | |
 |---|---|
-| **PUSHED** | ⛔ **NO.** Four files modified in the working tree, uncommitted. `origin/main == f830444b`, unchanged. |
-| **DEPLOYED** | ⛔ **NO.** `compute-snapshot` is touched, so this needs a deploy AND a snapshot run to reach a screen. Nothing was deployed — and the handoff's own instruction stands: **the 2026-08-28 deploy is already ahead of him; do not deploy before he rebuilds Monday.** |
-| **VERIFIED** | Fixtures only. No human has seen a record render. |
+> ⛔⛔ **CORRECTED 2026-08-28, LATER THE SAME SESSION. THE TABLE BELOW WAS WRITTEN BEFORE MICHAEL
+> AUTHORISED THE PUSH AND THEN SHIPPED UNCHANGED INSIDE THE VERY COMMIT IT DESCRIBES.** He caught it
+> off `git reflog show origin/main`. It read PUSHED: NO / DEPLOYED: NO while both had already
+> happened. **A state table is the one thing in this file that must never be stale** — it is the only
+> record of what is actually running, and he cannot check it himself.
+>
+> ⛔ **AND THE COMMIT MESSAGE OF `40e371c3` CARRIES THE SAME FALSE LINE AND CANNOT BE FIXED.** Its
+> body ends *"NOT PUSHED. NOT DEPLOYED."* The commit is on `origin/main`; correcting it would mean
+> rewriting pushed history, which is not worth it for a message. **If you read that commit message,
+> read this block instead — item 1 went out.**
 
-⚠️ **ONE THING IN THE TREE THAT IS NOT MINE:** `docs/OPEN-QUESTIONS-2.md` carries 34 uncommitted
-added lines from before this session. Left alone. Whoever commits Item 1 should not sweep it in.
+| | |
+|---|---|
+| **PUSHED** | ✅ **YES.** `40e371c3` on `origin/main` (`f830444b..40e371c3`), pushed on Michael's explicit *"push, deploy"*. Six files: the item 1 code + its two fixtures, `compute-snapshot`, this work order, and his own `OPEN-QUESTIONS-2.md` long-run rulings. |
+| **DEPLOYED** | ✅ **YES — `compute-snapshot` version 144** (was 143), read back from `supabase functions list`, not assumed. ⚠️ **THE ONLY FUNCTION DEPLOYED**, because it is the only one whose behaviour this change alters; no client build went out (none was needed — the "best" tile is drawn by code already live). ⚠️ **NOTHING APPEARS UNTIL A SNAPSHOT RUNS ON HIS NEXT INGEST.** |
+| **VERIFIED** | ⛔ **NO.** Fixtures only. No human has seen a record render. |
+
+⚠️ **WHAT THE DEPLOY MEANS FOR MONDAY.** The handoff's instruction — *do not deploy before he
+rebuilds* — was written about the 2026-08-28 build that was already ahead of him. He ruled otherwise
+here, and this work order's own TIMING section already said **item 1 is safe to move now**. So the
+records are live and the rest of the arc is not; that asymmetry is deliberate.
+
+⚠️ **THE `OPEN-QUESTIONS-2.md` LINES WERE HIS, NOT STRAY.** An earlier draft of this section called
+them uncommitted leftovers to leave alone. They are the 2026-08-28 long-run rulings and he directed
+that they go in with item 1, which they did.
 
 ---
 
@@ -509,3 +528,111 @@ intervals and hills were. The exclusion was real but smaller than stated.
 | **PUSHED** | ⛔ **NO.** Working tree only. `origin/main == 40e371c3` (item 1), unchanged. |
 | **DEPLOYED** | ⛔ **NO.** ⚠️ `_shared/state-trend/run.ts` and `assemble.ts` are SHARED — the deploy trap. Touched functions plus every importer of the changed shared files must go together, and the client is a Netlify build, separate again. |
 | **VERIFIED** | ⛔ **NO.** No human has seen a spine card render. |
+
+---
+
+## ITEMS 4 AND 5 — DONE IN THE WORKING TREE. NOT PUSHED, NOT DEPLOYED, NOT VERIFIED.
+
+**Terminal session 2026-08-28. Items 4 and 5. The arc's last two items; nothing else started.**
+
+### ITEM 4 — HEAVY IS DERIVED FROM THE SET
+
+`setMintsAMax(row, refMax)` — **two doors into one gate**, in this order:
+1. **Stamped** — `slot_intent === 'ME'`. Unchanged, still wins first, still fails closed on its own.
+2. **Derived** — 1–5 reps at ≥90%, **read from `prescribe('ME','barbell')`, not restated.** A second
+   copy of p218's band in a gate is how the book's table and the code silently diverge.
+
+⛔ **It is not a loosening.** A set that is neither stamped nor measurably heavy mints nothing, exactly
+as before — Michael's fail-closed ruling stands.
+
+⚠️ **NO UPPER BOUND ON THE FRACTION, deliberately.** p218's band tops at 100%, but a set above the
+reference is a **new max**, not a disqualification — capping at 1.00 would refuse the one set proving
+the reference is stale.
+
+**The denominator came from things the assembly already had — no new query, no new plumbing:**
+baseline 1RM per lift where one exists, falling back to the **all-time trusted e1RM record**.
+⛔ **That record is ungated as of item 1, so there is no cycle** — item 1 is what made item 4
+possible, which was not obvious from the ordering.
+
+⚠️ **AND `best_weight` WAS NOT IN THE SERIES QUERY.** `estimated_1rm` cannot answer "was this heavy" —
+it is the set's own extrapolation, so dividing it by itself is always 1.0. The column exists on
+`exercise_log` and the series select never asked for it. **Same starvation as `slot_intent` before it**:
+selected nowhere, arriving `undefined`, and a gate reading `undefined` takes the absent branch in
+silence. Added to the select AND to the field-by-field row map — both, as this file's own warning says.
+
+**⛔ THE GET STRONGER MAIN LIFT MINTS AGAIN, and it is pinned as a fixture.** A 5/3/1 wave against a
+200 lb training max: the 5s week at 85% correctly does NOT mint, the 3s week at 90% and the 1s week
+at 95% do. **Its heavy weeks were always heavy by arithmetic; nothing could see it.**
+
+⚠️ **THE FALLBACK IS STATED, NOT SILENT — as this item required.** No stamp AND no known max for that
+lift means neither door can judge the set, so it mints nothing. The assembly counts those rows and
+logs the count. On a new athlete that is every row, and it resolves the moment any max exists.
+
+⚠️ **RECENCY IS NOT APPLIED, AND THAT IS A DELIBERATE OMISSION.** The spec says the max must be
+"recent enough". **There is no defensible staleness window anywhere in this codebase**, and inventing
+one would repeat exactly what item 2 just deleted — a hand-picked duration constant deciding which
+evidence counts. ⛔ An old max reads CONSERVATIVELY (it makes 90% harder to clear, so the gate admits
+FEWER sets, never more), which is the safe direction for a gate that fails closed. **Flagged as a real
+open end, not solved.**
+
+### ITEM 5 — SECONDARIES AND ACCESSORIES
+
+**Secondaries** need no new code: item 4's derived door is what gives them a minting set, and
+`strength.lifts` has always carried every canonical with a series — the per-lift row, its record, its
+PR and its rep-PR all follow. Pinned end-to-end with a front squat that has a record and no baseline.
+⚠️ **They correctly get NO sparkline.** `TRACKED_MAX_LIFTS` is four names because 5/3/1 holds four
+training maxes, and that file's own header says a front squat is *"coached but not charted"* on
+purpose. **That is a settled decision and this item is not a reason to reopen it.**
+
+**Accessories — records and best sets, and the placement is the ruling:**
+⛔ **NOT A PICKER. No lift selector on the State screen.** They hang in the **"from your logged sets"**
+section that already exists, folded by default, under the main lifts.
+⚠️ **`perLiftMain`'s own comment had already named this gap** — *"Accessories are not being hidden as
+unimportant — they have no home YET… That row is unbuilt."* This is that home. Q-253.
+- **The record is the heaviest SET, decided on weight, never on the estimate.** An estimate ranks by
+  reps — D-417's whole lesson, the 105 × 35 that read as a 225 "max" — and a lift with no tested max
+  has nothing honest for an estimate to stand on.
+- ⛔ **No e1RM and no direction word.** *"Nobody trends a 1RM here."*
+- **Its own quiet heading** ("your best sets"), because it answers a different question from the rows
+  above; running them together would imply the accessory has a max line.
+- Capped at 8, most-trained first. **An uncapped list would BE the scrollable picker just rejected.**
+
+⚠️ **NO NEW QUERY AND NO SERVER CHANGE FOR THIS HALF.** `liftTrends` (`useExerciseLog`) already
+covers every logged canonical, plan or no plan. Traced before building, per this file's rule 1.
+⚠️ **Volume: nothing built.** `_shared/workload.ts` and `session-load.ts` already compute per-set
+tonnage; the spec says trace before building a second, and a second was not built. **Not surfaced
+either** — naming it here rather than leaving it looking done.
+
+### VERIFIED BY FIXTURE, NOT ON A DEVICE
+
+- **`_shared` suite: 2361 passed, 0 failed.** Client `npm run build` passes. ESLint on `StateTab.tsx`:
+  **19 problems before this change and 19 after** — none added.
+- New permanent regressions in `derived-heavy-gate.test.ts` (7), including the Get Stronger wave and
+  the no-known-max fallback, asserted through `assembleStateTrends` as well as the helper.
+- ⚠️ `deno check` on `compute-snapshot`: **3 errors, all pre-existing** (`bike.lead`, the
+  `GenericStringError` cast at :375, `newestRideAgeDays` at :817). None in this diff.
+
+### ⚠️ NO PAYLOAD VERSION BUMP, AND HERE IS WHY
+
+Items 4 and 5 add **no field** to the contract — item 4 changes what the existing strength series
+CONTAINS, item 5 is client-side off a hook that was already fetching. So a cached row is not the wrong
+SHAPE. ⛔ **But it is stale data:** the newly-minted lifts appear only after `compute-snapshot` runs
+again. **A recompute is required; a bump is not.** Do not read "no bump" as "nothing to wait for".
+
+### STATE, THE THREE WAYS
+
+| | |
+|---|---|
+| **PUSHED** | ⛔ **NO.** Committed locally with the item 1 state-table correction. `origin/main == 40e371c3` — items 2, 3, 4 and 5 are all local. |
+| **DEPLOYED** | ⛔ **NO.** ⚠️ `_shared/state-trend/assemble.ts` is SHARED — the deploy trap: every importer must go together, and the client is a separate Netlify build. |
+| **VERIFIED** | ⛔ **NO.** No human has seen a derived max mint or an accessory record render. |
+
+### ⛔ THE WHOLE ARC, WHAT IS AND IS NOT LIVE
+
+| Item | Committed | On `origin` | Deployed |
+|---|---|---|---|
+| 1 — ungate the records | ✅ | ✅ `40e371c3` | ✅ `compute-snapshot` **144** |
+| 2 — efficiency reads every run | ✅ `0dbb6b90` | ⛔ | ⛔ |
+| 3 — endurance renders without a plan | ✅ `0dbb6b90` | ⛔ | ⛔ |
+| 4 — heavy derived from the set | ✅ this commit | ⛔ | ⛔ |
+| 5 — secondaries and accessories | ✅ this commit | ⛔ | ⛔ |

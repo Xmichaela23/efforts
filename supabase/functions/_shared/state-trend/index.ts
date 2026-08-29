@@ -86,6 +86,7 @@ export {
   assembleStateTrends,
   liftSeriesFromExerciseLog,
   buildAllTimeBestByLift,
+  setMintsAMax,
   swimVolumeFacts,
   type SwimVolume,
   type FitnessMode,

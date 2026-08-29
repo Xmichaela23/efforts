@@ -13,6 +13,8 @@ import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeStat
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, runSessionGroup, type RunSessionGroup, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
+// ⛔ THE BOOK'S OWN TABLE, read not restated — see `setMintsAMax`. p218's ME band lives in one place.
+import { prescribe } from '../strength-grid/intents.ts';
 import { computeLoadFloor } from './load-floor.ts';
 // [Step 7] The ONE list of lifts that carry a tracked max — shared with the client renderer so the
 // emitted series and the drawn sparkline cannot disagree about which four. Path precedent:
@@ -199,6 +201,15 @@ export interface ExerciseLogLite {
    * one write site is enough.
    */
   slot_intent?: string | null;
+  /**
+   * ⛔ THE WEIGHT ON THE BAR — the second half of what makes heaviness DERIVABLE (Q-297, item 4).
+   * `estimated_1rm` cannot answer "was this heavy": it is the set's own extrapolation, so dividing it
+   * by itself is always 1.0. Only the actual load against a KNOWN max says anything.
+   * ⚠️ IT IS ON `exercise_log` AND WAS NOT IN THE SERIES QUERY. Same starvation as `slot_intent`
+   * before it — selected nowhere, arriving as `undefined`, and a gate reading `undefined` takes the
+   * absent branch in silence. Grep before assuming one write site is enough.
+   */
+  best_weight?: number | null;
 }
 
 /**
@@ -244,6 +255,58 @@ export function intentCanMintAMax(slotIntent: string | null | undefined): boolea
   // all fail — a set only mints when the plan is on record asking for a maximal effort.
   return String(slotIntent ?? '').trim().toUpperCase() === 'ME';
 }
+/**
+ * ⛔⛔ HEAVY IS A PROPERTY OF THE SET, NOT A LABEL THE PLAN WROTE ON IT (Q-297, 2026-08-28, item 4).
+ *
+ * ⛔ TWO DOORS INTO ONE GATE, IN THIS ORDER, AND IT IS NOT A LOOSENING.
+ *  1. **STAMPED** — `slot_intent === 'ME'`. Unchanged, and it still wins where it exists.
+ *  2. **DERIVED** — ME is a NUMBER, not an opinion: Viada p218 prescribes **1 to 5 reps at 90 to
+ *     100%**, and the weight, the reps and the max are all on the logged set.
+ * ⚠️ The band is READ FROM `prescribe('ME', 'barbell')`, never restated here. A second copy of
+ * "1-5 reps at 90%" is how the book's own table and this gate would silently diverge.
+ *
+ * ⛔ WHAT IT CLOSES, and why it is the load-bearing correction of this whole work order:
+ *  - **The off-plan athlete**, who stamps nothing and therefore had no strength line at all.
+ *  - **The Strava importer**, same.
+ *  - **The Get Stronger main lift**, which is DELIBERATELY unstamped — a 5/3/1 top set is 65-95%, so
+ *    claiming `ME` would assert a band that programme does not prescribe — and which therefore
+ *    **currently mints nothing whatsoever.** Its heavy weeks are heavy by arithmetic; now they count.
+ *
+ * ⛔⛔ IT STILL FAILS CLOSED. Michael ruled that on 2026-08-28 (*"begin this line fresh… don't let the
+ * old lifts drag me down"*) and derivation does NOT reverse it: a set that is neither stamped ME nor
+ * measurably heavy mints nothing, exactly as before. This is a second door into the same gate.
+ *
+ * ⚠️⚠️ **AND IT NEEDS A MAX TO DIVIDE BY — WHICH IS PRECISELY WHAT A NEW ATHLETE LACKS. STATED, NOT
+ * SILENT:** with no reference max the derivation cannot run and the set falls to the stamped door
+ * alone. So a brand-new athlete on an unstamped programme still has no line until they have a max —
+ * a real limit of this design, not a bug to hunt. The caller counts these and logs the count.
+ *
+ * ⚠️ RECENCY IS NOT APPLIED, AND THAT IS A DELIBERATE OMISSION. The spec says the max must be "recent
+ * enough". There is no defensible staleness window anywhere in this codebase, and inventing one here
+ * would repeat exactly what item 2 just deleted — a hand-picked duration constant deciding which
+ * evidence counts. An old max reads CONSERVATIVELY (it makes 90% harder to clear, so the gate admits
+ * fewer sets, never more), which is the safe direction for a gate that fails closed.
+ */
+export function setMintsAMax(
+  row: { slot_intent?: string | null; reps?: number | null; best_weight?: number | null },
+  refMax?: number | null,
+): boolean {
+  // DOOR 1 — the plan said so.
+  if (intentCanMintAMax(row.slot_intent)) return true;
+  // DOOR 2 — the set says so. Needs all three facts; any missing one keeps the closed default.
+  const me = prescribe('ME', 'barbell') as { reps: { lo: number; hi: number }; pctOf1RM: { lo: number; hi: number } };
+  const reps = Number(row.reps);
+  const weight = Number(row.best_weight);
+  const max = Number(refMax);
+  if (!Number.isFinite(reps) || !Number.isFinite(weight) || !Number.isFinite(max)) return false;
+  if (!(max > 0) || !(weight > 0)) return false;
+  if (reps < me.reps.lo || reps > me.reps.hi) return false;
+  // ⚠️ NO UPPER BOUND ON THE FRACTION. p218's band tops out at 100%, but a set ABOVE the reference is
+  // a new max, not a disqualification — capping at 1.00 would refuse the very set that proves the
+  // reference is stale.
+  return weight / max >= me.pctOf1RM.lo;
+}
+
 /** D-338 — what the PLAN was asking for on each dated point, resolved once by the caller off the
  *  single plan-phase resolver. `phaseByDate` carries the raw phase name lowercased ('deload',
  *  'leader', 'anchor', 'build'…); `measuredDates` are the days an all-out set was actually
@@ -265,6 +328,15 @@ export interface LiftSeriesContext {
    * shows them without a week.
    */
   weekByDate?: Record<string, number> | null;
+  /**
+   * ⛔ THE KNOWN MAX PER LIFT — the denominator `setMintsAMax`'s DERIVED door divides by (item 4).
+   * Resolved by the caller off the athlete's baseline 1RM where one exists, falling back to the
+   * all-time trusted e1RM record. ⚠️ Both already existed; neither is new machinery.
+   * ⚠️ ABSENT FOR A LIFT → that lift derives nothing and falls back to the stamped door alone. A new
+   * athlete has no maxes, so this is the state to expect first, not a failure.
+   * ⛔ NO CYCLE: the record it reads is UNGATED (item 1), so it does not depend on this line.
+   */
+  refMaxByCanonical?: Record<string, number> | null;
 }
 /**
  * ⛔ THE ALL-TIME e1RM RECORD — per lift, TRUSTED SETS ONLY (D-417, applied here 2026-08-12).
@@ -327,6 +399,7 @@ export function buildAllTimeBestByLift(
 }
 
 export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSeriesContext): LiftSeries[] {
+  const refMaxByCanonical = ctx?.refMaxByCanonical ?? null;
   const byCanonical = new Map<string, ExerciseLogLite[]>();
   for (const e of rows) {
     if ((e.estimated_1rm ?? 0) <= 0) continue;
@@ -337,8 +410,10 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
     // kept, so we never blank real data. Matches the strength-world rule: a 1RM comes from a low-rep set.
     if (e.reps != null && e.reps > trustedMaxReps(e.canonical_name)) continue;
     // ⛔ ONLY A HEAVY SET MAY MINT A MAX — and it fails CLOSED, unlike the rep gate directly above.
-    // See `intentCanMintAMax`: the two differ on purpose and the difference is not an oversight.
-    if (!intentCanMintAMax(e.slot_intent)) continue;
+    // ⛔ TWO DOORS SINCE 2026-08-28 (item 4): the plan's stamp, OR the set's own numbers against the
+    // lift's known max. See `setMintsAMax` — derivation is a second door into the same gate, never a
+    // loosening of it. A lift with no known max derives nothing and keeps the stamped door alone.
+    if (!setMintsAMax(e, refMaxByCanonical?.[e.canonical_name])) continue;
     const arr = byCanonical.get(e.canonical_name) ?? [];
     arr.push(e);
     byCanonical.set(e.canonical_name, arr);
@@ -833,11 +908,45 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // fitness read, session count is the receipt. e1RM is NULL when there's no trend to hold (drop the
   // clause, don't assert "holding"). Volume gives the row a real verdict so it no longer falls to the
   // adherence "needs data · N unplanned" shrug — unplanned demotes to a dim receipt.
+  /**
+   * ⛔ THE DENOMINATOR FOR THE DERIVED HEAVY GATE (item 4, Q-297) — resolved here, from two things
+   * the assembly ALREADY receives. No new query, no new plumbing, and nothing invented.
+   *  1. `strengthBaselines` — the athlete's own 1RM per primary lift (declared or learned). This is
+   *     the truest "known max" and it is what a percentage prescription already means by it.
+   *  2. `allTimeBestByLift` — the trusted all-time e1RM record, which covers EVERY lift including the
+   *     secondaries and accessories that carry no baseline at all. ⛔ It is ungated as of item 1, so
+   *     reading it here creates no cycle with the line it feeds.
+   * ⚠️ A LIFT ABSENT FROM BOTH DERIVES NOTHING — the stamped door still applies and the closed
+   * default still holds. That is the new athlete's state and it is counted and logged below rather
+   * than failing in silence, which is what this item explicitly asked for.
+   */
+  const refMaxByCanonical: Record<string, number> = {};
+  for (const [k, v] of Object.entries(inp.allTimeBestByLift ?? {})) {
+    const n = Number((v as { best?: number } | null)?.best);
+    if (Number.isFinite(n) && n > 0) refMaxByCanonical[k] = n;
+  }
+  for (const [k, v] of Object.entries(inp.strengthBaselines ?? {})) {
+    const n = Number(v);
+    // ⚠️ THE BASELINE WINS where both exist: a tested or declared 1RM is a measurement of the max,
+    // while the record is the best ESTIMATE off a working set. Different confidence, same question.
+    if (Number.isFinite(n) && n > 0) refMaxByCanonical[k] = n;
+  }
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows, {
     phaseByDate: inp.phaseByDate,
     measuredDates: inp.measuredDates,
     weekByDate: inp.weekByDate,
+    refMaxByCanonical,
   });
+  /**
+   * ⚠️ THE FALLBACK, STATED OUT LOUD AS THIS ITEM REQUIRED. A set that carries no stamp AND belongs
+   * to a lift with no known max cannot be judged heavy by either door, so it mints nothing. Silent
+   * would be indistinguishable from "the athlete lifted nothing"; this counts them and says so.
+   */
+  const unjudgeableRows = inp.exerciseRows.filter((e) =>
+    !intentCanMintAMax(e.slot_intent) && refMaxByCanonical[e.canonical_name] == null).length;
+  if (unjudgeableRows > 0) {
+    console.log(`[state-trend] item 4: ${unjudgeableRows}/${inp.exerciseRows.length} logged sets carry no intent AND no known max for their lift — neither door can judge them, so they mint nothing. Expected on a new athlete; it resolves as soon as any max exists for that lift.`);
+  }
   // Slice 2: the protocol's own gauge. For a 5/3/1 block (`readsEffortAs: 'amrap'`) a waved main
   // lift's direction reads the ALL-OUT SET, not the working-set e1RM the program itself waves.
   // Absent inputs ⇒ 'e1rm' everywhere ⇒ byte-identical pre-slice behaviour.
