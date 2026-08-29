@@ -1600,7 +1600,22 @@ export default function StateTab({
          * downstream. `slot_intent` was dropped at three separate narrow points the same way.
          * ⚠️ BOTH NAMES ARE ACCEPTED so a payload written before this cannot go dark again.
          */
-        for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
+        /**
+         * ⛔⛔ TWO DIFFERENT `per_lift` OBJECTS, AND THIS READ THE ONE WITHOUT THE CHART.
+         *
+         * `response_model.strength.per_lift` (the coach's) carries the VERDICT row — rir_trend,
+         * suggested_weight, e1rm_delta_pct, keyed `canonical_name`. It has no `series` and never has.
+         * `state_trends_v1.strength.per_lift` (the snapshot's) carries the CHART — `series`,
+         * `expected`, `bestE1rm` — keyed `canonical`. Same name, same subject, different payloads.
+         * The chart source is checked first; the coach's row stays as the fallback so nothing that
+         * used to render can stop.
+         * ⚠️ THIRD TIME THIS SHAPE HAS BITTEN: a field resolved upstream and looked up by the wrong
+         * name downstream fails SILENTLY — empty map, no chart, no error.
+         */
+        const trendPerLift = ((wsv.trends as any)?.strength?.per_lift ?? []) as Array<any>;
+        const modelPerLift = (rm?.strength?.per_lift ?? []) as Array<any>;
+        const perLiftRows = trendPerLift.length > 0 ? trendPerLift : modelPerLift;
+        for (const l of perLiftRows as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
           const key = l?.canonical ?? l?.canonical_name;
           if (!key) continue;
           if (Array.isArray(l.series)) seriesByCanonical[key] = l.series;
