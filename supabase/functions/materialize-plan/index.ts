@@ -18,6 +18,9 @@ import {
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
+// ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
+// the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
+import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 
@@ -2499,8 +2502,21 @@ function expandTokensForRow(
             // on purpose — the plan names no weight, and the athlete is handed somewhere to start.
             // ⚠️ GUARDED ON A FINITE POSITIVE. Absent means "no suggestion"; a zero would render as a
             // prescribed nothing, which is the shape of the bug this field exists to avoid.
-            ...(Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
-              ? { weight_suggested: (ex as any).weight_suggested } : {}),
+            // ⛔⛔ AND THE ATHLETE'S OWN LAST WEIGHT BEATS THE RATIO (2026-08-29, Michael: *"no
+            // history user adds whatever they went to failure or 1 RIR — get carried onto the next
+            // round"*). The composer's suggestion is derived from the parent lift's max times a
+            // catalogue ratio — a reasonable guess for a movement never performed, and strictly
+            // worse than the number the athlete actually used last time. Fitbod, the closest app
+            // that both writes the program and fills the box, works the same way round: your own
+            // history first, a population estimate only when you have none.
+            // ⚠️ STILL A SUGGESTION, NOT A PRESCRIPTION. The row's weight stays unset — Viada
+            // auto-regulates this work and the athlete picks the load.
+            ...(() => {
+              const own = lastWeightByMovement[canonicalizeName(String((ex as any)?.name ?? ''))];
+              if (Number.isFinite(own) && own > 0) return { weight_suggested: own };
+              return Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
+                ? { weight_suggested: (ex as any).weight_suggested } : {};
+            })(),
             // ⛔ AND CARRY THE SUPPLEMENTAL MARKER (2026-08-15, §1e) — THE SAME WHITELIST, THE THIRD
             // TIME. An FSL row shares its main lift's NAME on purpose, so this flag is the only thing
             // that tells the logger it is a second block of the same movement rather than a duplicate
@@ -2844,8 +2860,21 @@ function expandTokensForRow(
             // on purpose — the plan names no weight, and the athlete is handed somewhere to start.
             // ⚠️ GUARDED ON A FINITE POSITIVE. Absent means "no suggestion"; a zero would render as a
             // prescribed nothing, which is the shape of the bug this field exists to avoid.
-            ...(Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
-              ? { weight_suggested: (ex as any).weight_suggested } : {}),
+            // ⛔⛔ AND THE ATHLETE'S OWN LAST WEIGHT BEATS THE RATIO (2026-08-29, Michael: *"no
+            // history user adds whatever they went to failure or 1 RIR — get carried onto the next
+            // round"*). The composer's suggestion is derived from the parent lift's max times a
+            // catalogue ratio — a reasonable guess for a movement never performed, and strictly
+            // worse than the number the athlete actually used last time. Fitbod, the closest app
+            // that both writes the program and fills the box, works the same way round: your own
+            // history first, a population estimate only when you have none.
+            // ⚠️ STILL A SUGGESTION, NOT A PRESCRIPTION. The row's weight stays unset — Viada
+            // auto-regulates this work and the athlete picks the load.
+            ...(() => {
+              const own = lastWeightByMovement[canonicalizeName(String((ex as any)?.name ?? ''))];
+              if (Number.isFinite(own) && own > 0) return { weight_suggested: own };
+              return Number.isFinite((ex as any)?.weight_suggested) && (ex as any).weight_suggested > 0
+                ? { weight_suggested: (ex as any).weight_suggested } : {};
+            })(),
             // ⛔ AND CARRY THE SUPPLEMENTAL MARKER (2026-08-15, §1e) — THE SAME WHITELIST, THE THIRD
             // TIME. An FSL row shares its main lift's NAME on purpose, so this flag is the only thing
             // that tells the logger it is a second block of the same movement rather than a duplicate
