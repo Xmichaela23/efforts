@@ -1164,9 +1164,29 @@ standing block the long run is ~73 minutes, excluded by three minutes over a cei
 ever defended in writing.** For a runner whose easy runs vary in length this is plausibly the larger
 of the two thinners, and it has never been discussed.
 
-⚠️ **DO NOT TREAT "23 runs cannot call a direction" AS DIAGNOSED.** It must be re-measured against
-BOTH filters — this window and the steady-aerobic gate — before anything is changed. The number has
-been quoted as evidence for a grade-correction fix that, per the trace below, would change nothing.
+⛔⛔ **RULED 2026-08-28 — THE 30-MINUTE FLOOR GOES. Michael: *"lets match training peaks."***
+The measured reason, on his own week: **two 27-minute easy runs and one 63-minute near-threshold
+session.** The floor drops **two of every three runs** before the row measures anything.
+TrainingPeaks computes efficiency for every session with **no duration floor at all** — the floor is
+ours, not the field's.
+
+⛔ **AND IT RE-EXPLAINS THE NUMBER WE WERE ABOUT TO DIAGNOSE WRONG. "23 runs cannot call a direction"
+was never 23 runs feeding it.** It is a SAMPLE problem, not a noise problem. A later session reading
+"23 runs" will otherwise keep hunting for scatter that is not the cause. ⚠️ Re-measure before
+concluding anything about the noise guard from that row.
+
+⚠️ **THE 70-MINUTE CEILING IS A SEPARATE QUESTION AND HIS RULING DOES NOT COVER IT.** The band's
+stated reason (`run.ts:77`) is *"The duration band blunts the whole-run distance confound"* — and
+**that reason is real at the top end and false at the bottom.** A two-hour run drifts more, so its
+average HR is higher at the same pace and it reads as less efficient purely for being long. A
+27-minute run has LESS drift, not more, so the floor was never serving the stated purpose.
+⛔ **DO NOT REMOVE THE CEILING SILENTLY AS PART OF "match TrainingPeaks."** Three options, and it
+needs its own answer: widen it, keep it, or **compare long runs against other long runs** rather than
+discarding them. ⚠️ Establish what TrainingPeaks actually does at the top end before choosing.
+
+⚠️ **AND TELL HIM WHAT DROPPING THE FLOOR DOES BEFORE IT LANDS.** Admitting every short run changes
+what the row has been saying: the series gets longer and **the verdict may move.** He should be told
+the number will shift and why, not discover it on the screen.
 
 ---
 
