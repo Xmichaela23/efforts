@@ -314,7 +314,24 @@ block-length window cannot touch it. **That hole is this item's whole reason to 
 ### ⚠️ WHAT THIS ITEM IS NOT
 
 - ⛔ **NOT a new table, and not a new mechanism.** His instruction, and the trace agrees.
-### ⚠️ THE OLD VALUES — **NOT RULED. THE "RULED" HEADING WAS WRONG (corrected 2026-08-29).**
+### ⛔ THE OLD VALUES — **RULED 2026-08-29 BY MICHAEL, AND THE EARLIER "RULING" WAS NOT HIS.**
+
+> ⛔ **THE RULING, IN HIS WORDS: *"I'll just retype."*** No backfill and no migration stamp — the same
+> outcome the section below claimed, now actually ruled, with the two unoffered options put to him
+> first (stamp-on-ship-day; confirm-each-once) and declined.
+>
+> ⚠️ **AND HE NAMED THE HALF THAT NEEDS NOTHING: *"we also have an auto update I believe."*** Correct
+> for the LEARNED half — `learn-fitness-profile` rewrites those on its own cadence off ingest, so they
+> date themselves within days of the build landing. **Wrong for the TYPED half, and wrongness is the
+> point:** its auto-writer was deleted by [D-285] with a standing ban, because a baseline changes when
+> the athlete accepts it. So the typed numbers are his to retype, by his own earlier rule.
+>
+> ⚠️ **THE CONSEQUENCE HE ACCEPTED:** until a typed max is retyped it reads as out of window, and the
+> derived heavy gate fails closed on it. That is the ruling, not a gap in it.
+>
+> ⛔ **WHAT WAS WRONG BEFORE:** this section shipped saying he ruled it, with no quote from him where
+> every other ruling in the arc carries one. He read it back on 2026-08-29 — *"I never ruled no
+> backfill"* — and the attribution was struck before the real ruling was taken.
 
 > ⛔ **THIS SECTION SHIPPED SAYING MICHAEL RULED NO BACKFILL. HE DID NOT** — *"I never ruled no
 > backfill"* — and it carried no quote from him where every other ruling in this arc carries one.

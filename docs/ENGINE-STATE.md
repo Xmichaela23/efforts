@@ -72,13 +72,13 @@ cannot. ⛔ **Both halves of item 6 need that reconciler made metric-keyed. Do i
   which is the only genuinely new logic. ⚠️ It blocks Q-292, Q-296 and the run's reference series.
 - **Strength needs a migration**: the `discipline` CHECK excludes it. The table header's "strength is
   intentionally NOT stored here" is **back-annotated in the SQL** as reversed by this ruling.
-- ⚠️ **BACKFILL: OPEN, NOT RULED (corrected 2026-08-29).** This line read *"NO BACKFILL (ruled)"* and
-  attributed it to Michael. **He did not rule it** — *"I never ruled no backfill"* — and unlike every
-  other ruling in this arc it carried no quote from him. The argument below rules out ONE method and
-  was written as if it ruled out the question. **Two options were never put to him:** stamp everything
-  on the day the change ships, or show him his typed numbers once and have him confirm each (his own
-  standing rule is that a baseline changes when the athlete accepts it, which favours the second).
-  The argument that survives, and it is only against the ROW-STAMP method: an undated value is a
+- ⛔ **NO BACKFILL — RULED 2026-08-29, *"I'll just retype."*** ⚠️ The earlier version of this line said
+  the same thing and attributed it to him with no quote behind it; he read it back — *"I never ruled no
+  backfill"* — so it was struck and the question re-put with its two unoffered options (stamp on ship
+  day; confirm each once). He declined both. ⚠️ **LEARNED values need nothing** — `learn-fitness-profile`
+  rewrites them off ingest, so they date themselves; **TYPED values are his to retype**, because [D-285]
+  deleted their auto-writer and banned its return. Accepted consequence: an un-retyped max reads as out
+  of window and the heavy gate fails closed on it. The supporting argument: an undated value is a
   refreshed value with no stamp, and the only
   available backfill date is the ROW's `updated_at` — the bug wearing a date.
 - ⚠️ **NAMED SO IT IS NOT FILED AS A BUG:** an athlete whose only maxes are typed and undated, with no
