@@ -1302,3 +1302,42 @@ argument for doing it, and it is stronger than any one of them alone.
 Twelve weeks of training, sleep, work stress and weather moved that number together. The honest
 framing is what CHANGED across the block, never what the block CAUSED — the same discipline the rest
 of this screen keeps.
+
+## Q-297 — "Heavy" is derivable from the set itself; the plan is one way to know, not the only way (2026-08-28)
+
+⛔ **THE GATE ADMITS ONLY A PLAN-STAMPED `slot_intent`, AND THE CONSEQUENCE WAS FILED AS AN
+UNFIXABLE PRODUCT HOLE. IT IS NOT UNFIXABLE.**
+
+Viada's own definition of ME is a **number**, and it is already in this codebase:
+`strength-grid/intents.ts:72-73` — `reps: { lo: 1, hi: 5 }`, `pctOf1RM: { lo: 0.90, hi: 1.00 }`.
+**The weight, the reps and the athlete's tested max are all on the logged set. The set says what it
+was.** Nothing about that requires a plan to have prescribed it.
+
+⚠️ **AND IT IS HOW THE FIELD DOES IT WITHOUT A PLAN.** Strong and Hevy take every set and let the
+numbers speak; the volume-landmark literature counts a set as hard by its **proximity to failure**,
+not by what prescribed it.
+
+⛔ **THE SHAPE OF THE FIX — TWO TIERS, THE SAME LADDER THIS APP ALREADY USES FOR PACE AND FTP:**
+the stamped intent stays the **authority** where it exists; where it is absent, **derive from the
+set** — reps inside the band, weight at or above the athlete's own threshold percentage. Evidence
+beats inference, inference beats nothing.
+
+**IT CLOSES THREE THINGS AT ONCE**, which is why it is its own question rather than a note:
+1. The off-plan athlete who logs a heavy bench and gets no strength line.
+2. ⛔ **The Get Stronger main lift**, which under the closed gate mints nothing — traced and flagged
+   2026-08-28, and currently means that whole path has no strength line at all.
+3. An athlete arriving with an imported lifting history and **no plan at all** — Michael's stated
+   customer: *"I ride a lot, I want to get stronger, I want the scaffolding of a program."*
+
+⛔⛔ **WHAT MUST BE ESTABLISHED FIRST, AND IT IS WHY THIS IS A QUESTION AND NOT A TASK: the derivation
+needs a trustworthy max to take a percentage OF, and that is exactly what a new athlete does not
+have.** A derivation that depends on a tested max may not serve the athlete it exists for. It may
+need the tested max, the best logged set, or to abstain — **do not resolve that in the filing.**
+
+⛔ **WHY IT WAS MISSED, AND IT IS A PATTERN RATHER THAN THREE OVERSIGHTS:** the whole card was
+designed **from inside a plan**, so a set without one read as *unknowable* rather than as *unread*.
+That is the same frame that made the endurance read plan-locked ([[Q-294]]) and the same frame behind
+[[Q-291]]. **Third instance. Record it as the pattern it is** — this codebase's own warning about a
+derivation slot that already exists, applied to the question "what does the app know without a plan".
+
+Related: [[Q-294]], [[Q-291]], [[Q-292]].
