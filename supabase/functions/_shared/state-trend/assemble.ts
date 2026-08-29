@@ -465,6 +465,17 @@ export function buildBestByLiftSince(
   return out;
 }
 
+/**
+ * ⛔ THE WEEK A DATE FALLS IN — ISO, Monday-based, so a Sunday session belongs to the week it
+ * finished rather than opening the next one. Used only to pick each week's heaviest set.
+ */
+function isoWeekKey(iso: string): string {
+  const d = new Date(iso + 'T12:00:00Z');
+  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
+  d.setUTCDate(d.getUTCDate() - day);
+  return d.toISOString().slice(0, 10);
+}
+
 export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSeriesContext): LiftSeries[] {
   const refMaxByCanonical = ctx?.refMaxByCanonical ?? null;
   const byCanonical = new Map<string, ExerciseLogLite[]>();
@@ -480,10 +491,54 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
     // ⛔ TWO DOORS SINCE 2026-08-28 (item 4): the plan's stamp, OR the set's own numbers against the
     // lift's known max. See `setMintsAMax` — derivation is a second door into the same gate, never a
     // loosening of it. A lift with no known max derives nothing and keeps the stamped door alone.
-    if (!setMintsAMax(e, refMaxByCanonical?.[e.canonical_name])) continue;
     const arr = byCanonical.get(e.canonical_name) ?? [];
     arr.push(e);
     byCanonical.set(e.canonical_name, arr);
+  }
+
+  /**
+   * ⛔⛔ THE HEAVY GATE IS REPLACED BY THE WEEK'S HEAVIEST SET (2026-08-29). Read this before
+   * reinstating `setMintsAMax` here — it was removed on evidence, not preference.
+   *
+   * ⛔ WHAT THE GATE ACTUALLY DID TO THIS ATHLETE, MEASURED: across 178 logged main-lift rows going
+   * back to 2025-09-02, ZERO passed either door. Not one. The stamped door needs `slot_intent`,
+   * which only began reaching `exercise_log` on 2026-08-26. The derived door needs a set at 90% of
+   * the known max — and a 5/3/1 top set is 65-95% BY DESIGN, so on this athlete's own numbers
+   * (bench top set 135, estimated max 165 = 82%) it can never fire. A gate that admits nothing is
+   * not a strict gate, it is an empty chart.
+   *
+   * ⛔ THE PROBLEM THE GATE EXISTED FOR IS REAL AND IS SOLVED WITHOUT IT. On a Viada block the same
+   * lift appears twice a week at two intensities — bench 135 heavy, 105 speed — and a line through
+   * both saws downward every week on a block followed exactly. **A speed day is never the week's
+   * heaviest set.** Taking one point per ISO week, the heaviest, drops it by arithmetic rather than
+   * by classification, and needs no stamp, no percentage and no reference max.
+   *
+   * ⛔ THE FIELD PLOTS EVERYTHING. Strong charts working sets, dips included; Hevy keeps the full
+   * history and lets the athlete choose the metric. Neither gates on intent — the comment in this
+   * file that once claimed they did was checked and found false.
+   * ⚠️ THE REP-CEILING GATE ABOVE STAYS (D-417): an 8-rep set inflates its own estimate, and that is
+   * a statement about the formula, not about training intent.
+   */
+  for (const [canonical, rs] of byCanonical) {
+    const bestOfWeek = new Map<string, ExerciseLogLite>();
+    for (const r of rs) {
+      const wk = isoWeekKey(r.date);
+      const held = bestOfWeek.get(wk);
+      /**
+       * Heaviest bar wins the week. ⚠️ THE TIE-BREAK IS THE ESTIMATE, NOT THE DATE, and the
+       * difference matters on exactly the rows this exists for: `best_weight` is absent on older
+       * rows (it reached `exercise_log` only in item 4), and a date tie-break would then hand the
+       * week to whichever session was logged LAST — on a Viada week that is the speed day, the one
+       * case this whole change exists to keep off the line. Ranking by the estimate keeps the
+       * week's best evidence whether or not the bar weight was recorded.
+       */
+      const rank = (x: ExerciseLogLite) => [Number(x.best_weight) || 0, Number(x.estimated_1rm) || 0];
+      const [rw, re] = rank(r);
+      const [hw, he] = held ? rank(held) : [-1, -1];
+      const heavier = !held || rw > hw || (rw === hw && re > he);
+      if (heavier) bestOfWeek.set(wk, r);
+    }
+    byCanonical.set(canonical, [...bestOfWeek.values()]);
   }
   // D-338: the plan's own answer for each date. `isDeloadWeek` reads `meta.phase`; without this the
   // points carried no meta at all, so the exclusion wired into computeStrengthState never once fired.

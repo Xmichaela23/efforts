@@ -52,29 +52,29 @@ Deno.test('⛔⛔ NO KNOWN MAX → DOOR 2 CANNOT RUN, AND IT FAILS CLOSED — th
   assertEquals(intentCanMintAMax(null), false);
 });
 
-Deno.test('⛔⛔ THE GET STRONGER MAIN LIFT MINTS AGAIN — the case that minted NOTHING AT ALL', () => {
+Deno.test('⛔⛔ SUPERSEDED 2026-08-29: THE MAIN LIFT REACHES THE LINE WITH NO GATE AT ALL', () => {
   /**
-   * ⛔ A 5/3/1 top set is deliberately UNSTAMPED: the range is 65-95%, so claiming `ME` would assert
-   * a band that programme does not prescribe. Correct — and under the stamped-only gate it meant the
-   * Get Stronger main lift produced no strength line whatsoever. Its heavy weeks are heavy by
-   * ARITHMETIC, and now they count; the light weeks of the same wave still do not.
+   * ⚠️ THIS TEST PINNED THE DERIVED DOOR AS THE FIX for the Get Stronger main lift, which is
+   * deliberately unstamped (a 5/3/1 top set is 65-95%, so `ME` would assert a band the programme
+   * does not prescribe). ⛔ MEASURED ON REAL DATA THE DOOR NEVER OPENED: 90% of the known max is
+   * above the top of that 65-95% band in practice — this athlete's bench top set is 82% of his own
+   * estimate — so across 178 logged rows it admitted zero.
+   * ⛔ The line now takes each WEEK'S HEAVIEST set and needs no reference max. What the derived door
+   * was reaching for is delivered by arithmetic instead.
+   * ⚠️ `setMintsAMax` ITSELF IS UNCHANGED and still tested below — it is no longer consulted by the
+   * line, and any future reader of it should know why.
    */
-  const tm = 200;
   const rows: ExerciseLogLite[] = [
-    // Week 1 — 5s week, 85% top set. Below the band: correctly does NOT mint.
     { date: '2026-09-01', canonical_name: 'squat', estimated_1rm: 196, reps: 5, best_weight: 170 },
-    // Week 2 — 3s week, 90%. Mints.
     { date: '2026-09-08', canonical_name: 'squat', estimated_1rm: 198, reps: 3, best_weight: 180 },
-    // Week 3 — 1s week, 95%. Mints.
     { date: '2026-09-15', canonical_name: 'squat', estimated_1rm: 205, reps: 1, best_weight: 190 },
   ];
-  const before = liftSeriesFromExerciseLog(rows);
-  assertEquals(before.length, 0, 'the stamped-only gate should still mint nothing without a reference max');
-
-  const after = liftSeriesFromExerciseLog(rows, { refMaxByCanonical: { squat: tm } });
-  assertEquals(after.length, 1, 'the Get Stronger main lift still mints nothing');
-  assertEquals(after[0].points.map((p) => p.value), [198, 205]);
+  // No reference max, no stamps, three different weeks — all three are their week's heaviest.
+  const series = liftSeriesFromExerciseLog(rows);
+  assertEquals(series.length, 1);
+  assertEquals(series[0].points.map((p) => p.value), [196, 198, 205]);
 });
+
 
 Deno.test('⛔ THE REP CEILING STILL COMPOSES — D-417 is not swallowed by the new door', () => {
   // A 20-rep set at a heavy-looking weight is still refused by the trusted-rep ceiling, and by the
@@ -168,28 +168,27 @@ Deno.test('⛔⛔ A MAX FROM A PREVIOUS BLOCK NO LONGER COUNTS AS THE CURRENT MA
   assertEquals(setMintsAMax({ reps: 3, best_weight: 280 }, 300), true);
 });
 
-Deno.test('⛔ THE WINDOW IS THE BLOCK\'S OWN LENGTH — 8, 12 or 16, never a constant at the read site', () => {
+Deno.test('⛔ THE BLOCK-LENGTH WINDOW STILL GOVERNS THE REFERENCE MAX (2026-08-29: not the line)', () => {
+  /**
+   * ⚠️ REWRITTEN, NOT DELETED. This test used to prove the window by watching the LINE empty or
+   * fill. The line no longer consults a reference max at all — it takes each week's heaviest set —
+   * so the window is asserted where it still lives: `buildBestByLiftSince`, the denominator the
+   * derived heavy gate divides by and the number a prescription is written from.
+   * ⛔ THE RULING IS UNCHANGED (D-456 §5): a max has a lifespan, and the lifespan is the block.
+   */
   const rows: ExerciseLogLite[] = [
-    // ~10 weeks before asOf: INSIDE a 12- or 16-week block, OUTSIDE an 8-week one.
     { date: '2026-07-12', canonical_name: 'squat', estimated_1rm: 300, reps: 3, best_weight: 280 },
     { date: '2026-09-01', canonical_name: 'squat', estimated_1rm: 204, reps: 3, best_weight: 188 },
     { date: '2026-09-08', canonical_name: 'squat', estimated_1rm: 206, reps: 3, best_weight: 190 },
   ];
-  const inputs = (extra: Record<string, unknown>) => ({
-    asOf: '2026-09-20', exerciseRows: rows, bikeRows: [], runJoined: [], swimRows: [],
-    plannedBy: { strength: 2 }, doneBy: { strength: 2 }, cadenceCounts: { strength: 20 },
-    ...extra,
-  } as never);
-
-  // 16-WEEK BLOCK: the 280 is in window, so it IS the max, and 188/300 = 63% mints nothing.
-  const long = assembleStateTrends(inputs({ blockDurationWeeks: 16 })) as any;
-  assertEquals(long.strengthFitness.perLift.find((l: any) => l.canonical === 'squat'), undefined);
-
-  // 8-WEEK BLOCK: the 280 has aged out, this block's own best is the reference, and the work mints.
-  const short = assembleStateTrends(inputs({ blockDurationWeeks: 8 })) as any;
-  assert(short.strengthFitness.perLift.find((l: any) => l.canonical === 'squat'),
-    'an 8-week block was still measured against a max from before it');
+  // A 16-week window reaches back past the July set, so it is the max.
+  assertEquals(buildBestByLiftSince(rows, '2026-06-01').squat, 300);
+  // An 8-week window does not, so the block's own numbers are.
+  assertEquals(buildBestByLiftSince(rows, '2026-08-01').squat, 206);
+  // And the old set is still heavy against its own era's max — the ruling reclassifies nothing.
+  assertEquals(setMintsAMax({ reps: 3, best_weight: 280 }, 300), true);
 });
+
 
 Deno.test('⚠️ NO BLOCK → THE APP\'S OWN DEFAULT BLOCK LENGTH, and 12 is not written at the read site', () => {
   // ⛔ The constant carries its own provenance and must match the generator's fallback. If the

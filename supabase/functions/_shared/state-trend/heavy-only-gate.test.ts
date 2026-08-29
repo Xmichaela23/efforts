@@ -70,71 +70,45 @@ Deno.test('⛔⛔ THE SERIES DROPS THE SPEED DAY — the false dip, closed', () 
   assert(values[1] > values[0], 'the line still falls on a correctly-followed block');
 });
 
-Deno.test('⛔⛔ AN UNMARKED SET DOES NOT REACH THE LINE — the line starts fresh', () => {
+Deno.test('⛔⛔ REVERSED 2026-08-29: AN UNMARKED SET *DOES* REACH THE LINE', () => {
   /**
-   * ⚠️ THE INVERSE OF WHAT THIS FILE PINNED BEFORE 2026-08-28. Everything logged before
-   * `slot_intent` existed leaves the strength line, by ruling. ⛔ The sets are NOT deleted — they
-   * keep their place in the logged-sets history, which is a different surface answering a different
-   * question. Only their claim to set an estimated max is withdrawn.
+   * ⚠️ THIS TEST HAS NOW BEEN REVERSED TWICE, AND BOTH REVERSALS ARE KEPT VISIBLE ON PURPOSE.
+   * It first pinned fail-open, then fail-closed (2026-08-28, "the line starts fresh"), and now the
+   * intent gate is gone from the line entirely.
+   *
+   * ⛔ THE EVIDENCE THAT ENDED IT, measured on the athlete's own data: across 178 logged main-lift
+   * rows back to 2025-09-02, ZERO passed either door — the stamp did not exist before 2026-08-26,
+   * and the derived door needs 90% of the known max while a 5/3/1 top set is 65-95% by design
+   * (bench 135 against an estimated 165 is 82%). The gate did not admit a strict subset; it admitted
+   * nothing, and the chart was empty.
+   * ⛔ THE FALSE DIP IS STILL CLOSED — by the week's-heaviest rule in `liftSeriesFromExerciseLog`,
+   * which the test above pins. A speed day is never the week's heaviest set.
    */
   const rows = [row('2026-08-10', 148, null), row('2026-08-17', 149, null)];
-  assertEquals(liftSeriesFromExerciseLog(rows).length, 0, 'unmarked sets still built a series');
+  const series = liftSeriesFromExerciseLog(rows);
+  assertEquals(series.length, 1, 'unstamped history is on the line again');
+  assertEquals(series[0].points.map((p) => p.value), [148, 149]);
 });
 
-Deno.test('⛔⛔ THE RECORD IS NOT GATED ON INTENT — the line and the record are different claims', () => {
+Deno.test('⚠️ THE REP CEILING STILL GATES THE LINE — it is about the formula, not about intent', () => {
   /**
-   * ⚠️ THIS TEST ASSERTED THE OPPOSITE FOR A FEW HOURS ON 2026-08-28 and is rewritten, not deleted,
-   * so the reversal stays visible. The intent gate was applied to the record on the reasoning that
-   * the two readers must agree. Right about the REP ceiling, wrong here:
-   *   - the LINE asks WHICH WAY, so it needs clean input and takes only sets the plan called maximal;
-   *   - the RECORD asks WHAT IS THE BEST YOU HAVE DONE, and only needs the set to be REAL.
-   * ⛔ THE LIVE CONSEQUENCE THAT MADE IT A REGRESSION: a front squat, a trap bar deadlift and every
-   * accessory carry no heavy mark and never will, so under the gate they could not set a record at
-   * all. Below, the unstamped trap-bar rows must still produce one.
+   * ⛔ D-417 SURVIVES THE 2026-08-29 CHANGE and must: an 8-rep set inflates its OWN estimate because
+   * the formula only holds to ~10 reps. That is a statement about arithmetic, not about training
+   * intent, so removing the intent gate has no bearing on it.
    */
-  const best = buildAllTimeBestByLift([
-    { canonical_name: 'bench_press', estimated_1rm: 150, best_reps: 3, slot_intent: 'ME' },
-    { canonical_name: 'bench_press', estimated_1rm: 190, best_reps: 3, slot_intent: 'DE' },
-  ]);
-  assertEquals(best.bench_press.best, 190, 'a real set was refused the record for its intent');
-  assertEquals(best.bench_press.count, 2, 'a real set was refused the PR confidence count');
-
-  // ⛔ THE LIFT THAT CAN NEVER CARRY A MARK. No plan stamps a trap bar deadlift, so under the gate
-  // this lift had no record and no count — nothing at all on the screen.
-  const unstamped = buildAllTimeBestByLift([
-    { canonical_name: 'trap_bar_deadlift', estimated_1rm: 210, best_reps: 3 },
-    { canonical_name: 'trap_bar_deadlift', estimated_1rm: 225, best_reps: 3, slot_intent: null },
-    { canonical_name: 'trap_bar_deadlift', estimated_1rm: 215, best_reps: 5, slot_intent: '' },
-  ]);
-  assertEquals(unstamped.trap_bar_deadlift.best, 225, 'an unmarked lift could not set a record');
-  assertEquals(unstamped.trap_bar_deadlift.count, 3, 'an unmarked lift had no history behind it');
+  const highRep: ExerciseLogLite = {
+    date: '2026-09-01', canonical_name: 'bench_press', estimated_1rm: 400, reps: 12, slot_intent: 'ME',
+  };
+  const clean: ExerciseLogLite = {
+    date: '2026-09-08', canonical_name: 'bench_press', estimated_1rm: 150, reps: 3, slot_intent: null,
+  };
+  const clean2: ExerciseLogLite = {
+    date: '2026-09-15', canonical_name: 'bench_press', estimated_1rm: 152, reps: 3, slot_intent: null,
+  };
+  const values = (liftSeriesFromExerciseLog([highRep, clean, clean2])[0]?.points ?? []).map((p) => p.value);
+  assertEquals(values, [150, 152], `a 12-rep set reached the line: ${JSON.stringify(values)}`);
 });
 
-Deno.test('⛔ THE REP CEILING IS THE GATE THE TWO READERS DO SHARE — D-417, still applied', () => {
-  /**
-   * Ungating the intent does NOT ungate the reps. The 105 × 35 deadlift that read as a 225 lb
-   * "best" on screen is still refused, stamped or not — that is what D-417 exists for, and it is
-   * the invariant that must survive this change.
-   */
-  const best = buildAllTimeBestByLift([
-    { canonical_name: 'deadlift', estimated_1rm: 140, best_reps: 5, slot_intent: 'ME' },
-    { canonical_name: 'deadlift', estimated_1rm: 225, best_reps: 35 },        // rep-out, unstamped
-    { canonical_name: 'deadlift', estimated_1rm: 200, best_reps: 25, slot_intent: 'DE' }, // rep-out
-  ]);
-  assertEquals(best.deadlift.best, 140, 'a rep-out set the record');
-  assertEquals(best.deadlift.count, 1, 'a rep-out counted toward the PR confidence gate');
-});
-
-Deno.test('⚠️ THE TWO GATES COMPOSE — rep ceiling AND intent, neither swallowing the other', () => {
-  // A high-rep ME set is still excluded by D-417; a low-rep DE set is still excluded by intent.
-  const rows: ExerciseLogLite[] = [
-    { date: '2026-09-01', canonical_name: 'bench_press', exercise_name: 'Bench Press', estimated_1rm: 200, reps: 20, slot_intent: 'ME' },
-    { date: '2026-09-04', canonical_name: 'bench_press', exercise_name: 'Bench Press', estimated_1rm: 118, reps: 3, slot_intent: 'DE' },
-    { date: '2026-09-08', canonical_name: 'bench_press', exercise_name: 'Bench Press', estimated_1rm: 151, reps: 3, slot_intent: 'ME' },
-    { date: '2026-09-15', canonical_name: 'bench_press', exercise_name: 'Bench Press', estimated_1rm: 153, reps: 3, slot_intent: 'ME' },
-  ];
-  assertEquals(liftSeriesFromExerciseLog(rows)[0].points.map((p) => p.value), [151, 153]);
-});
 
 Deno.test('⛔ THE WEEK COMES FROM THE SERVER, AND ONLY FOR POINTS INSIDE THE BLOCK', () => {
   /**
