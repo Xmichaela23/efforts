@@ -568,12 +568,50 @@ at 95% do. **Its heavy weeks were always heavy by arithmetic; nothing could see 
 lift means neither door can judge the set, so it mints nothing. The assembly counts those rows and
 logs the count. On a new athlete that is every row, and it resolves the moment any max exists.
 
-⚠️ **RECENCY IS NOT APPLIED, AND THAT IS A DELIBERATE OMISSION.** The spec says the max must be
-"recent enough". **There is no defensible staleness window anywhere in this codebase**, and inventing
-one would repeat exactly what item 2 just deleted — a hand-picked duration constant deciding which
-evidence counts. ⛔ An old max reads CONSERVATIVELY (it makes 90% harder to clear, so the gate admits
-FEWER sets, never more), which is the safe direction for a gate that fails closed. **Flagged as a real
-open end, not solved.**
+### ⛔⛔ RECENCY — RULED 2026-08-28 AND NOW BUILT. THE WINDOW IS THE ATHLETE'S BLOCK LENGTH.
+
+> ⚠️ **THIS REPLACES THE "deliberate omission" NOTE THAT STOOD HERE.** It said there was no
+> defensible staleness window in the codebase and declined to invent one. **The source had the answer
+> and it was not consulted** — which is the rule this work order's own §1 states, and the second time
+> this arc got it in that order.
+
+⛔ **THE RULE:** the reference max is the best trusted e1RM **inside the athlete's own block**
+(`plans.duration_weeks`). No block → `STATE_TREND_WINDOWS.defaultBlockWeeks`.
+
+⛔ **PROVENANCE IS VIADA, NOT A ROUND NUMBER.** Part H (**p215**): the **pretest sets the max at block
+start** and the block's percentages are written from it. Part F records the agreement with Wendler in
+as many words — *"progress without retesting on fixed increments."* **So a max is a fact with a
+LIFESPAN, and the lifespan is the block.** A number from two blocks ago was tested against a body that
+has since done a whole block of work.
+
+⚠️ **12 IS NOT HARDCODED, and the constant carries its own provenance.** `defaultBlockWeeks` is the
+app's OWN default block length — the generator already falls back to it twice
+(`generate-strength-plan`, `weeks:` / `durationWeeks:`) and `SPEC-get-stronger.md` calls 12 weeks
+*"The default."* ⛔ If that default ever moves it moves THERE and this follows.
+⚠️ **AND IT IS DELIBERATELY NOT `liftWeeks`, WHICH ALSO EQUALS 12.** That is how far back the fetch
+reaches; this is how long a max stays true. **Same number, different question** — collapsing them
+would let a fetch-window change silently redefine what counts as a current max.
+
+⛔ **A SECOND ACCESSOR, NOT A CHANGE TO THE RECORD.** `buildBestByLiftSince` is new and windowed;
+`buildAllTimeBestByLift` stays all-history and undated, because **a record does not expire** — item 1
+exists precisely because it must not be gated. Merging them would either expire the record or make a
+two-year-old number a current max. Both directions are pinned.
+⚠️ **The all-time record is NO LONGER the denominator at all.** Pinned: supplying a huge one changes
+nothing.
+
+⛔ **AND THE FETCH HAD TO GROW, OR THE RULING WOULD HAVE BEEN QUIETLY FALSE.** A window cannot reach
+past the rows fetched, and the `exercise_log` fetch was fixed at `liftWeeks` (12). **A 16-week block —
+which `SPEC-get-stronger.md` explicitly offers — would have silently got a 12-week window**, for
+exactly the athletes the ruling names. The fetch now takes the longer of the two, off a small early
+lookup of `duration_weeks`.
+
+⚠️⚠️ **THE ONE HOLE LEFT, NAMED RATHER THAN PAPERED OVER: A BASELINE CARRIES NO DATE.**
+`buildStrengthBaselines` reads `user_baselines.performance_numbers` / `learned_fitness`, neither of
+which timestamps a value — so a baseline the athlete typed in two years ago still counts as a current
+max and **cannot be windowed by this ruling.** It is the smallest version of the hole (a baseline IS
+the number the athlete's programme is written from, which is what the pretest produces), but closing
+it needs a **dated strength baseline**, which does not exist. ⚠️ The run's version of the same gap is
+**Q-290**; this is its strength twin and should probably be filed beside it.
 
 ### ITEM 5 — SECONDARIES AND ACCESSORIES
 

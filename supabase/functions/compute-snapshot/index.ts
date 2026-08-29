@@ -732,6 +732,32 @@ serve(async (req: Request) => {
         const asOf = todayISO();
         const adhStart = isoMinus(STATE_TREND_WINDOWS.adherenceDays - 1);
 
+        /**
+         * ⛔⛔ THE BLOCK'S LENGTH IS READ FIRST, BECAUSE IT SIZES THE FETCH BELOW (ruled 2026-08-28).
+         *
+         * The derived heavy gate's reference max is windowed to the athlete's block (Viada Part H,
+         * p215 — the pretest sets the max at block start and the block is written from it). ⛔ A
+         * WINDOW CANNOT REACH PAST THE ROWS WE FETCHED: `liftWeeks` is 12, so a 16-week block would
+         * have silently got a 12-week window and the ruling would be quietly false for exactly the
+         * athletes it names. **The fetch takes the LONGER of the two.**
+         * ⚠️ ITS OWN SMALL QUERY, DELIBERATELY. The plan row is already read further down for phases
+         * and week indices, but that happens AFTER this batch — and reordering that block to save one
+         * cheap lookup would move code that resolves the week map every screen depends on.
+         * ⚠️ Non-fatal: no plan, no row, or a failed read → null → the default window. Never a throw.
+         */
+        let planDurationWeeks: number | null = null;
+        try {
+          const { data: durRow } = await supabase
+            .from("plans").select("duration_weeks")
+            .eq("user_id", userId).eq("status", "active")
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          const n = Number((durRow as any)?.duration_weeks);
+          if (Number.isFinite(n) && n > 0) planDurationWeeks = n;
+        } catch (e: any) {
+          console.log("[compute-snapshot] block length lookup failed (non-fatal):", e?.message || e);
+        }
+        const liftFetchWeeks = Math.max(STATE_TREND_WINDOWS.liftWeeks, planDurationWeeks ?? 0);
+
         const [exR, bikeR, runR, swimR, plannedR, doneR, cadenceR, runFactsR, strengthVolR] = await Promise.all([
           // ⛔ `slot_intent` IS SELECTED OR THE HEAVY-ONLY GATE CANNOT FIRE (2026-08-28). The exact trap
           // D-417 hit on the record: the rule lived in the shared reader and the query did not fetch
@@ -740,7 +766,9 @@ serve(async (req: Request) => {
           // `setMintsAMax`'s second door reads `undefined` on every row and can never fire — the
           // same starvation `slot_intent` suffered at three separate points before it reached a screen.
           supabase.from("exercise_log").select("date,canonical_name,exercise_name,estimated_1rm,best_reps,best_weight,slot_intent")
-            .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.liftWeeks * 7)).order("date"),
+            // ⚠️ `liftFetchWeeks`, NOT `liftWeeks` — the reference-max window is the block's length and
+            // cannot reach past the rows fetched here. See the block above.
+            .eq("user_id", userId).gte("date", isoMinus(liftFetchWeeks * 7)).order("date"),
           supabase.from("workouts").select("date,workout_analysis,workout_metadata")
             .eq("user_id", userId).in("type", ["ride", "bike"]).not("workout_analysis", "is", null)
             .order("date", { ascending: false }).limit(STATE_TREND_WINDOWS.bikeLimit),
@@ -1054,6 +1082,9 @@ serve(async (req: Request) => {
         // Slice 2: what the block says it READS. 'amrap' (5/3/1) puts waved main lifts on the
         // all-out-set gauge; anything else keeps the e1RM read, byte for byte.
         let strengthEffortRead: EffortReadMode | null = null;
+        /** ⛔ `plans.duration_weeks` — the derived heavy gate's recency window. Null → the assembly
+         *  falls back to `STATE_TREND_WINDOWS.defaultBlockWeeks`, never to a number chosen here. */
+        let blockDurationWeeks: number | null = planDurationWeeks;
         try {
           const { data: activePlanRow } = await supabase
             .from("plans").select("config,duration_weeks")
@@ -1064,6 +1095,11 @@ serve(async (req: Request) => {
             const protocolId = resolveProtocolId(cfg);
             strengthEffortRead = protocolId ? protocolEffortRead(resolveProfile(protocolId)) : null;
             const dur = Number((activePlanRow as any)?.duration_weeks) || null;
+            // ⛔ THE BLOCK'S LENGTH IS ALSO THE "KNOWN MAX" WINDOW (ruled 2026-08-28, item 4). Viada
+            // Part H p215: the pretest sets the max at block start and the block is written from it,
+            // so a max is a fact with a lifespan and the lifespan is the block. Carried to the
+            // assembly rather than re-derived there — the plan row is read here and nowhere else.
+            if (dur && dur > 0) blockDurationWeeks = dur;
             const dates = new Set<string>([
               ...exerciseRows.map((r: any) => String(r.date)),
               ...strengthVolumeRows.map((r: any) => String(r.date)),
@@ -1696,7 +1732,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, enduranceSpine, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

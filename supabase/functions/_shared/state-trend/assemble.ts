@@ -85,6 +85,29 @@ export const isoMinus = (days: number): string => new Date(Date.now() - days * D
 // Fetch windows the spine needs — exported so client + server slice identical boundaries.
 export const STATE_TREND_WINDOWS = {
   liftWeeks: 12, // useExerciseLog(12)
+  /**
+   * ⛔⛔ HOW FAR BACK A "KNOWN MAX" STAYS KNOWN — the recency window for the derived heavy gate
+   * (item 4). **RULED 2026-08-28: it is the athlete's own BLOCK LENGTH**, and this is only the value
+   * used when there is no block to ask.
+   *
+   * ⛔ PROVENANCE IS VIADA, NOT A ROUND NUMBER. Part H (p215): the **pretest sets the max at block
+   * start**, and the block is then written from it — Part F records the agreement with Wendler in as
+   * many words: *"progress without retesting on fixed increments."* **So the max is a fact with a
+   * lifespan, and that lifespan is the block.** A number from two blocks ago was tested against a
+   * body that has since done twelve weeks of work; a number from this block is the one the
+   * programme's own percentages mean.
+   *
+   * ⚠️ 12 IS NOT PICKED HERE — IT IS THE APP'S OWN DEFAULT BLOCK LENGTH, read off the generator that
+   * already falls back to it twice (`generate-strength-plan`, `weeks:`/`durationWeeks:`) and off
+   * `SPEC-get-stronger.md` (*"12 weeks = three 4-week cycles… The default."*). ⛔ If the default
+   * block length ever changes, it changes THERE and this follows — do not let the two drift.
+   *
+   * ⚠️ AND IT IS DELIBERATELY NOT `liftWeeks`, WHICH HAPPENS TO EQUAL 12. That one is how far back
+   * the exercise_log FETCH reaches; this one is how long a max stays true. **Same number, different
+   * question** — the `MovementGroup`-vs-`MovementPattern` lesson in CLAUDE.md. Collapsing them is how
+   * a fetch-window change would silently redefine what counts as a current max.
+   */
+  defaultBlockWeeks: 12,
   bikeLimit: 30, // latest 30 rides carrying workout_analysis
   runDays: 42, // GAP pace 6wk
   swimDays: 56, // pace/100 8wk
@@ -398,6 +421,42 @@ export function buildAllTimeBestByLift(
   return out;
 }
 
+/**
+ * ⛔⛔ THE BEST TRUSTED e1RM PER LIFT **INSIDE A WINDOW** — the denominator for the derived heavy
+ * gate (item 4), and a SECOND ACCESSOR beside `buildAllTimeBestByLift`, never a replacement for it.
+ *
+ * ⛔ THE TWO ANSWER DIFFERENT QUESTIONS AND MUST NOT MERGE.
+ *  - `buildAllTimeBestByLift` — *"what is the best you have ever done?"* **All history, no window**,
+ *    because a record does not expire. It is what the screen prints as "best".
+ *  - This one — *"what max is this block working from?"* **Windowed**, because a max is a fact with a
+ *    LIFESPAN: Viada Part H (p215) has the pretest set it at block start, and Part F records the
+ *    agreement with Wendler — *"progress without retesting on fixed increments."*
+ * ⚠️ Merging them would either expire the record (wrong — item 1 exists because the record must not
+ * be gated) or make a two-year-old number a current max (wrong — this window exists to stop that).
+ *
+ * ⚠️ SAME REP CEILING (D-417): a rep-out set inflates its estimate and cannot stand as a max here
+ * either. Unknown reps fail OPEN, matching both the series and the record.
+ */
+export function buildBestByLiftSince(
+  rows: Array<{ date?: string | null; canonical_name?: string | null; estimated_1rm?: number | null; best_reps?: number | null }>,
+  sinceIso: string | null | undefined,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  const since = typeof sinceIso === 'string' && sinceIso.length === 10 ? sinceIso : null;
+  for (const e of Array.isArray(rows) ? rows : []) {
+    const k = e?.canonical_name;
+    const v = Number(e?.estimated_1rm);
+    if (!k || !Number.isFinite(v) || v <= 0) continue;
+    // ⚠️ A ROW WITH NO DATE IS DROPPED HERE, unlike the record builder which never sees dates at all.
+    // An undateable set cannot be shown to be inside the block, and this gate fails closed.
+    const d = String(e?.date ?? '').slice(0, 10);
+    if (since) { if (d.length !== 10 || d < since) continue; }
+    if (e.best_reps != null && !estimateIsTrusted(k, e.best_reps)) continue;
+    out[k] = Math.max(out[k] ?? 0, v);
+  }
+  return out;
+}
+
 export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSeriesContext): LiftSeries[] {
   const refMaxByCanonical = ctx?.refMaxByCanonical ?? null;
   const byCanonical = new Map<string, ExerciseLogLite[]>();
@@ -518,6 +577,13 @@ export interface StateTrendInputs {
   namedSessions?: NamedSessionSeries[] | null;
   /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
   enduranceSpine?: EnduranceSpineSeries[] | null;
+  /**
+   * ⛔ THE ACTIVE BLOCK'S LENGTH IN WEEKS (`plans.duration_weeks`) — the recency window for the
+   * derived heavy gate's reference max (ruled 2026-08-28). Absent → `defaultBlockWeeks`.
+   * ⚠️ It is the BLOCK's number, never a constant chosen at the read site: an athlete on an 8- or
+   * 16-week block gets their own window, which is the whole point of the ruling.
+   */
+  blockDurationWeeks?: number | null;
   /** ⛔ The block's expected curve per canonical lift — dated weekly points, anchored on the block's
    *  opening working number at the plan's own rate. Built by the caller; carried, never computed. */
   expectedByCanonical?: Record<string, Array<{ date: string; value: number }>> | null;
@@ -566,6 +632,13 @@ export interface StateTrendResult {
   namedSessions?: NamedSessionSeries[] | null;
   /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
   enduranceSpine?: EnduranceSpineSeries[] | null;
+  /**
+   * ⛔ THE ACTIVE BLOCK'S LENGTH IN WEEKS (`plans.duration_weeks`) — the recency window for the
+   * derived heavy gate's reference max (ruled 2026-08-28). Absent → `defaultBlockWeeks`.
+   * ⚠️ It is the BLOCK's number, never a constant chosen at the read site: an athlete on an 8- or
+   * 16-week block gets their own window, which is the whole point of the ruling.
+   */
+  blockDurationWeeks?: number | null;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -920,15 +993,41 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
    * default still holds. That is the new athlete's state and it is counted and logged below rather
    * than failing in silence, which is what this item explicitly asked for.
    */
-  const refMaxByCanonical: Record<string, number> = {};
-  for (const [k, v] of Object.entries(inp.allTimeBestByLift ?? {})) {
-    const n = Number((v as { best?: number } | null)?.best);
-    if (Number.isFinite(n) && n > 0) refMaxByCanonical[k] = n;
-  }
+  /**
+   * ⛔⛔ THE WINDOW IS THE ATHLETE'S BLOCK LENGTH — RULED 2026-08-28, and it closes the "recent
+   * enough" hole this item shipped with.
+   *
+   * ⛔ PROVENANCE IS VIADA, NOT CONVENIENCE. Part H (p215): the pretest sets the max AT BLOCK START
+   * and the block's percentages are written from it; Part F records the agreement with Wendler —
+   * *"progress without retesting on fixed increments."* **A max is therefore a fact with a lifespan,
+   * and the lifespan is the block.** A number from two blocks ago was tested against a body that has
+   * since done a whole block of work.
+   * ⚠️ NO BLOCK → `STATE_TREND_WINDOWS.defaultBlockWeeks`, which is the app's OWN default block
+   * length (the generator falls back to it twice), not a number chosen here.
+   */
+  const refWindowWeeks = Number(inp.blockDurationWeeks) > 0
+    ? Number(inp.blockDurationWeeks)
+    : STATE_TREND_WINDOWS.defaultBlockWeeks;
+  const refSince = new Date(new Date(asOf + 'T12:00:00Z').getTime() - refWindowWeeks * 7 * 86_400_000)
+    .toISOString().slice(0, 10);
+  const refMaxByCanonical: Record<string, number> = {
+    // ⛔ WINDOWED, and read off the DATED log rather than the undated record — see
+    // `buildBestByLiftSince` for why that is a second accessor and not a change to the record.
+    ...buildBestByLiftSince(inp.exerciseRows, refSince),
+  };
   for (const [k, v] of Object.entries(inp.strengthBaselines ?? {})) {
     const n = Number(v);
-    // ⚠️ THE BASELINE WINS where both exist: a tested or declared 1RM is a measurement of the max,
-    // while the record is the best ESTIMATE off a working set. Different confidence, same question.
+    /**
+     * ⚠️ THE BASELINE WINS where both exist: a tested or declared 1RM is a measurement of the max,
+     * while the record is the best ESTIMATE off a working set. Different confidence, same question.
+     * ⚠️⚠️ AND IT IS NOT WINDOWED, BECAUSE IT CARRIES NO DATE. `buildStrengthBaselines` reads
+     * `user_baselines.performance_numbers` / `learned_fitness`, neither of which timestamps a value.
+     * ⛔ THAT IS THE REMAINING HOLE IN THIS RULING, AND IT IS NAMED RATHER THAN PAPERED OVER: a
+     * baseline the athlete typed in two years ago still counts as a current max. It is also the
+     * SMALLEST hole — a baseline is the number the athlete's own programme is written from, which is
+     * exactly what the pretest produces — but closing it needs a DATED strength baseline, which does
+     * not exist (the run's version of the same gap is Q-290).
+     */
     if (Number.isFinite(n) && n > 0) refMaxByCanonical[k] = n;
   }
   const liftSeries = liftSeriesFromExerciseLog(inp.exerciseRows, {
@@ -1341,6 +1440,13 @@ export interface StateDisplayV1 {
   namedSessions?: NamedSessionSeries[] | null;
   /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
   enduranceSpine?: EnduranceSpineSeries[] | null;
+  /**
+   * ⛔ THE ACTIVE BLOCK'S LENGTH IN WEEKS (`plans.duration_weeks`) — the recency window for the
+   * derived heavy gate's reference max (ruled 2026-08-28). Absent → `defaultBlockWeeks`.
+   * ⚠️ It is the BLOCK's number, never a constant chosen at the read site: an athlete on an 8- or
+   * 16-week block gets their own window, which is the whole point of the ruling.
+   */
+  blockDurationWeeks?: number | null;
 }
 
 export interface StateTrendsV1 {
