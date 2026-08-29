@@ -1,3 +1,4 @@
+import { calculateIntervalGapPace } from '../analysis/interval-gap.ts';
 import { calculatePaceRangeAdherence } from '../adherence/pace-adherence.ts';
 import { calculateIntervalHeartRate } from '../analysis/heart-rate.ts';
 import { calculateIntervalElevation } from '../analysis/elevation.ts';
@@ -350,6 +351,10 @@ export function generateIntervalBreakdown(
         ? null // Use range instead
         : (plannedPace > 0 ? Math.round(plannedPace / 60 * 100) / 100 : 0),
       actual_pace_min_per_mi: paceValid ? Math.round(actualPace / 60 * 100) / 100 : 0,
+      // ⛔ THE SEGMENT'S GRADE-ADJUSTED PACE (2026-08-29) — Strava prints it on every split of a
+      // hilly run and lets the athlete swap the column. `null` on a flat or too-short segment, and
+      // the row keeps raw pace: never a raw number wearing the adjusted label.
+      gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], interval.sample_idx_start, interval.sample_idx_end),
       // Canonical pace fields for frontend (no math required)
       pace_s_per_mi: paceValid ? Math.round(actualPace) : null,
       pace_display: paceValid ? formatPaceDisplay(actualPace) : '—',
@@ -681,6 +686,7 @@ export function generateIntervalBreakdown(
             ? null // Use range instead
             : (warmupInterval.planned?.target_pace_s_per_mi || 0) / 60,
           actual_pace_min_per_mi: warmupActualPace > 0 ? Math.round(warmupActualPace / 60 * 100) / 100 : 0,
+          gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end),
           pace_adherence_percent: Math.round(warmupPaceAdherence),
           performance_score: Math.round(warmupPerformanceScore),
           avg_heart_rate_bpm: warmupHR.avg_heart_rate_bpm,
@@ -779,6 +785,7 @@ export function generateIntervalBreakdown(
                      ? null // Use range instead
                      : (recoveryInterval.planned?.target_pace_s_per_mi || 0) / 60,
                    actual_pace_min_per_mi: recActualPace > 0 ? Math.round(recActualPace / 60 * 100) / 100 : 0,
+                   gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], recoveryInterval.sample_idx_start, recoveryInterval.sample_idx_end),
                    pace_adherence_percent: Math.round(recPaceAdherence),
                    performance_score: Math.round(recPerformanceScore),
                    avg_heart_rate_bpm: recHR.avg_heart_rate_bpm,
@@ -847,6 +854,7 @@ export function generateIntervalBreakdown(
                      ? null // Use range instead
                      : (cooldownInterval.planned?.target_pace_s_per_mi || 0) / 60,
                    actual_pace_min_per_mi: cooldownActualPace > 0 ? Math.round(cooldownActualPace / 60 * 100) / 100 : 0,
+                   gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end),
                    pace_adherence_percent: Math.round(cooldownPaceAdherence),
                    performance_score: Math.round(cooldownPerformanceScore),
                    avg_heart_rate_bpm: cooldownHR.avg_heart_rate_bpm,

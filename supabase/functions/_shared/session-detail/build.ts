@@ -542,7 +542,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           distance_m: fin(iv?.actual_distance_m) ?? fin(sr?.executed?.distance_m),
           avg_hr: fin(iv?.avg_heart_rate_bpm) ?? fin(sr?.executed?.avg_hr),
           actual_pace_sec_per_mi: paceSec,
-          actual_gap_sec_per_mi: null,
+          // ⛔ THE SEGMENT'S ADJUSTED PACE, CARRIED (2026-08-29). This was hard-null since the field
+          // existed: the analyzer had no per-segment number to give it. It does now
+          // (`interval-gap.ts`), so the table can offer the Strava swap between raw and adjusted.
+          actual_gap_sec_per_mi: fin(iv?.gap_pace_s_per_mi) ?? fin(sr?.executed?.gap_pace_s_per_mi) ?? null,
           power_watts: fin(iv?.avg_power_watts) ?? null,
         },
         // D-089: for cycling, fall back to power_adherence_percent so the
@@ -598,7 +601,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           distance_m: fin(ex.distance_m),
           avg_hr: fin(ex.avg_hr),
           actual_pace_sec_per_mi: paceS,
-          actual_gap_sec_per_mi: null,
+          // ⚠️ The session_state_v1 path carries whatever the analyzer put on the row; absent stays null.
+          actual_gap_sec_per_mi: fin((ex as any).gap_pace_s_per_mi) ?? null,
           power_watts: fin(ex.power_watts) ?? null,
         },
         pace_adherence_pct: judgedOnIntensity ? null : fin(r.adherence_pct),
@@ -807,6 +811,38 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         weatherTempStartF ?? null,
         weatherTempEndF ?? null,
       );
+
+  /**
+   * ⛔ GRADE-ADJUSTED PACE REACHES THE SCREEN (2026-08-29, Michael: *"should be added"*).
+   *
+   * ⚠️ IT WAS COMPUTED, USED AND NEVER SHOWN. The adjustment drives the efficiency trend, the drift
+   * basis and — through `enrichSamplesWithGAP` in `granular-pace.ts` — the per-rep adherence badges
+   * themselves, so the app has been GRADING him on grade-adjusted pace while printing only raw. The
+   * number was already resolved onto `completed_totals.avg_gap_s_per_mi` and no surface read it.
+   *
+   * ⛔ FIELD STANDARD: Strava prints GAP on every run; TrainingPeaks' efficiency read is normalized
+   * GRADED pace over heart rate. Showing it is the convention, not an addition to it.
+   *
+   * ⚠️ ONLY WHEN IT SAYS SOMETHING. A flat run's adjusted pace equals its raw pace, and printing two
+   * identical numbers side by side teaches the athlete that the row is noise. The gate is 5 s/mi —
+   * the same floor `formatCyclingPacingRow`'s neighbours use for "a difference a reader can act on".
+   * ⛔ RUN ONLY. Grade adjustment is a running construct; a ride's answer is power.
+   * ⚠️ APPENDED AT THE CALL SITE ON PURPOSE — `buildAnalysisDetailRows` takes POSITIONAL arguments
+   * and its own header records a row VANISHING because two params were added to the wrong function.
+   */
+  if (type === 'run') {
+    const rawPace = fin(completedTotals.avg_pace_s_per_mi);
+    const gapPace = fin(completedTotals.avg_gap_s_per_mi);
+    if (rawPace != null && gapPace != null && rawPace > 0 && gapPace > 0 && Math.abs(gapPace - rawPace) >= 5) {
+      const fmt = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}/mi`;
+      analysisDetailRows.push({
+        label: 'Grade-adjusted pace',
+        // ⛔ BOTH NUMBERS, AND THE RAW ONE IS NAMED. The table above prints raw pace per segment; a
+        // lone adjusted figure here would read as a correction to it rather than a second view of it.
+        value: `${fmt(gapPace)} — the hills cost you ${Math.round(Math.abs(rawPace - gapPace))}s/mi against your raw ${fmt(rawPace)}`,
+      });
+    }
+  }
 
   // ── Adherence narrative ────────────────────────────────────────────────────
   const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)

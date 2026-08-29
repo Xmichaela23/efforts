@@ -100,6 +100,15 @@ export default function EnduranceIntervalTable({
   swimExtras = null,
 }: EnduranceIntervalTableProps) {
   const [showAllIntervals, setShowAllIntervals] = useState(false);
+  /**
+   * ⛔ THE PACE COLUMN SWAPS BETWEEN RAW AND GRADE-ADJUSTED (2026-08-29) — Strava's own answer, and
+   * the reason it is a SWAP rather than a second column: on a phone two pace columns fight for the
+   * width the segment name needs, and the athlete only ever wants one of them at a time.
+   * ⚠️ RAW IS THE DEFAULT. The adjusted number is the interpretation; the athlete's own watch says
+   * the raw one, and a screen that opens on the adjusted figure looks like it is disagreeing with
+   * the device.
+   */
+  const [showGapPace, setShowGapPace] = useState(false);
 
   const sportType = String(sd?.type || '').toLowerCase();
   const isRide = /ride|bike|cycling/.test(sportType);
@@ -130,6 +139,15 @@ export default function EnduranceIntervalTable({
   const leftColHeader = hasPlanned ? 'Planned' : 'Segments';
 
   // useMemo MUST be called before any early returns (React hooks rules)
+  /** ⛔ Does ANY segment carry an adjusted number? The toggle is hidden otherwise — see the header. */
+  const anySegmentHasGap = useMemo(
+    () => allIntervals.some((iv) => {
+      const g = iv.executed.actual_gap_sec_per_mi;
+      return g != null && Number.isFinite(g) && g > 0;
+    }),
+    [allIntervals],
+  );
+
   const visibleIntervals = useMemo(() => {
     if (showAllIntervals) return allIntervals;
     if (!isEasyLike || allIntervals.length <= 2) return allIntervals;
@@ -247,7 +265,21 @@ export default function EnduranceIntervalTable({
               </div>
             </th>
             <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">
-              {isRide ? 'Watts' : (isSwim ? '/100 (pref)' : 'Pace')}
+              {/* ⛔ THE TOGGLE ONLY EXISTS WHERE THE NUMBER DOES. A flat run, a short session or a
+                  file with no elevation produces no adjusted pace on any segment, and a control that
+                  swaps a column to a row of dashes is worse than no control. */}
+              {!isRide && !isSwim && anySegmentHasGap ? (
+                <button
+                  type="button"
+                  onClick={() => setShowGapPace((v) => !v)}
+                  className="readout-label font-medium whitespace-nowrap underline decoration-white/25 underline-offset-4 hover:decoration-white/60"
+                  title={showGapPace ? 'Showing grade-adjusted pace — tap for raw' : 'Showing raw pace — tap for grade-adjusted'}
+                >
+                  {showGapPace ? 'GAP' : 'Pace'}
+                </button>
+              ) : (
+                isRide ? 'Watts' : (isSwim ? '/100 (pref)' : 'Pace')
+              )}
             </th>
             <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">Dist</th>
             <th className="readout-label px-2 py-2 text-left font-medium whitespace-nowrap">Time</th>
@@ -256,9 +288,15 @@ export default function EnduranceIntervalTable({
         </thead>
         <tbody>
           {visibleIntervals.map((iv, idx) => {
+            // ⚠️ A SEGMENT WITH NO ADJUSTED NUMBER KEEPS ITS RAW ONE while the toggle is on — a rep
+            // too short to grade honestly still ran at a pace, and blanking it would read as missing
+            // data rather than as an unadjustable segment.
+            const paceCellSec = showGapPace
+              ? (iv.executed.actual_gap_sec_per_mi ?? iv.executed.actual_pace_sec_per_mi)
+              : iv.executed.actual_pace_sec_per_mi;
             const execCell = isRide
               ? (iv.executed.power_watts != null ? `${Math.round(iv.executed.power_watts)} W` : '—')
-              : fmtPaceSec(iv.executed.actual_pace_sec_per_mi);
+              : fmtPaceSec(paceCellSec);
             const distStr = fmtDist(iv.executed.distance_m, isSwim, useImperial);
             const durStr = iv.executed.duration_s != null && iv.executed.duration_s > 0
               ? fmtTime(iv.executed.duration_s) : '—';
