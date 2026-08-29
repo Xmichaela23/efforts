@@ -79,11 +79,38 @@ rule at all today.**
 
 ### 1c. When the weight moves
 
+⛔⛔ **p123 IS THE RULE THE ENGINE RUNS ON. p112 IS THE PRINCIPLE BEHIND IT.** He states the strength
+case as a **count**, not a feeling, and he names the mechanism:
+
+> *"As the weeks progress, athletes may rotate through the **"circle of maxes,"** varying repetition
+> ranges and using their expected performance on each as a baseline. **If an athlete repeatedly
+> succeeds at these lifts or outperforms**, the coach may, **after a period of time**, raise their
+> theoretical 1-rep max and base the next few training microcycles/training weeks on this new max."*
+> — p123
+
+⛔ **"REPEATEDLY SUCCEEDS AT THESE LIFTS OR OUTPERFORMS" IS COUNTABLE OFF LOGGED SETS.** Hit the
+prescribed rep target at the prescribed weight, repeatedly, and the number underneath goes up. **No
+RPE reading is required for the bar**, and none should be invented — see §6.3.
+
+⚠️ **"THE CIRCLE OF MAXES" (p123) IS ALMOST CERTAINLY "THE CIRCLE OF REPS" (p112, p247)** — the same
+mechanism, 124 pages apart, one of them naming reps and one naming maxes. ⛔ **Reported, not
+relabelled** — Part B4b flags the identification as Michael's call, not the corpus's. **It does not
+block the build: p123's mechanism stands on its own page regardless of what the other phrase meant.**
+
+⛔ **AND THE INSTRUMENT ALREADY EXISTS — IT IS THE ONE PIECE OF WENDLER WORTH KEEPING.** The heavy
+day ends in an all-out set (p218 gives ME **no RIR target**, so the set runs to a clean-rep count).
+That AMRAP is Wendler's *measuring device*, not his loading scheme, and it is exactly what makes
+p123's rule readable. ⚠️ **It survives the extraction (§3) and must not be archived with the loading
+module.**
+
 | Rule | Page |
 |---|---|
-| Raise on **lower RPE than intended**, or **consistently superior performance *at* the target RPE** | p112 |
+| ⛔ **Raise when the athlete repeatedly succeeds at the prescribed lifts or outperforms** — the countable form | **p123** |
+| The principle behind it: raise on **lower RPE than intended**, or **consistently superior performance *at* the target RPE** | p112 |
 | **Lower it** if you fail to achieve targets at any point | p112 |
 | A load holds for **several weeks at a time** with minor session-to-session adjustment | p112 |
+| The raise comes *"after a period of time"* — ⚠️ **unquantified for strength on p123**; §1c's rate table supplies the number | p123 |
+| ⚠️ The **endurance** twin uses three signals — lower HR at completion, **lower reported RPE**, reducing rest on self-led work — **after six weeks**, and it moves the *target* (threshold pace), not the volume | p123 |
 | The max moves **"up a pound or two"** — after the rotation, not on a schedule | p112 |
 | **~1% every 3 weeks** (*"every 3 to 4 weeks, assume 1 percent every 3 weeks as a starting point"*) | p245, p247 |
 | *"1% every four weeks or so"* — same band, different emphasis | p251 |
@@ -202,14 +229,18 @@ Stage 4 needs.
 
 ### STAGE 4 — PROGRESSION ON EVIDENCE.
 
-**Build §1c literally.**
-- Raise when targets are met at **lower effort than prescribed**, or beaten **at** the target effort.
-- **Lower when targets are missed.** Both directions, or it is not his rule.
+**Build §1c literally — and §1c's rule is p123's, which is a COUNT.**
+- ⛔ **Raise on repeated success at the prescribed rep target, or outperformance of it** (p123), read
+  off the heavy day's all-out set. **Not off a feel reading.**
+- **Lower when targets are missed** (p112). Both directions, or it is not his rule.
+- ⚠️ **"Repeatedly" and "after a period of time" are unquantified on p123.** The rate table (§1c)
+  supplies the cadence; **how many consecutive successes count as "repeatedly" is OURS** — see §6.4.
 - Rate: **~1% every 3 weeks**, unrounded on the ledger.
 - ⛔ **The max is a ledger, not a plate.** It drifts by ~2 lb; the bar steps 5 lb only when accumulated
   drift crosses a boundary. Arithmetic, never a scheduled jump.
-- ⚠️ **RPE vs RIR:** p112 says RPE, p218 prescribes RIR, and ME has no RIR target. **The mapping
-  between them is OURS** (§6) — do not convert silently.
+- ⚠️ **RPE vs RIR:** p112 says RPE, p218 prescribes RIR, and ME has no RIR target. ⛔ **p123 removes
+  the need for a bridge on the BAR** — the strength trigger is a rep count. **Any RPE↔RIR mapping is
+  still OURS** (§6.3) and is only needed if a surface chooses to show effort, never to move weight.
 
 **Then §1d, the haircut:** lower-body working max opens **3–4% down** and climbs at **2% every three
 weeks for the first nine weeks**, conditional on progression holding.
@@ -255,9 +286,14 @@ not a cap. ⚠️ **This is why the deadlift card behaves differently from the o
 against p214/p215, and if the cap survives it survives as **OURS**, labelled, not as a Wendler
 inheritance.
 
-**Order:** resolve all six outside sites → confirm zero non-test imports remain → **then** move
-`shared/strength-system/loading/` (and whatever else is Wendler-only) to `archive/`. **Nothing is
-deleted; nothing points at it.**
+⛔⛔ **DO NOT ARCHIVE THE ALL-OUT SET WITH THE LOADING MODULE.** The heavy day's max-rep set is
+Wendler's *measuring device*, and it is the instrument p123's progression rule is read from (§1c).
+**Wendler's loading goes; Wendler's instrument stays**, re-homed on the Viada side before anything
+moves. `_shared/strength/all-out-set.ts` is the file this concerns.
+
+**Order:** resolve all six outside sites → re-home the all-out set on the Viada side → confirm zero
+non-test imports remain → **then** move `shared/strength-system/loading/` (and whatever else is
+Wendler-only) to `archive/`. **Nothing is deleted; nothing points at it.**
 
 ---
 
@@ -303,6 +339,10 @@ not ship.**
    **Nothing in the book answers this.**
 3. **The RPE↔RIR mapping.** p112 gates progression on RPE; p218 prescribes RIR and gives ME no RIR
    target at all. Any bridge between them is ours.
+
+4. **How many consecutive successes count as *"repeatedly"*.** p123 gives the rule and not the
+   count; p245 gives the mirror image for the deload trigger (**ME lifts underperform 2 weeks in a
+   row**). ⚠️ **Symmetry with p245's two is the defensible choice and it is still ours** — label it.
 
 ⚠️ **And one that may become ours:** `trustedMaxRepsFor`'s per-lift rep ceiling (§3).
 
