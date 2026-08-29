@@ -314,6 +314,21 @@ function SpineCard({ series }: { series: SpineSeries }) {
       )}
       {eff.length >= 2 && <DatedChart points={eff} color={color} />}
 
+      {/**
+        * ⛔ HOW TO READ IT, ON THE CARD (2026-08-29, Michael). The number alone invited exactly the
+        * comparison TrainingPeaks warns against — this session against the one before — so the card
+        * now says what to watch instead. Their own instruction: compare similar sessions across
+        * several weeks; a rising line means the aerobic base is improving.
+        * ⚠️ ONLY WHERE THERE IS A LINE TO WATCH. On a single reading this sentence would be telling
+        * the athlete to read a trend that does not exist yet.
+        */}
+      {eff.length >= 2 && (
+        <div className="text-[11px] text-white/35 mt-1">
+          one session doesn't tell you much — a hot day or a hilly route moves this more than your
+          fitness does. watch the line over a few weeks.
+        </div>
+      )}
+
       {/* ── FADE, AND THE CASE WHERE THERE DELIBERATELY IS NONE. ── */}
       {latest.driftPct != null ? (
         <div className="text-[12px] text-white/50 mt-2">
