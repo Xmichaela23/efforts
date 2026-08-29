@@ -1567,111 +1567,13 @@ export default function StateTab({
           ⚠️ AND THAT SECTION READS `useExerciseLog` DIRECTLY — a client query, so it is already an
           exception to smart-server/dumb-client. This work did not widen it: every number on these
           cards is server-decided. Not fixed here. */}
-      {(() => {
-        const meHistory = (wsv as { me_history_v1?: React.ComponentProps<typeof StrengthReadCards>['meHistory'] }).me_history_v1;
-        const namedSessions = (wsv.trends?.display as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | undefined)?.namedSessions ?? null;
-        // ⛔ THE ATHLETE-SCOPED SPINE (2026-08-28, item 3 / Q-294). Every run and ride, grouped by
-        // session type, NO PLAN REQUIRED — the primary endurance read. `namedSessions` above is the
-        // overlay that appears when a block exists, and it is drawn after this.
-        const enduranceSpine = (wsv.trends?.display as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | undefined)?.enduranceSpine ?? null;
-        // ⛔ VIADA'S TWO LIFTING DOSES OVER THE LOGGED WEEK (2026-08-29). Resolved server-side and
-        // rendered verbatim; absent when nothing was lifted in the window.
-        const viadaWeek = (wsv.trends?.display as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | undefined)?.viadaWeek ?? null;
-        // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
-        // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
-        // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
-        // section on the lift half would hide it for the block's whole first week.
-        // ⛔ ANY OF THE THREE IS ENOUGH. The spine was added to this test on 2026-08-28: an athlete
-        // with no block at all still has runs, and gating the section on a plan-linked series is the
-        // exact precondition item 3 removed.
-        // ⚠️ AND THE WEEK'S DOSE IS A FOURTH WAY IN. An athlete who lifted this week has something to
-        // read even with no heavy session, no named session and no run in the window.
-        if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0) && !viadaWeek) return null;
-        const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
-        const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
-        /**
-         * ⛔⛔ THE FIELD IS `canonical`, NOT `canonical_name` (2026-08-29) — and reading the wrong one
-         * cost nothing visible, which is why it survived. `per_lift` entries carry `canonical`;
-         * `exercise_log` rows carry `canonical_name`, and this loop was written against the second
-         * while reading the first. Every entry failed the guard, the map came out EMPTY, and the
-         * charts simply did not render — no error, no warning, no blank card. Four of this athlete's
-         * lifts had a series sitting in the payload the whole time.
-         * ⚠️ THE PATTERN THIS CODEBASE KEEPS REPEATING: a field resolved upstream and rebuilt by name
-         * downstream. `slot_intent` was dropped at three separate narrow points the same way.
-         * ⚠️ BOTH NAMES ARE ACCEPTED so a payload written before this cannot go dark again.
-         */
-        /**
-         * ⛔⛔ TWO DIFFERENT `per_lift` OBJECTS, AND THIS READ THE ONE WITHOUT THE CHART.
-         *
-         * `response_model.strength.per_lift` (the coach's) carries the VERDICT row — rir_trend,
-         * suggested_weight, e1rm_delta_pct, keyed `canonical_name`. It has no `series` and never has.
-         * `state_trends_v1.strength.per_lift` (the snapshot's) carries the CHART — `series`,
-         * `expected`, `bestE1rm` — keyed `canonical`. Same name, same subject, different payloads.
-         * The chart source is checked first; the coach's row stays as the fallback so nothing that
-         * used to render can stop.
-         * ⚠️ THIRD TIME THIS SHAPE HAS BITTEN: a field resolved upstream and looked up by the wrong
-         * name downstream fails SILENTLY — empty map, no chart, no error.
-         */
-        const trendPerLift = ((wsv.trends as any)?.strength?.per_lift ?? []) as Array<any>;
-        const modelPerLift = (rm?.strength?.per_lift ?? []) as Array<any>;
-        const perLiftRows = trendPerLift.length > 0 ? trendPerLift : modelPerLift;
-        for (const l of perLiftRows as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
-          const key = l?.canonical ?? l?.canonical_name;
-          if (!key) continue;
-          if (Array.isArray(l.series)) seriesByCanonical[key] = l.series;
-          if (Array.isArray(l.expected)) expectedByCanonical[key] = l.expected;
-        }
-        // The cards' own predicate, so the header above them cannot disagree with them.
-        // ⚠️ The header follows the CARDS, and a card can now come from the series alone (2026-08-29),
-        // so the count has to include those or the header disappears exactly when the charts arrive.
-        const liftCardCount = strengthReadCards({
-          history: meHistory?.history,
-          lastReps: meHistory?.last_reps,
-          atWeight: meHistory?.at_weight,
-        }).length + Object.values(seriesByCanonical).filter((pts) => (pts?.length ?? 0) >= 2).length;
-        const cards = (
-          <StrengthReadCards
-            meHistory={meHistory ?? null}
-            seriesByCanonical={seriesByCanonical}
-            expectedByCanonical={expectedByCanonical}
-          />
-        );
-        return (
-          <>
-            {/* ⛔ THE HEADER BELONGS TO THE LIFT CARDS AND NOTHING ELSE (2026-08-29, Michael: it sat
-                above easy runs, quality runs, rides and the week's lifting, none of which are about
-                a bar). It moves inside, directly over the cards it describes, and renders only when
-                there are cards to describe. */}
-            <div
-              className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
-              style={readoutPlateStyle(undefined, { galaxy: true })}
-            >
-              {/* ⚠️ GATED ON THE CARDS EXISTING, NOT ON THE HISTORY EXISTING (2026-08-29, second cut).
-                  `me_history_v1` is present as soon as any heavy session is on file, but the cards
-                  render off `strengthReadCards`, which returns nothing until a lift has a heavy day
-                  IN THIS BLOCK — week 1 is the two tests. So the header still drew, alone, above the
-                  runs. Same predicate the cards use, asked once here. */}
-              {liftCardCount > 0 && (
-                <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
-              )}
-              {cards}
-              {/* ⛔ THE ENDURANCE CARDS SIT ON THE SAME PLATE, LAST — one per sport. They answer the
-                  same question in the other disciplines (is the same work getting cheaper) and the
-                  block is one thing, not three screens. ⚠️ They render independently of the lift
-                  cards: week 1 of every block is the two strength tests, so a week where the runs
-                  and rides are logged and no heavy session is yet shows these alone, which is the
-                  honest state. */}
-              <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} />
-              {/* ⛔ THE WEEK'S DOSE LAST — the lift cards answer "is the bar going up", this answers
-                  "did the week buy what his page asks for". Different question, same plate. */}
-              <ViadaWeekCard week={viadaWeek} />
-            </div>
-          </>
-        );
-      })()}
 
       {/* Section clock label: LOAD + BODY are the FAST clock (how the last 7 days feel vs typical).
           Named once here; per-row specifics (WTD pts, RPE receipt) inherit it. */}
+      {/* ⛔ THE WEEK'S LIFTING BELONGS TO THE WEEK (2026-08-29). It was sitting on the trends plate
+          below, so the screen carried TWO "this week" reads with thirteen weeks of charts wedged
+          between them. Hoisted here so the load plate holds one clock: what the last seven days
+          were, in every unit the app has for them. */}
       <div className="px-1 mb-1 text-[12px] text-white/50 lowercase">load · rolling last 7 days vs your typical week</div>
 
       {/* READOUT PLATES (2026-08-15) — State wears the workout Details tab's card language
@@ -1874,7 +1776,123 @@ export default function StateTab({
           );
         })()}
 
+        {/* ⛔ WHAT THE WEEK BOUGHT EACH MUSCLE — the same seven days the rows above measure, in
+            Viada's own units. Moved here from the trends plate (2026-08-29): sets and effective reps
+            per muscle are a WEEK's fact, not a trend, and it read as an orphan under thirteen weeks
+            of charts. */}
+        <ViadaWeekCard week={(wsv.trends?.display as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | undefined)?.viadaWeek ?? null} />
+
       </div>
+
+      <div className="px-1 mb-1 mt-3 text-[12px] text-white/50 lowercase">trends · the arc behind this week</div>
+
+      {/* ⛔ ORDER: WHAT IS TRUE NOW, THEN WHAT IS TRENDING (2026-08-29, Michael: *"shouldn't
+          ACWR be at the top?"*). It is the field's order and it was inverted here: TrainingPeaks
+          opens on fitness / fatigue / form, Intervals.icu the same, Whoop on today's recovery.
+          This screen opened on a 13-week efficiency chart — a trend — on a screen called State.
+          The load plate above is the NOW; everything below it is the arc behind it. */}
+      {(() => {
+        const meHistory = (wsv as { me_history_v1?: React.ComponentProps<typeof StrengthReadCards>['meHistory'] }).me_history_v1;
+        const namedSessions = (wsv.trends?.display as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | undefined)?.namedSessions ?? null;
+        // ⛔ THE ATHLETE-SCOPED SPINE (2026-08-28, item 3 / Q-294). Every run and ride, grouped by
+        // session type, NO PLAN REQUIRED — the primary endurance read. `namedSessions` above is the
+        // overlay that appears when a block exists, and it is drawn after this.
+        const enduranceSpine = (wsv.trends?.display as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | undefined)?.enduranceSpine ?? null;
+        // ⛔ VIADA'S TWO LIFTING DOSES OVER THE LOGGED WEEK (2026-08-29). Resolved server-side and
+        // rendered verbatim; absent when nothing was lifted in the window.
+        const viadaWeek = (wsv.trends?.display as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | undefined)?.viadaWeek ?? null;
+        // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
+        // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
+        // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
+        // section on the lift half would hide it for the block's whole first week.
+        // ⛔ ANY OF THE THREE IS ENOUGH. The spine was added to this test on 2026-08-28: an athlete
+        // with no block at all still has runs, and gating the section on a plan-linked series is the
+        // exact precondition item 3 removed.
+        // ⚠️ AND THE WEEK'S DOSE IS A FOURTH WAY IN. An athlete who lifted this week has something to
+        // read even with no heavy session, no named session and no run in the window.
+        if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0) && !viadaWeek) return null;
+        const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
+        const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
+        /**
+         * ⛔⛔ THE FIELD IS `canonical`, NOT `canonical_name` (2026-08-29) — and reading the wrong one
+         * cost nothing visible, which is why it survived. `per_lift` entries carry `canonical`;
+         * `exercise_log` rows carry `canonical_name`, and this loop was written against the second
+         * while reading the first. Every entry failed the guard, the map came out EMPTY, and the
+         * charts simply did not render — no error, no warning, no blank card. Four of this athlete's
+         * lifts had a series sitting in the payload the whole time.
+         * ⚠️ THE PATTERN THIS CODEBASE KEEPS REPEATING: a field resolved upstream and rebuilt by name
+         * downstream. `slot_intent` was dropped at three separate narrow points the same way.
+         * ⚠️ BOTH NAMES ARE ACCEPTED so a payload written before this cannot go dark again.
+         */
+        /**
+         * ⛔⛔ TWO DIFFERENT `per_lift` OBJECTS, AND THIS READ THE ONE WITHOUT THE CHART.
+         *
+         * `response_model.strength.per_lift` (the coach's) carries the VERDICT row — rir_trend,
+         * suggested_weight, e1rm_delta_pct, keyed `canonical_name`. It has no `series` and never has.
+         * `state_trends_v1.strength.per_lift` (the snapshot's) carries the CHART — `series`,
+         * `expected`, `bestE1rm` — keyed `canonical`. Same name, same subject, different payloads.
+         * The chart source is checked first; the coach's row stays as the fallback so nothing that
+         * used to render can stop.
+         * ⚠️ THIRD TIME THIS SHAPE HAS BITTEN: a field resolved upstream and looked up by the wrong
+         * name downstream fails SILENTLY — empty map, no chart, no error.
+         */
+        const trendPerLift = ((wsv.trends as any)?.strength?.per_lift ?? []) as Array<any>;
+        const modelPerLift = (rm?.strength?.per_lift ?? []) as Array<any>;
+        const perLiftRows = trendPerLift.length > 0 ? trendPerLift : modelPerLift;
+        for (const l of perLiftRows as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
+          const key = l?.canonical ?? l?.canonical_name;
+          if (!key) continue;
+          if (Array.isArray(l.series)) seriesByCanonical[key] = l.series;
+          if (Array.isArray(l.expected)) expectedByCanonical[key] = l.expected;
+        }
+        // The cards' own predicate, so the header above them cannot disagree with them.
+        // ⚠️ The header follows the CARDS, and a card can now come from the series alone (2026-08-29),
+        // so the count has to include those or the header disappears exactly when the charts arrive.
+        const liftCardCount = strengthReadCards({
+          history: meHistory?.history,
+          lastReps: meHistory?.last_reps,
+          atWeight: meHistory?.at_weight,
+        }).length + Object.values(seriesByCanonical).filter((pts) => (pts?.length ?? 0) >= 2).length;
+        const cards = (
+          <StrengthReadCards
+            meHistory={meHistory ?? null}
+            seriesByCanonical={seriesByCanonical}
+            expectedByCanonical={expectedByCanonical}
+          />
+        );
+        return (
+          <>
+            {/* ⛔ THE HEADER BELONGS TO THE LIFT CARDS AND NOTHING ELSE (2026-08-29, Michael: it sat
+                above easy runs, quality runs, rides and the week's lifting, none of which are about
+                a bar). It moves inside, directly over the cards it describes, and renders only when
+                there are cards to describe. */}
+            <div
+              className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
+              style={readoutPlateStyle(undefined, { galaxy: true })}
+            >
+              {/* ⚠️ GATED ON THE CARDS EXISTING, NOT ON THE HISTORY EXISTING (2026-08-29, second cut).
+                  `me_history_v1` is present as soon as any heavy session is on file, but the cards
+                  render off `strengthReadCards`, which returns nothing until a lift has a heavy day
+                  IN THIS BLOCK — week 1 is the two tests. So the header still drew, alone, above the
+                  runs. Same predicate the cards use, asked once here. */}
+              {liftCardCount > 0 && (
+                <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
+              )}
+              {cards}
+              {/* ⛔ THE ENDURANCE CARDS SIT ON THE SAME PLATE, LAST — one per sport. They answer the
+                  same question in the other disciplines (is the same work getting cheaper) and the
+                  block is one thing, not three screens. ⚠️ They render independently of the lift
+                  cards: week 1 of every block is the two strength tests, so a week where the runs
+                  and rides are logged and no heavy session is yet shows these alone, which is the
+                  honest state. */}
+              <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} />
+              {/* ⚠️ THE WEEK'S DOSE MOVED TO THE LOAD PLATE (2026-08-29) — it is a week's fact and
+                  belongs with the other week facts. `viadaWeek` is still read here because the
+                  section's render gate counts it as substance. */}
+            </div>
+          </>
+        );
+      })()}
 
       {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
       {/* ⛔ `block` is the block-identity card the coach payload has carried since v150 — protocol,
