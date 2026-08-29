@@ -347,6 +347,13 @@ being a reference max. ⚠️ **That is the correct behaviour and it is also a r
 screen shows** — it is the honest end of the ruling ("a max has a lifespan"), not a gap in it, and it
 resolves the moment the athlete confirms or retypes the number. **It must not be discovered as a bug.**
 
+⛔⛔ **THE ONBOARDING CASE, NAMED SO IT IS NOT REDISCOVERED AS A BUG: an athlete whose only maxes are
+typed and undated, with no logged sets in the window, gets NO STRENGTH LINE AT ALL when off-plan** —
+neither door can open, so nothing mints. ⚠️ **It is narrow**: the plan-stamped door covers anyone on a
+generated plan, and it self-resolves the moment they log a couple of sessions, because the reference
+max is then derived from their own log. **But it is a real empty screen for a brand-new off-plan
+athlete, and it will look broken to whoever meets it first.**
+
 ⚠️ **AND THE REPO ALREADY HAS THE PER-COLUMN PRECEDENT:** `materialize-plan:3543` writes
 `effort_paces` **with its own `effort_updated_at`** beside it. A column with its own stamp is an
 established pattern here, not a new idea.
