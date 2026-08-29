@@ -11,17 +11,39 @@ import { estimate1RM, estimate1RMRounded, effectiveRepsForReserve, isRepRecord, 
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-Deno.test('the book\'s own worked examples reproduce exactly (p32)', () => {
-  // ⚠️ WENDLER TRUNCATES, HE DOES NOT ROUND — and both printed examples prove it:
-  //   "255 x 8 x .0333 + 255 = 322"   → the arithmetic gives 322.932, and he writes 322.
-  //   "270 x 6 x .0333 + 270 = 323"   → the arithmetic gives 323.946, and he writes 323.
-  // Checked against the 2nd edition PDF, not from memory. We keep our own rounding (nearest 5 lb,
-  // how plates load) — this test pins the FORMULA, and asserts the raw value floors to his printed one.
-  assertEquals(Math.floor(estimate1RM(255, 8)), 322);
-  assertEquals(Math.floor(estimate1RM(270, 6)), 323);
-  // ⛔ THE POINT OF THAT EXAMPLE: 270x6 beats 255x8 by one pound. This is what the estimate is FOR —
-  // comparing sets at different weights. Wendler uses it for nothing else.
-  assertEquals(estimate1RM(270, 6) > estimate1RM(255, 8), true);
+Deno.test('⛔ VIADA p215: Epley and Brzycki, AVERAGED — the two are between the halves', () => {
+  /**
+   * ⚠️ THIS TEST PINNED WENDLER'S p32 EXAMPLES UNTIL 2026-08-29 and is rewritten, not deleted, so the
+   * source change is visible. Michael: *"wendler is a ghost in the machine, use viada's math."*
+   * p215: the set's load and reps go through BOTH equations and the two are AVERAGED, because they
+   * diverge as the rep count changes.
+   */
+  const epley = (w: number, r: number) => w * r * WENDLER_EPLEY_COEFF + w;
+  const brzycki = (w: number, r: number) => w * 36 / (37 - r);
+  for (const [w, r] of [[255, 8], [270, 6], [135, 10], [105, 5]] as Array<[number, number]>) {
+    const got = estimate1RM(w, r);
+    const lo = Math.min(epley(w, r), brzycki(w, r));
+    const hi = Math.max(epley(w, r), brzycki(w, r));
+    assertEquals(got >= lo && got <= hi, true, `${w}x${r}: ${got} outside [${lo}, ${hi}]`);
+    assertEquals(round(got), round((epley(w, r) + brzycki(w, r)) / 2));
+  }
+  /**
+   * ⛔⛔ AND WENDLER'S OWN WORKED POINT INVERTS UNDER THE AVERAGE — recorded, not hidden.
+   * p32 makes 270×6 (323.9) beat 255×8 (322.9) by a pound under Epley. Brzycki reads them the other
+   * way: 313.6 against 316.6. Averaged, 255×8 wins by one pound instead of losing by one.
+   * ⚠️ A ONE-POUND FLIP AT THE FOURTH SIGNIFICANT FIGURE IS THE DIVERGENCE VIADA IS DESCRIBING, not
+   * a defect in either equation — and it is invisible after the app's 5 lb rounding, which is the
+   * only form an athlete ever sees. Pinned so nobody "restores" the old assertion as a regression.
+   */
+  assertEquals(estimate1RMRounded(270, 6), estimate1RMRounded(255, 8));
+});
+
+Deno.test('⛔ BRZYCKI IS DROPPED PAST 30 REPS — a singularity is not a large number', () => {
+  // 36/(37 − r) runs to infinity at 37 and goes negative beyond. Above the guard the average falls
+  // back to Epley alone. ⚠️ Arithmetic only — whether a long set may set a record is `trustedMaxReps`.
+  const epley = (w: number, r: number) => w * r * WENDLER_EPLEY_COEFF + w;
+  assertEquals(estimate1RM(100, 31), epley(100, 31));
+  assertEquals(estimate1RM(100, 40) > 0, true);
 });
 
 Deno.test('Wendler\'s coefficient is Epley\'s 1/30 — but printed short, and a hair LOWER', () => {
@@ -45,12 +67,13 @@ Deno.test('a true single is itself — no equation adds pounds to one rep', () =
 
 Deno.test('the set that prompted this: 75 lb for 15', () => {
   // Michael, 2026-07-30, week 1 top set logged all-out at 15 reps.
-  assertEquals(estimate1RMRounded(75, 15), 110);
-  // ⚠️ The OLD Brzycki path returned 125 on the same set (75 × 36/22 = 122.7 → nearest 5). A 15 lb
-  // spread on one set, on the number that drives the working weights.
-  const oldBrzycki = Math.round((75 * (36 / (37 - 15))) / 5) * 5;
-  assertEquals(oldBrzycki, 125);
+  // ⚠️ UPDATED 2026-08-29 FOR VIADA'S AVERAGE. Epley alone returned 110; Brzycki alone 123; the
+  // average is 117.6 → 120 on the nearest five. THE ORIGINAL POINT IS UNCHANGED and is why he
+  // averages: at 15 reps the two equations are 13 lb apart on one set, and picking either is a
+  // choice about which way to be wrong.
+  assertEquals(estimate1RMRounded(75, 15), 120);
 });
+
 
 Deno.test('⛔ the crossover is exactly 10 reps — this is why the old note\'s reasoning inverted', () => {
   const brzycki = (w: number, r: number) => w * (36 / (37 - r));
@@ -84,7 +107,9 @@ Deno.test('reps-in-reserve is folded OUTSIDE the estimator, for the protocols th
   // estimator, and no reserve fold happens for a null RIR. Eight of twelve 5/3/1 weeks are sub-maximal;
   // this is the guarantee that a future protocol rename can never silently turn a reserve back on here.
   assertEquals(effectiveRepsForReserve(5, 0), 5);
-  assertEquals(estimate1RM(100, 5), 100 * 5 * WENDLER_EPLEY_COEFF + 100);
+  // ⚠️ The right-hand side is now the AVERAGE (Viada p215), not Epley alone — the guarantee being
+  // pinned is that no reserve reaches the estimator, which is unchanged by which equations it uses.
+  assertEquals(estimate1RM(100, 5), ((100 * 5 * WENDLER_EPLEY_COEFF + 100) + (100 * 36 / 32)) / 2);
 });
 
 Deno.test('garbage in stays zero, never NaN', () => {

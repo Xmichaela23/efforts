@@ -56,6 +56,13 @@
 export const WENDLER_EPLEY_COEFF = 0.0333;
 
 /**
+ * ⛔ WHERE BRZYCKI STOPS BEING ARITHMETIC. `36/(37 − reps)` climbs toward a singularity at 37 and is
+ * negative beyond it. 30 is the last rep count at which it still returns a finite, positive, sane
+ * multiplier (×6), so the average falls back to Epley alone above it.
+ */
+export const BRZYCKI_MAX_REPS = 30;
+
+/**
  * Estimated 1RM from a completed set — PURE: weight and the reps that go into the estimate, nothing else.
  *
  * ⛔ NO RIR HERE, EVER. Reps-in-reserve is a property of the PROTOCOL, not of this formula. A protocol
@@ -74,7 +81,44 @@ export function estimate1RM(weight: number, reps: number): number {
   const r = Math.max(1, Math.round(Number(reps) || 0));
   // A true single IS the max — no equation needed, and every equation adds a few pounds to one rep.
   if (r === 1) return weight;
-  return weight * r * WENDLER_EPLEY_COEFF + weight;
+
+  /**
+   * ⛔⛔ VIADA'S OWN METHOD, p215 (2026-08-29, Michael: *"wendler is a ghost in the machine, use
+   * viada's math"*). The final set's load and reps go through BOTH Epley and Brzycki and the two are
+   * AVERAGED — his stated reason is that **the formulas diverge as the rep count changes**, so
+   * neither alone is trustworthy across the range his pretest produces.
+   *
+   * ⚠️ THIS REPLACES EPLEY-ALONE, which was here as WENDLER's arithmetic (his p32 coefficient) so a
+   * 5/3/1 athlete could check the app against his own copy. That reason stands only while Wendler is
+   * the source; this app's programme is composed from Viada.
+   * ⚠️ ON THIS ATHLETE'S OWN SETS THE MOVE IS SMALL AND THAT IS EXPECTED: 135×10 is 180 either way
+   * (the two equations cross near ten reps); 105×5 goes 122.5 → 120.3. The divergence Viada is
+   * guarding against opens up further out, which is exactly where an average beats a pick.
+   *
+   * ⛔ BRZYCKI HAS A SINGULARITY AT 37 REPS — `36/(37−r)` runs to infinity and then goes NEGATIVE.
+   * Past 30 reps it is not a large estimate, it is not an estimate, so the average falls back to
+   * Epley alone there. ⚠️ This is a guard on arithmetic, NOT a judgement about long sets: that is
+   * `trustedMaxReps`'s job and it is unchanged.
+   */
+  const epley = weight * r * WENDLER_EPLEY_COEFF + weight;
+  if (r > BRZYCKI_MAX_REPS) return epley;
+  const brzycki = weight * 36 / (37 - r);
+  return (epley + brzycki) / 2;
+}
+
+/**
+ * ⛔ VIADA'S WORKING MAX — p215: *"roughly 96% of that predicted true 1RM."*
+ *
+ * ⚠️ IT IS NOT WENDLER'S TRAINING MAX AND THE TWO MUST NEVER CONVERT INTO EACH OTHER. Wendler's is
+ * 85% of a true 1RM and has its own live readers (`plans.config.training_max`); Viada's is 96% of a
+ * freshly tested predicted max. Same English word, two different numbers, two different programmes.
+ * No function may accept both — see Part H of the source record.
+ */
+export const VIADA_WORKING_MAX_FRACTION = 0.96;
+
+export function viadaWorkingMax(predicted1RM: number): number {
+  const v = Number(predicted1RM);
+  return Number.isFinite(v) && v > 0 ? v * VIADA_WORKING_MAX_FRACTION : 0;
 }
 
 /**

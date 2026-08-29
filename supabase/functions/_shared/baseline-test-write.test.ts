@@ -89,6 +89,9 @@ Deno.test('⛔ phase one writes NOTHING when any lift needs deciding', () => {
 Deno.test('the formula is the app\'s one formula — not a copy', () => {
   // A 5-rep test at 185: whatever `estimate1RM` says, floored to plate granularity.
   assertEquals(roundedFromTest(185, 5), Math.floor(estimate1RM(185, 5) / 5) * 5);
-  // And it is Wendler's, so it matches what `compute-facts` will later say about the same set.
-  assertEquals(Math.floor(estimate1RM(255, 8)), 322); // p32's worked example
+  // ⚠️ THE SECOND ASSERTION PINNED WENDLER'S p32 EXAMPLE (322) UNTIL 2026-08-29. The estimator is
+  // Viada's now — Epley and Brzycki averaged, p215 — so the claim being pinned is the one that
+  // matters here and always was: this path and `compute-facts` call the SAME function, whichever
+  // equations live inside it.
+  assertEquals(roundedFromTest(255, 8), Math.floor(estimate1RM(255, 8) / 5) * 5);
 });
