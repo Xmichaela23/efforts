@@ -182,3 +182,78 @@ Deno.test('a band-ASSISTED chin-up is full bodyweight, not a band token (Q-233, 
   assertEquals(assisted.completed[0].volume_lb, unassisted.completed[0].volume_lb);
   assertEquals(assisted.completed[0].volume_lb, 1400);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-08-28 — THE TWO WAYS THE PLANNED SIDE INVENTED WORK THE ATHLETE NEVER OWED
+//
+// Both shipped a RED shortfall on a session where every prescribed row was met or beaten. Kept as
+// permanent regressions: each is a number that was on Michael's screen, not a hypothetical.
+// ─────────────────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ THE WARM-UP RAMP IS NOT THE PRESCRIPTION — set_plan warm-ups price nothing', () => {
+  // The 2026-08-28 bench day, as authored: three warm-ups prepended to three work sets. The table
+  // renders the WORK sets (the exercise\'s own `sets` count is workSets.length) and the athlete logs
+  // three. Pricing all six read 2,430 lb of "plan" against 2,015 lb of work — a 415 lb deficit made
+  // entirely of a ramp nobody logs.
+  const v = build(
+    [{
+      name: 'Bench Press',
+      sets: 3,
+      reps: '1+',
+      weight: 135,
+      setPlan: [
+        { weight: 60, reps: 5, warmup: true },
+        { weight: 75, reps: 5, warmup: true },
+        { weight: 95, reps: 3, warmup: true },
+        { weight: 115, reps: 6 },
+        { weight: 130, reps: 5 },
+        { weight: 135, reps: 1, amrap: true },
+      ],
+    }],
+    [{
+      name: 'Bench Press',
+      sets: [
+        { weight: 115, reps: 6, completed: true },
+        { weight: 130, reps: 5, completed: true },
+        { weight: 135, reps: 5, completed: true },
+      ],
+    }],
+    BW,
+  );
+  // 690 + 650 + 135 — the three rows the screen actually shows, at the prescribed minimum.
+  assertEquals(v.planned[0].volume_lb, 1475);
+  // And the athlete BEAT it (5 reps on a 1+ set), so the delta must read positive, never red.
+  assertEquals(v.completed[0].volume_lb, 2015);
+});
+
+Deno.test('⛔ A "By feel" ACCESSORY PRICES ZERO ON THE PLANNED SIDE — no load was ever named', () => {
+  // Priced 175 x 8 x 3 through the bodyweight fall-through and printed "-1,150 lb" against an
+  // athlete who did 26 reps of a prescribed 8. A zero is what makes the client drop the delta.
+  const v = build(
+    [{ name: 'Tricep Extensions', sets: 3, reps: 8, weight: 'By feel' }],
+    [{ name: 'Barbell Curl', sets: [{ weight: 55, reps: 8, completed: true }] }],
+    BW,
+  );
+  assertEquals(v.planned[0].volume_lb, 0);
+});
+
+Deno.test('⚠️ AND THE BODY IS STILL THE LOAD WHERE IT REALLY IS — a prescribed chin-up prices', () => {
+  // The guard above must not swallow D-348. `Chin-ups` is typed `bodyweight`, so an unweighted
+  // PRESCRIPTION still prices at body weight on both sides.
+  const v = build(
+    [{ name: 'Chin-ups', sets: 3, reps: 8 }],
+    [{ name: 'Chin-ups', sets: [{ weight: 0, reps: 8, completed: true }] }],
+    BW,
+  );
+  assertEquals(v.planned[0].volume_lb, BW * 8 * 3);
+});
+
+Deno.test('⛔ A CURL LOGGED WITH NO WEIGHT PRICES ZERO, NOT BODY WEIGHT (Michael, 2026-08-28)', () => {
+  const v = build(
+    [],
+    [{ name: 'Barbell Curl', sets: [{ weight: 0, reps: 12, completed: true }, { weight: 55, reps: 8, completed: true }] }],
+    BW,
+  );
+  // The weighted set still prices; the empty one contributes nothing rather than 175 x 12.
+  assertEquals(v.completed[0].volume_lb, 440);
+});

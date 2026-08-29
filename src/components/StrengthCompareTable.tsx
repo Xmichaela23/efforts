@@ -469,7 +469,24 @@ export default function StrengthCompareTable({ planned, completed, completedWork
       return max > 0 ? weights.lastIndexOf(max) : -1;
     })();
     const difficulty = topCompletedIdx >= 0 ? (cSetsArr[topCompletedIdx] as any)?.difficulty ?? null : null;
-    return { name: displayName, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cRepsTotal, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty, assistanceTotalReps } as any;
+    /**
+     * ⛔ WHAT THE SLOT WAS FOR — the one word that stops a speed day reading as a bad heavy day
+     * (2026-08-28, Michael). The four intents are Viada's own (p218/p219); `slot_intent` has been
+     * DATA on every prescribed and logged row since 2026-08-26 and the logger already reads it for
+     * its in-session cues. This screen is where the session is reviewed and it never said it.
+     *
+     * ⚠️ HIS SHORTHAND IS ME/DE/SKILL/HYP AND THE SCREEN DOES NOT SPEAK IT. A lifter coming from
+     * Strong or Hevy reads "heavy" and "speed"; "DE" is a book abbreviation. The data keeps his
+     * vocabulary, the label carries the plain word.
+     * ⚠️ PLANNED FIRST, LOGGED AS THE FALLBACK — same order `slotIntentOf` uses on the server, so
+     * the two cannot disagree. An unstamped row (Get Stronger's main lift is deliberately unstamped)
+     * simply shows nothing.
+     */
+    const SLOT_INTENT_WORD: Record<string, string> = { ME: 'heavy', DE: 'speed', SKILL: 'skill', HYP: 'hypertrophy' };
+    const slotIntentWord = SLOT_INTENT_WORD[
+      String((p as any)?.slot_intent ?? (c as any)?.slot_intent ?? '').toUpperCase()
+    ] ?? null;
+    return { name: displayName, slotIntentWord, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cRepsTotal, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty, assistanceTotalReps } as any;
   });
 
   // ⛔ THE `totals` REDUCER IS DELETED, NOT ORPHANED. It fed the "vs plan" row at the bottom of this
@@ -528,6 +545,11 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 )}
                 {r.status === 'skipped' && !r.swappedWith && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">not logged</span>
+                )}
+                {/* The intent, in the same quiet register as the other row tags — it states what the
+                    slot was for, never how it went. */}
+                {r.slotIntentWord && (
+                  <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.slotIntentWord}</span>
                 )}
                 {/* ⚠️ ONLY MEANINGFUL WHEN THERE IS A PLAN. With none attached, EVERY row is
                     "not in the plan" — which is noise, not information, and it read as an accusation

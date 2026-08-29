@@ -78,7 +78,7 @@ Deno.test('mild weather and a flat ride say nothing — silence is legal', () =>
 Deno.test('⛔ an unstructured ride now gets a Pacing row — it used to get none', () => {
   assertEquals(formatCyclingPacingRow([], { first_w: 150, second_w: 132 }), {
     label: 'Pacing',
-    value: 'Power 150W → 132W across the halves',
+    value: 'Average pedalling power 150W → 132W across the halves',
   });
 });
 
@@ -91,7 +91,7 @@ Deno.test('⛔ NO INVENTED FADE THRESHOLD — the watts are stated, never graded
   for (const row of [small, large]) {
     assertEquals(/faded|held|rose|%/.test(row.value), false, 'no verdict word, no percentage');
   }
-  assertEquals(small.value, 'Power 150W → 147W across the halves');
+  assertEquals(small.value, 'Average pedalling power 150W → 147W across the halves');
 });
 
 Deno.test('structured work still wins — the halves are a fallback, not a replacement', () => {

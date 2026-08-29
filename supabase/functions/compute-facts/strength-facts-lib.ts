@@ -174,10 +174,13 @@ export function buildStrengthFacts(
     // than falling through to `bodyweight x reps` (2026-08-03). Asked of the shared type axis, which
     // also answers for `clamshell` and `lateral band walk` (no "band" in either name).
     const bandIsLoad = typeForExercise(rawName) === 'band';
+    // ⛔ AND THE BODY IS ONLY THE LOAD WHERE IT REALLY IS (2026-08-28). Same axis, same question:
+    // an unweighted curl records no tonnage rather than the athlete's own weight.
+    const bodyIsLoad = typeForExercise(rawName) === 'bodyweight' || bandIsAssistance;
     for (const s of completedSets) {
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;
-      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad });
+      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad, bodyIsLoad });
       if (w > bestWeight) { bestWeight = w; bestReps = r; }
       if (w === bestWeight && r > bestReps) { bestReps = r; }
       // ⛔ POSITIVE PROTOCOL GATE (2026-08-12). Fold a set's reserve into e1RM ONLY when the exercise's

@@ -330,6 +330,22 @@ export type StrengthVolumeOpts = {
    * never told what the movement was; it only ever saw the set.
    */
   bandIsLoad?: boolean;
+  /**
+   * ⛔ IS THE BODY THE LOAD ON THIS MOVEMENT? `typeForExercise(name) === 'bodyweight'` — the same
+   * shared type axis `bandIsLoad` asks, so the three flags are one question asked three ways and
+   * cannot drift apart.
+   *
+   * ⛔ IT EXISTS BECAUSE A CURL WITH AN EMPTY WEIGHT BOX WAS PRICED AS BODY WEIGHT (Michael,
+   * 2026-08-28: *"a curl is not a body weight workout"*). The final fall-through below priced EVERY
+   * unweighted, unbanded set at `bodyweight × reps` — right for a push-up or a chin-up (D-348),
+   * and wrong for a barbell curl, a tricep extension or a machine row, where the body is not what
+   * moved. On the 2026-08-28 session it read a logged curl set at 160 × 12 = 1,920 lb.
+   *
+   * ⚠️ `undefined` MEANS UNKNOWN AND PRICES AS BEFORE, exactly like `bandIsLoad`'s default. Only an
+   * explicit `false` zeroes the set, so a caller that has not been taught the question cannot
+   * silently start discarding a chin-up. All four call sites pass it.
+   */
+  bodyIsLoad?: boolean;
 };
 
 /**
@@ -473,6 +489,14 @@ export function strengthSetVolume(
   // real number and the token would throw it away.
   if (opts.bandIsLoad) return BAND_SET_VOLUME_TOKEN;
 
+  // ⛔ AND NEITHER IS A CURL A BODYWEIGHT MOVEMENT (2026-08-28, Michael's ruling — the same shape as
+  // the band correction directly above, one movement class later). An unweighted LOADED accessory
+  // recorded no load, so it contributes no tonnage; it does not contribute the athlete.
+  // ⚠️ THE SET STILL HAPPENED. This zeroes its TONNAGE, not its existence — the reps, the RIR and
+  // the row itself are untouched, and a strength session's load has a duration/intensity floor that
+  // does not read this number.
+  if (opts.bodyIsLoad === false) return 0;
+
   return bw > 0 ? bw * reps : 0;
 }
 
@@ -485,9 +509,10 @@ export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number,
       // Asked once per EXERCISE, not per set — a band means the same thing on every set of a row.
       const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
       const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
+      const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
       ex.sets.forEach((set: any) => {
         if (set.completed !== false) {
-          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance, bandIsLoad });
+          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad });
         }
       });
     }
@@ -557,9 +582,13 @@ export function calculatePlannedStrengthWorkload(
       // fell to the bodyweight rule on the PLANNED side while the completed side took the token —
       // the exact planned-vs-actual mismatch this function exists to prevent, one layer down.
       const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
+      // ⚠️ THE SAME FLAG ON BOTH SIDES, for the reason stated at the top of this block: if the
+      // completed curl stops pricing bodyweight and the prescribed one does not, prescribed ==
+      // performed breaks and every session reads as under plan.
+      const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
       totalVolume += sets * strengthSetVolume(
         { weight: ex.weight, reps, resistance_level: plannedIsBand ? 'band' : null },
-        { ...opts, bandIsAssistance, bandIsLoad },
+        { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad },
       );
     }
     if (typeof ex.target_rir === 'number' && ex.target_rir >= 0) intensities.push(rirToStrengthIntensity(ex.target_rir));

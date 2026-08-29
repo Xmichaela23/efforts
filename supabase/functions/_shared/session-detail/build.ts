@@ -1414,9 +1414,17 @@ export function formatCyclingPacingRow(
   // The two watts are the fact. State them, in order, and let the reader see the size of the gap —
   // the same call made for the Easy chip this morning and for the temperature range: report, do not
   // grade. A verdict word can come back the day the field supplies a bar for it.
+  // ⛔ NAME THE MEASUREMENT, BECAUSE THE CARD CARRIES TWO OF THEM (2026-08-28). The insight line
+  // above this row reports whole-ride NORMALIZED power (138W on Michael's 2026-08-26 ride) while
+  // this row reported a bare "Power 145W → 147W" — a mean of PEDALLING samples only, coasting
+  // excluded, which is why it reads higher than the normalized figure on the same ride. Two
+  // different measurements, both called "power", ten lines apart: the card looked like it was
+  // disagreeing with itself. TrainingPeaks compares halves through Efficiency Factor and states the
+  // basis every time; the fix here is the label, not the arithmetic — the reason this is a pedalling
+  // mean rather than a halved NP is argued at the writer in `analyze-cycling-workout`.
   return {
     label: 'Pacing',
-    value: `Power ${Math.round(f)}W → ${Math.round(sec)}W across the halves`,
+    value: `Average pedalling power ${Math.round(f)}W → ${Math.round(sec)}W across the halves`,
   };
 }
 
@@ -1546,16 +1554,39 @@ export function buildAnalysisDetailRows(
           if (spread <= 10) {
             rows.push({ label: 'Pacing', value: `Work intervals consistent (${fmtPace(paces[0])}–${fmtPace(paces[paces.length - 1])})` });
           } else {
-            const firstPace = paces[0];
-            const lastPace = paces[paces.length - 1];
-            const drift = Math.round(lastPace - firstPace);
-            if (drift > 10) {
-              rows.push({ label: 'Pacing', value: `Work intervals faded ${drift}s/mi (${fmtPace(firstPace)} → ${fmtPace(lastPace)})` });
-            } else if (drift < -10) {
-              rows.push({ label: 'Pacing', value: `Work intervals sped up ${Math.abs(drift)}s/mi (${fmtPace(firstPace)} → ${fmtPace(lastPace)})` });
-            } else {
-              rows.push({ label: 'Pacing', value: `Work intervals: ${spread}s/mi spread (${fmtPace(Math.min(...paces))}–${fmtPace(Math.max(...paces))})` });
-            }
+            // ⛔ THE SET IS THE UNIT, NOT ITS TWO ENDPOINTS (2026-08-28).
+            //
+            // This row was first-vs-last. On Michael's 2026-08-28 run — six reps at 6:43, 7:01,
+            // 9:44, 9:31, 11:11, 9:33 — it printed *"Work intervals faded 170s/mi (6:43 → 9:33)"*.
+            // Arithmetically true, and the wrong sentence: he did not fade, he opened three minutes
+            // a mile faster than the rest and then settled, his SLOWEST rep was the fifth, and the
+            // spread across the set (268s/mi) is four times the "fade" being reported. Two of six
+            // reps decided the verdict and the middle four were not read at all.
+            //
+            // ⛔ THE FIELD READS THE WHOLE SET. TrainingPeaks' interval guidance is to hold the same
+            // split every rep and check afterwards whether you did, and its variability measures
+            // compare a session against itself rather than its endpoints. So the SPREAD leads —
+            // every rep is in it — and direction is a qualifier the row earns, not the headline.
+            //
+            // ⛔ AND IT IS ONLY EARNED WHEN THE REPS ACTUALLY TREND: the halves must separate by
+            // more than the reps scatter inside them. Otherwise the number is real and the story is
+            // not, which is exactly what "faded 170s/mi" was.
+            // ⚠️ NOT [D-456]'s FADE SWITCH — that decides whether a session gets an HR DRIFT number
+            // at all. This decides the wording of an interval session's pacing row; it always renders.
+            const mid = Math.ceil(paces.length / 2);
+            const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+            const range = (xs: number[]) => Math.max(...xs) - Math.min(...xs);
+            const firstHalf = paces.slice(0, mid);
+            const secondHalf = paces.slice(mid);
+            const halfGap = mean(secondHalf) - mean(firstHalf);
+            const scatter = Math.max(range(firstHalf), range(secondHalf));
+            const trend = Math.abs(halfGap) > scatter
+              ? (halfGap > 0 ? ' — progressively slower' : ' — progressively faster')
+              : '';
+            rows.push({
+              label: 'Pacing',
+              value: `Work intervals: ${spread}s/mi spread (${fmtPace(Math.min(...paces))}–${fmtPace(Math.max(...paces))})${trend}`,
+            });
           }
         }
       }
@@ -2218,8 +2249,11 @@ function buildStrengthVolume(
     // a blank band box prices at the token rather than bodyweight x reps (2026-08-03).
     const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
     const setsArr = Array.isArray(ex?.sets) ? ex.sets : (Array.isArray(ex?.setsArray) ? ex.setsArray : []);
+    // ⛔ A CURL IS NOT A BODYWEIGHT MOVEMENT (2026-08-28, Michael). Same type axis as the two band
+    // flags beside it; an unweighted LOADED accessory prices zero rather than the athlete's weight.
+    const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
     const volume_lb = setsArr.filter(isPerformedSet).reduce(
-      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad }),
+      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad }),
       0,
     );
     return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };
@@ -2239,16 +2273,53 @@ function buildStrengthVolume(
     const plannedIsBand = /band/i.test(String(ex?.weight ?? ''));
     const resistance_level = plannedIsBand ? 'band' : null;
 
+    // ⛔ A PRESCRIPTION THAT NAMED NO LOAD PRICES NOTHING — unless the body IS the load (2026-08-28).
+    //
+    // `strengthSetVolume`'s final fall-through is `bodyweight × reps`, which is right for a push-up
+    // or a chin-up (D-348) and wrong for a barbell curl prescribed "By feel". On the 2026-08-28
+    // session that fall-through priced a three-set tricep-extension slot at 160 × 8 × 3 = 3,840 lb
+    // and printed "-1,150 lb" in red against an athlete who did 26 reps of a prescribed 8.
+    // ⚠️ THE CLIENT ALREADY HANDLES A ZERO CORRECTLY and says why: with `pVol === 0` it renders the
+    // completed number alone and NO delta — "no delta against a plan that never prescribed load"
+    // (`StrengthCompareTable.tsx`). This makes the planned side tell it the truth.
+    // ⛔ THE TYPE AXIS ANSWERS IT, NOT A NAME TEST: `bodyweight` is the type whose capability is
+    // `load: 'bodyweight'`, and the band-assisted stems (pull-up, chin-up, dip, GHR) are typed
+    // `bodyweight` too — the band is help, the body is what moved.
+    // ⚠️ SCOPED TO THE PRESCRIPTION DELIBERATELY. The COMPLETED side still prices an unweighted
+    // accessory set at body weight, and changing that moves session load and ACWR history, not a
+    // screen. Named, not done here.
+    // ⚠️ ASKED OF THE RAMP TOO, NOT ONLY OF `ex.weight`. A 5/3/1 row carries its top-set weight on
+    // the exercise AND a per-set weight on every `set_plan` entry; a row that names a load anywhere
+    // is a row that named a load, and must keep pricing exactly as it did.
+    const bodyIsTheLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
+    const anySetPlanWeight = Array.isArray(ex?.setPlan)
+      && ex.setPlan.some((ap: any) => (Number(ap?.weight) || 0) > 0);
+    const plannedNamesNoLoad = (Number(ex?.weight) || 0) <= 0 && !anySetPlanWeight
+      && !plannedIsBand && !bandIsLoad && !bodyIsTheLoad;
+
     // ⛔ THE AUTHORED RAMP WINS (D-338). On 5/3/1 the three sets are three DIFFERENT weights, and
     // the client renders them that way. Pricing `sets × reps × topWeight` here would print a delta
     // that disagrees with the set rows directly above it — the exact bug D-338 fixed.
-    const setPlan = Array.isArray(ex?.setPlan) ? ex.setPlan : null;
+    // ⛔ THE RAMP IS PRICED ON ONE SIDE ONLY, AND THAT IS THE WHOLE OF THE RED SHORTFALL
+    //    (2026-08-28). `set_plan` carries the WARM-UP sets — `strength-primary-plan.ts` prepends them
+    //    and flags each `warmup: true` — while the exercise's own `sets` count is `workSets.length`,
+    //    so the table above renders three rows and the athlete logs three sets. The planned total
+    //    priced all six. On the 2026-08-28 bench day that is 2,430 lb of "prescription" against
+    //    2,015 lb of work: the three rows on screen add to 1,475 lb, and the 955 lb gap is the ramp.
+    //    ⚠️ EVERY STRENGTH SESSION SHOWED A RED DEFICIT ROUGHLY THE SIZE OF ITS OWN WARM-UP, on days
+    //    where every prescribed row was met or beaten. The completed side cannot balance it: warm-ups
+    //    are not logged, by design.
+    //    ⛔ THE WORK SETS ARE THE PRESCRIPTION. Same filter `strength-primary-plan.ts` uses to derive
+    //    the set count and the top set — one definition of "the work", three readers.
+    const setPlan = Array.isArray(ex?.setPlan) ? ex.setPlan.filter((ap: any) => ap?.warmup !== true) : null;
     let volume_lb = 0;
-    if (setPlan?.length) {
+    if (plannedNamesNoLoad) {
+      volume_lb = 0;
+    } else if (setPlan?.length) {
       for (const ap of setPlan) {
         volume_lb += strengthSetVolume(
           { weight: ap?.weight ?? ex?.weight, reps: ap?.reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance, bandIsLoad },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad },
         );
       }
     } else {
@@ -2257,7 +2328,7 @@ function buildStrengthVolume(
       if (sets > 0 && Number.isFinite(reps) && reps > 0) {
         volume_lb = sets * strengthSetVolume(
           { weight: ex?.weight, reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance, bandIsLoad },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad },
         );
       }
     }

@@ -137,8 +137,14 @@ const STRENGTH_DAY = [
   { name: 'Back Squat', sets: Array.from({ length: 3 }, () => ({ reps: 5, weight: 185, completed: true })) },
   { name: 'Romanian Deadlift', sets: Array.from({ length: 3 }, () => ({ reps: 8, weight: 135, completed: true })) },
   { name: 'Chin Up', sets: Array.from({ length: 3 }, () => ({ reps: 8, weight: 0, completed: true })) },
-  { name: 'Box Jump', sets: Array.from({ length: 3 }, () => ({ reps: 5, weight: 0, completed: true })) },
-  { name: 'Hip Thrust', sets: Array.from({ length: 3 }, () => ({ reps: 10, weight: 0, completed: true })) },
+  // ⚠️ THESE TWO NAMES CHANGED 2026-08-28 AND THE CLAIM DID NOT. They were `Box Jump` and
+  // `Hip Thrust`, chosen before the type axis existed. Under Michael's ruling (*"a curl is not a
+  // body weight workout"*) an unweighted set prices at body weight ONLY where the body is the load
+  // — and a box jump is `plyo` (capability `load: 'none'`) while an unweighted hip thrust is
+  // `loaded_accessory`, so neither prices any more. D-348's claim is about movements where the body
+  // genuinely IS the load, so it is pinned on two of those instead.
+  { name: 'Push Up', sets: Array.from({ length: 3 }, () => ({ reps: 12, weight: 0, completed: true })) },
+  { name: 'Glute Bridge', sets: Array.from({ length: 3 }, () => ({ reps: 10, weight: 0, completed: true })) },
   { name: 'Band Face Pull', sets: Array.from({ length: 3 }, () => ({ reps: 15, weight: 0, resistance_level: 'Medium', completed: true })) },
 ];
 
