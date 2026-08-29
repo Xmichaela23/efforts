@@ -22,6 +22,22 @@
 -- STRENGTH is intentionally NOT stored here — its declared 1RMs in user_baselines are already confirmed
 -- anchors (contract §2d). This table holds the DERIVABLE disciplines: run / bike / swim.
 --
+-- ⛔⛔ REVERSED 2026-08-28 BY MICHAEL'S RULING — the paragraph directly above is now HISTORY. Typed-in
+-- and learned baselines MUST carry a date stamp, and this table is the mechanism they move onto
+-- (his instruction, verbatim: "do not build a new mechanism"). §2d assumed a CONFIRMED anchor needs
+-- no history; the derived heavy gate's block-length window is the reader that proves otherwise — an
+-- undated 1RM cannot be tested against "is this max still current?", so a number typed two years ago
+-- still counts today. See docs/WORKORDER-the-progress-standard-2026-08-28.md ITEM 6 and D-456.
+--
+-- ⛔ WHAT THAT MEANS FOR THIS FILE WHEN ITEM 6 IS BUILT (it is SPEC ONLY today — nothing built):
+--   · the `discipline` CHECK below must admit 'strength'. It is the only schema blocker.
+--   · `metric` is free text with NO CHECK, so per-lift metrics ('squat', 'bench_press', …) and the
+--     run's 'threshold_pace' (Q-290) need no schema change at all.
+-- ⚠️ THE REAL WORK IS NOT IN THIS FILE. compute-snapshot's reconciler is keyed by DISCIPLINE, not by
+--    (discipline, metric) — it builds Map<discipline,row> and loops run/bike/swim — while the partial
+--    unique index below is ALREADY per-metric. So the database can hold many metrics per discipline
+--    and the writer cannot. Both halves of item 6 need that reconciler made metric-keyed; do it once.
+--
 -- Apply via the Supabase SQL editor (repo migration-tracking divergence), reviewed.
 -- ⛔ CORRECTION 2026-08-28: THIS IS APPLIED AND LIVE IN PRODUCTION. The line here read "STAGED — not
 -- yet applied" long after it had been applied, and that was believed on sight during the endurance

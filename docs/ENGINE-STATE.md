@@ -1,70 +1,89 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-28, late — two deploys, neither verified)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-29 — the progress-standard arc: five items live, none verified)
 
-### Your job: WATCH MONDAY LAND. Do not start anything. Two pieces went out tonight and NOT ONE PIECE OF EITHER HAS BEEN SEEN WORKING.
+### Your job: WATCH IT LAND, THEN ITEM 6. Do not start item 6 before the screen is confirmed.
 
-**Read `docs/DEPLOY-OWED.md`'s top TWO entries first** — the endurance read sits on the strength
-read, and both carry a section on **what is expected to look wrong** plus a real-failure tripwire.
-Reporting an expected state as a break is the way to waste Monday.
+**Read `docs/WORKORDER-the-progress-standard-2026-08-28.md` first**, section *"THE WHOLE ARC, WHAT IS
+AND IS NOT LIVE"*. The rulings behind it are consolidated in **D-456**. ⚠️ The handoff beside it
+(`HANDOFF-the-strength-and-endurance-read-2026-08-28.md`) carries a SUPERSEDED box at the top — its
+reasoning is good, its state is a day old.
 
-**PUSHED:** `origin/main == dc354b27`.
+**PUSHED:** `origin/main == 4b8d8463`.
 **DEPLOYED**, versions read back from `supabase functions list`, never assumed:
-`compute-facts` **126** · `compute-snapshot` **143** · `coach` **471** · `workout-detail` **352** ·
-`analyze-cycling-workout` **218** · `generate-strength-plan` **175** ·
-`rematerialize-standing-block` **51** · `materialize-plan` **308**.
-**CLIENT:** `https://efforts.work` → `/assets/index-eYfKzP5E.js`, confirmed off the served bundle.
-⚠️ That URL is nowhere in the repo; it is recorded in `DEPLOY-OWED.md` so you do not go looking.
-**VERIFIED: NO, ON BOTH.** Nobody has watched a card render a number. That is the whole job.
+`compute-snapshot` **145** · `compute-facts` **127** · `coach` **472** · `workout-detail` **353** ·
+`analyze-running-workout` **832** · `analyze-cycling-workout` **219**.
+⛔ **The last three carry NO edits of their own** — they bundle the changed `_shared/state-trend`, and
+Supabase freezes a copy of `_shared` per function at deploy time. Touch those shared files, deploy all six.
+**CLIENT:** confirmed **served** at `https://efforts.work` → `/assets/index-CQL4H5id.js`, checked off
+the served bundle for the new strings, not off the push.
+**VERIFIED: ⛔ NO, ON EVERYTHING.** Nobody has watched a card render a number. That is the whole job.
+⚠️ **NOTHING APPEARS UNTIL `compute-snapshot` RUNS ON THE NEXT INGEST.** The old screen is expected.
 
-### The four facts you need before touching anything
+⚠️ **AND THE NIGHT BEFORE'S DEPLOY IS STILL UNVERIFIED TOO, sitting underneath this one.** Three
+functions from 2026-08-28 were NOT redeployed tonight because nothing they bundle changed, and they
+have never been seen working: `generate-strength-plan` **175** · `rematerialize-standing-block` **51**
+· `materialize-plan` **308**. **Their entries are in `docs/DEPLOY-OWED.md`** — read its top entries
+for what is expected to look wrong, because reporting an expected state as a break is the way to
+waste a day.
 
-1. ⛔ **THE e1RM GATE FAILS CLOSED. Only a set stamped `ME` mints a max.** Everything logged before
-   2026-08-26 has no stamp and has LEFT the strength line. **That is Michael's ruling, not a bug** —
-   *"don't let the old lifts drag me down."* An earlier fail-open ruling was reversed the same day;
-   do not restore it by analogy with D-417's rep gate, which still fails OPEN on purpose.
-2. ⛔ **THE TEST WEEK REFILLS THE LINE.** `compose.ts` stamps the pretest's competition lifts `ME`
-   (accessories stay unstamped). ⚠️ **If the line is still empty after those two sessions are logged
-   and a snapshot has run, that is a REAL failure** — start at `exercise_log.slot_intent` on those rows.
-3. ⛔ **THE ENDURANCE CARDS ARE GATED ON THE FAMILY TAG AND NOTHING ELSE.**
-   `family:run_near_threshold` and `family:ride_sweet_spot` on the PLANNED row, reached through the
-   attach at ingest. A missing week is a LINKER fault, not the card's. ⚠️ The run card has no
-   reference line by design — see Q-290, which is the reason and is unstarted.
-4. ⚠️ **THE PATTERN THAT KEPT BITING, and it will bite you.** `slot_intent` was dropped THREE times
-   at points that rebuild a row field by field — `compute-snapshot`'s query map, the per-lift display
-   map in `assemble.ts` (which discards `meta`), and two record-gate fixtures. Each time it was
-   selected, resolved and correct, and arrived as `undefined`. **A gate reading `undefined` does not
-   error; it silently takes the absent branch.** None were caught by reading. The note lives on
-   `ExerciseLogLite.slot_intent`.
+### The five facts you need before touching anything
 
-### What shipped tonight, in one line each
-- **Strength:** one card per main lift — the weight being lifted, reps held at it, a heavy-only e1RM
-  line (rolling across blocks) against a faint expected curve (block-scoped, anchored on the block's
-  opening working number). One word — **Stalled · On track · Moving up** — mapped from
-  `meSessionOutcome`, which had run on every restate and had its verdict thrown away.
-- **Endurance:** one card per sport, the same shape. Ride leads on FTP over time (the endurance twin
-  of the 1RM); run leads on heart rate. Both carry cost-per-session (efficiency read AS STORED) and
-  fade against p107 — 10%, or 5% when a key session falls within 24 hours. No verdict word on either.
-- **Not rendered on purpose:** `week_ledger_v1` (the five weekly numbers — a standing block is the
-  same week twelve times) and the `holding`-vs-suppressed distinction (Q-289).
+1. ⛔ **THE e1RM GATE NOW HAS TWO DOORS, AND IT STILL FAILS CLOSED.** The plan's `ME` stamp, OR the set
+   itself — **1–5 reps at ≥90% of the lift's known max**, read from `prescribe('ME','barbell')` (Viada
+   p218), never restated. A set that is neither mints nothing, exactly as before. ⚠️ **This is what
+   finally gives the Get Stronger main lift a line** — its top set is deliberately unstamped (5/3/1
+   prescribes 65–95%) and it minted **nothing at all**.
+2. ⛔ **A MAX HAS A LIFESPAN, AND IT IS THE BLOCK'S LENGTH.** `plans.duration_weeks`, defaulting to
+   `STATE_TREND_WINDOWS.defaultBlockWeeks`. Viada Part H p215: the pretest sets the max at block start
+   and the block is written from it. ⚠️ **`buildBestByLiftSince` is a second accessor beside
+   `buildAllTimeBestByLift` — a RECORD does not expire, a reference max does. Do not merge them.**
+3. ⛔ **THE ENDURANCE READ NO LONGER NEEDS A PLAN.** `enduranceSpine` carries every run and ride,
+   grouped by session type, on DATES not block weeks. The family-tagged card is now the OVERLAY on top.
+   ⚠️ **A missing overlay week is still a LINKER fault**, but an empty section no longer is.
+4. ⛔ **RUN EFFICIENCY HAS NO DURATION GATE AT EITHER END** (Q-295 closed), and fast/long sessions are
+   **GROUPED, never deleted** (easy / long / quality). ⚠️ **The headline is fitted on the EASY group
+   alone.** The real pooling lived in the route engine in `assemble.ts`, not in the two functions the
+   work order named — a fix in those alone would have changed nothing on screen.
+5. ⚠️ **THE PATTERN THAT KEPT BITING, AND IT BIT AGAIN THIS ARC.** A row rebuilt field by field drops
+   whatever is not named, and a gate reading `undefined` does not error — it silently takes the absent
+   branch. `slot_intent` was dropped three times; `best_weight` was missing from the series query this
+   arc for the same reason; and `run_facts.workout_type` had been written since 2026-07-30 and **never
+   reached a reader at all.** ⛔ **Ask "is it starved or absent?" before concluding anything is missing.**
 
-### Open, raised tonight, unstarted
-- **Q-289** — "holding" is a CLAIM stated for two different facts; a genuinely flat metric and a
-  noise-suppressed one are indistinguishable on the payload. Three rows. ⛔ Do not loosen the guard.
-- **Q-290** — run threshold pace has no history, which is why the run card has two rows not three.
-- **Q-291** — the whole read is a PLAN-HOLDER'S screen: every card needs a plan, and the off-plan
-  strength hole compounds it. ⛔ The useful half is that FTP history, per-session efficiency and
-  per-session drift need NO plan — the measurements survive, the comparison does not.
-- **Q-292** — a race plan breaks the premise structurally: it builds, peaks and tapers, so there is
-  no repeated session and a week-10 heart-rate drop may be the taper. ⛔ The answer is the OTHER
-  read (the reference number climbing), which **promotes Q-290 from one missing row to the whole
-  card** on that plan type.
-- **Get Stronger has no strength line at all** — nothing stamps `ME` outside the Standing Plan
-  composer. Neither does any off-plan session. Raised in `DEPLOY-OWED`, unruled.
+### ⛔ DEPLOYED BUT UNDRAWN — do not report these as shipped, do not "fix" one without a ruling
 
-⚠️ **No `D-NNN` entries for either arc** — the low-doc-overhead posture continues. The rulings live in
-`DEPLOY-OWED.md`, the work orders, and code comments that are heavy on purpose.
+- **The long-run and quality efficiency trends.** `runFitness.efficiency.groups` reaches the payload
+  with counts, directions and series. **Only the easy headline and the spine cards are drawn.**
+- **Accessory volume.** Computed in `_shared/workload.ts` / `session-load.ts`, **surfaced nowhere.**
+- **The bike has no session-type split** — one group, `all`. No equivalent classifier exists and
+  inventing one would grow a second vocabulary.
 
+### What is NEXT, and it is spec'd not built
+
+⛔ **ITEM 6 — typed-in and learned baselines must carry a date.** `fitness_baselines` is the mechanism
+and it is already live (supersede-not-delete, 14 rows on this athlete); **do not build a new one.**
+⚠️ **THE LOAD-BEARING FINDING:** that table's writer in `compute-snapshot` is keyed by **DISCIPLINE,
+not by (discipline, metric)** — `Map<discipline,row>` looping run/bike/swim — while the partial unique
+index is **already per-metric**. The database can hold many metrics per discipline and the writer
+cannot. ⛔ **Both halves of item 6 need that reconciler made metric-keyed. Do it once, not twice.**
+- **Q-290** (run threshold pace has no history) needs **no schema change** — `discipline='run'`,
+  `metric='threshold_pace'` fits today — but it needs the metric-keyed writer first, plus a deriver,
+  which is the only genuinely new logic. ⚠️ It blocks Q-292, Q-296 and the run's reference series.
+- **Strength needs a migration**: the `discipline` CHECK excludes it. The table header's "strength is
+  intentionally NOT stored here" is **back-annotated in the SQL** as reversed by this ruling.
+- ⚠️ **BACKFILL: OPEN, NOT RULED (corrected 2026-08-29).** This line read *"NO BACKFILL (ruled)"* and
+  attributed it to Michael. **He did not rule it** — *"I never ruled no backfill"* — and unlike every
+  other ruling in this arc it carried no quote from him. The argument below rules out ONE method and
+  was written as if it ruled out the question. **Two options were never put to him:** stamp everything
+  on the day the change ships, or show him his typed numbers once and have him confirm each (his own
+  standing rule is that a baseline changes when the athlete accepts it, which favours the second).
+  The argument that survives, and it is only against the ROW-STAMP method: an undated value is a
+  refreshed value with no stamp, and the only
+  available backfill date is the ROW's `updated_at` — the bug wearing a date.
+- ⚠️ **NAMED SO IT IS NOT FILED AS A BUG:** an athlete whose only maxes are typed and undated, with no
+  logged sets in the window, gets **no strength line at all off-plan**. Narrow — the plan-stamped door
+  covers anyone on a generated plan, and it self-resolves once they log a couple of sessions.
 ## 🧭 SUPERSEDED — was START HERE (2026-08-26, late — the gear-gate + plate-trace handoff)
 
 > ⛔ **ITS HEADLINE CLAIM IS FALSE AS WRITTEN — see the banner above.** `advanceStep` HAS a production

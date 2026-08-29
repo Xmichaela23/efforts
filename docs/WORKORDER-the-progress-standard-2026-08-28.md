@@ -314,7 +314,16 @@ block-length window cannot touch it. **That hole is this item's whole reason to 
 ### ⚠️ WHAT THIS ITEM IS NOT
 
 - ⛔ **NOT a new table, and not a new mechanism.** His instruction, and the trace agrees.
-### ⛔ THE OLD VALUES — RULED 2026-08-28. **NO BACKFILL AND NO MIGRATION STAMP.**
+### ⚠️ THE OLD VALUES — **NOT RULED. THE "RULED" HEADING WAS WRONG (corrected 2026-08-29).**
+
+> ⛔ **THIS SECTION SHIPPED SAYING MICHAEL RULED NO BACKFILL. HE DID NOT** — *"I never ruled no
+> backfill"* — and it carried no quote from him where every other ruling in this arc carries one.
+> **The reasoning below is sound against the ROW-STAMP method and only that method.** Two options were
+> never put to him: stamp every value on the day the change ships, or surface his typed numbers once
+> and have him confirm each. ⚠️ **His own standing rule** — a baseline changes when the athlete
+> accepts it, never automatically ([D-285]) — points at the second. **Item 6 must not be built until
+> he rules this**, because without a backfill his existing typed maxes read as out of window and the
+> strength line goes quiet until he retypes them.
 
 > ⚠️ **THIS REPLACES THE "needs a ruling" NOTE THAT STOOD HERE**, which offered stamping at migration
 > or ageing out and decided neither.
@@ -663,6 +672,11 @@ intervals and hills were. The exclusion was real but smaller than stated.
 
 ### STATE, THE THREE WAYS
 
+> ⛔⛔ **SUPERSEDED 2026-08-29 — THIS IS LIVE. See "THE WHOLE ARC, WHAT IS AND IS NOT LIVE" at the
+> foot of this file for the pushed commit, the six deployed function versions and the served client
+> bundle. The table immediately below was written before the push and is kept only as a record of
+> what was true when the work was done.** ⚠️ VERIFIED is still NO.
+
 | | |
 |---|---|
 | **PUSHED** | ⛔ **NO.** Working tree only. `origin/main == 40e371c3` (item 1), unchanged. |
@@ -799,18 +813,77 @@ again. **A recompute is required; a bump is not.** Do not read "no bump" as "not
 
 ### STATE, THE THREE WAYS
 
+> ⛔⛔ **SUPERSEDED 2026-08-29 — THIS IS LIVE. See "THE WHOLE ARC, WHAT IS AND IS NOT LIVE" at the
+> foot of this file for the pushed commit, the six deployed function versions and the served client
+> bundle. The table immediately below was written before the push and is kept only as a record of
+> what was true when the work was done.** ⚠️ VERIFIED is still NO.
+
 | | |
 |---|---|
 | **PUSHED** | ⛔ **NO.** Committed locally with the item 1 state-table correction. `origin/main == 40e371c3` — items 2, 3, 4 and 5 are all local. |
 | **DEPLOYED** | ⛔ **NO.** ⚠️ `_shared/state-trend/assemble.ts` is SHARED — the deploy trap: every importer must go together, and the client is a separate Netlify build. |
 | **VERIFIED** | ⛔ **NO.** No human has seen a derived max mint or an accessory record render. |
 
-### ⛔ THE WHOLE ARC, WHAT IS AND IS NOT LIVE
+### ⛔ THE WHOLE ARC, WHAT IS AND IS NOT LIVE — **CLOSED OUT 2026-08-29**
+
+> ⚠️ **THIS TABLE IS THE ARC'S RECORD OF TRUTH AND IT HAS BEEN WRONG ONCE.** The item 1 table below
+> shipped reading PUSHED: NO inside the very commit that pushed it. **If you change what is running,
+> change this table in the same commit.**
 
 | Item | Committed | On `origin` | Deployed |
 |---|---|---|---|
-| 1 — ungate the records | ✅ | ✅ `40e371c3` | ✅ `compute-snapshot` **144** |
-| 2 — efficiency reads every run | ✅ `0dbb6b90` | ⛔ | ⛔ |
-| 3 — endurance renders without a plan | ✅ `0dbb6b90` | ⛔ | ⛔ |
-| 4 — heavy derived from the set | ✅ this commit | ⛔ | ⛔ |
-| 5 — secondaries and accessories | ✅ this commit | ⛔ | ⛔ |
+| 1 — ungate the records | ✅ `40e371c3` | ✅ | ✅ |
+| 2 — efficiency reads every run | ✅ `0dbb6b90` | ✅ | ✅ |
+| 3 — endurance renders without a plan | ✅ `0dbb6b90` | ✅ | ✅ |
+| 4 — heavy derived from the set | ✅ `828a4200` | ✅ | ✅ |
+| 5 — secondaries and accessories | ✅ `828a4200` | ✅ | ✅ |
+| — the block-length window ruling | ✅ `bfdece3a` | ✅ | ✅ |
+| 6 — dated baselines | ✅ `dda51de8` + `4b8d8463` | ✅ | **SPEC ONLY — nothing built** |
+
+**PUSHED:** `origin/main == 4b8d8463`.
+
+**DEPLOYED — six edge functions, versions read back from `supabase functions list`, never assumed:**
+
+| function | version | why it needed deploying |
+|---|---|---|
+| `compute-snapshot` | **145** | changed directly |
+| `compute-facts` | **127** | changed directly (`classifyRunIntent` now emits `long`) |
+| `coach` | **472** | `COACH_PAYLOAD_VERSION` 173 → 174 |
+| `workout-detail` | **353** | ⚠️ **no edits of its own** — bundles the changed `_shared/state-trend` |
+| `analyze-running-workout` | **832** | ⚠️ **no edits of its own** — bundles the changed `run.ts` |
+| `analyze-cycling-workout` | **219** | ⚠️ **no edits of its own** — bundles the changed `index.ts` |
+
+⛔ **THE LAST THREE ARE THE POINT.** Supabase freezes a copy of `_shared` into each function at deploy
+time, so leaving them would have stranded three functions on the old run code — the trap `CLAUDE.md`
+records as having silently stranded **17 functions for a month**. Whoever touches
+`_shared/state-trend/*` next deploys all six.
+
+**CLIENT: served, not merely built.** Confirmed against the live bundle at `efforts.work`
+(`assets/index-CQL4H5id.js`), which contains the new strings *"no fade number"*, *"your best sets"*
+and the reworded *"Reading N easy runs"*. ⚠️ **Checked off the SERVED file — not off the push, and not
+off the local `dist/`.**
+
+**VERIFIED: ⛔ NO, ON EVERYTHING.** No human has watched a single card render a number.
+⚠️ **NOTHING APPEARS UNTIL `compute-snapshot` RUNS ON THE NEXT INGEST.** Opening the app and seeing
+the old screen is expected, not a failed deploy.
+
+**WHAT TO LOOK FOR when it does run:** endurance cards rendering with no plan attached · *"your best
+sets"* under the folded "from your logged sets" section · lift lines appearing for lifts that were
+never stamped heavy · a "best" number reappearing beside a fresh line where an older lift still holds
+the record.
+
+### ⛔⛔ DEPLOYED BUT UNDRAWN — NAMED IN ONE PLACE SO NOBODY REPORTS THEM AS SHIPPED
+
+**All three are live in the payload or the code and reach no screen.** They are not bugs and not
+half-finished work; each was scoped out deliberately. ⛔ **Do not report any of them as shipped, and
+do not "fix" one without a ruling.**
+
+1. **The long-run and quality efficiency trends.** `runFitness.efficiency.groups` carries every
+   session-type group with its own count, direction and series. **Only the easy-run headline and the
+   spine cards are drawn.** The run row's layout was not in scope for item 2.
+2. **Accessory volume.** Per-set tonnage is computed in `_shared/workload.ts` / `session-load.ts` and
+   is **surfaced nowhere.** Item 5 said trace before building a second, and a second was not built —
+   but the first is not on a screen either.
+3. **The bike has no session-type split.** The run groups easy / long / quality; rides carry the
+   single group `all`, because the bike has no equivalent classifier and inventing one would grow the
+   second vocabulary this codebase keeps growing. Named, not solved.

@@ -1,6 +1,37 @@
 # HANDOFF — the strength and endurance read
 **Written 2026-08-28, end of a long day. Read this first; everything else is depth behind it.**
 
+> ## ⛔⛔ SUPERSEDED IN PART, 2026-08-29. READ THIS BOX BEFORE THE FILE.
+>
+> **This handoff describes the state on the evening of 2026-08-28. A whole work order has landed since,
+> and five of its items are LIVE.** Everything below still reads *"nothing is pushed"* and *"the
+> records are gated"*. **Both are now false.** The file is kept for its reasoning — the THREE MISTAKES
+> section at the bottom is still the most useful thing in it — but not for its state.
+>
+> ⛔ **THE CURRENT RECORD IS `docs/WORKORDER-the-progress-standard-2026-08-28.md`**, section *"THE
+> WHOLE ARC, WHAT IS AND IS NOT LIVE"*. The rulings are consolidated in **D-456**.
+>
+> **PUSHED:** `origin/main == 4b8d8463`.
+> **DEPLOYED:** `compute-snapshot` **145** · `compute-facts` **127** · `coach` **472** ·
+> `workout-detail` **353** · `analyze-running-workout` **832** · `analyze-cycling-workout` **219**.
+> Client confirmed **served** at `efforts.work`, off the served bundle rather than off the push.
+> **VERIFIED: ⛔ STILL NO, ON EVERYTHING.** Nothing renders until a snapshot runs on the next ingest.
+>
+> **What changed under this file's feet:**
+> - ⛔ **"WHAT IS WRONG RIGHT NOW — the records are gated" is FIXED** (item 1, `40e371c3`). Do not act
+>   on that section.
+> - **Q-295 is CLOSED AT BOTH ENDS** — no duration gate on run efficiency, floor or ceiling.
+> - **Q-294 is BUILT** — the endurance read is athlete-scoped; a run needs no plan.
+> - **Q-297 is BUILT** — heavy is derived from the set, and the reference max is windowed to the
+>   athlete's block length.
+> - **Q-290 is STILL OPEN** and is now the head of item 6, which is **SPEC ONLY, nothing built.**
+> - ⚠️ **The comment claiming Strong/Hevy/Boostcamp separate heavy from light is corrected in code.**
+>   This file already flagged it; it is done.
+>
+> ⚠️ **AND THE MONDAY PLAN AT THE BOTTOM IS STALE IN ONE RESPECT:** it says *"do not deploy anything
+> before he rebuilds."* He ruled otherwise and authorised the deploy directly. The expected-states and
+> tripwires in that section are still correct and still worth reading.
+
 ---
 
 ## STATE — THREE WAYS, AND NEVER "SHIPPED"

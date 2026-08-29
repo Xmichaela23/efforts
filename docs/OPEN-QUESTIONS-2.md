@@ -1165,6 +1165,31 @@ narrower than it should be, which is not the same thing.**
 
 ## Q-295 — An undefended 30-70 minute window is thinning the run efficiency sample (2026-08-28)
 
+> ## ⛔⛔ CLOSED AT BOTH ENDS, BUILT AND DEPLOYED 2026-08-29. Everything below is history.
+>
+> **The window is gone from `efficiencyIndexToSeries` and `recentEfficiencyPaceHr` — no floor, no
+> ceiling, and neither returns.** Exclusion by session type was replaced with GROUPING (`runSessionGroup`:
+> easy / long / quality), so a fast session or a long run is compared to its own kind rather than
+> deleted. Deployed: `compute-snapshot` **145**, `compute-facts` **127**, plus the four functions that
+> bundle the changed shared code. Spec: `docs/WORKORDER-the-progress-standard-2026-08-28.md` item 2.
+>
+> ⛔⛔ **AND THE QUESTION NAMED THE WRONG CODE — read this before trusting the trace below.** These two
+> functions feed the FALLBACK verdict. On an athlete with enough runs to fit a regression (this one:
+> 127) the ROUTE ENGINE overrides verdict and pctChange, and **that pool always read every run with no
+> duration window and no session-type gate.** The ceiling was never what pooled this athlete's long
+> runs with his 27-minute ones — **pooling was**, in `assemble.ts`, and there was no exclusion there to
+> remove, only an absence of grouping. Fixing only the two functions named below would have changed
+> nothing on screen. Measured, 12 improving easy runs plus 10 hard sessions:
+> `POOLED → still_learning, −0.7%, ci [−7.8, +6.4]` · `GROUPED → improving, +6.9%, ci [+6.6, +7.2]`.
+>
+> ⚠️ **A second starved reader was found on the way:** `run_facts.workout_type` (`classifyRunIntent`,
+> written since 2026-07-30) **had never reached a reader** — the join used the analyser's field, which
+> collapses everything to `intervals` / `hill_repeats` / `steady_state`. The classifier was not
+> missing, it was starved, and the grouping would have had nothing to group on.
+>
+> ⚠️ **See also D-456** for the rulings this closes under, and item 2 of the work order for the
+> long-run fade rule (decided on whether the session WAS steady, never on its duration).
+
 ⛔⛔ **START HERE, NOT WITH THE GAP ITEM BELOW.** `efficiencyIndexToSeries` (`run.ts:85`) filters on
 `duration_minutes >= 30 && <= 70`. **It drops every run under half an hour AND every long run** — on a
 standing block the long run is ~73 minutes, excluded by three minutes over a ceiling **nobody has

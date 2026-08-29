@@ -1293,3 +1293,86 @@ failure, so a future tag error cannot hide there.
 **Superseded:** Slice 7's *"do not re-add a chip here"* is annotated in place in
 `TrainingBaselines.tsx` — the two chips APPLY its rule rather than excepting it, and the note says
 so where the next reader will be standing.
+
+---
+
+## D-456 — The progress standard: no duration gate, group don't delete, fade decided on the session, and a max has a lifespan (2026-08-28/29, Michael)
+
+**One consolidated entry for a whole arc, deliberately.** Six rulings landed in one evening against
+`docs/WORKORDER-the-progress-standard-2026-08-28.md`. They are recorded together because they are one
+correction stated six ways, and because doc overhead is being kept down — the work order carries the
+depth, this carries what must survive it.
+
+**The ask, in his words:** *"Looking for the TrainingPeaks / Viada standard for tracking endurance and
+strength gains… What we built wasn't collecting data right — counting low weight sets against the max
+— and endurance was not figuring out numbers based on total runs, discarding fast and hilly runs."*
+
+⛔ **THE ONE MISTAKE UNDERNEATH ALL OF IT: the build made the plan a precondition for a MEASUREMENT,
+then filtered the population down to whatever the plan prescribed.** TrainingPeaks' reads need no
+plan; Viada's same-session-versus-itself test does. **TrainingPeaks is the spine, Viada is the
+overlay** — the build shipped that inverted.
+
+### 1. No duration gate on run efficiency, at either end
+The 30–70 minute window is gone from `efficiencyIndexToSeries` and `recentEfficiencyPaceHr` and
+**neither end returns.** The floor dropped two of every three of this athlete's runs (*"let's match
+TrainingPeaks"*); the ceiling deleted the long run (*"it shouldn't cap at 70, that's crucial for
+marathon trainers"*). ⚠️ The durability row beside it always ran with a floor and NO ceiling — two
+numbers on one screen reading two different populations. Closes **Q-295 at both ends.**
+
+### 2. Group, don't delete
+`runSessionGroup` → easy / long / quality. A fast session or a long run is compared to its own kind,
+never binned. ⛔ **The `long` group is the same mechanism, not a second one:** *"a long run drifts
+more"* is true, and is a reason to compare long runs to long runs. ⛔ **Derived from the session's own
+word, never from a minutes threshold** — a duration cutoff is what ruling 1 deleted.
+⚠️ **The headline is fitted on the EASY group alone.** Pooling was the actual defect and it lived in
+the route engine (`assemble.ts`), not in the two functions the work order named.
+
+### 3. The fade number is decided on whether the session WAS steady
+Not on its duration, and not on its plan. `decoupling_mixed_effort` is the **switch**: a session that
+was not steady shows **no fade figure** and **still feeds the efficiency trend**. ⛔ Not a second
+steadiness test, and not a contradiction of **D-283** — that says don't delete a steady run for being
+low-confidence; this says don't print a fade number for a session that wasn't steady.
+**Why:** Viada's LSD inserts surges, pauses and race-pace finishes by prescription (p235, p246), so a
+fade read there would report a durability failure every week on an athlete following the book exactly.
+⛔ **The screen SAYS SO** — *"no fade number — this session changed pace on purpose."* Rendered as a
+blank it reads as broken data.
+
+### 4. The endurance read is athlete-scoped (Q-294)
+`enduranceSpine` — every run and ride, grouped by session type, **no `planned_id`, no family tag, no
+block week map.** Dates, not block weeks, so a rebuilt block cannot empty it. The plan-linked card
+becomes the overlay. ⛔ **No day-of-week + duration fallback guessing which session a run "was."**
+
+### 5. Heavy is a property of the set (Q-297), and a max has a LIFESPAN
+Two doors into one gate: the plan's stamp, or **1–5 reps at ≥90%** read from `prescribe('ME','barbell')`
+rather than restated. ⛔ **Still fails closed** — this is a second door, not a loosening. It unblocks the
+off-plan athlete, the Strava importer, and the Get Stronger main lift, which is deliberately unstamped
+(a 5/3/1 top set is 65–95%) and therefore **minted nothing at all.**
+⛔ **THE WINDOW IS THE ATHLETE'S BLOCK LENGTH** (`plans.duration_weeks`; no block →
+`STATE_TREND_WINDOWS.defaultBlockWeeks`, which is the app's own default, not a number picked here).
+**Provenance: Viada Part H p215** — the pretest sets the max at block start and the block is written
+from it; Part F records the agreement with Wendler, *"progress without retesting on fixed increments."*
+⚠️ **`buildBestByLiftSince` is a SECOND ACCESSOR beside `buildAllTimeBestByLift`, not a replacement:
+a RECORD does not expire, a reference max does.** Merging them breaks one or the other.
+
+### 6. Where records render: NOT a picker
+Secondaries get their own line (ruling 5 supplies the minting set). Accessories get **records and best
+sets, never a max line** — *"nobody trends a 1RM here."* ⛔ **No lift selector on the State screen.**
+They hang in the folded "from your logged sets" section that already existed, whose own comment had
+already named the gap (*"they have no home YET"*). Field standard: Strong and Hevy put a lift's record
+on that lift, seen where it was already the subject.
+
+### And one product ruling, permanent
+⛔ **The standalone daily READINESS check-in comes off** (energy/soreness/sleep chips, `StateTab`).
+Two independent reasons: the data is not obtainable from accessible dev APIs, and self-report is not
+logged. ⚠️⚠️ **The BODY row STAYS** — effort rating + soreness written by the post-workout tap
+(D-234/D-235) is live and populated, and an earlier framing of this ruling would have deleted a
+working input. **Two rows, only one goes.**
+
+**Supersedes / annotates:** Q-295 (closed both ends, back-annotated) · the item-4 note claiming no
+defensible staleness window existed — **the source had the answer and was not consulted first**, which
+is this codebase's own rule, missed twice in one arc · the `fitness_baselines` migration header's
+"strength is intentionally not stored here" (back-annotated in the SQL).
+
+**Deployed 2026-08-29:** `compute-snapshot` 145 · `compute-facts` 127 · `coach` 472 · `workout-detail`
+353 · `analyze-running-workout` 832 · `analyze-cycling-workout` 219. Client served at `efforts.work`.
+⛔ **VERIFIED: NO.** Nothing renders until a snapshot runs on the next ingest.
