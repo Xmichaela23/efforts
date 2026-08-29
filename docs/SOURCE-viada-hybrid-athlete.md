@@ -33,6 +33,7 @@ room** and without re-photographing it.
 | **E — All Rounder week + notes** (pp.274–275) | transcribed with the page images open; the week table re-verified against `p274.jpg` | ✅ high |
 | **B — Ch.4 dosing** (pp.69–125) | ⚠️ earlier-session notes, **part-corrected against the 2026-08-26 re-shoot and the 2026-08-27 second pass** | ⚠️ **MIXED.** Twenty-two pages now read off the photographs — **B4b** (eleven, the endurance-side pages) and **B4d** (eleven, the strength half, pp.71–90). ⛔ **B4d falsified a shipped constant.** Everything named in neither is still one generation removed. |
 | **C — week assembly** (pp.128–151) | ⚠️ same — earlier-session notes | ⚠️ one generation removed, **and incomplete: six items are recorded under a heading that says nine.** |
+| **I — progression** (pp.110–112) | transcribed 2026-08-29 with the page images open | ✅ high — **but its two mechanisms live in uncaptured Part 2 pages, see I9** |
 
 ## ⛔ THE PAGE IMAGES — the ground truth
 
@@ -50,8 +51,13 @@ directions — see the changelog.
 **Coverage:** pp.69–151 (Ch.4 programming + Ch.5 hybrid training) · pp.218–241 (Ch.9 movement key) ·
 **pp.244–284 (Ch.10, all eighteen programs)**.
 
-⛔ **Chapters 4, 5, 9 and 10 are COMPLETELY captured. Nothing in this file is waiting on a page.**
+⛔ **Chapters 4, 5, 9 and 10 are COMPLETELY captured.**
 *(pp.228, 257, 267 and 273 are full-page photographs with no content.)*
+
+⛔⛔ **THIS FILE IS NOW WAITING ON A PAGE — CORRECTED 2026-08-29.** The line that stood here said
+*"nothing in this file is waiting on a page."* **pp.152–217 are 66 consecutive unphotographed pages**
+(the folder jumps `p151.jpg` → `p218.jpg`), and p112 points into them for both the **circle of reps**
+and the **threshold adjustment method**. See **Part I9**.
 
 ## Cross-refs
 
@@ -616,6 +622,8 @@ is the endurance half; B4c already relays the load-bearing pages inside it.
 ## B7. Progression, testing, periodization
 
 - Progressive overload is a **principle, not a ratchet**; load increases are RPE-gated.
+  ⛔ **THIS BULLET IS NOW A FULL SECTION — see PART I (pp.110–112), transcribed 2026-08-29.** The
+  loading rotation (75/80/85%) and the raise/lower trigger are on the page; this summary predates it.
 - **PAP protocol:** 70–90% loads at 2–3 RIR; starting template ~80% × 3×6 then **6–8 min rest**.
 - **Hybrid periodization's four cores:** submaximal always · full-spectrum maintenance · rotate
   structure at the same stimulus · overreach-to-deload breaks down in hybrid training.
@@ -1252,8 +1260,11 @@ resolved.**
 - ⛔ **PROGRESSION — his own rate anchor for THIS program:** *"Progress here should be through the
   circle of reps, with slow gradual increases in the calculated 1RM taking place **every 3 to 4
   weeks (assume 1 percent every 3 weeks as a starting point)**."*
-  ⚠️ **"The circle of reps" is not defined on this page** and appears nowhere else in this corpus.
-  Do not assume it means double progression without finding his definition.
+  ⚠️ **"The circle of reps" is not defined on this page.** ⛔ **UPDATED 2026-08-29: p112 names it and
+  places it in Part 2** — *"This is further outlined in the circle of reps coverage in Part 2"* — and
+  gives the rotation it summarizes (75/80/85% around a predicted max, reps adjusted, then the max up
+  a pound or two). **See Part I7.** Part 2's pp.152–217 are unphotographed, so the mechanism itself is
+  still unread. Do not assume it means double progression.
 - **Primary movements rotate SPARINGLY** (main text): higher background fatigue than an obligate
   lifting program means slower skill acquisition, and *"spreading yourself too thin across multiple
   movements may return inferior results."*
@@ -1400,6 +1411,465 @@ they are equivalent.
 
 ---
 
+# PART I — PROGRESSION AND PROGRESSIVE OVERLOAD (pp.110–112)
+
+**Provenance: ✅ HIGH — transcribed 2026-08-29 with `p110.jpg`, `p111.jpg`, `p112.jpg` open.**
+(Same frames as `~/Downloads/Endurance period/IMG_3678–3680.JPG`.)
+
+⚠️ **IT IS A SECTION, NOT A CHAPTER.** p110 is a display opener — full-bleed photo, then the title
+**"PROGRESSION AND PROGRESSIVE OVERLOAD"** — but the running head on p111 reads **"4. PROGRAMMING"**,
+so this sits *inside* Ch.4, the same chapter Part B captures. The page footers read **"PART 1: THE
+SCIENCE AND PRINCIPLES BEHIND HYBRID TRAINING"**. Cite it as *p110–112, Ch.4*, not as "Ch.4
+Progression".
+
+⛔ **THIS IS THE PAGE THAT ANSWERS STRENGTH PROGRESSION.** Part G recorded ~40 unread frames and
+warned in its own words that *"an unread frame is not a gap in the book."* Three of those frames were
+this section. **He does not leave weekly loading silent.**
+
+## I1. What progressive overload is NOT (p110, verbatim)
+
+> *"One important component in* all *training is progressive overload. Progressive overload is often
+> misrepresented in that it is summarized as "Make every workout a little harder than the last." In
+> other words, add weight, repetitions, or sets; increase speed or duration; and so on.*
+>
+> *This isn't really what it means, and if you enjoy being an obnoxious pedant who is nevertheless
+> tolerated because you are correct more often than not, you should highlight this portion of the
+> book. (It may not make you popular at parties, but people may acknowledge your superiority
+> grudgingly with a sneer and a sigh.)"*
+
+⛔ **The four things he names as the misrepresentation are exactly the four levers a naive engine
+pulls:** add weight · add reps · add sets · increase speed or duration.
+
+## I2. The definition, and why session-to-session is the wrong grain (p111, verbatim)
+
+> *"Progressive overload doesn't mean that sessions need to gradually get harder; it means that the
+> stimulus in a workout generally needs to increase over time as a result of greater fitness. You may
+> think these two things sound roughly the same, but there's a difference: The stimulus doesn't have
+> to increase from session to session to continue pushing adaptation. In fact, the same stimulus can
+> continue to trigger adaptation week after week, being marginally, imperceptibly less impactful over
+> time, but still useful. To put it another way, most athletes are unlikely to progress so much from
+> one week to another that a given week's stimulus proves inadequate the next. More specifically, the
+> overload principle states that habitually overloading a system will cause it to respond and adapt.
+> Progressive overload refers to the* principle *of overload — that is, the adaptation caused by
+> progressive overloading. So, progressive overload means that the stimulus must progress over time
+> to ensure that you're still overloading the system. Overload does not mean loading more each
+> session!"*
+
+⚠️ The leading capital of *"Progressive"* sits at the crop edge of `p111.jpg`; the rest of the
+sentence is unambiguous and it opens a fresh paragraph (p110 ends on a closed parenthetical).
+
+## I3. The rate — how slowly capability actually moves (p111, verbatim)
+
+> *"The same stimulus is often sufficient to drive adaptations for weeks (or even months) in a row
+> because increases in physical capabilities from session to session measured in fractions of a
+> percentage point don't require measurable increases in stimulus over the same time period!
+> Eventually, of course, the stimulus must increase. If you're gaining "only" 5 to 10 percent more
+> strength on a single lift over the course of several months (or more, for high-level athletes),
+> then your capabilities may increase — for example, by a half kilo or so week to week — which means
+> an initial appropriate load will remain within the "ideal" load's margin of error for a month or
+> so. (Most of us would* love *to get so much faster, stronger, or bigger in a week that looking at
+> last week's workout makes us scoff.) If you run a three-mile loop at a moderate intensity in
+> twenty-four minutes one week, will your adaptations grind to a halt if you don't run 23:59 or
+> better the next, or add fifty feet of distance to the run? Of course not. If I bench 100 kilos for
+> 3 sets of 8 one week, is 100 kilos so light the next week that it's no longer a significant stress?
+> Very unlikely. In fact, it may represent a solid growth or strength stimulus for quite some time,
+> even as it gets "easier.""*
+
+⛔ **THE NUMBERS.** 5–10 percent on one lift over *several months* · about **a half kilo per week**
+of capability · an appropriate load stays inside the ideal load's margin of error **for a month or
+so**. That last figure is the licence to hold a weight.
+
+## I4. Undulation is permitted — a week may go DOWN (p111, verbatim)
+
+> *"Progressive overload implies that, yes, eventually there needs to be an upward trend in some
+> critical variables to continue development, but hybrid athletes must understand that continuously
+> increasing the stimulus is far more likely to result in burnout and stagnation (and the need for a
+> deload) than in superior progress. In fact, some undulation is acceptable; you can decrease the
+> stimulus somewhat from one week to the next and still progress as long as the lower stimulus is
+> enough to overload the system to a certain extent."*
+
+⚠️ **THE ONLY THING THIS PAGE SAYS ABOUT DELOADS** is that a *continuously* rising stimulus is what
+creates the need for one. It states no cadence. Read with p120 (Part B7): overreach-to-deload is
+rejected for hybrid athletes. **Q-C stays open.**
+
+## I5. Why hybrid especially (p111 → p112, verbatim across the page break)
+
+> *"The reason I emphasize this so heavily is because hybrid programs must be carefully progressed.
+> Multiple variables are being manipulated, so it's important to realize that minor increases in one
+> stimulus may impact recovery from a seemingly unrelated stimulus, limiting overall progress. It's
+> often tempting in training to continuously try to go a little bit faster or lift a little bit more
+> every week, which is made worse by sharing lifting progress on social media and Strava reminding
+> you that someone has taken your segment crown."*
+
+⛔ **A MINOR INCREASE IN ONE STIMULUS SPENDS RECOVERY IN ANOTHER.** This is the interference cost
+stated at the level of *progression*, not of session placement — a per-week ratchet on the barbell is
+a withdrawal from the run.
+
+## I6. "Be a little better every week" is a TRAP (p112, verbatim)
+
+> *"But this urge to "be a little better every week" is a trap — and it's unsustainable. Progressive
+> overload means ensuring that your training stimulus remains optimal for the chosen parameter. If
+> it's progressing in the wrong direction over multiple sessions, that's an issue to manage via
+> program modifications or lifestyle adjustments, not by simply throwing more stress at your body."*
+
+> *"This does not mean that workouts must be the same from week to week, either. Rotations in sets
+> and reps, interval intensity and duration, and so forth may all take place — if for no other reason
+> than to avoid stagnation and eliminate any potential weaknesses in the program — but the overall
+> volume and intensity can remain fairly similar. One of the first questions I'm often asked about
+> progression is "When do I add more intensity versus longer duration/more reps on each set or
+> interval?" There are some guidelines that may help you decide the best direction to proceed."*
+
+⛔ **A DECLINE IS A PROGRAM/LIFESTYLE PROBLEM, NOT A LOADING PROBLEM.** Multiple sessions trending the
+wrong way are answered by changing the program or the life around it — explicitly **not** by adding
+stress.
+
+## I7. ⛔⛔ THE LOADING ROTATION (p112, verbatim)
+
+> *"For many of my athletes, I rotate the reps and weight around a given max (that is, with a
+> predicted max of X pounds, you can hit a certain number of reps at 75 percent and a certain number
+> at 85 percent, so I may cycle between 75 percent, 80 percent, and 85 percent week to week in load,
+> adjusting reps to keep the overall stimulus similar) before adjusting the overall max up a pound or
+> two. This is further outlined in the circle of reps coverage in Part 2. Similar principles are used
+> in the threshold adjustment method, also in Part 2."*
+
+- The basis is the **predicted max** — Part H's number, not a Wendler training max.
+- The weekly wave is **75 / 80 / 85 percent**, reps moved to hold the stimulus roughly constant.
+- The max moves **a pound or two**, and it moves *after* the rotation, not on a schedule.
+- ⛔ **"THE CIRCLE OF REPS" IS REAL AND IT IS NOT "THE CIRCLE OF MAXES"** (p123, Part B4b). p112 names
+  it and points at **Part 2**. See I9.
+- ⚠️ **"THE THRESHOLD ADJUSTMENT METHOD"** is named here for the first time in this corpus, also in
+  Part 2, and is presumably the endurance twin of the same mechanism.
+
+## I8. ⛔⛔ THE PROGRESSION TRIGGER (p112, verbatim)
+
+> *"The overall guidance is summed up as follows: A given training load (intensity/volume/frequency)
+> can be maintained for several weeks at a time with minor adjustments from session to session that
+> assume the same level of peak performance, simply applied across slightly different set durations
+> and intensities. If you're meeting or exceeding expectations at this load, as indicated by lower
+> RPE than intended, or consistently superior performance* at *the target RPE, you can increase the
+> load incrementally to be exposed to a new cycle at this higher load. You can follow this process
+> indefinitely and decrease load if you fail to achieve targets at any point."*
+
+**The rule, stripped:**
+
+| | |
+|---|---|
+| **Hold** | a given load (intensity/volume/frequency) for **several weeks at a time** |
+| **Vary** | minor session-to-session adjustments across different set durations and intensities, assuming the same peak performance |
+| **Raise** | when **RPE comes in lower than intended**, OR performance is **consistently superior *at* the target RPE** — increase **incrementally**, into a new cycle at the higher load |
+| **Lower** | **if you fail to achieve targets at any point** |
+| **Duration** | **indefinitely** |
+
+⛔ **THE TRIGGER IS EFFORT, NOT THE CALENDAR.** Nothing here counts weeks to a jump. Both directions
+are evidence-driven, and the downward direction is stated as plainly as the upward one.
+
+⚠️ **RPE, NOT RIR.** He writes RPE on this page. p218's grid prescribes RIR, and **ME has no RIR
+target**. Mapping one to the other is ours, not his — do not silently convert.
+
+⚠️ **DRIFT NOTE — the workorder's copy is not the page.** `WORKORDER-viada-owns-the-engine-2026-08-29.md`
+quotes this passage without *"The overall guidance is summed up as follows:"* and renders the middle
+clause as *"…peak performance across slightly different set durations and intensities"*; the page
+reads *"…peak performance, simply applied across slightly different set durations and intensities."*
+**This file is the transcription; the workorder is not.**
+
+## I9. ⛔ THE BLOCKER — THE MECHANISM IS IN pp.180–217, THE LAST UNREAD PAGES IN THE BOOK
+
+p112 hands both mechanisms to **Part 2** and neither is in this corpus.
+
+⚠️ **NARROWED AND CORRECTED 2026-08-29 (second pass).** This section first recorded the gap as
+*"pp.152–217, and Part 2 runs from roughly p152"*. **Both halves were wrong.** pp.153–179 were shot
+and read the same day (see I11); **every verso footer in that run reads "PART 1: THE SCIENCE AND
+PRINCIPLES BEHIND HYBRID TRAINING"**, and p161 and p173 both point *forward* to Part 2 from inside
+it. **Part 2 therefore begins after p179**, and the unread slice is **pp.180–217**.
+
+| | |
+|---|---|
+| **What is missing** | **pp.180–217 — 38 pages, zero frames.** `book-sources/` jumps `p179` → `p218.jpg` |
+| **What is in them** | *"the circle of reps coverage"*, *"the threshold adjustment method"*, and *"several ways to determine FTP"* (p173) |
+| **What is captured of Part 2** | p215 (Part H, read but its image is still pending) · pp.218–241 (Ch.9 Movement Key) · pp.244–284 (Ch.10 programs) — **no term appears in any of them** |
+| **Where Part 2 starts** | between p180 and p215, exact page unread |
+
+⛔ **THREE FORWARD-POINTERS NOW LAND IN THE SAME 38 PAGES**, from three different chapters:
+
+| From | Pointing at |
+|---|---|
+| **p112** (Ch.4) | *"This is further outlined in the circle of reps coverage in Part 2. Similar principles are used in the threshold adjustment method, also in Part 2."* |
+| **p161** (Ch.6) | *"Part 2 contains several recommended movement variants for the powerlifts."* ⚠️ **This one resolves to the captured Movement Key (pp.218–227)** — proof that "Part 2" includes the pages we already hold, and that not every pointer lands in the gap. |
+| **p173** (Ch.6) | *"As discussed in Part 2, there are several ways to determine FTP…"* ⛔ FTP determination is **not** in pp.218–284 either. |
+
+⛔ **SO pp.180–217 IS A METHODS BLOCK, NOT MORE PROSE.** Two of the three pointers (the loading
+rotation, FTP determination) are procedures we do not have, and **p215's pretest protocol already
+sits inside this range** — a protocol page, read out of order, with no image. That is the shape of
+what is missing.
+
+⛔ **NO PROGRESSION CODE UNTIL pp.180–217 ARE SHOT.** I7's rotation is the summary of a mechanism
+described elsewhere; building the mechanism from the summary is the same mistake that produced
+`DOUBLE_PROGRESSION_IS_OURS` and the "chapter that was assumed absent" this section corrects.
+
+## I11. ⛔ pp.153–179 SWEPT FOR BOTH TERMS — NULL RESULT (2026-08-29)
+
+**27 frames read off the images** (`~/Downloads/152/IMG_4295–4321.JPG`). ⚠️ **Filename formula
+verified before use, at three points and not one:** `IMG_number − 4142 = page` holds at IMG_4296=154,
+IMG_4308=166 and IMG_4321=179, all read off printed page numbers. The run is **pp.153–179**, contiguous.
+
+⛔ **NEITHER "THE CIRCLE OF REPS" NOR "THE THRESHOLD ADJUSTMENT METHOD" APPEARS ON ANY OF THESE 27
+PAGES.** Not defined, not named, not alluded to. **No mechanism was inferred from the surrounding
+text, and none should be.**
+
+⚠️ **THE NEAR MISS, RECORDED SO NOBODY MISTAKES IT FOR THE METHOD.** p166 ("Benchmarks and Planning")
+says benchmark workouts *"allow you to monitor your progression and adjust threshold when needed,
+without forcing retesting."* **That is the same words in a different order, not the named method.**
+It is a rationale for benchmark sessions; the *threshold adjustment method* is a named procedure in
+Part 2. ⛔ **Do not cite p166 as its definition.**
+
+**What the run is:** Ch.6, **"THE SPORTS"** — a blue full-bleed divider on p153, then one profile per
+sport, each built as *[SPORT] → Strength Component → Endurance Component → Hybrid Athlete
+Considerations*. Ultramarathon (p154), Powerlifting (p159), Road Running (p165), Cycling (p170),
+Swimming (p177). ⚠️ **Ch.7 and Ch.8 are not named anywhere in this run** — their titles and start
+pages are in pp.180–217 and remain unknown.
+
+⚠️ **FOUR FINDINGS IN THIS RUN BEAR ON THE ENGINE AND ARE NOT TRANSCRIBED HERE** — recorded as
+pointers so the next session knows they exist rather than inferring around them. **Read the page
+before using any of them:**
+- **p163** — a hybrid athlete's working max may run a **double-digit percentage below their true
+  max**, and he endorses Conjugate-style rotation for exactly that reason. ⛔ Bears directly on
+  Part H and on the working-number stage of `WORKORDER-viada-owns-the-engine-2026-08-29.md`.
+- **p160** — he names **5/3/1 and Westside Conjugate by name**, neutrally, as straightforward
+  implementations of undulating periodization. ⛔ Bears on that workorder's *"his week on someone
+  else's block"* framing.
+- **p163** — a **"two upper and two lower"** split with weekly emphasis rotating *"squat/knee bend"*
+  versus *"deadlift/hip hinge"*, alternating at least once per microcycle. ⚠️ A second source for the
+  ME rotation the corpus currently cites only to p247 (Part E1c).
+- **p172** — *"Functional threshold power (FTP) is the most commonly used measurement of cyclist
+  fitness. This measure roughly corresponds to VT2 or maximal lactate steady state (MLSS)"*, and he
+  states he uses power as the method for controlling output. ⛔ **This is the cycling percentage
+  basis Part G gap #2 records as inferred rather than captured.**
+
+## I10. What this section settles, and what it does not
+
+**Settles:**
+- ⛔ **A weekly ratchet is wrong**, and is named as a trap (I6).
+- ⛔ **Strength progression triggers on effort** — lower-than-intended RPE, or superior performance at
+  the target — **and reverses on missed targets** (I8).
+- ⛔ **The max moves by a pound or two**, off a **predicted max**, after a **75/80/85 percent**
+  rotation (I7).
+- ⛔ **A load can be held for several weeks, and a week may be lighter** and still progress (I3, I4).
+- ⛔ **The four naive levers** (weight/reps/sets/speed-or-duration) are the misrepresentation, not the
+  method (I1).
+
+**Does not settle:**
+- **The circle of reps mechanism** — Part 2, unread (I9).
+- **The threshold adjustment method** — Part 2, unread (I9).
+- **Deload cadence** — no cadence on the page (I4); p120 rejects overreach-to-deload.
+- **Block length** — nothing here bounds a cycle. *"Indefinitely"* is the only duration stated.
+- **Whether the rotation runs per lift or per block** — *"week to week in load"* is said of an
+  athlete, not of a lift.
+- **How his RPE maps onto p218's RIR bands** (I8).
+
+---
+
+# PART J — THE CH.10 SWEEP: WHAT THE PROGRAMS SAY ABOUT PROGRESSION (2026-08-29)
+
+**Provenance: ✅ HIGH — fifteen program notes pages read off the images**: pp.245, 247, 249, 251,
+253, 255, 259, 261, 263, 265, 269, 271, 277, 280, 283. Plus **pp.213, 214, 215 read directly for the
+first time** (`~/Downloads/IMG_4324–4327.JPG`) — p215's image had been missing since 2026-08-23
+(Part G #7).
+
+⛔ **THE HEADLINE: NOT ONE PROGRAM STATES A WEEK-TO-WEEK LOADING SCHEME.** No program gives a
+percentage wave, a week-by-week ladder, or a rule for what goes on the bar in week 2 versus week 3.
+**p112's rotation is the only loading scheme in the book, and Part J does not outrank it — it feeds
+it a rate.**
+
+## J1. ⛔ WHAT THE PROGRAMS DO GIVE: THE RATE THE MAX MOVES
+
+Four separate rate statements, all read off the page:
+
+| Page | Program | The rate, verbatim |
+|---|---|---|
+| **p245** | Hypertrophy + 5K | *"Progress should be through the circle of reps, with slow gradual increases in the calculated 1RM taking place **every 3 to 4 weeks (assume 1 percent every 3 weeks as a starting point)**."* |
+| **p247** | Strength + 5K | ⛔ **The identical sentence, word for word.** |
+| **p251** | Strength + Half-Marathon | *"As this program progresses, minor increases in 1RM can be maintained over time, with **1% every four weeks or so** as a solid starting point."* |
+| **p247** (running notes) | Strength + 5K | ⛔ **A SECOND, FASTER RATE FOR THE LOWER BODY** — see J2. |
+
+⚠️ **THESE ARE ONE RATE, NOT THREE.** p245/p247 give a **3-to-4-week band with 3 weeks as the
+starting point**; p251's *"four weeks or so"* sits inside that band. **Do not model them as
+conflicting per-program constants.** The honest reading is ~1% every 3–4 weeks, with the program
+naming where in the band to start.
+
+⛔ **AND THE ARITHMETIC CLOSES ON p112 FROM THE OTHER SIDE.** 1% of a 225 lb bench is ~2.25 lb.
+p112 says the max moves *"up a pound or two."* **Two chapters, two different framings, the same
+number.** That is the strongest corroboration in this corpus for the p112 mechanism.
+
+## J2. ⛔⛔ THE ENDURANCE HAIRCUT ON THE WORKING MAX — STATED TWICE, NEVER TRANSCRIBED BEFORE
+
+**p247, Running Notes** (a *strength* rule filed under running, which is why it was missed):
+
+> *"Monday's run is fairly challenging, given that there is an ME lower session the next day. For the
+> first few weeks, you may notice that the ME lower session is slightly hindered by lingering
+> fatigue. **As such, a 3 to 4 percent reduction in working 1RM should be assumed here.** As long as
+> progression is maintained week to week and month to month, this reduction can be gradually phased
+> out in eight to ten weeks (that is, **increasing lower body estimated 1RM by about 2 percent every
+> three weeks for the first nine weeks**)."*
+
+**p280, Cycling programs:**
+
+> *"…fatigue will mask fitness quite thoroughly in these programs, and you should expect somewhat
+> lowered performance on the lower body days. You can still make progress, but **you may want to
+> proactively lower your working max by a few more percentage points than usual** to account for
+> this."*
+
+⛔ **SO THE HAIRCUT IS HIS, IT IS QUANTIFIED ONCE (3–4%), AND IT IS TEMPORARY.** It applies to the
+**lower body**, it exists because of the endurance session next to it, and it is **burned off at 2%
+every three weeks over the first nine weeks** — a *faster* rate than J1's baseline, running only
+until the deficit is gone. ⚠️ **Conditional:** *"as long as progression is maintained week to week
+and month to month."*
+
+⚠️ **THIS IS A SECOND, TRANSIENT RATE LIVING UNDER THE FIRST.** Any engine that models one global
+1%/3wk drift will be wrong for the first nine weeks of a runner's lower body.
+
+## J3. ⛔ SEVEN PROGRAMS SAY DO NOT CHASE THE 1RM AT ALL
+
+The corpus has been reading Ch.10 as if every program progresses load. It does not.
+
+| Page | What it says |
+|---|---|
+| **p249** Strength + Speed | *"**Increases in 1RM over the course of the program may not be necessary.** An athlete's priority here should be increasing power and explosiveness, and improvements in bar velocity and sprint speed take precedence."* |
+| **p259** The Runner: Pivot | *"**There is little need for significant overload on these strength movements.** … increase their estimated 1RM slowly … and focus instead on improving concentric velocity, balance, or proficiency."* |
+| **p265** Selection | *"Increasing in weight on the primary movements **can be** a goal, but athletes … may find that frequent variation and reduced rest periods allow for a greater emphasis on adaptability and work capacity."* |
+| **p271** Strength + Ironman | *"…strength gains are unlikely (though still possible!)"* — keep fatigue low, quality over load |
+| **p277** The Speed Solution | *"…the emphasis should be on quality and minimizing fatigue, **not necessarily pushing big weight with ultra high effort**."* |
+| **p255** Strength + Ultramarathon | *"running strength"*, not competitive strength; *"rotating between more RIR and fewer RIR as personal preference dictates"* |
+| **p261** Strongman + Endurance | *"Increasing weight is important … and load increased over time"* — **no rate given** |
+
+⛔ **PROGRESSION IS A PROPERTY OF THE PROGRAM, NOT OF THE ENGINE.** Some of his programs are
+explicitly *not* trying to move the bar. A builder that always ratchets is wrong for seven of
+eighteen.
+
+## J4. ⛔ THE DELOAD: EVERY CADENCE HE STATES IS TIED TO AN EVENT OR A FATIGUE STATE
+
+**Q-C is answered, and the answer is that there is no calendar.** Every program's week table already
+carries a **TAPER/DELOAD column** (Part E0) — the light week is a *variant of the same week*, not a
+separate block. What varies is **when you switch to it**, and he states that per program:
+
+| Page | Trigger |
+|---|---|
+| **p245** | ⛔⛔ *"If performance begins to suffer, particularly **if the ME lifts underperform 2 weeks in a row**, consider running a single deload week."* **THE EVIDENCE TRIGGER.** |
+| **p249** | *"…a deload week **every 3 or 4 weeks** if they're currently in preseason training … or **every other week** if they're in season and need to be at peak performance during games."* ⚠️ Conditional on sport-practice load, not a clock. |
+| **p247** | *"If a powerlifting meet or 5K approaches … **2 weeks out**, you switch the program to the deload version."* |
+| **p251** | *"**4 to 5 weeks out from a meet**, consider running the deload running portion (unless a race is within 6 weeks)."* |
+| **p263** | *"If you're experiencing significant fatigue, **don't hesitate to run several weeks of 'deload' in a row!**"* |
+| **p265** | *"**deload weeks can be taken fairly frequently**, but unless an athlete is really suffering from overreaching, deload weeks can and should still incorporate some active recovery/minimal sport training."* |
+| **p269** | *"…the deload week should be run **3 weeks out and 2 weeks out**, with the final race week being even lighter. If this training cycle is **less than 8 weeks**, only a single week of deload 2 weeks out is needed."* |
+| **p283** | *"…the deload version of the program can be used for **up to 4 weeks** before competition."* |
+
+⛔ **NOT ONE PROGRAM DELOADS ON A FIXED CALENDAR FOR ITS OWN SAKE.** Every cadence names a cause —
+a meet, a race, a season, or accumulated fatigue. **This is consistent with p111 (a lighter week may
+still overload) and p120 (overreach-to-deload is rejected).** The 4-and-8 deloads in our engine are
+Wendler's and have no counterpart here.
+
+## J5. ⛔ THE ROTATION QUESTION (Q-E) — WHAT ROTATES IS THE SLOT, NOT THE PERCENTAGE
+
+| Page | What rotates |
+|---|---|
+| **p247** | *"the **ME lift will rotate week to week**, with one week consisting of ME squat and DE deadlift, and the next week the reverse."* ⚠️ Bench is trained **twice a week** and sits outside this swap. |
+| **p163** | The same alternation stated **generally**, not per program: weekly emphasis on *"squat/knee bend"* versus *"deadlift/hip hinge"*, *"rotating regularly or even alternating each week."* |
+| **p251** | *"Consider **switching the ME upper and lower days** on occasion if the lower day is suffering heavily from the fast run the day before."* |
+| **p263** | *"The press day should focus on the same movement for both the ME and skill components on most weeks, but **this may rotate week to week**."* |
+
+⛔ **ALL FOUR DESCRIBE WHICH LIFT OCCUPIES THE HEAVY SLOT. NONE DESCRIBES WHAT PERCENTAGE IS ON THE
+BAR.** ⚠️ **Q-E IS STILL OPEN AND THE BOOK DOES NOT CLOSE IT.** Whether four lifts ride p112's
+75/80/85 in phase or on independent clocks is **not stated anywhere in this corpus**. Anything we
+choose here is ours and must be labelled as ours.
+
+## J6. ✅ REPS AT PERCENTAGES — WHAT IS PINNED, AND WHAT IS NOT
+
+**p214 and p215, read directly 2026-08-29** (p215's image had been missing since 2026-08-23; ⚠️ Part
+G #7 can now close).
+
+**p214 — the working max, verbatim:**
+> *"For certain lifts, I recommend utilizing a percentage of your working 1-rep max, which I define
+> as (roughly) **96 percent of your true 1-rep max**. To calculate this number, I recommend **testing
+> your 5-rep max** prior to the program. … a **5- to 6-rep max** seems to allow for the best
+> combination of reliability and precision."*
+
+**p215 — the only percentage/rep pairs in the book:**
+
+| Percentage | Reps | Source |
+|---|---|---|
+| **75%** | *"a weight where you can **comfortably perform 8 repetitions** but are **approaching failure if you had to push to 10**"* — the protocol has you do **6** there to confirm the estimate | p215 step 1 |
+| **~84%** | **6 reps** to near-failure (worked example: 190 lb off a 225 lb true max = 84.4%, sixth rep *"being nearly a fail"*) | p215 worked example |
+
+Method confirmed: **Epley and Brzycki averaged**, then **× 0.96** for the training max. Worked
+example: 227.9 and 220.6 → 224.25 average → *"225 is your true max, and 215 training max."*
+
+⛔⛔ **CORRECTION, SAME DAY — THIS WAS WRITTEN AS A FINAL GAP AND IT IS NOT A GAP. p218 COVERS THE
+WHOLE BAND.** Michael pointed at the page. **`SKILL: 3 to 5 reps, 75 to 85%, controlled eccentric,
+fast concentric (3 to 4 RIR), 3 to 5 sets`** — that is exactly the range p112's rotation moves
+through, with the reps already attached.
+
+⛔ **SO THE WAVE NEEDS NO INVENTION.** p112 says he cycles 75 / 80 / 85 percent *"adjusting reps to
+keep the overall stimulus similar."* p218's SKILL band says what those reps are: **5 at the light
+end, 3 at the heavy end**, at **3–4 RIR**, for **3–5 sets**. The rotation is a traverse of a band he
+already published. ⚠️ **The band is a range, not a per-percentage table** — that 80% lands on 4 reps
+is an inference, but it is bounded on both sides by his own numbers rather than invented.
+
+**The full key (p218), for the record:**
+
+| Intent | Reps | % | Effort | Sets |
+|---|---|---|---|---|
+| **ME** | 1–5 | 90–100 | **no RIR target** | 1–3 |
+| **DE** | 2–4 | 70–80 | maximum velocity (3–4 RIR) | 4–6 |
+| **SKILL** | 3–5 | **75–85** | controlled eccentric, fast concentric (3–4 RIR) | 3–5 |
+| **HYP** | 6–12 | — | controlled both ways (0–2 RIR) | 3–4 |
+
+⛔⛔ **AND p218 CARRIES A SECOND PROGRESSION LEVER NOBODY HAD LOGGED:** *"Sets should always remain on
+the lower end when starting a program, **increasing only if an athlete is finding that they are
+progressing well and seem to have recovery to spare!**"* **Sets are evidence-gated exactly like load
+is on p112** — start at the bottom of the band, add only on demonstrated progress plus spare
+recovery. ⚠️ **Our engine has no set-progression rule at all.**
+
+⚠️ **What p215 adds on top** is the *test* anchor, not the *prescription*: 75% = comfortably 8, near
+failure at 10 (the protocol uses 6 there), and ~84% = 6 near-failure. Those are max-rep figures for
+estimating a max. **p218's are the working prescriptions.** Do not confuse the two.
+
+⚠️ **The week tables still supply nothing here** — every Ch.10 table is *intent × category × pattern*
+(Part E1a) with no percentages and no rep counts. **They do not need to: the intent token resolves
+against p218.**
+
+*(Superseded, kept so the error is legible: this section first recorded 80% and 85% as "not pinned
+anywhere" and the gap as "final, not pending a page." That was wrong — it read p215 as the only
+source of percentage/rep pairs and forgot p218's bands, which Part A1 has recorded since 2026-08-21.)*
+
+## J7. ⚠️ "ACCESSORY:" IS GLOSSED FOUR DIFFERENT WAYS — Part E1b's rule generalizes, its DEFINITION does not
+
+Part E1b records p247's gloss as though it were the corpus-wide meaning. It is not:
+
+| Page | *"Accessory"* means |
+|---|---|
+| **p247** | *"noncompetition lifts with similar gross movement patterns — for example, paused deadlifts, box squats, Larsen presses"* |
+| **p249** | *"**accommodating resistance** (for example, the use of resistance bands or chains) **or paused variants**"* |
+| **p251** | *"**paused movements** to maximize practice in the competition lifts"* |
+| **p269** | *"target muscle groups and movement patterns that **may vary in terms of direction of movement from the primary**"* |
+
+⛔ **E1b's structural finding still holds** — it is a ROLE prefix, and the word after it is the
+pattern. ⚠️ **But the role's CONTENT is defined per program**, and a composer that hardcodes p247's
+gloss will be wrong on three of the four programs that define it.
+
+## J8. What this sweep settles
+
+- ⛔ **p112 is the whole loading engine.** Sixteen programs add no scheme; they add a **rate**.
+- ⛔ **The rate is ~1% every 3–4 weeks** (p245, p247, p251), corroborating p112's *"a pound or two."*
+- ⛔ **A second, transient rate exists** — lower body, **2% every three weeks for nine weeks**, to
+  burn off a **3–4% endurance haircut** (p247, p280).
+- ⛔ **The deload has no calendar** — every stated cadence names an event or a fatigue state, and
+  **p245 gives an evidence trigger: ME lifts underperform two weeks running** (p245, p249, p247,
+  p251, p263, p265, p269, p283).
+- ⛔ **Seven programs do not chase the 1RM at all** — progression is a per-program property.
+- ✅ **75% and ~84% are pinned to reps** (p215). ⛔ **80% and 85% are not, and never will be.**
+- ⚠️ **Q-E (per-lift or in-phase) is not answered by any page.**
+
+---
+
 # PART G — KNOWN GAPS IN THIS CAPTURE
 
 1. ✅ **CLOSED — the "missing asymmetrical category" was never missing.** There is no such category;
@@ -1408,6 +1878,12 @@ they are equivalent.
 2. ⚠️ **The cycling percentage basis is inferred, not captured** (see Part D header). The running
    convention is stated on p229; the cycling opener on p236 states no counterpart. **This is now the
    only unresolved question in Parts A–D, and it is an inference we are choosing to rely on.**
+   ⛔ **LIKELY ANSWERED, NOT YET TRANSCRIBED (2026-08-29).** **p172** ("A Display of Power") states he
+   uses **power** as the method for controlling cycling intensity and that **FTP** *"is the most
+   commonly used measurement of cyclist fitness… roughly corresponds to VT2 or maximal lactate steady
+   state (MLSS)."* ⚠️ **Read off the image but recorded as a pointer only** — the sweep it surfaced in
+   was scoped to two other terms (Part I11). **Transcribe p172–173 before closing this gap**, and note
+   p173 sends FTP *determination* into the unshot pp.180–217.
 3. **Level assignment is settled for THIS program and unknown in general.** p274 assigns a level to
    every endurance slot itself (standard vs taper), so the All Rounder needs no separate rule. **How
    an athlete would pick levels for a program that does not name them is still uncaptured.**
@@ -1430,6 +1906,10 @@ they are equivalent.
      hypertrophy, and p89's plyometric progression ladder — none of which we had.
    ⛔ **~40 FRAMES REMAIN UNREAD — ALMOST ALL pp.91–131, THE ENDURANCE HALF** (p90 opens "Endurance
    Training Principles"). B4c relays several of those at weaker provenance.
+   - **2026-08-29** — **pp.110, 111, 112 read off the images** and written up as **PART I**. ⛔ They
+     were not endurance pages at all: they are the titled section *"Progression and Progressive
+     Overload"*, and they carry the strength loading rotation and the progression trigger. ⚠️ **Three
+     frames inside "~40 unread" held the answer to a question three sessions had treated as absent.**
    ⛔ **EVERY NUMBER NAMED IN NEITHER B4b NOR B4d STILL CARRIES THE OLD PROVENANCE.** Specifically
    still one generation removed: the five accounting buckets, the 10%-per-week change rule, "back off
    all buckets equally", the weekly floor, both two-a-day spacings, the ~1/3 maintenance figure and
@@ -1438,13 +1918,54 @@ they are equivalent.
    constant asserts *"the source does not say"*, the pages it would be on must have been read.
 5. ✅ **CLOSED — all eighteen Ch.10 programs are captured as images** (pp.244–284, see Part E0).
    Sixteen are untranscribed **by choice**, not by gap.
-7. ⚠️ **p215 IS READ AND VERIFIED; ITS IMAGE IS PENDING IN THE FOLDER** (raised and closed
-   2026-08-23). The page was photographed 2026-08-22 and read in the planning chat; the file has not
-   yet landed in `book-sources/`, so this corpus cannot re-verify it until it does. **The numbers are
-   in Part H and are built against.** ⚠️ Gap closes when `p215.jpg` lands.
-8. ⚠️ **"The circle of reps" is used and never defined** (p247, Part E1c). He prescribes progression
-   "through the circle of reps" for Strength + 5K and the term appears nowhere else in this capture.
-   Do not assume it means double progression without finding his definition.
+7. ✅ **CLOSED 2026-08-29 — p215 READ OFF ITS OWN IMAGE.** It was photographed again
+   (`~/Downloads/IMG_4327.JPG`, with p213 and p214 alongside) and read directly. **Part H's numbers
+   are confirmed**: Epley and Brzycki averaged, ×0.96 for the training max, worked example 224.25 →
+   215. **p214 states the 96% definition in his own words** and specifies the test as a **5-rep max**
+   (5–6 reps best for reliability). ⚠️ **The files still are not in `book-sources/`** — they live in
+   `~/Downloads/`. Move them in so the corpus is self-contained. **See Part J6.**
+8. ⚠️ **HALF-ANSWERED 2026-08-29 — "the circle of reps" is NAMED and LOCATED, and still not defined
+   here.** The old wording said the term *"appears nowhere else in this capture"*; that was true of
+   the capture, not of the book. **p112 names it and points at Part 2** — *"This is further outlined
+   in the circle of reps coverage in Part 2."* It also names a second mechanism nobody had recorded,
+   the **threshold adjustment method**, same sentence, same Part 2.
+   ✅ **What p112 does give** is the rotation the term summarizes — 75/80/85 percent week to week
+   around a predicted max, reps adjusted to hold the stimulus, then the max up a pound or two — plus
+   the raise/lower trigger. **Transcribed in Part I (I7, I8).**
+   ⛔ **What is still missing is the MECHANISM, and it is missing because the pages are unshot, not
+   because he is silent.** See gap #9. **Do not build the circle of reps from I7's summary**, and do
+   not assume it means double progression.
+9. ✅⛔ **CLOSED 2026-08-29 — THE BOOK IS FULLY ACCOUNTED FOR, AND NEITHER TERM EXISTS.**
+   Michael flipped pp.180–217 himself and listed the contents: **180 rucking · 183 strongman · 190
+   thermoregulation · 192 calorie intake · 194 peak performance capacity/body size · 197 hydration
+   and nutrition · 202–203 wearables · 208–209 chapter break · 210 establishing VO2max pace and VT1
+   heart rate zone · 216–217 chapter break**, with **242–243** a chapter break. pp.211, 213, 214, 215
+   and two unnumbered pretesting pages were photographed, and **213/214/215 were read here** (Part J6).
+   ⚠️ **PROVENANCE IS SPLIT AND MUST STAY SPLIT:** the page-range contents are **Michael's
+   flip-through**, not a transcription; only 213/214/215 were read off images.
+   ⛔⛔ **THE p112 POINTER IS ORPHANED.** *"The circle of reps coverage in Part 2"* and *"the threshold
+   adjustment method, also in Part 2"* **point at coverage that is not in the book** — promised text
+   that did not survive editing. **Q-A and Q-B close as unanswerable, not as unread.**
+   ✅ **p173's third pointer DID land** — *"several ways to determine FTP"* is **Ch.8 Pretesting,
+   pp.212–213** (the 20-minute test ×0.95 and the ramp test), read 2026-08-29.
+   ⛔ **CONSEQUENCE: p112 IS THE ENTIRE LOADING MECHANISM.** There is no fuller version to find. See
+   **Part J** for what the Ch.10 programs add — a rate, a haircut and a deload trigger, but **no
+   scheme**. **The progression block is lifted.**
+   ⚠️ **Chapter names now known:** Ch.6 THE SPORTS (p153–~179) · **Ch.8 PRETESTING** (~p210–215).
+   Ch.7 sits between them, unnamed in anything read.
+   *(Original entry, for the record: pp.180–217 were the last unphotographed pages and blocked
+   progression work.)*
+   ✅ **NARROWED THE SAME DAY IT WAS OPENED.** Raised as pp.152–217; **pp.153–179 were then shot and
+   read (27 frames), and neither term is in them.** See **Part I11** for the sweep and **I9** for the
+   corrected geometry.
+   ⚠️ **AND THE PART BOUNDARY WAS WRONG.** This entry first said Part 2 begins about p152. It does
+   not: **pp.153–179 all carry the PART 1 footer**, and p161 and p173 point *forward* to Part 2 from
+   inside them. **Part 2 begins after p179.**
+   ⛔ **THREE POINTERS NOW LAND IN THE SAME 38 PAGES** — p112's *circle of reps* and *threshold
+   adjustment method*, and p173's *"several ways to determine FTP."* p215's pretest already sits
+   inside the range, so this is a **methods block**, not more prose.
+   ⛔ **No progression code may be written until these are shot.**
+   `WORKORDER-viada-owns-the-engine-2026-08-29.md` (Q-A, Q-B).
 
 ---
 
@@ -1509,6 +2030,36 @@ they are equivalent.
   p80's quantified weekly strength dose (which is also the source for the ME/DE rotation our code
   cited only p247 for), p89's plyometric progression ladder, and p72's Westside provenance for the
   ME/DE vocabulary. ⛔ **Root cause: the assertion was written about pages nobody had read.**
+- **2026-08-29 — ⛔⛔ THE PROGRESSION SECTION TRANSCRIBED, AND THE CORPUS IS NO LONGER COMPLETE.**
+  **pp.110–112 read off `p110/p111/p112.jpg` and written up as PART I.** They are a titled section
+  inside Ch.4 — *"Progression and Progressive Overload"* — and they answer what earlier sessions had
+  filed as absent: the weekly loading rotation (**75/80/85 percent around a predicted max**, reps
+  adjusted to hold the stimulus, **max up a pound or two**) and the progression trigger (**raise on
+  lower-than-intended RPE or superior performance at the target RPE; lower on missed targets;
+  indefinitely**). The *"be a little better every week"* urge is named **a trap** on p112.
+  ⛔ **AND THE FILE'S OWN COMPLETENESS CLAIM IS FALSIFIED.** The header line *"nothing in this file is
+  waiting on a page"* (written 2026-08-26) is corrected: **pp.152–217 are 66 unphotographed pages**,
+  and p112 points into them for the **circle of reps** and the **threshold adjustment method**.
+  Part G gap #8 is downgraded from "never defined" to **half-answered**; gap #9 is opened for the
+  missing pages. ⛔ **No progression code until they are shot.** ⚠️ **Root cause, again: three frames
+  of a shoot that was recorded as ~40 unread frames contained the chapter the question was about.**
+- **2026-08-29, same day — ⛔ pp.153–179 SHOT AND SWEPT. NULL ON BOTH TERMS, AND THE GAP WAS THE WRONG
+  SHAPE.** 27 frames read (`~/Downloads/152/`), filename formula verified at three printed page
+  numbers before use. The run is **Ch.6 "THE SPORTS"** (divider p153; ultramarathon, powerlifting,
+  road running, cycling, swimming). **Neither "the circle of reps" nor "the threshold adjustment
+  method" is anywhere in it**, and nothing was inferred from the surrounding text — recorded as
+  **Part I11**.
+  ⛔ **THE STRUCTURAL CORRECTION: pp.153–179 ARE PART 1, NOT PART 2.** Every verso footer says so, and
+  p161 and p173 point *forward* to Part 2 from inside the run. The morning's entry (and Part G #9 as
+  first written) had Part 2 starting about p152. **It starts after p179**, so the unread slice is
+  **pp.180–217 — 38 pages, now the only unread pages in the book.** Three forward-pointers land in
+  them: the circle of reps, the threshold adjustment method, and FTP determination (p173). With
+  p215's pretest already inside the range, it reads as a **methods block**.
+  ⚠️ **FOUR ENGINE-RELEVANT FINDINGS LOGGED AS POINTERS, DELIBERATELY NOT TRANSCRIBED** (the sweep was
+  scoped to two terms): p163's **working max double-digit percentage below true max** for hybrid
+  athletes, p160 **naming 5/3/1 and Westside Conjugate** as legitimate undulating implementations,
+  p163's **upper/lower split with squat-vs-deadlift weekly rotation**, and p172's **FTP-as-basis**,
+  which is what Part G gap #2 has been calling an inference. **Each needs its page re-read before use.**
 
 ---
 
