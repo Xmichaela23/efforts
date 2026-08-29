@@ -37,8 +37,11 @@ Deno.test('⛔ AN ALREADY-ENRICHED SAMPLE IS NOT ADJUSTED TWICE — the raw fiel
   assertEquals(onEnriched, onRaw);
 });
 
-Deno.test('⚠️ A SEGMENT TOO SHORT TO GRADE RETURNS NULL — the row keeps raw pace', () => {
-  assertEquals(calculateIntervalGapPace(samples(15, 600, 0.05), 0, 14), null);
+Deno.test('⛔ NO MINIMUM SEGMENT LENGTH — a 15-second rep is adjusted like any other', () => {
+  // The struck 20-sample floor swallowed exactly this. Strava publishes no minimum lap length.
+  const gap = calculateIntervalGapPace(samples(15, 600, 0.05), 0, 14);
+  assertEquals(gap !== null, true, `expected a number, got ${gap}`);
+  assertEquals((gap as number) < 600, true, `a climb should adjust faster, got ${gap}`);
 });
 
 Deno.test('no samples, no indices, no number', () => {

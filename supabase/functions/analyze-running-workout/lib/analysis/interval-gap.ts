@@ -15,17 +15,18 @@
 import { computeSampleGrades, aggregateGapPace } from '../../../_shared/gap.ts';
 
 /**
- * ⛔ A REP IS NOT A RUN, SO THE SAMPLE FLOOR IS NOT THE RUN'S (2026-08-29).
+ * ⛔ NO MINIMUM SEGMENT LENGTH — CHECKED AGAINST THE FIELD, NOT REASONED (2026-08-29).
  *
- * `aggregateGapPace` defaults to 60 samples — about a minute — which is right for a whole session
- * and wrong here: on Michael's 2026-08-28 run the reps were 69 to 120 seconds, so the default would
- * have silently dropped roughly half of them and the column would have been blank on exactly the
- * short, steep reps that need it.
- * ⚠️ 20 SECONDS IS A FLOOR ON THE MEASUREMENT, NOT A TUNED THRESHOLD: below it a single GPS
- * elevation wobble is most of the segment. A shorter rep returns null and the row keeps raw pace,
- * which is the honest fallback — never a raw number wearing the adjusted label.
+ * The first cut of this file set a 20-sample floor and argued it as "below this a GPS wobble is most
+ * of the segment". ⛔ THAT WAS OURS. Strava publishes no minimum lap length — laps can be any
+ * distance, GAP is shown for every split, and on flat ground it simply equals pace. Michael:
+ * *"I want it to be exactly what the fucking industry standard is."*
+ *
+ * ⚠️ `aggregateGapPace` requires `count > minSamples`, so zero means "at least one usable sample" —
+ * a segment with no pace samples at all still returns null and the row keeps its raw pace, which is
+ * absence, not a threshold.
  */
-const MIN_SAMPLES_PER_SEGMENT = 20;
+const MIN_SAMPLES_PER_SEGMENT = 0;
 
 export function calculateIntervalGapPace(
   sensorData: any[],
