@@ -1886,7 +1886,7 @@ export default function StateTab({
                   IN THIS BLOCK — week 1 is the two tests. So the header still drew, alone, above the
                   runs. Same predicate the cards use, asked once here. */}
               {liftCardCount > 0 && (
-                <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
+                <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up</div>
               )}
               {cards}
               {/* ⛔ THE ENDURANCE CARDS SIT ON THE SAME PLATE, LAST — one per sport. They answer the
