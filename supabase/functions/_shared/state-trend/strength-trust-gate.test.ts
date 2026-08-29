@@ -18,12 +18,21 @@ import { trustedMaxReps } from '../../../../src/lib/estimate-1rm.ts';
  * the last test in this file pins directly. ⛔ The rep-ceiling gate these tests DO pin is what the
  * two readers actually share, and it still fails OPEN on an unknown rep count.
  */
-Deno.test('trustedMaxReps: deadlift ceiling is 5, everything else 8 (LeSuer bias)', () => {
-  assertEquals(trustedMaxReps('deadlift'), 5);
-  assertEquals(trustedMaxReps('Barbell Deadlift'), 5);
-  assertEquals(trustedMaxReps('squat'), 8);
-  assertEquals(trustedMaxReps('bench_press'), 8);
-  assertEquals(trustedMaxReps(null), 8);
+Deno.test('⛔ trustedMaxReps: ONE ceiling, ten reps, every lift (2026-08-29)', () => {
+  /**
+   * ⚠️ REWRITTEN, NOT DELETED. This pinned 5 on the deadlift and 8 elsewhere, from LeSuer et al. 1997
+   * via `wendler-531.ts`.
+   * ⛔ WHAT THE SPLIT DID: Michael's heaviest and most recent deadlift session — 135 × 10 on 25 Aug —
+   * was discarded before his chart was built, so the card read 120 lb off a 105 × 5 four days earlier.
+   * The same ten reps on a bench were kept. Ten is the validity limit this codebase already cited
+   * ("validated to ~10 reps, best 2-6"); the 5 was a carve-out about the DIRECTION of deadlift error,
+   * not a reason to discard the set.
+   */
+  assertEquals(trustedMaxReps('deadlift'), 10);
+  assertEquals(trustedMaxReps('Barbell Deadlift'), 10);
+  assertEquals(trustedMaxReps('squat'), 10);
+  assertEquals(trustedMaxReps('bench_press'), 10);
+  assertEquals(trustedMaxReps(null), 10);
 });
 
 Deno.test('series gate: the rep-out set is dropped; low-rep sets form the series (squat, ceiling 8)', () => {
@@ -36,7 +45,7 @@ Deno.test('series gate: the rep-out set is dropped; low-rep sets form the series
   assertEquals(squat.points.map((p) => p.value), [105, 108]); // the 17-rep 125 never enters the series
 });
 
-Deno.test("series gate: Michael's deadlift — the tighter ceiling of 5 kills the 35-rep 225", () => {
+Deno.test("series gate: Michael's deadlift — the long conditioning sets still never enter", () => {
   const rows: ExerciseLogLite[] = [
     { date: '2026-07-10', canonical_name: 'deadlift', estimated_1rm: 140, reps: 5, slot_intent: 'ME' },
     { date: '2026-07-24', canonical_name: 'deadlift', estimated_1rm: 155, reps: 5, slot_intent: 'ME' }, // 120 × 5, the real read

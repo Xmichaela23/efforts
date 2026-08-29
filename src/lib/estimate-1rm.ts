@@ -179,8 +179,30 @@ export function estimate1RMRounded(weight: number, reps: number): number {
  * (LeSuer et al. 1997 — deadlift estimates run systematically low, so its ceiling is tighter). Same
  * numbers (deadlift 5, else 8); keep the two in sync, or unify by having wendler delegate here.
  */
-export function trustedMaxReps(liftName?: string | null): number {
-  return /deadlift/i.test(String(liftName ?? '')) ? 5 : 8;
+export function trustedMaxReps(_liftName?: string | null): number {
+  /**
+   * ⛔⛔ ONE CEILING, TEN REPS, EVERY LIFT (2026-08-29). It was 5 on the deadlift and 8 elsewhere.
+   *
+   * ⛔ WHAT THE SPLIT DID TO A REAL ATHLETE: Michael's heaviest and most recent deadlift session —
+   * 135 × 10 on 25 Aug — was discarded before his chart was built, so the card read 120 lb off a
+   * 105 × 5 four days earlier and the line stopped on 21 Aug. The same ten reps on a bench were kept.
+   *
+   * ⛔ TEN IS THE NUMBER THIS FILE ALREADY CITED: *"the formulas are validated to ~10 reps, best
+   * 2-6"*. The 5 was a deadlift-only carve-out from LeSuer et al. 1997 (deadlift estimates run
+   * systematically LOW) carried over from `wendler-531.ts` — a reason to distrust the direction of a
+   * deadlift estimate, not a reason to throw the set away.
+   * ⚠️ VIADA'S ANSWER TO FORMULA DIVERGENCE IS THE AVERAGE, NOT A CAP (p215), and he gives one
+   * protocol for every lift with no per-lift variation.
+   *
+   * ⚠️ THE CEILING ITSELF SURVIVES BECAUSE THIS APP PRESCRIBES FROM THE NUMBER. Strong and Hevy show
+   * an estimate on any set and nothing happens; ours writes next week's weights. Michael's own log
+   * holds 105 × 35 stored as a 225 lb max and 110 × 25 as 200 — conditioning sets that would become
+   * his deadlift prescription. Those stay out at ten.
+   * ⛔ OPEN, AND IT IS Q-H IN `docs/WORKORDER-viada-owns-the-engine-2026-08-29.md`: under Viada the
+   * max comes from the PRETEST, not from scraping every logged set, and then no ceiling is needed at
+   * all. This is the honest interim, not the destination.
+   */
+  return 10;
 }
 
 /** Is this set's estimated 1RM trustworthy for a record/trend (reps within the ceiling for the lift)? */
