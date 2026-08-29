@@ -940,7 +940,12 @@ serve(async (req: Request) => {
         let allTimeBestByLift: Record<string, { best: number; count: number }> = {};
         try {
           const { data: allHist } = await supabase.from("exercise_log")
-            .select("canonical_name,estimated_1rm,best_reps,slot_intent")  // slot_intent: the record gates on it too
+            // ⚠️ `slot_intent` IS SELECTED AND THE RECORD NO LONGER READS IT (ungated 2026-08-28 —
+            // the line and the record are different claims; see `buildAllTimeBestByLift`). Kept in
+            // the select so this query and the series query stay one shape, and so re-reading it is
+            // a one-line change rather than a re-traced column. `best_reps` IS load-bearing: the rep
+            // ceiling (D-417) is the gate the two readers really do share.
+            .select("canonical_name,estimated_1rm,best_reps,slot_intent")
             .eq("user_id", userId).not("estimated_1rm", "is", null);
           allTimeBestByLift = buildAllTimeBestByLift((allHist ?? []) as any[]);
         } catch (e: any) { console.warn('[compute-snapshot] all-time-best e1RM query failed (non-fatal):', e?.message ?? e); }

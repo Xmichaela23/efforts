@@ -8,11 +8,15 @@ import { allOutSeriesByLift } from '../strength/all-out-set.ts';
 import { trustedMaxReps } from '../../../../src/lib/estimate-1rm.ts';
 
 /**
- * ⚠️ EVERY ROW HERE CARRIES `slot_intent: 'ME'`. The e1RM gate fails CLOSED since 2026-08-28 — only a
- * set the plan asked to be maximal mints a max — and these fixtures are main-lift heavy sets, which
- * is what they were always testing. Without the stamp the series would be empty and every assertion
- * below would be passing on nothing. ⛔ The rep-ceiling gate these tests DO pin is unaffected: it
- * still fails OPEN on an unknown rep count, and that difference between the two gates is deliberate.
+ * ⚠️ EVERY ROW HERE CARRIES `slot_intent: 'ME'`, and that is for the SERIES tests only. The e1RM
+ * LINE gate fails CLOSED since 2026-08-28 — only a set the plan asked to be maximal mints a max —
+ * and these fixtures are main-lift heavy sets, which is what they were always testing. Without the
+ * stamp the series would be empty and every series assertion below would be passing on nothing.
+ * ⛔ THE RECORD IS NOT INTENT-GATED (ungated 2026-08-28, the day it was gated — see
+ * `buildAllTimeBestByLift`). The stamps on the record fixtures below are therefore INERT: they
+ * neither admit nor exclude a row, and the record assertions hold identically without them, which
+ * the last test in this file pins directly. ⛔ The rep-ceiling gate these tests DO pin is what the
+ * two readers actually share, and it still fails OPEN on an unknown rep count.
  */
 Deno.test('trustedMaxReps: deadlift ceiling is 5, everything else 8 (LeSuer bias)', () => {
   assertEquals(trustedMaxReps('deadlift'), 5);
@@ -76,16 +80,20 @@ const MICHAEL_DEADLIFT: ExerciseLogLite[] = [
 Deno.test("⛔ RECORD GATE (permanent): Michael's deadlift all-time best is 140, NOT the 225 rep-out", () => {
   const best = buildAllTimeBestByLift(MICHAEL_DEADLIFT.map((r) => ({
     canonical_name: r.canonical_name, estimated_1rm: r.estimated_1rm, best_reps: r.reps,
-    // ⚠️ Carried, or the closed intent gate blanks the record's population too — the same narrow
-    // point as the display map: a row rebuilt field by field loses whatever is not named.
+    // ⚠️ INERT since the record was ungated on intent (2026-08-28). Kept only so this fixture stays
+    // the same rows as the series fixtures above; the assertions do not depend on it.
     slot_intent: r.slot_intent,
   })));
   assertEquals(best.deadlift.best, 140);
   assertEquals(best.deadlift.count, 2); // the two trusted sets — the rep-outs can't back a record either
 });
 
-Deno.test('RECORD GATE: the record can never exceed the top of the gated SERIES — one population, one ceiling', () => {
+Deno.test('RECORD GATE: the record never exceeds the top of the REP-TRUSTED series — one ceiling', () => {
   // The invariant the screen violated: "best" sat above the range the series can produce.
+  // ⚠️ THE REP CEILING IS THE ONLY THING THIS PINS. Since the record was ungated on intent
+  // (2026-08-28) the record CAN legitimately sit above the intent-gated line's top — an older
+  // unstamped set is a real best and cannot reach the line. These rows all carry `ME`, so here the
+  // two populations coincide and the rep ceiling is what is under test.
   const rows = MICHAEL_DEADLIFT;
   const seriesTop = Math.max(...liftSeriesFromExerciseLog(rows).find((s) => s.canonical === 'deadlift')!.points.map((p) => p.value));
   const record = buildAllTimeBestByLift(rows.map((r) => ({
@@ -113,15 +121,14 @@ Deno.test("RECORD GATE: the squat ceiling is its own (8) — a 17-rep set can't 
   assertEquals(best.squat.count, 2);
 });
 
-Deno.test('RECORD GATE: reps UNKNOWN fails open — the record reads the SAME population as the series', () => {
-  // An older row written before `best_reps` was threaded must not blank a real record; the series
-  // already fails open here, and the two must not disagree about what history exists.
-  // ⚠️ THE ROWS CARRY AN INTENT because the INTENT gate is a separate, closed one — this test is
-  // about the REP gate, and leaving them unstamped would blank the population for the other reason
-  // and pass for the wrong cause.
+Deno.test('RECORD GATE: reps UNKNOWN fails open — an older row must not blank a real record', () => {
+  // A row written before `best_reps` was threaded must not blank a real record; the series fails
+  // open here too, and the two must not disagree about a set they both accept.
+  // ⚠️ NO INTENT NEEDED — the record does not read one. Rows left unstamped on purpose, so this
+  // test cannot start passing for the wrong reason if the intent gate is ever re-added here.
   const best = buildAllTimeBestByLift([
-    { canonical_name: 'squat', estimated_1rm: 100, best_reps: null, slot_intent: 'ME' },
-    { canonical_name: 'squat', estimated_1rm: 110, slot_intent: 'ME' },
+    { canonical_name: 'squat', estimated_1rm: 100, best_reps: null },
+    { canonical_name: 'squat', estimated_1rm: 110 },
   ]);
   assertEquals(best.squat.best, 110);
   assertEquals(best.squat.count, 2);

@@ -1171,6 +1171,40 @@ standing block the long run is ~73 minutes, excluded by three minutes over a cei
 ever defended in writing.** For a runner whose easy runs vary in length this is plausibly the larger
 of the two thinners, and it has never been discussed.
 
+⛔⛔ **RULED 2026-08-28 — THE CEILING GOES TOO. Michael: *"it shouldn't cap at 70 — that's crucial
+for marathon trainers."*** Q-295 is now **CLOSED AT BOTH ENDS**; there is no remaining duration gate
+on run efficiency. Checked before recording: **TrainingPeaks applies no duration ceiling to Efficiency
+Factor**, and ⛔ **the app already contradicts itself** — the ceiling lives at two call sites, both on
+the EFFICIENCY rows (`run.ts:85`, `run.ts:110`), while the DURABILITY row beside it
+(`isQualifyingDecouplingRow`, `run.ts:264`) has a ≥20 min floor and **no ceiling**, and bike has
+neither. Two numbers on one screen, two populations. It also deletes the sessions with the most
+signal — a 27-minute run barely drifts, and Friel's decoupling protocol is a LONG steady effort — and
+for a marathon athlete it measures everything except the session being trained for.
+⚠️ **THE OLD ARGUMENT IS REDIRECTED, NOT DISMISSED:** "a long run drifts more" is true, and it is a
+reason to compare long runs **to other long runs** — the same grouping fix the quality-session
+exclusion needs. **One mechanism, two populations. Do not build a second.**
+⛔ **AND THE LONG-RUN HEADLINE IS ANSWERED 2026-08-28 — IT IS NOT A DURATION QUESTION.** The field
+gives the two numbers different jobs: **Efficiency Factor = the cross-session fitness trend (every
+run); decoupling/fade = the within-session durability read (≤5%, Friel), and it is the
+marathon-specific one.** The long run gets BOTH — a fade number and a contribution to the trend.
+⛔⛔ **BUT FADE NEEDS A STEADY EFFORT AND VIADA'S LSD IS DELIBERATELY NOT ONE** (p235: *"may include
+rest periods or pauses… with little negative impact"*; p246: *"90 to 100 minutes… with an emphasis on
+LT intervals"*, shorter fartlek variations for the less experienced; every level inserts race-pace
+finishes and surges; *"intensity may be lower past 60 minutes"*; it may be a hike or a team sport
+day). **A fade read on that session reports a durability failure every week on an athlete following
+the book exactly.**
+⛔ **RULE: decide on WHAT THE SESSION WAS, not its duration and not its plan.** Steady → leads on
+fade. Surges/pauses/race-pace finish → feeds the efficiency trend, **no fade number**.
+⚠️ `decoupling_mixed_effort` already carries this fact and D-283 correctly made it a HEDGE for the
+general row. **Here it is the SWITCH** — withhold the fade figure only, never drop the run from the
+efficiency trend. Not a contradiction of D-283; different question.
+⚠️ **Consequence, correct:** a marathon long run gets a fade number, a standing-block long run
+usually does not. Same athlete, same distance, different number — say so on screen rather than
+letting it read as missing data.
+⛔ **DO NOT CONFLATE THE TWO 5%s:** p107's is a session-TERMINATION rule, Friel's is a durability
+band. The endurance card already prints p107's beside the drift figure.
+Spec: `docs/WORKORDER-the-progress-standard-2026-08-28.md` Item 2.
+
 ⛔⛔ **RULED 2026-08-28 — THE 30-MINUTE FLOOR GOES. Michael: *"lets match training peaks."***
 The measured reason, on his own week: **two 27-minute easy runs and one 63-minute near-threshold
 session.** The floor drops **two of every three runs** before the row measures anything.

@@ -209,9 +209,17 @@ export interface ExerciseLogLite {
  * bench is 135 on the heavy day (ME, 90-100%) and 105 on the speed day (DE, 70-80%). Both landed on
  * this series, so every Thursday planted a point roughly a fifth below Monday's and the graph read
  * as a decline on a block the athlete was following exactly. Speed and hypertrophy sets keep their
- * place in the logged-sets history; they stop moving the line. Field standard — Strong, Hevy and
- * Boostcamp all separate the two — and the same move that closed the bike easy-ride false dip
- * (`e8b67eaf`, gated on the shared hard-effort bins).
+ * place in the logged-sets history; they stop moving the line. Same move that closed the bike
+ * easy-ride false dip (`e8b67eaf`, gated on the shared hard-effort bins).
+ *
+ * ⛔ THIS COMMENT CLAIMED A FIELD CONSENSUS THAT DOES NOT EXIST — corrected 2026-08-28. Strong, Hevy
+ * and Boostcamp do NOT separate heavy from light on their charts: Strong plots working sets and
+ * dips, Hevy keeps the full history and adds monotonic records. Do not cite the old claim.
+ * ⛔ THE HONEST ARGUMENT FOR THIS GATE, which is better than the invented one: a Strong user's light
+ * day is INCIDENTAL — a tired Tuesday. Michael's is 105 against 135 every week BECAUSE THE PROGRAMME
+ * SAYS SO. Systematic, not noise, and that is what makes it worth excluding from a direction read.
+ * ⚠️ AND IT IS AN ARGUMENT ABOUT THE LINE ONLY. See `buildAllTimeBestByLift` — the record is not
+ * gated on intent and must not be.
  *
  * ⛔⛔ IT FAILS CLOSED: ONLY `ME` MINTS. An unknown intent does NOT. This reverses an earlier
  * fail-open ruling and the reversal is deliberate, so do not "restore" it by reading D-417 below as
@@ -275,11 +283,21 @@ export interface LiftSeriesContext {
  * ⚠️ UNKNOWN REPS FAIL OPEN, exactly as the series does — an older row written before `best_reps` was
  * threaded is KEPT rather than blanking a real record. The two reads therefore see the same population.
  *
- * ⚠️ `count` IS GATED TOO, and that is deliberate. It is the confidence gate on the PR claim
- * (`isPr` needs ≥3 all-history readings behind the best); counting sets that can never produce a max
- * would let a lift with twenty rep-out sets and one real set claim a record on "history" it doesn't
- * have. Consequence, stated: a lift whose trusted history is thinner than 3 loses its PR badge — which
- * is the honest read, not a regression.
+ * ⚠️ `count` OBEYS THE SAME REP CEILING, and that is deliberate. It is the confidence gate on the PR
+ * claim (`isPr` needs ≥3 all-history readings behind the best); counting rep-out sets that can never
+ * produce a max would let a lift with twenty of them and one real set claim a record on "history" it
+ * doesn't have. Consequence, stated: a lift whose trusted history is thinner than 3 loses its PR
+ * badge — which is the honest read, not a regression.
+ *
+ * ⛔⛔ THE INTENT GATE (`intentCanMintAMax`) IS NOT APPLIED HERE. It was, for a few hours on
+ * 2026-08-28, and it was a live regression: the LINE and the RECORD are different claims. The line
+ * asks WHICH WAY, so it takes only sets the plan asked to be maximal. The record asks WHAT IS THE
+ * BEST YOU HAVE DONE, so it takes any real set. A front squat, a trap bar deadlift and every
+ * accessory carry no heavy mark and never will — gated, they could not set a record at all.
+ * ⚠️ SO THE TWO READS SEE DIFFERENT POPULATIONS ON PURPOSE, and `isPr` compares the heavy-only
+ * LATEST against an all-history BEST. That is the strict, honest read of "a real PR": the new line
+ * has to beat everything the athlete has ever logged, not just everything logged since the stamp
+ * existed.
  *
  * ⛔ THE HIGH-REP SET IS NOT DISCARDED — it is a REP PR (`lastAllOut` / `isRepRecord`, D-420 pillar 2),
  * which is its correct home. Only the e1RM record stops reading it.
@@ -294,10 +312,14 @@ export function buildAllTimeBestByLift(
     if (!k || !Number.isFinite(v) || v <= 0) continue;
     // Fail-open on unknown reps (mirrors the series gate at `liftSeriesFromExerciseLog`).
     if (e.best_reps != null && !estimateIsTrusted(k, e.best_reps)) continue;
-    // ⛔ AND ONLY A HEAVY SET MAY MINT A MAX (2026-08-28) — the SAME gate the series applies, for the
-    // same reason this file already gives for keeping the two side by side: split across files, one
-    // of them silently rots. A speed set cannot set an e1RM record any more than it can move the line.
-    if (!intentCanMintAMax(e.slot_intent)) continue;
+    // ⛔⛔ NO INTENT GATE HERE — REMOVED 2026-08-28, THE DAY IT WAS ADDED. It was applied on the
+    // reasoning that the two readers must agree, which is right about the REP ceiling above and
+    // wrong here: THE LINE AND THE RECORD ARE DIFFERENT CLAIMS. The line is about DIRECTION and
+    // needs clean input, so it takes only sets the plan asked to be maximal. The record is about
+    // THE BEST YOU HAVE DONE and only needs the set to be real. A front squat, a trap bar deadlift
+    // or a curl carries no heavy mark and never will, so under the intent gate it could no longer
+    // set a record AT ALL. ⛔ Do not "restore consistency" by re-adding it — the two gates being
+    // different is the point, and `estimateIsTrusted` directly above is the one they share.
     const cur = out[k];
     out[k] = cur ? { best: Math.max(cur.best, v), count: cur.count + 1 } : { best: v, count: 1 };
   }

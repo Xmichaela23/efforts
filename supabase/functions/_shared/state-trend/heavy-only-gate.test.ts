@@ -81,18 +81,48 @@ Deno.test('⛔⛔ AN UNMARKED SET DOES NOT REACH THE LINE — the line starts fr
   assertEquals(liftSeriesFromExerciseLog(rows).length, 0, 'unmarked sets still built a series');
 });
 
-Deno.test('⛔ THE RECORD GATES IDENTICALLY TO THE SERIES', () => {
+Deno.test('⛔⛔ THE RECORD IS NOT GATED ON INTENT — the line and the record are different claims', () => {
   /**
-   * This file's own warning, applied: split across two readers, one of them silently rots — D-417
-   * gated the series and left the record ungated and the screen printed a 225 lb deadlift "best".
-   * A speed set must not set a record either.
+   * ⚠️ THIS TEST ASSERTED THE OPPOSITE FOR A FEW HOURS ON 2026-08-28 and is rewritten, not deleted,
+   * so the reversal stays visible. The intent gate was applied to the record on the reasoning that
+   * the two readers must agree. Right about the REP ceiling, wrong here:
+   *   - the LINE asks WHICH WAY, so it needs clean input and takes only sets the plan called maximal;
+   *   - the RECORD asks WHAT IS THE BEST YOU HAVE DONE, and only needs the set to be REAL.
+   * ⛔ THE LIVE CONSEQUENCE THAT MADE IT A REGRESSION: a front squat, a trap bar deadlift and every
+   * accessory carry no heavy mark and never will, so under the gate they could not set a record at
+   * all. Below, the unstamped trap-bar rows must still produce one.
    */
   const best = buildAllTimeBestByLift([
     { canonical_name: 'bench_press', estimated_1rm: 150, best_reps: 3, slot_intent: 'ME' },
     { canonical_name: 'bench_press', estimated_1rm: 190, best_reps: 3, slot_intent: 'DE' },
   ]);
-  assertEquals(best.bench_press.best, 150, 'a speed set set the record');
-  assertEquals(best.bench_press.count, 1, 'a speed set counted toward the PR confidence gate');
+  assertEquals(best.bench_press.best, 190, 'a real set was refused the record for its intent');
+  assertEquals(best.bench_press.count, 2, 'a real set was refused the PR confidence count');
+
+  // ⛔ THE LIFT THAT CAN NEVER CARRY A MARK. No plan stamps a trap bar deadlift, so under the gate
+  // this lift had no record and no count — nothing at all on the screen.
+  const unstamped = buildAllTimeBestByLift([
+    { canonical_name: 'trap_bar_deadlift', estimated_1rm: 210, best_reps: 3 },
+    { canonical_name: 'trap_bar_deadlift', estimated_1rm: 225, best_reps: 3, slot_intent: null },
+    { canonical_name: 'trap_bar_deadlift', estimated_1rm: 215, best_reps: 5, slot_intent: '' },
+  ]);
+  assertEquals(unstamped.trap_bar_deadlift.best, 225, 'an unmarked lift could not set a record');
+  assertEquals(unstamped.trap_bar_deadlift.count, 3, 'an unmarked lift had no history behind it');
+});
+
+Deno.test('⛔ THE REP CEILING IS THE GATE THE TWO READERS DO SHARE — D-417, still applied', () => {
+  /**
+   * Ungating the intent does NOT ungate the reps. The 105 × 35 deadlift that read as a 225 lb
+   * "best" on screen is still refused, stamped or not — that is what D-417 exists for, and it is
+   * the invariant that must survive this change.
+   */
+  const best = buildAllTimeBestByLift([
+    { canonical_name: 'deadlift', estimated_1rm: 140, best_reps: 5, slot_intent: 'ME' },
+    { canonical_name: 'deadlift', estimated_1rm: 225, best_reps: 35 },        // rep-out, unstamped
+    { canonical_name: 'deadlift', estimated_1rm: 200, best_reps: 25, slot_intent: 'DE' }, // rep-out
+  ]);
+  assertEquals(best.deadlift.best, 140, 'a rep-out set the record');
+  assertEquals(best.deadlift.count, 1, 'a rep-out counted toward the PR confidence gate');
 });
 
 Deno.test('⚠️ THE TWO GATES COMPOSE — rep ceiling AND intent, neither swallowing the other', () => {
