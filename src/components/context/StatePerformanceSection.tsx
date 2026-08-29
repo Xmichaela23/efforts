@@ -5,6 +5,7 @@
 // NOT YET SHIPPED — under review. Run/swim performance is on PROVISIONAL thresholds and is
 // tagged as such; swim is additionally Q-038-clouded.
 
+import { trustedMaxReps } from '@/lib/estimate-1rm';
 import React from 'react';
 import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode, FitnessAnchor } from '@shared/state-trend';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
@@ -713,11 +714,32 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                     | { date: string; weight: number; reps: number; isRepRecord: boolean }
                     | null | undefined;
                   if (!ao || !(ao.weight > 0) || !(ao.reps > 0)) return null;
+                  /**
+                   * ⛔⛔ THE SET AND THE ESTIMATE ARE OFTEN DIFFERENT SESSIONS, AND THE CARD SAID SO
+                   * NOWHERE (2026-08-29, Michael: *"deadlift math is wrong"*).
+                   *
+                   * His deadlift read "120 lb E1RM" beside "all-out 135 lb × 10" — a heavier set,
+                   * next to a smaller number, with nothing to connect or separate them. Both are
+                   * correct and they are five days apart: the estimate is 105 × 5 on 21 Aug, and the
+                   * all-out set is 135 × 10 on 25 Aug, which D-417's rep ceiling REFUSES to estimate
+                   * from because the formula only holds to ~5 reps on a deadlift (it would have
+                   * claimed 180). The arithmetic was never wrong; the card was.
+                   *
+                   * So the line carries its OWN DATE, and when the set is past the ceiling it says
+                   * why it is not the estimate. ⚠️ It is still shown — a long all-out set is a real
+                   * record and this is its only home (D-420).
+                   */
+                  const aoDate = ao.date ? new Date(ao.date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
+                  const tooManyReps = ao.reps > trustedMaxReps(l.canonical);
                   return (
-                    <span className="basis-full text-white/50 text-[11px] -mt-0.5 inline-flex items-baseline gap-1.5">
+                    <span className="basis-full text-white/50 text-[11px] -mt-0.5 inline-flex items-baseline gap-1.5 flex-wrap">
                       <span className="tabular-nums">all-out {Math.round(ao.weight)} lb × {ao.reps}</span>
+                      {aoDate && <span className="text-white/40">{aoDate}</span>}
                       {ao.isRepRecord && (
                         <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">rep PR</span>
+                      )}
+                      {tooManyReps && (
+                        <span className="text-white/40">· too many reps to estimate a max from</span>
                       )}
                     </span>
                   );
