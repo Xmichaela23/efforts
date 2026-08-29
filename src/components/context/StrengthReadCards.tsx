@@ -288,15 +288,28 @@ function SpineCard({ series }: { series: SpineSeries }) {
 
       {latest.efficiency != null && (
         <>
+          {/**
+            * ⛔ THE FIELD'S NAME, NOT OURS (2026-08-29, Michael: *"does anyone know what speed per
+            * beat means?"* — no, nobody, it was ours). TrainingPeaks calls this Efficiency Factor
+            * and defines it exactly as we compute it: graded pace ÷ average heart rate for a run,
+            * normalized power ÷ average heart rate for a ride. A runner who tracks this knows the
+            * name; nobody knows "speed per beat".
+            */}
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="readout-num text-[26px] leading-none">{fmtEff(latest.efficiency, isRide)}</span>
-            <span className="text-[12px] text-white/45">{isRide ? 'watts per beat' : 'speed per beat'}</span>
+            <span className="text-[12px] text-white/45">efficiency factor</span>
           </div>
-          {prior?.efficiency != null && (
-            <div className="text-[12px] text-white/50 mt-1">
-              last time <span className="tabular-nums text-white/75">{fmtEff(prior.efficiency, isRide)}</span>
-            </div>
-          )}
+          <div className="text-[11px] text-white/35 mt-0.5">
+            {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
+          </div>
+          {/**
+            * ⛔⛔ "last time 1.720" IS DELETED, AND THE SOURCE SAYS WHY. TrainingPeaks' instruction is
+            * to compare SIMILAR sessions over several weeks — a rising line means the aerobic base is
+            * improving — and explicitly not to read one session against the one before it, because a
+            * single hot or hilly day moves the number more than fitness does. The card put that exact
+            * comparison in the athlete's eye and it was the first thing he read.
+            * ⚠️ THE TREND IS ALREADY ON THIS CARD: the line below, with its own date range.
+            */}
         </>
       )}
       {eff.length >= 2 && <DatedChart points={eff} color={color} />}
@@ -304,9 +317,11 @@ function SpineCard({ series }: { series: SpineSeries }) {
       {/* ── FADE, AND THE CASE WHERE THERE DELIBERATELY IS NONE. ── */}
       {latest.driftPct != null ? (
         <div className="text-[12px] text-white/50 mt-2">
-          fade <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span>
+          last one:{' '}
+          <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> harder in the
+          second half
           <span className="text-white/35">
-            {' '}· the line is {driftLimit}%{latest.keySessionWithin24h ? ' — a key session is inside 24 hours' : ''}
+            {' '}· {driftLimit}% is the line{latest.keySessionWithin24h ? ', and a hard day is inside 24 hours' : ''}
           </span>
         </div>
       ) : latest.fadeWithheld ? (
@@ -320,12 +335,12 @@ function SpineCard({ series }: { series: SpineSeries }) {
          * ⚠️ AND THE SESSION STILL COUNTS ABOVE: only the fade figure is withheld, never the run.
          */
         <div className="text-[12px] text-white/35 mt-2">
-          no fade number — this session changed pace on purpose
+          last one: no second-half number — its pace changed on purpose
         </div>
       ) : null}
 
       {latest.durationMin != null && latest.durationMin > 0 && (
-        <div className="text-[11px] text-white/35 mt-1">last one {latest.durationMin} min</div>
+        <div className="text-[11px] text-white/35 mt-1">{latest.durationMin} min long</div>
       )}
     </div>
   );
@@ -375,7 +390,8 @@ function EnduranceCard({ session }: { session: NamedSession }) {
       {/* ── ROW 2: cost per session. ── */}
       {latest.efficiency != null && (
         <div className="text-[12px] text-white/50 mt-2">
-          {isRide ? 'watts per beat' : 'speed per beat'}{' '}
+          {/* Same rename as the spine card above — the field's name, not ours. */}
+          efficiency factor{' '}
           <span className="tabular-nums text-white/75">{fmtEff(latest.efficiency, isRide)}</span>
           {/* ⚠️ Only when there IS an earlier reading of the same session. One number is not a trend,
               and a second number that is the first would state a comparison that has not happened. */}

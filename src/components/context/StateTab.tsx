@@ -1602,11 +1602,17 @@ export default function StateTab({
         );
         return (
           <>
-            <div className="px-1 mb-1 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
+            {/* ⛔ THE HEADER BELONGS TO THE LIFT CARDS AND NOTHING ELSE (2026-08-29, Michael: it sat
+                above easy runs, quality runs, rides and the week's lifting, none of which are about
+                a bar). It moves inside, directly over the cards it describes, and renders only when
+                there are cards to describe. */}
             <div
               className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
               style={readoutPlateStyle(undefined, { galaxy: true })}
             >
+              {meHistory && (
+                <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up · heavy days only</div>
+              )}
               {cards}
               {/* ⛔ THE ENDURANCE CARDS SIT ON THE SAME PLATE, LAST — one per sport. They answer the
                   same question in the other disciplines (is the same work getting cheaper) and the
