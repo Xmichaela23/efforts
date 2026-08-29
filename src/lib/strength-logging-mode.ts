@@ -26,7 +26,11 @@
  * named, tested, single-source classifier instead of an inline regex ladder — and when it earns a
  * row on the shared table (Axis 3, not scoped yet), there is exactly one place to change.
  */
-import { capabilitiesForExercise, lookupExerciseType, type TypeCapability } from './exercise-role';
+// ⚠️ THE `.ts` IS LOAD-BEARING (2026-08-29). This module is now reached from the edge functions'
+// load path (`_shared/workload.ts` asks it whether a movement has a bar), and Deno will not resolve
+// an extensionless specifier — the deploy fails at bundle time with "Maybe add a '.ts' extension".
+// Vite resolves it either way, and `assistance-catalog.ts` already imports this way.
+import { capabilitiesForExercise, lookupExerciseType, type TypeCapability } from './exercise-role.ts';
 
 /** The question a row asks. Identical to the type table's `loggedAs` — named for the caller. */
 export type LoggingMode = TypeCapability['loggedAs'];
