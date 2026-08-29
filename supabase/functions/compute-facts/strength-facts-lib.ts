@@ -10,7 +10,7 @@
 // with it because this was its only caller. `index.ts` imports both back and behaves identically.
 // ============================================================================
 
-import { strengthSetVolume } from "../_shared/workload.ts";
+import { strengthSetVolume, barLbForExercise } from "../_shared/workload.ts";
 import { estimate1RMRounded, effectiveRepsForReserve } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup } from "../_shared/canonicalize.ts";
 import { isBandAssistedMovement } from "../../../src/lib/band-assistance.ts";
@@ -177,10 +177,12 @@ export function buildStrengthFacts(
     // ⛔ AND THE BODY IS ONLY THE LOAD WHERE IT REALLY IS (2026-08-28). Same axis, same question:
     // an unweighted curl records no tonnage rather than the athlete's own weight.
     const bodyIsLoad = typeForExercise(rawName) === 'bodyweight' || bandIsAssistance;
+    // ⛔ A barbell lift with a blank weight box is the bar, not zero (2026-08-29).
+    const barLb = barLbForExercise(rawName);
     for (const s of completedSets) {
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;
-      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad, bodyIsLoad });
+      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
       if (w > bestWeight) { bestWeight = w; bestReps = r; }
       if (w === bestWeight && r > bestReps) { bestReps = r; }
       // ⛔ POSITIVE PROTOCOL GATE (2026-08-12). Fold a set's reserve into e1RM ONLY when the exercise's

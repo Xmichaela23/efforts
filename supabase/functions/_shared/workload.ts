@@ -19,6 +19,12 @@ import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
 // the shared TYPE axis so it answers for `clamshell` and `lateral band walk`, which carry no "band"
 // in the name. Same import path precedent as `_shared/response-model/weekly.ts`.
 import { typeForExercise } from '../../../src/lib/exercise-role.ts';
+import { equipmentForExercise } from '../../../src/lib/strength-logging-mode.ts';
+import { getExerciseConfig } from '../../../src/lib/exercise-config.ts';
+
+/** ⛔ The empty Olympic bar — the same 45 the plan writer floors warm-ups at (`BAR_LB`), restated
+ *  here rather than imported so the load path does not depend on the 5/3/1 loading module. */
+const OLYMPIC_BAR_LB = 45;
 
 // ---------------------------------------------------------------------------
 // Intensity factor tables
@@ -346,6 +352,21 @@ export type StrengthVolumeOpts = {
    * silently start discarding a chin-up. All four call sites pass it.
    */
   bodyIsLoad?: boolean;
+  /**
+   * ⛔ THE EMPTY BAR, WHEN THE MOVEMENT HAS ONE (Michael, 2026-08-29: *"a barbell curl would have
+   * the weight of the barbell"*). He is right and it is physical: a barbell set with a blank weight
+   * box is not zero pounds, it is the bar.
+   *
+   * ⛔ FIELD STANDARD: Strong and Hevy both default barbell exercises to a 45 lb / 20 kg Olympic bar
+   * and let the athlete change it; their plate calculators price the bar first and the plates on top.
+   * ⚠️ THE APP ALREADY HELD THIS NUMBER — `BAR_LB` (45) / `BAR_LB_LIGHT` (35), which the plan writer
+   * uses to floor a warm-up that computes below an empty bar. Same constant, not a new opinion.
+   *
+   * ⚠️ ASKED OF THE EXERCISE, NOT THE SET, and only for a movement the catalogue actually knows:
+   * `equipmentForExercise` DEFAULTS to 'barbell', so an unrecognised name would otherwise be handed
+   * 45 lb it never lifted. Absent → a blank set prices zero, as it did before.
+   */
+  barLb?: number | null;
 };
 
 /**
@@ -495,7 +516,11 @@ export function strengthSetVolume(
   // ⚠️ THE SET STILL HAPPENED. This zeroes its TONNAGE, not its existence — the reps, the RIR and
   // the row itself are untouched, and a strength session's load has a duration/intensity floor that
   // does not read this number.
-  if (opts.bodyIsLoad === false) return 0;
+  if (opts.bodyIsLoad === false) {
+    // ⛔ EXCEPT THAT A BARBELL LIFT IS NEVER ZERO POUNDS — THERE IS A BAR (2026-08-29). See `barLb`.
+    const bar = Number(opts.barLb) || 0;
+    return bar > 0 ? bar * reps : 0;
+  }
 
   return bw > 0 ? bw * reps : 0;
 }
@@ -510,9 +535,10 @@ export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number,
       const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
       const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
       const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
+      const barLb = barLbForExercise(String(ex?.name ?? ''));
       ex.sets.forEach((set: any) => {
         if (set.completed !== false) {
-          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad });
+          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
         }
       });
     }
@@ -586,9 +612,10 @@ export function calculatePlannedStrengthWorkload(
       // completed curl stops pricing bodyweight and the prescribed one does not, prescribed ==
       // performed breaks and every session reads as under plan.
       const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
+      const barLb = barLbForExercise(String(ex?.name ?? ''));
       totalVolume += sets * strengthSetVolume(
         { weight: ex.weight, reps, resistance_level: plannedIsBand ? 'band' : null },
-        { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad },
+        { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb },
       );
     }
     if (typeof ex.target_rir === 'number' && ex.target_rir >= 0) intensities.push(rirToStrengthIntensity(ex.target_rir));
@@ -788,4 +815,26 @@ export function classifyWorkloadMethod(args: {
   }
   if (args.hasStepsPreset) return { method: 'steps_preset', estimated: false };
   return { method: 'duration_intensity', estimated: false };
+}
+
+/**
+ * ⛔ THE BAR THIS MOVEMENT IS LIFTED WITH, OR NULL — the one place that decides it (2026-08-29).
+ *
+ * Michael: *"a barbell curl would have the weight of the barbell."* Physical, and the field agrees:
+ * Strong and Hevy default barbell exercises to the 45 lb / 20 kg Olympic bar.
+ *
+ * ⚠️ TWO GATES, AND BOTH ARE LOAD-BEARING:
+ *   1. `getExerciseConfig` must know the name. `equipmentForExercise` DEFAULTS to 'barbell', so an
+ *      unmapped movement would otherwise be handed a bar it never touched.
+ *   2. The equipment axis must actually say 'barbell'. A dumbbell curl, a cable row and a machine
+ *      press have no bar, and a blank box on those is still no number.
+ * ⚠️ 45, NOT 35. `BAR_LB_LIGHT` is the plan writer's floor for an athlete not yet lifting above an
+ * empty men's bar; which bar is in an athlete's hands is not knowable from a logged set, and 45 is
+ * both the app's own default and the field's.
+ */
+export function barLbForExercise(name: string): number | null {
+  const raw = String(name ?? '').trim();
+  if (!raw) return null;
+  if (!getExerciseConfig(raw)) return null;
+  return equipmentForExercise(raw) === 'barbell' ? OLYMPIC_BAR_LB : null;
 }

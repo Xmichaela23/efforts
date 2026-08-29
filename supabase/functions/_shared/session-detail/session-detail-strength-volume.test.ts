@@ -248,12 +248,18 @@ Deno.test('⚠️ AND THE BODY IS STILL THE LOAD WHERE IT REALLY IS — a prescr
   assertEquals(v.planned[0].volume_lb, BW * 8 * 3);
 });
 
-Deno.test('⛔ A CURL LOGGED WITH NO WEIGHT PRICES ZERO, NOT BODY WEIGHT (Michael, 2026-08-28)', () => {
+Deno.test('⛔ A CURL LOGGED WITH NO WEIGHT IS THE BAR, NOT BODY WEIGHT (Michael, 2026-08-28/29)', () => {
   const v = build(
     [],
     [{ name: 'Barbell Curl', sets: [{ weight: 0, reps: 12, completed: true }, { weight: 55, reps: 8, completed: true }] }],
     BW,
   );
-  // The weighted set still prices; the empty one contributes nothing rather than 175 x 12.
-  assertEquals(v.completed[0].volume_lb, 440);
+  // 45 x 12 (the empty bar — Strong and Hevy both default a barbell to 45 lb) + 55 x 8.
+  // Not 175 x 12: the athlete's body is not the load on a curl.
+  assertEquals(v.completed[0].volume_lb, 45 * 12 + 55 * 8);
+});
+
+Deno.test('⚠️ AND A MOVEMENT WITH NO BAR STILL PRICES ZERO — a dumbbell has no 45 lb floor', () => {
+  const v = build([], [{ name: 'Dumbbell Row', sets: [{ weight: 0, reps: 10, completed: true }] }], BW);
+  assertEquals(v.completed[0].volume_lb, 0);
 });

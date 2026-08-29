@@ -19,7 +19,7 @@ import { routeHeadline } from '../heat-adjust.ts';
 import { frielBand, decouplingBandDisplay } from '../state-trend/run.ts';
 // D-349: the ONE set rule (D-348). Imported, never re-implemented — the whole point of this field is
 // that the lb on this screen and the lb in the load score come out of the same function.
-import { strengthSetVolume } from '../workload.ts';
+import { strengthSetVolume, barLbForExercise } from '../workload.ts';
 // [Step 5] The ONE gate for "does a band mean help here" — the same function the logger's assist
 // input reads, so the two cannot answer differently for the same movement. See the module header
 // for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
@@ -2271,8 +2271,10 @@ function buildStrengthVolume(
     // ⛔ A CURL IS NOT A BODYWEIGHT MOVEMENT (2026-08-28, Michael). Same type axis as the two band
     // flags beside it; an unweighted LOADED accessory prices zero rather than the athlete's weight.
     const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
+    // ⛔ A barbell lift with a blank weight box is the bar, not zero (2026-08-29).
+    const barLb = barLbForExercise(String(ex?.name ?? ''));
     const volume_lb = setsArr.filter(isPerformedSet).reduce(
-      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad }),
+      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb }),
       0,
     );
     return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };
@@ -2311,6 +2313,7 @@ function buildStrengthVolume(
     // the exercise AND a per-set weight on every `set_plan` entry; a row that names a load anywhere
     // is a row that named a load, and must keep pricing exactly as it did.
     const bodyIsTheLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
+    const plannedBarLb = barLbForExercise(String(ex?.name ?? ''));
     const anySetPlanWeight = Array.isArray(ex?.setPlan)
       && ex.setPlan.some((ap: any) => (Number(ap?.weight) || 0) > 0);
     const plannedNamesNoLoad = (Number(ex?.weight) || 0) <= 0 && !anySetPlanWeight
@@ -2338,7 +2341,7 @@ function buildStrengthVolume(
       for (const ap of setPlan) {
         volume_lb += strengthSetVolume(
           { weight: ap?.weight ?? ex?.weight, reps: ap?.reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad, barLb: plannedBarLb },
         );
       }
     } else {
@@ -2347,7 +2350,7 @@ function buildStrengthVolume(
       if (sets > 0 && Number.isFinite(reps) && reps > 0) {
         volume_lb = sets * strengthSetVolume(
           { weight: ex?.weight, reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad, barLb: plannedBarLb },
         );
       }
     }
