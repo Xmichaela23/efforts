@@ -24,24 +24,18 @@ function pacingRow(paceSecPerMi: number[]): string | null {
   return row ? row.value : null;
 }
 
-Deno.test('⛔ THE RUN THAT NAMED THIS: the whole set leads, and it claims no direction', () => {
-  const v = pacingRow([403, 421, 584, 571, 671, 573]);
-  // Every rep is in the spread — 6:43 to 11:11 — and no trend is asserted over the top of it.
-  assertEquals(v, 'Work intervals: 268s/mi spread (6:43/mi–11:11/mi)');
+Deno.test('⛔ THE RUN THAT NAMED THIS: the range, and no claim over the top of it', () => {
+  assertEquals(pacingRow([403, 421, 584, 571, 671, 573]), 'Work intervals: 6:43/mi–11:11/mi');
 });
 
-Deno.test('reps that genuinely drift slower earn the trend, AFTER the spread', () => {
-  const v = pacingRow([400, 420, 440, 460, 480, 500]);
-  assertEquals(v?.startsWith('Work intervals: 100s/mi spread'), true, `got: ${v}`);
-  assertEquals(v?.endsWith('— progressively slower'), true, `got: ${v}`);
+Deno.test('⛔ A REAL FADE GETS NO WORD EITHER — no app publishes a rule for one', () => {
+  assertEquals(pacingRow([400, 420, 440, 460, 480, 500]), 'Work intervals: 6:40/mi–8:20/mi');
 });
 
-Deno.test('reps that genuinely drift faster earn the other direction', () => {
-  const v = pacingRow([500, 480, 460, 440, 420, 400]);
-  assertEquals(v?.endsWith('— progressively faster'), true, `got: ${v}`);
+Deno.test('⛔ NOR DOES A NEGATIVE SPLIT', () => {
+  assertEquals(pacingRow([500, 480, 460, 440, 420, 400]), 'Work intervals: 6:40/mi–8:20/mi');
 });
 
-Deno.test('tight reps still read as consistent', () => {
-  const v = pacingRow([420, 423, 425, 428]);
-  assertEquals(v?.startsWith('Work intervals consistent'), true, `got: ${v}`);
+Deno.test('⛔ AND TIGHT REPS ARE NOT CALLED "CONSISTENT" — that bar was ours too', () => {
+  assertEquals(pacingRow([420, 423, 425, 428]), 'Work intervals: 7:00/mi–7:08/mi');
 });

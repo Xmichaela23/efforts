@@ -1587,43 +1587,24 @@ export function buildAnalysisDetailRows(
           .map((r) => r.executed?.actual_pace_sec_per_mi ?? null)
           .filter((n): n is number => n != null && Number.isFinite(n) && n > 0);
         if (paces.length >= 2) {
-          const spread = Math.round(Math.max(...paces) - Math.min(...paces));
           const fmtPace = (s: number) => { const m = Math.floor(s / 60); const sec = Math.round(s % 60); return `${m}:${String(sec).padStart(2, '0')}/mi`; };
-          if (spread <= 10) {
-            rows.push({ label: 'Pacing', value: `Work intervals consistent (${fmtPace(paces[0])}–${fmtPace(paces[paces.length - 1])})` });
-          } else {
-            // ⛔ THE SET IS THE UNIT, NOT ITS TWO ENDPOINTS (2026-08-28).
+          // ⛔ AND "CONSISTENT" WENT WITH IT. It fired under a 10s/mi spread — another bar of ours,
+          // and the same kind of claim: a word deciding whether the athlete reads their reps as tight
+          // or scattered. One row, one range, every session.
+          {
+            // ⛔ THE SET IS THE UNIT, AND THE ROW CLAIMS NOTHING ABOUT IT (2026-08-29).
             //
-            // This row was first-vs-last. On Michael's 2026-08-28 run — six reps at 6:43, 7:01,
-            // 9:44, 9:31, 11:11, 9:33 — it printed *"Work intervals faded 170s/mi (6:43 → 9:33)"*.
-            // Arithmetically true, and the wrong sentence: he did not fade, he opened three minutes
-            // a mile faster than the rest and then settled, his SLOWEST rep was the fifth, and the
-            // spread across the set (268s/mi) is four times the "fade" being reported. Two of six
-            // reps decided the verdict and the middle four were not read at all.
-            //
-            // ⛔ THE FIELD READS THE WHOLE SET. TrainingPeaks' interval guidance is to hold the same
-            // split every rep and check afterwards whether you did, and its variability measures
-            // compare a session against itself rather than its endpoints. So the SPREAD leads —
-            // every rep is in it — and direction is a qualifier the row earns, not the headline.
-            //
-            // ⛔ AND IT IS ONLY EARNED WHEN THE REPS ACTUALLY TREND: the halves must separate by
-            // more than the reps scatter inside them. Otherwise the number is real and the story is
-            // not, which is exactly what "faded 170s/mi" was.
-            // ⚠️ NOT [D-456]'s FADE SWITCH — that decides whether a session gets an HR DRIFT number
-            // at all. This decides the wording of an interval session's pacing row; it always renders.
-            const mid = Math.ceil(paces.length / 2);
-            const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-            const range = (xs: number[]) => Math.max(...xs) - Math.min(...xs);
-            const firstHalf = paces.slice(0, mid);
-            const secondHalf = paces.slice(mid);
-            const halfGap = mean(secondHalf) - mean(firstHalf);
-            const scatter = Math.max(range(firstHalf), range(secondHalf));
-            const trend = Math.abs(halfGap) > scatter
-              ? (halfGap > 0 ? ' — progressively slower' : ' — progressively faster')
-              : '';
+            // This row was first-vs-last: on Michael's 2026-08-28 run — six reps at 6:43, 7:01,
+            // 9:44, 9:31, 11:11, 9:33 — it printed *"faded 170s/mi"*, his slowest rep was the fifth,
+            // and two of six reps decided the verdict. The fix's FIRST cut kept the word and gated it
+            // on a half-versus-scatter test, and that test was OURS: TrainingPeaks judges repeats
+            // across the whole set, but no app publishes a rule for when a set counts as a fade.
+            // ⛔ SO THE WORD IS GONE, NOT REGATED (Michael: *"kill 1 especially if other apps don't
+            // do it. Let the numbers speak for themselves."*). The row states the range the reps
+            // actually covered. A reader who wants a direction has the table above it, rep by rep.
             rows.push({
               label: 'Pacing',
-              value: `Work intervals: ${spread}s/mi spread (${fmtPace(Math.min(...paces))}–${fmtPace(Math.max(...paces))})${trend}`,
+              value: `Work intervals: ${fmtPace(Math.min(...paces))}–${fmtPace(Math.max(...paces))}`,
             });
           }
         }
