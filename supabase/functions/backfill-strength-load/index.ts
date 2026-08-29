@@ -35,6 +35,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveUser } from '../_shared/require-user.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
+import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 import { resolveAthleteTimezone } from '../_shared/athlete-timezone.ts';
 
 const corsHeaders = {
@@ -216,6 +217,9 @@ serve(async (req) => {
     if (pErr) throw new Error(`planned_workouts read failed: ${pErr.message}`);
 
     const planned = plannedRows ?? [];
+    // ⛔ THE PRICE OF AN AUTO-REGULATED ROW IS WHAT THE ATHLETE LIFTS ON IT (2026-08-29). Read once
+    // for the whole pass — a per-row query would be 130 round trips to answer one question.
+    const lastWeightByMovement = await fetchLastWeightByMovement(admin, userId);
     let pProcessed = 0, pUpdated = 0, pSkipped = 0, pErrors = 0;
     const pSample: Array<{ date: string; before: number | null; after: number }> = [];
 
@@ -223,7 +227,7 @@ serve(async (req) => {
       pProcessed++;
       const exercises = parseExercises(row.strength_exercises);
       if (exercises.length === 0) { pSkipped++; continue; }
-      const next = calculatePlannedStrengthWorkload(exercises, { bodyweightLb });
+      const next = calculatePlannedStrengthWorkload(exercises, { bodyweightLb, lastWeightByMovement });
       if (!(next > 0)) { pSkipped++; continue; }
       if (next === row.workload_planned) { pSkipped++; continue; } // already on the new basis
       if (pSample.length < 10) pSample.push({ date: row.date, before: row.workload_planned, after: next });

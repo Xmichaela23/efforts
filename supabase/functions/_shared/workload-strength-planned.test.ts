@@ -54,3 +54,36 @@ Deno.test('lifting heavier than prescribed makes actual EXCEED planned (not the 
   const actual = calculateStrengthWorkload(performedHeavier);
   assertEquals(actual > planned, true);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// 2026-08-29 — AN AUTO-REGULATED ROW IS SCORED AT WHAT THE ATHLETE LIFTS ON IT
+//
+// Michael: "we can leave it open but what the user lifts and reports should count." Viada
+// auto-regulates hypertrophy work, so the prescription stays "By feel"; the SCORE stops pretending
+// the row was either bodyweight (the old lie) or nothing (the new one).
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ a "By feel" row is priced at the athlete\'s own last logged weight', () => {
+  const withHistory = calculatePlannedStrengthWorkload(
+    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 'By feel' }],
+    { bodyweightLb: 160, lastWeightByMovement: { barbell_curl: 55 } },
+  );
+  const withoutHistory = calculatePlannedStrengthWorkload(
+    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 'By feel' }],
+    { bodyweightLb: 160 },
+  );
+  // 55 x 10 x 3 against 45 x 10 x 3 — history beats the bar fallback, and both beat bodyweight.
+  assertEquals(withHistory > withoutHistory, true, `${withoutHistory} → ${withHistory}`);
+});
+
+Deno.test('⛔ A NAMED WEIGHT IS NEVER OVERRIDDEN BY HISTORY — the prescription wins', () => {
+  const a = calculatePlannedStrengthWorkload(
+    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 65 }],
+    { bodyweightLb: 160, lastWeightByMovement: { barbell_curl: 55 } },
+  );
+  const b = calculatePlannedStrengthWorkload(
+    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 65 }],
+    { bodyweightLb: 160 },
+  );
+  assertEquals(a, b);
+});

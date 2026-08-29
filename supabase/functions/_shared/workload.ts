@@ -21,6 +21,7 @@ import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
 import { typeForExercise } from '../../../src/lib/exercise-role.ts';
 import { equipmentForExercise } from '../../../src/lib/strength-logging-mode.ts';
 import { barWeightForType, DEFAULT_BAR_LB } from '../../../src/lib/bar-types.ts';
+import { canonicalize } from './canonicalize.ts';
 import { getExerciseConfig } from '../../../src/lib/exercise-config.ts';
 
 /** ⛔ The fallback bar for a barbell movement whose set never named one — `BAR_TYPES.standard`, the
@@ -368,6 +369,22 @@ export type StrengthVolumeOpts = {
    * 45 lb it never lifted. Absent → a blank set prices zero, as it did before.
    */
   barLb?: number | null;
+  /**
+   * ⛔ WHAT THE ATHLETE LAST LIFTED ON THIS MOVEMENT, keyed by canonical name (2026-08-29, Michael:
+   * *"we can leave it open but what the user lifts and reports should count"*).
+   *
+   * ⛔ THE PROBLEM IT SOLVES IS ON THE PLANNED SIDE ONLY. Viada auto-regulates hypertrophy work —
+   * 8-10 reps at 1-2 in reserve, the athlete picks the load — so an accessory row is authored "By
+   * feel" with no weight, deliberately (Michael, on a prescribed 25: *"25 chin ups? lol i can do
+   * 5"*). Pricing that row at body weight was the old lie; pricing it at nothing is a new one, and
+   * it makes every session read as far heavier than the plan that asked for it.
+   * ⚠️ NOTHING IS INVENTED: the number is the athlete's OWN last logged weight on that movement,
+   * which is also what Strong and Hevy put in front of you as the reference. No history → no entry →
+   * the row falls through to the bar, exactly as it does today.
+   * ⚠️ PLANNED SIDE ONLY. A COMPLETED set already carries the weight that was lifted; a fallback
+   * there would overwrite a fact with an estimate.
+   */
+  lastWeightByMovement?: Record<string, number> | null;
 };
 
 /**
@@ -621,8 +638,24 @@ export function calculatePlannedStrengthWorkload(
       // performed breaks and every session reads as under plan.
       const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
       const barLb = barLbForExercise(String(ex?.name ?? ''));
+      /**
+       * ⛔ AN AUTO-REGULATED ROW IS PRICED AT WHAT THE ATHLETE LIFTS ON IT (2026-08-29).
+       *
+       * The prescription stays open — that is Viada's instruction for hypertrophy work and it is not
+       * changed here. This is the SCORING side: a row the plan declined to load is scored at the
+       * athlete's own last logged weight so plan-versus-done compares two real numbers.
+       * ⚠️ ONLY WHEN THE PRESCRIPTION NAMED NOTHING. A row that says 135 is priced at 135, always —
+       * history never overrides a prescription.
+       */
+      const plannedWeight = (() => {
+        const named = Number(ex.weight);
+        if (Number.isFinite(named) && named > 0) return ex.weight;
+        if (plannedIsBand || bandIsAssistance || bodyIsLoad) return ex.weight;
+        const last = opts.lastWeightByMovement?.[canonicalize(String(ex?.name ?? ''))];
+        return Number.isFinite(last) && (last as number) > 0 ? last : ex.weight;
+      })();
       totalVolume += sets * strengthSetVolume(
-        { weight: ex.weight, reps, resistance_level: plannedIsBand ? 'band' : null },
+        { weight: plannedWeight, reps, resistance_level: plannedIsBand ? 'band' : null },
         { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb },
       );
     }

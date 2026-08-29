@@ -17,6 +17,7 @@ import {
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
+import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 
@@ -3484,12 +3485,18 @@ Deno.serve(async (req) => {
     const userId = rows[0]?.user_id;
     // D1: null when never recorded — planned bodyweight sets then score exactly as they do today.
     let plannedBodyweightLb: number | null = null;
+    let lastWeightByMovement: Record<string, number> = {};
     let baselines: Baselines = {};
     try {
       // `weight` rides along for D1 — planned bodyweight sets are priced at the athlete's own body
       // weight, exactly as the completed side prices them, or the two stop reconciling.
       const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source, units, weight').eq('user_id', userId).maybeSingle();
       plannedBodyweightLb = resolveBodyweightLb(ub as any);
+      // ⛔ AND WHAT THE ATHLETE LIFTS ON EACH MOVEMENT (2026-08-29). Viada leaves hypertrophy work
+      // auto-regulated, so an accessory is authored "By feel" with no weight and stays that way —
+      // this is the SCORE's number for it, and it is the athlete's own logged weight rather than a
+      // figure we invented. Empty on a new athlete, which falls back to the bar exactly as before.
+      lastWeightByMovement = await fetchLastWeightByMovement(supabase, userId);
 
       // Audit: strength tier + raw baselines (generate-combined-plan uses effectiveProtocolTier; materialize uses equipment list for substitutions)
       const strengthEquipArr = Array.isArray(ub?.equipment?.strength) ? (ub.equipment.strength as string[]) : [];
@@ -3939,7 +3946,7 @@ Deno.serve(async (req) => {
               // ⚠️ `name` now rides along: pricing a set has to ask the exercise whether a band on
               // it is the load or is assistance (D1), and the name is the only way to ask.
               .map((st:any) => ({ name: st.strength.name, sets: st.strength.sets, reps: st.strength.reps, weight: st.strength.weight, target_rir: st.strength.target_rir }));
-            const plannedLoad = calculatePlannedStrengthWorkload(strengthEx, { bodyweightLb: plannedBodyweightLb });
+            const plannedLoad = calculatePlannedStrengthWorkload(strengthEx, { bodyweightLb: plannedBodyweightLb, lastWeightByMovement });
             if (plannedLoad > 0) update.workload_planned = plannedLoad;
           }
 
