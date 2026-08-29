@@ -27,7 +27,15 @@ import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
 import { readPosture, postureSentence, disciplineWord, type PerDisciplinePosture } from './posture.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
-import { canonicalDisplayName } from '../canonicalize.ts';
+import { canonicalDisplayName, canonicalize } from '../canonicalize.ts';
+// ⛔ VIADA'S TWO LIFTING DOSES, PERFORMED — the counting lives in `accessory-dosing`, which owns his
+// bands; this file supplies the window and the reference max. See `performed-ledger.ts`.
+import {
+  performedLedgerFor,
+  performedStrengthDose,
+  type PerformedSession,
+} from '../accessory-dosing/performed-ledger.ts';
+import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 // ⛔ The workout screen's engine. D-346: State reads THIS, it does not mint its own run verdict.
 import { routeTrend, type RouteTrend } from '../heat-adjust.ts';
 import { computeEfficiencyIndex } from '../efficiency-index.ts';
@@ -602,6 +610,20 @@ export interface StateTrendInputs {
   /** Active auto/manual fitness baselines (fitness_baselines table), keyed by discipline (run/bike/swim).
    *  Presence → ANCHORED mode + the tick. Absent → the discipline falls to trend_only / facts_only. */
   fitnessBaselines?: Record<string, ActiveFitnessBaseline> | null;
+  /**
+   * ⛔ THE RAW LOGGED SETS — the substrate for Viada's two LIFTING doses as PERFORMED (2026-08-29).
+   *
+   * ⚠️ IT CANNOT COME FROM `exerciseRows`, and that is the whole reason it is an input — the same
+   * reason `pullupProgress` is one. `exercise_log` is an aggregate: `best_weight` / `best_reps` per
+   * exercise per session. His counts need EVERY set's weight and reps (4-6 reps above 90%, 15-20
+   * velocity reps at 70-85%, sets per muscle), and the aggregate threw the other sets away.
+   * ⚠️ THE CALLER ALREADY FETCHES THESE for the rep-record window — no new query, no new column.
+   */
+  loggedSessions?: Array<{
+    date: string;
+    label?: string | null;
+    exercises: Array<Record<string, unknown>>;
+  }> | null;
 }
 
 export interface StateTrendResult {
@@ -639,6 +661,36 @@ export interface StateTrendResult {
    * 16-week block gets their own window, which is the whole point of the ruling.
    */
   blockDurationWeeks?: number | null;
+  /** ⛔ Viada's two lifting doses over the last seven days, as performed. See {@link ViadaWeekPerformed}. */
+  viadaWeek?: ViadaWeekPerformed | null;
+}
+
+/**
+ * ⛔ VIADA'S TWO LIFTING DOSES, AS PERFORMED — the week's own numbers, not the plan's.
+ *
+ * ⚠️ THE PLAN'S COPY ALREADY EXISTS AND IS DELIBERATELY UNRENDERED (`standing-plan/week-ledger.ts`):
+ * a standing block's twelve weeks are identical by design, so the composed dose is one picture shown
+ * twelve times. What the athlete DID is the number that moves — a session skipped, a slot swapped,
+ * an accessory added — and this is that number.
+ * ⚠️ NULL WHEN NOTHING WAS LOGGED IN THE WINDOW. A card with nothing to say does not render, and a
+ * week of zeroes is not the same statement as a week with no data.
+ */
+export interface ViadaWeekPerformed {
+  /** The seven days ending `asOf`, inclusive — his buckets are weekly (p084, p086). */
+  since: string;
+  /** Sets and effective reps per muscle, with his verdict bands. `ledgerFor`'s own output. */
+  perMuscle: Array<{ muscle: string; sets: number; effectiveReps: number; verdict: string }>;
+  /** Muscles the week left under the floor of one accessory slot. */
+  belowFloor: string[];
+  /** Per lifting session: work sets, and what that costs the next day (his 6-8 / 14+ figure). */
+  perSession: Array<{ label: string; countedSets: number; totalIfAllCounted: number; verdict: string }>;
+  /** p084's other dose — heavy reps and velocity reps per movement pattern. */
+  perPattern: Array<{
+    pattern: string; heavyReps: number; velocityReps: number;
+    heavy: 'below' | 'in_band' | 'above'; velocity: 'below' | 'in_band' | 'above';
+  }>;
+  /** Lifts with no known max in the window — named, never counted as zero. */
+  unpriced: string[];
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -1259,6 +1311,74 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // ⛔ THE SPINE, likewise carried. It is the PRIMARY endurance read and `namedSessions` is the
     // overlay on top of it — see `EnduranceSpineSeries` for why that order is the whole design call.
     enduranceSpine: inp.enduranceSpine ?? null,
+    // ⛔ HIS TWO LIFTING DOSES, OVER WHAT WAS ACTUALLY LOGGED. Computed HERE and not at the caller
+    // because the percentages need `refMaxByCanonical`, which is resolved a few lines up — the same
+    // windowed max the derived heavy gate uses. A second resolution of "what is this lift's max"
+    // is how two screens come to disagree about whether a set was heavy.
+    viadaWeek: buildViadaWeekPerformed(inp.loggedSessions, asOf, refMaxByCanonical),
+  };
+}
+
+/**
+ * ⛔ THE LAST SEVEN DAYS OF LOGGED LIFTING, THROUGH HIS OWN TWO COUNTS.
+ *
+ * ⚠️ NOTHING IS RE-DERIVED HERE. `performedLedgerFor` hands the logged week to `ledgerFor`, which
+ * owns the muscle attribution, the effective-reps formula (sets x 4) and every verdict band;
+ * `performedStrengthDose` owns p084's percentages. This function is the window and the adapter.
+ */
+function buildViadaWeekPerformed(
+  loggedSessions: StateTrendInputs['loggedSessions'],
+  asOf: string,
+  refMaxByCanonical: Record<string, number>,
+): ViadaWeekPerformed | null {
+  const rows = Array.isArray(loggedSessions) ? loggedSessions : [];
+  if (rows.length === 0) return null;
+  const since = new Date(new Date(asOf + 'T12:00:00Z').getTime() - 6 * 86_400_000).toISOString().slice(0, 10);
+  const week: PerformedSession[] = rows
+    .filter((r) => {
+      const d = String(r?.date ?? '').slice(0, 10);
+      return d.length === 10 && d >= since && d <= asOf;
+    })
+    .map((r) => ({
+      label: String(r?.label ?? r?.date ?? ''),
+      date: String(r?.date ?? '').slice(0, 10),
+      exercises: (Array.isArray(r?.exercises) ? r.exercises : []).map((ex: any) => ({
+        name: String(ex?.name ?? ''),
+        intent: typeof ex?.slot_intent === 'string' ? ex.slot_intent : null,
+        sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((st: any) => ({
+          weightLb: Number(st?.weight) || null,
+          reps: Number(st?.reps) || null,
+          // ⚠️ THE LOGGER'S OWN FLAGS. A prefill the athlete never touched is not a receipt (D-204),
+          // and a warm-up is not a work set at any percentage (p147).
+          isWarmup: st?.warmup === true || (st?.completed !== true && st?.prefilled === true),
+        })),
+      })).filter((ex) => ex.name.length > 0),
+    }));
+  if (week.length === 0) return null;
+
+  const ledger = performedLedgerFor(week);
+  const dose = performedStrengthDose(
+    week,
+    (name) => refMaxByCanonical[canonicalize(name)] ?? refMaxByCanonical[name] ?? null,
+    (name) => getExerciseConfig(name)?.pattern ?? null,
+  );
+  const hasWork = ledger.perMuscle.some((m) => m.sets > 0);
+  if (!hasWork) return null;
+
+  return {
+    since,
+    perMuscle: ledger.perMuscle
+      .filter((m) => m.sets > 0)
+      .map((m) => ({ muscle: m.muscle, sets: m.sets, effectiveReps: m.effectiveReps, verdict: m.verdict })),
+    belowFloor: ledger.belowFloor,
+    perSession: ledger.perSession.map((sess) => ({
+      label: sess.label,
+      countedSets: sess.countedSets,
+      totalIfAllCounted: sess.totalIfAllCounted,
+      verdict: sess.verdict,
+    })),
+    perPattern: dose.perPattern,
+    unpriced: dose.unpriced,
   };
 }
 
@@ -1440,6 +1560,8 @@ export interface StateDisplayV1 {
   namedSessions?: NamedSessionSeries[] | null;
   /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
   enduranceSpine?: EnduranceSpineSeries[] | null;
+  /** ⛔ Viada's two lifting doses over the last seven days, as PERFORMED. See `ViadaWeekPerformed`. */
+  viadaWeek?: ViadaWeekPerformed | null;
   /**
    * ⛔ THE ACTIVE BLOCK'S LENGTH IN WEEKS (`plans.duration_weeks`) — the recency window for the
    * derived heavy gate's reference max (ruled 2026-08-28). Absent → `defaultBlockWeeks`.
@@ -1691,6 +1813,9 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       // TIMES: this map rebuilds the display object field by field, so a field resolved upstream and
       // not named HERE reaches the client as nothing at all — no error, no warning.
       ...(r.enduranceSpine && r.enduranceSpine.length > 0 ? { enduranceSpine: r.enduranceSpine } : {}),
+      // ⛔ AND VIADA'S WEEK. Same narrow point, same rule: named here or it does not exist to the
+      // client. Absent when nothing was lifted in the window — not an empty object.
+      ...(r.viadaWeek ? { viadaWeek: r.viadaWeek } : {}),
     },
     strength: {
       ...disc('strength'),

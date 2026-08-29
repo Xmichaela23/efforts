@@ -1522,10 +1522,21 @@ serve(async (req: Request) => {
         // record is "reps AT a weight", so the weight has to be exact, and only the logged set is.
         let allOutByLift: Record<string, Array<{ date: string; weight: number; reps: number; estimated_1rm: number }>> | null = null;
         let pullupProgress: PullupProgress | null = null;
+        /**
+         * ⛔ THE SAME RAW SESSIONS, HANDED ON FOR VIADA'S TWO LIFTING DOSES (2026-08-29).
+         *
+         * ⚠️ `exercise_log` CANNOT ANSWER THEM — it stores `best_weight` / `best_reps` per exercise
+         * per session, and his counts need every set (4-6 reps above 90%, 15-20 velocity reps at
+         * 70-85%, sets per muscle). Same reason `pullupProgress` is computed from these rows.
+         * ⚠️ NO NEW QUERY: this is the rep-record window's fetch, already running.
+         */
+        let loggedSessions: Array<{ date: string; label?: string | null; exercises: Array<Record<string, unknown>> }> | null = null;
         try {
           const { data: strengthRows } = await supabase
             .from("workouts")
-            .select("date,planned_id,strength_exercises")
+            // ⚠️ `name` joined the select for the per-session line's label — a date is a poor label
+            //    for "ME: Upper cost you 11 work sets".
+            .select("date,name,planned_id,strength_exercises")
             .eq("user_id", userId)
             .in("type", ["strength", "weight_training", "weights", "mobility"])
             .lte("date", asOf)
@@ -1560,6 +1571,7 @@ serve(async (req: Request) => {
                 const pid = typeof r?.planned_id === "string" ? r.planned_id : null;
                 return {
                   date: String(r?.date || "").slice(0, 10),
+                  name: typeof r?.name === "string" ? r.name : null,
                   exercises,
                   plannedExercises: pid ? (plannedById.get(pid) ?? null) : null,
                 };
@@ -1567,6 +1579,13 @@ serve(async (req: Request) => {
               .filter((s: any) => s.date.length === 10);
             const built = allOutSeriesByLift(sessions);
             allOutByLift = Object.keys(built).length ? built : null;
+            // ⛔ CARRIED, NOT RE-FETCHED — `assembleStateTrends` windows them to the last seven days
+            // and prices them against `refMaxByCanonical`, which only it holds.
+            loggedSessions = sessions.map((sess: any) => ({
+              date: sess.date,
+              label: sess.name ?? null,
+              exercises: Array.isArray(sess.exercises) ? sess.exercises : [],
+            }));
 
             // ── THE PULL-UP PROGRESSION'S COUNTS ────────────────────────────────────────────────
             //
@@ -1732,7 +1751,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

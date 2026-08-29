@@ -36,6 +36,7 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
 import { StrengthReadCards, EnduranceReadCards } from './StrengthReadCards';
+import ViadaWeekCard from './ViadaWeekCard';
 
 const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
 
@@ -1572,6 +1573,9 @@ export default function StateTab({
         // session type, NO PLAN REQUIRED — the primary endurance read. `namedSessions` above is the
         // overlay that appears when a block exists, and it is drawn after this.
         const enduranceSpine = (wsv.trends?.display as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | undefined)?.enduranceSpine ?? null;
+        // ⛔ VIADA'S TWO LIFTING DOSES OVER THE LOGGED WEEK (2026-08-29). Resolved server-side and
+        // rendered verbatim; absent when nothing was lifted in the window.
+        const viadaWeek = (wsv.trends?.display as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | undefined)?.viadaWeek ?? null;
         // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
         // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
         // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
@@ -1579,7 +1583,9 @@ export default function StateTab({
         // ⛔ ANY OF THE THREE IS ENOUGH. The spine was added to this test on 2026-08-28: an athlete
         // with no block at all still has runs, and gating the section on a plan-linked series is the
         // exact precondition item 3 removed.
-        if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0)) return null;
+        // ⚠️ AND THE WEEK'S DOSE IS A FOURTH WAY IN. An athlete who lifted this week has something to
+        // read even with no heavy session, no named session and no run in the window.
+        if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0) && !viadaWeek) return null;
         const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
         const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
         for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
@@ -1609,6 +1615,9 @@ export default function StateTab({
                   and rides are logged and no heavy session is yet shows these alone, which is the
                   honest state. */}
               <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} />
+              {/* ⛔ THE WEEK'S DOSE LAST — the lift cards answer "is the bar going up", this answers
+                  "did the week buy what his page asks for". Different question, same plate. */}
+              <ViadaWeekCard week={viadaWeek} />
             </div>
           </>
         );
