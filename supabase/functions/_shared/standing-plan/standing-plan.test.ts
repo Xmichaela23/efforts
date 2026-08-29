@@ -206,10 +206,64 @@ Deno.test('the pretest walks his three steps, aimed by the stored max', () => {
   // ⛔ THE SEED IS NOT THE ANSWER. A stored 1RM sets where the bar starts and nothing else.
   const steps = pretestSession('squat', 300, 5)!;
   assertEquals(steps.length, 3);
+  // ⛔ A = 75% of the seed, rounded to a loadable increment. The upper two are MULTIPLES OF A
+  // (1.1A, 1.15A) — p215's own arithmetic, not three independent fractions of the predicted max.
   assertEquals(steps[0], { fractionOfPredicted: 0.75, weight: 225, reps: 6 });
-  assertEquals(steps[1], { fractionOfPredicted: 0.85, weight: 255, reps: 5 });
-  assertEquals(steps[2], { fractionOfPredicted: 0.90, weight: 270, reps: 'max' });
+  assertEquals(steps[1], { fractionOfPredicted: 0.825, weight: 250, reps: 5 });
+  assertEquals(steps[2], { fractionOfPredicted: 0.8625, weight: 260, reps: 'max' });
   assertEquals(pretestSession('squat', 0, 5), null);
+});
+
+Deno.test('⛔⛔ p215 WORKED EXAMPLE — the regression that keeps the test set off 90%', () => {
+  /**
+   * ⛔ HIS OWN NUMBERS, FROM THE PAGE. p215 walks a 225 lb bench through the protocol:
+   *
+   *   A = 165 (75% or so) · B = 0.1A = 16 · C = B/2 = 8
+   *   D = A + B = 181 → 180, for 5 reps
+   *   E = C + D = 189 → 190, for max reps → the athlete gets 6, "the sixth being nearly a fail"
+   *   Epley 227.9, Brzycki 220.6 → average 224.25 → x0.96 → "225 is your true max, and 215 training max"
+   *
+   * ⛔ THIS TEST EXISTS BECAUSE THE CODE SHIPPED `0.85` AND `0.90` FOR THE UPPER TWO STEPS — an
+   * error that reached a real generated block (Strong Focus, 12 weeks) and would have had the
+   * athlete test at 90% and estimate off ~4 reps instead of 6. Every prescribed weight in a block
+   * is computed from that one set.
+   *
+   * ⚠️ ROUNDING IS OURS. We round every step to the nearest loadable increment; he rounds by eye
+   * (168.75 -> 165). So the WEIGHTS are not asserted against his — the RATIOS and the resulting
+   * percentage are, plus the formula arithmetic, which is his exactly.
+   */
+  const steps = pretestSession('bench', 225, 5)!;
+  const [a, d, e] = steps;
+
+  // The shape of his protocol: confirm at A, five at 1.1A, max reps at 1.15A.
+  assertEquals(a.reps, 6);
+  assertEquals(d.reps, 5);
+  assertEquals(e.reps, 'max');
+
+  // ⛔ THE MEASURED STEP IS NEAR 86%, NOT 90%. This is the whole point of the fixture.
+  const pct = e.weight / 225;
+  assert(pct > 0.84 && pct < 0.88, `measured step landed at ${(pct * 100).toFixed(1)}% of the max`);
+  assert(e.weight < Math.round(225 * 0.90), 'the measured step must sit below the old 90% figure');
+
+  // The upper two steps are additions to A, in his ratio.
+  assert(Math.abs(d.weight / a.weight - 1.10) < 0.03, `D/A was ${(d.weight / a.weight).toFixed(3)}`);
+  assert(Math.abs(e.weight / a.weight - 1.15) < 0.03, `E/A was ${(e.weight / a.weight).toFixed(3)}`);
+
+  /**
+   * ⛔ AND HIS ARITHMETIC, off the page's own weight and rep count.
+   *
+   * ⚠️ EPLEY DIFFERS FROM HIS PRINTED FIGURE BY 0.1 lb, AND THE CODE IS THE PRECISE ONE. p215 prints
+   * the formula as `E x (1 + 0.0333 x F)` — a rounded 1/30 — giving 190 x 1.1998 = 227.9. We use
+   * exact `reps/30`, giving 190 x 1.2 = 228. Brzycki matches him exactly (220.6).
+   * ⛔ THE DIFFERENCE DIES IN THE ROUNDING THAT MATTERS: his average is 224.25 and ours 224.32, and
+   * both give **215** for the training max — the number the block is actually built from.
+   */
+  assertEquals(Math.round(epley1RM(190, 6) * 10) / 10, 228);
+  assertEquals(Math.round(brzycki1RM(190, 6) * 10) / 10, 220.6);
+  const wn = workingNumberFromTest('bench', { weight: 190, reps: 6 })!;
+  assertEquals(Math.round(wn.predicted1RM * 100) / 100, 224.32);
+  // ⛔ HIS NUMBER, REACHED FROM HIS PAGE: "225 is your true max, and 215 training max."
+  assertEquals(Math.round(wn.workingNumber), 215);
 });
 
 Deno.test('no function accepts both numbers', async () => {

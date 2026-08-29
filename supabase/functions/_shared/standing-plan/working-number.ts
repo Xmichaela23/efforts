@@ -72,11 +72,52 @@ export function testedLiftName(
  * weights — it is the SEED for the test, never the answer to it. That distinction is the whole of
  * Michael's 2026-08-23 ruling: a fresh test runs for everyone at block start, and a stored baseline
  * may only aim it.
+ *
+ * ⛔⛔ THE UPPER TWO STEPS ARE DERIVED FROM THE WARM-UP, NOT FROM THE PREDICTED MAX (fixed
+ * 2026-08-29). They used to be independent fractions `0.85` and `0.90` of the predicted max, and
+ * **both were too heavy.** p215 does not give three fractions — it gives ONE weight and then two
+ * additions to it:
+ *
+ * > *"Perform a regular warm-up in your chosen lift, slowly working your way up to a starting weight
+ * > of 75 percent or so of your predicted max; perform 6 reps… [**A**]
+ * > Multiply this weight by 0.1 and enter the number here [**B**]…
+ * > Take half of number B and enter it here [**C**]…
+ * > Add A and B and enter this weight here [**D**]… Perform 5 repetitions with this weight…
+ * > Add number C to number D… Perform the maximum number of repetitions possible with this weight."*
+ *
+ * ⛔ SO **D = A + 0.1A = 1.1A** AND **E = D + 0.05A = 1.15A.** Against the predicted max that is
+ * **0.825** and **0.8625**, not 0.85 and 0.90. His own worked example (p215): a 225 lb max gives
+ * A=165, D=180 for 5, **E=190 for max reps — and it lands on 6.**
+ *
+ * ⛔ WHY THE OLD NUMBERS MATTERED, AND WHY THIS IS EXPRESSED AS MULTIPLES RATHER THAN AS TWO
+ * CORRECTED FRACTIONS. At 0.90 the measured set returns roughly **4 reps where his example returns
+ * 6**. p214 states the reason that is worse, not merely different: *"a 5- to 6-rep max seems to allow
+ * for the best combination of reliability and precision"*, and Epley and Brzycki **diverge as the rep
+ * count changes** — which is p215's own stated reason for averaging them. Testing high lands in the
+ * noisier part of both curves, and **every prescribed weight in the block is computed from that one
+ * set.** Writing the steps as multiples of A keeps them tied to his arithmetic, so they cannot drift
+ * from the page again however A itself is rounded.
+ *
+ * ⚠️ ROUNDING IS OURS AND IS UNCHANGED — nearest loadable increment, applied to each step. His
+ * example rounds by eye (168.75 → 165, 181.5 → 180, 189.75 → 190); we round consistently instead of
+ * reproducing his hand-rounding, so a seeded 225 gives 170 / 185 / 195 rather than his 165/180/190.
+ * ⛔ THE RATIO IS WHAT MATTERS, NOT THE HAND-MATCH: 195/225 = 86.7%, against his 190/225 = 84.4%,
+ * and against the old code's 90%.
  */
-export const PRETEST_STEPS: { fractionOfPredicted: number; reps: number | 'max' }[] = [
-  { fractionOfPredicted: 0.75, reps: 6 },
-  { fractionOfPredicted: 0.85, reps: 5 },
-  { fractionOfPredicted: 0.90, reps: 'max' },
+export const PRETEST_WARMUP_FRACTION = 0.75;
+
+/**
+ * ⛔ MULTIPLES OF THE WARM-UP WEIGHT (A), which is p215's own unit. `fractionOfPredicted` is carried
+ * alongside for readers that want the headline percentage; it is derived, never the source.
+ */
+export const PRETEST_STEPS: {
+  multipleOfWarmup: number;
+  fractionOfPredicted: number;
+  reps: number | 'max';
+}[] = [
+  { multipleOfWarmup: 1.00, fractionOfPredicted: 0.75, reps: 6 },
+  { multipleOfWarmup: 1.10, fractionOfPredicted: 0.825, reps: 5 },
+  { multipleOfWarmup: 1.15, fractionOfPredicted: 0.8625, reps: 'max' },
 ];
 
 /** The step that is actually measured — the last one, taken for max reps. */
@@ -159,9 +200,14 @@ export function pretestSession(
 ): { fractionOfPredicted: number; weight: number; reps: number | 'max' }[] | null {
   if (!Number.isFinite(predictedFromFile) || predictedFromFile <= 0) return null;
   const step = Number.isFinite(roundTo) && roundTo > 0 ? roundTo : 5;
+  // ⛔ A IS THE UNIT (p215). The warm-up weight is rounded to a loadable increment FIRST, and the
+  // upper two steps are multiples of that rounded number — his arithmetic, not three independent
+  // fractions. Rounding A first is what keeps 1.1A and 1.15A honest additions to the weight the
+  // athlete actually put on the bar.
+  const warmup = Math.round((predictedFromFile * PRETEST_WARMUP_FRACTION) / step) * step;
   return PRETEST_STEPS.map((s) => ({
     fractionOfPredicted: s.fractionOfPredicted,
-    weight: Math.round((predictedFromFile * s.fractionOfPredicted) / step) * step,
+    weight: Math.round((warmup * s.multipleOfWarmup) / step) * step,
     reps: s.reps,
   }));
 }
