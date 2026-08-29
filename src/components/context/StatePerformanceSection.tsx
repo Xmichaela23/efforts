@@ -498,6 +498,9 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       {/* THE LONG VIEW — 12-week power sparkline (the cyclist's e1RM/efficiency analog, 2026-07-23). Only when
           power LEADS with a REAL w20 verdict — `lead: 'none'` (building) used to slip through here and put a
           sinking per-ride-effort line under "load holding", which read as fitness falling (Michael, 2026-08-13). */}
+      {/* ⚠️ THE POWER CHART STAYS — it is watts, not efficiency, and nothing else on the screen shows
+          it. Only the efficiency picture was duplicated by the rides card, and the bike row never
+          drew one: its charts are power and load. */}
       {!building && leadIsPower && (
         <TrendSparkline
           series={fitness.power.series}
@@ -1271,14 +1274,14 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
           anything away: it is literally the same ground.
           ⚠️ CONDITIONS ARE CAPTIONED, NOT CORRECTED — Intervals.icu's pattern (weather shown so a
           reader can interpret a poor point). Nobody in the field heat-adjusts an efficiency chart. */}
-      {(eff.route?.series?.length ?? 0) >= 2 ? (
-        <TrendSparkline
-          series={eff.route!.series}
-          dotNoun="run"
-          recentLabel="recent 6 weeks in color"
-          caption={routeCaption}
-        />
-      ) : hasTrend ? <TrendSparkline series={eff.series} /> : null}
+      {/* ⛔ THE CHART MOVED UP THE SCREEN (2026-08-29, Michael: *"I never trusted those old rows"*).
+          The efficiency cards at the top of State now draw this same read per session type — easy,
+          quality, ride — each with its own line, its own date range and the field's own name for the
+          number. Two charts of one metric on one screen is how a reader stops believing either.
+          ⚠️ THE VERDICT SENTENCE STAYS. It carries the direction across the whole population of runs
+          ("reading 20 easy runs — the change is smaller than the normal spread between them"), which
+          the card does not compute. The words are not the duplicate; the picture was. */}
+      {null}
       {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
       {durWord && (
         <span className="basis-full text-[12px] text-white/55">{durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
