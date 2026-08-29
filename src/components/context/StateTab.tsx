@@ -1595,11 +1595,13 @@ export default function StateTab({
           if (Array.isArray(l.expected)) expectedByCanonical[l.canonical_name] = l.expected;
         }
         // The cards' own predicate, so the header above them cannot disagree with them.
+        // ⚠️ The header follows the CARDS, and a card can now come from the series alone (2026-08-29),
+        // so the count has to include those or the header disappears exactly when the charts arrive.
         const liftCardCount = strengthReadCards({
           history: meHistory?.history,
           lastReps: meHistory?.last_reps,
           atWeight: meHistory?.at_weight,
-        }).length;
+        }).length + Object.values(seriesByCanonical).filter((pts) => (pts?.length ?? 0) >= 2).length;
         const cards = (
           <StrengthReadCards
             meHistory={meHistory ?? null}

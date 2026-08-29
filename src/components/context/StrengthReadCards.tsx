@@ -154,7 +154,27 @@ export function StrengthReadCards({
     lastReps: meHistory?.last_reps,
     atWeight: meHistory?.at_weight,
   });
-  if (cards.length === 0) return null;
+
+  /**
+   * ⛔⛔ THE LINE DOES NOT WAIT FOR THE BLOCK (2026-08-29, Michael: *"we don't get strength graphs
+   * anymore? it should just be how fitbod and strong and hevy show"*).
+   *
+   * These cards were gated entirely on `meHistory` — the block's own heavy-session ladder — so a
+   * lifter with a year of logged sets and no heavy day IN THE CURRENT BLOCK saw nothing at all.
+   * Week 1 of every block is the tests, so that is every athlete, every twelve weeks.
+   *
+   * ⛔ THE FIELD SHOWS THE CHART REGARDLESS. Strong charts a lift's estimated max and volume from
+   * your logged sets; Hevy graphs projected 1RM, heaviest weight, best set and volume with a metric
+   * picker. Neither requires a programme to be running.
+   * ⚠️ WHAT THE BLOCK STILL OWNS IS THE WORD. "Stalled" / "on track" / "moving up" judges against a
+   * prescription, so a lift with a line and no block history renders its chart and NO word — never a
+   * verdict inferred from a line.
+   */
+  const seriesOnly = Object.entries(seriesByCanonical ?? {})
+    .filter(([canonical, pts]) => (pts?.length ?? 0) >= 2 && !cards.some((c) => canonicalKey(c.movement) === canonical))
+    .map(([canonical, pts]) => ({ canonical, points: pts! }));
+
+  if (cards.length === 0 && seriesOnly.length === 0) return null;
 
   return (
     <>
@@ -169,7 +189,35 @@ export function StrengthReadCards({
           expected={expectedByCanonical?.[canonicalKey(c.movement)]}
         />
       ))}
+      {seriesOnly.map((s) => (
+        <LineOnlyCard key={s.canonical} canonical={s.canonical} points={s.points} />
+      ))}
     </>
+  );
+}
+
+/**
+ * ⛔ A LIFT WITH A LINE AND NO BLOCK VERDICT. The chart, the latest estimate, and nothing else —
+ * the reading is the line's own direction, which the athlete can see.
+ * ⚠️ NO WORD, DELIBERATELY: see the note above. A verdict here would be inferred from a chart
+ * rather than judged against a prescription.
+ */
+function LineOnlyCard({ canonical, points }: { canonical: string; points: SeriesPoint[] }) {
+  const latest = points[points.length - 1];
+  const name = canonical.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+  return (
+    <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[13px] text-white/80">{name}</span>
+        <span className="text-[11px] text-white/55 tabular-nums">{points.length} weeks</span>
+      </div>
+      <div className="flex items-baseline gap-1.5 mt-1">
+        <span className="readout-num text-[26px] leading-none">{Math.round(latest.value)}</span>
+        <span className="text-[12px] text-white/60">lb estimated max</span>
+      </div>
+      <div className="text-[11px] text-white/55 mt-0.5">your heaviest set each week</div>
+      <ReadChart points={points} />
+    </div>
   );
 }
 
