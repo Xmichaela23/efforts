@@ -16,16 +16,53 @@ import { efficiencyIndexToSeries, computeRunEfficiencyState } from './run.ts';
 const AS_OF = '2026-07-03';
 const WEEKS_90D = 90 / 7;
 
-Deno.test('efficiencyIndexToSeries (SECONDARY): steady aerobic + 30–70min band + plausible eff band', () => {
-  const series = efficiencyIndexToSeries([
-    { metric_date: '2026-06-10', efficiency_index: 1.72, workout_type: 'steady_state', duration_minutes: 45 }, // keep
-    { metric_date: '2026-06-12', efficiency_index: 1.85, workout_type: 'steady_state', duration_minutes: 60 }, // keep
-    { metric_date: '2026-06-14', efficiency_index: 1.90, workout_type: 'fartlek', duration_minutes: 40 },      // drop (interval)
-    { metric_date: '2026-06-16', efficiency_index: 1.80, workout_type: 'steady_state', duration_minutes: 90 }, // drop (>70min, distance confound)
-    { metric_date: '2026-06-18', efficiency_index: 1.70, workout_type: 'steady_state', duration_minutes: 20 }, // drop (<30min)
-    { metric_date: '2026-06-20', efficiency_index: 0, workout_type: 'steady_state', duration_minutes: 45 },    // drop (corrupt <0.5)
-  ]);
-  assertEquals(series.map((p) => p.value), [1.72, 1.85]);
+Deno.test('⛔⛔ EVERY RUN REACHES THE METRIC — no duration window, at either end', () => {
+  /**
+   * ⚠️ THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-28 and is rewritten, not deleted, so the
+   * reversal stays visible. It pinned a 30–70 minute band and an interval exclusion. Q-295 is now
+   * CLOSED AT BOTH ENDS and neither comes back:
+   *  - the FLOOR dropped two of every three of this athlete's runs (his week is two 27-minute runs
+   *    and one 63-minute session) and TrainingPeaks applies none — *"let's match TrainingPeaks"*;
+   *  - the CEILING deleted the long run, which for a marathon athlete IS the session — *"it
+   *    shouldn't cap at 70, that's crucial for marathon trainers"*.
+   * ⛔ AND THE APP CONTRADICTED ITSELF: the durability row beside this one has always had a floor and
+   * NO ceiling, so two numbers on one screen read two different populations of runs.
+   */
+  const rows = [
+    { metric_date: '2026-06-10', efficiency_index: 1.72, workout_type: 'easy', duration_minutes: 45 },
+    { metric_date: '2026-06-12', efficiency_index: 1.85, workout_type: 'easy', duration_minutes: 60 },
+    { metric_date: '2026-06-18', efficiency_index: 1.70, workout_type: 'easy', duration_minutes: 20 },  // was dropped: under the floor
+    { metric_date: '2026-06-20', efficiency_index: 1.66, workout_type: 'easy', duration_minutes: 27 },  // was dropped: under the floor
+    { metric_date: '2026-06-22', efficiency_index: 0, workout_type: 'easy', duration_minutes: 45 },     // still dropped: corrupt (<0.5)
+  ];
+  assertEquals(efficiencyIndexToSeries(rows).map((p) => p.value), [1.72, 1.85, 1.70, 1.66]);
+});
+
+Deno.test('⛔⛔ FAST AND LONG SESSIONS ARE GROUPED, NOT DELETED', () => {
+  /**
+   * ⛔ THE RULE THAT REPLACED EXCLUSION. TrainingPeaks computes Efficiency Factor on every session
+   * carrying pace and HR and compares LIKE FOR LIKE by session type. The old build binned anything
+   * named interval/tempo/fartlek/threshold/vo2/speed/track/race/surge outright.
+   * ⚠️ The long group is the SAME mechanism, not a second one: *"a long run drifts more"* is true,
+   * and it is a reason to compare long runs to other long runs — never a reason to delete them.
+   */
+  const rows = [
+    { metric_date: '2026-06-10', efficiency_index: 1.72, workout_type: 'easy', duration_minutes: 45 },
+    { metric_date: '2026-06-14', efficiency_index: 1.90, workout_type: 'fartlek', duration_minutes: 40 },
+    { metric_date: '2026-06-16', efficiency_index: 1.80, workout_type: 'long', duration_minutes: 130 },
+    { metric_date: '2026-06-21', efficiency_index: 1.83, workout_type: 'long', duration_minutes: 145 },
+    { metric_date: '2026-06-23', efficiency_index: 1.95, workout_type: 'intervals', duration_minutes: 50 },
+  ];
+  assertEquals(efficiencyIndexToSeries(rows, 'easy').map((p) => p.value), [1.72]);
+  // ⛔ THE 130- AND 145-MINUTE RUNS: deleted by the old ceiling, now their own comparison group.
+  assertEquals(efficiencyIndexToSeries(rows, 'long').map((p) => p.value), [1.80, 1.83]);
+  // ⛔ AND THE FAST SESSIONS SURVIVE — in their own pool, never mixed into the easy line.
+  assertEquals(efficiencyIndexToSeries(rows, 'quality').map((p) => p.value), [1.90, 1.95]);
+  // ⚠️ NOTHING WAS LOST: every row lands in exactly one group.
+  assertEquals(
+    (['easy', 'long', 'quality'] as const).reduce((n, g) => n + efficiencyIndexToSeries(rows, g).length, 0),
+    rows.length,
+  );
 });
 
 // DIRECTION PIN #1 — RISING index = getting fitter.

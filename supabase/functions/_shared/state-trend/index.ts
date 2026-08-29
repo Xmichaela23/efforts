@@ -39,7 +39,7 @@ export {
 } from './bike-fitness.ts';
 export {
   computeRunState, routeMetricsToSeries, isComparableRunEffort, COMPARABLE_RUN_EFFORT,
-  efficiencyIndexToSeries, computeRunEfficiencyState,
+  efficiencyIndexToSeries, computeRunEfficiencyState, runSessionGroup,
   decouplingToSeries, computeRunDecouplingState, frielBand, decouplingLabel, decouplingBandDisplay, isSteadyAerobic,
   type RunState, type RunFitness, type DecouplingBand, type DecouplingState,
 } from './run.ts';
@@ -109,6 +109,8 @@ export {
   type StateTrendsV1,
   type StateDisplayV1,
   type NamedSessionSeries,
+  type EnduranceSpineSeries,
+  type SpineSessionPoint,
   type NamedSessionPoint,
   type ReferenceSeries,
   DRIFT_LIMITS,

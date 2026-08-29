@@ -43,6 +43,9 @@ import {
   toStateTrendsV1,
   buildStrengthBaselines,
   buildAllTimeBestByLift,
+  runSessionGroup,
+  type EnduranceSpineSeries,
+  type SpineSessionPoint,
   deriveProvisionalBaselines,
   reconcileBaseline,
   disciplineOf,
@@ -841,11 +844,31 @@ serve(async (req: Request) => {
         const runEffHistory: Array<Record<string, unknown>> = [];
         const runEffIndexByDate = new Map<string, number>();
         const runHrByDate = new Map<string, number>(); // for the GRADE-ADJUSTED efficiency (GAP-pace ÷ HR)
+        /**
+         * ⛔⛔ WHAT KIND OF SESSION IT WAS — THE RICH ANSWER, WHICH NOTHING WAS READING (2026-08-28).
+         *
+         * There are TWO `workout_type` fields on a run and this file was joining the poor one.
+         *  - `workout_analysis.heart_rate_summary.workoutType` — the analyser's. `mapClassifiedTypeToHrWorkoutType`
+         *    collapses EVERYTHING to three words: `intervals`, `hill_repeats`, `steady_state`. A tempo, a
+         *    threshold run, a race and a two-hour long run all read `steady_state`.
+         *  - `run_facts.workout_type` — `classifyRunIntent`'s, written since 2026-07-30 off the PLAN the
+         *    run is attached to, and now separating `long` as its own word.
+         *
+         * ⛔ THE SECOND ONE HAS NEVER REACHED A READER. It was written to fix the steady gate and the
+         * join was never moved, so every consumer of `workout_type` here has been reading the
+         * three-word field — which is why the code comments around this row say it "reads
+         * `steady_state` on every run ever logged". **The classifier was not missing. It was starved.**
+         *
+         * ⚠️ FALLS BACK, NEVER BLANKS: no `run_facts` word → the analyser's, exactly as before.
+         */
+        const runTypeByDate = new Map<string, string>();
         for (const f of (runFactsR.data ?? []) as any[]) {
           const v = f.run_facts?.efficiency_index;
           if (typeof v === "number") runEffIndexByDate.set(f.date, v);
           const h = f.run_facts?.hr_avg;
           if (typeof h === "number" && h > 0) runHrByDate.set(f.date, h);
+          const t = f.run_facts?.workout_type;
+          if (typeof t === "string" && t.trim().length > 0) runTypeByDate.set(f.date, t.trim().toLowerCase());
         }
         const MI_PER_KM = 1 / 1.60934;
         const runJoined = runRows.map((r) => {
@@ -870,7 +893,15 @@ serve(async (req: Request) => {
                 pace_s_per_km: gapPaceSecPerKm,
                 hr: Number(hrForTrend),
                 temp_f: Number.isFinite(tF) ? tF : null,
+                /**
+                 * ⛔ `intent` STAYS NULL ON PURPOSE, AND `workout_type` IS THE NEW FIELD BESIDE IT.
+                 * `routeTrend`'s `isComparableIntent` is a BLOCKLIST that DELETES intervals, tempo
+                 * and races. Filling `intent` would switch exclusion back on under another name —
+                 * the exact thing work-order item 2 exists to reverse. The session type rides here
+                 * instead, and `assemble.ts` uses it to PARTITION the pool into groups.
+                 */
                 intent: null,
+                workout_type: runTypeByDate.get(r.date) ?? hrs?.workoutType ?? null,
               });
             }
           }
@@ -884,7 +915,9 @@ serve(async (req: Request) => {
             decoupling_basis: hrs?.decouplingBasis ?? null,
             decoupling_mixed_effort: hrs?.decouplingMixedEffort ?? null, // confidence hedge — NOT a filter
             decoupling_confounded: hrs?.decouplingConfounded ?? null, // heat/RPE-confounded → excluded from the durability substrate
-            workout_type: hrs?.workoutType ?? null,
+            // ⛔ THE PLAN'S OWN WORD FIRST (2026-08-28) — see `runTypeByDate` above. The analyser's
+            // three-word field is the fallback, so nothing that read this before reads less now.
+            workout_type: runTypeByDate.get(r.date) ?? hrs?.workoutType ?? null,
             duration_minutes: hrs?.durationMinutes ?? null,
             classified_type: r.workout_analysis?.classified_type ?? null,
           };
@@ -1148,6 +1181,170 @@ serve(async (req: Request) => {
          * oversight: a set is a measurement, a session is a prescription, and only one of them
          * survives its plan.
          */
+        /**
+         * ⛔⛔ THE ENDURANCE FACTS, RESOLVED ONCE AND WITHOUT A PLAN (2026-08-28, work order item 3).
+         *
+         * These two maps used to live INSIDE the `weekByDate` branch below, which made a block week
+         * map a precondition for reading a heart rate. They are hoisted because the SPINE needs them
+         * and the spine is athlete-scoped: **a run is yours whether a plan exists or not** (Michael's
+         * ruling, Q-294). The plan-linked overlay reads the same two maps, so there is one query and
+         * one definition rather than a second copy that could drift.
+         */
+        const endFactByDate = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null }>();
+        const keyDates = new Set<string>();
+        try {
+          const { data: factRows } = await supabase
+            .from("workout_facts").select("date,discipline,run_facts,ride_facts")
+            .eq("user_id", userId).in("discipline", ["run", "ride"])
+            .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
+          for (const f of (Array.isArray(factRows) ? factRows : []) as any[]) {
+            const rf = f?.run_facts, bf = f?.ride_facts;
+            const src = rf ?? bf;
+            if (!src) continue;
+            /**
+             * ⛔ THE FACTS ARE READ AS STORED, NEVER RE-DERIVED. `run_facts.efficiency_index` is
+             * metres per second per beat; `ride_facts.efficiency_factor` is normalised power over
+             * average heart rate — TrainingPeaks' EF exactly, already published by the analyser. A
+             * second derivation here would fork the definition from the one every other surface uses.
+             */
+            const eff = Number(rf?.efficiency_index ?? bf?.efficiency_factor);
+            const drift = Number(src?.hr_drift_pct);
+            const hr = Number(rf?.hr_avg ?? bf?.avg_hr);
+            endFactByDate.set(String(f.date).slice(0, 10), {
+              efficiency: Number.isFinite(eff) && eff > 0 ? eff : null,
+              // ⚠️ Drift may legitimately be NEGATIVE (HR fell across the session), so the guard is
+              // finiteness alone. A `> 0` test here would silently drop the best sessions.
+              drift: Number.isFinite(drift) ? drift : null,
+              hr: Number.isFinite(hr) && hr > 0 ? hr : null,
+            });
+          }
+          /**
+           * ⛔ WHICH DAYS CARRY A KEY SESSION — p107's tighter 5% line applies when one falls within
+           * 24 hours. Read off the PLAN, never guessed from the weekday: the frame's rotation decides
+           * which days are hard, and it moves with the athlete's pins.
+           * ⚠️ AN ATHLETE WITH NO PLAN SIMPLY HAS AN EMPTY SET, so every session takes p107's standard
+           * 10% line. That is the correct read, not a missing one — with nothing prescribed inside 24
+           * hours there is no key session for the tighter line to protect.
+           */
+          const { data: keyRows } = await supabase
+            .from("planned_workouts").select("date,tags")
+            .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", addDaysIso(asOf, 1));
+          for (const p2 of (Array.isArray(keyRows) ? keyRows : []) as any[]) {
+            const tags = (Array.isArray(p2?.tags) ? p2.tags : []).map((t: any) => String(t).toLowerCase());
+            /**
+             * ⛔ A KEY SESSION IS ONE OF THE BLOCK'S QUALITY SLOTS OR A BARBELL DAY, AND THAT IS THE
+             * PAGE'S OWN DEFINITION RATHER THAN ours. p107: *"one targeting a system or adaptation
+             * that you're hoping to improve in the current training cycle."*
+             * ⚠️ DO NOT NARROW THIS BACK TO ENDURANCE. In a strength-led block a barbell day is
+             * squarely what that sentence describes — it is the adaptation the cycle exists for.
+             * An easy run the next morning is not, which is the whole reason the 5% line is
+             * tighter than the 10% one.
+             */
+            const isKey = tags.some((t: string) => /family:(run_near_threshold|run_sprint|ride_sweet_spot|ride_vo2|ride_anaerobic)/.test(t))
+              || tags.includes('strength');
+            if (isKey) keyDates.add(String(p2.date).slice(0, 10));
+          }
+        } catch (e: any) {
+          console.log("[compute-snapshot] endurance facts load failed (non-fatal):", e?.message || e);
+        }
+
+        /**
+         * ⛔⛔ THE SPINE — EVERY RUN AND EVERY RIDE, NO PLAN REQUIRED (work order item 3, Q-294).
+         *
+         * ⛔ WHAT WAS WRONG. A run reached the endurance read only if it carried a `planned_id`, whose
+         * planned row carried `family:run_near_threshold`, on a date inside the current block's week
+         * map. **Three plan preconditions on a measurement that has none.** Every one of the five
+         * TrainingPeaks numbers is plan-agnostic; only the IDENTIFICATION was plan-locked. Michael's
+         * ruling: *a lift is prescribed so the plan is the right frame; a run is yours whether a plan
+         * exists or not.*
+         *
+         * ⛔ SO THIS IS THE PRIMARY READ AND THE NAMED-SESSION CARD BELOW IS THE OVERLAY. The build
+         * had it inverted — Viada's same-session-versus-itself test shipped as the headline, and the
+         * TrainingPeaks spine it should sit on was filtered down to nothing.
+         *
+         * ⛔ NO WEEK AXIS, BY CONSTRUCTION. Block weeks are the overlay's frame. Dates are the
+         * spine's, which is why a rebuilt block cannot empty it.
+         * ⛔ AND NO GUESSING. There is deliberately no day-of-week + duration fallback inferring which
+         * prescribed session a run "was" (ruled 2026-08-28). The overlay stays honest by staying
+         * linked; the spine does not need to guess because it does not care.
+         *
+         * ⚠️ GROUPED BY SESSION TYPE, using `runSessionGroup` — the SAME predicate the efficiency
+         * trend groups on (item 2). Not a second rule. Rides carry one group: the bike has no
+         * equivalent session-type classifier, and inventing one here would be exactly the second
+         * vocabulary this codebase keeps growing.
+         */
+        let enduranceSpine: EnduranceSpineSeries[] = [];
+        try {
+          const { data: spineRows } = await supabase
+            .from("workouts").select("date,type,workout_analysis")
+            .eq("user_id", userId).in("type", ["run", "running", "ride", "bike", "cycling"])
+            .eq("workout_status", "completed")
+            .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
+          const bySport = new Map<string, Map<string, SpineSessionPoint[]>>();
+          for (const r of (Array.isArray(spineRows) ? spineRows : []) as any[]) {
+            const t = String(r?.type || "").toLowerCase();
+            const sport = t.includes("run") ? "run" : "ride";
+            const date = String(r?.date || "").slice(0, 10);
+            if (date.length !== 10) continue;
+            const f = endFactByDate.get(date);
+            // ⚠️ A POINT NEEDS SOMETHING TO PLOT. No heart rate and no efficiency is a session we
+            // measured nothing on; inventing a zero would draw a crash.
+            if (!f || (f.hr == null && f.efficiency == null)) continue;
+            const hrs = r?.workout_analysis?.heart_rate_summary ?? null;
+            const group = sport === "run"
+              ? runSessionGroup(runTypeByDate.get(date) ?? hrs?.workoutType ?? null)
+              : "all";
+            /**
+             * ⛔⛔ THE FADE NUMBER IS WITHHELD WHEN THE SESSION WAS NOT STEADY — RULED 2026-08-28.
+             * **Decided on WHAT THE SESSION ACTUALLY WAS, not on its duration and not on its plan.**
+             *
+             * Fade (decoupling) is a within-session durability read and it requires a steady effort.
+             * Viada's long run deliberately is NOT one — p235: *"may include rest periods or pauses…
+             * with little negative impact"*; p246: *"90 to 100 minutes… with an emphasis on LT
+             * intervals"*, shorter fartlek variations for the less experienced, race-pace finishes and
+             * surges at every level, *"intensity may be lower past 60 minutes"*. **A fade read on that
+             * session would report a durability failure every week on an athlete following the book
+             * exactly** — the pace changes by prescription and the ratio falls apart by design.
+             *
+             * ⚠️ THE FLAG ALREADY EXISTED AND THIS IS NOT A SECOND STEADINESS TEST. D-283 correctly
+             * made `decoupling_mixed_effort` a HEDGE rather than an exclusion for the general
+             * durability row. **Here it is the SWITCH.** Not a contradiction: D-283 says do not delete
+             * a steady run for being LOW-CONFIDENCE; this says do not print a fade number for a
+             * session that WAS NOT STEADY.
+             * ⛔ IT WITHHOLDS THE FIGURE ONLY. The session still carries its efficiency and still
+             * feeds the trend — never dropped.
+             * ⚠️ CONSEQUENCE, STATED AND CORRECT: a marathon-plan long run is usually genuinely steady
+             * and gets a fade number; a Viada standing-block long run usually is not and does not.
+             * Same athlete, same distance, different number. **That is the design — the surface must
+             * say so rather than letting it read as missing data.**
+             */
+            const steady = hrs?.decouplingMixedEffort !== true;
+            bySport.set(sport, bySport.get(sport) ?? new Map());
+            const groups = bySport.get(sport)!;
+            groups.set(group, groups.get(group) ?? []);
+            groups.get(group)!.push({
+              date,
+              hrAvg: f.hr != null ? Math.round(f.hr) : null,
+              durationMin: Number.isFinite(Number(hrs?.durationMinutes)) ? Math.round(Number(hrs.durationMinutes)) : null,
+              efficiency: f.efficiency,
+              // ⛔ The switch above. Null here means "this session was not steady enough to fade-read",
+              // which is a different fact from "we did not measure it" — `fadeWithheld` says which.
+              driftPct: steady ? f.drift : null,
+              fadeWithheld: !steady,
+              keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
+            });
+          }
+          for (const [sport, groups] of bySport) {
+            for (const [group, points] of groups) {
+              points.sort((a, b) => a.date.localeCompare(b.date));
+              if (points.length === 0) continue;
+              enduranceSpine.push({ sport, group, points });
+            }
+          }
+        } catch (e: any) {
+          console.log("[compute-snapshot] endurance spine failed (non-fatal):", e?.message || e);
+        }
+
         let namedSessions: NamedSessionSeries[] = [];
         try {
           // Only worth asking when the block gave us a week map — without it there is no axis.
@@ -1169,52 +1366,12 @@ serve(async (req: Request) => {
              * average heart rate — TrainingPeaks' EF exactly, already published by the analyser. A
              * second derivation here would fork the definition from the one every other surface uses.
              */
-            const { data: factRows } = await supabase
-              .from("workout_facts").select("date,discipline,run_facts,ride_facts")
-              .eq("user_id", userId).in("discipline", ["run", "ride"])
-              .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
-            const factByDate = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null }>();
-            for (const f of (Array.isArray(factRows) ? factRows : []) as any[]) {
-              const rf = f?.run_facts, bf = f?.ride_facts;
-              const src = rf ?? bf;
-              if (!src) continue;
-              const eff = Number(rf?.efficiency_index ?? bf?.efficiency_factor);
-              const drift = Number(src?.hr_drift_pct);
-              const hr = Number(rf?.hr_avg ?? bf?.avg_hr);
-              factByDate.set(String(f.date).slice(0, 10), {
-                efficiency: Number.isFinite(eff) && eff > 0 ? eff : null,
-                // ⚠️ Drift may legitimately be NEGATIVE (HR fell across the session), so the guard is
-                // finiteness alone. A `> 0` test here would silently drop the best sessions.
-                drift: Number.isFinite(drift) ? drift : null,
-                hr: Number.isFinite(hr) && hr > 0 ? hr : null,
-              });
-            }
 
             /**
              * ⛔ WHICH DAYS CARRY A KEY SESSION — p107's tighter 5% line applies when one falls
              * within 24 hours. Read off the PLAN, never guessed from the weekday: the frame's
              * rotation decides which days are hard, and it moves with the athlete's pins.
              */
-            const { data: keyRows } = await supabase
-              .from("planned_workouts").select("date,tags")
-              .eq("user_id", userId).gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", addDaysIso(asOf, 1));
-            const keyDates = new Set<string>();
-            for (const p2 of (Array.isArray(keyRows) ? keyRows : []) as any[]) {
-              const tags = (Array.isArray(p2?.tags) ? p2.tags : []).map((t: any) => String(t).toLowerCase());
-              /**
-               * ⛔ A KEY SESSION IS ONE OF THE BLOCK'S QUALITY SLOTS OR A BARBELL DAY, AND THAT IS THE
-               * PAGE'S OWN DEFINITION RATHER THAN ours. p107: *"one targeting a system or adaptation
-               * that you're hoping to improve in the current training cycle."*
-               * ⚠️ DO NOT NARROW THIS BACK TO ENDURANCE. In a strength-led block a barbell day is
-               * squarely what that sentence describes — it is the adaptation the cycle exists for.
-               * An easy run the next morning is not, which is the whole reason the 5% line is
-               * tighter than the 10% one.
-               */
-              const isKey = tags.some((t: string) => /family:(run_near_threshold|run_sprint|ride_sweet_spot|ride_vo2|ride_anaerobic)/.test(t))
-                || tags.includes('strength');
-              if (isKey) keyDates.add(String(p2.date).slice(0, 10));
-            }
-
             for (const fam of FAMILIES) {
               const { data: linkRows } = await supabase
                 .from("workouts").select("date,planned_id")
@@ -1246,7 +1403,7 @@ serve(async (req: Request) => {
                 // ⚠️ Outside the block → no week → not emitted. Same rule as the lift line: a session
                 // from a previous block is not week 1 of this one.
                 if (!Number.isFinite(week)) continue;
-                const f = factByDate.get(date);
+                const f = endFactByDate.get(date);
                 const hr = f?.hr ?? null;
                 // ⚠️ A POINT NEEDS SOMETHING TO PLOT. No heart rate and no efficiency is a session we
                 // measured nothing on; inventing a zero would draw a crash.
@@ -1533,7 +1690,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, enduranceSpine, measuredDates, allOutByLift, strengthEffortRead, pullupProgress });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

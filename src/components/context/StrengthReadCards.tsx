@@ -222,10 +222,113 @@ type NamedSession = {
   reference?: { metric: string; unit: string; points: Array<{ date: string; value: number; status: string }> } | null;
 };
 
-export function EnduranceReadCards({ sessions }: { sessions?: NamedSession[] | null }) {
+type SpinePoint = {
+  date: string; hrAvg: number | null; durationMin: number | null;
+  efficiency: number | null; driftPct: number | null; fadeWithheld: boolean; keySessionWithin24h: boolean;
+};
+type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
+
+/** ⛔ THE SPINE'S GROUPS IN THE ATHLETE'S OWN WORDS. No invented vocabulary on a screen. */
+const GROUP_LABEL: Record<string, string> = {
+  easy: 'easy runs', long: 'long runs', quality: 'quality runs', all: 'rides',
+};
+/** ⛔ THE SPINE LEADS, THE OVERLAY FOLLOWS — easy first, then long, then quality, then rides. */
+const GROUP_ORDER = ['easy', 'long', 'quality', 'all'];
+
+export function EnduranceReadCards(
+  { sessions, spine }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null },
+) {
   const list = (sessions ?? []).filter((s) => (s?.points?.length ?? 0) > 0);
-  if (list.length === 0) return null;
-  return <>{list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}</>;
+  /**
+   * ⛔⛔ THE SPINE RENDERS WITHOUT A PLAN, AND IT RENDERS FIRST (2026-08-28, work order item 3).
+   *
+   * ⛔ WHAT WAS WRONG. A run reached this section only if it carried a `planned_id`, whose planned
+   * row carried a family tag, on a date inside the current block's week map — three plan
+   * preconditions on a measurement that has none. Michael's ruling (Q-294): *a lift is prescribed so
+   * the plan is the right frame; a run is yours whether a plan exists or not.*
+   *
+   * ⛔ AND THE ORDER IS THE DESIGN CALL, NOT A LAYOUT CHOICE. TrainingPeaks' read needs nothing;
+   * Viada's needs a repeated prescribed session. **So TrainingPeaks is the spine and Viada is the
+   * overlay that appears when a block exists** — the build shipped it inverted, with the overlay as
+   * the headline and the spine filtered down to nothing.
+   */
+  const spineList = (spine ?? [])
+    .filter((s) => (s?.points?.length ?? 0) > 0)
+    .sort((a, b) => (GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)) || a.sport.localeCompare(b.sport));
+  if (list.length === 0 && spineList.length === 0) return null;
+  return (
+    <>
+      {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} />)}
+      {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
+    </>
+  );
+}
+
+/**
+ * ⛔ ONE GROUP OF SESSIONS, COMPARED TO ITSELF. Dates, never block weeks — a rebuilt block cannot
+ * empty this card, which is the whole reason the spine exists beside the overlay.
+ */
+function SpineCard({ series }: { series: SpineSeries }) {
+  const pts = series.points;
+  const latest = pts[pts.length - 1];
+  const prior = pts.length > 1 ? pts[pts.length - 2] : null;
+  const isRide = series.sport === 'ride';
+  const color = getDisciplineColor(isRide ? 'ride' : 'run');
+  const driftLimit = latest.keySessionWithin24h ? DRIFT_KEY_SESSION_PCT : DRIFT_STANDARD_PCT;
+  const label = GROUP_LABEL[series.group] ?? `${series.sport} sessions`;
+  const eff = pts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
+
+  return (
+    <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[13px] text-white/80">{label}</span>
+        {/* ⚠️ THE COUNT, NOT A WEEK NUMBER. This card has no block axis by construction. */}
+        <span className="text-[11px] text-white/45 tabular-nums">{pts.length} logged</span>
+      </div>
+
+      {latest.efficiency != null && (
+        <>
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <span className="readout-num text-[26px] leading-none">{fmtEff(latest.efficiency, isRide)}</span>
+            <span className="text-[12px] text-white/45">{isRide ? 'watts per beat' : 'speed per beat'}</span>
+          </div>
+          {prior?.efficiency != null && (
+            <div className="text-[12px] text-white/50 mt-1">
+              last time <span className="tabular-nums text-white/75">{fmtEff(prior.efficiency, isRide)}</span>
+            </div>
+          )}
+        </>
+      )}
+      {eff.length >= 2 && <DatedChart points={eff} color={color} />}
+
+      {/* ── FADE, AND THE CASE WHERE THERE DELIBERATELY IS NONE. ── */}
+      {latest.driftPct != null ? (
+        <div className="text-[12px] text-white/50 mt-2">
+          fade <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span>
+          <span className="text-white/35">
+            {' '}· the line is {driftLimit}%{latest.keySessionWithin24h ? ' — a key session is inside 24 hours' : ''}
+          </span>
+        </div>
+      ) : latest.fadeWithheld ? (
+        /**
+         * ⛔⛔ SAY IT OUT LOUD RATHER THAN LEAVING A GAP. A fade read needs a steady effort, and a
+         * long run with surges, pauses or a race-pace finish is not one — its pace changes BY
+         * PRESCRIPTION, so the ratio falls apart by design. Printing a fade number there would fail
+         * the athlete every week for doing exactly what the book asked.
+         * ⚠️ RENDERED AS A BLANK IT READS AS BROKEN DATA, and the athlete concludes the app is
+         * missing their run. It is not missing — it is a different kind of session.
+         * ⚠️ AND THE SESSION STILL COUNTS ABOVE: only the fade figure is withheld, never the run.
+         */
+        <div className="text-[12px] text-white/35 mt-2">
+          no fade number — this session changed pace on purpose
+        </div>
+      ) : null}
+
+      {latest.durationMin != null && latest.durationMin > 0 && (
+        <div className="text-[11px] text-white/35 mt-1">last one {latest.durationMin} min</div>
+      )}
+    </div>
+  );
 }
 
 function EnduranceCard({ session }: { session: NamedSession }) {

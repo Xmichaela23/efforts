@@ -11,7 +11,7 @@
 // barrel here would create a load-order cycle.
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type PullupProgress, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
-import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, type RunFitness } from './run.ts';
+import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, runSessionGroup, type RunSessionGroup, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 import { computeLoadFloor } from './load-floor.ts';
 // [Step 7] The ONE list of lifts that carry a tracked max — shared with the client renderer so the
@@ -441,6 +441,8 @@ export interface StateTrendInputs {
   /** ⛔ The repeated named sessions, one per sport, already gated and joined by the caller (see
    *  `compute-snapshot`). This module carries them to the display contract and does nothing else. */
   namedSessions?: NamedSessionSeries[] | null;
+  /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
+  enduranceSpine?: EnduranceSpineSeries[] | null;
   /** ⛔ The block's expected curve per canonical lift — dated weekly points, anchored on the block's
    *  opening working number at the plan's own rate. Built by the caller; carried, never computed. */
   expectedByCanonical?: Record<string, Array<{ date: string; value: number }>> | null;
@@ -487,6 +489,8 @@ export interface StateTrendResult {
   /** ⛔ The repeated named sessions, carried through from the inputs. Empty when the block has none
    *  or nothing has been logged against them — a card with nothing to say does not render. */
   namedSessions?: NamedSessionSeries[] | null;
+  /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
+  enduranceSpine?: EnduranceSpineSeries[] | null;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -597,9 +601,41 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   //
   // ⚠️ Non-fatal — a verdict that cannot be computed must never break the snapshot, and its absence
   // simply leaves the old trend in place.
+  /**
+   * ⛔⛔ THE VERDICT IS FITTED WITHIN ONE SESSION-TYPE GROUP (2026-08-28, work order item 2).
+   *
+   * ⚠️ THE WORK ORDER NAMED THE WRONG TWO CALL SITES, AND THE CORRECTION MATTERS. It located the
+   * duration window and the steady-only exclusion at `run.ts:85` and `run.ts:110` and treated those
+   * as the live defect. They are real and they are fixed — but they feed the FALLBACK verdict. On an
+   * athlete with enough runs to fit (this one: 127) `runRoute` OVERRIDES verdict and pctChange, and
+   * **the route pool has always read every run with no duration window and no session-type gate.**
+   * So the ceiling was never what was pooling this athlete's long runs with his 27-minute ones —
+   * pooling was, right here, and no exclusion existed to remove.
+   *
+   * ⛔ SO THE GROUPING HAD TO LAND HERE OR IT WOULD HAVE CHANGED NOTHING ON THE SCREEN. That is this
+   * row's signature failure — `StatePerformanceSection` renders `efficiency.verdict`, and a fix
+   * landing anywhere else leaves it untouched.
+   *
+   * ⚠️ AND THE GROUPING IS DONE BY PARTITIONING HERE, NOT by feeding `intent` into `routeTrend`.
+   * That function's own `isComparableIntent` is a BLOCKLIST — it DELETES intervals, tempo and races.
+   * Handing it the real session type would have turned exclusion back on under a different name,
+   * which is the exact move item 2 exists to reverse. It stays inert (`intent: null` per row) and the
+   * population is decided here instead.
+   */
+  const runEffByGroup = new Map<RunSessionGroup, Array<Record<string, unknown>>>();
+  for (const r of (inp.runEffHistory ?? []) as Array<Record<string, unknown>>) {
+    const g = runSessionGroup(r?.workout_type as string | null | undefined);
+    const arr = runEffByGroup.get(g) ?? [];
+    arr.push(r);
+    runEffByGroup.set(g, arr);
+  }
+  // ⛔ THE HEADLINE IS THE EASY GROUP. "Am I getting fitter" is answered on the population the
+  // athlete repeats most and which varies least — the field's own like-for-like comparison. The
+  // other groups are fitted too and carried below; nothing is deleted, it is just not pooled.
+  const runEffHeadlineRows = runEffByGroup.get('easy') ?? [];
   let runRoute: RouteTrend | null = null;
   try {
-    const fitted = routeTrend((inp.runEffHistory ?? []) as any);
+    const fitted = routeTrend(runEffHeadlineRows as any);
     // ⛔ A POPULATION CONSTANT MAY NOT REACH A VERDICT (Michael, 2026-07-31 — Q-231).
     //
     // Under `MIN_REGRESSION_N` (8) runs the joint fit cannot run and `heat-adjust` falls back to the
@@ -652,10 +688,13 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       // ⚠️ THE RECENCY STAMP COMES FROM THE VERDICT'S POOL TOO. Left on the old trend it reported
       // "1d ago" off the polluted series while the verdict's newest run was today — a third label
       // describing a different set of runs than the number beside it.
-      newestAgeDays: runRoute && (inp.runEffHistory?.length ?? 0) > 0
+      // ⚠️ THE HEADLINE POOL, NOT ALL RUNS (2026-08-28). "How old is this reading" has to mean the
+      // newest run the VERDICT actually read; quoting the newest run of any kind would age-stamp a
+      // number that session never touched.
+      newestAgeDays: runRoute && runEffHeadlineRows.length > 0
         ? Math.max(0, Math.round(
             (Date.parse(asOf + 'T12:00:00Z')
-              - Date.parse(String((inp.runEffHistory as any[])[inp.runEffHistory!.length - 1]?.date) + 'T12:00:00Z')
+              - Date.parse(String(runEffHeadlineRows[runEffHeadlineRows.length - 1]?.date) + 'T12:00:00Z')
             ) / 86_400_000))
         : runEfficiency.trend.newestAgeDays,
       recentlyFlat: runEfficiency.trend.recentlyFlat,
@@ -681,8 +720,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       // returns 13:08 @ 135, dragged by the hill and the jog it cannot identify.
       // ⚠️ GAP twin is dropped: these paces ARE grade-adjusted, so a raw-vs-GAP toggle has nothing to
       // toggle between. Offering one would imply a distinction that no longer exists.
-      ...(runRoute && (inp.runEffHistory?.length ?? 0) > 0 ? (() => {
-        const rows = (inp.runEffHistory ?? []).slice(-5) as Array<Record<string, number>>;
+      ...(runRoute && runEffHeadlineRows.length > 0 ? (() => {
+        // ⚠️ SAME POOL AS THE VERDICT — the D-346 rule this block was written for, now applied to the
+        // GROUP as well as to the metric. A median over the last five EASY runs; a quality session
+        // can no longer drag the line that describes easy running.
+        const rows = runEffHeadlineRows.slice(-5) as Array<Record<string, number>>;
         const median = (get: (r: Record<string, number>) => number): number => {
           const xs = rows.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
           if (xs.length === 0) return 0;
@@ -717,7 +759,10 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
         // Intervals.icu's pattern, whose own framing is that a weather overlay "helps interpret a poor
         // data point when there was heat, wind or unusual conditions". ⛔ Nobody in the field corrects
         // an efficiency chart for heat, and neither do we — we annotate and let the athlete discount it.
-        series: (inp.runEffHistory ?? [])
+        // ⛔ THE CHART PLOTS THE VERDICT'S OWN GROUP. Drawing every run under a line fitted on easy
+        // runs is the same "chart and verdict on different data" failure this block already names —
+        // the other groups ride on `groups` below, where they carry their own trend.
+        series: (runEffHeadlineRows as any[])
           .map((r: any) => ({
             date: String(r?.date ?? ''),
             value: computeEfficiencyIndex(Number(r?.pace_s_per_km), Number(r?.hr)),
@@ -732,6 +777,40 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
         heatCoefPctPerF: runRoute.heatCoefPctPerF,
         spanDays: runRoute.spanDays,
       } : null,
+      /**
+       * ⛔ EVERY GROUP, INCLUDING THE ONES THAT DO NOT LEAD (2026-08-28, work order item 2).
+       *
+       * The quality sessions and the long runs used to be DELETED from this read — binned by
+       * `isSteadyAerobic` and by a 70-minute ceiling. They are now trended in their own right and
+       * carried here. **A group with too few runs to fit still appears, with a null direction and a
+       * real count** — that is the honest state, and it is how the athlete sees that their long runs
+       * are being read at all rather than silently missing.
+       *
+       * ⚠️ NEVER POOL THESE FOR A HEADLINE. Each entry is a within-group trend; averaging them would
+       * rebuild the exact confound the grouping removed.
+       */
+      groups: (['easy', 'long', 'quality'] as RunSessionGroup[]).map((g) => {
+        const rows = runEffByGroup.get(g) ?? [];
+        let fit: RouteTrend | null = null;
+        try {
+          const f = rows.length ? routeTrend(rows as any) : null;
+          fit = f && f.method !== 'linear_k' && f.method !== 'half_vs_half' ? f : null;
+        } catch { fit = null; }
+        return {
+          group: g,
+          runs: rows.length,
+          direction: fit ? fit.direction : null,
+          pctChange: fit && fit.direction !== 'still_learning' ? fit.pct : null,
+          ci: fit ? fit.ci : null,
+          series: rows
+            .map((r: any) => ({
+              date: String(r?.date ?? ''),
+              value: computeEfficiencyIndex(Number(r?.pace_s_per_km), Number(r?.hr)),
+            }))
+            .filter((pt) => !!pt.date && pt.value != null)
+            .map((pt) => ({ date: pt.date, value: pt.value as number, recent: pt.date > _verdictStart })),
+        };
+      }).filter((g) => g.runs > 0),
     },
   };
 
@@ -969,6 +1048,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     cadenceCounts: inp.cadenceCounts,
     // Carried, not computed — the caller gated and joined it. See `NamedSessionSeries`.
     namedSessions: inp.namedSessions ?? null,
+    // ⛔ THE SPINE, likewise carried. It is the PRIMARY endurance read and `namedSessions` is the
+    // overlay on top of it — see `EnduranceSpineSeries` for why that order is the whole design call.
+    enduranceSpine: inp.enduranceSpine ?? null,
   };
 }
 
@@ -1075,6 +1157,62 @@ export interface NamedSessionSeries {
   reference?: ReferenceSeries | null;
 }
 
+/**
+ * ⛔⛔ ONE SESSION ON THE ATHLETE-SCOPED SPINE (2026-08-28, work order item 3 / Q-294).
+ *
+ * ⚠️ IT IS NOT `NamedSessionPoint` AND THE DIFFERENCE IS THE WHOLE POINT: that one carries a block
+ * `week`, because it describes a PRESCRIBED session repeated inside a block. This one carries a
+ * DATE and no week — it describes a run the athlete did, which is true whether a plan exists, and
+ * which does not stop being theirs when the app rebuilds their programme.
+ */
+export interface SpineSessionPoint {
+  date: string;
+  /** Average heart rate; null when the session carried none but did carry an efficiency number. */
+  hrAvg: number | null;
+  /** The session's own measured duration. ⚠️ RECORDED, NEVER A GATE — no floor, no ceiling (item 2). */
+  durationMin: number | null;
+  /** Output per heartbeat, read AS STORED (`run_facts.efficiency_index` / `ride_facts.efficiency_factor`). */
+  efficiency: number | null;
+  /**
+   * ⛔ FADE INSIDE THE SESSION — `hr_drift_pct`. **Null when `fadeWithheld` is true**, which means the
+   * session was not a steady effort, NOT that nothing was measured. See `fadeWithheld`.
+   */
+  driftPct: number | null;
+  /**
+   * ⛔⛔ TRUE = WE HAVE A DRIFT NUMBER AND ARE DELIBERATELY NOT CALLING IT A FADE READ.
+   * A fade read requires a steady effort; a session with surges, pauses or a race-pace finish has a
+   * pace that changes BY PRESCRIPTION, so its pace-to-HR ratio falls apart by design. Reporting that
+   * as a durability failure would fail an athlete every week for following the book exactly.
+   * ⛔ THE SURFACE MUST SAY THIS OUT LOUD. Rendered as a gap it reads as missing data, and the athlete
+   * concludes the app is broken. It is a different number for a different kind of session.
+   */
+  fadeWithheld: boolean;
+  /** ⛔ True when the plan puts a key session inside 24 hours, so p107's tighter 5% line applies
+   *  rather than the standard 10%. An athlete with no plan gets `false` everywhere — correct, not missing. */
+  keySessionWithin24h: boolean;
+}
+
+/**
+ * ⛔⛔ THE ENDURANCE SPINE — every run and every ride, grouped by session type, NO PLAN REQUIRED.
+ *
+ * ⛔ THIS IS THE PRIMARY READ AND `NamedSessionSeries` IS THE OVERLAY. The build shipped them the
+ * other way round: Viada's same-session-versus-itself test became the headline, and the
+ * TrainingPeaks spine underneath it was filtered down to nothing by three plan preconditions.
+ * TrainingPeaks' test requires no plan at all; Viada's requires a repeated prescribed session, so it
+ * can only ever be the layer that APPEARS when a block exists.
+ *
+ * ⚠️ `group` is `runSessionGroup`'s — easy / long / quality — the same predicate the efficiency trend
+ * groups on, never a second rule. Rides carry the single group `all`: the bike has no equivalent
+ * session-type classifier and inventing one here would grow a second vocabulary beside the first.
+ */
+export interface EnduranceSpineSeries {
+  /** 'run' | 'ride'. */
+  sport: string;
+  /** 'easy' | 'long' | 'quality' for runs; 'all' for rides. */
+  group: string;
+  points: SpineSessionPoint[];
+}
+
 export interface StateDisplayV1 {
   cards: DisciplineCard[];
   bikeFitness: BikeFitness;
@@ -1092,6 +1230,8 @@ export interface StateDisplayV1 {
    *  logged. Absent otherwise — a card with nothing to say does not render, and there is no
    *  placeholder. */
   namedSessions?: NamedSessionSeries[] | null;
+  /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
+  enduranceSpine?: EnduranceSpineSeries[] | null;
 }
 
 export interface StateTrendsV1 {
@@ -1332,6 +1472,10 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       cadenceCounts: r.cadenceCounts,
       // Passed through verbatim — this assembly neither builds nor judges it.
       ...(r.namedSessions && r.namedSessions.length > 0 ? { namedSessions: r.namedSessions } : {}),
+      // ⛔ AND THE SPINE, likewise verbatim. ⚠️ THE NARROW POINT THIS FILE HAS BEEN BITTEN BY THREE
+      // TIMES: this map rebuilds the display object field by field, so a field resolved upstream and
+      // not named HERE reaches the client as nothing at all — no error, no warning.
+      ...(r.enduranceSpine && r.enduranceSpine.length > 0 ? { enduranceSpine: r.enduranceSpine } : {}),
     },
     strength: {
       ...disc('strength'),

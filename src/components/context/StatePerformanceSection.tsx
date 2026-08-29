@@ -1184,8 +1184,14 @@ function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; post
                     more" here — the other branch below is the one that means those things.
                     ⚠️ SEE Q-289 for the larger version of this, still open: when the noise guard
                     fires elsewhere the screen says "holding", which is a CLAIM, and nothing on the
-                    payload records that it was suppressed. */}
-                Reading {eff.route.points} runs — the change is smaller than the normal spread between them
+                    payload records that it was suppressed.
+                    ⛔ AND THE COUNT IS NOW THE EASY GROUP'S, NOT EVERY RUN (2026-08-28, item 2). The
+                    verdict is fitted within one session-type group — easy against easy — so naming a
+                    total that includes quality sessions and long runs would quote a population the
+                    number never read. That was already the fault in the old line: it said "23 runs"
+                    when 23 runs were never what fed it. ⚠️ The other groups are not lost; they carry
+                    their own trend on `efficiency.groups` and are not yet rendered. */}
+                Reading {eff.route.points} easy runs — the change is smaller than the normal spread between them
               </span>
             : <span className="text-white/60 text-[12px]">Need a few more runs — {eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read a trend</span>
         )}

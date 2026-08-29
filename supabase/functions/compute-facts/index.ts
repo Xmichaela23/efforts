@@ -1017,7 +1017,24 @@ async function updateLearnedStrengthFromExerciseLog(
  */
 function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string | null {
   const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge/i;
-  const STEADY = /easy|long|recovery|base|aerobic|steady|shakeout|conversational/i;
+  const STEADY = /easy|long|lsd|recovery|base|aerobic|steady|shakeout|conversational/i;
+  /**
+   * ⛔ THE LONG RUN IS ITS OWN WORD NOW (2026-08-28, work order item 2).
+   *
+   * It used to collapse into `easy`, which was harmless while the efficiency read applied a
+   * 70-minute ceiling — the long run never reached the metric to be mis-grouped. **The ceiling is
+   * gone** (Michael: *"it shouldn't cap at 70, that's crucial for marathon trainers"*), so the long
+   * run now trends beside 27-minute easy runs unless it is separable. `runSessionGroup` in
+   * `state-trend/run.ts` reads this word to compare long runs to other long runs.
+   *
+   * ⛔ NAME-DERIVED, NEVER DURATION-DERIVED, and the app already had this pattern: `isLongRunLike`
+   * (`session-detail/race-readiness-llm.ts`) reads the planned name for the same fact. A minutes
+   * threshold is precisely what item 2 deleted; re-adding one as a grouping key smuggles it back.
+   * ⚠️ SO IT IS FORWARD-ONLY. Rows written before today say `easy` on long runs and will group as
+   * easy until re-computed. That is a thinner long-run pool at first, never a wrong one.
+   */
+  const LONG = /long|lsd|marathon\s*prep|endurance\s*run/i;
+  const steadyWord = (text: string): string => (LONG.test(text) ? 'long' : 'easy');
 
   // 1. THE PLAN. Its own words, in the order they are most likely to name the intent.
   const planText = [
@@ -1027,7 +1044,7 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string |
   ].filter(Boolean).join(' ');
   if (planText) {
     if (NONSTEADY.test(planText)) return 'interval';
-    if (STEADY.test(planText)) return 'easy';
+    if (STEADY.test(planText)) return steadyWord(planText);
   }
 
   // 2. THE FILE, when nothing is attached. A structured session with real work intervals is not
@@ -1039,7 +1056,7 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string |
   // 3. The athlete's own name for it, last — it is free text and often just "Morning Run".
   const own = String((w as any)?.name ?? '');
   if (NONSTEADY.test(own)) return 'interval';
-  if (STEADY.test(own)) return 'easy';
+  if (STEADY.test(own)) return steadyWord(own);
 
   return null;
 }

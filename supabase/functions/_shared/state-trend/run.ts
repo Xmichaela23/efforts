@@ -70,19 +70,65 @@ export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerW
 const MIN_EFF_INDEX = 0.5;
 const MAX_EFF_INDEX = 5;
 
-/** SOURCE ADAPTER: run efficiency on steady aerobic runs in a comparable-DURATION band (30–70 min).
+/**
+ * ⛔⛔ SESSION-TYPE GROUPS — THE MECHANISM THAT REPLACED EXCLUSION (2026-08-28, work order item 2).
+ *
+ * TrainingPeaks computes Efficiency Factor on EVERY session carrying pace and HR, and makes the
+ * comparison like-for-like BY SESSION TYPE — easy against easy, quality against quality. It does not
+ * delete two of every three runs to keep a pool clean. This app did: `isSteadyAerobic` binned
+ * anything named interval/tempo/fartlek/threshold/vo2/speed/track/race/surge, and a 30–70 minute
+ * window binned the rest. **Both are gone. Nothing is dropped for what kind of session it was — it
+ * is placed in a group and compared inside it.**
+ *
+ * ⛔ THREE GROUPS, AND THE THIRD ONE IS THE MARATHON FIX. `quality` and `easy` answer the "fast
+ * sessions are grouped, not deleted" rule. `long` answers the OTHER half of the same ruling: *"a
+ * long run drifts more, so it is not comparable to a 40-minute run"* is TRUE, and it is a reason to
+ * compare long runs TO OTHER LONG RUNS — never a reason to delete them, which is what the 70-minute
+ * ceiling did. **One mechanism, both populations. Do not build a second.**
+ *
+ * ⛔ DERIVED FROM THE SESSION, NOT FROM ITS DURATION. `long` comes from the classifier's own word
+ * (`compute-facts.classifyRunIntent` now separates it), never from a minutes threshold — a duration
+ * cutoff is the thing this whole item removed, and re-adding one as a grouping key would smuggle it
+ * back. ⚠️ An unclassified run groups as `easy`: it is the blocklist philosophy this codebase
+ * already uses for run intent (`isComparableIntent`), and the alternative — a fourth "unknown"
+ * group — splits a mostly-unlabelled history into pools too thin to trend.
+ */
+export type RunSessionGroup = 'easy' | 'long' | 'quality';
+export function runSessionGroup(workoutType?: string | null): RunSessionGroup {
+  const wt = String(workoutType || '').toLowerCase().trim();
+  // ⛔ UNKNOWN GROUPS AS EASY, AND IT MUST BE TESTED BEFORE `isSteadyAerobic`. That predicate answers
+  // a DIFFERENT question — "may this run carry a durability number?" — and it returns false on an
+  // empty type, which is right there (no evidence of steadiness) and wrong here (it would file every
+  // unclassified run as a quality session). ⚠️ The same word, two questions: see `isSteadyAerobic`.
+  if (wt.length === 0) return 'easy';
+  if (!isSteadyAerobic(wt)) return 'quality';
+  if (wt.includes('long') || wt.includes('lsd')) return 'long';
+  return 'easy';
+}
+
+/** SOURCE ADAPTER: run efficiency, WITHIN ONE SESSION-TYPE GROUP.
  * GRADE-ADJUSTED (2026-07-21): reads `gap_efficiency_index` (GAP-pace ÷ HR — terrain-honest, the
  * "faster at the same heart rate" number) and falls back to the raw `efficiency_index` only where GAP
  * is absent (flat / treadmill runs, where raw pace IS the grade-adjusted pace). So a hilly run no
  * longer reads as false decline. This is the run row's LEAD now — decoupling becomes the secondary
- * durability read. The duration band blunts the whole-run distance confound. */
+ * durability read.
+ *
+ * ⛔ NO DURATION WINDOW (2026-08-28). The 30–70 minute band is GONE at both ends and neither end
+ * comes back — Q-295 is closed. The floor dropped two of every three of this athlete's runs (his
+ * week is two 27-minute runs and one 63-minute session) and TrainingPeaks applies none. The ceiling
+ * deleted the sessions with the most signal and, for a marathon athlete, the only session that
+ * matters. ⚠️ The DURABILITY row beside this one has always run with a floor and NO ceiling, so the
+ * two numbers on that screen were reading two different populations of runs.
+ *
+ * ⚠️ `group` selects WHICH pool, defaulting to `easy` — the headline "am I getting fitter" read.
+ * Pass a different group to trend that population; never pool two groups into one series. */
 export function efficiencyIndexToSeries(
   rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; gap_efficiency_index?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
+  group: RunSessionGroup = 'easy',
 ): TrendPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows
-    .filter((r) => isSteadyAerobic(r.workout_type))
-    .filter((r) => typeof r.duration_minutes === 'number' && r.duration_minutes >= 30 && r.duration_minutes <= 70)
+    .filter((r) => runSessionGroup(r.workout_type) === group)
     .map((r) => ({ date: r.date ?? r.metric_date ?? '', value: Number(r.gap_efficiency_index ?? r.efficiency_index) }))
     .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_EFF_INDEX && p.value <= MAX_EFF_INDEX);
 }
@@ -103,11 +149,15 @@ export function recentEfficiencyPaceHr(
   asOf: string,
   windowDays = 42,
   endpointN = 2,
+  group: RunSessionGroup = 'easy',
 ): EffPaceHr {
   const start = new Date(new Date(asOf + 'T12:00:00Z').getTime() - windowDays * 86_400_000).toISOString().slice(0, 10);
   const pts = (Array.isArray(rows) ? rows : [])
-    .filter((r) => isSteadyAerobic(r.workout_type))
-    .filter((r) => typeof r.duration_minutes === 'number' && r.duration_minutes >= 30 && r.duration_minutes <= 70)
+    // ⛔ GROUPED, NOT FILTERED, AND NO DURATION WINDOW (2026-08-28) — see `efficiencyIndexToSeries`.
+    // This line is the RECEIPT under the verdict, so it must read the SAME pool the verdict read;
+    // when they diverged, the row printed "pace ~13:32/mi at 140 bpm" under a verdict cleaned of
+    // exactly the session that produced 140. One pool, or the clean number vouches for a dirty one.
+    .filter((r) => runSessionGroup(r.workout_type) === group)
     .map((r) => ({
       date: r.date ?? r.metric_date ?? '',
       idxRaw: Number(r.efficiency_index ?? r.gap_efficiency_index), // RAW = what the watch showed (GAP only as fallback)
@@ -357,6 +407,21 @@ export interface RunFitness {
        *  `tempF` rides along so conditions are SHOWN beside the reading as well as fitted. */
       series?: Array<{ date: string; value: number; tempF: number | null; recent: boolean }>;
     } | null;
+    /**
+     * ⛔ ONE ENTRY PER SESSION-TYPE GROUP (2026-08-28, work order item 2) — easy, long, quality.
+     * Efficiency Factor is computed on EVERY run and compared LIKE FOR LIKE, which is the field
+     * standard; the old build deleted two of every three runs instead. `direction` is null when the
+     * group has too few runs to fit — a real count with no claim, never a hidden group.
+     * ⚠️ THE HEADLINE (`verdict` / `pctChange` above) IS THE `easy` GROUP. Do not average these.
+     */
+    groups?: Array<{
+      group: RunSessionGroup;
+      runs: number;
+      direction: string | null;
+      pctChange: number | null;
+      ci: [number, number] | null;
+      series: Array<{ date: string; value: number; recent: boolean }>;
+    }>;
     /** 12-WEEK CHART series — the "long view" (Michael 2026-07-22). Same efficiency points the verdict
      *  reads, over a WIDER 84d window (verdict is 42d), so the chart's recent tail IS the verdict's data —
      *  they can't contradict. `recent` = inside the 42d verdict window (client brightens it). Fills as the

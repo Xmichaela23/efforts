@@ -1505,11 +1505,18 @@ export default function StateTab({
       {(() => {
         const meHistory = (wsv as { me_history_v1?: React.ComponentProps<typeof StrengthReadCards>['meHistory'] }).me_history_v1;
         const namedSessions = (wsv.trends?.display as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | undefined)?.namedSessions ?? null;
+        // ⛔ THE ATHLETE-SCOPED SPINE (2026-08-28, item 3 / Q-294). Every run and ride, grouped by
+        // session type, NO PLAN REQUIRED — the primary endurance read. `namedSessions` above is the
+        // overlay that appears when a block exists, and it is drawn after this.
+        const enduranceSpine = (wsv.trends?.display as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | undefined)?.enduranceSpine ?? null;
         // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
         // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
         // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
         // section on the lift half would hide it for the block's whole first week.
-        if (!meHistory && !(namedSessions && namedSessions.length > 0)) return null;
+        // ⛔ ANY OF THE THREE IS ENOUGH. The spine was added to this test on 2026-08-28: an athlete
+        // with no block at all still has runs, and gating the section on a plan-linked series is the
+        // exact precondition item 3 removed.
+        if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0)) return null;
         const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
         const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
         for (const l of (rm?.strength?.per_lift ?? []) as Array<{ canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
@@ -1538,7 +1545,7 @@ export default function StateTab({
                   cards: week 1 of every block is the two strength tests, so a week where the runs
                   and rides are logged and no heavy session is yet shows these alone, which is the
                   honest state. */}
-              <EnduranceReadCards sessions={namedSessions} />
+              <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} />
             </div>
           </>
         );

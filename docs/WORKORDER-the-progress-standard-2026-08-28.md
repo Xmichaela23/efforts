@@ -230,6 +230,39 @@ not a loosening of it.
 
 ---
 
+## ⛔ RULED OUT PERMANENTLY — SLEEP / ENERGY / SORENESS (Michael, 2026-08-28)
+
+*"I don't wanna fuck with the sleep stuff because I can't get reliable data based on the accessible
+dev APIs and no one will log that shit."*
+
+⛔ **THIS IS A PRODUCT RULING, NOT A DEFERRAL. Do not propose a subjective-wellness input, a
+readiness score built on one, or a manual soreness/energy prompt again.** Two independent reasons,
+either sufficient:
+1. **The data is not obtainable.** The accessible consumer dev APIs do not return sleep reliably
+   enough to compute anything on.
+2. **Self-report will not be logged.** Compliance on manual wellness entry is poor in every product
+   that has shipped it, and a metric nobody fills in is worse than an absent one — it renders as a
+   number rather than as a gap.
+
+⛔⛔ **WHICH ROW — TRACED 2026-08-28 AFTER GETTING IT WRONG ONCE. THERE ARE TWO, AND ONLY ONE GOES.**
+
+| Row | What it is | Ruling |
+|---|---|---|
+| **BODY** | Effort rating + soreness, written by the **post-workout tap** (`PostWorkoutFeedback.tsx`, D-234/D-235, Hooper 1–7). Live and populated — Michael's screen reads *"5.1 of 10 avg vs 4.5 typical · Soreness 1.0 of 7 · logged on 7 sessions."* | ⛔ **STAYS. Do not touch it.** |
+| **READINESS** | energy / soreness / sleep as three chips off a **standalone daily check-in** (`StateTab.tsx:1688`, Q-049 Phase 1, D-144). Renders only when a check-in exists. **Michael has never done one, so it does not render at all.** | ⛔ **THIS is the one that comes off.** |
+
+⚠️ **THE EARLIER FRAMING WAS TOO BROAD** and would have deleted a working input. The post-workout
+soreness tap is a subjective input Michael DOES use; the ruling kills the **standalone check-in**,
+not self-report as a category.
+
+⚠️ **AND `WORKORDER-the-strength-read-2026-08-28.md` item 4's *"nothing under `src/` writes it"* is
+about READINESS**, not BODY. Read it that way or you will remove the wrong row.
+
+⚠️ **THIS DOES NOT TOUCH MEASURED RECOVERY INPUTS** — heart rate, drift, and the load reconciler are
+unaffected.
+
+---
+
 # ⛔ RULES FOR THIS BUILD
 
 1. **Derive from the source and the field FIRST, then trace what exists.** `trace-before-build`
@@ -345,3 +378,134 @@ there. Read Item 5 before acting on this finding. **Not built, and not to be bui
 
 ⚠️ **ONE THING IN THE TREE THAT IS NOT MINE:** `docs/OPEN-QUESTIONS-2.md` carries 34 uncommitted
 added lines from before this session. Left alone. Whoever commits Item 1 should not sweep it in.
+
+---
+
+## ITEMS 2 AND 3 — DONE IN THE WORKING TREE. NOT PUSHED, NOT DEPLOYED, NOT VERIFIED.
+
+**Terminal session 2026-08-28. Items 2 and 3 only. Items 4 and 5 untouched, as instructed.**
+
+### ⛔⛔ FIRST — THIS SPEC NAMED THE WRONG CALL SITES, AND THE CORRECTION IS THE FINDING
+
+Item 2 locates the defect at `run.ts:85` and `run.ts:110` and calls them *"exactly two call sites."*
+They are real and they are fixed. **They are not what was on Michael's screen.**
+
+`efficiencyIndexToSeries` and `recentEfficiencyPaceHr` feed the **FALLBACK** verdict. On any athlete
+with enough runs to fit a regression — this one has 127 — `runRoute` **OVERRIDES** verdict and
+pctChange (D-346, `assemble.ts`), and **the route pool has always read every run: no duration window,
+no session-type gate, `intent: null` on every row so its own blocklist never fired.**
+
+⛔ **SO THE POOLING WAS NEVER THE CEILING. It was the route fit, and there was no exclusion there to
+remove — only an absence of grouping.** Fixing only the two named functions would have changed
+nothing the athlete sees. Measured, on a fixture of 12 improving easy runs plus 10 hard sessions:
+
+```
+POOLED (what shipped) : direction still_learning · pct −0.7 · ci [−7.8, +6.4] · 22 points
+GROUPED (now)         : direction improving      · pct +6.9 · ci [+6.6, +7.2] · 12 points
+```
+
+⚠️ **That is the "23 runs cannot call a direction" complaint, reproduced in a fixture.** It was never
+only a sample-size problem — pooling hard sessions into an easy-run regression widened the interval
+until it straddled zero.
+
+### ⛔ AND A SECOND STARVED READER, FOUND ON THE WAY
+
+There are **two** `workout_type` fields on a run and the spine was joining the poor one.
+
+- `workout_analysis.heart_rate_summary.workoutType` — collapses everything to **three words**
+  (`intervals`, `hill_repeats`, `steady_state`) via `mapClassifiedTypeToHrWorkoutType`. A tempo, a
+  threshold run, a race and a two-hour long run **all read `steady_state`.**
+- `run_facts.workout_type` — `classifyRunIntent`'s, written off the attached plan since 2026-07-30.
+
+⛔ **The second has never reached a reader.** It was written to fix the steady gate and the join was
+never moved — which is why the comments around that row say the field *"reads `steady_state` on every
+run ever logged."* **The classifier was not missing. It was starved**, and item 2's grouping would
+have had nothing to group on. `compute-snapshot` now prefers it and falls back to the analyser's.
+
+⚠️ **Consequence for item 2's own premise:** `isSteadyAerobic` was binning far less than the spec
+says. Tempo, threshold and race runs read `steady_state`, so they were never excluded — only
+intervals and hills were. The exclusion was real but smaller than stated.
+
+### WHAT CHANGED
+
+**Item 2 — run efficiency reads every run.**
+1. `run.ts` — the 30–70 minute window is **gone from both functions, at both ends.** Q-295 closed.
+2. `run.ts` — new `runSessionGroup()`: **easy / long / quality.** Exclusion replaced with grouping;
+   both functions take a group, defaulting to `easy`. **The `long` group is the marathon fix** and it
+   is the SAME mechanism, not a second one — *"a long run drifts more"* is true and is a reason to
+   compare long runs to long runs.
+   ⛔ **Derived from the session's own word, never from a minutes threshold.** A duration cutoff is
+   what this item deleted; re-adding one as a grouping key smuggles it back. Precedent already in the
+   app: `isLongRunLike` (`session-detail/race-readiness-llm.ts`) reads the name, not the clock.
+3. `compute-facts.classifyRunIntent` — now emits `long` as its own word (it collapsed into `easy`,
+   harmless only while the ceiling meant long runs never reached the metric). `lsd` added to the
+   steady vocabulary. The mirror classifier in `run-intent.test.ts` moved with it, as its own header
+   demands.
+4. `assemble.ts` — **the route fit is partitioned by group and the headline is the EASY group.**
+   Every other reader of that pool moved with it (the age stamp, the median-of-5 pace receipt, the
+   chart), because chart-and-verdict-on-different-data is this row's signature failure.
+   ⚠️ **Grouping is done by partitioning at the caller, NOT by feeding `intent` into `routeTrend`** —
+   that function's `isComparableIntent` is a **blocklist that deletes** intervals, tempo and races.
+   Handing it the real session type would have switched exclusion back on under a new name.
+5. `runFitness.efficiency.groups` — every group carried with its own count, direction and series. **A
+   group too thin to fit still appears, with a real count and a null direction.** Nothing is deleted.
+6. Copy: the row now reads *"Reading N **easy** runs"*. The count is the headline group's, which is
+   the honest recount this item asked for.
+
+**Item 3 — the endurance read renders without a plan.**
+7. `compute-snapshot` — the facts map and the key-session set are **hoisted out of the `weekByDate`
+   branch.** A block week map was a precondition for reading a heart rate.
+8. New `enduranceSpine`: **every completed run and ride, grouped by session type, dates not block
+   weeks, no `planned_id`, no family tag, no week map.** ⛔ No day-of-week + duration fallback, as
+   ruled. `namedSessions` is untouched and becomes the overlay.
+9. `StrengthReadCards.tsx` / `StateTab.tsx` — the spine **renders, and renders first.** The section's
+   visibility test no longer requires a plan-linked series.
+10. `COACH_PAYLOAD_VERSION` 173 → 174. Added fields, so a cached row simply lacks them.
+
+**The fade rule, as ruled — decided on what the session WAS.**
+11. A spine point carries `fadeWithheld`. `decoupling_mixed_effort` is the **switch**: a session that
+    was not steady gets **no fade figure**, and still feeds the efficiency trend. ⚠️ Not a second
+    steadiness test and not a contradiction of D-283 — that says don't delete a steady run for being
+    low-confidence; this says don't print a fade number for a session that wasn't steady.
+    ⛔ **The card SAYS SO** — *"no fade number — this session changed pace on purpose."* Rendered as a
+    blank it reads as broken data and the athlete concludes the app lost their run.
+
+### VERIFIED BY FIXTURE, NOT ON A DEVICE
+
+- **`_shared` suite whole: 2354 passed, 0 failed.**
+- New permanent regressions in `run-grouping-spine.test.ts`, asserted **through `assembleStateTrends`
+  and `toStateTrendsV1`, not through helpers** — the display map has silently dropped an upstream
+  field three times in this file. It caught one on the way: the spine reached `display`, and my first
+  assertion read `v1.run`.
+- The three fixtures that pinned the removed gates were **rewritten, not deleted**, so the reversal
+  stays visible.
+- Client `npm run build` passes. ESLint on the three touched components: **31 problems before this
+  change and 31 after** — none added.
+- ⚠️ `deno check` on `compute-snapshot` reports 3 errors, **all pre-existing** (`bike.lead`, the
+  `GenericStringError` cast at :375, `newestRideAgeDays` at :817). None in this diff.
+
+### ⚠️ WHAT IS NOT DONE, AND WHERE IT IS THIN
+
+1. ⛔ **`efficiency.groups` is emitted and NOT rendered.** The long-run and quality trends reach the
+   payload; only the easy headline and the spine cards are drawn. Deliberate — the run row's layout
+   was not in scope — **but do not report the long-run trend as visible.**
+2. ⛔ **The `long` word is FORWARD-ONLY.** Rows written before today say `easy` on long runs, so the
+   long group fills as sessions are re-computed. Thin at first, never wrong.
+3. **Rides get one group (`all`).** The bike has no session-type classifier and inventing one here
+   would grow the second vocabulary this codebase keeps growing. Named, not solved.
+4. **The unclassified run groups as `easy`** (blocklist philosophy, matching `isComparableIntent`).
+   The alternative — an "unknown" fourth group — splits a mostly-unlabelled history into pools too
+   thin to trend. Stated because it is a judgement call, not a derivation.
+5. **Q-290 is untouched**, so the run still has no reference series. Item 2 point 5 stays blocked.
+6. **The two 5% figures are still not reconciled on one screen.** The spine card states p107's line
+   beside drift, same as the overlay; Friel's durability band lives on the run row above. They do not
+   currently appear together, so nothing states both as one thing — **but this was not solved, only
+   not-yet-broken.**
+
+### STATE, THE THREE WAYS
+
+| | |
+|---|---|
+| **PUSHED** | ⛔ **NO.** Working tree only. `origin/main == 40e371c3` (item 1), unchanged. |
+| **DEPLOYED** | ⛔ **NO.** ⚠️ `_shared/state-trend/run.ts` and `assemble.ts` are SHARED — the deploy trap. Touched functions plus every importer of the changed shared files must go together, and the client is a Netlify build, separate again. |
+| **VERIFIED** | ⛔ **NO.** No human has seen a spine card render. |
