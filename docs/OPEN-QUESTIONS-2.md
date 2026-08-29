@@ -1133,6 +1133,13 @@ nothing about plans — `fitness_baselines` FTP history (keyed on user/disciplin
 IDENTIFICATION is plan-locked.** The "same session repeated" row does not disappear athlete-scoped;
 its qualifier changes from *this Wednesday session week to week* to *your steady aerobic work*.
 
+⛔⛔ **AND THE FIELD AGREES WITH THE REFINEMENT, WHICH WE DID NOT KNOW WHEN WE CHOSE IT
+(2026-08-28, researched).** TrainingPeaks' own method for tracking efficiency over time is **a
+repeated benchmark session** — a steady zone-two effort of consistent duration, ideally on a familiar
+course, repeated eight weeks later and compared. So *"the same session repeated"* is the field's
+recommendation as well as Viada's, not a quirk of one book. See [[Q-295]]. **The refinement is the
+field-standard read; the athlete-scoped spine is what makes it available when no plan exists.**
+
 ⛔ **RECOMMENDATION: REFINEMENT, NOT REMOVAL.** Athlete-scoped series as the card's spine; the
 family-tag join (`namedSessions`, ~40 lines in `compute-snapshot`, already isolated) kept as an
 optional sharper overlay where a plan happens to exist. Where a plan DOES exist the repeated-session
@@ -1180,9 +1187,40 @@ stated reason (`run.ts:77`) is *"The duration band blunts the whole-run distance
 **that reason is real at the top end and false at the bottom.** A two-hour run drifts more, so its
 average HR is higher at the same pace and it reads as less efficient purely for being long. A
 27-minute run has LESS drift, not more, so the floor was never serving the stated purpose.
-⛔ **DO NOT REMOVE THE CEILING SILENTLY AS PART OF "match TrainingPeaks."** Three options, and it
-needs its own answer: widen it, keep it, or **compare long runs against other long runs** rather than
-discarding them. ⚠️ Establish what TrainingPeaks actually does at the top end before choosing.
+⛔ **DO NOT REMOVE THE CEILING SILENTLY AS PART OF "match TrainingPeaks."** It needs its own answer.
+
+### ⛔ THE CEILING — RESEARCHED 2026-08-28, RECOMMENDED NOT RULED (Michael has not seen it)
+
+**a) TrainingPeaks' own method for tracking efficiency over time IS a repeated benchmark session.**
+Their guidance: run a steady zone-two effort of **consistent duration**, ideally on a familiar
+course, and repeat the same workout eight weeks later to compare.
+⚠️ So the duration band's INTENT is field-standard — comparing like with like is the method, not our
+invention. **What is ours is implementing it as a hard 30-70 window applied to every run, rather than
+as comparison groups.**
+⛔ **AND IT RETROACTIVELY DEFENDS THE PLAN-SCOPED CARD.** "The same session repeated" is
+TrainingPeaks' recommendation as well as Viada's — not a quirk of one book. See [[Q-294]]: it
+strengthens keeping the family-tag read as a refinement rather than removing it.
+
+**b) THE LONG RUN IS WHERE THE MARATHON-RELEVANT NUMBER LIVES, AND IT IS FADE, NOT EFFICIENCY.** The
+field standard for a marathoner is decoupling over the target duration: **≤5% is the target, 10% at
+marathon pace is a red flag on pacing.** That number only means anything on a long effort.
+⛔ **SO THE 70-MINUTE CEILING CUTS OUT THE SINGLE MOST USEFUL SESSION A MARATHON ATHLETE DOES.** The
+long run is the durability test, and it is excluded.
+
+**c) RECOMMENDED SHAPE: the long run is not excluded — it is its OWN comparison group, read on FADE
+rather than on efficiency.** That satisfies the band's real purpose (never compare a 27-minute run's
+efficiency against a two-hour run's) without discarding the session that matters most to the athlete
+this app is for.
+⚠️ **RECOMMENDED, NOT RULED. Michael has not seen it and it is his.**
+
+Sources: TrainingPeaks' *"Efficiency Factor and Decoupling"* guide and their help-centre article on
+Pa:Hr; Uphill Athlete's durability piece.
+
+⛔⛔ **AND THE THING THAT STOPS A SECOND METRIC BEING BUILT:** the fade number **already exists per
+session for both sports** (`hr_drift_pct`, `compute-facts:1094` / `:1248`) and is already on the
+endurance cards deployed 2026-08-28 — but only against p107's 10% / 5%. **The marathon read is the
+SAME NUMBER against a DIFFERENT LINE.** Same measurement, two sources, two purposes. ⚠️ Do not build a
+second drift metric; add a second line to the one that exists.
 
 ⚠️ **AND TELL HIM WHAT DROPPING THE FLOOR DOES BEFORE IT LANDS.** Admitting every short run changes
 what the row has been saying: the series gets longer and **the verdict may move.** He should be told
