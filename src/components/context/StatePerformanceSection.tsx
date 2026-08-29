@@ -180,8 +180,18 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
   if (planWeek == null) return null;
   const weeks = block?.block_weeks ?? null;
   const where = weeks != null && weeks > 0 ? `week ${planWeek} of ${weeks}` : `week ${planWeek}`;
-  const word = block?.phase_word ?? null;
-  return word ? `${where} · ${word}` : where;
+  /**
+   * ⛔ THE PHASE WORD IS STRIPPED (2026-08-29, Michael: *"wendler is a ghost in the machine"* →
+   * *"remove it"*). `phase_word` resolves from `PHASE_NAME` in `strength-primary-plan.ts`, whose
+   * vocabulary is Wendler's block shape — Leader, Anchor, TM Test, Deload. None of those words is
+   * Viada's, and the screen was printing them as though they described the athlete's programme.
+   * ⚠️ THE POSITION SURVIVES: "week 1 of 12" is a fact about where the athlete is and belongs to no
+   * author. Only the phase name comes off.
+   * ⚠️ THIS IS DISPLAY ONLY. The block still RUNS on that shape — stages 2-5 of
+   * `docs/WORKORDER-viada-owns-the-engine-2026-08-29.md`. Removing the word does not remove the
+   * programme, and nothing here should be read as though it had.
+   */
+  return where;
 }
 
 // ── THE AEROBIC READ'S OWN WORDS (2026-08-01) ───────────────────────────────────────────────────

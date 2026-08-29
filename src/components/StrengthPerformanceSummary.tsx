@@ -280,7 +280,13 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     if (week == null) return null;
     const weeks = block.block_weeks ?? null;
     const where = weeks != null && weeks > 0 ? `week ${week} of ${weeks}` : `week ${week}`;
-    return block.phase_word ? `${where} · ${block.phase_word}` : where;
+    /**
+     * ⛔ THE PHASE WORD IS STRIPPED HERE TOO (2026-08-29) — same removal as the State row, same
+     * reason: `PHASE_NAME`'s vocabulary is Wendler's block shape (Leader, Anchor, TM Test, Deload),
+     * and none of those words is Viada's. "week 1 of 12" is a position and stays.
+     * ⚠️ DISPLAY ONLY — the block still runs on that shape. See the work order.
+     */
+    return where;
   })();
   const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
   // D-095: per-exercise prior-session lookup populated by workout-detail.
