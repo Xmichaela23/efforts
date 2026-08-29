@@ -825,8 +825,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
    * ⛔⛔ NO DIFFERENCE THRESHOLD, AND THE FIRST CUT HAD ONE (struck 2026-08-29, Michael: *"you
    * created this weird governor… they all show it even if it's just a fucking one percent grade"*).
    * It withheld the row until raw and adjusted differed by 5s/mi — a number nobody's page supports,
-   * deciding whether the athlete gets told anything at all. He is right: a run either has the figure
-   * or it does not. If it has it, it prints, and a run where the two match says exactly that.
+   * deciding whether the athlete gets told anything at all. Strava shows GAP on every split and on
+   * flat ground it simply equals pace.
+   * ⛔ AND NO SENTENCE EXPLAINING THE GAP BETWEEN THEM (struck 2026-08-29). It read *"— the hills
+   * cost you 28s/mi"*. Checked: Strava, Garmin and TrainingPeaks all print the two numbers and stop;
+   * the explaining framing appears only in articles and calculators. The subtraction is on the row.
    * ⛔ RUN ONLY. Grade adjustment is a running construct; a ride's answer is power.
    */
   if (type === 'run') {
@@ -834,17 +837,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     const gapPace = fin(completedTotals.avg_gap_s_per_mi);
     if (rawPace != null && gapPace != null && rawPace > 0 && gapPace > 0) {
       const fmt = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}/mi`;
-      const delta = Math.round(rawPace - gapPace);
       // ⛔ BOTH NUMBERS, AND THE RAW ONE IS NAMED. The table above prints raw pace per segment; a
       // lone adjusted figure here would read as a correction to it rather than a second view of it.
-      // ⚠️ The tail is a FACT about the terrain, and it is only appended when there IS one — on a
-      // flat run the two numbers standing side by side is the whole statement.
-      const tail = delta >= 1 ? ` — the hills cost you ${delta}s/mi`
-        : delta <= -1 ? ` — the descents gave you ${Math.abs(delta)}s/mi`
-        : '';
       analysisDetailRows.push({
         label: 'Grade-adjusted pace',
-        value: `${fmt(gapPace)} · raw ${fmt(rawPace)}${tail}`,
+        value: `${fmt(gapPace)} · raw ${fmt(rawPace)}`,
       });
     }
   }
