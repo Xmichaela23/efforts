@@ -3035,6 +3035,16 @@ Deno.serve(async (req: Request) => {
                 }
                 return Object.keys(out).length > 0 ? { endurance_experience: out } : {};
               })(),
+              /**
+               * ⛔⛔ WHICH FOCUS THE ATHLETE PICKED, AND THEREFORE WHICH FRAME (2026-08-30). Same hop,
+               * same failure mode as `endurance_experience` directly above: `generate-strength-plan`
+               * reads this off its own BODY, so a hop that drops it hands `resolveFrame` nothing —
+               * and nothing is the 5K frame. An athlete who picked Standard Focus would silently be
+               * built a different Viada programme.
+               * ⚠️ ALLOWLISTED TO THE TWO KNOWN VALUES. Anything else is dropped rather than passed
+               * through, so a stale or malformed client cannot name a frame that does not exist.
+               */
+              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' ? { focus: gsTp.focus } : {}),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {
                 const raw = (gsTp as Record<string, unknown>).endurance_slot_archetypes;

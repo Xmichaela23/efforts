@@ -98,11 +98,21 @@ Deno.test('⛔⛔ THE AUTO-ASSIGN READS THE CONSTANT, NEVER A SPELLED-OUT SET OF
    * never picked. It was narrowed to the required two on 2026-08-26, and the same evening p119 made
    * all four required.
    *
-   * ⛔ READING `REQUIRED_SLOT_KEYS` IS WHAT MADE THAT LAST CHANGE FREE. A spelled-out list here is
-   * a second owner of the frame's membership, and it is how this went stale the first time.
+   * ⛔ READING THE FRAME IS WHAT MADE THAT LAST CHANGE FREE. A spelled-out list here is a second
+   * owner of the frame's membership, and it is how this went stale the first time.
+   *
+   * ⛔⛔ IT READS `frameSlots` DIRECTLY NOW, NOT `REQUIRED_SLOT_KEYS` (2026-08-30), and that is a
+   * STRENGTHENING of this assertion rather than a relaxation of it. Two frames exist; the constant
+   * is `strength_5k`'s membership, so a five-slot week auto-assigned only its first four and left
+   * the fifth blank. The effect asks the CURRENT frame instead.
+   * ⚠️ AND IT SKIPS A SLOT THE FRAME PRESCRIBES AS A RIDE when the athlete's single sport is running
+   * — there is no ride-to-run conversion, so filling it with `run` would claim an answer the engine
+   * would ignore. The assertion below still forbids a spelled-out list, which is the real rule.
    */
-  assert(/for \(const k of REQUIRED_SLOT_KEYS\) slots\[k\] = only;/.test(WIZARD),
-    'the auto-assign no longer fills exactly the required slots');
+  assert(/for \(const k of fillable\) slots\[k\] = only;/.test(WIZARD),
+    'the auto-assign no longer fills exactly the frame\'s own slots');
+  assert(/frameSlots\(wizardFrame\)/.test(WIZARD),
+    'the auto-assign no longer derives its slots from the frame');
   assertEquals(/const slots = \{ hard1: only, hard2: only/.test(WIZARD), false,
     'the auto-assign names its slots again instead of reading the frame');
 });

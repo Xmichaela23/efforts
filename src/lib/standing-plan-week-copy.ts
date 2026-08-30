@@ -723,20 +723,21 @@ export function hardSlotKeysFor(
  * ⛔⛔ CONTINUE WAITS ON ALL FOUR AGAIN (Michael, 2026-08-26 evening), which is what it did before
  * the hard slots became opt-in on 2026-08-25. A week with an unanswered slot is not a week.
  */
-export function allSlotsChosen(slots: SlotSelection): boolean {
-  return REQUIRED_SLOT_KEYS.every((k) => slots[k] === 'run' || slots[k] === 'ride');
+export function allSlotsChosen(slots: SlotSelection, frame: FrameId = 'strength_5k'): boolean {
+  // ⚠️ THE FRAME'S OWN ROWS — a five-slot week is not finished when its first four are answered.
+  return slotKeysFor(frame).every((k) => slots[k] === 'run' || slots[k] === 'ride');
 }
 
 /** The rows still waiting, in screen order — for the line above a disabled Continue. */
-export function unansweredSlots(slots: SlotSelection): SlotKey[] {
-  return REQUIRED_SLOT_KEYS.filter((k) => slots[k] !== 'run' && slots[k] !== 'ride');
+export function unansweredSlots(slots: SlotSelection, frame: FrameId = 'strength_5k'): SlotKey[] {
+  return slotKeysFor(frame).filter((k) => slots[k] !== 'run' && slots[k] !== 'ride');
 }
 
 /**
  * ⛔ WHAT THE SCREEN SAYS WHILE IT IS STILL BEING ANSWERED. Fact-first, no imperative — it names
  * what is missing and nothing else.
  */
-export function unansweredLine(slots: SlotSelection): string | null {
+export function unansweredLine(slots: SlotSelection, frame: FrameId = 'strength_5k'): string | null {
   /**
    * ⛔⛔ NAMED IN THE ORDER THE ATHLETE IS LOOKING AT (Michael, off the deployed screen, 2026-08-27).
    * It read *"hard session 1, hard session 2, easy session and long session have no sport yet"* under
@@ -753,8 +754,9 @@ export function unansweredLine(slots: SlotSelection): string | null {
    * key has a position. `?? 0` is the dead-guard shape this file keeps deleting, hence `indexOf`
    * straight through.
    */
-  const left = [...unansweredSlots(slots)]
-    .sort((a, b) => REQUIRED_SLOT_DISPLAY_ORDER.indexOf(a) - REQUIRED_SLOT_DISPLAY_ORDER.indexOf(b));
+  const drawn = displayOrderFor(frame);
+  const left = [...unansweredSlots(slots, frame)]
+    .sort((a, b) => drawn.indexOf(a) - drawn.indexOf(b));
   if (left.length === 0) return null;
   const names = left.map((k) => SLOT_LABEL[k].toLowerCase());
   const named = names.length === 1

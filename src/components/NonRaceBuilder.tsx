@@ -13,6 +13,9 @@ import {
   allSlotsChosen,
   REQUIRED_SLOT_KEYS,
   emptySlotSports,
+  slotKeysFor,
+  hardSlotKeysFor,
+  frameSlots,
   unansweredLine,
   type SlotKey,
   type SlotSelection,
@@ -38,6 +41,7 @@ import {
   experienceLevels,
   type EnduranceExperience,
   type ExperienceTier,
+  type FrameId,
 } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
@@ -301,10 +305,12 @@ const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, buil
  * `non-race-goal-seeds.ts` and still work for goals already built on them — pointing a card at one
  * would open exactly the unfinished flow the July rule exists to keep shut.
  */
-type TrainCardId = 'run' | 'ride' | 'strength' | 'athletic';
+type TrainCardId = 'standard' | 'run' | 'ride' | 'strength' | 'athletic';
 // ⛔ STRENGTH LEADS (Michael, 2026-08-24) — it is the one card that is actually buildable today,
 // so it goes first rather than sitting third under two dimmed ones.
-const TRAIN_ORDER: TrainCardId[] = ['strength', 'run', 'ride', 'athletic'];
+// ⛔ STANDARD FOCUS LEADS (Michael, 2026-08-30). It is the year-round programme — the one an athlete
+// SITS in — so it goes above the singular sports rather than beside them (DESIGN §1).
+const TRAIN_ORDER: TrainCardId[] = ['standard', 'strength', 'run', 'ride', 'athletic'];
 type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 /**
  * ⛔ THEY ARE "<DISCIPLINE> FOCUS", NOT THE BARE DISCIPLINE (Michael, 2026-08-05). "Run" is a thing
@@ -316,6 +322,16 @@ type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSPrope
  * rather than borrowing one of the four and implying a default.
  */
 const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: CardIcon; color: string }> = {
+  standard: {
+    label: 'Standard Focus',
+    // ⛔ HIS CLAIMS, ALL OF THEM ON p274-275: an "all-year" programme, for an athlete interested in
+    // multiple sports, that pivots to a race programme about a month out. Nothing here is ours.
+    // ⚠️ VIADA IS NOT NAMED. The Strength Focus card below already names him and twice on one screen
+    // reads as two different programmes borrowing the same authority.
+    blurb: 'Strength and both endurance sports run together, year-round, with a pivot to a race or a single sport when one comes up.',
+    Icon: Shuffle,
+    color: getDisciplineColor('strength'),
+  },
   run: { label: 'Run Focus', blurb: 'Base, VO2 max, distance', Icon: Footprints, color: getDisciplineColor('run') },
   ride: { label: 'Ride Focus', blurb: 'FTP and endurance', Icon: Bike, color: getDisciplineColor('ride') },
   strength: {
@@ -330,9 +346,55 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
   athletic: { label: 'Athletic Focus', blurb: 'Several disciplines, balanced', Icon: Shuffle, color: getDisciplineColor('mobility') },
 };
 /** The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate. */
+/**
+ * The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate.
+ *
+ * ⚠️ TWO CARDS, ONE GOAL, AND THAT IS THE DESIGN. Standard Focus and Strength Focus are the same
+ * flow and the same builder — what differs is WHICH VIADA PROGRAMME the week is cut from, which is
+ * the frame, and the frame is chosen by `focus` rather than by a second goal id. A second goal would
+ * mean a second seed, a second length floor and a second everything downstream, for one dial.
+ * ⛔ SO THE CARD, NOT THE GOAL, IS WHAT THE SCREEN HIGHLIGHTS — see `state.focus`.
+ */
 const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
-  run: null, ride: null, strength: 'get_stronger', athletic: null,
+  standard: 'get_stronger', run: null, ride: null, strength: 'get_stronger', athletic: null,
 };
+
+/** ⛔ WHICH FRAME EACH FOCUS BUILDS. See `resolveFrame` — the engine takes the same two words. */
+const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
+  standard: 'all_rounder',
+  run: 'strength_5k',
+};
+
+/**
+ * ⛔ THE FRAME THIS BUILD IS DESCRIBING. One derivation, read by the payload assembler AND by the
+ * component, because the screen and the payload disagreeing about how many endurance rows there are
+ * is the whole class of defect the per-slot answer exists to prevent.
+ * ⚠️ ABSENT IS `strength_5k`, so the Strength Focus path is untouched.
+ */
+const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+
+/**
+ * ⛔⛔ WHAT THE BLOCK ACTUALLY REQUIRES, AT THE DOOR (Michael, 2026-08-30).
+ *
+ * ⛔ THE 2026-07-25 RULE IS BACK, AND SHORTER. A precondition paragraph used to sit under the
+ * Strength Focus card and was cut for height, with a note saying the requirement had gone UNSAID and
+ * that finding out on step three is worse than knowing before you start. This is one line instead of
+ * five.
+ *
+ * ⛔ EVERY CLAUSE IS ENFORCED OR PRESCRIBED, NOT ASPIRATIONAL:
+ *   · the four numbers — `missingBarbellLifts` / `liftsBelowEntryMinimum` refuse entry without them.
+ *   · the barbell, rack and bench — those four lifts are what the block prescribes as its
+ *     day-opening movements REGARDLESS of declared equipment, and `strength-gear.ts` states their
+ *     kit: back squat needs barbell + rack, bench press needs barbell + bench.
+ * ⚠️ DUMBBELLS ARE DELIBERATELY ABSENT. Measured 2026-08-30: every day of both columns fills on
+ * barbell + rack + bench with no dumbbells at all, so naming them would state a requirement the app
+ * does not have.
+ * ⚠️ AND NO NUMBER. The entry minimum is not on the card — the refusal names the athlete's own lift
+ * and their own figure when it fires, and a second copy here is one more place for it to go stale.
+ */
+const STANDARD_FOCUS_REQUIREMENT =
+  'Needs a barbell and plates, a rack and a bench — and a tested squat, bench press, deadlift and '
+  + 'overhead press.';
 
 /**
  * ⛔ THE THREE STRENGTH TIERS (SPEC §A). One the previous program spine, three intents — the tier moves accessory
@@ -870,6 +932,13 @@ type NonRaceState = {
    */
   entry: EntryCardId | null;
   /**
+   * ⛔ WHICH FOCUS THE ATHLETE PICKED on the Train screen — the dial from DESIGN §1. It chooses the
+   * FRAME, and it is card-level rather than goal-level because both strength cards seed one goal.
+   * ⚠️ Absent is `run`, which is every athlete who picked Strength Focus and everyone before this
+   * card existed. It never changes what that path builds.
+   */
+  focus?: 'standard' | 'run';
+  /**
    * Which strength tier was picked (SPEC §A). Only `strong` is selectable today and it is a no-op —
    * see `TIER_COPY`. Held in state so the card reads as chosen and Back returns to it.
    */
@@ -1379,11 +1448,18 @@ function assemblePayload(
    * place the payload is assembled and a second derivation upstream is how two numbers drift.
    */
   const isStrengthFocusPath = state.goal === 'get_stronger';
+  /**
+   * ⛔⛔ THE FRAME THIS WIZARD IS DESCRIBING. Every slot question on the endurance step reads it —
+   * how many rows there are, what each one is for, which day it lands on, and what the chips size.
+   * ⚠️ ABSENT IS `strength_5k`, so the Strength Focus path is untouched.
+   */
+  const wizardFrame: FrameId = frameOf(state);
   const derivedCounts = (() => {
-      const slots = state.slotSports ?? emptySlotSports();
-    const runs = SLOT_KEYS.filter((k) => slots[k] === 'run').length;
-    const rides = SLOT_KEYS.filter((k) => slots[k] === 'ride').length;
-    return { runs, rides, slots: slotsForEngine(slots) };
+    const keys = slotKeysFor(wizardFrame);
+    const slots = state.slotSports ?? emptySlotSports(wizardFrame);
+    const runs = keys.filter((k) => slots[k] === 'run').length;
+    const rides = keys.filter((k) => slots[k] === 'ride').length;
+    return { runs, rides, slots: slotsForEngine(slots, wizardFrame) };
   })();
   return {
     summary: isRace
@@ -1717,6 +1793,15 @@ function assemblePayload(
             }
             return Object.keys(out).length > 0 ? { endurance_experience: out } : {};
           })(),
+          /**
+           * ⛔⛔ WHICH FOCUS, AND THEREFORE WHICH FRAME (Michael, 2026-08-30). It has to travel the
+           * WHOLE path — here, then `create-goal`'s forward, then `generate-strength-plan`'s body
+           * read — for the same reason `endurance_experience` above does: the hop that does not
+           * forward it hands the resolver nothing, and nothing means the 5K frame. An athlete who
+           * picked Standard Focus would be handed a different programme with nothing said.
+           * ⚠️ OMITTED ON THE 5K PATH, so that payload is byte-identical to what it sends today.
+           */
+          ...(isStrengthFocusPath && state.focus === 'standard' ? { focus: 'standard' } : {}),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -2160,6 +2245,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // `posture.strength === 'develop'`. An assumed answer that never reaches the payload is the same
   // as no answer.
   const isStrengthFocus = state.goal === 'get_stronger';
+  // ⛔ THE FRAME EVERY SLOT QUESTION ON THIS SCREEN READS — see `frameOf`.
+  const wizardFrame: FrameId = frameOf(state);
   // ── THE STANDING PLAN'S ACCESSORY ANSWERS ────────────────────────────────────────────────────
   //
   // ⛔ SEEDED PRE-FILLED, AND THAT IS THE POINT OF THE SCREEN (Michael, 2026-08-24): the picks open
@@ -2567,7 +2654,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * renders, the other's pin is cleared (the phantom "Long Run: sunday" on a long-ride week came
    * from here), and the count rows do not exist: counts derive from the slots.
    */
-  const longSlotSport = isStrengthFocus ? ((state.slotSports ?? emptySlotSports()).long ?? null) : null;
+  const longSlotSport = isStrengthFocus ? ((state.slotSports ?? emptySlotSports(wizardFrame)).long ?? null) : null;
   const scheduleRunShown = isStrengthFocus
     ? longSlotSport === 'run'
     : state.posture?.run != null && state.posture?.run !== 'out';
@@ -3460,10 +3547,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // athlete was never asked (the count rows are hidden there). Read off state directly: the
     // component-scope `derivedCounts` declares later in this function body.
     runDays: isStrengthFocus
-      ? SLOT_KEYS.filter((k) => (state.slotSports ?? emptySlotSports())[k] === 'run').length
+      ? slotKeysFor(wizardFrame).filter((k) => (state.slotSports ?? emptySlotSports(wizardFrame))[k] === 'run').length
       : state.runDays,
     rideDays: isStrengthFocus
-      ? SLOT_KEYS.filter((k) => (state.slotSports ?? emptySlotSports())[k] === 'ride').length
+      ? slotKeysFor(wizardFrame).filter((k) => (state.slotSports ?? emptySlotSports(wizardFrame))[k] === 'ride').length
       : state.rideDays,
     targetMiles: state.targetMiles,
     rideHours: state.rideHours,
@@ -3518,7 +3605,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * until all four are answered — see `allSlotsChosen`. ⚠️ The pre-fill this replaced put both hard
    * slots on the bike before the athlete had said anything.
    */
-  const slotSportsNow: SlotSelection = state.slotSports ?? emptySlotSports();
+  const slotSportsNow: SlotSelection = state.slotSports ?? emptySlotSports(wizardFrame);
 
   /**
    * ⛔ THE ATHLETE-TYPE ANSWER PRE-SHAPES THE SLOT SCREEN (Michael, 2026-08-24). "Run only" never
@@ -3567,8 +3654,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * number the athlete sees and the number the gate tests cannot come apart.
    */
   const experienceOptions = useMemo(
-    () => experienceChips(slotSportsNow, { baselines: (baselinesRow ?? {}) as never }),
-    [slotSportsNow, baselinesRow],
+    () => experienceChips(slotSportsNow, { baselines: (baselinesRow ?? {}) as never, frame: wizardFrame }),
+    [slotSportsNow, baselinesRow, wizardFrame],
   );
   /** The sports that actually fill a slot, so have an experience question. ⚠️ A sport the athlete
    *  keeps but whose four slots carry none of it has nothing for the answer to size. */
@@ -3649,11 +3736,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   useEffect(() => {
     if (currentStep !== 'endurance' || allowedSlotSports.length !== 1) return;
     const only = allowedSlotSports[0];
-    const cur = state.slotSports ?? emptySlotSports();
-    if (REQUIRED_SLOT_KEYS.every((k) => cur[k] === only)) return;
+    const cur = state.slotSports ?? emptySlotSports(wizardFrame);
+    // ⚠️ THE FRAME'S OWN ROWS. A slot the frame prescribes as a ride is never auto-assigned to run.
+    const fillable = frameSlots(wizardFrame)
+      .filter((x) => !x.family.startsWith('ride_') || only === 'ride').map((x) => x.key);
+    if (fillable.every((k) => cur[k] === only)) return;
     setState((st) => {
-      const slots = { ...(st.slotSports ?? emptySlotSports()) } as SlotSelection;
-      for (const k of REQUIRED_SLOT_KEYS) slots[k] = only;
+      const slots = { ...(st.slotSports ?? emptySlotSports(wizardFrame)) } as SlotSelection;
+      for (const k of fillable) slots[k] = only;
       return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3674,7 +3764,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // ⚠️ THE FRAME'S HARD ROWS IN ITS OWN ORDER — a positional fallback for drafts written before
   // `slot` existed. Three rows where the frame has three.
   const HARD_SLOT_INDEX: Record<string, number> = Object.fromEntries(
-    HARD_SLOT_KEYS.map((k, i) => [k, i]),
+    hardSlotKeysFor(wizardFrame).map((k, i) => [k, i]),
   );
 
   /**
@@ -3718,7 +3808,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const syncHardDays = (
     st: NonRaceState,
     slots: SlotSelection,
-  ): NonRaceState['hardDays'] => (HARD_SLOT_KEYS as HardSlotKey[]).map((k) => {
+  ): NonRaceState['hardDays'] => (hardSlotKeysFor(wizardFrame) as HardSlotKey[]).map((k) => {
     const i = HARD_SLOT_INDEX[k];
     const prev = st.hardDays[i];
     const sport = slots[k];
@@ -3760,8 +3850,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * cannot disagree with itself.
    */
   const derivedCounts = (() => {
-    const runs = SLOT_KEYS.filter((k) => slotSportsNow[k] === 'run').length;
-    return { runs, rides: SLOT_KEYS.length - runs };
+    const keys = slotKeysFor(wizardFrame);
+    const runs = keys.filter((k) => slotSportsNow[k] === 'run').length;
+    return { runs, rides: keys.length - runs };
   })();
 
   /**
@@ -3774,7 +3865,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     [baselinesRow],
   );
   const fixedHoursLineFor = (sport: 'run' | 'ride'): string | null => {
-    if (!allSlotsChosen(slotSportsNow)) return null;
+    if (!allSlotsChosen(slotSportsNow, wizardFrame)) return null;
     /**
      * ⛔ THE EXPERIENCE ANSWER APPLIES HERE TOO. This sentence names the hours the week FIXES, and
      * the engine builds those sessions at the levels the answer picks — quoting the frame's printed
@@ -3784,7 +3875,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
      * compared against the frame's own floor; history is out of the level entirely now.
      */
     const tierLevels = experienceLevels(state.enduranceExperience);
-    const specs = SLOT_KEYS.map((k) => {
+    const specs = slotKeysFor(wizardFrame).map((k) => {
       const s = slotSportsNow[k];
       if (!s) return null;
       const fam = SLOT_FAMILY[k];
@@ -3805,7 +3896,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     return fixedHoursLine(
       spans,
       sport,
-      (span) => HARD_SLOT_KEYS.includes(keyOf(span) as SlotKey),
+      (span) => hardSlotKeysFor(wizardFrame).includes(keyOf(span) as SlotKey),
       (span) => keyOf(span) === 'long',
     );
   };
@@ -4103,12 +4194,27 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const goal = TRAIN_GOAL[t];
               const { Icon, color } = TRAIN_COPY[t];
               const live = goal != null;
+              /**
+               * ⛔ THE CARD IS THE SELECTION, NOT THE GOAL (2026-08-30). Standard Focus and Strength
+               * Focus seed the same goal, so highlighting on the goal would light BOTH cards the
+               * moment either was tapped. `state.focus` is what tells them apart.
+               */
+              const focusOfCard = t === 'standard' ? 'standard' : t === 'strength' ? 'run' : null;
+              const chosen = live && state.goal === goal
+                && (focusOfCard == null || (state.focus ?? 'run') === focusOfCard);
               return (
                 <button
                   key={t} type="button"
-                  className={optBtn(live && state.goal === goal, !live)}
+                  className={optBtn(chosen, !live)}
                   disabled={!live}
-                  onClick={() => { if (!goal) return; reseed(goal, undefined); next(); }}
+                  onClick={() => {
+                    if (!goal) return;
+                    reseed(goal, undefined);
+                    // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`) and it is
+                    // what the payload carries. Set AFTER `reseed`, which does not touch it.
+                    if (focusOfCard) setState((st) => ({ ...st, focus: focusOfCard }));
+                    next();
+                  }}
                 >
                   <span className="flex items-start gap-3.5">
                     {/* Discipline colour survives the dimming, at lower opacity — a not-yet card
@@ -4119,6 +4225,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
                         {TRAIN_COPY[t].blurb}
                       </span>
+                      {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — see `STANDARD_FOCUS_REQUIREMENT`. One
+                          line, on the one card whose block refuses at the gate without it. */}
+                      {t === 'standard' ? (
+                        <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
+                          {STANDARD_FOCUS_REQUIREMENT}
+                        </span>
+                      ) : null}
                       {/* ⛔ THE PRECONDITION PARAGRAPH IS GONE (Michael, 2026-08-05: *"lose this"*).
                           It listed what the block needs — barbell, rack, bench, four maxes on file —
                           and it made one card three times the height of its three neighbours, which
@@ -5762,9 +5875,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
            * downstream catches an athlete who never saw the control. ⚠️ The slots are named first —
            * the chips do not exist until all four are answered, so that is the sentence to show.
            */
-          canContinue={allSlotsChosen(slotSportsNow) && experienceUnanswered.length === 0}
+          canContinue={allSlotsChosen(slotSportsNow, wizardFrame) && experienceUnanswered.length === 0}
           blockedReason={tintedReason(
-            unansweredLine(slotSportsNow)
+            unansweredLine(slotSportsNow, wizardFrame)
             ?? experienceUnansweredLine(experienceUnanswered)
             ?? undefined,
           )}
@@ -5781,6 +5894,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             <p className="text-white/55 text-xs mb-3" data-testid="tier-line">{tierLine}</p>
           ) : null}
           <EnduranceWeekCard
+            // ⛔ THE ROWS ARE THE FRAME'S — how many, what each is for, and which day it lands on.
+            frame={wizardFrame}
             allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
             /** ⛔ THE SAME ANSWER THE ENGINE BUILDS THE LEVELS FROM, so the hours this screen quotes
@@ -5800,7 +5915,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              *  gesture is answering a row; the dismiss that used to clear one is gone with the
              *  opt-in, and the prop's type says so rather than leaving a dead arm behind. */
             onSlotChange={(key, sport) => setState((st) => {
-              const picked = { ...(st.slotSports ?? emptySlotSports()), [key]: sport };
+              const picked = { ...(st.slotSports ?? emptySlotSports(wizardFrame)), [key]: sport };
               /**
                * ⛔⛔ ONE HARD RUN AND ONE HARD RIDE GO IN HIS ORDER — ride on his day 1, run on his
                * day 3 — whichever row the athlete answered (Michael, 2026-08-27: *"follow his
@@ -5835,7 +5950,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               if (key === 'long') return state.longClub ? 'Club ride' : null;
               // ⚠️ ONLY A HARD ROW HAS AN ENTRY. The easy row reaches here now that the frame owns
               // the row list, and it has no session answer of its own to show.
-              if (!HARD_SLOT_KEYS.includes(key)) return null;
+              if (!hardSlotKeysFor(wizardFrame).includes(key)) return null;
               const hk = key as HardSlotKey;
               const h = hardEntry(state, hk);
               if (h?.ownership === 'club') return 'Club session';

@@ -962,6 +962,33 @@ Moved off the queue. Do not re-open without new evidence.
 
 ---
 
+# LOGGED 2026-08-30 — found while building Standard Focus, none of them started
+
+⛔ **ALL FOUR ARE SHARED, NOT All-Rounder-specific.** They are true of the live 5K program today.
+
+- **The entry test and week one's test are the same test.** The gate demands four 1RMs
+  (`shared/strength-system/barbell-maxes.ts`), and the Baselines screen's own copy says *"Same test
+  the Get Strong block ends with"* — an all-out set per lift after guided warm-ups. Week one then
+  runs the p215 pretest again. ⚠️ **Measured: the typed numbers are consumed by exactly one thing,
+  the warm-up weights on week one's four test sets** (`compose.ts` `testDaySession`, `seed1RMs`).
+  With none on file the test still runs, by feel, with its own sentence. Every other row in weeks one
+  and two is byte-identical either way. Michael, 2026-08-30: *"it can happen later."*
+- **The plan's number and the athlete's number never reconcile.** `rematerialize-standing-block`
+  writes the measured working numbers into the PLAN's config and never touches
+  `user_baselines.performance_numbers`. The next block seeds its warm-ups off the older typed figure
+  again. Two numbers per lift, in two places, nothing compares them.
+- **Overhead press is tested every block and loaded by nothing.** It has no pattern slot in either
+  frame (`PATTERN_FOR_TESTED_LIFT`), so it is demanded at the gate, measured in week one, and used
+  only to aim its own warm-ups.
+- **The competition lifts are prescribed regardless of declared equipment.** `exerciseForSlot` only
+  puts a weight on a row when the movement IS the athlete's named competition lift, so the four
+  barbell lifts open every lifting day whatever the kit — measured: a dumbbell-only athlete is handed
+  Bench Press, Back Squat and Deadlift with nothing said. ⚠️ **The fix is already half-built:**
+  `testedLiftName` tests whatever movement occupies the slot, and `defaultCompetitionLifts` hardcodes
+  the barbell three with a comment saying the athlete has not been asked yet. It is starved, not
+  missing.
+
+
 # SHELVED 2026-08-30 — open items on Strength + 5K, and which ones follow you into the All Rounder
 
 ⛔ **FOUR OF THESE SIX ARE NOT 5K-SPECIFIC.** They live in the materializer, the volume solver and the

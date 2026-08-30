@@ -316,7 +316,16 @@ Deno.serve(async (req: Request) => {
      * Stronger is the answer for all of them and its composer is not touched by this stage.
      * ═══════════════════════════════════════════════════════════════════════════════════════════
      */
-    const framePosition = { enduranceSport: sport };
+    /**
+     * ⛔⛔ WHICH FOCUS, READ OFF THE BODY AND VALIDATED (2026-08-30). Standard Focus builds the All
+     * Rounder (p274-275); Run Focus builds Strength + 5K (p246-247). See `resolveFrame`.
+     * ⚠️ AN UNRECOGNISED OR ABSENT VALUE TAKES THE 5K FRAME, which is what every caller before this
+     * card existed already gets — so the default path is untouched by construction rather than by a
+     * rule somebody has to remember.
+     */
+    const focusRaw = (body as Record<string, unknown>).focus;
+    const focus = focusRaw === 'standard' ? 'standard' as const : 'run' as const;
+    const framePosition = { enduranceSport: sport, focus };
     const frameResolution = resolveFrame(framePosition);
 
     if (frameResolution.frame) {

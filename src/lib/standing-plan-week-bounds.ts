@@ -55,6 +55,7 @@ import {
   type SlotSpec,
 } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import { frameSlots, type SlotKey, type SlotSelection, type SlotSport } from './standing-plan-week-copy';
+import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
 /**
  * ⛔⛔ THE FRAME'S OWN SLOTS, READ OFF THE FRAME (2026-08-30). It was a four-entry literal, and the
@@ -111,12 +112,16 @@ export const SLOT_FRAME_KEY: Record<SlotKey, string> = (() => {
  * ⚠️ EASY AND LONG ARE STILL OMITTED WHEN UNANSWERED, because they are not opt-in: Continue is gated
  * on both, so an unanswered one never reaches here in a submitted week.
  */
-export function slotsForEngine(slots: SlotSelection): Record<string, SlotSport | 'none'> {
+export function slotsForEngine(
+  slots: SlotSelection,
+  frame: FrameId = 'strength_5k',
+): Record<string, SlotSport | 'none'> {
   const out: Record<string, SlotSport | 'none'> = {};
-  for (const key of Object.keys(SLOT_FRAME_KEY) as SlotKey[]) {
-    const v = slots[key];
-    if (v) { out[SLOT_FRAME_KEY[key]] = v; continue; }
-    if (HARD_SLOT_KEYS.includes(key)) out[SLOT_FRAME_KEY[key]] = 'none';
+  // ⚠️ THE FRAME'S OWN SLOTS AND ITS OWN HARD ROWS — a five-slot week sends five answers.
+  for (const s of frameSlots(frame)) {
+    const v = slots[s.key];
+    if (v) { out[s.frameKey] = v; continue; }
+    if (s.role === 'hard') out[s.frameKey] = 'none';
   }
   return out;
 }
@@ -132,9 +137,43 @@ export function slotsForEngine(slots: SlotSelection): Record<string, SlotSport |
  * ⚠️ IDEMPOTENT. The wizard already normalises on tap so the rows swap visibly; this is the guard
  * that keeps a caller who did not from getting a different answer.
  */
-function inFrameOrder(slots: SlotSelection): SlotSelection {
+function inFrameOrder(slots: SlotSelection, frame: FrameId = 'strength_5k'): SlotSelection {
+  /**
+   * ⚠️ ONLY WHERE THE TWO HARD SLOTS ARE INTERCHANGEABLE (2026-08-30). The normalisation exists
+   * because `strength_5k`'s two quality slots are BOTH run families that map onto one ride family,
+   * so "which of them is the ride" is genuinely the athlete's answer to normalise. A frame that
+   * prescribes one of its quality sessions as a ride outright has no such ambiguity — p274's day 2
+   * is a ride and cannot be anything else — and swapping the pair there would move an answer the
+   * athlete did not give.
+   */
+  const pairIsInterchangeable = frameSlots(frame)
+    .filter((x) => x.role === 'hard')
+    .slice(0, 2)
+    .every((x) => !x.family.startsWith('ride_'));
+  if (!pairIsInterchangeable) return slots;
   const put = hardPairInFrameOrder(slots.hard1 ?? undefined, slots.hard2 ?? undefined);
   return { ...slots, hard1: put.hard1 ?? null, hard2: put.hard2 ?? null };
+}
+
+/** ⚠️ THE FRAME'S OWN SLOT FAMILIES — `SLOT_FAMILY` is this for `strength_5k`. */
+function familyMapFor(frame: FrameId): Record<string, { family: FamilyId; level: Level }> {
+  const out: Record<string, { family: FamilyId; level: Level }> = {};
+  for (const x of frameSlots(frame)) out[x.key] = { family: x.family as FamilyId, level: x.level as Level };
+  return out;
+}
+
+/**
+ * ⛔ THE FAMILY A SLOT BUILDS ONCE ITS SPORT IS KNOWN. A slot the frame already prescribes as a ride
+ * IS the answer — `RIDE_EQUIVALENT` maps run families to ride ones and has no entry for it.
+ */
+function builtFamily(
+  base: { family: FamilyId; level: Level },
+  sport: SlotSport,
+): { family: FamilyId; archetype?: string } | null {
+  if (String(base.family).startsWith('ride_')) return { family: base.family };
+  if (sport !== 'ride') return { family: base.family };
+  const eq = RIDE_EQUIVALENT[base.family];
+  return eq ? { family: eq.family, archetype: eq.archetype } : null;
 }
 
 export type WeekBounds = {
@@ -168,11 +207,15 @@ export function weekBounds(
      * ⚠️ A SPORT WITH NO ANSWER TAKES THE FRAME'S OWN PRINTED LEVELS, exactly as the composer does.
      */
     experience?: EnduranceExperience | null;
+    /** ⚠️ WHICH FRAME'S SLOTS. Absent keeps `strength_5k`, which is every caller before a second one. */
+    frame?: FrameId;
   },
 ): WeekBounds {
+  const frame = opts.frame ?? 'strength_5k';
   const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
   // ⛔ HIS ORDER FIRST — see `inFrameOrder`.
-  const slots = inFrameOrder(rawSlots);
+  const slots = inFrameOrder(rawSlots, frame);
+  const families = familyMapFor(frame);
   const tierLevels = experienceLevels(opts.experience);
   const levelFor = (family: string, frameLevel: Level): Level =>
     // ⛔ SAME BIKE CEILING THE COMPOSER APPLIES — see `clampRideLevel`.
@@ -185,15 +228,16 @@ export function weekBounds(
   let anyRide = false;
   let isLowerBound = false;
 
-  for (const key of Object.keys(SLOT_FAMILY) as SlotKey[]) {
-    const base = SLOT_FAMILY[key];
+  for (const key of Object.keys(families) as SlotKey[]) {
+    const base = families[key];
     const sport = slots[key];
     // ⛔ AN UNANSWERED SLOT HOLDS NOTHING YET. Counting it as a run would show a cap for a week the
     // athlete has not described.
     if (!sport) continue;
     if (sport === 'ride') {
       // ⛔ THE COMPOSER'S OWN EQUIVALENCE. A second table here is how a preview and a plan diverge.
-      const eq = RIDE_EQUIVALENT[base.family];
+      // ⚠️ AND A SLOT THE FRAME ALREADY PRESCRIBES AS A RIDE NEEDS NO CONVERSION — see `builtFamily`.
+      const eq = builtFamily(base, 'ride');
       if (!eq) continue;
       // ⚠️ THE TIER IS KEYED BY FAMILY, so a slot the athlete put on the bike is untouched by
       // construction — the tier only names run families.
@@ -338,18 +382,24 @@ export function experienceChips(
      * session they just replaced. ⚠️ Absent leaves the frame's answer, which is the default path.
      */
     archetypes?: Partial<Record<SlotKey, string | undefined>>;
+    /** ⚠️ WHICH FRAME'S SLOTS. Absent keeps `strength_5k`. */
+    frame?: FrameId;
   },
 ): Record<SlotSport, ExperienceChoice> {
+  const frame = opts.frame ?? 'strength_5k';
   const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
   // ⛔ HIS ORDER FIRST — see `inFrameOrder`. A chip measured on the raw answers quotes the hard run
   // at day 1's easier dose while the block builds it at day 3's.
-  const slots = inFrameOrder(rawSlots);
+  const slots = inFrameOrder(rawSlots, frame);
+  const families = familyMapFor(frame);
   /** One slot as the engine will build it, at one tier. Null when this slot is not that sport. */
   const specFor = (key: SlotKey, sport: SlotSport, tier: ExperienceTier): SlotSpec | null => {
     const sp = slots[key];
     if (!sp) return null;
-    const base = SLOT_FAMILY[key];
-    const eq = sp === 'ride' ? RIDE_EQUIVALENT[base.family] : null;
+    const base = families[key];
+    if (!base) return null;
+    // ⚠️ A NATIVELY-PRESCRIBED RIDE IS ALREADY THE ANSWER — see `builtFamily`.
+    const eq = sp === 'ride' ? builtFamily(base, 'ride') : null;
     if (sp === 'ride' && !eq) return null;
     const family = (eq?.family ?? base.family) as FamilyId;
     // ⛔ "Newer" APPLIES `LOW_VOLUME_TIER_LEVELS` FOR THIS SPORT; "Experienced" APPLIES NOTHING.
@@ -390,14 +440,15 @@ export function experienceChips(
     return offered.reduce((best, a) => Math.max(best, top(a.id)), 0);
   };
   const chipFor = (sport: SlotSport, tier: ExperienceTier): ExperienceChip | null => {
-    const all = (Object.keys(SLOT_FAMILY) as SlotKey[])
+    const all = (Object.keys(families) as SlotKey[])
       .map((k) => specFor(k, sport, tier))
       .filter((sp): sp is SlotSpec => sp != null);
     const mine = all.filter((sp) => sp.sport === sport);
     // ⛔ A SPORT WITH NO SLOT HAS NOTHING TO SIZE. No chip rather than a chip reading zero.
     if (mine.length === 0) return null;
     // ⛔ HARD SLOTS ONLY — see `longestMin`.
-    const hard = HARD_SLOT_KEYS
+    // ⚠️ THE FRAME'S OWN HARD ROWS — three on a frame that prescribes three quality sessions.
+    const hard = frameSlots(frame).filter((x) => x.role === 'hard').map((x) => x.key)
       .map((k) => (slots[k] === sport ? specFor(k, sport, tier) : null))
       .filter((sp): sp is SlotSpec => sp != null);
     const longest = hard.reduce((top, spec) => Math.max(top, longestFor(spec)), 0);
