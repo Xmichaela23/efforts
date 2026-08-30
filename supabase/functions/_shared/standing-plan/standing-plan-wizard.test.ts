@@ -229,9 +229,22 @@ Deno.test('the strength path drops the two old steps and every other goal keeps 
     new URL('../../../../src/components/NonRaceBuilder.tsx', import.meta.url).pathname,
   );
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/.*$/gm, '');
-  // ⛔ ONE SCREEN ON THE STRENGTH PATH.
-  assert(/out\.push\('endurance'\)/.test(code), 'the strength path never reaches the new screen');
-  assert(!/out\.push\('hardday'\)/.test(code), 'the strength path still pushes the hard-day screen');
+  /**
+   * ⛔ ONE SCREEN ON THE STRENGTH PATH — AND IT IS RUN NOW, NOT GREPPED (2026-08-30). The step flow
+   * moved to `src/lib/wizard-steps.ts`, a file with no React in it, precisely so the route can be
+   * CALLED. It moved because the Standard Focus card shipped landing on the wrong screen while every
+   * source-text assertion on this path passed — see `src/lib/wizard-steps.test.ts`.
+   * ⚠️ SAME RULE, STRONGER EVIDENCE: this asserts the built flow, not that a string appears in a file.
+   */
+  const { getSteps } = await import('../../../../src/lib/wizard-steps.ts');
+  const flow = getSteps({
+    goal: 'get_stronger',
+    entry: 'train',
+    posture: { strength: 'develop', run: 'maintain', bike: 'maintain', swim: 'out' },
+  });
+  assert(flow.includes('endurance'), 'the strength path never reaches the new screen');
+  assert(!flow.includes('hardday'), 'the strength path still reaches the hard-day screen');
+  assert(!flow.includes('volume'), 'the strength path still reaches the volume screen');
   // ⚠️ AND THE OLD SCREENS STILL EXIST for the goals that use them — deleting their render would
   // take the volume card away from every non-strength flow.
   assert(/currentStep === 'volume'/.test(code), 'the volume card was deleted rather than unrouted');
