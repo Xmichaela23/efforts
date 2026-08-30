@@ -258,6 +258,37 @@ function meRepBand(): { lo: number; hi: number } {
   return p.kind === 'barbell' ? p.reps : { lo: 1, hi: 1 };
 }
 
+/**
+ * ⛔⛔ AN AUTOFILLED RIR IS NOT EVIDENCE, AND THIS IS THE ONE PLACE THAT DECIDES IT (2026-08-29).
+ *
+ * ⛔ D-203: the logger COMPLETES A SET WITH THE PRESCRIBED RIR when the athlete did not type one,
+ * and stamps `rir_autofilled: true` on it. So `rir` is populated on most sets whether or not anyone
+ * said anything, and the flag is the only thing that tells them apart.
+ *
+ * ⛔ WITHOUT THIS THE ENGINE GRADES ITS OWN SUGGESTION. `meSessionOutcome` reads `rir === 0` as the
+ * grind that costs a set, and `progressionVerdict` gates advancement on the reserve — both would be
+ * scoring a number the app wrote. **The tell would be an app telling an athlete they are handling
+ * the weight well because it filled in the number that says so.**
+ *
+ * ⛔ TWO OTHER READERS IN THIS CODEBASE ALREADY DO EXACTLY THIS, and this is the third:
+ *   · `compute-facts/strength-facts-lib.ts:197` — `… && !s.rir_autofilled` before it counts;
+ *   · `analyze-strength-workout/index.ts:547` — the same filter on executed sets.
+ * **The Viada engine was the one that did not**, and it is the engine that moves the bar.
+ *
+ * ⚠️ AUTOFILLED BECOMES ABSENT, NOT ZERO — the D-324 rule, unchanged. `meSessionOutcome` already
+ * says an absent RIR is not a grind, and `progressionVerdict` already advances on reps alone when no
+ * reserve was reported. So dropping the flagged ones lands both readers on their existing
+ * "did not say" branch rather than on a new one.
+ *
+ * ⚠️ IT IS FIXED AT THE BOUNDARY, ONCE. `setsOf` is the only place a stored row becomes a
+ * `LoggedMeSet`, and `earnedMeSets` is the only caller of both readers — so one condition here is
+ * the whole fix, and a fourth reader cannot forget it.
+ *
+ * ⚠️ **THIS CHANGES LIVE VERDICTS.** Sessions previously scored on a suggested reserve will grade
+ * differently — some advances that were gated on an autofilled number will now advance on reps
+ * alone, and some `setback`s read off an autofilled 0 will stop firing. That is the point, and it is
+ * why it lands before any surface is built on top of the signal.
+ */
 function setsOf(ex: Record<string, unknown>): LoggedMeSet[] {
   const raw = ex?.sets;
   if (!Array.isArray(raw)) return [];
@@ -266,7 +297,10 @@ function setsOf(ex: Record<string, unknown>): LoggedMeSet[] {
     weight: Number(s?.weight),
     // ⚠️ ABSENT STAYS ABSENT. `Number(undefined)` is NaN and would never equal 0, but writing it as
     // null makes the "did not say" case legible at the one place that reads it.
-    rir: typeof s?.rir === 'number' ? s.rir : null,
+    // ⛔ AND AN AUTOFILLED NUMBER IS ABSENT — see the block above.
+    rir: s?.rir_autofilled === true
+      ? null
+      : (typeof s?.rir === 'number' ? s.rir : null),
     completed: s?.completed === true,
   }));
 }

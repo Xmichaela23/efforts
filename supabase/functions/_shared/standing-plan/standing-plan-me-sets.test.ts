@@ -257,6 +257,58 @@ Deno.test('⛔ THE LADDER IS READ OFF LOGGED SESSIONS, matched on week + weekday
   assert(none.unread > 0, 'the reader claims it read rows it never saw');
 });
 
+Deno.test('⛔⛔ AN AUTOFILLED RIR IS NOT EVIDENCE — the engine must not grade its own suggestion', () => {
+  /**
+   * ⛔ D-203: the logger completes a set with the PRESCRIBED reserve when the athlete typed nothing,
+   * and stamps `rir_autofilled: true`. Two other readers in this codebase already refuse those
+   * (`compute-facts/strength-facts-lib.ts:197`, `analyze-strength-workout/index.ts:547`); the Viada
+   * engine did not, and it is the engine that moves the bar.
+   *
+   * ⚠️ MUTATION CHECK: delete the `rir_autofilled` condition in `setsOf` and the first assertion
+   * below fails — the autofilled 0 is read as a grind and costs the pattern its earned set.
+   */
+  const block = composeBlock({ ...BASE, weeks: 6, taperWeeks: [] } as never);
+  const meRows = block.flatMap((b) => b.meRows).filter((r) => r.movement === 'Bench Press');
+  assert(meRows.length >= 3, 'the composer reported almost no ME rows');
+
+  const sessions = (rir: Record<string, unknown>) => meRows.slice(0, 3).map((r) => ({
+    week_number: r.week,
+    date: dateOn(r.day),
+    strength_exercises: [{
+      name: r.movement,
+      sets: [{ reps: 5, weight: r.weight ?? 180, completed: true, ...rir }],
+    }],
+  }));
+
+  // ⛔ THREE CLEAN SESSIONS WHOSE ZERO WAS WRITTEN BY THE APP. `meSessionOutcome` scores `rir === 0`
+  // as the grind that costs a set — but nobody said zero, so the ladder must climb exactly as it
+  // does when no reserve is reported at all.
+  const autofilled = earnedMeSets({
+    composed: block,
+    logged: sessions({ rir: 0, rir_autofilled: true }),
+    throughWeek: 6,
+  });
+  assertEquals(
+    autofilled.sets.push_upper,
+    2,
+    'an RIR the app wrote itself was graded as if the athlete had reported it',
+  );
+
+  // ⛔ AND A ZERO THE ATHLETE ACTUALLY TYPED STILL COSTS THE SET. The fix drops the flag, not the
+  // signal — otherwise it would have deleted the grind rule instead of aiming it.
+  const typed = earnedMeSets({
+    composed: block,
+    logged: sessions({ rir: 0 }),
+    throughWeek: 6,
+  });
+  assertEquals(
+    typed.history.push_upper!.every((h) => h.outcome === 'setback'),
+    true,
+    'a reported zero-in-reserve stopped being read as the grind',
+  );
+  assertEquals(typed.sets.push_upper, ME_SETS_BAND.lo, 'three ground-out sessions still earned a set');
+});
+
 Deno.test('⛔ EVIDENCE STOPS AT THE LIVE WEEK — the future is not evidence', () => {
   // ⚠️ MUTATION-TESTED. Without the bound, sessions logged against later weeks (a re-log, an early
   // tick) would earn sets before the weeks that hold them have been trained.
