@@ -245,10 +245,14 @@ function anchorRoleOf(family: string, role?: 'hard' | 'long' | 'easy' | null): '
 function enduranceDayFor(
   args: ComposeArgs,
   frameDay: number,
-  family: string,
+  /**
+   * ⛔ THE ROLE, PASSED IN — not re-derived from a family name (2026-08-30). This function used to
+   * ask `anchorRoleOf` a second time off the family alone, so a frame that STATED its slot's role
+   * had that answer thrown away here and a natively-prescribed ride got no pin.
+   */
+  role: 'long' | 'hard' | null,
   hardIndex: number,
 ): Weekday {
-  const role = anchorRoleOf(family);
   const pins = args.endurancePins;
   if (pins) {
     if (role === 'long' && pins.long) return pins.long;
@@ -898,7 +902,11 @@ function exerciseForSlot(
    * both days the same answer. ⚠️ Frame day, not weekday: it does not rotate.
    */
   frameDay: number | null = null,
-): { exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern } {
+  /**
+   * ⛔ NULL WHEN THE DAY HAS NO MOVEMENT LEFT FOR THIS SLOT — see the drop branch below. The caller
+   * skips the slot and says so; it does not print the row above twice.
+   */
+): { exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern } | null {
   const pattern = patternForWeek(slot, args.week);
   const competition = args.competitionLifts[pattern] ?? null;
 
@@ -907,6 +915,14 @@ function exerciseForSlot(
     pattern,
     intent: slot.intent,
     equipment: args.equipment ?? null,
+    /**
+     * ⛔ THE FRAME'S OWN MODIFIER — `StrengthSlot.asymmetrical`. p274 prints `braced push
+     * (asymmetrical)` three times and this is the only path that carries it, so without it those
+     * three slots would resolve to an ordinary two-legged braced press and the frame would say
+     * nothing about it.
+     * ⚠️ ABSENT ON EVERY `strength_5k` SLOT, so that frame resolves exactly as before.
+     */
+    asymmetrical: slot.asymmetrical,
   });
 
   let movement: string;
@@ -1025,9 +1041,25 @@ function exerciseForSlot(
         if (fresh) break;
       }
     }
-    // ⚠️ AND ONLY THEN A REPEAT. A duplicated movement is worse than nothing only until it is the
-    // difference between a slot and a hole.
-    movement = (fresh ?? options[0] ?? resolved.chosen).name;
+    /**
+     * ⛔⛔ AND IF NOTHING FRESH EXISTS, THE SLOT IS DROPPED AND SAID — IT IS NOT FILLED WITH A REPEAT
+     * (2026-08-30). What stood here was *"a duplicated movement is worse than nothing only until it
+     * is the difference between a slot and a hole"*, and that reasoning held while every frame's
+     * upper days carried FOUR slots. p274's carry SIX — an ME, a DE, a braced and three focused —
+     * and on a minimal kit the pull pool runs out at five: the sixth slot printed
+     * `prone y t w raise` a second time on the same day, beside itself, with nothing said.
+     *
+     * ⛔ A ROW THAT REPEATS THE ROW ABOVE IT IS NOT A SLOT, IT IS THE ENGINE LOSING ITS PLACE, and
+     * the athlete reads it as one. Dropping it and naming the drop is the same choice this file
+     * already makes everywhere else: `placement_compromises` exists so a compromise is stated rather
+     * than absorbed.
+     *
+     * ⚠️ MEASURED BYTE-IDENTICAL FOR `strength_5k` across every kit, week, column and pick set —
+     * that frame never exhausts a cell, so this branch cannot fire on the frozen frame.
+     */
+    const lastResort = fresh ?? options[0] ?? resolved.chosen;
+    if (!lastResort || takenToday.has(canonicalize(lastResort.name))) return null;
+    movement = lastResort.name;
     /**
      * ⛔ AND IF THE ONLY ROUTE LEFT IS A BAND, THE ROW SAYS BAND (2026-08-24). `lat pulldown` on a
      * home gym with no cable stack reads as an engine that ignored the declared equipment; `band
@@ -1714,7 +1746,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     let n = 0;
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
-        if (anchorRoleOf(slot.family) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
+        if (anchorRoleOf(slot.family, slot.role) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
       });
     }
   }
@@ -1835,7 +1867,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         dd.endurance.forEach((slot, i) => {
           const a = assignedSlot(sportAssignment, dd.day, i, slot);
           if (a.sport !== sport) return;
-          const role = anchorRoleOf(slot.family);
+          const role = anchorRoleOf(slot.family, slot.role);
           mine.push({ key: `${dd.day}:${i}`, rank: role === 'long' ? 2 : role === 'hard' ? 1 : 0 });
         });
       }
@@ -2103,13 +2135,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         if (droppedSlots.has(key)) return; // ⛔ the stated day count removed this slot
         if (enduranceDays.has(key)) return;
         const hardIndex = hardSlotIndex.get(key) ?? 0;
-        // ⛔ THE FRAME'S FAMILY, matching `hardSlotIndex` above — see `anchorRoleOf`.
-        const role = anchorRoleOf(slot.family);
+        // ⛔ THE FRAME'S OWN ANSWER, matching `hardSlotIndex` above — see `anchorRoleOf`. The slot's
+        // stated role wins where it has one; the family decides where it does not.
+        const role = anchorRoleOf(slot.family, slot.role);
         const pinned = role === 'long'
           ? !!args.endurancePins?.long
           : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
         if (pinned !== wantPinned) return;
-        const proposed = enduranceDayFor(args, d.day, slot.family, hardIndex);
+        const proposed = enduranceDayFor(args, d.day, role, hardIndex);
         enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
       });
     }
@@ -2141,17 +2174,26 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * running does, which is the whole reason the substituted case drops the reduction
    * (`HAIRCUT_CAUSE_IS_OURS`).
    */
-  const meLowerFrameDay = days.find((d) => d.label === 'ME: Lower')?.day ?? null;
-  const meLowerDay = meLowerFrameDay == null ? null : dayNameFor(args, meLowerFrameDay);
-  const dayBeforeMeLower = meLowerDay == null
-    ? null
-    : WEEKDAYS[(WEEKDAYS.indexOf(meLowerDay) + 6) % 7];
-  const hardRunBeforeLower = dayBeforeMeLower != null && days.some((d) =>
+  /**
+   * ⛔ EVERY ME LOWER DAY THE FRAME HAS, ASKED OF THE FRAME (2026-08-30) — see `FrameDay.lowerRole`.
+   * ⚠️ IT WAS A `find` ON THE LABEL `'ME: Lower'`, WHICH IS BOTH TOO NARROW AND TOO FEW. p274 names
+   * the All Rounder's lower days for their pattern and opens BOTH on an ME slot, so the old test
+   * returned nothing and the p247 reduction could never fire on this frame. `strength_5k` still
+   * answers with its one day, in the same order, through the label fallback in `lowerRoleOf`.
+   */
+  const meLowerFrameDays = days
+    .filter((d) => (d.lowerRole ?? (d.label === 'ME: Lower' ? 'me' : null)) === 'me')
+    .map((d) => d.day);
+  const daysBeforeMeLower = new Set(
+    meLowerFrameDays.map((fd) => WEEKDAYS[(WEEKDAYS.indexOf(dayNameFor(args, fd)) + 6) % 7]),
+  );
+  const hardRunBeforeLower = daysBeforeMeLower.size > 0 && days.some((d) =>
     d.endurance.some((slot, i) => {
       const assigned = assignedSlot(sportAssignment, d.day, i, slot);
+      const placed = enduranceDays.get(`${d.day}:${i}`);
       return assigned.sport === 'run'
-        && isHardSlot({ family: assigned.family })
-        && enduranceDays.get(`${d.day}:${i}`) === dayBeforeMeLower;
+        && isHardSlot({ family: assigned.family, role: assigned.role })
+        && placed != null && daysBeforeMeLower.has(placed);
     }));
   for (const n of sportAssignment.notes) {
     if (!notes.some((x) => x.text === n.text)) {
@@ -2199,10 +2241,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const exercises: StrengthExercise[] = [];
         const dosed: DosingSession['sets'] = [];
         const takenToday = new Set<string>();
+        let droppedHere = 0;
         for (const slot of day.strength) {
-          const { exercise, movement, sets, pattern } = exerciseForSlot(
+          const built = exerciseForSlot(
             slot, args, notes, hardRunBeforeLower, takenToday, picks, focusMuscles,
             dialMuscles, day.day);
+          // ⛔ THE DAY RAN OUT OF MOVEMENTS FOR THIS PATTERN — see `exerciseForSlot`'s drop branch.
+          if (!built) { droppedHere += 1; continue; }
+          const { exercise, movement, sets, pattern } = built;
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
           if (slot.intent === 'ME') {
@@ -2228,6 +2274,26 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             cite: 'Viada p215',
           });
         }
+        /**
+         * ⛔ A DROPPED SLOT IS SAID, NOT ABSORBED (2026-08-30). `buildStandingPlanRow` turns a
+         * `warning` note into a `placement_compromises` entry, which is the channel the builder
+         * already reads — so the athlete is told their kit came up short on this pattern rather than
+         * being handed a shorter day with no reason, or the same lift printed twice.
+         * ⚠️ ONE SENTENCE PER DAY, not per slot; a bodyweight-only pull day can drop more than one.
+         */
+        if (droppedHere > 0) {
+          notes.push({
+            kind: 'warning',
+            // ⛔ IT NAMES THE CAUSE AND THE FIX. "Came up short" on its own teaches the athlete
+            // nothing — the cause is the equipment on file, and adding to it is the thing that
+            // changes the answer.
+            text: `${day.label ?? `Day ${day.day}`} is ${droppedHere} `
+              + `${droppedHere === 1 ? 'exercise' : 'exercises'} short. The equipment on file does `
+              + 'not cover enough different movements for this part of the body to fill the day '
+              + 'without repeating one, and the same lift twice is not two exercises. Adding what '
+              + 'you have to your equipment list is what fills these.',
+          });
+        }
         sessions.push({
           day: dayNameFor(args, day.day),
           type: 'strength',
@@ -2240,7 +2306,13 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           description: sessionCueFor(day),
           duration: 55,
           strength_exercises: exercises,
-          tags: ['standing_plan', `frame:${frame.id}`, `column:${args.column}`],
+          // ⛔ THE DAY'S STRUCTURAL FACT TRAVELS WITH THE SESSION — see `FrameDay.lowerRole`. The
+          // interference law used to recover "this is the heavy leg day" by string-matching the
+          // session's NAME, which only worked while every frame named its days the same way.
+          tags: [
+            'standing_plan', `frame:${frame.id}`, `column:${args.column}`,
+            ...(day.lowerRole ? [`lower:${day.lowerRole}`] : []),
+          ],
         });
         dosing.push({ label: day.label ?? `day ${day.day}`, sets: dosed });
       }
@@ -2280,14 +2352,19 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * there's no need for a speed session to be a lengthy stand-alone!"* p246 prints four slots and
        * all four are the frame's, so the economy work goes ON one of them.
        *
-       * ⚠️ THE EASY RUN CARRIES THEM, and only when that slot is actually a run. It is the lightest
-       * session in the week and sits on day 4 — after the hardest day and before the long one. An
-       * athlete who put that slot on the bike gets no strides, which is the honest answer: there is
-       * no running economy to train on a session with no running in it.
+       * ⛔⛔ THE FRAME NAMES THE CARRIER NOW — `EnduranceSlot.carriesStrides` (2026-08-30). It was
+       * `family === 'run_vt1'`, which asked a different question: the easy run was chosen because it
+       * is the lightest RUNNING SESSION in the week, and that is a fact about the slot's job rather
+       * than about its family. A frame whose easy slot is prescribed as a ride — p274 day 4 — has no
+       * session of that family at all, so the test silently found nothing.
+       *
+       * ⚠️ AND THE RUN GUARD STAYS. A marked slot carries strides only when its sport is actually a
+       * run. An athlete who put the carrier on the bike gets none, which is the honest answer: there
+       * is no running economy to train on a session with no running in it.
        * ⚠️ THE FRAME'S OWN SLOT ONLY. The volume-fill easy runs and the advanced tier's extra easy
        * runs are appended elsewhere in this file and carry none — one stride block a week.
        */
-      const carriesStrides = assigned.family === 'run_vt1' && assigned.sport === 'run';
+      const carriesStrides = slot.carriesStrides === true && assigned.sport === 'run';
       const built = buildEnduranceSession({
         family: assigned.family,
         level,

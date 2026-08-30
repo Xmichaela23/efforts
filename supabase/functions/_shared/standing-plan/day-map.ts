@@ -15,6 +15,7 @@
 // ============================================================================
 
 import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
+import { isHardSlot, isLongSlot } from './sport-slots.ts';
 
 /** ⛔ Monday-first, because `activate-plan:437` `DAY_INDEX` is Monday:1 … Sunday:7 and dates are
  *  computed off `mondayOf(startDate)`. This module and that mapping must agree or a session lands on
@@ -51,9 +52,18 @@ export function offsetPutting(frameDay: number, weekday: Weekday): number {
 // ── WHICH FRAME DAY CARRIES WHICH ANCHOR ─────────────────────────────────────────────────────────
 
 /**
- * ⛔ READ OFF THE FRAME, NOT HARDCODED. The long day is the frame day carrying the LSD family; the
- * hard days are the ones carrying MLSS or near-threshold. A second table naming "day 6" would go
- * stale the first time a frame is added, and `FRAMES` is the law.
+ * ⛔ READ OFF THE FRAME, NOT HARDCODED. A second table naming "day 6" would go stale the first time a
+ * frame is added, and `FRAMES` is the law.
+ *
+ * ⛔⛔ AND IT ASKS THE ONE OWNER NOW (2026-08-30). This was a FOURTH hand-maintained copy of "which
+ * slot is long, which are hard" — `if (e.family === 'run_lsd')` and a two-family test for hard —
+ * beside `HARDNESS`/`isLongSlot`, `anchorRoleOf` and `week-conflicts.ts`. It keyed on RUN families
+ * only, so the All Rounder's natively-prescribed `Cyc AnA` (p274 day 2) and `Cyc endurance` (day 4)
+ * would have returned no anchor day at all: no pin, no placement, and nothing said. Same silent
+ * class as the `HARD_FAMILIES` defect fixed earlier today.
+ * ⚠️ IT ANSWERS IDENTICALLY FOR EVERY SLOT WRITTEN BEFORE ROLES EXISTED — `run_lsd` is the only long
+ * family in `HARDNESS`'s companion test, and `run_mlss`/`run_near_threshold` are exactly the two
+ * families ranked at or above 3.
  */
 export function anchorDaysFor(frame: FrameId, column: ColumnKind = 'standard'): {
   long: number | null;
@@ -64,8 +74,8 @@ export function anchorDaysFor(frame: FrameId, column: ColumnKind = 'standard'): 
   const hard: number[] = [];
   for (const d of days) {
     for (const e of d.endurance) {
-      if (e.family === 'run_lsd') long = d.day;
-      if (e.family === 'run_mlss' || e.family === 'run_near_threshold') hard.push(d.day);
+      if (isLongSlot(e)) long = d.day;
+      else if (isHardSlot(e)) hard.push(d.day);
     }
   }
   return { long, hard: [...new Set(hard)].sort((a, b) => a - b) };

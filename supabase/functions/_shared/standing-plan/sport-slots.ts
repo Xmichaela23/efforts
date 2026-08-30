@@ -75,6 +75,17 @@ export type AssignedSlot = {
   sport: 'run' | 'ride' | 'swim';
   /** ⛔ TRUE WHEN THE SPORT WAS SUBSTITUTED. Carried so a note can say so and a test can see it. */
   substituted: boolean;
+  /**
+   * ⛔⛔ THE FRAME'S OWN MARKER, CARRIED THROUGH THE ASSIGNMENT (2026-08-30). `EnduranceSlot.role`
+   * existed and every reader downstream of `assignSports` lost it here, so a frame that stated its
+   * roles was still classified by family name once the week had been assigned — the exact silence
+   * the field was added to end.
+   *
+   * ⚠️ IT IS THE **ASSIGNED** SESSION'S ROLE, NOT ALWAYS THE FRAME SLOT'S. A modality swap keeps it
+   * (a hard run moved to the bike is still the week's hard session); a DECLINED hard slot takes the
+   * easy slot's role, because the week has genuinely converted it to easy work.
+   */
+  role?: 'hard' | 'long' | 'easy';
   /** The frame slot this came from, verbatim, so a reader can find the row on the page. */
   sourceText: string;
 };
@@ -303,12 +314,16 @@ export function declineHardSlot(
       return {
         family: eq.family, level: easySlot.level, archetype: eq.archetype, raceTempo: false,
         sport: 'ride', substituted: true, sourceText: slot.sourceText,
+        // ⛔ THE EASY SLOT'S ROLE, NOT THE DECLINED ONE'S — this session IS the easy slot now.
+        role: easySlot.role,
       };
     }
   }
   return {
     family: easySlot.family, level: easySlot.level, archetype: easySlot.archetype, raceTempo: false,
     sport: 'run', substituted: true, sourceText: slot.sourceText,
+    // ⛔ THE EASY SLOT'S ROLE — see the ride branch above.
+    role: easySlot.role,
   };
 }
 
@@ -516,7 +531,7 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
   const notes: SlotAssignment['notes'] = [];
   const asRun = (s: EnduranceSlot): AssignedSlot => ({
     family: s.family, level: s.level, archetype: s.archetype, raceTempo: s.raceTempo,
-    sport: 'run', substituted: false, sourceText: s.sourceText,
+    sport: 'run', substituted: false, sourceText: s.sourceText, role: s.role,
   });
   for (const { day, i, slot } of slots) byKey[key(day, i)] = asRun(slot);
 
@@ -583,6 +598,9 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
         family: eq.family, level: clampRideLevel(eq.family, slot.level),
         archetype: eq.archetype, raceTempo: slot.raceTempo,
         sport: 'ride', substituted: true, sourceText: slot.sourceText,
+        // ⛔ A MODALITY SWAP DOES NOT CHANGE WHAT THE SESSION IS FOR. The frame's hard slot ridden
+        // instead of run is still the week's hard session.
+        role: slot.role,
       };
       substituted += 1;
     }
@@ -652,6 +670,8 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
       byKey[key(day, i)] = {
         family: eq.family, level: slot.level, archetype: eq.archetype, raceTempo: slot.raceTempo,
         sport: 'ride', substituted: true, sourceText: slot.sourceText,
+        // ⛔ SAME RULE AS THE DIAL'S OWN SUBSTITUTION ABOVE — the sport moved, the role did not.
+        role: slot.role,
       };
       placed += 1;
     }
@@ -704,5 +724,6 @@ export function assignedSlot(
   return assignment?.byKey[key(day, i)] ?? {
     family: fallback.family, level: fallback.level, archetype: fallback.archetype,
     raceTempo: fallback.raceTempo, sport: 'run', substituted: false, sourceText: fallback.sourceText,
+    role: fallback.role,
   };
 }

@@ -481,18 +481,21 @@ export function setPositionForCount(count: number, band: { lo: number; hi: numbe
  * unrounded number happens to sit against the rounding line.
  *
  * ⚠️ ONE REP IS WORTH ABOUT THREE PER CENT — finer than the smallest plate jump a light bar can take,
- * which is six. So the reps are where the overload lives and `scheduledRise` stays underneath as the
- * FLOOR: when nobody earns anything his one per cent still moves the bar, and the earned jump sits on
- * top of it rather than replacing it.
+ * which is six. So the reps are where the overload lives.
+ *
+ * ⛔⛔ AND WHETHER ANYTHING SITS UNDERNEATH IS NOW PER FRAME — DO NOT READ THIS AS TRUE OF BOTH
+ * (2026-08-30). `strength_5k` keeps p247's one per cent as a FLOOR beneath the earned jump: when
+ * nobody earns anything his rate still moves the bar. **The All Rounder's rate is ZERO on Michael's
+ * ruling that progression is earned or it does not happen**, so on that frame the reps carry ALL of
+ * it and a bar that nobody earned does not move. See `RATE_ANCHOR` for the whole chain.
  *
  * ⛔ RIR IS NOT PART OF THIS. A rep count is completed work; a reserve estimate is a guess about a rep
  * that was not performed, and it is least reliable in exactly the athletes this plan is for.
  */
 export const REPS_CARRY_THE_PROGRESSION_IS_OURS =
   'The heavy set moves the weight up when the athlete finishes its rep range twice in a row, and the '
-  + 'reps start again at the bottom of the range when it does. The book states one progression rate — '
-  + 'one per cent every three weeks — and that stays underneath as the floor. Reading the reps as the '
-  + 'overload is ours: his own number cannot be expressed on a bar light enough to need it.';
+  + 'reps start again at the bottom of the range when it does. Reading the reps as the overload is '
+  + 'ours: the book\'s own rate cannot be expressed on a bar light enough to need it.';
 
 /** ⛔ THREE FALLING SESSIONS, AND STRICTLY FALLING. See `barLadderStep` for why not two, and why not equal. */
 export const DECLINE_SESSIONS_TO_UNDO = 3;

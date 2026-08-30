@@ -316,9 +316,7 @@ function checkPlacementLaws(
 
   const view = lawViewOf(ss, column);
   const lower = lowerDaysOf('strength_5k', column);
-  const lowerWeekdays = [lower.me, lower.de]
-    .filter((d): d is number => d != null)
-    .map(dayOf);
+  const lowerWeekdays = [...lower.me, ...lower.de].map(dayOf);
 
   /**
    * ⛔⛔ WHICH SESSIONS THE ATHLETE'S OWN ANSWERS MOVED — p130's classifier, and the first draft of it
@@ -407,12 +405,13 @@ function checkPlacementLaws(
    * ME Lower. Criterion 8 below is the only thing that judges it now; criterion 7 needs no exemption
    * for it since D-453 set the leg debt to 24h and the day-after clears exactly.
    */
-  const meLowerWeekday = lower.me == null ? null : dayOf(lower.me);
-  const dayBeforeMeLower = meLowerWeekday == null
-    ? null
-    : DAYS[(DAYS.indexOf(meLowerWeekday) + 6) % 7];
-  const hardRunTheDayBefore = dayBeforeMeLower != null && view.typed.some((t) =>
-    t.load === 'hard_cardio' && t.s.type === 'run' && t.s.day === dayBeforeMeLower);
+  // ⚠️ EVERY ME LOWER DAY — `lowerDaysOf` returns a list now (a frame may open two lower days on an
+  // ME slot). `strength_5k` has exactly one, so this measures what it always measured.
+  const daysBeforeMeLower = new Set(
+    lower.me.map((fd) => DAYS[(DAYS.indexOf(dayOf(fd)) + 6) % 7] as string),
+  );
+  const hardRunTheDayBefore = daysBeforeMeLower.size > 0 && view.typed.some((t) =>
+    t.load === 'hard_cardio' && t.s.type === 'run' && daysBeforeMeLower.has(t.s.day));
 
   // 7 ── KEYSTONES: FRESH IN THE RELEVANT SYSTEMS (p131, Q-288). Asked of `COST`, not restated.
   //
@@ -474,9 +473,11 @@ function checkPlacementLaws(
   //   · the reduction dropped → `HAIRCUT_CAUSE_IS_OURS`, our stated reading of his p280 reason.
   // Exactly one of them is true of a block, and which one must match the calendar.
   {
-    const meWeekday = meLowerWeekday;
-    if (meWeekday != null) {
-      const before = dayBeforeMeLower!;
+    // ⚠️ NAMES THE FRAME'S ME LOWER DAYS — one for `strength_5k`, so the sentences below read the
+    // same as they always did.
+    const meWeekday = lower.me.map(dayOf).join(' and ');
+    if (lower.me.length > 0) {
+      const before = [...daysBeforeMeLower].join(' and ');
       const adjacency = hardRunTheDayBefore;
       const saysReduced = spoken.some((t) => t.includes('three and a half per cent'));
       const saysDropped = spoken.some((t) => t === HAIRCUT_CAUSE_IS_OURS);

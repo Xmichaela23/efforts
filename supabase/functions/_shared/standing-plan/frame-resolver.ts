@@ -27,6 +27,22 @@ export type FramePosition = {
    * whole** rather than left behind a flag.
    */
   enduranceSport: 'run' | 'bike' | null;
+  /**
+   * ⛔⛔ WHICH FOCUS THE ATHLETE IS IN — the dial from
+   * `DESIGN-standard-focus-all-rounder-2026-08-30.md` §1, and the reason this file stopped returning
+   * one frame unconditionally (2026-08-30).
+   *
+   *   - `'standard'` → **Standard Focus**, the All Rounder (pp274-275). The year-round home base:
+   *     it integrates strength with BOTH endurance sports and prescribes its own cycling.
+   *   - `'run'` → **Run Focus**, which houses Strength + 5K (pp246-247).
+   *
+   * ⚠️ ABSENT KEEPS TODAY'S ANSWER, AND THAT IS DELIBERATE, NOT AN OVERSIGHT. §1 says Standard Focus
+   * is where an athlete SITS and should eventually be the default — but nothing asks yet, and
+   * flipping the default here would silently move every existing athlete onto a different program
+   * mid-block. **The frame is reachable; which one is the default is Michael's call and needs the
+   * screen that asks.** §11 still has it open.
+   */
+  focus?: 'standard' | 'run';
 };
 
 export type FrameResolution =
@@ -69,10 +85,12 @@ export type FrameResolution =
  * that is not the wizard, and it is not the gap.
  */
 export function resolveFrame(position: FramePosition): FrameResolution {
-  // ⛔ ONE FRAME, EITHER SPORT. Which sport fills the slots is `sport-slots.ts`'s question, not this
-  // file's — see the note above for what a bike-only athlete is actually handed.
+  // ⛔ EITHER SPORT REACHES EITHER FRAME. Which sport fills the slots is `sport-slots.ts`'s question,
+  // not this file's — see the note above for what a bike-only athlete is actually handed. What this
+  // file answers now is WHICH PROGRAM the week is cut from, and that is `focus`.
   if (position.enduranceSport === 'run' || position.enduranceSport === 'bike') {
-    return { frame: 'strength_5k', cite: FRAMES.strength_5k.cite };
+    const frame: FrameId = position.focus === 'standard' ? 'all_rounder' : 'strength_5k';
+    return { frame, cite: FRAMES[frame].cite };
   }
   return { frame: null, reason: 'no endurance sport is being held, and every frame is a hybrid week' };
 }

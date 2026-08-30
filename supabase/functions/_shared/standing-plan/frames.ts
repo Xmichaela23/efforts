@@ -14,7 +14,12 @@
 import type { ViadaCategory, ViadaIntent, ViadaPattern } from '../strength-grid/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
 
-export type FrameId = 'strength_5k';
+/**
+ * ⛔ TWO FRAMES ON A DIAL, NOT A REPLACEMENT (DESIGN-standard-focus-all-rounder-2026-08-30 §2).
+ * `strength_5k` is FROZEN AS A DESIGN — stop shaping new work around its quirks — and still fully
+ * guarded by its tests, because both frames share the composer, the materializer and the progression.
+ */
+export type FrameId = 'strength_5k' | 'all_rounder';
 
 export type ColumnKind = 'standard' | 'taper';
 
@@ -77,6 +82,17 @@ export type StrengthSlot = {
    * stage 2's substitution ladder. Recorded in Part E1b as ambiguous rather than resolved.
    */
   ambiguousNotation?: string;
+  /**
+   * ⛔ THE MODIFIER, NOT A CATEGORY — `grid.ts` `SlotRequest.asymmetrical`, and its own comment says
+   * it: *"Braced push (asymmetrical) is a braced push done one limb at a time — there is no
+   * asymmetrical list to draw from."* p274 prints it three times in the All Rounder and it is
+   * resolved in `SOURCE-viada-hybrid-athlete.md` Part A2 as a braced LOWER push done single-leg.
+   *
+   * ⚠️ p275 SANCTIONS THE ROTATION OUT OF IT: *"You can rotate the braced asymmetrical movements
+   * with secondary asymmetrical."* `resolveSlot` already implements exactly that fallback, so a slot
+   * the athlete's kit cannot reach becomes a split squat rather than losing the asymmetry.
+   */
+  asymmetrical?: boolean;
   /** What the page prints, kept verbatim so a reader can find the row. */
   sourceText: string;
 };
@@ -99,6 +115,28 @@ export type EnduranceSlot = {
    * family name is what made a natively-prescribed ride invisible as hard or long.
    */
   role?: 'hard' | 'long' | 'easy';
+  /**
+   * ⛔⛔ THIS SLOT CARRIES THE WEEK'S STRIDES — STATED BY THE FRAME (2026-08-30), for the same reason
+   * `role` is: it was being inferred from a family name and the inference does not survive a second
+   * frame.
+   *
+   * ⛔ WHY THE STRIDES EXIST AT ALL. p119 lists running economy FIRST of the three qualities that may
+   * not lapse, and no frame slot is running speed work. p109 is why there is no fifth slot for it:
+   * economy improves with *"as few as a handful of strides before, during, or after other running
+   * sessions"*, so the economy work goes ON a session the frame already has.
+   *
+   * ⚠️ IT WAS `family === 'run_vt1'`, WHICH IS A DIFFERENT QUESTION. That test read "the easy run",
+   * and the easy run was the chosen carrier because it is the lightest running session in the week —
+   * a reason about the SESSION'S JOB, not about its family. **The All Rounder's easy slot is
+   * prescribed as a RIDE (p274 day 4, `Cyc endurance`), so the family test finds nothing in its
+   * standard column and the athlete gets no economy work for a whole block; in its taper column the
+   * family lands on the PLYOMETRICS day and the strides go there. Nobody chose either outcome.**
+   *
+   * ⚠️ AND THE RUN GUARD STAYS. A slot marked here still carries strides only when its sport is
+   * actually a run — there is no running economy to train on a session with no running in it. That
+   * guard is `compose.ts`'s, not this field's.
+   */
+  carriesStrides?: boolean;
   sourceText: string;
 };
 
@@ -110,6 +148,24 @@ export type FrameDay = {
   /** Day 3 only. p227 governs the dose; see `PLYO_DOSE`. */
   plyo?: boolean;
   rest?: boolean;
+  /**
+   * ⛔⛔ WHAT A LOWER-BODY DAY IS FOR, STATED BY THE FRAME (2026-08-30) — the SAME fix as
+   * `EnduranceSlot.role`, applied to the strength side, and for the same reason.
+   *
+   * `label` was carrying two jobs: the athlete's name for the session AND the structural fact that
+   * this is the week's heavy leg day. Five readers string-matched `'ME: Lower'` / `'DE: Lower'` to
+   * recover it — `lowerDaysOf`, `typedSessionsOf`, `phraseFor`, the speed-day rule and the p247
+   * haircut in `compose.ts`. **The All Rounder's lower days are named for their PATTERN on p274
+   * (`Lower body: Hinge`, `Lower body: Push`), so every one of those tests would have missed, and
+   * the frame's two heavy leg days would have carried no interference check at all.** Silent, like
+   * every other defect in this family.
+   *
+   * ⚠️ ABSENT MEANS "READ THE LABEL", so `strength_5k` is byte-identical either way — its days 2 and
+   * 5 are marked here with exactly what their labels already said.
+   * ⚠️ A FRAME MAY HAVE TWO `me` DAYS AND NO `de` DAY. p274 opens both All Rounder lower days on an
+   * ME slot; `lowerDaysOf` returns LISTS for that reason.
+   */
+  lowerRole?: 'me' | 'de';
 };
 
 export type Frame = {
@@ -165,6 +221,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
   {
     day: 2,
     label: 'ME: Lower',
+    lowerRole: 'me',
     strength: [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
       S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
@@ -185,11 +242,14 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'secondary', 'push_upper', '1 x HYP: Accessory: secondary push'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
     ],
-    endurance: [E('run_vt1', 1, 'VT1 (level 1)')],
+    // ⛔ THE WEEK'S ECONOMY WORK RIDES ON THIS SLOT — see `EnduranceSlot.carriesStrides`. It is the
+    // lightest running session in the week and it sits after the hardest day and before the long one.
+    endurance: [E('run_vt1', 1, 'VT1 (level 1)', { carriesStrides: true })],
   },
   {
     day: 5,
     label: 'DE: Lower',
+    lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
       S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower (rotate with primary push lower)', { rotatesWith: 'press_lower' }),
@@ -225,6 +285,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
   {
     day: 2,
     label: 'ME: Lower',
+    lowerRole: 'me',
     strength: [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate)', { rotatesWith: 'press_lower' }),
       S('DE', 'accessory', 'primary', 'press_lower', '1 x DE: Accessory: primary push lower'),
@@ -254,6 +315,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
   {
     day: 5,
     label: 'DE: Lower',
+    lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate)', { rotatesWith: 'hinge_lower' }),
       S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower'),
@@ -264,6 +326,194 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
     endurance: [],
   },
   { day: 6, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1)')] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔⛔ THE ALL ROUNDER (p274), TRANSCRIBED FROM THE PAGE IMAGE — `SOURCE-viada-hybrid-athlete.md`
+ * Part E1, verified against `p274.jpg` 2026-08-21. Design: `DESIGN-standard-focus-all-rounder-2026-08-30.md`.
+ *
+ * Four strength days organised by MOVEMENT PATTERN (1, 2, 4, 5), a plyo-only day 3, an
+ * endurance-only day 6, one full rest day. **Five endurance sessions in standard, three in taper** —
+ * more than Strength + 5K, not fewer.
+ *
+ * ⛔⛔ ITS CYCLING IS PRESCRIBED NATIVELY, and that is the whole reason `EnduranceSlot.role` exists.
+ * p274 puts `Cyc AnA (level 1)` on day 2 and `Cyc endurance (level 1)` on day 4. Every other frame
+ * slot in this file is a run family that `RIDE_EQUIVALENT` converts afterwards, so a run-only reader
+ * returned nothing for these two: not hard, not long, not easy — invisible, silently.
+ * **EVERY ENDURANCE SLOT BELOW STATES ITS ROLE.** If a future reader has to be taught a family name
+ * to understand this week, the frame should be stating the fact instead.
+ *
+ * ⛔ THE DAY-OPENING LIFT IS A COMPETITION PRIMARY, AND THAT IS MICHAEL'S RULING, NOT THE PAGE.
+ * p274 prints every ME slot as a SECONDARY lift, and p275 gives his two reasons: (1) variety of
+ * implements and planes keeps progress coming, and (2) it *"breaks the attachment to the big
+ * three."* **Reason 2 is about HIS reader — a lifter moving into endurance. Ours is an endurance
+ * athlete moving into lifting and has no such attachment** (DESIGN §3). Reason 1 survives, which is
+ * why the braced and focused slots below are untouched.
+ * ⚠️ AND p275 PERMITS IT OUTRIGHT: *"primary lifts CAN be substituted in, you're encouraged to keep
+ * your options open."* The mechanical reason it matters: `exerciseForSlot` only puts a WEIGHT on a
+ * row when the movement is the athlete's named competition lift for that pattern, so without a
+ * primary opening each day this frame prescribes nothing and every weight rides the ratio table
+ * outside its stated range. `sourceText` keeps the page's own words on every row regardless.
+ *
+ * ⚠️ THE SUPERSETS ARE NOT STRUCTURAL YET (DESIGN §5). p274 pairs four HYP slots — arms on the upper
+ * days, braced hinge with braced lower push on the lower days. They are transcribed here as ordinary
+ * adjacent slots because the build order is display-first: two rows marked as a pair, and structure
+ * only if rest, dosing or the ledger genuinely need it. **Nothing in the app pairs exercises today.**
+ *
+ * ⚠️ NO `archetype` ANYWHERE. That field is *"p247's own refinement of the slot, where it gives
+ * one"*, and p275 gives none — not even on the LSD, where p246's frame carries an insert refinement.
+ * Adding one here would be inventing a refinement and attributing it to the page.
+ */
+const ALL_ROUNDER_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'Upper body: Push',
+    strength: [
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: secondary push'),
+      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push'),
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push'),
+      // ⚠️ THE ARMS SUPERSET — p274 prints these two as one paired entry. Display-first (DESIGN §5).
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: focused push'),
+    ],
+    endurance: [E('run_mlss', 2, 'MLSS+ (level 2)', { role: 'hard' })],
+  },
+  {
+    day: 2,
+    label: 'Lower body: Hinge',
+    // ⛔ BOTH LOWER DAYS OPEN HEAVY IN THIS FRAME — see `FrameDay.lowerRole`. p274 gives it no speed
+    // leg day at all, which is why `lowerDaysOf` had to return lists.
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: secondary hinge'),
+      // ⚠️ THE BRACED SUPERSET — same region, opposite patterns, which is p275's own rule 2b for what
+      // may be paired: *"similar muscle groups but dramatically different specific patterns and loads."*
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset'),
+      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset'),
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring'),
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
+    ],
+    endurance: [E('ride_anaerobic', 1, 'Cyc AnA (level 1)', { role: 'hard' })],
+  },
+  {
+    day: 3,
+    label: null,
+    strength: [],
+    endurance: [E('run_near_threshold', 2, 'NT (level 2)', { role: 'hard' })],
+    plyo: true,
+  },
+  {
+    day: 4,
+    label: 'Upper body: Pull',
+    strength: [
+      S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: secondary pull'),
+      S('DE', 'accessory', 'secondary', 'pull_upper', '1 x DE: secondary pull'),
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
+    ],
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+  },
+  {
+    day: 5,
+    label: 'Lower body: Push',
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'press_lower', '1 x ME: secondary push'),
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset'),
+      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset'),
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps'),
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true }),
+    ],
+    endurance: [],
+  },
+  {
+    day: 6,
+    label: null,
+    strength: [],
+    // ⚠️ p275 OPENS THIS SESSION UP AND THE FRAME DOES NOT NARROW IT: *"the weekend LSR can be a
+    // hike, a long ride, a team sport day, or whatever else is of interest."* The sport is
+    // `sport-slots.ts`'s question; what the frame states is that this is the week's LONG session.
+    endurance: [E('run_lsd', 2, 'LSD (level 2)', { role: 'long' })],
+  },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔ THE TAPER/DELOAD COLUMN (p274, right-hand pair), AND IT IS A SUBSTITUTION AS MUCH AS A CUT:
+ * every ME becomes SKILL on the upper days and DE on the lower ones, the braced and superset volume
+ * comes off BOTH lower days, every endurance level drops from 2 to 1, day 3 drops from NT to VT1,
+ * and days 2 and 5 lose their endurance entirely. Three endurance sessions instead of five.
+ *
+ * ⚠️ THE DAY-OPENING LIFT STAYS A COMPETITION PRIMARY, for the same reason as the standard column —
+ * a day with no tested lift prescribes no weight. The page's INTENT is kept exactly as printed.
+ */
+const ALL_ROUNDER_TAPER: FrameDay[] = [
+  {
+    day: 1,
+    label: 'Upper body: Push',
+    strength: [
+      S('SKILL', 'competition', 'primary', 'push_upper', '1 x SKILL: secondary push'),
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: focused push'),
+    ],
+    endurance: [E('run_mlss', 1, 'MLSS+ (level 1)', { role: 'hard' })],
+  },
+  {
+    day: 2,
+    label: 'Lower body: Hinge',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: secondary hinge'),
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring'),
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
+    ],
+    endurance: [],
+  },
+  {
+    day: 3,
+    label: null,
+    strength: [],
+    endurance: [E('run_vt1', 1, 'VT1 (level 1)', { role: 'easy' })],
+    plyo: true,
+  },
+  {
+    day: 4,
+    label: 'Upper body: Pull',
+    strength: [
+      S('SKILL', 'competition', 'primary', 'pull_upper', '1 x SKILL: secondary pull'),
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
+    ],
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+  },
+  {
+    day: 5,
+    label: 'Lower body: Push',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: secondary push'),
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps'),
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true }),
+    ],
+    endurance: [],
+  },
+  {
+    day: 6,
+    label: null,
+    strength: [],
+    // ⚠️ p274's TAPER CELL PRINTS A CHOICE — *"LSD (level 1) or Cyc endurance (level 1)"*. The frame
+    // states the ROLE and leaves the modality to `sport-slots.ts`, which is the same answer the
+    // choice gives; spelling it as two slots would double the session.
+    endurance: [E('run_lsd', 1, 'LSD (level 1) or Cyc endurance (level 1)', { role: 'long' })],
+  },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
 
@@ -281,6 +531,53 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
  */
 export const RATE_ANCHOR: Record<FrameId, { perWeek: number; cite: string }> = {
   strength_5k: { perWeek: 0.01 / 3, cite: 'Viada p247 — 1% every 3 weeks' },
+  /**
+   * ⛔⛔ ZERO, AND ZERO IS A RULING RATHER THAN A MISSING NUMBER (Michael, 2026-08-30).
+   * **Progression is EARNED or it does not happen.** Read the whole chain before restoring a rate
+   * here; the zero alone is not checkable, and it will look like an oversight to anybody who finds
+   * `strength_5k` carrying a number one line above it.
+   *
+   * ⛔ HIS RATE AND HIS BAND ARE REAL AND ARE NOT BEING DISPUTED.
+   * `SOURCE-viada-hybrid-athlete.md` §J1: p245 and p247 print the identical sentence — *"slow
+   * gradual increases in the calculated 1RM taking place every 3 to 4 weeks (assume 1 percent every
+   * 3 weeks as a starting point)"* — and p251's *"1% every four weeks or so"* sits inside that band.
+   * The band is his. **p275 states no rate at all for this program**, so ANY number here is a
+   * position we chose, and reusing p247's would be an unlabelled inference off a different page.
+   *
+   * ⚠️ A POSITION WAS CHOSEN AND THEN OVERRULED, AND IT IS RECORDED SO IT IS NOT RE-DERIVED. The
+   * slow end of his band — 1% every four weeks — was reasoned from p275's *"resist the urge to add
+   * difficulty or length"* and from this frame carrying five endurance sessions to Strength + 5K's
+   * four. **That reasoning was sound and is not why it was rejected.**
+   *
+   * ⛔⛔ WHY IT IS ZERO. A scheduled rise is a drift on the CALENDAR, and this app is never short of
+   * evidence: the logger lays the session out, so a completed heavy set is recorded every time one
+   * happens. A calendar drift is therefore a guess stacked on top of evidence the app already holds,
+   * and it can only ever fire for an athlete who is NOT earning it. `progression.ts` already states
+   * the rule it contradicts — the bar moves when it is earned, which is why there is no percentage
+   * back-off either. **The double progression owns the number: finish the top of the rep range twice
+   * running and the bar moves; miss the bottom and it returns to the last weight held; log nothing
+   * and nothing changes.**
+   *
+   * ⚠️ AND IT REMOVES ALMOST NOTHING IN PRACTICE, WHICH IS THE SENTENCE THAT SHOULD STOP ANYONE
+   * REINSTATING IT AS HARMLESS. One per cent cannot be expressed on a bar under roughly 250 lb once
+   * it is rounded to real plates (see `REPS_CARRY_THE_PROGRESSION_IS_OURS`) — on a 145 lb bench the
+   * drift moved the weight ONCE in twelve weeks, in a week decided by where the unrounded number
+   * happened to fall against the rounding line. **What zeroing it removes is the single case that
+   * contradicted the rule: a bar that rose for somebody who logged nothing.**
+   *
+   * ⛔ IT IS ONE CONSTANT AND NOT A BRANCH. `scheduledRise` multiplies into `prescribedLoad` and
+   * nothing else reads it; at zero the multiplier is 1 and drops out of the arithmetic. The earned
+   * increment is a POUNDS offset added AFTER the rounding and never compounded with this multiplier,
+   * so removing the drift cannot weaken the mechanism that actually moves the bar. **There is no
+   * "what if nobody logs" branch here, no decay and no default drift, and none may be added.**
+   * ⚠️ `strength_5k` IS UNTOUCHED — its own entry above, its own page, and measured byte-identical
+   * across every kit, week, column and pick set.
+   */
+  all_rounder: {
+    perWeek: 0,
+    cite: 'OURS — Michael, 2026-08-30: progression is earned or it does not happen. p275 states no '
+      + 'rate for this program, and the double progression owns the number.',
+  },
 };
 
 export const FRAMES: Record<FrameId, Frame> = {
@@ -291,6 +588,14 @@ export const FRAMES: Record<FrameId, Frame> = {
     liftingDays: 4,
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
+  },
+  all_rounder: {
+    id: 'all_rounder',
+    sourceName: 'The All Rounder',
+    cite: 'Viada pp274-275',
+    liftingDays: 4,
+    columns: { standard: ALL_ROUNDER_STANDARD, taper: ALL_ROUNDER_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.all_rounder.perWeek,
   },
 };
 

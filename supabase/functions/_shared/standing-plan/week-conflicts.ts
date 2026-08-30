@@ -94,13 +94,23 @@ function frameEnduranceSlots(frame: FrameId, column: ColumnKind): Array<'long' |
   return out;
 }
 
-/** The frame days carrying lower-body barbell work — ME (the keystone) and DE. Read off `FRAMES`. */
-export function lowerDaysOf(frame: FrameId, column: ColumnKind): { me: number | null; de: number | null } {
-  let me: number | null = null;
-  let de: number | null = null;
+/**
+ * The frame days carrying lower-body barbell work — ME (the keystone) and DE. Read off `FRAMES`.
+ *
+ * ⛔⛔ LISTS, AND IT ASKS THE FRAME RATHER THAN ITS LABEL (2026-08-30). See `FrameDay.lowerRole`.
+ * The old form returned one day per kind and recovered the kind by string-matching the athlete-facing
+ * label, so a frame that names its days for their PATTERN — p274's `Lower body: Hinge` and
+ * `Lower body: Push` — returned nothing at all. **The All Rounder also opens BOTH lower days on an ME
+ * slot**, which the old `{ me, de }` shape could not express even with the labels renamed.
+ * ⚠️ THE LABEL IS STILL THE FALLBACK, so `strength_5k` answers exactly as it did.
+ */
+export function lowerDaysOf(frame: FrameId, column: ColumnKind): { me: number[]; de: number[] } {
+  const me: number[] = [];
+  const de: number[] = [];
   for (const d of FRAMES[frame].columns[column]) {
-    if (d.label === 'ME: Lower') me = d.day;
-    if (d.label === 'DE: Lower') de = d.day;
+    const role = d.lowerRole ?? (d.label === 'ME: Lower' ? 'me' : d.label === 'DE: Lower' ? 'de' : null);
+    if (role === 'me') me.push(d.day);
+    if (role === 'de') de.push(d.day);
   }
   return { me, de };
 }
@@ -135,7 +145,13 @@ export function typedSessionsOf(
   for (const s of sessions) {
     if ((s.tags ?? []).includes('plyo')) { out.push({ s, load: 'easy' }); continue; }
     if (s.type === 'strength') {
-      const heavy = s.name === 'ME: Lower' || s.name === 'Test: Lower';
+      /**
+       * ⛔ THE TAG FIRST, THE NAME AS FALLBACK (2026-08-30) — `compose.ts` stamps `lower:me` off
+       * `FrameDay.lowerRole`, so a frame whose heavy leg day is not CALLED "ME: Lower" is still
+       * counted as one. `Test: Lower` is week one's own name for the same day and keeps its test.
+       */
+      const heavy = (s.tags ?? []).includes('lower:me')
+        || s.name === 'ME: Lower' || s.name === 'Test: Lower';
       out.push({ s, load: heavy ? 'heavy_lower' : 'upper' });
       continue;
     }
@@ -219,7 +235,7 @@ function phraseFor(t: TypedSession): string {
   if (t.load === 'long_run') return 'the long run';
   if (t.load === 'long_ride') return 'the long ride';
   if (t.load === 'hard_cardio') return t.s.type === 'ride' ? 'the hard ride' : 'the hard run';
-  if (t.s.name === 'DE: Lower') return 'the speed leg session';
+  if ((t.s.tags ?? []).includes('lower:de') || t.s.name === 'DE: Lower') return 'the speed leg session';
   return t.s.name;
 }
 
@@ -348,10 +364,13 @@ export function weekConflicts(args: {
   //      clearance in `COST`, so this cost exists nowhere else and would otherwise go unsaid.
   //      ⚠️ The ME lower day is covered by rule 1 above and is deliberately not repeated here.
   {
+    // ⚠️ EVERY DE LOWER DAY THE FRAME HAS, WHICH IS ONE OR NONE TODAY. The All Rounder has none —
+    // p274 opens both its lower days on an ME slot — so this rule correctly says nothing there.
     const lower = lowerDaysOf(args.frame, args.column);
-    const speedDay = lower.de == null ? null : weekdayForFrameDay(lower.de, args.dayOffset);
-    if (speedDay != null) {
-      const speed = typed.find((t) => t.s.name === 'DE: Lower' && t.s.day === speedDay);
+    for (const deDay of lower.de) {
+      const speedDay = weekdayForFrameDay(deDay, args.dayOffset);
+      const speed = typed.find((t) =>
+        ((t.s.tags ?? []).includes('lower:de') || t.s.name === 'DE: Lower') && t.s.day === speedDay);
       const hard = typed.find((t) => t.load === 'hard_cardio' && t.s.day === speedDay);
       if (speed && hard) {
         push({
