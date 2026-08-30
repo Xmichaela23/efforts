@@ -42,6 +42,7 @@ import {
   VOLUME_HONESTY_LINES,
   SLOT_KEYS,
   SLOT_LABEL,
+  slotFrameDay,
   SLOT_OPTIONS,
   slotSummary,
   upperLowerSplitLine,
@@ -225,6 +226,9 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           const session = (isHard || key === 'long')
             ? props.hardSessionTitle?.(key) ?? null
             : null;
+          // ⛔ THE FRAME OWNS THE DAY — see `slotFrameDay`. `null` on a column with no such slot
+          // (the taper carries three, not four), which renders no prefix rather than a wrong one.
+          const dayNumber = slotFrameDay(key);
           return (
             <div
               key={key}
@@ -280,7 +284,16 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 >
                   <span className="min-w-0">
                     {/* ⛔ THE ROW STATES ITS WHOLE ANSWER — never "Hard 1". See `slotSummary`. */}
+                    {/* ⛔ AND WHICH DAY OF THE WEEK'S SEVEN IT IS (Michael, 2026-08-30: *"lets number
+                        the days in this section"*). Read off the frame by `slotFrameDay`, never
+                        hardcoded, and a NUMBER rather than a weekday — the frame rotates onto the
+                        calendar after this screen, so a weekday here is a promise the next screen
+                        breaks. ⚠️ Its own element, not folded into `slotSummary`: the slot labels are
+                        frozen and this adds a fact to the row rather than renaming anything. */}
                     <span className="block text-white/90 text-sm leading-snug truncate">
+                      {dayNumber != null ? (
+                        <span className="text-white/45 tabular-nums">{`Day ${dayNumber} · `}</span>
+                      ) : null}
                       {slotSummary(key, sport, session)}
                     </span>
                     {key === 'long' ? (

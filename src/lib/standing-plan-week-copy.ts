@@ -12,6 +12,9 @@
  * words or not at all.
  */
 
+import { FRAMES, type ColumnKind } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+
+
 /** Which of the frame's four endurance slots a control is for. */
 export type SlotKey = 'hard1' | 'hard2' | 'easy' | 'long';
 export type SlotSport = 'run' | 'ride';
@@ -221,6 +224,50 @@ export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]
  * default path is read, glance at the rate, Continue. ⚠️ The parts are joined with a middle dot
  * rather than punctuation, because they are three facts of equal weight and not a sentence.
  */
+/**
+ * ⛔ WHICH DAY OF THE FRAME'S WEEK A SLOT LANDS ON (Michael, 2026-08-30: *"lets number the days in
+ * this section"*).
+ *
+ * ⛔⛔ READ OFF `FRAMES`, NEVER HARDCODED. The four day numbers are a fact about the frame, and a
+ * literal `{ hard1: 1, hard2: 3 }` here would be a second copy of `frames.ts` that goes stale the
+ * first time a column changes. This walks the column's own endurance slots in day order.
+ *
+ * ⛔ DAY NUMBERS, NOT WEEKDAYS, AND THAT IS NOT A STYLE CHOICE. p246 numbers days and names no
+ * weekday, and the frame rotates onto the calendar as a WHOLE — the offset is chosen at generation,
+ * after this screen, and `endurancePins` can move a session again afterwards. `compose.ts` already
+ * refuses to name a weekday for exactly this reason: *"a weekday here would be a promise the next
+ * screen breaks."* The same rule applies to the screen that comes before it.
+ *
+ * ⚠️ THE COLUMN IS AN ARGUMENT because the taper shape is genuinely different: it carries THREE
+ * endurance slots, not four — day 4 loses its endurance and day 6 is the easy session rather than
+ * the long one. A caller that renders the taper gets the taper's days, and a slot the column does
+ * not have returns `null` rather than a wrong number.
+ *
+ * ⚠️ CLASSIFIED BY FAMILY, in the frame's own day order: the LSD slot is the long one, the VT1 slot
+ * is the easy one, and whatever else the column carries is hard, numbered in the order it appears.
+ */
+export function slotFrameDay(key: SlotKey, column: ColumnKind = 'standard'): number | null {
+  const days = FRAMES.strength_5k?.columns?.[column];
+  if (!Array.isArray(days)) return null;
+  let hardSeen = 0;
+  for (const d of days) {
+    for (const slot of d.endurance ?? []) {
+      const family = String((slot as { family?: string }).family ?? '');
+      if (family.endsWith('_lsd')) {
+        if (key === 'long') return d.day;
+        continue;
+      }
+      if (family.endsWith('_vt1')) {
+        if (key === 'easy') return d.day;
+        continue;
+      }
+      hardSeen += 1;
+      if (key === (hardSeen === 1 ? 'hard1' : 'hard2')) return d.day;
+    }
+  }
+  return null;
+}
+
 export function slotSummary(key: SlotKey, sport: SlotSport | null, session?: string | null): string {
   // ⛔ AN UNANSWERED ROW SAYS SO — it is the label alone, and the row carries no sport colour either.
   if (!sport) return SLOT_LABEL[key];
