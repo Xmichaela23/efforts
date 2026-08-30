@@ -2145,7 +2145,7 @@ function inferSwimEquipmentPack(row: any): {
   }
 }
 
-function expandTokensForRow(
+export function expandTokensForRow(
   row: any,
   baselines: Baselines,
   adjustments: PlanAdjustment[] = [],
@@ -2158,6 +2158,13 @@ function expandTokensForRow(
   strengthProtocolId: string | null = null,
   rowPhase: string | null = null,
   addsToInject: PlannedAdd[] = [],
+  // ⛔ THE ATHLETE'S OWN LAST WEIGHT PER MOVEMENT — PASSED IN, NOT REACHED FOR (2026-08-30).
+  // This map is loaded inside the request handler; this function lives at module top level, so
+  // reading it as a free identifier threw a ReferenceError on the FIRST exercise of every strength
+  // row, which the catch below swallowed into a single generic 'strength block'. Threaded
+  // explicitly, mirroring the way calculatePlannedStrengthWorkload already receives it.
+  // Default {} → no history, the ratio-derived suggestion stands, exactly as before 6f1996d3.
+  lastWeightByMovement: Record<string, number> = {},
 ): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   // Strength-PRIMARY rows (Get Strong arc) periodize their own peak + 1RM retest: lift the 0.85 clamp
@@ -2540,7 +2547,12 @@ function expandTokensForRow(
         }
         return { steps, total_s: 0 };
       }
-    } catch {}
+    } catch (err) {
+      // ⛔ NEVER SILENT AGAIN (2026-08-30). A bare `catch {}` here turned a hard crash into a
+      // plan full of empty 'strength block' rows for a full day. The fallback below still runs —
+      // an athlete gets a row rather than nothing — but the reason is now in the logs.
+      console.error('❌ expandTokensForRow: strength (no tokens) expansion threw, falling back to generic block:', err);
+    }
     // No details present: still emit a generic block so computed exists
     steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
     return { steps, total_s: 0 };
@@ -2898,7 +2910,10 @@ function expandTokensForRow(
         }
         return { steps, total_s: 0 };
       }
-    } catch {}
+    } catch (err) {
+      // ⛔ NEVER SILENT AGAIN (2026-08-30) — see the twin branch above.
+      console.error('❌ expandTokensForRow: strength (with tokens) expansion threw, falling back to generic block:', err);
+    }
     // Fallback placeholder if no details present
     steps.push({ id: uid(), kind:'strength', strength: { name: 'strength block' } });
     return { steps, total_s: 0 };
@@ -3881,7 +3896,7 @@ Deno.serve(async (req) => {
             : null;
         const rowPhaseForRir = resolvePlanPhase(rirPlanConfig, weekNum);
         const addsForRow = addInjectionsByRow.get(String(row.id)) || [];
-        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir, addsForRow);
+        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir, addsForRow, lastWeightByMovement);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist
