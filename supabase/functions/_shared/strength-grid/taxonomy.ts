@@ -425,11 +425,44 @@ export function allGridMovements(): GridMovement[] {
   return out;
 }
 
+/**
+ * ⛔⛔ A MOVEMENT MAY SIT IN TWO OF HIS CATEGORIES, BECAUSE HIS OWN KEY DOES THAT (Michael's ruling,
+ * 2026-08-29: *"I would just put them in both and don't complicate it, the only gates that matter are
+ * equipment gates"*).
+ *
+ * ⛔ THE CASE, AND IT IS THE ONLY ONE IN THE KEY: **calf raises are printed in two categories.**
+ *   · p220, SECONDARY press lower — *"freestanding barbell calf raises"*
+ *   · p223, FOCUSED push lower / quads — *"seated calf raises"*
+ *
+ * ⚠️ `viadaCategoryOf` CANNOT EXPRESS THIS AND IS NOT ASKED TO. It answers "what IS this movement"
+ * with one value, by rule (single-joint → focused), and every other caller depends on that single
+ * answer. This table answers a different question — *"which cells may OFFER it"* — and it is
+ * additive only: nothing is removed from the category the classifier gives it. Same data, two
+ * questions, two accessors, which is the shape `CLAUDE.md` names.
+ *
+ * ⚠️ IT IS NOT A LICENCE TO CROSS-FILE ANYTHING. A movement belongs here only when HE prints it in
+ * two lists. Everything else is the classifier's business.
+ */
+const ALSO_OFFERED_IN: { match: RegExp; categories: ViadaCategory[] }[] = [
+  // ⛔ Every calf variant, both ways. The rule-based classifier files them all `focused` (single
+  // joint); p220 puts the barbell one in `secondary`. Rather than adjudicate per variant — which is
+  // the complication the ruling refuses — both cells offer all of them and the EQUIPMENT GATE
+  // decides what an athlete actually sees: the barbell one needs a barbell, the seated one a station.
+  { match: /\bcalf\b|\bsoleus\b/i, categories: ['secondary', 'focused'] },
+];
+
 /** Movements in one cell of the grid. Unfiltered by equipment — that is the grid's job. */
 export function movementsIn(category: ViadaCategory, pattern: ViadaPattern | null): GridMovement[] {
-  return allGridMovements().filter((m) =>
-    m.category === category && (pattern == null || m.pattern === pattern)
-  );
+  return allGridMovements()
+    .filter((m) => {
+      if (pattern != null && m.pattern !== pattern) return false;
+      if (m.category === category) return true;
+      // ⛔ THE SECOND HOME, IF HE GAVE IT ONE.
+      return ALSO_OFFERED_IN.some((r) => r.categories.includes(category) && r.match.test(m.name));
+    })
+    // ⚠️ The cell reports the category it was ASKED for, so a caller reading `m.category` back off a
+    // cell's own list never sees a movement claiming to belong somewhere it was not offered from.
+    .map((m) => (m.category === category ? m : { ...m, category }));
 }
 
 /**
