@@ -143,6 +143,18 @@ export type ViadaPickSpec = {
    */
   hisList: string[];
   /**
+   * MOVEMENTS THAT ARE OURS, OFFERED ALONGSIDE HIS AND MARKED AS SUCH (Michael, 2026-08-29:
+   * "allow the dumbbell fly as ours, labelled as an addition, not as his").
+   *
+   * The strict cut removes everything he never printed. This is the one deliberate exception to it,
+   * and the exception has to be VISIBLE or the cut means nothing - an unmarked addition is exactly
+   * the thing the cut exists to stop. Every entry here carries `ours: true` to the surface.
+   *
+   * It is not a back door for the wider library. A movement belongs here only when Michael has named
+   * it and said why, and the reason lives on the entry.
+   */
+  oursList?: { name: string; because: string }[];
+  /**
    * OPT-IN: the row opens EMPTY and the athlete adds it, rather than opening on a pre-filled
    * choice (Michael, 2026-08-29: "don't default to a core exercise, it's 'add core'").
    * ⚠️ Only `core` carries this. Every other pick is a slot the FRAME named, so it must open on
@@ -275,6 +287,25 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // p222 FOCUSED PUSH/ARMS, his six. Skull crushers and the Tate press are FOCUSED and belong here
     // rather than in the press slot. `chest fly` and every push-up variant are not his.
     hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    /**
+     * THE ONE ADDITION IN THE APP, AND IT FILLS A REAL HOLE. Of his six focused push/arms movements
+     * the pec deck is the only chest mover, and it needs the station - so at Michael's equipment
+     * baseline a home athlete gets NO chest isolation from his list at all, and the chest dial chip
+     * has nothing to point at.
+     *
+     * IT IS NOT HIS PEC DECK UNDER ANOTHER NAME, and that was considered and refused. The swap rule
+     * allows an implement change only when the joint action AND the body position are unchanged; his
+     * pec deck is seated upright and a dumbbell fly is supine, so it fails the boundary. The rear
+     * delt swap passes it because both versions are seated and chest-supported - nothing about the
+     * body changes there. A pec deck also loads the top of the range where a fly loses tension.
+     *
+     * So it is offered as OURS, marked, rather than smuggled in as his.
+     */
+    oursList: [{
+      name: 'chest fly',
+      because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
+        + 'gym gets none of his. Ours, not a substitute for his movement.',
+    }],
     leadWith: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     servesChips: ['chest', 'shoulders', 'arms'],
@@ -313,7 +344,11 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // p222 FOCUSED PULL/ARMS. `barbell curl` LED THIS CELL and is not in his key; hammer and cable
     // curls are not either.
     hisList: ['preacher curl', 'spider curl', 'rear delt machine', 'drag curl', 'pullover machine'],
-    leadWith: ['preacher curl', 'spider curl', 'drag curl', 'pullover machine'],
+    // THE DAY-4 HEAD STARTS ON A DIFFERENT ARM MOVEMENT FROM DAY 1's, so the two can never collide
+    // (2026-08-25's balance ruling). Day 1 opens on his rear delt work where it is reachable and
+    // falls to the preacher curl where it is not - so day 4 must not also open on the preacher curl,
+    // or a kit without an incline bench collapses both pull days onto one movement.
+    leadWith: ['drag curl', 'spider curl', 'pullover machine', 'preacher curl'],
     leadCite: 'Viada pp222-223 — focused pull, arms',
     servesChips: ['arms'],
   },
@@ -592,6 +627,11 @@ export type PickOption = {
   display: string;
   /** The muscle a set on it counts to. `null` when the catalogue cannot attribute it. */
   muscle: MuscleGroup | null;
+  /**
+   * OURS, NOT HIS - present only on a movement Viada never printed that Michael has deliberately
+   * added. Absent on everything else, so a surface can mark it without a second lookup.
+   */
+  ours?: true;
 };
 
 /**
@@ -696,6 +736,7 @@ export function pickOptions(
    * baseline rules that case out rather than solving it.
    */
   const his = new Set((spec.hisList ?? []).map((n) => canonicalize(n)));
+  const ours = new Set((spec.oursList ?? []).map((o) => canonicalize(o.name)));
   const excluded = new Set((spec.excludes ?? []).map((n) => canonicalize(n)));
   /**
    * ⛔ ONLY FOR AN ATHLETE WHO OWNS SOMETHING TO LOAD WITH. A bodyweight athlete's whole catalogue is
@@ -708,7 +749,7 @@ export function pickOptions(
     if (excluded.has(canonicalize(m.name))) return false;
     // HIS LIST ONLY. An empty `hisList` would offer nothing, so a spec without one is a bug rather
     // than an opt-out - every pick carries one.
-    if (his.size > 0 && !his.has(canonicalize(m.name))) return false;
+    if (his.size > 0 && !his.has(canonicalize(m.name)) && !ours.has(canonicalize(m.name))) return false;
     return !(dropBodyweight && isBodyweightLoad(m.name));
   });
   const leadKeys = spec.leadWith.map((n) => canonicalize(n));
@@ -723,6 +764,9 @@ export function pickOptions(
       name: m.name,
       display: movementLabel(m.name),
       muscle: musclesWorkedBy(m.name)?.primary ?? null,
+      // MARKED AT THE SURFACE, not just in the table. An addition the athlete cannot tell from his
+      // own movements is an addition the strict cut did not really make.
+      ...(ours.has(canonicalize(m.name)) ? { ours: true as const } : {}),
     }));
 }
 

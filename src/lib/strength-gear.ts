@@ -193,6 +193,10 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
     if (s.includes('pull-up bar') || s.includes('pull up bar') || s.includes('chin-up')) out.add('pull_up_bar');
     if (s.includes('box') || s.includes('plyo box')) out.add('box');
     if (s.includes('ring')) out.add('rings');
+    // TRIED AND REVERTED 2026-08-29: mapping "adjustable" to `incline_bench` here. The reasoning was
+    // that an adjustable bench IS an incline bench - but the app already asks the question separately,
+    // with its own `Incline bench` chip, and `strength-equipment-tier.test.ts` pins that distinction.
+    // Conflating them made a DB incline press performable for someone who only ticked the flat bench.
     if (s.includes('incline bench')) out.add('incline_bench');
     if (s.includes('ab wheel') || s.includes('ab roller')) out.add('ab_wheel');
     // ⚠️ THE `dip_bars` / `ghd` / `leg_curl_machine` / `decline_bench` CLAUSES ARE GONE WITH THEIR
@@ -692,7 +696,10 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ROUTE ORDER MATTERS TO THE RANKING, not just to the gate: `equipmentFitRank` scores a movement
   // by its FIRST route, so leading with the station made a home-reachable movement rank behind a
   // bodyweight fallback. Routes are alternatives - the one most athletes have goes first.
-  'rear delt machine': [['dumbbells', 'bench'], ['dumbbells', 'incline_bench'], ['machine']],
+  // THE INCLINE IS THE POSITION, NOT JUST A BENCH (corrected 2026-08-29). A flat-bench route was
+  // written here and is wrong by the swap rule's own boundary: chest-supported on a FLAT bench is
+  // PRONE, and his movement is SEATED. The incline bench is what keeps the position his.
+  'rear delt machine': [['dumbbells', 'incline_bench'], ['machine']],
   'weighted knee raise': [['pull_up_bar'], ['dumbbells']],
   'machine hip thrust': [['machine']],
 
@@ -708,7 +715,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // `incline_bench` key alone made it gym-only for an athlete whose bench adjusts, which is most of
   // them - and it was the only one of his five focused-pull movements a home gym lost to a tag
   // rather than to the movement itself.
-  'spider curl': [['dumbbells', 'bench'], ['dumbbells', 'incline_bench'], ['barbell', 'bench']],
+  // The incline is the position here too - a spider curl is chest-down on the incline. Now that an
+  // adjustable bench grants `incline_bench`, the loosened flat-bench route is no longer needed.
+  'spider curl': [['dumbbells', 'incline_bench'], ['barbell', 'incline_bench']],
   'drag curl': [['barbell'], ['dumbbells']],
 
 };
