@@ -123,7 +123,20 @@ Deno.test('the day tags are the real days of p246, read off the frame', () => {
 });
 
 Deno.test('every pick offers something, at every equipment subset', () => {
-  for (const equipment of [null, [], EQUIPMENT, ['bodyweight'], ['barbell']]) {
+  /**
+   * THE SUBSETS ARE NOW THE BASELINE AND ABOVE (2026-08-29). Michael: "everyone has a barbell, and
+   * dumbbells, and a bench." The strict cut - each picker offers only what Viada prints - leaves a
+   * BODYWEIGHT-ONLY athlete with nothing in several cells, because his focused lists are machines,
+   * cables and dumbbells and he never writes a bodyweight programme. That case is ruled out by the
+   * baseline rather than solved, so it is no longer asserted here.
+   *
+   * `null` and `[]` STAY, and they are not the same case. They are the athlete nobody has ASKED yet -
+   * `materialize-plan:1181` treats an empty list as the unknown athlete and substitutes down for
+   * them - so a cell going empty there would be a real defect rather than a ruled-out configuration.
+   */
+  // `['barbell']` alone is also below the baseline and is gone with the bodyweight case: every one of
+  // his six secondary push movements needs a bench or dumbbells as well as the bar.
+  for (const equipment of [null, [], EQUIPMENT]) {
     for (const key of VIADA_PICK_KEYS) {
       const opts = pickOptions(key, equipment);
       assert(opts.length > 0, `${key} offers nothing for ${JSON.stringify(equipment)}`);
@@ -293,8 +306,25 @@ Deno.test('a chip re-points the picks it can reach and leaves the rest alone', (
 });
 
 Deno.test('a named muscle takes four sets on its own slots — the top of his 3-4 band', () => {
-  const picks = defaultViadaPicks(EQUIPMENT, ['chest']);
-  const rows = rowsOf(week({ slotPicks: picks, dial: ['chest'] }));
+  /**
+   * THE CHIP IS `arms`, NOT `chest`, AND THE REASON IS THE STRICT CUT (2026-08-29). At Michael's
+   * equipment baseline his focused push/arms cell holds no CHEST movement a home athlete can reach:
+   * p222's six are triceps pushdowns, Tate press, behind-the-neck DB triceps extensions, skull
+   * crushers, pec deck and lateral raises - and the pec deck, the only chest mover among them, needs
+   * the station.
+   *
+   * SO CHEST ISOLATION IS GYM-ONLY UNDER THE STRICT LIST, and that is his list rather than a defect.
+   * The behaviour under test is the SET COUNT reaching the top of his 3-4 band when a muscle is
+   * named, which needs a chip the cell can actually serve.
+   */
+  const picks = defaultViadaPicks(EQUIPMENT, ['arms']);
+  const rows = rowsOf(week({ slotPicks: picks, dial: ['arms'] }));
+  /**
+   * UNDER THE STRICT CUT the chest chip may no longer find a CHEST movement in this cell: of his six
+   * focused push/arms movements only the pec deck is a chest mover, and it needs the station. So the
+   * pick can stay on a triceps or deltoid movement and the chip's job here is the SET COUNT, not the
+   * movement. The assertion follows whatever the pick actually is.
+   */
   const hyp = rows.filter((r) => String(r.reps) === '6-12'
     && canonicalize(r.name) === canonicalize(picks.iso_push));
   assert(hyp.length > 0, 'the chest slot was not built');
@@ -783,7 +813,10 @@ Deno.test('⛔⛔ EVERY LABEL IS HIS PRINTED HEADING — no invented tier names'
   // ⛔ THE LABEL WAS THE ONLY CHANGE. The 2026-08-25 day split and both lead heads still stand.
   assertEquals(VIADA_PICKS.single_leg_a.slot?.frameDay, 2);
   assertEquals(VIADA_PICKS.single_leg_b.slot?.frameDay, 5);
-  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'bulgarian split squat');
+  // THE DAY SPLIT STANDS; the heads now open on HIS OWN NAMES after the strict cut (2026-08-29).
+  // p220 prints "Split squat" and "Forward or reverse lunge" - the Bulgarian and walking versions are
+  // the same movements under a setup modification (p218), not separate entries.
+  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'split squat');
   assertEquals(VIADA_PICKS.single_leg_b.leadWith[0], 'walking lunge');
 });
 
@@ -802,17 +835,28 @@ Deno.test('⛔⛔ UNLOADED WORK IS GATED, NOT DELETED — it surfaces only with 
   }
 
   /**
-   * ⛔ AND THE ATHLETE WITH NOTHING TO LOAD WITH STILL GETS THEM. For that athlete these ARE the real
-   * options, and `resolveSlot`'s contract is that a cell is never empty — this must not be the thing
-   * that empties one. ⚠️ MUTATION-TESTED: drop `ownsLoadingImplement` from the gate and this fails.
+   * THE BODYWEIGHT ARM IS GONE, AND THE GATE IT TESTED IS NOT (2026-08-29). Bodyweight squats and air
+   * squats are not in p220's list, so the strict cut removes them from this cell for EVERY athlete -
+   * there is no longer a case where they are offered here and therefore no case where they can be
+   * wrongly withheld.
+   *
+   * `ownsLoadingImplement` STILL RUNS and still guards its own cell; what changed is that the strict
+   * list now removes these movements first, so this assertion was testing a branch that can no longer
+   * be reached. Michael's baseline - barbell, dumbbells and a bench for everyone - is why that is
+   * acceptable rather than a hole.
    */
   const bodyweight = pickOptions('single_leg_a', NOTHING).map((o) => o.name);
-  assert(bodyweight.some((n) => ['bodyweight squat', 'air squat', 'bodyweight lunges'].includes(n)),
-    `the bodyweight athlete lost their own options: ${bodyweight.join(', ')}`);
+  assert(!bodyweight.some((n) => ['bodyweight squat', 'air squat', 'bodyweight lunges'].includes(n)),
+    `a non-Viada bodyweight movement survived the strict cut: ${bodyweight.join(', ')}`);
 
-  // ⚠️ AN ATHLETE NOBODY ASKED IS UNTOUCHED — the conservative arm, and the app's existing §0h rule.
+  /**
+   * AN ATHLETE NOBODY ASKED IS STILL UNGATED - what they see is his whole list rather than a subset
+   * of it. The §0h rule is about EQUIPMENT, and the strict cut is not an equipment gate: it removes
+   * movements he never printed, for everybody, asked or not.
+   */
   const undeclared = pickOptions('single_leg_a', null).map((o) => o.name);
-  assert(undeclared.includes('bodyweight squat'), 'an unasked athlete was gated on equipment they never declared');
+  assert(!undeclared.includes('bodyweight squat'), 'a non-Viada movement survived for the unasked athlete');
+  assert(undeclared.length >= 4, `the unasked athlete was gated after all: ${undeclared.join(', ')}`);
 });
 
 Deno.test('⛔ EXPLOSIVE STEP UP IS OUT OF THIS CELL, AND STILL IN THE APP', () => {
@@ -830,8 +874,15 @@ Deno.test('⛔ EXPLOSIVE STEP UP IS OUT OF THIS CELL, AND STILL IN THE APP', () 
     for (const key of ['single_leg_a', 'single_leg_b'] as const) {
       const names = pickOptions(key, eq).map((o) => o.name);
       assertEquals(names.includes('explosive step up'), false, `${key} still offers the speed-cued copy`);
-      // ⛔ AND THE MOVEMENT IT DUPLICATES IS STILL THERE — the exclusion must not take the real one.
-      assert(names.includes('step up'), `${key} lost the plain step up too: ${names.join(', ')}`);
+      /**
+       * THE PLAIN STEP-UP IS GONE TOO NOW, AND FOR A DIFFERENT REASON (2026-08-29). The exclusion
+       * above targeted the speed-cued DUPLICATE; the strict cut removes the step-up itself, because
+       * p220's secondary press lower is split squat, Zercher squat, freestanding barbell calf raises
+       * and forward or reverse lunge - no step-up among them.
+       * BOTH RULES STILL MATTER: the exclusion is what stops a speed-cued copy appearing beside a
+       * movement of his if one is ever added back, and it is asserted above on its own.
+       */
+      assert(!names.includes('step up'), `${key} still offers a movement he never printed: ${names.join(', ')}`);
     }
   }
 });

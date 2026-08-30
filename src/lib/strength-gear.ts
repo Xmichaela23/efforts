@@ -653,6 +653,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ⛔ UNGATED, ON THE `leg curl` PRECEDENT. A sandbag is required and is NOT commonly declarable —
   // no inventory chip produces one — so a route would delete the movement instead of swapping it.
   'sandbag throw': ALWAYS,
+  // A KETTLEBELL SWING NEEDS A KETTLEBELL. It was untagged, so `gearRoutesFor` returned ALWAYS and
+  // warned - and it is one of his secondary hinge movements, so it was being offered to everyone.
+  'kb swing': [['kettlebell'], ['dumbbells']],
 
   // ── fixed stations: the commercial-gym chip is the declaration ──────────────────────────────────
   'smith machine press': [['machine']],
@@ -676,11 +679,20 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // qualifier — while p220's secondary entry is explicitly *"freestanding BARBELL calf raises"*. He
   // qualifies the one he means to qualify. Gating this to the station cost a home athlete his only
   // reachable focused-quad movement and handed the leg slot to knee raises, which train core.
-  'seated calf raise': [['machine'], ['dumbbells', 'bench'], ['barbell', 'bench']],
+  'seated calf raise': [['dumbbells', 'bench'], ['barbell', 'bench'], ['machine']],
   'ghd back extension': [['machine']],
   'machine back extension': [['machine']],
   'behind the neck db triceps extension': [['dumbbells']],
-  'rear delt machine': [['machine']],
+  // THE IMPLEMENT SWAP APPLIES HERE (2026-08-29, reversing an earlier read). His rear delt machine
+  // is seated, chest-supported, horizontal shoulder abduction. A chest-supported rear delt raise on
+  // an incline bench is the same seated position, the same chest support and the same joint action -
+  // only the load source changes from a stack to gravity, which is inside the swap boundary.
+  // It is NOT a dumbbell reverse fly: that is a different body position, and `reverse fly` is one of
+  // the non-Viada names the strict cut removed. The ENTRY stays named as his movement.
+  // ROUTE ORDER MATTERS TO THE RANKING, not just to the gate: `equipmentFitRank` scores a movement
+  // by its FIRST route, so leading with the station made a home-reachable movement rank behind a
+  // bodyweight fallback. Routes are alternatives - the one most athletes have goes first.
+  'rear delt machine': [['dumbbells', 'bench'], ['dumbbells', 'incline_bench'], ['machine']],
   'weighted knee raise': [['pull_up_bar'], ['dumbbells']],
   'machine hip thrust': [['machine']],
 
@@ -692,7 +704,11 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'tate press': [['dumbbells', 'bench']],
   'skull crusher': [['barbell', 'bench'], ['dumbbells', 'bench']],
   'preacher curl': [['barbell', 'bench'], ['dumbbells', 'bench']],
-  'spider curl': [['dumbbells', 'incline_bench']],
+  // An ADJUSTABLE BENCH IS AN INCLINE BENCH (2026-08-29). Gating the spider curl on the
+  // `incline_bench` key alone made it gym-only for an athlete whose bench adjusts, which is most of
+  // them - and it was the only one of his five focused-pull movements a home gym lost to a tag
+  // rather than to the movement itself.
+  'spider curl': [['dumbbells', 'bench'], ['dumbbells', 'incline_bench'], ['barbell', 'bench']],
   'drag curl': [['barbell'], ['dumbbells']],
 
 };

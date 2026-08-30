@@ -450,6 +450,26 @@ const ALSO_OFFERED_IN: { match: RegExp; categories: ViadaCategory[] }[] = [
   // decides what an athlete actually sees: the barbell one needs a barbell, the seated one a station.
   { match: /\bcalf\b|\bsoleus\b/i, categories: ['secondary', 'focused'] },
   /**
+   * FOUR OF HIS OWN MOVEMENTS THAT THE RULE-BASED CLASSIFIER MISFILES (2026-08-29). Each is printed
+   * in a FOCUSED list on p222 and lands somewhere else by rule:
+   *   tate press, skull crusher -> `secondary` (they read as compound presses)
+   *   rear delt machine         -> `braced`    (the machine bracing wins over the single joint)
+   *   drag curl                 -> `carry`     (the word "drag" matches the carry/drag family)
+   *
+   * The last one is the clearest illustration of why this table exists: a name-shaped rule cannot
+   * know that dragging the bar up your torso is a curl. His page is the authority on where his
+   * movements live; the classifier is a fallback for everything he does not name.
+   *
+   * ADDITIVE, LIKE THE CALVES ABOVE. `viadaCategoryOf` still answers with one value and every other
+   * caller is untouched - this only widens which cells may OFFER them.
+   */
+  { match: /\btate press\b|\bskull crusher/i, categories: ['focused'] },
+  { match: /\brear delt machine\b/i, categories: ['focused'] },
+  { match: /\bdrag curl/i, categories: ['focused'] },
+  // Same class again: p223 prints "weighted knee raises (hip flexors)" under FOCUSED PUSH
+  // LOWER/QUADS. The classifier reads it as a loaded compound and files it `secondary`.
+  { match: /\bweighted knee raise/i, categories: ['focused'] },
+  /**
    * ⚠️ THE RAISE CROSSOVER WAS BUILT AND BACKED OUT, 2026-08-29 — recorded so the next attempt starts
    * from the finding rather than from the idea.
    *

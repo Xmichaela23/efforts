@@ -3197,23 +3197,10 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   'machine back extension':               { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'behind the neck db triceps extension': { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'rear delt machine':                    { pattern: 'horizontal_pull', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
-  /**
-   * ⚠️ `core`, AND HIS FILING IS DELIBERATELY NOT FOLLOWED YET — 2026-08-29, recorded so the next
-   * attempt starts from the finding.
-   *
-   * ⛔ p223 prints "Weighted knee raises (hip flexors)" under FOCUSED PUSH LOWER/QUADS, so
-   * `knee_dominant` is the faithful pattern and it was tried. It works: the movement reaches the
-   * quad cell and an athlete can pick knee raises over calves, which is what Michael asked for.
-   *
-   * ⛔⛔ WHAT STOPPED IT: this movement's PRIME MOVER is `core`. Once it can fill the leg cell it can
-   * also satisfy the week's core floor — and the floor is how an explicitly chosen core movement
-   * reaches the week, so the athlete's own core pick is then silently dropped. **His category map and
-   * the app's muscle map disagree about this movement, and the muscle map is what the floor reads.**
-   *
-   * ⛔ IT IS THE SAME PIECE OF WORK AS THE OPT-IN CORE ROW AND THE RAISE CROSSOVER: an added row must
-   * not depend on the floor being hungry. Fix that and all three land together.
-   */
-  'weighted knee raise':                  { pattern: 'core',           primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  // `knee_dominant`, HIS FILING (p223 prints "Weighted knee raises (hip flexors)" under FOCUSED
+  // PUSH LOWER/QUADS). Filed as `core` it classified with a null pattern and never reached the quad
+  // cell, which left a home athlete one option in that slot.
+  'weighted knee raise':                  { pattern: 'knee_dominant',  primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'machine hip thrust':                   { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
 
   // ── FOCUSED LOWER (p223) ────────────────────────────────────────────────────────────────────────

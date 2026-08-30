@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { musclesWorkedBy } from '../accessory-dosing/muscles.ts';
 import {
   assignSports,
   buildStandingPlanRow,
@@ -638,9 +639,17 @@ Deno.test('the core chip can reach core work through the floor path', () => {
   const wk = composeWeek({ ...BASE, week: 2, column: 'standard', focus: ['core'] });
   const names = wk.sessions.flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name.toLowerCase()));
   assert(names.length > 0, 'no strength rows at all');
-  // Core arrives via the floor when no HYP slot carries a core pattern — the guarantee is that the
-  // week holds core work at all, not which slot carries it.
-  assert(names.some((n) => /plank|sit-up|situp|ab wheel|rollout|leg raise|dead bug|bird dog|crunch/.test(n)),
+  /**
+   * THE GUARANTEE IS THAT THE WEEK HOLDS CORE WORK, NOT WHICH MOVEMENT CARRIES IT - so it is asked of
+   * the MUSCLE MAP rather than of a list of names.
+   *
+   * The name regex broke on 2026-08-29 when weighted knee raises were filed where p223 puts them
+   * (focused push lower / quads). Their prime mover is `core`, so the week HAD core work and the
+   * floor correctly added nothing - the test was looking for spellings, not for the muscle. Reading
+   * the map is also what the floor itself reads, so the two can no longer disagree.
+   */
+  const rows = wk.sessions.flatMap((s) => (s.strength_exercises ?? []));
+  assert(rows.some((e) => musclesWorkedBy(String(e.name ?? ''))?.primary === 'core'),
     `no core movement anywhere in the focused week: ${names.join(', ')}`);
 });
 

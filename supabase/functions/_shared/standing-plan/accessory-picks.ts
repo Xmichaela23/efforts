@@ -128,8 +128,23 @@ export type ViadaPickSpec = {
    */
   slot: { category: ViadaCategory; pattern: ViadaPattern | null; frameDay?: number } | null;
   /**
-   * ⛔ OPT-IN: the row opens EMPTY and the athlete adds it, rather than opening on a pre-filled
-   * choice (Michael, 2026-08-29: *"don't default to a core exercise, it's 'add core'"*).
+   * HIS PRINTED LIST FOR THIS CELL, AND THE ONLY THING THE PICKER OFFERS (Michael, 2026-08-29:
+   * "I don't want extraneous exercises that aren't in his book").
+   *
+   * It is a product decision about fidelity, not a legal one - exercise names are generic and
+   * unprotectable. This is Michael choosing that the app offers his programme rather than a library
+   * wearing his category names.
+   *
+   * THE EQUIPMENT BASELINE IT RESTS ON (Michael, 2026-08-29): "everyone has a barbell, and
+   * dumbbells, and a bench." Against that floor every cell keeps two or more options. It does NOT
+   * survive a bodyweight-only athlete - four cells go to zero - and that case is ruled out by the
+   * baseline rather than solved. If the equipment picker still offers setups below that floor, this
+   * cut breaks them. Raised, not chased.
+   */
+  hisList: string[];
+  /**
+   * OPT-IN: the row opens EMPTY and the athlete adds it, rather than opening on a pre-filled
+   * choice (Michael, 2026-08-29: "don't default to a core exercise, it's 'add core'").
    * ⚠️ Only `core` carries this. Every other pick is a slot the FRAME named, so it must open on
    * something — a zero-touch Continue has to build a complete week.
    */
@@ -242,6 +257,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS SIX, IN HIS PRINTED ORDER (p220). The head was four movements of which one — incline
     // bench press — was his; the rest named the cell by its implement. Naming a whole category after
     // a dumbbell is why single-joint work read as belonging here.
+    // p220 SECONDARY PUSH UPPER, his six. `dumbbell bench press` was the day-1/day-4 DEFAULT and is
+    // NOT in his book anywhere - cut on Michael's call. His nearest are the seated DB press and the
+    // Arnold press, both shoulder movements, so the flat dumbbell press simply goes.
+    hisList: ['larsen press', 'incline bench press', 'close grip bench press', 'jm press', 'seated db press', 'arnold press'],
     leadWith: ['larsen press', 'incline bench press', 'close grip bench press', 'jm press', 'seated db press', 'arnold press'],
     leadCite: 'Viada p220 — secondary push upper',
     servesChips: ['chest', 'shoulders'],
@@ -253,6 +272,9 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS SIX, IN HIS PRINTED ORDER (p222). `chest fly` and `tricep extensions` were our words for
     // two of his — pec deck and behind-the-neck DB triceps extensions — and skull crushers and the
     // Tate press were absent from the head entirely.
+    // p222 FOCUSED PUSH/ARMS, his six. Skull crushers and the Tate press are FOCUSED and belong here
+    // rather than in the press slot. `chest fly` and every push-up variant are not his.
+    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     leadWith: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     servesChips: ['chest', 'shoulders', 'arms'],
@@ -273,7 +295,11 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS ONE REAR-DELT MOVEMENT FIRST (p222 — "rear delt machine"), then the catalogue's
     // equipment-reachable versions of the same thing. ⚠️ Face pulls and band pull-aparts are NOT his
     // and stay BELOW his own movement rather than above it.
-    leadWith: ['rear delt machine', 'rear delt fly', 'face pull', 'band pull apart'],
+    // p222 FOCUSED PULL/ARMS. `rear delt fly`, `face pull` and `band pull apart` are NOT his and are
+    // cut; his rear-delt movement is the MACHINE. Mapping it to a dumbbell reverse fly was considered
+    // and refused - different body position, and `reverse fly` is one of the names this cut removes.
+    hisList: ['preacher curl', 'spider curl', 'rear delt machine', 'drag curl', 'pullover machine'],
+    leadWith: ['rear delt machine', 'preacher curl', 'spider curl', 'drag curl', 'pullover machine'],
     leadCite: 'Viada pp222-223 — focused pull, rear delt / upper back',
     servesChips: ['shoulders'],
   },
@@ -284,7 +310,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS ARM WORK, IN HIS PRINTED ORDER (p222): preacher curls, spider curls, drag curls,
     // pullover machine. ⚠️ `barbell curl` LED THIS CELL AND IS NOT IN HIS KEY AT ALL — it is what the
     // athlete was being offered first on day 4.
-    leadWith: ['preacher curl', 'spider curl', 'drag curl', 'pullover machine', 'dumbbell curls', 'hammer curls'],
+    // p222 FOCUSED PULL/ARMS. `barbell curl` LED THIS CELL and is not in his key; hammer and cable
+    // curls are not either.
+    hisList: ['preacher curl', 'spider curl', 'rear delt machine', 'drag curl', 'pullover machine'],
+    leadWith: ['preacher curl', 'spider curl', 'drag curl', 'pullover machine'],
     leadCite: 'Viada pp222-223 — focused pull, arms',
     servesChips: ['arms'],
   },
@@ -330,7 +359,13 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS FOUR FIRST (p220): split squat, Zercher squat, freestanding barbell calf raises,
     // forward or reverse lunge. Step-ups and lateral lunges are not his words; they fit his
     // definition and stay available BELOW his own list.
-    leadWith: ['bulgarian split squat', 'zercher squat', 'reverse lunge', 'step up', 'lateral lunge'],
+    // p220 SECONDARY PRESS LOWER. The Bulgarian split squat and the walking lunge are kept as HIS,
+    // not as extras: p218's Primary definition allows a movement "with or without minor modifications
+    // to setup", so elevating the rear foot is a setup change and a walking lunge is his forward lunge
+    // performed travelling. The two lunge entries are his two DIRECTIONS, not two variants.
+    // Step-ups, goblet squats and lateral lunges are not his and are cut.
+    hisList: ['split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
+    leadWith: ['split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
     leadCite: 'Viada p220 — secondary press lower (ME lower day)',
     servesChips: [],
     requiresLoad: true,
@@ -342,7 +377,9 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 5 },
     // ⛔ SAME CELL, DIFFERENT HEAD — the day-5 split of 2026-08-25 stands. His forward/reverse lunge
     // leads here; the walking lunge is the catalogue's name for the forward one.
-    leadWith: ['walking lunge', 'reverse lunge', 'zercher squat', 'step up', 'lateral lunge'],
+    // p220 SECONDARY PRESS LOWER - same cell, day-5 head. See day 2 for the split-squat reasoning.
+    hisList: ['split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
+    leadWith: ['walking lunge', 'reverse lunge', 'zercher squat', 'split squat'],
     leadCite: 'Viada p220 — secondary press lower (DE lower day)',
     servesChips: [],
     requiresLoad: true,
@@ -373,7 +410,11 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * extension, a home athlete still opens on something they can do. That split is 2026-08-25's
      * ruling and it survives his ordering.
      */
-    leadWith: ['leg extension', 'hip adduction machine', 'weighted knee raise', 'seated calf raise', 'calf raise'],
+    // p223 FOCUSED PUSH LOWER/QUADS, his four. Every other calf variant is cut - the plain,
+    // single-leg, soleus and tibialis raises are not his, and the FREESTANDING BARBELL one is p220's
+    // SECONDARY entry that belongs in the leg-variation cell instead.
+    hisList: ['leg extension', 'hip adduction machine', 'weighted knee raise', 'seated calf raise'],
+    leadWith: ['leg extension', 'hip adduction machine', 'seated calf raise', 'weighted knee raise'],
     leadCite: 'Viada p223 — focused push lower / quads',
     servesChips: [],
   },
@@ -400,6 +441,12 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     slot: null,
     // ⛔ HIS OWN CORE LIST, p223, IN HIS ORDER: hanging leg raises, crunches, V-ups, dynamic plank
     // variants, ab wheel rollouts. The catalogue's spellings for each.
+    // p223 CORE, his five. "Dynamic plank variants" is HIS OWN catch-all, so the MOVING planks are
+    // kept inside it - shoulder taps, hip dips, stir-the-pot, TRX fallouts - and the STATIC holds are
+    // not, because a plank hold is not a dynamic variant. Side bends, sit-ups, dead bugs, bird dogs,
+    // flutter kicks, scissor kicks and toe touches are cut, along with the four `core work`
+    // placeholder entries that were never movements.
+    hisList: ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap', 'side plank with hip dip', 'stir the pot', 'trx fallout', 'ab wheel rollout', 'ab rollout'],
     leadWith: ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap', 'ab rollout'],
     leadCite: 'Viada p223 — core',
     servesChips: ['core'],
@@ -635,6 +682,20 @@ export function pickOptions(
    * MATTERS is a per-cell judgement, and widening either rule on this cell's evidence is how one
    * screenshot becomes an app-wide behaviour change nobody ruled on.
    */
+  /**
+   * THE STRICT CUT (Michael, 2026-08-29): "I don't want extraneous exercises that aren't in his
+   * book." The pool is intersected with the cell's own printed list, so a slot offers his movements
+   * and nothing else.
+   *
+   * IT SITS AFTER `resolveSlot`, NOT INSTEAD OF IT. The equipment gate and the substitution ladder
+   * still run first, so an athlete is never offered a movement they cannot perform - this only
+   * removes movements HE never printed.
+   *
+   * IT CAN EMPTY A CELL, and that is why the equipment baseline is load-bearing. At barbell +
+   * dumbbells + bench every cell keeps two or more. Below that floor four cells go to zero, and the
+   * baseline rules that case out rather than solving it.
+   */
+  const his = new Set((spec.hisList ?? []).map((n) => canonicalize(n)));
   const excluded = new Set((spec.excludes ?? []).map((n) => canonicalize(n)));
   /**
    * ⛔ ONLY FOR AN ATHLETE WHO OWNS SOMETHING TO LOAD WITH. A bodyweight athlete's whole catalogue is
@@ -645,6 +706,9 @@ export function pickOptions(
   const dropBodyweight = spec.requiresLoad === true && ownsLoadingImplement(equipment);
   const pool = dedupeByCanonical(resolved.options).filter((m) => {
     if (excluded.has(canonicalize(m.name))) return false;
+    // HIS LIST ONLY. An empty `hisList` would offer nothing, so a spec without one is a bug rather
+    // than an opt-out - every pick carries one.
+    if (his.size > 0 && !his.has(canonicalize(m.name))) return false;
     return !(dropBodyweight && isBodyweightLoad(m.name));
   });
   const leadKeys = spec.leadWith.map((n) => canonicalize(n));
